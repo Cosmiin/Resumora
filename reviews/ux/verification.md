@@ -70,3 +70,12 @@ Evidence drawers read the displayed editor draft directly, without requiring Bas
 Focused regressions exercise evidence before the first save and after draft corrections, saved Base/job/analysis evidence, precise/year-only/current/unknown dates in both document languages with an independent UI language, and both override directions for every requirement with both UI languages.
 
 Focused result: `npm test --prefix prototype` passed 434 assertions against source and 434 against the regenerated portable page. The regression setup uses the supported Jobs → Requirements navigation. No complete repository test/lint suite, browser-layout pass, production integration, push, PR or CI phase was run.
+
+
+### Record synchronization and translated outcome support
+
+Opening an application synchronizes the active record before looking up the saved entry. The latest-CV path already follows that order. Focused regressions cover reopening every requirement override in both directions, latest-CV opening, switching records, and preservation of current/submitted CV snapshots.
+
+Translation applies the same known fixture wording replacements to visible/retained section text, role context, bullets and the outcome support marker. Longer known passages are translated first; custom surrounding text is retained. Unknown custom outcomes remain unchanged. Focused regressions cover the reported enriched-context journey for Base and job documents in both language directions, all text section locations, comparison/preview scores and independence of the other document.
+
+Focused result: `npm test --prefix prototype` passed 503 assertions against source and 503 against the regenerated portable page. The custom-outcome regression explicitly targets the job CV rather than an application’s older attached Base snapshot. No complete repository test/lint suite, browser-layout pass, production service, push, PR or CI phase was run.

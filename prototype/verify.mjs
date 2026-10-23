@@ -155,6 +155,34 @@ for(const locale of ['ro','en']){
     nav('requirements');check(q(`[data-required="${id}"]`).checked===required,'effective priority survives navigation and recalculation');
   }
 }
+resetDemo();nav('compare');click('reject-all');click('accept-tailor');nav('application');change('[data-bind="application.status"]','Sent');change('#sent-confirm',true);click('save-application');
+const reopenId=state().application.id,reopenSnapshot=JSON.stringify(state().application.submittedSnapshot),reopenCV=JSON.stringify(state().application.currentCV);
+for(const id of ['automation','sql','api','years','hr','work_authorization'])for(const required of [false,true]){
+  nav('jobs');nav('requirements');change(`[data-required="${id}"]`,required);const editedJob=JSON.stringify(state().job);nav('applications');click('open-application',`[data-id="${reopenId}"]`);
+  check(JSON.stringify(state().job)===editedJob&&JSON.stringify(state().application.job)===editedJob,'reopening the active record keeps the synchronized job version and overrides');
+  check(JSON.stringify(state().application.currentCV)===reopenCV&&JSON.stringify(state().application.submittedSnapshot)===reopenSnapshot,'priority-only synchronization preserves current CV and submitted snapshot');
+}
+nav('jobs');nav('requirements');change('[data-required="automation"]',false);const latestJob=JSON.stringify(state().job);nav('applications');click('open-latest');check(JSON.stringify(state().job)===latestJob&&q('.document').textContent.includes('Mara Ionescu'),'latest-CV opening also keeps synchronized job edits');
+nav('jobs');click('sample-job');click('parse-job');await wait();nav('application');click('save-application');const alternateId=state().application.id;
+nav('jobs');nav('requirements');change('[data-required="api"]',false);const alternateJob=JSON.stringify(state().job);nav('applications');click('open-application',`[data-id="${reopenId}"]`);nav('applications');click('open-application',`[data-id="${alternateId}"]`);check(JSON.stringify(state().job)===alternateJob&&state().application.id===alternateId,'switching away and back preserves the departing record’s synchronized job');
+for(const target of ['base','job']){
+  click('reset');click('confirm-reset');nav('import');click('extract');await wait();change('#confirm-facts',true);click('confirm-base');nav('interview');click('sample-answer');click('review-answer');change('#claim-confirm',true);click('confirm-answer');nav('jobs');click('sample-job');click('parse-job');await wait();nav('compare');click('reject-all');click('accept-tailor');nav('ats');click('analyze');await wait();check(state().analysis.value===80,'enriched outcome without a project starts at 80');
+  const independent=JSON.stringify(target==='job'?state().base:state().jobCV);
+  for(const locale of ['en','ro']){
+    nav(target==='job'?'jobeditor':'base');change('#cv-locale',locale);click('translate');click('accept-translation');const doc=target==='job'?state().jobCV.doc:state().base;
+    check(doc.language===locale&&doc.roles.find(r=>r.id==='role-a').context===doc.confirmedImpactText,'approved translation keeps enriched role context and support marker aligned in both directions');
+    check(JSON.stringify(target==='job'?state().base:state().jobCV)===independent,'translation preserves the other document');
+    if(target==='base'){nav('compare');check(q('.compare-old').textContent.includes('80 / 100'),'Base comparison preserves translated outcome points');}
+    else{nav('ats');click('analyze');await wait();check(state().analysis.value===80&&state().analysis.dimensions.find(x=>x[1]==='Achievements')[3]===10,'job translation preserves the selected outcome contribution');nav('compare');check(q('.compare-new').textContent.includes('80 / 100'),'comparison scores translated enriched context consistently');nav('preview');check(text().includes('CV–Job Match: 80/100'),'preview preserves the translated outcome score');}
+  }
+}
+for(const key of ['summary','education','languages','project','certifications','custom']){
+  resetDemo();nav('compare');click('reject-all');click('accept-tailor');click('add-section');const marker=state().draft.confirmedImpactText,index=state().draft.sections.findIndex(s=>s.id===key),prefix='[Personal note] ';
+  change(`[data-bind="draft.${key}"]`,prefix+marker);change(`[data-section="${index}"]`,true);saveEditor();nav('ats');click('analyze');await wait();const scoreBefore=state().analysis.value;
+  for(const locale of ['en','ro']){nav('jobeditor');change('#cv-locale',locale);click('translate');click('accept-translation');const doc=state().jobCV.doc;check(doc[key]===prefix+doc.confirmedImpactText,'fixture outcome fragments and support marker translate together while retaining custom surrounding text');nav('ats');click('analyze');await wait();check(state().analysis.value===scoreBefore,'translation preserves outcome support in every visible text section');}
+}
+resetDemo();nav('interview');click('ask-section','[data-key="role-role-a"]');change('[data-bind="interview.answer"]','Rezultat personalizat confirmat pentru verificarea pașilor interni.');click('review-answer');change('#claim-confirm',true);change('#claim-target','job');click('confirm-answer');nav('compare');click('reject-all');click('accept-tailor');nav('ats');click('analyze');await wait();const customScore=state().analysis.value,customImpact=state().jobCV.doc.confirmedImpactText;
+nav('jobeditor');change('#cv-locale','en');click('translate');click('accept-translation');nav('ats');click('analyze');await wait();check(state().analysis.value===customScore&&state().jobCV.doc.confirmedImpactText===customImpact&&state().jobCV.doc.roles.find(r=>r.id==='role-a').context===customImpact,'unrecognized custom outcome text and marker remain unchanged and supported');
 const browserJourney=w.eval('('+fs.readFileSync(path.join(dir,'../reviews/ux/browser-journeys.js'),'utf8')+')');const browserResult=await browserJourney();check(browserResult.status==='PASS'&&browserResult.checks.length>30,'maintained browser journey completes against public DOM interactions');
 check(runtimeErrors.length===0,'all public interactions complete without runtime errors');
 
