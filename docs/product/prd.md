@@ -43,7 +43,7 @@ Discovery/prototype covers every baseline journey, URL/text/manual/extension imp
 
 **Recommended smallest useful release, pending review of D-01–14:** persistent versioned Base; PDF text/DOCX/manual import with confirmation; targeted enrichment; pasted/manual job text; required/preferred requirements; deterministic explainable matching with curated RO/EN aliases; truthful approved job variant; structured editor/history; one tested single-column PDF; RO/EN UI and independent CV language; privacy/account/server entitlements if commercial launch is approved.
 
-**Reviewable later scope:** URL fetch behind security limits, minimal extension, OCR, more templates, wider language coverage, DOCX export, broad semantic embeddings. Reference-only application tracking, automated job applications, job discovery, cover letters and predicted interview timelines are outside this proposed core. Their marketing presence is not evidence they are needed in the MVP. Implementation agents may begin only after explicit requirements/UX/architecture/MVP/budget approval.
+**Reviewable later scope:** URL fetch behind security limits, minimal extension, OCR, more templates, wider language coverage, DOCX export, broad semantic embeddings. The lean manual application record is specified in section 15. Automated job applications, job discovery, cover letters and predicted interview timelines are outside this proposed core. Their marketing presence is not evidence they are needed in the MVP. Implementation agents may begin only after explicit requirements/UX/architecture/MVP/budget approval.
 
 ## 5. Canonical career record
 
@@ -59,7 +59,7 @@ Required supported entities and fields:
 - Education: institution/qualification/field/location/partial dates plus useful distinctions/coursework. Certifications include actual credential/status/evidence. Projects, portfolio, languages with level basis, leadership/publications/volunteering/achievements and custom evidenced sections are optional modules.
 - Section-instance identity and independent document order/display label/visibility. Add/remove/rename/reorder without conflating presentation and source data.
 
-Dates retain known precision: `{year:2021}` renders2021; exact month renders localized Month YYYY. Unknown month never becomes January. Ongoing is explicit, not an invented end date. Validate only what precision supports, using interval bounds for uncertain ordering. No penalties for career gaps or uncertain dates. Architecture owns exact schema/union calculations; prototype only checks year/month values/order.
+Dates retain known precision: `{year:2021}` renders2021; exact month renders localized Month YYYY. Unknown month never becomes January. Ongoing is explicit, not an invented end date. Validate only what precision supports, using interval bounds for uncertain ordering. No penalties for career gaps or uncertain dates. Architecture owns exact schema/union calculations; the prototype’s date controls and bounded duration demonstration are described in the [screen specifications](../../research/ux/screen-specifications.md#structured-date-rules).
 
 ## 6. Versioning, approval and recovery
 
@@ -84,6 +84,8 @@ Five exclusive primary keyword statuses (proposed display mapping for D-11):
 | Confirmed fact, neither exact nor equivalent selected | verified_omitted | Offer relevant content selection; no fabricated claim. |
 | Plausible evidence still unconfirmed | awaiting_confirmation | Ask for confirmation even when a proposed sentence already contains the word. |
 | No supported or plausible evidence | unsupported | Explain gap; never insert it to optimize score. |
+
+A supported work-authorization attestation is displayed separately as **Supported by attestation / Susținut prin declarație**. It does not establish equivalent wording or inclusion in the CV, and does not change either semantic score. This is a synthetic self-report, not external verification.
 
 Confirmation/source validation comes before term matching. Exact+equivalent selected uses included plus equivalence badge. Qualification recognition cannot be established by alias matching. Java≠JavaScript; stakeholder collaboration≠people-management seniority; diploma translation≠country-specific licence. Candidate aliases from ESCO require curation; no claim of perfect multilingual matching.
 
@@ -144,7 +146,7 @@ Detailed scripts: [A–F](../../research/ux/journeys.md); full fields/states: [s
 - E per-change comparison→job editor→templates→preview; Base remains byte-for-byte unchanged by job-only saves; undo/restore and separate promotion.
 - F1/3/6-month choice→placeholder checkout→active/pending/declined→cancel-at-end/resume. No real payment.
 
-Iteration-1 evidence:56 deterministic DOM/state checks across A–F;27 Chrome interactions. Iteration-2 verification is captured separately in the updated task report and v2 snapshot; v1 receipts are historical. No horizontal overflow or console messages remained in the final browser session. Screenshots and logs in `reviews/ux/`. Browser library issue was centrally resolved by Firstmate; only task-owned verified session used. DOM checks do not establish actual backend/PDF behavior. Final browser receipts and known limits are recorded separately; local review opening is not owner approval.
+Verification setup, historical browser receipts, focused regression results and their limits are maintained in the [verification receipt](../../reviews/ux/verification.md). Local review opening is not owner approval.
 
 Responsive/accessibility proposal: desktop split view, tablet stacked content, mobile scoped horizontal navigation and stacked forms,44px controls, visible focus/native labels/dialogs/live statuses/reduced motion, text alongside status color. Screen-reader, touch-device, Safari/Firefox, full WCAG audit and production rendering remain unverified.
 
@@ -231,6 +233,6 @@ Architecture and strategy contributions are included as versioned snapshots unde
 
 ## 17. Integrated package verification and readiness
 
-The portable prototype has 67 deterministic local-state assertions across A–F and a complete 39-interaction Chrome journey pass at desktop and mobile sizes. The final integrated-v3 label was spot-checked after rebuild at 1560×1000 and 390×844; both layouts fit their viewport and the browser console was empty. The ten-route mobile sweep and current technical artifact checks are itemized in [`reviews/ux/verification.md`](../../reviews/ux/verification.md). Checks validate local discovery fixtures only.
+The [verification receipt](../../reviews/ux/verification.md) owns reproducible setup, current focused results and historical desktop/mobile browser evidence. The browser layout pass predates the subsequent prototype corrections; DOM checks do not establish their layout. All checks concern local discovery fixtures only.
 
 The architecture-owned canonical CV, assessment, workspace, ATS/readiness, duration and current v1.2 cost demonstrators pass their documented checks. The retained historical `research/costs/cohorts_v1_1.py` is not verified in this snapshot because its imported `model_v1_1.py` is absent; it is excluded from current cost claims. No production service, real model call, payment, PDF renderer, calibrated hiring outcome, or browser support outside the checked Chrome environment is established. The complete proposal is packaged for cross-review/promotion; D-01–14 remain explicit owner choices.

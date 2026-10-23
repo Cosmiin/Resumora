@@ -6,8 +6,8 @@ This receipt describes discovery-artifact checks only. None establishes connecte
 
 - `python3 prototype/build_portable.py` — rebuilt `prototype/review.html` from the reviewed app source; styles are locally bundled and optional theme helpers use pinned CDN assets.
 - `node --check prototype/app.js` — passed.
-- `node prototype/verify.mjs` — passed 67 deterministic DOM/local-state assertions covering journeys A–F.
-- `python3 reviews/ux/browser-runner.py --script reviews/ux/browser-journeys.js` — 39 Chrome interaction checks passed at 1560×1000 and 390×844 in the prior complete journey pass. The changed integrated-v3 label was then checked against the rebuilt portable file at both sizes; scroll width matched viewport (1560/1560 and 390/390). Console reported no messages.
+- Initial integrated DOM verification is superseded by the focused correction results below; use the reproducible setup there for the maintained source and portable checks.
+- Historical task-owned browser runner (excluded from this checkout), exercising `reviews/ux/browser-journeys.js` — 39 Chrome interaction checks passed at 1560×1000 and 390×844 in the prior complete journey pass. The changed integrated-v3 label was then checked against the rebuilt portable file at both sizes; scroll width matched viewport (1560/1560 and 390/390). Console reported no messages.
 - The prior mobile route sweep covered Home, Base, ATS, Compare, Templates, Preview, Plans, LinkedIn, Applications and Guide at 390px; all ten fit the viewport. Browser commands used the task-owned `chrome-devtools-axi` wrapper. Its machine-specific runner and captured PNGs are ignored and not included in the proposal package.
 
 ## Included schema and demonstrator checks
