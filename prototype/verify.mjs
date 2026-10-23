@@ -93,6 +93,35 @@ resetDemo();nav('application');change('[data-bind="application.status"]','Sent')
 nav('jobs');click('sample-job');click('parse-job');await wait();nav('compare');click('accept-tailor');nav('application');click('save-application');
 nav('base');click('ask-section','[data-key="education"]');change('[data-bind="interview.answer"]','Instituție Demo · 2018');click('review-answer');change('#claim-confirm',true);click('confirm-answer');nav('linkedin');click('sample-linkedin');click('review-linkedin');
 for(const route of ['account','preview']){nav(route);const before=state();click('download-json');const payload=JSON.parse(q('#detail-body textarea').value);check(JSON.stringify(payload.applications)===JSON.stringify(before.applications)&&payload.applications.length===2,'both export entry points retain every saved application');const a=payload.applications.find(x=>x.id===exportedA);check(a.submittedAt&&a.submittedSnapshot.cv.doc&&a.submittedSnapshot.job&&a.job&&a.currentCV.doc&&a.contact==='Iulia · contact@example.test'&&a.nextAction==='Trimite portofoliul','portable application retains job current submitted and sent/contact/action records');check(JSON.stringify(payload.sectionAnswers)===JSON.stringify(before.sectionAnswers)&&payload.sectionAnswers.education.confirmed,'export retains saved section answers and confirmations');check(payload.linkedinText===before.linkedinText&&payload.linkedinReviewed,'export retains LinkedIn input and reviewed state');closeModal();}
+for(const locale of ['ro','en']){
+  click('reset');click('confirm-reset');change('#cv-locale',locale);click('load-demo');nav('ats');click('recommend');click('accept-project');nav('jobeditor');click('add-section');saveEditor();
+  const original=state().jobCV.doc,project=original.project;
+  for(const key of ['summary','education','languages','project','certifications','custom']){
+    const sectionIndex=original.sections.findIndex(section=>section.id===key);
+    nav('jobeditor');change(`[data-section="${original.sections.findIndex(section=>section.id==='project')}"]`,false);change(`[data-bind="draft.${key}"]`,project);change(`[data-section="${sectionIndex}"]`,true);saveEditor();nav('ats');click('analyze');await wait();
+    check(state().analysis.value===90&&state().analysis.dimensions.find(x=>x[1]==='Achievements')[3]===10,`${locale} ${key}: visible supported content retains its score and outcome`);
+    check(keyword('REST API integration').includes('Inclus în CV')&&keyword('HR / payroll context').includes('Inclus în CV'),`${locale} ${key}: visible supported content retains both keywords`);
+    nav('preview');check(q('.document').textContent.includes(project)&&text().includes('CV–Job Match: 90/100'),`${locale} ${key}: preview displays the assessed evidence`);
+    nav('compare');click('reject-all');check(q('.compare-old').textContent.includes('62.5 / 100')&&q('.compare-new').textContent.includes('90 / 100')&&q('.compare-new .document').textContent.includes(project),`${locale} ${key}: comparison scores the actual displayed documents`);
+    nav('jobeditor');change(`[data-section="${sectionIndex}"]`,false);saveEditor();nav('ats');click('analyze');await wait();
+    check(state().analysis.value===62.5&&keyword('REST API integration').includes('omis')&&keyword('HR / payroll context').includes('omis'),`${locale} ${key}: hiding the same content removes its score and keywords`);
+    nav('preview');check(!q('.document').textContent.includes(project)&&text().includes('CV–Job Match: 62.5/100'),`${locale} ${key}: hidden content is absent from export preview`);
+    nav('compare');check(q('.compare-new').textContent.includes('62.5 / 100')&&!q('.compare-new .document').textContent.includes(project),`${locale} ${key}: hidden content stays absent in comparison`);
+    nav('jobeditor');change(`[data-bind="draft.${key}"]`,original[key]);change(`[data-section="${sectionIndex}"]`,original.sections[sectionIndex].visible);saveEditor();
+  }
+}
+click('reset');click('confirm-reset');nav('jobs');click('sample-job');click('parse-job');await wait();nav('application');
+check(!state().base&&!state().application.currentCV,'job-first tracking can start without a document');click('save-application');
+check(state().route==='applications'&&state().applications.length===1&&!state().applications[0].submittedAt&&q('#sent-application-count').textContent==='0','unsent job record saves without a CV');
+const jobFirstId=state().application.id;
+for(const status of ['Preparing','Sent','Interview','Closed']){
+  click('open-application',`[data-id="${jobFirstId}"]`);change('[data-bind="application.status"]',status);change('#sent-confirm',true);click('save-application');
+  check(state().route==='application'&&!state().application.submittedAt&&!state().application.submittedSnapshot&&q('#notice').textContent.includes('Atașează un CV'),`${status}: submission attestation without a current CV is rejected`);
+  nav('applications');check(q('#sent-application-count').textContent==='0'&&state().applications.every(a=>!a.submittedAt&&!a.submittedSnapshot),'rejected attestation creates no saved sent history or snapshot');
+}
+nav('import');click('extract');await wait();change('#confirm-facts',true);click('confirm-base');nav('application');change('[data-bind="application.status"]','Preparing');change('#sent-confirm',true);click('save-application');
+check(state().route==='applications'&&state().application.submittedAt&&JSON.stringify(state().application.submittedSnapshot.cv.doc)===JSON.stringify(state().base)&&q('#sent-application-count').textContent==='1','job-first record can attest submission from Preparing after attaching a Base');
+const jobFirstSnapshot=JSON.stringify(state().application.submittedSnapshot);click('open-application',`[data-id="${jobFirstId}"]`);click('view-submitted');check(q('#detail-body .document').textContent.includes('Mara Ionescu'),'new submission always has a viewable snapshot');closeModal();change('[data-bind="application.status"]','Interview');click('save-application');check(JSON.stringify(state().application.submittedSnapshot)===jobFirstSnapshot&&q('#sent-application-count').textContent==='1','ordinary stage updates retain the existing attested snapshot');
 const browserJourney=w.eval('('+fs.readFileSync(path.join(dir,'../reviews/ux/browser-journeys.js'),'utf8')+')');const browserResult=await browserJourney();check(browserResult.status==='PASS'&&browserResult.checks.length>30,'maintained browser journey completes against public DOM interactions');
 check(runtimeErrors.length===0,'all public interactions complete without runtime errors');
 

@@ -52,3 +52,12 @@ The default synthetic document now omits API/payroll bullets and their summary/c
 The focused verifier also exercises hiding/restoring sections, editing away project evidence, selecting bullets without a project, preserving helper corrections and Undo, excluding unmeasured results, and exporting two independent application records through both JSON controls with submitted snapshots, sent attestations, contacts, next actions, section confirmations and LinkedIn review state. The maintained browser journey is executed in the DOM verifier to detect contract drift; this does not constitute a Chrome layout pass.
 
 Follow-up focused result: `npm test --prefix prototype` passed 200 assertions for the source entry and 200 for the rebuilt portable page, including execution of the maintained browser journey. The new selection checks distinguish Base from an application's attached snapshot, and verify identical Romanian/English payroll coverage. Dependency setup used the declared lockfile with scripts disabled. No repository-wide test/lint suite or browser-layout, PDF, push, PR or CI phase was run.
+
+
+### Selected sections and submission prerequisites
+
+The evidence projection now includes every visible text section (summary, education, languages, project, certifications and custom content), both skill groups, and visible role text and selected bullets. The focused regressions move the same canonical supported project evidence through each text section in Romanian and English, checking score, keywords, comparison and export preview before and after hiding it.
+
+New submission attestations require an attached current document at the shared application-save boundary, whether the stage is Preparing, Sent, Interview or Closed. Job-first records still save without a CV while unsent. Regression coverage checks rejection without a snapshot or sent-count increment, successful attestation after creating Base, a viewable submitted snapshot and preserved history through later stages. Existing rewrite, Undo, unmeasured-result and full application/review JSON portability coverage remains in the verifier.
+
+Focused result for this round: `npm test --prefix prototype` passed 297 assertions for the source page and 297 for the regenerated portable page. Both new regressions and the existing rewrite/export/browser-journey checks passed. No complete repository test or lint suite, browser-layout pass, production service, push, PR or CI phase was run.
