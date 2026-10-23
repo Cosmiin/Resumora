@@ -79,3 +79,12 @@ Opening an application synchronizes the active record before looking up the save
 Translation applies the same known fixture wording replacements to visible/retained section text, role context, bullets and the outcome support marker. Longer known passages are translated first; custom surrounding text is retained. Unknown custom outcomes remain unchanged. Focused regressions cover the reported enriched-context journey for Base and job documents in both language directions, all text section locations, comparison/preview scores and independence of the other document.
 
 Focused result: `npm test --prefix prototype` passed 503 assertions against source and 503 against the regenerated portable page. The custom-outcome regression explicitly targets the job CV rather than an application’s older attached Base snapshot. No complete repository test/lint suite, browser-layout pass, production service, push, PR or CI phase was run.
+
+
+### Evidence-derived skills and authorization attestation labels
+
+The skill proposal no longer supplies professional skills merely because a confirmed bullet exists. It recognizes reviewed canonical Romanian/English wording, including its neutral bullet rewrite, and maps only that supporting evidence to requirements analysis, stakeholder collaboration, Power Automate, SQL and REST APIs. Other or unconfirmed wording produces no suggestion; empty proposals cannot replace manual lists. Preview, explicit draft application, factual confirmation on save and Undo remain intact.
+
+Supported work-authorization attestation has its own keyword status and filter. It is separate from equivalent wording and document inclusion; unknown and confirmed-gap states remain distinct. Focused regressions cover both languages, both editors, Append/Replace, unconfirmed and unrelated repair work, technical-only/professional-only evidence, stale claim IDs, Undo and authorization filters without changing the CV or score.
+
+Focused result: `npm test --prefix prototype` passed 573 assertions against source and 573 against the regenerated portable page. Both skill groups are checked through preview, Append/Replace, confirmation and Undo; supported authorization is checked through its dedicated filter in both interface languages. No complete repository test/lint suite, browser-layout pass, production integration, push, PR or CI phase was run.
