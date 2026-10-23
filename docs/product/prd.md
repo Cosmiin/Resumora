@@ -164,7 +164,7 @@ The strategy publication candidate contains the current D-01–14 decision regis
 | Keyword precedence / completeness | Exclusive primary status with separate evidence/equivalence badges; completeness diagnostic separate from score | D-11 and score acceptance |
 | Validation and implementation promotion | Review UX/requirements/architecture/MVP/budget; then production agent plan | D-12 / consolidated gate |
 
-The linked strategy D-01–14 register is authoritative for the unresolved product choices; this topic table is a navigation aid, not a replacement. No unresolved choice is silently selected. The iteration-2 Guided journey supersedes this earlier five-question list; see the six current choices below. The demo fixture is aligned in section 16; fixture alignment is a synthetic-coherence choice, not product policy. The first option marked recommended is a discussion aid only. Selections stay local, can be copied into feedback, and never record approval. Reconcile each option with D-01–14 in the linked strategy register.
+The linked strategy D-01–14 register is authoritative for the unresolved product choices; this topic table is a navigation aid, not a replacement. No unresolved choice is silently selected. The iteration-2 Guided journey supersedes this earlier five-question list; see the five current choices below. The demo fixture is aligned in section 16; fixture alignment is a synthetic-coherence choice, not product policy. The first option marked recommended is a discussion aid only. Selections stay local, can be copied into feedback, and never record approval. Reconcile each option with D-01–14 in the linked strategy register.
 
 ## 14. Known gaps before implementation
 
@@ -178,7 +178,7 @@ This section supersedes conflicting first-release flow, application tracking, re
 
 ### Product outcome and entry
 
-The product’s immediate outcome is a credible, reviewed job-specific CV attached to a user-controlled application record. The Home workspace leads with “Prepare your next application,” with a primary **Start here · prepare for a job** action and a visible **Create my Base CV** alternative. This job-specific emphasis follows strategy’s response to owner feedback; the two paths converge on one Base → job CV → application loop. Returning users see an active application with status, attached CV version, contact and next action/date. The application workspace always surfaces the latest generated CV with an explicit tailored/not-tailored state, offers search across saved applications, and counts applications marked Sent. Tracking is lean and manual; reminders, reporting and outbound contact are not included in this proposal.
+The product’s immediate outcome is a credible, reviewed job-specific CV attached to a user-controlled application record. The Home workspace leads with “Prepare your next application,” with a primary **Start here · prepare for a job** action and a visible **Create my Base CV** alternative. This job-specific emphasis follows strategy’s response to owner feedback; the two paths converge on one Base → job CV → application loop. Returning users see an active application with status, attached CV version, contact and next action/date. The application workspace always surfaces the latest generated CV with an explicit tailored/not-tailored state, offers search across saved applications, and counts explicit submission attestations independently of later Interview/Closed stages. Tracking is lean and manual; reminders, reporting and outbound contact are not included in this proposal.
 
 ### First-use and return loops
 
@@ -203,12 +203,13 @@ Use the shared architecture v3 Mara case `mara-journey-1.0`: `mara_job_1`, `mara
 
 ### First guided review questions (proposal only)
 
-1. Entry emphasis: job-specific CV primary with a Base-only alternative (strategy recommendation) / Base-first primary / equal paths.
-2. Application continuity: create a lean editable record when a job is added (strategy recommendation) / create only after choosing Track / full board and reminders.
-3. Clarification timing: progressive, skippable section questions after immediate Base review (shared recommendation) / mandatory interview / on-demand only.
-4. Capture scope: pasted/manual LinkedIn plus previewed, consented click capture with text fallback (strategy recommendation) / deeper profile connection / staged extension; no hidden scraping or credential requests.
-5. Value before payment: useful Base advice plus one job-CV comparison (shared recommendation) / Base advice only / earlier analysis or export gate.
-6. Quota fallback: bounded queue and manual editing during limits (architecture recommendation) / capped paid upgrade after an owner-approved ceiling / pause the affected feature.
+The job-specific entry focus with a visible Base alternative is recorded direction and is not reopened.
+
+1. Application continuity: create a lean editable record when a job is added (strategy recommendation) / create only after choosing Track / full board and reminders.
+2. Clarification timing: progressive, skippable section questions after immediate Base review (shared recommendation) / mandatory interview / on-demand only.
+3. Capture scope: pasted/manual LinkedIn plus previewed, consented click capture with text fallback (strategy recommendation) / deeper profile connection / staged extension; no hidden scraping or credential requests.
+4. Value before payment: useful Base advice plus one job-CV comparison (shared recommendation) / Base advice only / earlier analysis or export gate.
+5. Quota fallback: bounded queue and manual editing during limits (architecture recommendation) / capped paid upgrade after an owner-approved ceiling / pause the affected feature.
 
 Each option has visible consequences. Selections remain local and reversible and never constitute approval. The prototype and linked technical artifacts now share Mara / Northstar People — Business Systems Analyst — Automation and the versioned IDs above. This resolves example coherence only; D-01–14 product-policy choices remain open in the linked decision register.
 
@@ -224,7 +225,7 @@ Inbox 012 relayed the current architecture v3 case, the complete strategy public
 
 The example keeps Candidate–Job Fit at 90 and changes CV–Job Match from 62.5 to 90 when the tailored CV represents already confirmed API, HR/payroll, outcome and context evidence. No time-saving metric is supplied or invented. The non-compensatory right-to-work requirement is `needs_verification`, not a claim that the candidate lacks authorization; actual PDF readability is `untested`. These synthetic review inputs and uncalibrated example weights do not estimate hiring likelihood or establish legal eligibility. Score is secondary to the evidence-backed readiness checklist.
 
-The prototype's local Guide retains six UX-level interaction choices. The integrated strategy package maintains the full D-01–14 register and its seven primary decision cards, consequences and recommendations; all remain **unresolved** unless the owner separately records a decision. The synthetic fixture selection above is resolved for demo coherence only. This package is ready for review as a discovery proposal; review is not policy approval, implementation authorization or a paid-service decision.
+The prototype's local Guide retains five UX-level interaction choices. The integrated strategy package maintains the full D-01–14 register and its seven primary decision cards, consequences and recommendations; all remain **unresolved** unless the owner separately records a decision. The synthetic fixture selection above is resolved for demo coherence only. This package is ready for review as a discovery proposal; review is not policy approval, implementation authorization or a paid-service decision.
 
 Architecture and strategy contributions are included as versioned snapshots under `research/architecture/`, `research/ats/`, `research/costs/`, `schemas/cv/v1/`, and `research/strategy/publication/`. The architecture/strategy teams own their technical and research artifacts. Do not treat their methods, cost scenarios, source summaries, or test receipts as production guarantees.
 

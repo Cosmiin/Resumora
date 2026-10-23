@@ -1,0 +1,8 @@
+{
+  "name": "atelier-cv-discovery-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node verify.mjs && node verify.mjs --portable"},
+  "devDependencies": {"jsdom": "26.1.0"},
+  "engines": {"node": ">=22"}
+}

@@ -23,7 +23,7 @@ The standalone `prototype/review.html` includes the same app source and is conve
 
 ## Package map
 
-- [`docs/product/prd.md`](docs/product/prd.md) — integrated proposal, scope, six decisions, unresolved policy choices.
+- [`docs/product/prd.md`](docs/product/prd.md) — integrated proposal, scope, five guided review choices, unresolved policy choices.
 - [`prototype/`](prototype/) — original interactive mockup, source, local assets and deterministic verifier.
 - [`research/ux/`](research/ux/) — 44-image inventory metadata, evidence map, states, assumptions, journeys and cross-review dispositions. Reference screenshot binaries are excluded.
 - [`schemas/cv/v1/`](schemas/cv/v1/) — proposed canonical CV/workspace schemas, Mara synthetic fixtures, and validation scripts.

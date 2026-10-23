@@ -27,3 +27,20 @@ This receipt describes discovery-artifact checks only. None establishes connecte
 ## Review state
 
 Lavish feedback rounds are terminal and acknowledged per task-owned receipts; no live board or unresolved annotation round is being claimed. The consolidated package remains discovery-only. Product policy decisions D-01–14 remain open in the linked strategy register; review is not implementation authorization.
+
+## Review corrections — reproducible focused checks
+
+Use Node 22 or newer. From a fresh checkout, install only the prototype's declared development dependencies and run its focused verifier:
+
+```sh
+npm ci --prefix prototype
+npm test --prefix prototype
+```
+
+`prototype/package-lock.json` pins jsdom and its transitive dependencies. The test command executes the same public interactions against both the source entry and the generated portable page. Its assertions observe rendered controls, exported JSON and `window.demo.snapshot()`; the network check records attempted fetch, XMLHttpRequest, WebSocket, EventSource and sendBeacon calls during those interactions. External theme assets are excluded from this DOM test. This does not establish browser layout or PDF behavior.
+
+The review correction covers canonical BridgeWorks/Power Automate/SQL/API evidence in recommendations, rewrites, enrichment and explicit Base promotion; draft freshness after saves, repeated tailoring and job switching; per-application job/current-CV/submitted-snapshot continuity; explicit sent history through Interview/Closed; document-specific translation; consistent eligibility and unavailable Candidate Fit; mixed-type chronology; search recovery after navigation; and diagnostic/question/confirmation paths for every Base section, each role and custom sections. Contextual answers retain separate per-section drafts, validate before saving and address roles by stable ID in each target document.
+
+The demo uses a new local storage namespace for its revised snapshot contract. Prior demonstration state remains untouched in its old namespace. No production persistence or service was added. The unused Home variant, redundant extensionless inventory and settled entry-focus question were removed; `inventory.json`, screenshot evidence metadata and frozen strategy snapshots remain preserved. Rebuild the portable page with `python3 prototype/build_portable.py` whenever app source changes, then refresh `PROPOSAL-MANIFEST.sha256` before handing the package back.
+
+Focused review result: `npm test --prefix prototype` passed 171 checks against the source entry and 171 against the rebuilt portable page. Dependency setup used `npm ci --prefix prototype --ignore-scripts --no-audit --no-fund`. No complete repository test/lint suite, browser-layout rerun, production service, push, PR or CI phase was executed in this review turn.
