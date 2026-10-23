@@ -1,0 +1,1834 @@
+{
+  "before": {
+    "id": "before",
+    "versions": {
+      "profile": "profile_confirmed_1",
+      "document": "cv_1",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "requirements": [
+      {
+        "id": "make",
+        "category": "technical",
+        "priority": "required",
+        "text": "make",
+        "jobEvidence": [
+          "job:sentence:make"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "airtable",
+        "category": "technical",
+        "priority": "required",
+        "text": "airtable",
+        "jobEvidence": [
+          "job:sentence:airtable"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "zapier",
+        "category": "technical",
+        "priority": "preferred",
+        "text": "zapier",
+        "jobEvidence": [
+          "job:sentence:zapier"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "hr",
+        "category": "responsibilities",
+        "priority": "preferred",
+        "text": "hr",
+        "jobEvidence": [
+          "job:sentence:hr"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "years",
+        "category": "experience",
+        "priority": "required",
+        "text": "years",
+        "jobEvidence": [
+          "job:sentence:years"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "impact",
+        "category": "achievements",
+        "priority": "unspecified",
+        "text": "impact",
+        "jobEvidence": [
+          "job:sentence:impact"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "degree",
+        "category": "qualifications",
+        "priority": "required",
+        "text": "degree",
+        "jobEvidence": [
+          "job:sentence:degree"
+        ],
+        "polarity": "positive",
+        "hardGate": true,
+        "gateKind": "credential",
+        "allowEquivalent": false
+      },
+      {
+        "id": "communication",
+        "category": "professional",
+        "priority": "unspecified",
+        "text": "communication",
+        "jobEvidence": [
+          "job:sentence:communication"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "positioning",
+        "category": "title",
+        "priority": "unspecified",
+        "text": "positioning",
+        "jobEvidence": [
+          "job:sentence:positioning"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      }
+    ],
+    "evidence": [
+      {
+        "id": "evidence_profile_make",
+        "requirementId": "make",
+        "scope": "profile",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "approved_equivalent",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_cv_make",
+        "requirementId": "make",
+        "scope": "cv",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [
+          "item_make"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "approved_equivalent",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_profile_airtable",
+        "requirementId": "airtable",
+        "scope": "profile",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_airtable",
+        "requirementId": "airtable",
+        "scope": "cv",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [
+          "item_airtable"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_zapier",
+        "requirementId": "zapier",
+        "scope": "profile",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "transferable",
+        "relation": "transferable",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_zapier",
+        "requirementId": "zapier",
+        "scope": "cv",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [
+          "item_zapier"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "transferable",
+        "relation": "transferable",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_hr",
+        "requirementId": "hr",
+        "scope": "profile",
+        "claimIds": [
+          "claim_hr"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_years",
+        "requirementId": "years",
+        "scope": "profile",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_years",
+        "requirementId": "years",
+        "scope": "cv",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [
+          "item_years"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_impact",
+        "requirementId": "impact",
+        "scope": "profile",
+        "claimIds": [
+          "claim_impact"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_degree",
+        "requirementId": "degree",
+        "scope": "profile",
+        "claimIds": [
+          "claim_degree"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_degree",
+        "requirementId": "degree",
+        "scope": "cv",
+        "claimIds": [
+          "claim_degree"
+        ],
+        "documentItemIds": [
+          "item_degree"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_communication",
+        "requirementId": "communication",
+        "scope": "profile",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_communication",
+        "requirementId": "communication",
+        "scope": "cv",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [
+          "item_communication"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_positioning",
+        "requirementId": "positioning",
+        "scope": "profile",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_positioning",
+        "requirementId": "positioning",
+        "scope": "cv",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [
+          "item_positioning"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      }
+    ],
+    "eligibilityAssertions": []
+  },
+  "after": {
+    "id": "after_selection",
+    "versions": {
+      "profile": "profile_confirmed_1",
+      "document": "cv_2",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "requirements": [
+      {
+        "id": "make",
+        "category": "technical",
+        "priority": "required",
+        "text": "make",
+        "jobEvidence": [
+          "job:sentence:make"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "airtable",
+        "category": "technical",
+        "priority": "required",
+        "text": "airtable",
+        "jobEvidence": [
+          "job:sentence:airtable"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "zapier",
+        "category": "technical",
+        "priority": "preferred",
+        "text": "zapier",
+        "jobEvidence": [
+          "job:sentence:zapier"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "hr",
+        "category": "responsibilities",
+        "priority": "preferred",
+        "text": "hr",
+        "jobEvidence": [
+          "job:sentence:hr"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "years",
+        "category": "experience",
+        "priority": "required",
+        "text": "years",
+        "jobEvidence": [
+          "job:sentence:years"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "impact",
+        "category": "achievements",
+        "priority": "unspecified",
+        "text": "impact",
+        "jobEvidence": [
+          "job:sentence:impact"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "degree",
+        "category": "qualifications",
+        "priority": "required",
+        "text": "degree",
+        "jobEvidence": [
+          "job:sentence:degree"
+        ],
+        "polarity": "positive",
+        "hardGate": true,
+        "gateKind": "credential",
+        "allowEquivalent": false
+      },
+      {
+        "id": "communication",
+        "category": "professional",
+        "priority": "unspecified",
+        "text": "communication",
+        "jobEvidence": [
+          "job:sentence:communication"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "positioning",
+        "category": "title",
+        "priority": "unspecified",
+        "text": "positioning",
+        "jobEvidence": [
+          "job:sentence:positioning"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      }
+    ],
+    "evidence": [
+      {
+        "id": "evidence_profile_make",
+        "requirementId": "make",
+        "scope": "profile",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "approved_equivalent",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_cv_make",
+        "requirementId": "make",
+        "scope": "cv",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [
+          "item_make"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "approved_equivalent",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_profile_airtable",
+        "requirementId": "airtable",
+        "scope": "profile",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_airtable",
+        "requirementId": "airtable",
+        "scope": "cv",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [
+          "item_airtable"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_zapier",
+        "requirementId": "zapier",
+        "scope": "profile",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "transferable",
+        "relation": "transferable",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_zapier",
+        "requirementId": "zapier",
+        "scope": "cv",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [
+          "item_zapier"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "transferable",
+        "relation": "transferable",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_hr",
+        "requirementId": "hr",
+        "scope": "profile",
+        "claimIds": [
+          "claim_hr"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_years",
+        "requirementId": "years",
+        "scope": "profile",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_years",
+        "requirementId": "years",
+        "scope": "cv",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [
+          "item_years"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_impact",
+        "requirementId": "impact",
+        "scope": "profile",
+        "claimIds": [
+          "claim_impact"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_degree",
+        "requirementId": "degree",
+        "scope": "profile",
+        "claimIds": [
+          "claim_degree"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_degree",
+        "requirementId": "degree",
+        "scope": "cv",
+        "claimIds": [
+          "claim_degree"
+        ],
+        "documentItemIds": [
+          "item_degree"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_communication",
+        "requirementId": "communication",
+        "scope": "profile",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_communication",
+        "requirementId": "communication",
+        "scope": "cv",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [
+          "item_communication"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_positioning",
+        "requirementId": "positioning",
+        "scope": "profile",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_positioning",
+        "requirementId": "positioning",
+        "scope": "cv",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [
+          "item_positioning"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_hr",
+        "requirementId": "hr",
+        "scope": "cv",
+        "claimIds": [
+          "claim_hr"
+        ],
+        "documentItemIds": [
+          "item_hr"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_impact",
+        "requirementId": "impact",
+        "scope": "cv",
+        "claimIds": [
+          "claim_impact"
+        ],
+        "documentItemIds": [
+          "item_impact"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      }
+    ],
+    "eligibilityAssertions": []
+  },
+  "missingCredential": {
+    "id": "missing_credential",
+    "versions": {
+      "profile": "profile_confirmed_1",
+      "document": "cv_2",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "requirements": [
+      {
+        "id": "make",
+        "category": "technical",
+        "priority": "required",
+        "text": "make",
+        "jobEvidence": [
+          "job:sentence:make"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "airtable",
+        "category": "technical",
+        "priority": "required",
+        "text": "airtable",
+        "jobEvidence": [
+          "job:sentence:airtable"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "zapier",
+        "category": "technical",
+        "priority": "preferred",
+        "text": "zapier",
+        "jobEvidence": [
+          "job:sentence:zapier"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "hr",
+        "category": "responsibilities",
+        "priority": "preferred",
+        "text": "hr",
+        "jobEvidence": [
+          "job:sentence:hr"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "years",
+        "category": "experience",
+        "priority": "required",
+        "text": "years",
+        "jobEvidence": [
+          "job:sentence:years"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "impact",
+        "category": "achievements",
+        "priority": "unspecified",
+        "text": "impact",
+        "jobEvidence": [
+          "job:sentence:impact"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "degree",
+        "category": "qualifications",
+        "priority": "required",
+        "text": "degree",
+        "jobEvidence": [
+          "job:sentence:degree"
+        ],
+        "polarity": "positive",
+        "hardGate": true,
+        "gateKind": "credential",
+        "allowEquivalent": false
+      },
+      {
+        "id": "communication",
+        "category": "professional",
+        "priority": "unspecified",
+        "text": "communication",
+        "jobEvidence": [
+          "job:sentence:communication"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "positioning",
+        "category": "title",
+        "priority": "unspecified",
+        "text": "positioning",
+        "jobEvidence": [
+          "job:sentence:positioning"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      }
+    ],
+    "evidence": [
+      {
+        "id": "evidence_profile_make",
+        "requirementId": "make",
+        "scope": "profile",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_cv_make",
+        "requirementId": "make",
+        "scope": "cv",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [
+          "item_make"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_profile_airtable",
+        "requirementId": "airtable",
+        "scope": "profile",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_airtable",
+        "requirementId": "airtable",
+        "scope": "cv",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [
+          "item_airtable"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_zapier",
+        "requirementId": "zapier",
+        "scope": "profile",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_zapier",
+        "requirementId": "zapier",
+        "scope": "cv",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [
+          "item_zapier"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_hr",
+        "requirementId": "hr",
+        "scope": "profile",
+        "claimIds": [
+          "claim_hr"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_years",
+        "requirementId": "years",
+        "scope": "profile",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_years",
+        "requirementId": "years",
+        "scope": "cv",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [
+          "item_years"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_impact",
+        "requirementId": "impact",
+        "scope": "profile",
+        "claimIds": [
+          "claim_impact"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_communication",
+        "requirementId": "communication",
+        "scope": "profile",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_communication",
+        "requirementId": "communication",
+        "scope": "cv",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [
+          "item_communication"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_positioning",
+        "requirementId": "positioning",
+        "scope": "profile",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_positioning",
+        "requirementId": "positioning",
+        "scope": "cv",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [
+          "item_positioning"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_hr",
+        "requirementId": "hr",
+        "scope": "cv",
+        "claimIds": [
+          "claim_hr"
+        ],
+        "documentItemIds": [
+          "item_hr"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_impact",
+        "requirementId": "impact",
+        "scope": "cv",
+        "claimIds": [
+          "claim_impact"
+        ],
+        "documentItemIds": [
+          "item_impact"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      }
+    ],
+    "eligibilityAssertions": []
+  },
+  "confirmedGap": {
+    "id": "missing_credential",
+    "versions": {
+      "profile": "profile_confirmed_1",
+      "document": "cv_2",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "requirements": [
+      {
+        "id": "make",
+        "category": "technical",
+        "priority": "required",
+        "text": "make",
+        "jobEvidence": [
+          "job:sentence:make"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "airtable",
+        "category": "technical",
+        "priority": "required",
+        "text": "airtable",
+        "jobEvidence": [
+          "job:sentence:airtable"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "zapier",
+        "category": "technical",
+        "priority": "preferred",
+        "text": "zapier",
+        "jobEvidence": [
+          "job:sentence:zapier"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "hr",
+        "category": "responsibilities",
+        "priority": "preferred",
+        "text": "hr",
+        "jobEvidence": [
+          "job:sentence:hr"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "years",
+        "category": "experience",
+        "priority": "required",
+        "text": "years",
+        "jobEvidence": [
+          "job:sentence:years"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "impact",
+        "category": "achievements",
+        "priority": "unspecified",
+        "text": "impact",
+        "jobEvidence": [
+          "job:sentence:impact"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "degree",
+        "category": "qualifications",
+        "priority": "required",
+        "text": "degree",
+        "jobEvidence": [
+          "job:sentence:degree"
+        ],
+        "polarity": "positive",
+        "hardGate": true,
+        "gateKind": "credential",
+        "allowEquivalent": false
+      },
+      {
+        "id": "communication",
+        "category": "professional",
+        "priority": "unspecified",
+        "text": "communication",
+        "jobEvidence": [
+          "job:sentence:communication"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "positioning",
+        "category": "title",
+        "priority": "unspecified",
+        "text": "positioning",
+        "jobEvidence": [
+          "job:sentence:positioning"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      }
+    ],
+    "evidence": [
+      {
+        "id": "evidence_profile_make",
+        "requirementId": "make",
+        "scope": "profile",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_cv_make",
+        "requirementId": "make",
+        "scope": "cv",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [
+          "item_make"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_profile_airtable",
+        "requirementId": "airtable",
+        "scope": "profile",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_airtable",
+        "requirementId": "airtable",
+        "scope": "cv",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [
+          "item_airtable"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_zapier",
+        "requirementId": "zapier",
+        "scope": "profile",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_zapier",
+        "requirementId": "zapier",
+        "scope": "cv",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [
+          "item_zapier"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_hr",
+        "requirementId": "hr",
+        "scope": "profile",
+        "claimIds": [
+          "claim_hr"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_years",
+        "requirementId": "years",
+        "scope": "profile",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_years",
+        "requirementId": "years",
+        "scope": "cv",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [
+          "item_years"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_impact",
+        "requirementId": "impact",
+        "scope": "profile",
+        "claimIds": [
+          "claim_impact"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_communication",
+        "requirementId": "communication",
+        "scope": "profile",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_communication",
+        "requirementId": "communication",
+        "scope": "cv",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [
+          "item_communication"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_positioning",
+        "requirementId": "positioning",
+        "scope": "profile",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_positioning",
+        "requirementId": "positioning",
+        "scope": "cv",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [
+          "item_positioning"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_hr",
+        "requirementId": "hr",
+        "scope": "cv",
+        "claimIds": [
+          "claim_hr"
+        ],
+        "documentItemIds": [
+          "item_hr"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_impact",
+        "requirementId": "impact",
+        "scope": "cv",
+        "claimIds": [
+          "claim_impact"
+        ],
+        "documentItemIds": [
+          "item_impact"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      }
+    ],
+    "eligibilityAssertions": [
+      {
+        "requirementId": "degree",
+        "state": "confirmed_unmet",
+        "reason": "User explicitly confirmed required credential not held",
+        "actor": "user_demo",
+        "sourceId": "interview_denial"
+      }
+    ]
+  },
+  "missingMaster": {
+    "id": "before",
+    "versions": {
+      "profile": null,
+      "document": "cv_1",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "requirements": [
+      {
+        "id": "make",
+        "category": "technical",
+        "priority": "required",
+        "text": "make",
+        "jobEvidence": [
+          "job:sentence:make"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "airtable",
+        "category": "technical",
+        "priority": "required",
+        "text": "airtable",
+        "jobEvidence": [
+          "job:sentence:airtable"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "zapier",
+        "category": "technical",
+        "priority": "preferred",
+        "text": "zapier",
+        "jobEvidence": [
+          "job:sentence:zapier"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "hr",
+        "category": "responsibilities",
+        "priority": "preferred",
+        "text": "hr",
+        "jobEvidence": [
+          "job:sentence:hr"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "years",
+        "category": "experience",
+        "priority": "required",
+        "text": "years",
+        "jobEvidence": [
+          "job:sentence:years"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "impact",
+        "category": "achievements",
+        "priority": "unspecified",
+        "text": "impact",
+        "jobEvidence": [
+          "job:sentence:impact"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "degree",
+        "category": "qualifications",
+        "priority": "required",
+        "text": "degree",
+        "jobEvidence": [
+          "job:sentence:degree"
+        ],
+        "polarity": "positive",
+        "hardGate": true,
+        "gateKind": "credential",
+        "allowEquivalent": false
+      },
+      {
+        "id": "communication",
+        "category": "professional",
+        "priority": "unspecified",
+        "text": "communication",
+        "jobEvidence": [
+          "job:sentence:communication"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      },
+      {
+        "id": "positioning",
+        "category": "title",
+        "priority": "unspecified",
+        "text": "positioning",
+        "jobEvidence": [
+          "job:sentence:positioning"
+        ],
+        "polarity": "positive",
+        "hardGate": false,
+        "gateKind": null,
+        "allowEquivalent": false
+      }
+    ],
+    "evidence": [
+      {
+        "id": "evidence_profile_make",
+        "requirementId": "make",
+        "scope": "profile",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "approved_equivalent",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_cv_make",
+        "requirementId": "make",
+        "scope": "cv",
+        "claimIds": [
+          "claim_make"
+        ],
+        "documentItemIds": [
+          "item_make"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "approved_equivalent",
+        "explanation": "Make and Integromat approved alias; same technology"
+      },
+      {
+        "id": "evidence_profile_airtable",
+        "requirementId": "airtable",
+        "scope": "profile",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_airtable",
+        "requirementId": "airtable",
+        "scope": "cv",
+        "claimIds": [
+          "claim_airtable"
+        ],
+        "documentItemIds": [
+          "item_airtable"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_zapier",
+        "requirementId": "zapier",
+        "scope": "profile",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "transferable",
+        "relation": "transferable",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_zapier",
+        "requirementId": "zapier",
+        "scope": "cv",
+        "claimIds": [
+          "claim_zapier"
+        ],
+        "documentItemIds": [
+          "item_zapier"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "transferable",
+        "relation": "transferable",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_hr",
+        "requirementId": "hr",
+        "scope": "profile",
+        "claimIds": [
+          "claim_hr"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_years",
+        "requirementId": "years",
+        "scope": "profile",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_years",
+        "requirementId": "years",
+        "scope": "cv",
+        "claimIds": [
+          "claim_years"
+        ],
+        "documentItemIds": [
+          "item_years"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_impact",
+        "requirementId": "impact",
+        "scope": "profile",
+        "claimIds": [
+          "claim_impact"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_degree",
+        "requirementId": "degree",
+        "scope": "profile",
+        "claimIds": [
+          "claim_degree"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_degree",
+        "requirementId": "degree",
+        "scope": "cv",
+        "claimIds": [
+          "claim_degree"
+        ],
+        "documentItemIds": [
+          "item_degree"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "demonstrated",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_communication",
+        "requirementId": "communication",
+        "scope": "profile",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_communication",
+        "requirementId": "communication",
+        "scope": "cv",
+        "claimIds": [
+          "claim_communication"
+        ],
+        "documentItemIds": [
+          "item_communication"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_profile_positioning",
+        "requirementId": "positioning",
+        "scope": "profile",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      },
+      {
+        "id": "evidence_cv_positioning",
+        "requirementId": "positioning",
+        "scope": "cv",
+        "claimIds": [
+          "claim_positioning"
+        ],
+        "documentItemIds": [
+          "item_positioning"
+        ],
+        "claimState": "user_confirmed",
+        "matchClass": "claimed_limited",
+        "relation": "exact",
+        "explanation": "Synthetic confirmed task/claim supports this requirement"
+      }
+    ],
+    "eligibilityAssertions": []
+  }
+}

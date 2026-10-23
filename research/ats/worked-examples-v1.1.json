@@ -1,0 +1,2503 @@
+{
+  "before": {
+    "evaluationId": "before",
+    "versions": {
+      "profile": "profile_confirmed_1",
+      "document": "cv_1",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "rulesHash": "7ffe47c32b3468f73a9490d0aa4762caa1e8402f7bc0013972d5f59d2f1772f2",
+    "inputHash": "66967c6d7dad0265523deff9af018ab6eda0301ec3434b0b131809ad0b8dc08a",
+    "requirementsHash": "0f5f875956fb99778d82ee1deee4a7a1878a68732df502d86171e288af055a79",
+    "weightProfile": "baseline-1.1",
+    "calibrated": false,
+    "candidateFit": {
+      "score": 94.93,
+      "rawScore": 94.92857143,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 0.91428571,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 27.42857143
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 1.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 25.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "verified_equivalent",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 0.4,
+          "matchClass": "transferable",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 1.71428571
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_hr"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 25.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_impact"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_degree"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        }
+      ]
+    },
+    "cvMatch": {
+      "score": 59.93,
+      "rawScore": 59.92857143,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 0.91428571,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 27.42857143
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 0.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 0.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 0.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 0.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [
+            "item_airtable"
+          ],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "verified_equivalent",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [
+            "item_make"
+          ],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 0.4,
+          "matchClass": "transferable",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [
+            "item_zapier"
+          ],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 1.71428571
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 0.0,
+          "matchClass": "not_evidenced",
+          "status": "verified_base_omitted",
+          "claimIds": [],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "No confirmed supporting evidence found; this does not prove absence of ability",
+          "points": 0.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [
+            "item_years"
+          ],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 0.0,
+          "matchClass": "not_evidenced",
+          "status": "verified_base_omitted",
+          "claimIds": [],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "No confirmed supporting evidence found; this does not prove absence of ability",
+          "points": 0.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_degree"
+          ],
+          "documentItemIds": [
+            "item_degree"
+          ],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [
+            "item_communication"
+          ],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [
+            "item_positioning"
+          ],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        }
+      ]
+    },
+    "eligibility": {
+      "status": "requirements_satisfied",
+      "scope": "Only identified non-compensatory job requirements; not legal eligibility certification",
+      "hardRequirements": [
+        {
+          "requirementId": "degree",
+          "state": "requirements_satisfied",
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "claimIds": [
+            "claim_degree"
+          ],
+          "reason": "Identified hard requirement supported"
+        }
+      ],
+      "ambiguities": [],
+      "persistentOn": [
+        "score",
+        "comparison",
+        "export_preview"
+      ]
+    },
+    "readability": {
+      "state": "untested",
+      "exportId": null
+    },
+    "scoringModel": "none; deterministic replay of accepted structured extraction/matching",
+    "evidenceMatcher": "synthetic-reviewed-1",
+    "recommendations": [
+      {
+        "requirementId": "zapier",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:zapier"
+        ],
+        "availableClaimIds": [
+          "claim_zapier"
+        ],
+        "needsConfirmation": false,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "hr",
+        "type": "profile_present_cv_omitted",
+        "jobEvidence": [
+          "job:sentence:hr"
+        ],
+        "availableClaimIds": [
+          "claim_hr"
+        ],
+        "needsConfirmation": false,
+        "action": "Select existing confirmed evidence",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "impact",
+        "type": "profile_present_cv_omitted",
+        "jobEvidence": [
+          "job:sentence:impact"
+        ],
+        "availableClaimIds": [
+          "claim_impact"
+        ],
+        "needsConfirmation": false,
+        "action": "Select existing confirmed evidence",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "communication",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:communication"
+        ],
+        "availableClaimIds": [
+          "claim_communication"
+        ],
+        "needsConfirmation": false,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "positioning",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:positioning"
+        ],
+        "availableClaimIds": [
+          "claim_positioning"
+        ],
+        "needsConfirmation": false,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      }
+    ]
+  },
+  "after_selection": {
+    "evaluationId": "after_selection",
+    "versions": {
+      "profile": "profile_confirmed_1",
+      "document": "cv_2",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "rulesHash": "7ffe47c32b3468f73a9490d0aa4762caa1e8402f7bc0013972d5f59d2f1772f2",
+    "inputHash": "23359084017d4f44d4483b32cb34801c7301e5d7d689b52102d0751cb8ff2bd2",
+    "requirementsHash": "0f5f875956fb99778d82ee1deee4a7a1878a68732df502d86171e288af055a79",
+    "weightProfile": "baseline-1.1",
+    "calibrated": false,
+    "candidateFit": {
+      "score": 94.93,
+      "rawScore": 94.92857143,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 0.91428571,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 27.42857143
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 1.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 25.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "verified_equivalent",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 0.4,
+          "matchClass": "transferable",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 1.71428571
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_hr"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 25.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_impact"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_degree"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        }
+      ]
+    },
+    "cvMatch": {
+      "score": 94.93,
+      "rawScore": 94.92857143,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 0.91428571,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 27.42857143
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 1.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 25.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [
+            "item_airtable"
+          ],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "verified_equivalent",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [
+            "item_make"
+          ],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 0.4,
+          "matchClass": "transferable",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [
+            "item_zapier"
+          ],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 1.71428571
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_hr"
+          ],
+          "documentItemIds": [
+            "item_hr"
+          ],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 25.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [
+            "item_years"
+          ],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_impact"
+          ],
+          "documentItemIds": [
+            "item_impact"
+          ],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_degree"
+          ],
+          "documentItemIds": [
+            "item_degree"
+          ],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [
+            "item_communication"
+          ],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [
+            "item_positioning"
+          ],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        }
+      ]
+    },
+    "eligibility": {
+      "status": "requirements_satisfied",
+      "scope": "Only identified non-compensatory job requirements; not legal eligibility certification",
+      "hardRequirements": [
+        {
+          "requirementId": "degree",
+          "state": "requirements_satisfied",
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "claimIds": [
+            "claim_degree"
+          ],
+          "reason": "Identified hard requirement supported"
+        }
+      ],
+      "ambiguities": [],
+      "persistentOn": [
+        "score",
+        "comparison",
+        "export_preview"
+      ]
+    },
+    "readability": {
+      "state": "untested",
+      "exportId": null
+    },
+    "scoringModel": "none; deterministic replay of accepted structured extraction/matching",
+    "evidenceMatcher": "synthetic-reviewed-1",
+    "recommendations": [
+      {
+        "requirementId": "zapier",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:zapier"
+        ],
+        "availableClaimIds": [
+          "claim_zapier"
+        ],
+        "needsConfirmation": false,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "communication",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:communication"
+        ],
+        "availableClaimIds": [
+          "claim_communication"
+        ],
+        "needsConfirmation": false,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "positioning",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:positioning"
+        ],
+        "availableClaimIds": [
+          "claim_positioning"
+        ],
+        "needsConfirmation": false,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      }
+    ]
+  },
+  "missing_credential": {
+    "evaluationId": "missing_credential",
+    "versions": {
+      "profile": "profile_confirmed_1",
+      "document": "cv_2",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "rulesHash": "7ffe47c32b3468f73a9490d0aa4762caa1e8402f7bc0013972d5f59d2f1772f2",
+    "inputHash": "68374fdd92bbfdd7d89100d27598b4a5a88aab120ddfe84fb1f9e5dd777bad79",
+    "requirementsHash": "0f5f875956fb99778d82ee1deee4a7a1878a68732df502d86171e288af055a79",
+    "weightProfile": "baseline-1.1",
+    "calibrated": false,
+    "candidateFit": {
+      "score": 90.0,
+      "rawScore": 90.0,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 1.0,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 30.0
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 1.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 25.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 0.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 0.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 5.0
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 5.0
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 4.28571429
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_hr"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 25.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_impact"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 0.0,
+          "matchClass": "not_evidenced",
+          "status": "missing_unsupported",
+          "claimIds": [],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "No confirmed supporting evidence found; this does not prove absence of ability",
+          "points": 0.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 5.0
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 5.0
+        }
+      ]
+    },
+    "cvMatch": {
+      "score": 90.0,
+      "rawScore": 90.0,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 1.0,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 30.0
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 1.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 25.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 0.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 0.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 5.0
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 5.0
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [
+            "item_airtable"
+          ],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [
+            "item_make"
+          ],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [
+            "item_zapier"
+          ],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 4.28571429
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_hr"
+          ],
+          "documentItemIds": [
+            "item_hr"
+          ],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 25.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [
+            "item_years"
+          ],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_impact"
+          ],
+          "documentItemIds": [
+            "item_impact"
+          ],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 0.0,
+          "matchClass": "not_evidenced",
+          "status": "missing_unsupported",
+          "claimIds": [],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "No confirmed supporting evidence found; this does not prove absence of ability",
+          "points": 0.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [
+            "item_communication"
+          ],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 5.0
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [
+            "item_positioning"
+          ],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 5.0
+        }
+      ]
+    },
+    "eligibility": {
+      "status": "needs_verification",
+      "scope": "Only identified non-compensatory job requirements; not legal eligibility certification",
+      "hardRequirements": [
+        {
+          "requirementId": "degree",
+          "state": "needs_verification",
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "claimIds": [],
+          "reason": "Mandatory evidence missing,limited,transferable or unconfirmed"
+        }
+      ],
+      "ambiguities": [],
+      "persistentOn": [
+        "score",
+        "comparison",
+        "export_preview"
+      ]
+    },
+    "readability": {
+      "state": "untested",
+      "exportId": null
+    },
+    "scoringModel": "none; deterministic replay of accepted structured extraction/matching",
+    "evidenceMatcher": "synthetic-reviewed-1",
+    "recommendations": [
+      {
+        "requirementId": "degree",
+        "type": "not_supported_in_available_profile",
+        "jobEvidence": [
+          "job:sentence:degree"
+        ],
+        "availableClaimIds": [],
+        "needsConfirmation": true,
+        "action": "Clarify missing evidence or acknowledge gap; never fabricate",
+        "estimatedDelta": null
+      }
+    ]
+  },
+  "confirmed_gap": {
+    "evaluationId": "missing_credential",
+    "versions": {
+      "profile": "profile_confirmed_1",
+      "document": "cv_2",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "rulesHash": "7ffe47c32b3468f73a9490d0aa4762caa1e8402f7bc0013972d5f59d2f1772f2",
+    "inputHash": "fbafe662bd0052a4b43a48c48a75a85a89dd5f788a95fff9aaf589e180b1b286",
+    "requirementsHash": "0f5f875956fb99778d82ee1deee4a7a1878a68732df502d86171e288af055a79",
+    "weightProfile": "baseline-1.1",
+    "calibrated": false,
+    "candidateFit": {
+      "score": 90.0,
+      "rawScore": 90.0,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 1.0,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 30.0
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 1.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 25.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 0.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 0.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 5.0
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 5.0
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 4.28571429
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_hr"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 25.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_impact"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 0.0,
+          "matchClass": "not_evidenced",
+          "status": "missing_unsupported",
+          "claimIds": [],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "No confirmed supporting evidence found; this does not prove absence of ability",
+          "points": 0.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 5.0
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 5.0
+        }
+      ]
+    },
+    "cvMatch": {
+      "score": 90.0,
+      "rawScore": 90.0,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 1.0,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 30.0
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 1.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 25.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 0.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 0.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 5.0
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 1.0,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 5.0
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [
+            "item_airtable"
+          ],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [
+            "item_make"
+          ],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [
+            "item_zapier"
+          ],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 4.28571429
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_hr"
+          ],
+          "documentItemIds": [
+            "item_hr"
+          ],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 25.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [
+            "item_years"
+          ],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_impact"
+          ],
+          "documentItemIds": [
+            "item_impact"
+          ],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 0.0,
+          "matchClass": "not_evidenced",
+          "status": "missing_unsupported",
+          "claimIds": [],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "No confirmed supporting evidence found; this does not prove absence of ability",
+          "points": 0.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [
+            "item_communication"
+          ],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 5.0
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [
+            "item_positioning"
+          ],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 5.0
+        }
+      ]
+    },
+    "eligibility": {
+      "status": "confirmed_requirement_gap",
+      "scope": "Only identified non-compensatory job requirements; not legal eligibility certification",
+      "hardRequirements": [
+        {
+          "requirementId": "degree",
+          "state": "confirmed_requirement_gap",
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "claimIds": [],
+          "reason": "User explicitly confirmed required credential not held"
+        }
+      ],
+      "ambiguities": [],
+      "persistentOn": [
+        "score",
+        "comparison",
+        "export_preview"
+      ]
+    },
+    "readability": {
+      "state": "untested",
+      "exportId": null
+    },
+    "scoringModel": "none; deterministic replay of accepted structured extraction/matching",
+    "evidenceMatcher": "synthetic-reviewed-1",
+    "recommendations": [
+      {
+        "requirementId": "degree",
+        "type": "not_supported_in_available_profile",
+        "jobEvidence": [
+          "job:sentence:degree"
+        ],
+        "availableClaimIds": [],
+        "needsConfirmation": true,
+        "action": "Clarify missing evidence or acknowledge gap; never fabricate",
+        "estimatedDelta": null
+      }
+    ]
+  },
+  "missing_master": {
+    "evaluationId": "before",
+    "versions": {
+      "profile": null,
+      "document": "cv_1",
+      "job": "job_1",
+      "requirements": "requirements_1",
+      "dictionary": "ro-en-1.1",
+      "normalizer": "normalized-reviewed-1",
+      "matcher": "synthetic-reviewed-1",
+      "rules": "compatibility-1.1.0",
+      "asOf": "2026-10-23"
+    },
+    "rulesHash": "7ffe47c32b3468f73a9490d0aa4762caa1e8402f7bc0013972d5f59d2f1772f2",
+    "inputHash": "1f9b7dafb52b927742575b01fcd356a112ad6a6f9d42bd834610458495de4268",
+    "requirementsHash": "0f5f875956fb99778d82ee1deee4a7a1878a68732df502d86171e288af055a79",
+    "weightProfile": "baseline-1.1",
+    "calibrated": false,
+    "candidateFit": {
+      "score": null,
+      "reason": "Master profile unavailable; no Candidate Fit inferred",
+      "categories": {},
+      "requirements": []
+    },
+    "cvMatch": {
+      "score": 59.93,
+      "rawScore": 59.92857143,
+      "categories": {
+        "technical": {
+          "nominalWeight": 30,
+          "coverage": 0.91428571,
+          "denominator": 7.0,
+          "effectiveWeight": 30.0,
+          "contribution": 27.42857143
+        },
+        "responsibilities": {
+          "nominalWeight": 25,
+          "coverage": 0.0,
+          "denominator": 1.0,
+          "effectiveWeight": 25.0,
+          "contribution": 0.0
+        },
+        "experience": {
+          "nominalWeight": 15,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 15.0,
+          "contribution": 15.0
+        },
+        "achievements": {
+          "nominalWeight": 10,
+          "coverage": 0.0,
+          "denominator": 2.0,
+          "effectiveWeight": 10.0,
+          "contribution": 0.0
+        },
+        "qualifications": {
+          "nominalWeight": 10,
+          "coverage": 1.0,
+          "denominator": 3.0,
+          "effectiveWeight": 10.0,
+          "contribution": 10.0
+        },
+        "professional": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        },
+        "title": {
+          "nominalWeight": 5,
+          "coverage": 0.75,
+          "denominator": 2.0,
+          "effectiveWeight": 5.0,
+          "contribution": 3.75
+        }
+      },
+      "requirements": [
+        {
+          "id": "airtable",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_airtable"
+          ],
+          "documentItemIds": [
+            "item_airtable"
+          ],
+          "jobEvidence": [
+            "job:sentence:airtable"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 12.85714286
+        },
+        {
+          "id": "make",
+          "category": "technical",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "verified_equivalent",
+          "claimIds": [
+            "claim_make"
+          ],
+          "documentItemIds": [
+            "item_make"
+          ],
+          "jobEvidence": [
+            "job:sentence:make"
+          ],
+          "explanation": "Make and Integromat approved alias; same technology",
+          "points": 12.85714286
+        },
+        {
+          "id": "zapier",
+          "category": "technical",
+          "priority": 1.0,
+          "matchStrength": 0.4,
+          "matchClass": "transferable",
+          "status": "included",
+          "claimIds": [
+            "claim_zapier"
+          ],
+          "documentItemIds": [
+            "item_zapier"
+          ],
+          "jobEvidence": [
+            "job:sentence:zapier"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 1.71428571
+        },
+        {
+          "id": "hr",
+          "category": "responsibilities",
+          "priority": 1.0,
+          "matchStrength": 0.0,
+          "matchClass": "not_evidenced",
+          "status": "missing_unsupported",
+          "claimIds": [],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:hr"
+          ],
+          "explanation": "No confirmed supporting evidence found; this does not prove absence of ability",
+          "points": 0.0
+        },
+        {
+          "id": "years",
+          "category": "experience",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_years"
+          ],
+          "documentItemIds": [
+            "item_years"
+          ],
+          "jobEvidence": [
+            "job:sentence:years"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 15.0
+        },
+        {
+          "id": "impact",
+          "category": "achievements",
+          "priority": 2.0,
+          "matchStrength": 0.0,
+          "matchClass": "not_evidenced",
+          "status": "missing_unsupported",
+          "claimIds": [],
+          "documentItemIds": [],
+          "jobEvidence": [
+            "job:sentence:impact"
+          ],
+          "explanation": "No confirmed supporting evidence found; this does not prove absence of ability",
+          "points": 0.0
+        },
+        {
+          "id": "degree",
+          "category": "qualifications",
+          "priority": 3.0,
+          "matchStrength": 1.0,
+          "matchClass": "demonstrated",
+          "status": "included",
+          "claimIds": [
+            "claim_degree"
+          ],
+          "documentItemIds": [
+            "item_degree"
+          ],
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 10.0
+        },
+        {
+          "id": "communication",
+          "category": "professional",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_communication"
+          ],
+          "documentItemIds": [
+            "item_communication"
+          ],
+          "jobEvidence": [
+            "job:sentence:communication"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        },
+        {
+          "id": "positioning",
+          "category": "title",
+          "priority": 2.0,
+          "matchStrength": 0.75,
+          "matchClass": "claimed_limited",
+          "status": "included",
+          "claimIds": [
+            "claim_positioning"
+          ],
+          "documentItemIds": [
+            "item_positioning"
+          ],
+          "jobEvidence": [
+            "job:sentence:positioning"
+          ],
+          "explanation": "Synthetic confirmed task/claim supports this requirement",
+          "points": 3.75
+        }
+      ]
+    },
+    "eligibility": {
+      "status": "requirements_satisfied",
+      "scope": "Only identified non-compensatory job requirements; not legal eligibility certification",
+      "hardRequirements": [
+        {
+          "requirementId": "degree",
+          "state": "requirements_satisfied",
+          "jobEvidence": [
+            "job:sentence:degree"
+          ],
+          "claimIds": [
+            "claim_degree"
+          ],
+          "reason": "Identified hard requirement supported"
+        }
+      ],
+      "ambiguities": [],
+      "persistentOn": [
+        "score",
+        "comparison",
+        "export_preview"
+      ]
+    },
+    "readability": {
+      "state": "untested",
+      "exportId": null
+    },
+    "scoringModel": "none; deterministic replay of accepted structured extraction/matching",
+    "evidenceMatcher": "synthetic-reviewed-1",
+    "recommendations": [
+      {
+        "requirementId": "zapier",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:zapier"
+        ],
+        "availableClaimIds": [
+          "claim_zapier"
+        ],
+        "needsConfirmation": true,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "hr",
+        "type": "not_supported_in_available_profile",
+        "jobEvidence": [
+          "job:sentence:hr"
+        ],
+        "availableClaimIds": [],
+        "needsConfirmation": true,
+        "action": "Clarify missing evidence or acknowledge gap; never fabricate",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "impact",
+        "type": "not_supported_in_available_profile",
+        "jobEvidence": [
+          "job:sentence:impact"
+        ],
+        "availableClaimIds": [],
+        "needsConfirmation": true,
+        "action": "Clarify missing evidence or acknowledge gap; never fabricate",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "communication",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:communication"
+        ],
+        "availableClaimIds": [
+          "claim_communication"
+        ],
+        "needsConfirmation": true,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      },
+      {
+        "requirementId": "positioning",
+        "type": "insufficiently_demonstrated",
+        "jobEvidence": [
+          "job:sentence:positioning"
+        ],
+        "availableClaimIds": [
+          "claim_positioning"
+        ],
+        "needsConfirmation": true,
+        "action": "Describe a real confirmed project/context; ask,do not invent",
+        "estimatedDelta": null
+      }
+    ]
+  },
+  "before_after": {
+    "cvDelta": 35.0,
+    "profileChanged": false,
+    "candidateDelta": 0.0,
+    "causes": [
+      {
+        "requirementId": "hr",
+        "before": 0.0,
+        "after": 1.0
+      },
+      {
+        "requirementId": "impact",
+        "before": 0.0,
+        "after": 1.0
+      }
+    ]
+  },
+  "enrichment_comparison": {
+    "cvDelta": 35.0,
+    "profileChanged": true,
+    "candidateDelta": 10.0,
+    "causes": [
+      {
+        "requirementId": "hr",
+        "before": 0.0,
+        "after": 1.0
+      },
+      {
+        "requirementId": "impact",
+        "before": 0.0,
+        "after": 1.0
+      }
+    ]
+  },
+  "acceptance": [
+    {
+      "id": 1,
+      "criterion": "Repeated keywords/evidence cannot increase score",
+      "status": "passed"
+    },
+    {
+      "id": 2,
+      "criterion": "Make/Integromat approved semantic equivalent",
+      "status": "passed"
+    },
+    {
+      "id": 3,
+      "criterion": "Transferable partial credit cannot satisfy strict credential",
+      "status": "passed"
+    },
+    {
+      "id": 4,
+      "criterion": "90score retains independent missing/confirmed-gap eligibility",
+      "status": "passed"
+    },
+    {
+      "id": 5,
+      "criterion": "Candidate Fit and evidenced CV Match invariant to wording/order alone",
+      "status": "passed"
+    },
+    {
+      "id": 6,
+      "criterion": "Omitted confirmed evidence improves CV Match only",
+      "status": "passed"
+    },
+    {
+      "id": 7,
+      "criterion": "Unsupported achievements earn zero",
+      "status": "passed"
+    },
+    {
+      "id": 8,
+      "criterion": "Absent job categories transparently renormalize; missing candidate evidence does not remove category",
+      "status": "passed"
+    },
+    {
+      "id": 9,
+      "criterion": "Category contributions equal total within rounding",
+      "status": "passed"
+    },
+    {
+      "id": 10,
+      "criterion": "Identical pinned inputs/rules replay identically",
+      "status": "passed"
+    },
+    {
+      "id": 11,
+      "criterion": "Readability independent and untested",
+      "status": "passed"
+    },
+    {
+      "id": 12,
+      "criterion": "Before/after exposes evidence causes,not phrasing gain",
+      "status": "passed"
+    }
+  ],
+  "edgeChecks": [
+    "master_unavailable_null",
+    "duplicate_atom",
+    "reviewed_negation",
+    "OR_once_max",
+    "AND_weight_conservation",
+    "version_lock_rejection"
+  ],
+  "limitations": [
+    "AI requirement extraction/semantic classification not implemented; reviewed synthetic structured inputs",
+    "No predictive validation or employer ATS integration",
+    "Same evidence can legitimately satisfy distinct explicit requirements; one primary category per canonical requirement",
+    "CV canonical schema1.0.0 unchanged; companion assessment schema1.1 added"
+  ]
+}

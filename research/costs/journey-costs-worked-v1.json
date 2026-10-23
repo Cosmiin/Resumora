@@ -1,0 +1,501 @@
+{
+  "version": "journey-costs-1.0",
+  "priceVersion": "2026-10-23",
+  "newBaselineDeltas": [
+    {
+      "activeUsers": 100,
+      "previousKnownUSD": "43.70779450",
+      "currentKnownUSD": "43.85558950",
+      "incrementKnownUSD": "0.14779500",
+      "addedOperations": [
+        "section_questions",
+        "skills_inference",
+        "linkedin_review"
+      ],
+      "deterministicFeatures": [
+        "allsectionpresence/structurechecks",
+        "manualhelpers",
+        "append/replace/Undo",
+        "duration",
+        "applications/contacts/nextaction/search/sentcounter"
+      ],
+      "deterministicFeaturesUseAI": false
+    },
+    {
+      "activeUsers": 1000,
+      "previousKnownUSD": "82.75294500",
+      "currentKnownUSD": "84.23089500",
+      "incrementKnownUSD": "1.47795000",
+      "addedOperations": [
+        "section_questions",
+        "skills_inference",
+        "linkedin_review"
+      ],
+      "deterministicFeatures": [
+        "allsectionpresence/structurechecks",
+        "manualhelpers",
+        "append/replace/Undo",
+        "duration",
+        "applications/contacts/nextaction/search/sentcounter"
+      ],
+      "deterministicFeaturesUseAI": false
+    },
+    {
+      "activeUsers": 10000,
+      "previousKnownUSD": "478.27945000",
+      "currentKnownUSD": "496.68395000",
+      "incrementKnownUSD": "18.40450000",
+      "addedOperations": [
+        "section_questions",
+        "skills_inference",
+        "linkedin_review"
+      ],
+      "deterministicFeatures": [
+        "allsectionpresence/structurechecks",
+        "manualhelpers",
+        "append/replace/Undo",
+        "duration",
+        "applications/contacts/nextaction/search/sentcounter"
+      ],
+      "deterministicFeaturesUseAI": false
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario": "guided_first_month",
+      "activeUsers": 100,
+      "knownUSD": "44.52491200",
+      "inferenceUSD": "4.38022200",
+      "renderHours": "1.75000000",
+      "assumptions": {
+        "ops": {
+          "upload_normalize": "1",
+          "interview_turn": "12",
+          "section_questions": "6",
+          "skills_inference": "1",
+          "linkedin_review": "1"
+        },
+        "why": "Firstimport,12answerturns,6selectedquestionbatches;notanobservedonboardingcohort."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "guided_first_month",
+      "activeUsers": 1000,
+      "knownUSD": "90.92412000",
+      "inferenceUSD": "43.80222000",
+      "renderHours": "17.50000000",
+      "assumptions": {
+        "ops": {
+          "upload_normalize": "1",
+          "interview_turn": "12",
+          "section_questions": "6",
+          "skills_inference": "1",
+          "linkedin_review": "1"
+        },
+        "why": "Firstimport,12answerturns,6selectedquestionbatches;notanobservedonboardingcohort."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "guided_first_month",
+      "activeUsers": 10000,
+      "knownUSD": "563.61620000",
+      "inferenceUSD": "438.02220000",
+      "renderHours": "175.00000000",
+      "assumptions": {
+        "ops": {
+          "upload_normalize": "1",
+          "interview_turn": "12",
+          "section_questions": "6",
+          "skills_inference": "1",
+          "linkedin_review": "1"
+        },
+        "why": "Firstimport,12answerturns,6selectedquestionbatches;notanobservedonboardingcohort."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "prefetch_all_sections",
+      "activeUsers": 100,
+      "knownUSD": "44.36609950",
+      "inferenceUSD": "4.22140950",
+      "renderHours": "1.75000000",
+      "assumptions": {
+        "ops": {
+          "section_questions": "12"
+        },
+        "questionCache": "0",
+        "why": "CompareupfrontAIquestiongenerationfor12sectionswith2selectedcachedbatches;diagnosticsstilldeterministic."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "prefetch_all_sections",
+      "activeUsers": 1000,
+      "knownUSD": "89.33599500",
+      "inferenceUSD": "42.21409500",
+      "renderHours": "17.50000000",
+      "assumptions": {
+        "ops": {
+          "section_questions": "12"
+        },
+        "questionCache": "0",
+        "why": "CompareupfrontAIquestiongenerationfor12sectionswith2selectedcachedbatches;diagnosticsstilldeterministic."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "prefetch_all_sections",
+      "activeUsers": 10000,
+      "knownUSD": "547.73495000",
+      "inferenceUSD": "422.14095000",
+      "renderHours": "175.00000000",
+      "assumptions": {
+        "ops": {
+          "section_questions": "12"
+        },
+        "questionCache": "0",
+        "why": "CompareupfrontAIquestiongenerationfor12sectionswith2selectedcachedbatches;diagnosticsstilldeterministic."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "active_search",
+      "activeUsers": 100,
+      "knownUSD": "46.01705650",
+      "inferenceUSD": "5.87236650",
+      "renderHours": "3.50000000",
+      "assumptions": {
+        "ops": {
+          "job_parse": "12",
+          "evidence_matching": "12",
+          "tailor_full": "6",
+          "rewrite_selected": "16",
+          "section_questions": "8",
+          "skills_inference": "2",
+          "linkedin_review": "2"
+        },
+        "exports": 12,
+        "requests": 1000,
+        "why": "Unapprovedhighactivityscenario,notallplanlimitsguaranteed."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "active_search",
+      "activeUsers": 1000,
+      "knownUSD": "107.82056500",
+      "inferenceUSD": "58.72366500",
+      "renderHours": "35.00000000",
+      "assumptions": {
+        "ops": {
+          "job_parse": "12",
+          "evidence_matching": "12",
+          "tailor_full": "6",
+          "rewrite_selected": "16",
+          "section_questions": "8",
+          "skills_inference": "2",
+          "linkedin_review": "2"
+        },
+        "exports": 12,
+        "requests": 1000,
+        "why": "Unapprovedhighactivityscenario,notallplanlimitsguaranteed."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "active_search",
+      "activeUsers": 10000,
+      "knownUSD": "732.58065000",
+      "inferenceUSD": "587.23665000",
+      "renderHours": "350.00000000",
+      "assumptions": {
+        "ops": {
+          "job_parse": "12",
+          "evidence_matching": "12",
+          "tailor_full": "6",
+          "rewrite_selected": "16",
+          "section_questions": "8",
+          "skills_inference": "2",
+          "linkedin_review": "2"
+        },
+        "exports": 12,
+        "requests": 1000,
+        "why": "Unapprovedhighactivityscenario,notallplanlimitsguaranteed."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "zero_response_cache",
+      "activeUsers": 100,
+      "knownUSD": "44.73148375",
+      "inferenceUSD": "4.58679375",
+      "renderHours": "1.75000000",
+      "assumptions": {
+        "zeroCache": true,
+        "why": "Noapplication/providercachebenefit."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "zero_response_cache",
+      "activeUsers": 1000,
+      "knownUSD": "92.98983750",
+      "inferenceUSD": "45.86793750",
+      "renderHours": "17.50000000",
+      "assumptions": {
+        "zeroCache": true,
+        "why": "Noapplication/providercachebenefit."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "zero_response_cache",
+      "activeUsers": 10000,
+      "knownUSD": "584.27337500",
+      "inferenceUSD": "458.67937500",
+      "renderHours": "175.00000000",
+      "assumptions": {
+        "zeroCache": true,
+        "why": "Noapplication/providercachebenefit."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "provider_max_three_attempts",
+      "activeUsers": 100,
+      "knownUSD": "53.24981500",
+      "inferenceUSD": "13.10512500",
+      "renderHours": "1.75000000",
+      "assumptions": {
+        "extraAttempts": "2",
+        "zeroCache": true,
+        "why": "Everymodeloperationbilled3attempts;correlatedoutagebound,notexpectedprobability."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "provider_max_three_attempts",
+      "activeUsers": 1000,
+      "knownUSD": "178.17315000",
+      "inferenceUSD": "131.05125000",
+      "renderHours": "17.50000000",
+      "assumptions": {
+        "extraAttempts": "2",
+        "zeroCache": true,
+        "why": "Everymodeloperationbilled3attempts;correlatedoutagebound,notexpectedprobability."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "provider_max_three_attempts",
+      "activeUsers": 10000,
+      "knownUSD": "1436.10650000",
+      "inferenceUSD": "1310.51250000",
+      "renderHours": "175.00000000",
+      "assumptions": {
+        "extraAttempts": "2",
+        "zeroCache": true,
+        "why": "Everymodeloperationbilled3attempts;correlatedoutagebound,notexpectedprobability."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "export_burst",
+      "activeUsers": 100,
+      "knownUSD": "45.31808950",
+      "inferenceUSD": "3.71089950",
+      "renderHours": "26.25000000",
+      "assumptions": {
+        "exports": 30,
+        "renderSeconds": 30,
+        "requests": 3000,
+        "why": "30multipageexportattempts;throughput/queuewaitunknown."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "export_burst",
+      "activeUsers": 1000,
+      "knownUSD": "108.68089500",
+      "inferenceUSD": "37.10899500",
+      "renderHours": "262.50000000",
+      "assumptions": {
+        "exports": 30,
+        "renderSeconds": 30,
+        "requests": 3000,
+        "why": "30multipageexportattempts;throughput/queuewaitunknown."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "export_burst",
+      "activeUsers": 10000,
+      "knownUSD": "747.18395000",
+      "inferenceUSD": "371.08995000",
+      "renderHours": "2625.00000000",
+      "assumptions": {
+        "exports": 30,
+        "renderSeconds": 30,
+        "requests": 3000,
+        "why": "30multipageexportattempts;throughput/queuewaitunknown."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "bad_full_rewrite_on_100_edits",
+      "activeUsers": 100,
+      "knownUSD": "96.24638950",
+      "inferenceUSD": "56.10169950",
+      "renderHours": "1.75000000",
+      "assumptions": {
+        "ops": {
+          "tailor_full": "104"
+        },
+        "tailorCache": "0",
+        "why": "Counterfactualbadpathbypassingreservationcaps:100editingeventsresendfullcontext;mustnotbeproductionbehavior."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "bad_full_rewrite_on_100_edits",
+      "activeUsers": 1000,
+      "knownUSD": "608.13889500",
+      "inferenceUSD": "561.01699500",
+      "renderHours": "17.50000000",
+      "assumptions": {
+        "ops": {
+          "tailor_full": "104"
+        },
+        "tailorCache": "0",
+        "why": "Counterfactualbadpathbypassingreservationcaps:100editingeventsresendfullcontext;mustnotbeproductionbehavior."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "bad_full_rewrite_on_100_edits",
+      "activeUsers": 10000,
+      "knownUSD": "5735.76395000",
+      "inferenceUSD": "5610.16995000",
+      "renderHours": "175.00000000",
+      "assumptions": {
+        "ops": {
+          "tailor_full": "104"
+        },
+        "tailorCache": "0",
+        "why": "Counterfactualbadpathbypassingreservationcaps:100editingeventsresendfullcontext;mustnotbeproductionbehavior."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "question_batch_reuse",
+      "activeUsers": 100,
+      "knownUSD": "43.79668450",
+      "inferenceUSD": "3.65199450",
+      "renderHours": "1.75000000",
+      "assumptions": {
+        "questionCache": ".80",
+        "why": "Sameversion/questionpurpose80%responsecachehit;sensitivityonly,notmeasured."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "question_batch_reuse",
+      "activeUsers": 1000,
+      "knownUSD": "83.64184500",
+      "inferenceUSD": "36.51994500",
+      "renderHours": "17.50000000",
+      "assumptions": {
+        "questionCache": ".80",
+        "why": "Sameversion/questionpurpose80%responsecachehit;sensitivityonly,notmeasured."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    },
+    {
+      "scenario": "question_batch_reuse",
+      "activeUsers": 10000,
+      "knownUSD": "490.79345000",
+      "inferenceUSD": "365.19945000",
+      "renderHours": "175.00000000",
+      "assumptions": {
+        "questionCache": ".80",
+        "why": "Sameversion/questionpurpose80%responsecachehit;sensitivityonly,notmeasured."
+      },
+      "businessTotalUSD": null,
+      "providerReportedUsage": null,
+      "actualCostUSD": null,
+      "capacityProven": false
+    }
+  ],
+  "freeTier": "No improvedclaim:50msassumption>10msWorkerFree;new600requests/userand1.5MBDB/userincreasequota/use. OpenAIpaid;pause/queuebeforeunapprovedupgrade."
+}

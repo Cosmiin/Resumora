@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "journey-workspace-1.0.0",
+  "workspaceId": "mara_workspace",
+  "synthetic": true,
+  "uiLocale": "ro",
+  "cvLocale": "en",
+  "baseSnapshotId": "mara_base_2",
+  "applications": [
+    {
+      "id": "mara_application_1",
+      "jobSnapshotId": "mara_job_1",
+      "cvSnapshotId": "mara_job_cv_2",
+      "exportId": null,
+      "stage": "drafting",
+      "stageSource": "user_managed",
+      "contactIds": [
+        "mara_contact_1"
+      ],
+      "nextActionId": "mara_action_1"
+    }
+  ],
+  "contacts": [
+    {
+      "id": "mara_contact_1",
+      "name": "Nora Example (synthetic)",
+      "company": "Northstar People (synthetic)",
+      "role": "Recruiter",
+      "channelKind": "email",
+      "value": "recruitment@example.test",
+      "sourceKind": "user_entry",
+      "purpose": "application_context",
+      "private": true
+    }
+  ],
+  "nextActions": [
+    {
+      "id": "mara_action_1",
+      "applicationId": "mara_application_1",
+      "kind": "review_eligibility",
+      "label": "Review right-to-work evidence before preparing the application",
+      "dueDate": "2026-10-26",
+      "state": "open",
+      "reminderMode": "none"
+    }
+  ],
+  "linkedinReviews": [
+    {
+      "id": "mara_linkedin_1",
+      "sourceKind": "own_user_paste",
+      "ownProfileAttested": true,
+      "sourceTextHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baseSnapshotId": "mara_base_2",
+      "state": "draft",
+      "proposedClaimIds": [],
+      "actualProfileWritten": false
+    }
+  ],
+  "draftPatches": [
+    {
+      "id": "mara_skills_proposal_1",
+      "targetSectionId": "section_technical_skills",
+      "kind": "skills",
+      "mode": "append",
+      "expectedRevision": 1,
+      "beforeItemIds": [
+        "skill_sql",
+        "skill_power"
+      ],
+      "proposedItemIds": [
+        "skill_api"
+      ],
+      "sourceClaimIds": [
+        "claim_api"
+      ],
+      "state": "proposed",
+      "factsAutomaticallyConfirmed": false
+    }
+  ],
+  "realMessagesSent": false
+}

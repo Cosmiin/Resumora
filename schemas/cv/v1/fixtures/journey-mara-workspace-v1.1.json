@@ -1,0 +1,148 @@
+{
+  "schemaVersion": "journey-workspace-1.1.0",
+  "workspaceId": "mara_workspace",
+  "synthetic": true,
+  "uiLocale": "ro",
+  "cvLocale": "en",
+  "baseSnapshotId": "mara_base_2",
+  "applications": [
+    {
+      "id": "mara_application_1",
+      "jobSnapshotId": "mara_job_1",
+      "cvSnapshotId": "mara_job_cv_2",
+      "exportId": null,
+      "stage": "drafting",
+      "stageSource": "user_managed",
+      "contactIds": [
+        "mara_contact_1"
+      ],
+      "nextActionId": "mara_action_1"
+    },
+    {
+      "id": "mara_application_2",
+      "jobSnapshotId": "mara_job_2",
+      "cvSnapshotId": "mara_base_1",
+      "exportId": null,
+      "stage": "closed",
+      "stageSource": "user_managed",
+      "contactIds": [],
+      "nextActionId": null
+    }
+  ],
+  "contacts": [
+    {
+      "id": "mara_contact_1",
+      "name": "Nora Example (synthetic)",
+      "company": "Northstar People (synthetic)",
+      "role": "Recruiter",
+      "channelKind": "email",
+      "value": "recruitment@example.test",
+      "sourceKind": "user_entry",
+      "purpose": "application_context",
+      "private": true
+    }
+  ],
+  "nextActions": [
+    {
+      "id": "mara_action_1",
+      "applicationId": "mara_application_1",
+      "kind": "review_eligibility",
+      "label": "Review right-to-work evidence before preparing the application",
+      "dueDate": "2026-10-26",
+      "state": "open",
+      "reminderMode": "none"
+    }
+  ],
+  "linkedinReviews": [
+    {
+      "id": "mara_linkedin_1",
+      "sourceKind": "own_user_paste",
+      "ownProfileAttested": true,
+      "sourceTextHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "baseSnapshotId": "mara_base_2",
+      "state": "draft",
+      "proposedClaimIds": [],
+      "actualProfileWritten": false
+    }
+  ],
+  "draftPatches": [
+    {
+      "id": "mara_skills_proposal_1",
+      "targetSectionId": "section_technical_skills",
+      "kind": "skills",
+      "mode": "append",
+      "expectedRevision": 1,
+      "beforeItemIds": [
+        "skill_sql",
+        "skill_power"
+      ],
+      "proposedItemIds": [
+        "skill_api"
+      ],
+      "sourceClaimIds": [
+        "claim_api"
+      ],
+      "state": "proposed",
+      "factsAutomaticallyConfirmed": false
+    }
+  ],
+  "realMessagesSent": false,
+  "jobs": [
+    {
+      "id": "mara_job_1",
+      "title": "Business Systems Analyst — Automation",
+      "company": "Northstar People (synthetic)"
+    },
+    {
+      "id": "mara_job_2",
+      "title": "Operations Analyst (SQL)",
+      "company": "Westport Services (synthetic)"
+    }
+  ],
+  "cvVersions": [
+    {
+      "id": "mara_job_cv_1",
+      "applicationId": "mara_application_1",
+      "sequence": 1,
+      "state": "completed",
+      "targetJobSnapshotId": "mara_job_1",
+      "tailoringOrigin": "ai_assisted"
+    },
+    {
+      "id": "mara_job_cv_2",
+      "applicationId": "mara_application_1",
+      "sequence": 2,
+      "state": "completed",
+      "targetJobSnapshotId": "mara_job_1",
+      "tailoringOrigin": "ai_assisted"
+    },
+    {
+      "id": "mara_cv_pending_3",
+      "applicationId": "mara_application_1",
+      "sequence": 3,
+      "state": "pending",
+      "targetJobSnapshotId": "mara_job_1",
+      "tailoringOrigin": "ai_assisted"
+    },
+    {
+      "id": "mara_base_2",
+      "applicationId": "mara_application_2",
+      "sequence": 1,
+      "state": "completed",
+      "targetJobSnapshotId": null,
+      "tailoringOrigin": "none"
+    }
+  ],
+  "sentRecords": [
+    {
+      "id": "sent_mara_2",
+      "applicationId": "mara_application_2",
+      "cvSnapshotId": "mara_base_1",
+      "recordedAt": "2026-10-23T10:15:00Z",
+      "occurredOn": "2026-10-18",
+      "source": "user_attestation",
+      "idempotencyKey": "mark_sent_mara_2",
+      "retracted": false
+    }
+  ]
+}

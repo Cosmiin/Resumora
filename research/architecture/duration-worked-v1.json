@@ -1,0 +1,62 @@
+{
+  "version": "elapsed-date-bounds-1.0",
+  "asOf": "2026-10-23",
+  "lowerWholeMonths": 68,
+  "upperWholeMonths": 92,
+  "lowerDisplay": {
+    "years": 5,
+    "months": 8
+  },
+  "upperDisplay": {
+    "years": 7,
+    "months": 8
+  },
+  "perRole": [
+    {
+      "id": "role_a",
+      "lowerWholeMonths": 34,
+      "upperWholeMonths": 35,
+      "lowerDisplay": {
+        "years": 2,
+        "months": 10
+      },
+      "upperDisplay": {
+        "years": 2,
+        "months": 11
+      },
+      "label": "Estimated completed elapsed months from stated precision; partial days omitted"
+    },
+    {
+      "id": "role_b",
+      "lowerWholeMonths": 51,
+      "upperWholeMonths": 52,
+      "lowerDisplay": {
+        "years": 4,
+        "months": 3
+      },
+      "upperDisplay": {
+        "years": 4,
+        "months": 4
+      },
+      "label": "Estimated completed elapsed months from stated precision; partial days omitted"
+    },
+    {
+      "id": "role_c",
+      "lowerWholeMonths": 0,
+      "upperWholeMonths": 23,
+      "lowerDisplay": {
+        "years": 0,
+        "months": 0
+      },
+      "upperDisplay": {
+        "years": 1,
+        "months": 11
+      },
+      "label": "Estimated completed elapsed months from stated precision; partial days omitted"
+    }
+  ],
+  "unknownRoleIds": [],
+  "convention": "Analyticalearliest/latestdayboundsarenotpersistedfactualdates;unionoverlapsbeforeconvertingtoelapsedcompletedmonths;partialdaysomitted",
+  "notComparableTo": "Historicalcalendar-monthcoverage71\u201394;elapsedtenureisadifferentnamedcalculation,notascoregain",
+  "protectedCharacteristicsUsed": false
+}
