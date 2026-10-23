@@ -1,0 +1,28 @@
+{
+  "version": "compatibility-1.1.0",
+  "weightProfile": "baseline-1.1",
+  "weights": {
+    "technical": 30,
+    "responsibilities": 25,
+    "experience": 15,
+    "achievements": 10,
+    "qualifications": 10,
+    "professional": 5,
+    "title": 5
+  },
+  "priority": {
+    "required": 3,
+    "unspecified": 2,
+    "preferred": 1
+  },
+  "matchStrength": {
+    "demonstrated": "1",
+    "claimed_limited": ".75",
+    "transferable": ".4",
+    "not_evidenced": "0"
+  },
+  "jobFamilyWeights": "future explicitly versioned override; not inferred per request",
+  "frequencyBonus": false,
+  "hardScoreCap": false,
+  "readabilityIncluded": false
+}

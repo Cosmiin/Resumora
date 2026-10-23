@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-23",
+  "type": "verification summary, not runtime transcript",
+  "checked_scope": "document/card/link/publication integrity only; no UX comprehension or product acceptance claim",
+  "relative_links_checked_in_working_and_publication_documents": 209,
+  "link_issues": 0,
+  "cards": {
+    "unique_questions": 14,
+    "unique_D_IDs": 14,
+    "primary": 7,
+    "progressive": 7,
+    "options_per_card": "2\u20133",
+    "consequences_recommendations_scope_cost_status": true,
+    "owner_answers_invented": false
+  },
+  "publication_selection": "Markdown/JSON/checksum files only; no private-path/runtime/secret patterns detected by bounded scan",
+  "limits": [
+    "Pattern scan is not a formal security audit.",
+    "External URLs were not re-fetched.",
+    "New integrated UX entry/fixture not relayed; no new browser/E2E/PDF pass."
+  ],
+  "integrated_acceptance": "pending UX fixture/entry and actual visual journey evidence"
+}

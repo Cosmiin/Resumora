@@ -1,0 +1,24 @@
+# User journeys A–F — integrated v3
+
+Open prototype/review.html locally as described in the top-level README. UI defaults to Romanian; interface and CV language are independent. The local demo uses synthetic data and makes no real service, model, payment, or PDF calls. Use Reia demonstrația / Reset demo to reset its browser state.
+
+| Journey | Happy path and proof of completion | Alternative / recovery | Evidence and limits |
+|---|---|---|---|
+| A · Account, import and Base | Register with synthetic details → upload/manual choice → simulated extraction → inspect fields and provenance → confirm → save Base version → edit/history. | Blank manual entry; invalid email/date/file; scan/protected-file message; simulated failure → retry/cancel. | Ref screens S14–15, S38/S42; all extraction and account states are local simulation. |
+| B · Enrichment interview | Open a specific prompt → enter/use synthetic answer → preview proposed claim and source → explicitly confirm → choose Base or job-CV destination → new version. | Skip/unknown creates no claim or score change; no metric is required; validation asks for useful context. | Ref screen S39; synthetic Mara answer says the finance team could review payroll exceptions in one place, with no time-saving measure. |
+| C · Job capture and requirements | Add the Northstar People Business Systems Analyst—Automation job → review structured required/preferred atoms and hard gate → choose profile → analyze. | Paste/manual, blocked-URL fallback, consented click-capture preview; editing/retry after simulated parse failure. | Ref screens S33/S43/S44. No real page or extension is read. |
+| D · ATS and evidence | Review the aligned Mara fixture → filter five keyword statuses → inspect evidence and RO/EN equivalence → accept supported API/HR/payroll/context recommendation to job CV → explicitly recalculate. Candidate–Job Fit stays 90; CV–Job Match changes 62.5→90 (+27.5 existing confirmed evidence). | Right-to-work in Romania stays needs_verification until affirmed; an explicit synthetic negative attestation creates confirmed_requirement_gap. Neither changes semantic score. Readability remains untested. | Rules compatibility-1.1.0 / baseline-1.1, case mara-journey-1.0; illustrative replay only, not live text analysis, legal advice, employer ATS score or hiring probability. |
+| E · Compare, edit and export | Compare old/current and proposed evidence → approve/reject individual changes → edit job CV without mutating Base → choose a distinct template → inspect saved-version preview → simulate export. | Undo/history/restore; optional sections and order; explicit Base promotion; stale-score notice and export failure/retry. | Ref screens S35–39/S42–44. Preview is HTML; no PDF is rendered or extracted. |
+| F · Subscription and account | Choose 1/3/6-month placeholder → simulated checkout → locally activate → account state → cancel-at-period-end/resume. | Declined and pending states; pending never grants access; export can return to options. | Ref screens S40–41. No card, payment provider or purchase exists. |
+
+For a full review, run A through F in order. Each journey is also directly navigable through the local workspace and explains prerequisites in its empty state. Application records show the latest generated CV with tailored/not-tailored status, role/company search, and count of user-marked Sent records; Sent is never inferred from export.
+
+## Shared synthetic fixture
+
+The prototype aligns to architecture case mara-journey-1.0: candidate Mara Ionescu; target Northstar People / Business Systems Analyst — Automation; job mara_job_1; Base mara_base_2; current CV mara_job_cv_1; tailored CV mara_job_cv_2; requirements mara_requirements_1. Method inputs are compatibility-1.1.0 / baseline-1.1, dictionary ro-en-1.1, normalizer reviewed_mara_1, matcher synthetic_reviewed_mara_1, as-of 2026-10-23.
+
+The architecture’s reviewed structured input has Candidate–Job Fit 90 and CV–Job Match 62.5→90 after the tailored document represents already-confirmed API, HR/payroll, outcome and context evidence. Right-to-work in Romania is unconfirmed and marked needs_verification; this does not prove absence. Actual PDF readability is untested. No measured time saving is supplied, and the prototype adds none. The arithmetic is uncalibrated, illustrative and not a prediction.
+
+## Verification distinction
+
+prototype/verify.mjs runs 67 deterministic DOM/state assertions across A–F. reviews/ux/browser-journeys.js runs 39 Chrome interactions with chrome-devtools-axi. The most recent desktop 1560×1000 and mobile 390×844 runs passed with no horizontal overflow; console had no messages. Exact receipts, changed-artifact screenshot paths and limitations are in verification.md. These checks do not establish production service behavior, live extraction, payment, or PDF validity.

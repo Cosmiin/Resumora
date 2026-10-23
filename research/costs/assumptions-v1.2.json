@@ -1,0 +1,189 @@
+{
+  "version": "costs-1.2.0",
+  "verifiedDate": "2026-10-23",
+  "periodDays": 30,
+  "activeUsers": [
+    100,
+    1000,
+    10000
+  ],
+  "defaultModel": "openai:gpt-6-luna",
+  "prices": {
+    "openai:gpt-6-luna": {
+      "input": ".10",
+      "cached": ".01",
+      "cache_write": ".125",
+      "output": ".50",
+      "source": "E-04",
+      "currency": "USD",
+      "mode": "standard; short context; 30m write"
+    },
+    "openai:gpt-6.1-sol": {
+      "input": "2",
+      "cached": ".10",
+      "cache_write": "2.5",
+      "output": "10",
+      "source": "E-04",
+      "currency": "USD",
+      "mode": "standard; short context; 30m write"
+    },
+    "anthropic:claude-haiku-5.5": {
+      "input": ".10",
+      "cached": ".01",
+      "cache_write": ".125",
+      "output": ".50",
+      "source": "E-08",
+      "currency": "USD",
+      "mode": "standard; <=100k prompt; 5m write"
+    },
+    "google:gemini-3.1-flash-lite": {
+      "input": ".25",
+      "cached": ".025",
+      "cache_write": null,
+      "output": "1.50",
+      "source": "E-09",
+      "currency": "USD",
+      "mode": "paid standard; cache storage extra, not modeled"
+    }
+  },
+  "operations": [
+    {
+      "operation": "upload_normalize",
+      "perUser": ".25",
+      "input": 6000,
+      "output": 1800,
+      "appCache": "0"
+    },
+    {
+      "operation": "interview_turn",
+      "perUser": "4",
+      "input": 1800,
+      "output": 350,
+      "appCache": "0"
+    },
+    {
+      "operation": "job_parse",
+      "perUser": "8",
+      "input": 2000,
+      "output": 600,
+      "appCache": ".20"
+    },
+    {
+      "operation": "tailor_full",
+      "perUser": "4",
+      "input": 6000,
+      "output": 1800,
+      "appCache": ".20"
+    },
+    {
+      "operation": "evidence_matching",
+      "perUser": "8",
+      "input": 7000,
+      "output": 1800,
+      "appCache": ".20"
+    },
+    {
+      "operation": "section_questions",
+      "perUser": "2",
+      "input": 2000,
+      "output": 450,
+      "appCache": ".20"
+    },
+    {
+      "operation": "skills_inference",
+      "perUser": ".5",
+      "input": 2500,
+      "output": 350,
+      "appCache": ".20"
+    },
+    {
+      "operation": "linkedin_review",
+      "perUser": ".5",
+      "input": 3500,
+      "output": 800,
+      "appCache": ".20"
+    },
+    {
+      "operation": "rewrite_selected",
+      "perUser": "8",
+      "input": 1200,
+      "output": 180,
+      "appCache": ".20"
+    }
+  ],
+  "inferenceExtraAttempts": ".05",
+  "renderExtraAttempts": ".05",
+  "premiumEscalationFraction": ".10",
+  "premiumModel": "openai:gpt-6.1-sol",
+  "regionalUplift": ".10",
+  "promptCacheReadFraction": "0",
+  "promptCacheWriteFraction": "0",
+  "deterministicAnalysesPerUser": 20,
+  "exportsPerUser": 6,
+  "renderSeconds": 10,
+  "renderConcurrencyCap": 5,
+  "peakFactor": 20,
+  "workingHoursPerMonth": 176,
+  "workerRequestsPerUser": 600,
+  "workerCpuMsPerRequest": 50,
+  "liveBlobGBPerUser": ".01",
+  "databaseGBPerUser": ".0015",
+  "backupCopies": 7,
+  "backupGBMonthUSD": ".015",
+  "backupWritesPerUser": 50,
+  "backupReadsPerUser": 40,
+  "backupWriteUSDPerMillion": "4.5",
+  "backupReadUSDPerMillion": ".36",
+  "euHostUSDByUsers": {
+    "100": "10.59",
+    "1000": "19.09",
+    "10000": "35.59"
+  },
+  "euHostPriceSource": "E-10/E-21; CX33/CX43/CX53 + IPv4; scenario sizing unbenchmarked",
+  "stagingComputeUSD": "10",
+  "supabasePlanUSD": "25",
+  "supabaseComputeCreditUSD": "10",
+  "computeUSDByUsers": {
+    "100": "10",
+    "1000": "15",
+    "10000": "60"
+  },
+  "workersPaidUSD": "5",
+  "workersIncludedRequests": 10000000,
+  "workersIncludedCpuMs": 30000000,
+  "workersRequestUSDPerMillion": ".30",
+  "workersCpuUSDPerMillionMs": ".02",
+  "browserIncludedHours": 10,
+  "browserUSDPerHour": ".09",
+  "browserConcurrencyUSD": 2,
+  "browserIncludedConcurrency": 10,
+  "storageIncludedGB": 100,
+  "storageOverageUSDPerGB": ".0213",
+  "databaseIncludedGB": 8,
+  "databaseOverageUSDPerGB": ".125",
+  "egressGBPerUser": ".02",
+  "egressIncludedGB": 250,
+  "egressOverageUSDPerGB": ".09",
+  "mauIncluded": 100000,
+  "mauOverageUSD": ".00325",
+  "reserveFraction": ".30",
+  "stripe": {
+    "standardEEA": "0.015",
+    "billing": "0.007",
+    "fixedRON": "1.00",
+    "sellingPrices": null,
+    "paidConversion": null,
+    "exchangeRate": null
+  },
+  "unknownCosts": [
+    "transactional SMTP",
+    "domain/DNS extras",
+    "VAT/taxes and currency conversion",
+    "chargebacks/refunds and Tax add-on",
+    "human engineering/support/legal/accounting",
+    "optional malware/OCR CPU and storage egress beyond assumptions",
+    "dedicated EU renderer or residency-required host",
+    "PITR/HA additional backup services",
+    "actual model access/latency and peak capacity"
+  ]
+}

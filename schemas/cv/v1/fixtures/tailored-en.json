@@ -1,0 +1,985 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshotId": "snapshot_tailored",
+  "baseCvId": "base_demo",
+  "version": 1,
+  "parentSnapshotId": null,
+  "createdAt": "2026-10-23T10:00:00Z",
+  "locale": "en",
+  "sources": [
+    {
+      "id": "source_manual",
+      "kind": "manual",
+      "label": "Synthetic user entry",
+      "capturedAt": "2026-10-23T10:00:00Z"
+    }
+  ],
+  "provenance": [
+    {
+      "id": "prov_manual",
+      "sourceId": "source_manual",
+      "locator": "manual form v1"
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim_name",
+      "kind": "text",
+      "value": "Ana Exemplu",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_title_1",
+      "kind": "text",
+      "value": "Inginer automatizări",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_title_2",
+      "kind": "text",
+      "value": "Business Systems Analyst",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_email",
+      "kind": "text",
+      "value": "ana@example.invalid",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_address",
+      "kind": "text",
+      "value": "Strada Sintetică 1",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_city",
+      "kind": "location",
+      "value": {
+        "city": "Iași",
+        "countryCode": "RO"
+      },
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_github",
+      "kind": "text",
+      "value": "https://example.invalid/ana",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_sql",
+      "kind": "text",
+      "value": "SQL",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_stakeholder",
+      "kind": "text",
+      "value": "Comunicare cu părțile interesate",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_role_a",
+      "kind": "text",
+      "value": "Automation Engineer",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_company_a",
+      "kind": "text",
+      "value": "Firma Sintetică A",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_start_a",
+      "kind": "date",
+      "value": {
+        "year": 2021,
+        "month": 1
+      },
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_end_a",
+      "kind": "date",
+      "value": {
+        "year": 2023,
+        "month": 12
+      },
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_resp_a",
+      "kind": "text",
+      "value": "SQL reporting and stakeholder coordination",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_achievement_a",
+      "kind": "text",
+      "value": "Reduced manual report preparation time",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_role_b",
+      "kind": "text",
+      "value": "Systems Analyst",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_company_b",
+      "kind": "text",
+      "value": "Firma Sintetică B",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_start_b",
+      "kind": "date",
+      "value": {
+        "year": 2022,
+        "month": 6
+      },
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_resp_b",
+      "kind": "text",
+      "value": "SQL reporting and stakeholder coordination",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_achievement_b",
+      "kind": "text",
+      "value": "Reduced manual report preparation time",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_role_c",
+      "kind": "text",
+      "value": "Consultant",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_company_c",
+      "kind": "text",
+      "value": "Firma Sintetică C",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_start_c",
+      "kind": "date",
+      "value": {
+        "year": 2019
+      },
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_end_c",
+      "kind": "date",
+      "value": {
+        "year": 2020
+      },
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_resp_c",
+      "kind": "text",
+      "value": "SQL reporting and stakeholder coordination",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_achievement_c",
+      "kind": "text",
+      "value": "Reduced manual report preparation time",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_metric",
+      "kind": "metric",
+      "value": {
+        "value": 20,
+        "unit": "percent",
+        "qualifier": "approximate"
+      },
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_uni",
+      "kind": "text",
+      "value": "Universitate Sintetică",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_degree",
+      "kind": "text",
+      "value": "BSc",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_field",
+      "kind": "text",
+      "value": "Engineering",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_grad",
+      "kind": "date",
+      "value": {
+        "year": 2018
+      },
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_certifications",
+      "kind": "text",
+      "value": "Synthetic certifications",
+      "status": "extracted_unconfirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ]
+    },
+    {
+      "id": "claim_projects",
+      "kind": "text",
+      "value": "Synthetic projects",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_achievements",
+      "kind": "text",
+      "value": "Synthetic achievements",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_portfolio",
+      "kind": "text",
+      "value": "Synthetic portfolio",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_languages",
+      "kind": "text",
+      "value": "Synthetic languages",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_leadership",
+      "kind": "text",
+      "value": "Synthetic leadership",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_publications",
+      "kind": "text",
+      "value": "Synthetic publications",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_volunteering",
+      "kind": "text",
+      "value": "Synthetic volunteering",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_custom",
+      "kind": "text",
+      "value": "Synthetic custom",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    },
+    {
+      "id": "claim_suggestion",
+      "kind": "text",
+      "value": "Managed a team of 50",
+      "status": "suggested",
+      "provenanceIds": [
+        "prov_manual"
+      ]
+    },
+    {
+      "id": "claim_rejected",
+      "kind": "text",
+      "value": "Unsupported credential",
+      "status": "rejected",
+      "provenanceIds": [
+        "prov_manual"
+      ]
+    }
+  ],
+  "facts": {
+    "nameClaimId": "claim_name",
+    "positioningTitleClaimIds": [
+      "claim_title_1",
+      "claim_title_2"
+    ],
+    "contacts": [
+      {
+        "id": "contact_email",
+        "kind": "email",
+        "valueClaimId": "claim_email",
+        "visibility": "export"
+      },
+      {
+        "id": "contact_address",
+        "kind": "address",
+        "valueClaimId": "claim_address",
+        "visibility": "private"
+      },
+      {
+        "id": "contact_city",
+        "kind": "location",
+        "valueClaimId": "claim_city",
+        "visibility": "export"
+      },
+      {
+        "id": "contact_github",
+        "kind": "github",
+        "valueClaimId": "claim_github",
+        "visibility": "export"
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill_sql",
+        "class": "technical",
+        "labelClaimId": "claim_sql",
+        "conceptId": "sql",
+        "evidenceClaimIds": [
+          "claim_resp_a"
+        ]
+      },
+      {
+        "id": "skill_stakeholder",
+        "class": "professional",
+        "labelClaimId": "claim_stakeholder",
+        "conceptId": "stakeholder",
+        "evidenceClaimIds": [
+          "claim_resp_a"
+        ]
+      }
+    ],
+    "employment": [
+      {
+        "id": "role_a",
+        "titleClaimId": "claim_role_a",
+        "companyClaimId": "claim_company_a",
+        "locationClaimId": "claim_city",
+        "startClaimId": "claim_start_a",
+        "endClaimId": "claim_end_a",
+        "ongoing": false,
+        "scopeClaimIds": [],
+        "responsibilityClaimIds": [
+          "claim_resp_a"
+        ],
+        "accomplishmentClaimIds": [
+          "claim_achievement_a"
+        ],
+        "metricClaimIds": [
+          "claim_metric"
+        ],
+        "skillIds": [
+          "skill_sql",
+          "skill_stakeholder"
+        ]
+      },
+      {
+        "id": "role_b",
+        "titleClaimId": "claim_role_b",
+        "companyClaimId": "claim_company_b",
+        "locationClaimId": "claim_city",
+        "startClaimId": "claim_start_b",
+        "endClaimId": null,
+        "ongoing": true,
+        "scopeClaimIds": [],
+        "responsibilityClaimIds": [
+          "claim_resp_b"
+        ],
+        "accomplishmentClaimIds": [
+          "claim_achievement_b"
+        ],
+        "metricClaimIds": [],
+        "skillIds": [
+          "skill_sql",
+          "skill_stakeholder"
+        ]
+      },
+      {
+        "id": "role_c",
+        "titleClaimId": "claim_role_c",
+        "companyClaimId": "claim_company_c",
+        "locationClaimId": "claim_city",
+        "startClaimId": "claim_start_c",
+        "endClaimId": "claim_end_c",
+        "ongoing": false,
+        "scopeClaimIds": [],
+        "responsibilityClaimIds": [
+          "claim_resp_c"
+        ],
+        "accomplishmentClaimIds": [
+          "claim_achievement_c"
+        ],
+        "metricClaimIds": [],
+        "skillIds": [
+          "skill_sql",
+          "skill_stakeholder"
+        ]
+      }
+    ],
+    "education": [
+      {
+        "id": "edu_demo",
+        "institutionClaimId": "claim_uni",
+        "qualificationClaimId": "claim_degree",
+        "fieldClaimId": "claim_field",
+        "locationClaimId": "claim_city",
+        "startClaimId": null,
+        "endClaimId": "claim_grad",
+        "detailClaimIds": []
+      }
+    ],
+    "optionalEntries": [
+      {
+        "id": "entry_certifications",
+        "kind": "certifications",
+        "labelClaimId": "claim_certifications",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      },
+      {
+        "id": "entry_projects",
+        "kind": "projects",
+        "labelClaimId": "claim_projects",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      },
+      {
+        "id": "entry_achievements",
+        "kind": "achievements",
+        "labelClaimId": "claim_achievements",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      },
+      {
+        "id": "entry_portfolio",
+        "kind": "portfolio",
+        "labelClaimId": "claim_portfolio",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      },
+      {
+        "id": "entry_languages",
+        "kind": "languages",
+        "labelClaimId": "claim_languages",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      },
+      {
+        "id": "entry_leadership",
+        "kind": "leadership",
+        "labelClaimId": "claim_leadership",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      },
+      {
+        "id": "entry_publications",
+        "kind": "publications",
+        "labelClaimId": "claim_publications",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      },
+      {
+        "id": "entry_volunteering",
+        "kind": "volunteering",
+        "labelClaimId": "claim_volunteering",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      },
+      {
+        "id": "entry_custom",
+        "kind": "custom",
+        "labelClaimId": "claim_custom",
+        "detailClaimIds": [],
+        "startClaimId": null,
+        "endClaimId": null,
+        "linkClaimIds": [],
+        "metricClaimIds": []
+      }
+    ]
+  },
+  "claimLinks": [
+    {
+      "id": "link_metric",
+      "fromClaimId": "claim_metric",
+      "toClaimId": "claim_achievement_a",
+      "relation": "metric_of"
+    }
+  ],
+  "enrichment": [
+    {
+      "id": "enrichment_demo",
+      "targetEntityId": "role_a",
+      "attribute": "impact_time",
+      "claimIds": [
+        "claim_metric",
+        "claim_achievement_a"
+      ]
+    }
+  ],
+  "interviews": [
+    {
+      "id": "interview_demo",
+      "question": "What evidence supports the certification?",
+      "answerClaimIds": [
+        "claim_certifications"
+      ],
+      "targetClaimIds": [
+        "claim_certifications"
+      ],
+      "state": "answered_unconfirmed"
+    }
+  ],
+  "generatedProse": [
+    {
+      "id": "prose_summary",
+      "kind": "summary",
+      "text": "Inginer automatizări cu experiență în SQL și colaborare.",
+      "claimIds": [
+        "claim_title_1",
+        "claim_sql",
+        "claim_stakeholder"
+      ],
+      "origin": "ai_generated",
+      "approval": "approved",
+      "locale": "ro",
+      "generationId": "generation_demo"
+    },
+    {
+      "id": "prose_bullet",
+      "kind": "bullet",
+      "text": "Reduced preparation time by approximately 20%.",
+      "claimIds": [
+        "claim_achievement_a",
+        "claim_metric"
+      ],
+      "origin": "ai_generated",
+      "approval": "pending",
+      "locale": "en",
+      "generationId": "generation_demo"
+    }
+  ],
+  "generations": [
+    {
+      "id": "generation_demo",
+      "provider": "synthetic",
+      "modelRequested": "fixture",
+      "modelResolved": "fixture-v1",
+      "promptVersion": "summary-v1",
+      "inputHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "createdAt": "2026-10-23T10:00:00Z"
+    }
+  ],
+  "document": {
+    "sectionOrder": [
+      "section_identity",
+      "section_projects",
+      "section_summary",
+      "section_professional_skills",
+      "section_technical_skills",
+      "section_experience",
+      "section_education",
+      "section_certifications",
+      "section_achievements",
+      "section_portfolio",
+      "section_languages",
+      "section_leadership",
+      "section_publications",
+      "section_volunteering",
+      "section_custom"
+    ],
+    "sections": [
+      {
+        "id": "section_identity",
+        "kind": "identity",
+        "label": "Profil",
+        "entryIds": [],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_summary",
+        "kind": "summary",
+        "label": "Summary",
+        "entryIds": [],
+        "proseIds": [
+          "prose_summary"
+        ],
+        "visible": true
+      },
+      {
+        "id": "section_professional_skills",
+        "kind": "professional_skills",
+        "label": "Professional Skills",
+        "entryIds": [
+          "skill_stakeholder"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_technical_skills",
+        "kind": "technical_skills",
+        "label": "Technical Skills",
+        "entryIds": [
+          "skill_sql"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_experience",
+        "kind": "experience",
+        "label": "Experience",
+        "entryIds": [
+          "role_a",
+          "role_b",
+          "role_c"
+        ],
+        "proseIds": [
+          "prose_bullet"
+        ],
+        "visible": true
+      },
+      {
+        "id": "section_education",
+        "kind": "education",
+        "label": "Education",
+        "entryIds": [
+          "edu_demo"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_certifications",
+        "kind": "certifications",
+        "label": "Certifications",
+        "entryIds": [
+          "entry_certifications"
+        ],
+        "proseIds": [],
+        "visible": false
+      },
+      {
+        "id": "section_projects",
+        "kind": "projects",
+        "label": "Projects",
+        "entryIds": [
+          "entry_projects"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_achievements",
+        "kind": "achievements",
+        "label": "Achievements",
+        "entryIds": [
+          "entry_achievements"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_portfolio",
+        "kind": "portfolio",
+        "label": "Portfolio",
+        "entryIds": [
+          "entry_portfolio"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_languages",
+        "kind": "languages",
+        "label": "Languages",
+        "entryIds": [
+          "entry_languages"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_leadership",
+        "kind": "leadership",
+        "label": "Leadership",
+        "entryIds": [
+          "entry_leadership"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_publications",
+        "kind": "publications",
+        "label": "Publications",
+        "entryIds": [
+          "entry_publications"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_volunteering",
+        "kind": "volunteering",
+        "label": "Volunteering",
+        "entryIds": [
+          "entry_volunteering"
+        ],
+        "proseIds": [],
+        "visible": true
+      },
+      {
+        "id": "section_custom",
+        "kind": "custom",
+        "label": "Custom",
+        "entryIds": [
+          "entry_custom"
+        ],
+        "proseIds": [],
+        "visible": true
+      }
+    ],
+    "templateVersionId": null,
+    "contactIds": [
+      "contact_email",
+      "contact_city",
+      "contact_github"
+    ]
+  },
+  "context": {
+    "kind": "tailored",
+    "baseSnapshotId": "snapshot_full",
+    "jobSnapshotId": "job_snapshot_demo",
+    "previousTailoredSnapshotId": null
+  }
+}

@@ -1,0 +1,1209 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "snapshotId": {
+      "$ref": "#/$defs/id"
+    },
+    "baseCvId": {
+      "$ref": "#/$defs/id"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "parentSnapshotId": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "locale": {
+      "enum": [
+        "ro",
+        "en"
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/provenance"
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nameClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "positioningTitleClaimIds": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contact"
+          }
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/skill"
+          }
+        },
+        "employment": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/employment"
+          }
+        },
+        "education": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/education"
+          }
+        },
+        "optionalEntries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/optionalEntry"
+          }
+        }
+      },
+      "required": [
+        "nameClaimId",
+        "positioningTitleClaimIds",
+        "contacts",
+        "skills",
+        "employment",
+        "education",
+        "optionalEntries"
+      ]
+    },
+    "claimLinks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/claimLink"
+      }
+    },
+    "enrichment": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/enrichment"
+      }
+    },
+    "interviews": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/interview"
+      }
+    },
+    "generatedProse": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/prose"
+      }
+    },
+    "generations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/generation"
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sectionOrder": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/section"
+          }
+        },
+        "templateVersionId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contactIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "sectionOrder",
+        "sections",
+        "templateVersionId",
+        "contactIds"
+      ]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "base",
+            "tailored"
+          ]
+        },
+        "baseSnapshotId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "jobSnapshotId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previousTailoredSnapshotId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "baseSnapshotId",
+        "jobSnapshotId",
+        "previousTailoredSnapshotId"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "snapshotId",
+    "baseCvId",
+    "version",
+    "parentSnapshotId",
+    "createdAt",
+    "locale",
+    "sources",
+    "provenance",
+    "claims",
+    "facts",
+    "claimLinks",
+    "enrichment",
+    "interviews",
+    "generatedProse",
+    "generations",
+    "document",
+    "context"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.invalid/cv/v1/schema.json",
+  "title": "CV Maker canonical snapshot v1 — discovery proposal",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{1,79}$"
+    },
+    "partialDate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "year": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2200
+        },
+        "month": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      },
+      "required": [
+        "year"
+      ]
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "city": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "countryCode": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
+        "address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        }
+      },
+      "required": []
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "baseline": {
+          "type": "number"
+        },
+        "period": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "qualifier": {
+          "enum": [
+            "exact",
+            "approximate",
+            "range"
+          ]
+        },
+        "upperValue": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "qualifier"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "upload",
+            "manual",
+            "interview",
+            "external_document",
+            "job_capture"
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "capturedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "extractorVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "capturedAt"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "sourceId": {
+          "$ref": "#/$defs/id"
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "excerpt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "extractionConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "id",
+        "sourceId",
+        "locator"
+      ]
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "date",
+            "location",
+            "metric"
+          ]
+        },
+        "value": {},
+        "status": {
+          "enum": [
+            "extracted_unconfirmed",
+            "user_confirmed",
+            "externally_verified",
+            "suggested",
+            "rejected"
+          ]
+        },
+        "provenanceIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "confirmedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "confirmationActor": {
+          "$ref": "#/$defs/id"
+        },
+        "verificationMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "value",
+        "status",
+        "provenanceIds"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20000
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "date"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/partialDate"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "location"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/location"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "metric"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/metric"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "user_confirmed",
+                  "externally_verified"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "confirmedAt",
+              "confirmationActor"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "externally_verified"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "verificationMethod"
+            ]
+          }
+        }
+      ]
+    },
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "email",
+            "phone",
+            "location",
+            "address",
+            "linkedin",
+            "github",
+            "portfolio",
+            "other"
+          ]
+        },
+        "valueClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "visibility": {
+          "enum": [
+            "private",
+            "export"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "valueClaimId",
+        "visibility"
+      ]
+    },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "class": {
+          "enum": [
+            "professional",
+            "technical"
+          ]
+        },
+        "labelClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "conceptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "evidenceClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "class",
+        "labelClaimId",
+        "evidenceClaimIds"
+      ]
+    },
+    "employment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "titleClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "companyClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "locationClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ongoing": {
+          "type": "boolean"
+        },
+        "scopeClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "responsibilityClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "accomplishmentClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "metricClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "skillIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "titleClaimId",
+        "companyClaimId",
+        "locationClaimId",
+        "startClaimId",
+        "endClaimId",
+        "ongoing",
+        "scopeClaimIds",
+        "responsibilityClaimIds",
+        "accomplishmentClaimIds",
+        "metricClaimIds",
+        "skillIds"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ongoing": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "endClaimId": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "education": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "institutionClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "qualificationClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "fieldClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detailClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "institutionClaimId",
+        "qualificationClaimId",
+        "fieldClaimId",
+        "locationClaimId",
+        "startClaimId",
+        "endClaimId",
+        "detailClaimIds"
+      ]
+    },
+    "optionalEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "certifications",
+            "projects",
+            "achievements",
+            "portfolio",
+            "languages",
+            "leadership",
+            "publications",
+            "volunteering",
+            "custom"
+          ]
+        },
+        "labelClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "detailClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "startClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endClaimId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linkClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "metricClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "labelClaimId",
+        "detailClaimIds",
+        "startClaimId",
+        "endClaimId",
+        "linkClaimIds",
+        "metricClaimIds"
+      ]
+    },
+    "prose": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "summary",
+            "bullet",
+            "scope",
+            "other"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "claimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "origin": {
+          "enum": [
+            "ai_generated",
+            "user_authored"
+          ]
+        },
+        "approval": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected"
+          ]
+        },
+        "locale": {
+          "enum": [
+            "ro",
+            "en"
+          ]
+        },
+        "generationId": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "text",
+        "claimIds",
+        "origin",
+        "approval",
+        "locale",
+        "generationId"
+      ]
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "identity",
+            "summary",
+            "professional_skills",
+            "technical_skills",
+            "experience",
+            "education",
+            "certifications",
+            "projects",
+            "achievements",
+            "portfolio",
+            "languages",
+            "leadership",
+            "publications",
+            "volunteering",
+            "custom"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "entryIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "proseIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "entryIds",
+        "proseIds",
+        "visible"
+      ]
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "modelRequested": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "modelResolved": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "promptVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "inputHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "modelRequested",
+        "modelResolved",
+        "promptVersion",
+        "inputHash",
+        "createdAt"
+      ]
+    },
+    "claimLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "fromClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "toClaimId": {
+          "$ref": "#/$defs/id"
+        },
+        "relation": {
+          "enum": [
+            "metric_of",
+            "supports",
+            "contribution_to",
+            "scope_of"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "fromClaimId",
+        "toClaimId",
+        "relation"
+      ]
+    },
+    "enrichment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "targetEntityId": {
+          "$ref": "#/$defs/id"
+        },
+        "attribute": {
+          "enum": [
+            "systems",
+            "technology",
+            "individual_contribution",
+            "impact_time",
+            "impact_cost",
+            "impact_accuracy",
+            "impact_revenue",
+            "impact_productivity",
+            "scale",
+            "stakeholders",
+            "budget",
+            "team",
+            "project"
+          ]
+        },
+        "claimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "targetEntityId",
+        "attribute",
+        "claimIds"
+      ]
+    },
+    "interview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "answerClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "targetClaimIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "state": {
+          "enum": [
+            "asked",
+            "answered_unconfirmed",
+            "confirmed",
+            "dismissed"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "question",
+        "answerClaimIds",
+        "targetClaimIds",
+        "state"
+      ]
+    }
+  }
+}

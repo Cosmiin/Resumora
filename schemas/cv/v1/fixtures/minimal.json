@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshotId": "snapshot_min",
+  "baseCvId": "base_demo",
+  "version": 1,
+  "parentSnapshotId": null,
+  "createdAt": "2026-10-23T10:00:00Z",
+  "locale": "ro",
+  "sources": [
+    {
+      "id": "source_manual",
+      "kind": "manual",
+      "label": "Synthetic user entry",
+      "capturedAt": "2026-10-23T10:00:00Z"
+    }
+  ],
+  "provenance": [
+    {
+      "id": "prov_manual",
+      "sourceId": "source_manual",
+      "locator": "manual form v1"
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim_name",
+      "kind": "text",
+      "value": "Ana Exemplu",
+      "status": "user_confirmed",
+      "provenanceIds": [
+        "prov_manual"
+      ],
+      "confirmedAt": "2026-10-23T10:00:00Z",
+      "confirmationActor": "user_demo"
+    }
+  ],
+  "facts": {
+    "nameClaimId": "claim_name",
+    "positioningTitleClaimIds": [
+      null,
+      null
+    ],
+    "contacts": [],
+    "skills": [],
+    "employment": [],
+    "education": [],
+    "optionalEntries": []
+  },
+  "claimLinks": [],
+  "enrichment": [],
+  "interviews": [],
+  "generatedProse": [],
+  "generations": [],
+  "document": {
+    "sectionOrder": [
+      "section_identity"
+    ],
+    "sections": [
+      {
+        "id": "section_identity",
+        "kind": "identity",
+        "label": "Profil",
+        "entryIds": [],
+        "proseIds": [],
+        "visible": true
+      }
+    ],
+    "templateVersionId": null,
+    "contactIds": []
+  },
+  "context": {
+    "kind": "base",
+    "baseSnapshotId": null,
+    "jobSnapshotId": null,
+    "previousTailoredSnapshotId": null
+  }
+}
