@@ -122,6 +122,39 @@ for(const status of ['Preparing','Sent','Interview','Closed']){
 nav('import');click('extract');await wait();change('#confirm-facts',true);click('confirm-base');nav('application');change('[data-bind="application.status"]','Preparing');change('#sent-confirm',true);click('save-application');
 check(state().route==='applications'&&state().application.submittedAt&&JSON.stringify(state().application.submittedSnapshot.cv.doc)===JSON.stringify(state().base)&&q('#sent-application-count').textContent==='1','job-first record can attest submission from Preparing after attaching a Base');
 const jobFirstSnapshot=JSON.stringify(state().application.submittedSnapshot);click('open-application',`[data-id="${jobFirstId}"]`);click('view-submitted');check(q('#detail-body .document').textContent.includes('Mara Ionescu'),'new submission always has a viewable snapshot');closeModal();change('[data-bind="application.status"]','Interview');click('save-application');check(JSON.stringify(state().application.submittedSnapshot)===jobFirstSnapshot&&q('#sent-application-count').textContent==='1','ordinary stage updates retain the existing attested snapshot');
+for(const locale of ['ro','en']){
+  click('reset');click('confirm-reset');change('#cv-locale',locale);change('#ui-locale',locale==='ro'?'en':'ro');nav('import');click('extract');await wait();
+  const exactDates=locale==='ro'?'ianuarie 2021 — decembrie 2023':'January 2021 — December 2023';
+  check(q('[data-role-dates]').textContent===exactDates&&q('.document').textContent.includes(exactDates),'extracted date label agrees with the draft document and its language');
+  click('review-editor');
+  for(const [roleIndex,role] of state().draft.roles.entries())for(const [bulletIndex,bullet] of role.bullets.entries()){
+    click('evidence',`[data-claim="${bullet.claim}"]`);check(q('#detail').open&&q('#detail-body blockquote').textContent===bullet.text,'every extracted bullet opens its draft evidence before Base or job exists');closeModal();
+  }
+  change('[data-bind="draft.roles.0.bullets.0.text"]','Contribuție revizuită numai în draft');click('evidence','[data-claim="claim_api"]');check(q('#detail-body blockquote').textContent==='Contribuție revizuită numai în draft'&&!state().base&&!state().job&&!state().history.length,'evidence reads the current unsaved draft without creating saved state');closeModal();click('undo');
+  change('[data-bind="draft.roles.0.start.month"]','');change('[data-bind="draft.roles.0.end.month"]','');
+  w.history.replaceState(null,'','#review');w.dispatchEvent(new w.PopStateEvent('popstate'));check(q('[data-role-dates]').textContent==='2021 — 2023'&&q('.document').textContent.includes('2021 — 2023'),'year-only dates remain year-only in review and document');
+  click('review-editor');change('[data-current="0"]',true);w.history.replaceState(null,'','#review');w.dispatchEvent(new w.PopStateEvent('popstate'));
+  check(q('[data-role-dates]').textContent===(locale==='ro'?'2021 — Prezent':'2021 — Present'),'current flag controls the review date label independently of UI language');
+  click('review-editor');change('[data-current="0"]',false);change('[data-bind="draft.roles.0.start.year"]','');change('[data-bind="draft.roles.0.end.year"]','');w.history.replaceState(null,'','#review');w.dispatchEvent(new w.PopStateEvent('popstate'));
+  check(q('[data-role-dates]').textContent===(locale==='ro'?'Necunoscut — Necunoscut':'Unknown — Unknown'),'missing endpoints remain unknown in the review label');
+}
+click('reset');click('confirm-reset');nav('import');click('manual');click('review-editor');click('add-role');click('add-bullet','[data-index="0"]');change('#achievement-action','Am documentat procedura de verificare');change('#achievement-unknown',true);click('save-achievement');
+const manualBullet=state().draft.roles[0].bullets[0];click('evidence',`[data-claim="${manualBullet.claim}"]`);check(q('#detail').open&&q('#detail-body blockquote').textContent===manualBullet.text&&!state().base&&!state().job,'manual unconfirmed draft evidence also works without a saved document');closeModal();
+resetDemo();click('evidence','[data-claim="claim_api"]');check(q('#detail').open&&q('#detail-body blockquote').textContent===state().draft.roles[0].bullets[0].text,'saved Base editor evidence uses the displayed draft');closeModal();
+nav('compare');click('accept-tailor');change('[data-bind="draft.roles.0.bullets.0.text"]','Contribuție corectată în ciorna pentru job');click('evidence','[data-claim="claim_api"]');check(q('#detail-body blockquote').textContent==='Contribuție corectată în ciorna pentru job'&&state().jobCV.doc.roles[0].bullets[0].text!=='Contribuție corectată în ciorna pentru job','job editor evidence follows unsaved changes instead of the saved current CV');closeModal();
+nav('ats');click('evidence','[data-claim="claim_api"]');check(q('#detail').open&&q('#detail-body blockquote').textContent===state().jobCV.doc.roles[0].bullets[0].text,'analysis evidence continues to use the saved analysis document');closeModal();click('evidence','[data-claim="work_authorization"]');check(q('#detail').open&&q('#detail-body').textContent.includes('work_authorization'),'non-bullet requirement evidence remains available');closeModal();
+for(const locale of ['ro','en']){
+  resetDemo();change('#ui-locale',locale);nav('jobs');nav('requirements');
+  const terms={automation:'Power Automate',api:'REST API integration',hr:'HR / payroll context',work_authorization:'Right to work in Romania'};
+  for(const id of ['automation','sql','api','years','hr','work_authorization'])for(const required of [false,true]){
+    const version=state().job.version;change(`[data-required="${id}"]`,required);
+    check(q(`[data-required="${id}"]`).checked===required&&q(`[data-required="${id}"]`).closest('.list-item').querySelector('.pill').textContent===(locale==='ro'?(required?'Obligatoriu':'Preferat'):(required?'Required':'Preferred')),'each requirement badge immediately reflects both priority directions');
+    check(state().job.version===version+1&&state().analysis===null,'priority edits update the job version and invalidate analysis');
+    nav('ats');click('analyze');await wait();check(state().analysis.value===62.5,'priority edits preserve the explicitly illustrative scorer');
+    if(terms[id]){const row=[...d.querySelectorAll('.keyword')].find(x=>x.querySelector('h3').textContent===terms[id]);check(row.querySelector('small').textContent.endsWith(' · '+(locale==='ro'?(required?'obligatoriu':'preferat'):(required?'required':'preferred'))),'applicable keyword groups use the same effective requirement priority');}
+    nav('requirements');check(q(`[data-required="${id}"]`).checked===required,'effective priority survives navigation and recalculation');
+  }
+}
 const browserJourney=w.eval('('+fs.readFileSync(path.join(dir,'../reviews/ux/browser-journeys.js'),'utf8')+')');const browserResult=await browserJourney();check(browserResult.status==='PASS'&&browserResult.checks.length>30,'maintained browser journey completes against public DOM interactions');
 check(runtimeErrors.length===0,'all public interactions complete without runtime errors');
 

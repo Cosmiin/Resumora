@@ -61,3 +61,12 @@ The evidence projection now includes every visible text section (summary, educat
 New submission attestations require an attached current document at the shared application-save boundary, whether the stage is Preparing, Sent, Interview or Closed. Job-first records still save without a CV while unsent. Regression coverage checks rejection without a snapshot or sent-count increment, successful attestation after creating Base, a viewable submitted snapshot and preserved history through later stages. Existing rewrite, Undo, unmeasured-result and full application/review JSON portability coverage remains in the verifier.
 
 Focused result for this round: `npm test --prefix prototype` passed 297 assertions for the source page and 297 for the regenerated portable page. Both new regressions and the existing rewrite/export/browser-journey checks passed. No complete repository test or lint suite, browser-layout pass, production service, push, PR or CI phase was run.
+
+
+### Draft evidence, dates and requirement priorities
+
+Evidence drawers read the displayed editor draft directly, without requiring Base, a job or a saved analysis. Analysis links still read the saved current document; non-bullet requirement links retain their synthetic source disclosure. Review dates and document dates share formatting from the role's actual endpoints, precision, current flag and document language. Requirement overrides are applied by the shared list consumed by checkboxes, badges and keyword priority groups; edits refresh labels immediately and invalidate analysis without changing the illustrative scoring method.
+
+Focused regressions exercise evidence before the first save and after draft corrections, saved Base/job/analysis evidence, precise/year-only/current/unknown dates in both document languages with an independent UI language, and both override directions for every requirement with both UI languages.
+
+Focused result: `npm test --prefix prototype` passed 434 assertions against source and 434 against the regenerated portable page. The regression setup uses the supported Jobs → Requirements navigation. No complete repository test/lint suite, browser-layout pass, production integration, push, PR or CI phase was run.
