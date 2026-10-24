@@ -1,0 +1,16 @@
+<!-- @dsCard group="Content" viewport="700x560" name="Romanian · errors" subtitle="Ce s-a întâmplat + cum repari + o acțiune" -->
+<!doctype html><html lang="ro"><head><meta charset="utf-8"><link rel="icon" type="image/svg+xml" href="../assets/favicon/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon/favicon-32.png"><link rel="stylesheet" href="../styles.css"><style>body{padding:20px;background:var(--surface-page)}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.stack{display:grid;gap:12px}.lbl{font:700 .64rem var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script><script src="../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { Field, Alert, Button } = window.CVizatDesignSystem_0f8e2e;
+function App(){return <div className="stack">
+<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}><Field label="E-mail" icon="mail" defaultValue="mara@exemplu" error="Adaugă o adresă de e-mail completă, de exemplu mara@exemplu.ro." /><Field label="Anunțul jobului" defaultValue="Analist" error="Lipește tot anunțul — avem nevoie de cel puțin 30 de caractere." /></div>
+<Alert tone="bad" title="Nu putem citi textul din acest PDF" action={<Button size="sm">Completează manual</Button>}>Pare scanat sau protejat. Încarcă un PDF cu text selectabil sau completează manual.</Alert>
+<Alert tone="warn" title="De verificat: dreptul de muncă în România" action={<Button size="sm">Răspunde</Button>}>Jobul îl cere ca o condiție eliminatorie și nu știm încă. Scorul nu se schimbă.</Alert>
+<Alert tone="info" title="CV-ul a fost modificat în altă fereastră" action={<Button size="sm">Compară</Button>}>Ți-am păstrat modificările — alege ce versiune rămâne.</Alert>
+<Alert tone="neutral" title="Ai folosit toate cele 4 adaptări din această lună">Se resetează pe 1 noiembrie; până atunci poți edita manual.</Alert>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

@@ -1,0 +1,21 @@
+<!-- @dsCard group="Components" viewport="700x900" name="Forms" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="icon" type="image/svg+xml" href="../../assets/favicon/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="../../assets/favicon/favicon-32.png"><link rel="apple-touch-icon" href="../../assets/favicon/apple-touch-icon.png"><link rel="manifest" href="../../assets/favicon/site.webmanifest"><meta name="theme-color" content="#17695d"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:22px;background:var(--surface-card)}.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.stack{display:grid;gap:18px}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script><script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { Field, Select, Checkbox, RadioGroup, Segmented, Dropzone } = window.CVizatDesignSystem_0f8e2e;
+function App(){const [m,setM]=React.useState('paste');const [r,setR]=React.useState('yes');const [f,setF]=React.useState(null);
+return <div className="stack">
+<Segmented fullWidth value={m} onChange={setM} options={[{value:'paste',label:'Paste the ad',icon:'clipboard-paste'},{value:'type',label:'Type it in',icon:'pencil'},{value:'link',label:'From a link',icon:'link'}]} />
+<div className="g2"><Field label="Job title" icon="briefcase" placeholder="e.g. Business Systems Analyst" hint="As written in the ad" /><Field label="Email" icon="mail" defaultValue="mara@example" error="Add the full address — e.g. mara@example.com" /></div>
+<div className="g2"><Field label="Experience" defaultValue="6" suffix="years" success="Matches your CV" /><Select label="CV language" defaultValue="ro" options={[{value:'ro',label:'Română',icon:'languages'},{value:'en',label:'English',icon:'languages'}]} optional /></div>
+<div className="g2"><Field label="Paste the job ad" multiline rows={3} maxLength={6000} defaultValue="Northstar People is hiring a Business Systems Analyst to automate HR and payroll workflows." /><Dropzone file={f} onFile={setF} onRemove={()=>setF(null)} /></div>
+<div className="g2"><RadioGroup label="Can you legally work in Romania?" direction="row" value={r} onChange={setR} options={[{value:'yes',label:'Yes'},{value:'no',label:'No'},{value:'unsure',label:'Not sure'}]} />
+<div className="stack" style={{gap:10,alignContent:'end'}}><Checkbox label="I’ve checked these details are true" defaultChecked /><Checkbox variant="card" label="Add the payroll API project" description="From your Base CV · BridgeWorks" defaultChecked /></div></div>
+<div className="g2" style={{minHeight:330,alignItems:'start'}}><Select label="City" searchable placeholder="Choose a city" defaultValue="bv" options={[{value:'b',label:'București',group:'South'},{value:'bv',label:'Brașov',group:'Centre'},{value:'cj',label:'Cluj-Napoca',group:'North-West'},{value:'ia',label:'Iași',group:'North-East'},{value:'tm',label:'Timișoara',group:'West'}]} hint="Type “brasov” — diacritics optional" />
+<Select label="Template" defaultValue="clar" defaultOpen options={[{value:'clar',label:'Clar',icon:'type',description:'Serif, editorial, one column'},{value:'contur',label:'Contur',icon:'layout-template',description:'Sans with an accent band, one column'},{value:'more',label:'More templates',icon:'lock',description:'After the first PDF is tested',disabled:true}]} /></div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

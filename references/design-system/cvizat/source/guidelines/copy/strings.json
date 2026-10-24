@@ -1,0 +1,567 @@
+{
+  "_meta": {
+    "locale": [
+      "ro",
+      "en"
+    ],
+    "note": "Resumora system strings. ICU MessageFormat. RO is primary. See guidelines/romanian-copy.md."
+  },
+  "action": {
+    "start_job": {
+      "ro": "Începe cu un job",
+      "en": "Start with a job"
+    },
+    "create_base": {
+      "ro": "Creează CV-ul de bază",
+      "en": "Create my Base CV"
+    },
+    "upload_cv": {
+      "ro": "Încarcă CV-ul",
+      "en": "Upload CV"
+    },
+    "enter_manually": {
+      "ro": "Completează manual",
+      "en": "Enter manually"
+    },
+    "confirm_save": {
+      "ro": "Confirmă și salvează",
+      "en": "Confirm and save"
+    },
+    "check_match": {
+      "ro": "Verifică potrivirea",
+      "en": "Check my match"
+    },
+    "add_missing": {
+      "ro": "{count, plural, one {Adaugă lipsa} few {Adaugă cele # lipsuri} other {Adaugă cele # de lipsuri}}",
+      "en": "{count, plural, one {Add the missing thing} other {Add the # missing things}}"
+    },
+    "save_job_cv": {
+      "ro": "Salvează CV-ul pentru job",
+      "en": "Save this job’s CV"
+    },
+    "only_this_job": {
+      "ro": "Doar pentru acest job",
+      "en": "Only this job"
+    },
+    "update_base_too": {
+      "ro": "Actualizează și baza",
+      "en": "Update Base too"
+    },
+    "download_pdf": {
+      "ro": "Descarcă PDF",
+      "en": "Download PDF"
+    },
+    "mark_sent": {
+      "ro": "Am trimis candidatura",
+      "en": "I’ve sent this application"
+    },
+    "retry": {
+      "ro": "Încearcă din nou",
+      "en": "Try again"
+    },
+    "cancel": {
+      "ro": "Renunță",
+      "en": "Cancel"
+    },
+    "undo": {
+      "ro": "Anulează",
+      "en": "Undo"
+    },
+    "close": {
+      "ro": "Închide",
+      "en": "Close"
+    },
+    "skip": {
+      "ro": "Sari peste",
+      "en": "Skip"
+    },
+    "later": {
+      "ro": "Mai târziu",
+      "en": "Later"
+    },
+    "sign_in": {
+      "ro": "Intră în cont",
+      "en": "Sign in"
+    },
+    "sign_up": {
+      "ro": "Creează cont",
+      "en": "Create account"
+    },
+    "sign_out": {
+      "ro": "Ieși din cont",
+      "en": "Sign out"
+    }
+  },
+  "select": {
+    "placeholder": {
+      "ro": "Alege o opțiune",
+      "en": "Choose an option"
+    },
+    "search": {
+      "ro": "Caută…",
+      "en": "Search…"
+    },
+    "empty": {
+      "ro": "Niciun rezultat",
+      "en": "No matches"
+    },
+    "unknown_month": {
+      "ro": "Lună necunoscută",
+      "en": "Unknown month"
+    },
+    "not_sure": {
+      "ro": "Nu știu",
+      "en": "Not sure"
+    }
+  },
+  "error": {
+    "email_invalid": {
+      "ro": "Adaugă o adresă de e-mail completă, de exemplu mara@exemplu.ro.",
+      "en": "Add a complete email address, e.g. mara@example.com."
+    },
+    "password_short": {
+      "ro": "Parola trebuie să aibă cel puțin 8 caractere.",
+      "en": "Password needs at least 8 characters."
+    },
+    "credentials": {
+      "ro": "E-mailul sau parola nu se potrivesc. Încearcă din nou sau resetează parola.",
+      "en": "Email or password doesn’t match. Try again or reset your password."
+    },
+    "account_exists": {
+      "ro": "Există deja un cont cu acest e-mail. Intră în cont sau resetează parola.",
+      "en": "An account already exists for this email. Sign in or reset your password."
+    },
+    "consent_missing": {
+      "ro": "Bifează acordul pentru prelucrarea datelor ca să putem continua.",
+      "en": "Tick the data-processing consent to continue."
+    },
+    "session_expired": {
+      "ro": "Sesiunea a expirat. Intră din nou în cont — modificările tale sunt salvate.",
+      "en": "Your session expired. Sign in again — your changes are saved."
+    },
+    "file_format": {
+      "ro": "Putem citi doar fișiere PDF sau DOCX. Salvează documentul într-unul dintre aceste formate sau completează manual.",
+      "en": "We can read PDF or DOCX files only. Save it in one of these formats or enter it manually."
+    },
+    "file_size": {
+      "ro": "Fișierul are {size} MB. Încarcă unul de cel mult 10 MB.",
+      "en": "The file is {size} MB. Upload one up to 10 MB."
+    },
+    "file_scanned": {
+      "ro": "Nu putem citi textul din acest PDF — pare scanat sau protejat. Încarcă un PDF cu text selectabil sau completează manual.",
+      "en": "We can’t read the text in this PDF — it looks scanned or protected. Upload a PDF with selectable text or enter it manually."
+    },
+    "file_password": {
+      "ro": "Fișierul e protejat cu parolă. Scoate parola și încarcă-l din nou.",
+      "en": "The file is password-protected. Remove the password and upload it again."
+    },
+    "extract_failed": {
+      "ro": "Nu am reușit să citim CV-ul de data asta. Încearcă din nou — nu ai pierdut nimic.",
+      "en": "We couldn’t read your CV this time. Try again — nothing was lost."
+    },
+    "fields_unconfirmed": {
+      "ro": "Mai ai {count, plural, one {un câmp} few {# câmpuri} other {# de câmpuri}} de verificat înainte de salvare.",
+      "en": "{count, plural, one {One field} other {# fields}} left to check before saving."
+    },
+    "confirm_facts": {
+      "ro": "Confirmă că informațiile sunt corecte înainte de salvare.",
+      "en": "Confirm the information is correct before saving."
+    },
+    "year_range": {
+      "ro": "Anul trebuie să fie între 1900 și {max}.",
+      "en": "Year must be between 1900 and {max}."
+    },
+    "end_before_start": {
+      "ro": "Data de sfârșit e înaintea celei de început. Verifică anii.",
+      "en": "The end date is before the start date. Check the years."
+    },
+    "bullet_empty": {
+      "ro": "Completează sau elimină realizarea goală.",
+      "en": "Complete or remove the empty accomplishment."
+    },
+    "answer_empty": {
+      "ro": "Scrie un răspuns sau alege „Sari peste”.",
+      "en": "Write an answer or choose “Skip”."
+    },
+    "claim_unconfirmed": {
+      "ro": "Confirmă afirmația înainte s-o folosim.",
+      "en": "Confirm the claim before we use it."
+    },
+    "job_too_short": {
+      "ro": "Lipește tot anunțul — avem nevoie de cel puțin 30 de caractere.",
+      "en": "Paste the whole ad — we need at least 30 characters."
+    },
+    "url_invalid": {
+      "ro": "Introdu un link care începe cu https://.",
+      "en": "Enter a link starting with https://."
+    },
+    "url_blocked": {
+      "ro": "Nu putem deschide pagina — cere autentificare. Copiază textul anunțului și lipește-l aici.",
+      "en": "We can’t open that page — it needs a login. Copy the ad text and paste it here."
+    },
+    "job_duplicate": {
+      "ro": "Ai adăugat deja acest anunț pe {date}. Deschide-l sau salvează-l ca versiune nouă.",
+      "en": "You already added this ad on {date}. Open it or save as a new version."
+    },
+    "no_requirements": {
+      "ro": "Nu am găsit cerințe clare în text. Adaugă-le manual, câte una pe rând.",
+      "en": "We couldn’t find clear requirements. Add them manually, one per line."
+    },
+    "base_missing": {
+      "ro": "Salvează mai întâi CV-ul de bază — comparăm faptele confirmate cu cerințele jobului.",
+      "en": "Save your Base CV first — we compare confirmed facts with the job’s requirements."
+    },
+    "analysis_stale": {
+      "ro": "Anunțul s-a schimbat. Recalculează potrivirea ca să vezi rezultatul actualizat.",
+      "en": "The ad changed. Recalculate the match to see the updated result."
+    },
+    "analysis_failed": {
+      "ro": "Analiza nu s-a terminat. Încearcă din nou; rezultatul anterior rămâne valabil.",
+      "en": "The analysis didn’t finish. Try again; the previous result still stands."
+    },
+    "needs_evidence": {
+      "ro": "Pentru această propunere avem nevoie de context de la tine — nu inventăm realizări.",
+      "en": "We need context from you for this suggestion — we never invent accomplishments."
+    },
+    "conflict": {
+      "ro": "CV-ul a fost modificat în altă fereastră. Ți-am păstrat modificările — alege ce versiune rămâne.",
+      "en": "This CV changed in another window. We kept your edits — choose which version stays."
+    },
+    "save_failed": {
+      "ro": "Nu am putut salva. Modificările sunt încă aici — încearcă din nou.",
+      "en": "We couldn’t save. Your changes are still here — try again."
+    },
+    "review_export": {
+      "ro": "Verifică documentul înainte de descărcare.",
+      "en": "Review the document before downloading."
+    },
+    "pdf_readability": {
+      "ro": "PDF-ul s-a generat, dar textul nu se citește în ordinea corectă. Încearcă din nou sau alege alt șablon.",
+      "en": "The PDF was created but its text doesn’t read in the right order. Try again or pick another template."
+    },
+    "pdf_diacritics": {
+      "ro": "Unele diacritice nu apar corect în PDF, așa că am oprit descărcarea. Încearcă din nou.",
+      "en": "Some Romanian characters didn’t render in the PDF, so we stopped the download. Try again."
+    },
+    "export_not_sent": {
+      "ro": "Descărcarea nu înseamnă trimitere. Marchează candidatura ca trimisă după ce o trimiți.",
+      "en": "Downloading isn’t sending. Mark the application as sent once you’ve sent it."
+    },
+    "sent_without_cv": {
+      "ro": "Atașează un CV înainte de a marca candidatura ca trimisă.",
+      "en": "Attach a CV before marking the application as sent."
+    },
+    "payment_declined": {
+      "ro": "Plata nu a trecut. Încearcă alt card sau contactează banca.",
+      "en": "The payment didn’t go through. Try another card or contact your bank."
+    },
+    "quota_reached": {
+      "ro": "Ai folosit toate cele {count} adaptări din această lună. Se resetează pe {date}; până atunci poți edita manual.",
+      "en": "You’ve used all {count} tailorings this month. They reset on {date}; until then you can edit manually."
+    },
+    "offline": {
+      "ro": "Nu ai conexiune la internet. Reîncercăm automat când revii online.",
+      "en": "You’re offline. We’ll retry automatically when you’re back."
+    },
+    "rate_limited": {
+      "ro": "Prea multe încercări într-un timp scurt. Încearcă din nou peste un minut.",
+      "en": "Too many attempts. Try again in a minute."
+    },
+    "not_found": {
+      "ro": "Nu găsim această pagină. Poate a fost mutată sau ștearsă.",
+      "en": "We can’t find this page. It may have moved or been deleted."
+    },
+    "unknown": {
+      "ro": "Ceva n-a mers cum trebuia. Încearcă din nou; dacă se repetă, scrie-ne la suport@resumora.ro.",
+      "en": "Something went wrong. Try again; if it keeps happening, email suport@resumora.ro."
+    }
+  },
+  "success": {
+    "base_saved": {
+      "ro": "Am salvat CV-ul de bază (v{version}).",
+      "en": "Base CV saved (v{version})."
+    },
+    "added_to_job": {
+      "ro": "Am adăugat proiectul în CV-ul pentru {company}. CV-ul de bază nu s-a schimbat.",
+      "en": "Added to the CV for {company}. Your Base CV didn’t change."
+    },
+    "restored": {
+      "ro": "Am restaurat versiunea {from} ca versiune nouă (v{to}).",
+      "en": "Restored version {from} as a new version (v{to})."
+    },
+    "undone": {
+      "ro": "Am anulat ultima modificare.",
+      "en": "Last change undone."
+    },
+    "pdf_ready": {
+      "ro": "PDF-ul e gata și se citește corect.",
+      "en": "Your PDF is ready and reads correctly."
+    },
+    "sent": {
+      "ro": "Am marcat candidatura ca trimisă. Mult succes, {name}!",
+      "en": "Marked as sent. Good luck, {name}!"
+    },
+    "kept_changes": {
+      "ro": "{count, plural, =0 {Nicio schimbare păstrată} one {O schimbare păstrată} few {# schimbări păstrate} other {# de schimbări păstrate}}",
+      "en": "{count, plural, =0 {No changes kept} one {1 change kept} other {# changes kept}}"
+    }
+  },
+  "status": {
+    "keyword": {
+      "included": {
+        "ro": "În CV-ul tău",
+        "en": "In your CV"
+      },
+      "verified_equivalent": {
+        "ro": "În CV · formulare echivalentă",
+        "en": "In your CV · similar wording"
+      },
+      "verified_omitted": {
+        "ro": "Ai experiența · lipsește din acest CV",
+        "en": "You have it · not in this CV"
+      },
+      "awaiting_confirmation": {
+        "ro": "E adevărat pentru tine?",
+        "en": "Is this true for you?"
+      },
+      "unsupported": {
+        "ro": "Nu apare în experiența ta",
+        "en": "Not in your experience"
+      },
+      "attestation": {
+        "ro": "Susținut prin declarație",
+        "en": "Supported by attestation"
+      }
+    },
+    "eligibility": {
+      "satisfied": {
+        "ro": "Cerințe îndeplinite",
+        "en": "Requirements satisfied"
+      },
+      "needs_verification": {
+        "ro": "De verificat",
+        "en": "Needs verification"
+      },
+      "confirmed_gap": {
+        "ro": "Cerință neîndeplinită",
+        "en": "Confirmed requirement gap"
+      }
+    },
+    "readability": {
+      "untested": {
+        "ro": "Netestat",
+        "en": "Not tested"
+      },
+      "pass": {
+        "ro": "Se citește corect",
+        "en": "Reads correctly"
+      },
+      "issues": {
+        "ro": "Probleme de citire",
+        "en": "Reading issues"
+      }
+    },
+    "fact": {
+      "extracted_unconfirmed": {
+        "ro": "Extras · neconfirmat",
+        "en": "Extracted · unconfirmed"
+      },
+      "user_confirmed": {
+        "ro": "Confirmat de tine",
+        "en": "Confirmed by you"
+      },
+      "externally_verified": {
+        "ro": "Verificat extern",
+        "en": "Externally verified"
+      },
+      "suggested": {
+        "ro": "Propunere",
+        "en": "Suggestion"
+      },
+      "rejected": {
+        "ro": "Respins",
+        "en": "Rejected"
+      }
+    },
+    "priority": {
+      "required": {
+        "ro": "Obligatoriu",
+        "en": "Required"
+      },
+      "preferred": {
+        "ro": "De preferat",
+        "en": "Preferred"
+      },
+      "unspecified": {
+        "ro": "Nespecificat",
+        "en": "Unspecified"
+      },
+      "hard_gate": {
+        "ro": "Condiție eliminatorie",
+        "en": "Strict requirement"
+      }
+    },
+    "application": {
+      "preparing": {
+        "ro": "De pregătit",
+        "en": "Preparing"
+      },
+      "sent": {
+        "ro": "Trimisă",
+        "en": "Sent"
+      },
+      "interview": {
+        "ro": "Interviu",
+        "en": "Interview"
+      },
+      "closed": {
+        "ro": "Închisă",
+        "en": "Closed"
+      },
+      "tailored": {
+        "ro": "Adaptat",
+        "en": "Tailored"
+      },
+      "not_tailored": {
+        "ro": "Neadaptat",
+        "en": "Not tailored"
+      }
+    },
+    "operation": {
+      "queued": {
+        "ro": "În așteptare…",
+        "en": "Waiting…"
+      },
+      "running_job": {
+        "ro": "Citim anunțul…",
+        "en": "Reading the job ad…"
+      },
+      "running_match": {
+        "ro": "Comparăm CV-ul cu cerințele…",
+        "en": "Comparing your CV with the requirements…"
+      },
+      "running_pdf": {
+        "ro": "Pregătim PDF-ul și verificăm că se citește corect…",
+        "en": "Preparing your PDF and checking it reads correctly…"
+      },
+      "needs_input": {
+        "ro": "Avem nevoie de un răspuns de la tine",
+        "en": "We need an answer from you"
+      },
+      "failed_retryable": {
+        "ro": "Nu s-a terminat.",
+        "en": "It didn’t finish."
+      },
+      "failed_final": {
+        "ro": "Nu putem finaliza această operațiune. Ultima versiune salvată e neatinsă.",
+        "en": "We can’t complete this. Your last saved version is untouched."
+      },
+      "cancel_requested": {
+        "ro": "Se oprește…",
+        "en": "Stopping…"
+      },
+      "cancelled": {
+        "ro": "Oprit. Nimic nu s-a schimbat.",
+        "en": "Stopped. Nothing changed."
+      },
+      "expired": {
+        "ro": "A expirat. Pornește din nou.",
+        "en": "Expired. Start again."
+      }
+    },
+    "subscription": {
+      "active": {
+        "ro": "Activ",
+        "en": "Active"
+      },
+      "pending": {
+        "ro": "Se confirmă plata",
+        "en": "Confirming payment"
+      },
+      "declined": {
+        "ro": "Plată refuzată",
+        "en": "Payment declined"
+      },
+      "ending": {
+        "ro": "Se oprește pe {date}",
+        "en": "Ends on {date}"
+      },
+      "expired": {
+        "ro": "Expirat",
+        "en": "Expired"
+      }
+    }
+  },
+  "score": {
+    "disclaimer": {
+      "ro": "Estimare pe baza faptelor confirmate de tine. Nu e scorul unui angajator și nu prezice angajarea.",
+      "en": "An estimate based on facts you confirmed. Not an employer’s score and not a hiring prediction."
+    },
+    "fit_label": {
+      "ro": "Tu vs. job",
+      "en": "You vs the job"
+    },
+    "match_label": {
+      "ro": "CV-ul vs. job",
+      "en": "This CV vs the job"
+    },
+    "rewording": {
+      "ro": "Reformularea singură nu schimbă scorul; contează ce fapte alegi.",
+      "en": "Rewording alone doesn’t change the score; the facts you choose do."
+    }
+  },
+  "honesty": {
+    "confirmed_only": {
+      "ro": "Propunerile folosesc doar fapte confirmate de tine.",
+      "en": "Suggestions only use facts you confirmed."
+    },
+    "no_invention": {
+      "ro": "Nu adăugăm cifre, titluri sau calificări pe care nu le-ai confirmat.",
+      "en": "We never add numbers, titles or qualifications you haven’t confirmed."
+    },
+    "self_confirmed": {
+      "ro": "„Confirmat de tine” înseamnă declarația ta, nu o verificare independentă.",
+      "en": "“Confirmed by you” is your statement, not independent verification."
+    },
+    "diploma": {
+      "ro": "Traducerea unei diplome nu înseamnă recunoașterea ei în România.",
+      "en": "Translating a diploma doesn’t mean it is recognised in Romania."
+    },
+    "template": {
+      "ro": "Șablonul schimbă aspectul, nu faptele.",
+      "en": "Templates change presentation, never facts."
+    }
+  },
+  "empty": {
+    "jobs": {
+      "title": {
+        "ro": "Niciun job încă",
+        "en": "No jobs yet"
+      },
+      "body": {
+        "ro": "Lipește un anunț și îți arătăm cât de bine te potrivești.",
+        "en": "Paste a job ad and we’ll show how well you fit."
+      }
+    },
+    "base": {
+      "title": {
+        "ro": "Încă nu ai un CV de bază",
+        "en": "No Base CV yet"
+      },
+      "body": {
+        "ro": "Încarcă CV-ul actual sau completează-l pas cu pas. Durează câteva minute.",
+        "en": "Upload your current CV or build it step by step. It takes a few minutes."
+      }
+    },
+    "history": {
+      "title": {
+        "ro": "Încă nu ai versiuni",
+        "en": "No versions yet"
+      },
+      "body": {
+        "ro": "Fiecare salvare creează o versiune pe care o poți restaura.",
+        "en": "Every save creates a version you can restore."
+      }
+    }
+  }
+}
