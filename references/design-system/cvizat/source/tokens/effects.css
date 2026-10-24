@@ -1,0 +1,19 @@
+:root{
+--shadow-none:none;
+--shadow-card:0 1px 2px rgba(23,59,57,.04);
+--shadow-raised:0 4px 16px rgba(23,59,57,.08);
+--shadow-document:0 9px 24px rgba(23,59,57,.035);
+--shadow-paper:0 14px 40px rgba(23,59,57,.08);
+--shadow-toast:0 4px 16px rgba(0,0,0,.13);
+--shadow-press:0 2px 0 var(--pine-800);
+--shadow-press-secondary:0 2px 0 var(--sage-300);
+--backdrop:rgba(23,59,57,.33);
+--ease-out:cubic-bezier(.2,.8,.2,1); /* @kind other */
+--ease-spring:cubic-bezier(.34,1.4,.64,1); /* @kind other */
+--ease-in-out:cubic-bezier(.65,0,.35,1); /* @kind other */
+--dur-fast:120ms; /* @kind other */
+--dur-base:200ms; /* @kind other */
+--dur-slow:360ms; /* @kind other */
+--dur-celebrate:700ms; /* @kind other */
+--focus-outline:3px solid var(--focus-ring);--focus-offset:3px;
+}

@@ -1,0 +1,14 @@
+<!-- @dsCard group="Content" viewport="700x440" name="Romanian · toasts, dialogs, progress" subtitle="Confirmări cu Anulează, dialog cu întrebare" -->
+<!doctype html><html lang="ro"><head><meta charset="utf-8"><link rel="icon" type="image/svg+xml" href="../assets/favicon/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon/favicon-32.png"><link rel="stylesheet" href="../styles.css"><style>body{padding:20px;background:var(--surface-page)}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.stack{display:grid;gap:12px}.lbl{font:700 .64rem var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script><script src="../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { Toast, Dialog, Button, Spinner } = window.CVizatDesignSystem_0f8e2e;
+function App(){return <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+<div className="stack"><Toast floating={false} action="Anulează">Am salvat CV-ul de bază (v4).</Toast><Toast floating={false}>Am adăugat proiectul în CV-ul pentru Northstar People. CV-ul de bază nu s-a schimbat.</Toast><Toast floating={false} icon="party-popper">Am marcat candidatura ca trimisă. Mult succes, Mara!</Toast>
+<div style={{background:'#fff',border:'1px solid var(--border-subtle)',borderRadius:14,padding:'22px 18px',display:'grid',justifyItems:'center',gap:10}}><Spinner size={30} label="Pregătim PDF-ul și verificăm că se citește corect…" /><Button size="sm" variant="ghost">Renunță</Button></div></div>
+<Dialog inline title="Actualizezi și CV-ul de bază?" onClose={()=>{}} footer={<><Button>Doar pentru acest job</Button><Button variant="primary">Actualizează și baza</Button></>}>Noul rezumat poate ajuta și la alte joburi. Salvăm o versiune nouă pe care o poți anula.</Dialog>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>

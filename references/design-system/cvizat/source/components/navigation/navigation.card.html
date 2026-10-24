@@ -1,0 +1,14 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Navigation" -->
+<!doctype html><html><head><meta charset="utf-8"><link rel="icon" type="image/svg+xml" href="../../assets/favicon/favicon.svg"><link rel="icon" type="image/png" sizes="32x32" href="../../assets/favicon/favicon-32.png"><link rel="apple-touch-icon" href="../../assets/favicon/apple-touch-icon.png"><link rel="manifest" href="../../assets/favicon/site.webmanifest"><meta name="theme-color" content="#17695d"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.stack{display:grid;gap:14px}.lbl{font:600 .68rem/1 var(--font-sans);letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script><script src="../../_ds_bundle.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+const { SideNav, TopBar, Stepper, IconButton, Button } = window.CVizatDesignSystem_0f8e2e;
+function App(){const [v,setV]=React.useState('home');return <div style={{display:'flex',border:'1px solid var(--border-subtle)',borderRadius:12,overflow:'hidden',height:300,background:'var(--surface-page)'}}>
+<SideNav value={v} onChange={setV} items={[{value:'home',label:'Home',icon:'house'},{value:'cv',label:'My CV',icon:'file-user'},{value:'jobs',label:'Jobs',icon:'briefcase',badge:'2'},{value:'account',label:'Account',icon:'circle-user'}]} />
+<div style={{flex:1,minWidth:0}}><TopBar back={<IconButton icon="x" label="Exit" />} title="Northstar People" right={<Button size="sm">Save & exit</Button>}><Stepper steps={['Job','Match','Improve','Download']} current={1} /></TopBar></div>
+</div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>
