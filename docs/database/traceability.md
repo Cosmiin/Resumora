@@ -21,7 +21,7 @@ No additional table scope is introduced. Concrete SQL adds precise reviewed-requ
 
 Entity kinds retain the canonical concepts: name, two positioning-title slots, contact, skill (professional/technical), employment, education, optional entry, enrichment. Claim and entity revision content is immutable; graph publication is atomic. Canonical facts projections, CV document layout/selection and job version inputs are distinct. Content changes allocate versions rather than rewriting the source Base CV while tailoring.
 
-The SQL canonical validator embeds `schemas/cv/v1/cv.schema.json` without loosening its ID grammar. Database UUIDs are encoded as `id_UUID` in the canonical envelope. The [API contract](api.md) explains allocation and decoding. Existing canonical fixtures and source ATS/duration calculators remain unchanged. Tests explicitly build separate relational evidence for the abstract ATS examples.
+The SQL canonical validator embeds the [canonical schema](../../schemas/cv/v1/schema.json) without loosening its ID grammar. Database UUIDs are encoded as `id_UUID` in the canonical envelope. The [API contract](api.md) explains allocation and decoding. Existing canonical fixtures and source ATS/duration calculators remain unchanged. Tests explicitly build separate relational evidence for the abstract ATS examples.
 
 ## Executable evidence
 
