@@ -6,7 +6,7 @@
 
 For infrastructure preparation before implementation, use the [setup guide](SETUP_GUIDE.md): verified repository readiness, account inventory, secure configuration and feature-triggered service checklists. The [authentication preparation](docs/setup/authentication.md) specifies email/password login/reset with Google later; it is documentation and credential-ignore preparation, not working authentication.
 
-1. Read the [integrated PRD](docs/product/prd.md) and [decision register](research/strategy/publication/docs/product/decisions.md).
+1. Read the [customer-journey reference](docs/product/customer-journeys.md), [documentation index](docs/README.md), [integrated PRD](docs/product/prd.md) and [decision register](research/strategy/publication/docs/product/decisions.md).
 2. Preview the [interactive Romanian-first prototype](prototype/review.html). It uses synthetic Mara Ionescu / Northstar People data and keeps state in your browser. The interface defaults to Romanian; interface and CV language have separate controls. No real AI, server, payment, or PDF service is connected.
 3. Read the [A–F journeys](research/ux/journeys.md), [screenshot evidence map](research/ux/evidence-map.md), and [screen specifications](research/ux/screen-specifications.md).
 4. See the [architecture snapshot](research/architecture/README.md), [versioned ATS method/demonstrator](research/ats/README.md), [cost model](research/costs/README.md), and [strategy/source package](research/strategy/README.md).

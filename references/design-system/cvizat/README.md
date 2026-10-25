@@ -1,5 +1,11 @@
 # CVizat design package — Resumora reference
 
+## Current reference · received 2026-10-25
+
+[CVizat Design System (2).zip](CVizat%20Design%20System%20%282%29.zip) supersedes the original export for future design review. Frontend application development remains on hold. Read the [exact change summary and intake receipt](update-2.md) and [ordered member inventory](update-2.manifest.json). The new archive is preserved byte for byte; no second extracted tree is committed. `source/` remains the **original 2026-10-24 snapshot**, not the updated export. Updated member paths in the summary refer to files inside `(2).zip`.
+
+## Original reference · received 2026-10-24
+
 Supplied archive: [CVizat Design System.zip](CVizat%20Design%20System.zip), 442,952 bytes, received 2026-10-24. The original export name is retained for provenance; its contents already use the Resumora brand. Supplied historical repository URLs and text remain unchanged. Current repository: [Cosmiin/Resumora](https://github.com/Cosmiin/Resumora).
 
 SHA-256 of the original and committed ZIP:
