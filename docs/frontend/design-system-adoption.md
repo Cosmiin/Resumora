@@ -2,7 +2,19 @@
 
 The supplied CVizat export is the visual reference for Resumora's future frontend. This change preserves the reference package and prepares the handoff; it does not implement an application or authorize production work. The [PRD](../product/prd.md), [canonical CV/workspace contracts](../../schemas/cv/v1/README.md), [journeys A–F](../../research/ux/journeys.md) and [D-01–14 decision register](../../research/strategy/publication/docs/product/decisions.md) retain their product/data authority. The brand name is now Resumora; historical discovery evidence and the supplied export remain unchanged.
 
-## What the team supplied
+## Updated reference · 2026-10-25
+
+The [second export](../../references/design-system/cvizat/CVizat%20Design%20System%20%282%29.zip) is now the current design reference; **frontend application development remains on hold**. Its [change summary](../../references/design-system/cvizat/update-2.md) and [member inventory](../../references/design-system/cvizat/update-2.manifest.json) record 23 added files, 8 changed files, 160 unchanged files and no removals. It adds onboarding, Base editing/history/review, enrichment, capture/requirements review, job editing/export, applications/LinkedIn comparison, account/payment, sign-in/recovery and system-state mock screens, plus a mobile board and journey registry A–I. These are supplied design examples, not implemented product capabilities or approved changes to scope.
+
+Tokens, fonts, brand assets, component interfaces and the RO/EN catalogue are unchanged. The updated MatchVerdict/Home/Improve/MatchReport source adds wrapping layouts; no browser, mobile or accessibility validation was performed. New screen copy remains inline English and synthetic data is illustrative. Export, parsing and payment success paths use timers; authentication, persistence, sent snapshots and provider confirmation require application-owned implementations. The new shell also starts with changes accepted. The earlier approval, scoring, eligibility, localization, rights and accessibility gaps therefore remain relevant.
+
+The new reference supplies examples for previously absent A/B/F and recovery screens; the remaining work is to review their state/contract coverage, not assume those journeys are complete. Before any implementation, an owner must reconcile the new registry's screen IDs/journey labels with the canonical UX specs and decide capture scope, access/renewal rules, authentication recovery policy and mobile navigation. The [detailed receipt](../../references/design-system/cvizat/update-2.md) identifies concrete proposals and discrepancies. No such decisions are made by this import.
+
+## Original export assessment · 2026-10-24
+
+The remainder of this guide describes the preserved original export. All `source/` links intentionally target that older snapshot; statements about missing screens describe that version. For updated members, inspect the second ZIP using its inventory rather than combining versions. The original backlog remains implementation preparation, with mock-screen availability updated above.
+
+### What the team supplied
 
 The [reference receipt](../../references/design-system/cvizat/README.md) records archive provenance, SHA-256 and extraction checks. Paths below refer to its unmodified `source/` tree.
 
