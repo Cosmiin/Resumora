@@ -119,6 +119,23 @@ BEGIN
    'document',layout,'context',pg_catalog.jsonb_build_object('kind','base','baseSnapshotId',NULL,'jobSnapshotId',NULL,'previousTailoredSnapshotId',NULL));
 END $$;
 
+CREATE FUNCTION app.cv_section_entity_ids(workspace uuid, profile_version uuid, section jsonb, layout jsonb)
+RETURNS SETOF text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+ SELECT entry FROM (
+  SELECT app.portable_id(pe.entity_id) entry,pe.ordinal::bigint ordinal
+  FROM app.profile_version_entities pe
+  JOIN app.career_entities e ON (e.tenant_id,e.id)=(pe.tenant_id,pe.entity_id)
+  JOIN app.entity_revisions r ON (r.tenant_id,r.id)=(pe.tenant_id,pe.entity_revision_id)
+  WHERE pe.tenant_id=workspace AND pe.profile_version_id=profile_version AND section->>'kind'='identity'
+   AND ((e.entity_kind='name' AND r.payload->>'nameClaimId' IS NOT NULL)
+    OR (e.entity_kind='positioning_title' AND r.payload->>'titleClaimId' IS NOT NULL)
+    OR (e.entity_kind='contact' AND layout->'contactIds' ? app.portable_id(pe.entity_id)))
+  UNION ALL
+  SELECT value,ordinality FROM pg_catalog.jsonb_array_elements_text(section->'entryIds') WITH ORDINALITY
+  WHERE section->>'kind'<>'identity'
+ ) entries ORDER BY ordinal
+$$;
+
 CREATE FUNCTION app.insert_cv_version(workspace uuid, document_id uuid, profile_version uuid,
  request_id uuid, layout jsonb, locale text) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
@@ -137,7 +154,7 @@ BEGIN
    INSERT INTO app.cv_sections(tenant_id,cv_version_id,section_instance_id,section_kind,label,ordinal,visible)
     VALUES(workspace,snapshot,app.canonical_id(entry),section->>'kind',section->>'label',order_no,(section->>'visible')::boolean) RETURNING id INTO section_row;
    item_no:=0;
-   FOR entry IN SELECT * FROM pg_catalog.jsonb_array_elements_text(section->'entryIds') LOOP
+   FOR entry IN SELECT * FROM app.cv_section_entity_ids(workspace,profile_version,section,layout) LOOP
      SELECT pe.entity_revision_id INTO revision FROM app.profile_version_entities pe WHERE pe.tenant_id=workspace AND pe.profile_version_id=profile_version AND pe.entity_id=app.canonical_id(entry);
      IF revision IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='CV_ENTITY_NOT_PINNED'; END IF;
      INSERT INTO app.cv_items(tenant_id,cv_section_id,cv_version_id,profile_version_id,item_kind,entity_revision_id,ordinal,selected,privacy_flags)
@@ -295,7 +312,11 @@ BEGIN
  PERFORM app.assert_profile_usable(v_workspace,v_old.profile_version_id);
  SELECT * INTO v_document FROM app.cv_documents WHERE tenant_id=v_workspace AND id=p_document FOR UPDATE;
  IF v_document.draft_revision IS DISTINCT FROM p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
- v_version:=app.insert_cv_version(v_workspace,p_document,v_old.profile_version_id,r.request_id,v_old.canonical_json->'document',v_old.locale);
+ IF v_document.document_kind='job' THEN
+  v_version:=app.insert_job_cv_version(v_workspace,p_document,v_old.profile_version_id,r.request_id,v_old.canonical_json->'document',v_old.locale,v_old.job_version_id,v_old.tailoring_state='tailored');
+ ELSE
+  v_version:=app.insert_cv_version(v_workspace,p_document,v_old.profile_version_id,r.request_id,v_old.canonical_json->'document',v_old.locale);
+ END IF;
  PERFORM app.audit(v_workspace,'cv.restore','cv_version',v_version);
  RETURN app.finish_request(v_workspace,r.request_id,pg_catalog.jsonb_build_object('cvVersionId',v_version,'documentId',p_document,'revision',v_document.draft_revision+1,'restoredFrom',p_historical_version));
 END $$;

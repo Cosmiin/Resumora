@@ -12,7 +12,7 @@ CREATE FUNCTION app.confirm_job(p_key uuid,p_job uuid,p_expected_revision bigint
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_workspace uuid:=app.tenant_for_user();r record;v_job app.jobs;v_job_id uuid;
  v_version uuid:=pg_catalog.gen_random_uuid();v_source uuid:=pg_catalog.gen_random_uuid();v_capture uuid;v_span uuid;
- v_requirement jsonb;v_atom jsonb;v_requirement_id uuid;v_atom_id uuid;v_operator text;v_text text;v_excerpt text;v_weight numeric;v_atom_count integer;v_atom_ordinal integer;v_total_atoms integer:=0;v_requirements jsonb;
+ v_requirement jsonb;v_atom jsonb;v_requirement_id uuid;v_atom_id uuid;v_operator text;v_text text;v_excerpt text;v_weight numeric;v_share numeric;v_priority numeric;v_atom_count integer;v_atom_ordinal integer;v_total_atoms integer:=0;v_requirements jsonb;
 BEGIN
  SELECT * INTO r FROM app.begin_request(v_workspace,'confirm_job',p_key,pg_catalog.jsonb_build_object('job',p_job,'expectedRevision',p_expected_revision,'input',p_input));
  IF r.cached IS NOT NULL THEN RETURN r.cached; END IF;
@@ -37,29 +37,33 @@ BEGIN
  VALUES(v_version,v_workspace,v_job_id,v_source,v_capture,v_job.draft_revision+1,v_job.head_version_id,p_input->>'title',p_input->>'company',p_input->>'location',v_text,app.hash_json(p_input));
  IF EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(p_input->'requirements')q GROUP BY pg_catalog.lower(pg_catalog.btrim(q->>'key')) HAVING count(*)>1) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DUPLICATE_REQUIREMENT_NEEDS_REVIEW'; END IF;
  FOR v_requirement IN SELECT * FROM pg_catalog.jsonb_array_elements(p_input->'requirements') LOOP
-  IF pg_catalog.jsonb_typeof(v_requirement)<>'object' OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(v_requirement)k WHERE k NOT IN ('id','key','category','priority','hardGate','gateBasis','gateKind','allowEquivalent','allowTransferableEquivalent','priorityFraction','sourceText','atoms')) OR
+  IF pg_catalog.jsonb_typeof(v_requirement)<>'object' OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(v_requirement)k WHERE k NOT IN ('key','category','priority','hardGate','gateBasis','gateKind','allowEquivalent','allowTransferableEquivalent','priorityFraction','sourceText','atoms')) OR
     COALESCE(v_requirement->>'key','') !~ '^[a-z][a-z0-9_-]{0,79}$' OR COALESCE(pg_catalog.jsonb_typeof(v_requirement->'atoms'),'missing')<>'array' THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_REQUIREMENT'; END IF;
-  -- Client IDs are optional correlation handles. Immutable version rows always get new UUIDs.
-  PERFORM (v_requirement->>'id')::uuid;
+  IF v_requirement ? 'priorityFraction' AND pg_catalog.jsonb_typeof(v_requirement->'priorityFraction')<>'number' THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_PRIORITY_FRACTION'; END IF;
+  v_priority:=COALESCE((v_requirement->>'priorityFraction')::numeric,1);
+  IF v_priority<=0 OR v_priority>1 OR v_priority<>pg_catalog.trunc(v_priority,6) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_PRIORITY_FRACTION'; END IF;
   v_requirement_id:=pg_catalog.gen_random_uuid();
   v_excerpt:=v_requirement->>'sourceText';
   IF v_excerpt IS NOT NULL AND (pg_catalog.octet_length(v_excerpt)>4096 OR pg_catalog.strpos(v_text,v_excerpt)=0) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='REQUIREMENT_SOURCE_NOT_IN_JOB'; END IF;
   INSERT INTO app.source_spans(tenant_id,job_id,source_document_id,locator,text_excerpt)
   VALUES(v_workspace,v_job_id,v_source,pg_catalog.jsonb_build_object('field','job.text','requirementKey',v_requirement->>'key'),v_excerpt) RETURNING id INTO v_span;
   INSERT INTO app.job_requirements(id,tenant_id,job_id,job_version_id,source_document_id,requirement_key,primary_category,priority,hard_gate,gate_basis,source_span_id,priority_fraction,gate_kind,allow_equivalent,allow_transferable_equivalent,scorable)
-  VALUES(v_requirement_id,v_workspace,v_job_id,v_version,v_source,v_requirement->>'key',v_requirement->>'category',v_requirement->>'priority',COALESCE((v_requirement->>'hardGate')::boolean,false),v_requirement->>'gateBasis',v_span,COALESCE((v_requirement->>'priorityFraction')::numeric,1),COALESCE(v_requirement->>'gateKind','other'),COALESCE((v_requirement->>'allowEquivalent')::boolean,false),COALESCE((v_requirement->>'allowTransferableEquivalent')::boolean,false),COALESCE(v_requirement->>'gateKind','other')<>'authorization');
+  VALUES(v_requirement_id,v_workspace,v_job_id,v_version,v_source,v_requirement->>'key',v_requirement->>'category',v_requirement->>'priority',COALESCE((v_requirement->>'hardGate')::boolean,false),v_requirement->>'gateBasis',v_span,v_priority,COALESCE(v_requirement->>'gateKind','other'),COALESCE((v_requirement->>'allowEquivalent')::boolean,false),COALESCE((v_requirement->>'allowTransferableEquivalent')::boolean,false),COALESCE(v_requirement->>'gateKind','other')<>'authorization');
   v_atom_count:=pg_catalog.jsonb_array_length(v_requirement->'atoms');v_total_atoms:=v_total_atoms+v_atom_count;
   IF v_total_atoms>2000 THEN RAISE EXCEPTION USING ERRCODE='PT413',MESSAGE='JOB_ATOM_LIMIT'; END IF;
   IF v_atom_count NOT BETWEEN 1 AND 100 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_REQUIREMENT_ATOM_COUNT'; END IF;
   v_operator:=COALESCE(v_requirement#>>'{atoms,0,operator}','AND');v_weight:=0;v_atom_ordinal:=0;
   FOR v_atom IN SELECT * FROM pg_catalog.jsonb_array_elements(v_requirement->'atoms') LOOP
-   IF pg_catalog.jsonb_typeof(v_atom)<>'object' OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(v_atom)k WHERE k NOT IN ('id','operator','polarity','concept','weightShare')) OR COALESCE(v_atom->>'operator','AND')<>v_operator THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='FLAT_REVIEWED_AND_OR_GROUP_REQUIRED'; END IF;
-   PERFORM (v_atom->>'id')::uuid;v_atom_id:=pg_catalog.gen_random_uuid();
+   IF pg_catalog.jsonb_typeof(v_atom)<>'object' OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(v_atom)k WHERE k NOT IN ('operator','polarity','concept','weightShare')) OR COALESCE(v_atom->>'operator','AND')<>v_operator THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='FLAT_REVIEWED_AND_OR_GROUP_REQUIRED'; END IF;
+   IF v_atom ? 'weightShare' AND pg_catalog.jsonb_typeof(v_atom->'weightShare')<>'number' THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_WEIGHT_SHARE'; END IF;
+   v_share:=COALESCE((v_atom->>'weightShare')::numeric,1);
+   IF v_share<=0 OR v_share>1 OR v_share<>pg_catalog.trunc(v_share,6) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_WEIGHT_SHARE'; END IF;
+   v_atom_id:=pg_catalog.gen_random_uuid();
    INSERT INTO app.requirement_atoms(id,tenant_id,job_id,job_version_id,source_document_id,requirement_id,group_key,operator,polarity,concept_key,weight_share,source_span_id,ordinal)
-   VALUES(v_atom_id,v_workspace,v_job_id,v_version,v_source,v_requirement_id,v_requirement->>'key',v_operator,COALESCE(v_atom->>'polarity','positive'),v_atom->>'concept',COALESCE((v_atom->>'weightShare')::numeric,1),v_span,v_atom_ordinal);
+   VALUES(v_atom_id,v_workspace,v_job_id,v_version,v_source,v_requirement_id,v_requirement->>'key',v_operator,COALESCE(v_atom->>'polarity','positive'),v_atom->>'concept',v_share,v_span,v_atom_ordinal);
    v_atom_ordinal:=v_atom_ordinal+1;
-   v_weight:=v_weight+COALESCE((v_atom->>'weightShare')::numeric,1);
-   IF v_operator='OR' AND COALESCE((v_atom->>'weightShare')::numeric,1)<>1 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='OR_ALTERNATIVES_COUNT_ONCE'; END IF;
+   v_weight:=v_weight+v_share;
+   IF v_operator='OR' AND v_share<>1 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='OR_ALTERNATIVES_COUNT_ONCE'; END IF;
   END LOOP;
   IF v_operator='AND' AND v_weight<>1 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='AND_WEIGHT_SHARES_MUST_SUM_TO_ONE'; END IF;
  END LOOP;
@@ -202,7 +206,7 @@ BEGIN
    INSERT INTO app.cv_sections(tenant_id,cv_version_id,section_instance_id,section_kind,label,ordinal,visible)
     VALUES(workspace,snapshot,app.canonical_id(entry),section->>'kind',section->>'label',order_no,(section->>'visible')::boolean) RETURNING id INTO section_row;
    item_no:=0;
-   FOR entry IN SELECT * FROM pg_catalog.jsonb_array_elements_text(section->'entryIds') LOOP
+   FOR entry IN SELECT * FROM app.cv_section_entity_ids(workspace,profile_version,section,layout) LOOP
      SELECT pe.entity_revision_id INTO revision FROM app.profile_version_entities pe WHERE pe.tenant_id=workspace AND pe.profile_version_id=profile_version AND pe.entity_id=app.canonical_id(entry);
      IF revision IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='CV_ENTITY_NOT_PINNED'; END IF;
      INSERT INTO app.cv_items(tenant_id,cv_section_id,cv_version_id,profile_version_id,item_kind,entity_revision_id,ordinal,selected,privacy_flags)

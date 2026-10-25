@@ -21,10 +21,12 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
  components AS(SELECT c.*,w.denominator,w.effective_weight,w.effective_weight*c.importance*c.strength/w.denominator contribution,
   CASE WHEN c.strength>0 THEN 'included' WHEN c.scope_name='cv' AND EXISTS(SELECT 1 FROM criteria p WHERE p.scope_name='profile' AND p.requirement_id=c.requirement_id AND p.strength>0) THEN 'verified_omitted' ELSE 'unsupported' END keyword_status
   FROM criteria c JOIN category_weights w USING(scope_name,primary_category)),
+ ambiguous AS(SELECT q.id FROM context c JOIN app.job_requirements q ON (q.tenant_id,q.job_version_id)=(c.tenant_id,c.job_version_id)
+  WHERE EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity='ambiguous')),
  gates AS(SELECT q.* FROM context c JOIN app.job_requirements q ON (q.tenant_id,q.job_version_id)=(c.tenant_id,c.job_version_id) WHERE q.hard_gate),
  eligibility AS(SELECT CASE
   WHEN EXISTS(SELECT 1 FROM app.match_evidence e WHERE e.evidence_mapping_id=p_mapping AND e.evidence_role='eligibility' AND e.gate_state='confirmed_unmet') THEN 'confirmed_requirement_gap'
-  WHEN EXISTS(SELECT 1 FROM gates g WHERE NOT (
+  WHEN EXISTS(SELECT 1 FROM ambiguous) OR EXISTS(SELECT 1 FROM gates g WHERE NOT (
     EXISTS(SELECT 1 FROM app.match_evidence e JOIN app.requirement_atoms a ON (a.tenant_id,a.id)=(e.tenant_id,e.requirement_atom_id) WHERE e.evidence_mapping_id=p_mapping AND a.requirement_id=g.id AND e.evidence_role='eligibility' AND e.gate_state='supported')
     OR (g.gate_kind<>'authorization' AND COALESCE((SELECT c.strength FROM criteria c WHERE c.requirement_id=g.id AND c.scope_name=CASE WHEN p_profile_available THEN 'profile' ELSE 'cv' END),0)=1))) THEN 'needs_verification'
   ELSE 'requirements_satisfied' END state)
@@ -32,8 +34,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   'cvMatch',(SELECT sum(contribution) FROM components WHERE scope_name='cv'),'eligibility',(SELECT state FROM eligibility),
   'components',COALESCE((SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('scope',scope_name,'requirementId',requirement_id,'atomId',atom_id,'category',primary_category,
     'priority',importance,'strength',strength,'effectiveWeight',effective_weight,'denominator',denominator,'contribution',contribution,'keywordStatus',keyword_status) ORDER BY scope_name,requirement_id) FROM components),'[]'),
-  'ambiguousRequirementIds',COALESCE((SELECT pg_catalog.jsonb_agg(q.id ORDER BY q.id) FROM context c JOIN app.job_requirements q ON (q.tenant_id,q.job_version_id)=(c.tenant_id,c.job_version_id)
-   WHERE EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity='ambiguous')),'[]'))
+  'ambiguousRequirementIds',COALESCE((SELECT pg_catalog.jsonb_agg(id ORDER BY id) FROM ambiguous),'[]'))
 $$;
 
 CREATE FUNCTION app.confirmation_fingerprint(p_profile uuid,p_cv uuid) RETURNS bytea
@@ -148,10 +149,11 @@ BEGIN
   IF v_strength IS NULL OR v_relation IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_MATCH_CLASS'; END IF;
   IF v_item ? 'fulfillment' AND pg_catalog.jsonb_typeof(v_item->'fulfillment')<>'number' THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_FULFILLMENT'; END IF;
   v_fulfillment:=COALESCE((v_item->>'fulfillment')::numeric,1);
+  IF v_fulfillment<0 OR v_fulfillment>1 OR v_fulfillment<>pg_catalog.trunc(v_fulfillment,6) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_FULFILLMENT'; END IF;
   v_explanation:=COALESCE(v_item->>'explanation','Reviewed supporting evidence');
   IF pg_catalog.length(v_explanation)>2000 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='EXPLANATION_LIMIT'; END IF;
   IF v_relation IN ('ambiguous','rejected') OR v_requirement.gate_kind='authorization' OR
-   (v_requirement.gate_kind IN ('credential','authorization') AND ((v_relation='approved_equivalent' AND NOT v_requirement.allow_equivalent) OR (v_class='transferable' AND NOT v_requirement.allow_transferable_equivalent))) THEN v_strength:=0; END IF;
+   (v_requirement.gate_kind IN ('credential','authorization') AND ((v_relation='approved_equivalent' AND NOT v_requirement.allow_equivalent) OR ((v_class='transferable' OR v_relation='transferable') AND NOT v_requirement.allow_transferable_equivalent))) THEN v_strength:=0; END IF;
   INSERT INTO app.match_evidence(tenant_id,evidence_mapping_id,requirement_atom_id,claim_id,cv_item_id,relation,strength,review_state,explanation,profile_version_id,job_version_id,cv_version_id,scope,match_class,fulfillment,evidence_role)
   VALUES(v_workspace,v_mapping,v_atom.id,v_claim,v_item_id,v_relation,v_strength,'accepted',v_explanation,v_input_profile,p_job_version,CASE WHEN v_scope='cv' THEN p_cv_version ELSE NULL END,v_scope,v_class,v_fulfillment,'semantic');
  END LOOP;

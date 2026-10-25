@@ -241,10 +241,10 @@ class Workspace(unittest.TestCase):
 
     def job_input(self,title='Engineer',company='Synthetic Org'):
         return {'title':title,'company':company,'text':'SQL required. Communication preferred.',
-                'requirements':[{'id':uid(),'key':'sql','category':'technical','priority':'required',
-                  'sourceText':'SQL required.','atoms':[{'id':uid(),'operator':'AND','concept':'sql','weightShare':1}]},
-                 {'id':uid(),'key':'communication','category':'professional','priority':'preferred',
-                  'sourceText':'Communication preferred.','atoms':[{'id':uid(),'operator':'AND','concept':'communication','weightShare':1}]}]}
+                'requirements':[{'key':'sql','category':'technical','priority':'required',
+                  'sourceText':'SQL required.','atoms':[{'operator':'AND','concept':'sql','weightShare':1}]},
+                 {'key':'communication','category':'professional','priority':'preferred',
+                  'sourceText':'Communication preferred.','atoms':[{'operator':'AND','concept':'communication','weightShare':1}]}]}
 
     def job(self,body=None,*,job=None,revision=0,key=None,user=None,error=False):
         body=body or self.job_input()
@@ -280,6 +280,91 @@ class Workspace(unittest.TestCase):
         bad=copy.deepcopy(body);bad['requirements'].append(copy.deepcopy(bad['requirements'][0]))
         self.assertIn('DUPLICATE_REQUIREMENT',self.job(bad,error=True))
         self.assertEqual(DB.sql(f"SELECT count(*) FROM app.jobs WHERE tenant_id='{self.wa}'"),'0')
+
+    def test_requirement_and_atom_ids_are_server_owned(self):
+        import copy
+        body=self.job_input()
+        for location in ['requirement','atom']:
+            bad=copy.deepcopy(body)
+            target=bad['requirements'][0] if location=='requirement' else bad['requirements'][0]['atoms'][0]
+            target['id']=uid()
+            with self.subTest(location=location):
+                self.assertIn('INVALID_REQUIREMENT' if location=='requirement' else 'FLAT_REVIEWED_AND_OR',self.job(bad,error=True))
+        first=self.job(body);second=self.job(body,job=first['jobId'],revision=1)
+        self.assertEqual([q['key'] for q in first['requirements']],[q['key'] for q in second['requirements']])
+        for before,after in zip(first['requirements'],second['requirements']):
+            self.assertNotEqual(before['requirementId'],after['requirementId'])
+            self.assertNotEqual(before['atoms'][0]['atomId'],after['atoms'][0]['atomId'])
+            self.assertEqual(DB.sql(f"SELECT requirement_key FROM app.job_requirements WHERE id='{after['requirementId']}'"),after['key'])
+            self.assertEqual(DB.sql(f"SELECT requirement_id FROM app.requirement_atoms WHERE id='{after['atoms'][0]['atomId']}'"),after['requirementId'])
+
+    def test_hard_gate_requires_nonblank_basis_in_command_and_table(self):
+        for basis in [None,'','   ',' \t\n']:
+            for omitted in ([True,False] if basis is None else [False]):
+                body=self.job_input();requirement=body['requirements'][0];requirement['hardGate']=True
+                if not omitted:requirement['gateBasis']=basis
+                with self.subTest(basis=basis,omitted=omitted):
+                    self.assertIn('INVALID_JOB_GRAPH',self.job(body,error=True))
+        body=self.job_input();body['requirements'][0].update(hardGate=True,gateBasis='Reviewed mandatory SQL condition')
+        job=self.job(body);req=next(q for q in job['requirements'] if q['key']=='sql')
+        for value in ['NULL',"''","E' \\t\\n'"]:
+            with self.subTest(direct=value):
+                self.assertIn('ck_job_requirements_2',DB.sql(f"INSERT INTO app.job_requirements SELECT (jsonb_populate_record(NULL::app.job_requirements,to_jsonb(q)||jsonb_build_object('id',gen_random_uuid(),'requirement_key','basis_probe','gate_basis',{value}))).* FROM app.job_requirements q WHERE id='{req['requirementId']}'",expect_error=True))
+
+    def test_job_fractions_reject_rounding_and_out_of_range_values(self):
+        for value in [-.0000001,0,.0000001,.9999999,1.0000001]:
+            for field in ['priorityFraction','weightShare']:
+                body=self.job_input()
+                target=body['requirements'][0] if field=='priorityFraction' else body['requirements'][0]['atoms'][0]
+                target[field]=value
+                with self.subTest(field=field,value=value):
+                    self.assertIn('INVALID_PRIORITY_FRACTION' if field=='priorityFraction' else 'INVALID_WEIGHT_SHARE',self.job(body,error=True))
+        body=self.job_input();body['requirements'][0]['atoms']=[{'operator':'AND','weightShare':v} for v in [.3333333333,.3333333333,.3333333334]]
+        self.assertIn('INVALID_WEIGHT_SHARE',self.job(body,error=True))
+        body['requirements'][0]['atoms']=[{'operator':'AND','weightShare':v} for v in [.333333,.333333,.333333]]
+        self.assertIn('AND_WEIGHT_SHARES',self.job(body,error=True))
+        self.assertEqual(DB.sql(f"SELECT count(*) FROM app.jobs WHERE tenant_id='{self.wa}'"),'0')
+        body['requirements'][0]['atoms'][-1]['weightShare']=.333334
+        body['requirements'][0]['priorityFraction']=.999999
+        job=self.job(body)
+        self.assertEqual(DB.sql(f"SELECT sum(weight_share) FROM app.requirement_atoms WHERE requirement_id='{next(q for q in job['requirements'] if q['key']=='sql')['requirementId']}'"),'1.000000')
+
+    def test_restore_linked_and_tailored_job_versions_preserves_historical_inputs(self):
+        import copy
+        initial_profile=copy.deepcopy(self.profile)
+        job=self.job();branches=[self.job_cv(job,tailored=tailored) for tailored in [False,True]]
+        old_rows={branch['cvVersionId']:DB.sql(f"SELECT to_jsonb(v) FROM app.cv_versions v WHERE id='{branch['cvVersionId']}'") for branch in branches}
+        self.cv['document']['sections'][0]['label']='New layout'
+        self.profile=self.publish(self.cv,profile=self.profile['profileId'],revision=1,base_revision=1)
+        body=self.job_input();body['title']='Changed target';new_job=self.job(body,job=job['jobId'],revision=1)
+        for branch in branches:
+            newer=json.loads(self.call('save_job_cv_checkpoint',f"'{uid()}','{branch['documentId']}',1,'{self.profile['profileVersionId']}','{new_job['jobVersionId']}',{literal(self.cv['document'])},'en',"+('false' if branch['tailoringState']=='tailored' else 'true')))
+            key=uid();args=f"'{key}','{branch['documentId']}',2,'{branch['cvVersionId']}'"
+            restored=json.loads(self.call('restore_cv_version',args))
+            self.assertEqual(restored,json.loads(self.call('restore_cv_version',args)))
+            self.assertNotIn(restored['cvVersionId'],[branch['cvVersionId'],newer['cvVersionId']])
+            row=json.loads(DB.sql(f"SELECT to_jsonb(v) FROM app.cv_versions v WHERE id='{restored['cvVersionId']}'"))
+            old=json.loads(old_rows[branch['cvVersionId']])
+            for field in ['document_id','profile_version_id','job_version_id','locale','tailoring_state']:
+                self.assertEqual(row[field],old[field],field)
+            self.assertEqual(row['canonical_json']['document'],old['canonical_json']['document'])
+            self.assertEqual(row['parent_version_id'],newer['cvVersionId']);self.assertEqual(row['sequence'],3)
+            self.assertEqual(restored['revision'],3);self.assertEqual(restored['restoredFrom'],branch['cvVersionId'])
+            self.assertEqual(old_rows[branch['cvVersionId']],DB.sql(f"SELECT to_jsonb(v) FROM app.cv_versions v WHERE id='{branch['cvVersionId']}'"))
+            self.assertEqual(DB.sql(f"SELECT head_version_id FROM app.cv_documents WHERE id='{branch['documentId']}'"),restored['cvVersionId'])
+        self.assertEqual(DB.sql(f"SELECT head_version_id FROM app.cv_documents WHERE id='{initial_profile['baseDocumentId']}'"),self.profile['baseCvVersionId'])
+        self.assertEqual(DB.sql(f"SELECT head_version_id FROM app.career_profiles WHERE id='{self.profile['profileId']}'"),self.profile['profileVersionId'])
+
+    def test_section_prose_references_are_rejected_by_all_publication_commands(self):
+        import copy
+        layout=copy.deepcopy(self.cv['document']);layout['sections'][0]['proseIds']=['id_'+uid()]
+        bad=copy.deepcopy(self.cv);bad['document']=layout
+        self.assertIn('DEFERRED_FEATURE_NOT_IN_P0_P3',self.publish(bad,profile=self.profile['profileId'],revision=1,base_revision=1,error=True))
+        self.assertIn('DEFERRED_FEATURE_NOT_IN_P0_P3',self.call('save_cv_checkpoint',f"'{uid()}','{self.profile['baseDocumentId']}',1,'{self.profile['profileVersionId']}',{literal(layout)},'ro'",error=True))
+        job=self.job()
+        for tailored in ['true','false']:
+            self.assertIn('DEFERRED_FEATURE_NOT_IN_P0_P3',self.call('save_job_cv_checkpoint',f"'{uid()}',NULL,0,'{self.profile['profileVersionId']}','{job['jobVersionId']}',{literal(layout)},'ro',{tailored}",error=True))
+        self.assertEqual(DB.sql(f"SELECT count(*) FROM app.cv_versions WHERE tenant_id='{self.wa}'"),'1')
 
     def test_job_cv_does_not_move_base_or_profile(self):
         job=self.job();branch=self.job_cv(job)
@@ -413,6 +498,73 @@ class Analysis(unittest.TestCase):
         result=self.call('publish_analysis',f"'{key or uid()}',{profile_arg},{cv_arg},'{job['jobVersionId']}',{literal(evidence)},{literal(gates or [])},'2026-10-23','ro'",error=error)
         return result if error else json.loads(result)
 
+    def test_identity_items_support_both_titles_and_respect_selection(self):
+        import copy
+        title_claims=[]
+        for label in ['Platform Engineer','Technical Lead','selected@example.invalid','omitted@example.invalid','private@example.invalid']:
+            claim='id_'+uid();title_claims.append(claim)
+            self.cv['claims'].append({'id':claim,'kind':'text','value':label,'status':'extracted_unconfirmed','provenanceIds':self.cv['claims'][0]['provenanceIds']})
+        self.cv['facts']['positioningTitleClaimIds']=title_claims[:2]
+        contacts=[{'id':'id_'+uid(),'kind':'email','valueClaimId':claim,'visibility':'private' if index==2 else 'export'} for index,claim in enumerate(title_claims[2:])]
+        self.cv['facts']['contacts']=contacts
+        self.cv['document']['contactIds']=[contacts[0]['id']]
+        self.profile=self.publish(self.cv,profile=self.profile['profileId'],revision=1,base_revision=1)
+        job=self.job({'title':'Title evidence','company':'Synthetic Org','text':'Reviewed titles.',
+          'requirements':[{'key':'titles','category':'title','priority':'required','hardGate':True,'gateBasis':'Reviewed title requirement',
+           'atoms':[{'operator':'AND','concept':'primary','weightShare':.5},{'operator':'AND','concept':'secondary','weightShare':.5}]}]})
+        base_saved=json.loads(self.call('save_cv_checkpoint',f"'{uid()}','{self.profile['baseDocumentId']}',2,'{self.profile['profileVersionId']}',{literal(self.cv['document'])},'en'"))
+        versions=[self.profile['baseCvVersionId'],base_saved['cvVersionId']]+[self.job_cv(job,tailored=value)['cvVersionId'] for value in [False,True]]
+        for version in versions:
+            with self.subTest(version=version):
+                items=self.item_ids(version)
+                for claim in [self.cv['facts']['nameClaimId']]+title_claims[:3]:self.assertIn(claim.removeprefix('id_'),items)
+                for claim in title_claims[3:]:self.assertNotIn(claim.removeprefix('id_'),items)
+                rows=[]
+                for atom,claim in zip(job['requirements'][0]['atoms'],title_claims[:2]):
+                    for scope in ['profile','cv']:
+                        row={'atomId':atom['atomId'],'claimId':claim.removeprefix('id_'),'scope':scope,'matchClass':'demonstrated','relation':'exact'}
+                        if scope=='cv':row['cvItemId']=items[claim.removeprefix('id_')]
+                        rows.append(row)
+                result=self.analyse(job,rows,cv_version=version)
+                self.assertEqual(result['candidateFit'],100);self.assertEqual(result['cvMatch'],100)
+                self.assertEqual(result['eligibility'],'requirements_satisfied')
+        hidden=copy.deepcopy(self.cv['document']);next(s for s in hidden['sections'] if s['kind']=='identity')['visible']=False
+        hidden_version=json.loads(self.call('save_cv_checkpoint',f"'{uid()}','{self.profile['baseDocumentId']}',3,'{self.profile['profileVersionId']}',{literal(hidden)},'ro'"))['cvVersionId']
+        hidden_items=self.item_ids(hidden_version)
+        for claim in [self.cv['facts']['nameClaimId']]+title_claims:self.assertNotIn(claim.removeprefix('id_'),hidden_items)
+        self.assertIn(self.claims['sql'],hidden_items)
+        hidden_row={'atomId':job['requirements'][0]['atoms'][0]['atomId'],'claimId':title_claims[0].removeprefix('id_'),'scope':'cv','matchClass':'demonstrated','relation':'exact'}
+        hidden_row['cvItemId']=DB.sql(f"SELECT i.id FROM app.cv_items i JOIN app.entity_revision_claims ec ON (ec.tenant_id,ec.entity_revision_id)=(i.tenant_id,i.entity_revision_id) WHERE i.cv_version_id='{hidden_version}' AND ec.claim_id='{hidden_row['claimId']}'")
+        self.assertIn('CLAIM_NOT_REPRESENTED_BY_CV_ITEM',self.analyse(job,[hidden_row],cv_version=hidden_version,error=True))
+        deselected=copy.deepcopy(self.cv['document']);deselected['contactIds']=[]
+        deselected_version=json.loads(self.call('save_cv_checkpoint',f"'{uid()}','{self.profile['baseDocumentId']}',4,'{self.profile['profileVersionId']}',{literal(deselected)},'ro'"))['cvVersionId']
+        self.assertNotIn(title_claims[2].removeprefix('id_'),self.item_ids(deselected_version))
+        self.assertIn(title_claims[0].removeprefix('id_'),self.item_ids(deselected_version))
+
+    def test_stored_six_decimal_shares_preserve_full_gate_coverage(self):
+        job=self.job({'title':'Conserved shares','company':'Synthetic Org','text':'Three required elements.',
+          'requirements':[{'key':'combined','category':'technical','priority':'required','priorityFraction':.999999,'hardGate':True,'gateBasis':'Reviewed combined gate',
+            'atoms':[{'operator':'AND','weightShare':share} for share in [.333333,.333333,.333334]]}]})
+        rows=[]
+        for atom in job['requirements'][0]['atoms']:
+            for scope in ['profile','cv']:
+                row={'atomId':atom['atomId'],'claimId':self.claims['sql'],'scope':scope,'matchClass':'demonstrated','relation':'exact'}
+                if scope=='cv':row['cvItemId']=self.item_ids()[self.claims['sql']]
+                rows.append(row)
+        result=self.analyse(job,rows)
+        self.assertEqual(result['candidateFit'],100);self.assertEqual(result['cvMatch'],100)
+        self.assertEqual(result['eligibility'],'requirements_satisfied')
+        for value in [-.0000001,.9999999,1.0000001]:
+            for scope in ['profile','cv']:
+                bad=[dict(row) for row in rows]
+                next(row for row in bad if row['scope']==scope)['fulfillment']=value
+                with self.subTest(value=value,scope=scope):self.assertIn('INVALID_FULFILLMENT',self.analyse(job,bad,error=True))
+        for value,eligibility in [(0,'needs_verification'),(.999999,'needs_verification'),(1,'requirements_satisfied')]:
+            result=self.analyse(job,[{**row,'fulfillment':value} for row in rows])
+            self.assertEqual(result['eligibility'],eligibility)
+            self.assertEqual(result['candidateFitRaw'],result['cvMatchRaw'])
+            self.assertAlmostEqual(result['candidateFitRaw'],value*100,places=5)
+
     def test_weighted_components_and_unavailable_profile_scope(self):
         job=self.job();result=self.analyse(job,self.evidence(job,classes={'communication':'transferable'}))
         self.assertAlmostEqual(result['candidateFitRaw'],(30+5*.4)/35*100,places=5)
@@ -470,16 +622,24 @@ class Analysis(unittest.TestCase):
         self.assertEqual(after['candidateFit'],denied['candidateFit'])
 
     def test_credential_equivalence_and_transfer_cannot_satisfy_strict_gate(self):
-        body=self.job_input();body['text']+=' Licence required.'
-        body['requirements'].append({'key':'licence','category':'qualifications','priority':'required','hardGate':True,'gateKind':'credential','gateBasis':'Explicit reviewed synthetic licence condition','sourceText':'Licence required.','atoms':[{'operator':'AND','weightShare':1}]})
-        job=self.job(body);req=next(q for q in job['requirements'] if q['key']=='licence');rows=self.evidence(job)
-        for scope in ['profile','cv']:
-            row={'atomId':req['atoms'][0]['atomId'],'claimId':self.claims['sql'],'scope':scope,'matchClass':'transferable','relation':'approved_equivalent'}
-            if scope=='cv':row['cvItemId']=self.item_ids()[self.claims['sql']]
-            rows.append(row)
-        result=self.analyse(job,rows)
-        self.assertEqual(result['eligibility'],'needs_verification')
-        self.assertLess(result['candidateFit'],100)
+        for allowed in [False,True]:
+            body=self.job_input();body['text']+=' Licence required.'
+            body['requirements'].append({'key':'licence','category':'qualifications','priority':'required','hardGate':True,'gateKind':'credential','gateBasis':'Explicit reviewed synthetic licence condition','allowEquivalent':allowed,'allowTransferableEquivalent':allowed,'sourceText':'Licence required.','atoms':[{'operator':'AND','weightShare':1}]})
+            job=self.job(body);req=next(q for q in job['requirements'] if q['key']=='licence')
+            for relation,match_class in [('approved_equivalent','demonstrated'),('approved_equivalent','transferable'),('transferable','demonstrated'),('transferable','claimed_limited'),('exact','transferable')]:
+                rows=self.evidence(job)
+                for scope in ['profile','cv']:
+                    row={'atomId':req['atoms'][0]['atomId'],'claimId':self.claims['sql'],'scope':scope,'matchClass':match_class,'relation':relation}
+                    if scope=='cv':row['cvItemId']=self.item_ids()[self.claims['sql']]
+                    rows.append(row)
+                for profile,cv_version in [(True,'default'),(True,None),(False,'default')]:
+                    scoped=[row for row in rows if (row['scope']=='profile' and profile) or (row['scope']=='cv' and cv_version)]
+                    with self.subTest(allowed=allowed,relation=relation,match_class=match_class,profile=profile,cv_version=cv_version):
+                        result=self.analyse(job,scoped,profile=profile,cv_version=cv_version)
+                        expected='requirements_satisfied' if allowed and match_class=='demonstrated' else 'needs_verification'
+                        self.assertEqual(result['eligibility'],expected)
+                        for component in result['components']:
+                            if component['key'].endswith(req['requirementId']) and not allowed:self.assertEqual(component['contribution'],0)
 
     def test_mapping_requires_exact_job_and_cv_item_lineage(self):
         import copy
@@ -608,7 +768,12 @@ class Analysis(unittest.TestCase):
         for polarity in ['not_required','ambiguous']:
             job=self.job({'title':'Excluded criterion','company':'Synthetic Vector','text':'Reviewed exclusion.',
              'requirements':[{'key':'excluded','category':'technical','priority':'required','atoms':[{'operator':'AND','polarity':polarity,'weightShare':1}]}]})
-            result=self.analyse(job,[]);self.assertIsNone(result['candidateFit']);self.assertIsNone(result['cvMatch'])
+            for profile,cv_version in [(True,'default'),(True,None),(False,'default')]:
+                result=self.analyse(job,[],profile=profile,cv_version=cv_version)
+                self.assertIsNone(result['candidateFit']);self.assertIsNone(result['cvMatch'])
+                expected='needs_verification' if polarity=='ambiguous' else 'requirements_satisfied'
+                self.assertEqual(result['eligibility'],expected)
+                self.assertEqual(DB.sql(f"SELECT eligibility FROM app.analysis_runs WHERE id='{result['analysisId']}'"),expected)
 
 
 def suite(database):

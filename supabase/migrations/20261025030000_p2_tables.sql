@@ -203,7 +203,7 @@ ALTER TABLE app."job_requirements" ADD CONSTRAINT "ck_job_requirements_0" CHECK 
 
 ALTER TABLE app."job_requirements" ADD CONSTRAINT "ck_job_requirements_1" CHECK (primary_category IN ('technical','responsibilities','experience','achievements','qualifications','professional','title'));
 
-ALTER TABLE app."job_requirements" ADD CONSTRAINT "ck_job_requirements_2" CHECK (NOT hard_gate OR length(gate_basis)>0);
+ALTER TABLE app."job_requirements" ADD CONSTRAINT "ck_job_requirements_2" CHECK (NOT hard_gate OR COALESCE(gate_basis ~ '[^[:space:]]',false));
 
 ALTER TABLE app."requirement_atoms" ADD CONSTRAINT "pk_requirement_atoms_id" PRIMARY KEY ("id");
 

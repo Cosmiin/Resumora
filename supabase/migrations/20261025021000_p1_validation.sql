@@ -126,7 +126,7 @@ BEGIN
  IF pg_catalog.cardinality(ids)<>(SELECT count(DISTINCT i) FROM pg_catalog.unnest(ids)i) THEN
    RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='DUPLICATE_CANONICAL_ID';
  END IF;
- IF pg_catalog.jsonb_array_length(cv->'generatedProse')>0 OR pg_catalog.jsonb_array_length(cv->'generations')>0 OR pg_catalog.jsonb_array_length(cv->'interviews')>0 OR cv#>>'{document,templateVersionId}' IS NOT NULL THEN
+ IF pg_catalog.jsonb_array_length(cv->'generatedProse')>0 OR pg_catalog.jsonb_array_length(cv->'generations')>0 OR pg_catalog.jsonb_array_length(cv->'interviews')>0 OR cv#>>'{document,templateVersionId}' IS NOT NULL OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{document,sections}')s WHERE pg_catalog.jsonb_array_length(s->'proseIds')>0) THEN
    RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='DEFERRED_FEATURE_NOT_IN_P0_P3';
  END IF;
  FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'provenance') LOOP
