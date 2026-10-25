@@ -17,17 +17,17 @@ The [design-system adoption guide](docs/frontend/design-system-adoption.md) maps
 
 ## Local application foundation
 
-For the local React frontend and Cloudflare Worker, follow [local development](docs/setup/local-development.md). With the pinned Node/npm toolchain, run `npm ci --ignore-scripts` and `npm run dev`, then open `http://127.0.0.1:5173/`. The health endpoint and same-origin proxy work locally; authentication and database access are explicitly unimplemented. No cloud credentials or deployment are needed. Run `npm run check` for type checks, build/dry-run bundle and a local HTTP smoke test.
+For the local React frontend and Cloudflare Worker, follow [local development](docs/setup/local-development.md). With the pinned Node/npm toolchain, run `npm ci --ignore-scripts` and `npm run dev`, then open `http://127.0.0.1:5173/`. The health endpoint and same-origin proxy work locally; authentication and database access are explicitly unimplemented. No cloud credentials or deployment are needed. Run `npm run check` for the [foundation checks](docs/setup/local-development.md#checks).
 
 ## Discovery prototype preview
 
 From the repository root, run:
 
 ```sh
-python3 -m http.server 8000
+python3 -m http.server 8000 --bind 127.0.0.1 --directory prototype
 ```
 
-Open `http://localhost:8000/prototype/review.html`. Core styles and interaction code are bundled; the page also references version-pinned Tailwind/DaisyUI browser assets from jsDelivr, so an internet connection is needed for those enhancements. The demo has an explicit in-memory fallback if browser storage is unavailable. Use **Reia demonstrația / Reset demo** to reset local state.
+Open `http://localhost:8000/review.html`. Serve only `prototype/` on loopback so the preview does not expose application configuration elsewhere in the repository. Core styles and interaction code are bundled; the page also references version-pinned Tailwind/DaisyUI browser assets from jsDelivr, so an internet connection is needed for those enhancements. The demo has an explicit in-memory fallback if browser storage is unavailable. Use **Reia demonstrația / Reset demo** to reset local state.
 
 The standalone `prototype/review.html` includes the same app source and is convenient for review. To rebuild it after editing the source, run `python3 prototype/build_portable.py` from the repository root. To run the deterministic interaction checks, follow [`reviews/ux/verification.md`](reviews/ux/verification.md).
 
