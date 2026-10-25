@@ -27,9 +27,12 @@ class PreflightBoundary(unittest.TestCase):
         self.secret.chmod(0o600)
         self.metadata = self.root / 'supabase/.temp'
         self.metadata.mkdir(parents=True)
+        self.metadata.chmod(0o700)
         (self.metadata / 'project-ref').write_text(preflight.TARGET)
+        (self.metadata / 'project-ref').chmod(0o600)
         self.url = self.metadata / 'pooler-url'
         self.url.write_text('postgres://postgres.' + preflight.TARGET + '@aws-0-eu-central-1.pooler.supabase.com:5432/postgres')
+        self.url.chmod(0o600)
 
     def test_secret_is_data_and_connection_is_exact_tls_read_only(self):
         with patch.dict(os.environ, {'PGHOST': 'evil.invalid', 'PGSERVICE': 'evil', 'SUPABASE_ACCESS_TOKEN': 'synthetic'}, clear=False):
@@ -53,6 +56,40 @@ class PreflightBoundary(unittest.TestCase):
     def test_wrong_project_link_rejected(self):
         (self.metadata / 'project-ref').write_text('wrong-project')
         with self.assertRaises(ValueError): preflight.credentials()
+
+    def test_unsafe_or_symlink_cache_directory_rejected_without_repair(self):
+        self.metadata.chmod(0o755)
+        with self.assertRaises(ValueError): preflight.credentials()
+        self.assertEqual(self.metadata.stat().st_mode & 0o777, 0o755)
+        self.metadata.chmod(0o700)
+        target = self.root / 'private-metadata'
+        self.metadata.rename(target)
+        self.metadata.symlink_to(target, target_is_directory=True)
+        with self.assertRaises(ValueError): preflight.credentials()
+
+    def test_link_metadata_must_be_private_regular_files(self):
+        for name in ['project-ref', 'pooler-url']:
+            with self.subTest(name=name):
+                path = self.metadata / name
+                path.chmod(0o644)
+                with self.assertRaises(ValueError): preflight.credentials()
+                self.assertEqual(path.stat().st_mode & 0o777, 0o644)
+                path.chmod(0o600)
+                target = self.root / ('private-' + name)
+                path.rename(target)
+                path.symlink_to(target)
+                with self.assertRaises(ValueError): preflight.credentials()
+                path.unlink()
+                target.rename(path)
+
+    def test_supported_legacy_direct_metadata_keeps_tls_and_read_only(self):
+        self.url.write_text('postgres://postgres@db.' + preflight.TARGET + '.supabase.co:5432/postgres')
+        env = preflight.credentials()
+        self.assertEqual(env['PGHOST'], 'db.' + preflight.TARGET + '.supabase.co')
+        self.assertEqual(env['PGUSER'], 'postgres')
+        self.assertEqual(env['PGPASSWORD'], self.password)
+        self.assertEqual(env['PGSSLMODE'], 'verify-full')
+        self.assertIn('default_transaction_read_only=on', env['PGOPTIONS'])
 
     def test_world_readable_or_symlink_secret_rejected(self):
         self.secret.chmod(0o644)
