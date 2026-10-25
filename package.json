@@ -1,0 +1,31 @@
+{
+  "name": "resumora",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "npm@10.9.9",
+  "engines": {
+    "node": ">=22.12.0 <23",
+    "npm": ">=10 <11"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "npm run dev --workspace @resumora/web",
+    "dev:api": "npm run dev --workspace @resumora/api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspace @resumora/web && npm run build --workspace @resumora/api",
+    "smoke": "node scripts/smoke.mjs",
+    "check": "npm run typecheck && npm run build && npm run smoke"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "@types/node": "22.20.5"
+  },
+  "overrides": {
+    "undici": "7.30.1"
+  }
+}

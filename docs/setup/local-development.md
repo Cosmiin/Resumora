@@ -1,0 +1,80 @@
+# Local frontend and Worker foundation
+
+This workspace is a runnable **local foundation**, not the CV product or working authentication. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. It does not call Supabase, send email, store CVs, set sessions, or use Google OAuth. No Cloudflare account, API token or environment file is needed to run it.
+
+## Start from a clean checkout
+
+Use Node **22.23.4** (`.nvmrc`) and npm **10.9.9** (`packageManager`). Direct dependencies are exact versions; the root lockfile pins transitive dependencies. From the repository root:
+
+```sh
+npm ci --ignore-scripts
+npm run dev
+```
+
+Open **http://127.0.0.1:5173/**. The page should show that its frontend can communicate with the API. Both servers bind to loopback; this does not expose a development server to the LAN. Stop the launcher with Ctrl+C; it stops only its own process trees.
+
+For separate terminals, use `npm run dev:api` and `npm run dev:web`. The Worker is **http://127.0.0.1:8787/**. The frontend uses relative `/v1/...` requests, which Vite proxies to that Worker. The browser sees one origin (`http://127.0.0.1:5173`); no permissive CORS configuration or browser API key is needed.
+
+The proxy preserves the incoming host/origin context rather than claiming all requests came from the API origin. Future session code must still check the actual `Origin` header and CSRF token; the proxy alone is not an authorization control. Keep the `127.0.0.1` hostname consistent: substituting `localhost` changes the origin and can affect future cookies. No HTTPS or cookie security behavior has been proven by this HTTP foundation.
+
+`npm ci --ignore-scripts` was used for this initial toolchain: the lockfile's platform packages supply the local executables without dependency lifecycle scripts. Other operating systems must verify their native tool binaries before development; do not disable antivirus if one is blocked.
+
+## Workspace map
+
+| Path | Purpose |
+| --- | --- |
+| `apps/web/` | Small Romanian development shell, Vite config and frontend build |
+| `apps/api/` | Worker entry point, local Wrangler configuration and API contract placeholders |
+| `packages/contracts/` | Shared health/error response types; no server bindings or secret values |
+| `scripts/dev.mjs` | Start/stop the local pair together |
+| `scripts/smoke.mjs` | Start a fresh local pair, verify HTTP/proxy behavior, then stop it |
+
+The discovery prototype remains under `prototype/` with its existing independent commands. It is not bundled into this app. The shell uses the established Resumora pine/sage palette and system fonts, without external CDN assets or copying the reference's incomplete login behavior.
+
+## Current routes and future auth boundary
+
+Every API response includes a generated `requestId` and `Cache-Control: private, no-store`. Unknown routes return 404; wrong methods on known routes return 405 with `Allow`. No request body, callback query, password or cookie is read or logged by this foundation.
+
+| Method and path | Current result | Future implementation contract |
+| --- | --- | --- |
+| `GET /v1/health` | 200; `status: ok`, development service identity, auth `not_implemented`, database `not_connected` | Process health only; not proof of database/Auth readiness |
+| `POST /v1/auth/signup` | 501 `AUTH_NOT_IMPLEMENTED` | Worker-managed signup; confirmation required |
+| `POST /v1/auth/login` | 501 | Worker verifies credentials and sets protected session cookies |
+| `POST /v1/auth/recovery` | 501 | Generic request response, bound recovery transaction; no delivery promise |
+| `GET /v1/auth/callback/confirm` | 501 | Verify bound PKCE confirmation code, then establish session |
+| `GET /v1/auth/callback/recovery` | 501 | Verify recovery code and server-controlled recovery context |
+| `POST /v1/auth/password` | 501 | Require verified recovery, CSRF and origin checks before update |
+| `POST /v1/auth/logout` | 501 | Explicit provider/session logout and cookie clearing |
+
+The 501 responses are deliberate: they never simulate successful signup, email delivery, password changes or logout. The shell has no password form. Complete [authentication preparation](authentication.md) before implementing these routes. The local proxy solves the development-origin plumbing; callback handlers themselves are not implemented, so **do not yet put these URLs in Supabase's hosted redirect allowlist**.
+
+## Configuration and secrets
+
+The checked-in Worker configuration contains only public `APP_ENV=development`, a proposed development Worker name and a compatibility date. No `account_id`, hosted routes, remote resource bindings, provider key or deployment command is configured. `workers_dev` and preview URLs are disabled as additional publishing defaults; they do not prevent somebody manually invoking a deployment command. This task did not deploy.
+
+No frontend environment variables are needed now. If future web configuration is introduced, Vite's client-prefixed values are public build output and must never contain secrets. Future Worker public configuration (`SUPABASE_URL`, publishable key and actual allowed origins) stays separate from secrets such as a cookie-protection key. Ordinary user-auth flows do not require a service-role key or database password.
+
+The root ignore rules cover `.env*` and `.dev.vars*` at every depth. Future local Worker secrets belong in `apps/api/.dev.vars`, only when the feature needs them. No real credential files or example exceptions were added. Verify a proposed path using `git check-ignore` before writing values. Never print credential-file contents to validate setup.
+
+Wrangler telemetry is disabled in this local configuration/launcher. The root `undici` override pins **7.30.1**, replacing Wrangler/Miniflare's vulnerable 7.29.1 dependency while retaining the current Wrangler version. Recheck the override when upgrading Wrangler; it is not permission to use `npm audit fix --force` or downgrade tooling blindly. [Maintainer advisory](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c)
+
+## Checks
+
+Stop any running local dev pair first, then run:
+
+```sh
+npm run check
+```
+
+This runs frontend/API type checks, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
+
+To run only the local integration check: `npm run smoke`. Generated `node_modules/`, `dist/` and `.wrangler/` directories are ignored. Native Windows runtime, browser rendering/accessibility and hosted Cloudflare behavior need their own later verification; this foundation was checked in the current WSL/Linux environment.
+
+## Next milestones
+
+1. Approve the DB architecture and implement its reviewed migration plan using synthetic fixtures.
+2. Implement the Worker auth/session boundary, UI and genuine confirmation/recovery tests, using authorized project-team recipients initially.
+3. Validate HTTPS/cookie behavior and actual app callback routes before changing hosted Auth settings.
+4. Separately authorize hosted development resources/Git integration and deployment. Do not reuse CVTailor resources or deploy the discovery repository root.
+
+Official tool references checked 25 October 2026: [Vite](https://vite.dev/guide/), [Wrangler installation](https://developers.cloudflare.com/workers/wrangler/install-and-update/), [local Workers development](https://developers.cloudflare.com/workers/local-development/), [Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/).

@@ -1,6 +1,6 @@
 # Resumora — Discovery proposal
 
-**Status: integrated discovery proposal for review.** This repository contains research, product/technical proposals, and a local synthetic prototype. It is not a production app and does not authorize implementation, spending, real model calls, payments, or deployment. Product policy decisions D-01–14 remain open in [`research/strategy/publication/docs/product/decisions.md`](research/strategy/publication/docs/product/decisions.md).
+**Status: discovery proposal and local development foundation.** This repository contains research, product/technical proposals, a local synthetic prototype, and a [local frontend/Worker foundation](docs/setup/local-development.md). It is not a production app; the local foundation does not authorize production launch, spending, real model calls, payments, or deployment. Product policy decisions D-01–14 remain open in [`research/strategy/publication/docs/product/decisions.md`](research/strategy/publication/docs/product/decisions.md).
 
 ## Start here
 
@@ -15,7 +15,11 @@ For infrastructure preparation before implementation, use the [setup guide](SETU
 
 The [design-system adoption guide](docs/frontend/design-system-adoption.md) maps the supplied Resumora design to journeys A–F and lists the next frontend preparation tasks. The [CVizat reference package](references/design-system/cvizat/README.md) preserves the original ZIP and separate design source. This is reference preparation; production implementation remains unapproved. Current repository: [Cosmiin/Resumora](https://github.com/Cosmiin/Resumora).
 
-## Local preview
+## Local application foundation
+
+For the local React frontend and Cloudflare Worker, follow [local development](docs/setup/local-development.md). With the pinned Node/npm toolchain, run `npm ci --ignore-scripts` and `npm run dev`, then open `http://127.0.0.1:5173/`. The health endpoint and same-origin proxy work locally; authentication and database access are explicitly unimplemented. No cloud credentials or deployment are needed. Run `npm run check` for type checks, build/dry-run bundle and a local HTTP smoke test.
+
+## Discovery prototype preview
 
 From the repository root, run:
 

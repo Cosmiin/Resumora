@@ -1,6 +1,6 @@
 # Development authentication preparation
 
-Prepared **25 October 2026** for email/password signup, login and password reset, with Google later. **This is docs/config preparation, not a working authentication implementation.** The discovery prototype has no real auth routes or Worker API. This change adds credential-file ignores; it does not change Supabase settings, deploy code or send email.
+Prepared **25 October 2026** for email/password signup, login and password reset, with Google later. **This is docs/config preparation, not a working authentication implementation.** The local frontend/Worker foundation now exposes health and reserved auth routes returning 501; authentication and callback handling remain unimplemented. The discovery prototype remains a separate demo. This change adds credential-file ignores; it does not change Supabase settings, deploy code or send email.
 
 ## Readiness and next step
 
@@ -24,7 +24,7 @@ Use host-only cookies, `Path=/`, `HttpOnly`, `Secure`, `SameSite=Lax`; productio
 
 For every mutating endpoint, including login/reset/logout: require exact approved `Origin`, a CSRF token bound to the protected session/flow and a bounded request body; reject absent/unapproved origins for browser writes. CORS credentials use exact allowlisted origins, never `*`. SameSite/CORS alone are insufficient. Callback GETs instead validate the bound PKCE transaction and fixed destination; do not require a cross-site email navigation to supply the app's Origin. No arbitrary `next`/redirect input. Auth responses use `Cache-Control: private, no-store`; callback pages use `Referrer-Policy: no-referrer` and no analytics/third-party assets.
 
-All routes below are **proposals**, not existing endpoints. `APP_ORIGIN` and `API_ORIGIN` are unset placeholders for actual origins. API paths are on the Worker; page paths are on the frontend.
+The local foundation reserves the routes below with explicit 501 responses. Their authenticated behavior remains **proposed and unimplemented**; no callback code is exchanged and no account/session changes occur. `APP_ORIGIN` and `API_ORIGIN` are unset placeholders for actual origins. API paths are on the Worker; page paths are on the frontend.
 
 | Proposed route | Future behavior |
 | --- | --- |
