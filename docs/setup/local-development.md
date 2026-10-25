@@ -4,7 +4,7 @@ This workspace is a runnable **local foundation**, not the CV product or working
 
 ## Start from a clean checkout
 
-Use Node **22.23.4** (`.nvmrc`) and npm **10.9.9** (`packageManager`). Direct dependencies are exact versions; the root lockfile pins transitive dependencies. From the repository root:
+Use the Node version pinned in [`.nvmrc`](../../.nvmrc) and the npm version in the root [`packageManager` field](../../package.json). Direct dependencies are exact versions; the [root lockfile](../../package-lock.json) pins transitive dependencies. From the repository root:
 
 ```sh
 npm ci --ignore-scripts
@@ -33,24 +33,24 @@ The discovery prototype remains under `prototype/` with its existing independent
 
 ## Current routes and future auth boundary
 
-Every API response includes a generated `requestId` and `Cache-Control: private, no-store`. Unknown routes return 404; wrong methods on known routes return 405 with `Allow`. No request body, callback query, password or cookie is read or logged by this foundation.
+Every API response includes a generated `requestId` and `Cache-Control: private, no-store`. Unknown routes return 404; wrong methods on known routes return 405 with `Allow`. The Worker handler does not read or log request bodies, callback queries, passwords or cookies.
 
-| Method and path | Current result | Future implementation contract |
-| --- | --- | --- |
-| `GET /v1/health` | 200; `status: ok`, development service identity, auth `not_implemented`, database `not_connected` | Process health only; not proof of database/Auth readiness |
-| `POST /v1/auth/signup` | 501 `AUTH_NOT_IMPLEMENTED` | Worker-managed signup; confirmation required |
-| `POST /v1/auth/login` | 501 | Worker verifies credentials and sets protected session cookies |
-| `POST /v1/auth/recovery` | 501 | Generic request response, bound recovery transaction; no delivery promise |
-| `GET /v1/auth/callback/confirm` | 501 | Verify bound PKCE confirmation code, then establish session |
-| `GET /v1/auth/callback/recovery` | 501 | Verify recovery code and server-controlled recovery context |
-| `POST /v1/auth/password` | 501 | Require verified recovery, CSRF and origin checks before update |
-| `POST /v1/auth/logout` | 501 | Explicit provider/session logout and cookie clearing |
+| Method and path | Current result |
+| --- | --- |
+| `GET /v1/health` | 200; `status: ok`, development service identity, auth `not_implemented`, database `not_connected`; process health only, not proof of database/Auth readiness |
+| `POST /v1/auth/signup` | 501 `AUTH_NOT_IMPLEMENTED` |
+| `POST /v1/auth/login` | 501 `AUTH_NOT_IMPLEMENTED` |
+| `POST /v1/auth/recovery` | 501 `AUTH_NOT_IMPLEMENTED` |
+| `GET /v1/auth/callback/confirm` | 501 `AUTH_NOT_IMPLEMENTED` |
+| `GET /v1/auth/callback/recovery` | 501 `AUTH_NOT_IMPLEMENTED` |
+| `POST /v1/auth/password` | 501 `AUTH_NOT_IMPLEMENTED` |
+| `POST /v1/auth/logout` | 501 `AUTH_NOT_IMPLEMENTED` |
 
-The 501 responses are deliberate: they never simulate successful signup, email delivery, password changes or logout. The shell has no password form. Complete [authentication preparation](authentication.md) before implementing these routes. The local proxy solves the development-origin plumbing; callback handlers themselves are not implemented, so **do not yet put these URLs in Supabase's hosted redirect allowlist**.
+The 501 responses are deliberate: they never simulate successful signup, email delivery, password changes or logout. The shell has no password form. [Authentication preparation](authentication.md#proposed-worker-session-boundary) owns the future implementation contracts. The local proxy solves the development-origin plumbing; callback handlers themselves are not implemented, so **do not yet put these URLs in Supabase's hosted redirect allowlist**.
 
 ## Configuration and secrets
 
-The checked-in Worker configuration contains only public `APP_ENV=development`, a proposed development Worker name and a compatibility date. No `account_id`, hosted routes, remote resource bindings, provider key or deployment command is configured. `workers_dev` and preview URLs are disabled as additional publishing defaults; they do not prevent somebody manually invoking a deployment command. This task did not deploy.
+The checked-in [Worker configuration](../../apps/api/wrangler.jsonc) contains only public `APP_ENV=development`, a proposed development Worker name and a compatibility date. No `account_id`, hosted routes, remote resource bindings or provider key is configured. The build script uses `wrangler deploy --dry-run` to bundle locally without uploading. `workers_dev` and preview URLs are disabled as additional publishing defaults; they do not prevent somebody manually invoking a deployment command. This task did not deploy.
 
 No frontend environment variables are needed now. If future web configuration is introduced, Vite's client-prefixed values are public build output and must never contain secrets. Future Worker public configuration (`SUPABASE_URL`, publishable key and actual allowed origins) stays separate from secrets such as a cookie-protection key. Ordinary user-auth flows do not require a service-role key or database password.
 
@@ -58,7 +58,7 @@ The root ignore rules cover `.env*` and `.dev.vars*` at every depth. Future loca
 
 Vite's development filesystem access is limited to `apps/web/`, `packages/contracts/` and `node_modules/`, retaining its default denied-file rules. Worker files, including `.dev.vars` and its environment variants, cannot be served through the frontend's `/@fs/` endpoint.
 
-Wrangler telemetry is disabled in this local configuration/launcher. The root `undici` override pins **7.30.1**, replacing Wrangler/Miniflare's vulnerable 7.29.1 dependency while retaining the current Wrangler version. Recheck the override when upgrading Wrangler; it is not permission to use `npm audit fix --force` or downgrade tooling blindly. [Maintainer advisory](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c)
+Wrangler telemetry is disabled in this local configuration/launcher. The root [`undici` override](../../package.json) replaces Wrangler/Miniflare's vulnerable dependency; the [lockfile](../../package-lock.json) records the resolved version. Recheck the override when upgrading Wrangler; it is not permission to use `npm audit fix --force` or downgrade tooling blindly. [Maintainer advisory](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c)
 
 ## Checks
 
