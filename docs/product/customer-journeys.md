@@ -1,6 +1,6 @@
 # Resumora customer journeys for future frontend implementation
 
-Reference date: **2026-10-25**. Status: **documentation proposal; frontend implementation remains on hold**. This document consolidates the existing product and data rules into complete user flows. It does not approve release scope, commercial/privacy policies, providers or infrastructure. “Must” and acceptance criteria below describe the proposed future implementation contract, not working features or owner approval.
+Reference date: **2026-10-25**. Status: **journey reference; a bounded [local Base CV implementation](../frontend/base-cv.md) now begins J05–J08**. Full hosted journeys remain planned. This document consolidates the existing product and data rules into complete user flows. It does not approve release scope, commercial/privacy policies, providers or infrastructure. “Must” and acceptance criteria below describe the proposed future implementation contract, not working features or owner approval.
 
 ## Authority, availability and evidence
 
@@ -8,9 +8,10 @@ Use the [PRD, especially §§15–16](prd.md), [decision register D-01–14](../
 
 | Availability label | Meaning in this checkout |
 |---|---|
-| **Implemented local foundation** | React development shell, Worker health endpoint and development proxy. Static source inspection confirms health reports authentication `not_implemented` and database `not_connected`; auth route contracts return 501. See [local foundation](../setup/local-development.md), [Worker source](../../apps/api/src/index.ts) and [shell source](../../apps/web/src/App.tsx). No app was run for this document. |
+| **Implemented local foundation** | React app workspace, Worker health endpoint and development proxy. Static source inspection confirms health reports authentication `not_implemented` and database `not_connected`; auth route contracts return 501. See [local foundation](../setup/local-development.md), [Worker source](../../apps/api/src/index.ts) and [shell source](../../apps/web/src/App.tsx). No app was run for this document. |
 | **Reference/demo only** | The synthetic discovery prototype and imported design examples. They illustrate interactions; they do not establish real accounts, parsing, model analysis, persistent hosted versions, payments or PDF output. Some prototype JSON portability works only on synthetic local state. |
-| **Planned** | Every customer product flow J01–J19 below. They require separately authorized application work and relevant dependencies. No end-to-end customer journey is implemented by the foundation. |
+| **Implemented local Base CV slice** | J05–J08 have editable React forms, explicit confirmation and memory-only save/reopen/history. Upload/extraction/AI and hosted persistence remain unavailable; see [review instructions](../frontend/base-cv.md). |
+| **Planned** | Hosted customer product flows J01–J19 beyond that bounded local slice. They require separately authorized application work and relevant dependencies. No hosted end-to-end customer journey is implemented by this local slice. |
 | **Owner decision** | Remaining depth, access, privacy, retention, policy and release choices. Recommendations are discussion options, not selections. |
 | **Deferred candidate** | URL fetching, extension, OCR, extra output formats/templates, Google and other later integrations. Discovery coverage is retained; inclusion/timing remains an owner choice. |
 
@@ -356,4 +357,4 @@ Before implementation starts, record approved scope/decisions, map canonical IDs
 
 Each implementation task should name its J flow, approved policy inputs, persisted transition, complete S1/U1 states and acceptance criteria above. Verify RO UI/EN CV and EN UI/RO CV independently, plus keyboard/dialog/mobile paths. Test scoped ownership, concurrent save/conflict, repeated retries and late async responses; separate structural validation from factual confirmation, prose approval and export eligibility. Signup/login/recovery require real authorized tests; PDF needs actual-file extraction; payments need genuine server confirmation tests. Existing mock examples cannot satisfy those checks.
 
-This documentation stage performed static consistency review and local link/anchor checks only. No app/build/tests, browser, installation, schema migration, hosted changes, provider/email/model/payment calls or deployment were performed. Independent DB validation is outside this document and is not assumed complete. The next action is Firstmate/owner review of unresolved policies, followed by a separately bounded implementation authorization; frontend development stays on hold.
+This documentation stage performed static consistency review and local link/anchor checks only. No app/build/tests, browser, installation, schema migration, hosted changes, provider/email/model/payment calls or deployment were performed. Independent DB validation is outside this document and is not assumed complete. The next action is Firstmate/owner review of unresolved policies, followed by a separately bounded implementation authorization; a later bounded J05–J08 implementation is described in the [Base CV slice](../frontend/base-cv.md).

@@ -1,6 +1,6 @@
 # Resumora frontend design-system adoption
 
-The supplied CVizat export is the visual reference for Resumora's future frontend. This change preserves the reference package and prepares the handoff; it does not implement an application or authorize production work. The [PRD](../product/prd.md), [canonical CV/workspace contracts](../../schemas/cv/v1/README.md), [journeys A–F](../../research/ux/journeys.md) and [D-01–14 decision register](../../research/strategy/publication/docs/product/decisions.md) retain their product/data authority. The brand name is now Resumora; historical discovery evidence and the supplied export remain unchanged.
+The supplied CVizat export is the visual reference for Resumora's frontend. The subsequently authorized [Base CV application slice](base-cv.md) adopts update-2 for J05–J08 with memory-only save/reopen/version behavior. The intake assessments below retain their historical context; frontend implementation is now authorized within that bounded slice. The original intake preserved the reference package and prepared the handoff; it did not implement an application or authorize production work. The [PRD](../product/prd.md), [canonical CV/workspace contracts](../../schemas/cv/v1/README.md), [journeys A–F](../../research/ux/journeys.md) and [D-01–14 decision register](../../research/strategy/publication/docs/product/decisions.md) retain their product/data authority. The brand name is now Resumora; historical discovery evidence and the supplied export remain unchanged.
 
 ## Updated reference · 2026-10-25
 
