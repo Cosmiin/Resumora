@@ -23,21 +23,34 @@ ROOT = Path(__file__).resolve().parents[2]
 TARGET = 'aquvhqbkvrtzhbmezkci'
 
 
+def require_private(path, *, directory=False):
+    """Check exact setup paths before reading values; never repair permissions."""
+    info = path.lstat()
+    correct_type = stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+    expected_mode = 0o700 if directory else 0o600
+    if not correct_type or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != expected_mode:
+        raise ValueError('Setup paths must be current-owner private directories/files, never symlinks.')
+
+
 def credentials():
     path = ROOT / '.env.db.local'
-    info = path.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
-        raise ValueError('Credential file must be an owner-owned regular file with mode 0600.')
+    metadata = ROOT / 'supabase/.temp'
+    reference = metadata / 'project-ref'
+    pooler_file = metadata / 'pooler-url'
+    require_private(path)
+    require_private(metadata, directory=True)
+    require_private(reference)
+    require_private(pooler_file)
     lines = path.read_text().splitlines()
     if len(lines) != 1 or not lines[0].startswith('SUPABASE_DB_PASSWORD='):
         raise ValueError('Credential file has an unsupported format; do not source or evaluate it.')
     words = shlex.split(lines[0].split('=', 1)[1])
     if len(words) != 1 or not words[0]:
         raise ValueError('Credential value is absent or malformed.')
-    if (ROOT / 'supabase/.temp/project-ref').read_text().strip() != TARGET:
+    if reference.read_text().strip() != TARGET:
         raise ValueError('Linked project differs from the approved target.')
     # Official CLI link writes this metadata. Never print it: a URI may contain credentials.
-    url = urlsplit((ROOT / 'supabase/.temp/pooler-url').read_text().strip())
+    url = urlsplit(pooler_file.read_text().strip())
     direct = url.hostname == f'db.{TARGET}.supabase.co' and unquote(url.username or '') == 'postgres'
     pooler = (re.fullmatch(r'[a-z0-9-]+\.pooler\.supabase\.com', url.hostname or '') is not None
               and unquote(url.username or '') == 'postgres.' + TARGET)
