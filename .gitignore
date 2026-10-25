@@ -9,3 +9,10 @@
 node_modules/
 dist/
 .wrangler/
+
+# Supabase CLI link/cache state; never publish credential-bearing local metadata.
+/supabase/.temp/
+/supabase/.branches/
+
+# Python verification bytecode.
+__pycache__/

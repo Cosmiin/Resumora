@@ -78,7 +78,7 @@ The [GitHub Actions workflow](../../.github/workflows/ci.yml) runs these foundat
 
 ## Next milestones
 
-1. Approve the DB architecture and implement its reviewed migration plan using synthetic fixtures.
+1. Follow the [database guide](../database/README.md) for the approved SQL implementation, verification and development apply boundary; Worker database integration remains a later step.
 2. Implement the Worker auth/session boundary, UI and genuine confirmation/recovery tests, using authorized project-team recipients initially.
 3. Validate HTTPS/cookie behavior and actual app callback routes before changing hosted Auth settings.
 4. Separately authorize hosted development resources/Git integration and deployment. Do not reuse CVTailor resources or deploy the discovery repository root.

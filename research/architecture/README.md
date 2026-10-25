@@ -2,6 +2,8 @@
 
 Current architecture discovery snapshot v3, relayed by Firstmate. This is design input, not a production implementation or infrastructure approval.
 
+For the approved database scope and implemented SQL contracts, use the [database guide](../../docs/database/README.md). The discovery documents below remain historical design input.
+
 - [Architecture proposal](proposal.md), [journey contract](journey-contracts-v3.md), [domain contracts](contracts.md), [data model](data-model.md), [security/operations](security-ops.md), [implementation plan](implementation-plan.md).
 - [Shared Mara case](mara-journey-v1.json) and [duration bounds example](duration-worked-v1.json).
 - [Canonical CV/workspace schemas and fixtures](../../schemas/cv/v1/README.md).
