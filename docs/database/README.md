@@ -4,7 +4,7 @@ Architecture 2.0.0 was explicitly approved for local implementation and staged a
 
 The frozen [plan](plan-v2.0.0.md) and [catalog](catalog-v2.0.0.json) remain the approved logical contract. Their original proposed/pending labels record the reviewed snapshot; this narrow P0–P3 approval supersedes those labels. The full 67-table roadmap is not an instruction to create later tables. Only 43 P0–P3 tables belong to this implementation.
 
-P0–P3 now has ten ordered migrations, 43 tables, transactional publication commands, RLS and deterministic reviewed-evidence analysis. The [API contract](api.md), [migration/test traceability](traceability.md) and [execution/recovery runbook](runbook.md) describe the implemented boundary. No hosted access or apply has occurred. Native SQL tests do not establish hosted Supabase or application integration.
+P0–P3 now has ten ordered migrations, 43 tables, transactional publication commands, RLS and deterministic reviewed-evidence analysis. The [API contract](api.md), [migration/test traceability](traceability.md) and [execution/recovery runbook](runbook.md) describe the implemented boundary. See the runbook's [evidence limits](runbook.md#3-read-only-target-history-drift-and-data-classification) for the credential-free hosted TLS handshake and the still-unperformed authenticated SQL inventory and hosted migrations. Native SQL tests do not establish hosted Supabase or application integration.
 
 ## Canonical IDs and ownership
 

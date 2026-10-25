@@ -2,7 +2,7 @@
 
 Approval covers architecture **2.0.0 P0–P3**, local implementation and staged apply only to development project **`aquvhqbkvrtzhbmezkci`**, after target/schema/history/drift/backup preflight and passing local tests. Synthetic acceptance and cleanup are included. This is existing execution authorization; another blanket approval is unnecessary. Production, real personal data, paid/provider activation, P4–P7, DNS and deployment are excluded. A wrong target, unexpected real data, destructive conflict, drift or missing access/recovery capability stops hosted execution for concrete review.
 
-Current evidence is local only. There is no hosted schema inventory or apply receipt. Access and the actual recovery baseline remain prerequisites, not assumptions of emptiness or free-tier backup availability.
+Current SQL evidence is local only. There is no hosted schema inventory or apply receipt. Access and the actual recovery baseline remain prerequisites, not assumptions of emptiness or free-tier backup availability.
 
 The current pipeline verification boundary is native PostgreSQL, mocked synthetic helper/preflight checks and applicable local HTTP, type and build checks. Do not launch or navigate a browser, including headless or isolated Chrome; perform hosted login, linking, queries or apply; or read credentials during pipeline verification. The source verification plan is external evidence, not a captured run `verification_plan`. The owner access and hosted execution procedures below are separate from these checks.
 
@@ -20,6 +20,12 @@ python3 -m unittest discover -s supabase/tests -p test_preflight.py -v
 For relocated verified official binaries, use `--pg-share <share/postgresql/16>` and `--pg-lib <lib/x86_64-linux-gnu>`. The runner never installs anything, inherits hosted PG/Supabase defaults or uses TCP. It initializes UTF-8/C.UTF-8, creates synthetic subjects and product data, executes real SQL/RLS/concurrent sessions and populated upgrades, stops its own cluster and deletes only its temporary files. Its `fsync=off` is restricted to this disposable synthetic cluster; never copy that setting to a hosted project. Failure returns nonzero. Do not redirect test bootstrap or `behavior.py` to a hosted URL: bootstrap replaces managed Auth with doubles.
 
 CI's separate database job runs these checks using native PostgreSQL 16 on Ubuntu 24.04. Existing application CI remains independent. A hosted project may use a different server version/collation; capture that in preflight and check compatibility rather than assuming equality.
+
+To check preflight inventory against native PostgreSQL rather than mocked SQL responses, run the focused regression below. It requires `openssl`, creates a disposable worktree-local cluster with a synthetic certificate and a loopback-only TLS listener, verifies the database's explicit C locale and read-only inventory, then stops and removes the cluster. For relocated binaries, also set `PG_SHAREDIR` and `PG_LIBDIR` to the corresponding directories. Without `PG_BINDIR`, this opt-in test is skipped.
+
+```sh
+PG_BINDIR=/usr/lib/postgresql/16/bin python3 -m unittest discover -s supabase/tests -p test_preflight_native.py -v
+```
 
 ## 2. Establish exact-target access without secret exposure
 
@@ -42,13 +48,21 @@ The task verified Supabase CLI 2.122.0 against the official release checksum and
 
 ## 3. Read-only target, history, drift and data classification
 
-After access setup, run:
+After access setup, select a trusted public CA file explicitly if the endpoint's root is absent from the system bundle. Supabase's [psql guide](https://supabase.com/docs/guides/database/psql) documents session-pooler connections with `verify-full` and an explicit root certificate. Obtain the CA independently from the official Database Settings certificate download or reviewed official Supabase source; never trust a certificate solely because the endpoint presented it. A downloaded certificate does not configure the client by itself.
+
+The investigated session-pooler endpoint presents Supabase Root2021 CA. Its strict hostname-verified TLS handshake fails with the selected Ubuntu bundle and passes with the matching public root independently obtained from [pinned official Supabase CLI source](https://github.com/supabase/cli/blob/466485003e9fc4a3c15bf80b5369fddba65c2846/apps/cli-go/internal/gen/types/templates/prod-ca-2021.crt). That root's DER SHA-256 is `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa`; the downloaded PEM file's SHA-256 is `700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7`. These fingerprints identify the investigated artifact, not a permanent pin that overrides future certificate rotation. Store the independently verified public file in task data, outside Git. No global trust-store edit, TLS downgrade, repeat login or password reset is needed for this observed trust failure. The TLS-only comparison did not authenticate the password or inspect SQL data.
+
+Run the read-only preflight with that regular-file CA path:
 
 ```sh
-python3 scripts/db/preflight.py --pg-bin /path/to/postgresql/bin --receipt /private/task-data/preflight-before-P0.json
+python3 scripts/db/preflight.py --pg-bin /path/to/postgresql/bin --ssl-root-cert /private/task-data/supabase-root.crt --receipt /private/task-data/preflight-before-P0.json
 ```
 
-Use `--pg-lib` if the relocated client needs it. Before reading values, the helper requires current-owner regular files with mode0600 at `.env.db.local` in the worktree root and at `supabase/.temp/project-ref` and `supabase/.temp/pooler-url`; `supabase/.temp` must be a current-owner directory with mode0700. Unsafe modes/types/symlinks are rejected without repair. It binds ignored CLI metadata to the exact project, allows only direct/session pooler connections for that ref, verifies TLS hostname/system CA, removes inherited connection defaults, forces read-only transactions and bounded statement/lock timeouts. It collects version/collation, custom table presence/RLS/column hashes, constraints, policy/function hashes/ACLs, migration versions/names, aggregate Auth/Storage counts and whether custom tables contain rows. It emits no row contents, migration SQL bodies, function bodies, URI or password. Receipts are owner-only. Failure diagnostics intentionally suppress raw connection details. The helper cannot apply and always records `can_apply:false`.
+Use `--pg-lib` if the relocated client needs it. `--ssl-root-cert` changes only this invocation's CA file: `verify-full` still verifies both certificate chain and hostname. Missing paths, directories and symlinks are rejected; the helper never downloads a CA or establishes its provenance for the operator. Without the option it uses `/etc/ssl/certs/ca-certificates.crt`; inherited `PGSSLROOTCERT`/`PGSSLMODE` cannot override its settings. An invalid or untrusted CA fails in the client rather than downgrading verification.
+
+Before reading values, the helper requires current-owner regular files with mode0600 at `.env.db.local` in the worktree root and at `supabase/.temp/project-ref` and `supabase/.temp/pooler-url`; `supabase/.temp` must be a current-owner directory with mode0700. Unsafe modes/types/symlinks are rejected without repair. It binds ignored CLI metadata to the exact project, allows only direct/session pooler connections for that ref, removes inherited connection defaults, forces read-only transactions and bounded statement/lock timeouts. It collects version/collation, custom table presence/RLS/column hashes, constraints, policy/function hashes/ACLs, migration versions/names, aggregate Auth/Storage counts and whether custom tables contain rows. It emits no row contents, migration SQL bodies, function bodies, URI or password. Receipts use exclusive creation with mode0600 (subject to a stricter caller umask); existing files and symlinks are refused without overwrite, including paths created by another writer during inventory. Keep the parent directory private and task-owned. Failure diagnostics intentionally suppress raw connection details. The helper cannot apply and always records `can_apply:false`.
+
+Offline preflight regressions execute the successful CLI path with synthetic setup files and mocked PostgreSQL responses, verify receipt contents/permissions and strict launch settings, and exercise unsafe CA paths, overwrite/symlink races and suppressed connection failures. They prove local tool behavior, not hosted authentication, schema readiness or recovery. Hosted inventory and migration execution remain separate gated operations after tool review.
 
 Review the receipt alongside an authoritative project identity/name/development-purpose check. Link metadata binds the requested transport but does not prove the owner's project-purpose classification. Confirm PostgreSQL compatibility, extensions/managed schema prerequisites and Auth UID semantics. Compare actual schema/history with the **stable reviewed prefix**, not only with a table count. Record migration names/hashes and any existing objects. RLS/constraint/function hashes are inventory, not automatic drift approval. The helper observes across several read-only transactions; it is not a consistent snapshot. Coordinate a quiet change window and repeat immediately before apply if other writers or migrations could have changed the target.
 
