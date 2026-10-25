@@ -25,7 +25,7 @@ The SQL canonical validator embeds `schemas/cv/v1/cv.schema.json` without loosen
 
 ## Executable evidence
 
-`scripts/db/test.py` starts a private native PostgreSQL cluster and executes `supabase/tests/bootstrap.sql` plus all real migrations. Bootstrap Auth roles/subjects are local doubles. `supabase/tests/behavior.py` supplies 45 behavioral methods; several include multiple races, source vectors or rejection cases. These are database behavior checks, not assertions that SQL source text happens to contain an expected string.
+`scripts/db/test.py` starts a private native PostgreSQL cluster and executes `supabase/tests/bootstrap.sql` plus all real migrations. Bootstrap Auth roles/subjects are local doubles. `supabase/tests/behavior.py` supplies executable behavioral methods; several include multiple races, source vectors or rejection cases. These are database behavior checks, not assertions that SQL source text happens to contain an expected string.
 
 | Acceptance area | Tests / concrete evidence |
 |---|---|
@@ -37,9 +37,9 @@ The SQL canonical validator embeds `schemas/cv/v1/cv.schema.json` without loosen
 | Tenant + lineage | foreign claim rejected; same-tenant wrong job/document/CV version rejected; exact mapping atom/job and selected CV item required; inappropriate recommendation/retraction joins guarded |
 | Reviewed job IDs | client requirement/atom IDs rejected, stable keys retained across versions, returned server row IDs resolve to exact requirement/atom lineage |
 | Application continuity | job branch preserves Base/profile; explicit sent/retraction replay and distinct-app count; sent CV remains historical when latest advances; bounded literal search and Romanian case folding; next action cannot imply sent |
-| Explainable analysis | five saved ATS math vectors compared to existing Python calculator; recomputed persisted result hash; six-decimal input/range checks and stored AND/OR conservation, exclusions/empty criteria, CV-only null profile scope, duplicate mapping reuse under concurrent different keys |
+| Explainable analysis | five saved ATS math vectors compared to existing Python calculator; recomputed persisted result hash; six-decimal input/range checks and stored AND/OR conservation, mixed-polarity positive-share normalization, wholly excluded hard gates, ambiguity/empty criteria, CV-only null profile scope, duplicate mapping reuse under concurrent different keys |
 | Eligibility and validity | authorization independent of semantic scores; strict credential relation/class combinations in profile/CV scopes; nonblank hard-gate basis; unresolved ambiguity requires verification; confirmed denial versus unknown; revocation makes current scores null while history survives |
-| Date precision / readiness | native interval bounds compared to existing Python calculator, overlapping roles counted once, unknown dates unknown; qualitative five categories and no numeric readiness |
+| Date precision / readiness | native interval bounds compared to existing Python calculator, overlapping roles counted once, unknown dates unknown; qualitative five categories and no numeric readiness; linked/tailored pinned-job inference, conflicting-version rejection, document/job application context including sent history, and category-specific true N/A absence |
 | Fresh and populated migrations | fresh ten-file install →43 tables; normal replay →0 pending; populated P0→P1→P2→P3 preserves earlier records; each phase replay →0; actual schema dump equals fresh install; failed DDL/history transaction leaves neither |
 | Preflight security | six network-free tests in `supabase/tests/test_preflight.py`: shell text treated as data, exact project/host/session port binding, TLS read-only requirement, mode0600/regular-file enforcement, no inherited PG service/Auth token |
 

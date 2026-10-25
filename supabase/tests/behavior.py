@@ -676,6 +676,112 @@ class Analysis(unittest.TestCase):
         job=self.job();checks['jobOptimization']={'state':'not_applicable','reason':'Cannot claim context absence while job exists'}
         self.assertIn('NOT_APPLICABLE_REQUIRES_TRUE_CONTEXT_ABSENCE',self.call('publish_readiness',f"'{uid()}','{self.profile['profileVersionId']}',NULL,'{job['jobVersionId']}',{literal(checks)}",error=True))
 
+    def test_readiness_uses_pinned_job_and_actual_application_context(self):
+        import copy
+        checks={k:{'state':'pending','reason':'Review not completed'} for k in ['content','structure','jobOptimization','writing','application']}
+        def publish(cv_version,job_version=None,*,profile=True,checks=checks,error=False,key=None):
+            profile_arg=f"'{self.profile['profileVersionId']}'" if profile else 'NULL'
+            cv_arg=f"'{cv_version}'" if cv_version else 'NULL'
+            job_arg=f"'{job_version}'" if job_version else 'NULL'
+            result=self.call('publish_readiness',f"'{key or uid()}',{profile_arg},{cv_arg},{job_arg},{literal(checks)}",error=error)
+            return result if error else json.loads(result)
+        absent=copy.deepcopy(checks)
+        for category in ['jobOptimization','application']:absent[category]={'state':'not_applicable','reason':'No selected context'}
+        for profile,version in [(True,None),(True,self.profile['baseCvVersionId']),(False,self.profile['baseCvVersionId'])]:
+            self.assertIsNone(publish(version,profile=profile,checks=absent)['numericScore'])
+        other=self.job()
+        for tailored in [False,True]:
+            job=self.job()
+            body=self.job_input();body['title']='Updated target';updated=self.job(body,job=job['jobId'],revision=1)
+            cv=self.job_cv(job,tailored=tailored)
+            for profile in [False,True]:
+                with self.subTest(tailored=tailored,profile=profile):
+                    implicit=publish(cv['cvVersionId'],profile=profile)
+                    explicit=publish(cv['cvVersionId'],job['jobVersionId'],profile=profile)
+                    self.assertEqual(implicit['readinessId'],explicit['readinessId'])
+                    saved=json.loads(DB.sql(f"SELECT to_jsonb(r) FROM app.readiness_runs r WHERE id='{implicit['readinessId']}'"))
+                    self.assertEqual(saved['job_version_id'],job['jobVersionId'])
+                    self.assertEqual(saved['checks']['context'],{'jobVersionId':job['jobVersionId'],'hasApplication':False})
+                    bad=copy.deepcopy(checks);bad['jobOptimization']=absent['jobOptimization']
+                    self.assertIn('NOT_APPLICABLE_REQUIRES_TRUE_CONTEXT_ABSENCE',publish(cv['cvVersionId'],profile=profile,checks=bad,error=True))
+                    no_application=copy.deepcopy(checks);no_application['application']=absent['application']
+                    self.assertEqual(publish(cv['cvVersionId'],profile=profile,checks=no_application)['checks']['application']['state'],'not_applicable')
+                    for conflict in [other['jobVersionId'],updated['jobVersionId']]:
+                        self.assertIn('READINESS_JOB_LINEAGE_MISMATCH',publish(cv['cvVersionId'],conflict,profile=profile,error=True))
+            application=Workspace.application(self,updated,cv)
+            for profile in [False,True]:
+                for supplied_job in [None,job['jobVersionId']]:
+                    with self.subTest(attached=True,profile=profile,supplied_job=supplied_job):
+                        for category in ['jobOptimization','application']:
+                            bad=copy.deepcopy(checks);bad[category]=absent[category]
+                            self.assertIn('NOT_APPLICABLE_REQUIRES_TRUE_CONTEXT_ABSENCE',publish(cv['cvVersionId'],supplied_job,profile=profile,checks=bad,error=True))
+                        result=publish(cv['cvVersionId'],supplied_job,profile=profile)
+                        self.assertEqual(DB.sql(f"SELECT checks#>>'{{context,hasApplication}}' FROM app.readiness_runs WHERE id='{result['readinessId']}'"),'true')
+            sent=Workspace.mark(self,application,1,cv)
+            Workspace.application(self,updated,application=application['applicationId'],revision=2)
+            self.assertIn('NOT_APPLICABLE_REQUIRES_TRUE_CONTEXT_ABSENCE',publish(cv['cvVersionId'],checks=no_application,error=True))
+            self.assertEqual(DB.sql(f"SELECT cv_version_id FROM app.application_events WHERE id='{sent['sentEventId']}'"),cv['cvVersionId'])
+        no_application=copy.deepcopy(checks);no_application['application']=absent['application']
+        self.assertIn('NOT_APPLICABLE_REQUIRES_TRUE_CONTEXT_ABSENCE',publish(None,job['jobVersionId'],checks=no_application,error=True))
+        key=uid();first=publish(self.profile['baseCvVersionId'],key=key)
+        self.assertEqual(first,publish(self.profile['baseCvVersionId'],key=key))
+        self.assertIn('READINESS_JOB_FORBIDDEN',publish(None,uid(),error=True))
+        self.assertIn('READINESS_CV_LINEAGE_FORBIDDEN',self.call('publish_readiness',f"'{uid()}',NULL,'{self.profile['baseCvVersionId']}',NULL,{literal(checks)}",user=self.b,error=True))
+
+    def test_applicable_atoms_conserve_scores_and_hard_gates(self):
+        cases=[('AND',['not_required','positive'],[.5,.5]),
+               ('AND',['not_required','positive','positive'],[.333334,.333333,.333333]),
+               ('OR',['not_required','positive','positive'],[1,1,1])]
+        for operator,polarities,shares in cases:
+            job=self.job({'title':'Applicable criteria','company':'Synthetic Org','text':'Reviewed mixed polarity.',
+              'requirements':[{'key':'mixed','category':'technical','priority':'required','hardGate':True,'gateBasis':'Reviewed applicable gate',
+                'atoms':[{'operator':operator,'polarity':polarity,'weightShare':share} for polarity,share in zip(polarities,shares)]}]})
+            requirement=job['requirements'][0]
+            positive=[atom for atom,polarity in zip(requirement['atoms'],polarities) if polarity=='positive']
+            for bound in [[],positive[:1],positive]:
+                expected=100 if bound and operator=='OR' else 100*len(bound)/len(positive)
+                rows=[]
+                excluded=[atom for atom,polarity in zip(requirement['atoms'],polarities) if polarity=='not_required']
+                for atom in bound+excluded:
+                    for scope in ['profile','cv']:
+                        row={'atomId':atom['atomId'],'claimId':self.claims['sql'],'scope':scope,'matchClass':'demonstrated','relation':'exact'}
+                        if scope=='cv':row['cvItemId']=self.item_ids()[self.claims['sql']]
+                        rows.append(row)
+                for profile,cv_version in [(True,'default'),(True,None),(False,'default')]:
+                    with self.subTest(operator=operator,positive=len(positive),bound=len(bound),profile=profile,cv_version=cv_version):
+                        scoped=[row for row in rows if (row['scope']=='profile' and profile) or (row['scope']=='cv' and cv_version)]
+                        result=self.analyse(job,scoped,profile=profile,cv_version=cv_version)
+                        for field,available in [('candidateFitRaw',profile),('cvMatchRaw',cv_version)]:
+                            if available:self.assertAlmostEqual(result[field],expected,places=5)
+                            else:self.assertIsNone(result[field])
+                        self.assertEqual(result['eligibility'],'requirements_satisfied' if expected==100 else 'needs_verification')
+                        if expected==100:self.assertEqual(result['recommendations'],[])
+                        gate={'requirementId':requirement['requirementId'],'state':'supported','claimId':self.claims['attestation'],'reason':'Reviewed applicable condition'}
+                        supported=self.analyse(job,scoped,profile=profile,cv_version=cv_version,gates=[gate])
+                        self.assertEqual(supported['eligibility'],'requirements_satisfied')
+                        self.assertEqual(DB.sql(f"SELECT a.polarity FROM app.analysis_runs r JOIN app.match_evidence e ON e.evidence_mapping_id=r.evidence_mapping_id JOIN app.requirement_atoms a ON a.id=e.requirement_atom_id WHERE r.id='{supported['analysisId']}' AND e.evidence_role='eligibility'"),'positive')
+
+    def test_excluded_hard_gates_and_ambiguity_in_both_scopes(self):
+        for polarities in [['not_required'],['ambiguous'],['not_required','ambiguous'],['positive','ambiguous']]:
+            for gate_kind in ['other','credential','authorization']:
+                job=self.job({'title':'Gate applicability','company':'Synthetic Org','text':'Reviewed polarity.',
+                  'requirements':[{'key':'polarity','category':'qualifications','priority':'required','hardGate':True,'gateKind':gate_kind,'gateBasis':'Reviewed polarity condition',
+                    'atoms':[{'operator':'AND','polarity':polarity,'weightShare':1/len(polarities)} for polarity in polarities]}]})
+                requirement=job['requirements'][0]
+                for profile,cv_version in [(True,'default'),(True,None),(False,'default')]:
+                    with self.subTest(polarities=polarities,gate_kind=gate_kind,profile=profile,cv_version=cv_version):
+                        result=self.analyse(job,[],profile=profile,cv_version=cv_version)
+                        self.assertIsNone(result['candidateFit']);self.assertIsNone(result['cvMatch']);self.assertEqual(result['components'],[])
+                        self.assertEqual(result['eligibility'],'needs_verification' if 'ambiguous' in polarities else 'requirements_satisfied')
+                        self.assertEqual(DB.sql(f"SELECT eligibility FROM app.analysis_runs WHERE id='{result['analysisId']}'"),result['eligibility'])
+                        for state in ['supported','confirmed_unmet','needs_verification']:
+                            gate={'requirementId':requirement['requirementId'],'state':state,'claimId':self.claims['attestation'],'reason':'Reviewed gate assertion'}
+                            if 'ambiguous' not in polarities:
+                                self.assertIn('GATE_ASSERTION_LINEAGE_MISMATCH',self.analyse(job,[],profile=profile,cv_version=cv_version,gates=[gate],error=True))
+                            else:
+                                asserted=self.analyse(job,[],profile=profile,cv_version=cv_version,gates=[gate])
+                                self.assertEqual(asserted['eligibility'],'confirmed_requirement_gap' if state=='confirmed_unmet' else 'needs_verification')
+
     def test_native_duration_matches_existing_precision_union_method(self):
         from datetime import date
         from pathlib import Path

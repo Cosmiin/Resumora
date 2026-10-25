@@ -2,11 +2,12 @@
 CREATE FUNCTION app.calculate_scores(p_mapping uuid,p_rules uuid,p_profile_available boolean,p_cv_available boolean) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
  WITH context AS(SELECT m.*,r.config rules FROM app.evidence_mappings m CROSS JOIN app.rule_versions r WHERE m.id=p_mapping AND r.id=p_rules AND r.rule_kind='scoring'),
+ applicable AS(SELECT q.* FROM context c JOIN app.job_requirements q ON (q.tenant_id,q.job_version_id)=(c.tenant_id,c.job_version_id)
+  WHERE EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity<>'not_required')),
  scopes AS(SELECT * FROM (VALUES('profile'::text,p_profile_available),('cv'::text,p_cv_available))s(scope_name,available) WHERE available),
  requirements AS(SELECT q.*,((c.rules->'priority'->>q.priority)::numeric*q.priority_fraction) importance,(c.rules->'weights'->>q.primary_category)::numeric nominal_weight
-  FROM context c JOIN app.job_requirements q ON (q.tenant_id,q.job_version_id)=(c.tenant_id,c.job_version_id)
-  WHERE q.scorable AND EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity='positive')
-   AND NOT EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity='ambiguous')),
+  FROM context c CROSS JOIN applicable q
+  WHERE q.scorable AND NOT EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity='ambiguous')),
  atoms AS(SELECT s.scope_name,q.id requirement_id,q.tenant_id,q.primary_category,q.importance,q.nominal_weight,q.gate_kind,a.id atom_id,a.ordinal,a.operator,a.weight_share,
   COALESCE((SELECT max(e.strength*e.fulfillment) FROM app.match_evidence e WHERE e.tenant_id=q.tenant_id AND e.evidence_mapping_id=p_mapping AND e.requirement_atom_id=a.id AND e.scope=s.scope_name AND e.evidence_role='semantic'),0) strength
   FROM scopes s CROSS JOIN requirements q JOIN app.requirement_atoms a ON (a.tenant_id,a.requirement_id)=(q.tenant_id,q.id) WHERE a.polarity='positive'),
@@ -14,18 +15,18 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
   (pg_catalog.array_agg(atom_id ORDER BY ordinal))[1] atom_id,
   CASE WHEN EXISTS(SELECT 1 FROM app.match_evidence denial JOIN app.requirement_atoms da ON (da.tenant_id,da.id)=(denial.tenant_id,denial.requirement_atom_id)
     WHERE denial.evidence_mapping_id=p_mapping AND da.requirement_id=atoms.requirement_id AND denial.evidence_role='eligibility' AND denial.gate_state='confirmed_unmet') THEN 0
-   WHEN min(operator)='OR' THEN max(strength) ELSE sum(strength*weight_share) END strength
+   WHEN min(operator)='OR' THEN max(strength) ELSE sum(strength*weight_share)/sum(weight_share) END strength
   FROM atoms GROUP BY scope_name,requirement_id,tenant_id,primary_category,importance,nominal_weight),
  category_denominators AS(SELECT scope_name,primary_category,max(nominal_weight) nominal_weight,sum(importance) denominator FROM criteria GROUP BY scope_name,primary_category),
  category_weights AS(SELECT *,100*nominal_weight/sum(nominal_weight) OVER(PARTITION BY scope_name) effective_weight FROM category_denominators),
  components AS(SELECT c.*,w.denominator,w.effective_weight,w.effective_weight*c.importance*c.strength/w.denominator contribution,
   CASE WHEN c.strength>0 THEN 'included' WHEN c.scope_name='cv' AND EXISTS(SELECT 1 FROM criteria p WHERE p.scope_name='profile' AND p.requirement_id=c.requirement_id AND p.strength>0) THEN 'verified_omitted' ELSE 'unsupported' END keyword_status
   FROM criteria c JOIN category_weights w USING(scope_name,primary_category)),
- ambiguous AS(SELECT q.id FROM context c JOIN app.job_requirements q ON (q.tenant_id,q.job_version_id)=(c.tenant_id,c.job_version_id)
+ ambiguous AS(SELECT q.id FROM applicable q
   WHERE EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity='ambiguous')),
- gates AS(SELECT q.* FROM context c JOIN app.job_requirements q ON (q.tenant_id,q.job_version_id)=(c.tenant_id,c.job_version_id) WHERE q.hard_gate),
+ gates AS(SELECT q.* FROM applicable q WHERE q.hard_gate),
  eligibility AS(SELECT CASE
-  WHEN EXISTS(SELECT 1 FROM app.match_evidence e WHERE e.evidence_mapping_id=p_mapping AND e.evidence_role='eligibility' AND e.gate_state='confirmed_unmet') THEN 'confirmed_requirement_gap'
+  WHEN EXISTS(SELECT 1 FROM app.match_evidence e JOIN app.requirement_atoms a ON (a.tenant_id,a.id)=(e.tenant_id,e.requirement_atom_id) JOIN gates g ON (g.tenant_id,g.id)=(a.tenant_id,a.requirement_id) WHERE e.evidence_mapping_id=p_mapping AND e.evidence_role='eligibility' AND e.gate_state='confirmed_unmet') THEN 'confirmed_requirement_gap'
   WHEN EXISTS(SELECT 1 FROM ambiguous) OR EXISTS(SELECT 1 FROM gates g WHERE NOT (
     EXISTS(SELECT 1 FROM app.match_evidence e JOIN app.requirement_atoms a ON (a.tenant_id,a.id)=(e.tenant_id,e.requirement_atom_id) WHERE e.evidence_mapping_id=p_mapping AND a.requirement_id=g.id AND e.evidence_role='eligibility' AND e.gate_state='supported')
     OR (g.gate_kind<>'authorization' AND COALESCE((SELECT c.strength FROM criteria c WHERE c.requirement_id=g.id AND c.scope_name=CASE WHEN p_profile_available THEN 'profile' ELSE 'cv' END),0)=1))) THEN 'needs_verification'
@@ -84,7 +85,7 @@ BEGIN
  SELECT q.* INTO v_requirement FROM app.job_requirements q JOIN app.requirement_atoms a ON (a.tenant_id,a.requirement_id)=(q.tenant_id,q.id)
  WHERE a.tenant_id=NEW.tenant_id AND a.id=NEW.requirement_atom_id AND q.job_version_id=m.job_version_id;
  IF v_requirement.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='REQUIREMENT_MAPPING_LINEAGE_MISMATCH'; END IF;
- IF NEW.evidence_role='eligibility' AND NOT v_requirement.hard_gate THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='GATE_ASSERTION_REQUIRES_REVIEWED_HARD_GATE'; END IF;
+ IF NEW.evidence_role='eligibility' AND (NOT v_requirement.hard_gate OR NOT EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=NEW.tenant_id AND a.requirement_id=v_requirement.id AND a.polarity<>'not_required')) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='GATE_ASSERTION_REQUIRES_REVIEWED_HARD_GATE'; END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER evidence_lineage BEFORE INSERT ON app.match_evidence FOR EACH ROW EXECUTE FUNCTION app.validate_evidence_lineage();
@@ -159,13 +160,14 @@ BEGIN
  END LOOP;
  FOR v_item IN SELECT * FROM pg_catalog.jsonb_array_elements(v_gates) LOOP
   IF pg_catalog.jsonb_typeof(v_item)<>'object' OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(v_item)k WHERE k NOT IN ('requirementId','state','claimId','reason')) OR COALESCE(v_item->>'state','') NOT IN ('supported','confirmed_unmet','needs_verification') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_GATE_ASSERTION'; END IF;
-  SELECT * INTO v_requirement FROM app.job_requirements WHERE tenant_id=v_workspace AND job_version_id=p_job_version AND id=(v_item->>'requirementId')::uuid AND hard_gate;
+  SELECT q.* INTO v_requirement FROM app.job_requirements q WHERE q.tenant_id=v_workspace AND q.job_version_id=p_job_version AND q.id=(v_item->>'requirementId')::uuid AND q.hard_gate
+   AND EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity<>'not_required');
   IF v_requirement.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='GATE_ASSERTION_LINEAGE_MISMATCH'; END IF;
   IF v_item->>'state'='needs_verification' AND v_item->>'claimId' IS NULL THEN CONTINUE; END IF;
   v_claim:=(v_item->>'claimId')::uuid;
   IF v_claim IS NULL OR pg_catalog.length(COALESCE(v_item->>'reason','')) NOT BETWEEN 1 AND 2000 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='EXPLICIT_GATE_EVIDENCE_REQUIRED'; END IF;
   v_input_profile:=COALESCE(p_profile_version,v_cv.profile_version_id);v_scope:=CASE WHEN p_profile_version IS NOT NULL THEN 'profile' ELSE 'cv' END;
-  SELECT * INTO v_atom FROM app.requirement_atoms WHERE tenant_id=v_workspace AND requirement_id=v_requirement.id ORDER BY ordinal LIMIT 1;
+  SELECT * INTO v_atom FROM app.requirement_atoms WHERE tenant_id=v_workspace AND requirement_id=v_requirement.id AND polarity<>'not_required' ORDER BY ordinal LIMIT 1;
   INSERT INTO app.match_evidence(tenant_id,evidence_mapping_id,requirement_atom_id,claim_id,relation,strength,review_state,explanation,profile_version_id,job_version_id,cv_version_id,scope,match_class,fulfillment,evidence_role,gate_state)
   VALUES(v_workspace,v_mapping,v_atom.id,v_claim,'exact',0,'accepted',v_item->>'reason',v_input_profile,p_job_version,CASE WHEN v_scope='cv' THEN p_cv_version ELSE NULL END,v_scope,'not_evidenced',1,'eligibility',v_item->>'state');
  END LOOP;
@@ -198,7 +200,7 @@ END $$;
 
 CREATE FUNCTION app.publish_readiness(p_key uuid,p_profile_version uuid,p_cv_version uuid,p_job_version uuid,p_checks jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE v_workspace uuid:=app.tenant_for_user();r record;v_profile uuid;v_cv app.cv_versions;v_rubric uuid;v_check jsonb;v_category text;v_hash bytea;v_id uuid;v_result jsonb;
+DECLARE v_workspace uuid:=app.tenant_for_user();r record;v_profile uuid;v_cv app.cv_versions;v_job app.job_versions;v_job_version uuid;v_has_application boolean;v_rubric uuid;v_check jsonb;v_category text;v_hash bytea;v_id uuid;v_result jsonb;
 BEGIN
  SELECT * INTO r FROM app.begin_request(v_workspace,'publish_readiness',p_key,pg_catalog.jsonb_build_object('profileVersion',p_profile_version,'cvVersion',p_cv_version,'jobVersion',p_job_version,'checks',p_checks));
  IF r.cached IS NOT NULL THEN RETURN r.cached; END IF;
@@ -212,24 +214,28 @@ BEGIN
   IF v_cv.id IS NULL OR (v_profile IS NOT NULL AND v_profile<>v_cv.profile_id) THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='READINESS_CV_LINEAGE_FORBIDDEN'; END IF;
   PERFORM app.assert_profile_usable(v_workspace,v_cv.profile_version_id);
  END IF;
- IF p_job_version IS NOT NULL AND NOT EXISTS(SELECT 1 FROM app.job_versions WHERE tenant_id=v_workspace AND id=p_job_version) THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='READINESS_JOB_FORBIDDEN'; END IF;
+ IF v_cv.job_version_id IS NOT NULL AND p_job_version IS NOT NULL AND p_job_version<>v_cv.job_version_id THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='READINESS_JOB_LINEAGE_MISMATCH'; END IF;
+ v_job_version:=COALESCE(p_job_version,v_cv.job_version_id);
+ SELECT * INTO v_job FROM app.job_versions WHERE tenant_id=v_workspace AND id=v_job_version;
+ IF v_job_version IS NOT NULL AND v_job.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='READINESS_JOB_FORBIDDEN'; END IF;
+ v_has_application:=EXISTS(SELECT 1 FROM app.applications a WHERE a.tenant_id=v_workspace AND a.job_id=v_job.job_id);
  IF p_checks IS NULL OR pg_catalog.jsonb_typeof(p_checks)<>'object' OR pg_catalog.octet_length(p_checks::text)>60000 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='QUALITATIVE_CHECKLIST_REQUIRED'; END IF;
  IF (SELECT count(*) FROM pg_catalog.jsonb_object_keys(p_checks))<>5 OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(p_checks)k WHERE k NOT IN ('content','structure','jobOptimization','writing','application')) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='QUALITATIVE_CATEGORIES_REQUIRED'; END IF;
  FOREACH v_category IN ARRAY ARRAY['content','structure','jobOptimization','writing','application'] LOOP
   v_check:=p_checks->v_category;
   IF pg_catalog.jsonb_typeof(v_check) IS DISTINCT FROM 'object' OR COALESCE(v_check->>'state','') NOT IN ('pass','needs_action','pending','not_applicable') OR
     EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(v_check)k WHERE k NOT IN ('state','reason','sourcePaths')) OR pg_catalog.length(COALESCE(v_check->>'reason',''))>2000 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_QUALITATIVE_CHECK'; END IF;
-  IF v_check->>'state'='not_applicable' AND (p_job_version IS NOT NULL OR v_category NOT IN ('jobOptimization','application') OR pg_catalog.length(COALESCE(v_check->>'reason',''))=0) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='NOT_APPLICABLE_REQUIRES_TRUE_CONTEXT_ABSENCE'; END IF;
+  IF v_check->>'state'='not_applicable' AND ((v_category='jobOptimization' AND v_job_version IS NOT NULL) OR (v_category='application' AND v_has_application) OR v_category NOT IN ('jobOptimization','application') OR pg_catalog.length(COALESCE(v_check->>'reason',''))=0) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='NOT_APPLICABLE_REQUIRES_TRUE_CONTEXT_ABSENCE'; END IF;
   IF v_check ? 'sourcePaths' THEN
    IF pg_catalog.jsonb_typeof(v_check->'sourcePaths')<>'array' THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_CHECK_SOURCE_PATHS'; END IF;
    IF pg_catalog.jsonb_array_length(v_check->'sourcePaths')>50 OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(v_check->'sourcePaths')p WHERE pg_catalog.jsonb_typeof(p)<>'string' OR pg_catalog.length(p#>>'{}')>200 OR p#>>'{}' NOT LIKE '/%') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_CHECK_SOURCE_PATHS'; END IF;
   END IF;
  END LOOP;
  SELECT id INTO STRICT v_rubric FROM app.rule_versions WHERE rule_kind='readiness' AND version='qualitative-review-1.0';
- v_result:=pg_catalog.jsonb_build_object('categories',p_checks,'basis','User-reviewed checklist; not automated writing quality or hiring probability','confirmationHash',pg_catalog.encode(app.confirmation_fingerprint(p_profile_version,p_cv_version),'hex'));
- v_hash:=app.hash_json(pg_catalog.jsonb_build_object('tenant',v_workspace,'profile',p_profile_version,'cv',p_cv_version,'job',p_job_version,'rubric',v_rubric,'result',v_result));
+ v_result:=pg_catalog.jsonb_build_object('categories',p_checks,'basis','User-reviewed checklist; not automated writing quality or hiring probability','context',pg_catalog.jsonb_build_object('jobVersionId',v_job_version,'hasApplication',v_has_application),'confirmationHash',pg_catalog.encode(app.confirmation_fingerprint(p_profile_version,p_cv_version),'hex'));
+ v_hash:=app.hash_json(pg_catalog.jsonb_build_object('tenant',v_workspace,'profile',p_profile_version,'cv',p_cv_version,'job',v_job_version,'rubric',v_rubric,'result',v_result));
  INSERT INTO app.readiness_runs(tenant_id,profile_version_id,cv_version_id,job_version_id,rubric_version_id,checks,input_hash,result_hash)
- VALUES(v_workspace,p_profile_version,p_cv_version,p_job_version,v_rubric,v_result,v_hash,app.hash_json(v_result)) ON CONFLICT(tenant_id,input_hash) DO NOTHING RETURNING id INTO v_id;
+ VALUES(v_workspace,p_profile_version,p_cv_version,v_job_version,v_rubric,v_result,v_hash,app.hash_json(v_result)) ON CONFLICT(tenant_id,input_hash) DO NOTHING RETURNING id INTO v_id;
  IF v_id IS NULL THEN SELECT id INTO v_id FROM app.readiness_runs WHERE tenant_id=v_workspace AND input_hash=v_hash; END IF;
  PERFORM app.audit(v_workspace,'readiness.reviewed','readiness',v_id);
  RETURN app.finish_request(v_workspace,r.request_id,pg_catalog.jsonb_build_object('readinessId',v_id,'rubricVersion','qualitative-review-1.0','checks',p_checks,'numericScore',NULL));
