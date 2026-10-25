@@ -313,7 +313,7 @@ BEGIN
  SELECT * INTO v_document FROM app.cv_documents WHERE tenant_id=v_workspace AND id=p_document FOR UPDATE;
  IF v_document.draft_revision IS DISTINCT FROM p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
  IF v_document.document_kind='job' THEN
-  v_version:=app.insert_job_cv_version(v_workspace,p_document,v_old.profile_version_id,r.request_id,v_old.canonical_json->'document',v_old.locale,v_old.job_version_id,v_old.tailoring_state='tailored');
+  v_version:=app.insert_job_cv_version(v_workspace,p_document,v_old.profile_version_id,r.request_id,v_old.canonical_json->'document',v_old.locale,v_old.job_version_id,v_old.tailoring_state='tailored',app.canonical_id(v_old.canonical_json#>>'{context,baseSnapshotId}'));
  ELSE
   v_version:=app.insert_cv_version(v_workspace,p_document,v_old.profile_version_id,r.request_id,v_old.canonical_json->'document',v_old.locale);
  END IF;

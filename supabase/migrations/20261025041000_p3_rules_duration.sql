@@ -2,7 +2,7 @@
 
 ALTER TABLE app.match_evidence ADD COLUMN evidence_role text NOT NULL DEFAULT 'semantic' CHECK(evidence_role IN ('semantic','eligibility'));
 
-ALTER TABLE app.match_evidence ADD COLUMN gate_state text CHECK(gate_state IN ('supported','confirmed_unmet','needs_verification'));
+ALTER TABLE app.match_evidence ADD COLUMN gate_state text CHECK(gate_state IN ('supported','confirmed_unmet'));
 
 ALTER TABLE app.match_evidence ADD CONSTRAINT ck_match_gate_role CHECK((evidence_role='semantic' AND gate_state IS NULL) OR (evidence_role='eligibility' AND gate_state IS NOT NULL AND strength=0));
 

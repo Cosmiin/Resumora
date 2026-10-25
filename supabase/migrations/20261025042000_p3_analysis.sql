@@ -159,11 +159,10 @@ BEGIN
   VALUES(v_workspace,v_mapping,v_atom.id,v_claim,v_item_id,v_relation,v_strength,'accepted',v_explanation,v_input_profile,p_job_version,CASE WHEN v_scope='cv' THEN p_cv_version ELSE NULL END,v_scope,v_class,v_fulfillment,'semantic');
  END LOOP;
  FOR v_item IN SELECT * FROM pg_catalog.jsonb_array_elements(v_gates) LOOP
-  IF pg_catalog.jsonb_typeof(v_item)<>'object' OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(v_item)k WHERE k NOT IN ('requirementId','state','claimId','reason')) OR COALESCE(v_item->>'state','') NOT IN ('supported','confirmed_unmet','needs_verification') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_GATE_ASSERTION'; END IF;
+  IF pg_catalog.jsonb_typeof(v_item)<>'object' OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(v_item)k WHERE k NOT IN ('requirementId','state','claimId','reason')) OR COALESCE(v_item->>'state','') NOT IN ('supported','confirmed_unmet') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_GATE_ASSERTION'; END IF;
   SELECT q.* INTO v_requirement FROM app.job_requirements q WHERE q.tenant_id=v_workspace AND q.job_version_id=p_job_version AND q.id=(v_item->>'requirementId')::uuid AND q.hard_gate
    AND EXISTS(SELECT 1 FROM app.requirement_atoms a WHERE a.tenant_id=q.tenant_id AND a.requirement_id=q.id AND a.polarity<>'not_required');
   IF v_requirement.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='GATE_ASSERTION_LINEAGE_MISMATCH'; END IF;
-  IF v_item->>'state'='needs_verification' AND v_item->>'claimId' IS NULL THEN CONTINUE; END IF;
   v_claim:=(v_item->>'claimId')::uuid;
   IF v_claim IS NULL OR pg_catalog.length(COALESCE(v_item->>'reason','')) NOT BETWEEN 1 AND 2000 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='EXPLICIT_GATE_EVIDENCE_REQUIRED'; END IF;
   v_input_profile:=COALESCE(p_profile_version,v_cv.profile_version_id);v_scope:=CASE WHEN p_profile_version IS NOT NULL THEN 'profile' ELSE 'cv' END;

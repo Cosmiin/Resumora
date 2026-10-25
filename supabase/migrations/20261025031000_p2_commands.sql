@@ -179,9 +179,9 @@ CREATE TRIGGER check_retraction BEFORE INSERT ON app.application_events FOR EACH
 
 
 CREATE FUNCTION app.insert_job_cv_version(workspace uuid, document_id uuid, profile_version uuid,
- request_id uuid, layout jsonb, locale text, p_job_version uuid, p_tailored boolean) RETURNS uuid
+ request_id uuid, layout jsonb, locale text, p_job_version uuid, p_tailored boolean, p_base_snapshot uuid) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE document app.cv_documents; profile uuid; snapshot uuid := pg_catalog.gen_random_uuid(); seq bigint; projection jsonb; section jsonb; entry text; section_row uuid; order_no integer:=0; item_no integer; revision uuid; v_target_job uuid; v_base_snapshot uuid; v_base_document uuid;
+DECLARE document app.cv_documents; profile uuid; snapshot uuid := pg_catalog.gen_random_uuid(); seq bigint; projection jsonb; section jsonb; entry text; section_row uuid; order_no integer:=0; item_no integer; revision uuid; v_target_job uuid; v_base_document uuid;
 BEGIN
  SELECT * INTO document FROM app.cv_documents d WHERE d.tenant_id=workspace AND d.id=document_id FOR UPDATE;
  SELECT v.profile_id INTO profile FROM app.profile_versions v WHERE v.tenant_id=workspace AND v.id=profile_version;
@@ -189,13 +189,12 @@ BEGIN
  SELECT COALESCE(max(v.sequence),0)+1 INTO seq FROM app.cv_versions v WHERE v.tenant_id=workspace AND v.document_id=insert_job_cv_version.document_id;
  SELECT j.job_id INTO v_target_job FROM app.job_versions j WHERE j.tenant_id=workspace AND j.id=p_job_version;
  IF v_target_job IS NULL OR document.job_id IS DISTINCT FROM v_target_job THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='CV_JOB_LINEAGE_FORBIDDEN'; END IF;
- SELECT cv.id,cv.document_id INTO v_base_snapshot,v_base_document FROM app.cv_versions cv JOIN app.cv_documents d ON (d.tenant_id,d.id)=(cv.tenant_id,cv.document_id)
- WHERE cv.tenant_id=workspace AND cv.profile_version_id=profile_version AND d.document_kind='base' ORDER BY cv.sequence DESC LIMIT 1;
- IF v_base_snapshot IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='PINNED_BASE_CV_REQUIRED'; END IF;
+ SELECT d.id INTO v_base_document FROM app.cv_documents d WHERE d.tenant_id=workspace AND d.profile_id=profile AND d.document_kind='base';
+ IF v_base_document IS NULL OR (p_tailored AND NOT EXISTS(SELECT 1 FROM app.cv_versions cv WHERE cv.tenant_id=workspace AND cv.id=p_base_snapshot AND cv.document_id=v_base_document AND cv.profile_version_id=profile_version)) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='PINNED_BASE_CV_REQUIRED'; END IF;
  projection:=app.canonical_for_cv(workspace,profile_version,document_id,snapshot,seq,document.head_version_id,locale,layout);
  projection:=pg_catalog.jsonb_set(projection,'{baseCvId}',pg_catalog.to_jsonb(app.portable_id(v_base_document)));
  IF p_tailored THEN
-  projection:=pg_catalog.jsonb_set(projection,'{context}',pg_catalog.jsonb_build_object('kind','tailored','baseSnapshotId',app.portable_id(v_base_snapshot),'jobSnapshotId',app.portable_id(p_job_version),'previousTailoredSnapshotId',
+  projection:=pg_catalog.jsonb_set(projection,'{context}',pg_catalog.jsonb_build_object('kind','tailored','baseSnapshotId',app.portable_id(p_base_snapshot),'jobSnapshotId',app.portable_id(p_job_version),'previousTailoredSnapshotId',
     CASE WHEN EXISTS(SELECT 1 FROM app.cv_versions WHERE id=document.head_version_id AND tailoring_state='tailored') THEN app.portable_id(document.head_version_id) ELSE NULL END));
  END IF;
  PERFORM app.validate_canonical(projection);
@@ -222,7 +221,7 @@ END $$;
 CREATE FUNCTION app.save_job_cv_checkpoint(p_key uuid,p_document uuid,p_expected_revision bigint,
  p_profile_version uuid,p_job_version uuid,p_layout jsonb,p_locale text,p_tailored boolean) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE v_workspace uuid:=app.tenant_for_user();r record;v_profile uuid;v_job uuid;v_document app.cv_documents;v_id uuid:=COALESCE(p_document,pg_catalog.gen_random_uuid());v_version uuid;
+DECLARE v_workspace uuid:=app.tenant_for_user();r record;v_profile uuid;v_job uuid;v_document app.cv_documents;v_id uuid:=COALESCE(p_document,pg_catalog.gen_random_uuid());v_version uuid;v_base_snapshot uuid;
 BEGIN
  SELECT * INTO r FROM app.begin_request(v_workspace,'save_job_cv_checkpoint',p_key,pg_catalog.jsonb_build_object('document',p_document,'expectedRevision',p_expected_revision,'profileVersion',p_profile_version,'jobVersion',p_job_version,'layout',p_layout,'locale',p_locale,'tailored',p_tailored));
  IF r.cached IS NOT NULL THEN RETURN r.cached; END IF;
@@ -239,7 +238,11 @@ BEGIN
  SELECT * INTO v_document FROM app.cv_documents WHERE tenant_id=v_workspace AND id=v_id FOR UPDATE;
  IF v_document.id IS NULL OR v_document.document_kind<>'job' OR v_document.profile_id<>v_profile OR v_document.job_id<>v_job THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='JOB_CV_LINEAGE_FORBIDDEN'; END IF;
  IF v_document.draft_revision IS DISTINCT FROM p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
- v_version:=app.insert_job_cv_version(v_workspace,v_id,p_profile_version,r.request_id,p_layout,p_locale,p_job_version,p_tailored);
+ IF p_tailored THEN
+  SELECT cv.id INTO v_base_snapshot FROM app.cv_versions cv JOIN app.cv_documents d ON (d.tenant_id,d.id)=(cv.tenant_id,cv.document_id)
+  WHERE cv.tenant_id=v_workspace AND cv.profile_version_id=p_profile_version AND d.document_kind='base' ORDER BY cv.sequence DESC LIMIT 1;
+ END IF;
+ v_version:=app.insert_job_cv_version(v_workspace,v_id,p_profile_version,r.request_id,p_layout,p_locale,p_job_version,p_tailored,v_base_snapshot);
  PERFORM app.audit(v_workspace,'cv.job_selection','cv_version',v_version,pg_catalog.jsonb_build_object('tailored',p_tailored));
  RETURN app.finish_request(v_workspace,r.request_id,pg_catalog.jsonb_build_object('cvVersionId',v_version,'documentId',v_id,'revision',p_expected_revision+1,'tailoringState',CASE WHEN p_tailored THEN 'tailored' ELSE 'not_tailored' END));
 EXCEPTION WHEN check_violation OR foreign_key_violation OR not_null_violation OR invalid_text_representation THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_JOB_CV_GRAPH';

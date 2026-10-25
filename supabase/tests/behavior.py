@@ -355,6 +355,33 @@ class Workspace(unittest.TestCase):
         self.assertEqual(DB.sql(f"SELECT head_version_id FROM app.cv_documents WHERE id='{initial_profile['baseDocumentId']}'"),self.profile['baseCvVersionId'])
         self.assertEqual(DB.sql(f"SELECT head_version_id FROM app.career_profiles WHERE id='{self.profile['profileId']}'"),self.profile['profileVersionId'])
 
+    def test_job_restore_preserves_base_snapshot_after_base_only_save(self):
+        import copy
+        job=self.job();branches=[self.job_cv(job,tailored=tailored) for tailored in [False,True]]
+        historical={branch['cvVersionId']:DB.sql(f"SELECT canonical_json FROM app.cv_versions WHERE id='{branch['cvVersionId']}'") for branch in branches}
+        layout=copy.deepcopy(self.cv['document']);layout['sections'][0]['label']='Base-only layout edit'
+        base=json.loads(self.call('save_cv_checkpoint',f"'{uid()}','{self.profile['baseDocumentId']}',1,'{self.profile['profileVersionId']}',{literal(layout)},'en'"))
+        for branch in branches:
+            tailored=branch['tailoringState']=='tailored'
+            newer=self.job_cv(job,document=branch['documentId'],revision=1,tailored=tailored)
+            current=json.loads(DB.sql(f"SELECT canonical_json FROM app.cv_versions WHERE id='{newer['cvVersionId']}'"))
+            old=json.loads(historical[branch['cvVersionId']])
+            self.assertEqual(current['context']['baseSnapshotId'],'id_'+base['cvVersionId'] if tailored else None)
+            key=uid();args=f"'{key}','{branch['documentId']}',2,'{branch['cvVersionId']}'"
+            restored=json.loads(self.call('restore_cv_version',args))
+            self.assertEqual(restored,json.loads(self.call('restore_cv_version',args)))
+            saved=json.loads(DB.sql(f"SELECT canonical_json FROM app.cv_versions WHERE id='{restored['cvVersionId']}'"))
+            self.assertEqual(saved['context']['baseSnapshotId'],old['context']['baseSnapshotId'])
+            self.assertEqual(saved['context']['baseSnapshotId'],'id_'+self.profile['baseCvVersionId'] if tailored else None)
+            self.assertEqual(saved['context']['jobSnapshotId'],old['context']['jobSnapshotId'])
+            self.assertEqual(saved['baseCvId'],old['baseCvId']);self.assertEqual(saved['document'],old['document'])
+            self.assertEqual(saved['parentSnapshotId'],'id_'+newer['cvVersionId'])
+            self.assertNotIn(restored['cvVersionId'],[branch['cvVersionId'],newer['cvVersionId']])
+            self.assertEqual(DB.sql(f"SELECT content_hash=app.hash_json(canonical_json-'snapshotId'-'baseCvId'-'version'-'parentSnapshotId'-'createdAt') FROM app.cv_versions WHERE id='{restored['cvVersionId']}'"),'t')
+            self.assertEqual(historical[branch['cvVersionId']],DB.sql(f"SELECT canonical_json FROM app.cv_versions WHERE id='{branch['cvVersionId']}'"))
+        self.assertEqual(DB.sql(f"SELECT head_version_id FROM app.cv_documents WHERE id='{self.profile['baseDocumentId']}'"),base['cvVersionId'])
+        self.assertEqual(DB.sql(f"SELECT head_version_id FROM app.career_profiles WHERE id='{self.profile['profileId']}'"),self.profile['profileVersionId'])
+
     def test_section_prose_references_are_rejected_by_all_publication_commands(self):
         import copy
         layout=copy.deepcopy(self.cv['document']);layout['sections'][0]['proseIds']=['id_'+uid()]
@@ -774,13 +801,36 @@ class Analysis(unittest.TestCase):
                         self.assertIsNone(result['candidateFit']);self.assertIsNone(result['cvMatch']);self.assertEqual(result['components'],[])
                         self.assertEqual(result['eligibility'],'needs_verification' if 'ambiguous' in polarities else 'requirements_satisfied')
                         self.assertEqual(DB.sql(f"SELECT eligibility FROM app.analysis_runs WHERE id='{result['analysisId']}'"),result['eligibility'])
-                        for state in ['supported','confirmed_unmet','needs_verification']:
+                        for state in ['supported','confirmed_unmet']:
                             gate={'requirementId':requirement['requirementId'],'state':state,'claimId':self.claims['attestation'],'reason':'Reviewed gate assertion'}
                             if 'ambiguous' not in polarities:
                                 self.assertIn('GATE_ASSERTION_LINEAGE_MISMATCH',self.analyse(job,[],profile=profile,cv_version=cv_version,gates=[gate],error=True))
                             else:
                                 asserted=self.analyse(job,[],profile=profile,cv_version=cv_version,gates=[gate])
                                 self.assertEqual(asserted['eligibility'],'confirmed_requirement_gap' if state=='confirmed_unmet' else 'needs_verification')
+
+    def test_needs_verification_is_output_only_for_gate_assertions(self):
+        body=self.job_input();body['requirements'][0].update(hardGate=True,gateKind='authorization',gateBasis='Reviewed authorization condition')
+        job=self.job(body);requirement=next(q for q in job['requirements'] if q['key']=='sql')
+        for profile,cv_version in [(True,'default'),(True,None),(False,'default')]:
+            baseline=self.analyse(job,[],profile=profile,cv_version=cv_version)
+            self.assertEqual(baseline['eligibility'],'needs_verification')
+            count_sql='SELECT jsonb_build_array('+','.join(f"(SELECT count(*) FROM app.{table} WHERE tenant_id='{self.wa}')" for table in ['analysis_runs','evidence_mappings','match_evidence','idempotency_requests','audit_events'])+')'
+            before=DB.sql(count_sql)
+            for claim in [None,self.claims['attestation']]:
+                key=uid();gate={'requirementId':requirement['requirementId'],'state':'needs_verification'}
+                if claim:gate.update(claimId=claim,reason='Unused assertion must be rejected')
+                with self.subTest(profile=profile,cv_version=cv_version,claim=claim):
+                    self.assertIn('INVALID_GATE_ASSERTION',self.analyse(job,[],profile=profile,cv_version=cv_version,gates=[gate],key=key,error=True))
+            self.assertEqual(DB.sql(count_sql),before)
+            valid=self.analyse(job,[],profile=profile,cv_version=cv_version,key=key)
+            self.assertEqual(valid['analysisId'],baseline['analysisId'])
+            gate={'requirementId':requirement['requirementId'],'state':'supported','claimId':self.claims['attestation'],'reason':'Reviewed affirmative support'}
+            supported=self.analyse(job,[],profile=profile,cv_version=cv_version,gates=[gate])
+            self.assertEqual(supported['eligibility'],'requirements_satisfied')
+            denied=self.analyse(job,[],profile=profile,cv_version=cv_version,gates=[{**gate,'state':'confirmed_unmet'}])
+            self.assertEqual(denied['eligibility'],'confirmed_requirement_gap')
+            self.assertIn('check constraint',DB.sql(f"INSERT INTO app.match_evidence SELECT (jsonb_populate_record(NULL::app.match_evidence,to_jsonb(e)||jsonb_build_object('id',gen_random_uuid(),'gate_state','needs_verification'))).* FROM app.match_evidence e JOIN app.analysis_runs r ON r.evidence_mapping_id=e.evidence_mapping_id WHERE r.id='{supported['analysisId']}' AND e.evidence_role='eligibility'",expect_error=True))
 
     def test_native_duration_matches_existing_precision_union_method(self):
         from datetime import date
