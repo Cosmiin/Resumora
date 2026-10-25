@@ -1,0 +1,17 @@
+# Local migration workspace only. Does not configure the hosted project or Auth.
+project_id = "resumora"
+
+[api]
+enabled = false
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 16
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = false
