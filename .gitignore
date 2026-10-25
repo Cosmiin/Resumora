@@ -1,2 +1,6 @@
 /references/screenshots/*
 !/references/screenshots/.gitkeep
+
+# Local environment and Worker credential files, at any directory depth.
+.env*
+.dev.vars*
