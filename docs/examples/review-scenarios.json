@@ -1,0 +1,48 @@
+{
+  "id": "synthetic-review-scenarios-1",
+  "synthetic": true,
+  "kind": "scenario_input_not_cv",
+  "notice": "Independent in-memory review counterfactuals, not new canonical snapshots or an alternative Mara history. Resolve claim IDs within source only; keep values and provenance. Never persist transformed objects under existing snapshot IDs.",
+  "scenarios": [
+    {
+      "id": "extracted-before-confirmation",
+      "source": "schemas/cv/v1/fixtures/journey-mara-base1.json",
+      "claimIds": [
+        "claim_resp_a"
+      ],
+      "status": "extracted_unconfirmed",
+      "removeConfirmation": true,
+      "proseApprovals": {
+        "prose_role_scope": "pending"
+      },
+      "expected": "Source-linked extraction remains reviewable but cannot support approved prose/export until explicit user confirmation. Original Base remains unchanged."
+    },
+    {
+      "id": "metric-awaiting-confirmation",
+      "source": "schemas/cv/v1/fixtures/full-ro.json",
+      "claimIds": [
+        "claim_metric"
+      ],
+      "status": "extracted_unconfirmed",
+      "removeConfirmation": true,
+      "proseApprovals": {},
+      "expected": "The synthetic approximate 20 percent metric is review-only; pending prose_bullet cannot be promoted. This is Ana schema coverage, never a Mara metric."
+    },
+    {
+      "id": "answer-awaiting-confirmation",
+      "source": "schemas/cv/v1/fixtures/journey-mara-base2.json",
+      "claimIds": [
+        "claim_api",
+        "claim_hr",
+        "claim_impact_mara",
+        "claim_finance_collaboration"
+      ],
+      "status": "suggested",
+      "removeConfirmation": true,
+      "proseApprovals": {
+        "prose_mara_summary": "pending"
+      },
+      "expected": "The scripted answer is a separate source; selecting suggested facts does not attest them. Ask for selected confirmation before approved prose; no measured time saving exists."
+    }
+  ]
+}

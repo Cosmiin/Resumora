@@ -32,6 +32,7 @@ The standalone `prototype/review.html` includes the same app source and is conve
 - [`docs/product/prd.md`](docs/product/prd.md) — integrated proposal, scope, five guided review choices, unresolved policy choices.
 - [`prototype/`](prototype/) — original interactive mockup, source, local assets and deterministic verifier.
 - [`research/ux/`](research/ux/) — 44-image inventory metadata, evidence map, states, assumptions, journeys and cross-review dispositions. Reference screenshot binaries are excluded.
+- [Shared synthetic examples](docs/examples/README.md) — fixture index, bilingual job inputs and acceptance checklist.
 - [`schemas/cv/v1/`](schemas/cv/v1/) — proposed canonical CV/workspace schemas, Mara synthetic fixtures, and validation scripts.
 - [`research/architecture/`](research/architecture/README.md), [`research/ats/`](research/ats/README.md), [`research/costs/`](research/costs/README.md) — Firstmate-relayed versioned technical discovery artifacts and limitations.
 - [`research/strategy/publication/`](research/strategy/README.md) — portable strategy evidence, options, decision cards, backlog and sources.

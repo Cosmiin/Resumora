@@ -1,0 +1,207 @@
+{
+  "id": "synthetic-mara-job-language-inputs-1",
+  "synthetic": true,
+  "kind": "scenario_input_not_cv",
+  "source": "research/architecture/mara-journey-v1.json#/inputCurrent/requirements",
+  "jobSnapshotId": "mara_job_1",
+  "requirementsVersion": "mara_requirements_1",
+  "notice": "Synthetic reviewed job-description renditions, not captured employer adverts. English atoms reused verbatim; Romanian is an editorial translation of each atom. No NLP or scoring of these texts was executed. Do not overwrite the immutable source job snapshot.",
+  "company": "Northstar People (synthetic)",
+  "title": "Business Systems Analyst — Automation",
+  "requirements": [
+    {
+      "id": "automation",
+      "category": "technical",
+      "priority": "required",
+      "text": "Workflow automation using Power Automate",
+      "jobEvidence": [
+        "job:sentence:automation"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/0",
+      "texts": {
+        "en": "Workflow automation using Power Automate",
+        "ro": "Automatizarea fluxurilor de lucru cu Power Automate"
+      }
+    },
+    {
+      "id": "sql",
+      "category": "technical",
+      "priority": "required",
+      "text": "SQL reporting",
+      "jobEvidence": [
+        "job:sentence:sql"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/1",
+      "texts": {
+        "en": "SQL reporting",
+        "ro": "Raportare SQL"
+      }
+    },
+    {
+      "id": "api",
+      "category": "technical",
+      "priority": "required",
+      "text": "REST API integration",
+      "jobEvidence": [
+        "job:sentence:api"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/2",
+      "texts": {
+        "en": "REST API integration",
+        "ro": "Integrarea API-urilor REST"
+      }
+    },
+    {
+      "id": "workflow",
+      "category": "responsibilities",
+      "priority": "required",
+      "text": "Deliver internal workflow improvements",
+      "jobEvidence": [
+        "job:sentence:workflow"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/3",
+      "texts": {
+        "en": "Deliver internal workflow improvements",
+        "ro": "Îmbunătățirea fluxurilor de lucru interne"
+      }
+    },
+    {
+      "id": "hr",
+      "category": "responsibilities",
+      "priority": "preferred",
+      "text": "HR or payroll process context preferred",
+      "jobEvidence": [
+        "job:sentence:hr"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/4",
+      "texts": {
+        "en": "HR or payroll process context preferred",
+        "ro": "Experiența în procese HR sau salarizare constituie un avantaj"
+      }
+    },
+    {
+      "id": "years",
+      "category": "experience",
+      "priority": "required",
+      "text": "At least3years relevant workflow/systems experience",
+      "jobEvidence": [
+        "job:sentence:years"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/5",
+      "texts": {
+        "en": "At least3years relevant workflow/systems experience",
+        "ro": "Cel puțin 3 ani de experiență relevantă în fluxuri de lucru și sisteme"
+      }
+    },
+    {
+      "id": "impact",
+      "category": "achievements",
+      "priority": "unspecified",
+      "text": "Explain relevant deliverables and business outcomes",
+      "jobEvidence": [
+        "job:sentence:impact"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/6",
+      "texts": {
+        "en": "Explain relevant deliverables and business outcomes",
+        "ro": "Descrierea livrabilelor relevante și a rezultatelor pentru organizație"
+      }
+    },
+    {
+      "id": "work_authorization",
+      "category": "qualifications",
+      "priority": "required",
+      "text": "Current right to work in Romania is non-negotiable;not inferred from location",
+      "jobEvidence": [
+        "job:sentence:work_authorization"
+      ],
+      "polarity": "positive",
+      "hardGate": true,
+      "gateKind": "authorization",
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/7",
+      "texts": {
+        "en": "Current right to work in Romania is non-negotiable;not inferred from location",
+        "ro": "Dreptul actual de muncă în România este obligatoriu; nu se deduce din locație"
+      }
+    },
+    {
+      "id": "communication",
+      "category": "professional",
+      "priority": "unspecified",
+      "text": "Stakeholder communication",
+      "jobEvidence": [
+        "job:sentence:communication"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/8",
+      "texts": {
+        "en": "Stakeholder communication",
+        "ro": "Comunicare cu părțile interesate"
+      }
+    },
+    {
+      "id": "positioning",
+      "category": "title",
+      "priority": "unspecified",
+      "text": "Business Systems Analyst — Automation positioning",
+      "jobEvidence": [
+        "job:sentence:positioning"
+      ],
+      "polarity": "positive",
+      "hardGate": false,
+      "gateKind": null,
+      "allowEquivalent": false,
+      "sourcePointer": "/inputCurrent/requirements/9",
+      "texts": {
+        "en": "Business Systems Analyst — Automation positioning",
+        "ro": "Poziționare ca Business Systems Analyst — Automation"
+      }
+    }
+  ],
+  "languagePairs": [
+    {
+      "uiLocale": "ro",
+      "cvLocale": "en"
+    },
+    {
+      "uiLocale": "en",
+      "cvLocale": "ro"
+    }
+  ],
+  "descriptions": {
+    "ro": "Automatizarea fluxurilor de lucru cu Power Automate.\nRaportare SQL.\nIntegrarea API-urilor REST.\nÎmbunătățirea fluxurilor de lucru interne.\nExperiența în procese HR sau salarizare constituie un avantaj.\nCel puțin 3 ani de experiență relevantă în fluxuri de lucru și sisteme.\nDescrierea livrabilelor relevante și a rezultatelor pentru organizație.\nDreptul actual de muncă în România este obligatoriu; nu se deduce din locație.\nComunicare cu părțile interesate.\nPoziționare ca Business Systems Analyst — Automation.",
+    "en": "Workflow automation using Power Automate.\nSQL reporting.\nREST API integration.\nDeliver internal workflow improvements.\nHR or payroll process context preferred.\nAt least3years relevant workflow/systems experience.\nExplain relevant deliverables and business outcomes.\nCurrent right to work in Romania is non-negotiable;not inferred from location.\nStakeholder communication.\nBusiness Systems Analyst — Automation positioning."
+  }
+}
