@@ -32,7 +32,7 @@ def require_private(path, *, directory=False):
         raise ValueError('Setup paths must be current-owner private directories/files, never symlinks.')
 
 
-def credentials():
+def credentials(ssl_root_cert=None):
     path = ROOT / '.env.db.local'
     metadata = ROOT / 'supabase/.temp'
     reference = metadata / 'project-ref'
@@ -56,14 +56,16 @@ def credentials():
               and unquote(url.username or '') == 'postgres.' + TARGET)
     if url.scheme not in {'postgres', 'postgresql'} or url.password is not None or url.query or url.fragment or not (direct or pooler) or url.path != '/postgres' or url.port not in {None, 5432}:
         raise ValueError('Link metadata is not a supported exact-target direct/session connection.')
-    ca = Path('/etc/ssl/certs/ca-certificates.crt')
-    if not ca.is_file():
-        raise ValueError('System TLS CA bundle is unavailable; do not downgrade TLS verification.')
+    # Trust is explicit per invocation, never inherited from PGSSLROOTCERT.
+    # The operator must obtain this public CA from an authoritative source.
+    ca = Path(ssl_root_cert) if ssl_root_cert is not None else Path('/etc/ssl/certs/ca-certificates.crt')
+    if not stat.S_ISREG(ca.lstat().st_mode):
+        raise ValueError('TLS CA must be a regular file, never a symlink or directory.')
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(('PG', 'SUPABASE_')) and k != 'DATABASE_URL'}
     env.update(PGHOST=url.hostname, PGPORT='5432', PGDATABASE='postgres',
                PGUSER=unquote(url.username), PGPASSWORD=words[0], PGSSLMODE='verify-full',
-               PGSSLROOTCERT=str(ca), PGCONNECT_TIMEOUT='10',
+               PGSSLROOTCERT=str(ca.absolute()), PGCONNECT_TIMEOUT='10',
                PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=15000 -c lock_timeout=3000',
                PGAPPNAME='resumora-approved-read-only-preflight')
     return env
@@ -139,17 +141,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pg-bin', type=Path, required=True)
     parser.add_argument('--pg-lib', type=Path)
+    parser.add_argument('--ssl-root-cert', type=Path,
+                        help='Authoritatively obtained public CA file; defaults to the system bundle. TLS remains verify-full.')
     parser.add_argument('--receipt', type=Path, required=True)
     args = parser.parse_args()
     try:
-        if args.receipt.exists():
+        if os.path.lexists(args.receipt):
             raise ValueError('Refusing to overwrite a prior preflight receipt.')
-        env = credentials()
+        env = credentials(args.ssl_root_cert)
         if args.pg_lib:
             env['LD_LIBRARY_PATH'] = str(args.pg_lib)
         result = inventory(args.pg_bin / 'psql', env)
         # Metadata stays owner-only, outside Git. No stdout schema or connection dump.
-        with args.receipt.open('x', opener=lambda path, flags: os.open(path, flags, 0o600)) as output:
+        with open(args.receipt, 'x', encoding='utf-8',
+                  opener=lambda path, flags: os.open(path, flags | os.O_NOFOLLOW, 0o600)) as output:
             json.dump(result, output, indent=2)
             output.write('\n')
         print('Read-only inventory saved. Apply remains disabled pending purpose/drift/recovery review.')
