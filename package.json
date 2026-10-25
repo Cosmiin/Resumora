@@ -19,7 +19,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspace @resumora/web && npm run build --workspace @resumora/api",
     "smoke": "node scripts/smoke.mjs",
-    "check": "npm run typecheck && npm run build && npm run smoke"
+    "test:dev-secrets": "node --test scripts/dev-secret-boundary.test.mjs",
+    "check": "npm run typecheck && npm run build && npm run smoke && npm run test:dev-secrets"
   },
   "devDependencies": {
     "typescript": "7.0.2",

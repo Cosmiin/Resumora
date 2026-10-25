@@ -56,6 +56,8 @@ No frontend environment variables are needed now. If future web configuration is
 
 The root ignore rules cover `.env*` and `.dev.vars*` at every depth. Future local Worker secrets belong in `apps/api/.dev.vars`, only when the feature needs them. No real credential files or example exceptions were added. Verify a proposed path using `git check-ignore` before writing values. Never print credential-file contents to validate setup.
 
+Vite's development filesystem access is limited to `apps/web/`, `packages/contracts/` and `node_modules/`, retaining its default denied-file rules. Worker files, including `.dev.vars` and its environment variants, cannot be served through the frontend's `/@fs/` endpoint.
+
 Wrangler telemetry is disabled in this local configuration/launcher. The root `undici` override pins **7.30.1**, replacing Wrangler/Miniflare's vulnerable 7.29.1 dependency while retaining the current Wrangler version. Recheck the override when upgrading Wrangler; it is not permission to use `npm audit fix --force` or downgrade tooling blindly. [Maintainer advisory](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c)
 
 ## Checks
@@ -69,6 +71,8 @@ npm run check
 This runs frontend/API type checks, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
 
 To run only the local integration check: `npm run smoke`. Generated `node_modules/`, `dist/` and `.wrangler/` directories are ignored. Native Windows runtime, browser rendering/accessibility and hosted Cloudflare behavior need their own later verification; this foundation was checked in the current WSL/Linux environment.
+
+To run only the development secret-boundary regression: `npm run test:dev-secrets`. It starts Vite on an available loopback port, checks that synthetic Worker secrets and Vite's default protected files return 403 for direct and `?raw` requests, verifies frontend/shared/dependency files remain accessible, then removes its fixtures and stops the server. It also runs as part of `npm run check`.
 
 ## Next milestones
 
