@@ -2,7 +2,7 @@
 
 Approval covers architecture **2.0.0 P0–P3**, local implementation and staged apply only to development project **`aquvhqbkvrtzhbmezkci`**, after target/schema/history/drift/backup preflight and passing local tests. Synthetic acceptance and cleanup are included. This is existing execution authorization; another blanket approval is unnecessary. Production, real personal data, paid/provider activation, P4–P7, DNS and deployment are excluded. A wrong target, unexpected real data, destructive conflict, drift or missing access/recovery capability stops hosted execution for concrete review.
 
-Current evidence is local only. There is no hosted schema inventory or apply receipt. Access and the actual recovery baseline remain prerequisites, not assumptions of emptiness or free-tier backup availability.
+Current SQL evidence is local only. There is no hosted schema inventory or apply receipt. Access and the actual recovery baseline remain prerequisites, not assumptions of emptiness or free-tier backup availability.
 
 The current pipeline verification boundary is native PostgreSQL, mocked synthetic helper/preflight checks and applicable local HTTP, type and build checks. Do not launch or navigate a browser, including headless or isolated Chrome; perform hosted login, linking, queries or apply; or read credentials during pipeline verification. The source verification plan is external evidence, not a captured run `verification_plan`. The owner access and hosted execution procedures below are separate from these checks.
 
