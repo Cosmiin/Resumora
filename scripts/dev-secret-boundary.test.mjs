@@ -40,7 +40,15 @@ test('frontend serves public modules without exposing Worker files or default-de
     await server.listen();
     const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
 
-    for (const file of denied) {
+    const deniedPaths = denied.flatMap(file => {
+      const workspace = file.startsWith(`${api}${path.sep}`) ? 'api' : 'web';
+      return [
+        file,
+        path.join(root, 'node_modules/@resumora', workspace,
+          path.relative(path.join(root, 'apps', workspace), file)),
+      ];
+    });
+    for (const file of deniedPaths) {
       for (const query of ['', '?raw']) {
         const response = await fetch(`${origin}/@fs/${file}${query}`);
         assert.equal(response.status, 403, `${path.relative(root, file)}${query} must be denied`);
@@ -51,8 +59,12 @@ test('frontend serves public modules without exposing Worker files or default-de
     // Real HTTP module responses prove the narrower allowlist still supports the app.
     for (const route of [
       '/', '/src/main.tsx', '/src/App.tsx',
-      `/@fs/${path.join(root, 'packages/contracts/src/index.ts')}?raw`,
-      `/@fs/${path.join(root, 'node_modules/react/index.js')}?raw`,
+      ...[
+        'packages/contracts/src/index.ts',
+        'node_modules/@resumora/contracts/src/index.ts',
+        'node_modules/@resumora/web/src/main.tsx',
+        'node_modules/react/index.js',
+      ].flatMap(file => ['', '?raw'].map(query => `/@fs/${path.join(root, file)}${query}`)),
     ]) {
       const response = await fetch(`${origin}${route}`);
       assert.equal(response.status, 200, `${route} must remain accessible`);

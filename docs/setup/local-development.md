@@ -56,7 +56,7 @@ No frontend environment variables are needed now. If future web configuration is
 
 The root ignore rules cover `.env*` and `.dev.vars*` at every depth. Future local Worker secrets belong in `apps/api/.dev.vars`, only when the feature needs them. No real credential files or example exceptions were added. Verify a proposed path using `git check-ignore` before writing values. Never print credential-file contents to validate setup.
 
-Vite's development filesystem access is limited to `apps/web/`, `packages/contracts/` and `node_modules/`, retaining its default denied-file rules. Worker files, including `.dev.vars` and its environment variants, cannot be served through the frontend's `/@fs/` endpoint.
+Vite's development filesystem access is limited to `apps/web/`, `packages/contracts/` and `node_modules/`, retaining the pinned Vite version's default denied-file rules. The Worker workspace is explicitly denied through both `apps/api/` and npm's `node_modules/@resumora/api/` symlink. Worker files, including `.dev.vars` and its environment variants, cannot be served through the frontend's `/@fs/` endpoint using either path.
 
 Wrangler telemetry is disabled in this local configuration/launcher. The root [`undici` override](../../package.json) replaces Wrangler/Miniflare's vulnerable dependency; the [lockfile](../../package-lock.json) records the resolved version. Recheck the override when upgrading Wrangler; it is not permission to use `npm audit fix --force` or downgrade tooling blindly. [Maintainer advisory](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c)
 
@@ -72,7 +72,7 @@ This runs frontend/API type checks, the frontend production build, the Worker's 
 
 To run only the local integration check: `npm run smoke`. Generated `node_modules/`, `dist/` and `.wrangler/` directories are ignored. Native Windows runtime, browser rendering/accessibility and hosted Cloudflare behavior need their own later verification; this foundation was checked in the current WSL/Linux environment.
 
-To run only the development secret-boundary regression: `npm run test:dev-secrets`. It starts Vite on an available loopback port, checks that synthetic Worker secrets and Vite's default protected files return 403 for direct and `?raw` requests, verifies frontend/shared/dependency files remain accessible, then removes its fixtures and stops the server. It also runs as part of `npm run check`.
+To run only the development secret-boundary regression: `npm run test:dev-secrets`. It starts Vite on an available loopback port, checks that synthetic Worker secrets, other private Worker files and Vite's default protected files return 403 for direct and `?raw` requests through canonical and npm workspace-symlink paths, verifies frontend/shared/dependency files remain accessible, then removes its fixtures and stops the server. It also runs as part of `npm run check`.
 
 ## Next milestones
 

@@ -13,6 +13,11 @@ export default defineConfig({
       allow: ['.', '../../packages/contracts', '../../node_modules'].map(
         path => fileURLToPath(new URL(path, import.meta.url)),
       ),
+      deny: [
+        '.env', '.env.*', '*.{crt,pem,key,p12,pfx,cer,der}',
+        '.npmrc', '.yarnrc.yml', '**/.git/**',
+        '**/apps/api/**', '**/node_modules/@resumora/api/**',
+      ],
     },
     proxy: {
       '/v1': {
