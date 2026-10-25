@@ -21,6 +21,12 @@ For relocated verified official binaries, use `--pg-share <share/postgresql/16>`
 
 CI's separate database job runs these checks using native PostgreSQL 16 on Ubuntu 24.04. Existing application CI remains independent. A hosted project may use a different server version/collation; capture that in preflight and check compatibility rather than assuming equality.
 
+To check preflight inventory against native PostgreSQL rather than mocked SQL responses, run the focused regression below. It requires `openssl`, creates a disposable worktree-local cluster with a synthetic certificate and a loopback-only TLS listener, verifies the database's explicit C locale and read-only inventory, then stops and removes the cluster. For relocated binaries, also set `PG_SHAREDIR` and `PG_LIBDIR` to the corresponding directories. Without `PG_BINDIR`, this opt-in test is skipped.
+
+```sh
+PG_BINDIR=/usr/lib/postgresql/16/bin python3 -m unittest discover -s supabase/tests -p test_preflight_native.py -v
+```
+
 ## 2. Establish exact-target access without secret exposure
 
 Use the supported CLI login/link workflow in an owner-controlled private terminal, with recording and shell tracing off. CLI login is a separate first step using `--no-browser`; any manual login URL must be opened only in the verified `cosmin@emedi.ro` Chrome profile. A reachable bridge or signed-in site is not proof of the browser profile. No auth-store extraction, cookie copy or new browser bridge. Do not share the session URL/code in chat.

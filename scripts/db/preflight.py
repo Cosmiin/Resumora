@@ -86,9 +86,10 @@ def inventory(psql, env):
         return json.loads(result.stdout)
 
     server = query("""SELECT json_build_object('version',current_setting('server_version'),
-      'database',current_database(),'collation',current_setting('lc_collate'),
-      'ctype',current_setting('lc_ctype'),'readOnly',current_setting('transaction_read_only'),
-      'tls',(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()))""")
+      'database',current_database(),'collation',datcollate,
+      'ctype',datctype,'readOnly',current_setting('transaction_read_only'),
+      'tls',(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()))
+      FROM pg_database WHERE datname=current_database()""")
     if server['readOnly'] != 'on' or server['tls'] is not True:
         raise RuntimeError('Verified TLS/read-only session assurance is absent. No apply attempted.')
     # Managed schemas are inventoried separately with counts; row contents and function bodies are never emitted.
