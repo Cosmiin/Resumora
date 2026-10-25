@@ -354,6 +354,8 @@ class Workspace(unittest.TestCase):
         self.assertEqual(json.loads(self.call('search_applications',"'Platform'",user=self.b))['resultCount'],0)
         self.assertIn('INVALID_APPLICATION_QUERY',self.call('search_applications',"'',NULL,NULL,NULL,101",error=True))
         self.assertEqual(self.call('sent_count',''),'1','Next actions do not create sent attestations')
+        romanian=self.job(self.job_input('Inginer Șef','Organizație Sintetică'));self.application(romanian)
+        self.assertEqual(json.loads(self.call('search_applications',"'șEF'"))['resultCount'],1)
 
     def test_changed_job_is_visible_without_overwriting_historical_cv(self):
         body=self.job_input();job=self.job(body);cv=self.job_cv(job);self.application(job,cv)

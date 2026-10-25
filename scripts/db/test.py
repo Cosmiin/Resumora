@@ -31,7 +31,7 @@ class Database:
         self.socket.mkdir(mode=0o700)
         # Do not inherit any hosted database credentials or connection defaults.
         self.env = {k: v for k, v in os.environ.items()
-                    if not k.startswith('PG') and k not in {'DATABASE_URL', 'SUPABASE_DB_URL'}}
+                    if not k.startswith(('PG', 'SUPABASE_')) and k != 'DATABASE_URL'}
         if library_dir:
             self.env['LD_LIBRARY_PATH'] = str(library_dir)
         self.env.update(PGHOST=str(self.socket), PGPORT='55439',
@@ -44,7 +44,7 @@ class Database:
 
     def start(self):
         args = [self.binary('initdb'), '-D', str(self.data), '-U',
-                'resumora_test_owner', '-A', 'trust', '--no-locale', '--encoding=UTF8']
+                'resumora_test_owner', '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8']
         if self.share_dir:
             args += ['-L', str(self.share_dir)]
         subprocess.run(args, env=self.env, check=True, capture_output=True, text=True)
@@ -109,6 +109,65 @@ class Database:
         return applied
 
 
+def check_populated_upgrade(db, behavior):
+    """Upgrade synthetic data phase by phase, then compare actual schema to fresh."""
+    import uuid
+    name = 'upgrade_' + uuid.uuid4().hex
+    db.sql('CREATE DATABASE ' + name)
+    staged = object.__new__(Database)
+    staged.__dict__.update(db.__dict__)
+    staged.env = dict(db.env, PGDATABASE=name)
+    old = behavior.DB
+    try:
+        staged.sql((ROOT / 'supabase/tests/bootstrap.sql').read_text())
+        behavior.DB = staged
+        applied = []
+        staged.migrate('P0')
+        f = behavior.Foundation()
+        f.setUp()
+        f.call('set_preferences', f"'{behavior.uid()}','en','{{}}'")
+        for phase, expected in [('P0', 7), ('P1', 26), ('P2', 34), ('P3', 43)]:
+            staged.migrate(phase)
+            assert staged.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'") == str(expected)
+            assert staged.migrate(phase) == 0
+            if phase == 'P1':
+                w = behavior.Workspace()
+                w.__dict__.update(f.__dict__)
+                w.cv = behavior.canonical_fixture('minimal.json', w.a)
+                w.profile = w.publish(w.cv)
+                base_id = w.profile['baseCvVersionId']
+                base = staged.sql(f"SELECT canonical_json FROM app.cv_versions WHERE id='{base_id}'")
+            elif phase == 'P2':
+                job = w.job()
+                cv = w.job_cv(job)
+                application = w.application(job, cv)
+            elif phase == 'P3':
+                result = json.loads(w.call('publish_analysis',
+                    f"'{behavior.uid()}','{w.profile['profileVersionId']}','{cv['cvVersionId']}',"
+                    f"'{job['jobVersionId']}','[]','[]','2026-10-23','ro'"))
+                assert result['candidateFit'] == 0 and result['cvMatch'] == 0
+                assert staged.sql(f"SELECT count(*) FROM app.applications WHERE id='{application['applicationId']}'") == '1'
+            if phase != 'P0':
+                assert staged.sql(f"SELECT canonical_json FROM app.cv_versions WHERE id='{base_id}'") == base
+            assert staged.sql(f"SELECT ui_locale FROM app.user_profiles WHERE user_id='{f.a}'") == 'en'
+            applied.append({'phase': phase, 'tables': expected, 'reapply_pending': 0})
+        # A failed migration transaction must leave neither DDL nor history.
+        staged.sql("BEGIN; CREATE TABLE app.failed_probe(id integer); INSERT INTO test_support.migrations VALUES ('failed','x'); SELECT 1/0; COMMIT;", expect_error=True)
+        assert staged.sql("SELECT to_regclass('app.failed_probe') IS NULL") == 't'
+        assert staged.sql("SELECT count(*) FROM test_support.migrations WHERE version='failed'") == '0'
+        def schema(connection):
+            result = subprocess.run([db.binary('pg_dump'), '--schema-only', '--schema=app', '--no-owner'],
+                                    env=connection.env, capture_output=True, text=True, check=True, timeout=30)
+            return '\n'.join(line for line in result.stdout.splitlines()
+                             if not line.startswith(('\\restrict ', '\\unrestrict ')))
+        assert schema(db) == schema(staged), 'Populated upgrade and fresh schema differ'
+        assert staged.sql("SELECT count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='app' AND NOT c.convalidated") == '0'
+        return {'stages': applied, 'fresh_schema_equal': True, 'failed_ddl_rolled_back': True}
+    finally:
+        behavior.DB = old
+        db.sql('DROP DATABASE ' + name)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pg-bin', default=os.environ.get('PG_BINDIR'))
@@ -140,12 +199,14 @@ def main():
             cases += result.testsRun
             if not result.wasSuccessful():
                 return 1
+            upgrade = check_populated_upgrade(db, module)
+            cases += 2
         receipt = {'migrations_applied':count,'normal_reapply_pending':0,
                    'tables':43,'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),
                    'database_version':db.sql('SHOW server_version'),
                    'transport':'private Unix socket; no TCP listener',
                    'auth':'local test roles/auth.uid(); no hosted Auth/API assurance',
-                   'hosted_access':False}
+                   'hosted_access':False, 'populated_upgrade':upgrade}
         if args.receipt:
             args.receipt.write_text(json.dumps(receipt,indent=2)+'\n')
         print(json.dumps(receipt,indent=2))
