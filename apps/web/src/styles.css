@@ -1708,3 +1708,68 @@ textarea.native {
     transition: none !important;
   }
 }
+
+.month-year-control {
+  position: relative;
+}
+.month-year-control > .field > input {
+  padding-right: 40px;
+}
+.date-picker-trigger {
+  position: absolute;
+  right: 5px;
+  top: 25px;
+}
+.month-year-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(100%, 300px);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  z-index: 20;
+  border: 1px solid var(--sage-300);
+  border-radius: 10px;
+  background: white;
+  box-shadow: var(--shadow-card);
+}
+.month-year-heading,
+.month-year-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.month-year-heading strong {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.month-year-picker > label {
+  font-size: 0.8rem;
+}
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.month-grid button,
+.month-year-actions button {
+  padding: 6px 3px;
+  min-height: 34px;
+  border: 1px solid var(--sage-200);
+  border-radius: 6px;
+  background: var(--sage-25);
+  color: var(--pine-700);
+  font-size: 0.73rem;
+  overflow-wrap: anywhere;
+}
+.month-grid button[aria-pressed="true"] {
+  background: var(--pine-100);
+  border-color: var(--pine-600);
+}
+.month-grid button:disabled,
+.month-year-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

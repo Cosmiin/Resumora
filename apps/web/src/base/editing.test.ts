@@ -303,35 +303,122 @@ it("does not reassociate identical text and combines native fragments carrying t
   ).toEqual([role.bullets[0]]);
 });
 
-it("invalidates formatted contributions on a factual edit without changing saved career context", () => {
+it("preserves unrelated formatting through Add, Update, Remove, preview edits and immutable restore", async () => {
   const d = blankDraft(),
     role = newRole();
   role.bullets = [
     {
-      ...fact("Old wording"),
+      ...fact("Kept bold"),
       sourceId: "fixture",
       sourceClaimId: "claim",
       status: "extracted_unconfirmed",
     },
+    fact("Kept italic"),
   ];
+  d.sources.push({ id: "fixture", kind: "fixture", label: "Original source" });
   d.roles.push(role);
-  const formatted = setContributions(
-    d,
-    role.id,
-    readContributions(richRoot(d, role.id)),
-  );
-  expect(formatted.roles[0].bullets).toEqual(role.bullets);
-  const changed = patchFact(
-    formatted,
-    formatted.roles[0].bullets[0],
-    "Corrected wording",
-  );
-  expect(changed.presentation.contributionHtml?.[role.id]).toBeUndefined();
-  expect(changed.roles[0].bullets[0].sourceLineage).toContainEqual({
-    sourceId: "fixture",
-    sourceClaimId: "claim",
+  const root = document.createElement("div");
+  root.innerHTML = `<ol><li data-contribution="${role.bullets[0].fieldId}"><b>Kept bold</b></li><li data-contribution="${role.bullets[1].fieldId}"><i>Kept italic</i></li></ol>`;
+  const formatted = setContributions(d, role.id, readContributions(root));
+  const baseline = root.querySelector("ol")!.outerHTML;
+  function rendered(draft: typeof d) {
+    const el = document.createElement("div");
+    el.innerHTML = draft.presentation.contributionHtml![role.id];
+    expect(el.querySelector("ol")!.outerHTML).toBe(baseline);
+    expect(draft.roles[0].bullets.slice(0, 2)).toEqual(role.bullets);
+    return el;
+  }
+  const adapter = new MemoryBaseCvAdapter();
+  const first = await adapter.save({
+    draft: formatted,
+    mode: "autosave",
+    expectedRevision: 0,
+    requestId: "first",
   });
-  expect(formatted.roles[0].bullets[0].value).toBe("Old wording");
+  const answer = {
+    id: "answer",
+    targetId: role.id,
+    question: "context" as const,
+    questionText: "What did you personally contribute?",
+    text: "Added\ncopy",
+    status: "draft" as const,
+  };
+  const saved = saveAnswer(formatted, answer, role.context.id);
+  expect(saved.presentation).toEqual(formatted.presentation);
+  const added = addAnswerToCv(saved, answer.id, role.context.id);
+  rendered(added);
+  const second = await adapter.save({
+    draft: added,
+    mode: "autosave",
+    expectedRevision: 1,
+    requestId: "second",
+  });
+  const revised = saveAnswer(
+    added,
+    { ...added.answers[0], text: "Updated\ncopy", status: "draft" },
+    role.context.id,
+  );
+  expect(revised.roles).toEqual(added.roles);
+  expect(revised.presentation).toEqual(added.presentation);
+  const updated = addAnswerToCv(revised, answer.id, role.context.id);
+  const copy = updated.roles[0].bullets[2];
+  expect(
+    richText(
+      rendered(updated).querySelector<HTMLElement>(
+        `[data-contribution="${copy.fieldId}"]`,
+      )!.innerHTML,
+    ),
+  ).toBe("Updated\ncopy");
+  const previewEdited = patchFact(updated, copy, "Preview correction");
+  const view = rendered(previewEdited);
+  expect(view.textContent).toContain("Preview correction");
+  expect(view.textContent).not.toContain("Updated");
+  expect(previewEdited.answers).toEqual(updated.answers);
+  await adapter.save({
+    draft: previewEdited,
+    mode: "autosave",
+    expectedRevision: 2,
+    requestId: "third",
+  });
+  const removed = removeAnswerFromCv(previewEdited, answer.id);
+  const removedView = rendered(removed);
+  expect(removedView.textContent).not.toContain("Preview correction");
+  expect(removed.answers[0]).toMatchObject({
+    questionText: answer.questionText,
+    text: "Updated\ncopy",
+  });
+  expect(removed.answers[0].cvFieldId).toBeUndefined();
+  await adapter.save({
+    draft: removed,
+    mode: "autosave",
+    expectedRevision: 3,
+    requestId: "fourth",
+  });
+  const restored = await adapter.restore({
+    snapshotId: second.id,
+    expectedRevision: 4,
+    requestId: "restore",
+  });
+  rendered(restored.draft);
+  expect(restored.draft).toEqual(second.draft);
+  expect((await adapter.history()).at(-1)).toEqual(first);
+});
+
+it("updates only the associated fragments inside a shared ordered list", () => {
+  const d = blankDraft(),
+    role = newRole();
+  role.bullets = [fact("First\nTail"), fact("Unchanged")];
+  d.roles.push(role);
+  const root = document.createElement("div");
+  root.innerHTML = `<ol><li data-contribution="${role.bullets[0].fieldId}">First</li><li data-contribution="${role.bullets[1].fieldId}"><i>Unchanged</i></li><li data-contribution="${role.bullets[0].fieldId}">Tail</li></ol>`;
+  const initial = setContributions(d, role.id, readContributions(root));
+  const next = patchFact(initial, initial.roles[0].bullets[0], "Corrected");
+  const view = document.createElement("div");
+  view.innerHTML = next.presentation.contributionHtml![role.id];
+  expect(view.querySelectorAll("ol>li")).toHaveLength(2);
+  expect(view.querySelector("i")!.textContent).toBe("Unchanged");
+  expect(view.textContent).toBe("CorrectedUnchanged");
+  expect(next.roles[0].bullets[1]).toEqual(role.bullets[1]);
 });
 
 it.each([

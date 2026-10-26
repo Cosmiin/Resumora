@@ -9,7 +9,7 @@ import {
   type Role,
   type OptionalEntry,
 } from "./model";
-import { replaceFact } from "./editing";
+import { replaceFact, updateContributionHtml } from "./editing";
 export function enrichmentTarget(
   draft: BaseDraft,
   id: string,
@@ -93,8 +93,8 @@ export function addAnswerToCv(
     const added = { ...fact(saved.text), sourceId: saved.sourceId! };
     (entry.bullets ??= []).push(added);
     saved.cvFieldId = added.fieldId;
+    updateContributionHtml(next, entry.id, added.fieldId, added.value);
   }
-  delete next.presentation.contributionHtml?.[entry.id];
   return next;
 }
 export function removeAnswerFromCv(
@@ -108,7 +108,8 @@ export function removeAnswerFromCv(
     target.entry.bullets = target.entry.bullets.filter(
       (f) => f.fieldId !== answer.cvFieldId,
     );
+  if (answer.cvFieldId)
+    updateContributionHtml(next, answer.targetId, answer.cvFieldId);
   delete answer.cvFieldId;
-  delete next.presentation.contributionHtml?.[answer.targetId];
   return next;
 }

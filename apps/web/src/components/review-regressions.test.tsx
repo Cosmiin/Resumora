@@ -16,7 +16,11 @@ import {
   addAnswerToCv,
   enrichmentTarget,
 } from "../base/enrichment";
-import { patchFact } from "../base/editing";
+import {
+  patchFact,
+  readContributions,
+  setContributions,
+} from "../base/editing";
 import { maraReviewDraft } from "../base/fixture";
 import {
   allFacts,
@@ -1184,4 +1188,80 @@ it("inspects full saved Q&A independently of CV wording in immutable history sna
     screen.getByRole("region", { name: "Saved career context" }).textContent,
   ).toContain("First\nSecond");
   expect((await adapter.history())[1]).toEqual(first);
+});
+
+it("preserves unrelated bold, italic and ordered-list rendering through explicit CV actions and preview editing", async () => {
+  const d = blankDraft(),
+    role = newRole();
+  role.title = fact("Role");
+  role.company = fact("Company");
+  role.bullets = [fact("Kept bold"), fact("Kept italic")];
+  d.roles.push(role);
+  const root = document.createElement("div");
+  root.innerHTML = `<ol><li data-contribution="${role.bullets[0].fieldId}"><b>Kept bold</b></li><li data-contribution="${role.bullets[1].fieldId}"><i>Kept italic</i></li></ol>`;
+  const initial = setContributions(d, role.id, readContributions(root));
+  let latest = initial;
+  function Surface() {
+    const [draft, setDraft] = useState(initial);
+    return (
+      <LanguageContext.Provider value="en">
+        <section aria-label="Improve">
+          <Enrichment
+            draft={draft}
+            change={(next) => {
+              latest = next;
+              setDraft(next);
+            }}
+            goEdit={() => {}}
+            asOf={asOf}
+          />
+        </section>
+        <section aria-label="Rendered CV">
+          <DocumentPreview draft={draft} asOf={asOf} />
+        </section>
+      </LanguageContext.Provider>
+    );
+  }
+  const user = userEvent.setup();
+  render(<Surface />);
+  function check() {
+    const cv = screen.getByRole("region", { name: "Rendered CV" });
+    expect(cv.querySelectorAll("ol>li")).toHaveLength(2);
+    expect(cv.querySelector("ol b")?.textContent).toBe("Kept bold");
+    expect(cv.querySelector("ol i")?.textContent).toBe("Kept italic");
+    return cv;
+  }
+  await user.type(
+    screen.getByRole("textbox", {
+      name: "What were your day-to-day responsibilities?",
+    }),
+    "Added copy{Control>}{Enter}{/Control}",
+  );
+  await user.click(screen.getByRole("button", { name: "Add to CV" }));
+  expect(check().textContent).toContain("Added copy");
+  const preview = within(
+    screen.getByRole("region", { name: "Improve" }),
+  ).getByRole("complementary", { name: "CV preview" });
+  const copy = textBox(preview, "Added copy");
+  copy.textContent = "Preview correction";
+  fireEvent.input(copy);
+  expect(check().textContent).toContain("Preview correction");
+  expect(check().textContent).not.toContain("Added copy");
+  expect(latest.answers[0].text).toBe("Added copy");
+  await user.click(screen.getByRole("button", { name: "Edit answer" }));
+  const question = screen.getByRole("textbox", {
+    name: "What were your day-to-day responsibilities?",
+  });
+  await user.clear(question);
+  await user.type(question, "Updated copy{Control>}{Enter}{/Control}");
+  expect(check().textContent).toContain("Preview correction");
+  await user.click(screen.getByRole("button", { name: "Update in CV" }));
+  expect(check().textContent).toContain("Updated copy");
+  expect(check().textContent).not.toContain("Preview correction");
+  await user.click(screen.getByRole("button", { name: "Remove from CV" }));
+  expect(check().textContent).not.toContain("Updated copy");
+  expect(latest.answers[0].text).toBe("Updated copy");
+  expect(latest.answers[0].questionText).toBe(
+    "What were your day-to-day responsibilities?",
+  );
 });

@@ -24,11 +24,68 @@ export function patchFact<T extends FactValue>(
 export function replaceFact(draft: BaseDraft, current: Fact, updated: Fact) {
   if (current === updated) return;
   for (const role of draft.roles)
-    if (role.bullets.includes(current as Fact<string>))
-      delete draft.presentation.contributionHtml?.[role.id];
+    if (
+      role.bullets.includes(current as Fact<string>) &&
+      typeof updated.value === "string"
+    )
+      updateContributionHtml(draft, role.id, current.fieldId, updated.value);
   for (const key of Object.keys(current))
     delete (current as unknown as Record<string, unknown>)[key];
   Object.assign(current, updated);
+}
+export function updateContributionHtml(
+  draft: BaseDraft,
+  roleId: string,
+  fieldId: string,
+  value?: string,
+) {
+  const html = draft.presentation.contributionHtml?.[roleId];
+  if (html === undefined) return;
+  const doc = document.implementation.createHTMLDocument();
+  doc.body.innerHTML = html;
+  const blocks = Array.from(
+    doc.body.querySelectorAll<HTMLElement>("[data-contribution]"),
+  ).filter((el) => el.dataset.contribution === fieldId);
+  function clearOwned(parent: Element) {
+    for (const node of Array.from(parent.childNodes)) {
+      if (
+        node instanceof HTMLElement &&
+        node.dataset.contribution &&
+        node.dataset.contribution !== fieldId
+      )
+        continue;
+      if (node instanceof Element && node.querySelector("[data-contribution]"))
+        clearOwned(node);
+      else node.remove();
+    }
+  }
+  for (const block of blocks) {
+    if (!doc.body.contains(block)) continue;
+    clearOwned(block);
+    block.removeAttribute("data-contribution");
+    if (
+      !block.childNodes.length &&
+      (block !== blocks[0] || value === undefined)
+    )
+      block.remove();
+  }
+  if (value !== undefined) {
+    const block = blocks[0] ?? doc.createElement("p");
+    block.dataset.contribution = fieldId;
+    const content = doc.createDocumentFragment();
+    value.split("\n").forEach((line, index) => {
+      if (index) content.append(doc.createElement("br"));
+      content.append(doc.createTextNode(line));
+    });
+    block.prepend(content);
+    if (!doc.body.contains(block)) doc.body.append(block);
+  }
+  for (const list of Array.from(doc.body.querySelectorAll("ul,ol")).reverse())
+    if (!list.children.length && !list.textContent?.trim()) list.remove();
+  draft.presentation.contributionHtml![roleId] = safeRichHtml(
+    doc.body.innerHTML,
+    draft.roles.find((r) => r.id === roleId)!.bullets.map((f) => f.fieldId),
+  );
 }
 export type ContributionEdit = {
   html: string;

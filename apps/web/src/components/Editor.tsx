@@ -21,8 +21,6 @@ import {
   type OptionalKind,
 } from "../base/model";
 import {
-  dateInput,
-  parseDateInput,
   patchFact,
   moveItem,
   focusField,
@@ -35,6 +33,7 @@ import type { Issue } from "../base/validation";
 import { Button, Field, LanguageContext, issueText, useCopy } from "./ui";
 import { ChipInput, Sortable, Visibility } from "./InlineControls";
 import { Contributions } from "./Contributions";
+import { MonthYearField } from "./MonthYearField";
 
 type Props = {
   draft: BaseDraft;
@@ -133,13 +132,11 @@ export function Editor({ draft: d, issues, change }: Props) {
     return box(
       f.fieldId,
       label,
-      <Field
+      <MonthYearField
         id={f.fieldId}
         label={label}
-        value={dateInput(f.value)}
-        placeholder={t("LL/AAAA", "MM/YYYY")}
-        hint={t("LL/AAAA sau doar AAAA", "MM/YYYY or YYYY only")}
-        onChange={(v) => patch(f, parseDateInput(v))}
+        value={f.value}
+        onChange={(v) => patch(f, v)}
         error={
           issues.some((i) => i.field === f.fieldId)
             ? issueText(issues.find((i) => i.field === f.fieldId)!.code, t)
