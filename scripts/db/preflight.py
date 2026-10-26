@@ -76,6 +76,9 @@ def quote_identifier(value):
 
 
 def inventory(psql, env):
+    if env.get('PGSSLMODE') != 'verify-full' or not env.get('PGSSLROOTCERT'):
+        raise RuntimeError('Client certificate/hostname verification is required. No apply attempted.')
+
     def query(sql):
         result = subprocess.run([str(psql), '-X', '-qAt', '--set', 'ON_ERROR_STOP=1'],
             input='BEGIN READ ONLY;\n' + sql + ';\nCOMMIT;\n', env=env,
@@ -88,10 +91,13 @@ def inventory(psql, env):
     server = query("""SELECT json_build_object('version',current_setting('server_version'),
       'database',current_database(),'collation',datcollate,
       'ctype',datctype,'readOnly',current_setting('transaction_read_only'),
-      'tls',(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()))
+      'backendTLS',(SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()))
       FROM pg_database WHERE datname=current_database()""")
-    if server['readOnly'] != 'on' or server['tls'] is not True:
-        raise RuntimeError('Verified TLS/read-only session assurance is absent. No apply attempted.')
+    if server['readOnly'] != 'on':
+        raise RuntimeError('Read-only session assurance is absent. No apply attempted.')
+    # Successful libpq queries with verify-full establish client CA/hostname
+    # verification. pg_stat_ssl observes PostgreSQL's backend, a separate hop
+    # behind a managed pooler; preserve false/null without claiming both-hop TLS.
     # Managed schemas are inventoried separately with counts; row contents and function bodies are never emitted.
     tables = query("""SELECT coalesce(json_agg(x ORDER BY x.schema,x.name),'[]') FROM
       (SELECT n.nspname AS schema,c.relname AS name,c.relkind,c.relrowsecurity AS rls,
@@ -126,7 +132,9 @@ def inventory(psql, env):
     history = []
     if query("SELECT to_json(to_regclass('supabase_migrations.schema_migrations') IS NOT NULL)"):
         history = query("SELECT coalesce(json_agg(x ORDER BY x.version),'[]') FROM (SELECT version,name FROM supabase_migrations.schema_migrations) x")
-    result = {'target_ref': TARGET, 'server': server, 'tables': tables, 'constraints': constraints,
+    result = {'target_ref': TARGET,
+              'clientTLS': {'mode': 'verify-full', 'certificateAndHostnameVerified': True},
+              'server': server, 'tables': tables, 'constraints': constraints,
               'policies': policies, 'functions': functions, 'managed_counts': counts,
               'migration_history': history}
     result['inventory_sha256'] = hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest()

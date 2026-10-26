@@ -82,9 +82,14 @@ class PreflightBoundary(unittest.TestCase):
                 self.assertFalse(receipt.exists())
 
     def test_successful_cli_saves_private_json_and_keeps_strict_query_environment(self):
+        for backend_tls in [True, False, None]:
+            with self.subTest(backend_tls=backend_tls):
+                self.check_successful_cli(backend_tls)
+
+    def check_successful_cli(self, backend_tls):
         receipt = self.root / 'inventory.json'
         values = [{'version': '16.15', 'database': 'postgres', 'collation': 'C.UTF-8',
-                   'ctype': 'C.UTF-8', 'readOnly': 'on', 'tls': True},
+                   'ctype': 'C.UTF-8', 'readOnly': 'on', 'backendTLS': backend_tls},
                   [], [], [], [], False, False, False, False]
         responses = [subprocess.CompletedProcess([], 0, json.dumps(value), '') for value in values]
         # A permissive caller umask must not make the new receipt public.
@@ -98,6 +103,8 @@ class PreflightBoundary(unittest.TestCase):
         saved = json.loads(receipt.read_text())
         self.assertEqual(saved['target_ref'], preflight.TARGET)
         self.assertFalse(saved['can_apply'])
+        self.assertEqual(saved['clientTLS'], {'mode': 'verify-full', 'certificateAndHostnameVerified': True})
+        self.assertIs(saved['server']['backendTLS'], backend_tls)
         self.assertEqual(saved['tables'], [])
         self.assertEqual(saved['migration_history'], [])
         self.assertEqual(receipt.stat().st_mode & 0o777, 0o600)
@@ -113,6 +120,7 @@ class PreflightBoundary(unittest.TestCase):
         for output in [receipt.read_text(), stdout, stderr]:
             self.assertNotIn(self.password, output)
             self.assertNotIn(self.url.read_text(), output)
+        receipt.unlink()
 
     def test_default_cli_success_writes_receipt_without_path_open_type_error(self):
         receipt = self.root / 'default-inventory.json'
@@ -232,12 +240,19 @@ class PreflightBoundary(unittest.TestCase):
             with self.assertRaises(ValueError): preflight.credentials()
         self.assertFalse((self.root / 'marker').exists())
 
-    def test_unverified_tls_is_rejected_before_inventory(self):
-        result = subprocess.CompletedProcess([], 0, '{"readOnly":"on","tls":false}\n', '')
+    def test_writable_session_is_rejected_before_inventory(self):
+        result = subprocess.CompletedProcess([], 0, '{"readOnly":"off","backendTLS":true}\n', '')
         with patch.object(preflight.subprocess, 'run', return_value=result) as run:
-            with self.assertRaises(RuntimeError): preflight.inventory(Path('/synthetic/psql'), {})
+            with self.assertRaises(RuntimeError): preflight.inventory(Path('/synthetic/psql'), preflight.credentials(self.ca))
         self.assertEqual(run.call_count, 1)
         self.assertTrue(run.call_args.kwargs['input'].startswith('BEGIN READ ONLY;'))
+
+    def test_unverified_client_settings_rejected_before_query(self):
+        for settings in [{}, {'PGSSLMODE': 'require', 'PGSSLROOTCERT': str(self.ca)},
+                         {'PGSSLMODE': 'verify-full'}]:
+            with self.subTest(settings=settings), patch.object(preflight.subprocess, 'run') as run:
+                with self.assertRaises(RuntimeError): preflight.inventory(Path('/synthetic/psql'), settings)
+                run.assert_not_called()
 
 
 if __name__ == '__main__':
