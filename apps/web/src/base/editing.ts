@@ -45,6 +45,17 @@ export function setContributions(
   const role = next.roles.find((r) => r.id === roleId)!;
   const lines = richLines(html);
   const previous = role.bullets;
+  for (const current of previous) {
+    const parts = current.value
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!parts.length || !current.value.includes("\n")) continue;
+    const start = lines.findIndex((_, i) =>
+      parts.every((part, j) => lines[i + j] === part),
+    );
+    if (start >= 0) lines.splice(start, parts.length, current.value);
+  }
   const available = new Set(previous);
   const matches = lines.map((value) => {
     const current = previous.find((f) => available.has(f) && f.value === value);
@@ -120,7 +131,8 @@ export const languageLevels = [
   "C2",
 ];
 export function safeRichHtml(value: string): string {
-  const doc = new DOMParser().parseFromString(value, "text/html");
+  const doc = document.implementation.createHTMLDocument();
+  doc.body.innerHTML = value;
   const allowed = new Set([
     "B",
     "STRONG",
@@ -145,13 +157,29 @@ export function safeRichHtml(value: string): string {
   }
   return doc.body.innerHTML;
 }
-export function richLines(value: string): string[] {
-  const doc = new DOMParser().parseFromString(safeRichHtml(value), "text/html");
-  for (const el of Array.from(doc.body.querySelectorAll("li,p,div,ul,ol,br"))) {
-    el.before(doc.createTextNode("\n"));
-    el.after(doc.createTextNode("\n"));
+export function richText(value: string): string {
+  const doc = document.implementation.createHTMLDocument();
+  doc.body.innerHTML = safeRichHtml(value);
+  function read(parent: ParentNode): string {
+    let text = "";
+    for (const node of parent.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) text += node.textContent ?? "";
+      else if (node instanceof Element) {
+        if (node.tagName === "BR") text += "\n";
+        else {
+          const block = ["LI", "P", "DIV", "UL", "OL"].includes(node.tagName);
+          if (block && text && !text.endsWith("\n")) text += "\n";
+          text += read(node);
+          if (block && node.nextSibling && !text.endsWith("\n")) text += "\n";
+        }
+      }
+    }
+    return text;
   }
-  return (doc.body.textContent ?? "")
+  return read(doc.body);
+}
+export function richLines(value: string): string[] {
+  return richText(value)
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);

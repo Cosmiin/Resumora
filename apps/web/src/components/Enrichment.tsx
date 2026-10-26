@@ -158,7 +158,11 @@ export function Enrichment({
   const preview = clone(d),
     previewTarget = enrichmentTarget(preview, targetId),
     pendingId = `pending-${answer.id}`;
-  if (previewTarget && answer.text.trim() && answer.status === "draft") {
+  if (
+    previewTarget &&
+    answer.status === "draft" &&
+    (answer.text.trim() || current)
+  ) {
     const prior = [
       previewTarget.field,
       ...(previewTarget.entry.bullets ?? []),
@@ -270,7 +274,6 @@ export function Enrichment({
         onTextEdit={(id, text) => {
           if (id === pendingId) {
             put(text);
-            input.current?.focus();
             return;
           }
           const f = [
@@ -279,7 +282,16 @@ export function Enrichment({
               s.entries.flatMap((e) => [e.details, ...(e.bullets ?? [])]),
             ),
           ].find((f) => f.fieldId === id);
-          if (f) change(patchFact(d, f, text));
+          if (f) {
+            const next = patchFact(d, f, text);
+            if (
+              target &&
+              f.fieldId === target.field.fieldId &&
+              signature.current === target.field.id
+            )
+              signature.current = enrichmentTarget(next, targetId)?.field.id;
+            change(next);
+          }
         }}
         onEdit={(id) => {
           goEdit();

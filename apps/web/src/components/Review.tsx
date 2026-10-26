@@ -1,4 +1,5 @@
-import { allFacts, hasValue, type BaseDraft } from "../base/model";
+import { allFacts, hasValue, isAuthored, type BaseDraft } from "../base/model";
+import { validateDraft } from "../base/validation";
 import { Button, Pill, useCopy } from "./ui";
 export function Review({
   draft,
@@ -11,21 +12,24 @@ export function Review({
 }) {
   const t = useCopy(),
     pending = allFacts(draft).filter(
-      (f) => hasValue(f.value) && f.status !== "user_confirmed",
+      (f) => hasValue(f.value) && !isAuthored(f),
     ).length;
+  const incomplete = validateDraft(draft).length;
   const checks = [
     {
       title: t("Conținut", "Content"),
       state:
-        pending || !draft.name.value.trim()
+        pending || incomplete
           ? t("Necesită atenție", "Needs action")
-          : t("Confirmat de tine", "Confirmed by you"),
+          : t("Informații auto-declarate", "Self-reported facts"),
       text: pending
-        ? `${pending} ${t("informații așteaptă confirmarea.", "facts await confirmation.")}`
-        : t(
-            "Informațiile introduse sunt auto-declarate. Secțiunile opționale pot rămâne goale.",
-            "Entered facts are self-reported. Optional sections may remain empty.",
-          ),
+        ? `${pending} ${t("informații necesită verificare.", "facts need review.")}`
+        : incomplete
+          ? `${incomplete} ${t("câmpuri necesită completare.", "fields need completion.")}`
+          : t(
+              "Informațiile introduse sunt auto-declarate. Secțiunile opționale pot rămâne goale.",
+              "Entered facts are self-reported. Optional sections may remain empty.",
+            ),
       action: edit,
     },
     {

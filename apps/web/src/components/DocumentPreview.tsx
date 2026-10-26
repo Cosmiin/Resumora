@@ -1,9 +1,39 @@
-import { useContext, type ReactNode } from "react";
+import { useContext, useLayoutEffect, useRef, type ReactNode } from "react";
 import { formatDate, durationBounds } from "../base/dates";
 import { hasValue, isAuthored, type BaseDraft, type Fact } from "../base/model";
-import { safeRichHtml } from "../base/editing";
+import { richText, safeRichHtml } from "../base/editing";
 import { sectionName } from "../base/sections";
 import { LanguageContext, useCopy } from "./ui";
+function PreviewText({
+  value,
+  label,
+  change,
+}: {
+  value: string;
+  label: string;
+  change: (text: string) => void;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && richText(el.innerHTML) !== value) el.textContent = value;
+  }, [value]);
+  return (
+    <span
+      ref={ref}
+      role="textbox"
+      aria-label={label}
+      contentEditable="plaintext-only"
+      tabIndex={0}
+      style={{ whiteSpace: "pre-wrap" }}
+      suppressContentEditableWarning
+      onInput={(e) => {
+        const text = richText(e.currentTarget.innerHTML);
+        if (text !== value) change(text);
+      }}
+    />
+  );
+}
 export function DocumentPreview({
   draft: d,
   asOf,
@@ -20,8 +50,7 @@ export function DocumentPreview({
     cv = (ro: string, en: string) => (d.language === "ro" ? ro : en);
   const live = !!onEdit || !!onTextEdit,
     hidden = (f: Fact) => d.presentation.hiddenFields?.includes(f.fieldId);
-  const text = (f: Fact<string>) =>
-    !hidden(f) && (live || isAuthored(f)) ? f.value : "";
+  const text = (f: Fact<string>) => (!hidden(f) ? f.value : "");
   function block(value: ReactNode, id: string, label?: string): ReactNode {
     return onEdit ? (
       <button
@@ -37,29 +66,22 @@ export function DocumentPreview({
     );
   }
   function editable(f: Fact<string>, id = f.fieldId): ReactNode {
-    if (!text(f)) return null;
+    if (hidden(f) || (!text(f) && !onTextEdit)) return null;
     if (onTextEdit)
       return (
-        <span
-          key={f.id}
-          role="textbox"
-          aria-label={t("Text din previzualizare", "Preview text")}
-          contentEditable
-          suppressContentEditableWarning
-          onBlur={(e) => {
-            const value = e.currentTarget.textContent ?? "";
-            if (value !== f.value) onTextEdit(f.fieldId, value);
-          }}
-        >
-          {text(f)}
-        </span>
+        <PreviewText
+          key={f.fieldId}
+          value={f.value}
+          label={t("Text din previzualizare", "Preview text")}
+          change={(value) => onTextEdit(f.fieldId, value)}
+        />
       );
     return block(text(f), id);
   }
   const date = (f: BaseDraft["roles"][number]["start"]) =>
     hidden(f)
       ? ""
-      : (live || isAuthored(f)) && hasValue(f.value)
+      : hasValue(f.value)
         ? formatDate(f.value, d.language)
         : cv("Dată necunoscută", "Date unknown");
   const eligible = d.roles.filter(
@@ -101,8 +123,7 @@ export function DocumentPreview({
       );
     if (id === "summary")
       return d.summary.text &&
-        !d.presentation.hiddenFields?.includes("summary") &&
-        (live || d.summary.approval === "approved") ? (
+        !d.presentation.hiddenFields?.includes("summary") ? (
         <p>{block(d.summary.text, "summary", sectionName(id, uiLocale, d))}</p>
       ) : null;
     if (id === "professionalSkills" || id === "technicalSkills")
@@ -128,21 +149,20 @@ export function DocumentPreview({
               </h4>
               <p className="document-meta">
                 {block(date(r.start), r.start.fieldId)} —{" "}
-                {r.ongoing.value && (live || isAuthored(r.ongoing))
+                {r.ongoing.value
                   ? block(cv("Prezent", "Present"), r.ongoing.fieldId)
                   : block(date(r.end), r.end.fieldId)}
                 {text(r.location) && (
                   <> · {block(text(r.location), r.location.fieldId)}</>
                 )}
               </p>
-              {text(r.context) && <p>{editable(r.context)}</p>}
-              {r.bullets.some((b) => text(b)) &&
+              {(text(r.context) || onTextEdit) && <p>{editable(r.context)}</p>}
+              {r.bullets.some((b) => text(b) || onTextEdit) &&
                 !d.presentation.hiddenFields?.includes(
                   `${r.id}-contributions`,
                 ) &&
                 (d.presentation.contributionHtml?.[r.id] &&
                 !r.bullets.some(hidden) &&
-                r.bullets.every((b) => live || isAuthored(b)) &&
                 !onTextEdit ? (
                   <div>
                     {block(
@@ -159,7 +179,7 @@ export function DocumentPreview({
                 ) : (
                   <ul>
                     {r.bullets
-                      .filter((b) => text(b))
+                      .filter((b) => !hidden(b) && (text(b) || onTextEdit))
                       .map((b) => (
                         <li key={b.fieldId}>
                           {editable(b, `${r.id}-contributions`)}
@@ -220,11 +240,11 @@ export function DocumentPreview({
                   </>
                 )}
             </h4>
-            {text(e.details) && <p>{editable(e.details)}</p>}
-            {e.bullets?.some((f) => text(f)) && (
+            {(text(e.details) || onTextEdit) && <p>{editable(e.details)}</p>}
+            {e.bullets?.some((f) => text(f) || onTextEdit) && (
               <ul>
                 {e.bullets
-                  .filter((f) => text(f))
+                  .filter((f) => !hidden(f) && (text(f) || onTextEdit))
                   .map((f) => (
                     <li key={f.fieldId}>{editable(f)}</li>
                   ))}
@@ -236,7 +256,7 @@ export function DocumentPreview({
                 e.ongoing?.value) && (
                 <p className="document-meta">
                   {block(date(e.start), e.start.fieldId)} —{" "}
-                  {e.ongoing?.value && (live || isAuthored(e.ongoing))
+                  {e.ongoing?.value
                     ? block(cv("În curs", "Ongoing"), e.ongoing.fieldId)
                     : block(date(e.end), e.end.fieldId)}
                 </p>

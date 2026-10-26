@@ -4,6 +4,7 @@ import {
   parseDateInput,
   prepareDraft,
   richLines,
+  richText,
   safeRichHtml,
   patchFact,
   setContributions,
@@ -30,6 +31,13 @@ it("roundtrips month/year, year-only and empty dates without inventing unknown m
   expect(parseDateInput("092021")).toEqual({ year: "2021", month: "9" });
   expect(parseDateInput("13/2020")).toEqual({ year: "2020", month: "13" });
   expect(parseDateInput("02/")).toEqual({ year: "", month: "2" });
+});
+
+it("preserves authored spaces and empty native lines when publishing preview text", () => {
+  expect(richText(" First  <br><br>Second ")).toBe(" First  \n\nSecond ");
+  expect(richText("<div>First</div><div><br></div><div>Second</div>")).toBe(
+    "First\n\nSecond",
+  );
 });
 it("keeps allowed text/list formatting while eliminating executable elements, remote content and attributes", () => {
   const safe = safeRichHtml(
@@ -356,6 +364,61 @@ it("preserves duplicate contributions as distinct facts and keeps edited answers
   });
   expect(edited.roles[0].bullets[3].fieldId).toBe(role.bullets[2].fieldId);
 });
+
+it.each([
+  "<p><b>First\nSecond</b></p>",
+  "<ul><li><i>First</i><br>Second</li></ul>",
+  "First<div><b>Second</b></div>",
+])(
+  "preserves a multiline answer's fact and source through formatting %s",
+  (html) => {
+    const d = blankDraft(),
+      role = newRole();
+    d.roles.push(role);
+    const initial = applyAnswer(
+      d,
+      {
+        id: "multiline",
+        targetId: role.id,
+        question: "context",
+        text: "First\nSecond",
+        status: "draft",
+        mode: "append",
+      },
+      role.context.id,
+    );
+    const formatted = setContributions(initial, role.id, html);
+    expect(formatted.roles[0].bullets).toEqual(initial.roles[0].bullets);
+    expect(formatted.answers).toEqual(initial.answers);
+    expect(formatted.sources).toEqual(initial.sources);
+    const withSibling = setContributions(
+      formatted,
+      role.id,
+      `<p>New</p>${html}<p>Last</p>`,
+    );
+    expect(withSibling.roles[0].bullets[1]).toEqual(
+      initial.roles[0].bullets[0],
+    );
+    expect(withSibling.answers).toEqual(initial.answers);
+    const reordered = setContributions(
+      withSibling,
+      role.id,
+      `<p>Last</p>${html}`,
+    );
+    expect(reordered.roles[0].bullets[1]).toEqual(initial.roles[0].bullets[0]);
+    const revised = applyAnswer(
+      reordered,
+      { ...reordered.answers[0], status: "draft", text: "Revised\nAnswer" },
+      role.context.id,
+    );
+    expect(revised.roles[0].bullets.map((f) => f.value)).toEqual([
+      "Last",
+      "Revised\nAnswer",
+    ]);
+    expect(revised.answers[0].factId).toBe(revised.roles[0].bullets[1].id);
+    expect(revised.presentation.contributionHtml?.[role.id]).toBeUndefined();
+  },
+);
 
 it.each([
   ["First<div>Second</div>", ["First", "Second"]],

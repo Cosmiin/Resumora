@@ -222,7 +222,10 @@ export function ChipInput({
             const raw = e.clipboardData.getData("text");
             if (/[,\n\r]/.test(raw)) {
               e.preventDefault();
-              add(text + raw);
+              const field = e.currentTarget;
+              const start = field.selectionStart ?? field.value.length;
+              const end = field.selectionEnd ?? start;
+              add(field.value.slice(0, start) + raw + field.value.slice(end));
             }
           }}
           onBlur={() => {
