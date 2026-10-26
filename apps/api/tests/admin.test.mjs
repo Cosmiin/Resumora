@@ -56,7 +56,11 @@ test('every admin route verifies owner before ledger reads, validates period and
       assert.equal(response.status, code);
       assert.match(response.headers.get('cache-control'), /no-store/);
     }
-    assert.equal((await adminRoute(request(path, owner), authConfig, { authTransport: fixture.transport, ledger: new SyntheticLedger() })).status, 503);
+    for (const unconnected of [undefined, new SyntheticLedger()]) {
+      const response = await adminRoute(request(path, owner), authConfig, { authTransport: fixture.transport, ledger: unconnected });
+      assert.equal(response.status, 503);
+      assert.match(await response.text(), /Registrul persistent de utilizare nu este conectat/);
+    }
     assert.equal((await adminRoute(request(path + '?from=bad', owner), authConfig, { authTransport: fixture.transport, ledger })).status, 400);
     const wrongMethod = await adminRoute(request(path, owner, { method: 'POST' }), authConfig, { authTransport: fixture.transport, ledger });
     assert.equal(wrongMethod.status, 405);
@@ -94,6 +98,23 @@ test('authorized usage and generated dashboard expose accounting only, with safe
   const escaped = await dashboardResponse({ kind: 'error', message: '<script>alert(1)</script>' }).text();
   assert.equal(escaped.includes('<script>'), false);
   assert.match(escaped, /&lt;script&gt;/);
+});
+
+test('dashboard output labels preparation and missing integrations in every state', async () => {
+  const ledger = await demoLedger();
+  const populated = await ledger.report({ from: '2026-10-26', to: '2026-10-26' });
+  const empty = await ledger.report({ from: '2026-10-27', to: '2026-10-28' });
+  for (const state of [
+    ...[populated, empty].flatMap(report => [true, false].map(synthetic => ({ kind: 'ready', report, synthetic }))),
+    ...['locked', 'unavailable', 'error'].map(kind => ({ kind, message: 'Test state' })),
+  ]) {
+    const html = await dashboardResponse(state).text();
+    assert.match(html, /Etapă de pregătire · integrarea urmează/);
+    assert.match(html, /Autentificarea în browser și registrul persistent de utilizare nu sunt conectate/);
+    assert.match(html, /Apelurile OpenAI sunt dezactivate în aplicație/);
+    assert.match(html, /Costurile reale acumulate nu sunt disponibile/);
+    if (state.synthetic) assert.match(html, /costurile de mai jos sunt exemple, nu cheltuieli acumulate/);
+  }
 });
 
 test('Worker unconfigured routes fail closed and never expose a provider proxy, demo, or credential files', async () => {

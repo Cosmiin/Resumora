@@ -89,12 +89,11 @@ test('timeout and malformed/oversized responses remain unknown; replay never iss
 test('limits/context and durable reservation fail before transport; settlement failure never repeats provider', async () => {
   let calls = 0;
   const transport = async () => { calls++; return providerResponse(); };
-  for (const limits of [{ maxOutputTokens: 257 }, { maxOutputTokens: 15 }, { maxInputBytes: 4097 }, { timeoutMs: 30001 }]) {
+  for (const limits of [{ maxOutputTokens: 257 }, { maxOutputTokens: 15 }, { timeoutMs: 30001 }]) {
     assert.throws(() => prepareConnection(config, { ledger: new SyntheticLedger(), ...limits }), /INVALID_LIMITS/);
   }
   const ownerContext = await context();
   assert.throws(() => prepareConnection(config, { ledger: new SyntheticLedger(), execution: 'misspelled', transport }), /INVALID_EXECUTION_MODE/);
-  await assert.rejects(prepareConnection(config, { ledger: new SyntheticLedger(), execution: 'synthetic', maxInputBytes: 1, transport }).check(ownerContext), /REQUEST_TOO_LARGE/);
   await assert.rejects(prepareConnection({ ...config, OPENAI_MODEL: undefined }, { ledger: new SyntheticLedger(), execution: 'synthetic', transport }).check(ownerContext), /INVALID_CONTEXT/);
   const ledger = new SyntheticLedger();
   const failing = { durability: 'synthetic', begin: ledger.begin.bind(ledger), finish: async () => { throw new Error('storage unavailable'); } };

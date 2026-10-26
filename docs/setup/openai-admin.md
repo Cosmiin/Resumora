@@ -2,10 +2,12 @@
 
 This is working preparation code with **synthetic verification only**, not a connected spend monitor. No inference, hosted migration, deployment, customer read or account configuration was performed. The Worker never constructs the provider adapter. Merely supplying a key cannot enable paid calls.
 
+**Approved milestone: finish preparation; integrate later.** Real accrued-cost monitoring is deferred until separately approved durable-ledger and full auth/session integration. No ledger or auth/session integration is delivered here. Every dashboard state carries this preparation notice, including empty and error states; the preview's token and cost examples remain explicitly synthetic.
+
 | Surface | Current state |
 | --- | --- |
 | `GET /admin/ai` on Worker port 8787 | Romanian server-rendered owner dashboard; locked until auth configured, then unavailable until durable ledger wired |
-| `GET /v1/admin/ai/usage` | Owner check on every request; accounting JSON or explicit 401/403/503, no CORS access |
+| `GET /v1/admin/ai/usage` | Owner check on every request; fails closed with no real totals because no durable ledger is wired, no CORS access |
 | Internal `prepareConnection().check()` | Fixed `connection_check` using Responses; disabled by default, injected synthetic transport tested; no public generation/check route |
 | Ledger | Typed `UsageLedger` port; **no durable implementation/binding**, new tables or migrations |
 | Login/session | Existing signup/login/cookie flows remain unimplemented; this adds narrow bearer JWT verification only |
@@ -64,13 +66,19 @@ After storage and approved auth/session integration, a separately approved **sin
 
 ## API and estimate rules
 
-The adapter uses one nonstreaming `POST https://api.openai.com/v1/responses`, fixed input `Reply with OK.`, `store:false`, no tools, `service_tier:default`, disabled truncation and no redirects. Output defaults to 32 tokens and is restricted to 16–256, including reasoning; input defaults to 256 bytes and can be set only within 1–4096. The complete request is capped at 4096 bytes, response at 256KiB and timeout at 30 seconds (default 15). There is no user-authored prompt or generic proxy. `store:false` does not promise zero provider retention. [Responses operation](https://developers.openai.com/api/reference/resources/responses/methods/create), [data controls](https://developers.openai.com/api/docs/guides/your-data)
+The adapter uses one nonstreaming `POST https://api.openai.com/v1/responses`, fixed input `Reply with OK.`, `store:false`, no tools, `service_tier:default`, disabled truncation and no redirects. Output defaults to 32 tokens and is restricted to 16–256, including reasoning; the fixed diagnostic input has a nonconfigurable 256-byte bound. The complete request is capped at 4096 bytes, response at 256KiB and timeout at 30 seconds (default 15). There is no user-authored prompt or generic proxy. `store:false` does not promise zero provider retention. [Responses operation](https://developers.openai.com/api/reference/resources/responses/methods/create), [data controls](https://developers.openai.com/api/docs/guides/your-data)
 
 The adapter makes **no automatic retries**. A rejection records a failed attempt with unknown usage unless reported; a timeout, transport failure or unreadable response records unknown outcome. Incomplete responses can still have billable usage. It stores safe fixed error codes, never upstream error text, prompts, output, keys, full headers or CV/job content. `X-Client-Request-Id` is the reserved attempt ID; `x-request-id` and response ID are retained when available. [Request IDs](https://developers.openai.com/api/reference/overview#debugging-requests), [error/retry guidance](https://developers.openai.com/api/docs/guides/error-codes)
 
 Prices are a versioned **26 October 2026 observed standard text snapshot**; the effective date is this application's snapshot boundary, not a claimed vendor price-change date. No model is selected by default. The demo prices `gpt-5.4-nano` (input/cached/output $0.20/$0.02/$1.25 per million tokens) and `gpt-5.4-mini` ($0.75/$0.075/$4.50), including exact documented `2026-03-17` snapshots. These fixture models are not a recommendation; review availability/deprecation/quality before future live use. Unknown models/tiers, pre-snapshot dates, unsupported nonzero cache-write usage or missing/invalid counters have unknown cost. New prices require a new version; do not replace stored historical rates. [Official pricing](https://developers.openai.com/api/docs/pricing), [nano model](https://developers.openai.com/api/docs/models/gpt-5.4-nano), [mini model](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
 
 `(input − cached input) × input rate + cached input × cache rate + output × output rate` uses integer nano-USD. Cached input is a subset of input, reasoning is a subset of output; neither is added again. Missing reasoning detail remains null. Money rounds half up only for display (six decimals); persisted sums retain full integer precision. Missing usage/prices are excluded from the **known subtotal**, with separate unknown counters; an unknown subtotal is labeled unknown, never free. Provider usage is allowlisted to documented numeric token fields, not arbitrary response JSON. Estimates cover only this application's recorded attempts and are **not an OpenAI invoice**. [Reasoning and output limits](https://developers.openai.com/api/docs/guides/reasoning)
+
+## PR delivery scope
+
+Use this scope in the PR description alongside the final pipeline verification results:
+
+> Prepares the internal OpenAI adapter and a synthetic owner-dashboard preview. This is the approved preparation milestone; real accrued-cost monitoring is deferred. Production routes fail closed, provider calls remain disabled in the Worker, and browser auth/session and durable-ledger integration remain unconnected. Preview costs are synthetic examples, not actual spend. No live inference, invoice reconciliation, durable storage, or browser visual/accessibility approval is claimed.
 
 ## Verification
 

@@ -22,16 +22,13 @@ export function prepareConnection(config: OpenAIConfig, options: {
   execution?: 'disabled' | 'synthetic' | 'live';
   transport?: typeof fetch;
   maxOutputTokens?: number;
-  maxInputBytes?: number;
   timeoutMs?: number;
 }) {
   const execution = options.execution ?? 'disabled';
   if (!['disabled', 'synthetic', 'live'].includes(execution)) throw new Error('INVALID_EXECUTION_MODE');
   const maxOutput = options.maxOutputTokens ?? 32;
-  const maxInput = options.maxInputBytes ?? 256;
   const timeout = options.timeoutMs ?? 15_000;
   if (!Number.isInteger(maxOutput) || maxOutput < 16 || maxOutput > 256
-    || !Number.isInteger(maxInput) || maxInput < 1 || maxInput > 4096
     || !Number.isInteger(timeout) || timeout < 1 || timeout > 30_000) throw new Error('INVALID_LIMITS');
   return {
     async check(context: CheckContext): Promise<Attempt> {
@@ -44,7 +41,7 @@ export function prepareConnection(config: OpenAIConfig, options: {
       const input = 'Reply with OK.';
       const body = JSON.stringify({ model: config.OPENAI_MODEL, input, max_output_tokens: maxOutput,
         store: false, stream: false, service_tier: 'default', tools: [], truncation: 'disabled' });
-      if (new TextEncoder().encode(input).byteLength > maxInput || new TextEncoder().encode(body).byteLength > 4096) throw new Error('REQUEST_TOO_LARGE');
+      if (new TextEncoder().encode(input).byteLength > 256 || new TextEncoder().encode(body).byteLength > 4096) throw new Error('REQUEST_TOO_LARGE');
       const startedAt = new Date().toISOString();
       const requestFingerprint = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)))]
         .map(b => b.toString(16).padStart(2, '0')).join('');
