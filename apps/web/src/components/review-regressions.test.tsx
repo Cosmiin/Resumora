@@ -764,6 +764,7 @@ it.each(["professionalSkills", "technicalSkills"] as const)(
           ? "Competențe tehnice"
           : "Competențe profesionale",
     });
+    await waitFor(() => expect(document.activeElement).toBe(input));
     await user.click(screen.getByRole("button", { name: "SQL" }));
     const edit = screen.getByRole("textbox", { name: "Editează competența" });
     for (const [mode, value] of [
@@ -820,6 +821,164 @@ it.each(["professionalSkills", "technicalSkills"] as const)(
       { timeout: 2000 },
     );
     expect((await adapter.history()).at(-1)).toEqual(initial);
+  },
+);
+
+it.each(["professionalSkills", "technicalSkills"] as const)(
+  "undoes a %s edit or addition on the first click despite chip finalization",
+  async (kind) => {
+    const d = completedDraft();
+    const original = fact("SQL");
+    d[kind] = [original];
+    const adapter = new MemoryBaseCvAdapter();
+    await adapter.save({ draft: d, expectedRevision: 0, requestId: "initial" });
+    const save = vi.spyOn(adapter, "save");
+    window.location.hash = "#base";
+    const user = userEvent.setup();
+    render(<App adapter={adapter} />);
+    const label =
+      kind === "technicalSkills"
+        ? "Competențe tehnice"
+        : "Competențe profesionale";
+    await user.click(await screen.findByText(label, { selector: "summary" }));
+    const input = screen.getByRole("textbox", {
+      name: label,
+    }) as HTMLInputElement;
+    await waitFor(() => expect(document.activeElement).toBe(input));
+    const undo = screen.getByRole("button", {
+      name: "Anulează ultima modificare",
+    });
+    await user.click(screen.getByRole("button", { name: "SQL" }));
+    const edit = screen.getByRole("textbox", {
+      name: "Editează competența",
+    }) as HTMLInputElement;
+    edit.setSelectionRange(0, edit.value.length);
+    await user.paste("PostgreSQL");
+    await user.click(undo);
+    expect(screen.getByRole("button", { name: "SQL" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "PostgreSQL" })).toBeNull();
+    input.focus();
+    await user.paste("React");
+    await user.click(undo);
+    expect(screen.queryByRole("button", { name: "React" })).toBeNull();
+    expect(input.value).toBe("");
+    input.focus();
+    await user.paste("Node");
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: "Node" })).toBeTruthy();
+    expect(input.value).toBe("");
+    expect(document.activeElement).toBe(input);
+    await user.click(undo);
+    expect(screen.queryByRole("button", { name: "Node" })).toBeNull();
+    expect(undo.hasAttribute("disabled")).toBe(true);
+    await user.click(screen.getByRole("button", { name: /Salvează acum/ }));
+    await waitFor(() =>
+      expect(save.mock.calls.at(-1)?.[0].draft[kind]).toEqual([original]),
+    );
+  },
+);
+
+it.each(["role", ...kinds] as const)(
+  "requires explicit reselection after Undo removes the selected %s entry, retaining its answer separately",
+  async (kind) => {
+    const d = completedDraft();
+    let remainingId: string;
+    if (kind === "role") {
+      const role = newRole();
+      role.title = fact("Remaining role");
+      role.company = fact("Company");
+      d.roles.push(role);
+      remainingId = role.id;
+    } else {
+      const entry = newOptionalEntry();
+      entry.title = fact("Remaining entry");
+      d.optionalSections.push({ id: kind, kind, label: "", entries: [entry] });
+      d.presentation.order.push(kind);
+      remainingId = entry.id;
+    }
+    const adapter = new MemoryBaseCvAdapter();
+    const first = await adapter.save({
+      draft: d,
+      expectedRevision: 0,
+      requestId: "initial",
+    });
+    window.location.hash = "#base";
+    const user = userEvent.setup();
+    render(<App adapter={adapter} />);
+    const label = {
+      role: "Experiență profesională",
+      projects: "Proiecte",
+      certifications: "Certificări",
+      volunteering: "Voluntariat",
+      custom: "Secțiune proprie",
+    }[kind];
+    await user.click(await screen.findByText(label, { selector: "summary" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: kind === "role" ? "Adaugă experiență" : "Adaugă intrare",
+      }),
+    );
+    await user.click(screen.getByRole("link", { name: "Îmbunătățește" }));
+    const select = screen.getByRole("combobox", {
+      name: "Intrare",
+    }) as HTMLSelectElement;
+    const removedId = Array.from(select.options).find(
+      (option) => option.value !== remainingId,
+    )!.value;
+    await user.selectOptions(select, removedId);
+    await user.click(
+      screen.getByRole("button", { name: "Anulează ultima modificare" }),
+    );
+    expect(select.value).toBe("");
+    expect(select.selectedOptions[0].textContent).toBe("Selectează o intrare");
+    const question = screen.getByRole("textbox", {
+      name: "Care erau responsabilitățile tale de zi cu zi?",
+    });
+    fireEvent.change(question, {
+      target: { value: "Answer for the removed entry" },
+    });
+    await user.click(
+      screen.getByRole("button", { name: /Salvează și continuă/ }),
+    );
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Destinația s-a schimbat",
+    );
+    await user.selectOptions(select, remainingId);
+    expect((question as HTMLTextAreaElement).value).toBe("");
+    fireEvent.change(question, {
+      target: { value: "Answer for the remaining entry" },
+    });
+    await user.click(
+      screen.getByRole("button", { name: /Salvează și continuă/ }),
+    );
+    expect(screen.queryByText(/Destinația s-a schimbat/)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Adaugă în CV" }));
+    await user.keyboard("{Control>}s{/Control}");
+    await waitFor(
+      async () => {
+        const saved = (await adapter.load())!.draft;
+        expect(enrichmentTarget(saved, removedId)).toBeNull();
+        expect(
+          saved.answers.find((a) => a.targetId === removedId),
+        ).toMatchObject({
+          text: "Answer for the removed entry",
+          status: "draft",
+        });
+        expect(
+          saved.answers.find((a) => a.targetId === remainingId),
+        ).toMatchObject({
+          text: "Answer for the remaining entry",
+          status: "confirmed",
+        });
+        expect(
+          enrichmentTarget(saved, remainingId)!.entry.bullets!.map(
+            (f) => f.value,
+          ),
+        ).toEqual(["Answer for the remaining entry"]);
+      },
+      { timeout: 2000 },
+    );
+    expect((await adapter.history()).at(-1)).toEqual(first);
   },
 );
 

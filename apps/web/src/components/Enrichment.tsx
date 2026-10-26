@@ -241,7 +241,7 @@ export function Enrichment({
             <label htmlFor="enrich-target">{t("Intrare", "Entry")}</label>
             <select
               id="enrich-target"
-              value={targetId}
+              value={target ? targetId : ""}
               onChange={(e) => {
                 setTargetId(e.target.value);
                 signature.current = enrichmentTarget(d, e.target.value)?.field
@@ -249,6 +249,11 @@ export function Enrichment({
                 setIndex(0);
               }}
             >
+              {!target && (
+                <option value="" disabled>
+                  {t("Selectează o intrare", "Select an entry")}
+                </option>
+              )}
               {targets.map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.label || t("Intrare nouă", "New entry")}

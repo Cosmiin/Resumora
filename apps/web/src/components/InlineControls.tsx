@@ -119,19 +119,19 @@ export function ChipInput({
   const t = useCopy(),
     ref = useRef<HTMLInputElement>(null);
   const skipBlur = useRef(false);
-  const pending = useRef<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
   const [editing, setEditing] = useState<Fact<string> | null>(null);
-  const text = items.find((s) => s.fieldId === pending.current)?.value ?? "";
+  const text = items.find((s) => s.fieldId === pending)?.value ?? "";
   function publish(raw: string) {
     if (!raw) {
-      const id = pending.current;
-      pending.current = null;
+      const id = pending;
+      setPending(null);
       change(items.filter((s) => s.fieldId !== id));
       return;
     }
-    const current = items.find((s) => s.fieldId === pending.current);
+    const current = items.find((s) => s.fieldId === pending);
     const next = current ? editFact(current, raw) : fact(raw);
-    pending.current = next.fieldId;
+    setPending(next.fieldId);
     change(
       current
         ? items.map((s) => (s.fieldId === next.fieldId ? next : s))
@@ -143,16 +143,16 @@ export function ChipInput({
       .split(/[,\n\r]+/)
       .map((s) => s.trim())
       .filter(Boolean);
-    const current = items.find((s) => s.fieldId === pending.current);
+    const current = items.find((s) => s.fieldId === pending);
     if (!current && !words.length) return;
-    const remaining = items.filter((s) => s.fieldId !== pending.current);
+    const remaining = items.filter((s) => s.fieldId !== pending);
     change([
       ...remaining,
       ...words.map((s, i) =>
         i === 0 && current ? editFact(current, s) : fact(s),
       ),
     ]);
-    pending.current = null;
+    setPending(null);
   }
   function commit(item: Fact<string>) {
     if (item.value.trim())
@@ -170,7 +170,7 @@ export function ChipInput({
       <label htmlFor={`chip-${label}`}>{label}</label>
       <div className="chip-input">
         {items.map((item, i) =>
-          item.fieldId === pending.current ? null : (
+          item.fieldId === pending ? null : (
             <Sortable
               key={item.fieldId}
               group={label}
@@ -267,7 +267,7 @@ export function ChipInput({
             }
           }}
           onBlur={() => {
-            if (pending.current) add(text);
+            if (pending) add(text);
           }}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;
@@ -282,8 +282,8 @@ export function ChipInput({
             }
             if (e.key === "Escape") {
               e.preventDefault();
-              change(items.filter((s) => s.fieldId !== pending.current));
-              pending.current = null;
+              change(items.filter((s) => s.fieldId !== pending));
+              setPending(null);
             }
           }}
         />

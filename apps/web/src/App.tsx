@@ -138,8 +138,10 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
     };
   }, [route, head?.id, adapter]);
   function change(next: BaseDraft) {
+    const current = latest.current;
+    if (JSON.stringify(next) === JSON.stringify(current)) return;
     generation.current++;
-    if (draft) setPast((p) => [...p.slice(-49), clone(draft)]);
+    if (current) setPast((p) => [...p.slice(-49), clone(current)]);
     latest.current = next;
     setDraft(next);
     setIssues([]);
