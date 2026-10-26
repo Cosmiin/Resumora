@@ -119,22 +119,46 @@ export function ChipInput({
   const t = useCopy(),
     ref = useRef<HTMLInputElement>(null);
   const skipBlur = useRef(false);
-  const [text, setText] = useState(""),
-    [editing, setEditing] = useState<string | null>(null),
-    [edit, setEdit] = useState("");
+  const pending = useRef<string | null>(null);
+  const [editing, setEditing] = useState<Fact<string> | null>(null);
+  const text = items.find((s) => s.fieldId === pending.current)?.value ?? "";
+  function publish(raw: string) {
+    if (!raw) {
+      const id = pending.current;
+      pending.current = null;
+      change(items.filter((s) => s.fieldId !== id));
+      return;
+    }
+    const current = items.find((s) => s.fieldId === pending.current);
+    const next = current ? editFact(current, raw) : fact(raw);
+    pending.current = next.fieldId;
+    change(
+      current
+        ? items.map((s) => (s.fieldId === next.fieldId ? next : s))
+        : [...items, next],
+    );
+  }
   function add(raw: string) {
     const words = raw
       .split(/[,\n\r]+/)
       .map((s) => s.trim())
       .filter(Boolean);
-    if (words.length) change([...items, ...words.map((s) => fact(s))]);
-    setText("");
+    const current = items.find((s) => s.fieldId === pending.current);
+    if (!current && !words.length) return;
+    const remaining = items.filter((s) => s.fieldId !== pending.current);
+    change([
+      ...remaining,
+      ...words.map((s, i) =>
+        i === 0 && current ? editFact(current, s) : fact(s),
+      ),
+    ]);
+    pending.current = null;
   }
   function commit(item: Fact<string>) {
-    if (edit.trim())
+    if (item.value.trim())
       change(
         items.map((s) =>
-          s.fieldId === item.fieldId ? editFact(s, edit.trim()) : s,
+          s.fieldId === item.fieldId ? editFact(s, item.value.trim()) : s,
         ),
       );
     else change(items.filter((s) => s.fieldId !== item.fieldId));
@@ -145,69 +169,83 @@ export function ChipInput({
     <div className="chip-field">
       <label htmlFor={`chip-${label}`}>{label}</label>
       <div className="chip-input">
-        {items.map((item, i) => (
-          <Sortable
-            key={item.fieldId}
-            group={label}
-            index={i}
-            label={item.value}
-            move={(from, to) => change(moveItem(items, from, to))}
-          >
-            <span className="skill-chip">
-              {editing === item.fieldId ? (
-                <input
-                  aria-label={t("Editează competența", "Edit skill")}
-                  autoFocus
-                  value={edit}
-                  onChange={(e) => setEdit(e.target.value)}
-                  onBlur={() => {
-                    if (skipBlur.current) {
-                      skipBlur.current = false;
-                      return;
+        {items.map((item, i) =>
+          item.fieldId === pending.current ? null : (
+            <Sortable
+              key={item.fieldId}
+              group={label}
+              index={i}
+              label={item.value}
+              move={(from, to) => change(moveItem(items, from, to))}
+            >
+              <span className="skill-chip">
+                {editing?.fieldId === item.fieldId ? (
+                  <input
+                    aria-label={t("Editează competența", "Edit skill")}
+                    autoFocus
+                    value={item.value}
+                    onChange={(e) =>
+                      change(
+                        items.map((s) =>
+                          s.fieldId === item.fieldId
+                            ? editFact(s, e.target.value)
+                            : s,
+                        ),
+                      )
                     }
-                    commit(item);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.nativeEvent.isComposing) return;
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      skipBlur.current = true;
+                    onBlur={() => {
+                      if (skipBlur.current) {
+                        skipBlur.current = false;
+                        return;
+                      }
                       commit(item);
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      skipBlur.current = true;
-                      setEditing(null);
-                      ref.current?.focus();
-                    }
-                  }}
-                />
-              ) : (
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return;
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        skipBlur.current = true;
+                        commit(item);
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        skipBlur.current = true;
+                        change(
+                          items.map((s) =>
+                            s.fieldId === item.fieldId ? editing : s,
+                          ),
+                        );
+                        setEditing(null);
+                        ref.current?.focus();
+                      }
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="chip-text"
+                    onClick={() => {
+                      setEditing(item);
+                    }}
+                  >
+                    {item.value}
+                  </button>
+                )}
                 <button
                   type="button"
-                  className="chip-text"
+                  className="chip-remove icon-button"
+                  aria-label={`${t("Elimină", "Remove")}: ${item.value}`}
                   onClick={() => {
-                    setEditing(item.fieldId);
-                    setEdit(item.value);
+                    change(items.filter((s) => s.fieldId !== item.fieldId));
+                    ref.current?.focus();
                   }}
                 >
-                  {item.value}
+                  <X size={14} />
                 </button>
-              )}
-              <button
-                type="button"
-                className="chip-remove icon-button"
-                aria-label={`${t("Elimină", "Remove")}: ${item.value}`}
-                onClick={() => {
-                  change(items.filter((s) => s.fieldId !== item.fieldId));
-                  ref.current?.focus();
-                }}
-              >
-                <X size={14} />
-              </button>
-            </span>
-          </Sortable>
-        ))}
+              </span>
+            </Sortable>
+          ),
+        )}
         <input
           ref={ref}
           id={`chip-${label}`}
@@ -216,7 +254,7 @@ export function ChipInput({
           placeholder={t("Scrie și Enter…", "Type and Enter…")}
           onChange={(e) => {
             if (e.target.value.includes(",")) add(e.target.value);
-            else setText(e.target.value);
+            else publish(e.target.value);
           }}
           onPaste={(e) => {
             const raw = e.clipboardData.getData("text");
@@ -229,7 +267,7 @@ export function ChipInput({
             }
           }}
           onBlur={() => {
-            if (text.trim()) add(text);
+            if (pending.current) add(text);
           }}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;
@@ -241,6 +279,11 @@ export function ChipInput({
             if (e.key === "Backspace" && !text && items.length) {
               e.preventDefault();
               change(items.slice(0, -1));
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              change(items.filter((s) => s.fieldId !== pending.current));
+              pending.current = null;
             }
           }}
         />

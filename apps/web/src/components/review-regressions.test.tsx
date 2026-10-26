@@ -735,7 +735,190 @@ it.each(["role", ...kinds] as const)(
   },
 );
 
-it("retains a genuinely stale destination signature after a later local preview edit", async () => {
+it.each(["professionalSkills", "technicalSkills"] as const)(
+  "saves active existing and new %s text without blur, retaining focus and Escape cancellation",
+  async (kind) => {
+    const d = completedDraft();
+    const original = fact("SQL");
+    d[kind] = [original];
+    const adapter = new MemoryBaseCvAdapter();
+    const initial = await adapter.save({
+      draft: d,
+      expectedRevision: 0,
+      requestId: "initial",
+    });
+    window.location.hash = "#base";
+    const user = userEvent.setup();
+    render(<App adapter={adapter} />);
+    await user.click(
+      await screen.findByText(
+        kind === "technicalSkills"
+          ? "Competențe tehnice"
+          : "Competențe profesionale",
+        { selector: "summary" },
+      ),
+    );
+    const input = screen.getByRole("textbox", {
+      name:
+        kind === "technicalSkills"
+          ? "Competențe tehnice"
+          : "Competențe profesionale",
+    });
+    await user.click(screen.getByRole("button", { name: "SQL" }));
+    const edit = screen.getByRole("textbox", { name: "Editează competența" });
+    for (const [mode, value] of [
+      ["shortcut", "PostgreSQL"],
+      ["autosave", "Postgres"],
+      ["button", "PostgreSQL 17"],
+    ] as const) {
+      fireEvent.change(edit, { target: { value } });
+      if (mode === "shortcut") await user.keyboard("{Control>}s{/Control}");
+      if (mode === "button")
+        fireEvent.click(screen.getByRole("button", { name: /Salvează acum/ }));
+      await waitFor(
+        async () => {
+          const saved = (await adapter.load())!;
+          expect(saved.draft[kind].map((f) => f.value)).toEqual([value]);
+          expect(saved.draft[kind][0].fieldId).toBe(original.fieldId);
+          expect(saved.reason).toBe(mode === "autosave" ? "autosave" : "save");
+        },
+        { timeout: 2000 },
+      );
+      expect(document.activeElement).toBe(edit);
+    }
+    await user.keyboard("{Escape}");
+    expect(document.activeElement).toBe(input);
+    await waitFor(
+      async () =>
+        expect((await adapter.load())!.draft[kind]).toEqual([original]),
+      { timeout: 2000 },
+    );
+    for (const [mode, value] of [
+      ["shortcut", "React"],
+      ["autosave", "React Native"],
+      ["button", "React 19"],
+    ] as const) {
+      fireEvent.change(input, { target: { value } });
+      if (mode === "shortcut") await user.keyboard("{Meta>}s{/Meta}");
+      if (mode === "button")
+        fireEvent.click(screen.getByRole("button", { name: /Salvează acum/ }));
+      await waitFor(
+        async () => {
+          const saved = (await adapter.load())!;
+          expect(saved.draft[kind].map((f) => f.value)).toEqual(["SQL", value]);
+          expect(saved.reason).toBe(mode === "autosave" ? "autosave" : "save");
+        },
+        { timeout: 2000 },
+      );
+      expect(document.activeElement).toBe(input);
+    }
+    await user.keyboard("{Escape}");
+    expect(document.activeElement).toBe(input);
+    await waitFor(
+      async () =>
+        expect((await adapter.load())!.draft[kind]).toEqual([original]),
+      { timeout: 2000 },
+    );
+    expect((await adapter.history()).at(-1)).toEqual(initial);
+  },
+);
+
+it.each(["role", ...kinds] as const)(
+  "refreshes an authorized Undo signature for one %s target through context save and explicit CV add/update",
+  async (kind) => {
+    const d = completedDraft();
+    let targetId: string;
+    if (kind === "role") {
+      const role = newRole();
+      role.title = fact("Role");
+      role.company = fact("Company");
+      d.roles.push(role);
+      targetId = role.id;
+    } else {
+      const entry = newOptionalEntry();
+      entry.title = fact("Entry");
+      d.optionalSections.push({ id: kind, kind, label: "", entries: [entry] });
+      d.presentation.order.push(kind);
+      targetId = entry.id;
+    }
+    enrichmentTarget(d, targetId)!.field.value = "Original context";
+    const original = clone(enrichmentTarget(d, targetId)!.field);
+    const adapter = new MemoryBaseCvAdapter();
+    const first = await adapter.save({
+      draft: d,
+      expectedRevision: 0,
+      requestId: "initial",
+    });
+    window.location.hash = "#enrich";
+    const user = userEvent.setup();
+    render(<App adapter={adapter} />);
+    const question = await screen.findByRole("textbox", {
+      name: "Care erau responsabilitățile tale de zi cu zi?",
+    });
+    fireEvent.change(question, { target: { value: "Reusable answer" } });
+    const preview = screen.getByRole("complementary", {
+      name: "Previzualizare CV",
+    });
+    async function editAndUndo() {
+      const context = textBox(preview, "Original context");
+      context.textContent = "Local correction";
+      fireEvent.input(context);
+      await user.click(
+        screen.getByRole("button", { name: "Anulează ultima modificare" }),
+      );
+      expect(textBox(preview, "Original context")).toBeTruthy();
+    }
+    await editAndUndo();
+    await user.click(
+      screen.getByRole("button", { name: /Salvează și continuă/ }),
+    );
+    expect(screen.queryByText(/Destinația s-a schimbat/)).toBeNull();
+    await editAndUndo();
+    await user.click(screen.getByRole("button", { name: "Adaugă în CV" }));
+    expect(textBox(preview, "Reusable answer")).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", { name: "Editează răspunsul" }),
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", {
+        name: "Care erau responsabilitățile tale de zi cu zi?",
+      }),
+      { target: { value: "Revised context answer" } },
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Salvează și continuă/ }),
+    );
+    expect(textBox(preview, "Reusable answer")).toBeTruthy();
+    await editAndUndo();
+    await user.click(
+      screen.getByRole("button", { name: "Actualizează în CV" }),
+    );
+    expect(screen.queryByText(/Destinația s-a schimbat/)).toBeNull();
+    await user.keyboard("{Control>}s{/Control}");
+    await waitFor(
+      async () => {
+        const saved = (await adapter.load())!.draft;
+        const destination = enrichmentTarget(saved, targetId)!;
+        expect(destination.field).toEqual(original);
+        expect(destination.entry.bullets!.map((f) => f.value)).toEqual([
+          "Revised context answer",
+        ]);
+        expect(saved.answers).toHaveLength(1);
+        expect(saved.answers[0].text).toBe("Revised context answer");
+        expect(saved.answers[0].cvFieldId).toBe(
+          destination.entry.bullets![0].fieldId,
+        );
+        expect(
+          saved.sources.filter((s) => s.kind === "answer").map((s) => s.text),
+        ).toEqual(["Reusable answer", "Revised context answer"]);
+      },
+      { timeout: 2000 },
+    );
+    expect((await adapter.history()).at(-1)).toEqual(first);
+  },
+);
+
+it("retains a genuinely stale destination signature after a later local preview edit and Undo", async () => {
   const d = blankDraft(),
     role = newRole();
   role.title = fact("Role");
@@ -743,14 +926,21 @@ it("retains a genuinely stale destination signature after a later local preview 
   role.context = fact("Original context");
   d.roles.push(role);
   let externalChange: (next: BaseDraft) => void = () => {};
+  let undo: () => void = () => {};
   let latest = d;
   function Surface() {
     const [draft, setDraft] = useState(d);
+    const [undoFrom, setUndoFrom] = useState<BaseDraft | null>(null);
     externalChange = setDraft;
+    undo = () => {
+      setUndoFrom(draft);
+      setDraft(changed);
+    };
     return (
       <LanguageContext.Provider value="en">
         <Enrichment
           draft={draft}
+          undoFrom={undoFrom}
           change={(next) => {
             latest = next;
             setDraft(next);
@@ -780,6 +970,7 @@ it("retains a genuinely stale destination signature after a later local preview 
   ).getByText("External context");
   context.textContent = "Later local edit";
   fireEvent.input(context);
+  await act(async () => undo());
   await user.click(screen.getByRole("button", { name: /Save and next/ }));
   expect(screen.getByRole("alert").textContent).toContain("The target changed");
   expect(latest.roles[0].bullets).toEqual([]);

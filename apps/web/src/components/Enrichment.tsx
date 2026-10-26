@@ -24,11 +24,13 @@ export function Enrichment({
   change,
   goEdit,
   asOf,
+  undoFrom,
 }: {
   draft: BaseDraft;
   change: (d: BaseDraft) => void;
   goEdit: () => void;
   asOf: { year: string; month: string };
+  undoFrom?: BaseDraft | null;
 }) {
   const t = useCopy();
   const targets = [
@@ -55,6 +57,16 @@ export function Enrichment({
     target = enrichmentTarget(d, targetId),
     question = dimensions[index];
   const signature = useRef(target?.field.id);
+  useEffect(() => {
+    const before = undoFrom && enrichmentTarget(undoFrom, targetId);
+    if (
+      before &&
+      target &&
+      signature.current === before.field.id &&
+      before.field.fieldId === target.field.fieldId
+    )
+      signature.current = target.field.id;
+  }, [undoFrom]);
   useEffect(() => {
     signature.current = target?.field.id;
     input.current?.focus();

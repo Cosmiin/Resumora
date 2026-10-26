@@ -43,6 +43,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
     [draft, setDraft] = useState<BaseDraft | null>(null),
     [head, setHead] = useState<Snapshot | null>(null);
   const [past, setPast] = useState<BaseDraft[]>([]),
+    [undoFrom, setUndoFrom] = useState<BaseDraft | null>(null),
     [versions, setVersions] = useState<Snapshot[]>([]),
     [inspected, setInspected] = useState<Snapshot | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]),
@@ -494,6 +495,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               {draft && route === "enrich" && (
                 <Enrichment
                   draft={draft}
+                  undoFrom={undoFrom}
                   change={change}
                   goEdit={() => go("base")}
                   asOf={asOf}
@@ -573,6 +575,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                   onClick={() => {
                     const previous = clone(past.at(-1)!);
                     generation.current++;
+                    setUndoFrom(latest.current);
                     latest.current = previous;
                     setDraft(previous);
                     setPast((p) => p.slice(0, -1));
