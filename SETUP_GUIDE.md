@@ -129,10 +129,12 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 **Purpose:** structured proposals and selective rewrites. The [provider contract](research/architecture/provider-adapter-v2.md) prefers direct OpenAI first; no router, vector DB or commercial ATS API is required for deterministic matching. Mock outputs are sufficient initially.
 
-1. Check for an appropriate existing Resumora OpenAI API organization/project. After model/data-policy/budget approval, use [OpenAI Platform](https://platform.openai.com/) organization/project settings and [API keys](https://platform.openai.com/api-keys). Select/create an isolated dev project and a restricted project key/service identity for only the required API operations. Exact current project-creation labels were not verified; use official settings rather than guessed clicks. [Official OpenAI production setup](https://developers.openai.com/api/docs/guides/production-best-practices)
-2. Store proposed `OPENAI_API_KEY` in the local API `.dev.vars` / Worker secret store; `OPENAI_MODEL` and approved `OPENAI_BASE_URL` are server config. No browser key, admin organization key, ChatGPT account credential or paid plan is required for mock development. Do not enable billing or exercise a model as a setup check.
-3. Approve exact endpoint/model, minimal input, retention/residency terms and usage ceilings. `store:false` does not itself guarantee zero retention or EU-only processing. API data is not used for training by default; abuse monitoring can retain content for up to 30 days and endpoint exceptions apply. [Official data controls](https://developers.openai.com/api/docs/guides/your-data)
-4. Configure alerts and distinguish them from an enforced hard spend limit where supported. Application quotas, token limits and a stop switch are still needed; alerts are not hard caps. Verify configuration read-only first; a later explicitly approved synthetic API call must return schema-valid output with usage recorded. That call consumes quota/possibly money and is not a non-destructive setup verification. [Spend controls](https://developers.openai.com/api/docs/guides/production-best-practices)
+The [OpenAI/admin preparation guide](docs/setup/openai-admin.md) owns the current synthetic preview, supported configuration, secure project-key setup and remaining integration requirements. Follow it rather than adding a configurable provider URL or enabling billing/inference as a setup check.
+
+Before extraction/generation is separately approved:
+
+1. Approve exact endpoint/model, minimal input, retention/residency terms and usage ceilings. `store:false` does not itself guarantee zero retention or EU-only processing. API data is not used for training by default; abuse monitoring can retain content for up to 30 days and endpoint exceptions apply. [Official data controls](https://developers.openai.com/api/docs/guides/your-data)
+2. Implement application quotas, token limits and a stop switch; provider alerts alone do not enforce them. Verify configuration read-only first; a later explicitly approved synthetic API call must return schema-valid output with usage recorded. That call consumes quota/possibly money and is not a non-destructive setup verification. [Spend controls](https://developers.openai.com/api/docs/guides/production-best-practices)
 
 ### PDF export, parsing and OCR: when file features begin
 
@@ -163,7 +165,7 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 ## 5. Proposed variable names and exact storage boundaries
 
-The [local configuration contract](docs/setup/local-development.md#configuration-and-secrets) owns current settings. **The integration names below remain proposals.** Configure only rows needed by the current feature. Placeholder notation such as `<DEV_PROJECT_URL>` or `<SERVER_SECRET_SET_LOCALLY>` is deliberately not a credential. Do not create actual environment files from this document during the preparation task.
+The [local configuration contract](docs/setup/local-development.md#configuration-and-secrets) owns current settings; the [OpenAI/admin setup contract](docs/setup/openai-admin.md#secure-owner-setup-only-when-needed) owns supported provider and owner-verifier variables. **The integration names below remain proposals.** Configure only rows needed by the current feature. Placeholder notation such as `<DEV_PROJECT_URL>` or `<SERVER_SECRET_SET_LOCALLY>` is deliberately not a credential. Do not create actual environment files from this document during the preparation task.
 
 | Proposed name | Classification / source | Proposed local location | Future hosted location / timing |
 | --- | --- | --- | --- |
@@ -171,13 +173,9 @@ The [local configuration contract](docs/setup/local-development.md#configuration
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Public publishable key; legacy `anon` only after compatibility review | Same web file | Same Pages build settings; RLS remains mandatory |
 | `VITE_API_BASE_URL` | Public API origin, only if future deployment requires a separate origin; unused by the local proxy | Same web file, only if implemented | Corresponding dev/prod Worker origin in Pages build settings |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | Public server project configuration | `apps/api/.dev.vars` | Worker plain variables, each environment |
-| `SUPABASE_JWT_ISSUER` | Public; proposed `<DEV_PROJECT_URL>/auth/v1` | Same API file | Worker variable; validate against actual Auth token issuer |
-| `SUPABASE_JWKS_URL` | Public; proposed `<DEV_PROJECT_URL>/auth/v1/.well-known/jwks.json` | Same API file | Worker variable; asymmetric signing only; may derive from URL instead |
 | `APP_ORIGIN`, `ALLOWED_ORIGINS` | Public; exact web origin, proposed comma-separated allowlist interpreted by future code | Same API file | Worker variables; no arbitrary origins with credentials |
 | `SUPABASE_SECRET_KEY` | **Privileged secret**, bypasses RLS; only approved admin/job operation | Same API file if justified | Worker **Secret**; never frontend/build/extension |
 | `SUPABASE_UPLOAD_BUCKET`, `SUPABASE_EXPORT_BUCKET` | Public identifiers; proposed `cv-uploads`, `cv-exports` | Same API file, when storage needed | Worker variables |
-| `OPENAI_API_KEY` | **Secret**, restricted project API key | Same API file, AI milestone | Worker **Secret** |
-| `OPENAI_MODEL`, `OPENAI_BASE_URL` | Public identifiers/approved endpoint, server controlled | Same API file | Worker variables; no implicit provider fallback |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | **Secrets**, sandbox initially; API key and endpoint signing secret are different | Same API file, billing milestone | Worker **Secrets**, separate test/live |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Public test/live publishable key, only if browser integration needs it | Web file, billing milestone | Pages build setting; no secret key beside it |
 | `STRIPE_PRICE_1M`, `STRIPE_PRICE_3M`, `STRIPE_PRICE_6M` | Public identifiers, server allowlist; prices unselected | API file when approved | Worker variables; separate sandbox/live objects |

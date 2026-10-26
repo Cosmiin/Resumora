@@ -1,7 +1,9 @@
 import type { ApiError, HealthResponse } from '@resumora/contracts';
+import { adminRoute } from './admin/routes.ts';
+import type { AdminAuthConfig } from './admin/auth.ts';
 
-// No provider clients or remote bindings exist in this foundation.
-interface Env {
+// No paid provider execution or durable database binding is wired in this entrypoint.
+interface Env extends AdminAuthConfig {
   APP_ENV: 'development';
 }
 
@@ -28,8 +30,9 @@ function json(body: HealthResponse | ApiError, status = 200, extraHeaders: Recor
 }
 
 export default {
-  fetch(request: Request, _env: Env): Response {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname;
+    if (path === '/admin/ai' || path === '/v1/admin/ai/usage') return adminRoute(request, env);
     const requestId = crypto.randomUUID();
     const expectedMethod = path === '/v1/health' ? 'GET' : authContracts[path];
 

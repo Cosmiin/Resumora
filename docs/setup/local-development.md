@@ -1,6 +1,6 @@
 # Local frontend and Worker foundation
 
-This workspace is a runnable **local foundation**, not the CV product or working authentication. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. It does not call Supabase, send email, store CVs, set sessions, or use Google OAuth. No Cloudflare account, API token or environment file is needed to run it.
+This workspace is a runnable **local foundation**, not the CV product or working login/session authentication. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. With default configuration it does not call Supabase, send email, store CVs, set sessions, or use Google OAuth. A configured admin verifier can fetch public Supabase signing keys; no database connection or paid inference is wired. No Cloudflare account, API token or environment file is needed to run it.
 
 ## Start from a clean checkout
 
@@ -24,7 +24,7 @@ The proxy preserves the incoming host/origin context rather than claiming all re
 | Path | Purpose |
 | --- | --- |
 | `apps/web/` | Small Romanian development shell, Vite config and frontend build |
-| `apps/api/` | Worker entry point, local Wrangler configuration and API contract placeholders |
+| `apps/api/` | Worker entry point, protected admin preparation, internal OpenAI adapter and API contract placeholders |
 | `packages/contracts/` | Shared health/error response types; no server bindings or secret values |
 | `scripts/dev.mjs` | Start/stop the local pair together |
 | `scripts/smoke.mjs` | Start a fresh local pair, verify HTTP/proxy behavior, then stop it |
@@ -33,7 +33,7 @@ The discovery prototype remains under `prototype/` with its existing independent
 
 ## Current routes and future auth boundary
 
-Every API response includes a generated `requestId` and `Cache-Control: private, no-store`. Unknown routes return 404; wrong methods on known routes return 405 with `Allow`. The Worker handler does not read or log request bodies, callback queries, passwords or cookies.
+JSON API responses include a generated `requestId`; API/admin responses use `Cache-Control: private, no-store`. Unknown routes return 404; wrong methods on foundation routes return 405 with `Allow`. Admin routes authorize before method/filter/data handling. The Worker handler does not read or log request bodies, callback queries, passwords or cookies.
 
 | Method and path | Current result |
 | --- | --- |
@@ -45,10 +45,14 @@ Every API response includes a generated `requestId` and `Cache-Control: private,
 | `GET /v1/auth/callback/recovery` | 501 `AUTH_NOT_IMPLEMENTED` |
 | `POST /v1/auth/password` | 501 `AUTH_NOT_IMPLEMENTED` |
 | `POST /v1/auth/logout` | 501 `AUTH_NOT_IMPLEMENTED` |
+| `GET /admin/ai` | Protected server-rendered usage dashboard; 503 locked/unconfigured until verified auth and durable storage are wired |
+| `GET /v1/admin/ai/usage` | Owner-only accounting JSON; same fail-closed configuration/storage boundary |
 
 The 501 responses are deliberate: they never simulate successful signup, email delivery, password changes or logout. The shell has no password form. [Authentication preparation](authentication.md#proposed-worker-session-boundary) owns the future implementation contracts. The local proxy solves the development-origin plumbing; callback handlers themselves are not implemented, so **do not yet put these URLs in Supabase's hosted redirect allowlist**.
 
 ## Configuration and secrets
+
+The [OpenAI/admin preparation guide](openai-admin.md) documents the isolated synthetic preview, Worker-only secret paths, narrow owner verifier and exact durable-ledger/session integration still required. No paid provider call is mounted in this foundation.
 
 The checked-in [Worker configuration](../../apps/api/wrangler.jsonc) contains only public `APP_ENV=development`, a proposed development Worker name and a compatibility date. No `account_id`, hosted routes, remote resource bindings or provider key is configured. The build script uses `wrangler deploy --dry-run` to bundle locally without uploading. `workers_dev` and preview URLs are disabled as additional publishing defaults; they do not prevent somebody manually invoking a deployment command. This task did not deploy.
 
@@ -68,13 +72,15 @@ Stop any running local dev pair first, then run:
 npm run check
 ```
 
-This runs frontend/API type checks, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
+This runs frontend/API type checks, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
 
 To run only the local integration check: `npm run smoke`. Generated `node_modules/`, `dist/` and `.wrangler/` directories are ignored. Native Windows runtime, browser rendering/accessibility and hosted Cloudflare behavior need their own later verification; this foundation was checked in the current WSL/Linux environment.
 
 To run only the development secret-boundary regression: `npm run test:dev-secrets`. It starts Vite on an available loopback port, checks that synthetic Worker secrets, other private Worker files and Vite's default protected files return 403 for direct and `?raw` requests through canonical and npm workspace-symlink paths, verifies frontend/shared/dependency files remain accessible, then removes its fixtures and stops the server. It also runs as part of `npm run check`.
 
 The [GitHub Actions workflow](../../.github/workflows/ci.yml) runs these foundation checks for pull requests and pushes to `main`, using the pinned Node/npm toolchain and locked dependencies with lifecycle scripts disabled. It does not deploy the application or verify browser rendering, hosted services or working authentication. The discovery prototype and schema/research checks remain separate from this workflow.
+
+Run `npm test --workspace @resumora/api` for injected OpenAI/accounting/owner-verification tests and synthetic admin HTTP checks; CI runs this separately from `npm run check`. It requires no provider credentials or remote inference.
 
 ## Next milestones
 

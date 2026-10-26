@@ -31,3 +31,5 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Check types, build and local HTTP behavior
         run: npm run check
+      - name: Check synthetic OpenAI accounting and protected admin routes
+        run: npm test --workspace @resumora/api
