@@ -16,7 +16,7 @@ spec.loader.exec_module(preflight)
 @unittest.skipUnless(os.environ.get('PG_BINDIR'), 'Set PG_BINDIR for native PostgreSQL inventory testing')
 class NativeInventory(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix='.test-preflight-native-', dir=SCRIPT.parents[2])
+        self.temp = tempfile.TemporaryDirectory(prefix='resumora-preflight-native-')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.binary = Path(os.environ['PG_BINDIR'])
@@ -57,6 +57,14 @@ class NativeInventory(unittest.TestCase):
                               text=True, timeout=40, **kwargs)
 
     def test_inventory_reads_database_locales_with_verified_tls(self):
+        self.run_command(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
+                          '-days', '1', '-keyout', str(self.root / 'untrusted.key'),
+                          '-out', str(self.root / 'untrusted.crt'), '-subj', '/CN=untrusted'])
+        for settings in [{'PGSSLROOTCERT': str(self.root / 'untrusted.crt')},
+                         {'PGHOST': 'wrong.example.invalid', 'PGHOSTADDR': '127.0.0.1'}]:
+            with self.subTest(settings=settings):
+                with self.assertRaisesRegex(RuntimeError, 'connection details suppressed'):
+                    preflight.inventory(self.binary / 'psql', self.env | settings)
         result = preflight.inventory(self.binary / 'psql', self.env)
         server = result['server']
         # initdb's explicit C locale is an independent expectation, not mocked SQL output.
@@ -64,7 +72,8 @@ class NativeInventory(unittest.TestCase):
         self.assertEqual(server['collation'], 'C')
         self.assertEqual(server['ctype'], 'C')
         self.assertEqual(server['readOnly'], 'on')
-        self.assertIs(server['tls'], True)
+        self.assertIs(server['backendTLS'], True)
+        self.assertEqual(result['clientTLS'], {'mode': 'verify-full', 'certificateAndHostnameVerified': True})
         self.assertFalse(result['can_apply'])
         self.assertEqual(result['tables'], [])
         self.assertEqual(result['migration_history'], [])
