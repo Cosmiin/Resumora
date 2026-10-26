@@ -948,6 +948,7 @@ export function Editor({ draft: d, issues, change }: Props) {
                   n.presentation.order.push(id);
                 });
                 setOpened(id);
+                focusFirstField(`section-${id}`);
               }}
             >
               {sectionName(kind, locale)}

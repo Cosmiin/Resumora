@@ -964,6 +964,38 @@ it("reveals and marks the combined Contributions control after a preview copy is
   });
 });
 
+it("focuses the first empty field after inserting each optional section", async () => {
+  function Surface() {
+    const [draft, change] = useState(blankDraft);
+    return (
+      <LanguageContext.Provider value="en">
+        <Editor draft={draft} change={change} issues={[]} />
+      </LanguageContext.Provider>
+    );
+  }
+  const user = userEvent.setup();
+  render(<Surface />);
+  await user.click(screen.getByText("Add section", { selector: "summary" }));
+  for (const name of [
+    "Projects",
+    "Certifications",
+    "Volunteering",
+    "Custom section",
+  ]) {
+    await user.click(screen.getByRole("button", { name }));
+    const section = screen.getByText(name, {
+      selector: ".editor-section > summary",
+    }).parentElement!;
+    const label = within(section).getByRole("textbox", {
+      name: "Section label",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(label));
+    expect(label.closest("details:not([open])")).toBeNull();
+    await user.keyboard(`My ${name}`);
+    expect((label as HTMLInputElement).value).toBe(`My ${name}`);
+  }
+});
+
 it.each(["experience", "education"] as const)(
   "reveals the first empty field in collapsed %s entries on section and entry opening",
   async (kind) => {

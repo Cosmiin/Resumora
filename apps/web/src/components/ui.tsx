@@ -126,18 +126,6 @@ export function issueText(code: Issue["code"], t: ReturnType<typeof useCopy>) {
       "Sfârșitul nu poate preceda începutul.",
       "End cannot precede start.",
     ),
-    pending: t(
-      "Verifică informația, apoi confirmă secțiunea.",
-      "Review this fact, then confirm the section.",
-    ),
-    prose: t(
-      "Aprobă textul propriu înainte de salvare.",
-      "Approve your wording before saving.",
-    ),
-    truth: t(
-      "Confirmă exactitatea informațiilor înainte de salvare.",
-      "Acknowledge the facts before saving.",
-    ),
   }[code];
 }
 export function Dialog({

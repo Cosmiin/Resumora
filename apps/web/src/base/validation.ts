@@ -2,15 +2,7 @@ import { allFacts, type BaseDraft } from "./model";
 import { dateError, reversedDates } from "./dates";
 export type Issue = {
   field: string;
-  code:
-    | "required"
-    | "email"
-    | "url"
-    | "date"
-    | "chronology"
-    | "pending"
-    | "prose"
-    | "truth";
+  code: "required" | "email" | "url" | "date" | "chronology";
 };
 export function validateDraft(d: BaseDraft): Issue[] {
   const issues: Issue[] = [];
