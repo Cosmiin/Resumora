@@ -414,6 +414,11 @@ it.each(kinds)(
     render(<Surface />);
     const section = document.getElementById(`section-${kind}`)!;
     await user.click(section.querySelector("summary")!);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(section).getByRole("textbox", { name: "Section label" }),
+      ),
+    );
     await user.type(screen.getByRole("textbox", { name: "End" }), "02/");
     await user.click(
       screen.getByRole("checkbox", { name: "Present / Ongoing" }),
