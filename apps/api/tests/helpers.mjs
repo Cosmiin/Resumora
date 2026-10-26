@@ -22,7 +22,7 @@ export async function signingFixture(alg = 'ES256') {
       return input + '.' + Buffer.from(signature).toString('base64url');
     },
     async transport(url, init) {
-      if (url !== authConfig.SUPABASE_JWKS_URL || init.redirect !== 'error') throw new Error('Unexpected JWKS request');
+      if (url !== authConfig.SUPABASE_JWKS_URL || init.redirect !== 'manual') throw new Error('Unexpected JWKS request');
       return Response.json({ keys: [jwk] });
     },
   };

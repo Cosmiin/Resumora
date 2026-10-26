@@ -59,25 +59,32 @@ export function prepareConnection(config: OpenAIConfig, options: {
         const transport = options.transport ?? fetch;
         // One HTTP attempt, fixed endpoint, no SDK automatic retries or redirect credentials.
         const response = await transport('https://api.openai.com/v1/responses', {
-          method: 'POST', redirect: 'error', signal: abort.signal,
+          method: 'POST', redirect: 'manual', signal: abort.signal,
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${execution === 'synthetic' ? 'synthetic-only' : config.OPENAI_API_KEY}`,
             'X-Client-Request-Id': context.attemptId }, body,
         });
         result.httpStatus = response.status;
         result.providerRequestId = metadataId(response.headers.get('x-request-id'));
-        const data = object(await boundedJson(response, 262_144));
-        result.providerResponseId = metadataId(data.id);
-        result.modelResolved = metadataId(typeof data.model === 'string' ? data.model.replaceAll('.', '_') : null)
-          ? data.model as string : null;
-        result.usage = normalizeUsage(data.usage);
-        if (data.status === 'completed' || data.status === 'incomplete' || data.status === 'failed') result.providerStatus = data.status;
-        if (!response.ok) { result.status = 'failed'; result.errorCode = 'PROVIDER_REJECTED'; }
-        else if (result.providerStatus && result.providerResponseId && result.modelResolved) {
-          result.status = result.providerStatus;
-          if (result.status === 'failed') result.errorCode = 'PROVIDER_FAILED';
-        } else result.errorCode = 'NETWORK_OR_RESPONSE_UNKNOWN';
-        result.price = result.modelResolved ? priceFor(result.modelResolved, startedAt, typeof data.service_tier === 'string' ? data.service_tier : null) : null;
-        result.estimatedNanoUsd = estimateNanoUsd(result.usage, result.price);
+        if (response.status >= 300 && response.status < 400) {
+          // Do not forward the key, retry, or ingest a redirect body's alleged usage.
+          await response.body?.cancel();
+          result.status = 'failed';
+          result.errorCode = 'PROVIDER_REJECTED';
+        } else {
+          const data = object(await boundedJson(response, 262_144));
+          result.providerResponseId = metadataId(data.id);
+          result.modelResolved = metadataId(typeof data.model === 'string' ? data.model.replaceAll('.', '_') : null)
+            ? data.model as string : null;
+          result.usage = normalizeUsage(data.usage);
+          if (data.status === 'completed' || data.status === 'incomplete' || data.status === 'failed') result.providerStatus = data.status;
+          if (!response.ok) { result.status = 'failed'; result.errorCode = 'PROVIDER_REJECTED'; }
+          else if (result.providerStatus && result.providerResponseId && result.modelResolved) {
+            result.status = result.providerStatus;
+            if (result.status === 'failed') result.errorCode = 'PROVIDER_FAILED';
+          } else result.errorCode = 'NETWORK_OR_RESPONSE_UNKNOWN';
+          result.price = result.modelResolved ? priceFor(result.modelResolved, startedAt, typeof data.service_tier === 'string' ? data.service_tier : null) : null;
+          result.estimatedNanoUsd = estimateNanoUsd(result.usage, result.price);
+        }
       } catch {
         // Never retain provider error messages or response bodies. No assumption of free usage.
         result.status = 'unknown';

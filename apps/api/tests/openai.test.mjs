@@ -15,7 +15,7 @@ test('fixed bounded Responses request, disabled by default, synthetic transport 
     calls++;
     assert.equal(url, 'https://api.openai.com/v1/responses');
     assert.equal(init.method, 'POST');
-    assert.equal(init.redirect, 'error');
+    assert.equal(init.redirect, 'manual');
     assert.equal(init.headers.Authorization, 'Bearer synthetic-only');
     assert.equal(init.headers['X-Client-Request-Id'], ownerContext.attemptId);
     assert.deepEqual(JSON.parse(init.body), { model: 'gpt-5.4-nano', input: 'Reply with OK.', max_output_tokens: 32,

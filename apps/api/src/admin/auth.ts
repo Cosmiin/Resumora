@@ -49,7 +49,12 @@ export async function authorizeOwner(request: Request, env: AdminAuthConfig, tra
       || (claims.nbf !== undefined && (!Number.isSafeInteger(claims.nbf) || (claims.nbf as number) > seconds))
       || (claims.iat !== undefined && (!Number.isSafeInteger(claims.iat) || (claims.iat as number) > seconds))) throw new Error('INVALID_JWT');
     // The URL is pinned to server configuration; never follow token URLs or redirects.
-    const response = await transport(jwksUrl.href, { signal: AbortSignal.timeout(3000), redirect: 'error', headers: { Accept: 'application/json' } });
+    const response = await transport(jwksUrl.href, { signal: AbortSignal.timeout(3000), redirect: 'manual', headers: { Accept: 'application/json' } });
+    // Workers supports manual/follow only. Reject returned redirects before reading keys.
+    if (response.status >= 300 && response.status < 400) {
+      await response.body?.cancel();
+      throw new Error('JWKS_REDIRECT_REJECTED');
+    }
     if (!response.ok) throw new Error('JWKS_UNAVAILABLE');
     const keys = object(await boundedJson(response, 32_768)).keys;
     if (!Array.isArray(keys) || keys.length > 20) throw new Error('INVALID_JWKS');
