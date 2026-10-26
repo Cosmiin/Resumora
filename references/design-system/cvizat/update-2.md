@@ -1,6 +1,6 @@
 # Second design export · receipt and changes
 
-Received 2026-10-25 from `C:\Users\mcosm\Downloads\CVizat Design System (2).zip` (read at `/mnt/c/Users/mcosm/Downloads/CVizat Design System (2).zip`). The [committed archive](CVizat%20Design%20System%20%282%29.zip) is the current supplied design reference for future review. Frontend application development remains on hold. Nothing in this receipt approves product scope or implements a feature.
+Received 2026-10-25 from `C:\Users\mcosm\Downloads\CVizat Design System (2).zip` (read at `/mnt/c/Users/mcosm/Downloads/CVizat Design System (2).zip`). The [committed archive](CVizat%20Design%20System%20%282%29.zip) is the current supplied design reference. Nothing in this receipt approves product scope or implements a feature.
 
 | Export | Archive bytes | Entries | Uncompressed bytes | SHA-256 |
 |---|---:|---:|---:|---|

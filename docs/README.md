@@ -1,6 +1,6 @@
 # Resumora documentation
 
-Start with the [customer-journey reference](product/customer-journeys.md) for registration, password recovery/change, CV import/enrichment, job review/tailoring/export and account/application lifecycle. It distinguishes planned behavior, design examples and implemented local foundation; frontend application development remains on hold.
+Start with the [customer-journey reference](product/customer-journeys.md) for registration, password recovery/change, CV import/enrichment, job review/tailoring/export and account/application lifecycle. It distinguishes planned behavior and design examples from the local application; the [Base CV guide](frontend/base-cv.md) owns its current scope and review instructions.
 
 - [Product requirements](product/prd.md) and [open decisions](../research/strategy/publication/docs/product/decisions.md).
 - [Design-system adoption](frontend/design-system-adoption.md) and [updated reference receipt](../references/design-system/cvizat/update-2.md).

@@ -110,7 +110,7 @@ it("adds skills with Enter, comma and paste; edits/cancels/removes and keyboard-
   const { user, adapter } = await openManual();
   await openSection(user, "Competențe tehnice");
   const chips = input("Competențe tehnice");
-  expect(document.activeElement).toBe(chips);
+  await waitFor(() => expect(document.activeElement).toBe(chips));
   await user.keyboard("React{Enter}Node,SQL{Enter}");
   await user.paste("CSS, TypeScript, Git");
   expect(screen.getByRole("button", { name: "React" })).toBeTruthy();
