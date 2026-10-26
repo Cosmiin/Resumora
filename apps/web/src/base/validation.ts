@@ -12,7 +12,7 @@ export type Issue = {
     | "prose"
     | "truth";
 };
-export function validateDraft(d: BaseDraft, _acknowledged = true): Issue[] {
+export function validateDraft(d: BaseDraft): Issue[] {
   const issues: Issue[] = [];
   if (!d.nameParts?.first.trim())
     issues.push({ field: "first-name", code: "required" });

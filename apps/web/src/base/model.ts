@@ -294,15 +294,5 @@ export function allFacts(d: BaseDraft): Fact[] {
     (s) => sectionFacts(d, s),
   );
 }
-export function confirmSection(d: BaseDraft, section: string): BaseDraft {
-  const next = clone(d);
-  for (const f of sectionFacts(next, section).filter((f) =>
-    hasValue(f.value),
-  )) {
-    f.status = "user_confirmed";
-    f.confirmedAt = new Date().toISOString();
-  }
-  return next;
-}
 export const isAuthored = (f: Fact) =>
   f.status === "user_confirmed" || f.status === "user_authored";

@@ -44,13 +44,22 @@ export function setContributions(
   const next = clone(draft);
   const role = next.roles.find((r) => r.id === roleId)!;
   const lines = richLines(html);
-  const removed = role.bullets.slice(lines.length);
+  const previous = role.bullets;
+  const available = new Set(previous);
+  const matches = lines.map((value) => {
+    const current = previous.find((f) => available.has(f) && f.value === value);
+    if (current) available.delete(current);
+    return current;
+  });
+  const replacements =
+    matches.filter((f) => !f).length === available.size ? [...available] : [];
   role.bullets = lines.map((value, i) => {
-    const current = role.bullets[i];
+    const current = matches[i] ?? replacements.shift();
     if (!current) return fact(value);
     replaceFact(next, current, editFact(current, value));
     return current;
   });
+  const removed = previous.filter((f) => !role.bullets.includes(f));
   for (const answer of next.answers)
     if (removed.some((f) => f.id === answer.factId)) delete answer.factId;
   next.presentation.contributionHtml = {
@@ -138,8 +147,10 @@ export function safeRichHtml(value: string): string {
 }
 export function richLines(value: string): string[] {
   const doc = new DOMParser().parseFromString(safeRichHtml(value), "text/html");
-  for (const el of Array.from(doc.body.querySelectorAll("li,p,div,br")))
+  for (const el of Array.from(doc.body.querySelectorAll("li,p,div,ul,ol,br"))) {
+    el.before(doc.createTextNode("\n"));
     el.after(doc.createTextNode("\n"));
+  }
   return (doc.body.textContent ?? "")
     .split("\n")
     .map((s) => s.trim())

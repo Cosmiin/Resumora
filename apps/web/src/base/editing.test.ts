@@ -257,6 +257,131 @@ it("keeps role answer links and formatted contributions consistent through previ
   );
 });
 
+it.each([
+  ["New", "Answer A", "Answer B"],
+  ["Answer A", "New", "Answer B"],
+  ["Answer A", "Answer B", "New"],
+  ["Answer B", "Answer A"],
+  ["Answer B"],
+  ["Answer A"],
+])(
+  "retains surviving answer identities after bulk contributions become %j",
+  (...lines) => {
+    const d = blankDraft(),
+      role = newRole();
+    d.roles.push(role);
+    let enriched = d;
+    for (const [id, text, question] of [
+      ["a", "Answer A", "context"],
+      ["b", "Answer B", "tools"],
+    ] as const) {
+      enriched = applyAnswer(
+        enriched,
+        {
+          id,
+          text,
+          question,
+          targetId: role.id,
+          status: "draft",
+          mode: "append",
+        },
+        role.context.id,
+      );
+    }
+    const original = clone(enriched);
+    const edited = setContributions(
+      enriched,
+      role.id,
+      lines.map((line) => `<p><b>${line}</b></p>`).join(""),
+    );
+    expect(edited.roles[0].bullets.map((f) => f.value)).toEqual(lines);
+    for (const saved of enriched.answers) {
+      const answer = edited.answers.find((a) => a.id === saved.id)!;
+      expect(answer.text).toBe(saved.text);
+      expect(answer.sourceId).toBe(saved.sourceId);
+      if (lines.includes(saved.text)) {
+        expect(answer.factId).toBe(saved.factId);
+        expect(
+          edited.roles[0].bullets.find((f) => f.id === saved.factId),
+        ).toEqual(enriched.roles[0].bullets.find((f) => f.id === saved.factId));
+      } else expect(answer.factId).toBeUndefined();
+    }
+    const revising = edited.answers.find((a) => lines.includes(a.text))!;
+    const revised = applyAnswer(
+      edited,
+      {
+        ...revising,
+        text: "Revised answer",
+        status: "draft",
+      },
+      role.context.id,
+    );
+    expect(revised.roles[0].bullets.map((f) => f.value)).toEqual(
+      lines.map((line) => (line === revising.text ? "Revised answer" : line)),
+    );
+    expect(revised.presentation.contributionHtml?.[role.id]).toBeUndefined();
+    expect(enriched).toEqual(original);
+  },
+);
+
+it("preserves duplicate contributions as distinct facts and keeps edited answers linked", () => {
+  const d = blankDraft(),
+    role = newRole();
+  role.bullets = [fact("Same"), fact("Same"), fact("Last")];
+  d.roles.push(role);
+  d.answers = role.bullets.map((f, i) => ({
+    id: `answer-${i}`,
+    targetId: role.id,
+    question: "context",
+    text: f.value,
+    status: "confirmed",
+    mode: "append",
+    factId: f.id,
+  }));
+  const inserted = setContributions(
+    d,
+    role.id,
+    "First<div>Same</div><div>Same</div><div>Last</div>",
+  );
+  expect(inserted.roles[0].bullets.slice(1)).toEqual(role.bullets);
+  expect(inserted.answers).toEqual(d.answers);
+  const edited = setContributions(
+    inserted,
+    role.id,
+    "<p>First</p><p>Same</p><p>Same</p><p>Edited last</p>",
+  );
+  expect(edited.answers[2]).toMatchObject({
+    text: "Edited last",
+    factId: edited.roles[0].bullets[3].id,
+  });
+  expect(edited.roles[0].bullets[3].fieldId).toBe(role.bullets[2].fieldId);
+});
+
+it.each([
+  ["First<div>Second</div>", ["First", "Second"]],
+  ["Before<p>Paragraph</p>After", ["Before", "Paragraph", "After"]],
+  ["<div>First<div>Second</div>Third</div>", ["First", "Second", "Third"]],
+  [
+    "<ul><li>Parent<ul><li>Child</li></ul>Tail</li><li>Sibling</li></ul>",
+    ["Parent", "Child", "Tail", "Sibling"],
+  ],
+  ["<p><b>Bold</b> and <i>italic</i><br>Next</p>", ["Bold and italic", "Next"]],
+  [
+    "Before<ol><li>One</li><li>Two</li></ol>After",
+    ["Before", "One", "Two", "After"],
+  ],
+])("preserves rich text block boundaries for %s", (html, expected) => {
+  expect(richLines(html as string)).toEqual(expected);
+  const d = blankDraft(),
+    role = newRole();
+  d.roles.push(role);
+  expect(
+    setContributions(d, role.id, html as string).roles[0].bullets.map(
+      (f) => f.value,
+    ),
+  ).toEqual(expected);
+});
+
 it("excludes inactive end dates consistently and validates them again after ongoing is cleared", () => {
   const d = blankDraft(),
     r = newRole(),

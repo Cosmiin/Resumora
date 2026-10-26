@@ -121,16 +121,21 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [draft, head]);
-  const refreshHistory = useCallback(async () => {
-    try {
-      setVersions(await adapter.history());
-    } catch {
-      setError("load");
-    }
-  }, [adapter]);
   useEffect(() => {
-    if (route === "history") void refreshHistory();
-  }, [route, refreshHistory]);
+    if (route !== "history") return;
+    let cancelled = false;
+    void adapter.history().then(
+      (history) => {
+        if (!cancelled) setVersions(history);
+      },
+      () => {
+        if (!cancelled) setError("load");
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [route, head?.id, adapter]);
   function change(next: BaseDraft) {
     generation.current++;
     if (draft) setPast((p) => [...p.slice(-49), clone(draft)]);

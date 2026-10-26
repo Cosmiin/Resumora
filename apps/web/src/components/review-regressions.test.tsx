@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -7,7 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { App } from "../App";
 import { MemoryBaseCvAdapter } from "../base/adapter";
 import { applyAnswer } from "../base/enrichment";
@@ -16,6 +17,7 @@ import {
   allFacts,
   blankDraft,
   fact,
+  newEducation,
   newOptionalEntry,
   newRole,
   type BaseDraft,
@@ -415,4 +417,151 @@ it("labels autosave, explicit save and restore snapshots distinctly in history",
   expect(cards[1].textContent).toContain("Explicit save");
   expect(cards[2].textContent).toContain("Autosave");
   expect(cards[2].textContent).not.toContain("Explicit save");
+});
+
+it("preserves answer identity when inserting a native rich-text line before existing answers", async () => {
+  const d = completeIdentity(),
+    role = newRole();
+  role.title = fact("Analist");
+  role.company = fact("Synthetic Co");
+  d.roles.push(role);
+  let enriched = d;
+  for (const [id, question, text] of [
+    ["a", "context", "Answer A"],
+    ["b", "tools", "Answer B"],
+  ] as const)
+    enriched = applyAnswer(
+      enriched,
+      {
+        id,
+        question,
+        text,
+        targetId: role.id,
+        status: "draft",
+        mode: "append",
+      },
+      role.context.id,
+    );
+  const adapter = new MemoryBaseCvAdapter();
+  await adapter.save({
+    draft: enriched,
+    expectedRevision: 0,
+    mode: "autosave",
+    requestId: "initial",
+  });
+  window.location.hash = "#base";
+  const user = userEvent.setup();
+  render(<App adapter={adapter} />);
+  await user.click(
+    await screen.findByText("Experiență profesională", { selector: "summary" }),
+  );
+  const rich = screen.getByRole("textbox", { name: "Contribuții" });
+  rich.innerHTML = "New<div>Answer A</div><div>Answer B</div>";
+  fireEvent.input(rich);
+  await user.click(screen.getByRole("link", { name: "Îmbunătățește" }));
+  const answer = await screen.findByRole("textbox", {
+    name: "Care erau responsabilitățile tale de zi cu zi?",
+  });
+  expect((answer as HTMLTextAreaElement).value).toBe("Answer A");
+  const preview = screen.getByRole("complementary", {
+    name: "Previzualizare CV",
+  });
+  expect(within(preview).getByText("New")).toBeTruthy();
+  await user.clear(answer);
+  await user.type(answer, "Revised A{Control>}{Enter}{/Control}");
+  expect(within(preview).getAllByText("Revised A")).toHaveLength(1);
+  expect(within(preview).getAllByText("Answer B")).toHaveLength(1);
+  expect(within(preview).queryByText("Answer A")).toBeNull();
+  await waitFor(
+    async () => {
+      const saved = (await adapter.load())!.draft;
+      expect(saved.roles[0].bullets.map((f) => f.value)).toEqual([
+        "New",
+        "Revised A",
+        "Answer B",
+      ]);
+      expect(saved.answers.find((a) => a.id === "b")!.factId).toBe(
+        enriched.answers.find((a) => a.id === "b")!.factId,
+      );
+    },
+    { timeout: 2000 },
+  );
+});
+
+it("saves education with an inactive partial end date and focuses that retained date when ongoing is cleared", async () => {
+  const d = completeIdentity(),
+    education = newEducation(),
+    language = newOptionalEntry();
+  education.institution = fact("Synthetic University");
+  education.start = fact({ year: "2020", month: "" });
+  education.end = fact({ year: "", month: "2" });
+  d.education.push(education);
+  language.title = fact("Română");
+  language.proficiency = fact("Native");
+  d.optionalSections[0].entries.push(language);
+  const adapter = new MemoryBaseCvAdapter();
+  await adapter.save({
+    draft: d,
+    expectedRevision: 0,
+    mode: "autosave",
+    requestId: "initial",
+  });
+  window.location.hash = "#base";
+  const user = userEvent.setup();
+  render(<App adapter={adapter} />);
+  await user.click(await screen.findByText("Studii", { selector: "summary" }));
+  await user.click(screen.getByRole("checkbox", { name: "În curs" }));
+  await user.keyboard("{Control>}s{/Control}");
+  await waitFor(async () =>
+    expect((await adapter.load())!.reason).toBe("save"),
+  );
+  expect(screen.queryByRole("textbox", { name: "Sfârșit studii" })).toBeNull();
+  expect((await adapter.load())!.draft.education[0].end.value).toEqual({
+    year: "",
+    month: "2",
+  });
+  await user.click(screen.getByRole("checkbox", { name: "În curs" }));
+  await user.keyboard("{Control>}s{/Control}");
+  const end = screen.getByRole("textbox", { name: "Sfârșit studii" });
+  await waitFor(() => expect(document.activeElement).toBe(end));
+  expect((end as HTMLInputElement).value).toBe("02/");
+  expect(end.getAttribute("aria-invalid")).toBe("true");
+});
+
+it("refreshes History after autosave and ignores an older history response arriving later", async () => {
+  const adapter = new MemoryBaseCvAdapter();
+  await adapter.save({
+    draft: completeIdentity(),
+    expectedRevision: 0,
+    mode: "autosave",
+    requestId: "initial",
+  });
+  const history = adapter.history.bind(adapter);
+  let releaseHistory: () => void = () => {};
+  vi.spyOn(adapter, "history").mockImplementationOnce(async () => {
+    const older = await history();
+    await new Promise<void>((resolve) => {
+      releaseHistory = resolve;
+    });
+    return older;
+  });
+  window.location.hash = "#base";
+  const user = userEvent.setup();
+  render(<App adapter={adapter} />);
+  const first = await screen.findByRole("textbox", { name: /Prenume/ });
+  fireEvent.change(first, { target: { value: "Mira" } });
+  await user.click(screen.getByRole("button", { name: "Istoric" }));
+  await screen.findByRole(
+    "button",
+    { name: "Inspectează v2" },
+    { timeout: 2000 },
+  );
+  await act(async () => releaseHistory());
+  await user.click(screen.getByRole("button", { name: "Inspectează v2" }));
+  const preview = screen.getByRole("complementary", {
+    name: "Previzualizare CV",
+  });
+  expect(within(preview).getByText("Mira Popescu")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Inspectează v1" })).toBeTruthy();
+  expect((await adapter.load())!.revision).toBe(2);
 });

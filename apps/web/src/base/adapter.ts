@@ -24,7 +24,6 @@ export interface BaseCvAdapter {
   save(input: {
     draft: BaseDraft;
     expectedRevision: number;
-    acknowledged?: boolean;
     mode?: "autosave" | "checkpoint";
     requestId: string;
   }): Promise<Snapshot>;
@@ -72,7 +71,6 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
   async save(input: {
     draft: BaseDraft;
     expectedRevision: number;
-    acknowledged?: boolean;
     mode?: "autosave" | "checkpoint";
     requestId: string;
   }) {

@@ -5,8 +5,6 @@ import { MemoryBaseCvAdapter, AdapterError } from "./adapter";
 import {
   blankDraft,
   clone,
-  confirmSection,
-  coreSections,
   editFact,
   fact,
   newRole,
@@ -18,9 +16,6 @@ import { dateError, durationBounds, reversedDates } from "./dates";
 import { maraReviewDraft } from "./fixture";
 import { applyAnswer } from "./enrichment";
 import { selectDocument, validateDraft } from "./validation";
-function confirmed(d: BaseDraft) {
-  return coreSections.reduce((next, s) => confirmSection(next, s), d);
-}
 function initial() {
   const d = blankDraft();
   d.name = fact("Persoană Fictivă");
@@ -39,13 +34,12 @@ function initial() {
   language.title = fact("Română");
   language.proficiency = fact("Native");
   d.optionalSections[0].entries.push(language);
-  return confirmed(d);
+  return d;
 }
 function input(draft: BaseDraft, expectedRevision = 0) {
   return {
     draft,
     expectedRevision,
-    acknowledged: true,
     requestId: crypto.randomUUID(),
   };
 }
@@ -88,7 +82,7 @@ describe("memory adapter through public operations", () => {
       saved = await adapter.save(write);
     expect(await adapter.save(write)).toEqual(saved);
     await expect(
-      adapter.save({ ...write, acknowledged: false }),
+      adapter.save({ ...write, mode: "autosave" }),
     ).rejects.toMatchObject({ code: "requestMismatch" });
     const edited = initial();
     edited.name = editFact(edited.name, "Other");
@@ -165,11 +159,6 @@ describe("date and review boundaries", () => {
     expect(
       allFacts(draft).find((f) => f.sourceClaimId === "claim_resp_a")!.status,
     ).toBe("extracted_unconfirmed");
-    const reviewed = confirmSection(draft, "experience");
-    expect(
-      allFacts(reviewed).find((f) => f.sourceClaimId === "claim_resp_a")!
-        .status,
-    ).toBe("user_confirmed");
     expect(maraReviewDraft()).toEqual(draft);
     const edited = editFact(draft.name, "Changed by caller");
     expect(edited.id).not.toBe(draft.name.id);
@@ -193,7 +182,7 @@ describe("date and review boundaries", () => {
     expect(selectDocument({ name: "empty.docx", size: 0 })).toMatchObject({
       state: "unsupported",
     });
-    expect(validateDraft(initial(), true)).toEqual([]);
+    expect(validateDraft(initial())).toEqual([]);
   });
 });
 describe("enrichment source lineage", () => {
