@@ -8,17 +8,19 @@ export function Visibility({
   label,
   visible,
   toggle,
+  keyboardReachable = false,
 }: {
   label: string;
   visible: boolean;
   toggle: () => void;
+  keyboardReachable?: boolean;
 }) {
   const t = useCopy();
   return (
     <button
       type="button"
       className="icon-button visibility"
-      tabIndex={-1}
+      tabIndex={keyboardReachable ? 0 : -1}
       aria-label={`${visible ? t("Ascunde", "Hide") : t("Arată", "Show")}: ${label}`}
       aria-pressed={visible}
       title={t("Vizibilitate · Alt+V în câmp", "Visibility · Alt+V in field")}

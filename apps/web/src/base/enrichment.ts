@@ -1,5 +1,4 @@
 import {
-  allFacts,
   clone,
   editFact,
   fact,
@@ -7,22 +6,28 @@ import {
   type Answer,
   type BaseDraft,
   type Fact,
+  type Role,
+  type OptionalEntry,
 } from "./model";
+import { replaceFact } from "./editing";
 export function enrichmentTarget(
   draft: BaseDraft,
   id: string,
-): { field: Fact<string>; label: string } | null {
+): { field: Fact<string>; label: string; entry: Role | OptionalEntry } | null {
   const role = draft.roles.find((r) => r.id === id);
   if (role)
     return {
       field: role.context,
+      entry: role,
       label: [role.title.value, role.company.value].filter(Boolean).join(" · "),
     };
   const entry = draft.optionalSections
     .filter((s) => s.kind !== "languages")
     .flatMap((s) => s.entries)
     .find((e) => e.id === id);
-  return entry ? { field: entry.details, label: entry.title.value } : null;
+  return entry
+    ? { field: entry.details, label: entry.title.value, entry }
+    : null;
 }
 export function applyAnswer(
   draft: BaseDraft,
@@ -44,27 +49,22 @@ export function applyAnswer(
     text: answer.text,
     locator: answer.targetId,
   });
-  const role = next.roles.find((r) => r.id === answer.targetId);
   const prior = answer.factId
-    ? allFacts(next).find((f) => f.id === answer.factId)
+    ? [target.field, ...(target.entry.bullets ?? [])].find(
+        (f) => f.id === answer.factId,
+      )
     : undefined;
   let result: Fact<string>;
-  if (prior && typeof prior.value === "string") {
-    result = { ...editFact(prior as Fact<string>, answer.text), sourceId };
-    Object.assign(prior, result);
-  } else if (role && answer.mode === "append") {
+  if (prior) {
+    result = { ...editFact(prior, answer.text), sourceId };
+    replaceFact(next, prior, result);
+  } else if (answer.mode === "append") {
     result = { ...fact(answer.text), sourceId };
-    role.bullets.push(result);
-    // Existing formatting is presentation; fall back to the complete factual list after an append.
-    if (next.presentation.contributionHtml)
-      delete next.presentation.contributionHtml[role.id];
+    (target.entry.bullets ??= []).push(result);
+    delete next.presentation.contributionHtml?.[target.entry.id];
   } else {
-    const value =
-      answer.mode === "replace"
-        ? answer.text
-        : [target.field.value, answer.text].filter(Boolean).join("\n");
-    result = { ...editFact(target.field, value), sourceId };
-    Object.assign(target.field, result);
+    result = { ...editFact(target.field, answer.text), sourceId };
+    replaceFact(next, target.field, result);
   }
   next.answers = [
     ...next.answers.filter((a) => a.id !== answer.id),

@@ -221,11 +221,24 @@ export function DocumentPreview({
                 )}
             </h4>
             {text(e.details) && <p>{editable(e.details)}</p>}
+            {e.bullets?.some((f) => text(f)) && (
+              <ul>
+                {e.bullets
+                  .filter((f) => text(f))
+                  .map((f) => (
+                    <li key={f.fieldId}>{editable(f)}</li>
+                  ))}
+              </ul>
+            )}
             {s.kind !== "languages" &&
-              (hasValue(e.start.value) || hasValue(e.end.value)) && (
+              (hasValue(e.start.value) ||
+                hasValue(e.end.value) ||
+                e.ongoing?.value) && (
                 <p className="document-meta">
                   {block(date(e.start), e.start.fieldId)} —{" "}
-                  {block(date(e.end), e.end.fieldId)}
+                  {e.ongoing?.value && (live || isAuthored(e.ongoing))
+                    ? block(cv("În curs", "Ongoing"), e.ongoing.fieldId)
+                    : block(date(e.end), e.end.fieldId)}
                 </p>
               )}
           </div>

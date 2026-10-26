@@ -500,13 +500,7 @@ textarea.native {
   font-size: 0.84rem;
   line-height: 1.5;
 }
-.fact-status {
-  color: var(--marigold-800);
-  font-size: 0.75rem;
-}
-.fact-status.confirmed {
-  color: var(--status-good-fg);
-}
+
 .check {
   display: flex;
   gap: 10px;
@@ -549,17 +543,7 @@ textarea.native {
 .section-heading {
   margin-bottom: 18px;
 }
-.entry-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.entry-actions .btn {
-  padding: 8px;
-  min-width: 44px;
-  min-height: 44px;
-  box-shadow: none;
-}
+
 .skill-row,
 .bullet-row {
   display: flex;
@@ -573,28 +557,7 @@ textarea.native {
 .bullet-row {
   align-items: center;
 }
-.date-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 10px;
-}
-.date-grid label {
-  display: grid;
-  gap: 7px;
-  font-size: 0.78rem;
-}
-.date-field {
-  padding: 12px;
-  border-color: var(--sage-200);
-  border-radius: 12px;
-}
-.date-field legend {
-  font-size: 0.82rem;
-}
-.date-field .native {
-  padding: 10px;
-  font-size: 0.85rem;
-}
+
 .add-row {
   display: flex;
   align-items: flex-end;
@@ -724,22 +687,7 @@ textarea.native {
 .duration-note p {
   margin: 5px 0;
 }
-.sources {
-  margin-top: 18px;
-  font-size: 0.85rem;
-  overflow-wrap: anywhere;
-}
-.sources summary {
-  cursor: pointer;
-  font-weight: 650;
-  min-height: 32px;
-}
-.sources div {
-  margin-top: 16px;
-}
-.sources blockquote {
-  margin: 10px 0;
-}
+
 .save-bar {
   display: flex;
   align-items: center;
@@ -956,18 +904,14 @@ dialog p {
     display: grid;
     gap: 8px;
   }
-  .entry-actions {
-    justify-content: flex-end;
-  }
+
   .entry {
     padding: 14px;
   }
   .field-grid {
     grid-template-columns: 1fr;
   }
-  .date-grid {
-    grid-template-columns: 1fr 1.25fr;
-  }
+
   .save-bar {
     padding: 16px;
   }

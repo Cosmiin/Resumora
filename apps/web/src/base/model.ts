@@ -65,6 +65,7 @@ export type OptionalEntry = {
   id: string;
   title: Fact<string>;
   details: Fact<string>;
+  bullets?: Fact<string>[];
   start: Fact<PartialDate>;
   end: Fact<PartialDate>;
   proficiency?: Fact<string>;
@@ -270,7 +271,7 @@ export function sectionFacts(d: BaseDraft, section: string): Fact[] {
       e.field,
       e.location,
       e.start,
-      e.end,
+      ...(!e.ongoing?.value ? [e.end] : []),
       e.details,
       ...(e.ongoing ? [e.ongoing] : []),
     ]);
@@ -280,8 +281,10 @@ export function sectionFacts(d: BaseDraft, section: string): Fact[] {
       ?.entries.flatMap((e) => [
         e.title,
         e.details,
+        ...(e.bullets ?? []),
         e.start,
-        e.end,
+        ...(!e.ongoing?.value ? [e.end] : []),
+        ...(e.ongoing ? [e.ongoing] : []),
         ...(e.proficiency ? [e.proficiency] : []),
       ]) ?? []
   );
@@ -301,13 +304,5 @@ export function confirmSection(d: BaseDraft, section: string): BaseDraft {
   }
   return next;
 }
-export function reorder<T>(items: T[], index: number, direction: -1 | 1): T[] {
-  const next = [...items],
-    other = index + direction;
-  if (index < 0 || other < 0 || other >= next.length) return next;
-  [next[index], next[other]] = [next[other], next[index]];
-  return next;
-}
-
 export const isAuthored = (f: Fact) =>
   f.status === "user_confirmed" || f.status === "user_authored";

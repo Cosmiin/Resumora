@@ -7,7 +7,6 @@ import {
 } from "react";
 import { Info, Plus, X } from "lucide-react";
 import {
-  allFacts,
   clone,
   editFact,
   fact,
@@ -28,7 +27,7 @@ import {
   moveItem,
   focusField,
   languageLevels,
-  richLines,
+  setContributions,
 } from "../base/editing";
 import { sectionName } from "../base/sections";
 import type { Issue } from "../base/validation";
@@ -401,19 +400,7 @@ export function Editor({ draft: d, issues, change }: Props) {
       <Contributions
         id={`${role.id}-contributions`}
         html={html}
-        onChange={(value) =>
-          update((n) => {
-            const r = n.roles.find((x) => x.id === role.id)!;
-            const lines = richLines(value);
-            r.bullets = lines.map((v, i) =>
-              r.bullets[i] ? editFact(r.bullets[i], v) : fact(v),
-            );
-            n.presentation.contributionHtml = {
-              ...n.presentation.contributionHtml,
-              [role.id]: value,
-            };
-          })
-        }
+        onChange={(value) => change(setContributions(d, role.id, value))}
       />,
     );
   }
@@ -492,6 +479,7 @@ export function Editor({ draft: d, issues, change }: Props) {
                 onClick={() =>
                   update((n) => {
                     n.roles.splice(i, 1);
+                    n.answers = n.answers.filter((a) => a.targetId !== r.id);
                   })
                 }
               >
@@ -555,6 +543,7 @@ export function Editor({ draft: d, issues, change }: Props) {
                     date(e.end, t("Sfârșit studii", "Education end"))}
                   <label className="current-job">
                     <input
+                      id={e.ongoing?.fieldId ?? `${e.id}-ongoing`}
                       type="checkbox"
                       checked={!!e.ongoing?.value}
                       onChange={(ev) =>
@@ -622,6 +611,14 @@ export function Editor({ draft: d, issues, change }: Props) {
             ? t("Adaugă limbă", "Add language")
             : t("Adaugă intrare", "Add entry")}
         </Button>
+        {isLanguage && issues.some((i) => i.field === `section-${s.id}`) && (
+          <p className="field-error" role="alert">
+            {t(
+              "Adaugă cel puțin o limbă și alege nivelul autoevaluat.",
+              "Add at least one language and choose its self-assessed level.",
+            )}
+          </p>
+        )}
         {s.entries.map((e, i) => (
           <Sortable
             key={e.id}
@@ -643,70 +640,128 @@ export function Editor({ draft: d, issues, change }: Props) {
                   { required: true },
                 )}
                 {isLanguage ? (
-                  <div className="field">
-                    <label htmlFor={e.proficiency?.fieldId ?? `${e.id}-level`}>
-                      {t("Nivel autoevaluat", "Self-assessed level")}
-                    </label>
-                    <select
-                      id={e.proficiency?.fieldId ?? `${e.id}-level`}
-                      value={e.proficiency?.value ?? ""}
-                      aria-describedby={`${e.id}-cefr`}
-                      onChange={(ev) =>
-                        update((n) => {
-                          n.optionalSections.find(
-                            (x) => x.id === s.id,
-                          )!.entries[i].proficiency = editFact(
-                            e.proficiency ?? fact(""),
-                            ev.target.value,
-                          );
-                        })
-                      }
-                    >
-                      {languageLevels.map((level) => (
-                        <option key={level} value={level}>
-                          {level === ""
-                            ? t("Alege nivelul", "Choose a level")
-                            : level === "Native"
-                              ? t("Nativ", "Native")
-                              : t(
-                                  (
-                                    {
-                                      A1: "A1 · Începător",
-                                      A2: "A2 · Elementar",
-                                      B1: "B1 · Intermediar",
-                                      B2: "B2 · Independent",
-                                      C1: "C1 · Avansat",
-                                      C2: "C2 · Stăpânire",
-                                    } as Record<string, string>
-                                  )[level] ?? level,
-                                  (
-                                    {
-                                      A1: "A1 · Beginner",
-                                      A2: "A2 · Elementary",
-                                      B1: "B1 · Intermediate",
-                                      B2: "B2 · Independent",
-                                      C1: "C1 · Advanced",
-                                      C2: "C2 · Proficient",
-                                    } as Record<string, string>
-                                  )[level] ?? level,
-                                )}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="field-hint" id={`${e.id}-cefr`}>
-                      {t(
-                        "CEFR: nivel european autoevaluat; Nativ separat, fără certificare.",
-                        "CEFR: self-assessed European level; Native separate, no certification.",
+                  box(
+                    e.proficiency?.fieldId ?? `${e.id}-level`,
+                    t("Nivel autoevaluat", "Self-assessed level"),
+                    <div className="field">
+                      <label
+                        htmlFor={e.proficiency?.fieldId ?? `${e.id}-level`}
+                      >
+                        {t("Nivel autoevaluat", "Self-assessed level")}
+                      </label>
+                      <select
+                        id={e.proficiency?.fieldId ?? `${e.id}-level`}
+                        value={e.proficiency?.value ?? ""}
+                        aria-required="true"
+                        aria-invalid={issues.some(
+                          (i) =>
+                            i.field ===
+                            (e.proficiency?.fieldId ?? `${e.id}-level`),
+                        )}
+                        aria-describedby={`${e.id}-cefr${issues.some((i) => i.field === (e.proficiency?.fieldId ?? `${e.id}-level`)) ? ` ${e.id}-level-error` : ""}`}
+                        onChange={(ev) =>
+                          update((n) => {
+                            n.optionalSections.find(
+                              (x) => x.id === s.id,
+                            )!.entries[i].proficiency = {
+                              ...editFact(
+                                e.proficiency ?? fact(""),
+                                ev.target.value,
+                              ),
+                              fieldId:
+                                e.proficiency?.fieldId ?? `${e.id}-level`,
+                            };
+                          })
+                        }
+                      >
+                        {languageLevels.map((level) => (
+                          <option key={level} value={level}>
+                            {level === ""
+                              ? t("Alege nivelul", "Choose a level")
+                              : level === "Native"
+                                ? t("Nativ", "Native")
+                                : t(
+                                    (
+                                      {
+                                        A1: "A1 · Începător",
+                                        A2: "A2 · Elementar",
+                                        B1: "B1 · Intermediar",
+                                        B2: "B2 · Independent",
+                                        C1: "C1 · Avansat",
+                                        C2: "C2 · Stăpânire",
+                                      } as Record<string, string>
+                                    )[level] ?? level,
+                                    (
+                                      {
+                                        A1: "A1 · Beginner",
+                                        A2: "A2 · Elementary",
+                                        B1: "B1 · Intermediate",
+                                        B2: "B2 · Independent",
+                                        C1: "C1 · Advanced",
+                                        C2: "C2 · Proficient",
+                                      } as Record<string, string>
+                                    )[level] ?? level,
+                                  )}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="field-hint" id={`${e.id}-cefr`}>
+                        {t(
+                          "CEFR: nivel european autoevaluat; Nativ separat, fără certificare.",
+                          "CEFR: self-assessed European level; Native separate, no certification.",
+                        )}
+                      </p>
+                      {issues.some(
+                        (i) =>
+                          i.field ===
+                          (e.proficiency?.fieldId ?? `${e.id}-level`),
+                      ) && (
+                        <p className="field-error" id={`${e.id}-level-error`}>
+                          {t(
+                            "Alege un nivel autoevaluat: Nativ sau A1–C2.",
+                            "Choose a self-assessed level: Native or A1–C2.",
+                          )}
+                        </p>
                       )}
-                    </p>
-                  </div>
+                    </div>,
+                  )
                 ) : (
                   <>
                     {field(e.details, t("Detalii", "Details"), {
                       multiline: true,
                     })}
+                    {e.bullets?.map((f) => (
+                      <div key={f.fieldId}>
+                        {field(
+                          f,
+                          t("Răspuns de îmbunătățire", "Enrichment answer"),
+                          { multiline: true },
+                        )}
+                      </div>
+                    ))}
                     {date(e.start, t("Început", "Start"))}
-                    {date(e.end, t("Sfârșit", "End"))}
+                    <div>
+                      {!e.ongoing?.value && date(e.end, t("Sfârșit", "End"))}
+                      <label className="current-job">
+                        <input
+                          id={e.ongoing?.fieldId ?? `${e.id}-ongoing`}
+                          type="checkbox"
+                          checked={!!e.ongoing?.value}
+                          onChange={(ev) =>
+                            update((n) => {
+                              const entry = n.optionalSections.find(
+                                (x) => x.id === s.id,
+                              )!.entries[i];
+                              entry.ongoing = editFact(
+                                entry.ongoing ?? fact(false),
+                                ev.target.checked,
+                              );
+                            })
+                          }
+                        />
+                        {t("Prezent / În curs", "Present / Ongoing")}
+                      </label>
+                    </div>
                   </>
                 )}
               </div>
@@ -718,6 +773,7 @@ export function Editor({ draft: d, issues, change }: Props) {
                     n.optionalSections
                       .find((x) => x.id === s.id)!
                       .entries.splice(i, 1);
+                    n.answers = n.answers.filter((a) => a.targetId !== e.id);
                   })
                 }
               >
@@ -732,6 +788,9 @@ export function Editor({ draft: d, issues, change }: Props) {
             className="text-remove"
             onClick={() =>
               update((n) => {
+                n.answers = n.answers.filter(
+                  (a) => !s.entries.some((e) => e.id === a.targetId),
+                );
                 n.optionalSections = n.optionalSections.filter(
                   (x) => x.id !== s.id,
                 );
@@ -838,6 +897,7 @@ export function Editor({ draft: d, issues, change }: Props) {
           >
             <span>{sectionName(section, locale, d)}</span>
             <Visibility
+              keyboardReachable
               label={sectionName(section, locale, d)}
               visible={!d.presentation.hidden.includes(section)}
               toggle={() =>

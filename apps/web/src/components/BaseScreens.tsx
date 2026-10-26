@@ -160,52 +160,6 @@ export function StartChooser({ start }: { start: (draft: BaseDraft) => void }) {
     </div>
   );
 }
-export function Sources({ draft }: { draft: BaseDraft }) {
-  const t = useCopy();
-  return (
-    draft && (
-      <details className="card sources">
-        <summary>
-          {t("Surse și informații de verificat", "Sources and facts to review")}
-        </summary>
-        {draft.sources.map((s) => (
-          <div key={s.id}>
-            <h3>
-              {s.kind === "manual"
-                ? t("Introducere manuală", "Manual entry")
-                : s.kind === "answer"
-                  ? t("Răspunsul tău", "Your answer")
-                  : t("Exemplu sintetic Mara", "Synthetic Mara example")}
-            </h3>
-            {s.text && <blockquote>{s.text}</blockquote>}
-            {s.locator && <p className="small">{s.locator}</p>}
-            <p className="small muted">
-              {s.kind === "fixture" ? s.label : s.id}
-            </p>
-          </div>
-        ))}
-        {draft.referenceProse.map((p) => (
-          <div className="notice" key={p.id}>
-            <b>
-              {t(
-                "Text de referință · în așteptare · nefolosit în CV",
-                "Reference wording · pending · unused in CV",
-              )}
-            </b>
-            <p>{p.text}</p>
-            <small>{p.claimIds.join(", ")}</small>
-          </div>
-        ))}
-        <p className="small">
-          {t(
-            "Identificatorii example/dev sunt referințe locale, nu ID-uri de bază de date. Confirmarea este auto-declarată.",
-            "example/dev identifiers are local references, not database IDs. Confirmation is self-reported.",
-          )}
-        </p>
-      </details>
-    )
-  );
-}
 export function HomeScreen({
   draft,
   head,
@@ -371,7 +325,9 @@ export function HistoryScreen({
                 <p className="small">
                   {v.reason === "restore"
                     ? t("Restaurare · copie nouă", "Restore · new copy")
-                    : t("Salvare explicită", "Explicit save")}{" "}
+                    : v.reason === "autosave"
+                      ? t("Salvare automată", "Autosave")
+                      : t("Salvare explicită", "Explicit save")}{" "}
                   · {v.draft.language.toUpperCase()}
                 </p>
                 <Button onClick={() => setInspected(v)}>

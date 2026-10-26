@@ -17,12 +17,46 @@ export function patchFact<T extends FactValue>(
   const next = clone(draft);
   const current = allFacts(next).find((f) => f.fieldId === field.fieldId);
   if (current) {
-    const updated = editFact(field, value);
-    // Replace obsolete evidence pointers; editFact retains their source lineage.
-    for (const key of Object.keys(current))
-      delete (current as unknown as Record<string, unknown>)[key];
-    Object.assign(current, updated);
+    replaceFact(next, current, editFact(current as Fact<T>, value));
   }
+  return next;
+}
+export function replaceFact(draft: BaseDraft, current: Fact, updated: Fact) {
+  if (current === updated) return;
+  for (const answer of draft.answers) {
+    if (answer.factId === current.id) {
+      answer.factId = updated.id;
+      if (typeof updated.value === "string") answer.text = updated.value;
+    }
+  }
+  for (const role of draft.roles)
+    if (role.bullets.includes(current as Fact<string>))
+      delete draft.presentation.contributionHtml?.[role.id];
+  for (const key of Object.keys(current))
+    delete (current as unknown as Record<string, unknown>)[key];
+  Object.assign(current, updated);
+}
+export function setContributions(
+  draft: BaseDraft,
+  roleId: string,
+  html: string,
+) {
+  const next = clone(draft);
+  const role = next.roles.find((r) => r.id === roleId)!;
+  const lines = richLines(html);
+  const removed = role.bullets.slice(lines.length);
+  role.bullets = lines.map((value, i) => {
+    const current = role.bullets[i];
+    if (!current) return fact(value);
+    replaceFact(next, current, editFact(current, value));
+    return current;
+  });
+  for (const answer of next.answers)
+    if (removed.some((f) => f.id === answer.factId)) delete answer.factId;
+  next.presentation.contributionHtml = {
+    ...next.presentation.contributionHtml,
+    [roleId]: safeRichHtml(html),
+  };
   return next;
 }
 export function moveItem<T>(items: T[], from: number, to: number): T[] {
@@ -36,13 +70,19 @@ export function focusField(id: string) {
   requestAnimationFrame(() => {
     const el = document.getElementById(id);
     if (!el) return;
-    let ancestor = el.parentElement;
+    let ancestor: HTMLElement | null = el;
     while (ancestor) {
       if (ancestor instanceof HTMLDetailsElement) ancestor.open = true;
       ancestor = ancestor.parentElement;
     }
-    el.focus();
-    el.scrollIntoView?.({ block: "nearest", behavior: "instant" });
+    const control =
+      el instanceof HTMLDetailsElement
+        ? el.querySelector<HTMLElement>(
+            "input,textarea,select,[contenteditable=true],button",
+          )
+        : el;
+    control?.focus();
+    control?.scrollIntoView?.({ block: "nearest", behavior: "instant" });
   });
 }
 export function dateInput(value: { year: string; month: string }) {

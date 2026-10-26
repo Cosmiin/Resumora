@@ -156,20 +156,27 @@ export function Enrichment({
       </section>
     );
   const preview = clone(d),
-    previewRole = preview.roles.find((r) => r.id === targetId),
     previewTarget = enrichmentTarget(preview, targetId),
     pendingId = `pending-${answer.id}`;
-  if (answer.text.trim() && answer.status === "draft") {
-    if (previewRole)
-      previewRole.bullets.push({
+  if (previewTarget && answer.text.trim() && answer.status === "draft") {
+    const prior = [
+      previewTarget.field,
+      ...(previewTarget.entry.bullets ?? []),
+    ].find((f) => f.id === answer.factId);
+    if (prior || answer.mode === "replace") {
+      Object.assign(prior ?? previewTarget.field, {
+        value: answer.text,
+        fieldId: pendingId,
+        id: pendingId,
+      });
+    } else {
+      (previewTarget.entry.bullets ??= []).push({
         ...fact(answer.text),
         fieldId: pendingId,
         id: pendingId,
       });
-    else if (previewTarget)
-      previewTarget.field.value = [previewTarget.field.value, answer.text]
-        .filter(Boolean)
-        .join("\n");
+    }
+    delete preview.presentation.contributionHtml?.[targetId];
   }
   return (
     <div className="editor-layout enrichment-inline">
@@ -269,7 +276,7 @@ export function Enrichment({
           const f = [
             ...d.roles.flatMap((r) => [r.context, ...r.bullets]),
             ...d.optionalSections.flatMap((s) =>
-              s.entries.map((e) => e.details),
+              s.entries.flatMap((e) => [e.details, ...(e.bullets ?? [])]),
             ),
           ].find((f) => f.fieldId === id);
           if (f) change(patchFact(d, f, text));
