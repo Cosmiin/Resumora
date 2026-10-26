@@ -72,7 +72,7 @@ Stop any running local dev pair first, then run:
 npm run check
 ```
 
-This runs frontend/API type checks, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
+This runs frontend/API type checks, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
 
 To run only the local integration check: `npm run smoke`. Generated `node_modules/`, `dist/` and `.wrangler/` directories are ignored. Native Windows runtime, browser rendering/accessibility and hosted Cloudflare behavior need their own later verification; this foundation was checked in the current WSL/Linux environment.
 

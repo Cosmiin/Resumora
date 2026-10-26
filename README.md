@@ -21,6 +21,8 @@ For the local React frontend and Cloudflare Worker, follow [local development](d
 
 For SQL migrations, database command contracts and native local verification, start with the [database guide](docs/database/README.md). The frontend and Worker do not yet call these commands.
 
+For the synthetic OpenAI cost-dashboard preview and its integration limits, follow [OpenAI/admin preparation](docs/setup/openai-admin.md).
+
 ## Discovery prototype preview
 
 From the repository root, run:
