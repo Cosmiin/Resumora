@@ -1,6 +1,6 @@
 # AI CV Maker V2 — integrated product requirements draft v1.0
 
-Date:2026-10-23. **Discovery review draft; production implementation, release scope, weights, prices and commercial/privacy policy are unapproved.** The separately authorized [local foundation](../setup/local-development.md) does not implement the product journeys. Consolidated review decisions: D-01–14 remain open in the linked strategy register; these do not block review of the discovery proposal. Opening a review is not approval. No production app/backend/infrastructure/payments or model calls have been built or tested.
+Date:2026-10-23. **Discovery review draft; production implementation, release scope, weights, prices and commercial/privacy policy are unapproved.** For the later authorized local implementation and its scoped behavior, see the [Base CV guide](../frontend/base-cv.md). Consolidated review decisions: D-01–14 remain open in the linked strategy register; these do not block review of the discovery proposal. Opening a review is not approval. No production app/backend/infrastructure/payments or model calls have been built or tested.
 
 ## 1. Product problem and desired behavior
 

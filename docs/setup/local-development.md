@@ -1,6 +1,6 @@
 # Local frontend and Worker foundation
 
-This workspace is a runnable **local foundation**, not the CV product or working login/session authentication. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. With default configuration it does not call Supabase, send email, store CVs, set sessions, or use Google OAuth. A configured admin verifier can fetch public Supabase signing keys; no database connection or paid inference is wired. No Cloudflare account, API token or environment file is needed to run it.
+This workspace includes a runnable [**local Base CV slice**](../frontend/base-cv.md), plus the local Worker foundation. Login/session authentication is not implemented. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. With default configuration it does not call Supabase, send email, persist CVs across reloads, set authenticated sessions, or use Google OAuth. A configured admin verifier can fetch public Supabase signing keys; no database connection or paid inference is wired. No Cloudflare account, API token or environment file is needed to run it.
 
 ## Start from a clean checkout
 
@@ -11,9 +11,9 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173/**. The page should show that its frontend can communicate with the API. Both servers bind to loopback; this does not expose a development server to the LAN. Stop the launcher with Ctrl+C; it stops only its own process trees.
+Open **http://127.0.0.1:5173/**. The page opens the Base CV workspace with a clear page-memory persistence boundary. Both servers bind to loopback; this does not expose a development server to the LAN. Stop the launcher with Ctrl+C; it stops only its own process trees.
 
-For separate terminals, use `npm run dev:api` and `npm run dev:web`. The Worker is **http://127.0.0.1:8787/**. The frontend uses relative `/v1/...` requests, which Vite proxies to that Worker. The browser sees one origin (`http://127.0.0.1:5173`); no permissive CORS configuration or browser API key is needed.
+For separate terminals, use `npm run dev:api` and `npm run dev:web`. The Worker is **http://127.0.0.1:8787/**. Vite proxies relative `/v1/...` requests to that Worker; the Base CV memory adapter makes no API requests. The browser sees one origin (`http://127.0.0.1:5173`); no permissive CORS configuration or browser API key is needed.
 
 The proxy preserves the incoming host/origin context rather than claiming all requests came from the API origin. Future session code must still check the actual `Origin` header and CSRF token; the proxy alone is not an authorization control. Keep the `127.0.0.1` hostname consistent: substituting `localhost` changes the origin and can affect future cookies. No HTTPS or cookie security behavior has been proven by this HTTP foundation.
 
@@ -23,13 +23,13 @@ The proxy preserves the incoming host/origin context rather than claiming all re
 
 | Path | Purpose |
 | --- | --- |
-| `apps/web/` | Small Romanian development shell, Vite config and frontend build |
+| `apps/web/` | Romanian-first Base CV app, memory adapter, interaction tests, Vite config and frontend build |
 | `apps/api/` | Worker entry point, protected admin preparation, internal OpenAI adapter and API contract placeholders |
 | `packages/contracts/` | Shared health/error response types; no server bindings or secret values |
 | `scripts/dev.mjs` | Start/stop the local pair together |
 | `scripts/smoke.mjs` | Start a fresh local pair, verify HTTP/proxy behavior, then stop it |
 
-The discovery prototype remains under `prototype/` with its existing independent commands. It is not bundled into this app. The shell uses the established Resumora pine/sage palette and system fonts, without external CDN assets or copying the reference's incomplete login behavior.
+The discovery prototype remains under `prototype/` with its existing independent commands. It is not bundled into this app. The app adopts the supplied Resumora pine/sage tokens and locally bundled fonts/icons, without external CDN requests or the reference's simulated login behavior.
 
 ## Current routes and future auth boundary
 
@@ -72,7 +72,9 @@ Stop any running local dev pair first, then run:
 npm run check
 ```
 
-This runs frontend/API type checks, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
+This runs frontend/API type checks, browser-free React interaction and memory-adapter tests, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
+
+To check frontend formatting separately, run `npm run format:check --workspace @resumora/web`. It checks `apps/web/src/` and `apps/web/vitest.config.ts` with Prettier; it is not included in `npm run check`.
 
 To run only the local integration check: `npm run smoke`. Generated `node_modules/`, `dist/` and `.wrangler/` directories are ignored. Native Windows runtime, browser rendering/accessibility and hosted Cloudflare behavior need their own later verification; this foundation was checked in the current WSL/Linux environment.
 
