@@ -26,6 +26,7 @@ import {
   patchFact,
   moveItem,
   focusField,
+  focusFirstField,
   languageLevels,
   setContributions,
 } from "../base/editing";
@@ -176,17 +177,7 @@ export function Editor({ draft: d, issues, change }: Props) {
   }
   function open(section: string) {
     setOpened(opened === section ? null : section);
-    requestAnimationFrame(() => {
-      const body = document
-        .getElementById(`section-${section}`)
-        ?.querySelector(".section-body");
-      const fields = Array.from(
-        body?.querySelectorAll<HTMLInputElement>(
-          "input:not([type=checkbox]),textarea,[contenteditable=true]",
-        ) ?? [],
-      );
-      (fields.find((f) => !f.value) ?? fields[0])?.focus();
-    });
+    if (opened !== section) focusFirstField(`section-${section}`);
   }
   function metadata(section: string) {
     return (
@@ -390,6 +381,7 @@ export function Editor({ draft: d, issues, change }: Props) {
     const node = document.createElement("div");
     for (const b of role.bullets) {
       const p = document.createElement("p");
+      p.dataset.contribution = b.fieldId;
       p.textContent = b.value;
       node.append(p);
     }
@@ -400,6 +392,12 @@ export function Editor({ draft: d, issues, change }: Props) {
       <Contributions
         id={`${role.id}-contributions`}
         html={html}
+        fieldIds={role.bullets.map((f) => f.fieldId)}
+        error={
+          issues.some((i) => i.field === `${role.id}-contributions`)
+            ? issueText("required", t)
+            : undefined
+        }
         onChange={(value) => change(setContributions(d, role.id, value))}
       />,
     );
@@ -433,10 +431,18 @@ export function Editor({ draft: d, issues, change }: Props) {
             }
           >
             <details
+              id={`entry-${r.id}`}
               className="inline-entry"
               open={entryOpen === r.id || d.roles.length === 1}
               onToggle={(e) => {
-                if (e.currentTarget.open) setEntryOpen(r.id);
+                if (e.currentTarget.open) {
+                  setEntryOpen(r.id);
+                  if (
+                    document.activeElement ===
+                    e.currentTarget.querySelector("summary")
+                  )
+                    focusFirstField(`entry-${r.id}`);
+                }
               }}
             >
               <summary>
@@ -479,7 +485,9 @@ export function Editor({ draft: d, issues, change }: Props) {
                 onClick={() =>
                   update((n) => {
                     n.roles.splice(i, 1);
-                    n.answers = n.answers.filter((a) => a.targetId !== r.id);
+                    for (const a of n.answers)
+                      if (a.targetId === r.id) delete a.cvFieldId;
+                    delete n.presentation.contributionHtml?.[r.id];
                   })
                 }
               >
@@ -520,10 +528,18 @@ export function Editor({ draft: d, issues, change }: Props) {
             }
           >
             <details
+              id={`entry-${e.id}`}
               className="inline-entry"
               open={entryOpen === e.id || d.education.length === 1}
               onToggle={(ev) => {
-                if (ev.currentTarget.open) setEntryOpen(e.id);
+                if (ev.currentTarget.open) {
+                  setEntryOpen(e.id);
+                  if (
+                    document.activeElement ===
+                    ev.currentTarget.querySelector("summary")
+                  )
+                    focusFirstField(`entry-${e.id}`);
+                }
               }}
             >
               <summary>
@@ -773,7 +789,8 @@ export function Editor({ draft: d, issues, change }: Props) {
                     n.optionalSections
                       .find((x) => x.id === s.id)!
                       .entries.splice(i, 1);
-                    n.answers = n.answers.filter((a) => a.targetId !== e.id);
+                    for (const a of n.answers)
+                      if (a.targetId === e.id) delete a.cvFieldId;
                   })
                 }
               >
@@ -788,9 +805,9 @@ export function Editor({ draft: d, issues, change }: Props) {
             className="text-remove"
             onClick={() =>
               update((n) => {
-                n.answers = n.answers.filter(
-                  (a) => !s.entries.some((e) => e.id === a.targetId),
-                );
+                for (const a of n.answers)
+                  if (s.entries.some((e) => e.id === a.targetId))
+                    delete a.cvFieldId;
                 n.optionalSections = n.optionalSections.filter(
                   (x) => x.id !== s.id,
                 );

@@ -330,8 +330,8 @@ it("enrichment autofocuses one question, saves and advances with one shortcut, s
   expect(
     within(
       screen.getByRole("complementary", { name: "Previzualizare CV" }),
-    ).getByText("Am verificat fluxurile, fără procente inventate."),
-  ).toBeTruthy();
+    ).queryByText("Am verificat fluxurile, fără procente inventate."),
+  ).toBeNull();
   await user.keyboard("{Control>}{Enter}{/Control}");
   expect(
     await screen.findByRole("textbox", {
@@ -344,6 +344,12 @@ it("enrichment autofocuses one question, saves and advances with one shortcut, s
       name: "Ce instrumente ai folosit și pentru ce?",
     }),
   ).toBeTruthy();
+  expect(
+    within(
+      screen.getByRole("complementary", { name: "Previzualizare CV" }),
+    ).queryByText("Am verificat fluxurile, fără procente inventate."),
+  ).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Adaugă în CV" }));
   await waitFor(
     async () =>
       expect((await adapter.load())?.draft.roles[0].bullets[0].value).toBe(

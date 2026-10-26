@@ -89,10 +89,11 @@ export type Answer = {
     | "impact"
     | "complexity";
   text: string;
-  status: "draft" | "review" | "confirmed" | "skipped" | "unknown";
-  mode: "append" | "replace";
+  status: "draft" | "confirmed" | "skipped" | "unknown";
+  questionText: string;
+  targetLabel?: string;
   sourceId?: string;
-  factId?: string;
+  cvFieldId?: string;
 };
 export type BaseDraft = {
   id: string;

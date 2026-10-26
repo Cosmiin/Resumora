@@ -3,14 +3,13 @@ import {
   dateInput,
   parseDateInput,
   prepareDraft,
-  richLines,
   richText,
   safeRichHtml,
   patchFact,
   setContributions,
+  readContributions,
 } from "./editing";
 import {
-  allFacts,
   blankDraft,
   clone,
   fact,
@@ -18,7 +17,12 @@ import {
   newOptionalEntry,
   newRole,
 } from "./model";
-import { applyAnswer } from "./enrichment";
+import {
+  saveAnswer,
+  addAnswerToCv,
+  removeAnswerFromCv,
+  enrichmentTarget,
+} from "./enrichment";
 import { MemoryBaseCvAdapter } from "./adapter";
 import { validateDraft } from "./validation";
 it("roundtrips month/year, year-only and empty dates without inventing unknown months", () => {
@@ -47,7 +51,7 @@ it("keeps allowed text/list formatting while eliminating executable elements, re
   expect(doc.querySelectorAll("script,img,svg,[onclick]")).toHaveLength(0);
   expect(doc.querySelector("b")?.textContent).toBe("Own");
   expect(doc.querySelector("ol li")?.textContent).toBe("One");
-  expect(richLines(safe)).toEqual(["Own work", "One"]);
+  expect(richText(safe)).toBe("Own work\nOne");
 });
 it("preserves original imported name and provenance, creates only empty required controls, and changes source lineage on manual editing", () => {
   const d = blankDraft();
@@ -96,329 +100,239 @@ it("saves incomplete drafts without attesting extracted facts and enforces requi
   ).rejects.toMatchObject({ code: "validation" });
   expect((await adapter.history())[0]).toEqual(s);
 });
-it("enriches optional targets without mutating their source, tracks the actual replacement fact and rejects stale targets", () => {
-  for (const kind of [
-    "projects",
-    "certifications",
-    "volunteering",
-    "custom",
-  ] as const) {
-    const d = blankDraft(),
-      entry = newOptionalEntry();
-    entry.title = fact("Synthetic entry");
-    entry.details = fact("Original details");
-    d.optionalSections.push({ id: kind, kind, label: "", entries: [entry] });
-    const old = clone(d);
+it.each([
+  "role",
+  "projects",
+  "certifications",
+  "volunteering",
+  "custom",
+] as const)(
+  "keeps %s Q&A independent from explicit CV additions, updates and removal",
+  (kind) => {
+    const d = blankDraft();
+    let targetId: string;
+    if (kind === "role") {
+      const entry = newRole();
+      d.roles.push(entry);
+      targetId = entry.id;
+    } else {
+      const entry = newOptionalEntry();
+      d.optionalSections.push({ id: kind, kind, label: "", entries: [entry] });
+      targetId = entry.id;
+    }
+    const target = enrichmentTarget(d, targetId)!;
+    target.field.value = "Original source content";
     const answer = {
       id: "answer",
-      targetId: entry.id,
-      question: "contribution" as const,
-      text: "Exact own words",
+      targetId: targetId,
+      question: "context" as const,
+      questionText: "What work did you personally do?",
+      text: "First\nSecond",
       status: "draft" as const,
-      mode: "replace" as const,
     };
-    const result = applyAnswer(d, answer, entry.details.id);
-    const updated = result.optionalSections.at(-1)!.entries[0].details;
-    expect(updated.value).toBe(answer.text);
-    expect(result.answers[0].factId).toBe(updated.id);
-    expect(result.sources.at(-1)?.locator).toBe(entry.id);
-    expect(d).toEqual(old);
-    expect(() => applyAnswer(result, answer, entry.details.id)).toThrow(
+    const original = clone(d);
+    const saved = saveAnswer(d, answer, target.field.id);
+    expect(saved.roles).toEqual(d.roles);
+    expect(saved.optionalSections).toEqual(d.optionalSections);
+    expect(saved.presentation).toEqual(d.presentation);
+    expect(saved.answers[0]).toMatchObject({
+      questionText: answer.questionText,
+      text: answer.text,
+    });
+    expect(saved.sources.at(-1)).toMatchObject({
+      label: answer.questionText,
+      text: answer.text,
+      locator: targetId,
+    });
+    const added = addAnswerToCv(saved, answer.id, target.field.id);
+    expect(addAnswerToCv(added, answer.id, target.field.id)).toEqual(added);
+    const first = enrichmentTarget(added, targetId)!.entry.bullets![0];
+    expect(added.answers[0].cvFieldId).toBe(first.fieldId);
+    expect(enrichmentTarget(added, targetId)!.field).toEqual(target.field);
+    const edited = patchFact(added, first, "Independent CV wording");
+    expect(edited.answers).toEqual(added.answers);
+    const revised = saveAnswer(
+      edited,
+      { ...edited.answers[0], status: "draft", text: "Revised context" },
+      target.field.id,
+    );
+    expect(enrichmentTarget(revised, targetId)!.entry.bullets![0].value).toBe(
+      "Independent CV wording",
+    );
+    const updated = addAnswerToCv(revised, answer.id, target.field.id);
+    expect(enrichmentTarget(updated, targetId)!.entry.bullets).toHaveLength(1);
+    expect(
+      enrichmentTarget(updated, targetId)!.entry.bullets![0],
+    ).toMatchObject({ fieldId: first.fieldId, value: "Revised context" });
+    const removed = removeAnswerFromCv(updated, answer.id);
+    expect(removed.answers[0].text).toBe("Revised context");
+    expect(removed.answers[0].questionText).toBe(answer.questionText);
+    expect(removed.answers[0].cvFieldId).toBeUndefined();
+    expect(enrichmentTarget(removed, targetId)!.entry.bullets).toEqual([]);
+    expect(
+      enrichmentTarget(
+        addAnswerToCv(removed, answer.id, target.field.id),
+        targetId,
+      )!.entry.bullets,
+    ).toHaveLength(1);
+    expect(() =>
+      saveAnswer(saved, { ...answer, text: "" }, target.field.id),
+    ).toThrow("emptyAnswer");
+    expect(() => addAnswerToCv(saved, answer.id, "stale")).toThrow(
       "staleTarget",
     );
-  }
-});
-it("revises a committed enrichment answer without duplicating its contribution", () => {
-  const d = blankDraft(),
-    r = newRole();
-  d.roles.push(r);
-  const answer = {
-    id: "answer",
-    targetId: r.id,
-    question: "impact" as const,
-    text: "First",
-    status: "draft" as const,
-    mode: "append" as const,
-  };
-  const first = applyAnswer(d, answer, r.context.id);
-  const second = applyAnswer(
-    first,
-    { ...first.answers[0], status: "draft", text: "Revised exact text" },
-    r.context.id,
-  );
-  expect(second.roles[0].bullets).toHaveLength(1);
-  expect(second.roles[0].bullets[0].value).toBe("Revised exact text");
-  expect(second.answers[0].factId).toBe(second.roles[0].bullets[0].id);
-  expect(first.roles[0].bullets[0].value).toBe("First");
-});
-
-it.each(["projects", "certifications", "volunteering", "custom"] as const)(
-  "preserves independent %s answers, original details and links through revisions and manual edits",
-  (kind) => {
-    const d = blankDraft(),
-      entry = newOptionalEntry();
-    entry.details = {
-      ...fact("Original details"),
-      sourceId: "import",
-      sourceClaimId: "details",
-    };
-    d.optionalSections.push({ id: kind, kind, label: "", entries: [entry] });
-    const original = clone(d);
-    const answer = {
-      id: "first",
-      targetId: entry.id,
-      question: "context" as const,
-      text: "First answer",
-      status: "draft" as const,
-      mode: "append" as const,
-    };
-    let next = applyAnswer(d, answer, entry.details.id);
-    next = applyAnswer(
-      next,
-      { ...answer, id: "second", question: "tools", text: "Second answer" },
-      entry.details.id,
-    );
-    next = applyAnswer(
-      next,
-      { ...next.answers[0], text: "Revised first", status: "draft" },
-      entry.details.id,
-    );
-    let updated = next.optionalSections.at(-1)!.entries[0];
-    expect(updated.details).toEqual(entry.details);
-    expect(updated.bullets!.map((f) => f.value)).toEqual([
-      "Revised first",
-      "Second answer",
-    ]);
-    const secondSource = next.sources.find((s) => s.text === "Second answer")!;
-    next = patchFact(next, updated.bullets![1], "Manually corrected second");
-    const second = next.answers.find((a) => a.id === "second")!;
-    expect(second.text).toBe("Manually corrected second");
-    next = applyAnswer(
-      next,
-      { ...second, status: "draft", text: "Revised second" },
-      entry.details.id,
-    );
-    updated = next.optionalSections.at(-1)!.entries[0];
-    expect(updated.bullets!.map((f) => f.value)).toEqual([
-      "Revised first",
-      "Revised second",
-    ]);
-    for (const saved of next.answers) {
-      const destination = allFacts(next).find((f) => f.id === saved.factId)!;
-      expect(destination.value).toBe(saved.text);
-      expect(next.sources.some((s) => s.id === saved.sourceId)).toBe(true);
-    }
-    expect(updated.bullets![1].sourceLineage).toContainEqual({
-      sourceId: secondSource.id,
-    });
     expect(d).toEqual(original);
   },
 );
 
-it("keeps role answer links and formatted contributions consistent through preview, bulk edits, revisions and deletion", () => {
-  const d = blankDraft(),
-    r = newRole();
-  d.roles.push(r);
-  const answer = {
-    id: "answer",
-    targetId: r.id,
-    question: "context" as const,
-    text: "First",
-    status: "draft" as const,
-    mode: "append" as const,
-  };
-  const first = applyAnswer(d, answer, r.context.id);
-  const formatted = setContributions(first, r.id, "<p><b>First</b></p>");
-  const corrected = patchFact(
-    formatted,
-    formatted.roles[0].bullets[0],
-    "Corrected",
-  );
-  expect(corrected.presentation.contributionHtml?.[r.id]).toBeUndefined();
-  expect(corrected.answers[0]).toMatchObject({
-    text: "Corrected",
-    factId: corrected.roles[0].bullets[0].id,
-  });
-  const bulk = setContributions(corrected, r.id, "<p><i>Bulk edit</i></p>");
-  expect(bulk.answers[0]).toMatchObject({
-    text: "Bulk edit",
-    factId: bulk.roles[0].bullets[0].id,
-  });
-  const revised = applyAnswer(
-    bulk,
-    { ...bulk.answers[0], status: "draft", text: "Final" },
-    r.context.id,
-  );
-  expect(revised.roles[0].bullets.map((f) => f.value)).toEqual(["Final"]);
-  expect(revised.presentation.contributionHtml?.[r.id]).toBeUndefined();
-  expect(
-    allFacts(revised).find((f) => f.id === revised.answers[0].factId)?.value,
-  ).toBe("Final");
-  expect(revised.roles[0].bullets[0].sourceLineage).toContainEqual({
-    sourceId: first.sources.at(-1)!.id,
-  });
-  const removed = setContributions(revised, r.id, "");
-  expect(removed.roles[0].bullets).toEqual([]);
-  expect(removed.answers[0].factId).toBeUndefined();
-  expect(formatted.presentation.contributionHtml?.[r.id]).toContain(
-    "<b>First</b>",
-  );
-});
-
-it.each([
-  ["New", "Answer A", "Answer B"],
-  ["Answer A", "New", "Answer B"],
-  ["Answer A", "Answer B", "New"],
-  ["Answer B", "Answer A"],
-  ["Answer B"],
-  ["Answer A"],
-])(
-  "retains surviving answer identities after bulk contributions become %j",
-  (...lines) => {
-    const d = blankDraft(),
-      role = newRole();
-    d.roles.push(role);
-    let enriched = d;
-    for (const [id, text, question] of [
-      ["a", "Answer A", "context"],
-      ["b", "Answer B", "tools"],
-    ] as const) {
-      enriched = applyAnswer(
-        enriched,
-        {
-          id,
-          text,
-          question,
-          targetId: role.id,
-          status: "draft",
-          mode: "append",
-        },
-        role.context.id,
-      );
-    }
-    const original = clone(enriched);
-    const edited = setContributions(
-      enriched,
-      role.id,
-      lines.map((line) => `<p><b>${line}</b></p>`).join(""),
-    );
-    expect(edited.roles[0].bullets.map((f) => f.value)).toEqual(lines);
-    for (const saved of enriched.answers) {
-      const answer = edited.answers.find((a) => a.id === saved.id)!;
-      expect(answer.text).toBe(saved.text);
-      expect(answer.sourceId).toBe(saved.sourceId);
-      if (lines.includes(saved.text)) {
-        expect(answer.factId).toBe(saved.factId);
-        expect(
-          edited.roles[0].bullets.find((f) => f.id === saved.factId),
-        ).toEqual(enriched.roles[0].bullets.find((f) => f.id === saved.factId));
-      } else expect(answer.factId).toBeUndefined();
-    }
-    const revising = edited.answers.find((a) => lines.includes(a.text))!;
-    const revised = applyAnswer(
-      edited,
-      {
-        ...revising,
-        text: "Revised answer",
-        status: "draft",
-      },
-      role.context.id,
-    );
-    expect(revised.roles[0].bullets.map((f) => f.value)).toEqual(
-      lines.map((line) => (line === revising.text ? "Revised answer" : line)),
-    );
-    expect(revised.presentation.contributionHtml?.[role.id]).toBeUndefined();
-    expect(enriched).toEqual(original);
-  },
-);
-
-it("preserves duplicate contributions as distinct facts and keeps edited answers linked", () => {
+function richRoot(d: ReturnType<typeof blankDraft>, roleId: string) {
+  const root = document.createElement("div");
+  for (const f of d.roles.find((r) => r.id === roleId)!.bullets) {
+    const block = document.createElement("div");
+    block.dataset.contribution = f.fieldId;
+    block.textContent = f.value;
+    root.append(block);
+  }
+  return root;
+}
+it("keeps explicit associations through multiline wording, formatting, insertion, reorder and deletion", () => {
   const d = blankDraft(),
     role = newRole();
-  role.bullets = [fact("Same"), fact("Same"), fact("Last")];
   d.roles.push(role);
-  d.answers = role.bullets.map((f, i) => ({
-    id: `answer-${i}`,
-    targetId: role.id,
-    question: "context",
-    text: f.value,
-    status: "confirmed",
-    mode: "append",
-    factId: f.id,
-  }));
-  const inserted = setContributions(
-    d,
-    role.id,
-    "First<div>Same</div><div>Same</div><div>Last</div>",
-  );
-  expect(inserted.roles[0].bullets.slice(1)).toEqual(role.bullets);
-  expect(inserted.answers).toEqual(d.answers);
-  const edited = setContributions(
-    inserted,
-    role.id,
-    "<p>First</p><p>Same</p><p>Same</p><p>Edited last</p>",
-  );
-  expect(edited.answers[2]).toMatchObject({
-    text: "Edited last",
-    factId: edited.roles[0].bullets[3].id,
-  });
-  expect(edited.roles[0].bullets[3].fieldId).toBe(role.bullets[2].fieldId);
-});
-
-it.each([
-  "<p><b>First\nSecond</b></p>",
-  "<ul><li><i>First</i><br>Second</li></ul>",
-  "First<div><b>Second</b></div>",
-])(
-  "preserves a multiline answer's fact and source through formatting %s",
-  (html) => {
-    const d = blankDraft(),
-      role = newRole();
-    d.roles.push(role);
-    const initial = applyAnswer(
-      d,
+  let initial = d;
+  for (const [id, text, question] of [
+    ["a", "First\nSecond", "context"],
+    ["b", "Same words", "tools"],
+  ] as const) {
+    initial = saveAnswer(
+      initial,
       {
-        id: "multiline",
+        id,
         targetId: role.id,
-        question: "context",
-        text: "First\nSecond",
+        question,
+        questionText: `Full question ${id}?`,
+        text,
         status: "draft",
-        mode: "append",
       },
       role.context.id,
     );
-    const formatted = setContributions(initial, role.id, html);
-    expect(formatted.roles[0].bullets).toEqual(initial.roles[0].bullets);
-    expect(formatted.answers).toEqual(initial.answers);
-    expect(formatted.sources).toEqual(initial.sources);
-    const withSibling = setContributions(
-      formatted,
-      role.id,
-      `<p>New</p>${html}<p>Last</p>`,
-    );
-    expect(withSibling.roles[0].bullets[1]).toEqual(
-      initial.roles[0].bullets[0],
-    );
-    expect(withSibling.answers).toEqual(initial.answers);
-    const reordered = setContributions(
-      withSibling,
-      role.id,
-      `<p>Last</p>${html}`,
-    );
-    expect(reordered.roles[0].bullets[1]).toEqual(initial.roles[0].bullets[0]);
-    const revised = applyAnswer(
-      reordered,
-      { ...reordered.answers[0], status: "draft", text: "Revised\nAnswer" },
-      role.context.id,
-    );
-    expect(revised.roles[0].bullets.map((f) => f.value)).toEqual([
-      "Last",
-      "Revised\nAnswer",
-    ]);
-    expect(revised.answers[0].factId).toBe(revised.roles[0].bullets[1].id);
-    expect(revised.presentation.contributionHtml?.[role.id]).toBeUndefined();
-  },
-);
+    initial = addAnswerToCv(initial, id, role.context.id);
+  }
+  const root = richRoot(initial, role.id);
+  const first = root.children[0] as HTMLElement;
+  first.innerHTML = "<ul><li><b>First</b><br>Second</li></ul>";
+  const formatted = setContributions(initial, role.id, readContributions(root));
+  expect(formatted.roles[0].bullets).toEqual(initial.roles[0].bullets);
+  expect(formatted.answers).toEqual(initial.answers);
+  expect(formatted.sources).toEqual(initial.sources);
+  first.innerHTML = "<p><b>First</b></p><p>Second!</p>";
+  const edited = setContributions(formatted, role.id, readContributions(root));
+  expect(edited.roles[0].bullets[0]).toMatchObject({
+    fieldId: initial.roles[0].bullets[0].fieldId,
+    value: "First\nSecond!",
+  });
+  expect(edited.answers).toEqual(initial.answers);
+  expect(edited.roles[0].bullets[0].sourceLineage).toContainEqual({
+    sourceId: initial.roles[0].bullets[0].sourceId,
+  });
+  const newBlock = document.createElement("p");
+  newBlock.textContent = "New";
+  root.prepend(newBlock);
+  const inserted = setContributions(edited, role.id, readContributions(root));
+  expect(inserted.roles[0].bullets.slice(1)).toEqual(edited.roles[0].bullets);
+  root.prepend(root.lastChild!);
+  const reordered = setContributions(
+    inserted,
+    role.id,
+    readContributions(root),
+  );
+  expect(reordered.roles[0].bullets.map((f) => f.value)).toEqual([
+    "Same words",
+    "New",
+    "First\nSecond!",
+  ]);
+  first.remove();
+  const removed = setContributions(reordered, role.id, readContributions(root));
+  expect(removed.answers.find((a) => a.id === "a")!.cvFieldId).toBeUndefined();
+  expect(removed.answers.find((a) => a.id === "a")!.text).toBe("First\nSecond");
+  expect(removed.answers.find((a) => a.id === "b")!.cvFieldId).toBe(
+    initial.answers.find((a) => a.id === "b")!.cvFieldId,
+  );
+  const revised = saveAnswer(
+    removed,
+    {
+      ...removed.answers.find((a) => a.id === "b")!,
+      text: "Revised B",
+      status: "draft",
+    },
+    role.context.id,
+  );
+  expect(revised.roles).toEqual(removed.roles);
+  const updated = addAnswerToCv(revised, "b", role.context.id);
+  expect(updated.roles[0].bullets.map((f) => f.value)).toEqual([
+    "Revised B",
+    "New",
+  ]);
+});
+
+it("does not reassociate identical text and combines native fragments carrying the same identity", () => {
+  const d = blankDraft(),
+    role = newRole();
+  role.bullets = [fact("Same"), fact("Same")];
+  d.roles.push(role);
+  const root = richRoot(d, role.id);
+  const second = root.children[1];
+  root.prepend(second);
+  const reordered = setContributions(d, role.id, readContributions(root));
+  expect(reordered.roles[0].bullets.map((f) => f.fieldId)).toEqual([
+    role.bullets[1].fieldId,
+    role.bullets[0].fieldId,
+  ]);
+  const fragment = second.cloneNode(true) as HTMLElement;
+  fragment.textContent = "Continuation";
+  second.after(fragment);
+  const split = setContributions(reordered, role.id, readContributions(root));
+  expect(split.roles[0].bullets[0]).toMatchObject({
+    fieldId: role.bullets[1].fieldId,
+    value: "Same\nContinuation",
+  });
+  second.remove();
+  fragment.remove();
+  expect(
+    setContributions(split, role.id, readContributions(root)).roles[0].bullets,
+  ).toEqual([role.bullets[0]]);
+});
+
+it("invalidates formatted contributions on a factual edit without changing saved career context", () => {
+  const d = blankDraft(),
+    role = newRole();
+  role.bullets = [
+    {
+      ...fact("Old wording"),
+      sourceId: "fixture",
+      sourceClaimId: "claim",
+      status: "extracted_unconfirmed",
+    },
+  ];
+  d.roles.push(role);
+  const formatted = setContributions(
+    d,
+    role.id,
+    readContributions(richRoot(d, role.id)),
+  );
+  expect(formatted.roles[0].bullets).toEqual(role.bullets);
+  const changed = patchFact(
+    formatted,
+    formatted.roles[0].bullets[0],
+    "Corrected wording",
+  );
+  expect(changed.presentation.contributionHtml?.[role.id]).toBeUndefined();
+  expect(changed.roles[0].bullets[0].sourceLineage).toContainEqual({
+    sourceId: "fixture",
+    sourceClaimId: "claim",
+  });
+  expect(formatted.roles[0].bullets[0].value).toBe("Old wording");
+});
 
 it.each([
   ["First<div>Second</div>", ["First", "Second"]],
@@ -434,15 +348,7 @@ it.each([
     ["Before", "One", "Two", "After"],
   ],
 ])("preserves rich text block boundaries for %s", (html, expected) => {
-  expect(richLines(html as string)).toEqual(expected);
-  const d = blankDraft(),
-    role = newRole();
-  d.roles.push(role);
-  expect(
-    setContributions(d, role.id, html as string).roles[0].bullets.map(
-      (f) => f.value,
-    ),
-  ).toEqual(expected);
+  expect(richText(html as string)).toBe((expected as string[]).join("\n"));
 });
 
 it("excludes inactive end dates consistently and validates them again after ongoing is cleared", () => {

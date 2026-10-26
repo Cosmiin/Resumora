@@ -347,6 +347,24 @@ export function HistoryScreen({
                 {t("Inspectezi", "Inspecting")} v{inspected.revision}
               </h2>
               <DocumentPreview draft={inspected.draft} asOf={asOf} />
+              {inspected.draft.answers.length > 0 && (
+                <section
+                  className="card"
+                  aria-label={t(
+                    "Context profesional salvat",
+                    "Saved career context",
+                  )}
+                >
+                  {inspected.draft.answers.map((a) => (
+                    <div key={a.id}>
+                      <p>
+                        <strong>{a.questionText}</strong>
+                      </p>
+                      <p style={{ whiteSpace: "pre-wrap" }}>{a.text}</p>
+                    </div>
+                  ))}
+                </section>
+              )}
               <Button onClick={() => setInspected(null)}>
                 {t("Închide inspecția", "Close inspection")}
               </Button>

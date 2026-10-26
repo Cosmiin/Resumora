@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { applyAnswer, enrichmentTarget } from "../base/enrichment";
 import {
-  clone,
-  fact,
-  localId,
-  type Answer,
-  type BaseDraft,
-} from "../base/model";
+  saveAnswer,
+  addAnswerToCv,
+  removeAnswerFromCv,
+  enrichmentTarget,
+} from "../base/enrichment";
+import { clone, type Answer, type BaseDraft } from "../base/model";
 import { focusField, patchFact } from "../base/editing";
 import { formatDate } from "../base/dates";
 import { Button, useCopy } from "./ui";
-import { DocumentPreview } from "./DocumentPreview";
+import { DocumentPreview, PreviewText } from "./DocumentPreview";
 const dimensions: Answer["question"][] = [
   "context",
   "ownership",
@@ -31,24 +30,24 @@ export function Enrichment({
   goEdit: () => void;
   asOf: { year: string; month: string };
 }) {
-  const t = useCopy(),
-    targets = [
-      ...d.roles.map((r) => ({
-        id: r.id,
-        label: [
-          r.title.value,
-          r.company.value,
-          formatDate(r.start.value, d.language),
-        ]
-          .filter(Boolean)
-          .join(" · "),
-      })),
-      ...d.optionalSections
-        .filter((s) => !["languages"].includes(s.kind))
-        .flatMap((s) =>
-          s.entries.map((e) => ({ id: e.id, label: e.title.value })),
-        ),
-    ];
+  const t = useCopy();
+  const targets = [
+    ...d.roles.map((r) => ({
+      id: r.id,
+      label: [
+        r.title.value,
+        r.company.value,
+        formatDate(r.start.value, d.language),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    })),
+    ...d.optionalSections
+      .filter((s) => s.kind !== "languages")
+      .flatMap((s) =>
+        s.entries.map((e) => ({ id: e.id, label: e.title.value })),
+      ),
+  ];
   const [targetId, setTargetId] = useState(targets[0]?.id ?? ""),
     [index, setIndex] = useState(0),
     [error, setError] = useState("");
@@ -60,17 +59,6 @@ export function Enrichment({
     signature.current = target?.field.id;
     input.current?.focus();
   }, [targetId, index]);
-  const current = d.answers.find(
-    (a) => a.targetId === targetId && a.question === question,
-  );
-  const answer: Answer = current ?? {
-    id: `answer_${targetId}_${question}`,
-    targetId,
-    question,
-    text: "",
-    status: "draft",
-    mode: "append",
-  };
   const questions: Record<Answer["question"], string> = {
     context: t(
       "Care erau responsabilitățile tale de zi cu zi?",
@@ -101,6 +89,19 @@ export function Enrichment({
       "Which difficulties did you overcome?",
     ),
   };
+
+  const current = d.answers.find(
+    (a) => a.targetId === targetId && a.question === question,
+  );
+  const answer: Answer = current ?? {
+    id: `answer_${targetId}_${question}`,
+    targetId,
+    question,
+    questionText: questions[question],
+    targetLabel: target?.label,
+    text: "",
+    status: "draft",
+  };
   function put(text: string) {
     const next = clone(d);
     next.answers = [
@@ -110,194 +111,257 @@ export function Enrichment({
     change(next);
     setError("");
   }
-  function next() {
+  function advance() {
     setIndex((i) => (i + 1) % dimensions.length);
   }
+  function failure() {
+    setError(
+      t(
+        "Destinația s-a schimbat. Răspunsul este păstrat; selectează din nou intrarea.",
+        "The target changed. Your answer is retained; select the entry again.",
+      ),
+    );
+  }
   function submit() {
+    if (!answer.text.trim()) {
+      input.current?.focus();
+      return;
+    }
     try {
-      if (!target || !signature.current) throw new Error("staleTarget");
-      const result = applyAnswer(
-        d,
-        { ...answer, status: "draft" },
-        signature.current,
-      );
-      change(result);
-      signature.current = enrichmentTarget(result, targetId)?.field.id;
+      if (!signature.current) throw new Error("staleTarget");
+      change(saveAnswer(d, { ...answer, status: "draft" }, signature.current));
       setError("");
-      next();
+      advance();
     } catch {
-      setError(
-        t(
-          "Destinația s-a schimbat. Răspunsul este păstrat; selectează din nou intrarea.",
-          "The target changed. Your answer is retained; select the entry again.",
-        ),
-      );
+      failure();
     }
   }
   function skip(status: "skipped" | "unknown") {
-    const result = clone(d);
-    result.answers = [
-      ...result.answers.filter((a) => a.id !== answer.id),
+    const next = clone(d);
+    next.answers = [
+      ...next.answers.filter((a) => a.id !== answer.id),
       { ...answer, status },
     ];
-    change(result);
-    next();
+    change(next);
+    advance();
   }
-  if (!targets.length)
-    return (
-      <section className="card">
-        <h2>
-          {t(
-            "Adaugă întâi o experiență sau o intrare",
-            "Add an experience or entry first",
-          )}
-        </h2>
-        <Button onClick={goEdit}>{t("Editor", "Editor")}</Button>
-      </section>
-    );
-  const preview = clone(d),
-    previewTarget = enrichmentTarget(preview, targetId),
-    pendingId = `pending-${answer.id}`;
-  if (
-    previewTarget &&
-    answer.status === "draft" &&
-    (answer.text.trim() || current)
-  ) {
-    const prior = [
-      previewTarget.field,
-      ...(previewTarget.entry.bullets ?? []),
-    ].find((f) => f.id === answer.factId);
-    if (prior || answer.mode === "replace") {
-      Object.assign(prior ?? previewTarget.field, {
-        value: answer.text,
-        fieldId: pendingId,
-        id: pendingId,
-      });
-    } else {
-      (previewTarget.entry.bullets ??= []).push({
-        ...fact(answer.text),
-        fieldId: pendingId,
-        id: pendingId,
-      });
+  function add(saved: Answer) {
+    try {
+      if (!signature.current || saved.targetId !== targetId)
+        throw new Error("staleTarget");
+      change(addAnswerToCv(d, saved.id, signature.current));
+      setError("");
+    } catch {
+      failure();
     }
-    delete preview.presentation.contributionHtml?.[targetId];
+  }
+  const saved = d.answers.filter((a) => a.sourceId);
+  function contextRow(a: Answer) {
+    const source = d.sources.find((s) => s.id === a.sourceId)!;
+    const destination = enrichmentTarget(d, a.targetId);
+    const linked = destination?.entry.bullets?.find(
+      (f) => f.fieldId === a.cvFieldId,
+    );
+    return (
+      <div key={a.id} className="saved-answer">
+        <p className="small muted">{a.targetLabel}</p>
+        <p>
+          <strong>{source.label}</strong>
+        </p>
+        <p style={{ whiteSpace: "pre-wrap" }}>{source.text}</p>
+        {destination && (
+          <div className="actions">
+            <Button
+              onClick={() => {
+                setTargetId(a.targetId);
+                setIndex(dimensions.indexOf(a.question));
+                signature.current = destination.field.id;
+                input.current?.focus();
+              }}
+            >
+              {t("Editează răspunsul", "Edit answer")}
+            </Button>
+            {a.targetId === targetId && (
+              <Button
+                disabled={a.status !== "confirmed" || linked?.value === a.text}
+                onClick={() => add(a)}
+              >
+                {linked
+                  ? linked.value === a.text
+                    ? t("Adăugat în CV", "Added to CV")
+                    : t("Actualizează în CV", "Update in CV")
+                  : t("Adaugă în CV", "Add to CV")}
+              </Button>
+            )}
+            {linked && (
+              <Button onClick={() => change(removeAnswerFromCv(d, a.id))}>
+                {t("Elimină din CV", "Remove from CV")}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
   }
   return (
-    <div className="editor-layout enrichment-inline">
-      <section
-        className="card question-card"
-        onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing || !(e.ctrlKey || e.metaKey)) return;
-          if (e.key === "Enter") {
-            e.preventDefault();
-            submit();
-          }
-          if (e.shiftKey && e.key.toLowerCase() === "k") {
-            e.preventDefault();
-            skip("unknown");
-          }
-          if (e.shiftKey && e.key.toLowerCase() === "j") {
-            e.preventDefault();
-            skip("skipped");
-          }
-        }}
-      >
-        <label htmlFor="enrich-target">{t("Intrare", "Entry")}</label>
-        <select
-          id="enrich-target"
-          value={targetId}
-          onChange={(e) => {
-            setTargetId(e.target.value);
-            signature.current = enrichmentTarget(d, e.target.value)?.field.id;
-            setIndex(0);
-          }}
-        >
-          {targets.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.label || t("Intrare nouă", "New entry")}
-            </option>
-          ))}
-        </select>
-        <p className="entry-context">{target?.field.value}</p>
-        <p className="eyebrow">
-          {t("Îndrumare manuală", "Manual guidance")} · {index + 1}/
-          {dimensions.length}
-        </p>
-        <label className="question-title" htmlFor="enrichment-answer">
-          {questions[question]}
-        </label>
-        <textarea
-          ref={input}
-          id="enrichment-answer"
-          className="native"
-          rows={5}
-          value={answer.text}
-          onChange={(e) => put(e.target.value)}
-        />
+    <div
+      className="editor-layout enrichment-inline"
+      onKeyDown={(e) => {
+        if (!target || e.nativeEvent.isComposing || !(e.ctrlKey || e.metaKey))
+          return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submit();
+        }
+        if (e.shiftKey && e.key.toLowerCase() === "k") {
+          e.preventDefault();
+          skip("unknown");
+        }
+        if (e.shiftKey && e.key.toLowerCase() === "j") {
+          e.preventDefault();
+          skip("skipped");
+        }
+      }}
+    >
+      <section className="card question-card">
+        {targets.length ? (
+          <>
+            <label htmlFor="enrich-target">{t("Intrare", "Entry")}</label>
+            <select
+              id="enrich-target"
+              value={targetId}
+              onChange={(e) => {
+                setTargetId(e.target.value);
+                signature.current = enrichmentTarget(d, e.target.value)?.field
+                  .id;
+                setIndex(0);
+              }}
+            >
+              {targets.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.label || t("Intrare nouă", "New entry")}
+                </option>
+              ))}
+            </select>
+            <p className="entry-context">{target?.field.value}</p>
+            <p className="eyebrow">
+              {t("Îndrumare manuală", "Manual guidance")} · {index + 1}/
+              {dimensions.length}
+            </p>
+            <label className="question-title" htmlFor="enrichment-answer">
+              {answer.questionText}
+            </label>
+            <textarea
+              ref={input}
+              id="enrichment-answer"
+              className="native"
+              rows={5}
+              value={answer.text}
+              onChange={(e) => put(e.target.value)}
+            />
+            <p className="small muted">
+              {t(
+                "Contextul rămâne în memoria paginii. Salvarea răspunsului nu modifică CV-ul.",
+                "Context stays in page memory. Saving an answer does not change the CV.",
+              )}
+            </p>
+            <div className="actions">
+              <Button
+                variant="primary"
+                disabled={!answer.text.trim()}
+                onClick={submit}
+              >
+                {t("Salvează și continuă", "Save and next")}{" "}
+                <kbd>⌘/Ctrl Enter</kbd>
+              </Button>
+              <Button onClick={() => skip("unknown")}>
+                {t("Nu știu", "I don't know")} <kbd>⌘/Ctrl ⇧ K</kbd>
+              </Button>
+              <Button onClick={() => skip("skipped")}>
+                {t("Omit", "Skip")} <kbd>⌘/Ctrl ⇧ J</kbd>
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2>
+              {t(
+                "Adaugă întâi o experiență sau o intrare",
+                "Add an experience or entry first",
+              )}
+            </h2>
+            <Button onClick={goEdit}>{t("Editor", "Editor")}</Button>
+          </>
+        )}
+        {error && <p role="alert">{error}</p>}
         <p className="small muted">
           {t(
-            "Scrie ce știi; un rezultat nemăsurat este suficient.",
-            "Write what you know; an unmeasured outcome is enough.",
+            "AI și relevanța pentru job nu sunt conectate. Folosim doar cuvintele tale.",
+            "AI and job relevance are not connected. Only your own wording is used.",
           )}
         </p>
-        <div className="actions">
-          <Button
-            variant="primary"
-            disabled={!answer.text.trim()}
-            onClick={submit}
-          >
-            {t("Salvează și continuă", "Save and next")} <kbd>⌘/Ctrl Enter</kbd>
-          </Button>
-          <Button onClick={() => skip("unknown")}>
-            {t("Nu știu", "I don't know")} <kbd>⌘/Ctrl ⇧ K</kbd>
-          </Button>
-          <Button onClick={() => skip("skipped")}>
-            {t("Omit", "Skip")} <kbd>⌘/Ctrl ⇧ J</kbd>
-          </Button>
-        </div>
-        {error && <p role="alert">{error}</p>}
-        <details className="section-info-text">
-          <summary>
-            {t("Relevanță pentru job și surse", "Job relevance and sources")}
-          </summary>
-          <p>
-            {t(
-              "AI și relevanța pentru job nu sunt conectate. Răspunsurile sunt folosite exact cum le scrii.",
-              "AI and job relevance are not connected. Your answers are used as written.",
-            )}
-          </p>
-        </details>
       </section>
-      <DocumentPreview
-        draft={preview}
-        asOf={asOf}
-        onTextEdit={(id, text) => {
-          if (id === pendingId) {
-            put(text);
-            return;
-          }
-          const f = [
-            ...d.roles.flatMap((r) => [r.context, ...r.bullets]),
-            ...d.optionalSections.flatMap((s) =>
-              s.entries.flatMap((e) => [e.details, ...(e.bullets ?? [])]),
-            ),
-          ].find((f) => f.fieldId === id);
-          if (f) {
-            const next = patchFact(d, f, text);
-            if (
-              target &&
-              f.fieldId === target.field.fieldId &&
-              signature.current === target.field.id
-            )
-              signature.current = enrichmentTarget(next, targetId)?.field.id;
-            change(next);
-          }
-        }}
-        onEdit={(id) => {
-          goEdit();
-          focusField(id);
-        }}
-      />
+      <div className="stack">
+        <section
+          className="card"
+          aria-label={t("Context profesional", "Career context")}
+        >
+          {target && (
+            <>
+              <p>
+                <strong>{answer.questionText}</strong>
+              </p>
+              <PreviewText
+                key={answer.id}
+                value={answer.text}
+                label={t("Previzualizare răspuns", "Answer preview")}
+                change={put}
+              />
+            </>
+          )}
+          {!!saved.length && (
+            <>
+              <h3>{t("Ultimul răspuns salvat", "Latest saved answer")}</h3>
+              {contextRow(saved.at(-1)!)}
+              <details>
+                <summary>
+                  {t(
+                    "Toate întrebările și răspunsurile salvate",
+                    "All saved questions and answers",
+                  )}
+                </summary>
+                {saved.slice(0, -1).map(contextRow)}
+              </details>
+            </>
+          )}
+        </section>
+        <DocumentPreview
+          draft={d}
+          asOf={asOf}
+          onTextEdit={(id, text) => {
+            const f = [
+              ...d.roles.flatMap((r) => [r.context, ...r.bullets]),
+              ...d.optionalSections.flatMap((s) =>
+                s.entries.flatMap((e) => [e.details, ...(e.bullets ?? [])]),
+              ),
+            ].find((f) => f.fieldId === id);
+            if (f) {
+              const next = patchFact(d, f, text);
+              if (
+                target &&
+                f.fieldId === target.field.fieldId &&
+                signature.current === target.field.id
+              )
+                signature.current = enrichmentTarget(next, targetId)?.field.id;
+              change(next);
+            }
+          }}
+          onEdit={(id) => {
+            goEdit();
+            focusField(id);
+          }}
+        />
+      </div>
     </div>
   );
 }

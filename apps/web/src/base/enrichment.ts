@@ -29,46 +29,86 @@ export function enrichmentTarget(
     ? { field: entry.details, label: entry.title.value, entry }
     : null;
 }
-export function applyAnswer(
+export function saveAnswer(
   draft: BaseDraft,
   answer: Answer,
   expectedContextId: string,
 ): BaseDraft {
-  const original = enrichmentTarget(draft, answer.targetId);
-  if (!original || original.field.id !== expectedContextId)
+  const target = enrichmentTarget(draft, answer.targetId);
+  if (!target || target.field.id !== expectedContextId)
     throw new Error("staleTarget");
-  if (!["draft", "review"].includes(answer.status) || !answer.text.trim())
+  if (
+    answer.status !== "draft" ||
+    !answer.text.trim() ||
+    !answer.questionText.trim()
+  )
     throw new Error("emptyAnswer");
-  const next = clone(draft),
-    target = enrichmentTarget(next, answer.targetId)!;
+  const next = clone(draft);
   const sourceId = localId();
   next.sources.push({
     id: sourceId,
     kind: "answer",
-    label: answer.question,
+    label: answer.questionText,
     text: answer.text,
     locator: answer.targetId,
   });
-  const prior = answer.factId
-    ? [target.field, ...(target.entry.bullets ?? [])].find(
-        (f) => f.id === answer.factId,
-      )
-    : undefined;
-  let result: Fact<string>;
-  if (prior) {
-    result = { ...editFact(prior, answer.text), sourceId };
-    replaceFact(next, prior, result);
-  } else if (answer.mode === "append") {
-    result = { ...fact(answer.text), sourceId };
-    (target.entry.bullets ??= []).push(result);
-    delete next.presentation.contributionHtml?.[target.entry.id];
-  } else {
-    result = { ...editFact(target.field, answer.text), sourceId };
-    replaceFact(next, target.field, result);
-  }
+  const stored = next.answers.find((a) => a.id === answer.id);
   next.answers = [
     ...next.answers.filter((a) => a.id !== answer.id),
-    { ...answer, status: "confirmed", sourceId, factId: result.id },
+    {
+      ...answer,
+      cvFieldId: stored?.cvFieldId,
+      targetLabel: target.label,
+      status: "confirmed",
+      sourceId,
+    },
   ];
+  return next;
+}
+export function addAnswerToCv(
+  draft: BaseDraft,
+  answerId: string,
+  expectedContextId: string,
+): BaseDraft {
+  const answer = draft.answers.find((a) => a.id === answerId);
+  const target = answer && enrichmentTarget(draft, answer.targetId);
+  if (
+    !answer ||
+    answer.status !== "confirmed" ||
+    !target ||
+    target.field.id !== expectedContextId
+  )
+    throw new Error("staleTarget");
+  const next = clone(draft);
+  const saved = next.answers.find((a) => a.id === answerId)!;
+  const entry = enrichmentTarget(next, saved.targetId)!.entry;
+  const current = entry.bullets?.find((f) => f.fieldId === saved.cvFieldId);
+  if (current?.value === saved.text) return next;
+  if (current)
+    replaceFact(next, current, {
+      ...editFact(current, saved.text),
+      sourceId: saved.sourceId!,
+    });
+  else {
+    const added = { ...fact(saved.text), sourceId: saved.sourceId! };
+    (entry.bullets ??= []).push(added);
+    saved.cvFieldId = added.fieldId;
+  }
+  delete next.presentation.contributionHtml?.[entry.id];
+  return next;
+}
+export function removeAnswerFromCv(
+  draft: BaseDraft,
+  answerId: string,
+): BaseDraft {
+  const next = clone(draft);
+  const answer = next.answers.find((a) => a.id === answerId)!;
+  const target = enrichmentTarget(next, answer.targetId);
+  if (target?.entry.bullets)
+    target.entry.bullets = target.entry.bullets.filter(
+      (f) => f.fieldId !== answer.cvFieldId,
+    );
+  delete answer.cvFieldId;
+  delete next.presentation.contributionHtml?.[answer.targetId];
   return next;
 }

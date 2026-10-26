@@ -1,30 +1,60 @@
 import { useLayoutEffect, useRef } from "react";
 import { Bold, Italic, List, ListOrdered } from "lucide-react";
-import { safeRichHtml } from "../base/editing";
+import {
+  readContributions,
+  safeRichHtml,
+  type ContributionEdit,
+} from "../base/editing";
 import { useCopy } from "./ui";
 
 export function Contributions({
   id,
   html,
   onChange,
+  fieldIds,
+  error,
 }: {
   id: string;
   html: string;
-  onChange: (html: string) => void;
+  onChange: (edit: ContributionEdit) => void;
+  fieldIds: string[];
+  error?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null),
     last = useRef(html),
     t = useCopy();
   useLayoutEffect(() => {
     if (ref.current && (last.current !== html || !ref.current.innerHTML))
-      ref.current.innerHTML = safeRichHtml(html);
+      ref.current.innerHTML = safeRichHtml(html, fieldIds);
     last.current = html;
   }, [html]);
   function publish() {
     if (ref.current) {
-      const value = safeRichHtml(ref.current.innerHTML);
-      last.current = value;
-      onChange(value);
+      const root = ref.current;
+      const safe = safeRichHtml(
+        root.innerHTML,
+        Array.from(
+          root.querySelectorAll<HTMLElement>("[data-contribution]"),
+          (el) => el.dataset.contribution!,
+        ),
+      );
+      if (safe !== root.innerHTML) root.innerHTML = safe;
+      const selection = window.getSelection();
+      const anchor = selection?.anchorNode,
+        focus = selection?.focusNode;
+      const anchorOffset = selection?.anchorOffset ?? 0,
+        focusOffset = selection?.focusOffset ?? 0;
+      const edit = readContributions(root);
+      if (
+        selection &&
+        anchor &&
+        focus &&
+        root.contains(anchor) &&
+        root.contains(focus)
+      )
+        selection.setBaseAndExtent(anchor, anchorOffset, focus, focusOffset);
+      last.current = edit.html;
+      onChange(edit);
     }
   }
   function format(command: string) {
@@ -46,6 +76,8 @@ export function Contributions({
         role="textbox"
         aria-multiline="true"
         aria-labelledby={`${id}-label`}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
         suppressContentEditableWarning
         onInput={publish}
         onPaste={(e) => {
@@ -65,6 +97,11 @@ export function Contributions({
           publish();
         }}
       />
+      {error && (
+        <p id={`${id}-error`} className="field-error">
+          {error}
+        </p>
+      )}
       <div
         className="format-toolbar"
         role="group"

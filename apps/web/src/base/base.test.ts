@@ -14,7 +14,7 @@ import {
 } from "./model";
 import { dateError, durationBounds, reversedDates } from "./dates";
 import { maraReviewDraft } from "./fixture";
-import { applyAnswer } from "./enrichment";
+import { saveAnswer, addAnswerToCv } from "./enrichment";
 import { selectDocument, validateDraft } from "./validation";
 function initial() {
   const d = blankDraft();
@@ -186,7 +186,7 @@ describe("date and review boundaries", () => {
   });
 });
 describe("enrichment source lineage", () => {
-  it("commits manual answers without a review step, applies verbatim to scoped targets, and rejects a stale or missing role", () => {
+  it("saves context independently, adds only explicitly, and rejects stale or missing destinations", () => {
     const d = maraReviewDraft(),
       role = d.roles[0],
       old = clone(d);
@@ -194,35 +194,29 @@ describe("enrichment source lineage", () => {
       id: "answer",
       targetId: role.id,
       question: "contribution" as const,
+      questionText: "What did you contribute?",
       text: "We reviewed exceptions; no time saving was measured.",
-      status: "review" as const,
-      mode: "append" as const,
+      status: "draft" as const,
     };
-    const result = applyAnswer(d, answer, role.context.id);
-    expect(result.roles[0].bullets.at(-1)).toMatchObject({
-      value: answer.text,
-      status: "user_authored",
-    });
-    expect(result.sources.at(-1)).toMatchObject({
+    const saved = saveAnswer(d, answer, role.context.id);
+    expect(saved.roles).toEqual(d.roles);
+    expect(saved.sources.at(-1)).toMatchObject({
+      label: answer.questionText,
       text: answer.text,
       locator: role.id,
     });
-    expect(result.roles[1]).toEqual(d.roles[1]);
-    expect(d).toEqual(old);
-    const replacement = applyAnswer(
-      d,
-      { ...answer, mode: "replace" },
-      role.context.id,
-    );
-    expect(replacement.roles[0].context.value).toBe(answer.text);
-    expect(replacement.roles[0].bullets).toEqual(d.roles[0].bullets);
+    const added = addAnswerToCv(saved, answer.id, role.context.id);
+    expect(added.roles[0].bullets.at(-1)).toMatchObject({
+      value: answer.text,
+      status: "user_authored",
+    });
+    expect(added.roles[1]).toEqual(d.roles[1]);
     expect(() =>
-      applyAnswer(d, { ...answer, text: "" }, role.context.id),
+      saveAnswer(d, { ...answer, text: "" }, role.context.id),
     ).toThrow("emptyAnswer");
-    expect(() => applyAnswer(d, answer, "stale")).toThrow("staleTarget");
+    expect(() => saveAnswer(d, answer, "stale")).toThrow("staleTarget");
+    expect(d).toEqual(old);
     d.roles.splice(0, 1);
-    expect(() => applyAnswer(d, answer, role.context.id)).toThrow(
-      "staleTarget",
-    );
+    expect(() => saveAnswer(d, answer, role.context.id)).toThrow("staleTarget");
   });
 });

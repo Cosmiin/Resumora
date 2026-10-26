@@ -81,8 +81,8 @@ export function validateDraft(d: BaseDraft): Issue[] {
       issues.push({ field: r.company.fieldId, code: "required" });
     if (!r.ongoing.value && reversedDates(r.start.value, r.end.value))
       issues.push({ field: r.end.fieldId, code: "chronology" });
-    for (const b of r.bullets)
-      if (!b.value.trim()) issues.push({ field: b.fieldId, code: "required" });
+    if (r.bullets.some((b) => !b.value.trim()))
+      issues.push({ field: `${r.id}-contributions`, code: "required" });
   }
   for (const e of d.education) {
     if (!e.institution.value.trim())
@@ -94,6 +94,9 @@ export function validateDraft(d: BaseDraft): Issue[] {
     for (const e of s.entries) {
       if (!e.title.value.trim())
         issues.push({ field: e.title.fieldId, code: "required" });
+      for (const b of e.bullets ?? [])
+        if (!b.value.trim())
+          issues.push({ field: b.fieldId, code: "required" });
       if (!e.ongoing?.value && reversedDates(e.start.value, e.end.value))
         issues.push({ field: e.end.fieldId, code: "chronology" });
     }

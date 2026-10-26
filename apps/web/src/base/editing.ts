@@ -23,12 +23,6 @@ export function patchFact<T extends FactValue>(
 }
 export function replaceFact(draft: BaseDraft, current: Fact, updated: Fact) {
   if (current === updated) return;
-  for (const answer of draft.answers) {
-    if (answer.factId === current.id) {
-      answer.factId = updated.id;
-      if (typeof updated.value === "string") answer.text = updated.value;
-    }
-  }
   for (const role of draft.roles)
     if (role.bullets.includes(current as Fact<string>))
       delete draft.presentation.contributionHtml?.[role.id];
@@ -36,46 +30,76 @@ export function replaceFact(draft: BaseDraft, current: Fact, updated: Fact) {
     delete (current as unknown as Record<string, unknown>)[key];
   Object.assign(current, updated);
 }
+export type ContributionEdit = {
+  html: string;
+  fields: { fieldId: string; value: string }[];
+};
+export function readContributions(root: HTMLElement): ContributionEdit {
+  function bind(parent: HTMLElement) {
+    for (const node of Array.from(parent.childNodes)) {
+      if (node instanceof HTMLElement && node.dataset.contribution) continue;
+      if (
+        node instanceof HTMLElement &&
+        (node.matches("ul,ol") || node.querySelector("[data-contribution]"))
+      )
+        bind(node);
+      else if (node instanceof HTMLElement || node.textContent?.trim()) {
+        const block =
+          node instanceof HTMLElement && node.matches("div,p,li")
+            ? node
+            : document.createElement("div");
+        if (block !== node) {
+          parent.insertBefore(block, node);
+          block.append(node);
+        }
+        block.dataset.contribution = localId();
+      }
+    }
+  }
+  bind(root);
+  const fields = new Map<string, string>();
+  for (const block of root.querySelectorAll<HTMLElement>(
+    "[data-contribution]",
+  )) {
+    const content = block.cloneNode(true) as HTMLElement;
+    for (const nested of content.querySelectorAll("[data-contribution]"))
+      nested.replaceWith(document.createElement("br"));
+    const id = block.dataset.contribution!;
+    const value = richText(content.innerHTML);
+    fields.set(id, fields.has(id) ? fields.get(id) + "\n" + value : value);
+  }
+  return {
+    html: safeRichHtml(root.innerHTML, [...fields.keys()]),
+    fields: [...fields].map(([fieldId, value]) => ({ fieldId, value })),
+  };
+}
 export function setContributions(
   draft: BaseDraft,
   roleId: string,
-  html: string,
+  edit: ContributionEdit,
 ) {
   const next = clone(draft);
   const role = next.roles.find((r) => r.id === roleId)!;
-  const lines = richLines(html);
   const previous = role.bullets;
-  for (const current of previous) {
-    const parts = current.value
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (!parts.length || !current.value.includes("\n")) continue;
-    const start = lines.findIndex((_, i) =>
-      parts.every((part, j) => lines[i + j] === part),
-    );
-    if (start >= 0) lines.splice(start, parts.length, current.value);
-  }
-  const available = new Set(previous);
-  const matches = lines.map((value) => {
-    const current = previous.find((f) => available.has(f) && f.value === value);
-    if (current) available.delete(current);
-    return current;
-  });
-  const replacements =
-    matches.filter((f) => !f).length === available.size ? [...available] : [];
-  role.bullets = lines.map((value, i) => {
-    const current = matches[i] ?? replacements.shift();
-    if (!current) return fact(value);
+  role.bullets = edit.fields.map(({ fieldId, value }) => {
+    const current = previous.find((f) => f.fieldId === fieldId);
+    if (!current) return { ...fact(value), fieldId };
     replaceFact(next, current, editFact(current, value));
     return current;
   });
-  const removed = previous.filter((f) => !role.bullets.includes(f));
   for (const answer of next.answers)
-    if (removed.some((f) => f.id === answer.factId)) delete answer.factId;
+    if (
+      answer.targetId === roleId &&
+      answer.cvFieldId &&
+      !role.bullets.some((f) => f.fieldId === answer.cvFieldId)
+    )
+      delete answer.cvFieldId;
   next.presentation.contributionHtml = {
     ...next.presentation.contributionHtml,
-    [roleId]: safeRichHtml(html),
+    [roleId]: safeRichHtml(
+      edit.html,
+      role.bullets.map((f) => f.fieldId),
+    ),
   };
   return next;
 }
@@ -105,6 +129,23 @@ export function focusField(id: string) {
     control?.scrollIntoView?.({ block: "nearest", behavior: "instant" });
   });
 }
+export function focusFirstField(id: string) {
+  requestAnimationFrame(() => {
+    const container = document.getElementById(id);
+    const fields = Array.from(
+      container?.querySelectorAll<HTMLElement>(
+        "input:not([type=checkbox]),textarea,select,[contenteditable=true],[contenteditable=plaintext-only]",
+      ) ?? [],
+    );
+    const first =
+      fields.find(
+        (el) =>
+          !("value" in el ? String(el.value) : (el.textContent ?? "")).trim(),
+      ) ?? fields[0];
+    if (first?.id) focusField(first.id);
+    else container?.querySelector<HTMLElement>("button.btn")?.focus();
+  });
+}
 export function dateInput(value: { year: string; month: string }) {
   return value.month
     ? `${value.month.padStart(2, "0")}/${value.year}`
@@ -130,7 +171,10 @@ export const languageLevels = [
   "C1",
   "C2",
 ];
-export function safeRichHtml(value: string): string {
+export function safeRichHtml(
+  value: string,
+  contributionIds: readonly string[] = [],
+): string {
   const doc = document.implementation.createHTMLDocument();
   doc.body.innerHTML = value;
   const allowed = new Set([
@@ -153,7 +197,11 @@ export function safeRichHtml(value: string): string {
     else if (!allowed.has(el.tagName)) el.replaceWith(...el.childNodes);
     else
       for (const attr of Array.from(el.attributes))
-        el.removeAttribute(attr.name);
+        if (
+          attr.name !== "data-contribution" ||
+          !contributionIds.includes(attr.value)
+        )
+          el.removeAttribute(attr.name);
   }
   return doc.body.innerHTML;
 }
@@ -178,13 +226,6 @@ export function richText(value: string): string {
   }
   return read(doc.body);
 }
-export function richLines(value: string): string[] {
-  return richText(value)
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 export function prepareDraft(draft: BaseDraft): BaseDraft {
   const next = clone(draft);
   for (const kind of ["email", "phone", "location", "social"] as const) {

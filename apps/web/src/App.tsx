@@ -483,7 +483,10 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                     <DocumentPreview
                       draft={draft}
                       asOf={asOf}
-                      onEdit={focusField}
+                      onEdit={(id) => {
+                        go("base");
+                        focusField(id);
+                      }}
                     />
                   </div>
                 </>

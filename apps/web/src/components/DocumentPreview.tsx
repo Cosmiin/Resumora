@@ -4,7 +4,7 @@ import { hasValue, isAuthored, type BaseDraft, type Fact } from "../base/model";
 import { richText, safeRichHtml } from "../base/editing";
 import { sectionName } from "../base/sections";
 import { LanguageContext, useCopy } from "./ui";
-function PreviewText({
+export function PreviewText({
   value,
   label,
   change,
@@ -210,7 +210,7 @@ export function DocumentPreview({
               <p className="document-meta">
                 {block(date(e.start), e.start.fieldId)} —{" "}
                 {e.ongoing?.value
-                  ? cv("În curs", "Ongoing")
+                  ? block(cv("În curs", "Ongoing"), e.ongoing.fieldId)
                   : block(date(e.end), e.end.fieldId)}
               </p>
               {text(e.details) && (

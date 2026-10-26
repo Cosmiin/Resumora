@@ -11,8 +11,12 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { App } from "../App";
 import { MemoryBaseCvAdapter } from "../base/adapter";
-import { applyAnswer, enrichmentTarget } from "../base/enrichment";
-import { patchFact, setContributions } from "../base/editing";
+import {
+  saveAnswer,
+  addAnswerToCv,
+  enrichmentTarget,
+} from "../base/enrichment";
+import { patchFact } from "../base/editing";
 import { maraReviewDraft } from "../base/fixture";
 import {
   allFacts,
@@ -82,97 +86,158 @@ function EnrichmentSurface({
   );
 }
 
-it.each(kinds)(
-  "edits pending and revisited %s answers in their own preview fields without changing original details",
+function saveAndAdd(
+  d: BaseDraft,
+  targetId: string,
+  text: string,
+  id = "answer",
+  question: "context" | "tools" = "context",
+) {
+  const target = enrichmentTarget(d, targetId)!;
+  const saved = saveAnswer(
+    d,
+    {
+      id,
+      targetId,
+      question,
+      questionText: `Full ${question} question?`,
+      text,
+      status: "draft",
+    },
+    target.field.id,
+  );
+  return addAnswerToCv(saved, id, target.field.id);
+}
+function textBox(preview: HTMLElement, value: string) {
+  return within(preview)
+    .getAllByRole("textbox")
+    .find((el) => el.textContent === value)!;
+}
+it.each(["role", ...kinds] as const)(
+  "saves %s career Q&A independently and adds, updates and removes a CV copy only explicitly",
   async (kind) => {
-    const initial = blankDraft(),
-      entry = newOptionalEntry();
-    entry.title = fact("Synthetic entry");
-    entry.details = fact("Original details");
-    initial.optionalSections.push({
-      id: kind,
-      kind,
-      label: "",
-      entries: [entry],
-    });
-    initial.presentation.order.push(kind);
+    const initial = blankDraft();
+    let targetId: string;
+    if (kind === "role") {
+      const r = newRole();
+      r.title = fact("Role");
+      r.company = fact("Company");
+      initial.roles.push(r);
+      targetId = r.id;
+    } else {
+      const e = newOptionalEntry();
+      e.title = fact("Entry");
+      initial.optionalSections.push({
+        id: kind,
+        kind,
+        label: "",
+        entries: [e],
+      });
+      initial.presentation.order.push(kind);
+      targetId = e.id;
+    }
+    enrichmentTarget(initial, targetId)!.field.value = "Original details";
     let latest = initial;
     const user = userEvent.setup();
     render(
       <EnrichmentSurface
         initial={initial}
-        changed={(d) => {
-          latest = d;
+        changed={(next) => {
+          latest = next;
         }}
       />,
     );
-    const preview = screen.getByRole("complementary", { name: "CV preview" });
-    const answer = screen.getByRole("textbox", {
+    const question = screen.getByRole("textbox", {
       name: "What were your day-to-day responsibilities?",
     });
-    await user.type(answer, "Pending answer");
-    const pending = within(preview).getByText("Pending answer");
-    expect(pending.getAttribute("role")).toBe("textbox");
-    pending.textContent = "Edited pending answer";
+    await user.type(question, "Pending");
+    const career = screen.getByRole("region", { name: "Career context" });
+    const pending = within(career).getByRole("textbox", {
+      name: "Answer preview",
+    });
+    pending.focus();
+    pending.innerHTML = "First<br>Second";
     fireEvent.input(pending);
-    expect((answer as HTMLTextAreaElement).value).toBe("Edited pending answer");
-    expect(latest.optionalSections.at(-1)!.entries[0].details.value).toBe(
+    expect(document.activeElement).toBe(pending);
+    expect(latest.roles).toEqual(initial.roles);
+    expect(latest.optionalSections).toEqual(initial.optionalSections);
+    await user.keyboard("{Control>}{Enter}{/Control}");
+    expect(
+      screen.getByRole("textbox", {
+        name: "What did you do yourself, with what autonomy?",
+      }),
+    ).toBe(document.activeElement);
+    expect(latest.answers[0]).toMatchObject({
+      questionText: "What were your day-to-day responsibilities?",
+      text: "First\nSecond",
+      status: "confirmed",
+    });
+    expect(enrichmentTarget(latest, targetId)!.entry.bullets ?? []).toEqual([]);
+    const cv = screen.getByRole("complementary", { name: "CV preview" });
+    expect(cv.textContent).not.toContain("First");
+    await user.click(within(career).getByRole("button", { name: "Add to CV" }));
+    const fieldId = latest.answers[0].cvFieldId;
+    expect(enrichmentTarget(latest, targetId)!.entry.bullets).toHaveLength(1);
+    const copy = textBox(cv, "First\nSecond");
+    copy.textContent = "Independent CV wording";
+    fireEvent.input(copy);
+    expect(latest.answers[0].text).toBe("First\nSecond");
+    await user.click(
+      within(career).getByRole("button", { name: "Edit answer" }),
+    );
+    const revising = screen.getByRole("textbox", {
+      name: "What were your day-to-day responsibilities?",
+    });
+    await user.clear(revising);
+    await user.type(revising, "Revised context{Control>}{Enter}{/Control}");
+    expect(enrichmentTarget(latest, targetId)!.entry.bullets![0].value).toBe(
+      "Independent CV wording",
+    );
+    await user.click(
+      within(career).getByRole("button", { name: "Update in CV" }),
+    );
+    expect(enrichmentTarget(latest, targetId)!.entry.bullets).toHaveLength(1);
+    expect(enrichmentTarget(latest, targetId)!.entry.bullets![0]).toMatchObject(
+      { fieldId, value: "Revised context" },
+    );
+    await user.click(
+      within(career).getByRole("button", { name: "Remove from CV" }),
+    );
+    expect(latest.answers[0].text).toBe("Revised context");
+    expect(latest.answers[0].questionText).toBe(
+      "What were your day-to-day responsibilities?",
+    );
+    expect(enrichmentTarget(latest, targetId)!.field.value).toBe(
       "Original details",
     );
-    await user.keyboard("{Control>}{Enter}{/Control}");
-    await user.keyboard("Second answer{Control>}{Enter}{/Control}");
-    for (let i = 0; i < 5; i++)
-      await user.keyboard("{Control>}{Shift>}j{/Shift}{/Control}");
-    const revisited = screen.getByRole("textbox", {
-      name: "What were your day-to-day responsibilities?",
+    expect(enrichmentTarget(latest, targetId)!.entry.bullets).toEqual([]);
+    const activePreview = within(career).getByRole("textbox", {
+      name: "Answer preview",
     });
-    expect((revisited as HTMLTextAreaElement).value).toBe(
-      "Edited pending answer",
-    );
-    await user.clear(revisited);
-    await user.type(revisited, "Revised first answer");
-    expect(within(preview).queryByText("Edited pending answer")).toBeNull();
-    expect(within(preview).getAllByText("Original details")).toHaveLength(1);
-    expect(within(preview).getAllByText("Revised first answer")).toHaveLength(
-      1,
-    );
-    await user.keyboard("{Control>}{Enter}{/Control}");
-    const updated = latest.optionalSections.at(-1)!.entries[0];
-    expect(updated.details).toEqual(entry.details);
-    expect(updated.bullets?.map((f) => f.value)).toEqual([
-      "Revised first answer",
-      "Second answer",
-    ]);
-    for (const a of latest.answers.filter((a) => a.factId))
-      expect(allFacts(latest).find((f) => f.id === a.factId)?.value).toBe(
-        a.text,
-      );
+    activePreview.focus();
+    await user.keyboard("{Control>}{Shift>}k{/Shift}{/Control}");
+    expect(
+      latest.answers.some(
+        (a) => a.question === "ownership" && a.status === "unknown",
+      ),
+    ).toBe(true);
+    textBox(cv, "Original details").focus();
+    await user.keyboard("{Control>}{Shift>}j{/Shift}{/Control}");
+    expect(
+      latest.answers.some(
+        (a) => a.question === "tools" && a.status === "skipped",
+      ),
+    ).toBe(true);
   },
 );
 
-it("shows preview corrections in the rich editor and keeps them when editing formatted contributions", async () => {
+it("shows factual preview corrections in the rich editor while preserving the independent answer", async () => {
   const d = blankDraft(),
-    role = newRole();
-  role.title = fact("Analyst");
-  role.company = fact("Synthetic Co");
-  d.roles.push(role);
-  const enriched = applyAnswer(
-    d,
-    {
-      id: "answer",
-      targetId: role.id,
-      question: "context",
-      text: "Old wording",
-      status: "draft",
-      mode: "append",
-    },
-    role.context.id,
-  );
-  const initial = setContributions(
-    enriched,
-    role.id,
-    "<p><b>Old wording</b></p>",
-  );
+    r = newRole();
+  r.title = fact("Analyst");
+  r.company = fact("Synthetic Co");
+  d.roles.push(r);
+  const initial = saveAndAdd(d, r.id, "Old wording");
   let latest = initial;
   const user = userEvent.setup();
   render(
@@ -183,31 +248,26 @@ it("shows preview corrections in the rich editor and keeps them when editing for
       }}
     />,
   );
-  const preview = screen.getByRole("complementary", { name: "CV preview" });
-  const bullet = within(preview).getByText("Old wording");
-  bullet.textContent = "Corrected wording";
-  fireEvent.input(bullet);
-  expect(latest.answers[0].factId).toBe(latest.roles[0].bullets[0].id);
-  await user.click(
-    within(preview).getByRole("button", { name: "Synthetic Co" }),
-  );
-  await user.click(
-    screen.getByText("Professional experience", { selector: "summary" }),
+  const cv = screen.getByRole("complementary", { name: "CV preview" });
+  const copy = textBox(cv, "Old wording");
+  copy.textContent = "Corrected wording";
+  fireEvent.input(copy);
+  expect(latest.answers[0].text).toBe("Old wording");
+  await user.click(within(cv).getByRole("button", { name: "Synthetic Co" }));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("textbox", { name: /^Company/ }),
+    ),
   );
   const rich = screen.getByRole("textbox", { name: "Contributions" });
   expect(rich.textContent).toBe("Corrected wording");
-  expect(
-    screen.getByRole("complementary", { name: "CV preview" }).textContent,
-  ).not.toContain("Old wording");
-  rich.innerHTML = "<p><i>Corrected wording</i> retained</p>";
+  rich.querySelector<HTMLElement>("[data-contribution]")!.innerHTML =
+    "<i>Corrected wording</i> retained";
   fireEvent.input(rich);
   expect(latest.roles[0].bullets.map((f) => f.value)).toEqual([
     "Corrected wording retained",
   ]);
-  expect(latest.answers[0]).toMatchObject({
-    text: "Corrected wording retained",
-    factId: latest.roles[0].bullets[0].id,
-  });
+  expect(latest.answers[0].text).toBe("Old wording");
 });
 
 it("reveals missing languages on save, focuses Add, then focuses and explains an omitted proficiency", async () => {
@@ -423,32 +483,17 @@ it("labels autosave, explicit save and restore snapshots distinctly in history",
   expect(cards[2].textContent).not.toContain("Explicit save");
 });
 
-it("preserves answer identity when inserting a native rich-text line before existing answers", async () => {
+it("keeps explicit associations through native rich insertion and later context revision", async () => {
   const d = completeIdentity(),
     role = newRole();
   role.title = fact("Analist");
   role.company = fact("Synthetic Co");
   d.roles.push(role);
-  let enriched = d;
-  for (const [id, question, text] of [
-    ["a", "context", "Answer A"],
-    ["b", "tools", "Answer B"],
-  ] as const)
-    enriched = applyAnswer(
-      enriched,
-      {
-        id,
-        question,
-        text,
-        targetId: role.id,
-        status: "draft",
-        mode: "append",
-      },
-      role.context.id,
-    );
+  let initial = saveAndAdd(d, role.id, "Answer A", "a");
+  initial = saveAndAdd(initial, role.id, "Answer B", "b", "tools");
   const adapter = new MemoryBaseCvAdapter();
   await adapter.save({
-    draft: enriched,
+    draft: initial,
     expectedRevision: 0,
     mode: "autosave",
     requestId: "initial",
@@ -460,22 +505,22 @@ it("preserves answer identity when inserting a native rich-text line before exis
     await screen.findByText("Experiență profesională", { selector: "summary" }),
   );
   const rich = screen.getByRole("textbox", { name: "Contribuții" });
-  rich.innerHTML = "New<div>Answer A</div><div>Answer B</div>";
+  const leading = document.createElement("p");
+  leading.textContent = "New";
+  rich.prepend(leading);
   fireEvent.input(rich);
   await user.click(screen.getByRole("link", { name: "Îmbunătățește" }));
   const answer = await screen.findByRole("textbox", {
-    name: "Care erau responsabilitățile tale de zi cu zi?",
+    name: "Full context question?",
   });
   expect((answer as HTMLTextAreaElement).value).toBe("Answer A");
-  const preview = screen.getByRole("complementary", {
-    name: "Previzualizare CV",
-  });
-  expect(within(preview).getByText("New")).toBeTruthy();
   await user.clear(answer);
   await user.type(answer, "Revised A{Control>}{Enter}{/Control}");
-  expect(within(preview).getAllByText("Revised A")).toHaveLength(1);
-  expect(within(preview).getAllByText("Answer B")).toHaveLength(1);
-  expect(within(preview).queryByText("Answer A")).toBeNull();
+  const cv = screen.getByRole("complementary", { name: "Previzualizare CV" });
+  expect(textBox(cv, "Answer A")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Actualizează în CV" }));
+  expect(textBox(cv, "Revised A")).toBeTruthy();
+  expect(textBox(cv, "Answer B")).toBeTruthy();
   await waitFor(
     async () => {
       const saved = (await adapter.load())!.draft;
@@ -484,8 +529,8 @@ it("preserves answer identity when inserting a native rich-text line before exis
         "Revised A",
         "Answer B",
       ]);
-      expect(saved.answers.find((a) => a.id === "b")!.factId).toBe(
-        enriched.answers.find((a) => a.id === "b")!.factId,
+      expect(saved.answers.find((a) => a.id === "b")!.cvFieldId).toBe(
+        initial.answers.find((a) => a.id === "b")!.cvFieldId,
       );
     },
     { timeout: 2000 },
@@ -580,100 +625,82 @@ function completedDraft() {
 }
 
 it.each(["role", ...kinds] as const)(
-  "publishes %s preview input before autosave and keyboard save, retains focus and accepts its local destination edit",
+  "publishes %s CV edits and career-context preview edits before save without coupling them",
   async (kind) => {
     const d = completedDraft();
     let targetId: string;
     if (kind === "role") {
-      const role = newRole();
-      role.title = fact("Analist");
-      role.company = fact("Synthetic Co");
-      d.roles.push(role);
-      targetId = role.id;
+      const r = newRole();
+      r.title = fact("Analist");
+      r.company = fact("Synthetic Co");
+      d.roles.push(r);
+      targetId = r.id;
     } else {
-      const entry = newOptionalEntry();
-      entry.title = fact("Synthetic entry");
-      d.optionalSections.push({ id: kind, kind, label: "", entries: [entry] });
+      const e = newOptionalEntry();
+      e.title = fact("Entry");
+      d.optionalSections.push({ id: kind, kind, label: "", entries: [e] });
       d.presentation.order.push(kind);
-      targetId = entry.id;
+      targetId = e.id;
     }
-    const target = enrichmentTarget(d, targetId)!;
-    target.field.value = "Original context";
-    const initial = applyAnswer(
+    enrichmentTarget(d, targetId)!.field.value = "Original context";
+    const initial = saveAndAdd(
       d,
-      {
-        id: "tools-answer",
-        targetId,
-        question: "tools",
-        text: "Original answer",
-        status: "draft",
-        mode: "append",
-      },
-      target.field.id,
+      targetId,
+      "Original answer",
+      "tools-answer",
+      "tools",
     );
     const adapter = new MemoryBaseCvAdapter();
     await adapter.save({
       draft: initial,
-      mode: "checkpoint",
       expectedRevision: 0,
       requestId: "initial",
     });
     window.location.hash = "#enrich";
     const user = userEvent.setup();
     render(<App adapter={adapter} />);
-    const question = await screen.findByRole("textbox", {
+    await screen.findByRole("textbox", {
       name: "Care erau responsabilitățile tale de zi cu zi?",
     });
-    const preview = screen.getByRole("complementary", {
-      name: "Previzualizare CV",
-    });
-    const context = within(preview).getByText("Original context");
+    const cv = screen.getByRole("complementary", { name: "Previzualizare CV" });
+    const context = textBox(cv, "Original context");
     context.focus();
     context.textContent = "";
     fireEvent.input(context);
     expect(context.isConnected).toBe(true);
-    expect(document.activeElement).toBe(context);
     context.innerHTML = "First<br>Second";
     fireEvent.input(context);
     expect(document.activeElement).toBe(context);
     await waitFor(
-      async () => {
-        const saved = (await adapter.load())!;
-        expect(saved.reason).toBe("autosave");
-        expect(enrichmentTarget(saved.draft, targetId)!.field.value).toBe(
-          "First\nSecond",
-        );
-      },
+      async () =>
+        expect(
+          enrichmentTarget((await adapter.load())!.draft, targetId)!.field
+            .value,
+        ).toBe("First\nSecond"),
       { timeout: 2000 },
     );
-    const bullet = within(preview).getByText("Original answer");
-    bullet.focus();
-    bullet.innerHTML = "Updated<div>Answer</div>";
-    fireEvent.input(bullet);
-    expect(document.activeElement).toBe(bullet);
+    const copy = textBox(cv, "Original answer");
+    copy.focus();
+    copy.innerHTML = "Updated<div>Answer</div>";
+    fireEvent.input(copy);
     await user.keyboard("{Control>}s{/Control}");
     await waitFor(async () => {
       const saved = (await adapter.load())!;
       expect(saved.reason).toBe("save");
-      const entry = enrichmentTarget(saved.draft, targetId)!.entry;
-      expect(entry.bullets!.map((f) => f.value)).toEqual(["Updated\nAnswer"]);
       expect(
-        saved.draft.answers.find((a) => a.id === "tools-answer"),
-      ).toMatchObject({
-        text: "Updated\nAnswer",
-        factId: entry.bullets![0].id,
-      });
+        enrichmentTarget(saved.draft, targetId)!.entry.bullets![0].value,
+      ).toBe("Updated\nAnswer");
+      expect(
+        saved.draft.answers.find((a) => a.id === "tools-answer")!.text,
+      ).toBe("Original answer");
     });
-    await user.type(question, "Pending text");
-    const pending = within(preview).getByText("Pending text");
+    const pending = screen.getByRole("textbox", {
+      name: "Previzualizare răspuns",
+    });
     pending.focus();
-    pending.textContent = "";
-    fireEvent.input(pending);
-    expect(pending.isConnected).toBe(true);
     pending.innerHTML = "Pending<br>Answer";
     fireEvent.input(pending);
     expect(document.activeElement).toBe(pending);
-    expect((question as HTMLTextAreaElement).value).toBe("Pending\nAnswer");
     await user.keyboard("{Control>}s{/Control}");
     await waitFor(async () =>
       expect(
@@ -682,7 +709,6 @@ it.each(["role", ...kinds] as const)(
         )!.text,
       ).toBe("Pending\nAnswer"),
     );
-    question.focus();
     await user.keyboard("{Control>}{Enter}{/Control}");
     expect(
       await screen.findByRole("textbox", {
@@ -691,13 +717,15 @@ it.each(["role", ...kinds] as const)(
     ).toBe(document.activeElement);
     expect(screen.queryByText(/Destinația s-a schimbat/)).toBeNull();
     await waitFor(
-      async () =>
+      async () => {
+        const saved = (await adapter.load())!.draft;
         expect(
-          enrichmentTarget(
-            (await adapter.load())!.draft,
-            targetId,
-          )!.entry.bullets!.map((f) => f.value),
-        ).toEqual(["Updated\nAnswer", "Pending\nAnswer"]),
+          saved.answers.find((a) => a.question === "context")!.status,
+        ).toBe("confirmed");
+        expect(
+          enrichmentTarget(saved, targetId)!.entry.bullets!.map((f) => f.value),
+        ).toEqual(["Updated\nAnswer"]);
+      },
       { timeout: 2000 },
     );
   },
@@ -889,3 +917,271 @@ it.each(["incomplete", "extracted"] as const)(
     ).toBeTruthy();
   },
 );
+
+it("reveals and marks the combined Contributions control after a preview copy is cleared, preserving its saved Q&A", async () => {
+  const d = completedDraft(),
+    r = newRole();
+  r.title = fact("Analist");
+  r.company = fact("Company");
+  d.roles.push(r);
+  const initial = saveAndAdd(d, r.id, "Saved career context");
+  const adapter = new MemoryBaseCvAdapter();
+  await adapter.save({
+    draft: initial,
+    expectedRevision: 0,
+    requestId: "initial",
+  });
+  window.location.hash = "#enrich";
+  const user = userEvent.setup();
+  render(<App adapter={adapter} />);
+  await screen.findByRole("textbox", { name: "Full context question?" });
+  const cv = screen.getByRole("complementary", { name: "Previzualizare CV" });
+  const copy = textBox(cv, "Saved career context");
+  copy.focus();
+  copy.textContent = "";
+  fireEvent.input(copy);
+  await user.keyboard("{Control>}s{/Control}");
+  const rich = await screen.findByRole("textbox", { name: "Contribuții" });
+  await waitFor(() => expect(document.activeElement).toBe(rich));
+  expect(rich.getAttribute("aria-invalid")).toBe("true");
+  const error = document.getElementById(
+    rich.getAttribute("aria-describedby")!,
+  )!;
+  expect(error.textContent).toContain("Completează câmpul");
+  expect(rich.closest("details")!.open).toBe(true);
+  rich.innerHTML = "";
+  fireEvent.input(rich);
+  await user.keyboard("{Control>}s{/Control}");
+  await waitFor(async () => {
+    const saved = (await adapter.load())!.draft;
+    expect(saved.roles[0].bullets).toEqual([]);
+    expect(saved.answers[0].text).toBe("Saved career context");
+    expect(saved.answers[0].cvFieldId).toBeUndefined();
+  });
+});
+
+it.each(["experience", "education"] as const)(
+  "reveals the first empty field in collapsed %s entries on section and entry opening",
+  async (kind) => {
+    const d = blankDraft();
+    let firstId: string, secondId: string, secondEntry: string;
+    if (kind === "experience") {
+      for (const n of [1, 2]) {
+        const r = newRole();
+        r.title = fact(`Role ${n}`);
+        r.company = fact("Company");
+        r.location = fact("City");
+        r.start = fact({ year: "2020", month: "" });
+        r.end = fact({ year: "2021", month: "" });
+        d.roles.push(r);
+      }
+      firstId = d.roles[0].context.fieldId;
+      secondId = d.roles[1].context.fieldId;
+      secondEntry = d.roles[1].id;
+    } else {
+      for (const n of [1, 2]) {
+        const e = newEducation();
+        e.institution = fact(`School ${n}`);
+        e.qualification = fact("Degree");
+        e.field = fact("Field");
+        e.location = fact("City");
+        e.start = fact({ year: "2015", month: "" });
+        e.end = fact({ year: "2019", month: "" });
+        d.education.push(e);
+      }
+      firstId = d.education[0].details.fieldId;
+      secondId = d.education[1].details.fieldId;
+      secondEntry = d.education[1].id;
+    }
+    function Surface() {
+      const [draft, change] = useState(d);
+      return (
+        <LanguageContext.Provider value="en">
+          <Editor draft={draft} change={change} issues={[]} />
+        </LanguageContext.Provider>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Surface />);
+    await user.click(
+      screen.getByText(
+        kind === "experience" ? "Professional experience" : "Education",
+        { selector: "summary" },
+      ),
+    );
+    await waitFor(() => expect(document.activeElement?.id).toBe(firstId));
+    expect(document.activeElement?.closest("details:not([open])")).toBeNull();
+    const second = document.getElementById(`entry-${secondEntry}`)!;
+    await user.click(second.querySelector("summary")!);
+    await waitFor(() => expect(document.activeElement?.id).toBe(secondId));
+    expect(document.activeElement?.closest("details:not([open])")).toBeNull();
+  },
+);
+
+it.each(["name", "skills", "role", "education", "project", "summary"] as const)(
+  "navigates the %s preview block from Review to its focused editor control",
+  async (kind) => {
+    const d = completedDraft(),
+      r = newRole(),
+      e = newEducation(),
+      project = newOptionalEntry();
+    r.title = fact("Analist");
+    r.company = fact("Preview Company");
+    r.ongoing = fact(true);
+    d.roles.push(r);
+    e.institution = fact("Preview School");
+    e.ongoing = fact(true);
+    d.education.push(e);
+    project.title = fact("Project");
+    project.details = fact("Project details");
+    d.optionalSections.push({
+      id: "projects",
+      kind: "projects",
+      label: "",
+      entries: [project],
+    });
+    d.presentation.order.push("projects");
+    d.technicalSkills = [fact("React")];
+    d.summary.text = "Own summary";
+    const name = {
+      name: "Editează: Prenume",
+      skills: "Editează: Competențe tehnice",
+      role: "Preview Company",
+      education: "În curs",
+      project: "Project details",
+      summary: "Editează: Rezumat profesional",
+    }[kind];
+    const expected = {
+      name: "first-name",
+      skills: "chip-Competențe tehnice",
+      role: r.company.fieldId,
+      education: e.ongoing.fieldId,
+      project: project.details.fieldId,
+      summary: "summary",
+    }[kind];
+    const adapter = new MemoryBaseCvAdapter();
+    await adapter.save({ draft: d, expectedRevision: 0, requestId: "initial" });
+    window.location.hash = "#review";
+    const user = userEvent.setup();
+    render(<App adapter={adapter} />);
+    const preview = await screen.findByRole("complementary", {
+      name: "Previzualizare CV",
+    });
+    await user.click(
+      within(preview).getByRole("button", { name, exact: true }),
+    );
+    await waitFor(() => expect(document.activeElement?.id).toBe(expected));
+    expect(window.location.hash).toBe("#base");
+    expect(document.activeElement?.closest("details:not([open])")).toBeNull();
+  },
+);
+
+it("retains reusable questions and answers after their role is deleted", async () => {
+  const d = completedDraft(),
+    r = newRole();
+  r.title = fact("Role");
+  r.company = fact("Company");
+  d.roles.push(r);
+  const initial = saveAndAdd(d, r.id, "Reusable context");
+  const adapter = new MemoryBaseCvAdapter();
+  await adapter.save({
+    draft: initial,
+    expectedRevision: 0,
+    requestId: "initial",
+  });
+  window.location.hash = "#base";
+  const user = userEvent.setup();
+  render(<App adapter={adapter} />);
+  await user.click(
+    await screen.findByText("Experiență profesională", { selector: "summary" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Elimină experiența" }));
+  await user.click(screen.getByRole("link", { name: "Îmbunătățește" }));
+  const context = screen.getByRole("region", { name: "Context profesional" });
+  expect(within(context).getByText("Reusable context")).toBeTruthy();
+  expect(within(context).getByText("Full context question?")).toBeTruthy();
+  await waitFor(
+    async () => {
+      const saved = (await adapter.load())!.draft;
+      expect(saved.roles).toEqual([]);
+      expect(saved.answers[0].text).toBe("Reusable context");
+      expect(saved.answers[0].cvFieldId).toBeUndefined();
+    },
+    { timeout: 2000 },
+  );
+});
+
+it("inspects full saved Q&A independently of CV wording in immutable history snapshots", async () => {
+  const d = completedDraft(),
+    role = newRole();
+  role.title = fact("Role");
+  role.company = fact("Company");
+  d.roles.push(role);
+  const contextOnly = saveAnswer(
+    d,
+    {
+      id: "context",
+      targetId: role.id,
+      question: "context",
+      questionText: "What did you personally own?",
+      text: "First\nSecond",
+      status: "draft",
+    },
+    role.context.id,
+  );
+  const adapter = new MemoryBaseCvAdapter();
+  const first = await adapter.save({
+    draft: contextOnly,
+    mode: "autosave",
+    expectedRevision: 0,
+    requestId: "one",
+  });
+  const withCopy = addAnswerToCv(contextOnly, "context", role.context.id);
+  const edited = patchFact(
+    withCopy,
+    withCopy.roles[0].bullets[0],
+    "Independent CV wording",
+  );
+  const second = await adapter.save({
+    draft: edited,
+    mode: "autosave",
+    expectedRevision: 1,
+    requestId: "two",
+  });
+  const versions = await adapter.history();
+  function Surface() {
+    const [inspected, setInspected] = useState<typeof first | null>(first);
+    return (
+      <LanguageContext.Provider value="en">
+        <HistoryScreen
+          draft
+          versions={versions}
+          head={second}
+          inspected={inspected}
+          setInspected={setInspected}
+          restore={() => {}}
+          go={() => {}}
+          asOf={asOf}
+        />
+      </LanguageContext.Provider>
+    );
+  }
+  const user = userEvent.setup();
+  render(<Surface />);
+  expect(
+    screen.getByRole("complementary", { name: "CV preview" }).textContent,
+  ).not.toContain("First");
+  const context = screen.getByRole("region", { name: "Saved career context" });
+  expect(
+    within(context).getByText("What did you personally own?"),
+  ).toBeTruthy();
+  expect(context.textContent).toContain("First\nSecond");
+  await user.click(screen.getByRole("button", { name: "Inspect v2" }));
+  expect(
+    screen.getByRole("complementary", { name: "CV preview" }).textContent,
+  ).toContain("Independent CV wording");
+  expect(
+    screen.getByRole("region", { name: "Saved career context" }).textContent,
+  ).toContain("First\nSecond");
+  expect((await adapter.history())[1]).toEqual(first);
+});
