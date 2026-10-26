@@ -7,7 +7,8 @@ export type Fact<T extends FactValue = FactValue> = {
   id: string;
   fieldId: string;
   value: T;
-  status: "draft" | "extracted_unconfirmed" | "user_confirmed";
+  status:
+    "draft" | "extracted_unconfirmed" | "user_confirmed" | "user_authored";
   sourceId: string;
   sourceClaimId?: string;
   sourceLineage?: { sourceId: string; sourceClaimId?: string }[];
@@ -34,6 +35,7 @@ export type Contact = {
   kind: "email" | "phone" | "location" | "address" | "social";
   value: Fact<string>;
   visible: boolean;
+  platform?: "linkedin" | "website" | "github" | "other";
 };
 export type Role = {
   id: string;
@@ -55,6 +57,7 @@ export type Education = {
   start: Fact<PartialDate>;
   end: Fact<PartialDate>;
   details: Fact<string>;
+  ongoing?: Fact<boolean>;
 };
 export type OptionalKind =
   "projects" | "certifications" | "languages" | "volunteering" | "custom";
@@ -64,6 +67,8 @@ export type OptionalEntry = {
   details: Fact<string>;
   start: Fact<PartialDate>;
   end: Fact<PartialDate>;
+  proficiency?: Fact<string>;
+  ongoing?: Fact<boolean>;
 };
 export type OptionalSection = {
   id: string;
@@ -74,7 +79,14 @@ export type OptionalSection = {
 export type Answer = {
   id: string;
   targetId: string;
-  question: "contribution" | "tools" | "context";
+  question:
+    | "contribution"
+    | "tools"
+    | "context"
+    | "ownership"
+    | "scale"
+    | "impact"
+    | "complexity";
   text: string;
   status: "draft" | "review" | "confirmed" | "skipped" | "unknown";
   mode: "append" | "replace";
@@ -85,6 +97,7 @@ export type BaseDraft = {
   id: string;
   language: Locale;
   name: Fact<string>;
+  nameParts?: { first: string; last: string };
   titles: [Fact<string>, Fact<string>];
   contacts: Contact[];
   summary: Prose;
@@ -101,7 +114,12 @@ export type BaseDraft = {
     claimIds: string[];
   }[];
   answers: Answer[];
-  presentation: { order: string[]; hidden: string[] };
+  presentation: {
+    order: string[];
+    hidden: string[];
+    hiddenFields?: string[];
+    contributionHtml?: Record<string, string>;
+  };
 };
 export const coreSections = [
   "identity",
@@ -116,7 +134,13 @@ export const clone = <T>(value: T): T => structuredClone(value);
 export const manualSourceId = "local_manual";
 export const fact = <T extends FactValue>(value: T): Fact<T> => {
   const id = localId();
-  return { id, fieldId: id, value, status: "draft", sourceId: manualSourceId };
+  return {
+    id,
+    fieldId: id,
+    value,
+    status: "user_authored",
+    sourceId: manualSourceId,
+  };
 };
 export const emptyDate = (): PartialDate => ({ year: "", month: "" });
 export const hasValue = (value: FactValue) =>
@@ -194,8 +218,15 @@ export function blankDraft(): BaseDraft {
     id: localId(),
     language: "ro",
     name: fact(""),
+    nameParts: { first: "", last: "" },
     titles: [fact(""), fact("")],
-    contacts: [],
+    contacts: ["email", "phone", "location", "social"].map((kind) => ({
+      id: localId(),
+      kind: kind as Contact["kind"],
+      value: fact(""),
+      visible: true,
+      ...(kind === "social" ? { platform: "linkedin" as const } : {}),
+    })),
     summary: {
       id: localId(),
       text: "",
@@ -207,11 +238,13 @@ export function blankDraft(): BaseDraft {
     technicalSkills: [],
     roles: [],
     education: [],
-    optionalSections: [],
+    optionalSections: [
+      { id: "languages", kind: "languages", label: "", entries: [] },
+    ],
     sources: [{ id: manualSourceId, kind: "manual", label: "manual" }],
     referenceProse: [],
     answers: [],
-    presentation: { order: [...coreSections], hidden: [] },
+    presentation: { order: [...coreSections, "languages"], hidden: [] },
   };
 }
 export function sectionFacts(d: BaseDraft, section: string): Fact[] {
@@ -239,11 +272,18 @@ export function sectionFacts(d: BaseDraft, section: string): Fact[] {
       e.start,
       e.end,
       e.details,
+      ...(e.ongoing ? [e.ongoing] : []),
     ]);
   return (
     d.optionalSections
       .find((s) => s.id === section)
-      ?.entries.flatMap((e) => [e.title, e.details, e.start, e.end]) ?? []
+      ?.entries.flatMap((e) => [
+        e.title,
+        e.details,
+        e.start,
+        e.end,
+        ...(e.proficiency ? [e.proficiency] : []),
+      ]) ?? []
   );
 }
 export function allFacts(d: BaseDraft): Fact[] {
@@ -268,3 +308,6 @@ export function reorder<T>(items: T[], index: number, direction: -1 | 1): T[] {
   [next[index], next[other]] = [next[other], next[index]];
   return next;
 }
+
+export const isAuthored = (f: Fact) =>
+  f.status === "user_confirmed" || f.status === "user_authored";

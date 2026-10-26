@@ -67,6 +67,7 @@ export function Field({
   multiline,
   type = "text",
   required = false,
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -77,11 +78,13 @@ export function Field({
   multiline?: boolean;
   type?: string;
   required?: boolean;
+  placeholder?: string;
 }) {
   const generated = useId(),
     fieldId = id ?? generated;
   const props = {
     id: fieldId,
+    placeholder,
     value,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       onChange(e.target.value),

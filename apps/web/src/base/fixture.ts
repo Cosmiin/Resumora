@@ -4,5 +4,8 @@ import { clone, type BaseDraft } from "./model";
 // recipe in docs/examples/review-scenarios.json. Never canonical/database UUIDs.
 // Original fixture stays untouched. Shared source claims can back distinct editable fields.
 export function maraReviewDraft(): BaseDraft {
-  return clone(maraProjection);
+  const draft = clone(maraProjection);
+  // Explicit synthetic-fixture mapping, never split an arbitrary imported name.
+  draft.nameParts = { first: "Mara", last: "Ionescu" };
+  return draft;
 }

@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useRef } from "react";
 import {
   ArrowRight,
   FileText,
@@ -17,6 +17,7 @@ import { DocumentPreview } from "./DocumentPreview";
 export function StartChooser({ start }: { start: (draft: BaseDraft) => void }) {
   const t = useCopy(),
     locale = useContext(LanguageContext);
+  const picker = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<FileSelection>({ state: "empty" }),
     [mode, setMode] = useState<"choose" | "file">("choose");
   return (
@@ -61,17 +62,41 @@ export function StartChooser({ start }: { start: (draft: BaseDraft) => void }) {
               "The file will not be read, uploaded, or stored. Only name and size are selected; safety and content are not checked.",
             )}
           </p>
-          <label className="dropzone">
-            {t("Selectează PDF sau DOCX", "Select PDF or DOCX")}
+          <div
+            className="dropzone"
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setFile(
+                e.dataTransfer.files.length === 1
+                  ? selectDocument(e.dataTransfer.files[0])
+                  : { state: "multiple" },
+              );
+            }}
+          >
+            <p>
+              {t(
+                "Trage un PDF/DOCX aici sau alege un fișier.",
+                "Drop a PDF/DOCX here or choose a file.",
+              )}
+            </p>
             <input
+              ref={picker}
+              hidden
               type="file"
               accept=".pdf,.docx"
               onChange={(e) => {
-                setFile(selectDocument(e.target.files?.[0]));
+                if (e.target.files?.[0])
+                  setFile(selectDocument(e.target.files[0]));
                 e.target.value = "";
               }}
             />
-          </label>
+            <Button onClick={() => picker.current?.click()}>
+              {t("Selectează PDF sau DOCX", "Select PDF or DOCX")}
+            </Button>
+          </div>
           <div role="status">
             {file.name && (
               <p>
@@ -85,6 +110,13 @@ export function StartChooser({ start }: { start: (draft: BaseDraft) => void }) {
                 {t(
                   "Selectat local. Nu a fost încărcat sau extras. Introdu manual informațiile pentru a continua.",
                   "Selected locally. Not uploaded or extracted. Enter the facts manually to continue.",
+                )}
+              </p>
+            ) : file.state === "multiple" ? (
+              <p className="field-error">
+                {t(
+                  "Alege un singur fișier sau continuă manual.",
+                  "Choose one file or continue manually.",
                 )}
               </p>
             ) : file.state === "unsupported" ? (

@@ -1,80 +1,172 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 import { formatDate, durationBounds } from "../base/dates";
-import { hasValue, type BaseDraft, type Fact } from "../base/model";
+import { hasValue, isAuthored, type BaseDraft, type Fact } from "../base/model";
+import { safeRichHtml } from "../base/editing";
 import { sectionName } from "../base/sections";
-import { Pill, useCopy } from "./ui";
+import { LanguageContext, useCopy } from "./ui";
 export function DocumentPreview({
   draft: d,
   asOf,
+  onEdit,
+  onTextEdit,
 }: {
   draft: BaseDraft;
   asOf: { year: string; month: string };
+  onEdit?: (id: string) => void;
+  onTextEdit?: (id: string, text: string) => void;
 }) {
   const t = useCopy(),
+    uiLocale = useContext(LanguageContext),
     cv = (ro: string, en: string) => (d.language === "ro" ? ro : en);
+  const live = !!onEdit || !!onTextEdit,
+    hidden = (f: Fact) => d.presentation.hiddenFields?.includes(f.fieldId);
   const text = (f: Fact<string>) =>
-    f.status === "user_confirmed" ? f.value : "";
+    !hidden(f) && (live || isAuthored(f)) ? f.value : "";
+  function block(value: ReactNode, id: string, label?: string): ReactNode {
+    return onEdit ? (
+      <button
+        type="button"
+        className="preview-edit"
+        aria-label={label ? `${t("Editează", "Edit")}: ${label}` : undefined}
+        onClick={() => onEdit(id)}
+      >
+        {value}
+      </button>
+    ) : (
+      value
+    );
+  }
+  function editable(f: Fact<string>, id = f.fieldId): ReactNode {
+    if (!text(f)) return null;
+    if (onTextEdit)
+      return (
+        <span
+          key={f.id}
+          role="textbox"
+          aria-label={t("Text din previzualizare", "Preview text")}
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={(e) => {
+            const value = e.currentTarget.textContent ?? "";
+            if (value !== f.value) onTextEdit(f.fieldId, value);
+          }}
+        >
+          {text(f)}
+        </span>
+      );
+    return block(text(f), id);
+  }
   const date = (f: BaseDraft["roles"][number]["start"]) =>
-    f.status === "user_confirmed" && hasValue(f.value)
-      ? formatDate(f.value, d.language)
-      : cv("Dată necunoscută", "Date unknown");
+    hidden(f)
+      ? ""
+      : (live || isAuthored(f)) && hasValue(f.value)
+        ? formatDate(f.value, d.language)
+        : cv("Dată necunoscută", "Date unknown");
   const eligible = d.roles.filter(
     (r) =>
-      r.start.status === "user_confirmed" &&
-      r.ongoing.status === "user_confirmed" &&
-      (r.ongoing.value || r.end.status === "user_confirmed"),
+      isAuthored(r.start) &&
+      isAuthored(r.ongoing) &&
+      (r.ongoing.value || isAuthored(r.end)),
   );
-  const bounds = durationBounds(eligible, asOf);
-  const unknown = bounds.unknown + d.roles.length - eligible.length;
+  const bounds = durationBounds(eligible, asOf),
+    unknown = bounds.unknown + d.roles.length - eligible.length;
   function content(id: string): ReactNode {
     if (id === "identity")
       return (
         <>
-          <h2>{text(d.name) || cv("Numele tău", "Your name")}</h2>
-          <p className="document-titles">
-            {d.titles.map(text).filter(Boolean).join(" · ")}
-          </p>
-          <p className="document-contacts">
+          {!hidden(d.name) && (
+            <h2>
+              {block(
+                text(d.name) || cv("Numele tău", "Your name"),
+                "first-name",
+                t("Prenume", "First name"),
+              )}
+            </h2>
+          )}
+          <div className="document-titles">
+            {d.titles
+              .filter((f) => text(f))
+              .map((f) => (
+                <span key={f.fieldId}>{block(text(f), f.fieldId)}</span>
+              ))}
+          </div>
+          <div className="document-contacts">
             {d.contacts
-              .filter((c) => c.visible)
-              .map((c) => text(c.value))
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
+              .filter((c) => c.visible && text(c.value))
+              .map((c) => (
+                <span key={c.id}>{block(text(c.value), c.value.fieldId)}</span>
+              ))}
+          </div>
         </>
       );
     if (id === "summary")
-      return d.summary.approval === "approved" && d.summary.text ? (
-        <p>{d.summary.text}</p>
+      return d.summary.text &&
+        !d.presentation.hiddenFields?.includes("summary") &&
+        (live || d.summary.approval === "approved") ? (
+        <p>{block(d.summary.text, "summary", sectionName(id, uiLocale, d))}</p>
       ) : null;
-    if (id === "professionalSkills" || id === "technicalSkills") {
-      const skills = d[id].map(text).filter(Boolean);
-      return skills.length ? <p>{skills.join(" · ")}</p> : null;
-    }
+    if (id === "professionalSkills" || id === "technicalSkills")
+      return d[id].some((f) => text(f)) ? (
+        <p>
+          {block(
+            d[id].map(text).filter(Boolean).join(" · "),
+            `chip-${sectionName(id, uiLocale)}`,
+            sectionName(id, uiLocale),
+          )}
+        </p>
+      ) : null;
     if (id === "experience")
       return d.roles.length
         ? d.roles.map((r) => (
             <div key={r.id} className="document-entry">
               <h4>
-                {[text(r.title), text(r.company)].filter(Boolean).join(" — ")}
+                {block(text(r.title) || cv("Rol", "Role"), r.title.fieldId)} ·{" "}
+                {block(
+                  text(r.company) || cv("Companie", "Company"),
+                  r.company.fieldId,
+                )}
               </h4>
               <p className="document-meta">
-                {date(r.start)} —{" "}
-                {r.ongoing.value && r.ongoing.status === "user_confirmed"
-                  ? cv("Prezent", "Present")
-                  : date(r.end)}{" "}
-                · {text(r.location)}
+                {block(date(r.start), r.start.fieldId)} —{" "}
+                {r.ongoing.value && (live || isAuthored(r.ongoing))
+                  ? block(cv("Prezent", "Present"), r.ongoing.fieldId)
+                  : block(date(r.end), r.end.fieldId)}
+                {text(r.location) && (
+                  <> · {block(text(r.location), r.location.fieldId)}</>
+                )}
               </p>
-              {text(r.context) && <p>{text(r.context)}</p>}
-              {r.bullets.some((b) => text(b)) && (
-                <ul>
-                  {r.bullets
-                    .filter((b) => text(b))
-                    .map((b) => (
-                      <li key={b.id}>{text(b)}</li>
-                    ))}
-                </ul>
-              )}
+              {text(r.context) && <p>{editable(r.context)}</p>}
+              {r.bullets.some((b) => text(b)) &&
+                !d.presentation.hiddenFields?.includes(
+                  `${r.id}-contributions`,
+                ) &&
+                (d.presentation.contributionHtml?.[r.id] &&
+                !r.bullets.some(hidden) &&
+                r.bullets.every((b) => live || isAuthored(b)) &&
+                !onTextEdit ? (
+                  <div>
+                    {block(
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: safeRichHtml(
+                            d.presentation.contributionHtml[r.id],
+                          ),
+                        }}
+                      />,
+                      `${r.id}-contributions`,
+                    )}
+                  </div>
+                ) : (
+                  <ul>
+                    {r.bullets
+                      .filter((b) => text(b))
+                      .map((b) => (
+                        <li key={b.fieldId}>
+                          {editable(b, `${r.id}-contributions`)}
+                        </li>
+                      ))}
+                  </ul>
+                ))}
             </div>
           ))
         : null;
@@ -82,30 +174,60 @@ export function DocumentPreview({
       return d.education.length
         ? d.education.map((e) => (
             <div key={e.id} className="document-entry">
-              <h4>{text(e.institution)}</h4>
+              <h4>
+                {block(
+                  text(e.institution) || cv("Instituție", "Institution"),
+                  e.institution.fieldId,
+                )}
+              </h4>
               <p>
-                {[text(e.qualification), text(e.field), text(e.location)]
-                  .filter(Boolean)
-                  .join(" · ")}
+                {[e.qualification, e.field, e.location]
+                  .filter((f) => text(f))
+                  .map((f) => (
+                    <span key={f.fieldId}>{block(text(f), f.fieldId)} </span>
+                  ))}
               </p>
               <p className="document-meta">
-                {date(e.start)} — {date(e.end)}
+                {block(date(e.start), e.start.fieldId)} —{" "}
+                {e.ongoing?.value
+                  ? cv("În curs", "Ongoing")
+                  : block(date(e.end), e.end.fieldId)}
               </p>
-              {text(e.details) && <p>{text(e.details)}</p>}
+              {text(e.details) && (
+                <p>{block(text(e.details), e.details.fieldId)}</p>
+              )}
             </div>
           ))
         : null;
-    const entries = d.optionalSections.find((s) => s.id === id)?.entries;
-    return entries?.length
-      ? entries.map((e) => (
+    const s = d.optionalSections.find((s) => s.id === id);
+    return s?.entries.length
+      ? s.entries.map((e) => (
           <div className="document-entry" key={e.id}>
-            <h4>{text(e.title)}</h4>
-            <p>{text(e.details)}</p>
-            {(hasValue(e.start.value) || hasValue(e.end.value)) && (
-              <p className="document-meta">
-                {date(e.start)} — {date(e.end)}
-              </p>
-            )}
+            <h4>
+              {block(text(e.title), e.title.fieldId)}
+              {s.kind === "languages" &&
+                e.proficiency?.value &&
+                !hidden(e.proficiency) && (
+                  <>
+                    {" "}
+                    ·{" "}
+                    {block(
+                      e.proficiency.value === "Native"
+                        ? cv("Nativ", "Native")
+                        : e.proficiency.value,
+                      e.proficiency.fieldId,
+                    )}
+                  </>
+                )}
+            </h4>
+            {text(e.details) && <p>{editable(e.details)}</p>}
+            {s.kind !== "languages" &&
+              (hasValue(e.start.value) || hasValue(e.end.value)) && (
+                <p className="document-meta">
+                  {block(date(e.start), e.start.fieldId)} —{" "}
+                  {block(date(e.end), e.end.fieldId)}
+                </p>
+              )}
           </div>
         ))
       : null;
@@ -116,15 +238,13 @@ export function DocumentPreview({
       aria-label={t("Previzualizare CV", "CV preview")}
     >
       <div className="preview-heading">
-        <span>{t("Previzualizare", "Preview")}</span>
-        <Pill>{d.language.toUpperCase()}</Pill>
+        <span>
+          {live
+            ? t("Previzualizare ciornă", "Draft preview")
+            : t("Versiune salvată", "Saved version")}
+        </span>
+        <small>{d.language.toUpperCase()}</small>
       </div>
-      <p className="small muted">
-        {t(
-          "Doar informațiile confirmate și textul aprobat apar aici. Aceasta este o previzualizare HTML, fără PDF.",
-          "Only confirmed facts and approved wording appear here. This is an HTML preview; PDF is unavailable.",
-        )}
-      </p>
       <article className="document" lang={d.language}>
         {d.presentation.order
           .filter((id) => !d.presentation.hidden.includes(id))
@@ -138,29 +258,24 @@ export function DocumentPreview({
             ) : null;
           })}
       </article>
-      <div className="duration-note">
-        <b>
-          {t(
-            "Durată cumulată, fără suprapuneri",
-            "Combined duration, without overlaps",
-          )}
-        </b>
+      <details className="duration-note">
+        <summary>{t("Durată cumulată", "Combined duration")}</summary>
         <p>
           {bounds.known
             ? `${bounds.min}–${bounds.max} ${t("luni", "months")}`
             : t("Nedeterminată", "Unknown")}
-          {bounds.unknown
-            ? ` · ${unknown} ${t("roluri cu date incomplete sau neconfirmate", "roles with incomplete or unconfirmed dates")}`
+          {unknown
+            ? ` · ${unknown} ${t("roluri cu date incomplete sau neverificate", "roles with incomplete or unreviewed dates")}`
             : ""}
         </p>
         <small>
           {t("La", "As of")} {formatDate(asOf, d.language)} ·{" "}
           {t(
-            "limite lunare; intervalele cu an necunoscut nu sunt incluse",
-            "month bounds; intervals with unknown years are excluded",
+            "fără suprapuneri, fără date inventate",
+            "without overlaps or invented dates",
           )}
         </small>
-      </div>
+      </details>
     </aside>
   );
 }

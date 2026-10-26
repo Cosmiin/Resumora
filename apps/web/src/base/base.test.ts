@@ -11,6 +11,7 @@ import {
   fact,
   newRole,
   allFacts,
+  newOptionalEntry,
   type BaseDraft,
 } from "./model";
 import { dateError, durationBounds, reversedDates } from "./dates";
@@ -23,6 +24,21 @@ function confirmed(d: BaseDraft) {
 function initial() {
   const d = blankDraft();
   d.name = fact("Persoană Fictivă");
+  d.nameParts = { first: "Persoană", last: "Fictivă" };
+  d.titles[0] = fact("Analist");
+  d.contacts.forEach((c) => {
+    c.value = fact(
+      c.kind === "email"
+        ? "test@example.test"
+        : c.platform === "linkedin"
+          ? "https://linkedin.com/in/synthetic"
+          : "Synthetic contact",
+    );
+  });
+  const language = newOptionalEntry();
+  language.title = fact("Română");
+  language.proficiency = fact("Native");
+  d.optionalSections[0].entries.push(language);
   return confirmed(d);
 }
 function input(draft: BaseDraft, expectedRevision = 0) {
@@ -158,7 +174,7 @@ describe("date and review boundaries", () => {
     const edited = editFact(draft.name, "Changed by caller");
     expect(edited.id).not.toBe(draft.name.id);
     expect(edited.fieldId).toBe(draft.name.fieldId);
-    expect(edited.status).toBe("draft");
+    expect(edited.status).toBe("user_authored");
     expect(edited.sourceLineage).toContainEqual({
       sourceId: "example_mara_source",
       sourceClaimId: "claim_name",
@@ -181,7 +197,7 @@ describe("date and review boundaries", () => {
   });
 });
 describe("enrichment source lineage", () => {
-  it("requires reviewed answers, applies verbatim to scoped targets, and rejects a stale or missing role", () => {
+  it("commits manual answers without a review step, applies verbatim to scoped targets, and rejects a stale or missing role", () => {
     const d = maraReviewDraft(),
       role = d.roles[0],
       old = clone(d);
@@ -196,7 +212,7 @@ describe("enrichment source lineage", () => {
     const result = applyAnswer(d, answer, role.context.id);
     expect(result.roles[0].bullets.at(-1)).toMatchObject({
       value: answer.text,
-      status: "user_confirmed",
+      status: "user_authored",
     });
     expect(result.sources.at(-1)).toMatchObject({
       text: answer.text,
@@ -212,8 +228,8 @@ describe("enrichment source lineage", () => {
     expect(replacement.roles[0].context.value).toBe(answer.text);
     expect(replacement.roles[0].bullets).toEqual(d.roles[0].bullets);
     expect(() =>
-      applyAnswer(d, { ...answer, status: "draft" }, role.context.id),
-    ).toThrow("answerUnconfirmed");
+      applyAnswer(d, { ...answer, text: "" }, role.context.id),
+    ).toThrow("emptyAnswer");
     expect(() => applyAnswer(d, answer, "stale")).toThrow("staleTarget");
     d.roles.splice(0, 1);
     expect(() => applyAnswer(d, answer, role.context.id)).toThrow(

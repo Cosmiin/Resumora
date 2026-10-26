@@ -2,11 +2,11 @@ import type { BaseDraft, Locale } from "./model";
 export function sectionName(id: string, locale: Locale, d?: BaseDraft) {
   const labels: Record<string, [string, string]> = {
     identity: ["Despre tine", "About you"],
-    summary: ["Profil", "Summary"],
+    summary: ["Rezumat profesional", "Professional Summary"],
     professionalSkills: ["Competențe profesionale", "Professional skills"],
     technicalSkills: ["Competențe tehnice", "Technical skills"],
     experience: ["Experiență profesională", "Professional experience"],
-    education: ["Educație", "Education"],
+    education: ["Studii", "Education"],
     projects: ["Proiecte", "Projects"],
     certifications: ["Certificări", "Certifications"],
     languages: ["Limbi", "Languages"],

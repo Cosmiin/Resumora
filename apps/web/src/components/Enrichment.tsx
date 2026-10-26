@@ -1,306 +1,284 @@
-import { useState } from "react";
-import { ArrowRight, Check, MessageSquare } from "lucide-react";
-import { applyAnswer } from "../base/enrichment";
-import { clone, localId, type Answer, type BaseDraft } from "../base/model";
-import { Button, Field, Pill, useCopy } from "./ui";
+import { useEffect, useRef, useState } from "react";
+import { applyAnswer, enrichmentTarget } from "../base/enrichment";
+import {
+  clone,
+  fact,
+  localId,
+  type Answer,
+  type BaseDraft,
+} from "../base/model";
+import { focusField, patchFact } from "../base/editing";
+import { formatDate } from "../base/dates";
+import { Button, useCopy } from "./ui";
+import { DocumentPreview } from "./DocumentPreview";
+const dimensions: Answer["question"][] = [
+  "context",
+  "ownership",
+  "tools",
+  "scale",
+  "contribution",
+  "impact",
+  "complexity",
+];
 export function Enrichment({
   draft: d,
   change,
   goEdit,
+  asOf,
 }: {
   draft: BaseDraft;
-  change: (next: BaseDraft) => void;
+  change: (d: BaseDraft) => void;
   goEdit: () => void;
+  asOf: { year: string; month: string };
 }) {
   const t = useCopy(),
-    [targetId, setTargetId] = useState(d.roles[0]?.id ?? ""),
-    [question, setQuestion] = useState<Answer["question"]>("contribution");
-  const [reviewTarget, setReviewTarget] = useState<string | null>(null),
-    [confirmed, setConfirmed] = useState(false),
+    targets = [
+      ...d.roles.map((r) => ({
+        id: r.id,
+        label: [
+          r.title.value,
+          r.company.value,
+          formatDate(r.start.value, d.language),
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      })),
+      ...d.optionalSections
+        .filter((s) => !["languages"].includes(s.kind))
+        .flatMap((s) =>
+          s.entries.map((e) => ({ id: e.id, label: e.title.value })),
+        ),
+    ];
+  const [targetId, setTargetId] = useState(targets[0]?.id ?? ""),
+    [index, setIndex] = useState(0),
     [error, setError] = useState("");
+  const input = useRef<HTMLTextAreaElement>(null),
+    target = enrichmentTarget(d, targetId),
+    question = dimensions[index];
+  const signature = useRef(target?.field.id);
+  useEffect(() => {
+    signature.current = target?.field.id;
+    input.current?.focus();
+  }, [targetId, index]);
   const current = d.answers.find(
     (a) => a.targetId === targetId && a.question === question,
   );
   const answer: Answer = current ?? {
-    id: localId(),
+    id: `answer_${targetId}_${question}`,
     targetId,
     question,
     text: "",
     status: "draft",
     mode: "append",
   };
-  const role = d.roles.find((r) => r.id === targetId),
-    reviewing = answer.status === "review",
-    handled = ["confirmed", "skipped", "unknown"].includes(answer.status);
-  const questions = {
-    contribution: t(
-      "Ce ai făcut tu și ce s-a schimbat pentru echipă?",
-      "What did you do, and what changed for the team?",
+  const questions: Record<Answer["question"], string> = {
+    context: t(
+      "Care erau responsabilitățile tale de zi cu zi?",
+      "What were your day-to-day responsibilities?",
+    ),
+    ownership: t(
+      "Ce ai făcut tu, cu ce autonomie?",
+      "What did you do yourself, with what autonomy?",
     ),
     tools: t(
-      "Ce instrumente ai folosit și pentru ce activitate?",
-      "Which tools did you use, and for what work?",
+      "Ce instrumente ai folosit și pentru ce?",
+      "Which tools did you use, and for what?",
     ),
-    context: t(
-      "Cu cine ai lucrat și în ce context?",
-      "Who did you work with, and in what context?",
+    scale: t(
+      "Cât de amplă era activitatea?",
+      "What was the scope and scale of the work?",
+    ),
+    contribution: t(
+      "Ce ai realizat sau îmbunătățit?",
+      "What did you achieve or improve?",
+    ),
+    impact: t(
+      "Ce rezultat ai observat sau măsurat?",
+      "What outcome did you observe or measure?",
+    ),
+    complexity: t(
+      "Ce dificultăți ai depășit?",
+      "Which difficulties did you overcome?",
     ),
   };
-  function put(patch: Partial<Answer>) {
+  function put(text: string) {
     const next = clone(d);
     next.answers = [
       ...next.answers.filter((a) => a.id !== answer.id),
-      { ...answer, ...patch },
+      { ...answer, text, status: "draft" },
     ];
     change(next);
-    setConfirmed(false);
     setError("");
   }
-  if (!d.roles.length)
+  function next() {
+    setIndex((i) => (i + 1) % dimensions.length);
+  }
+  function submit() {
+    try {
+      if (!target || !signature.current) throw new Error("staleTarget");
+      const result = applyAnswer(
+        d,
+        { ...answer, status: "draft" },
+        signature.current,
+      );
+      change(result);
+      signature.current = enrichmentTarget(result, targetId)?.field.id;
+      setError("");
+      next();
+    } catch {
+      setError(
+        t(
+          "Destinația s-a schimbat. Răspunsul este păstrat; selectează din nou intrarea.",
+          "The target changed. Your answer is retained; select the entry again.",
+        ),
+      );
+    }
+  }
+  function skip(status: "skipped" | "unknown") {
+    const result = clone(d);
+    result.answers = [
+      ...result.answers.filter((a) => a.id !== answer.id),
+      { ...answer, status },
+    ];
+    change(result);
+    next();
+  }
+  if (!targets.length)
     return (
-      <section className="card empty">
-        <MessageSquare size={32} />
-        <h2>{t("Începem cu un rol real", "Start with a real role")}</h2>
-        <p>
-          {t(
-            "Adaugă experiență în editor pentru întrebări legate de acel rol.",
-            "Add experience in the editor for questions tied to that role.",
-          )}
-        </p>
-        <Button variant="primary" onClick={goEdit}>
-          {t("Deschide editorul", "Open editor")}
-        </Button>
-      </section>
-    );
-  return (
-    <div className="enrichment-layout">
       <section className="card">
         <h2>
-          {t("Un pas mic, mai mult context", "A small step, more context")}
-        </h2>
-        <p>
           {t(
-            "Răspunde doar ce știi. Rezultatele calitative sunt suficiente; nu ai nevoie de procente.",
-            "Answer what you know. Qualitative results are enough; percentages are not required.",
+            "Adaugă întâi o experiență sau o intrare",
+            "Add an experience or entry first",
           )}
-        </p>
-        <label className="field">
-          {t("Rolul vizat", "Target role")}
-          <select
-            value={targetId}
-            onChange={(e) => {
-              setTargetId(e.target.value);
-              setReviewTarget(null);
-              setConfirmed(false);
-            }}
-          >
-            {d.roles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.title.value || t("Rol nou", "New role")} · {r.company.value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="question-list">
-          {(["contribution", "tools", "context"] as const).map((q) => (
-            <Button
-              key={q}
-              aria-pressed={q === question}
-              onClick={() => {
-                setQuestion(q);
-                setReviewTarget(null);
-                setConfirmed(false);
-              }}
-            >
-              {questions[q]}
-            </Button>
+        </h2>
+        <Button onClick={goEdit}>{t("Editor", "Editor")}</Button>
+      </section>
+    );
+  const preview = clone(d),
+    previewRole = preview.roles.find((r) => r.id === targetId),
+    previewTarget = enrichmentTarget(preview, targetId),
+    pendingId = `pending-${answer.id}`;
+  if (answer.text.trim() && answer.status === "draft") {
+    if (previewRole)
+      previewRole.bullets.push({
+        ...fact(answer.text),
+        fieldId: pendingId,
+        id: pendingId,
+      });
+    else if (previewTarget)
+      previewTarget.field.value = [previewTarget.field.value, answer.text]
+        .filter(Boolean)
+        .join("\n");
+  }
+  return (
+    <div className="editor-layout enrichment-inline">
+      <section
+        className="card question-card"
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing || !(e.ctrlKey || e.metaKey)) return;
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+          if (e.shiftKey && e.key.toLowerCase() === "k") {
+            e.preventDefault();
+            skip("unknown");
+          }
+          if (e.shiftKey && e.key.toLowerCase() === "j") {
+            e.preventDefault();
+            skip("skipped");
+          }
+        }}
+      >
+        <label htmlFor="enrich-target">{t("Intrare", "Entry")}</label>
+        <select
+          id="enrich-target"
+          value={targetId}
+          onChange={(e) => {
+            setTargetId(e.target.value);
+            signature.current = enrichmentTarget(d, e.target.value)?.field.id;
+            setIndex(0);
+          }}
+        >
+          {targets.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.label || t("Intrare nouă", "New entry")}
+            </option>
           ))}
-        </div>
+        </select>
+        <p className="entry-context">{target?.field.value}</p>
+        <p className="eyebrow">
+          {t("Îndrumare manuală", "Manual guidance")} · {index + 1}/
+          {dimensions.length}
+        </p>
+        <label className="question-title" htmlFor="enrichment-answer">
+          {questions[question]}
+        </label>
+        <textarea
+          ref={input}
+          id="enrichment-answer"
+          className="native"
+          rows={5}
+          value={answer.text}
+          onChange={(e) => put(e.target.value)}
+        />
         <p className="small muted">
           {t(
-            "Destinație: CV de bază. Îmbogățirea doar pentru un job nu este disponibilă încă.",
-            "Destination: Base CV. Job-only enrichment is not available yet.",
+            "Scrie ce știi; un rezultat nemăsurat este suficient.",
+            "Write what you know; an unmeasured outcome is enough.",
           )}
         </p>
-      </section>
-      <section className="card answer-card">
-        <Pill tone={handled ? "good" : "neutral"}>
-          {handled
-            ? answer.status === "confirmed"
-              ? t("Răspuns confirmat în ciornă", "Answer confirmed in draft")
-              : t("Omis · nu adaugă informații", "Skipped · adds no facts")
-            : reviewing
-              ? t("Pasul 2 · Confirmă", "Step 2 · Confirm")
-              : t("Pasul 1 · Răspunde", "Step 1 · Answer")}
-        </Pill>
-        <h2>{questions[question]}</h2>
-        {handled ? (
-          <>
-            <p>
-              {answer.text ||
-                t("Nu a fost adăugată nicio informație.", "No fact was added.")}
-            </p>
-            <p className="muted">
-              {answer.status === "confirmed"
-                ? t(
-                    "Poți edita informația în rolul vizat. Salvează explicit ciorna pentru o versiune în această sesiune.",
-                    "You can edit the fact in the target role. Save the draft explicitly for a version in this session.",
-                  )
-                : t(
-                    "Poți reveni oricând la această întrebare.",
-                    "You can return to this question at any time.",
-                  )}
-            </p>
-            {answer.status !== "confirmed" && (
-              <Button onClick={() => put({ status: "draft" })}>
-                {t("Răspunde acum", "Answer now")}
-              </Button>
-            )}
-            <Button variant="primary" onClick={goEdit}>
-              {t("Vezi CV-ul de bază", "See Base CV")}
-            </Button>
-          </>
-        ) : reviewing ? (
-          <>
-            <h3>{t("Ce ai spus", "What you told us")}</h3>
-            <blockquote>{answer.text}</blockquote>
-            <p className="muted">
-              {t(
-                "Textul va fi folosit exact cum l-ai scris. Nu a fost extras, reformulat sau generat de AI.",
-                "Your exact words will be used. Nothing was extracted, rewritten, or AI-generated.",
-              )}
-            </p>
-            <fieldset>
-              <legend>{t("Mod de adăugare", "How to add it")}</legend>
-              <label className="check">
-                <input
-                  type="radio"
-                  name="answer-mode"
-                  checked={answer.mode === "append"}
-                  onChange={() => put({ mode: "append" })}
-                />
-                {t(
-                  "Adaugă o contribuție la acest rol",
-                  "Append a contribution to this role",
-                )}
-              </label>
-              <label className="check">
-                <input
-                  type="radio"
-                  name="answer-mode"
-                  checked={answer.mode === "replace"}
-                  onChange={() => put({ mode: "replace" })}
-                />
-                {t(
-                  "Înlocuiește doar contextul acestui rol",
-                  "Replace only this role’s context",
-                )}
-              </label>
-            </fieldset>
-            {answer.mode === "replace" && (
-              <div className="before-after">
-                <p>
-                  <b>{t("Înainte", "Before")}: </b>
-                  {role?.context.value || "—"}
-                </p>
-                <p>
-                  <b>{t("După", "After")}: </b>
-                  {answer.text}
-                </p>
-              </div>
-            )}
-            <label className="check check-card">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-              />
-              {t(
-                "Aceste informații sunt adevărate și descriu munca mea.",
-                "These facts are true and describe my own work.",
-              )}
-            </label>
-            <div className="actions">
-              <Button
-                onClick={() => {
-                  put({ status: "draft" });
-                  setReviewTarget(null);
-                }}
-              >
-                {t("Editează răspunsul", "Edit answer")}
-              </Button>
-              <Button
-                variant="primary"
-                disabled={!confirmed || !reviewTarget}
-                onClick={() => {
-                  try {
-                    change(applyAnswer(d, answer, reviewTarget!));
-                    setConfirmed(false);
-                  } catch {
-                    setError(
-                      t(
-                        "Rolul sau contextul s-a schimbat. Răspunsul este păstrat; revino la editare și verifică din nou destinația.",
-                        "The role or context changed. Your answer is preserved; edit it and review the target again.",
-                      ),
-                    );
-                  }
-                }}
-              >
-                <Check size={16} />
-                {t(
-                  "Confirmă și aplică în ciornă",
-                  "Confirm and apply to draft",
-                )}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <Field
-              label={t("Răspunsul tău", "Your answer")}
-              multiline
-              value={answer.text}
-              onChange={(v) => put({ text: v, status: "draft" })}
-              hint={t(
-                "Poți spune că nu ai măsurat rezultatul. Nu presupunem instrumente, ani sau cifre.",
-                "You can say the result was not measured. We infer no tools, years, or numbers.",
-              )}
-            />
-            <div className="actions">
-              <Button onClick={() => put({ status: "skipped" })}>
-                {t("Omit întrebarea", "Skip question")}
-              </Button>
-              <Button onClick={() => put({ status: "unknown" })}>
-                {t("Nu știu", "I don’t know")}
-              </Button>
-              <Button
-                variant="primary"
-                disabled={!answer.text.trim() || !role}
-                onClick={() => {
-                  put({ status: "review" });
-                  setReviewTarget(role!.context.id);
-                }}
-              >
-                <ArrowRight size={16} />
-                {t("Revizuiește răspunsul", "Review answer")}
-              </Button>
-            </div>
-          </>
-        )}
-        {reviewing && !reviewTarget && (
-          <p className="notice">
+        <div className="actions">
+          <Button
+            variant="primary"
+            disabled={!answer.text.trim()}
+            onClick={submit}
+          >
+            {t("Salvează și continuă", "Save and next")} <kbd>⌘/Ctrl Enter</kbd>
+          </Button>
+          <Button onClick={() => skip("unknown")}>
+            {t("Nu știu", "I don't know")} <kbd>⌘/Ctrl ⇧ K</kbd>
+          </Button>
+          <Button onClick={() => skip("skipped")}>
+            {t("Omit", "Skip")} <kbd>⌘/Ctrl ⇧ J</kbd>
+          </Button>
+        </div>
+        {error && <p role="alert">{error}</p>}
+        <details className="section-info-text">
+          <summary>
+            {t("Relevanță pentru job și surse", "Job relevance and sources")}
+          </summary>
+          <p>
             {t(
-              "Redeschide editarea răspunsului pentru a verifica din nou destinația.",
-              "Edit the answer again to recheck its target.",
+              "AI și relevanța pentru job nu sunt conectate. Răspunsurile sunt folosite exact cum le scrii.",
+              "AI and job relevance are not connected. Your answers are used as written.",
             )}
           </p>
-        )}
-        {error && (
-          <p role="alert" className="field-error">
-            {error}
-          </p>
-        )}
+        </details>
       </section>
+      <DocumentPreview
+        draft={preview}
+        asOf={asOf}
+        onTextEdit={(id, text) => {
+          if (id === pendingId) {
+            put(text);
+            input.current?.focus();
+            return;
+          }
+          const f = [
+            ...d.roles.flatMap((r) => [r.context, ...r.bullets]),
+            ...d.optionalSections.flatMap((s) =>
+              s.entries.map((e) => e.details),
+            ),
+          ].find((f) => f.fieldId === id);
+          if (f) change(patchFact(d, f, text));
+        }}
+        onEdit={(id) => {
+          goEdit();
+          focusField(id);
+        }}
+      />
     </div>
   );
 }

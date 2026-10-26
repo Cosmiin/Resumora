@@ -1,4 +1,4 @@
-import { allFacts, hasValue, type BaseDraft } from "./model";
+import { allFacts, type BaseDraft } from "./model";
 import { dateError, reversedDates } from "./dates";
 export type Issue = {
   field: string;
@@ -12,8 +12,39 @@ export type Issue = {
     | "prose"
     | "truth";
 };
-export function validateDraft(d: BaseDraft, acknowledged: boolean): Issue[] {
+export function validateDraft(d: BaseDraft, _acknowledged = true): Issue[] {
   const issues: Issue[] = [];
+  if (!d.nameParts?.first.trim())
+    issues.push({ field: "first-name", code: "required" });
+  if (!d.nameParts?.last.trim())
+    issues.push({ field: "last-name", code: "required" });
+  if (!d.titles[0].value.trim())
+    issues.push({ field: d.titles[0].fieldId, code: "required" });
+  for (const kind of ["email", "phone", "location", "linkedin"]) {
+    const contact = d.contacts.find((c) =>
+      kind === "linkedin" ? c.platform === "linkedin" : c.kind === kind,
+    );
+    if (!contact?.value.value.trim())
+      issues.push({
+        field: contact?.value.fieldId ?? `contact-${kind}`,
+        code: "required",
+      });
+  }
+  const languages = d.optionalSections
+    .filter((s) => s.kind === "languages")
+    .flatMap((s) => s.entries);
+  if (!languages.length)
+    issues.push({ field: "section-languages", code: "required" });
+  for (const entry of languages)
+    if (
+      !["Native", "A1", "A2", "B1", "B2", "C1", "C2"].includes(
+        entry.proficiency?.value ?? "",
+      )
+    )
+      issues.push({
+        field: entry.proficiency?.fieldId ?? `${entry.id}-level`,
+        code: "required",
+      });
   if (!d.name.value.trim())
     issues.push({ field: d.name.fieldId, code: "required" });
   for (const c of d.contacts) {
@@ -27,6 +58,11 @@ export function validateDraft(d: BaseDraft, acknowledged: boolean): Issue[] {
       try {
         const u = new URL(c.value.value);
         if (!["https:", "http:"].includes(u.protocol)) throw new Error();
+        if (
+          c.platform === "linkedin" &&
+          !/(^|\.)linkedin\.com$/i.test(u.hostname)
+        )
+          throw new Error();
       } catch {
         issues.push({ field: c.value.fieldId, code: "url" });
       }
@@ -48,29 +84,24 @@ export function validateDraft(d: BaseDraft, acknowledged: boolean): Issue[] {
   for (const e of d.education) {
     if (!e.institution.value.trim())
       issues.push({ field: e.institution.fieldId, code: "required" });
-    if (reversedDates(e.start.value, e.end.value))
+    if (!e.ongoing?.value && reversedDates(e.start.value, e.end.value))
       issues.push({ field: e.end.fieldId, code: "chronology" });
   }
   for (const s of d.optionalSections)
     for (const e of s.entries) {
       if (!e.title.value.trim())
         issues.push({ field: e.title.fieldId, code: "required" });
-      if (reversedDates(e.start.value, e.end.value))
+      if (!e.ongoing?.value && reversedDates(e.start.value, e.end.value))
         issues.push({ field: e.end.fieldId, code: "chronology" });
     }
   for (const f of allFacts(d)) {
     if (typeof f.value === "object" && dateError(f.value))
       issues.push({ field: f.fieldId, code: "date" });
-    if (hasValue(f.value) && f.status !== "user_confirmed")
-      issues.push({ field: f.fieldId, code: "pending" });
   }
-  if (d.summary.text.trim() && d.summary.approval !== "approved")
-    issues.push({ field: "summary", code: "prose" });
-  if (!acknowledged) issues.push({ field: "truth", code: "truth" });
   return issues;
 }
 export type FileSelection = {
-  state: "empty" | "unsupported" | "unavailable";
+  state: "empty" | "unsupported" | "unavailable" | "multiple";
   name?: string;
   size?: number;
 };

@@ -8,7 +8,6 @@ import {
   Undo2,
   BriefcaseBusiness,
   UserRound,
-  Check,
 } from "lucide-react";
 import {
   AdapterError,
@@ -17,22 +16,16 @@ import {
   type Snapshot,
 } from "./base/adapter";
 import { clone, localId, type BaseDraft, type Locale } from "./base/model";
+import { prepareDraft, focusField } from "./base/editing";
 import { validateDraft, type Issue } from "./base/validation";
 import { DocumentPreview } from "./components/DocumentPreview";
 import { Editor } from "./components/Editor";
 import { Enrichment } from "./components/Enrichment";
 import { Review } from "./components/Review";
-import {
-  Button,
-  Dialog,
-  LanguageContext,
-  Pill,
-  issueText,
-} from "./components/ui";
+import { Button, Dialog, LanguageContext, issueText } from "./components/ui";
 import { routes, type Route } from "./base/routes";
 import {
   StartChooser,
-  Sources,
   HomeScreen,
   HistoryScreen,
 } from "./components/BaseScreens";
@@ -53,46 +46,38 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
     [versions, setVersions] = useState<Snapshot[]>([]),
     [inspected, setInspected] = useState<Snapshot | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]),
-    [acknowledged, setAcknowledged] = useState(false),
     [busy, setBusy] = useState(false),
-    [loading, setLoading] = useState(true);
-  const [notice, setNotice] = useState<
-      | "saved"
-      | "restored"
-      | "reopened"
-      | "undone"
-      | "noChange"
-      | "savedDraftKept"
-      | "newerDraftKept"
-      | null
-    >(null),
-    [error, setError] = useState<string | null>(null);
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState<string | null>(null),
+    [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<
     | { kind: "replace"; next: BaseDraft }
     | { kind: "reopen" }
     | { kind: "restore"; snapshot: Snapshot }
     | null
   >(null);
-  const generation = useRef(0);
-  const failedAction = useRef<
-    "load" | "save" | "history" | { restore: Snapshot }
-  >("load");
-  const main = useRef<HTMLElement>(null),
-    errors = useRef<HTMLDivElement>(null),
-    savedRequest = useRef<{ body: string; id: string } | null>(null);
+  const generation = useRef(0),
+    lock = useRef(false),
+    latest = useRef(draft),
+    headRef = useRef(head),
+    saveRef = useRef<() => void>(() => {}),
+    main = useRef<HTMLElement>(null);
+  const savedRequest = useRef<{ body: string; id: string } | null>(null);
+  latest.current = draft;
+  headRef.current = head;
   const [asOf] = useState(() => {
-    const now = new Date();
+    const n = new Date();
     return {
-      year: String(now.getUTCFullYear()),
-      month: String(now.getUTCMonth() + 1),
+      year: String(n.getUTCFullYear()),
+      month: String(n.getUTCMonth() + 1),
     };
   });
   const dirty =
     !!draft && (!head || JSON.stringify(draft) !== JSON.stringify(head.draft));
+  const editing = !!draft && ["base", "enrich", "review"].includes(route);
   const go = useCallback((next: Route) => {
     window.location.hash = next;
     setRoute(next);
-    setError(null);
   }, []);
   useEffect(() => {
     const change = () => setRoute(currentRoute());
@@ -100,7 +85,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
     return () => window.removeEventListener("hashchange", change);
   }, []);
   useEffect(() => {
-    main.current?.focus();
+    if (!draft || !["base", "enrich"].includes(route)) main.current?.focus();
   }, [route]);
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -113,7 +98,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
       .then((s) => {
         if (!cancelled) {
           setHead(s);
-          if (s) setDraft(clone(s.draft));
+          if (s) setDraft(prepareDraft(s.draft));
           setLoading(false);
         }
       })
@@ -140,7 +125,6 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
     try {
       setVersions(await adapter.history());
     } catch {
-      failedAction.current = "history";
       setError("load");
     }
   }, [adapter]);
@@ -149,222 +133,191 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
   }, [route, refreshHistory]);
   function change(next: BaseDraft) {
     generation.current++;
-    if (draft) setPast((p) => [...p.slice(-29), clone(draft)]);
+    if (draft) setPast((p) => [...p.slice(-49), clone(draft)]);
+    latest.current = next;
     setDraft(next);
-    setAcknowledged(false);
     setIssues([]);
-    setNotice(null);
-    setError(null);
-  }
-  function start(next: BaseDraft) {
-    if (draft && dirty) {
-      setDialog({ kind: "replace", next });
-      return;
-    }
-    openDraft(next);
+    setNotice("");
+    if (error !== "conflict") setError(null);
   }
   function openDraft(next: BaseDraft) {
     generation.current++;
-    setDraft(clone(next));
+    const ready = prepareDraft(next);
+    latest.current = ready;
+    setDraft(ready);
     setPast([]);
     setIssues([]);
-    setAcknowledged(false);
-    setNotice(null);
+    setError(null);
+    setNotice("");
     go("base");
   }
-  function focusIssue(found: Issue[]) {
-    setTimeout(() => {
-      const f = document.getElementById(found[0]?.field);
-      if (f) f.focus();
-      else errors.current?.focus();
-    }, 0);
+  function start(next: BaseDraft) {
+    if (draft && dirty) setDialog({ kind: "replace", next });
+    else openDraft(next);
   }
   function requestId(body: string) {
     if (savedRequest.current?.body !== body)
       savedRequest.current = { body, id: localId() };
     return savedRequest.current.id;
   }
-  async function save() {
-    if (!draft || busy) return;
-    const found = validateDraft(draft, acknowledged);
-    setIssues(found);
-    setNotice(null);
-    setError(null);
-    if (found.length) {
-      if (route !== "base") go("base");
-      focusIssue(found);
-      return;
+  async function save(mode: "autosave" | "checkpoint" = "checkpoint") {
+    const current = latest.current;
+    if (!current || lock.current) return;
+    if (mode === "checkpoint") {
+      const found = validateDraft(current);
+      setIssues(found);
+      if (found.length) {
+        go("base");
+        setNotice(
+          t(
+            "Completează câmpul marcat; ciorna rămâne salvată în sesiune.",
+            "Complete the marked field; your draft remains saved in session.",
+          ),
+        );
+        focusField(found[0].field);
+        return;
+      }
     }
+    lock.current = true;
     setBusy(true);
-    const submittedGeneration = generation.current,
-      submittedHash = window.location.hash;
+    const submitted = generation.current;
     try {
       const input = {
-        draft,
-        expectedRevision: head?.revision ?? 0,
-        acknowledged,
+        draft: clone(current),
+        expectedRevision: headRef.current?.revision ?? 0,
+        mode,
       };
       const saved = await adapter.save({
         ...input,
         requestId: requestId(JSON.stringify(input)),
       });
+      headRef.current = saved;
       setHead(saved);
-      if (generation.current === submittedGeneration) {
-        setNotice(saved.revision === head?.revision ? "noChange" : "saved");
-        setDraft(clone(saved.draft));
-        setPast([]);
-        setAcknowledged(false);
-        if (window.location.hash === submittedHash) go("review");
-      } else setNotice("savedDraftKept");
+      setError(null);
+      if (submitted === generation.current)
+        setNotice(
+          mode === "autosave"
+            ? ""
+            : t("Salvat în sesiune.", "Saved in session."),
+        );
     } catch (e) {
-      failedAction.current = "save";
       setError(e instanceof AdapterError ? e.code : "save");
-      if (
-        e instanceof AdapterError &&
-        generation.current === submittedGeneration
-      ) {
-        setIssues(e.issues);
-        if (e.issues.length) focusIssue(e.issues);
-      }
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
+  saveRef.current = () => {
+    void save();
+  };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveRef.current();
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+  useEffect(() => {
+    if (!dirty || !draft || busy || loading || error) return;
+    const timer = setTimeout(() => {
+      void save("autosave");
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [draft, dirty, busy, loading, error]);
   async function reopen() {
+    if (lock.current) return;
+    lock.current = true;
     setBusy(true);
-    const requestedGeneration = generation.current;
+    const started = generation.current;
     try {
-      const saved = await adapter.load();
-      if (!saved) {
+      const s = await adapter.load();
+      if (!s) {
         setError("missing");
         return;
       }
-      setHead(saved);
-      if (generation.current === requestedGeneration) {
-        openDraft(saved.draft);
-        setNotice("reopened");
-      } else setNotice("newerDraftKept");
-      setDialog(null);
+      headRef.current = s;
+      setHead(s);
+      if (started === generation.current) {
+        openDraft(s.draft);
+        setNotice(
+          t(
+            "Ultima ciornă salvată în sesiune a fost redeschisă.",
+            "Latest session draft reopened.",
+          ),
+        );
+      } else
+        setNotice(
+          t(
+            "Ciorna mai nouă a fost păstrată.",
+            "Your newer draft was retained.",
+          ),
+        );
     } catch {
-      failedAction.current = "load";
       setError("load");
-      setDialog(null);
     } finally {
+      lock.current = false;
       setBusy(false);
+      setDialog(null);
     }
   }
   async function restore(snapshot: Snapshot) {
+    if (lock.current) return;
+    lock.current = true;
     setBusy(true);
+    const started = generation.current;
     try {
       const input = {
         snapshotId: snapshot.id,
-        expectedRevision: head?.revision ?? 0,
+        expectedRevision: headRef.current?.revision ?? 0,
       };
-      const saved = await adapter.restore({
+      const s = await adapter.restore({
         ...input,
         requestId: requestId(JSON.stringify(input)),
       });
-      setHead(saved);
-      openDraft(saved.draft);
-      setNotice("restored");
+      headRef.current = s;
+      setHead(s);
+      if (started === generation.current) {
+        openDraft(s.draft);
+        setNotice(
+          t(
+            `Restaurat ca v${s.revision}; istoricul este păstrat.`,
+            `Restored as v${s.revision}; history retained.`,
+          ),
+        );
+      } else
+        setNotice(
+          t(
+            "Versiune restaurată; editările mai noi rămân în ciornă.",
+            "Version restored; newer edits remain in your draft.",
+          ),
+        );
       setInspected(null);
-      setDialog(null);
     } catch (e) {
-      failedAction.current = { restore: snapshot };
       setError(e instanceof AdapterError ? e.code : "save");
-      setDialog(null);
     } finally {
+      lock.current = false;
       setBusy(false);
+      setDialog(null);
     }
   }
-  function retryFailure() {
-    const action = failedAction.current;
-    if (typeof action === "object")
-      setDialog({ kind: "restore", snapshot: action.restore });
-    else if (action === "history") void refreshHistory();
-    else if (action === "load") {
-      if (dirty) setDialog({ kind: "reopen" });
-      else void reopen();
-    } else void save();
-  }
-  const noticeText =
-    notice &&
-    {
-      saved: t(
-        `CV de bază v${head?.revision} salvat în memoria acestei pagini.`,
-        `Base CV v${head?.revision} saved in this page’s memory.`,
-      ),
-      savedDraftKept: t(
-        `Versiunea v${head?.revision} a fost salvată. Modificările mai noi rămân în ciornă, nesalvate.`,
-        `Version v${head?.revision} was saved. Newer edits remain in the unsaved draft.`,
-      ),
-      newerDraftKept: t(
-        "Ultima versiune a fost găsită. Ciorna mai nouă a fost păstrată.",
-        "The latest version was found. Your newer draft was preserved.",
-      ),
-      restored: t(
-        `Restaurat ca v${head?.revision}. Versiunile anterioare sunt păstrate în această sesiune.`,
-        `Restored as v${head?.revision}. Earlier versions are preserved in this session.`,
-      ),
-      reopened: t(
-        "Ultima versiune salvată în această sesiune a fost redeschisă.",
-        "The latest version saved in this session has been reopened.",
-      ),
-      undone: t(
-        "Ultima modificare din ciornă a fost anulată.",
-        "The last draft change was undone.",
-      ),
-      noChange: t(
-        "Conținut neschimbat. Nu s-a creat o versiune nouă.",
-        "Content unchanged. No new version was created.",
-      ),
-    }[notice];
-  const errorText =
-    error &&
-    (error === "conflict"
-      ? t(
-          "Versiunea salvată s-a schimbat. Ciorna ta este păstrată. Inspectează istoricul sau redeschide explicit ultima versiune.",
-          "The saved version changed. Your draft is preserved. Inspect history or explicitly reopen the latest version.",
-        )
-      : error === "validation"
-        ? t("Verifică informațiile marcate.", "Review the marked fields.")
-        : t(
-            "Acțiunea nu a reușit. Ciorna este păstrată. Reîncearcă sau revino în editor.",
-            "The action failed. Your draft is preserved. Retry or return to the editor.",
-          ));
   const nav = [
-    { route: "home" as Route, label: t("Acasă", "Home"), Icon: Home },
+    { route: "home", label: t("Acasă", "Home"), Icon: Home },
+    { route: "base", label: t("CV de bază", "Base CV"), Icon: FileText },
     {
-      route: "base" as Route,
-      label: t("CV de bază", "Base CV"),
-      Icon: FileText,
-    },
-    {
-      route: "enrich" as Route,
+      route: "enrich",
       label: t("Îmbunătățește", "Improve"),
       Icon: MessageSquare,
     },
-    {
-      route: "jobs" as Route,
-      label: t("Joburi", "Jobs"),
-      Icon: BriefcaseBusiness,
-    },
-    { route: "account" as Route, label: t("Cont", "Account"), Icon: UserRound },
+    { route: "jobs", label: t("Joburi", "Jobs"), Icon: BriefcaseBusiness },
+    { route: "account", label: t("Cont", "Account"), Icon: UserRound },
   ];
-  const title = {
-    home: t("Fiecare pas începe cu tine.", "Every next step starts with you."),
-    start: t("Cum vrei să începi?", "How would you like to start?"),
-    base: t("CV de bază", "Base CV"),
-    review: t(
-      "O bază mai clară pentru următorul pas",
-      "A clearer Base for your next step",
-    ),
-    enrich: t("Povestește despre munca ta", "Tell us about your work"),
-    history: t("Istoricul CV-ului de bază", "Base CV history"),
-    jobs: t("Un CV potrivit fiecărui job", "A CV for each job"),
-    account: t("Cont și salvare online", "Account and online saving"),
-    missing: t("Pagina nu a fost găsită", "Page not found"),
-  }[route];
+  const editingTitle =
+    route === "enrich"
+      ? t("Mai mult context, pas cu pas", "More context, one step at a time")
+      : t("CV-ul tău de bază", "Your Base CV");
   return (
     <LanguageContext value={locale}>
       <a
@@ -382,12 +335,11 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
           <img
             src="/resumora-logo.svg"
             alt="Resumora"
-            width="166"
-            height="38"
+            width="142"
+            height="34"
           />
         </a>
         <div className="header-tools">
-          <Pill>{t("Sesiune locală", "Local session")}</Pill>
           <label>
             {t("Interfață", "Interface")}
             <select
@@ -399,6 +351,24 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               <option value="en">EN</option>
             </select>
           </label>
+          {draft && (
+            <label>
+              {t("CV", "CV")}
+              <select
+                aria-label={t("Limba CV-ului", "CV language")}
+                value={draft.language}
+                onChange={(e) =>
+                  change({
+                    ...clone(draft),
+                    language: e.target.value as Locale,
+                  })
+                }
+              >
+                <option value="ro">RO</option>
+                <option value="en">EN</option>
+              </select>
+            </label>
+          )}
         </div>
       </header>
       <div className="app-layout">
@@ -408,66 +378,29 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               <a
                 key={n.route}
                 href={`#${n.route}`}
-                aria-current={
-                  route === n.route ||
-                  (n.route === "base" &&
-                    ["review", "history", "start"].includes(route))
-                    ? "page"
-                    : undefined
-                }
+                aria-current={route === n.route ? "page" : undefined}
               >
-                <n.Icon size={20} aria-hidden="true" />
+                <n.Icon size={19} />
                 <span>{n.label}</span>
               </a>
             ))}
           </nav>
-          <div className="sidebar-note">
-            <span className="icon-tile">
-              <Check size={20} />
-            </span>
-            <b>
-              {t(
-                "Experiența ta. În cuvintele tale.",
-                "Your experience. Your words.",
-              )}
-            </b>
-            <p>
-              {t(
-                "Nicio informație inventată. Tu alegi ce confirmi.",
-                "No invented facts. You choose what to confirm.",
-              )}
-            </p>
-          </div>
         </aside>
-        <main id="main" ref={main} tabIndex={-1}>
-          <div className="session-banner">
-            {t(
-              "Salvarea funcționează doar în memoria acestei pagini. Reîncărcarea sau închiderea șterge ciornele și versiunile. Folosește date fictive pentru această revizuire.",
-              "Saving works only in this page’s memory. Reloading or closing clears drafts and versions. Use synthetic data for this review.",
-            )}
-          </div>
+        <main
+          id="main"
+          ref={main}
+          tabIndex={-1}
+          className={editing ? "editing-page" : ""}
+        >
           <div className="page-heading">
-            <div>
-              <p className="eyebrow">
-                {t("Spațiul tău de lucru", "Your workspace")}
-              </p>
-              <h1>{title}</h1>
-              {draft && ["base", "review", "enrich"].includes(route) && (
-                <div className="pills">
-                  <Pill>
-                    {head
-                      ? `v${head.revision} · ${t("salvat în sesiune", "saved in session")}`
-                      : t("Ciornă nouă", "New draft")}
-                  </Pill>
-                  {dirty && (
-                    <Pill tone="warn">
-                      {t("Modificări nesalvate", "Unsaved changes")}
-                    </Pill>
-                  )}
-                </div>
-              )}
-            </div>
-            {draft && ["base", "review", "enrich"].includes(route) && (
+            <h1>
+              {editing
+                ? editingTitle
+                : route === "history"
+                  ? t("Istoric în sesiune", "Session history")
+                  : "Resumora"}
+            </h1>
+            {editing && (
               <div className="actions">
                 <Button onClick={() => go("history")}>
                   <History size={16} />
@@ -476,7 +409,6 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                 <Button
                   onClick={() => go(route === "enrich" ? "base" : "enrich")}
                 >
-                  <MessageSquare size={16} />
                   {route === "enrich"
                     ? t("Editor", "Editor")
                     : t("Întrebări", "Questions")}
@@ -484,26 +416,26 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               </div>
             )}
           </div>
-          <div role="status" className={noticeText ? "notice notice-good" : ""}>
-            {noticeText}
-          </div>
-          {errorText && (
+          {error && (
             <div role="alert" className="notice notice-error">
-              {errorText}
-              {error === "conflict" ? (
-                <div className="actions">
-                  <Button onClick={() => go("history")}>
-                    {t("Inspectează istoricul", "Inspect history")}
-                  </Button>
-                  <Button onClick={() => setDialog({ kind: "reopen" })}>
-                    {t("Redeschide ultima versiune", "Reopen latest version")}
-                  </Button>
-                </div>
-              ) : (
-                <Button onClick={retryFailure} disabled={busy}>
-                  {t("Reîncearcă", "Retry")}
-                </Button>
-              )}
+              {error === "conflict"
+                ? t(
+                    "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
+                    "Session changed. Your draft is retained; inspect history before reopening.",
+                  )
+                : t(
+                    "Acțiunea a eșuat; ciorna este păstrată.",
+                    "The action failed; your draft is retained.",
+                  )}
+              <Button
+                onClick={() =>
+                  error === "conflict" ? go("history") : void save()
+                }
+              >
+                {error === "conflict"
+                  ? t("Istoric", "History")
+                  : t("Reîncearcă", "Retry")}
+              </Button>
             </div>
           )}
           {loading ? (
@@ -526,62 +458,10 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               )}
               {draft && ["base", "review"].includes(route) && (
                 <>
-                  <div className="editor-toolbar">
-                    <div className="segments">
-                      <Button
-                        aria-pressed={route === "base"}
-                        onClick={() => go("base")}
-                      >
-                        {t("Editează", "Edit")}
-                      </Button>
-                      <Button
-                        aria-pressed={route === "review"}
-                        onClick={() => go("review")}
-                      >
-                        {t("Verificări", "Review")}
-                      </Button>
-                    </div>
-                    <label>
-                      {t("Limba CV-ului", "CV language")}
-                      <select
-                        aria-label={t("Limba CV-ului", "CV language")}
-                        value={draft.language}
-                        onChange={(e) =>
-                          change({
-                            ...clone(draft),
-                            language: e.target.value as Locale,
-                          })
-                        }
-                      >
-                        <option value="ro">Română</option>
-                        <option value="en">English</option>
-                      </select>
-                    </label>
-                  </div>
-                  <p className="small muted">
-                    {t(
-                      "Limba CV-ului schimbă etichetele documentului. Textul tău nu este tradus automat; revizuiește-l separat.",
-                      "CV language changes document labels. Your text is not translated automatically; review it separately.",
-                    )}
-                  </p>
-                  {issues.length > 0 && (
-                    <div
-                      className="notice notice-error"
-                      role="alert"
-                      ref={errors}
-                      tabIndex={-1}
-                    >
-                      <b>
-                        {t(
-                          "Mai sunt informații de verificat.",
-                          "Some facts still need review.",
-                        )}
-                      </b>
-                      <p>{issueText(issues[0].code, t)}</p>
-                      <Button onClick={() => focusIssue(issues)}>
-                        {t("Mergi la primul câmp", "Go to first field")}
-                      </Button>
-                    </div>
+                  {!!issues.length && (
+                    <p role="alert" className="notice notice-error">
+                      {issueText(issues[0].code, t)}
+                    </p>
                   )}
                   <div className="editor-layout">
                     <div>
@@ -594,9 +474,12 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                           enrich={() => go("enrich")}
                         />
                       )}
-                      <Sources draft={draft} />
                     </div>
-                    <DocumentPreview draft={draft} asOf={asOf} />
+                    <DocumentPreview
+                      draft={draft}
+                      asOf={asOf}
+                      onEdit={focusField}
+                    />
                   </div>
                 </>
               )}
@@ -605,6 +488,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                   draft={draft}
                   change={change}
                   goEdit={() => go("base")}
+                  asOf={asOf}
                 />
               )}
               {route === "history" && (
@@ -623,90 +507,92 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               )}
               {["jobs", "account", "missing"].includes(route) && (
                 <section className="card empty">
-                  <span className="icon-tile">
-                    {route === "jobs" ? <BriefcaseBusiness /> : <UserRound />}
-                  </span>
-                  <h2>
-                    {route === "missing"
-                      ? t("Revino la spațiul tău", "Return to your workspace")
-                      : t("În pregătire", "In preparation")}
-                  </h2>
+                  <h2>{t("În pregătire", "In preparation")}</h2>
                   <p>
                     {route === "jobs"
                       ? t(
-                          "Capturarea joburilor, adaptarea, scorurile și exportul nu sunt conectate. Poți continua construirea CV-ului de bază.",
-                          "Job capture, tailoring, scores, and export are not connected. You can continue building your Base CV.",
+                          "Joburile, adaptarea și exportul nu sunt conectate.",
+                          "Jobs, tailoring and export are not connected.",
                         )
-                      : route === "account"
-                        ? t(
-                            "Autentificarea și baza de date nu sunt conectate. Nu există salvare în cloud sau sincronizare. Revizuirea locală nu necesită un cont.",
-                            "Authentication and the database are not connected. Cloud saving and sync are unavailable. Local review requires no account.",
-                          )
-                        : t(
-                            "Linkul nu corespunde unei pagini disponibile.",
-                            "This link does not match an available page.",
-                          )}
+                      : t(
+                          "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
+                          "Account and online saving are not connected. You can use the local editor without an account.",
+                        )}
                   </p>
-                  <Button
-                    variant="primary"
-                    onClick={() => go(draft ? "base" : "start")}
-                  >
-                    {t("Continuă cu CV-ul de bază", "Continue with Base CV")}
+                  <Button onClick={() => go(draft ? "base" : "start")}>
+                    {t("CV de bază", "Base CV")}
                   </Button>
                 </section>
               )}
-              {draft && ["base", "review", "enrich"].includes(route) && (
-                <footer className="save-bar">
-                  <div>
-                    <label className="check">
-                      <input
-                        id="truth"
-                        type="checkbox"
-                        checked={acknowledged}
-                        onChange={(e) => setAcknowledged(e.target.checked)}
-                      />
-                      {t(
-                        "Am verificat informațiile introduse și confirm exactitatea lor.",
-                        "I reviewed the entered facts and confirm their accuracy.",
-                      )}
-                    </label>
-                    <small>
-                      {t(
-                        "Salvarea păstrează o copie doar până la reîncărcarea paginii.",
-                        "Saving keeps a copy only until this page reloads.",
-                      )}
-                    </small>
-                  </div>
-                  <div className="actions">
-                    <Button
-                      disabled={!past.length || busy}
-                      onClick={() => {
-                        generation.current++;
-                        setDraft(clone(past.at(-1)!));
-                        setPast((p) => p.slice(0, -1));
-                        setAcknowledged(false);
-                        setIssues([]);
-                        setNotice("undone");
-                      }}
-                    >
-                      <Undo2 size={16} />
-                      {t("Anulează ultima modificare", "Undo last change")}
-                    </Button>
-                    <Button
-                      variant="primary"
-                      disabled={busy}
-                      aria-busy={busy}
-                      onClick={() => void save()}
-                    >
-                      <Save size={16} />
-                      {busy
-                        ? t("Se salvează…", "Saving…")
-                        : t("Salvează în sesiune", "Save in session")}
-                    </Button>
-                  </div>
-                </footer>
-              )}
             </>
+          )}
+          {editing && (
+            <footer className="save-bar">
+              <div>
+                <p role="status">
+                  {busy
+                    ? t("Se salvează…", "Saving…")
+                    : error
+                      ? t(
+                          "Ciornă păstrată · salvarea a eșuat",
+                          "Draft retained · save failed",
+                        )
+                      : dirty
+                        ? t("Modificări în ciornă…", "Draft changes…")
+                        : t(
+                            "Ciornă salvată în sesiune",
+                            "Draft saved in session",
+                          )}
+                  {head ? ` · v${head.revision}` : ""}
+                </p>
+                <small>
+                  {t(
+                    "Doar memoria paginii · reîncărcarea șterge datele",
+                    "Page memory only · reloading clears data",
+                  )}
+                </small>
+                <span className="sr-only" role="status">
+                  {notice}
+                </span>
+              </div>
+              <div className="actions">
+                <Button
+                  aria-label={t(
+                    "Anulează ultima modificare",
+                    "Undo last change",
+                  )}
+                  disabled={!past.length}
+                  onClick={() => {
+                    const previous = clone(past.at(-1)!);
+                    generation.current++;
+                    latest.current = previous;
+                    setDraft(previous);
+                    setPast((p) => p.slice(0, -1));
+                    setIssues([]);
+                    setError(null);
+                  }}
+                >
+                  <Undo2 size={17} />
+                </Button>
+                <Button
+                  variant="primary"
+                  disabled={busy}
+                  onClick={() => void save()}
+                >
+                  <Save size={16} />
+                  {t("Salvează acum", "Save now")}
+                  <kbd>⌘/Ctrl S</kbd>
+                </Button>
+              </div>
+            </footer>
+          )}
+          {!editing && (
+            <p className="session-footnote">
+              {t(
+                "Sesiune locală: reîncărcarea șterge datele. Fără salvare online.",
+                "Local session: reloading clears data. No online saving.",
+              )}
+            </p>
           )}
         </main>
       </div>
@@ -718,23 +604,18 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                   `Restaurezi v${dialog.snapshot.revision}?`,
                   `Restore v${dialog.snapshot.revision}?`,
                 )
-              : t("Înlocuiești ciorna deschisă?", "Replace the open draft?")
+              : t("Înlocuiești ciorna?", "Replace draft?")
           }
           onClose={() => !busy && setDialog(null)}
         >
           <p>
-            {dialog.kind === "restore"
-              ? t(
-                  "Se va crea o versiune nouă din această copie. Modificările nesalvate vor fi înlocuite. Istoricul rămâne intact în sesiune.",
-                  "A new version will be created from this copy. Unsaved changes will be replaced. Session history stays intact.",
-                )
-              : t(
-                  "Modificările nesalvate din ciorna curentă vor fi pierdute. Versiunile salvate în sesiune rămân în istoric.",
-                  "Unsaved changes in the current draft will be lost. Session-saved versions stay in history.",
-                )}
+            {t(
+              "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric până la reîncărcare.",
+              "The current draft will be replaced. Prior versions remain in history until reload.",
+            )}
           </p>
           <div className="actions">
-            <Button autoFocus disabled={busy} onClick={() => setDialog(null)}>
+            <Button onClick={() => setDialog(null)} disabled={busy}>
               {t("Păstrează ciorna", "Keep draft")}
             </Button>
             <Button
@@ -749,7 +630,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               }}
             >
               {dialog.kind === "restore"
-                ? t("Confirmă restaurarea", "Confirm restore")
+                ? t("Restaurează versiunea", "Restore version")
                 : t("Înlocuiește ciorna", "Replace draft")}
             </Button>
           </div>

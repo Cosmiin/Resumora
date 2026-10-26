@@ -6,7 +6,7 @@ export type Snapshot = {
   parentId: string | null;
   restoredFrom?: string;
   createdAt: string;
-  reason: "save" | "restore";
+  reason: "save" | "autosave" | "restore";
   draft: BaseDraft;
 };
 export class AdapterError extends Error {
@@ -24,7 +24,8 @@ export interface BaseCvAdapter {
   save(input: {
     draft: BaseDraft;
     expectedRevision: number;
-    acknowledged: boolean;
+    acknowledged?: boolean;
+    mode?: "autosave" | "checkpoint";
     requestId: string;
   }): Promise<Snapshot>;
   restore(input: {
@@ -71,7 +72,8 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
   async save(input: {
     draft: BaseDraft;
     expectedRevision: number;
-    acknowledged: boolean;
+    acknowledged?: boolean;
+    mode?: "autosave" | "checkpoint";
     requestId: string;
   }) {
     const body = JSON.stringify(input),
@@ -80,12 +82,16 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
     const head = this.versions.at(-1);
     if (input.expectedRevision !== (head?.revision ?? 0))
       throw new AdapterError("conflict");
-    const issues = validateDraft(input.draft, input.acknowledged);
+    // Autosave preserves incomplete drafts without attesting imported facts.
+    const issues = input.mode === "autosave" ? [] : validateDraft(input.draft);
     if (issues.length) throw new AdapterError("validation", issues);
     const snapshot =
       head && JSON.stringify(head.draft) === JSON.stringify(input.draft)
         ? clone(head)
-        : this.publish(input.draft, "save");
+        : this.publish(
+            input.draft,
+            input.mode === "autosave" ? "autosave" : "save",
+          );
     this.requests.set(input.requestId, { body, snapshot: clone(snapshot) });
     return snapshot;
   }

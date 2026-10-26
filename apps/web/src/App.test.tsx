@@ -14,455 +14,490 @@ import { maraReviewDraft } from "./base/fixture";
 import {
   allFacts,
   blankDraft,
-  confirmSection,
-  coreSections,
   fact,
-  type BaseDraft,
+  newOptionalEntry,
+  newRole,
 } from "./base/model";
-async function openManual() {
+import { prepareDraft } from "./base/editing";
+async function openManual(adapter = new MemoryBaseCvAdapter()) {
+  window.location.hash = "#start";
+  const user = userEvent.setup();
+  render(<App adapter={adapter} />);
+  await user.click(
+    await screen.findByRole("button", { name: "Completează manual" }),
+  );
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("textbox", { name: /Prenume/ }),
+    ),
+  );
+  return { user, adapter };
+}
+const input = (name: RegExp | string) =>
+  screen.getByRole("textbox", { name }) as HTMLInputElement;
+async function openSection(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+) {
+  await user.click(screen.getByText(name, { selector: "summary" }));
+}
+it("fills seven required identity fields using only typing and Tab, immediately previews and coalesces session autosave", async () => {
+  const { user, adapter } = await openManual();
+  const save = vi.spyOn(adapter, "save");
+  const values = [
+    "Ana",
+    "Popescu-Ionescu",
+    "Analist",
+    "ana@example.test",
+    "0700000000",
+    "Brașov",
+    "https://linkedin.com/in/synthetic-ana",
+  ];
+  for (let i = 0; i < values.length; i++) {
+    await user.keyboard(values[i]);
+    if (i < values.length - 1) await user.tab();
+  }
+  expect(input("LinkedIn").value).toBe(values[6]);
+  const preview = screen.getByRole("complementary", {
+    name: "Previzualizare CV",
+  });
+  expect(within(preview).getByText("Ana Popescu-Ionescu")).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.queryByText("Confirmă informațiile din secțiune")).toBeNull();
+  await waitFor(
+    async () =>
+      expect((await adapter.load())?.draft.name.value).toBe(
+        "Ana Popescu-Ionescu",
+      ),
+    { timeout: 2000 },
+  );
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(
+    (await adapter.load())!.draft.contacts.find((c) => c.kind === "email")!
+      .value.status,
+  ).toBe("user_authored");
+});
+it("adds an optional contact with one click and focus, toggles field visibility with one click or Alt+V", async () => {
+  const { user, adapter } = await openManual();
+  await user.click(screen.getByRole("button", { name: "+ Website" }));
+  const site = input("Website");
+  expect(document.activeElement).toBe(site);
+  await user.type(site, "https://example.test");
+  await user.click(screen.getByRole("button", { name: "Ascunde: Website" }));
+  expect(
+    within(
+      screen.getByRole("complementary", { name: "Previzualizare CV" }),
+    ).queryByText("https://example.test"),
+  ).toBeNull();
+  site.focus();
+  await user.keyboard("{Alt>}v{/Alt}");
+  expect(
+    within(
+      screen.getByRole("complementary", { name: "Previzualizare CV" }),
+    ).getByText("https://example.test"),
+  ).toBeTruthy();
+  await waitFor(
+    async () =>
+      expect(
+        (await adapter.load())?.draft.contacts.some(
+          (c) => c.platform === "website",
+        ),
+      ).toBe(true),
+    { timeout: 2000 },
+  );
+});
+it("adds skills with Enter, comma and paste; edits/cancels/removes and keyboard-reorders chips", async () => {
+  const { user, adapter } = await openManual();
+  await openSection(user, "Competențe tehnice");
+  const chips = input("Competențe tehnice");
+  expect(document.activeElement).toBe(chips);
+  await user.keyboard("React{Enter}Node,SQL{Enter}");
+  await user.paste("CSS, TypeScript, Git");
+  expect(screen.getByRole("button", { name: "React" })).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "React" }));
+  const edit = input("Editează competența");
+  await user.clear(edit);
+  await user.type(edit, "Discard{Escape}");
+  expect(screen.queryByRole("button", { name: "Discard" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "React" }));
+  await user.clear(input("Editează competența"));
+  await user.type(input("Editează competența"), "React 19{Enter}");
+  screen.getByRole("button", { name: "Node" }).focus();
+  await user.keyboard("{Alt>}{ArrowUp}{/Alt}");
+  chips.focus();
+  await user.keyboard("{Backspace}");
+  await waitFor(
+    async () =>
+      expect(
+        (await adapter.load())?.draft.technicalSkills.map((s) => s.value),
+      ).toEqual(["Node", "React 19", "SQL", "CSS", "TypeScript"]),
+    { timeout: 2000 },
+  );
+});
+it("adds entries with autofocus, accepts partial typed dates and current toggles, and focuses a preview field in one click", async () => {
+  const { user, adapter } = await openManual();
+  await openSection(user, "Experiență profesională");
+  await user.click(screen.getByRole("button", { name: "Adaugă experiență" }));
+  const role = input(/^Rol/);
+  await waitFor(() => expect(document.activeElement).toBe(role));
+  await user.keyboard("Analist{Enter}Example Co{Enter}2020{Enter}02/2024");
+  const ongoing = screen.getByRole("checkbox", { name: "Prezent / În curs" });
+  await user.click(ongoing);
+  expect(
+    screen.queryByRole("textbox", { name: "Când s-a terminat?" }),
+  ).toBeNull();
+  const preview = screen.getByRole("complementary", {
+    name: "Previzualizare CV",
+  });
+  await user.click(within(preview).getByRole("button", { name: "Example Co" }));
+  await waitFor(() => expect(document.activeElement).toBe(input(/^Companie/)));
+  await waitFor(
+    async () =>
+      expect((await adapter.load())?.draft.roles[0].start.value).toEqual({
+        year: "2020",
+        month: "",
+      }),
+    { timeout: 2000 },
+  );
+  expect((await adapter.load())?.draft.roles[0].end.value).toEqual({
+    year: "2024",
+    month: "2",
+  });
+  await openSection(user, "Studii");
+  await user.click(screen.getByRole("button", { name: "Adaugă studii" }));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(input(/^Instituție/)),
+  );
+  await user.keyboard(
+    "Synthetic University{Enter}Diplomă{Enter}092015{Enter}2019",
+  );
+  await waitFor(
+    async () =>
+      expect((await adapter.load())?.draft.education[0].start.value).toEqual({
+        year: "2015",
+        month: "9",
+      }),
+    { timeout: 2000 },
+  );
+});
+it("keyboard-reorders sections without changing facts and keeps source information hidden until requested", async () => {
+  const { user, adapter } = await openManual();
+  await user.type(input(/Prenume/), "Ana");
+  await user.click(
+    screen.getByText("Structura CV-ului", { selector: "summary" }),
+  );
+  const handle = screen.getByRole("button", {
+    name: "Reordonează: Competențe tehnice",
+  });
+  handle.focus();
+  await user.keyboard("{Alt>}{ArrowUp}{ArrowUp}{ArrowUp}{/Alt}");
+  await waitFor(
+    async () =>
+      expect((await adapter.load())?.draft.presentation.order[0]).toBe(
+        "technicalSkills",
+      ),
+    { timeout: 2000 },
+  );
+  expect((await adapter.load())!.draft.name.value).toBe("Ana");
+  expect(document.querySelector(".section-info[open]")).toBeNull();
+});
+it("focuses missing fields on Ctrl+S without a truth checkbox, permits Back/Cancel, and keeps incomplete autosaves", async () => {
+  const { user, adapter } = await openManual();
+  await user.keyboard("Ana{Control>}s{/Control}");
+  await waitFor(() =>
+    expect(document.activeElement).toBe(input(/Nume de familie/)),
+  );
+  expect(screen.queryByRole("checkbox", { name: /exactitatea/ })).toBeNull();
+  await waitFor(
+    async () => expect((await adapter.load())?.draft.name.value).toBe("Ana"),
+    { timeout: 2000 },
+  );
+  await user.click(screen.getByRole("link", { name: "Acasă" }));
+  expect(
+    await screen.findByRole("button", { name: "Redeschide versiunea salvată" }),
+  ).toBeTruthy();
+});
+it("saves/reopens incomplete manual drafts and restores immutable history as a new version", async () => {
+  const { user, adapter } = await openManual();
+  await user.keyboard("Ana");
+  await waitFor(async () => expect((await adapter.history()).length).toBe(1), {
+    timeout: 2000,
+  });
+  const first = (await adapter.load())!;
+  await user.clear(input(/Prenume/));
+  await user.type(input(/Prenume/), "Mira");
+  await waitFor(async () => expect((await adapter.history()).length).toBe(2), {
+    timeout: 2000,
+  });
+  await user.click(screen.getByRole("link", { name: "Acasă" }));
+  await user.click(
+    screen.getByRole("button", { name: "Redeschide versiunea salvată" }),
+  );
+  expect(input(/Prenume/).value).toBe("Mira");
+  await user.click(screen.getByRole("button", { name: "Istoric" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Inspectează v1" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Restaurează v1" }));
+  await user.click(screen.getByRole("button", { name: "Păstrează ciorna" }));
+  expect((await adapter.load())!.revision).toBe(2);
+  await user.click(screen.getByRole("button", { name: "Restaurează v1" }));
+  await user.click(
+    screen.getByRole("button", { name: "Restaurează versiunea" }),
+  );
+  await waitFor(() => expect(input(/Prenume/).value).toBe("Ana"));
+  expect((await adapter.history()).map((s) => s.revision)).toEqual([3, 2, 1]);
+  expect((await adapter.history())[2]).toEqual(first);
+});
+it("preserves newer edits while an asynchronous save is in flight and retries errors", async () => {
+  const adapter = new MemoryBaseCvAdapter(),
+    real = adapter.save.bind(adapter);
+  let release: () => void = () => {};
+  vi.spyOn(adapter, "save").mockImplementationOnce(async (input) => {
+    await new Promise<void>((r) => {
+      release = r;
+    });
+    return real(input);
+  });
+  const { user } = await openManual(adapter);
+  await user.keyboard("Ana");
+  await waitFor(() => expect(screen.getByText("Se salvează…")).toBeTruthy(), {
+    timeout: 2000,
+  });
+  await user.type(input(/Prenume/), " nou");
+  await act(async () => release());
+  expect(input(/Prenume/).value).toBe("Ana nou");
+  await waitFor(
+    async () =>
+      expect((await adapter.load())?.draft.name.value).toBe("Ana nou"),
+    { timeout: 2000 },
+  );
+});
+it("keeps UI/CV language independent, preserves imported status and keeps generated reference prose out of live preview", async () => {
   window.location.hash = "#start";
   const adapter = new MemoryBaseCvAdapter(),
     user = userEvent.setup();
   render(<App adapter={adapter} />);
   await user.click(
-    await screen.findByRole("button", { name: "Completează manual" }),
-  );
-  return { adapter, user };
-}
-async function confirmIdentity(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(
-    within(screen.getByRole("region", { name: "Despre tine" })).getByRole(
-      "button",
-      { name: "Confirmă informațiile din secțiune" },
-    ),
-  );
-}
-async function save(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(
-    screen.getByRole("checkbox", {
-      name: "Am verificat informațiile introduse și confirm exactitatea lor.",
-    }),
-  );
-  await user.click(screen.getByRole("button", { name: "Salvează în sesiune" }));
-}
-it("manual edits validate, confirm, save, reopen and restore without mutating earlier snapshots", async () => {
-  const { user, adapter } = await openManual();
-  const name = screen.getByRole("textbox", { name: /Nume complet/ });
-  expect((name as HTMLInputElement).value).toBe("");
-  expect(
-    (
-      screen.getByRole("textbox", {
-        name: "Al doilea titlu de poziționare",
-      }) as HTMLInputElement
-    ).value,
-  ).toBe("");
-  await user.click(screen.getByRole("button", { name: "Salvează în sesiune" }));
-  await waitFor(() => expect(document.activeElement).toBe(name));
-  expect(screen.getByRole("alert").textContent).toContain(
-    "Mai sunt informații de verificat",
-  );
-  await user.type(name, "Ana Fictivă");
-  await confirmIdentity(user);
-  await save(user);
-  await screen.findByText("CV de bază v1 salvat în memoria acestei pagini.");
-  const first = (await adapter.load())!;
-  await user.click(screen.getByRole("button", { name: "Editează" }));
-  await user.clear(screen.getByRole("textbox", { name: /Nume complet/ }));
-  await user.type(
-    screen.getByRole("textbox", { name: /Nume complet/ }),
-    "Ana Revizuită",
-  );
-  // An edit resets confirmation and the save acknowledgment.
-  expect(screen.getByText(/1 de confirmat/)).toBeTruthy();
-  await confirmIdentity(user);
-  await save(user);
-  await screen.findByText("CV de bază v2 salvat în memoria acestei pagini.");
-  await user.click(screen.getByRole("link", { name: "Acasă" }));
-  await user.click(
-    screen.getByRole("button", { name: "Redeschide versiunea salvată" }),
-  );
-  await screen.findByText(
-    "Ultima versiune salvată în această sesiune a fost redeschisă.",
-  );
-  expect(
-    (screen.getByRole("textbox", { name: /Nume complet/ }) as HTMLInputElement)
-      .value,
-  ).toBe("Ana Revizuită");
-  await user.type(
-    screen.getByRole("textbox", { name: /Nume complet/ }),
-    " draft",
-  );
-  await user.click(screen.getByRole("link", { name: "Acasă" }));
-  await user.click(
-    screen.getByRole("button", { name: "Redeschide versiunea salvată" }),
-  );
-  expect(screen.getByRole("dialog")).toBeTruthy();
-  await user.click(screen.getByRole("button", { name: "Păstrează ciorna" }));
-  await user.click(screen.getByRole("link", { name: "CV de bază" }));
-  expect(
-    (screen.getByRole("textbox", { name: /Nume complet/ }) as HTMLInputElement)
-      .value,
-  ).toBe("Ana Revizuită draft");
-  await user.click(screen.getByRole("button", { name: "Istoric" }));
-  await user.click(
-    await screen.findByRole("button", { name: "Inspectează v1" }),
-  );
-  expect(screen.getByRole("heading", { name: "Inspectezi v1" })).toBeTruthy();
-  await user.click(screen.getByRole("button", { name: "Restaurează v1" }));
-  await user.click(
-    screen.getByRole("button", { name: "Confirmă restaurarea" }),
-  );
-  await screen.findByText(
-    "Restaurat ca v3. Versiunile anterioare sunt păstrate în această sesiune.",
-  );
-  expect(
-    (screen.getByRole("textbox", { name: /Nume complet/ }) as HTMLInputElement)
-      .value,
-  ).toBe("Ana Fictivă");
-  expect((await adapter.history())[2]).toEqual(first);
-});
-it("keeps UI and CV languages independent, preserves partial dates and changes presentation without changing facts", async () => {
-  window.location.hash = "#start";
-  const user = userEvent.setup(),
-    adapter = new MemoryBaseCvAdapter();
-  render(<App adapter={adapter} />);
-  await user.click(
     await screen.findByRole("button", { name: "Explorează exemplul Mara" }),
   );
-  const cv = screen.getByRole("complementary", { name: "Previzualizare CV" });
-  expect(cv.querySelector("article")!.lang).toBe("en");
-  expect(
-    within(cv).getByRole("heading", { name: "Professional experience" }),
-  ).toBeTruthy();
-  expect(
-    within(cv).queryByText(
-      "Automated internal workflows using Power Automate and SQL",
-    ),
-  ).toBeNull();
-  const experience = screen.getByRole("region", {
-    name: "Experiență profesională",
+  const preview = screen.getByRole("complementary", {
+    name: "Previzualizare CV",
   });
-  await user.click(
-    within(experience).getByRole("button", {
-      name: "Confirmă informațiile din secțiune",
-    }),
-  );
-  expect(
-    within(cv).getByText(
-      "Automated internal workflows using Power Automate and SQL",
-    ),
-  ).toBeTruthy();
+  expect(preview.querySelector("article")!.lang).toBe("en");
   await user.selectOptions(
     screen.getByRole("combobox", { name: "Limba interfeței" }),
     "en",
   );
-  expect(
-    screen.getByRole("heading", { level: 1, name: "Base CV" }),
-  ).toBeTruthy();
-  expect(cv.querySelector("article")!.lang).toBe("en");
+  expect(preview.querySelector("article")!.lang).toBe("en");
   await user.selectOptions(
     screen.getByRole("combobox", { name: "CV language" }),
     "ro",
   );
-  expect(cv.querySelector("article")!.lang).toBe("ro");
+  expect(preview.querySelector("article")!.lang).toBe("ro");
+  await waitFor(
+    async () => expect((await adapter.load())?.draft.language).toBe("ro"),
+    { timeout: 2000 },
+  );
+  const saved = (await adapter.load())!;
   expect(
-    within(cv).getByRole("heading", { name: "Experiență profesională" }),
-  ).toBeTruthy();
-  expect(
-    within(cv).getByText(
-      "Automated internal workflows using Power Automate and SQL",
-    ),
-  ).toBeTruthy();
-  const months = screen.getAllByRole("combobox", {
-    name: "Role start · Month",
-  });
-  expect((months[2] as HTMLSelectElement).value).toBe("");
-  await user.click(
-    screen.getByRole("button", { name: "Move section up: Technical skills" }),
-  );
-  const previewSections = Array.from(cv.querySelectorAll("article h3")).map(
-    (el) => el.textContent,
-  );
-  expect(previewSections.indexOf("Competențe tehnice")).toBeLessThan(
-    previewSections.indexOf("Competențe profesionale"),
-  );
-  await user.click(
-    screen.getByRole("button", { name: "Visibility: Technical skills" }),
-  );
-  expect(
-    within(cv).queryByRole("heading", { name: "Competențe tehnice" }),
-  ).toBeNull();
-  expect(
-    (
-      screen.getByRole("textbox", {
-        name: "Technical skills 1",
-      }) as HTMLInputElement
-    ).value,
-  ).toBe("SQL");
-  const technical = screen.getByRole("region", { name: "Technical skills" });
-  const professional = screen.getByRole("region", {
-    name: "Professional skills",
-  });
-  await user.click(
-    within(technical).getByRole("button", { name: "Add a skill" }),
-  );
-  await user.type(
-    within(technical).getByRole("textbox", { name: "Technical skills 3" }),
-    "REST APIs (synthetic)",
-  );
-  await user.click(
-    within(technical).getByRole("button", { name: "Move down: SQL" }),
-  );
-  expect(
-    within(technical)
-      .getAllByRole("textbox")
-      .map((el) => (el as HTMLInputElement).value),
-  ).toEqual(["Power Automate", "SQL", "REST APIs (synthetic)"]);
-  expect(within(professional).getAllByRole("textbox")).toHaveLength(1);
-  await user.click(screen.getByRole("button", { name: "Add a role" }));
-  expect(screen.getAllByRole("textbox", { name: /Job title/ })).toHaveLength(4);
-  await user.click(screen.getByRole("button", { name: "Remove: New role" }));
-  await user.selectOptions(
-    screen.getByRole("combobox", { name: "Section type" }),
-    "projects",
-  );
-  await user.click(screen.getByRole("button", { name: "Add section" }));
-  const projects = screen.getByRole("region", { name: "Projects" });
-  await user.click(within(projects).getByRole("button", { name: "Add entry" }));
-  await user.type(
-    within(projects).getByRole("textbox", { name: /Name/ }),
-    "Synthetic project",
-  );
-  await user.click(
-    within(projects).getByRole("button", { name: "Confirm section facts" }),
-  );
-  expect(
-    within(cv).getByRole("heading", { name: "Synthetic project" }),
-  ).toBeTruthy();
+    allFacts(saved.draft).find((f) => f.sourceClaimId === "claim_resp_a")
+      ?.status,
+  ).toBe("extracted_unconfirmed");
+  expect(preview.textContent).not.toContain(saved.draft.referenceProse[0].text);
 });
-it("preserves invalid email/date input and focuses actionable errors, with safe optional contact removal", async () => {
-  const { user } = await openManual();
-  await user.type(
-    screen.getByRole("textbox", { name: /Nume complet/ }),
-    "Test",
-  );
-  await user.click(screen.getByRole("button", { name: "Adaugă un contact" }));
-  const email = screen.getByRole("textbox", { name: "Email" });
-  await user.type(email, "invalid");
-  await confirmIdentity(user);
-  await save(user);
-  await waitFor(() => expect(document.activeElement).toBe(email));
-  expect((email as HTMLInputElement).value).toBe("invalid");
-  expect(
-    screen.getAllByText("Introdu o adresă de email validă.").length,
-  ).toBeGreaterThan(0);
-  await user.click(screen.getByRole("button", { name: "Elimină: Email" }));
-  await user.click(screen.getByRole("button", { name: "Adaugă un rol" }));
-  await user.type(screen.getByRole("textbox", { name: /Funcție/ }), "Analist");
-  await user.type(
-    screen.getByRole("textbox", { name: /Angajator/ }),
-    "Synthetic",
-  );
-  await user.type(
-    screen.getByRole("textbox", { name: "Început rol · An" }),
-    "2024",
-  );
-  await user.type(
-    screen.getByRole("textbox", { name: "Sfârșit rol · An" }),
-    "2023",
-  );
-  const role = screen.getByRole("region", { name: "Experiență profesională" });
-  await user.click(
-    within(role).getByRole("button", {
-      name: "Confirmă informațiile din secțiune",
-    }),
-  );
-  await save(user);
-  expect(
-    screen.getAllByText("Sfârșitul nu poate preceda începutul.").length,
-  ).toBeGreaterThan(0);
-  expect(
-    (
-      screen.getByRole("textbox", {
-        name: "Sfârșit rol · An",
-      }) as HTMLInputElement
-    ).value,
-  ).toBe("2023");
-});
-it("enrichment requires review and explicit confirmation, preserves exact answer and supports scoped undo and skip", async () => {
-  const d = maraReviewDraft(),
-    adapter = new MemoryBaseCvAdapter();
+it("enrichment autofocuses one question, saves and advances with one shortcut, supports unknown/skip and editable preview", async () => {
+  const d = prepareDraft(blankDraft()),
+    role = newRole();
+  role.title = fact("Analist");
+  role.company = fact("Synthetic Co");
+  d.roles.push(role);
+  const adapter = new MemoryBaseCvAdapter();
   await adapter.save({
-    draft: coreSections.reduce((v, s) => confirmSection(v, s), d),
+    draft: d,
     expectedRevision: 0,
-    acknowledged: true,
+    mode: "autosave",
     requestId: "initial",
   });
-  const initial = (await adapter.load())!;
   window.location.hash = "#enrich";
   const user = userEvent.setup();
   render(<App adapter={adapter} />);
-  const answer = await screen.findByRole("textbox", { name: "Răspunsul tău" });
-  await user.type(
-    answer,
-    "The team reviewed exceptions in one place; no time saving was measured.",
-  );
-  await user.click(
-    screen.getByRole("button", { name: "Revizuiește răspunsul" }),
-  );
-  const apply = screen.getByRole("button", {
-    name: "Confirmă și aplică în ciornă",
+  const answer = await screen.findByRole("textbox", {
+    name: "Care erau responsabilitățile tale de zi cu zi?",
   });
-  expect((apply as HTMLButtonElement).disabled).toBe(true);
-  await user.click(
-    screen.getByRole("checkbox", {
-      name: "Aceste informații sunt adevărate și descriu munca mea.",
+  await waitFor(() => expect(document.activeElement).toBe(answer));
+  await user.type(answer, "Am verificat fluxurile, fără procente inventate.");
+  expect(
+    within(
+      screen.getByRole("complementary", { name: "Previzualizare CV" }),
+    ).getByText("Am verificat fluxurile, fără procente inventate."),
+  ).toBeTruthy();
+  await user.keyboard("{Control>}{Enter}{/Control}");
+  expect(
+    await screen.findByRole("textbox", {
+      name: "Ce ai făcut tu, cu ce autonomie?",
     }),
+  ).toBe(document.activeElement);
+  await user.keyboard("{Control>}{Shift>}k{/Shift}{/Control}");
+  expect(
+    screen.getByRole("textbox", {
+      name: "Ce instrumente ai folosit și pentru ce?",
+    }),
+  ).toBeTruthy();
+  await waitFor(
+    async () =>
+      expect((await adapter.load())?.draft.roles[0].bullets[0].value).toBe(
+        "Am verificat fluxurile, fără procente inventate.",
+      ),
+    { timeout: 2000 },
   );
-  await user.click(apply);
-  expect(screen.getByText("Răspuns confirmat în ciornă")).toBeTruthy();
-  expect(await adapter.load()).toEqual(initial);
-  await user.click(
-    screen.getByRole("button", { name: "Anulează ultima modificare" }),
-  );
-  expect(screen.getByText("Pasul 2 · Confirmă")).toBeTruthy();
-  await user.click(screen.getByRole("button", { name: "Editează răspunsul" }));
-  await user.click(screen.getByRole("button", { name: "Nu știu" }));
-  expect(screen.getByText("Omis · nu adaugă informații")).toBeTruthy();
-  expect(await adapter.load()).toEqual(initial);
+  expect(
+    (await adapter.load())!.draft.answers.some((a) => a.status === "unknown"),
+  ).toBe(true);
+  expect(screen.queryByText("Revizuiește răspunsul")).toBeNull();
 });
-it("checks file metadata without reading or sending, and unavailable routes preserve the draft", async () => {
+it("file picker/drop validate metadata only, reject multiple files, and unavailable routes preserve the draft", async () => {
   window.location.hash = "#start";
   const user = userEvent.setup(),
-    send = vi.spyOn(window, "fetch");
-  render(<App adapter={new MemoryBaseCvAdapter()} />);
+    adapter = new MemoryBaseCvAdapter();
+  render(<App adapter={adapter} />);
   await user.click(
     await screen.findByRole("button", { name: "Alege un document" }),
   );
-  const input = screen.getByLabelText("Selectează PDF sau DOCX");
-  const file = new File(["Synthetic bytes, never parsed"], "synthetic.pdf", {
-    type: "application/pdf",
+  const file = new File(["synthetic"], "cv.pdf", { type: "application/pdf" });
+  const bytes = vi.spyOn(file, "arrayBuffer");
+  fireEvent.drop(document.querySelector(".dropzone")!, {
+    dataTransfer: { files: [file] },
   });
-  fireEvent.change(input, { target: { files: [file] } });
-  expect(
-    screen.getByText(/Selectat local. Nu a fost încărcat sau extras/),
-  ).toBeTruthy();
-  fireEvent.change(input, {
-    target: { files: [new File(["x"], "wrong.txt")] },
+  expect(screen.getByText(/Selectat local/)).toBeTruthy();
+  expect(bytes).not.toHaveBeenCalled();
+  fireEvent.drop(document.querySelector(".dropzone")!, {
+    dataTransfer: { files: [file, file] },
   });
-  expect(screen.getByText(/Selectează un PDF\/DOCX nevid/)).toBeTruthy();
+  expect(screen.getByText(/Alege un singur fișier/)).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Continuă manual" }));
-  await user.type(
-    screen.getByRole("textbox", { name: /Nume complet/ }),
-    "Draft preserved",
-  );
-  await user.click(screen.getByRole("link", { name: "Joburi" }));
-  expect(
-    screen.getByText(
-      /Capturarea joburilor, adaptarea, scorurile și exportul nu sunt conectate/,
-    ),
-  ).toBeTruthy();
+  await user.type(input(/Prenume/), "Ana");
   await user.click(screen.getByRole("link", { name: "Cont" }));
   expect(
-    screen.getByText(/Autentificarea și baza de date nu sunt conectate/),
+    screen.getByText(/Contul și salvarea online nu sunt conectate/),
   ).toBeTruthy();
   await user.click(screen.getByRole("link", { name: "CV de bază" }));
-  expect(
-    (screen.getByRole("textbox", { name: /Nume complet/ }) as HTMLInputElement)
-      .value,
-  ).toBe("Draft preserved");
-  expect(send).not.toHaveBeenCalled();
+  expect(input(/Prenume/).value).toBe("Ana");
 });
-it("shows adapter failure with a preserved editable draft and a working retry", async () => {
-  const adapter = new MemoryBaseCvAdapter(),
-    d = blankDraft();
-  d.name = fact("Test");
-  const ready: BaseDraft = confirmSection(d, "identity");
-  await adapter.save({
-    draft: ready,
-    expectedRevision: 0,
-    acknowledged: true,
-    requestId: "init",
+it("edits all contributions in one rich field, safely preserves lists, and records separate self-assessed Native/CEFR languages", async () => {
+  const { user, adapter } = await openManual();
+  await openSection(user, "Experiență profesională");
+  await user.click(screen.getByRole("button", { name: "Adaugă experiență" }));
+  const rich = screen.getByRole("textbox", { name: "Contribuții" });
+  rich.innerHTML =
+    '<ul><li><strong>Reviewed</strong> workflows</li><li><em>Measured</em> nothing</li></ul><img src="https://bad.test/a" onerror="x()">';
+  fireEvent.input(rich);
+  const preview = screen.getByRole("complementary", {
+    name: "Previzualizare CV",
   });
-  const saveMethod = vi
-    .spyOn(adapter, "save")
-    .mockRejectedValueOnce(new Error("temporary"));
+  expect(preview.querySelector("strong")?.textContent).toBe("Reviewed");
+  expect(preview.querySelector("img")).toBeNull();
+  await openSection(user, "Limbi");
+  await user.click(screen.getByRole("button", { name: "Adaugă limbă" }));
+  await waitFor(() => expect(document.activeElement).toBe(input("Limbă")));
+  await user.keyboard("Română");
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Nivel autoevaluat" }),
+    "Native",
+  );
+  await waitFor(
+    async () =>
+      expect(
+        (await adapter.load())?.draft.optionalSections[0].entries[0].proficiency
+          ?.value,
+      ).toBe("Native"),
+    { timeout: 2000 },
+  );
+  const snapshot = (await adapter.load())!;
+  expect(snapshot.draft.roles[0].bullets.map((f) => f.value)).toEqual([
+    "Reviewed workflows",
+    "Measured nothing",
+  ]);
+  expect(
+    snapshot.draft.presentation.contributionHtml?.[snapshot.draft.roles[0].id],
+  ).toContain("<strong>");
+});
+it("applies section and skill drag payloads to actual ordering while ignoring another group", async () => {
+  const { user, adapter } = await openManual();
+  await openSection(user, "Competențe tehnice");
+  const chips = input("Competențe tehnice");
+  await user.type(chips, "React{Enter}SQL{Enter}");
+  const rows = Array.from(document.querySelectorAll(".chip-input>.sortable"));
+  fireEvent.drop(rows[0], {
+    dataTransfer: {
+      getData: () => JSON.stringify({ group: "Competențe tehnice", index: 1 }),
+    },
+  });
+  await waitFor(
+    async () =>
+      expect(
+        (await adapter.load())?.draft.technicalSkills.map((f) => f.value),
+      ).toEqual(["SQL", "React"]),
+    { timeout: 2000 },
+  );
+  fireEvent.drop(rows[0], {
+    dataTransfer: {
+      getData: () => JSON.stringify({ group: "foreign", index: 1 }),
+    },
+  });
+  expect(
+    (await adapter.load())?.draft.technicalSkills.map((f) => f.value),
+  ).toEqual(["SQL", "React"]);
+});
+it("keeps the optional second title focused while typing, without remounting its field", async () => {
+  const { user, adapter } = await openManual();
+  await user.click(screen.getByRole("button", { name: "+ Al doilea titlu" }));
+  const title = input("Al doilea titlu");
+  await waitFor(() => expect(document.activeElement).toBe(title));
+  await user.keyboard("Analist operațional");
+  expect(document.activeElement).toBe(title);
+  expect(title.value).toBe("Analist operațional");
+  await waitFor(
+    async () =>
+      expect((await adapter.load())?.draft.titles[1].value).toBe(
+        "Analist operațional",
+      ),
+    { timeout: 2000 },
+  );
+});
+
+it("autofocuses enrichment after navigation and preserves the requested field when returning from its preview", async () => {
+  const d = prepareDraft(blankDraft()),
+    r = newRole();
+  r.title = fact("Analist");
+  r.company = fact("Synthetic Co");
+  d.roles.push(r);
+  const adapter = new MemoryBaseCvAdapter();
+  await adapter.save({
+    draft: d,
+    mode: "autosave",
+    expectedRevision: 0,
+    requestId: "initial",
+  });
   window.location.hash = "#base";
   const user = userEvent.setup();
   render(<App adapter={adapter} />);
-  await screen.findByRole("textbox", { name: /Nume complet/ });
-  await save(user);
-  expect(screen.getByRole("alert").textContent).toContain(
-    "Acțiunea nu a reușit",
-  );
-  expect(
-    (screen.getByRole("textbox", { name: /Nume complet/ }) as HTMLInputElement)
-      .value,
-  ).toBe("Test");
-  await user.click(screen.getByRole("button", { name: "Reîncearcă" }));
-  await screen.findByText("Conținut neschimbat. Nu s-a creat o versiune nouă.");
-  expect(saveMethod).toHaveBeenCalledTimes(2);
-});
-
-it("keeps user-authored summary approval separate from fact confirmation", async () => {
-  const { user, adapter } = await openManual();
-  await user.type(
-    screen.getByRole("textbox", { name: /Nume complet/ }),
-    "Persoană Sintetică",
-  );
-  await confirmIdentity(user);
-  const summary = screen.getByRole("textbox", {
-    name: "Profil în cuvintele tale",
+  await screen.findByRole("textbox", { name: /Prenume/ });
+  await user.click(screen.getByRole("link", { name: "Îmbunătățește" }));
+  const answer = await screen.findByRole("textbox", {
+    name: "Care erau responsabilitățile tale de zi cu zi?",
   });
-  await user.type(summary, "Am lucrat la proiectul descris în CV.");
-  await save(user);
-  await waitFor(() => expect(document.activeElement).toBe(summary));
-  expect(await adapter.load()).toBeNull();
+  await waitFor(() => expect(document.activeElement).toBe(answer));
+  await user.keyboard("Exact text{Control>}{Enter}{/Control}");
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("textbox", { name: "Ce ai făcut tu, cu ce autonomie?" }),
+    ),
+  );
   await user.click(
-    screen.getByRole("checkbox", {
-      name: "Aprob acest text propriu pentru CV.",
-    }),
+    within(
+      screen.getByRole("complementary", { name: "Previzualizare CV" }),
+    ).getByRole("button", { name: "Synthetic Co" }),
   );
-  // Content approval resets the final acknowledgment; approve the save separately.
-  await save(user);
-  await screen.findByText("CV de bază v1 salvat în memoria acestei pagini.");
-  expect((await adapter.load())!.draft.summary).toMatchObject({
-    origin: "user_authored",
-    approval: "approved",
-    claimIds: [],
-  });
-});
-
-it("preserves edits made while an asynchronous adapter save is still pending", async () => {
-  window.location.hash = "#start";
-  const adapter = new MemoryBaseCvAdapter(),
-    originalSave = adapter.save.bind(adapter);
-  let release!: (value: Awaited<ReturnType<typeof adapter.save>>) => void;
-  vi.spyOn(adapter, "save").mockImplementationOnce(async (input) => {
-    const result = await originalSave(input);
-    return new Promise((resolve) => {
-      release = resolve;
-    }).then(() => result);
-  });
-  const user = userEvent.setup();
-  render(<App adapter={adapter} />);
-  await user.click(
-    await screen.findByRole("button", { name: "Completează manual" }),
-  );
-  await user.type(
-    screen.getByRole("textbox", { name: /Nume complet/ }),
-    "Saved content",
-  );
-  await confirmIdentity(user);
-  await save(user);
-  const name = screen.getByRole("textbox", { name: /Nume complet/ });
-  await user.type(name, " plus newer draft");
-  await act(async () => release((await adapter.load())!));
-  await screen.findByText(
-    "Versiunea v1 a fost salvată. Modificările mai noi rămân în ciornă, nesalvate.",
-  );
-  expect((name as HTMLInputElement).value).toBe(
-    "Saved content plus newer draft",
-  );
-  expect((await adapter.load())!.draft.name.value).toBe("Saved content");
+  await waitFor(() => expect(document.activeElement).toBe(input(/^Companie/)));
 });
