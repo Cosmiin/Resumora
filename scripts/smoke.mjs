@@ -65,7 +65,15 @@ try {
   }
   const missing = await fetch('http://127.0.0.1:5173/v1/does-not-exist');
   assert.equal(missing.status, 404);
-  console.log('PASS: frontend shell, same-origin Worker health proxy, method handling, honest auth contracts and unknown-route handling.');
+  const adminUsage = await fetch('http://127.0.0.1:5173/v1/admin/ai/usage');
+  assert.equal(adminUsage.status, 503);
+  assert.equal((await adminUsage.json()).error.code, 'AUTH_UNCONFIGURED');
+  assert.match(adminUsage.headers.get('cache-control'), /no-store/);
+  const adminPage = await fetch('http://127.0.0.1:8787/admin/ai');
+  assert.equal(adminPage.status, 503);
+  assert.match(await adminPage.text(), /Acces restricționat/);
+  assert.match(adminPage.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+  console.log('PASS: frontend shell, same-origin Worker health proxy, methods, honest auth contracts, protected unavailable admin and unknown routes.');
 } finally {
   stop();
   process.removeListener('SIGINT', abort);
