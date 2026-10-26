@@ -1071,9 +1071,7 @@ it.each(["name", "skills", "role", "education", "project", "summary"] as const)(
     const preview = await screen.findByRole("complementary", {
       name: "Previzualizare CV",
     });
-    await user.click(
-      within(preview).getByRole("button", { name, exact: true }),
-    );
+    await user.click(within(preview).getByRole("button", { name }));
     await waitFor(() => expect(document.activeElement?.id).toBe(expected));
     expect(window.location.hash).toBe("#base");
     expect(document.activeElement?.closest("details:not([open])")).toBeNull();
