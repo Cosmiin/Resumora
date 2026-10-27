@@ -38,7 +38,11 @@ function currentRoute(): Route {
 }
 const adapterKeys = new WeakMap<BaseCvAdapter, number>();
 let nextAdapterKey = 0;
-type PendingWrite = { generation: number; expired?: boolean } & (
+type PendingWrite = {
+  generation: number;
+  expired?: boolean;
+  uncertain?: boolean;
+} & (
   | { kind: "save"; input: Parameters<BaseCvAdapter["save"]>[0] }
   | { kind: "restore"; input: Parameters<BaseCvAdapter["restore"]>[0] }
 );
@@ -260,9 +264,10 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     } catch (e) {
       if (e instanceof AdapterError) {
         if (e.code === "expired") operation.expired = true;
-        else pendingWrite.current = null;
-      }
+        else if (!operation.uncertain) pendingWrite.current = null;
+      } else operation.uncertain = true;
       const supersededRejection =
+        !operation.uncertain &&
         e instanceof AdapterError &&
         (e.code === "rejected" || e.code === "validation") &&
         operation.generation !== generation.current;
@@ -544,7 +549,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                 >
                   {pendingWrite.current?.expired
                     ? t("Verifică starea salvată", "Check saved state")
-                    : error === "conflict"
+                    : !pendingWrite.current && error === "conflict"
                       ? t("Istoric", "History")
                       : t("Reîncearcă", "Retry")}
                 </Button>

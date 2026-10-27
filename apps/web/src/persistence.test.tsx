@@ -315,7 +315,7 @@ it("autosaves an incomplete draft corrected before the oversized request returns
 });
 
 it.each(["save", "restore"] as const)(
-  "keeps unload protection after an unknown %s and Undo to the acknowledged head",
+  "keeps an unknown %s after Undo and denied replays until exact recovery",
   async (kind) => {
     const { adapter, storage, transport, writes } = httpStore();
     await seed(storage, namedDraft("Ana"));
@@ -355,10 +355,32 @@ it.each(["save", "restore"] as const)(
     const original = kind === "save" ? "Ana" : "Mira";
     expect(screen.getByDisplayValue(original)).toBeTruthy();
     expect(unloadPrevented()).toBe(true);
+    for (const [status, code] of [
+      [401, "unauthorized"],
+      [403, "forbidden"],
+      [404, "missing"],
+      [409, "conflict"],
+    ] as const) {
+      const count = writes().length;
+      transport.mockImplementationOnce(async () =>
+        Response.json({ error: { code } }, { status }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Reîncearcă" }));
+      });
+      expect(writes()[count]).toEqual(writes()[0]);
+      expect(screen.getByDisplayValue(original)).toBeTruthy();
+      expect(unloadPrevented()).toBe(true);
+      expect(screen.getByRole("button", { name: "Reîncearcă" })).toBeTruthy();
+      fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+      fireEvent.click(screen.getByRole("button", { name: /Salvează acum/ }));
+      await tick(2000);
+      expect(writes()).toHaveLength(count + 1);
+    }
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Reîncearcă" }));
     });
-    expect(writes()[1]).toEqual(writes()[0]);
+    expect(writes().at(-1)).toEqual(writes()[0]);
     expect(screen.getByDisplayValue(original)).toBeTruthy();
     expect(unloadPrevented()).toBe(true);
     await tick();
