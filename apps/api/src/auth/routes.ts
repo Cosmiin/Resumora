@@ -21,13 +21,13 @@ export async function authRoute(request: Request, env: AuthConfig, transport: ty
       const flow = await readCookie<FlowCookie>(request, env, 'flow');
       clearCookie(headers, env, 'flow');
       const purpose = path.endsWith('/recovery') ? 'recovery' : 'confirm';
-      const code = url.searchParams.get('code'), flowId = url.searchParams.get('sb_flow_id');
+      const code = url.searchParams.get('code');
       let success = false;
       if (flow?.purpose === purpose && code && code.length < 2048 && url.searchParams.getAll('code').length === 1 && !url.searchParams.has('error')) {
         const auth = createAuth(env, flow.storage, transport);
         let recoveryEvent = false;
         const subscription = auth.onAuthStateChange(event => { if (event === 'PASSWORD_RECOVERY') recoveryEvent = true; });
-        const { data, error } = await auth.exchangeCodeForSession(code, flowId ? { flowId } : undefined);
+        const { data, error } = await auth.exchangeCodeForSession(code);
         subscription.data.subscription.unsubscribe();
         if (!error && data.session && (purpose !== 'recovery' || recoveryEvent)) {
           const verified = await auth.getUser(data.session.access_token);

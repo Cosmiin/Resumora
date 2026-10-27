@@ -9,6 +9,7 @@ const env = { APP_ENV: 'development', APP_ORIGIN: 'http://127.0.0.1:5173', API_O
 const jwt = (exp = Math.floor(Date.now() / 1000) + 3600) => ['eyJhbGciOiJIUzI1NiJ9', Buffer.from(JSON.stringify({ sub: user.id, exp, session_id: 'synthetic-session' })).toString('base64url'), 'synthetic'].join('.');
 function provider() {
   const calls = [];
+  let failure = null;
   let revoked = false, failUser = false, refreshCount = 0, rejectRefresh = false, accountError = false, redirect = false, exchangeError = false, limited = false;
   const session = () => ({ access_token: jwt(), refresh_token: 'synthetic-refresh-' + refreshCount, expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user });
   const transport = async (input, init) => {
@@ -16,6 +17,7 @@ function provider() {
     assert.equal(url.origin, env.SUPABASE_URL);
     assert.equal(init.redirect, 'manual');
     calls.push({ path: url.pathname, search: url.search, method: init.method, body: init.body ? JSON.parse(init.body) : null, authorization: new Headers(init.headers).get('authorization') });
+    if (failure && url.pathname.endsWith(failure.path) && init.method === failure.method) return Response.json({ message: 'synthetic unavailable' }, { status: failure.status });
     if (limited) return Response.json({ msg: 'rate limited' }, { status: 429 });
     if (redirect) return new Response(null, { status: 302, headers: { Location: 'https://untrusted.invalid/' } });
     if (url.pathname.endsWith('/user') && init.method === 'GET') return failUser || revoked ? Response.json({ message: 'invalid token' }, { status: 401 }) : Response.json(user);
@@ -30,7 +32,7 @@ function provider() {
     }
     throw Error('Unexpected provider request');
   };
-  return { transport, calls, session, get refreshCount() { return refreshCount; }, set failUser(v) { failUser = v; }, set rejectRefresh(v) { rejectRefresh = v; }, set accountError(v) { accountError = v; }, set redirect(v) { redirect = v; }, set exchangeError(v) { exchangeError = v; }, set limited(v) { limited = v; } };
+  return { transport, calls, session, set failure(v) { failure = v; }, get refreshCount() { return refreshCount; }, set failUser(v) { failUser = v; }, set rejectRefresh(v) { rejectRefresh = v; }, set accountError(v) { accountError = v; }, set redirect(v) { redirect = v; }, set exchangeError(v) { exchangeError = v; }, set limited(v) { limited = v; } };
 }
 class Browser {
   jar = new Map(); csrf = '';
@@ -166,7 +168,7 @@ test('invalid/expired exchange and expired flow cannot establish a session; conf
       if (failure === 'wrong-signal') for (const key of Object.keys(flow.storage)) flow.storage[key] = flow.storage[key].replace('/recovery', '');
       const headers = authHeaders(); await writeCookie(headers, env, 'flow', flow, failure === 'expired' ? -1 : 600); b.accept(new Response(null, { headers }));
     }
-    const response = await b.call('/callback/' + (recovery ? 'recovery' : 'confirm') + '?code=synthetic-code&next=https://evil.invalid');
+    const response = await b.call('/callback/' + (recovery ? 'recovery' : 'confirm') + '?code=synthetic-code&next=https://evil.invalid&sb_flow_id=unused');
     assert.equal(response.headers.get('location'), env.APP_ORIGIN + (failure === 'none' ? '/' : '/?auth=link-invalid'));
     assert.equal((await b.status()).user?.id ?? null, failure === 'none' ? user.id : null);
   }
@@ -186,4 +188,70 @@ test('callback internal failure still removes the code with a clean fixed redire
   const response = await b.call('/callback/confirm?code=synthetic-private-code');
   assert.equal(response.status, 303); assert.equal(response.headers.get('location'), env.APP_ORIGIN + '/?auth=link-invalid');
   assert.equal((await b.status()).user, null);
+});
+
+
+test('temporary identity and refresh failures preserve cookies and deny protected requests until verification recovers', async () => {
+  for (const path of ['/user', '/token']) {
+    for (const status of [429, 503]) {
+      const p = provider(), b = new Browser(p);
+      await b.login();
+      if (path === '/token') {
+        const headers = authHeaders();
+        await saveSession(headers, env, { ...p.session(), refresh_token: crypto.randomUUID(), expires_at: 1 }, false);
+        b.accept(new Response(null, { headers }));
+      }
+      const originalCookie = b.cookie();
+      p.failure = { path, method: path === '/user' ? 'GET' : 'POST', status };
+      const response = await b.call('/session');
+      assert.equal(response.status, 503);
+      assert.equal((await response.json()).error.code, 'AUTH_UNAVAILABLE');
+      assert.equal(response.headers.getSetCookie().length, 0);
+      assert.equal(b.cookie(), originalCookie);
+      const denied = await authenticateRequest(b.request('/v1/base-cv'), env, p.transport);
+      assert.equal(denied.response.status, 503);
+      assert.equal(denied.response.headers.getSetCookie().length, 0);
+      p.failure = null;
+      assert.equal((await b.status()).user.id, user.id);
+      assert.equal((await authenticateRequest(b.request('/v1/base-cv'), env, p.transport)).user.id, user.id);
+      p.failUser = true;
+      assert.equal((await b.status()).user, null);
+    }
+  }
+});
+
+test('rotated refresh cookies survive a temporary identity check failure', async () => {
+  const p = provider(), b = new Browser(p);
+  const headers = authHeaders();
+  await saveSession(headers, env, { ...p.session(), refresh_token: crypto.randomUUID(), expires_at: 1 }, false);
+  b.accept(new Response(null, { headers }));
+  p.failure = { path: '/user', method: 'GET', status: 429 };
+  assert.equal((await b.call('/session')).status, 503);
+  const rotated = await readCookie(b.request('/'), env, 'session');
+  assert.equal(rotated.refresh, 'synthetic-refresh-1');
+  p.failure = null;
+  assert.equal((await b.status()).user.id, user.id);
+  assert.equal(p.refreshCount, 1);
+});
+
+test('logout and password failures that clear cookies can recover anonymous CSRF for the next action', async () => {
+  for (const action of ['logout', 'refresh', 'update', 'signout']) {
+    const p = provider(), b = new Browser(p);
+    if (action === 'logout') await b.login();
+    else {
+      await b.status(); await b.call('/recovery', { email: user.email });
+      await b.call('/callback/recovery?code=synthetic-code'); await b.status();
+    }
+    const oldCsrf = b.csrf;
+    p.failure = action === 'refresh' ? { path: '/token', method: 'POST', status: 400 }
+      : action === 'update' ? { path: '/user', method: 'PUT', status: 400 }
+      : { path: '/logout', method: 'POST', status: 503 };
+    const response = await b.call(action === 'logout' ? '/logout' : '/password', { password: 'new-password' });
+    assert.equal(response.ok, false);
+    assert.equal(b.jar.size, 0);
+    assert.equal((await b.call('/logout', {})).status, 403);
+    const recovered = await b.status();
+    assert.equal(recovered.user, null); assert.notEqual(recovered.csrfToken, oldCsrf);
+    assert.equal((await b.call('/logout', {})).status, 200);
+  }
 });

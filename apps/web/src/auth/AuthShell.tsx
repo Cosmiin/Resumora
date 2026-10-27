@@ -35,6 +35,9 @@ export function AuthShell({
   const csrf = useRef(""),
     generation = useRef(0);
   const loggingOut = useRef(false);
+  const verified = useRef(false),
+    accountId = useRef<string | null>(null),
+    check = useRef(0);
   const transport: AuthTransport = useCallback(
     async (path, init = {}) => {
       const startedGeneration = generation.current,
@@ -44,12 +47,48 @@ export function AuthShell({
         headers.set("X-CSRF-Token", csrf.current);
         headers.set("Content-Type", "application/json");
       }
-      const response = await fetcher(path, {
-        ...init,
-        headers,
-        credentials: "same-origin",
-        cache: "no-store",
-      });
+      let response: Response;
+      try {
+        response = await fetcher(path, {
+          ...init,
+          headers,
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+      } catch (error) {
+        if (
+          !path.startsWith("/v1/auth/") &&
+          startedGeneration === generation.current &&
+          startedCsrf === csrf.current
+        ) {
+          verified.current = false;
+          setError(
+            "Conexiunea nu este confirmată. Reîncearcă verificarea sesiunii.",
+          );
+        }
+        throw error;
+      }
+      if (
+        response.status === 503 &&
+        !path.startsWith("/v1/auth/") &&
+        startedGeneration === generation.current &&
+        startedCsrf === csrf.current
+      ) {
+        const body = await response
+          .clone()
+          .json()
+          .catch(() => null);
+        if (
+          body?.error?.code === "AUTH_UNAVAILABLE" &&
+          startedGeneration === generation.current &&
+          startedCsrf === csrf.current
+        ) {
+          verified.current = false;
+          setError(
+            "Conexiunea nu este confirmată. Reîncearcă verificarea sesiunii.",
+          );
+        }
+      }
       if (
         response.status === 401 &&
         !path.startsWith("/v1/auth/") &&
@@ -57,6 +96,7 @@ export function AuthShell({
         startedCsrf === csrf.current
       ) {
         generation.current++;
+        verified.current = false;
         setStatus(null);
         setMode("login");
         setError("Sesiunea a expirat. Autentifică-te din nou.");
@@ -68,43 +108,70 @@ export function AuthShell({
   // A retired adapter must never send old draft work under a replacement session.
   const accountTransport = useMemo<AuthTransport>(() => {
     const expectedCsrf = status?.csrfToken,
+      expectedAccount = status?.user?.id,
       expectedGeneration = generation.current;
     return async (path, init) => {
       if (
         !expectedCsrf ||
+        accountId.current !== expectedAccount ||
         csrf.current !== expectedCsrf ||
         loggingOut.current ||
         generation.current !== expectedGeneration
       )
         throw new Error("SESSION_CHANGED");
+      if (!verified.current) throw new Error("SESSION_UNVERIFIED");
       return transport(path, init);
     };
   }, [status?.csrfToken, status?.user?.id, status?.recovery, transport]);
-  const load = useCallback(async () => {
-    if (loggingOut.current) return;
-    const started = generation.current;
-    try {
-      const response = await transport("/v1/auth/session");
-      const body = await response.json();
-      if (started !== generation.current) return;
-      if (!response.ok)
-        throw Error(
-          body.error?.message ?? "Autentificarea nu este disponibilă.",
+  const load = useCallback(
+    async (recoverLogout = false) => {
+      if (loggingOut.current && !recoverLogout) return;
+      const started = generation.current,
+        startedCheck = ++check.current;
+      try {
+        const response = await transport("/v1/auth/session");
+        const body = await response.json();
+        if (started !== generation.current || startedCheck !== check.current)
+          return;
+        if (!response.ok)
+          throw Error(
+            body.error?.message ?? "Autentificarea nu este disponibilă.",
+          );
+        if (
+          accountId.current !== (body.user?.id ?? null) ||
+          csrf.current !== body.csrfToken
+        )
+          generation.current++;
+        csrf.current = body.csrfToken;
+        accountId.current = body.user?.id ?? null;
+        verified.current = !loggingOut.current;
+        if (loggingOut.current) return;
+        setStatus(body);
+        if (body.recovery) setMode("password");
+        setError("");
+        return body as Status;
+      } catch (e) {
+        if (started !== generation.current || startedCheck !== check.current)
+          return;
+        verified.current = false;
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Autentificarea nu este disponibilă.",
         );
-      csrf.current = body.csrfToken;
-      setStatus(body);
-      if (body.recovery) setMode("password");
-      setError("");
-    } catch (e) {
-      if (started !== generation.current) return;
-      setStatus(null);
-      setError(
-        e instanceof Error ? e.message : "Autentificarea nu este disponibilă.",
-      );
-    } finally {
-      setReady(true);
-    }
-  }, [transport]);
+      } finally {
+        setReady(true);
+      }
+    },
+    [transport],
+  );
+  async function reloadAfterAction() {
+    generation.current++;
+    verified.current = false;
+    csrf.current = "";
+    setStatus(null);
+    return load(true);
+  }
   useEffect(() => {
     void load();
     const focus = () => {
@@ -150,13 +217,20 @@ export function AuthShell({
       } else if (mode === "password") {
         setMode("login");
         window.history.replaceState(null, "", "/");
-        await load();
+        await reloadAfterAction();
         setNotice("Parolă schimbată. Autentifică-te cu parola nouă.");
       } else
         setNotice(
           "Dacă există un cont eligibil, verifică emailul. Deschide linkul în acest browser.",
         );
     } catch (e) {
+      if (mode === "password") {
+        const next = await reloadAfterAction();
+        if (next && !next.recovery) {
+          setMode("login");
+          window.history.replaceState(null, "", "/");
+        }
+      }
       setError(e instanceof Error ? e.message : "Cererea nu a reușit.");
     } finally {
       setBusy(false);
@@ -165,12 +239,16 @@ export function AuthShell({
   async function logout() {
     if (busy) return;
     generation.current++;
+    verified.current = false;
     loggingOut.current = true;
     setBusy(true);
     setStatus(null);
     setMode("login");
     setNotice("");
     try {
+      if (!csrf.current) await load(true);
+      if (!csrf.current)
+        throw Error("Deconectarea nu este confirmată. Reîncearcă.");
       const response = await transport("/v1/auth/logout", {
         method: "POST",
         body: "{}",
@@ -178,8 +256,9 @@ export function AuthShell({
       if (!response.ok)
         throw Error("Deconectarea nu este confirmată. Reîncearcă.");
       loggingOut.current = false;
-      await load();
+      await reloadAfterAction();
     } catch (e) {
+      await reloadAfterAction();
       setError(
         e instanceof Error
           ? e.message
@@ -208,7 +287,18 @@ export function AuthShell({
             Deconectare
           </button>
         </div>
-        <Fragment key={status.csrfToken}>
+        {error && (
+          <div role="alert">
+            <p>
+              {error} Modificările rămân în această pagină; salvarea așteaptă
+              verificarea sesiunii.
+            </p>
+            <button className="btn btn-ghost" onClick={() => void load()}>
+              Reîncearcă conexiunea
+            </button>
+          </div>
+        )}
+        <Fragment key={`${status.user.id}:${status.csrfToken}`}>
           {children(status.user, accountTransport)}
         </Fragment>
       </>

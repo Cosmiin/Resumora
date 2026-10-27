@@ -1,4 +1,4 @@
-import { AuthClient } from '@supabase/auth-js';
+import { AuthClient, isAuthApiError } from '@supabase/auth-js';
 import type { Session } from '@supabase/auth-js';
 import { config, readCookie, writeCookie, clearCookie } from './cookies.ts';
 import type { AuthConfig } from './cookies.ts';
@@ -41,8 +41,8 @@ async function refreshed(cookie: SessionCookie, env: AuthConfig, transport: type
   const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(cookie.refresh))), v => v.toString(16).padStart(2, '0')).join('');
   for (const [key, entry] of refreshes) if (entry.until < Date.now()) refreshes.delete(key);
   if (refreshes.has(digest)) return refreshes.get(digest)!.result;
-  if (refreshes.size > 1000) return null;
-  const result = (async () => { const auth = createAuth(env, {}, transport); const { data, error } = await auth.refreshSession({ refresh_token: cookie.refresh }); return error ? null : data.session; })().catch(() => null);
+  if (refreshes.size > 1000) throw Error('AUTH_UNAVAILABLE');
+  const result = (async () => { const auth = createAuth(env, {}, transport); const { data, error } = await auth.refreshSession({ refresh_token: cookie.refresh }); if (error) throw error; return data.session; })().catch(error => { refreshes.delete(digest); throw error; });
   refreshes.set(digest, { until: Date.now() + 10_000, result });
   return result;
 }
@@ -51,23 +51,28 @@ export async function verifySession(request: Request, env: AuthConfig, headers: 
   if (!cookie) { clearCookie(headers, env, 'session'); return null; }
   try {
     if (cookie.expires <= Date.now() / 1000 + 90) {
-      if (cookie.recovery) throw Error();
-      const session = await refreshed(cookie, env, transport);
-      if (!session) throw Error();
+      const session = cookie.recovery ? null : await refreshed(cookie, env, transport);
+      if (!session) { clearCookie(headers, env, 'session'); return null; }
       // Recovery lifetime never extends during refresh.
       cookie = { ...cookie, ...await saveSession(headers, env, session, false, cookie.csrf) };
     }
     const { data, error } = await createAuth(env, {}, transport).getUser(cookie.access);
-    if (error || !data.user?.email_confirmed_at) throw Error();
+    if (error) throw error;
+    if (!data.user?.email_confirmed_at) { clearCookie(headers, env, 'session'); return null; }
     return { user: { id: data.user.id, email: data.user.email ?? '' }, accessToken: cookie.access, cookie };
-  } catch { clearCookie(headers, env, 'session'); return null; }
+  } catch (error) {
+    if (!isAuthApiError(error) || ![400, 401, 403].includes(error.status)) throw error;
+    clearCookie(headers, env, 'session'); return null;
+  }
 }
 export async function authenticateRequest(request: Request, env: AuthConfig, transport: typeof fetch = fetch) {
   const headers = authHeaders();
   try { config(env); } catch { return { response: authError('AUTH_UNCONFIGURED', 503, headers) }; }
-  const verified = await verifySession(request, env, headers, transport);
-  if (!verified || verified.cookie.recovery) return { response: authError('UNAUTHORIZED', 401, headers) };
-  return { user: verified.user, accessToken: verified.accessToken, headers };
+  try {
+    const verified = await verifySession(request, env, headers, transport);
+    if (!verified || verified.cookie.recovery) return { response: authError('UNAUTHORIZED', 401, headers) };
+    return { user: verified.user, accessToken: verified.accessToken, headers };
+  } catch { return { response: authError('AUTH_UNAVAILABLE', 503, headers) }; }
 }
 export async function checkWrite(request: Request, env: AuthConfig) {
   if (request.headers.get('origin') !== config(env).app || request.headers.get('content-type')?.split(';')[0] !== 'application/json') return false;

@@ -13,12 +13,13 @@ test('native composed Worker enforces identity/CSRF/recovery and forwards refres
   const token = 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url') + '.synthetic';
   const bundle = await build({ entryPoints: [fileURLToPath(new URL('../src/index.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser' });
   const calls = [];
-  let databaseFailure = false;
+  let databaseFailure = false, authFailure = false;
   const runtime = new Miniflare(convertV4MiniflareOptions({
     script: bundle.outputFiles[0].text, modules: true, compatibilityDate: '2026-10-25', host: '127.0.0.1', port: 0, unsafeRegisterWorker: false, bindings: env,
     outboundService: async request => {
       const url = new URL(request.url); assert.equal(url.origin, env.SUPABASE_URL); calls.push(url.pathname);
       if (url.pathname === '/auth/v1/token') return RuntimeResponse.json({ access_token: token, refresh_token: 'runtime-refresh', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user });
+      if (url.pathname === '/auth/v1/user' && authFailure) return RuntimeResponse.json({ message: 'synthetic auth failure' }, { status: 429 });
       if (url.pathname === '/auth/v1/user') { assert.equal(request.headers.get('authorization'), 'Bearer ' + token); return RuntimeResponse.json(user); }
       if (url.pathname === '/auth/v1/logout') return RuntimeResponse.json({});
       if (url.pathname.startsWith('/rest/v1/rpc/')) {
@@ -62,6 +63,19 @@ test('native composed Worker enforces identity/CSRF/recovery and forwards refres
     const priorRpcs = rpcCount();
     for (const headers of [{}, { 'X-CSRF-Token': signed.csrfToken, Origin: 'https://evil.invalid' }]) assert.equal((await cv('/save', save, headers)).status, 403);
     assert.equal(rpcCount(), priorRpcs);
+    authFailure = true;
+    const pausedJar = [...jar];
+    assert.equal((await call('/session')).status, 503);
+    for (const path of ['', '/history', '/save', '/restore']) {
+      const response = await cv(path, path === '/save' || path === '/restore' ? save : undefined, { 'X-CSRF-Token': signed.csrfToken });
+      assert.equal(response.status, 503);
+      assert.equal((await response.json()).error.code, 'AUTH_UNAVAILABLE');
+      assert.equal(response.headers.getSetCookie().length, 0);
+    }
+    assert.deepEqual([...jar], pausedJar);
+    assert.equal(rpcCount(), priorRpcs);
+    authFailure = false;
+    assert.equal((await (await call('/session')).json()).user.id, user.id);
     const method = await cv('/save'); assert.equal(method.status, 405); assert.equal(method.headers.get('allow'), 'POST');
     const originalJar = new Map(jar);
     const cookieRequest = () => new Request(env.APP_ORIGIN, { headers: { Cookie: [...jar].map(([k,v]) => k + '=' + v).join('; ') } });
