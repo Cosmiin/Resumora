@@ -85,6 +85,8 @@ export async function cvRoute(request: Request, gateway: CvDraftGateway): Promis
     if (e?.status === 404) return failure('missing', 404);
     if (e?.status === 401) return failure('unauthorized', 401);
     if (e?.status === 403) return failure('missing', 404);
+    if (e?.status === 400 || e?.status === 413 || e?.status === 422)
+      return failure('invalidRequest', e.status);
     // Unknown/expired outcome must remain an error; never re-key/retry writes.
     return failure('unavailable', e?.status === 410 ? 410 : 503);
   }

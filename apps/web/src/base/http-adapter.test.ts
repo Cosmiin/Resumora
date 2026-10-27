@@ -2,6 +2,145 @@ import { expect, it, vi } from "vitest";
 import { HttpBaseCvAdapter } from "./http-adapter";
 import { blankDraft } from "./model";
 import { AdapterError, type Snapshot } from "./adapter";
+import { cvRoute, type CvDraftGateway } from "../../../api/src/cv/routes";
+import { createDatabaseGateway } from "../../../api/src/db/supabase";
+
+function gatewayAdapter(transport: typeof fetch) {
+  const gateway = createDatabaseGateway(
+    {
+      SUPABASE_URL: "https://synthetic.supabase.co",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_synthetic",
+    },
+    { user: { id: crypto.randomUUID() }, accessToken: "synthetic-user-token" },
+    transport,
+  ) as CvDraftGateway;
+  const responses: Response[] = [];
+  const adapter = new HttpBaseCvAdapter(async (path, init) => {
+    const response = await cvRoute(
+      new Request(`https://resumora.invalid${path}`, init),
+      gateway,
+    );
+    responses.push(response.clone());
+    return response;
+  });
+  return { gateway, adapter, responses };
+}
+
+it("preserves a pre-fetch RPC size rejection and permits a corrected save", async () => {
+  const remote = vi.fn<typeof fetch>(async (_url, init) => {
+    const args = JSON.parse(init!.body as string);
+    return Response.json({
+      id: crypto.randomUUID(),
+      revision: 1,
+      parentId: null,
+      createdAt: new Date().toISOString(),
+      reason: "autosave",
+      payload: args.p_payload,
+    });
+  });
+  const { gateway, adapter, responses } = gatewayAdapter(remote);
+  const save = vi.spyOn(gateway, "saveDraft");
+  const draft = blankDraft();
+  draft.answers.push({
+    id: "synthetic-answer",
+    targetId: "synthetic-role",
+    question: "context",
+    questionText: "What did you do?",
+    text: "",
+    status: "draft",
+  });
+  const input = {
+    draft,
+    mode: "autosave" as const,
+    expectedRevision: 0,
+    requestId: crypto.randomUUID(),
+  };
+  const bytes = (value: unknown) =>
+    new TextEncoder().encode(JSON.stringify(value)).length;
+  draft.answers[0].text = "x".repeat(1048575 - bytes(input));
+  expect(bytes(input)).toBe(1048575);
+  await expect(adapter.save(input)).rejects.toMatchObject({ code: "rejected" });
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(remote).not.toHaveBeenCalled();
+  expect(responses[0].status).toBe(413);
+  expect(await responses[0].json()).toEqual({
+    error: { code: "invalidRequest" },
+  });
+
+  const corrected = structuredClone(draft);
+  corrected.answers[0].text = "Corrected context";
+  const saved = await adapter.save({
+    ...input,
+    draft: corrected,
+    requestId: crypto.randomUUID(),
+  });
+  expect(saved).toMatchObject({
+    revision: 1,
+    reason: "autosave",
+    draft: corrected,
+  });
+  expect(remote).toHaveBeenCalledTimes(1);
+  expect(responses[1].status).toBe(200);
+  expect(JSON.parse(remote.mock.calls[0][1]!.body as string)).toMatchObject({
+    p_expected_revision: 0,
+    p_mode: "autosave",
+    p_payload: { answers: [{ text: "Corrected context" }] },
+  });
+});
+
+it.each([
+  ["network", 0, "", 503, null],
+  ["server", 500, "", 503, null],
+  ["unavailable", 503, "", 503, null],
+  ["unknown rejection", 400, "PGRST_UNKNOWN", 503, null],
+  ["expired", 410, "PT410", 410, "expired"],
+  ["invalid command", 400, "PT400", 400, "rejected"],
+  ["invalid payload", 422, "PT422", 422, "rejected"],
+] as const)(
+  "translates composed gateway %s without exposing diagnostics",
+  async (_label, status, code, expectedStatus, expectedCode) => {
+    const remote = vi.fn<typeof fetch>(async () => {
+      if (!status) throw new Error("private connection details");
+      return Response.json(
+        {
+          code,
+          message:
+            status === 410
+              ? "REQUEST_EXPIRED_RECOVER_EXISTING_RESOURCE"
+              : "private upstream details",
+          details: "private user data",
+        },
+        { status },
+      );
+    });
+    const { adapter, responses } = gatewayAdapter(remote);
+    const error = await adapter
+      .restore({
+        snapshotId: crypto.randomUUID(),
+        expectedRevision: 1,
+        requestId: crypto.randomUUID(),
+      })
+      .catch((error) => error);
+    expect(remote).toHaveBeenCalledTimes(1);
+    expect(responses[0].status).toBe(expectedStatus);
+    expect(await responses[0].json()).toEqual({
+      error: {
+        code:
+          expectedStatus === 400 || expectedStatus === 422
+            ? "invalidRequest"
+            : "unavailable",
+      },
+    });
+    if (expectedCode) {
+      expect(error).toBeInstanceOf(AdapterError);
+      expect(error.code).toBe(expectedCode);
+    } else {
+      expect(error).toBeInstanceOf(Error);
+      expect(error).not.toBeInstanceOf(AdapterError);
+      expect(error.message).toBe("cvRequestFailed");
+    }
+  },
+);
 
 it("uses authenticated transport for every operation and keeps request IDs across retries", async () => {
   const draft = blankDraft();
