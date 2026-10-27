@@ -11,11 +11,11 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173/**. The page opens the authentication shell, which stays locked until configured. The auth branch alone retains the existing Base CV adapter until persistence composition lands. Both servers bind to loopback; this does not expose a development server to the LAN. Stop the launcher with Ctrl+C; it stops only its own process trees.
+Open **http://127.0.0.1:5173/**. The page opens the authentication shell, which stays locked until configured. Signed-in accounts use the HTTP Base CV adapter through the authenticated Worker gateway; there is no memory fallback in the composed entrypoint. Both servers bind to loopback; this does not expose a development server to the LAN. Stop the launcher with Ctrl+C; it stops only its own process trees.
 
-For separate terminals, use `npm run dev:api` and `npm run dev:web`. The Worker is **http://127.0.0.1:8787/**. Vite proxies relative `/v1/...` requests to that Worker; the Base CV memory adapter makes no API requests. The browser sees one origin (`http://127.0.0.1:5173`); no permissive CORS configuration or browser API key is needed.
+For separate terminals, use `npm run dev:api` and `npm run dev:web`. The Worker is **http://127.0.0.1:8787/**. Vite proxies relative `/v1/...` requests to that Worker; the composed Base CV adapter uses those authenticated routes. The browser sees one origin (`http://127.0.0.1:5173`); no permissive CORS configuration or browser API key is needed.
 
-The proxy preserves the incoming host/origin context rather than claiming all requests came from the API origin. Future session code must still check the actual `Origin` header and CSRF token; the proxy alone is not an authorization control. Keep the `127.0.0.1` hostname consistent: substituting `localhost` changes the origin and can affect future cookies. No HTTPS or cookie security behavior has been proven by this HTTP foundation.
+The proxy preserves the incoming host/origin context rather than claiming all requests came from the API origin. Session code checks the actual `Origin` header and CSRF token; the proxy alone is not an authorization control. Keep the `127.0.0.1` hostname consistent: substituting `localhost` changes the origin and can affect future cookies. No HTTPS or cookie security behavior has been proven by this HTTP foundation.
 
 `npm ci --ignore-scripts` was used for this initial toolchain: the lockfile's platform packages supply the local executables without dependency lifecycle scripts. Other operating systems must verify their native tool binaries before development; do not disable antivirus if one is blocked.
 
@@ -33,7 +33,7 @@ The discovery prototype remains under `prototype/` with its existing independent
 
 ## Current routes and auth boundary
 
-`GET /v1/health` reports process health only, with authentication `implemented_unverified` and database `not_connected`; it is not proof of hosted connectivity. Unknown routes return 404, wrong methods 405. Auth routes use the Worker-only PKCE/cookie boundary documented in [authentication setup](authentication.md#session-and-request-contract). Unconfigured auth returns `503 AUTH_UNCONFIGURED`, never simulated success. Admin routes retain their separate existing owner-verifier/durable-ledger requirements.
+`GET /v1/health` reports process health only, with authentication `implemented_unverified` and database `implemented_unverified`; it is not proof of hosted connectivity. Unknown routes return 404, wrong methods 405. Auth routes use the Worker-only PKCE/cookie boundary documented in [authentication setup](authentication.md#session-and-request-contract). Unconfigured auth returns `503 AUTH_UNCONFIGURED`, never simulated success. Admin routes retain their separate existing owner-verifier/durable-ledger requirements.
 
 ## Configuration and secrets
 
@@ -57,7 +57,7 @@ Stop any running local dev pair first, then run:
 npm run check
 ```
 
-This runs frontend/API type checks, the browser-free frontend suite described in the [Base CV guide](../frontend/base-cv.md#verification-and-limits), the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, each unconfigured auth route, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
+This runs frontend/API type checks, the browser-free frontend suite described in the [Base CV guide](../frontend/base-cv.md#verification-and-limits), the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, unconfigured auth denial or configured Origin/CSRF and missing-flow denial, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
 
 To check frontend formatting separately, run `npm run format:check --workspace @resumora/web`. It checks `apps/web/src/` and `apps/web/vitest.config.ts` with Prettier; it is not included in `npm run check`.
 
@@ -71,9 +71,9 @@ Run `npm test --workspace @resumora/api` for injected OpenAI/accounting/owner-ve
 
 ## Next milestones
 
-1. Follow the [database guide](../database/README.md) for the approved SQL implementation, verification and development apply boundary; Worker database integration remains a later step.
+1. Follow the [database guide](../database/README.md) for the approved SQL implementation, verification and development apply boundary; the Worker now composes the user-scoped database gateway and CV routes.
 2. Configure the implemented Worker auth boundary and coordinate real confirmation/recovery tests using authorized project-team recipients.
-3. Validate HTTPS/cookie behavior and actual app callback routes before changing hosted Auth settings.
-4. Separately authorize hosted development resources/Git integration and deployment. Do not reuse CVTailor resources or deploy the discovery repository root.
+3. Complete controlled hosted signup/login/reset and account-isolation acceptance. Owner-reported hosted URL/schema configuration is separate from observed user-flow evidence.
+4. Separately authorize hosted deployment. Do not reuse CVTailor resources or deploy the discovery repository root.
 
 Official tool references checked 25 October 2026: [Vite](https://vite.dev/guide/), [Wrangler installation](https://developers.cloudflare.com/workers/wrangler/install-and-update/), [local Workers development](https://developers.cloudflare.com/workers/local-development/), [Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/).

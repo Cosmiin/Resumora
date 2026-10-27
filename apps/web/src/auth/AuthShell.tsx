@@ -1,6 +1,8 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
+  Fragment,
   useRef,
   useState,
   type ReactNode,
@@ -35,6 +37,8 @@ export function AuthShell({
   const loggingOut = useRef(false);
   const transport: AuthTransport = useCallback(
     async (path, init = {}) => {
+      const startedGeneration = generation.current,
+        startedCsrf = csrf.current;
       const headers = new Headers(init.headers);
       if (init.method && init.method !== "GET") {
         headers.set("X-CSRF-Token", csrf.current);
@@ -46,7 +50,12 @@ export function AuthShell({
         credentials: "same-origin",
         cache: "no-store",
       });
-      if (response.status === 401 && !path.startsWith("/v1/auth/")) {
+      if (
+        response.status === 401 &&
+        !path.startsWith("/v1/auth/") &&
+        startedGeneration === generation.current &&
+        startedCsrf === csrf.current
+      ) {
         generation.current++;
         setStatus(null);
         setMode("login");
@@ -56,6 +65,21 @@ export function AuthShell({
     },
     [fetcher],
   );
+  // A retired adapter must never send old draft work under a replacement session.
+  const accountTransport = useMemo<AuthTransport>(() => {
+    const expectedCsrf = status?.csrfToken,
+      expectedGeneration = generation.current;
+    return async (path, init) => {
+      if (
+        !expectedCsrf ||
+        csrf.current !== expectedCsrf ||
+        loggingOut.current ||
+        generation.current !== expectedGeneration
+      )
+        throw new Error("SESSION_CHANGED");
+      return transport(path, init);
+    };
+  }, [status?.csrfToken, status?.user?.id, status?.recovery, transport]);
   const load = useCallback(async () => {
     if (loggingOut.current) return;
     const started = generation.current;
@@ -184,7 +208,9 @@ export function AuthShell({
             Deconectare
           </button>
         </div>
-        {children(status.user, transport)}
+        <Fragment key={status.csrfToken}>
+          {children(status.user, accountTransport)}
+        </Fragment>
       </>
     );
   const reset = mode === "password",

@@ -2,7 +2,7 @@
 
 The application implements email/password signup, confirmation, login, session refresh, logout, password-reset request and recovery completion through the local Cloudflare Worker and Supabase Auth. Google sign-in is deferred. This is one application: React calls relative `/v1` routes through Vite; only the Worker uses `@supabase/auth-js`. There is no browser Supabase session, password database, service-role client or separate local auth service.
 
-Implementation tests use a synthetic provider and include a native workerd login/session/logout check. They do **not** establish hosted login, email receipt, recipient eligibility or configured redirects. No hosted Auth settings have been changed. Persistence composition is delivered after the Database and Persistence module branches land; the auth branch alone retains the existing editor adapter.
+Implementation tests use a synthetic provider and include a native workerd login/session/logout check. They do **not** establish hosted login, email receipt, recipient eligibility or configured redirects. The owner separately reported completing the local Site URL/redirect entries and app-schema exposure; this is distinct from observed hosted login acceptance. The frontend now uses `HttpBaseCvAdapter` per authenticated account/session, and the Worker mounts the four CV routes through the authenticated Supabase gateway. Automated synthetic tests do not establish hosted login or account-isolation acceptance.
 
 ## Local configuration
 
@@ -61,17 +61,17 @@ AES-GCM cookies bind ciphertext to cookie purpose/name. Token pairs are encrypte
 `apps/api/src/auth/session.ts` exports:
 
 - `authenticateRequest(request, env, transport?)` → `{user, accessToken, headers}` or `{response}`. `user.id` comes from current Supabase Auth `getUser(accessToken)`, never browser input. Recovery-only sessions cannot access CV data. The database gateway forwards that same access token for authenticated RLS/RPC access; ownership is keyed by user ID, never email.
-- `checkWrite(request, env)` checks Origin/content-type/CSRF. CV composition must call it for POST requests before dispatch.
+- `checkWrite(request, env)` checks Origin/content-type/CSRF. CV composition calls it for POST requests before gateway dispatch.
 
 Forward **all** authentication response headers, particularly each rotated/cleared `Set-Cookie`, onto both successful and failed CV responses. Keep `accessToken` inside the Worker. Expiring normal access tokens refresh on demand; a short-lived single-flight cache shares the rotated pair across concurrent requests in the supported local Worker isolate. Refresh failure clears session cookies and fails closed. Multi-isolate/hosted deployment requires separately reviewed refresh/recovery coordination; these in-memory locks are not a distributed guarantee. Supabase-issued JWTs may remain valid until expiry after refresh revocation; logout cannot promise instant invalidation of a separately copied JWT. See [Supabase session behavior](https://supabase.com/docs/guides/auth/sessions).
 
-`AuthShell` wraps the existing editor; its render child receives `(account, transport)`. That stable transport adds credentials/CSRF/no-store and unmounts private UI on protected-resource 401. Construct the persistence adapter per authenticated account. Logout unmounts the editor immediately and fences older status responses. Failed logout remains explicit instead of silently reopening private UI on focus.
+`AuthShell` wraps the existing editor; its render child receives `(account, transport)`. That stable transport adds credentials/CSRF/no-store and unmounts private UI on protected-resource 401. The composed `ConnectedApp` constructs a persistence adapter per authenticated account/session. Retired transport instances reject new work after session replacement, and late401 responses cannot clear a replacement account. Logout unmounts the editor immediately and fences older status responses. Failed logout remains explicit instead of silently reopening private UI on focus.
 
 ## Focused checks
 
 ```sh
 npm test --workspace @resumora/api
-npm run test --workspace @resumora/web -- src/auth/AuthShell.test.tsx
+npm run test --workspace @resumora/web -- src/auth/AuthShell.test.tsx src/auth/ConnectedApp.test.tsx
 npm run typecheck
 npm run smoke
 ```

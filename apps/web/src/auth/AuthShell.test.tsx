@@ -179,3 +179,47 @@ it("ignores a status response started before logout, keeping the private editor 
   });
   expect(screen.queryByText("Private editor")).toBeNull();
 });
+
+it("fences retired account transports and ignores their late401 after a replacement session", async () => {
+  let current = { ...signed, csrfToken: "account-a-csrf" };
+  let resolveOld: (response: Response) => void = () => {};
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    if (String(input) === "/v1/base-cv")
+      return new Promise<Response>((resolve) => {
+        resolveOld = resolve;
+      });
+    return Response.json(current);
+  });
+  let accountTransport:
+    ((path: string, init?: RequestInit) => Promise<Response>) | undefined;
+  render(
+    <AuthShell fetcher={fetcher}>
+      {(account, transport) => {
+        accountTransport = transport;
+        return <p>Private {account.email}</p>;
+      }}
+    </AuthShell>,
+  );
+  await screen.findByText("Private test@example.invalid");
+  const retired = accountTransport!;
+  const pending = retired("/v1/base-cv");
+  current = {
+    ...signed,
+    csrfToken: "account-b-csrf",
+    user: { id: "account-b", email: "b@example.invalid" },
+  };
+  fireEvent.focus(window);
+  await screen.findByText("Private b@example.invalid");
+  const count = fetcher.mock.calls.length;
+  await expect(
+    retired("/v1/base-cv/save", { method: "POST", body: "{}" }),
+  ).rejects.toThrow("SESSION_CHANGED");
+  expect(fetcher.mock.calls.length).toBe(count);
+  await act(async () => {
+    resolveOld(
+      Response.json({ error: { code: "unauthorized" } }, { status: 401 }),
+    );
+    await pending;
+  });
+  expect(screen.getByText("Private b@example.invalid")).toBeTruthy();
+});

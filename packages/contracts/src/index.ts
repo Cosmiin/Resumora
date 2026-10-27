@@ -4,7 +4,7 @@ export type HealthResponse = {
   environment: 'development';
   capabilities: {
     authentication: 'implemented_unverified';
-    database: 'not_connected';
+    database: 'implemented_unverified';
   };
   requestId: string;
 };
