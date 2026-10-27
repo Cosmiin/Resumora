@@ -50,7 +50,9 @@ describe("memory adapter through public operations", () => {
     const draft = initial();
     const first = await adapter.save(input(draft));
     const decoded = decodeDraft(encodeDraft(draft));
-    decoded.name = Object.fromEntries(Object.entries(decoded.name).reverse()) as typeof decoded.name;
+    decoded.name = Object.fromEntries(
+      Object.entries(decoded.name).reverse(),
+    ) as typeof decoded.name;
     expect(await adapter.save(input(decoded, 1))).toEqual(first);
     expect(await adapter.history()).toHaveLength(1);
     decoded.contacts.reverse();
