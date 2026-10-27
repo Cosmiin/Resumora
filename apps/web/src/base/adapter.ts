@@ -1,4 +1,4 @@
-import { clone, localId, type BaseDraft } from "./model";
+import { clone, equalValues, localId, type BaseDraft } from "./model";
 import { validateDraft, type Issue } from "./validation";
 export type Snapshot = {
   id: string;
@@ -11,14 +11,22 @@ export type Snapshot = {
 };
 export class AdapterError extends Error {
   constructor(
-    public code: "validation" | "conflict" | "missing" | "requestMismatch",
+    public code:
+      | "validation"
+      | "conflict"
+      | "missing"
+      | "requestMismatch"
+      | "rejected"
+      | "unauthenticated"
+      | "forbidden"
+      | "expired",
     public issues: Issue[] = [],
   ) {
     super(code);
   }
 }
 export interface BaseCvAdapter {
-  readonly capability: "session-memory";
+  readonly capability: "session-memory" | "durable";
   load(): Promise<Snapshot | null>;
   history(): Promise<Snapshot[]>;
   save(input: {
@@ -84,7 +92,7 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
     const issues = input.mode === "autosave" ? [] : validateDraft(input.draft);
     if (issues.length) throw new AdapterError("validation", issues);
     const snapshot =
-      head && JSON.stringify(head.draft) === JSON.stringify(input.draft)
+      head && equalValues(head.draft, input.draft)
         ? clone(head)
         : this.publish(
             input.draft,

@@ -23,9 +23,9 @@ The proxy preserves the incoming host/origin context rather than claiming all re
 
 | Path | Purpose |
 | --- | --- |
-| `apps/web/` | Romanian-first Base CV app, memory adapter, interaction tests, Vite config and frontend build |
-| `apps/api/` | Worker entry point, protected admin preparation, internal OpenAI adapter and API contract placeholders |
-| `packages/contracts/` | Shared health/error response types; no server bindings or secret values |
+| `apps/web/` | Romanian-first Base CV app, interaction tests, Vite config and frontend build; adapters described in the [Base CV guide](../frontend/base-cv.md#code-and-replacement-boundary) |
+| `apps/api/` | Worker entry point, protected admin preparation, internal OpenAI adapter and API contract placeholders; unmounted CV handler described in the [persistence handoff](../frontend/base-cv.md#persistence-component-handoff) |
+| `packages/contracts/` | Shared health/error response types and [editor modules](../frontend/base-cv.md#code-and-replacement-boundary); no server bindings or secret values |
 | `scripts/dev.mjs` | Start/stop the local pair together |
 | `scripts/smoke.mjs` | Start a fresh local pair, verify HTTP/proxy behavior, then stop it |
 
@@ -72,7 +72,7 @@ Stop any running local dev pair first, then run:
 npm run check
 ```
 
-This runs frontend/API type checks, browser-free React interaction and memory-adapter tests, the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
+This runs frontend/API type checks, the browser-free frontend suite described in the [Base CV guide](../frontend/base-cv.md#verification-and-limits), the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, every unimplemented auth contract, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
 
 To check frontend formatting separately, run `npm run format:check --workspace @resumora/web`. It checks `apps/web/src/` and `apps/web/vitest.config.ts` with Prettier; it is not included in `npm run check`.
 
@@ -82,7 +82,7 @@ To run only the development secret-boundary regression: `npm run test:dev-secret
 
 The [GitHub Actions workflow](../../.github/workflows/ci.yml) runs these foundation checks for pull requests and pushes to `main`, using the pinned Node/npm toolchain and locked dependencies with lifecycle scripts disabled. It does not deploy the application or verify browser rendering, hosted services or working authentication. The discovery prototype and schema/research checks remain separate from this workflow.
 
-Run `npm test --workspace @resumora/api` for injected OpenAI/accounting/owner-verification tests and synthetic admin HTTP checks; CI runs this separately from `npm run check`. It requires no provider credentials or remote inference.
+Run `npm test --workspace @resumora/api` for injected OpenAI/accounting/owner-verification tests, synthetic admin HTTP checks, database gateway checks and CV route/editor transport checks; CI runs this separately from `npm run check`. It requires no provider credentials, hosted database access or remote inference.
 
 ## Next milestones
 
