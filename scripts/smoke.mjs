@@ -46,7 +46,7 @@ try {
   const health = await response.json();
   assert.equal(health.service, 'resumora-api');
   assert.equal(health.environment, 'development');
-  assert.deepEqual(health.capabilities, { authentication: 'not_implemented', database: 'not_connected' });
+  assert.deepEqual(health.capabilities, { authentication: 'implemented_unverified', database: 'not_connected' });
   assert.match(health.requestId, /^[0-9a-f-]{36}$/);
 
   const wrongMethod = await fetch('http://127.0.0.1:5173/v1/health', { method: 'POST' });
@@ -59,8 +59,8 @@ try {
     ['/callback/confirm', 'GET'], ['/callback/recovery', 'GET'],
   ]) {
     const result = await fetch(`http://127.0.0.1:5173/v1/auth${path}`, { method });
-    assert.equal(result.status, 501, `${method} ${path} must not pretend to authenticate`);
-    assert.equal((await result.json()).error.code, 'AUTH_NOT_IMPLEMENTED');
+    assert.equal(result.status, 503, `${method} ${path} must not pretend to authenticate`);
+    assert.equal((await result.json()).error.code, 'AUTH_UNCONFIGURED');
     assert.equal(result.headers.get('set-cookie'), null);
   }
   const missing = await fetch('http://127.0.0.1:5173/v1/does-not-exist');

@@ -3,7 +3,7 @@ export type HealthResponse = {
   service: 'resumora-api';
   environment: 'development';
   capabilities: {
-    authentication: 'not_implemented';
+    authentication: 'implemented_unverified';
     database: 'not_connected';
   };
   requestId: string;

@@ -1773,3 +1773,38 @@ textarea.native {
   opacity: 0.5;
   cursor: default;
 }
+
+.auth-panel {
+  max-width: 480px;
+  margin: 8vh auto;
+  padding: 24px;
+}
+.auth-panel form,
+.auth-panel label {
+  display: grid;
+  gap: 12px;
+}
+.auth-panel form {
+  margin: 24px 0;
+}
+.auth-panel input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-field);
+  border-radius: 8px;
+  font: inherit;
+}
+.auth-panel nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.auth-account {
+  display: flex;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 24px;
+}
