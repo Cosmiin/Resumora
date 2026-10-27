@@ -249,7 +249,9 @@ it.each([400, 401, 403, 404, 405, 410, 413, 415, 422])(
         ? "expired"
         : status === 401
           ? "unauthenticated"
-          : "rejected";
+          : status === 403
+            ? "forbidden"
+            : "rejected";
     const input = { expectedRevision: 0, requestId: crypto.randomUUID() };
     await expect(
       adapter.save({ ...input, draft: blankDraft() }),

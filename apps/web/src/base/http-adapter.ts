@@ -38,10 +38,12 @@ export class HttpBaseCvAdapter implements BaseCvAdapter {
         (response.status === 404 && code === "missing")
       )
         throw new AdapterError(code, body?.error?.issues ?? []);
-      if ([400, 401, 403, 404, 405, 413, 415, 422].includes(response.status))
+      if (response.status === 401 || response.status === 403)
         throw new AdapterError(
-          response.status === 401 ? "unauthenticated" : "rejected",
+          response.status === 401 ? "unauthenticated" : "forbidden",
         );
+      if ([400, 404, 405, 413, 415, 422].includes(response.status))
+        throw new AdapterError("rejected");
       throw new Error("cvRequestFailed");
     }
     return (await response.json()) as T;

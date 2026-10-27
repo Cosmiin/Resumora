@@ -18,6 +18,7 @@ export class AdapterError extends Error {
       | "requestMismatch"
       | "rejected"
       | "unauthenticated"
+      | "forbidden"
       | "expired",
     public issues: Issue[] = [],
   ) {

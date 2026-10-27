@@ -56,7 +56,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     t = (ro: string, en: string) => (locale === "ro" ? ro : en);
   const [route, setRoute] = useState<Route>(currentRoute),
     [draft, setDraft] = useState<BaseDraft | null>(null),
-    [head, setHead] = useState<Snapshot | null>(null);
+    [head, setHead] = useState<Snapshot | null | undefined>(undefined);
   const [past, setPast] = useState<BaseDraft[]>([]),
     [undoFrom, setUndoFrom] = useState<BaseDraft | null>(null),
     [versions, setVersions] = useState<Snapshot[]>([]),
@@ -118,15 +118,19 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
   }, [locale]);
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    setLoading(!latest.current);
     void adapter
       .load()
       .then((s) => {
         if (!cancelled) {
           setHead(s);
-          if (s) setDraft(prepareDraft(s.draft));
+          if (s && !latest.current) setDraft(prepareDraft(s.draft));
           setLoading(false);
-          setError(null);
+          setError(
+            s && latest.current && !equalValues(latest.current, s.draft)
+              ? "conflict"
+              : null,
+          );
         }
       })
       .catch(() => {
@@ -175,7 +179,12 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     setDraft(next);
     setIssues([]);
     setNotice("");
-    if (error !== "conflict" && !pendingWrite.current) setError(null);
+    if (
+      headRef.current !== undefined &&
+      error !== "conflict" &&
+      !pendingWrite.current
+    )
+      setError(null);
   }
   function openDraft(next: BaseDraft) {
     generation.current++;
@@ -184,7 +193,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     setDraft(ready);
     setPast([]);
     setIssues([]);
-    if (!pendingWrite.current) setError(null);
+    if (headRef.current !== undefined && !pendingWrite.current) setError(null);
     setNotice("");
     go("base");
   }
@@ -194,7 +203,13 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
   }
   async function save(mode: "autosave" | "checkpoint" = "checkpoint") {
     const current = latest.current;
-    if (!current || lock.current || pendingWrite.current) return;
+    if (
+      !current ||
+      headRef.current === undefined ||
+      lock.current ||
+      pendingWrite.current
+    )
+      return;
     if (mode === "checkpoint") {
       const found = validateDraft(current);
       setIssues(found);
@@ -264,10 +279,14 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     } catch (e) {
       if (e instanceof AdapterError) {
         if (e.code === "expired") operation.expired = true;
-        else if (!operation.uncertain) pendingWrite.current = null;
+        else if (
+          !operation.uncertain ||
+          !["unauthenticated", "forbidden", "missing"].includes(e.code)
+        )
+          pendingWrite.current = null;
       } else operation.uncertain = true;
       const supersededRejection =
-        !operation.uncertain &&
+        !pendingWrite.current &&
         e instanceof AdapterError &&
         (e.code === "rejected" || e.code === "validation") &&
         operation.generation !== generation.current;
@@ -385,7 +404,8 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     }
   }
   async function restore(snapshot: Snapshot) {
-    if (lock.current || pendingWrite.current) return;
+    if (headRef.current === undefined || lock.current || pendingWrite.current)
+      return;
     pendingWrite.current = {
       kind: "restore",
       generation: generation.current,
@@ -540,7 +560,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                         : void submitPendingWrite()
                       : error === "conflict"
                         ? go("history")
-                        : !draft
+                        : head === undefined || !draft
                           ? setLoadAttempt((n) => n + 1)
                           : dirty
                             ? setDialog({ kind: "reopen" })
@@ -575,7 +595,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                 <HomeScreen
                   durable={durable}
                   draft={!!draft}
-                  head={head}
+                  head={head ?? null}
                   go={go}
                   reopen={() =>
                     dirty ? setDialog({ kind: "reopen" }) : void reopen()
@@ -631,7 +651,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                   durable={durable}
                   draft={!!draft}
                   versions={versions}
-                  head={head}
+                  head={head ?? null}
                   inspected={inspected}
                   setInspected={setInspected}
                   restore={(snapshot) =>
@@ -720,7 +740,11 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                     setDraft(previous);
                     setPast((p) => p.slice(0, -1));
                     setIssues([]);
-                    if (error !== "conflict" && !pendingWrite.current)
+                    if (
+                      headRef.current !== undefined &&
+                      error !== "conflict" &&
+                      !pendingWrite.current
+                    )
                       setError(null);
                   }}
                 >
@@ -728,7 +752,9 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                 </Button>
                 <Button
                   variant="primary"
-                  disabled={busy || !!pendingWrite.current}
+                  disabled={
+                    busy || head === undefined || !!pendingWrite.current
+                  }
                   onClick={() => void save()}
                 >
                   <Save size={16} />
@@ -782,7 +808,11 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
             </Button>
             <Button
               variant="primary"
-              disabled={busy || !!pendingWrite.current}
+              disabled={
+                busy ||
+                !!pendingWrite.current ||
+                (dialog.kind === "restore" && head === undefined)
+              }
               onClick={() => {
                 if (dialog.kind === "replace") {
                   openDraft(dialog.next);

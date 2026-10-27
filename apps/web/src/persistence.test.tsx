@@ -219,6 +219,182 @@ async function tick(ms = 700) {
   });
 }
 
+it.each(["save", "restore"] as const)(
+  "releases an uncommitted %s on authoritative replay conflict and permits reopen",
+  async (kind) => {
+    const { adapter, storage, transport, writes } = httpStore();
+    await seed(storage, namedDraft("Ana"));
+    if (kind === "restore") await seed(storage, namedDraft("Mira"));
+    window.location.hash = "#base";
+    render(<App adapter={adapter} />);
+    await screen.findByRole("textbox", { name: /Prenume/ });
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
+      target: { value: "Local" },
+    });
+    if (kind === "restore") {
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Istoric" }));
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Restaurează v1" }));
+    }
+    transport.mockRejectedValueOnce(new Error("request never reached server"));
+    if (kind === "restore") {
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "Restaurează versiunea" }),
+        );
+      });
+      fireEvent.click(screen.getByRole("link", { name: "CV de bază" }));
+      await tick(10);
+    } else await tick();
+    expect((await storage.load())?.draft.name.value).toBe(
+      kind === "save" ? "Ana" : "Mira",
+    );
+    const remote = await seed(storage, namedDraft("Remote"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Reîncearcă" }));
+    });
+    expect(writes()[1]).toEqual(writes()[0]);
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Sesiunea s-a schimbat",
+    );
+    expect(screen.queryByRole("button", { name: "Reîncearcă" })).toBeNull();
+    expect(screen.getByDisplayValue("Local")).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: /Salvează acum/,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+    await tick(2000);
+    expect(writes()).toHaveLength(2);
+    expect((await storage.load())?.id).toBe(remote.id);
+    fireEvent.click(screen.getByRole("link", { name: "Acasă" }));
+    await tick(10);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Redeschide versiunea salvată" }),
+    );
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Înlocuiește ciorna" }),
+      );
+    });
+    expect(screen.getByDisplayValue("Remote")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
+      target: { value: "After recovery" },
+    });
+    await tick();
+    expect(JSON.parse(writes()[2][1]!.body as string).expectedRevision).toBe(
+      remote.revision,
+    );
+    expect((await storage.load())?.draft.name.value).toBe("After recovery");
+  },
+);
+
+it.each([false, true])(
+  "recovers an unknown initial baseline without overwriting local edits, existing remote: %s",
+  async (existing) => {
+    const { adapter, storage, transport, writes } = httpStore();
+    if (existing) await seed(storage, namedDraft("Remote"));
+    transport.mockRejectedValueOnce(new Error("initial read failed"));
+    window.location.hash = "#start";
+    render(<App adapter={adapter} />);
+    const manual = await screen.findByRole("button", {
+      name: "Completează manual",
+    });
+    vi.useFakeTimers();
+    fireEvent.click(manual);
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
+      target: { value: "Local" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Anulează ultima modificare" }),
+    );
+    expect(screen.getByRole("button", { name: "Reîncearcă" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
+      target: { value: "Local" },
+    });
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    await tick(2000);
+    expect(writes()).toHaveLength(0);
+    if (existing) {
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Istoric" }));
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Restaurează v1" }));
+      const confirm = screen.getByRole("button", {
+        name: "Restaurează versiunea",
+      });
+      expect((confirm as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(confirm);
+      expect(writes()).toHaveLength(0);
+      fireEvent.click(screen.getByRole("button", { name: "Păstrează ciorna" }));
+      fireEvent.click(screen.getByRole("link", { name: "CV de bază" }));
+      await tick(10);
+    }
+    const send = transport.getMockImplementation()!;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    transport.mockImplementationOnce(async (...args) => {
+      const response = await send(...args);
+      await gate;
+      return response;
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Reîncearcă" }));
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
+      target: { value: "Newer local" },
+    });
+    await act(async () => release());
+    expect(screen.getByDisplayValue("Newer local")).toBeTruthy();
+    expect(writes()).toHaveLength(0);
+    if (existing) {
+      expect(screen.getByRole("alert").textContent).toContain(
+        "Sesiunea s-a schimbat",
+      );
+      await tick(2000);
+      expect(writes()).toHaveLength(0);
+      expect((await storage.load())?.draft.name.value).toBe("Remote");
+      fireEvent.click(screen.getByRole("link", { name: "Acasă" }));
+      await tick(10);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Redeschide versiunea salvată" }),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Păstrează ciorna" }));
+      fireEvent.click(screen.getByRole("link", { name: "CV de bază" }));
+      await tick(10);
+      expect(screen.getByDisplayValue("Newer local")).toBeTruthy();
+      fireEvent.click(screen.getByRole("link", { name: "Acasă" }));
+      await tick(10);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Redeschide versiunea salvată" }),
+      );
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: "Înlocuiește ciorna" }),
+        );
+      });
+      expect(screen.getByDisplayValue("Remote")).toBeTruthy();
+      fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
+        target: { value: "Newer local" },
+      });
+    } else expect(screen.queryByRole("alert")).toBeNull();
+    await tick();
+    expect(writes()).toHaveLength(1);
+    expect(JSON.parse(writes()[0][1]!.body as string).expectedRevision).toBe(
+      existing ? 1 : 0,
+    );
+    expect((await storage.load())?.draft.name.value).toBe("Newer local");
+  },
+);
+
 it("saves corrected enrichment after the API rejects an oversized autosave", async () => {
   const { adapter, storage, transport, writes } = httpStore();
   const draft = namedDraft("Ana");
@@ -359,7 +535,6 @@ it.each(["save", "restore"] as const)(
       [401, "unauthorized"],
       [403, "forbidden"],
       [404, "missing"],
-      [409, "conflict"],
     ] as const) {
       const count = writes().length;
       transport.mockImplementationOnce(async () =>
