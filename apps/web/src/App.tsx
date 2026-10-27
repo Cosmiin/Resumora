@@ -83,6 +83,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
   });
   const dirty =
     !!draft && (!head || JSON.stringify(draft) !== JSON.stringify(head.draft));
+  const warnOnUnload = durable ? dirty : !!(draft || head);
   const editing = !!draft && ["base", "enrich", "review"].includes(route);
   const go = useCallback((next: Route) => {
     window.location.hash = next;
@@ -124,14 +125,14 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     };
   }, [adapter, loadAttempt]);
   useEffect(() => {
-    if (!dirty) return;
+    if (!warnOnUnload) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  }, [warnOnUnload]);
   useEffect(() => {
     if (route !== "history") return;
     let cancelled = false;
