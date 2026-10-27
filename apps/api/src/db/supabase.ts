@@ -25,7 +25,7 @@ export class DatabaseError extends Error {
   constructor(status: number, code: string) { super(code); this.status = status; this.code = code; }
 }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const safeCodes = new Set(['VERSION_CONFLICT', 'BASE_VERSION_CONFLICT', 'IDEMPOTENCY_BODY_MISMATCH',
+const safeCodes = new Set(['VERSION_CONFLICT', 'IDEMPOTENCY_BODY_MISMATCH',
   'REQUEST_EXPIRED_RECOVER_EXISTING_RESOURCE', 'COMMAND_IN_PROGRESS', 'RESOURCE_FORBIDDEN',
   'ACTIVE_WORKSPACE_REQUIRED', 'AUTHENTICATION_REQUIRED', 'SNAPSHOT_NOT_FOUND',
   'INVALID_COMMAND_ENVELOPE', 'INVALID_EDITOR_PAYLOAD', 'EDITOR_HISTORY_TOO_LARGE', 'EDITOR_PROFILE_CONFLICT']);
@@ -117,21 +117,5 @@ export function createDatabaseGateway(env: DatabaseConfig, identity: DatabaseIde
     restoreDraft: (input: { requestId: string; expectedRevision: number; snapshotId: string }) => rpc<DraftSnapshot>('restore_base_draft', {
       p_key: key(input.requestId), p_expected_revision: revision(input.expectedRevision), p_snapshot: key(input.snapshotId),
     }),
-    saveProfileCheckpoint: (input: { requestId: string; profileId: string | null; expectedRevision: number; expectedBaseRevision: number;
-      cv: Record<string, unknown>; confirmClaimIds: string[]; asOf: string }) => rpc<{
-        profileId: string; profileVersionId: string; revision: number; baseDocumentId: string; baseCvVersionId: string; baseRevision: number;
-      }>('save_profile_checkpoint', { p_key: key(input.requestId), p_profile: input.profileId === null ? null : key(input.profileId),
-        p_expected_revision: revision(input.expectedRevision), p_expected_base_revision: revision(input.expectedBaseRevision),
-        p_cv: input.cv, p_confirm_claim_ids: input.confirmClaimIds.map(key), p_as_of: input.asOf }),
-    saveCvCheckpoint: (input: { requestId: string; documentId: string; expectedRevision: number; profileVersionId: string;
-      layout: Record<string, unknown>; locale: string }) => rpc<{ documentId: string; cvVersionId: string; revision: number }>('save_cv_checkpoint', {
-        p_key: key(input.requestId), p_document: key(input.documentId), p_expected_revision: revision(input.expectedRevision),
-        p_profile_version: key(input.profileVersionId), p_layout: input.layout, p_locale: input.locale,
-      }),
-    restoreCvVersion: (input: { requestId: string; documentId: string; expectedRevision: number; historicalVersionId: string }) =>
-      rpc<{ documentId: string; cvVersionId: string; revision: number; restoredFrom: string }>('restore_cv_version', {
-        p_key: key(input.requestId), p_document: key(input.documentId), p_expected_revision: revision(input.expectedRevision),
-        p_historical_version: key(input.historicalVersionId),
-      }),
   };
 }

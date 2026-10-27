@@ -39,18 +39,12 @@ test('draft mapping preserves original token, exact payload and revision without
   assert.deepEqual(JSON.parse(init.body), { p_key: requestId, p_expected_revision: 0, p_payload: payload, p_mode: 'checkpoint' });
 });
 
-test('canonical RPC named arguments match existing SQL, independent revision and IDs retained', async () => {
+test('workspace provisioning maps the request key to the existing SQL command', async () => {
   const calls = [];
   const gateway = createDatabaseGateway(env, identity, async (url, init) => { calls.push([url.split('/').at(-1), JSON.parse(init.body)]); return Response.json({}); });
   await gateway.provisionWorkspace(requestId);
-  await gateway.saveProfileCheckpoint({ requestId, profileId: null, expectedRevision: 2, expectedBaseRevision: 4, cv: {}, confirmClaimIds: [id], asOf: '2026-10-27' });
-  await gateway.saveCvCheckpoint({ requestId, documentId: id, expectedRevision: 4, profileVersionId: requestId, layout: {}, locale: 'ro' });
-  await gateway.restoreCvVersion({ requestId, documentId: id, expectedRevision: 5, historicalVersionId: requestId });
   assert.deepEqual(calls, [
     ['provision_workspace', { request_key: requestId }],
-    ['save_profile_checkpoint', { p_key: requestId, p_profile: null, p_expected_revision: 2, p_expected_base_revision: 4, p_cv: {}, p_confirm_claim_ids: [id], p_as_of: '2026-10-27' }],
-    ['save_cv_checkpoint', { p_key: requestId, p_document: id, p_expected_revision: 4, p_profile_version: requestId, p_layout: {}, p_locale: 'ro' }],
-    ['restore_cv_version', { p_key: requestId, p_document: id, p_expected_revision: 5, p_historical_version: requestId }],
   ]);
 });
 

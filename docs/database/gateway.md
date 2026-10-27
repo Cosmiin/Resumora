@@ -1,8 +1,14 @@
 # Local Worker database gateway
 
-`apps/api/src/db/supabase.ts` is a server module. The application composition calls
-`createDatabaseGateway(env, authContext)` only after Supabase Auth has verified the
-request. Auth owns verification/refresh and response cookies; the gateway forwards
+This change delivers the Database component of the explicitly owner-approved
+three-agent implementation plan. Authentication owns final API/web composition
+after the approved Database and Persistence modules land. At this head the API
+still returns `AUTH_NOT_IMPLEMENTED` for account routes, and the frontend uses
+`MemoryBaseCvAdapter`; the connected milestone remains incomplete.
+
+`apps/api/src/db/supabase.ts` is a server module for that composition. The future
+caller must invoke `createDatabaseGateway(env, authContext)` only after Supabase
+Auth has verified the request. Auth owns verification/refresh and response cookies; the gateway forwards
 that original user access token to PostgREST. It accepts no acting user or tenant
 argument. Supabase RLS and command authorization remain authoritative. A resource
 UUID is never an authorization grant. Do not pass this context from browser JSON.
@@ -74,11 +80,27 @@ Preserve local changes on these errors. A wrong-owner/missing historical snapsho
 returns `404 SNAPSHOT_NOT_FOUND`, revealing no other account's existence. Direct
 table writes and the private shared writer are unavailable to authenticated users.
 
-The gateway also maps the existing `provision_workspace`, `save_profile_checkpoint`,
-`save_cv_checkpoint` and `restore_cv_version` commands with exact named arguments.
-Their canonical payload/UUID, confirmation, independent profile/document revision
-and idempotency contracts remain in [api.md](api.md). The editor does not invoke
-canonical publication in this milestone.
+The gateway also maps `provisionWorkspace(requestId)` to the existing
+`provision_workspace(request_key)` command. Its idempotency contract remains in
+[api.md](api.md). Editor persistence saves unconfirmed draft snapshots and does
+not invoke canonical publication; existing SQL publication commands are unchanged.
+
+## PR evidence and delivery ownership
+
+PR evidence for this component must identify the exact tested revision, commands,
+results and environment. Gateway transport tests exercise mocked responses;
+native SQL fixtures exercise synthetic Auth subjects. These checks provide
+component evidence only and do not establish cloud connectivity or completed
+account and persistence flows. No successful cloud integration is claimed here.
+
+The agreed acceptance remains a frontend and Cloudflare API running locally,
+connected to the existing cloud development Supabase project through one
+application and Supabase Auth. Signup, sign-in, sign-out, password reset, Base CV
+creation/editing, saved content/enrichment answers/version history, close/reopen
+recovery and account isolation all remain required. Authentication owns final
+API/web composition after the approved modules land, including integration with
+Persistence's editor adapter and validation of those combined acceptance flows.
+Completing this Database component does not complete or reduce that acceptance.
 
 ## Verification and staged development execution
 
