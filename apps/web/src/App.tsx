@@ -38,7 +38,7 @@ function currentRoute(): Route {
 }
 const adapterKeys = new WeakMap<BaseCvAdapter, number>();
 let nextAdapterKey = 0;
-type PendingWrite = { generation: number } & (
+type PendingWrite = { generation: number; expired?: boolean } & (
   | { kind: "save"; input: Parameters<BaseCvAdapter["save"]>[0] }
   | { kind: "restore"; input: Parameters<BaseCvAdapter["restore"]>[0] }
 );
@@ -61,6 +61,8 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [loadAttempt, setLoadAttempt] = useState(0),
+    [historyAttempt, setHistoryAttempt] = useState(0),
+    [historyError, setHistoryError] = useState(false),
     [error, setError] = useState<string | null>(null),
     [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<
@@ -87,7 +89,10 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
   });
   const dirty =
     !!draft && (!head || !equalValues(draft, head.draft));
-  const warnOnUnload = durable ? dirty : !!(draft || head);
+  const pending = pendingWrite.current;
+  const uncertainDraft = !!pending &&
+    (pending.kind === "restore" || !equalValues(draft, pending.input.draft));
+  const warnOnUnload = durable ? dirty || uncertainDraft || error === "conflict" : !!(draft || head);
   const editing = !!draft && ["base", "enrich", "review"].includes(route);
   const go = useCallback((next: Route) => {
     window.location.hash = next;
@@ -142,16 +147,19 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     let cancelled = false;
     void adapter.history().then(
       (history) => {
-        if (!cancelled) setVersions(history);
+        if (!cancelled) {
+          setVersions(history);
+          setHistoryError(false);
+        }
       },
       () => {
-        if (!cancelled) setError("load");
+        if (!cancelled) setHistoryError(true);
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [route, head?.id, adapter]);
+  }, [route, head?.id, adapter, historyAttempt]);
   function change(next: BaseDraft) {
     const current = latest.current;
     if (equalValues(next, current)) return;
@@ -210,7 +218,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
   }
   async function submitPendingWrite() {
     const operation = pendingWrite.current;
-    if (!operation || lock.current) return;
+    if (!operation || operation.expired || lock.current) return;
     lock.current = true;
     setBusy(true);
     try {
@@ -245,12 +253,46 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
             : durable ? t("Salvat în cont.", "Saved to your account.") : t("Salvat în sesiune.", "Saved in session."),
         );
     } catch (e) {
-      if (e instanceof AdapterError) pendingWrite.current = null;
+      if (e instanceof AdapterError) {
+        if (e.code === "expired") operation.expired = true;
+        else pendingWrite.current = null;
+      }
       setError(e instanceof AdapterError ? e.code : "save");
     } finally {
       lock.current = false;
       setBusy(false);
       if (operation.kind === "restore") setDialog(null);
+    }
+  }
+  async function reconcilePendingWrite() {
+    const operation = pendingWrite.current;
+    if (!operation?.expired || lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    try {
+      const saved = await adapter.load();
+      const unchanged = (saved?.revision ?? 0) === operation.input.expectedRevision &&
+        saved?.id === headRef.current?.id;
+      const applied = !!saved && (operation.kind === "save"
+        ? equalValues(saved.draft, operation.input.draft)
+        : saved.restoredFrom === operation.input.snapshotId);
+      pendingWrite.current = null;
+      if (!unchanged && !applied) {
+        setError("conflict");
+        return;
+      }
+      headRef.current = saved;
+      setHead(saved);
+      if (applied && saved && operation.kind === "restore" &&
+          operation.generation === generation.current) openDraft(saved.draft);
+      setError(null);
+      setNotice(t("Starea salvată a fost verificată; ciorna ta este păstrată.",
+        "Saved state checked; your draft was retained."));
+    } catch {
+      setError("expired");
+    } finally {
+      lock.current = false;
+      setBusy(false);
     }
   }
   saveRef.current = () => {
@@ -437,7 +479,12 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
           </div>
           {error && (
             <div role="alert" className="notice notice-error">
-              {error === "conflict"
+              {pendingWrite.current?.expired
+                ? t(
+                    "Rezultatul salvării nu mai poate fi reluat. Verifică starea salvată; editările tale vor fi păstrate.",
+                    "This save can no longer be replayed. Check saved state; your edits will be retained.",
+                  )
+                : error === "conflict"
                 ? t(
                     "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
                     "Session changed. Your draft is retained; inspect history before reopening.",
@@ -451,7 +498,9 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                   disabled={busy}
                   onClick={() =>
                     pendingWrite.current
-                      ? void submitPendingWrite()
+                      ? pendingWrite.current.expired
+                        ? void reconcilePendingWrite()
+                        : void submitPendingWrite()
                       : error === "conflict"
                         ? go("history")
                         : !draft
@@ -461,11 +510,21 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                             : void reopen()
                   }
                 >
-                  {error === "conflict"
+                  {pendingWrite.current?.expired
+                    ? t("Verifică starea salvată", "Check saved state")
+                    : error === "conflict"
                     ? t("Istoric", "History")
                     : t("Reîncearcă", "Retry")}
                 </Button>
               )}
+            </div>
+          )}
+          {route === "history" && historyError && (
+            <div role="alert" className="notice notice-error">
+              {t("Istoricul nu a putut fi încărcat.", "History could not be loaded.")}
+              <Button onClick={() => setHistoryAttempt((n) => n + 1)}>
+                {t("Reîncearcă istoricul", "Retry history")}
+              </Button>
             </div>
           )}
           {loading ? (
@@ -519,6 +578,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
               )}
               {draft && route === "enrich" && (
                 <Enrichment
+                  durable={durable}
                   draft={draft}
                   undoFrom={undoFrom}
                   change={change}
@@ -606,7 +666,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                     setDraft(previous);
                     setPast((p) => p.slice(0, -1));
                     setIssues([]);
-                    if (!pendingWrite.current) setError(null);
+                    if (error !== "conflict" && !pendingWrite.current) setError(null);
                   }}
                 >
                   <Undo2 size={17} />

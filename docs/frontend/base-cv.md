@@ -27,7 +27,7 @@ Manually open **http://127.0.0.1:5173/** in the owner's `cosmin@emedi.ro` Chrome
 
 ## Persistence component handoff
 
-This change delivers the independently deliverable Persistence component for review: `HttpBaseCvAdapter` in `apps/web/src/base/http-adapter.ts`, `cvRoute(request, gateway)` in `apps/api/src/cv/routes.ts`, and shared editor model/validation/transport exports under `@resumora/contracts/editor`. The default app still uses page memory, and the Worker entrypoint does not mount the CV routes. Memory-backed drafts or saved heads retain unload protection; a durable adapter warns only for unsaved dirty edits.
+This change delivers the independently deliverable Persistence component for review: `HttpBaseCvAdapter` in `apps/web/src/base/http-adapter.ts`, `cvRoute(request, gateway)` in `apps/api/src/cv/routes.ts`, and shared editor model/validation/transport exports under `@resumora/contracts/editor`. The default app still uses page memory, and the Worker entrypoint does not mount the CV routes. Memory-backed drafts or saved heads retain unload protection; a durable adapter warns for unsaved edits and unresolved writes that may differ from the current draft.
 
 Authentication owns the final frontend and Worker composition after the approved Database and Persistence modules land: supply the authenticated, CSRF-protected transport and real database gateway, and unmount the editor on logout or account changes. Database owns the approved development migration checks and apply prerequisites. This component does not implement a parallel auth or database application.
 

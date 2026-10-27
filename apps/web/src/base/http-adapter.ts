@@ -23,9 +23,14 @@ export class HttpBaseCvAdapter implements BaseCvAdapter {
         error?: { code?: string; issues?: AdapterError["issues"] };
       } | null;
       const code = body?.error?.code;
-      if (code === "validation" || code === "conflict" || code === "missing" || code === "requestMismatch")
+      if (response.status === 410) throw new AdapterError("expired");
+      if ((response.status === 422 && code === "validation") ||
+          (response.status === 409 && (code === "conflict" || code === "requestMismatch")) ||
+          (response.status === 404 && code === "missing"))
         throw new AdapterError(code, body?.error?.issues ?? []);
-      throw new Error(response.status === 401 ? "unauthenticated" : "cvRequestFailed");
+      if ([400, 401, 403, 404, 405, 413, 415, 422].includes(response.status))
+        throw new AdapterError(response.status === 401 ? "unauthenticated" : "rejected");
+      throw new Error("cvRequestFailed");
     }
     return await response.json() as T;
   }

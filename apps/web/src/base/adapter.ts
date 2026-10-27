@@ -11,7 +11,7 @@ export type Snapshot = {
 };
 export class AdapterError extends Error {
   constructor(
-    public code: "validation" | "conflict" | "missing" | "requestMismatch",
+    public code: "validation" | "conflict" | "missing" | "requestMismatch" | "rejected" | "unauthenticated" | "expired",
     public issues: Issue[] = [],
   ) {
     super(code);

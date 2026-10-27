@@ -2,9 +2,10 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { AdapterError, MemoryBaseCvAdapter, type BaseCvAdapter, type Snapshot } from "./base/adapter";
-import { blankDraft, clone, fact, newOptionalEntry, type BaseDraft } from "./base/model";
+import { blankDraft, clone, fact, newOptionalEntry, newRole, type BaseDraft } from "./base/model";
 import { HttpBaseCvAdapter } from "./base/http-adapter";
 import { decodeDraft, encodeDraft } from "@resumora/contracts/editor/transport";
+import { cvRoute } from "../../api/src/cv/routes";
 
 afterEach(() => vi.useRealTimers());
 
@@ -115,7 +116,9 @@ function httpStore() {
       return Response.json(wire(row));
     } catch (error) {
       if (error instanceof AdapterError)
-        return Response.json({ error: { code: error.code } }, { status: 409 });
+        return Response.json({ error: { code: error.code } }, {
+          status: error.code === "validation" ? 422 : error.code === "missing" ? 404 : 409,
+        });
       throw error;
     }
   });
@@ -146,6 +149,228 @@ async function seed(storage: MemoryBaseCvAdapter, draft: BaseDraft) {
 async function tick(ms = 700) {
   await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 }
+
+it("saves corrected enrichment after the API rejects an oversized autosave", async () => {
+  const { adapter, storage, transport, writes } = httpStore();
+  const draft = namedDraft("Ana");
+  draft.roles.push(newRole());
+  await seed(storage, draft);
+  window.location.hash = "#enrich";
+  render(<App adapter={adapter} />);
+  const answer = await screen.findByRole("textbox", { name: "Care erau responsabilitățile tale de zi cu zi?" });
+  const write = vi.fn(async () => { throw new Error("gateway must not be called"); });
+  transport.mockImplementationOnce((path, init) => cvRoute(
+    new Request(`https://resumora.invalid${path}`, init),
+    { loadDraft: async () => null, draftHistory: async () => [], saveDraft: write, restoreDraft: write },
+  ));
+  vi.useFakeTimers();
+  fireEvent.change(answer, { target: { value: "x".repeat(1048577) } });
+  await tick();
+  expect(screen.getByRole("alert")).toBeTruthy();
+  expect(write).not.toHaveBeenCalled();
+  expect((await storage.load())?.revision).toBe(1);
+  fireEvent.change(answer, { target: { value: "Corrected context" } });
+  await tick();
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect((await storage.load())?.draft.answers[0].text).toBe("Corrected context");
+  const rejected = JSON.parse(writes()[0][1]!.body as string);
+  const corrected = JSON.parse(writes()[1][1]!.body as string);
+  expect(corrected.requestId).not.toBe(rejected.requestId);
+  expect(corrected.expectedRevision).toBe(1);
+  expect(writes()).toHaveLength(2);
+});
+
+it.each(["save", "restore"] as const)("keeps unload protection after an unknown %s and Undo to the acknowledged head", async (kind) => {
+  const { adapter, storage, transport, writes } = httpStore();
+  await seed(storage, namedDraft("Ana"));
+  if (kind === "restore") await seed(storage, namedDraft("Mira"));
+  window.location.hash = "#base";
+  render(<App adapter={adapter} />);
+  await screen.findByRole("textbox", { name: /Prenume/ });
+  vi.useFakeTimers();
+  fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), { target: { value: "Temporary" } });
+  if (kind === "restore") {
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Istoric" })); });
+    fireEvent.click(screen.getByRole("button", { name: "Restaurează v1" }));
+  }
+  const send = transport.getMockImplementation()!;
+  transport.mockImplementationOnce(async (...args) => {
+    await send(...args);
+    throw new Error("response lost after commit");
+  });
+  if (kind === "restore") {
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Restaurează versiunea" })); });
+    fireEvent.click(screen.getByRole("link", { name: "CV de bază" }));
+    await tick(10);
+  } else {
+    await tick();
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Anulează ultima modificare" }));
+  const original = kind === "save" ? "Ana" : "Mira";
+  expect(screen.getByDisplayValue(original)).toBeTruthy();
+  expect(unloadPrevented()).toBe(true);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Reîncearcă" })); });
+  expect(writes()[1]).toEqual(writes()[0]);
+  expect(screen.getByDisplayValue(original)).toBeTruthy();
+  expect(unloadPrevented()).toBe(true);
+  await tick();
+  expect((await storage.load())?.draft.name.value).toBe(original);
+  expect(unloadPrevented()).toBe(false);
+});
+
+it.each([
+  ["save", false], ["save", true], ["restore", false], ["restore", true],
+] as const)("reconciles an expired %s through reads, with newer edits: %s", async (kind, newer) => {
+  const { adapter, storage, transport, writes } = httpStore();
+  await seed(storage, namedDraft("Ana"));
+  if (kind === "restore") await seed(storage, namedDraft("Mira"));
+  window.location.hash = kind === "save" ? "#base" : "#history";
+  render(<App adapter={adapter} />);
+  if (kind === "restore")
+    fireEvent.click(await screen.findByRole("button", { name: "Restaurează v1" }));
+  else await screen.findByDisplayValue("Ana");
+  const send = transport.getMockImplementation()!;
+  transport.mockImplementationOnce(async (...args) => {
+    await send(...args);
+    throw new Error("committed response lost");
+  });
+  if (kind === "restore") {
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Restaurează versiunea" })); });
+    fireEvent.click(screen.getByRole("link", { name: "CV de bază" }));
+    await screen.findByRole("textbox", { name: /Prenume/ });
+    vi.useFakeTimers();
+  } else {
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), { target: { value: "Mira" } });
+    await tick();
+  }
+  if (newer)
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), { target: { value: "Newer" } });
+  transport.mockImplementationOnce(async () => Response.json({ error: { code: "unavailable" } }, { status: 410 }));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Reîncearcă" })); });
+  expect(writes()[1]).toEqual(writes()[0]);
+  expect(screen.queryByRole("button", { name: "Reîncearcă" })).toBeNull();
+  expect(unloadPrevented()).toBe(true);
+  await tick(2000);
+  expect(writes()).toHaveLength(2);
+  transport.mockImplementationOnce(async () => { throw new Error("read failed"); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Verifică starea salvată" })); });
+  expect(screen.getByDisplayValue(newer ? "Newer" : "Mira")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Verifică starea salvată" })).toBeTruthy();
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  transport.mockImplementationOnce(async (...args) => {
+    const response = await send(...args);
+    await gate;
+    return response;
+  });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Verifică starea salvată" })); });
+  if (newer)
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), { target: { value: "Newest" } });
+  await act(async () => release());
+  const expected = newer ? "Newest" : kind === "save" ? "Mira" : "Ana";
+  expect(screen.getByDisplayValue(expected)).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(writes()).toHaveLength(2);
+  await tick();
+  expect(writes()).toHaveLength(newer ? 3 : 2);
+  if (newer)
+    expect(JSON.parse(writes()[2][1]!.body as string)).toMatchObject({ expectedRevision: kind === "save" ? 2 : 3 });
+  expect((await storage.load())?.draft.name.value).toBe(expected);
+  expect(unloadPrevented()).toBe(false);
+});
+
+it("preserves CAS conflicts when an expired write has a different remote head", async () => {
+  const { adapter, storage, transport, writes } = httpStore();
+  await seed(storage, namedDraft("Ana"));
+  window.location.hash = "#base";
+  render(<App adapter={adapter} />);
+  await screen.findByDisplayValue("Ana");
+  transport.mockImplementationOnce(async () => Response.json({ error: { code: "unavailable" } }, { status: 410 }));
+  vi.useFakeTimers();
+  fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), { target: { value: "Local" } });
+  await tick();
+  await seed(storage, namedDraft("Remote"));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Verifică starea salvată" })); });
+  expect(screen.getByRole("alert").textContent).toContain("Sesiunea s-a schimbat");
+  expect(screen.getByDisplayValue("Local")).toBeTruthy();
+  await tick(2000);
+  expect(writes()).toHaveLength(1);
+  expect((await storage.load())?.draft.name.value).toBe("Remote");
+  fireEvent.click(screen.getByRole("button", { name: "Anulează ultima modificare" }));
+  expect(screen.getByDisplayValue("Ana")).toBeTruthy();
+  expect(unloadPrevented()).toBe(true);
+});
+
+it("releases an expired intent after confirming the server head is unchanged", async () => {
+  const { adapter, storage, transport, writes } = httpStore();
+  await seed(storage, namedDraft("Ana"));
+  window.location.hash = "#base";
+  render(<App adapter={adapter} />);
+  await screen.findByDisplayValue("Ana");
+  transport.mockImplementationOnce(async () => Response.json({ error: { code: "unavailable" } }, { status: 410 }));
+  vi.useFakeTimers();
+  fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), { target: { value: "Local" } });
+  await tick();
+  expect((await storage.load())?.revision).toBe(1);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Verifică starea salvată" })); });
+  expect(writes()).toHaveLength(1);
+  await tick();
+  expect((await storage.load())?.draft.name.value).toBe("Local");
+  const expired = JSON.parse(writes()[0][1]!.body as string);
+  const fresh = JSON.parse(writes()[1][1]!.body as string);
+  expect(fresh.requestId).not.toBe(expired.requestId);
+  expect(fresh.expectedRevision).toBe(1);
+  expect(unloadPrevented()).toBe(false);
+});
+
+it.each([false, true])("retries history without reopening a loaded draft, dirty: %s", async (dirty) => {
+  const { adapter, storage, transport, writes } = httpStore();
+  await seed(storage, namedDraft("Ana"));
+  window.location.hash = "#base";
+  render(<App adapter={adapter} />);
+  await screen.findByDisplayValue("Ana");
+  vi.useFakeTimers();
+  if (dirty)
+    fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), { target: { value: "Local" } });
+  transport.mockImplementationOnce(async () => Response.json({ error: { code: "unavailable" } }, { status: 503 }));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Istoric" })); });
+  expect(screen.getByRole("button", { name: "Reîncearcă istoricul" })).toBeTruthy();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Reîncearcă istoricul" })); });
+  expect(transport.mock.calls.map(([path]) => path)).toEqual([
+    "/v1/base-cv", "/v1/base-cv/history", "/v1/base-cv/history",
+  ]);
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(window.location.hash).toBe("#history");
+  expect(writes()).toHaveLength(0);
+  fireEvent.click(screen.getByRole("link", { name: "CV de bază" }));
+  await tick(10);
+  expect(screen.getByDisplayValue(dirty ? "Local" : "Ana")).toBeTruthy();
+});
+
+it.each(["session-memory", "durable"] as const)("describes %s enrichment storage in Romanian and English", async (capability) => {
+  const store = httpStore();
+  const adapter = capability === "durable" ? store.adapter : store.storage;
+  const draft = namedDraft("Ana");
+  draft.roles.push(newRole());
+  await seed(store.storage, draft);
+  window.location.hash = "#enrich";
+  render(<App adapter={adapter} />);
+  const answer = await screen.findByRole("textbox", { name: "Care erau responsabilitățile tale de zi cu zi?" });
+  expect(screen.getByText(capability === "durable"
+    ? /Contextul se salvează automat în contul tău/
+    : /Contextul rămâne în memoria paginii/)).toBeTruthy();
+  fireEvent.change(screen.getByRole("combobox", { name: "Limba interfeței" }), { target: { value: "en" } });
+  expect(screen.getByText(capability === "durable"
+    ? /Context autosaves to your account/
+    : /Context stays in page memory/)).toBeTruthy();
+  vi.useFakeTimers();
+  fireEvent.change(answer, { target: { value: "Exact context" } });
+  await tick();
+  expect((await store.storage.load())?.draft.answers[0].text).toBe("Exact context");
+  expect(store.writes()).toHaveLength(capability === "durable" ? 1 : 0);
+});
 
 it("settles a decoded HTTP save without repeated autosaves or a durable unload warning", async () => {
   const { adapter, writes } = httpStore();

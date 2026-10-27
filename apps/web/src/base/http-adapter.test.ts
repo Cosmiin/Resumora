@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { HttpBaseCvAdapter } from "./http-adapter";
 import { blankDraft } from "./model";
-import type { Snapshot } from "./adapter";
+import { AdapterError, type Snapshot } from "./adapter";
 
 it("uses authenticated transport for every operation and keeps request IDs across retries", async () => {
   const draft = blankDraft();
@@ -48,4 +48,26 @@ it("loads every bounded history page and rejects non-progressing cursors", async
   expect(transport.mock.calls.map(([path]) => path)).toEqual(["/v1/base-cv/history", "/v1/base-cv/history?beforeRevision=2"]);
   const stalled = new HttpBaseCvAdapter(async () => Response.json(rows.slice(0, 20)));
   await expect(stalled.history()).rejects.toThrow("invalidHistoryPage");
+});
+
+it.each([400, 401, 403, 404, 405, 410, 413, 415, 422])(
+  "classifies HTTP %s for both save and restore recovery",
+  async (status) => {
+    const adapter = new HttpBaseCvAdapter(async () => Response.json(
+      { error: { code: status === 410 ? "unavailable" : "invalidRequest" } }, { status },
+    ));
+    const code = status === 410 ? "expired" : status === 401 ? "unauthenticated" : "rejected";
+    const input = { expectedRevision: 0, requestId: crypto.randomUUID() };
+    await expect(adapter.save({ ...input, draft: blankDraft() })).rejects.toMatchObject({ code });
+    await expect(adapter.restore({ ...input, snapshotId: crypto.randomUUID() })).rejects.toMatchObject({ code });
+  },
+);
+
+it.each([408, 409, 429, 500, 503])("keeps HTTP %s uncertain without a known rejection contract", async (status) => {
+  const adapter = new HttpBaseCvAdapter(async () => Response.json(
+    { error: { code: status === 500 ? "conflict" : "unavailable" } }, { status },
+  ));
+  const error = await adapter.save({ draft: blankDraft(), expectedRevision: 0, requestId: crypto.randomUUID() }).catch(error => error);
+  expect(error).toBeInstanceOf(Error);
+  expect(error).not.toBeInstanceOf(AdapterError);
 });
