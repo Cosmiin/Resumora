@@ -279,13 +279,15 @@ export function Enrichment({
               onChange={(e) => put(e.target.value)}
             />
             <p className="small muted">
-              {durable ? t(
-                "Contextul se salvează automat în contul tău. Salvarea răspunsului nu modifică CV-ul.",
-                "Context autosaves to your account. Saving an answer does not change the CV.",
-              ) : t(
-                "Contextul rămâne în memoria paginii. Salvarea răspunsului nu modifică CV-ul.",
-                "Context stays in page memory. Saving an answer does not change the CV.",
-              )}
+              {durable
+                ? t(
+                    "Contextul se salvează automat în contul tău. Salvarea răspunsului nu modifică CV-ul.",
+                    "Context autosaves to your account. Saving an answer does not change the CV.",
+                  )
+                : t(
+                    "Contextul rămâne în memoria paginii. Salvarea răspunsului nu modifică CV-ul.",
+                    "Context stays in page memory. Saving an answer does not change the CV.",
+                  )}
             </p>
             <div className="actions">
               <Button

@@ -87,12 +87,14 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
       month: String(n.getUTCMonth() + 1),
     };
   });
-  const dirty =
-    !!draft && (!head || !equalValues(draft, head.draft));
+  const dirty = !!draft && (!head || !equalValues(draft, head.draft));
   const pending = pendingWrite.current;
-  const uncertainDraft = !!pending &&
+  const uncertainDraft =
+    !!pending &&
     (pending.kind === "restore" || !equalValues(draft, pending.input.draft));
-  const warnOnUnload = durable ? dirty || uncertainDraft || error === "conflict" : !!(draft || head);
+  const warnOnUnload = durable
+    ? dirty || uncertainDraft || error === "conflict"
+    : !!(draft || head);
   const editing = !!draft && ["base", "enrich", "review"].includes(route);
   const go = useCallback((next: Route) => {
     window.location.hash = next;
@@ -222,9 +224,10 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     lock.current = true;
     setBusy(true);
     try {
-      const saved = operation.kind === "save"
-        ? await adapter.save(clone(operation.input))
-        : await adapter.restore(clone(operation.input));
+      const saved =
+        operation.kind === "save"
+          ? await adapter.save(clone(operation.input))
+          : await adapter.restore(clone(operation.input));
       pendingWrite.current = null;
       headRef.current = saved;
       setHead(saved);
@@ -250,17 +253,26 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
         setNotice(
           operation.input.mode === "autosave"
             ? ""
-            : durable ? t("Salvat în cont.", "Saved to your account.") : t("Salvat în sesiune.", "Saved in session."),
+            : durable
+              ? t("Salvat în cont.", "Saved to your account.")
+              : t("Salvat în sesiune.", "Saved in session."),
         );
     } catch (e) {
       if (e instanceof AdapterError) {
         if (e.code === "expired") operation.expired = true;
         else pendingWrite.current = null;
       }
-      const supersededRejection = e instanceof AdapterError &&
+      const supersededRejection =
+        e instanceof AdapterError &&
         (e.code === "rejected" || e.code === "validation") &&
         operation.generation !== generation.current;
-      setError(supersededRejection ? null : e instanceof AdapterError ? e.code : "save");
+      setError(
+        supersededRejection
+          ? null
+          : e instanceof AdapterError
+            ? e.code
+            : "save",
+      );
     } finally {
       lock.current = false;
       setBusy(false);
@@ -274,11 +286,14 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     setBusy(true);
     try {
       const saved = await adapter.load();
-      const unchanged = (saved?.revision ?? 0) === operation.input.expectedRevision &&
+      const unchanged =
+        (saved?.revision ?? 0) === operation.input.expectedRevision &&
         saved?.id === headRef.current?.id;
-      const applied = !!saved && (operation.kind === "save"
-        ? equalValues(saved.draft, operation.input.draft)
-        : saved.restoredFrom === operation.input.snapshotId);
+      const applied =
+        !!saved &&
+        (operation.kind === "save"
+          ? equalValues(saved.draft, operation.input.draft)
+          : saved.restoredFrom === operation.input.snapshotId);
       pendingWrite.current = null;
       if (!unchanged && !applied) {
         setError("conflict");
@@ -286,11 +301,20 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
       }
       headRef.current = saved;
       setHead(saved);
-      if (applied && saved && operation.kind === "restore" &&
-          operation.generation === generation.current) openDraft(saved.draft);
+      if (
+        applied &&
+        saved &&
+        operation.kind === "restore" &&
+        operation.generation === generation.current
+      )
+        openDraft(saved.draft);
       setError(null);
-      setNotice(t("Starea salvată a fost verificată; ciorna ta este păstrată.",
-        "Saved state checked; your draft was retained."));
+      setNotice(
+        t(
+          "Starea salvată a fost verificată; ciorna ta este păstrată.",
+          "Saved state checked; your draft was retained.",
+        ),
+      );
     } catch {
       setError("expired");
     } finally {
@@ -312,7 +336,8 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     return () => window.removeEventListener("keydown", key);
   }, []);
   useEffect(() => {
-    if (!dirty || !draft || busy || loading || error || pendingWrite.current) return;
+    if (!dirty || !draft || busy || loading || error || pendingWrite.current)
+      return;
     const timer = setTimeout(() => {
       void save("autosave");
     }, 650);
@@ -461,7 +486,9 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
               {editing
                 ? editingTitle
                 : route === "history"
-                  ? durable ? t("Istoric", "History") : t("Istoric în sesiune", "Session history")
+                  ? durable
+                    ? t("Istoric", "History")
+                    : t("Istoric în sesiune", "Session history")
                   : "Resumora"}
             </h1>
             {editing && (
@@ -488,15 +515,17 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                     "This save can no longer be replayed. Check saved state; your edits will be retained.",
                   )
                 : error === "conflict"
-                ? t(
-                    "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
-                    "Session changed. Your draft is retained; inspect history before reopening.",
-                  )
-                : t(
-                    "Acțiunea a eșuat; ciorna este păstrată.",
-                    "The action failed; your draft is retained.",
-                  )}
-              {(pendingWrite.current || error === "conflict" || error === "load") && (
+                  ? t(
+                      "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
+                      "Session changed. Your draft is retained; inspect history before reopening.",
+                    )
+                  : t(
+                      "Acțiunea a eșuat; ciorna este păstrată.",
+                      "The action failed; your draft is retained.",
+                    )}
+              {(pendingWrite.current ||
+                error === "conflict" ||
+                error === "load") && (
                 <Button
                   disabled={busy}
                   onClick={() =>
@@ -516,15 +545,18 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                   {pendingWrite.current?.expired
                     ? t("Verifică starea salvată", "Check saved state")
                     : error === "conflict"
-                    ? t("Istoric", "History")
-                    : t("Reîncearcă", "Retry")}
+                      ? t("Istoric", "History")
+                      : t("Reîncearcă", "Retry")}
                 </Button>
               )}
             </div>
           )}
           {route === "history" && historyError && (
             <div role="alert" className="notice notice-error">
-              {t("Istoricul nu a putut fi încărcat.", "History could not be loaded.")}
+              {t(
+                "Istoricul nu a putut fi încărcat.",
+                "History could not be loaded.",
+              )}
               <Button onClick={() => setHistoryAttempt((n) => n + 1)}>
                 {t("Reîncearcă istoricul", "Retry history")}
               </Button>
@@ -614,8 +646,12 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                           "Jobs, tailoring and export are not connected.",
                         )
                       : t(
-                          durable ? "CV-ul și istoricul sunt salvate în contul tău." : "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
-                          durable ? "Your CV and history are saved in your account." : "Account and online saving are not connected. You can use the local editor without an account.",
+                          durable
+                            ? "CV-ul și istoricul sunt salvate în contul tău."
+                            : "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
+                          durable
+                            ? "Your CV and history are saved in your account."
+                            : "Account and online saving are not connected. You can use the local editor without an account.",
                         )}
                   </p>
                   <Button onClick={() => go(draft ? "base" : "start")}>
@@ -638,17 +674,27 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                         )
                       : dirty
                         ? t("Modificări în ciornă…", "Draft changes…")
-                        : durable ? t("Ciornă salvată în cont", "Draft saved to your account") : t(
-                            "Ciornă salvată în sesiune",
-                            "Draft saved in session",
-                          )}
+                        : durable
+                          ? t(
+                              "Ciornă salvată în cont",
+                              "Draft saved to your account",
+                            )
+                          : t(
+                              "Ciornă salvată în sesiune",
+                              "Draft saved in session",
+                            )}
                   {head ? ` · v${head.revision}` : ""}
                 </p>
                 <small>
-                  {durable ? t("Salvare online în contul tău", "Saved online to your account") : t(
-                    "Doar memoria paginii · reîncărcarea șterge datele",
-                    "Page memory only · reloading clears data",
-                  )}
+                  {durable
+                    ? t(
+                        "Salvare online în contul tău",
+                        "Saved online to your account",
+                      )
+                    : t(
+                        "Doar memoria paginii · reîncărcarea șterge datele",
+                        "Page memory only · reloading clears data",
+                      )}
                 </small>
                 <span className="sr-only" role="status">
                   {notice}
@@ -669,7 +715,8 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                     setDraft(previous);
                     setPast((p) => p.slice(0, -1));
                     setIssues([]);
-                    if (error !== "conflict" && !pendingWrite.current) setError(null);
+                    if (error !== "conflict" && !pendingWrite.current)
+                      setError(null);
                   }}
                 >
                   <Undo2 size={17} />
@@ -688,10 +735,15 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
           )}
           {!editing && (
             <p className="session-footnote">
-              {durable ? t("Ciornele salvate se păstrează în contul tău.", "Saved drafts stay in your account.") : t(
-                "Sesiune locală: reîncărcarea șterge datele. Fără salvare online.",
-                "Local session: reloading clears data. No online saving.",
-              )}
+              {durable
+                ? t(
+                    "Ciornele salvate se păstrează în contul tău.",
+                    "Saved drafts stay in your account.",
+                  )
+                : t(
+                    "Sesiune locală: reîncărcarea șterge datele. Fără salvare online.",
+                    "Local session: reloading clears data. No online saving.",
+                  )}
             </p>
           )}
         </main>
@@ -709,10 +761,15 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
           onClose={() => !busy && setDialog(null)}
         >
           <p>
-            {durable ? t("Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric.", "Your current draft will be replaced. Previous versions stay in history.") : t(
-              "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric până la reîncărcare.",
-              "The current draft will be replaced. Prior versions remain in history until reload.",
-            )}
+            {durable
+              ? t(
+                  "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric.",
+                  "Your current draft will be replaced. Previous versions stay in history.",
+                )
+              : t(
+                  "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric până la reîncărcare.",
+                  "The current draft will be replaced. Prior versions remain in history until reload.",
+                )}
           </p>
           <div className="actions">
             <Button onClick={() => setDialog(null)} disabled={busy}>

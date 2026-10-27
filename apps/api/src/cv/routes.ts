@@ -41,8 +41,8 @@ async function readBody(request: Request): Promise<Record<string, unknown> | Res
   } catch { return failure('invalidRequest', 400); }
 }
 
-// Entrypoint authenticates, enforces Origin/CSRF on writes and forwards auth
-// cookie headers. This module receives only that request's authenticated gateway.
+// The caller must authenticate, enforce Origin/CSRF on writes and forward auth
+// cookie headers, supplying only that request's authenticated gateway.
 export async function cvRoute(request: Request, gateway: CvDraftGateway): Promise<Response> {
   const path = new URL(request.url).pathname;
   const method = routes[path];
