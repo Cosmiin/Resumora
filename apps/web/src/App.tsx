@@ -257,7 +257,10 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
         if (e.code === "expired") operation.expired = true;
         else pendingWrite.current = null;
       }
-      setError(e instanceof AdapterError ? e.code : "save");
+      const supersededRejection = e instanceof AdapterError &&
+        (e.code === "rejected" || e.code === "validation") &&
+        operation.generation !== generation.current;
+      setError(supersededRejection ? null : e instanceof AdapterError ? e.code : "save");
     } finally {
       lock.current = false;
       setBusy(false);

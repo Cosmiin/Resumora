@@ -180,6 +180,47 @@ it("saves corrected enrichment after the API rejects an oversized autosave", asy
   expect(writes()).toHaveLength(2);
 });
 
+it("autosaves an incomplete draft corrected before the oversized request returns 413", async () => {
+  const { adapter, storage, transport, writes } = httpStore();
+  const draft = namedDraft("Ana");
+  draft.roles.push(newRole());
+  await seed(storage, draft);
+  window.location.hash = "#enrich";
+  render(<App adapter={adapter} />);
+  const answer = await screen.findByRole("textbox", { name: "Care erau responsabilitățile tale de zi cu zi?" });
+  const write = vi.fn(async () => { throw new Error("gateway must not be called"); });
+  let deliver!: () => void;
+  const responseGate = new Promise<void>(resolve => { deliver = resolve; });
+  let rejection!: Response;
+  transport.mockImplementationOnce(async (path, init) => {
+    rejection = await cvRoute(new Request(`https://resumora.invalid${path}`, init), {
+      loadDraft: async () => null, draftHistory: async () => [], saveDraft: write, restoreDraft: write,
+    });
+    await responseGate;
+    return rejection;
+  });
+  vi.useFakeTimers();
+  fireEvent.change(answer, { target: { value: "x".repeat(1048577) } });
+  await tick();
+  expect(rejection.status).toBe(413);
+  expect(screen.getByText(/^Se salvează…/)).toBeTruthy();
+  fireEvent.change(answer, { target: { value: "Corrected while pending" } });
+  await tick();
+  expect(writes()).toHaveLength(1);
+  await act(async () => deliver());
+  expect(screen.queryByRole("alert")).toBeNull();
+  await tick();
+  expect((await storage.load())?.draft.answers[0].text).toBe("Corrected while pending");
+  expect((await storage.history()).map(row => row.revision)).toEqual([2, 1]);
+  expect(write).not.toHaveBeenCalled();
+  const rejected = JSON.parse(writes()[0][1]!.body as string);
+  const corrected = JSON.parse(writes()[1][1]!.body as string);
+  expect(corrected).toMatchObject({ mode: "autosave", expectedRevision: 1 });
+  expect(corrected.requestId).not.toBe(rejected.requestId);
+  await tick(2000);
+  expect(writes()).toHaveLength(2);
+});
+
 it.each(["save", "restore"] as const)("keeps unload protection after an unknown %s and Undo to the acknowledged head", async (kind) => {
   const { adapter, storage, transport, writes } = httpStore();
   await seed(storage, namedDraft("Ana"));
