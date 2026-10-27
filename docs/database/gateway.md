@@ -34,8 +34,9 @@ rotated/cleared cookies on error responses too.
 Canonical P0–P3 publication requires valid confirmed factual graphs. Its profile
 draft columns and revisions participate in publication, and are unique per tenant.
 They cannot safely represent incomplete editor snapshots independently. The
-additive `20261027010000_p1_editor_drafts.sql` therefore introduces one immutable
-`editor_draft_snapshots` table. It leaves all ten previous migration files intact.
+additive editor extension therefore introduces one immutable snapshot table;
+see the [migration inventory](traceability.md#migration-order-and-table-coverage).
+It leaves all previous migration files intact.
 Existing canonical profiles, publications, confirmation events and document heads
 are untouched. This is application storage in Supabase, not a local database or
 authentication implementation.
@@ -106,19 +107,14 @@ Completing this Database component does not complete or reduce that acceptance.
 
 Focused transport checks: `node --experimental-strip-types --test apps/api/tests/database.test.mjs`,
 API typecheck and `node --test scripts/dev-secret-boundary.test.mjs`.
-Run native SQL with the existing disposable fixture runner and
-`--suite editor-drafts`; this covers pending context/null preservation, immutable
-history/restore, pagination, per-snapshot limits, existing canonical preservation,
-replay/CAS/expiry/concurrency and anonymous/wrong-owner/revoked/direct-write denial.
-The default runner still runs the complete mandatory SQL suite and upgrades.
-These tests use synthetic Auth subjects; they do not establish hosted integration.
+For native SQL checks, suite selection and coverage, see
+[executable evidence](traceability.md#executable-evidence). These tests use
+synthetic Auth subjects; they do not establish hosted integration.
 
 Use the [runbook](runbook.md) after exact-head review, target/preflight, recovery
-readiness and explicit development execution authority. Keep its existing P0
-(7 tables), P1 (26), P2 (34), P3 (43) chronological prefixes, then apply the editor
-extension as the final named phase (44 tables). The runner's focused phase-filtered
-local fixtures may include this P1-classified extension earlier; hosted staging
-always follows filename chronology. Verify byte-for-byte manifests, supported
+readiness and explicit development execution authority. Follow the
+[migration inventory](traceability.md#migration-order-and-table-coverage) for
+chronological prefixes and the final editor extension. Verify byte-for-byte manifests, supported
 linked CLI dry-run, applied history, RLS/grants and no pending versions per prefix.
 No history repair, reset, force or retrospective migration editing is permitted.
 
