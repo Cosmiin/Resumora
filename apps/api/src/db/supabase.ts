@@ -1,4 +1,5 @@
 import { boundedJson } from '../ai/http.ts';
+import type { DraftSnapshot, EditorWireEnvelope } from '@resumora/contracts/editor/transport';
 
 /** Worker bindings only. Never use a service-role/secret key at this boundary. */
 export interface DatabaseConfig {
@@ -10,15 +11,6 @@ export interface DatabaseIdentity {
   user: { id: string; email?: string };
   accessToken: string;
 }
-export type EditorEnvelope = {
-  schemaVersion: 'resumora-editor-draft/1';
-  content: Record<string, unknown>;
-  answers: unknown[];
-};
-export type DraftSnapshot = {
-  id: string; revision: number; parentId: string | null; restoredFrom?: string;
-  createdAt: string; reason: 'save' | 'autosave' | 'restore'; payload: EditorEnvelope;
-};
 export class DatabaseError extends Error {
   readonly status: number;
   readonly code: string;
@@ -105,7 +97,7 @@ export function createDatabaseGateway(env: DatabaseConfig, identity: DatabaseIde
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) throw new DatabaseError(400, 'INVALID_REQUEST');
       return rpc<DraftSnapshot[]>('base_draft_history', { p_before_revision: page.beforeRevision === undefined ? null : revision(page.beforeRevision), p_limit: limit }, 21 * 1048576);
     },
-    saveDraft: (input: { requestId: string; expectedRevision: number; mode: 'autosave' | 'checkpoint'; payload: EditorEnvelope }) => {
+    saveDraft: (input: { requestId: string; expectedRevision: number; mode: 'autosave' | 'checkpoint'; payload: EditorWireEnvelope }) => {
       if (!['autosave', 'checkpoint'].includes(input.mode)) throw new DatabaseError(400, 'INVALID_REQUEST');
       return rpc<DraftSnapshot>('save_base_draft', { p_key: key(input.requestId), p_expected_revision: revision(input.expectedRevision),
         p_payload: input.payload, p_mode: input.mode });

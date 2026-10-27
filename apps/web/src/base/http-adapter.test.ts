@@ -6,14 +6,14 @@ import { cvRoute, type CvDraftGateway } from "../../../api/src/cv/routes";
 import { createDatabaseGateway } from "../../../api/src/db/supabase";
 
 function gatewayAdapter(transport: typeof fetch) {
-  const gateway = createDatabaseGateway(
+  const gateway: CvDraftGateway = createDatabaseGateway(
     {
       SUPABASE_URL: "https://synthetic.supabase.co",
       SUPABASE_PUBLISHABLE_KEY: "sb_publishable_synthetic",
     },
     { user: { id: crypto.randomUUID() }, accessToken: "synthetic-user-token" },
     transport,
-  ) as CvDraftGateway;
+  );
   const responses: Response[] = [];
   const adapter = new HttpBaseCvAdapter(async (path, init) => {
     const response = await cvRoute(

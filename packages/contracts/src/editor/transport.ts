@@ -5,6 +5,12 @@ export type EditorEnvelope = {
   content: Omit<BaseDraft, "answers">;
   answers: Answer[];
 };
+// Database JSON has envelope structure; decodeDraft validates its editor content.
+export type EditorWireEnvelope = {
+  schemaVersion: EditorEnvelope["schemaVersion"];
+  content: Record<string, unknown>;
+  answers: unknown[];
+};
 export type DraftSnapshot = {
   id: string;
   revision: number;
@@ -12,7 +18,7 @@ export type DraftSnapshot = {
   restoredFrom?: string;
   createdAt: string;
   reason: "save" | "autosave" | "restore";
-  payload: EditorEnvelope;
+  payload: EditorWireEnvelope;
 };
 export interface CvDraftGateway {
   loadDraft(): Promise<DraftSnapshot | null>;
@@ -25,7 +31,7 @@ export function encodeDraft(draft: BaseDraft): EditorEnvelope {
   const { answers, ...content } = structuredClone(draft);
   return { schemaVersion: "resumora-editor-draft/1", content, answers };
 }
-export function decodeDraft(payload: EditorEnvelope): BaseDraft {
+export function decodeDraft(payload: EditorWireEnvelope): BaseDraft {
   if (payload.schemaVersion !== "resumora-editor-draft/1") throw new Error("unsupportedEditorVersion");
   const draft = { ...payload.content, answers: payload.answers };
   if (!isBaseDraft(draft)) throw new Error("invalidEditorDraft");
