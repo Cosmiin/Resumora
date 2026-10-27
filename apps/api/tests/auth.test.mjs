@@ -17,7 +17,7 @@ function provider() {
     assert.equal(url.origin, env.SUPABASE_URL);
     assert.equal(init.redirect, 'manual');
     calls.push({ path: url.pathname, search: url.search, method: init.method, body: init.body ? JSON.parse(init.body) : null, authorization: new Headers(init.headers).get('authorization') });
-    if (failure && url.pathname.endsWith(failure.path) && init.method === failure.method) return Response.json({ message: 'synthetic unavailable' }, { status: failure.status });
+    if (failure && url.pathname.endsWith(failure.path) && init.method === failure.method) return Response.json({ message: 'synthetic unavailable', code: failure.code }, { status: failure.status, headers: { 'X-Supabase-Api-Version': '2024-01-01' } });
     if (limited) return Response.json({ msg: 'rate limited' }, { status: 429 });
     if (redirect) return new Response(null, { status: 302, headers: { Location: 'https://untrusted.invalid/' } });
     if (url.pathname.endsWith('/user') && init.method === 'GET') return failUser || revoked ? Response.json({ message: 'invalid token' }, { status: 401 }) : Response.json(user);
@@ -253,5 +253,31 @@ test('logout and password failures that clear cookies can recover anonymous CSRF
     const recovered = await b.status();
     assert.equal(recovered.user, null); assert.notEqual(recovered.csrfToken, oldCsrf);
     assert.equal((await b.call('/logout', {})).status, 200);
+  }
+});
+
+
+test('SDK session_not_found definitively clears status, password, and protected CV sessions', async () => {
+  for (const consumer of ['session', 'password', 'cv']) {
+    for (const path of consumer === 'password' ? ['/user'] : ['/user', '/token']) {
+      const p = provider(), b = new Browser(p), headers = authHeaders();
+      const session = await saveSession(headers, env, {
+        ...p.session(), refresh_token: crypto.randomUUID(), expires_at: path === '/token' ? 1 : Math.floor(Date.now() / 1000) + 3600,
+      }, consumer === 'password');
+      b.accept(new Response(null, { headers })); b.csrf = session.csrf;
+      p.failure = { path, method: path === '/token' ? 'POST' : 'GET', status: 403, code: 'session_not_found' };
+      let response;
+      if (consumer === 'cv') {
+        response = (await authenticateRequest(b.request('/v1/base-cv'), env, p.transport)).response;
+        b.accept(response);
+      } else response = await b.call('/' + consumer, consumer === 'password' ? { password: 'new-password' } : undefined);
+      assert.equal(response.status, consumer === 'session' ? 200 : 401);
+      const body = await response.json();
+      if (consumer === 'session') assert.equal(body.user, null);
+      else assert.equal(body.error.code, 'UNAUTHORIZED');
+      assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
+      assert.equal(await readCookie(b.request('/'), env, 'session'), null);
+      assert.ok(p.calls.some(call => call.path.endsWith(path)));
+    }
   }
 });

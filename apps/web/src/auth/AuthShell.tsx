@@ -36,8 +36,16 @@ export function AuthShell({
     generation = useRef(0);
   const loggingOut = useRef(false);
   const verified = useRef(false),
-    accountId = useRef<string | null>(null),
-    check = useRef(0);
+    accountId = useRef<string | null>(null);
+  const pending = useRef(Promise.resolve());
+  const ordered = useCallback(<T,>(operation: () => Promise<T>) => {
+    const result = pending.current.then(operation);
+    pending.current = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }, []);
   const transport: AuthTransport = useCallback(
     async (path, init = {}) => {
       const startedGeneration = generation.current,
@@ -110,29 +118,34 @@ export function AuthShell({
     const expectedCsrf = status?.csrfToken,
       expectedAccount = status?.user?.id,
       expectedGeneration = generation.current;
-    return async (path, init) => {
-      if (
-        !expectedCsrf ||
-        accountId.current !== expectedAccount ||
-        csrf.current !== expectedCsrf ||
-        loggingOut.current ||
-        generation.current !== expectedGeneration
-      )
-        throw new Error("SESSION_CHANGED");
-      if (!verified.current) throw new Error("SESSION_UNVERIFIED");
-      return transport(path, init);
-    };
-  }, [status?.csrfToken, status?.user?.id, status?.recovery, transport]);
+    return (path, init) =>
+      ordered(async () => {
+        if (
+          !expectedCsrf ||
+          accountId.current !== expectedAccount ||
+          csrf.current !== expectedCsrf ||
+          loggingOut.current ||
+          generation.current !== expectedGeneration
+        )
+          throw new Error("SESSION_CHANGED");
+        if (!verified.current) throw new Error("SESSION_UNVERIFIED");
+        return transport(path, init);
+      });
+  }, [
+    status?.csrfToken,
+    status?.user?.id,
+    status?.recovery,
+    transport,
+    ordered,
+  ]);
   const load = useCallback(
     async (recoverLogout = false) => {
       if (loggingOut.current && !recoverLogout) return;
-      const started = generation.current,
-        startedCheck = ++check.current;
+      const started = generation.current;
       try {
         const response = await transport("/v1/auth/session");
         const body = await response.json();
-        if (started !== generation.current || startedCheck !== check.current)
-          return;
+        if (started !== generation.current) return;
         if (!response.ok)
           throw Error(
             body.error?.message ?? "Autentificarea nu este disponibilă.",
@@ -151,8 +164,7 @@ export function AuthShell({
         setError("");
         return body as Status;
       } catch (e) {
-        if (started !== generation.current || startedCheck !== check.current)
-          return;
+        if (started !== generation.current) return;
         verified.current = false;
         setError(
           e instanceof Error
@@ -173,9 +185,9 @@ export function AuthShell({
     return load(true);
   }
   useEffect(() => {
-    void load();
+    void ordered(() => load());
     const focus = () => {
-      void load();
+      void ordered(() => load());
     };
     const interval = window.setInterval(focus, 60_000);
     window.addEventListener("focus", focus);
@@ -184,7 +196,7 @@ export function AuthShell({
       window.clearInterval(interval);
       window.removeEventListener("focus", focus);
     };
-  }, [load]);
+  }, [load, ordered]);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -199,74 +211,77 @@ export function AuthShell({
         : mode === "recovery"
           ? { email: data.get("email") }
           : { email: data.get("email"), password: data.get("password") };
-    try {
-      const response = await transport("/v1/auth/" + mode, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw Error(
-          result.error?.message ?? "Cererea nu a reușit. Încearcă din nou.",
-        );
-      form.reset();
-      if (mode === "login") {
-        loggingOut.current = false;
-        generation.current++;
-        await load();
-      } else if (mode === "password") {
-        setMode("login");
-        window.history.replaceState(null, "", "/");
-        await reloadAfterAction();
-        setNotice("Parolă schimbată. Autentifică-te cu parola nouă.");
-      } else
-        setNotice(
-          "Dacă există un cont eligibil, verifică emailul. Deschide linkul în acest browser.",
-        );
-    } catch (e) {
-      if (mode === "password") {
-        const next = await reloadAfterAction();
-        if (next && !next.recovery) {
+    await ordered(async () => {
+      try {
+        const response = await transport("/v1/auth/" + mode, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        const result = await response.json();
+        if (!response.ok)
+          throw Error(
+            result.error?.message ?? "Cererea nu a reușit. Încearcă din nou.",
+          );
+        form.reset();
+        if (mode === "login") {
+          loggingOut.current = false;
+          generation.current++;
+          await load();
+        } else if (mode === "password") {
           setMode("login");
           window.history.replaceState(null, "", "/");
+          await reloadAfterAction();
+          setNotice("Parolă schimbată. Autentifică-te cu parola nouă.");
+        } else
+          setNotice(
+            "Dacă există un cont eligibil, verifică emailul. Deschide linkul în acest browser.",
+          );
+      } catch (e) {
+        if (mode === "password") {
+          const next = await reloadAfterAction();
+          if (next && !next.recovery) {
+            setMode("login");
+            window.history.replaceState(null, "", "/");
+          }
         }
+        setError(e instanceof Error ? e.message : "Cererea nu a reușit.");
+      } finally {
+        setBusy(false);
       }
-      setError(e instanceof Error ? e.message : "Cererea nu a reușit.");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   async function logout() {
     if (busy) return;
-    generation.current++;
     verified.current = false;
     loggingOut.current = true;
     setBusy(true);
     setStatus(null);
     setMode("login");
     setNotice("");
-    try {
-      if (!csrf.current) await load(true);
-      if (!csrf.current)
-        throw Error("Deconectarea nu este confirmată. Reîncearcă.");
-      const response = await transport("/v1/auth/logout", {
-        method: "POST",
-        body: "{}",
-      });
-      if (!response.ok)
-        throw Error("Deconectarea nu este confirmată. Reîncearcă.");
-      loggingOut.current = false;
-      await reloadAfterAction();
-    } catch (e) {
-      await reloadAfterAction();
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Deconectarea nu este confirmată. Reîncearcă.",
-      );
-    } finally {
-      setBusy(false);
-    }
+    await ordered(async () => {
+      try {
+        if (!csrf.current) await load(true);
+        if (!csrf.current)
+          throw Error("Deconectarea nu este confirmată. Reîncearcă.");
+        const response = await transport("/v1/auth/logout", {
+          method: "POST",
+          body: "{}",
+        });
+        if (!response.ok)
+          throw Error("Deconectarea nu este confirmată. Reîncearcă.");
+        loggingOut.current = false;
+        await reloadAfterAction();
+      } catch (e) {
+        await reloadAfterAction();
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Deconectarea nu este confirmată. Reîncearcă.",
+        );
+      } finally {
+        setBusy(false);
+      }
+    });
   }
   if (!ready)
     return (
@@ -293,7 +308,10 @@ export function AuthShell({
               {error} Modificările rămân în această pagină; salvarea așteaptă
               verificarea sesiunii.
             </p>
-            <button className="btn btn-ghost" onClick={() => void load()}>
+            <button
+              className="btn btn-ghost"
+              onClick={() => void ordered(() => load())}
+            >
               Reîncearcă conexiunea
             </button>
           </div>
@@ -403,7 +421,7 @@ export function AuthShell({
           className="btn btn-ghost"
           onClick={() => {
             if (loggingOut.current) void logout();
-            else void load();
+            else void ordered(() => load());
           }}
           disabled={busy}
         >

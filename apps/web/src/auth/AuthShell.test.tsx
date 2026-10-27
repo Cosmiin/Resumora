@@ -174,16 +174,24 @@ it("ignores a status response started before logout, keeping the private editor 
   );
   await screen.findByText("Private editor");
   fireEvent.focus(window);
+  await waitFor(() => expect(count).toBe(2));
   fireEvent.click(screen.getByRole("button", { name: "Deconectare" }));
   await screen.findByRole("heading", { name: "Autentificare" });
   await act(async () => {
     resolveOld(Response.json(signed));
   });
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("button", { name: "Intră în cont" })
+        .hasAttribute("disabled"),
+    ).toBe(false),
+  );
   expect(screen.queryByText("Private editor")).toBeNull();
 });
 
 it.each(["changed", "same"])(
-  "fences retired account transports and ignores their late401 with %s CSRF after a replacement session",
+  "fences retired account transports with %s CSRF after a queued replacement session",
   async (token) => {
     let current = { ...signed, csrfToken: "account-a-csrf" };
     let resolveOld: (response: Response) => void = () => {};
@@ -207,24 +215,29 @@ it.each(["changed", "same"])(
     await screen.findByText("Private test@example.invalid");
     const retired = accountTransport!;
     const pending = retired("/v1/base-cv");
+    await waitFor(() =>
+      expect(fetcher.mock.calls.some(([path]) => path === "/v1/base-cv")).toBe(
+        true,
+      ),
+    );
     current = {
       ...signed,
       csrfToken: token === "same" ? "account-a-csrf" : "account-b-csrf",
       user: { id: "account-b", email: "b@example.invalid" },
     };
     fireEvent.focus(window);
-    await screen.findByText("Private b@example.invalid");
-    const count = fetcher.mock.calls.length;
-    await expect(
-      retired("/v1/base-cv/save", { method: "POST", body: "{}" }),
-    ).rejects.toThrow("SESSION_CHANGED");
-    expect(fetcher.mock.calls.length).toBe(count);
     await act(async () => {
       resolveOld(
         Response.json({ error: { code: "unauthorized" } }, { status: 401 }),
       );
       await pending;
     });
+    await screen.findByText("Private b@example.invalid");
+    const count = fetcher.mock.calls.length;
+    await expect(
+      retired("/v1/base-cv/save", { method: "POST", body: "{}" }),
+    ).rejects.toThrow("SESSION_CHANGED");
+    expect(fetcher.mock.calls.length).toBe(count);
     expect(screen.getByText("Private b@example.invalid")).toBeTruthy();
   },
 );
@@ -445,3 +458,242 @@ it.each([400, 401, 503, 0])(
     window.history.replaceState(null, "", "/");
   },
 );
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+it("finishes anonymous cookie responses and CSRF updates before dispatching login", async () => {
+  const delayed = deferred();
+  const events: string[] = [];
+  let checks = 0;
+  let cookie: string | null = null,
+    cookieCsrf = anonymous.csrfToken;
+  const fetcher = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/session")) {
+        checks++;
+        if (checks === 2) {
+          events.push("check started");
+          await delayed.promise;
+          cookie = null;
+          cookieCsrf = "new-browser-csrf";
+          events.push("anonymous cookies applied");
+        }
+        return Response.json(
+          cookie
+            ? { ...signed, csrfToken: cookieCsrf }
+            : { ...anonymous, csrfToken: cookieCsrf },
+        );
+      }
+      expect(String(input)).toBe("/v1/auth/login");
+      events.push("login sent");
+      expect(new Headers(init?.headers).get("x-csrf-token")).toBe(cookieCsrf);
+      cookie = "new-session";
+      cookieCsrf = "new-session-csrf";
+      return Response.json({ user: signed.user });
+    },
+  );
+  render(
+    <AuthShell fetcher={fetcher}>
+      {() => <input aria-label="Private draft" defaultValue="New draft" />}
+    </AuthShell>,
+  );
+  await screen.findByRole("heading", { name: "Autentificare" });
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: signed.user.email },
+  });
+  fireEvent.change(screen.getByLabelText("Parolă"), {
+    target: { value: "synthetic-password" },
+  });
+  fireEvent.focus(window);
+  await waitFor(() => expect(events).toEqual(["check started"]));
+  fireEvent.click(screen.getByRole("button", { name: "Intră în cont" }));
+  await act(async () => {});
+  expect(events).toEqual(["check started"]);
+  delayed.resolve();
+  const input = await screen.findByLabelText("Private draft");
+  fireEvent.change(input, { target: { value: "Unsaved CV" } });
+  expect(events).toEqual([
+    "check started",
+    "anonymous cookies applied",
+    "login sent",
+  ]);
+  expect(cookie).toBe("new-session");
+  fireEvent.focus(window);
+  await act(async () => {});
+  expect(screen.getByLabelText("Private draft")).toBe(input);
+  expect((input as HTMLInputElement).value).toBe("Unsaved CV");
+});
+
+it.each(["session", "anonymous-session", "cv"])(
+  "orders outstanding %s cookies before logout and discards queued retired CV work",
+  async (source) => {
+    const delayed = deferred();
+    const events: string[] = [];
+    let checks = 0;
+    let cookie: string | null = "old-session",
+      cookieCsrf = signed.csrfToken;
+    let account = signed.user;
+    let cvTransport: AuthTransport = async () => Response.json(null);
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = String(input);
+        if (path.endsWith("/session")) checks++;
+        if (
+          (source !== "cv" && path.endsWith("/session") && checks === 2) ||
+          path === "/v1/base-cv"
+        ) {
+          events.push("old request sent");
+          await delayed.promise;
+          cookie =
+            source === "anonymous-session" ? null : "rotated-old-session";
+          if (source === "anonymous-session") cookieCsrf = "new-browser-csrf";
+          events.push("old cookies applied");
+        }
+        if (path.endsWith("/session"))
+          return Response.json({
+            ...anonymous,
+            user: cookie ? account : null,
+            csrfToken: cookieCsrf,
+          });
+        if (path.endsWith("/logout")) {
+          events.push("logout sent");
+          expect(cookie).toBe(
+            source === "anonymous-session" ? null : "rotated-old-session",
+          );
+          expect(new Headers(init?.headers).get("x-csrf-token")).toBe(
+            cookieCsrf,
+          );
+          cookie = null;
+          cookieCsrf = "anonymous-after-logout";
+        }
+        if (path.endsWith("/login")) {
+          events.push("login sent");
+          expect(new Headers(init?.headers).get("x-csrf-token")).toBe(
+            cookieCsrf,
+          );
+          cookie = "account-b-session";
+          cookieCsrf = "account-b-csrf";
+          account = { id: "account-b", email: "b@example.invalid" };
+        }
+        return Response.json({});
+      },
+    );
+    render(
+      <AuthShell fetcher={fetcher}>
+        {(account, transport) => {
+          cvTransport = transport;
+          return <p>Private {account.email}</p>;
+        }}
+      </AuthShell>,
+    );
+    await screen.findByText("Private test@example.invalid");
+    const retired = cvTransport;
+    let oldRequest: Promise<Response> | undefined;
+    if (source !== "cv") fireEvent.focus(window);
+    else oldRequest = retired("/v1/base-cv");
+    await waitFor(() => expect(events).toEqual(["old request sent"]));
+    const queued = Promise.allSettled(
+      ["/history", "/save", "/restore"].map((path) =>
+        retired(`/v1/base-cv${path}`, {
+          method: path === "/history" ? "GET" : "POST",
+          body: path === "/history" ? undefined : "{}",
+        }),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Deconectare" }));
+    expect(screen.queryByText("Private test@example.invalid")).toBeNull();
+    await act(async () => {});
+    expect(events).toEqual(["old request sent"]);
+    delayed.resolve();
+    await oldRequest;
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Intră în cont" })
+          .hasAttribute("disabled"),
+      ).toBe(false),
+    );
+    expect(events).toEqual([
+      "old request sent",
+      "old cookies applied",
+      "logout sent",
+    ]);
+    expect(cookie).toBeNull();
+    expect(
+      (await queued).every(
+        (result) =>
+          result.status === "rejected" &&
+          result.reason.message === "SESSION_CHANGED",
+      ),
+    ).toBe(true);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "b@example.invalid" },
+    });
+    fireEvent.change(screen.getByLabelText("Parolă"), {
+      target: { value: "synthetic-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Intră în cont" }));
+    await screen.findByText("Private b@example.invalid");
+    await expect(
+      retired("/v1/base-cv/save", { method: "POST", body: "{}" }),
+    ).rejects.toThrow("SESSION_CHANGED");
+    expect(
+      fetcher.mock.calls
+        .filter(([path]) => String(path).startsWith("/v1/base-cv"))
+        .map(([path]) => path),
+    ).toEqual(source === "cv" ? ["/v1/base-cv"] : []);
+    expect(cookie).toBe("account-b-session");
+  },
+);
+
+it("finishes recovery cookie responses before password completion clears them", async () => {
+  window.history.replaceState(null, "", "/reset-password");
+  const delayed = deferred();
+  const events: string[] = [];
+  let checks = 0,
+    cookie = "recovery-session";
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const path = String(input);
+    if (path.endsWith("/session")) {
+      checks++;
+      if (checks === 2) {
+        events.push("recovery check sent");
+        await delayed.promise;
+        cookie = "checked-recovery-session";
+        events.push("recovery cookies applied");
+      }
+      return Response.json(cookie ? { ...signed, recovery: true } : anonymous);
+    }
+    expect(path).toBe("/v1/auth/password");
+    expect(cookie).toBe("checked-recovery-session");
+    events.push("password sent");
+    cookie = "";
+    return Response.json({ message: "Password changed" });
+  });
+  render(
+    <AuthShell fetcher={fetcher}>{() => <p>Private editor</p>}</AuthShell>,
+  );
+  const password = await screen.findByLabelText("Parolă nouă");
+  fireEvent.change(password, { target: { value: "new-password" } });
+  fireEvent.focus(window);
+  await waitFor(() => expect(events).toEqual(["recovery check sent"]));
+  fireEvent.click(screen.getByRole("button", { name: "Salvează parola" }));
+  await act(async () => {});
+  expect(events).toEqual(["recovery check sent"]);
+  delayed.resolve();
+  await screen.findByText("Parolă schimbată. Autentifică-te cu parola nouă.");
+  expect(cookie).toBe("");
+  expect(events).toEqual([
+    "recovery check sent",
+    "recovery cookies applied",
+    "password sent",
+  ]);
+  expect(screen.queryByText("Private editor")).toBeNull();
+  window.history.replaceState(null, "", "/");
+});

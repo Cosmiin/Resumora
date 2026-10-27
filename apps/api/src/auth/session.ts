@@ -1,4 +1,4 @@
-import { AuthClient, isAuthApiError } from '@supabase/auth-js';
+import { AuthClient, isAuthApiError, isAuthSessionMissingError } from '@supabase/auth-js';
 import type { Session } from '@supabase/auth-js';
 import { config, readCookie, writeCookie, clearCookie } from './cookies.ts';
 import type { AuthConfig } from './cookies.ts';
@@ -61,7 +61,7 @@ export async function verifySession(request: Request, env: AuthConfig, headers: 
     if (!data.user?.email_confirmed_at) { clearCookie(headers, env, 'session'); return null; }
     return { user: { id: data.user.id, email: data.user.email ?? '' }, accessToken: cookie.access, cookie };
   } catch (error) {
-    if (!isAuthApiError(error) || ![400, 401, 403].includes(error.status)) throw error;
+    if (!isAuthSessionMissingError(error) && (!isAuthApiError(error) || ![400, 401, 403].includes(error.status))) throw error;
     clearCookie(headers, env, 'session'); return null;
   }
 }
