@@ -18,7 +18,7 @@ export class AdapterError extends Error {
   }
 }
 export interface BaseCvAdapter {
-  readonly capability: "session-memory";
+  readonly capability: "session-memory" | "durable";
   load(): Promise<Snapshot | null>;
   history(): Promise<Snapshot[]>;
   save(input: {

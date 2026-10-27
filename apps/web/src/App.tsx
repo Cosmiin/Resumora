@@ -15,7 +15,7 @@ import {
   type BaseCvAdapter,
   type Snapshot,
 } from "./base/adapter";
-import { clone, localId, type BaseDraft, type Locale } from "./base/model";
+import { clone, type BaseDraft, type Locale } from "./base/model";
 import { prepareDraft, focusField } from "./base/editing";
 import { validateDraft, type Issue } from "./base/validation";
 import { DocumentPreview } from "./components/DocumentPreview";
@@ -36,7 +36,14 @@ function currentRoute(): Route {
     ? (hash as Route)
     : "missing";
 }
+const adapterKeys = new WeakMap<BaseCvAdapter, number>();
+let nextAdapterKey = 0;
 export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
+  if (!adapterKeys.has(adapter)) adapterKeys.set(adapter, ++nextAdapterKey);
+  return <CvEditor key={adapterKeys.get(adapter)} adapter={adapter} />;
+}
+function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
+  const durable = adapter.capability === "durable";
   const [locale, setLocale] = useState<Locale>("ro"),
     t = (ro: string, en: string) => (locale === "ro" ? ro : en);
   const [route, setRoute] = useState<Route>(currentRoute),
@@ -49,6 +56,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
   const [issues, setIssues] = useState<Issue[]>([]),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
+    [loadAttempt, setLoadAttempt] = useState(0),
     [error, setError] = useState<string | null>(null),
     [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<
@@ -94,6 +102,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
   }, [locale]);
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     void adapter
       .load()
       .then((s) => {
@@ -101,6 +110,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
           setHead(s);
           if (s) setDraft(prepareDraft(s.draft));
           setLoading(false);
+          setError(null);
         }
       })
       .catch(() => {
@@ -112,16 +122,16 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
     return () => {
       cancelled = true;
     };
-  }, [adapter]);
+  }, [adapter, loadAttempt]);
   useEffect(() => {
-    if (!draft && !head) return;
+    if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [draft, head]);
+  }, [dirty]);
   useEffect(() => {
     if (route !== "history") return;
     let cancelled = false;
@@ -165,7 +175,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
   }
   function requestId(body: string) {
     if (savedRequest.current?.body !== body)
-      savedRequest.current = { body, id: localId() };
+      savedRequest.current = { body, id: crypto.randomUUID() };
     return savedRequest.current.id;
   }
   async function save(mode: "autosave" | "checkpoint" = "checkpoint") {
@@ -178,8 +188,8 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
         go("base");
         setNotice(
           t(
-            "Completează câmpul marcat; ciorna rămâne salvată în sesiune.",
-            "Complete the marked field; your draft remains saved in session.",
+            "Completează câmpul marcat; salvarea automată păstrează și ciorne incomplete.",
+            "Complete the marked field; autosave also preserves incomplete drafts.",
           ),
         );
         focusField(found[0].field);
@@ -206,7 +216,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
         setNotice(
           mode === "autosave"
             ? ""
-            : t("Salvat în sesiune.", "Saved in session."),
+            : durable ? t("Salvat în cont.", "Saved to your account.") : t("Salvat în sesiune.", "Saved in session."),
         );
     } catch (e) {
       setError(e instanceof AdapterError ? e.code : "save");
@@ -252,8 +262,8 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
         openDraft(s.draft);
         setNotice(
           t(
-            "Ultima ciornă salvată în sesiune a fost redeschisă.",
-            "Latest session draft reopened.",
+            "Ultima ciornă salvată a fost redeschisă.",
+            "Latest saved draft reopened.",
           ),
         );
       } else
@@ -405,7 +415,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               {editing
                 ? editingTitle
                 : route === "history"
-                  ? t("Istoric în sesiune", "Session history")
+                  ? durable ? t("Istoric", "History") : t("Istoric în sesiune", "Session history")
                   : "Resumora"}
             </h1>
             {editing && (
@@ -437,7 +447,13 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                   )}
               <Button
                 onClick={() =>
-                  error === "conflict" ? go("history") : void save()
+                  error === "conflict"
+                    ? go("history")
+                    : error === "load" && !draft
+                      ? setLoadAttempt((n) => n + 1)
+                      : error === "load"
+                        ? dirty ? setDialog({ kind: "reopen" }) : void reopen()
+                        : void save()
                 }
               >
                 {error === "conflict"
@@ -452,6 +468,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
             <>
               {route === "home" && (
                 <HomeScreen
+                  durable={durable}
                   draft={!!draft}
                   head={head}
                   go={go}
@@ -505,6 +522,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
               )}
               {route === "history" && (
                 <HistoryScreen
+                  durable={durable}
                   draft={!!draft}
                   versions={versions}
                   head={head}
@@ -527,8 +545,8 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                           "Jobs, tailoring and export are not connected.",
                         )
                       : t(
-                          "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
-                          "Account and online saving are not connected. You can use the local editor without an account.",
+                          durable ? "CV-ul și istoricul sunt salvate în contul tău." : "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
+                          durable ? "Your CV and history are saved in your account." : "Account and online saving are not connected. You can use the local editor without an account.",
                         )}
                   </p>
                   <Button onClick={() => go(draft ? "base" : "start")}>
@@ -551,14 +569,14 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
                         )
                       : dirty
                         ? t("Modificări în ciornă…", "Draft changes…")
-                        : t(
+                        : durable ? t("Ciornă salvată în cont", "Draft saved to your account") : t(
                             "Ciornă salvată în sesiune",
                             "Draft saved in session",
                           )}
                   {head ? ` · v${head.revision}` : ""}
                 </p>
                 <small>
-                  {t(
+                  {durable ? t("Salvare online în contul tău", "Saved online to your account") : t(
                     "Doar memoria paginii · reîncărcarea șterge datele",
                     "Page memory only · reloading clears data",
                   )}
@@ -601,7 +619,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
           )}
           {!editing && (
             <p className="session-footnote">
-              {t(
+              {durable ? t("Ciornele salvate se păstrează în contul tău.", "Saved drafts stay in your account.") : t(
                 "Sesiune locală: reîncărcarea șterge datele. Fără salvare online.",
                 "Local session: reloading clears data. No online saving.",
               )}
@@ -622,7 +640,7 @@ export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
           onClose={() => !busy && setDialog(null)}
         >
           <p>
-            {t(
+            {durable ? t("Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric.", "Your current draft will be replaced. Previous versions stay in history.") : t(
               "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric până la reîncărcare.",
               "The current draft will be replaced. Prior versions remain in history until reload.",
             )}

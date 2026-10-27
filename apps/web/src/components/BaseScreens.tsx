@@ -161,11 +161,13 @@ export function StartChooser({ start }: { start: (draft: BaseDraft) => void }) {
   );
 }
 export function HomeScreen({
+  durable = false,
   draft,
   head,
   go,
   reopen,
 }: {
+  durable?: boolean;
   draft: boolean;
   head: Snapshot | null;
   go: (route: Route) => void;
@@ -189,7 +191,7 @@ export function HomeScreen({
             )}
           </h2>
           <p>
-            {t(
+            {durable ? t("Construiește un CV de bază, adaugă context și păstrează versiuni în contul tău.", "Build a Base CV, add context, and keep versions in your account.") : t(
               "Construiește un CV de bază din informații reale. Revizuiește, adaugă context și păstrează versiuni în această sesiune.",
               "Build a Base CV from real facts. Review, add context, and keep versions during this session.",
             )}
@@ -223,7 +225,7 @@ export function HomeScreen({
           {head ? (
             <>
               <Pill tone="good">
-                v{head.revision} · {t("în această sesiune", "in this session")}
+                v{head.revision} · {durable ? t("în contul tău", "in your account") : t("în această sesiune", "in this session")}
               </Pill>
               <p>{head.draft.name.value}</p>
               <Button onClick={reopen}>
@@ -233,7 +235,7 @@ export function HomeScreen({
           ) : (
             <>
               <p>
-                {t(
+                {durable ? t("Nu ai salvat încă o versiune.", "No version has been saved yet.") : t(
                   "Nu ai salvat încă o versiune în această sesiune.",
                   "No version has been saved in this session.",
                 )}
@@ -267,6 +269,7 @@ export function HomeScreen({
   );
 }
 export function HistoryScreen({
+  durable = false,
   draft,
   versions,
   head,
@@ -276,6 +279,7 @@ export function HistoryScreen({
   go,
   asOf,
 }: {
+  durable?: boolean;
   draft: boolean;
   versions: Snapshot[];
   head: Snapshot | null;
@@ -290,7 +294,7 @@ export function HistoryScreen({
   return (
     <>
       <p className="muted">
-        {t(
+        {durable ? t("Versiunile sunt păstrate în cont. Restaurarea creează o versiune nouă fără să rescrie istoricul.", "Versions are saved in your account. Restoring creates a new version without rewriting history.") : t(
           "Versiunile sunt copii în memoria paginii. Restaurarea creează o versiune nouă și nu rescrie sursele sau istoricul.",
           "Versions are copies in page memory. Restoring creates a new version and never rewrites sources or history.",
         )}
