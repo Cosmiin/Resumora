@@ -50,7 +50,7 @@ Typing content is excluded. Each Tab/Enter/chord is listed separately. Mouse foc
 - Native layout, actual scrolling, required-reading effort, focus/Tab, IME, formatting shortcuts, drag/touch and the file picker remain manual checks. The baseline has two mandatory approval/declaration checkbox interactions in the full flow; the replacement has none. Reading time is not invented.
 - Mobile/200% zoom and long content may scroll vertically to preserve readable controls. Save stays in a fixed bar; there is no clipped form, tiny-text shortcut or mobile preview toggle.
 - Destructive restore/draft replacement retains its cancellation dialog. Ordinary editing has no modals or per-section confirmations. Source/status details are optional disclosures.
-- Autosave is page-memory only; reload/close clears drafts and history. No durable save, account, AI, parsing or export claim is made.
+- The captured bundles used page-memory autosave; those traces establish no durable save or account behavior. See the [Base CV guide](base-cv.md#run-and-review) for current persistence. No AI, parsing or export claim is made.
 
 ## Optional month/year picker · current component evidence
 

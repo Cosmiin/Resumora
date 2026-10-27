@@ -10,7 +10,7 @@ This is working preparation code with **synthetic verification only**, not a con
 | `GET /v1/admin/ai/usage` | Owner check on every request; fails closed with no real totals because no durable ledger is wired, no CORS access |
 | Internal `prepareConnection().check()` | Fixed `connection_check` using Responses; disabled by default, injected synthetic transport tested; no public generation/check route |
 | Ledger | Typed `UsageLedger` port; **no durable implementation/binding**, new tables or migrations |
-| Login/session | Existing signup/login/cookie flows remain unimplemented; this adds narrow bearer JWT verification only |
+| Login/session | [Authentication setup](authentication.md#session-and-request-contract) owns application login/session flows; this admin boundary still uses separate bearer JWT verification |
 | Organization Costs API | Unimplemented; no organization admin key required |
 
 ## Local synthetic preview
@@ -46,7 +46,7 @@ All three auth variables are required. Admin IDs come from the existing Supabase
 
 For a later approved Cloudflare environment, use **Workers & Pages → the approved Worker → Settings → Variables and Secrets**: `OPENAI_API_KEY` must be a **Secret**, separately per environment. Nonsecret model/scope/issuer/JWKS/allowlist values are Worker variables. Alternatively the owner can use the local pinned Wrangler CLI's interactive `secret put OPENAI_API_KEY` with this app's config and the explicitly approved target environment. Do not pass a key on a command line or reuse development values blindly. No such command or deployment was run here.
 
-Config alone still does not connect data or execute inference. Future browser access must extract identity from the approved Worker-managed HttpOnly session and feed the same verified owner authorization, preserving the [existing auth boundary](authentication.md#proposed-worker-session-boundary). Do not build a browser token-entry form to work around missing sessions. No access/refresh token is returned by this UI or stored in JavaScript. A trusted nonbrowser caller can use an existing bearer access token; this preparation does not mint one or implement login.
+Config alone still does not connect data or execute inference. Future browser access must extract identity from the approved Worker-managed HttpOnly session and feed the same verified owner authorization, preserving the [existing auth boundary](authentication.md#session-and-request-contract). Do not build a browser token-entry form to work around missing sessions. No access/refresh token is returned by this UI or stored in JavaScript. A trusted nonbrowser caller can use an existing bearer access token; this preparation does not mint one or implement login.
 
 ## Required integration before real usage
 

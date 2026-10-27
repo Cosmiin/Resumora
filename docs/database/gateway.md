@@ -1,21 +1,19 @@
 # Local Worker database gateway
 
-This change delivers the Database component of the explicitly owner-approved
-three-agent implementation plan. Authentication owns final API/web composition
-after the approved Database and Persistence modules land. At this head the API
-still returns `AUTH_NOT_IMPLEMENTED` for account routes, and the frontend uses
-`MemoryBaseCvAdapter`; the connected milestone remains incomplete.
+For current API/web composition and its acceptance limits, see the
+[Base CV persistence handoff](../frontend/base-cv.md#persistence-component-handoff).
+The [authentication contract](../setup/authentication.md#session-and-request-contract)
+owns session verification and response cookies.
 
-`apps/api/src/db/supabase.ts` is a server module for that composition. The future
-caller must invoke `createDatabaseGateway(env, authContext)` only after Supabase
+`apps/api/src/db/supabase.ts` is a server module for that composition. The Worker
+invokes `createDatabaseGateway(env, authContext)` only after Supabase
 Auth has verified the request. Auth owns verification/refresh and response cookies; the gateway forwards
 that original user access token to PostgREST. It accepts no acting user or tenant
 argument. Supabase RLS and command authorization remain authoritative. A resource
 UUID is never an authorization grant. Do not pass this context from browser JSON.
 
-Worker-only bindings are `SUPABASE_URL` (the project's HTTPS origin) and
-`SUPABASE_PUBLISHABLE_KEY` (publishable key). Configure them through
-the ignored `apps/api/.dev.vars` for local Wrangler. Never use a database password,
+Use the Worker configuration in [authentication setup](../setup/authentication.md#local-configuration).
+Never use a database password,
 service-role JWT, `sb_secret_` key, browser Vite environment binding or privileged
 SQL connection in the application. The gateway rejects privileged configuration,
 does not log upstream bodies and does not retry writes automatically. Calls have
@@ -94,14 +92,9 @@ native SQL fixtures exercise synthetic Auth subjects. These checks provide
 component evidence only and do not establish cloud connectivity or completed
 account and persistence flows. No successful cloud integration is claimed here.
 
-The agreed acceptance remains a frontend and Cloudflare API running locally,
-connected to the existing cloud development Supabase project through one
-application and Supabase Auth. Signup, sign-in, sign-out, password reset, Base CV
-creation/editing, saved content/enrichment answers/version history, close/reopen
-recovery and account isolation all remain required. Authentication owns final
-API/web composition after the approved modules land, including integration with
-Persistence's editor adapter and validation of those combined acceptance flows.
-Completing this Database component does not complete or reduce that acceptance.
+The [Base CV persistence handoff](../frontend/base-cv.md#persistence-component-handoff)
+owns the connected milestone's remaining acceptance requirements. Gateway
+component evidence does not complete or reduce that acceptance.
 
 ## Verification and staged development execution
 

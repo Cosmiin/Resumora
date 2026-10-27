@@ -4,7 +4,7 @@
 
 ## Start here
 
-For infrastructure preparation before implementation, use the [setup guide](SETUP_GUIDE.md): verified repository readiness, account inventory, secure configuration and feature-triggered service checklists. The [authentication preparation](docs/setup/authentication.md) specifies email/password login/reset with Google later; it is documentation and credential-ignore preparation, not working authentication.
+For infrastructure preparation, use the [setup guide](SETUP_GUIDE.md): verified repository readiness, account inventory, secure configuration and feature-triggered service checklists. The [authentication setup](docs/setup/authentication.md) owns the implemented email/password flows, local configuration and hosted acceptance dependencies.
 
 1. Read the [customer-journey reference](docs/product/customer-journeys.md), [documentation index](docs/README.md), [integrated PRD](docs/product/prd.md) and [decision register](research/strategy/publication/docs/product/decisions.md).
 2. Preview the [interactive Romanian-first prototype](prototype/review.html). It uses synthetic Mara Ionescu / Northstar People data and keeps state in your browser. The interface defaults to Romanian; interface and CV language have separate controls. No real AI, server, payment, or PDF service is connected.
@@ -17,9 +17,9 @@ The [design-system adoption guide](docs/frontend/design-system-adoption.md) maps
 
 ## Local application foundation
 
-For the runnable React Base CV journey, follow [Base CV review instructions](docs/frontend/base-cv.md). For the local frontend/Cloudflare Worker toolchain, follow [local development](docs/setup/local-development.md). With the pinned Node/npm toolchain, run `npm ci --ignore-scripts` and `npm run dev`, then open `http://127.0.0.1:5173/`. The health endpoint and same-origin proxy work locally; authentication and database access are explicitly unimplemented. No cloud credentials or deployment are needed. Run `npm run check` for the [foundation checks](docs/setup/local-development.md#checks).
+For the runnable React Base CV journey, follow [Base CV review instructions](docs/frontend/base-cv.md). With the pinned Node/npm toolchain, run `npm ci --ignore-scripts` and `npm run dev`, then open `http://127.0.0.1:5173/` following the [browser verification requirements](docs/setup/authentication.md#external-setup-dependencies). Configure the existing cloud development Supabase project using [authentication setup](docs/setup/authentication.md) to create an account, confirm email, sign in, sign out or reset a password. Signed-in users can create/edit a Base CV and save content, enrichment answers and version history through the Worker. The unconfigured app stays locked; hosted authentication, save/reopen and account isolation still await controlled acceptance. No deployment is needed. See [local development](docs/setup/local-development.md) for toolchain details and `npm run check` for the [foundation checks](docs/setup/local-development.md#checks).
 
-For SQL migrations, database command contracts and native local verification, start with the [database guide](docs/database/README.md). The frontend and Worker do not yet call these commands.
+For SQL migrations, database command contracts and native local verification, start with the [database guide](docs/database/README.md). The [gateway contract](docs/database/gateway.md) owns the Worker’s user-scoped persistence boundary.
 
 For the synthetic OpenAI cost-dashboard preview and its integration limits, follow [OpenAI/admin preparation](docs/setup/openai-admin.md).
 

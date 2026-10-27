@@ -1,6 +1,6 @@
 # Local frontend and Worker foundation
 
-This workspace includes a runnable [**local Base CV slice**](../frontend/base-cv.md), plus the local Worker foundation. Email/password authentication is implemented through the Worker; see [authentication setup](authentication.md) for private local configuration and hosted test dependencies. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. Without auth configuration it fails closed and does not call Supabase or send email. The auth implementation uses protected Worker cookies; Google OAuth remains deferred. A configured admin verifier can fetch public Supabase signing keys; no database connection or paid inference is wired. No Cloudflare account, API token or environment file is needed to run it.
+This workspace includes a runnable [**local Base CV slice**](../frontend/base-cv.md), plus the local Worker foundation. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. See [authentication setup](authentication.md) for the implemented auth boundary, private local configuration and hosted test dependencies, and the [Base CV guide](../frontend/base-cv.md#persistence-component-handoff) for the connected editor. Without auth configuration the app stays locked and does not call Supabase or send email. A configured admin verifier can fetch public Supabase signing keys; paid inference remains unmounted. No Cloudflare account, API token or environment file is needed to start the locked shell.
 
 ## Start from a clean checkout
 
@@ -11,7 +11,7 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173/**. The page opens the authentication shell, which stays locked until configured. Signed-in accounts use the HTTP Base CV adapter through the authenticated Worker gateway; there is no memory fallback in the composed entrypoint. Both servers bind to loopback; this does not expose a development server to the LAN. Stop the launcher with Ctrl+C; it stops only its own process trees.
+Open **http://127.0.0.1:5173/** following the [browser verification requirements](authentication.md#external-setup-dependencies). The page opens the authentication shell, which stays locked until configured. See the [Base CV guide](../frontend/base-cv.md#run-and-review) for persistence behavior. Both servers bind to loopback; this does not expose a development server to the LAN. Stop the launcher with Ctrl+C; it stops only its own process trees.
 
 For separate terminals, use `npm run dev:api` and `npm run dev:web`. The Worker is **http://127.0.0.1:8787/**. Vite proxies relative `/v1/...` requests to that Worker; the composed Base CV adapter uses those authenticated routes. The browser sees one origin (`http://127.0.0.1:5173`); no permissive CORS configuration or browser API key is needed.
 
@@ -24,7 +24,7 @@ The proxy preserves the incoming host/origin context rather than claiming all re
 | Path | Purpose |
 | --- | --- |
 | `apps/web/` | Romanian-first Base CV app, interaction tests, Vite config and frontend build; adapters described in the [Base CV guide](../frontend/base-cv.md#code-and-replacement-boundary) |
-| `apps/api/` | Worker entry point, protected admin preparation, internal OpenAI adapter and API contract placeholders; unmounted CV handler described in the [persistence handoff](../frontend/base-cv.md#persistence-component-handoff) |
+| `apps/api/` | Worker entry point; [authentication](authentication.md#session-and-request-contract), [database gateway](../database/gateway.md), CV routes described in the [persistence handoff](../frontend/base-cv.md#persistence-component-handoff), protected admin preparation and internal OpenAI adapter |
 | `packages/contracts/` | Shared health/error response types and [editor modules](../frontend/base-cv.md#code-and-replacement-boundary); no server bindings or secret values |
 | `scripts/dev.mjs` | Start/stop the local pair together |
 | `scripts/smoke.mjs` | Start a fresh local pair, verify HTTP/proxy behavior, then stop it |
