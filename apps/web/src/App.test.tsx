@@ -81,7 +81,7 @@ it("adds an optional contact with one click and focus, toggles field visibility 
   const { user, adapter } = await openManual();
   await user.click(screen.getByRole("button", { name: "+ Website" }));
   const site = input("Website");
-  expect(document.activeElement).toBe(site);
+  await waitFor(() => expect(document.activeElement).toBe(site));
   await user.type(site, "https://example.test");
   await user.click(screen.getByRole("button", { name: "Ascunde: Website" }));
   expect(
@@ -124,6 +124,10 @@ it("adds skills with Enter, comma and paste; edits/cancels/removes and keyboard-
   await user.type(input("Editează competența"), "React 19{Enter}");
   screen.getByRole("button", { name: "Node" }).focus();
   await user.keyboard("{Alt>}{ArrowUp}{/Alt}");
+  // Finish the reorder's focus restoration before starting another interaction.
+  await act(async () => {
+    await new Promise<number>((resolve) => requestAnimationFrame(resolve));
+  });
   chips.focus();
   await user.keyboard("{Backspace}");
   await waitFor(

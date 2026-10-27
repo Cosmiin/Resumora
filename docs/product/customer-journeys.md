@@ -4,11 +4,11 @@ Reference date: **2026-10-25**. Status: **journey reference; a bounded [local Ba
 
 ## Authority, availability and evidence
 
-Use the [PRD, especially §§15–16](prd.md), [decision register D-01–14](../../research/strategy/publication/docs/product/decisions.md), [UX journeys A–F](../../research/ux/journeys.md), [screen specifications](../../research/ux/screen-specifications.md), [canonical CV/workspace schemas](../../schemas/cv/v1/README.md), [journey contracts v3](../../research/architecture/journey-contracts-v3.md), [authentication preparation](../setup/authentication.md) and [shared synthetic examples](../examples/README.md) together. Later PRD direction takes precedence over the older architecture proposal for a numeric readiness rubric: retain five qualitative checks, no additional readiness score. This consolidation does not modify those sources or resolve their open decisions.
+Use the [PRD, especially §§15–16](prd.md), [decision register D-01–14](../../research/strategy/publication/docs/product/decisions.md), [UX journeys A–F](../../research/ux/journeys.md), [screen specifications](../../research/ux/screen-specifications.md), [canonical CV/workspace schemas](../../schemas/cv/v1/README.md), [journey contracts v3](../../research/architecture/journey-contracts-v3.md), [authentication setup](../setup/authentication.md) and [shared synthetic examples](../examples/README.md) together. Later PRD direction takes precedence over the older architecture proposal for a numeric readiness rubric: retain five qualitative checks, no additional readiness score. This consolidation does not modify those sources or resolve their open decisions.
 
 | Availability label | Meaning in this checkout |
 |---|---|
-| **Implemented local foundation** | React app workspace, Worker health endpoint and development proxy. Static source inspection confirms health reports authentication `not_implemented` and database `not_connected`; auth route contracts return 501. See [local foundation](../setup/local-development.md), [Worker source](../../apps/api/src/index.ts) and [shell source](../../apps/web/src/App.tsx). No app was run for this document. |
+| **Implemented local foundation** | See [local development](../setup/local-development.md#current-routes-and-auth-boundary) for current health/routes and [authentication setup](../setup/authentication.md) for the implemented local auth subset and hosted acceptance dependencies. These do not establish the full journeys below. |
 | **Reference/demo only** | The synthetic discovery prototype and imported design examples. They illustrate interactions; they do not establish real accounts, parsing, model analysis, persistent hosted versions, payments or PDF output. Some prototype JSON portability works only on synthetic local state. |
 | **Implemented local Base CV slice** | See the [Base CV guide](../frontend/base-cv.md) for the implemented J05–J08 behavior, review instructions and availability limits. |
 | **Planned** | Hosted customer product flows J01–J19 beyond that bounded local slice. They require separately authorized application work and relevant dependencies. No hosted end-to-end customer journey is implemented by this local slice. |
@@ -53,7 +53,7 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 **State contract S1:** every flow needs idle/loading/success plus relevant validation, empty, cancelled, expired, conflict and retryable/final error states. State labels must say what was saved and what remains a draft. Async operations follow the architecture's queued/running/needs_input/succeeded/failed_retryable/failed_final/cancel_requested/cancelled/expired model where applicable. Keep the last saved snapshot visible; retain recoverable input according to approved privacy policy. Cancel prevents late results publishing over newer work. Retrying a write/payment/export cannot duplicate a version, charge, submission or entitlement reservation. Quota/provider failures offer a truthful manual/retry path; no automatic paid upgrade or repeated background generation.
 
-**Session/access contract A1:** production authorization and ownership are server-enforced, independent of UI visibility. Browser → Worker → Auth follows the existing preparation: protected session/flow cookies, exact origin/CSRF checks for writes, verified identity and purpose-bound callbacks, no passwords/tokens in browser storage or logs. Feature access is a policy decision; no client redirect/timer grants entitlement. No real service is enabled by this reference.
+**Session/access contract A1:** production authorization and ownership are server-enforced, independent of UI visibility. Browser → Worker → Auth follows the [session and request contract](../setup/authentication.md#session-and-request-contract). Feature access is a policy decision; no client redirect/timer grants entitlement. No real service is enabled by this reference.
 
 **Frontend acceptance contract U1:** all flows require labeled fields, keyboard navigation, visible focus, text alongside color, accessible progress/errors, dialog focus/return/Escape handling, and usable mobile/zoom layouts. Preserve input on validation and focus the relevant error. Cancel/back and browser history must not silently discard unsaved edits. Responsive navigation is open: original horizontal navigation and the new five-tab proposal differ. Accessibility/mobile conformance has not been established by the references.
 
@@ -74,11 +74,11 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 ## J02 · Log in, resume and log out
 
-**Goal, entry, preconditions:** a returning user opens Login or resumes after expiry. Availability: planned; confirmed account, real Worker session boundary and an approved draft-retention policy are required. Evidence: AUTH01/AUTH05 and authentication preparation.
+**Goal, entry, preconditions:** a returning user opens Login or resumes after expiry. Availability: planned; confirmed account, real Worker session boundary and an approved draft-retention policy are required. Evidence: AUTH01/AUTH05 and [authentication setup](../setup/authentication.md).
 
 1. Enter email/password and submit; show progress, generic invalid-credentials guidance and Forgot password.
 2. Verify identity server-side, then return to a fixed safe destination or authorized retained app location. Returning Home shows the active application and latest completed CV; empty Home offers Add job and Create Base.
-3. Refresh sessions safely; if refresh fails, show Signed out, explain what is actually retained, and allow login without losing the last saved version.
+3. Refresh sessions safely and follow the [session and request contract](../setup/authentication.md#session-and-request-contract) for temporary failure versus definitive invalidation and draft retention.
 4. Explicit Logout requests server logout and clears session/flow cookies; display confirmation and Login. “Log out other devices” is a separate policy/action, not implied by local logout.
 
 **Boundaries/outcome:** login/logout do not change Base/job snapshots or sent status. Retained private drafts must not appear to a different account on the same device; no promise of offline persistence before it exists. L1 preferences do not determine identity/provider.
@@ -103,7 +103,7 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 ## J04 · Recover a forgotten password
 
-**Goal, entry, preconditions:** a signed-out user selects Forgot password. Availability: planned; purpose-bound email recovery and actual approved recipient/sender/callback setup are dependencies. Evidence: AUTH02–AUTH04 plus authentication preparation, which governs conflicts with the mock.
+**Goal, entry, preconditions:** a signed-out user selects Forgot password. Availability: planned; purpose-bound email recovery and actual approved recipient/sender/callback setup are dependencies. Evidence: AUTH02–AUTH04 plus [authentication setup](../setup/authentication.md), which governs conflicts with the mock.
 
 1. Enter email → submit → generic “If an eligible account exists, check your email.” Apply actual throttling; request acceptance does not prove delivery or account existence.
 2. Open the recovery link in the initiating browser. Worker validates purpose/verifier, exchanges the code and establishes restricted, expiring recovery context.

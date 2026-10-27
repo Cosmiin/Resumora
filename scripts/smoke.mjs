@@ -46,7 +46,7 @@ try {
   const health = await response.json();
   assert.equal(health.service, 'resumora-api');
   assert.equal(health.environment, 'development');
-  assert.deepEqual(health.capabilities, { authentication: 'not_implemented', database: 'not_connected' });
+  assert.deepEqual(health.capabilities, { authentication: 'implemented_unverified', database: 'implemented_unverified' });
   assert.match(health.requestId, /^[0-9a-f-]{36}$/);
 
   const wrongMethod = await fetch('http://127.0.0.1:5173/v1/health', { method: 'POST' });
@@ -58,10 +58,21 @@ try {
     ['/password', 'POST'], ['/logout', 'POST'],
     ['/callback/confirm', 'GET'], ['/callback/recovery', 'GET'],
   ]) {
-    const result = await fetch(`http://127.0.0.1:5173/v1/auth${path}`, { method });
-    assert.equal(result.status, 501, `${method} ${path} must not pretend to authenticate`);
-    assert.equal((await result.json()).error.code, 'AUTH_NOT_IMPLEMENTED');
-    assert.equal(result.headers.get('set-cookie'), null);
+    // Never submit credentials, Origin/CSRF or flow cookies. This remains safe
+    // with a privately configured development checkout as well as clean CI.
+    const result = await fetch(`http://127.0.0.1:5173/v1/auth${path}`, { method, redirect: 'manual' });
+    assert.match(result.headers.get('cache-control'), /no-store/);
+    if (result.status === 503) {
+      assert.equal((await result.json()).error.code, 'AUTH_UNCONFIGURED');
+      assert.equal(result.headers.get('set-cookie'), null);
+    } else if (method === 'POST') {
+      assert.equal(result.status, 403, `${path} must reject absent Origin/CSRF`);
+      assert.equal((await result.json()).error.code, 'FORBIDDEN');
+      assert.equal(result.headers.get('set-cookie'), null);
+    } else {
+      assert.equal(result.status, 303, `${path} must reject missing browser flow`);
+      assert.equal(result.headers.get('location'), 'http://127.0.0.1:5173/?auth=link-invalid');
+    }
   }
   const missing = await fetch('http://127.0.0.1:5173/v1/does-not-exist');
   assert.equal(missing.status, 404);

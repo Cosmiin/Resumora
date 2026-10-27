@@ -1,86 +1,81 @@
-# Development authentication preparation
+# Local Supabase authentication
 
-Prepared **25 October 2026** for email/password signup, login and password reset, with Google later. **This is docs/config preparation, not a working authentication implementation.** See the [local route inventory](local-development.md#current-routes-and-future-auth-boundary) for current API behavior; authentication and callback handling remain unimplemented. The discovery prototype remains a separate demo. This change adds credential-file ignores; it does not change Supabase settings, deploy code or send email.
+The application implements email/password signup, confirmation, login, session refresh, logout, password-reset request and recovery completion through the local Cloudflare Worker and Supabase Auth. Google sign-in is deferred. This is one application: React calls relative `/v1` routes through Vite; only the Worker uses `@supabase/auth-js`. There is no browser Supabase session, password database, service-role client or separate local auth service.
 
-## Readiness and next step
+Implementation tests use a synthetic provider and include a native workerd login/session/logout check. They do **not** establish hosted login, email receipt, recipient eligibility or configured redirects. The owner separately reported completing the local Site URL/redirect entries and app-schema exposure; this is distinct from observed hosted login acceptance. The frontend now uses `HttpBaseCvAdapter` per authenticated account/session, and the Worker mounts the four CV routes through the authenticated Supabase gateway. Automated synthetic tests do not establish hosted login or account-isolation acceptance.
 
-| State | Evidence / next dependency |
+## Local configuration
+
+Use the existing **Resumora development Supabase project**, not a duplicate project. Keep the frontend at `http://127.0.0.1:5173` and Worker at `http://127.0.0.1:8787`; the existing Vite proxy preserves the browser Origin. `API_ORIGIN` is the browser-facing API origin through that proxy, **not** port 8787. Do not substitute `localhost` or expose these HTTP listeners to the LAN.
+
+Check the intended secret path before creating it:
+
+```sh
+git check-ignore apps/api/.dev.vars
+```
+
+Place configuration privately in ignored `apps/api/.dev.vars`. The following are **placeholders**, not usable credentials:
+
+```dotenv
+APP_ORIGIN="http://127.0.0.1:5173"
+API_ORIGIN="http://127.0.0.1:5173"
+SUPABASE_URL="https://<existing-development-project-ref>.supabase.co"
+SUPABASE_PUBLISHABLE_KEY="<existing-development-publishable-key>"
+AUTH_COOKIE_KEY="<private-base64-encoded-32-random-bytes>"
+```
+
+`APP_ENV=development` already lives in Wrangler's checked-in configuration. The URL, publishable key and origins are public configuration; the cookie key is a Worker-only secret. Obtain existing designated configuration through the approved private setup path. Generate/store the cookie key privately without printing it in chat, terminals, logs or source files. Do not use a Supabase signing key, service-role/secret key, database password or management token. Legacy JWT API keys and service-role/secret keys fail configuration validation. Never put secrets in a `VITE_*` value. Root ignores and Vite's Worker filesystem deny rules remain in force.
+
+Run `npm ci --ignore-scripts`, then `npm run dev`. Missing/invalid settings return actionable `503 AUTH_UNCONFIGURED`; the frontend stays locked. Frontend and browser-facing API must share one exact origin. This implementation deliberately has no permissive CORS or cross-site cookie mode. HTTPS uses Secure `__Host-` cookies; only explicit development on HTTP `127.0.0.1` uses the distinct `resumora-local-` cookie names. Ports share host cookies, so do not run unrelated apps using these names on the same hostname. Replacing `AUTH_COOKIE_KEY` invalidates existing cookies; no automatic key rotation or hosted settings write occurs.
+
+## External setup dependencies
+
+Before any controlled signup/reset send, Firstmate must coordinate eligible project-team recipients and test approval. Keep email confirmation enabled. Team-only built-in SMTP restrictions and actual limits must be verified by the authorized project owner; an API success is never delivery evidence. No paid SMTP, outside testers, account resets or remote test users are implied by installing/running this code.
+
+Before any website navigation, select and positively verify the existing `cosmin@emedi.ro` Chrome profile through Firstmate-coordinated access. A reachable bridge or signed-in page alone does not verify profile identity. If the profile cannot be selected or verified, stop and report to Firstmate; no alternative, fresh, isolated or headless browser is authorized. Do not copy cookies/passwords, change browser settings or expand browser-control access beyond this computer. Hosted users, emails and settings operations require separately coordinated authorization.
+
+Separately review/approve hosted Authentication URL Configuration. The exact local browser-facing callback paths are:
+
+- `http://127.0.0.1:5173/v1/auth/callback/confirm`
+- `http://127.0.0.1:5173/v1/auth/callback/recovery`
+
+Use those exact entries without a trailing slash, wildcard or query suffix. The pinned Auth SDK appends `sb_flow_id` only with the experimental `appendPkceFlowIdToRedirects` opt-in; this client leaves it disabled and keeps one pending browser-bound verifier. The callback uses only the browser-bound verifier; requests submit the two plain URLs above. See Supabase's [PKCE flow documentation](https://supabase.com/docs/guides/auth/sessions/pkce-flow) and [redirect allowlist rules](https://supabase.com/docs/guides/auth/redirect-urls). Site URL is the actual frontend origin. Existing hosted Redirect URLs still need owner readback before any separately approved edit; preserve other approved entries. Email templates must retain the provider redirect. No arbitrary `next`/return URL is supported. Do not copy codes, email links or browser sessions into logs, chat or tests. Proxy/access-log configuration must redact callback queries before real email tests. Automated tests do not establish native browser acceptance.
+
+Hosted database migrations, schema exposure and the final two-account save/reopen test are separate dependencies owned by Database/Persistence and Firstmate. Auth tests do not prove database RLS or hosted integration.
+
+## Session and request contract
+
+| Route | Behavior |
 | --- | --- |
-| **READY** | Earlier read-only dashboard inspection (25 October, 07:37–07:40 UTC): project **Resumora**, ref `aquvhqbkvrtzhbmezkci`; General: **West EU (Ireland)**; linked organization Billing: **Free Plan**; Authentication → Sign In / Providers: **Email enabled**, **Confirm email enabled**, signup allowed. Reuse this project. |
-| **READY** | Root `.gitignore` protects `.env*` and `.dev.vars*` at every depth, including suffixed/local variants. No example exceptions or credential files added. These are proposed branch changes until merged. |
-| **PREPARED** | Worker session boundary, proposed routes, configuration boundaries and future checks below. Owner choice: **only owner/project-team email recipients initially**; no external testers or paid SMTP configuration now. |
-| **NEEDS OWNER** | Before email tests, verify each intended recipient is an authorized organization-team address. Before external recipients, approve an SMTP approach/sender; none selected. Before hosted URL changes, the implementation must establish real frontend/API origins and callback routes. |
-| **NOT IMPLEMENTED** | Signup/login/reset/session API and UI, delivery tests, Google and application integration. See the [SQL access contract](../database/api.md#granted-reads-and-access) for implemented tenant policies. “Empty” and intended development use are owner claims. Machine region code, hosted RLS, storage protection, login, SMTP and delivery remain unverified. Dashboard `PRODUCTION` is a branch/context label, not proof of actual production data. |
+| `GET /v1/auth/session` | Safe `{user:{id,email}\|null, csrfToken, recovery}` status; initializes anonymous browser CSRF context. No tokens. |
+| `POST /v1/auth/signup` | SDK `signUp`, PKCE confirmation transaction; generic check-email response even for existing-account provider rejection. Signup never directly establishes an application session. |
+| `POST /v1/auth/login` | SDK `signInWithPassword`, then server `getUser` verification and protected cookie. Unknown user/wrong password share one safe error. |
+| `POST /v1/auth/recovery` | SDK `resetPasswordForEmail`, recovery-purpose PKCE transaction; generic known/unknown account response. |
+| `GET /v1/auth/callback/confirm` | Exchange code against the initiating browser's PKCE verifier; verify identity, then clean fixed redirect to `/`. |
+| `GET /v1/auth/callback/recovery` | Bound recovery-purpose exchange plus SDK `PASSWORD_RECOVERY` signal; verify identity, then fixed `/reset-password` redirect. |
+| `POST /v1/auth/password` | Require unexpired verified recovery session and CSRF. Refresh validates provider revocation, update password, revoke local recovery session, clear cookies and require login. |
+| `POST /v1/auth/logout` | Provider local signout and all app session/flow/browser-cookie removal. Provider failure is explicit even though local cookies are cleared. |
 
-**Exact next configuration step, after separate implementation approval:** once the real app and Worker callback routes exist locally, record their exact origins, then review **Authentication → URL Configuration** on this existing project: Site URL = actual frontend origin; redirect allowlist = exact Worker confirmation/recovery callback URLs. Do not put the prototype preview address or proposed examples into hosted settings now. Verify eligible team recipients and current email limits before a controlled send. No duplicate project, upgrade or password/key collection is needed for preparation.
+Every write, including login/reset/logout, requires exact configured Origin, JSON, a bounded body and `X-CSRF-Token` matching protected session/anonymous context. Callback GETs instead validate the browser-bound flow and code. Responses use `private, no-store`, `no-referrer` and `nosniff`. Provider diagnostics and credentials never enter responses/logs. Provider `429` yields safe retry guidance; email flows also set `Retry-After: 60`. This local implementation does not add a distributed abuse-limiting service.
 
-## Proposed Worker session boundary
+AES-GCM cookies bind ciphertext to cookie purpose/name. Token pairs are encrypted and HttpOnly, host-only, `Path=/`, `SameSite=Lax`, chunked into at most four 3000-character values; stale chunks are explicitly removed. Oversized/unusable/tampered/expired sessions fail closed. Normal cookies have a seven-day application cap; recovery has ten minutes, never extended by refresh. Provider policy may expire sessions earlier. Start one pending email flow at a time; overlapping attempts with its cookie return `FLOW_PENDING`. Use the cancel/signout action to discard the pending flow and request another. Links require the initiating browser/device. Invalid, expired, consumed or wrong-purpose callback context redirects to a clean restart message without echoing parameters.
 
-Follow the existing [API contract](../../research/architecture/contracts.md) and [security proposal](../../research/architecture/security-ops.md): browser → Worker → Supabase Auth. Only the Worker uses the Auth SDK; browser JavaScript receives safe account/session status, never access/refresh tokens or a Supabase localStorage session. Use a request-scoped client with `flowType: 'pkce'` and a server-controlled storage adapter; no shared mutable user client across requests. Supabase's usual browser/SSR examples do not automatically implement this HttpOnly boundary. [Server-side Auth guidance](https://supabase.com/docs/guides/auth/server-side/advanced-guide)
+`apps/api/src/auth/session.ts` exports:
 
-Proposed session storage: authenticated-encrypted, HttpOnly cookies containing the token pair, with a separate protected, expiring flow cookie for PKCE verifier and purpose. A future Worker-only `AUTH_COOKIE_KEY` seals them; it is not a Supabase signing secret. Implementation must handle cookie size/chunking, key rotation, refresh concurrency and reject tampering/expiry before this design is usable. No store or key is created here.
+- `authenticateRequest(request, env, transport?)` → `{user, accessToken, headers}` or `{response}`. `user.id` comes from current Supabase Auth `getUser(accessToken)`, never browser input. Recovery-only sessions cannot access CV data. The database gateway forwards that same access token for authenticated RLS/RPC access; ownership is keyed by user ID, never email.
+- `checkWrite(request, env)` checks Origin/content-type/CSRF. CV composition calls it for POST requests before gateway dispatch.
 
-Use host-only cookies, `Path=/`, `HttpOnly`, `Secure`, `SameSite=Lax`; production may use the `__Host-` prefix with no `Domain`. Prefer HTTPS and same-site frontend/API deployment. Local HTTP needs an explicit development-only cookie policy/name: do not assume Secure/prefix behavior works identically in every localhost browser. Local ports share cookies by host; use consistent hostnames and avoid collisions. Unrelated `pages.dev` and `workers.dev` sites may not support this Lax cookie flow; settle routing/custom domains or a local proxy before configuring origins. [Cookie rules](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie)
+Forward **all** authentication response headers, particularly each rotated/cleared `Set-Cookie`, onto both successful and failed CV responses. Keep `accessToken` inside the Worker. Expiring normal access tokens refresh on demand; a short-lived single-flight cache shares the rotated pair across concurrent requests in the supported local Worker isolate. Definitive provider token rejection, including the SDK’s `AuthSessionMissingError` for `session_not_found`, clears session cookies and fails closed. Temporary verification failures return `503 AUTH_UNAVAILABLE`, preserve usable cookies (including any rotated pair), and deny protected requests until verification succeeds. Multi-isolate/hosted deployment requires separately reviewed refresh/recovery coordination; these in-memory locks are not a distributed guarantee. Supabase-issued JWTs may remain valid until expiry after refresh revocation; logout cannot promise instant invalidation of a separately copied JWT. See [Supabase session behavior](https://supabase.com/docs/guides/auth/sessions).
 
-For every mutating endpoint, including login/reset/logout: require exact approved `Origin`, a CSRF token bound to the protected session/flow and a bounded request body; reject absent/unapproved origins for browser writes. CORS credentials use exact allowlisted origins, never `*`. SameSite/CORS alone are insufficient. Callback GETs instead validate the bound PKCE transaction and fixed destination; do not require a cross-site email navigation to supply the app's Origin. No arbitrary `next`/redirect input. Auth responses use `Cache-Control: private, no-store`; callback pages use `Referrer-Policy: no-referrer` and no analytics/third-party assets.
+`AuthShell` wraps the existing editor; its render child receives `(account, transport)`. That stable transport adds credentials/CSRF/no-store and unmounts private UI on protected-resource 401. The composed `ConnectedApp` constructs a persistence adapter per authenticated account/session. Retired transport instances reject new work after session replacement, and late 401 responses cannot clear a replacement account. The shell orders cookie-changing requests and their state updates before later authentication actions; queued CV work rechecks its account at dispatch. Logout unmounts the editor immediately and fences older status responses. Temporary verification failures preserve the mounted editor and unsaved draft, show a retry action, and fence CV requests until verification succeeds. Confirmed anonymous or replacement-account status retires the prior editor. Failed logout remains explicit instead of silently reopening private UI on focus; logout and password-completion failures reload the cookie-backed CSRF context before another action.
 
-The authenticated behavior below remains **proposed and unimplemented**; the [local route inventory](local-development.md#current-routes-and-future-auth-boundary) owns current responses. `APP_ORIGIN` and `API_ORIGIN` are unset placeholders for actual origins. API paths are on the Worker; page paths are on the frontend.
+## Focused checks
 
-| Proposed route | Future behavior |
-| --- | --- |
-| `POST /v1/auth/signup` | Worker calls `signUp({ email, password, options: { emailRedirectTo: API_ORIGIN + '/v1/auth/callback/confirm' } })`. Keep confirmation enabled; do not treat account creation as a confirmed session. Show a generic check-email response. [Signup API](https://supabase.com/docs/reference/javascript/auth-signup) |
-| `GET /v1/auth/callback/confirm` | Exchange the confirmation code using its bound verifier; only verified success establishes the session, then redirect to a fixed frontend page without query credentials. |
-| `POST /v1/auth/login` | Worker calls `signInWithPassword({ email, password })`, validates the resulting identity and sets protected cookies. Generic invalid-credentials message for unknown user/wrong password; no provider/account-existence hints. [Password login](https://supabase.com/docs/reference/javascript/auth-signinwithpassword) |
-| `POST /v1/auth/recovery` | Worker starts a recovery-only PKCE transaction and calls `resetPasswordForEmail(email, { redirectTo: API_ORIGIN + '/v1/auth/callback/recovery' })`. Show “If an eligible account exists, check your email.” Success is not delivery evidence. [Recovery request API](https://supabase.com/docs/reference/javascript/auth-resetpasswordforemail) |
-| `GET /v1/auth/callback/recovery` | Validate the original recovery transaction and exchange its code; only then permit the reset form at `APP_ORIGIN + '/reset-password'` using protected recovery context. A path, `type=recovery` query, ordinary login cookie or client event alone is not proof of recovery. |
-| `POST /v1/auth/password` | Require CSRF, verified user and the unexpired recovery context bound to that user/session; call `updateUser({ password })`. Consume/clear recovery context on success, end that recovery session and require login with the new password. Reject direct form visits without verified recovery. [Password update API](https://supabase.com/docs/reference/javascript/auth-updateuser) |
-| `POST /v1/auth/logout` | Explicit `signOut({ scope: 'local' })`, clear all session/flow cookies; keep global logout an explicit separate action. Refresh revocation does not instantly invalidate an already-issued JWT. [Logout API](https://supabase.com/docs/reference/javascript/auth-signout) |
+```sh
+npm test --workspace @resumora/api
+npm run test --workspace @resumora/web -- src/auth/AuthShell.test.tsx src/auth/ConnectedApp.test.tsx
+npm run typecheck
+npm run smoke
+```
 
-## Confirmation, recovery and session rules
-
-Use `exchangeCodeForSession(code)` with the verifier saved when the transaction started. Bind purpose (`confirmation` or `recovery`) and browser to that transaction; never let a confirmation/Google code grant recovery rights. Preserve the SDK recovery signal (`PASSWORD_RECOVERY`) where provided, alongside server-controlled purpose, rather than deriving purpose from untrusted URL text. PKCE requires the initiating browser/device; if context is missing, offer a fresh request in that browser. Start one pending flow at a time; overlapping requests must not silently replace another verifier. Auth codes are documented as **single-use, valid for five minutes**; this is distinct from the email verification link's configured lifetime. [PKCE flow](https://supabase.com/docs/guides/auth/sessions/pkce-flow), [code exchange](https://supabase.com/docs/reference/javascript/auth-exchangecodeforsession)
-
-Supabase verifies the email link before returning the code. Treat consumed/expired/invalid links as a safe restart, never an authentication bypass. The hosted project's email-token expiry and templates have not been inspected: read their actual settings before testing, rather than promising an invented recovery lifetime. Templates must preserve the intended confirmation/recovery redirect; scanner prefetch can consume one-time links. [Email templates and limitations](https://supabase.com/docs/guides/auth/auth-email-templates)
-
-After exchange, remove codes from the address bar with a redirect to a clean fixed URL. Redact passwords, cookies, Authorization headers, email links, codes, token hashes, PKCE verifiers and token pairs at logging/telemetry boundaries, including proxy access logs. Never log full callback URLs or raw provider responses. Keep recovery sessions restricted to changing the password/logout; a successful request to send email grants no recovery access. The one-time Auth exchange is provider-enforced; implementing consumption of application recovery context is still required and must be tested.
-
-Worker requests validate identity using supported Auth verification (`getUser()` for current server-side user/session checks); never authorize from an unverified `getSession()` payload. Refresh on demand, persist both rotated tokens before responding and serialize concurrent refresh attempts. Fail closed and clear unusable cookies on invalid refresh. Supabase documents refresh-token rotation/reuse exceptions; do not implement blind retry loops. App cookie expiry is not provider revocation, and Free does not include every paid session-lifetime control. [Session lifecycle](https://supabase.com/docs/guides/auth/sessions)
-
-## Email scope and configuration boundaries
-
-The owner chose team-only testing. Built-in hosted SMTP currently sends only to pre-authorized project-team addresses, at **two messages/hour**, best effort with no delivery SLA. Verify actual membership and receipt separately; do not add outside testers to the project just to enable email. External users need an approved SMTP sender/provider setup later. No paid provider is selected. [SMTP restrictions](https://supabase.com/docs/guides/auth/auth-smtp)
-
-Keep signup/reset responses generic for known and unknown accounts, without distinct account-existence status/body/timing paths. A successful reset request may send nothing for an unknown address. [Password recovery behavior](https://supabase.com/docs/guides/auth/passwords)
-
-Handle provider `429` responses with bounded backoff/cooldown and safe retry guidance; add Worker IP/account throttles without exposing account existence. Check current project limits before functional testing; do not increase limits to get tests through. [Auth rate limits](https://supabase.com/docs/guides/auth/rate-limits)
-
-| Proposed configuration | Classification / future location |
-| --- | --- |
-| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | Public backend configuration; future Worker variables. Public does not mean authorized: user token/RLS still enforce access. |
-| `APP_ORIGIN`, `API_ORIGIN`, `ALLOWED_ORIGINS` | Public exact origins/routes, chosen when implementation exists. Callback entries follow [redirect rules](https://supabase.com/docs/guides/auth/redirect-urls). |
-| `AUTH_COOKIE_KEY` | Future Worker secret for cookie protection, separate per environment; local ignored API `.dev.vars` only if needed. Generate/store privately during implementation, never now. |
-| User password, access/refresh tokens, PKCE verifier | Sensitive transient input/session data; no Git, frontend build values, chat or logs. |
-| SMTP credentials / future Google client secret | Later provider settings/password manager only; neither is needed now. |
-
-No service-role/secret key, database password, management access token or `JWT_SECRET` is required by default for these user-auth flows. No real keys belong in this document or example files. Root ignores cover `.env*`/`.dev.vars*` everywhere; `git check-ignore` checks filenames without reading contents. Ignore rules do not remove already tracked secrets.
-
-## Google later
-
-Keep password accounts. Key application ownership by the stable Supabase user ID (`sub`), never email/provider name. Supabase documents automatic identity linking for matching emails with verification safeguards, and optional manual `linkIdentity()` for authenticated users, including different-email cases; manual linking is beta and was observed disabled. Do not create custom merges or promise every Google account maps to an existing password account. Later decide explicit linking UX, duplicate/different-email handling and unlink safeguards, then test identity continuity. [Identity linking](https://supabase.com/docs/guides/auth/auth-identity-linking)
-
-Future Google authorization should return through the same Worker PKCE/session boundary with purpose/state validation. Google's provider redirect to Supabase is separate from Supabase's allowlisted callback to this application. No Google IDs/secrets or provider setup now. UI locale and CV language remain separate preferences, independent of login identity/provider.
-
-## Future checks after implementation
-
-These checks are planned, **not run against nonexistent auth code**; use synthetic accounts and authorized team recipients only.
-
-| Check | Expected result |
-| --- | --- |
-| Signup/confirmation | Unconfirmed user cannot access app; valid confirmation works; expired/replayed link fails safely; verify actual email receipt separately. |
-| Login | Confirmed valid credentials work; wrong password/unknown account produce equivalent safe errors. |
-| Recovery | Known/unknown addresses get generic responses; valid bound callback allows update; missing verifier, ordinary login/confirmation code, expired/replayed link and direct reset-page visit cannot. Old password fails after update; new login works. |
-| Cookie/CSRF | JavaScript cannot read tokens; flags/host/path and local HTTPS behavior verified; forged origin/missing CSRF/tampered cookie rejected; callbacks/redacted logs contain no leaked credentials. |
-| Refresh/logout | Rotated cookies persist, parallel refresh is safe, revoked/expired refresh fails closed, logout clears cookies; test remaining JWT lifetime rather than promising instant revocation. |
-| Google later | Matching verified identity follows documented linking; different-email/manual cases follow approved UX; existing user ID/owned records and password access remain correct. |
-
-Official references above checked 25 October 2026. No app tests, installs, migrations, schema changes, browser reconnects or hosted configuration changes were needed for this preparation.
+These cover the SDK against synthetic provider responses, native Worker cookie/session execution, form transitions, generic enumeration responses, CSRF/origin/body boundaries, refresh rotation/failure, cookie tampering/expiry, recovery isolation/consumption and fixed redirects. No test sends real email, creates hosted users or proves hosted login. Mandatory no-mistakes and CI gates remain part of delivery.
