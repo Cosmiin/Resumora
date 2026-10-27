@@ -31,22 +31,26 @@ LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
 $$;
 CREATE FUNCTION app.load_base_draft() RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
-DECLARE actor uuid := app.require_user(); result jsonb;
+DECLARE actor uuid := app.require_user(); workspace uuid; result jsonb;
 BEGIN
+ SELECT t.id INTO workspace FROM app.tenants t
+ WHERE t.owner_user_id=actor AND t.kind='personal' AND app.is_active_member(t.id);
  SELECT app.editor_snapshot_json(s) INTO result FROM app.editor_draft_snapshots s
- WHERE app.is_active_member(s.tenant_id) ORDER BY s.revision DESC LIMIT 1;
+ WHERE s.tenant_id=workspace ORDER BY s.revision DESC LIMIT 1;
  RETURN result;
 END $$;
 -- Cursor is an exclusive revision, not an account identifier. Empty means newest.
 CREATE FUNCTION app.base_draft_history(p_before_revision bigint DEFAULT NULL,p_limit integer DEFAULT 20) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
-DECLARE actor uuid := app.require_user(); result jsonb;
+DECLARE actor uuid := app.require_user(); workspace uuid; result jsonb;
 BEGIN
  IF p_limit IS NULL OR p_limit<1 OR p_limit>20 OR p_before_revision<=0 THEN
    RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';
  END IF;
+ SELECT t.id INTO workspace FROM app.tenants t
+ WHERE t.owner_user_id=actor AND t.kind='personal' AND app.is_active_member(t.id);
  SELECT coalesce(pg_catalog.jsonb_agg(app.editor_snapshot_json(s) ORDER BY s.revision DESC),'[]'::jsonb) INTO result
- FROM (SELECT * FROM app.editor_draft_snapshots s WHERE app.is_active_member(s.tenant_id)
+ FROM (SELECT * FROM app.editor_draft_snapshots s WHERE s.tenant_id=workspace
    AND (p_before_revision IS NULL OR s.revision<p_before_revision) ORDER BY s.revision DESC LIMIT p_limit) s;
  RETURN result;
 END $$;

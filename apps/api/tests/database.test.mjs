@@ -13,6 +13,7 @@ test('database gateway fails closed on missing identity/config and privileged ke
   for (const config of [{}, { ...env, SUPABASE_URL: 'http://synthetic.supabase.co' },
     { ...env, SUPABASE_URL: 'https://synthetic.supabase.co/redirect' },
     { ...env, SUPABASE_PUBLISHABLE_KEY: 'sb_secret_private' },
+    { ...env, SUPABASE_PUBLISHABLE_KEY: `x.${Buffer.from(JSON.stringify({ role: 'anon' })).toString('base64url')}.x` },
     { ...env, SUPABASE_PUBLISHABLE_KEY: `x.${Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url')}.x` }]) {
     assert.throws(() => createDatabaseGateway(config, identity), rejected(503, 'DATABASE_UNAVAILABLE'));
   }

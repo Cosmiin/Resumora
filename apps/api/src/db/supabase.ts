@@ -54,11 +54,7 @@ function configuration(env: DatabaseConfig): { origin: string; apiKey: string } 
     if (url.protocol !== 'https:' || !/^[a-z0-9]+\.supabase\.co$/.test(url.hostname)
       || url.username || url.password || url.port || url.search || url.hash || !['', '/'].includes(url.pathname)) throw new Error();
     const apiKey = env.SUPABASE_PUBLISHABLE_KEY ?? '';
-    if (!/^sb_publishable_[A-Za-z0-9_-]+$/.test(apiKey)) {
-      // Legacy anon JWTs remain supported, but privileged JWT keys never are.
-      const claims = JSON.parse(atob(apiKey.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      if (claims.role !== 'anon' || apiKey.split('.').length !== 3) throw new Error();
-    }
+    if (!/^sb_publishable_[A-Za-z0-9_-]+$/.test(apiKey)) throw new Error();
     return { origin: url.origin, apiKey };
   } catch { throw new DatabaseError(503, 'DATABASE_UNAVAILABLE'); }
 }

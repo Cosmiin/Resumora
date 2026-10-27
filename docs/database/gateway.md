@@ -14,7 +14,7 @@ argument. Supabase RLS and command authorization remain authoritative. A resourc
 UUID is never an authorization grant. Do not pass this context from browser JSON.
 
 Worker-only bindings are `SUPABASE_URL` (the project's HTTPS origin) and
-`SUPABASE_PUBLISHABLE_KEY` (publishable or legacy anon key). Configure them through
+`SUPABASE_PUBLISHABLE_KEY` (publishable key). Configure them through
 the ignored `apps/api/.dev.vars` for local Wrangler. Never use a database password,
 service-role JWT, `sb_secret_` key, browser Vite environment binding or privileged
 SQL connection in the application. The gateway rejects privileged configuration,

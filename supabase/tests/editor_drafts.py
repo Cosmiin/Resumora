@@ -72,9 +72,16 @@ def suite(db):
             self.assertIn('permission denied', db.sql('SELECT app.load_base_draft()', role='anon', expect_error=True))
             self.assertIn('AUTHENTICATION_REQUIRED', db.sql('SELECT app.load_base_draft()', role='authenticated', expect_error=True))
             self.assertEqual(self.call('load_base_draft', user=self.b), '')
+            self.assertEqual(json.loads(self.call('base_draft_history', user=self.b)), [])
+            self.assertEqual(db.sql(f"SELECT count(*) FROM app.tenants WHERE owner_user_id='{self.b}'"), '0')
             self.call('provision_workspace', f"'{uid()}'", user=self.b)
             self.assertIn('SNAPSHOT_NOT_FOUND', self.call('restore_base_draft', f"'{uid()}',0,'{first['id']}'", user=self.b, error=True))
             self.assertEqual(db.sql(f"SELECT count(*) FROM app.editor_draft_snapshots WHERE id='{first['id']}'", user=self.b, role='authenticated'), '0')
+            other = json.loads(self.call('save_base_draft', f"'{uid()}',0,{literal(self.payload)},'autosave'", user=self.b))
+            self.assertEqual(json.loads(self.call('load_base_draft', user=self.b)), other)
+            self.assertEqual(json.loads(self.call('load_base_draft')), first)
+            self.assertEqual(json.loads(self.call('base_draft_history')), [first])
+            self.assertEqual(json.loads(self.call('base_draft_history', user=self.b)), [other])
             for command in [f"UPDATE app.editor_draft_snapshots SET revision=2 WHERE id='{first['id']}'",
                             f"DELETE FROM app.editor_draft_snapshots WHERE id='{first['id']}'",
                             "INSERT INTO app.editor_draft_snapshots SELECT * FROM app.editor_draft_snapshots",
@@ -83,6 +90,7 @@ def suite(db):
             self.assertIn('IMMUTABLE_RECORD', db.sql(f"UPDATE app.editor_draft_snapshots SET revision=2 WHERE id='{first['id']}'", expect_error=True))
             db.sql(f"UPDATE app.tenant_memberships SET state='revoked' WHERE user_id='{self.a}'")
             self.assertEqual(self.call('load_base_draft'), '')
+            self.assertEqual(json.loads(self.call('base_draft_history')), [])
             self.assertIn('ACTIVE_WORKSPACE_REQUIRED', self.call('restore_base_draft', f"'{uid()}',1,'{first['id']}'", error=True))
             self.assertIn('RESOURCE_FORBIDDEN', self.save(error=True))
 
