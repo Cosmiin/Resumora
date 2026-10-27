@@ -50,7 +50,11 @@ class Browser {
 test('configuration fails closed; methods and privileged configuration rejected before provider egress', async () => {
   const p = provider(), b = new Browser(p);
   assert.equal((await authRoute(b.request('/v1/auth/session'), {}, p.transport)).status, 503);
-  assert.equal((await authRoute(b.request('/v1/auth/session'), { ...env, SUPABASE_PUBLISHABLE_KEY: 'sb_secret_forbidden' }, p.transport)).status, 503);
+  const legacyAnon = 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify({ role: 'anon' })).toString('base64url') + '.synthetic';
+  for (const key of ['sb_secret_forbidden', legacyAnon, '', 'sb_publishable_', 'sb_publishable_invalid key']) {
+    assert.equal((await authRoute(b.request('/v1/auth/session'), { ...env, SUPABASE_PUBLISHABLE_KEY: key }, p.transport)).status, 503);
+  }
+  assert.equal((await authRoute(b.request('/v1/auth/session'), env, p.transport)).status, 200);
   assert.equal((await authRoute(b.request('/v1/auth/session'), { ...env, APP_ORIGIN: 'http://evil.invalid' }, p.transport)).status, 503);
   assert.equal((await b.call('/login')).status, 405);
   assert.equal(p.calls.length, 0);

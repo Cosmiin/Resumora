@@ -20,11 +20,11 @@ Place configuration privately in ignored `apps/api/.dev.vars`. The following are
 APP_ORIGIN="http://127.0.0.1:5173"
 API_ORIGIN="http://127.0.0.1:5173"
 SUPABASE_URL="https://<existing-development-project-ref>.supabase.co"
-SUPABASE_PUBLISHABLE_KEY="<existing-development-publishable-or-legacy-anon-key>"
+SUPABASE_PUBLISHABLE_KEY="<existing-development-publishable-key>"
 AUTH_COOKIE_KEY="<private-base64-encoded-32-random-bytes>"
 ```
 
-`APP_ENV=development` already lives in Wrangler's checked-in configuration. The URL, publishable/anon key and origins are public configuration; the cookie key is a Worker-only secret. Obtain existing designated configuration through the approved private setup path. Generate/store the cookie key privately without printing it in chat, terminals, logs or source files. Do not use a Supabase signing key, service-role/secret key, database password or management token. Service-role/secret keys fail configuration validation. Never put secrets in a `VITE_*` value. Root ignores and Vite's Worker filesystem deny rules remain in force.
+`APP_ENV=development` already lives in Wrangler's checked-in configuration. The URL, publishable key and origins are public configuration; the cookie key is a Worker-only secret. Obtain existing designated configuration through the approved private setup path. Generate/store the cookie key privately without printing it in chat, terminals, logs or source files. Do not use a Supabase signing key, service-role/secret key, database password or management token. Legacy JWT API keys and service-role/secret keys fail configuration validation. Never put secrets in a `VITE_*` value. Root ignores and Vite's Worker filesystem deny rules remain in force.
 
 Run `npm ci --ignore-scripts`, then `npm run dev`. Missing/invalid settings return actionable `503 AUTH_UNCONFIGURED`; the frontend stays locked. Frontend and browser-facing API must share one exact origin. This implementation deliberately has no permissive CORS or cross-site cookie mode. HTTPS uses Secure `__Host-` cookies; only explicit development on HTTP `127.0.0.1` uses the distinct `resumora-local-` cookie names. Ports share host cookies, so do not run unrelated apps using these names on the same hostname. Replacing `AUTH_COOKIE_KEY` invalidates existing cookies; no automatic key rotation or hosted settings write occurs.
 

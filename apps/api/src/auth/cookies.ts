@@ -7,9 +7,7 @@ export interface AuthConfig {
   AUTH_COOKIE_KEY?: string;
 }
 function publicKey(value?: string) {
-  if (!value || value.length > 4096) return false;
-  if (/^sb_publishable_[A-Za-z0-9_-]+$/.test(value)) return true;
-  try { return JSON.parse(atob(value.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).role === 'anon'; } catch { return false; }
+  return !!value && value.length <= 4096 && /^sb_publishable_[A-Za-z0-9_-]+$/.test(value);
 }
 export function config(env: AuthConfig) {
   try {
