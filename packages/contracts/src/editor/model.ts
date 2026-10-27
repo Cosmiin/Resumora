@@ -133,6 +133,24 @@ export const coreSections = [
 ] as const;
 export const localId = () => `dev_${crypto.randomUUID()}`;
 export const clone = <T>(value: T): T => structuredClone(value);
+export function equalValues(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right))
+    return (
+      Array.isArray(left) && Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, i) => equalValues(value, right[i]))
+    );
+  if (!left || !right || typeof left !== "object" || typeof right !== "object")
+    return false;
+  const a = left as Record<string, unknown>,
+    b = right as Record<string, unknown>;
+  const keys = Object.keys(a).filter((key) => a[key] !== undefined);
+  return (
+    keys.length === Object.keys(b).filter((key) => b[key] !== undefined).length &&
+    keys.every((key) => Object.hasOwn(b, key) && equalValues(a[key], b[key]))
+  );
+}
 export const manualSourceId = "local_manual";
 export const fact = <T extends FactValue>(value: T): Fact<T> => {
   const id = localId();
@@ -155,7 +173,7 @@ export function editFact<T extends FactValue>(
   current: Fact<T>,
   value: T,
 ): Fact<T> {
-  if (JSON.stringify(current.value) === JSON.stringify(value)) return current;
+  if (equalValues(current.value, value)) return current;
   const lineage = [...(current.sourceLineage ?? [])];
   if (
     !lineage.some(

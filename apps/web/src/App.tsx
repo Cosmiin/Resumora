@@ -15,7 +15,7 @@ import {
   type BaseCvAdapter,
   type Snapshot,
 } from "./base/adapter";
-import { clone, type BaseDraft, type Locale } from "./base/model";
+import { clone, equalValues, type BaseDraft, type Locale } from "./base/model";
 import { prepareDraft, focusField } from "./base/editing";
 import { validateDraft, type Issue } from "./base/validation";
 import { DocumentPreview } from "./components/DocumentPreview";
@@ -38,6 +38,10 @@ function currentRoute(): Route {
 }
 const adapterKeys = new WeakMap<BaseCvAdapter, number>();
 let nextAdapterKey = 0;
+type PendingWrite = { generation: number } & (
+  | { kind: "save"; input: Parameters<BaseCvAdapter["save"]>[0] }
+  | { kind: "restore"; input: Parameters<BaseCvAdapter["restore"]>[0] }
+);
 export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
   if (!adapterKeys.has(adapter)) adapterKeys.set(adapter, ++nextAdapterKey);
   return <CvEditor key={adapterKeys.get(adapter)} adapter={adapter} />;
@@ -71,7 +75,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     headRef = useRef(head),
     saveRef = useRef<() => void>(() => {}),
     main = useRef<HTMLElement>(null);
-  const savedRequest = useRef<{ body: string; id: string } | null>(null);
+  const pendingWrite = useRef<PendingWrite | null>(null);
   latest.current = draft;
   headRef.current = head;
   const [asOf] = useState(() => {
@@ -82,7 +86,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     };
   });
   const dirty =
-    !!draft && (!head || JSON.stringify(draft) !== JSON.stringify(head.draft));
+    !!draft && (!head || !equalValues(draft, head.draft));
   const warnOnUnload = durable ? dirty : !!(draft || head);
   const editing = !!draft && ["base", "enrich", "review"].includes(route);
   const go = useCallback((next: Route) => {
@@ -150,14 +154,14 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
   }, [route, head?.id, adapter]);
   function change(next: BaseDraft) {
     const current = latest.current;
-    if (JSON.stringify(next) === JSON.stringify(current)) return;
+    if (equalValues(next, current)) return;
     generation.current++;
     if (current) setPast((p) => [...p.slice(-49), clone(current)]);
     latest.current = next;
     setDraft(next);
     setIssues([]);
     setNotice("");
-    if (error !== "conflict") setError(null);
+    if (error !== "conflict" && !pendingWrite.current) setError(null);
   }
   function openDraft(next: BaseDraft) {
     generation.current++;
@@ -166,7 +170,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     setDraft(ready);
     setPast([]);
     setIssues([]);
-    setError(null);
+    if (!pendingWrite.current) setError(null);
     setNotice("");
     go("base");
   }
@@ -174,14 +178,9 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     if (draft && dirty) setDialog({ kind: "replace", next });
     else openDraft(next);
   }
-  function requestId(body: string) {
-    if (savedRequest.current?.body !== body)
-      savedRequest.current = { body, id: crypto.randomUUID() };
-    return savedRequest.current.id;
-  }
   async function save(mode: "autosave" | "checkpoint" = "checkpoint") {
     const current = latest.current;
-    if (!current || lock.current) return;
+    if (!current || lock.current || pendingWrite.current) return;
     if (mode === "checkpoint") {
       const found = validateDraft(current);
       setIssues(found);
@@ -197,33 +196,61 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
         return;
       }
     }
-    lock.current = true;
-    setBusy(true);
-    const submitted = generation.current;
-    try {
-      const input = {
+    pendingWrite.current = {
+      kind: "save",
+      generation: generation.current,
+      input: {
         draft: clone(current),
         expectedRevision: headRef.current?.revision ?? 0,
         mode,
-      };
-      const saved = await adapter.save({
-        ...input,
-        requestId: requestId(JSON.stringify(input)),
-      });
+        requestId: crypto.randomUUID(),
+      },
+    };
+    await submitPendingWrite();
+  }
+  async function submitPendingWrite() {
+    const operation = pendingWrite.current;
+    if (!operation || lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    try {
+      const saved = operation.kind === "save"
+        ? await adapter.save(clone(operation.input))
+        : await adapter.restore(clone(operation.input));
+      pendingWrite.current = null;
       headRef.current = saved;
       setHead(saved);
       setError(null);
-      if (submitted === generation.current)
+      if (operation.kind === "restore") {
+        if (operation.generation === generation.current) {
+          openDraft(saved.draft);
+          setNotice(
+            t(
+              `Restaurat ca v${saved.revision}; istoricul este păstrat.`,
+              `Restored as v${saved.revision}; history retained.`,
+            ),
+          );
+        } else
+          setNotice(
+            t(
+              "Versiune restaurată; editările mai noi rămân în ciornă.",
+              "Version restored; newer edits remain in your draft.",
+            ),
+          );
+        setInspected(null);
+      } else if (operation.generation === generation.current)
         setNotice(
-          mode === "autosave"
+          operation.input.mode === "autosave"
             ? ""
             : durable ? t("Salvat în cont.", "Saved to your account.") : t("Salvat în sesiune.", "Saved in session."),
         );
     } catch (e) {
+      if (e instanceof AdapterError) pendingWrite.current = null;
       setError(e instanceof AdapterError ? e.code : "save");
     } finally {
       lock.current = false;
       setBusy(false);
+      if (operation.kind === "restore") setDialog(null);
     }
   }
   saveRef.current = () => {
@@ -240,14 +267,14 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     return () => window.removeEventListener("keydown", key);
   }, []);
   useEffect(() => {
-    if (!dirty || !draft || busy || loading || error) return;
+    if (!dirty || !draft || busy || loading || error || pendingWrite.current) return;
     const timer = setTimeout(() => {
       void save("autosave");
     }, 650);
     return () => clearTimeout(timer);
   }, [draft, dirty, busy, loading, error]);
   async function reopen() {
-    if (lock.current) return;
+    if (lock.current || pendingWrite.current) return;
     lock.current = true;
     setBusy(true);
     const started = generation.current;
@@ -283,44 +310,17 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
     }
   }
   async function restore(snapshot: Snapshot) {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    const started = generation.current;
-    try {
-      const input = {
+    if (lock.current || pendingWrite.current) return;
+    pendingWrite.current = {
+      kind: "restore",
+      generation: generation.current,
+      input: {
         snapshotId: snapshot.id,
         expectedRevision: headRef.current?.revision ?? 0,
-      };
-      const s = await adapter.restore({
-        ...input,
-        requestId: requestId(JSON.stringify(input)),
-      });
-      headRef.current = s;
-      setHead(s);
-      if (started === generation.current) {
-        openDraft(s.draft);
-        setNotice(
-          t(
-            `Restaurat ca v${s.revision}; istoricul este păstrat.`,
-            `Restored as v${s.revision}; history retained.`,
-          ),
-        );
-      } else
-        setNotice(
-          t(
-            "Versiune restaurată; editările mai noi rămân în ciornă.",
-            "Version restored; newer edits remain in your draft.",
-          ),
-        );
-      setInspected(null);
-    } catch (e) {
-      setError(e instanceof AdapterError ? e.code : "save");
-    } finally {
-      lock.current = false;
-      setBusy(false);
-      setDialog(null);
-    }
+        requestId: crypto.randomUUID(),
+      },
+    };
+    await submitPendingWrite();
   }
   const nav = [
     { route: "home", label: t("Acasă", "Home"), Icon: Home },
@@ -446,21 +446,26 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                     "Acțiunea a eșuat; ciorna este păstrată.",
                     "The action failed; your draft is retained.",
                   )}
-              <Button
-                onClick={() =>
-                  error === "conflict"
-                    ? go("history")
-                    : error === "load" && !draft
-                      ? setLoadAttempt((n) => n + 1)
-                      : error === "load"
-                        ? dirty ? setDialog({ kind: "reopen" }) : void reopen()
-                        : void save()
-                }
-              >
-                {error === "conflict"
-                  ? t("Istoric", "History")
-                  : t("Reîncearcă", "Retry")}
-              </Button>
+              {(pendingWrite.current || error === "conflict" || error === "load") && (
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    pendingWrite.current
+                      ? void submitPendingWrite()
+                      : error === "conflict"
+                        ? go("history")
+                        : !draft
+                          ? setLoadAttempt((n) => n + 1)
+                          : dirty
+                            ? setDialog({ kind: "reopen" })
+                            : void reopen()
+                  }
+                >
+                  {error === "conflict"
+                    ? t("Istoric", "History")
+                    : t("Reîncearcă", "Retry")}
+                </Button>
+              )}
             </div>
           )}
           {loading ? (
@@ -601,14 +606,14 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                     setDraft(previous);
                     setPast((p) => p.slice(0, -1));
                     setIssues([]);
-                    setError(null);
+                    if (!pendingWrite.current) setError(null);
                   }}
                 >
                   <Undo2 size={17} />
                 </Button>
                 <Button
                   variant="primary"
-                  disabled={busy}
+                  disabled={busy || !!pendingWrite.current}
                   onClick={() => void save()}
                 >
                   <Save size={16} />
@@ -652,7 +657,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
             </Button>
             <Button
               variant="primary"
-              disabled={busy}
+              disabled={busy || !!pendingWrite.current}
               onClick={() => {
                 if (dialog.kind === "replace") {
                   openDraft(dialog.next);

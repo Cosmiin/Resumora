@@ -1,4 +1,4 @@
-import { clone, localId, type BaseDraft } from "./model";
+import { clone, equalValues, localId, type BaseDraft } from "./model";
 import { validateDraft, type Issue } from "./validation";
 export type Snapshot = {
   id: string;
@@ -84,7 +84,7 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
     const issues = input.mode === "autosave" ? [] : validateDraft(input.draft);
     if (issues.length) throw new AdapterError("validation", issues);
     const snapshot =
-      head && JSON.stringify(head.draft) === JSON.stringify(input.draft)
+      head && equalValues(head.draft, input.draft)
         ? clone(head)
         : this.publish(
             input.draft,

@@ -16,6 +16,7 @@ import { dateError, durationBounds, reversedDates } from "./dates";
 import { maraReviewDraft } from "./fixture";
 import { saveAnswer, addAnswerToCv } from "./enrichment";
 import { selectDocument, validateDraft } from "./validation";
+import { decodeDraft, encodeDraft } from "@resumora/contracts/editor/transport";
 function initial() {
   const d = blankDraft();
   d.name = fact("Persoană Fictivă");
@@ -44,6 +45,22 @@ function input(draft: BaseDraft, expectedRevision = 0) {
   };
 }
 describe("memory adapter through public operations", () => {
+  it("ignores object-key order after transport while retaining array and value changes", async () => {
+    const adapter = new MemoryBaseCvAdapter();
+    const draft = initial();
+    const first = await adapter.save(input(draft));
+    const decoded = decodeDraft(encodeDraft(draft));
+    decoded.name = Object.fromEntries(Object.entries(decoded.name).reverse()) as typeof decoded.name;
+    expect(await adapter.save(input(decoded, 1))).toEqual(first);
+    expect(await adapter.history()).toHaveLength(1);
+    decoded.contacts.reverse();
+    expect((await adapter.save(input(decoded, 1))).revision).toBe(2);
+    decoded.language = "en";
+    expect((await adapter.save(input(decoded, 2))).revision).toBe(3);
+    const date = fact({ year: "2020", month: "2" });
+    expect(editFact(date, { month: "2", year: "2020" })).toBe(date);
+    expect(editFact(date, { month: "3", year: "2020" }).id).not.toBe(date.id);
+  });
   it("saves, reopens cloned immutable versions, restores a new checkpoint, and clears in a new page instance", async () => {
     const adapter = new MemoryBaseCvAdapter(),
       d = initial(),
