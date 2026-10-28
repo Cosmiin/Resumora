@@ -20,6 +20,8 @@ import { prepareDraft, focusField } from "./base/editing";
 import { validateDraft, type Issue } from "./base/validation";
 import { DocumentPreview } from "./components/DocumentPreview";
 import { Editor } from "./components/Editor";
+import { JobsScreen } from "./components/JobsScreen";
+import type { AuthTransport } from "./auth/AuthShell";
 import { Enrichment } from "./components/Enrichment";
 import { Review } from "./components/Review";
 import { Button, Dialog, LanguageContext, issueText } from "./components/ui";
@@ -46,11 +48,29 @@ type PendingWrite = {
   | { kind: "save"; input: Parameters<BaseCvAdapter["save"]>[0] }
   | { kind: "restore"; input: Parameters<BaseCvAdapter["restore"]>[0] }
 );
-export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
+export function App({
+  adapter = sessionAdapter,
+  transport,
+}: {
+  adapter?: BaseCvAdapter;
+  transport?: AuthTransport;
+}) {
   if (!adapterKeys.has(adapter)) adapterKeys.set(adapter, ++nextAdapterKey);
-  return <CvEditor key={adapterKeys.get(adapter)} adapter={adapter} />;
+  return (
+    <CvEditor
+      key={adapterKeys.get(adapter)}
+      adapter={adapter}
+      transport={transport}
+    />
+  );
 }
-function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
+function CvEditor({
+  adapter,
+  transport,
+}: {
+  adapter: BaseCvAdapter;
+  transport?: AuthTransport;
+}) {
   const durable = adapter.capability === "durable";
   const [locale, setLocale] = useState<Locale>("ro"),
     t = (ro: string, en: string) => (locale === "ro" ? ro : en);
@@ -638,6 +658,9 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
               )}
               {draft && route === "enrich" && (
                 <Enrichment
+                  transport={transport}
+                  snapshot={head ?? null}
+                  ready={!dirty && !busy && !error && !pendingWrite.current}
                   durable={durable}
                   draft={draft}
                   undoFrom={undoFrom}
@@ -661,23 +684,25 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                   asOf={asOf}
                 />
               )}
-              {["jobs", "account", "missing"].includes(route) && (
+              {route === "jobs" && (
+                <JobsScreen
+                  transport={transport}
+                  snapshot={head ?? null}
+                  ready={!dirty && !busy && !error && !pendingWrite.current}
+                />
+              )}
+              {["account", "missing"].includes(route) && (
                 <section className="card empty">
                   <h2>{t("În pregătire", "In preparation")}</h2>
                   <p>
-                    {route === "jobs"
-                      ? t(
-                          "Joburile, adaptarea și exportul nu sunt conectate.",
-                          "Jobs, tailoring and export are not connected.",
-                        )
-                      : t(
-                          durable
-                            ? "CV-ul și istoricul sunt salvate în contul tău."
-                            : "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
-                          durable
-                            ? "Your CV and history are saved in your account."
-                            : "Account and online saving are not connected. You can use the local editor without an account.",
-                        )}
+                    {t(
+                      durable
+                        ? "CV-ul și istoricul sunt salvate în contul tău."
+                        : "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
+                      durable
+                        ? "Your CV and history are saved in your account."
+                        : "Account and online saving are not connected. You can use the local editor without an account.",
+                    )}
                   </p>
                   <Button onClick={() => go(draft ? "base" : "start")}>
                     {t("CV de bază", "Base CV")}

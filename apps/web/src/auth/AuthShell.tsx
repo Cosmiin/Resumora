@@ -65,6 +65,10 @@ export function AuthShell({
         });
       } catch (error) {
         if (
+          !(
+            init.signal?.aborted &&
+            (error as { name?: string } | null)?.name === "AbortError"
+          ) &&
           !path.startsWith("/v1/auth/") &&
           startedGeneration === generation.current &&
           startedCsrf === csrf.current

@@ -17,7 +17,7 @@ function snapshot(row: DraftSnapshot) {
   const { payload, ...metadata } = row;
   return { ...metadata, draft: decodeDraft(payload) };
 }
-async function readBody(request: Request): Promise<Record<string, unknown> | Response> {
+export async function readBody(request: Request): Promise<Record<string, unknown> | Response> {
   if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json')
     return failure('invalidRequest', 415);
   const reader = request.body?.getReader();

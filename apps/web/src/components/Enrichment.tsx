@@ -1,3 +1,5 @@
+import { AiSuggestions } from "./AiSuggestions";
+import type { AuthTransport } from "../auth/AuthShell";
 import { useEffect, useRef, useState } from "react";
 import {
   saveAnswer,
@@ -26,7 +28,13 @@ export function Enrichment({
   asOf,
   undoFrom,
   durable = false,
+  transport,
+  snapshot,
+  ready = false,
 }: {
+  transport?: AuthTransport;
+  snapshot?: { id: string; revision: number } | null;
+  ready?: boolean;
   draft: BaseDraft;
   change: (d: BaseDraft) => void;
   goEdit: () => void;
@@ -318,12 +326,16 @@ export function Enrichment({
           </>
         )}
         {error && <p role="alert">{error}</p>}
-        <p className="small muted">
-          {t(
-            "AI și relevanța pentru job nu sunt conectate. Folosim doar cuvintele tale.",
-            "AI and job relevance are not connected. Only your own wording is used.",
-          )}
-        </p>
+        {transport && target && (
+          <AiSuggestions
+            draft={d}
+            targetId={targetId}
+            snapshot={snapshot ?? null}
+            ready={ready}
+            transport={transport}
+            change={change}
+          />
+        )}
       </section>
       <div className="stack">
         <section

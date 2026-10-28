@@ -78,6 +78,8 @@ const draftShape = obj({
   referenceProse: list(obj({ id: str, text: str, approval: str, claimIds: list(str) })),
   answers: list(answer),
   presentation: obj({ order: list(str), hidden: list(str) }, { hiddenFields: list(str),
+    approvedWording: v => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(obj({ text: str,
+      sources: list(obj({ id: str, text: str, sourceId: str }, { sourceClaimId: str, sourceLineage: list(ref) })) })),
     contributionHtml: v => !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(str) }),
 }, { nameParts: obj({ first: str, last: str }) });
 export function isBaseDraft(value: unknown): value is BaseDraft { return draftShape(value); }

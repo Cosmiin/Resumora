@@ -14,5 +14,5 @@ export function ConnectedApp({
     () => new HttpBaseCvAdapter(transport),
     [account.id, transport],
   );
-  return <App key={account.id} adapter={adapter} />;
+  return <App key={account.id} adapter={adapter} transport={transport} />;
 }

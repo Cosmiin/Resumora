@@ -116,11 +116,12 @@ test('one regional request, source-preserving proposal, no mutation or prompt/ke
     assert.equal(body.max_completion_tokens, 256);
     assert.deepEqual(body.provider, { only: [primary.upstreamEndpoint], allow_fallbacks: false, require_parameters: true, data_collection: 'deny', zdr: true });
     assert.equal(body.tools, undefined);
-    return response();
+    return response('openrouter', { provider: undefined });
   } }));
   const result = await adapter.propose(input());
   assert.equal(result.proposal.status, 'proposal');
   assert.deepEqual(result.proposal.sources, context.facts);
+  assert.equal(result.attempts[0].result.upstreamProvider, null);
   assert.equal(result.attempts[0].result.usage.cachedInput, 5);
   assert.equal(result.attempts[0].result.reportedCost.nanoUsd, '200000');
   assert.equal(JSON.stringify(result.attempts).includes(context.facts[0].text), false);
@@ -131,7 +132,9 @@ test('one regional request, source-preserving proposal, no mutation or prompt/ke
 });
 
 test('one fallback on bare availability or transport failure; attempts share operation and unknown primary cost stays unknown', async () => {
-  for (const failure of [() => Response.json({}, { status: 503 }), () => { throw new TypeError('private transport error'); }]) {
+  for (const failure of [() => Response.json({}, { status: 503 }),
+    ...[502, 503, 504].map(status => () => new Response(null, { status })),
+    () => { throw new TypeError('private transport error'); }]) {
     const ledger = new SyntheticLedger();
     let calls = 0;
     const result = await prepareEnhancement(options({ ledger, transport: async (url, init) => {

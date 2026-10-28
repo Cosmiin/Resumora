@@ -1,7 +1,6 @@
-/** Evidence checklist, not a residency certification. There are NO approved live routes.
- * Synthetic tests may supply invented evidence to exercise rejection/selection only.
- * No env flag or caller attestation grants live generation capability.
- */
+/** Historical strict-EU synthetic rehearsal checklist, not residency certification.
+ * Configured execution uses the separate default-OFF server policy in ai/routes.ts;
+ * synthetic evidence never establishes real geographic or contractual guarantees. */
 export type EnhancementProvider = 'openrouter' | 'openai';
 export type EnhancementRoute = {
   provider: EnhancementProvider;
