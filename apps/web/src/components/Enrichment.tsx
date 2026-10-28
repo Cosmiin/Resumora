@@ -546,7 +546,11 @@ export function Enrichment({
             request={rewriteRole}
             change={change}
             accept={(draft, targetId, text, sources) =>
-              acceptWording(draft, targetId, { text, sources })
+              acceptWording(draft, targetId, {
+                text,
+                sources,
+                scope: "experience",
+              })
             }
           />
         )}

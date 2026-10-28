@@ -96,6 +96,9 @@ export function DocumentPreview({
       </>
     );
   }
+  const hasExperienceWording = (target: string) =>
+    d.presentation.approvedWording?.[target]?.scope === "experience" &&
+    !!currentWording(d, target);
   const date = (f: BaseDraft["roles"][number]["start"]) =>
     hidden(f)
       ? ""
@@ -175,7 +178,8 @@ export function DocumentPreview({
                 )}
               </p>
               {wording(r.id, r.context)}
-              {r.bullets.some((b) => text(b) || onTextEdit) &&
+              {!hasExperienceWording(r.id) &&
+                r.bullets.some((b) => text(b) || onTextEdit) &&
                 !d.presentation.hiddenFields?.includes(
                   `${r.id}-contributions`,
                 ) &&
@@ -259,15 +263,16 @@ export function DocumentPreview({
                 )}
             </h4>
             {wording(e.id, e.details)}
-            {e.bullets?.some((f) => text(f) || onTextEdit) && (
-              <ul>
-                {e.bullets
-                  .filter((f) => !hidden(f) && (text(f) || onTextEdit))
-                  .map((f) => (
-                    <li key={f.fieldId}>{editable(f)}</li>
-                  ))}
-              </ul>
-            )}
+            {!hasExperienceWording(e.id) &&
+              e.bullets?.some((f) => text(f) || onTextEdit) && (
+                <ul>
+                  {e.bullets
+                    .filter((f) => !hidden(f) && (text(f) || onTextEdit))
+                    .map((f) => (
+                      <li key={f.fieldId}>{editable(f)}</li>
+                    ))}
+                </ul>
+              )}
             {s.kind !== "languages" &&
               (hasValue(e.start.value) ||
                 hasValue(e.end.value) ||
