@@ -631,6 +631,14 @@
   display: none;
 }
 @media print {
+  /* Expanded tracking and synthetic small caps split words in PDF extraction. */
+  .document.document-template h2,
+  .document.document-template h3 {
+    letter-spacing: normal !important;
+  }
+  .document.document-template.template-archive h2 {
+    font-variant: normal;
+  }
   .document.document-template.template-meridian
     .document-section
     + .document-section {
