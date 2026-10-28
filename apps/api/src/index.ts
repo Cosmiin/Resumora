@@ -98,12 +98,9 @@ export default {
           { status: 503 },
         );
       }
-      // Preserve refresh/clear cookies even when the route or database fails.
       const headers = new Headers(response.headers);
       for (const [name, value] of identity.headers)
-        if (name !== "set-cookie") headers.set(name, value);
-      for (const cookie of identity.headers.getSetCookie())
-        headers.append("Set-Cookie", cookie);
+        headers.set(name, value);
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
