@@ -2,7 +2,7 @@
 
 The product registry contains the five selected designs: T01 Folio, T02 Meridian, T05 Signal, T06 Archive and T08 Monograph, all version2.1.0. The native **Șablon / Template** control changes the existing document preview immediately and uses normal autosave/history. Legacy documents keep the classic layout. A missing version displays an explicit classic fallback while retaining the saved reference and every content field.
 
-**Current integration boundary:** the Base/review/enrichment preview is connected. Job-tailored selection/preview/export is a core acceptance requirement, but this base has no tailored-document editor/HTTP persistence/export path. The reusable renderer and typed document-presentation seam are implemented; end-to-end tailoring remains partial until the vacancy owner wires those paths below. No template change requests inference. Downloadable PDF export is not implemented by adding a stylesheet.
+**FOUNDATION delivery — end-to-end job tailoring/export PARTIAL:** the Base/review/enrichment preview is connected. Job-tailored selection/preview/export is a core acceptance requirement, but this base has no tailored-document editor/HTTP persistence/export path. The reusable renderer and typed document-presentation seam are implemented; end-to-end tailoring remains partial until the vacancy owner wires those paths below. No template change requests inference. Downloadable PDF export is not implemented by adding a stylesheet.
 
 ## Files and boundaries
 
@@ -14,7 +14,7 @@ The product registry contains the five selected designs: T01 Folio, T02 Meridian
 - `apps/web/src/components/DocumentPreview.tsx`: the shared content renderer for editing/read-only inspection. It retains section order/visibility, field visibility, `currentWording`, safe rich contributions, dates and editing callbacks. It renders both skill categories as comma-separated inline text, with natural wrapping for long lists.
 - `apps/web/src/App.tsx` and `components/Enrichment.tsx`: existing draft changes/autosave are reused; history inspection does not mutate an old version.
 
-The existing database editor snapshot writer stores the versioned envelope as JSONB, so the optional presentation field requires no table/policy migration. API and client must share the updated codec. Checkpoints, history and restore retain the exact version reference. Canonical published CVs already have `document.templateVersionId`; that publication contract is distinct from the editor envelope.
+The existing database editor snapshot writer stores the versioned envelope as JSONB, so the optional presentation field requires no table/policy change. Canonical publication is a separate boundary: the forward migration `supabase/migrations/20261028050000_p6_templates.sql` replaces the shared `validate_canonical` rejection with an allowlist of the exact five registry version IDs while retaining legacy null and the existing schema, graph and deferred-prose checks. No template table is seeded and no new CV model is introduced. Unknown editor references remain roundtrippable/displayable, but canonical publication rejects unregistered references. API and client must share the updated codec. Checkpoints, history and restore retain the exact version reference. Canonical published CVs already have `document.templateVersionId`; that publication contract is distinct from the editor envelope.
 
 ## Add one selected template
 
@@ -35,6 +35,8 @@ Add an immutable entry to the registry only after selection. For example:
   },
 }
 ```
+
+Extend the canonical validator allowlist in a new forward migration with the same registered version ID, and extend the actual canonical publication tests in `supabase/tests/templates.py`. Never edit an applied migration or admit arbitrary well-formed editor references into publication.
 
 Add coordinated CSS, scoped to its class:
 
@@ -79,10 +81,12 @@ Current missing paths are concrete:
 
 1. `JobsScreen` captures/reviews vacancies and pins an editor snapshot; it has no tailored editor route. `App`/`base/routes.ts` need the independently loaded job-CV document view.
 2. The Worker router and `db/supabase.ts` expose Base editor snapshots and vacancy context, not job-CV document load/save/history/export. The vacancy work must add authenticated, owner-scoped routes/gateway calls with existing Origin/CSRF/revision/replay rules.
-3. Existing SQL `save_job_cv_checkpoint` already persists a job-kind document/version and its canonical `p_layout.templateVersionId`. `cv_versions.canonical_json.document` and `cv_documents.draft_payload` retain that per-document layout. However, the editor→confirmed profile/Base publication bridge is missing; do not send an unconfirmed editor envelope as canonical layout or invent its mapping. The chosen registry version ID fits the existing canonical ID grammar.
+3. Existing SQL `save_job_cv_checkpoint` persists a job-kind document/version. The foundation forward migration permits the five registered `p_layout.templateVersionId` choices through the shared canonical validator; grammar compatibility alone did not previously make non-null references publishable. `cv_versions.canonical_json.document` and `cv_documents.draft_payload` retain that per-document layout. However, the editor→confirmed profile/Base publication bridge is missing; do not send an unconfirmed editor envelope as canonical layout or invent its mapping. The chosen registry version ID fits the existing canonical ID grammar.
 4. The future exporter must consume that exact saved tailored version and the same renderer/style. No production exporter exists here. Switching presentation must not regenerate tailoring or call an AI/provider.
 
-Until those are wired, report acceptance as partial rather than displaying an inactive tailored chooser. No generic job-only helper or second CV model substitutes for integration.
+The queued vacancy-owner handoff must connect independently loaded per-job content/revision, that document’s versioned template choice, the confirmed editor→canonical publication bridge and export of the exact saved version. Import validation belongs to the separate sibling lane. The owner approved “Publish foundation; complete wiring next (Recommended)”; PR title/body must describe FOUNDATION and keep end-to-end job tailoring/import/export explicitly PARTIAL. No production migration/activation is authorized here.
+
+Until those are wired, report acceptance as PARTIAL rather than displaying an inactive tailored chooser. No generic job-only helper or second CV model substitutes for integration.
 
 ## Print and acceptance
 
@@ -109,3 +113,5 @@ Acceptance checklist:
 - Native chooser and real preview work at1366×768 and390×844 with readable controls and no horizontal clipping.
 - Actual renderer/export text, fonts, safe bounds, dates and multipage flow checked; no fabricated metrics or ATS score.
 - Clearly distinguish active Base behavior, reusable tailored seam and missing job/export wiring; no paid inference for changing a template.
+
+Canonical SQL verification uses `python3 scripts/db/test.py --suite templates` with PostgreSQL 16+ on PATH (or an explicitly supplied tool path). It executes the actual validator/profile/Base/job save and restore interfaces for all five choices, legacy null and invalid/unregistered references, plus focused existing permission/ownership/integrity checks. Migration inclusion in the disposable P0–P3 harness is explicit despite the reserved `p6_templates` filename. SQL acceptance/publication is unproven until that command passes; no hosted apply is implied.

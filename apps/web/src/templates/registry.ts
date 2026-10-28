@@ -89,10 +89,8 @@ export function resolveTemplate(
 }
 
 export function chooseTemplate(draft: BaseDraft, versionId: string): BaseDraft {
-  if (versionId && !resolveTemplate(versionId))
-    throw new Error("unavailableTemplate");
+  if (!resolveTemplate(versionId)) throw new Error("unavailableTemplate");
   const next = clone(draft);
-  if (versionId) next.presentation.templateVersionId = versionId;
-  else delete next.presentation.templateVersionId;
+  next.presentation.templateVersionId = versionId;
   return next;
 }

@@ -18,7 +18,11 @@ import {
 } from "@resumora/contracts/editor/transport";
 import { AdapterError, MemoryBaseCvAdapter } from "../base/adapter";
 import { App } from "../App";
-import type { CvPhoto } from "@resumora/contracts/editor/photo";
+import {
+  cropRectangle,
+  isPhoto,
+  type CvPhoto,
+} from "@resumora/contracts/editor/photo";
 import { inspectPhoto } from "@resumora/contracts/editor/photo-format";
 import { readFileSync } from "node:fs";
 import { Blob as NativeBlob } from "node:buffer";
@@ -445,5 +449,85 @@ it.each(["replay", "expired"] as const)(
     await screen.findByText(/Fotografia nu este încă salvată/);
     expect(save).toHaveBeenCalledTimes(3);
     expect((await adapter.load())?.draft.presentation.photo?.crop.zoom).toBe(2);
+  },
+);
+
+it.each([
+  [400, 600, 1],
+  [400, 600, 2],
+  [600, 400, 1],
+  [600, 400, 2],
+])(
+  "clamps large pointer deltas on both axes and keeps movement/save working (%i×%i, zoom %i)",
+  async (width, height, zoom) => {
+    vi.mocked(createImageBitmap).mockResolvedValue({
+      width,
+      height,
+      close: vi.fn(),
+    } as unknown as ImageBitmap);
+    vi.stubGlobal("PointerEvent", MouseEvent);
+    const commit = vi.fn(
+      async (_photo: CvPhoto | null, _expected: CvPhoto | null) => true,
+    );
+    render(
+      <PhotoContext.Provider value={client()}>
+        <LanguageContext.Provider value="en">
+          <PhotoEditor value={null} commit={commit} />
+        </LanguageContext.Provider>
+      </PhotoContext.Provider>,
+    );
+    fireEvent.change(screen.getByLabelText("Choose a photo"), {
+      target: { files: [file()] },
+    });
+    await screen.findByLabelText("Shape");
+    fireEvent.change(screen.getByRole("slider", { name: /Zoom/ }), {
+      target: { value: String(zoom) },
+    });
+    const canvas = screen.getByRole("img", { name: /Photo framing/ });
+    Object.defineProperty(canvas, "setPointerCapture", { value: vi.fn() });
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      width: 360,
+    } as DOMRect);
+    const horizontal = screen.getByRole("slider", {
+      name: /Horizontal framing/,
+    }) as HTMLInputElement;
+    const vertical = screen.getByRole("slider", {
+      name: /Vertical framing/,
+    }) as HTMLInputElement;
+    fireEvent.pointerDown(canvas, { clientX: 0, clientY: 0 });
+    for (const [clientX, clientY] of [
+      [3600, 3600],
+      [-3600, -3600],
+    ]) {
+      fireEvent.pointerMove(canvas, { clientX, clientY });
+      const x = Number(horizontal.value),
+        y = Number(vertical.value);
+      expect(x).toBeCloseTo(
+        clientX > 0 ? Number(horizontal.min) : Number(horizontal.max),
+      );
+      expect(y).toBeCloseTo(
+        clientY > 0 ? Number(vertical.min) : Number(vertical.max),
+      );
+    }
+    fireEvent.pointerMove(canvas, { clientX: -3564, clientY: -3564 });
+    if (Number(horizontal.min) < Number(horizontal.max))
+      expect(Number(horizontal.value)).toBeLessThan(Number(horizontal.max));
+    if (Number(vertical.min) < Number(vertical.max))
+      expect(Number(vertical.value)).toBeLessThan(Number(vertical.max));
+    fireEvent.pointerUp(canvas);
+    fireEvent.click(screen.getByRole("button", { name: "Save photo" }));
+    await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
+    const saved = commit.mock.calls[0][0]!;
+    expect(isPhoto(saved)).toBe(true);
+    expect(cropRectangle(width, height, saved.crop).crop).toEqual(saved.crop);
+    for (const axis of ["centerX", "centerY"]) {
+      for (const value of [-0.5, 1.5]) {
+        const invalid = { ...saved, crop: { ...saved.crop, [axis]: value } };
+        expect(isPhoto(invalid)).toBe(false);
+        expect(() => cropRectangle(width, height, invalid.crop)).toThrow(
+          "invalidPhotoCrop",
+        );
+      }
+    }
   },
 );

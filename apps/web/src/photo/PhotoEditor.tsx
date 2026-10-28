@@ -190,7 +190,14 @@ export function PhotoEditor({
     image.src = source.url;
   }
   function position(next: PhotoCrop) {
-    if (local) setCrop(cropRectangle(local.width, local.height, next).crop);
+    if (local)
+      setCrop(
+        cropRectangle(local.width, local.height, {
+          ...next,
+          centerX: Math.max(0, Math.min(1, next.centerX)),
+          centerY: Math.max(0, Math.min(1, next.centerY)),
+        }).crop,
+      );
   }
   function move(x: number, y: number) {
     if (!local) return;

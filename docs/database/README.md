@@ -10,7 +10,7 @@ The [migration/test traceability](traceability.md) owns the ordered migration in
 
 The [API contract](api.md#ids-at-the-canonical-boundary) owns database/canonical ID allocation, encoding and fixture mapping, including the separate photo asset ID contract.
 
-The canonical factual contract is preserved: two independent title slots, professional/technical skills, partial dates, RO/EN, evidence/confirmation, and independent Base/job content. Generated prose/interviews/templates are deferred; P0–P3 rejects those inputs instead of silently accepting unsupported data.
+The canonical factual contract is preserved: two independent title slots, professional/technical skills, partial dates, RO/EN, evidence/confirmation, and independent Base/job content. Generated prose/interviews remain deferred and rejected. The selected-template foundation forward migration permits only the five registered 2.1.0 template references and legacy null in canonical publication; unknown editor references are preserved separately and cannot be published. End-to-end job tailoring/export remains PARTIAL; see the [handoff](../frontend/TEMPLATE_AUTHORING.md#required-job-tailored-wiring).
 
 ## Local verification
 

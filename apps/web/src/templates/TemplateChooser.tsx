@@ -22,10 +22,11 @@ export function TemplateChooser({
         aria-describedby={`${id}-description`}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">{t("Aspect clasic", "Classic layout")}</option>
-        {!!value && !template && (
-          <option value={value}>
-            {t("Șablon salvat indisponibil", "Saved template unavailable")}
+        {!template && (
+          <option value={value ?? ""} disabled hidden>
+            {value
+              ? t("Șablon salvat indisponibil", "Saved template unavailable")
+              : t("Alege un șablon", "Choose a template")}
           </option>
         )}
         {cvTemplates.map((item) => (

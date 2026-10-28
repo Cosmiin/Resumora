@@ -5,7 +5,8 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+import { TemplateChooser } from "./TemplateChooser";
 import { App } from "../App";
 import { MemoryBaseCvAdapter } from "../base/adapter";
 import { prepareDraft } from "../base/editing";
@@ -144,7 +145,7 @@ it("keeps legacy layout and unknown saved versions without rewriting content", (
   expect(future).toEqual(draft);
 });
 
-it("uses CV language independently and offers only selected templates plus the legacy layout", () => {
+it("uses CV language independently and offers exactly the five selected templates", () => {
   const draft = chooseTemplate(maraReviewDraft(), cvTemplates[0].versionId);
   draft.language = "ro";
   render(
@@ -158,14 +159,7 @@ it("uses CV language independently and offers only selected templates plus the l
   ).toBeTruthy();
   expect(
     screen.getAllByRole("option").map((option) => option.textContent),
-  ).toEqual([
-    "Classic layout",
-    "Folio",
-    "Meridian",
-    "Signal",
-    "Archive",
-    "Monograph",
-  ]);
+  ).toEqual(["Folio", "Meridian", "Signal", "Archive", "Monograph"]);
 });
 
 it("autosaves the native chooser through App, reopens it and restores versioned history", async () => {
@@ -295,4 +289,59 @@ it("keeps authored section order and modular content when applying a layout", ()
   ]);
   expect(paper.textContent).toContain("Synthetic project");
   expect(paper.textContent).toContain("Authored project details.");
+});
+
+it("keeps legacy and unknown choices display-only until selecting a registered version", () => {
+  const draft = maraReviewDraft();
+  draft.presentation.photo = {
+    assetId: "11111111-1111-4111-8111-111111111111",
+    crop: { version: 1, centerX: 0.5, centerY: 0.5, zoom: 2 },
+    visible: false,
+    shape: "circle",
+  };
+  draft.presentation.hidden = ["education"];
+  draft.presentation.hiddenFields = [draft.contacts[0].value.fieldId];
+  draft.presentation.approvedWording = {
+    field: { text: "Keep wording", sources: [] },
+  };
+  const original = clone(draft);
+  const onChange = vi.fn();
+  const { rerender } = render(<TemplateChooser onChange={onChange} />);
+  const selectable = () =>
+    Array.from((screen.getByRole("combobox") as HTMLSelectElement).options)
+      .filter((option) => !option.disabled)
+      .map((option) => option.value);
+  expect(selectable()).toEqual([
+    "template_folio_2_1_0",
+    "template_meridian_2_1_0",
+    "template_signal_2_1_0",
+    "template_archive_2_1_0",
+    "template_monograph_2_1_0",
+  ]);
+  expect(onChange).not.toHaveBeenCalled();
+  draft.presentation.templateVersionId = "template_future_9_0_0";
+  rerender(
+    <TemplateChooser
+      value={draft.presentation.templateVersionId}
+      onChange={onChange}
+    />,
+  );
+  expect(selectable()).toHaveLength(5);
+  expect(onChange).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole("combobox"), {
+    target: { value: cvTemplates[2].versionId },
+  });
+  expect(onChange).toHaveBeenCalledExactlyOnceWith(cvTemplates[2].versionId);
+  expect(chooseTemplate(draft, cvTemplates[2].versionId)).toEqual({
+    ...original,
+    presentation: {
+      ...original.presentation,
+      templateVersionId: cvTemplates[2].versionId,
+    },
+  });
+  expect(draft.presentation.templateVersionId).toBe("template_future_9_0_0");
+  expect(() => chooseTemplate(draft, "")).toThrow("unavailableTemplate");
+  expect(() => chooseTemplate(draft, "template_future_9_0_0")).toThrow(
+    "unavailableTemplate",
+  );
 });
