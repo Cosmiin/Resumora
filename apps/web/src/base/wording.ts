@@ -1,3 +1,4 @@
+import { isCurrentExperienceWording } from "@resumora/contracts/intelligence/context";
 import { answerEvidenceText } from "@resumora/contracts/intelligence/model";
 import { clone, type BaseDraft } from "./model";
 export type Wording = NonNullable<
@@ -5,7 +6,11 @@ export type Wording = NonNullable<
 >[string];
 export function currentWording(d: BaseDraft, target: string): string | null {
   const p = d.presentation.approvedWording?.[target];
-  if (!p) return null;
+  if (
+    !p ||
+    (p.scope === "experience" && !isCurrentExperienceWording(d, target, p.text))
+  )
+    return null;
   const role = d.roles.find((r) => r.id === target);
   const section = d.optionalSections.find(
     (s) => s.kind !== "languages" && s.entries.some((e) => e.id === target),

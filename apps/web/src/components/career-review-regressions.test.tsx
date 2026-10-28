@@ -1,0 +1,439 @@
+import { afterEach, expect, it, vi } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { App } from "../App";
+import { MemoryBaseCvAdapter } from "../base/adapter";
+import {
+  blankDraft,
+  clone,
+  fact,
+  newOptionalEntry,
+  newRole,
+  type BaseDraft,
+} from "../base/model";
+import {
+  addAnswerToCv,
+  enrichmentTarget,
+  removeAnswerFromCv,
+  saveAnswer,
+} from "../base/enrichment";
+import { patchFact } from "../base/editing";
+import { currentWording } from "../base/wording";
+import type { IntelligenceClient } from "../base/intelligence";
+import { careerContext } from "@resumora/contracts/intelligence/context";
+import { decodeDraft, encodeDraft } from "@resumora/contracts/editor/transport";
+import { Enrichment } from "./Enrichment";
+import { DocumentPreview } from "./DocumentPreview";
+import { LanguageContext } from "./ui";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+function base() {
+  const d = blankDraft(),
+    r = newRole();
+  d.language = "en";
+  d.name = fact("Mara Ionescu");
+  d.nameParts = { first: "Mara", last: "Ionescu" };
+  r.title = fact("Coordinator");
+  r.company = fact("Fictional company");
+  r.context = fact("Prepared reports.");
+  r.bullets = [fact("Uncited contribution.")];
+  d.roles.push(r);
+  return d;
+}
+function result(
+  action: "questions" | "rewrite",
+  d: BaseDraft,
+  target = d.roles[0].id,
+): any {
+  return action === "questions"
+    ? {
+        schemaVersion: "career-question-plan/1",
+        targetId: target,
+        questions: [
+          {
+            id: "q",
+            dimension: "tools",
+            text: "Which tools did you use?",
+            why: "Missing context",
+            selectionMode: "single",
+            options: [{ id: "x", label: "Spreadsheet" }],
+          },
+        ],
+      }
+    : {
+        schemaVersion: "career-role-rewrite/1",
+        targetId: target,
+        text: "Prepared clear reports.",
+        factIds: [careerContext(d, target).facts[0].id],
+        warnings: [],
+      };
+}
+const buttonName = (action: "questions" | "rewrite") =>
+  action === "questions"
+    ? "Prepare AI questions"
+    : "Propose experience rewrite";
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.location.hash = "";
+});
+
+for (const action of ["questions", "rewrite"] as const) {
+  it(`${action} cannot overwrite or autosave over edits made after leaving enrichment`, async () => {
+    vi.stubGlobal("fetch", () => {
+      throw new Error("NETWORK_DENIED");
+    });
+    const d = base(),
+      pending = deferred<any>(),
+      adapter = new MemoryBaseCvAdapter();
+    await adapter.save({
+      draft: d,
+      expectedRevision: 0,
+      requestId: "initial",
+      mode: "autosave",
+    });
+    const client: IntelligenceClient = {
+      questions: vi.fn(() => pending.promise),
+      rewrite: vi.fn(() => pending.promise),
+      importDocument: vi.fn(),
+      listImports: vi.fn(),
+      importStatus: vi.fn(),
+      cancelImport: vi.fn(),
+    };
+    window.location.hash = "#enrich";
+    render(<App adapter={adapter} intelligence={client} />);
+    await screen.findByRole("button", {
+      name: "Propune rescrierea experienței",
+    });
+    fireEvent.change(screen.getByLabelText("Limba interfeței"), {
+      target: { value: "en" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: buttonName(action) }));
+    expect(client[action]).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Editor" }));
+    const firstName = await screen.findByRole("textbox", {
+      name: "First name",
+    });
+    fireEvent.change(firstName, { target: { value: "Newer edit" } });
+    await act(async () => pending.resolve(result(action, d)));
+    expect(screen.getByDisplayValue("Newer edit")).toBeTruthy();
+    await waitFor(
+      async () => {
+        const saved = (await adapter.load())!.draft;
+        expect(saved.nameParts?.first).toBe("Newer edit");
+        expect(saved.questionPlans).toBeUndefined();
+        expect(saved.roleRewriteReviews).toBeUndefined();
+      },
+      { timeout: 2500 },
+    );
+  });
+
+  it(`${action} ignores success after component unmount even without an App callback`, async () => {
+    const d = base(),
+      pending = deferred<any>(),
+      change = vi.fn();
+    const view = render(
+      <LanguageContext value="en">
+        <Enrichment
+          draft={d}
+          change={change}
+          goEdit={() => {}}
+          asOf={{ year: "2026", month: "10" }}
+          prepareQuestions={() => pending.promise}
+          rewriteRole={() => pending.promise}
+        />
+      </LanguageContext>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: buttonName(action) }));
+    view.unmount();
+    await act(async () => pending.resolve(result(action, d)));
+    expect(change).not.toHaveBeenCalled();
+  });
+
+  for (const outcome of ["resolve", "reject"] as const) {
+    it(`${action} fences a superseded target's ${outcome} and busy state`, async () => {
+      const d = base(),
+        second = newRole(),
+        old = deferred<any>(),
+        current = deferred<any>(),
+        change = vi.fn();
+      second.title = fact("Another role");
+      second.context = fact("Prepared schedules.");
+      d.roles.push(second);
+      let calls = 0;
+      const request = vi.fn(() =>
+        calls++ === 0 ? old.promise : current.promise,
+      );
+      render(
+        <LanguageContext value="en">
+          <Enrichment
+            draft={d}
+            change={change}
+            goEdit={() => {}}
+            asOf={{ year: "2026", month: "10" }}
+            prepareQuestions={request}
+            rewriteRole={request}
+          />
+        </LanguageContext>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: buttonName(action) }));
+      fireEvent.change(screen.getByLabelText("Entry"), {
+        target: { value: second.id },
+      });
+      fireEvent.click(screen.getByRole("button", { name: buttonName(action) }));
+      await act(async () => {
+        if (outcome === "resolve") old.resolve(result(action, d));
+        else old.reject(new Error("late failure"));
+      });
+      expect(change).not.toHaveBeenCalled();
+      expect(
+        screen.queryByText(/AI questions are unavailable|Proposal unavailable/),
+      ).toBeNull();
+      expect(
+        screen.getByRole<HTMLButtonElement>("button", {
+          name: action === "questions" ? "Preparing questions…" : "Preparing…",
+        }).disabled,
+      ).toBe(true);
+      await act(async () => current.resolve(result(action, d, second.id)));
+      expect(change).toHaveBeenCalledTimes(1);
+      const next = change.mock.calls[0][0] as BaseDraft;
+      expect(
+        action === "questions"
+          ? next.questionPlans![0].targetId
+          : next.roleRewriteReviews![0].proposal.targetId,
+      ).toBe(second.id);
+    });
+  }
+}
+
+it("changing question goal supersedes the pending generation", async () => {
+  const d = base(),
+    old = deferred<any>(),
+    current = deferred<any>(),
+    change = vi.fn();
+  const request = vi
+    .fn()
+    .mockReturnValueOnce(old.promise)
+    .mockReturnValueOnce(current.promise);
+  render(
+    <LanguageContext value="en">
+      <Enrichment
+        draft={d}
+        change={change}
+        goEdit={() => {}}
+        asOf={{ year: "2026", month: "10" }}
+        prepareQuestions={request}
+      />
+    </LanguageContext>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Prepare AI questions" }));
+  fireEvent.change(screen.getByLabelText("Question goal"), {
+    target: { value: "impact" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Prepare AI questions" }));
+  await act(async () => old.resolve(result("questions", d)));
+  expect(change).not.toHaveBeenCalled();
+  await act(async () =>
+    current.resolve({ ...result("questions", d), goal: "impact" }),
+  );
+  expect(change.mock.calls[0][0].questionPlans[0].goal).toBe("impact");
+});
+
+const mutations = [
+  "add bullet",
+  "edit bullet",
+  "remove bullet",
+  "edit context",
+  "add answer",
+  "edit answer",
+  "remove answer",
+  "unconfirm answer",
+  "copy answer",
+  "remove copy",
+  "remove copied answer",
+] as const;
+it.each([
+  "role",
+  "projects",
+  "certifications",
+  "volunteering",
+  "custom",
+] as const)(
+  "%s whole-experience wording invalidates on every evidence-set change",
+  async (kind) => {
+    let accepted = base();
+    if (kind !== "role") {
+      const entry = newOptionalEntry();
+      entry.title = fact("Extra experience");
+      entry.details = accepted.roles[0].context;
+      entry.bullets = accepted.roles[0].bullets;
+      accepted.roles = [];
+      accepted.optionalSections.push({
+        id: "extra",
+        kind,
+        label: "Extra",
+        entries: [entry],
+      });
+      accepted.presentation.order.push("extra");
+    }
+    const target =
+      kind === "role"
+        ? accepted.roles[0].id
+        : accepted.optionalSections.at(-1)!.entries[0].id;
+    const field = enrichmentTarget(accepted, target)!.field;
+    for (const [id, text] of [
+      ["answer", "Confirmed answer."],
+      ["copied", "Copied answer."],
+    ]) {
+      accepted = saveAnswer(
+        accepted,
+        {
+          id,
+          targetId: target,
+          question: "tools",
+          questionText: "Tools used?",
+          text,
+          status: "draft",
+        },
+        field.id,
+      );
+    }
+    accepted = addAnswerToCv(accepted, "copied", field.id);
+    const original = clone(accepted);
+    const view = render(
+      <LanguageContext value="en">
+        <Enrichment
+          draft={accepted}
+          change={(next) => {
+            accepted = next;
+            view.rerender(surface(next));
+          }}
+          goEdit={() => {}}
+          asOf={{ year: "2026", month: "10" }}
+          rewriteRole={async () => result("rewrite", accepted, target)}
+        />
+      </LanguageContext>,
+    );
+    function surface(draft: BaseDraft) {
+      return (
+        <LanguageContext value="en">
+          <Enrichment
+            draft={draft}
+            change={(next) => {
+              accepted = next;
+              view.rerender(surface(next));
+            }}
+            goEdit={() => {}}
+            asOf={{ year: "2026", month: "10" }}
+            rewriteRole={async () => result("rewrite", draft, target)}
+          />
+        </LanguageContext>
+      );
+    }
+    await act(async () =>
+      fireEvent.click(
+        screen.getByRole("button", { name: "Propose experience rewrite" }),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Accept rewrite" }));
+    accepted = decodeDraft(encodeDraft(accepted));
+    expect(currentWording(accepted, target)).toBe("Prepared clear reports.");
+    expect(accepted.roles).toEqual(original.roles);
+    expect(accepted.optionalSections).toEqual(original.optionalSections);
+    expect(accepted.answers).toEqual(original.answers);
+    view.unmount();
+    for (const mutation of mutations) {
+      let next = clone(accepted);
+      const dest = enrichmentTarget(next, target)!;
+      if (mutation === "add bullet")
+        dest.entry.bullets!.push(fact("New visible contribution."));
+      if (mutation === "edit bullet")
+        next = patchFact(next, dest.entry.bullets![0], "Changed contribution.");
+      if (mutation === "remove bullet") dest.entry.bullets!.shift();
+      if (mutation === "edit context")
+        next = patchFact(next, dest.field, "Changed context.");
+      if (mutation === "add answer" || mutation === "edit answer")
+        next = saveAnswer(
+          next,
+          {
+            id: mutation === "add answer" ? "new-answer" : "answer",
+            targetId: target,
+            question: "tools",
+            questionText: "Tools used?",
+            text: "New answer.",
+            status: "draft",
+          },
+          dest.field.id,
+        );
+      if (mutation === "remove answer")
+        next.answers = next.answers.filter((a) => a.id !== "answer");
+      if (mutation === "remove copied answer")
+        next.answers = next.answers.filter((a) => a.id !== "copied");
+      if (mutation === "unconfirm answer")
+        next.answers.find((a) => a.id === "answer")!.status = "draft";
+      if (mutation === "copy answer")
+        next = addAnswerToCv(next, "answer", dest.field.id);
+      if (mutation === "remove copy") next = removeAnswerFromCv(next, "copied");
+      for (const editable of [false, true]) {
+        const rendered = render(
+          <LanguageContext value="en">
+            <DocumentPreview
+              draft={next}
+              asOf={{ year: "2026", month: "10" }}
+              {...(editable ? { onTextEdit: () => {} } : {})}
+            />
+          </LanguageContext>,
+        );
+        const preview = screen.getByRole("complementary", {
+          name: "CV preview",
+        });
+        expect(preview.textContent, `${kind}: ${mutation}`).not.toContain(
+          "Prepared clear reports.",
+        );
+        expect(preview.textContent).toContain(
+          mutation === "edit context"
+            ? "Changed context."
+            : "Prepared reports.",
+        );
+        if (mutation === "add bullet")
+          expect(preview.textContent).toContain("New visible contribution.");
+        if (mutation === "edit bullet")
+          expect(preview.textContent).toContain("Changed contribution.");
+        if (mutation === "copy answer")
+          expect(preview.textContent).toContain("Confirmed answer.");
+        rendered.unmount();
+      }
+    }
+    const unrelated = clone(accepted);
+    unrelated.name.value = "Unrelated name";
+    unrelated.presentation.hiddenFields = [unrelated.name.fieldId];
+    expect(currentWording(unrelated, target)).toBe("Prepared clear reports.");
+    const preview = render(
+      <LanguageContext value="en">
+        <DocumentPreview
+          draft={unrelated}
+          asOf={{ year: "2026", month: "10" }}
+        />
+      </LanguageContext>,
+    );
+    expect(
+      within(
+        screen.getByRole("complementary", { name: "CV preview" }),
+      ).getByText("Prepared clear reports."),
+    ).toBeTruthy();
+    preview.unmount();
+  },
+);

@@ -19,7 +19,7 @@ PDF preflight uses the pinned maintained `@cantoo/pdf-lib` fork inside the Worke
 
 DOCX uses `fflate` with ZIP checks, bounded streamed expansion, no encrypted/macro/DTD input, 10MB total expanded bytes, 500KB individual relevant XML and 1MB aggregate relevant XML. Extracted relevant text is limited to 40,000 characters. Legacy DOC uses `cfb` to inspect OLE/WordDocument, reject encryption/macros/embedded objects and conservatively limit WordDocument bytes to 40,000 and metadata to 160,000. Formatting-heavy legacy files may be rejected even when visually short. `cfb` is a small older dependency (1.2.2); dependency maintenance remains an explicit operational risk. No Office converter/service is installed. Provider-native Word reading is text based; Word image OCR is not promised.
 
-Structured extraction allows at most 250 candidates and 40,000 combined candidate-value/quote characters. Partial dates are year or month/year, with uncertain dates left pending. Career context is bounded to 24 facts, 2,000 characters per fact and 8,000 total. It omits identity/contact/employer/raw document fields, but role free text can still contain personal information; minimization is not anonymization.
+Structured extraction allows at most 250 candidates and 40,000 combined candidate-value/quote characters. Partial dates are year or month/year, with uncertain dates left pending. Career context is bounded to 24 facts, 2,000 characters per fact and 8,000 total; confirmed answers retain their own identities even when also copied into CV fields. Whole-experience wording stays active only while the complete accepted input matches, including uncited facts and confirmed answers. It omits identity/contact/employer/raw document fields, but role free text can still contain personal information; minimization is not anonymization.
 
 ## Provider seam and operation contracts
 
@@ -46,6 +46,10 @@ Keep `AI_PAID_INFERENCE=off`. Future authorized activation must deliberately con
 Routes are `/v1/intelligence/imports` (POST bytes, GET list), `/v1/intelligence/imports/:operationId` (GET), `.../:operationId/cancel` (POST), `/v1/intelligence/questions` and `/v1/intelligence/rewrite` (POST). Snapshot ownership/revision is verified before career reservation. Reusing an operation ID returns stored status or an explicit replay result without redispatch. Reload can recover recent owned imports. Interrupted processing becomes unknown after the bounded window; the user can inspect/cancel, not silently regenerate.
 
 Cancellation persists a database fence before object deletion; a late provider completion cannot publish an extraction afterward. Per-account list activity retries bounded cleanup of expired/cancelled sources and acknowledges deletion only after success. **No continuous scheduler is activated**: accounts that never return do not have a guaranteed physical-deletion deadline. A separately authorized periodic cleanup integration, hosted Storage/Auth permission check, parser resource evaluation and real-provider synthetic quality/cost evaluation are required before real-data activation. Source `retain_until` metadata alone is not a deletion guarantee. No compliance, residency or provider retention guarantee is implied.
+
+## Owner-run real-provider evaluation
+
+For the owner's requested hands-on AI testing, follow the [owner evaluation runbook](owner-ai-evaluation.md). It lists prerequisites, coordinated isolated loopback ports, OFF/on/OFF verification, synthetic fixtures, a 22-attempt maximum sequence and bounded usage/unknown-cost inspection. It prepares the procedure only: no ready live link, hosted setup or model quality is verified, and agents make no paid calls.
 
 ## Verification
 
