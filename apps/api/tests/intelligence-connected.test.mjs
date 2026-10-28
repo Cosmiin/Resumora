@@ -337,7 +337,6 @@ test("owned saved context drives choices and semantic whole-role proposals; fore
     snapshotId: f.snapshot.id,
     revision: 1,
     targetId: f.role.id,
-    goal: "ownership",
   };
   const transport = async (url, init) => {
     calls++;
@@ -347,6 +346,7 @@ test("owned saved context drives choices and semantic whole-role proposals; fore
       ? {
           schemaVersion: "career-question-plan/1",
           targetId: f.role.id,
+          goal: "Ignored historical metadata in provider output",
           questions: [
             {
               id: "q",
@@ -369,6 +369,7 @@ test("owned saved context drives choices and semantic whole-role proposals; fore
           warnings: [],
         };
     assert.equal(payload.targetId, f.role.id);
+    assert.equal(Object.hasOwn(payload, "goal"), false);
     return reply(b, data, false);
   };
   const plan = await (
@@ -380,6 +381,19 @@ test("owned saved context drives choices and semantic whole-role proposals; fore
       transport,
     )
   ).json();
+  assert.equal(Object.hasOwn(plan, "goal"), false);
+  assert.equal(
+    (
+      await configuredIntelligenceRoute(
+        request({ ...body, operationId: crypto.randomUUID(), goal: "removed" }),
+        env,
+        f.gateway,
+        f.user,
+        transport,
+      )
+    ).status,
+    400,
+  );
   assert.equal(plan.questions[0].selectionMode, "multiple");
   assert.equal(plan.questions[0].id, body.operationId + "_0");
   assert.equal(plan.questions[0].options[0].selected, undefined);

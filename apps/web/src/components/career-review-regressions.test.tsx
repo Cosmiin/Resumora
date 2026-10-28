@@ -220,39 +220,6 @@ for (const action of ["questions", "rewrite"] as const) {
   }
 }
 
-it("changing question goal supersedes the pending generation", async () => {
-  const d = base(),
-    old = deferred<any>(),
-    current = deferred<any>(),
-    change = vi.fn();
-  const request = vi
-    .fn()
-    .mockReturnValueOnce(old.promise)
-    .mockReturnValueOnce(current.promise);
-  render(
-    <LanguageContext value="en">
-      <Enrichment
-        draft={d}
-        change={change}
-        goEdit={() => {}}
-        asOf={{ year: "2026", month: "10" }}
-        prepareQuestions={request}
-      />
-    </LanguageContext>,
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Prepare AI questions" }));
-  fireEvent.change(screen.getByLabelText("Question goal"), {
-    target: { value: "impact" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Prepare AI questions" }));
-  await act(async () => old.resolve(result("questions", d)));
-  expect(change).not.toHaveBeenCalled();
-  await act(async () =>
-    current.resolve({ ...result("questions", d), goal: "impact" }),
-  );
-  expect(change.mock.calls[0][0].questionPlans[0].goal).toBe("impact");
-});
-
 const mutations = [
   "add bullet",
   "edit bullet",

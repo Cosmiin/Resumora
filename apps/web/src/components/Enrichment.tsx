@@ -48,7 +48,7 @@ export function Enrichment({
   asOf: { year: string; month: string };
   undoFrom?: BaseDraft | null;
   durable?: boolean;
-  prepareQuestions?: (targetId: string, goal: string) => Promise<QuestionPlan>;
+  prepareQuestions?: (targetId: string) => Promise<QuestionPlan>;
   rewriteRole?: (targetId: string) => Promise<RoleProposal>;
 }) {
   const t = useCopy();
@@ -73,7 +73,6 @@ export function Enrichment({
     [index, setIndex] = useState(0),
     [error, setError] = useState("");
   const [planning, setPlanning] = useState(false);
-  const [goal, setGoal] = useState("contribution");
   const currentDraft = useRef(d),
     requestGeneration = useRef(0);
   currentDraft.current = d;
@@ -82,7 +81,7 @@ export function Enrichment({
     return () => {
       requestGeneration.current++;
     };
-  }, [targetId, goal]);
+  }, [targetId]);
   const [editingAnswerId, setEditingAnswerId] = useState<string | null>(null);
   const editingAnswer = d.answers.find(
     (a) => a.id === editingAnswerId && a.targetId === targetId,
@@ -360,25 +359,6 @@ export function Enrichment({
             </select>
             <p className="entry-context">{target?.field.value}</p>
             {prepareQuestions && (
-              <label>
-                {t("Scopul întrebărilor", "Question goal")}
-                <select value={goal} onChange={(e) => setGoal(e.target.value)}>
-                  <option value="contribution">
-                    {t("Explică propria contribuție", "Explain contribution")}
-                  </option>
-                  <option value="ownership">
-                    {t("Clarifică autonomia", "Clarify ownership")}
-                  </option>
-                  <option value="impact">
-                    {t("Amintește-ți rezultate reale", "Recall real outcomes")}
-                  </option>
-                  <option value="tools">
-                    {t("Descrie instrumentele folosite", "Explain tools used")}
-                  </option>
-                </select>
-              </label>
-            )}
-            {prepareQuestions && (
               <Button
                 disabled={planning}
                 onClick={async () => {
@@ -388,7 +368,7 @@ export function Enrichment({
                   setPlanning(true);
                   setError("");
                   try {
-                    const result = await prepareQuestions(targetId, goal);
+                    const result = await prepareQuestions(targetId);
                     if (!active()) return;
                     if (currentDraft.current !== before)
                       throw new Error("stale");

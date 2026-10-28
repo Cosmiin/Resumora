@@ -53,6 +53,7 @@ describe("CV import and career intelligence integration", () => {
     const target = latest.roles[0].id;
     const plan: QuestionPlan = {
       schemaVersion: "career-question-plan/1",
+      goal: "Historical saved goal",
       targetId: target,
       questions: [
         {
@@ -79,6 +80,7 @@ describe("CV import and career intelligence integration", () => {
         },
       ],
     };
+    const prepareQuestions = vi.fn(async () => plan);
     function Harness({ initial }: { initial: BaseDraft }) {
       const [d, setD] = useState(initial);
       latest = d;
@@ -89,7 +91,7 @@ describe("CV import and career intelligence integration", () => {
             change={setD}
             goEdit={() => {}}
             asOf={{ year: "2026", month: "10" }}
-            prepareQuestions={async () => plan}
+            prepareQuestions={prepareQuestions}
           />
         </LanguageContext.Provider>
       );
@@ -98,6 +100,8 @@ describe("CV import and career intelligence integration", () => {
     await user.click(
       screen.getByRole("button", { name: "Prepare AI questions" }),
     );
+    expect(prepareQuestions).toHaveBeenCalledWith(target);
+    expect(screen.queryByLabelText("Question goal")).toBeNull();
     await user.click(await screen.findByLabelText("Consolidated reports"));
     await user.click(screen.getByLabelText("Reviewed reports"));
     await user.click(screen.getByRole("button", { name: /Save and next/ }));
@@ -118,6 +122,7 @@ describe("CV import and career intelligence integration", () => {
       screen.getByText("Questions completed. Your context is retained."),
     ).toBeTruthy();
     const persisted = decodeDraft(encodeDraft(latest));
+    expect(persisted.questionPlans?.[0].goal).toBe("Historical saved goal");
     view.unmount();
     render(<Harness initial={persisted} />);
     await screen.findByText("Questions completed. Your context is retained.");
