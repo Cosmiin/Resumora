@@ -91,7 +91,7 @@ test("mounted native Worker keeps auth/CSRF on raw import and rejects paid-off b
             ? "application/octet-stream"
             : "application/json",
           Origin: env.APP_ORIGIN,
-          ...(signed ? { Cookie: cookie } : {}),
+          ...(signed ? { Cookie: cookie, "X-Resumora-Account": user.id } : {}),
           ...extra,
         },
         body: path.endsWith("/imports") ? "%PDF-1.7 synthetic" : "{}",
@@ -123,6 +123,23 @@ test("mounted native Worker keeps auth/CSRF on raw import and rejects paid-off b
         .status,
       503,
     );
+    for (const path of [
+      "/v1/base-cv/history",
+      "/v1/jobs",
+      "/v1/intelligence/imports",
+      "/v1/intelligence/imports/11111111-1111-4111-8111-111111111111",
+    ]) {
+      for (const binding of [
+        { "X-Resumora-Account": crypto.randomUUID(), "X-CSRF-Token": csrf },
+        { "X-Resumora-Account": user.id, "X-CSRF-Token": "retired-session" },
+      ]) {
+        const denied = await fetch(origin + path, {
+          headers: { Cookie: cookie, ...binding },
+        });
+        assert.equal(denied.status, 401);
+        assert.equal((await denied.json()).error.code, "UNAUTHORIZED");
+      }
+    }
     assert.ok(calls.every((url) => url.endsWith("/auth/v1/user")));
   } finally {
     await runtime.dispose();

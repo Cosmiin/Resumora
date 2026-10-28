@@ -39,7 +39,7 @@ class Browser {
   constructor(p) { this.p = p; }
   cookie() { return [...this.jar].map(([k, v]) => k + '=' + v).join('; '); }
   accept(response) { for (const value of response.headers.getSetCookie()) { const [part] = value.split(';'); const at = part.indexOf('='); const k = part.slice(0, at), v = part.slice(at + 1); if (v) this.jar.set(k, v); else this.jar.delete(k); } }
-  request(path, init = {}) { return new Request(env.APP_ORIGIN + path, { ...init, headers: { Cookie: this.cookie(), ...(init.method === 'POST' ? { Origin: env.APP_ORIGIN, 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf } : {}), ...init.headers } }); }
+  request(path, init = {}) { return new Request(env.APP_ORIGIN + path, { ...init, headers: { Cookie: this.cookie(), 'X-Resumora-Account': user.id, 'X-CSRF-Token': this.csrf, ...(init.method === 'POST' ? { Origin: env.APP_ORIGIN, 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf } : {}), ...init.headers } }); }
   async call(path, body, overrides = {}) {
     const response = await authRoute(this.request('/v1/auth' + path, body === undefined ? overrides : { method: 'POST', body: JSON.stringify(body), ...overrides }), env, this.p.transport);
     this.accept(response);
@@ -113,7 +113,7 @@ test('tampered, expired and provider-rejected sessions fail closed; rotated cook
   assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 401);
   let headers = authHeaders(); await writeCookie(headers, env, 'session', sessionCookie, -1); b.accept(new Response(null, { headers }));
   assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 401);
-  headers = authHeaders(); await saveSession(headers, env, { ...p.session(), expires_at: Math.floor(Date.now() / 1000) - 1 }, false); b.accept(new Response(null, { headers }));
+  headers = authHeaders(); await saveSession(headers, env, { ...p.session(), expires_at: Math.floor(Date.now() / 1000) - 1 }, false, b.csrf); b.accept(new Response(null, { headers }));
   const results = await Promise.all([authenticateRequest(b.request('/'), env, p.transport), authenticateRequest(b.request('/'), env, p.transport)]);
   assert.equal(p.refreshCount, 1);
   for (const result of results) { assert.equal(result.user.id, user.id); assert.ok(result.headers.getSetCookie().length); }
@@ -279,5 +279,23 @@ test('SDK session_not_found definitively clears status, password, and protected 
       assert.equal(await readCookie(b.request('/'), env, 'session'), null);
       assert.ok(p.calls.some(call => call.path.endsWith(path)));
     }
+  }
+});
+
+test('private reads reject a captured foreign account or session even with a valid replacement cookie', async () => {
+  const p = provider(), b = new Browser(p); await b.login();
+  for (const path of ['/v1/base-cv/history', '/v1/jobs', '/v1/intelligence/imports', '/v1/intelligence/imports/11111111-1111-4111-8111-111111111111']) {
+    for (const headers of [
+      { 'X-Resumora-Account': '' },
+      { 'X-Resumora-Account': '22222222-2222-4222-8222-222222222222' },
+      { 'X-CSRF-Token': '' },
+      { 'X-CSRF-Token': 'retired-session-csrf' },
+    ]) {
+      const result = await authenticateRequest(b.request(path, { headers }), env, p.transport);
+      assert.equal(result.response.status, 401);
+      assert.equal(result.accessToken, undefined);
+      assert.deepEqual((await result.response.json()).error.code, 'UNAUTHORIZED');
+    }
+    assert.equal((await authenticateRequest(b.request(path), env, p.transport)).user.id, user.id);
   }
 });

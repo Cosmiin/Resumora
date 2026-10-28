@@ -38,25 +38,35 @@ export function AuthShell({
   const verified = useRef(false),
     accountId = useRef<string | null>(null);
   const pending = useRef(Promise.resolve()),
+    verificationPending = useRef(Promise.resolve()),
     accountPending = useRef(Promise.resolve()),
     independent = useRef(Promise.resolve());
   const ordered = useCallback(
     <T,>(
       operation: () => Promise<T>,
-      lane: "session" | "account" | "intelligence" = "session",
+      lane: "session" | "verification" | "account" | "intelligence" = "session",
     ) => {
       const result = (
         lane === "session"
-          ? Promise.all([pending.current, independent.current])
+          ? Promise.all([
+              pending.current,
+              independent.current,
+              verificationPending.current,
+            ])
           : lane === "account"
-            ? Promise.all([pending.current, accountPending.current])
-            : pending.current
+            ? Promise.all([
+                pending.current,
+                verificationPending.current,
+                accountPending.current,
+              ])
+            : Promise.all([pending.current, verificationPending.current])
       ).then(operation);
       const settled = result.then(
         () => {},
         () => {},
       );
       if (lane === "session") pending.current = settled;
+      else if (lane === "verification") verificationPending.current = settled;
       else {
         independent.current = Promise.all([independent.current, settled]).then(
           () => {},
@@ -69,7 +79,7 @@ export function AuthShell({
   );
   const afterRequests = useCallback(
     <T,>(operation: () => Promise<T>) =>
-      independent.current.then(() => ordered(operation)),
+      independent.current.then(() => ordered(operation, "verification")),
     [ordered],
   );
   const transport: AuthTransport = useCallback(
@@ -133,6 +143,7 @@ export function AuthShell({
       }
       if (
         response.status === 401 &&
+        verified.current &&
         !path.startsWith("/v1/auth/") &&
         startedGeneration === generation.current &&
         startedCsrf === csrf.current
@@ -186,6 +197,10 @@ export function AuthShell({
     },
     [transport],
   );
+  const verify = useCallback(() => {
+    verified.current = false;
+    return ordered(() => load(), "verification");
+  }, [load, ordered]);
   // A retired adapter must never send old draft work under a replacement session.
   const accountTransport = useMemo<AuthTransport>(() => {
     const expectedCsrf = status?.csrfToken,
@@ -203,9 +218,14 @@ export function AuthShell({
       if (!verified.current) throw new Error("SESSION_UNVERIFIED");
     };
     return (path, init) => {
-      const send = () => {
+      const send = async () => {
         assertCurrent();
-        return transport(path, init);
+        const headers = new Headers(init?.headers);
+        headers.set("X-Resumora-Account", expectedAccount!);
+        headers.set("X-CSRF-Token", expectedCsrf!);
+        const response = await transport(path, { ...init, headers });
+        assertCurrent();
+        return response;
       };
       if (
         init?.method === "POST" &&
@@ -242,9 +262,9 @@ export function AuthShell({
     return load(true);
   }
   useEffect(() => {
-    void afterRequests(() => load());
+    void verify();
     const focus = () => {
-      void afterRequests(() => load());
+      void verify();
     };
     const interval = window.setInterval(focus, 60_000);
     window.addEventListener("focus", focus);
@@ -253,7 +273,7 @@ export function AuthShell({
       window.clearInterval(interval);
       window.removeEventListener("focus", focus);
     };
-  }, [load, afterRequests]);
+  }, [verify]);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -365,10 +385,7 @@ export function AuthShell({
               {error} Modificările rămân în această pagină; salvarea așteaptă
               verificarea sesiunii.
             </p>
-            <button
-              className="btn btn-ghost"
-              onClick={() => void afterRequests(() => load())}
-            >
+            <button className="btn btn-ghost" onClick={() => void verify()}>
               Reîncearcă conexiunea
             </button>
           </div>
@@ -478,7 +495,7 @@ export function AuthShell({
           className="btn btn-ghost"
           onClick={() => {
             if (loggingOut.current) void logout();
-            else void afterRequests(() => load());
+            else void verify();
           }}
           disabled={busy}
         >
