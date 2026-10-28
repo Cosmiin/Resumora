@@ -90,6 +90,10 @@ export function createDatabaseGateway(env: DatabaseConfig, identity: DatabaseIde
       : name === 'save_base_draft' || name === 'restore_base_draft' ? isSnapshot(result)
       : name === 'list_target_jobs' ? Array.isArray(result) && result.length <= 50
       : name === 'get_target_job' || name === 'load_editor_snapshot' ? result === null || record(result)
+      : name === 'save_job_cv_checkpoint' ? record(result) && typeof result.documentId === 'string' && uuid.test(result.documentId)
+        && typeof result.cvVersionId === 'string' && uuid.test(result.cvVersionId)
+        && result.revision === (args.p_expected_revision as number) + 1
+        && result.tailoringState === (args.p_tailored ? 'tailored' : 'not_tailored')
       : name === 'expire_photo_uploads' ? Array.isArray(result) && result.length <= 10 : record(result);
     if (!valid) throw new DatabaseError(503, 'DATABASE_UNAVAILABLE');
     return result as T;
@@ -152,6 +156,14 @@ export function createDatabaseGateway(env: DatabaseConfig, identity: DatabaseIde
       await response.body?.cancel();
     },
     provisionWorkspace: (requestId: string) => rpc<{ tenantId: string; userId: string }>('provision_workspace', { request_key: key(requestId) }),
+    saveJobCvCheckpoint: (input: { requestId: string; documentId: string | null; expectedRevision: number;
+      profileVersionId: string; jobVersionId: string; layout: Record<string, unknown>; locale: 'ro' | 'en'; tailored: boolean }) => {
+      if (typeof input.tailored !== 'boolean' || !['ro', 'en'].includes(input.locale)) throw new DatabaseError(400, 'INVALID_REQUEST');
+      return rpc<{ documentId: string; cvVersionId: string; revision: number; tailoringState: 'tailored' | 'not_tailored' }>(
+        'save_job_cv_checkpoint', { p_key: key(input.requestId), p_document: input.documentId === null ? null : key(input.documentId),
+          p_expected_revision: revision(input.expectedRevision), p_profile_version: key(input.profileVersionId),
+          p_job_version: key(input.jobVersionId), p_layout: input.layout, p_locale: input.locale, p_tailored: input.tailored });
+    },
     loadDraft: () => rpc<DraftSnapshot | null>('load_base_draft', {}),
     draftHistory: (page: { beforeRevision?: number; limit?: number } = {}) => {
       const limit = page.limit ?? 20;

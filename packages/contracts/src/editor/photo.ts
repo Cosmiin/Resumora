@@ -16,7 +16,6 @@ export function cropRectangle(width: number, height: number, crop: PhotoCrop) {
   if (![width, height].every(v => Number.isSafeInteger(v) && v > 0) ||
       !isPhoto({ assetId: '11111111-1111-4111-8111-111111111111', crop, shape: 'square', visible: true }))
     throw new Error('invalidPhotoCrop');
-  // Pixel rounding is shared by canvas and future export adapters.
   const size = Math.max(1, Math.floor(Math.min(width, height) / crop.zoom));
   const x = Math.max(0, Math.min(width - size, Math.round(crop.centerX * width - size / 2)));
   const y = Math.max(0, Math.min(height - size, Math.round(crop.centerY * height - size / 2)));
@@ -26,9 +25,4 @@ export function cropRectangle(width: number, height: number, crop: PhotoCrop) {
 export function photoForNextTailoredDraft(base: CvPhoto | null | undefined,
   previous: CvPhoto | null | undefined, mode: 'base' | 'override' = 'base'): CvPhoto | null {
   return structuredClone((mode === 'override' ? previous : base) ?? null);
-}
-/** Byte access stays in the authenticated renderer; no URLs/keys in documents. */
-export function photoRenderSpec(photo: CvPhoto | null | undefined, width: number, height: number) {
-  if (!photo?.visible) return null;
-  return { assetId: photo.assetId, shape: photo.shape, ...cropRectangle(width, height, photo.crop) };
 }

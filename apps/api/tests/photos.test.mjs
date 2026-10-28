@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { photoRoute, digestPhoto } from '../src/photos/routes.ts';
 import { inspectPhoto, PhotoError } from '../src/photos/format.ts';
-import { cropRectangle, defaultPhotoCrop, isPhoto, photoForNextTailoredDraft, photoRenderSpec } from '../../../packages/contracts/src/editor/photo.ts';
+import { cropRectangle, defaultPhotoCrop, isPhoto, photoForNextTailoredDraft } from '../../../packages/contracts/src/editor/photo.ts';
 const id='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',secret='s'.repeat(40);
 const photo={assetId:id,crop:{...defaultPhotoCrop},shape:'circle',visible:true};
 function fixture(){const bytes=new Uint8Array([255,216,255,217]), calls=[];let asset=null,stored=null;
@@ -21,12 +21,35 @@ test('crop keeps all framing within source across dimensions/zoom; masks do not 
   assert.deepEqual(cropRectangle(w,h,r.crop),r);
  }
  assert.equal(isPhoto({...photo,crop:{...photo.crop,zoom:Infinity}}),false);assert.equal(isPhoto({...photo,crop:{...photo.crop,centerX:NaN}}),false);
- assert.equal(isPhoto({...photo,assetId:'http://image.invalid'}),false);assert.equal(isPhoto({...photo,arbitrary:1}),false);assert.equal(photoRenderSpec({...photo,visible:false},256,256),null);
+ assert.equal(isPhoto({...photo,assetId:'http://image.invalid'}),false);assert.equal(isPhoto({...photo,arbitrary:1}),false);
 });
 test('next inherited draft uses latest Base; explicit override including no photo wins; historical input unchanged',()=>{
  const old=structuredClone(photo),base={...photo,shape:'square'};
  assert.deepEqual(photoForNextTailoredDraft(base,old),base);assert.deepEqual(photoForNextTailoredDraft(base,old,'override'),old);assert.equal(photoForNextTailoredDraft(base,null,'override'),null);
  const next=photoForNextTailoredDraft(base,old);next.crop.zoom=2;assert.equal(base.crop.zoom,1);assert.equal(old.shape,'circle');
+});
+test('job checkpoint gateway sends photo policy through the existing authenticated revision command',async()=>{
+ const {createDatabaseGateway,DatabaseError}=await import('../src/db/supabase.ts');const calls=[];
+ const result={documentId:id,cvVersionId:other,revision:3,tailoringState:'tailored'};
+ const gateway=createDatabaseGateway({SUPABASE_URL:'https://synthetic.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic'},
+  {user:{id},accessToken:'synthetic-user-token'},async(url,init)=>{calls.push({url,init});return Response.json(result);});
+ for(const policy of [{},{photoMode:'base'},{photoMode:'override',photo},{photoMode:'override',photo:null}]){
+  const layout={sectionOrder:[],sections:[],contactIds:[],templateVersionId:null,...policy};
+  assert.deepEqual(await gateway.saveJobCvCheckpoint({requestId:other,documentId:id,expectedRevision:2,profileVersionId:id,
+   jobVersionId:other,layout,locale:'en',tailored:true,userId:'spoofed',tenantId:'spoofed'}),result);
+  const call=calls.at(-1);assert.equal(call.url,'https://synthetic.supabase.co/rest/v1/rpc/save_job_cv_checkpoint');
+  assert.equal(call.init.headers.Authorization,'Bearer synthetic-user-token');assert.equal(call.init.headers['Content-Profile'],'app');
+  assert.deepEqual(JSON.parse(call.init.body),{p_key:other,p_document:id,p_expected_revision:2,p_profile_version:id,p_job_version:other,p_layout:layout,p_locale:'en',p_tailored:true});
+ }
+ const input={requestId:other,documentId:null,expectedRevision:0,profileVersionId:id,jobVersionId:other,layout:{},locale:'ro',tailored:false};
+ for(const invalid of [{...input,expectedRevision:-1},{...input,jobVersionId:'foreign'},{...input,tailored:null}])
+  assert.throws(()=>gateway.saveJobCvCheckpoint(invalid),e=>e instanceof DatabaseError&&e.status===400);
+ assert.equal(calls.length,4);
+ for(const status of [403,422]){
+  const denied=createDatabaseGateway({SUPABASE_URL:'https://synthetic.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic'},
+   {user:{id},accessToken:'synthetic-user-token'},async()=>Response.json({code:`PT${status}`,message:'PHOTO_NOT_AVAILABLE'},{status}));
+  await assert.rejects(denied.saveJobCvCheckpoint(input),e=>e instanceof DatabaseError&&e.status===status);
+ }
 });
 test('owned normalized upload is replayable; content is checksum verified and cross-CV deletion fenced',async()=>{
  const f=fixture();assert.equal((await photoRoute(req(),f.gateway,secret,f.normalize)).status,200);
