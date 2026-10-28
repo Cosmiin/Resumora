@@ -1698,9 +1698,7 @@ it("reveals and focuses selected history before a long revision list without cha
     expect(
       screen.queryByRole("complementary", { name: "CV preview" }),
     ).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Inspect v1", exact: true }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Inspect v1" }));
     const heading = await screen.findByRole("heading", {
       name: "Inspecting v1",
     });
@@ -1718,14 +1716,10 @@ it("reveals and focuses selected history before a long revision list without cha
         (version) => `v${version.revision} · ${version.draft.name.value}`,
       ),
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Inspect v1", exact: true }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Inspect v1" }));
     expect(document.activeElement).toBe(heading);
     expect(scroll).toHaveBeenCalledTimes(2);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Inspect v88", exact: true }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Inspect v88" }));
     expect(document.activeElement).toBe(
       await screen.findByRole("heading", { name: "Inspecting v88" }),
     );
