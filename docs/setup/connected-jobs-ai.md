@@ -140,10 +140,7 @@ verification and paid/live smoke need separate owner authorization.
 
 ## PDF/enrichment follow-up seam
 
-The [connected CV import/enrichment integration](cv-import-enrichment.md) now adds text/scanned/mixed PDFs, native Word reading, evidence review and AI-guided questions through a separate structured operation. This earlier scoped composition endpoint retains its own limits. Reuse authenticated routes, bounded
-provider transport and durable operation/attempt reservation; implement a distinct extraction
-schema and operation kind. Do not pass PDF contents through the constrained prose-composition
-validator, infer confirmation from extraction, or store generated questions as accepted facts.
-Preserve page/excerpt evidence and separately saved user answers; canonical publication remains
-an explicit validated step. Token/output limits and text-only Chat Completions here are unsuitable
-for whole-document vision/OCR without a separately reviewed adapter and cost bounds.
+The [CV import/enrichment guide](cv-import-enrichment.md) owns the separate structured
+operations for document extraction, evidence review, questions and whole-role rewriting.
+The scoped composition endpoint above retains its constrained validator and limits;
+document contents must use the format-specific import route.

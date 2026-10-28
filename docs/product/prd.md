@@ -1,6 +1,6 @@
 # AI CV Maker V2 — integrated product requirements draft v1.0
 
-Date:2026-10-23. **Discovery review draft; production implementation, release scope, weights, prices and commercial/privacy policy are unapproved.** For the later authorized local implementation and its scoped behavior, see the [Base CV guide](../frontend/base-cv.md). Consolidated review decisions: D-01–14 remain open in the linked strategy register; these do not block review of the discovery proposal. Opening a review is not approval. No production app/backend/infrastructure/payments or model calls have been built or tested.
+Date:2026-10-23. **Discovery review draft; production implementation, release scope, weights, prices and remaining commercial/privacy choices are unapproved.** For the later authorized local implementation and its scoped behavior, see the [Base CV guide](../frontend/base-cv.md). Remaining review decisions are tracked in the linked strategy register; these do not block review of the discovery proposal. Opening a review is not approval. No production app/backend/infrastructure/payments or model calls have been built or tested.
 
 ## 1. Product problem and desired behavior
 
@@ -41,9 +41,9 @@ Proposed first-use experience: account→upload/manual→structured review→Bas
 
 Discovery/prototype covers every baseline journey, URL/text/manual/extension import, distinct templates, PDF concept, error/empty/validation/retry and 1/3/6-month subscription lifecycle. Staging a feature for later implementation does not remove discovery coverage.
 
-**Recommended smallest useful release, pending review of D-01–14:** persistent versioned Base; PDF text/DOCX/manual import with confirmation; targeted enrichment; pasted/manual job text; required/preferred requirements; deterministic explainable matching with curated RO/EN aliases; truthful approved job variant; structured editor/history; one tested single-column PDF; RO/EN UI and independent CV language; privacy/account/server entitlements if commercial launch is approved.
+**Recommended smallest useful release, pending remaining review decisions:** persistent versioned Base; [implemented CV intake and confirmation scope](../setup/cv-import-enrichment.md#customer-journey-and-saved-truth); targeted enrichment; pasted/manual job text; required/preferred requirements; deterministic explainable matching with curated RO/EN aliases; truthful approved job variant; structured editor/history; one tested single-column PDF; RO/EN UI and independent CV language; privacy/account/server entitlements if commercial launch is approved.
 
-**Reviewable later scope:** URL fetch behind security limits, minimal extension, OCR, more templates, wider language coverage, DOCX export, broad semantic embeddings. The lean manual application record is specified in section 15. Automated job applications, job discovery, cover letters and predicted interview timelines are outside this proposed core. Their marketing presence is not evidence they are needed in the MVP. Implementation agents may begin only after explicit requirements/UX/architecture/MVP/budget approval.
+**Reviewable later scope:** URL fetch behind security limits, minimal extension, more templates, wider language coverage, DOCX export, broad semantic embeddings. The lean manual application record is specified in section 15. Automated job applications, job discovery, cover letters and predicted interview timelines are outside this proposed core. Their marketing presence is not evidence they are needed in the MVP. Implementation agents may begin only after explicit requirements/UX/architecture/MVP/budget approval.
 
 ## 5. Canonical career record
 
