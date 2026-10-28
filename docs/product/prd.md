@@ -121,7 +121,7 @@ Prototype has HTML preview, simulated PDF preparation and actual synthetic JSON 
 
 ## 10. Account, subscriptions, entitlements and privacy
 
-Discovery covers1/3/6-month terms, recurring renewal concept, pending/declined/active, cancel-at-period-end and resume. Prices are `— RON` placeholders; commercial amounts/discounts/refunds/VAT/limit/grace policy are unapproved. No cards/real payments/invoices. Proposed monthly allowance windows for every term avoid front-loaded6-month usage, but final limits remain D-05/07 decisions.
+Accepted billing direction supersedes the earlier allowance proposal: subscriptions allocate 30/45/150/350 credits upfront and auto-renew. Unused subscription credits roll over at renewal. Credit packs do not expire and can be combined with subscription credits. Credit quantities are separate from monetary pricing; money prices, refund terms and post-cancellation rollover rules remain unset. Stripe implementation is deferred until real AI testing and stability; no billing integration is implemented here.
 
 Production Checkout success redirects never authorize access. Signed/idempotent webhook handling and server-side entitlement reservation/enforcement are required. Entitlement read is informational with revision/status/period/features/remaining/reserved/resetAt. Editing/history/preview should not consume AI units; export/analysis/AI gates are commercial choices. Prototype illustrates one export activation path, not an approved monetization gate.
 
@@ -159,7 +159,7 @@ The strategy publication candidate contains the current D-01–14 decision regis
 | First-release input/extension/OCR | Current CV intake: [import guide](../setup/cv-import-enrichment.md); URL/extension and export depth remain separate | D-01/02/04, remaining release choices in strategy register |
 | Score display/calibration | Uncalibrated0–100 with explicit required warning and separate format vs withhold numeric release until calibration; no employer equivalence | D-03 |
 | PDF/template scope | One tested PDF initially vs multiple templates/export formats | D-04 |
-| Terms/limits/entitlement/grace/refunds | Proposed1/3/6 terms and monthly allowances; amounts/limits/gates unknown | D-05/07 and commercial policy |
+| Terms/limits/entitlement/grace/refunds | Accepted credits and renewal/rollover in section 10; remaining terms, limits and gates unset | D-05/07 and commercial policy |
 | Stack, budget, EU processing/retention | Architecture alternatives; budget ceiling and strictness need owner direction | Consolidated technical/privacy decisions |
 | First-use/enrichment | Quick Base then optional targeted interview (recommended) vs mandatory guided interview | D-09 / final register mapping |
 | Two titles | Optional second/unknown without invention (recommended) vs require confirmed two-title positioning later | D-10 |

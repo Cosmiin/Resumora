@@ -275,3 +275,38 @@ test('duplicate provider response cannot carry conflicting router cost evidence'
   await assert.rejects(ledger.finish('other-delivery', { ...previous.result,
     reportedCost: { ...previous.result.reportedCost, nanoUsd: '999999' } }), /PROVIDER_EVIDENCE_CONFLICT/);
 });
+
+test('optional reasoning effort is snapshotted for ordinary Chat attempts and opaque fingerprints, including fallback', async () => {
+  for (const effort of [undefined, 'none', 'low']) {
+    const calls = [], opts = options({ reasoningEffort: effort, transport: async (_url, init) => {
+      const body = JSON.parse(init.body); calls.push(body);
+      assert.equal(body.store, false); assert.equal(body.stream, false); assert.equal(body.max_completion_tokens, 256);
+      if (calls.length === 1) {
+        if (effort === undefined) assert.equal(Object.hasOwn(body, 'reasoning'), false);
+        else assert.deepEqual(body.reasoning, { effort });
+        assert.equal(Object.hasOwn(body, 'reasoning_effort'), false);
+        return Response.json({}, { status: 503 });
+      }
+      if (effort === undefined) assert.equal(Object.hasOwn(body, 'reasoning_effort'), false);
+      else assert.equal(body.reasoning_effort, effort);
+      assert.equal(Object.hasOwn(body, 'reasoning'), false);
+      return response('openai');
+    } });
+    const runner = prepareEnhancement(opts);
+    opts.reasoningEffort = effort === 'none' ? 'low' : 'none';
+    const result = await runner.propose(input());
+    assert.equal(calls.length, 2); assert.ok(result.proposal);
+    for (const attempt of result.attempts) {
+      const fingerprint = JSON.parse(attempt.requestFingerprint);
+      assert.equal(fingerprint.length, effort === undefined ? 4 : 5);
+      if (effort !== undefined) assert.deepEqual(fingerprint[4], { reasoningEffort: effort });
+      assert.equal(attempt.requestFingerprint.includes(context.facts[0].text), false);
+    }
+    assert.equal((await runner.propose(input())).attempts.length, 1);
+    assert.equal(calls.length, 2);
+  }
+});
+test('invalid effort fails runner preparation before ledger or transport access', () => {
+  for (const effort of [null, false, '', 'None', ' low', 'ultra', {}])
+    assert.throws(() => prepareEnhancement(options({ reasoningEffort: effort, ledger: {}, transport: () => assert.fail('No transport') })), /INVALID_REASONING_EFFORT/);
+});

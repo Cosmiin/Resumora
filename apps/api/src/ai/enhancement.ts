@@ -13,6 +13,22 @@ import type {
   EnhancementProposal,
 } from "./enhancement-context.ts";
 
+export type ReasoningEffort =
+  "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export function validateReasoningEffort(
+  value: unknown,
+): ReasoningEffort | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    !["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(
+      value,
+    )
+  )
+    throw new Error("INVALID_REASONING_EFFORT");
+  return value as ReasoningEffort;
+}
+
 const safeId = (v: unknown): string | null =>
   typeof v === "string" && /^[A-Za-z0-9_.:/-]{1,128}$/.test(v) ? v : null;
 const promptVersion = "extractive-proposal.v1";
@@ -74,6 +90,7 @@ export function prepareEnhancement(options: {
   execution?: "disabled" | "synthetic" | "configured";
   credentials?: { openrouter: string; openai?: string };
   processingPolicy?: string;
+  reasoningEffort?: ReasoningEffort;
   groundedComposition?: boolean;
   structured?: {
     request: StructuredOperation;
@@ -93,6 +110,7 @@ export function prepareEnhancement(options: {
     ...(options.fallback ? [options.fallback] : []),
   ]);
   const evidence = structuredClone(options.evidence ?? []);
+  const reasoningEffort = validateReasoningEffort(options.reasoningEffort);
   const total = options.totalTimeoutMs ?? 12_000,
     perAttempt = options.attemptTimeoutMs ?? 5_000;
   if (
@@ -196,6 +214,7 @@ export function prepareEnhancement(options: {
             route,
             context.targetId,
             context.facts.map((f) => f.id),
+            ...(reasoningEffort === undefined ? [] : [{ reasoningEffort }]),
           ]),
           startedAt,
         });
@@ -249,8 +268,15 @@ export function prepareEnhancement(options: {
             );
           });
           const request = async () => {
+            const effortBody =
+              reasoningEffort === undefined
+                ? {}
+                : word || route.provider === "openrouter"
+                  ? { reasoning: { effort: reasoningEffort } }
+                  : { reasoning_effort: reasoningEffort };
             const ordinaryBody = JSON.stringify({
               model: route.model,
+              ...effortBody,
               messages: [
                 {
                   role: "system",
@@ -310,6 +336,7 @@ export function prepareEnhancement(options: {
               body = word
                 ? JSON.stringify({
                     model: route.model,
+                    ...effortBody,
                     store: false,
                     stream: false,
                     max_output_tokens: task.maxOutputTokens,
@@ -334,6 +361,7 @@ export function prepareEnhancement(options: {
                   })
                 : JSON.stringify({
                     model: route.model,
+                    ...effortBody,
                     store: false,
                     stream: false,
                     max_completion_tokens: task.maxOutputTokens,

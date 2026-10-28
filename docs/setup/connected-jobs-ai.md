@@ -17,6 +17,8 @@ personal workspace; no client tenant/owner ID or service role is accepted.
 
 ## Enhancement behavior
 
+Optional server-only `AI_REASONING_EFFORT` configures the shared runner; see the [effort binding, endpoint mapping and compatibility limits](cv-import-enrichment.md#optional-reasoning-effort). Omit it to retain provider defaults. No client override is accepted.
+
 `POST /v1/enhancement` is session/CSRF protected. `AI_PAID_INFERENCE` defaults OFF and must be
 exactly `on` to permit provider execution. With OFF, the authenticated endpoint returns HTTP503
 `enhancementDisabled`, even with ambient keys. No provider call is needed to discover this state.

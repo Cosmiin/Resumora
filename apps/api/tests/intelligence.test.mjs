@@ -469,3 +469,97 @@ test("whole-experience prior wording uses complete saved evidence, including cop
     assert.deepEqual(original.roleRewriteReviews[0].input, input);
   }
 });
+
+test("canonical numeric extraction paths reject aliases before they can overwrite facts", () => {
+  for (const [canonical, alias] of [
+    ["professionalSkills.0", "professionalSkills.00"],
+    ["professionalSkills.9", "professionalSkills.09"],
+    ["technicalSkills.0", "technicalSkills.00"],
+    ["technicalSkills.9", "technicalSkills.09"],
+    ["roles.0.bullets.0", "roles.0.bullets.00"],
+    ["roles.9.bullets.9", "roles.9.bullets.09"],
+    ["roles.0.title", "roles.00.title"],
+    ["education.0.institution", "education.00.institution"],
+    ["languages.0.title", "languages.00.title"],
+    ["titles.0", "titles.00"],
+  ]) {
+    const duplicate = {
+      ...extraction,
+      candidates: [
+        { ...candidate, id: "original", path: canonical, value: "SQL" },
+        { ...candidate, id: "alias", path: alias, value: "Python" },
+      ],
+    };
+    assert.throws(
+      () => validateExtraction(duplicate, [page]),
+      /EXTRACTION_OUTPUT/,
+      alias,
+    );
+    assert.throws(
+      () => importedDraft({ ...review, extraction: duplicate }),
+      /INVALID_IMPORT_REVIEW/,
+      alias,
+    );
+  }
+  for (const path of [
+    "professionalSkills.100",
+    "technicalSkills.100",
+    "roles.0.bullets.100",
+    "roles.10.title",
+    "education.10.institution",
+    "languages.10.title",
+    "titles.2",
+  ])
+    assert.throws(
+      () =>
+        validateExtraction(
+          { ...extraction, candidates: [{ ...candidate, path }] },
+          [page],
+        ),
+      /EXTRACTION_OUTPUT/,
+      path,
+    );
+  const paths = [
+    "professionalSkills.99",
+    "technicalSkills.99",
+    "roles.9.bullets.99",
+    "professionalSkills.10",
+    "professionalSkills.9",
+    "professionalSkills.0",
+    "roles.9.bullets.0",
+    "technicalSkills.0",
+    "titles.1",
+    "education.9.institution",
+    "languages.9.title",
+  ];
+  const result = validateExtraction(
+    {
+      ...extraction,
+      candidates: paths.map((path, i) => ({
+        ...candidate,
+        id: `c${i}`,
+        path,
+        value: path,
+      })),
+    },
+    [page],
+  );
+  const draft = importedDraft({ ...review, extraction: result });
+  assert.deepEqual(
+    draft.professionalSkills.map((f) => f.value),
+    [
+      "professionalSkills.0",
+      "professionalSkills.9",
+      "professionalSkills.10",
+      "professionalSkills.99",
+    ],
+  );
+  assert.deepEqual(
+    draft.technicalSkills.map((f) => f.value),
+    ["technicalSkills.0", "technicalSkills.99"],
+  );
+  assert.deepEqual(
+    draft.roles[9].bullets.map((f) => f.value),
+    ["roles.9.bullets.0", "roles.9.bullets.99"],
+  );
+});

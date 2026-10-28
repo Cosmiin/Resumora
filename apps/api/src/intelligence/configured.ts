@@ -1,4 +1,8 @@
-import { prepareEnhancement } from "../ai/enhancement.ts";
+import {
+  prepareEnhancement,
+  validateReasoningEffort,
+  type ReasoningEffort,
+} from "../ai/enhancement.ts";
 import { configId, type EnhancementConfig } from "../ai/routes.ts";
 import { privateJson } from "../jobs/routes.ts";
 import type { UsageLedger } from "../ai/ledger.ts";
@@ -42,6 +46,14 @@ export async function configuredIntelligenceRoute(
       !configId(env.AI_PROCESSING_POLICY))
   )
     return privateJson({ error: { code: "AI_UNCONFIGURED" } }, 503);
+  let reasoningEffort: ReasoningEffort | undefined;
+  try {
+    reasoningEffort = reading
+      ? undefined
+      : validateReasoningEffort(env.AI_REASONING_EFFORT);
+  } catch {
+    return privateJson({ error: { code: "AI_UNCONFIGURED" } }, 503);
+  }
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(90000)]);
   const secret = env.AI_WORKER_SECRET ?? "",
     policy = env.AI_PROCESSING_POLICY ?? "";
@@ -113,6 +125,7 @@ export async function configuredIntelligenceRoute(
     const runner = prepareEnhancement({
       execution: "configured",
       processingPolicy: policy,
+      reasoningEffort,
       credentials: {
         openrouter: env.OPENROUTER_API_KEY ?? "",
         openai: env.OPENAI_API_KEY,
