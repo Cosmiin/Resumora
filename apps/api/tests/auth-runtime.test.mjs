@@ -95,7 +95,7 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
       headers = authHeaders();
       await saveSession(headers, env, { access_token: token, refresh_token: 'expired-runtime-' + result, expires_at: 1, user }, false, signed.csrfToken);
       accept(new Response(null, { headers }));
-      const expired = await cv(); assert.equal(expired.status, 401); assert.equal(expired.headers.getSetCookie().length, 0);
+      const expired = await cv(); assert.equal(expired.status, 409); assert.equal((await expired.json()).error.code, "SESSION_REFRESH_REQUIRED"); assert.equal(expired.headers.getSetCookie().length, 0);
       const refreshed = await call('/session'); assert.equal(refreshed.status, 200); assert.match(refreshed.headers.get('set-cookie'), /resumora-local-session/);
       databaseFailure = result === 'database';
       const response = await cv('/save', { ...save, mode: result === 'validation' ? 'checkpoint' : 'autosave' }, { 'X-CSRF-Token': signed.csrfToken });

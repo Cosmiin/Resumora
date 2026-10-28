@@ -115,7 +115,7 @@ test('private authentication never mutates cookies; explicit concurrent session 
   assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 401);
   headers = authHeaders(); await saveSession(headers, env, { ...p.session(), expires_at: Math.floor(Date.now() / 1000) - 1 }, false, b.csrf); b.accept(new Response(null, { headers }));
   const denied = await authenticateRequest(b.request('/'), env, p.transport);
-  assert.equal(denied.response.status, 401); assert.equal(denied.response.headers.getSetCookie().length, 0); assert.equal(p.refreshCount, 0);
+  assert.equal(denied.response.status, 409); assert.equal((await denied.response.json()).error.code, "SESSION_REFRESH_REQUIRED"); assert.equal(denied.response.headers.getSetCookie().length, 0); assert.equal(p.refreshCount, 0);
   const results = await Promise.all([b.call('/session'), b.call('/session')]);
   assert.equal(p.refreshCount, 1);
   for (const result of results) { assert.equal((await result.json()).user.id, user.id); assert.ok(result.headers.getSetCookie().length); }
@@ -125,7 +125,7 @@ test('private authentication never mutates cookies; explicit concurrent session 
 test('revoked refresh fails closed; provider redirects are not followed', async () => {
   const p = provider(), b = new Browser(p); p.rejectRefresh = true;
   const headers = authHeaders(); await saveSession(headers, env, { ...p.session(), refresh_token: 'different-revoked-refresh', expires_at: 1 }, false); b.accept(new Response(null, { headers }));
-  assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 401);
+  assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 409);
   await b.status(); p.redirect = true;
   assert.equal((await b.call('/login', { email: user.email, password: 'synthetic-password' })).status, 401);
   assert.equal(p.calls.at(-1).path, '/auth/v1/token');
@@ -211,7 +211,7 @@ test('temporary identity and refresh failures preserve cookies and deny protecte
       assert.equal(response.headers.getSetCookie().length, 0);
       assert.equal(b.cookie(), originalCookie);
       const denied = await authenticateRequest(b.request('/v1/base-cv'), env, p.transport);
-      assert.equal(denied.response.status, path === '/token' ? 401 : 503);
+      assert.equal(denied.response.status, path === '/token' ? 409 : 503);
       assert.equal(denied.response.headers.getSetCookie().length, 0);
       p.failure = null;
       assert.equal((await b.status()).user.id, user.id);
@@ -273,10 +273,10 @@ test('SDK session_not_found clears short auth responses while private failures l
         response = (await authenticateRequest(b.request('/v1/base-cv'), env, p.transport)).response;
         b.accept(response);
       } else response = await b.call('/' + consumer, consumer === 'password' ? { password: 'new-password' } : undefined);
-      assert.equal(response.status, consumer === 'session' ? 200 : 401);
+      assert.equal(response.status, consumer === 'session' ? 200 : consumer === 'cv' && path === '/token' ? 409 : 401);
       const body = await response.json();
       if (consumer === 'session') assert.equal(body.user, null);
-      else assert.equal(body.error.code, 'UNAUTHORIZED');
+      else assert.equal(body.error.code, consumer === 'cv' && path === '/token' ? 'SESSION_REFRESH_REQUIRED' : 'UNAUTHORIZED');
       if (consumer === 'cv') {
         assert.equal(response.headers.getSetCookie().length, 0);
         assert.ok(await readCookie(b.request('/'), env, 'session'));

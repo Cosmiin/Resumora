@@ -87,7 +87,8 @@ test('mounted Worker private responses cannot replace newer cookies after refres
     await delay(Math.max(0, (expiry - 90) * 1000 - Date.now() + 100));
     const oldCookie = same.header();
     const insufficient = await privateCall(same);
-    assert.equal(insufficient.status, 401);
+    assert.equal(insufficient.status, 409);
+    assert.equal((await insufficient.clone().json()).error.code, "SESSION_REFRESH_REQUIRED");
     assert.equal(insufficient.headers.getSetCookie().length, 0);
     assert.equal(refreshCount, 0, 'Private requests cannot rotate a refresh token');
     assert.equal(same.header(), oldCookie);
@@ -143,7 +144,7 @@ test('mounted Worker private responses cannot replace newer cookies after refres
     await seed(stale, 1);
     for (const path of ['/v1/base-cv/history', '/v1/intelligence/imports', '/v1/intelligence/imports/11111111-1111-4111-8111-111111111111']) {
       const response = await privateCall(stale, path);
-      assert.equal(response.status, 401);
+      assert.equal(response.status, 409);
       assert.equal(response.headers.getSetCookie().length, 0);
     }
     assert.equal(refreshCount, 2);

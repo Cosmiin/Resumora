@@ -162,7 +162,10 @@ for (const action of ["open", "check", "upload", "cancel"] as const) {
             screen.getByRole("button", { name: "Cancel import" }),
           ),
         );
-        expect(client.cancelImport).toHaveBeenLastCalledWith("b");
+        expect(client.cancelImport).toHaveBeenLastCalledWith(
+          "b",
+          expect.any(AbortSignal),
+        );
         expect(screen.getByRole("status").textContent).toBe("cancelled");
         expect(
           screen.queryByRole("button", { name: "Open unconfirmed facts" }),

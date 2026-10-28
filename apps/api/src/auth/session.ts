@@ -42,11 +42,13 @@ export function authError(
       ? "Configure Worker SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, APP_ORIGIN, API_ORIGIN and private AUTH_COOKIE_KEY. See docs/setup/authentication.md."
       : code === "UNAUTHORIZED"
         ? "Sign in again to continue."
-        : code === "INVALID_CREDENTIALS"
-          ? "Email or password is incorrect."
-          : code === "RATE_LIMITED"
-            ? "Please wait before trying again."
-            : "Unable to complete this request. Please try again.";
+        : code === "SESSION_REFRESH_REQUIRED"
+          ? "Verify your session again. Your draft is retained."
+          : code === "INVALID_CREDENTIALS"
+            ? "Email or password is incorrect."
+            : code === "RATE_LIMITED"
+              ? "Please wait before trying again."
+              : "Unable to complete this request. Please try again.";
   return authJson(
     { error: { code, message }, requestId: crypto.randomUUID() },
     status,
@@ -95,7 +97,7 @@ export async function saveSession(
   env: AuthConfig,
   session: Session,
   recovery: boolean,
-  csrf = crypto.randomUUID(),
+  csrf: string = crypto.randomUUID(),
 ) {
   if (
     !session.access_token ||
@@ -158,6 +160,7 @@ async function refreshed(
   refreshes.set(digest, { until: Date.now() + 10_000, result });
   return result;
 }
+class SessionRefreshRequired extends Error {}
 export async function verifySession(
   request: Request,
   env: AuthConfig,
@@ -172,7 +175,10 @@ export async function verifySession(
   }
   try {
     if (cookie.expires <= Date.now() / 1000 + 90) {
-      if (!updateCookie) return null;
+      if (!updateCookie) {
+        if (cookie.recovery) return null;
+        throw new SessionRefreshRequired();
+      }
       const session = cookie.recovery
         ? null
         : await refreshed(cookie, env, transport);
@@ -237,7 +243,9 @@ export async function authenticateRequest(
     )
       return { response: authError("UNAUTHORIZED", 401, headers) };
     return { user: verified.user, accessToken: verified.accessToken, headers };
-  } catch {
+  } catch (error) {
+    if (error instanceof SessionRefreshRequired)
+      return { response: authError("SESSION_REFRESH_REQUIRED", 409, headers) };
     return { response: authError("AUTH_UNAVAILABLE", 503, headers) };
   }
 }

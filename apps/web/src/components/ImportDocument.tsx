@@ -24,10 +24,12 @@ export function ImportDocument({
     [error, setError] = useState(""),
     [recent, setRecent] = useState<ImportStatus[]>([]);
   const operation = useRef<string | null>(null),
-    session = useRef(0);
+    session = useRef(0),
+    request = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
       session.current++;
+      request.current?.abort();
     },
     [],
   );
@@ -64,6 +66,7 @@ export function ImportDocument({
       return;
     }
     session.current++;
+    request.current?.abort();
     setFile(f);
     setStatus(null);
     setError("");
@@ -75,12 +78,20 @@ export function ImportDocument({
       operationId = operation.current;
     const active = () =>
       generation === session.current && operationId === operation.current;
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
     setBusy(true);
     setError("");
     try {
       const result = checkOnly
-        ? await client.importStatus(operationId)
-        : await client.importDocument(file!, operationId, revision);
+        ? await client.importStatus(operationId, controller.signal)
+        : await client.importDocument(
+            file!,
+            operationId,
+            revision,
+            controller.signal,
+          );
       if (active()) setStatus(result);
     } catch (error) {
       if (active())
@@ -124,6 +135,9 @@ export function ImportDocument({
             <Button
               key={row.id}
               onClick={async () => {
+                request.current?.abort();
+                const controller = new AbortController();
+                request.current = controller;
                 const generation = ++session.current,
                   operationId = row.id;
                 operation.current = operationId;
@@ -135,7 +149,10 @@ export function ImportDocument({
                 setError("");
                 setBusy(true);
                 try {
-                  const result = await client.importStatus(operationId);
+                  const result = await client.importStatus(
+                    operationId,
+                    controller.signal,
+                  );
                   if (active()) setStatus(result);
                 } catch {
                   if (active())
@@ -200,6 +217,9 @@ export function ImportDocument({
           disabled={!operation.current}
           onClick={async () => {
             if (!operation.current) return;
+            request.current?.abort();
+            const controller = new AbortController();
+            request.current = controller;
             const generation = ++session.current,
               operationId = operation.current;
             const active = () =>
@@ -209,7 +229,7 @@ export function ImportDocument({
             setError("");
             setBusy(true);
             try {
-              await client.cancelImport(operationId);
+              await client.cancelImport(operationId, controller.signal);
               if (active()) setStatus({ id: operationId, state: "cancelled" });
             } catch {
               if (active())
