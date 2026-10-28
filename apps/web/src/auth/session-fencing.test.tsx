@@ -26,7 +26,7 @@ for (const check of ["focus", "interval"] as const) {
   for (const token of ["same", "changed"] as const) {
     for (const lateStatus of [200, 401]) {
       it(`${check} fences cross-tab account replacement with ${token} CSRF before a late ${lateStatus} upload response`, async () => {
-        let tick = () => {
+        let tick: () => void = () => {
           throw new Error("INTERVAL_NOT_REGISTERED");
         };
         if (check === "interval") {
@@ -35,7 +35,9 @@ for (const check of ["focus", "interval"] as const) {
             (handler, delay, ...args) => {
               if (delay === 60_000 && typeof handler === "function")
                 tick = () => handler(...args);
-              return schedule(handler, delay, ...args);
+              return schedule(handler, delay, ...args) as unknown as ReturnType<
+                typeof window.setInterval
+              >;
             },
           );
         }
