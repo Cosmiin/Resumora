@@ -324,10 +324,16 @@ it("actual App photo commit merges late text edits and preserves presentation ov
   fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
     target: { value: "Mara" },
   });
+  fireEvent.change(screen.getByRole("combobox", { name: "Șablon" }), {
+    target: { value: "template_archive_2_1_0" },
+  });
   await act(async () => release({ id }));
   await screen.findByText("Fotografie salvată în CV.");
   const head = await adapter.load();
   expect(head?.draft.name.value).toBe("Mara");
+  expect(head?.draft.presentation.templateVersionId).toBe(
+    "template_archive_2_1_0",
+  );
   expect(head?.draft.presentation.photo?.assetId).toBe(id);
   expect(head?.draft.presentation.approvedWording).toEqual(
     draft.presentation.approvedWording,

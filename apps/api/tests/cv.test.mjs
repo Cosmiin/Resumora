@@ -104,3 +104,49 @@ test('history uses bounded revision cursor and rejects malformed cursors', async
     assert.equal((await cvRoute(req('/history' + query), gateway)).status, 400);
   assert.equal(calls.length, 2);
 });
+
+test('template version choices survive route/envelope history and restore, including future references', async () => {
+  const gateway = store(), draft = blankDraft();
+  const first = await (await cvRoute(req('/save', write(draft)), gateway)).json();
+  let revision = first.revision;
+  const refs = ['template_folio_2_1_0', 'template_meridian_2_1_0', 'template_signal_2_1_0', 'template_archive_2_1_0', 'template_monograph_2_1_0', 'template_future_9_0_0'];
+  for (const templateVersionId of refs) {
+    draft.presentation.templateVersionId = templateVersionId;
+    const response = await cvRoute(req('/save', write(draft, revision)), gateway);
+    assert.equal(response.status, 200);
+    const row = await response.json(); revision = row.revision;
+    assert.equal(row.draft.presentation.templateVersionId, templateVersionId);
+    assert.deepEqual(row.draft, draft);
+  }
+  const history = await (await cvRoute(req('/history'), gateway)).json();
+  assert.deepEqual(history.slice(0, refs.length).map(row => row.draft.presentation.templateVersionId), [...refs].reverse());
+  const restored = await (await cvRoute(req('/restore', { snapshotId: first.id, expectedRevision: revision, requestId: crypto.randomUUID() }), gateway)).json();
+  assert.equal(restored.draft.presentation.templateVersionId, undefined);
+  assert.equal(history[0].draft.presentation.templateVersionId, 'template_future_9_0_0');
+});
+
+test('invalid template version shapes are rejected before any persistence write', async () => {
+  let calls = 0;
+  const gateway = { async saveDraft() { calls++; throw new Error('unexpected'); } };
+  for (const value of ['', null, 42, { id: 'template_folio_2_1_0' }, 'T01@2.1.0', 'x'.repeat(81)]) {
+    const draft = blankDraft(); draft.presentation.templateVersionId = value;
+    assert.equal((await cvRoute(req('/save', write(draft)), gateway)).status, 400);
+  }
+  assert.equal(calls, 0);
+});
+
+test('template choice and typed saved photo survive one envelope and immutable restore', async () => {
+  const gateway = store(), draft = blankDraft();
+  draft.presentation.templateVersionId = 'template_archive_2_1_0';
+  draft.presentation.photo = { assetId: '11111111-1111-4111-8111-111111111111',
+    crop: { version: 1, centerX: .6, centerY: .4, zoom: 2 }, shape: 'circle', visible: true };
+  const first = await (await cvRoute(req('/save', write(draft)), gateway)).json();
+  assert.deepEqual(first.draft.presentation, draft.presentation);
+  const changed = structuredClone(draft); changed.presentation.templateVersionId = 'template_signal_2_1_0';
+  changed.presentation.photo.visible = false; changed.presentation.photo.shape = 'square';
+  await cvRoute(req('/save', write(changed, 1)), gateway);
+  const restored = await (await cvRoute(req('/restore', { snapshotId: first.id, expectedRevision: 2, requestId: crypto.randomUUID() }), gateway)).json();
+  assert.deepEqual(restored.draft.presentation, draft.presentation);
+  const malformed = structuredClone(changed); malformed.presentation.photo.crop.zoom = 9;
+  assert.equal((await cvRoute(req('/save', write(malformed, 3)), gateway)).status, 400);
+});

@@ -27,6 +27,8 @@ For the synthetic OpenAI cost-dashboard preview and its integration limits, foll
 
 After the CV draft has saved, open **Jobs** to paste an advert and save it to your account, then review its details. In **Improve**, select an entry and use **Suggest wording**; suggestions are switched off by default. Review any proposal and its sources before **Accept wording**. See [connected vacancies and wording setup](docs/setup/connected-jobs-ai.md) for configuration and limits, and the [capture design](docs/product/vacancy-capture-design.md) for planned extension and URL intake.
 
+The CV preview offers the five selected layouts—Folio, Meridian, Signal, Archive and Monograph—with a versioned choice saved through the existing editor history. See [template authoring and integration](docs/frontend/TEMPLATE_AUTHORING.md) for adding designs, font licenses and print checks. Job-tailored template selection/export remains a core integration requirement: the shared renderer/transport seam is available, but the current Jobs screen does not yet provide a tailored-document editor or exporter. This is partial tailoring delivery, with no inference triggered by a layout change.
+
 ## Discovery prototype preview
 
 From the repository root, run:
