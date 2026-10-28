@@ -508,6 +508,7 @@ function CvEditor({
       <div className="app-layout">
         <aside className="sidebar">
           <nav aria-label={t("Navigare principală", "Main navigation")}>
+            <a href="/extension">{t("Extensie Chrome", "Chrome extension")}</a>
             {nav.map((n) => (
               <a
                 key={n.route}

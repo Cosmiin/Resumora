@@ -8,9 +8,12 @@ import { authenticateRequest, checkWrite, authError } from './auth/session.ts';
 import type { AuthConfig } from './auth/session.ts';
 import { createDatabaseGateway } from './db/supabase.ts';
 import { cvRoute } from './cv/routes.ts';
+import { extensionRoute } from './extension/routes.ts';
+import { processCaptures } from './extension/processor.ts';
+import type { CaptureConfig } from './extension/gateway.ts';
 
 // Private endpoints use the authenticated user token; paid inference is OFF by default.
-interface Env extends AdminAuthConfig, AuthConfig, EnhancementConfig {
+interface Env extends AdminAuthConfig, AuthConfig, EnhancementConfig, CaptureConfig {
   APP_ENV: 'development';
 }
 
@@ -29,8 +32,14 @@ function json(body: HealthResponse | ApiError, status = 200, extraHeaders: Recor
 }
 
 export default {
+  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+    await processCaptures(env);
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname;
+    if (path.startsWith('/v1/extension/') || path === '/v1/jobs/capture-status' ||
+      (path === '/v1/jobs' && (request.headers.has('Authorization') || request.method === 'OPTIONS' || request.headers.get('Origin')?.startsWith('chrome-extension://'))))
+      return extensionRoute(request, env);
     if (path === '/admin/ai' || path === '/v1/admin/ai/usage') return adminRoute(request, env);
     if (authMethods[path]) return authRoute(request, env);
     if (cvPaths.has(path) || path === '/v1/jobs' || path.startsWith('/v1/jobs/') || path === '/v1/enhancement') {

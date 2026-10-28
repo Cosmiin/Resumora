@@ -52,8 +52,18 @@ export function JobsScreen({
   }, [transport]);
   function choose(j: SavedJob) {
     setSelected(j);
-    setTitle(j.intake.title ?? "");
-    setCompany(j.intake.company ?? "");
+    setTitle(
+      j.intake.title ??
+        (typeof j.intake.extracted?.title === "string"
+          ? j.intake.extracted.title
+          : ""),
+    );
+    setCompany(
+      j.intake.company ??
+        (typeof j.intake.extracted?.company === "string"
+          ? j.intake.extracted.company
+          : ""),
+    );
     setRequirements(j.requirements);
     setMessage("");
     setTimeout(() => reviewTitle.current?.focus(), 0);
@@ -165,26 +175,19 @@ export function JobsScreen({
         />
         <p className="small muted">
           {t(
-            "URL-ul este doar metadată; nu accesăm pagina. Asociem versiunea salvată a ciornei CV, fără să o modificăm.",
-            "The URL is metadata only; we do not retrieve the page. We attach the saved CV draft version without changing it.",
+            "URL-ul este doar metadată; nu accesăm pagina. Asociem automat cel mai recent CV salvat, dacă există.",
+            "The URL is metadata only; we do not retrieve the page. The server associates the latest saved Base when available.",
           )}
         </p>
         <Button
           variant="primary"
-          disabled={
-            !transport ||
-            !ready ||
-            !snapshot ||
-            !text.trim() ||
-            busy ||
-            !!pending.current
-          }
+          disabled={!transport || !text.trim() || busy || !!pending.current}
           onClick={() =>
             void send("/v1/jobs", {
               requestId: crypto.randomUUID(),
               intake: { text, ...(sourceUrl ? { sourceUrl } : {}) },
-              snapshotId: snapshot!.id,
-              snapshotRevision: snapshot!.revision,
+              snapshotId: null,
+              snapshotRevision: null,
               requirements: [],
             })
           }
@@ -193,9 +196,12 @@ export function JobsScreen({
             ? t("Se salvează…", "Saving…")
             : t("Salvează ciorna jobului", "Save job draft")}
         </Button>
-        {!ready && (
+        {!snapshot && (
           <p>
-            {t("Salvează întâi ciorna CV-ului.", "Save the CV draft first.")}
+            {t(
+              "Poți salva jobul acum. CV-ul de bază va fi necesar pentru analiză și adaptare.",
+              "Save the job now. A saved Base CV is needed for analysis and tailoring.",
+            )}
           </p>
         )}
         {pending.current && (
@@ -227,13 +233,76 @@ export function JobsScreen({
           <>
             <h2>{t("Verifică anunțul", "Review advert")}</h2>
             <p className="small">
-              {t("Ciornă CV asociată", "Associated CV draft")} · v
-              {selected.snapshotRevision}
+              {selected.snapshotId
+                ? `${t("Ciornă CV asociată", "Associated CV draft")} · v${selected.snapshotRevision}`
+                : t(
+                    "Salvat fără CV de bază. Adaugă un CV înainte de analiză/adaptare.",
+                    "Saved without a Base CV. Add a saved Base before analysis/tailoring.",
+                  )}
             </p>
             <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
               {selected.intake.text}
             </pre>
             {selected.intake.sourceUrl && <p>{selected.intake.sourceUrl}</p>}
+            {!selected.intake.sourceUrl && (
+              <p>
+                {t(
+                  "Salvat fără un link sursă. Păstrează anunțul original pentru a reveni și a trimite CV-ul acolo.",
+                  "Saved without a source link. Keep the original posting so you can return and submit your CV there.",
+                )}
+              </p>
+            )}
+            {selected.intake.capture !== undefined && (
+              <details>
+                <summary>
+                  {t(
+                    "Câmpuri capturate · neverificate",
+                    "Captured fields · unreviewed",
+                  )}
+                </summary>
+                <dl>
+                  {(
+                    [
+                      "title",
+                      "company",
+                      "location",
+                      "remote",
+                      "skills",
+                      "requiredSkills",
+                      "preferredSkills",
+                      "experience",
+                      "education",
+                      "certifications",
+                      "languages",
+                      "statedSalary",
+                      "applicationUrl",
+                    ] as const
+                  ).map((field) => (
+                    <div key={field}>
+                      <dt>{field}</dt>
+                      <dd>
+                        {typeof selected.intake.extracted?.[field] === "string"
+                          ? (selected.intake.extracted[field] as string)
+                          : Array.isArray(selected.intake.extracted?.[field])
+                            ? (
+                                selected.intake.extracted[field] as string[]
+                              ).join(", ")
+                            : t(
+                                "Necunoscut / indisponibil",
+                                "Unknown / not available",
+                              )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <p>
+                  {t(
+                    "Păstrăm doar salariul declarat, fără estimări. Verifică aceste informații.",
+                    "Only stated salary is retained, without estimates. Review these details.",
+                  )}
+                </p>
+              </details>
+            )}
             <label htmlFor="job-title">{t("Titlu", "Title")}</label>
             <input
               id="job-title"

@@ -5,6 +5,7 @@ export interface AuthConfig {
   SUPABASE_URL?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
   AUTH_COOKIE_KEY?: string;
+  CAPTURE_WORKER_SECRET?: string;
 }
 function publicKey(value?: string) {
   return !!value && value.length <= 4096 && /^sb_publishable_[A-Za-z0-9_-]+$/.test(value);

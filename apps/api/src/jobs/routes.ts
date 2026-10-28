@@ -1,5 +1,6 @@
 import { parseJobSave, isUuid, type JobSave, type SavedJob, type JobSummary } from '@resumora/contracts/jobs/connected';
 import { readBody } from '../cv/routes.ts';
+import { normalizeJobIntake } from '@resumora/contracts/jobs/intake';
 export interface JobsGateway {
   saveJob(input: JobSave): Promise<SavedJob>;
   reviewJob(input: { requestId: string; jobId: string; title: string; company: string; requirements: unknown[] }): Promise<SavedJob>;
@@ -26,11 +27,11 @@ export async function jobsRoute(request: Request, gateway: JobsGateway) {
       if (!isUuid(id) || Object.keys(body).sort().join(',') !== 'company,requestId,requirements,title') throw new Error('invalidRequest');
       const existing = await gateway.getJob(id);
       if (!existing) return privateJson({ error: { code: 'missing' } }, 404);
-      const checked = parseJobSave({ requestId: body.requestId, intake: { ...existing.intake, title: body.title, company: body.company },
-        snapshotId: existing.snapshotId, snapshotRevision: existing.snapshotRevision, requirements: body.requirements });
-      if (!checked.intake.title || !checked.intake.company) throw new Error('invalidRequest');
-      return privateJson(await gateway.reviewJob({ requestId: checked.requestId, jobId: id, title: checked.intake.title,
-        company: checked.intake.company, requirements: checked.requirements }));
+      const intake = normalizeJobIntake({text:existing.intake.text,title:body.title,company:body.company});
+      if(!isUuid(body.requestId) || !intake.ok || !intake.value.title || !intake.value.company || !Array.isArray(body.requirements) || body.requirements.length>100 ||
+        body.requirements.some(e=>!e || typeof e!=='object' || Object.keys(e).sort().join(',')!=='priority,text' || !['required','preferred'].includes(e.priority) || typeof e.text!=='string' || !e.text.trim() || e.text.length>1000 || !existing.intake.text.includes(e.text))) throw Error('invalidRequest');
+      return privateJson(await gateway.reviewJob({ requestId: body.requestId, jobId: id, title: intake.value.title,
+        company: intake.value.company, requirements: body.requirements }));
     }
     if (new URL(request.url).search) throw new Error('invalidRequest');
     if (id === null) return privateJson(await gateway.listJobs());

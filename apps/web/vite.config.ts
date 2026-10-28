@@ -8,6 +8,7 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    headers: { 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' },
     fs: {
       // Do not expose the Worker or the rest of the workspace through /@fs/.
       allow: ['.', '../../packages/contracts', '../../node_modules'].map(
@@ -27,5 +28,5 @@ export default defineConfig({
       },
     },
   },
-  preview: { host: '127.0.0.1', port: 4173, strictPort: true },
+  preview: { host: '127.0.0.1', port: 4173, strictPort: true, headers: { 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' } },
 });

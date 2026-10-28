@@ -20,6 +20,47 @@ import { encodeDraft, decodeDraft } from "@resumora/contracts/editor/transport";
 import { cvRoute } from "../../../api/src/cv/routes";
 import { acceptWording, currentWording } from "../base/wording";
 import { LanguageContext } from "./ui";
+it("manual fallback saves without Base and renders captured script text as data", async () => {
+  const text = "A job <script>globalThis.compromised=true</script>";
+  const writes: Record<string, unknown>[] = [];
+  const transport = async (_path: string, init?: RequestInit) => {
+    if (!init?.body) return Response.json([]);
+    const body = JSON.parse(String(init.body));
+    writes.push(body);
+    return Response.json({
+      id: crypto.randomUUID(),
+      versionId: null,
+      state: "draft",
+      createdAt: new Date().toISOString(),
+      snapshotId: null,
+      snapshotRevision: null,
+      intake: body.intake,
+      requirements: [],
+    });
+  };
+  render(
+    <LanguageContext value="en">
+      <JobsScreen transport={transport} snapshot={null} ready={false} />
+    </LanguageContext>,
+  );
+  fireEvent.change(screen.getByLabelText("Advert text"), {
+    target: { value: text },
+  });
+  expect(
+    (
+      screen.getByRole("button", {
+        name: "Save job draft",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Save job draft" }));
+  await screen.findByText(/Saved without a Base CV/);
+  expect(writes[0].snapshotId).toBeNull();
+  expect(writes[0].snapshotRevision).toBeNull();
+  expect(screen.getByText(/Saved without a source link/)).toBeTruthy();
+  expect(document.querySelector("pre")?.textContent).toBe(text);
+  expect(document.querySelector("pre script")).toBeNull();
+});
 it.each(["none", "capture", "review"])(
   "%s retry preserves unrelated intake while reviewing a saved capture",
   async (failure) => {

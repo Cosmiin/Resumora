@@ -174,7 +174,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'capture'], default='all', help='Focused SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -191,6 +191,16 @@ def main():
         tests = ROOT / 'supabase/tests/behavior.py'
         cases = 2
         upgrade = None
+        if args.suite == 'capture':
+            count += db.migrate('P5')
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('capture', ROOT / 'supabase/tests/capture.py')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            result = unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+            if args.receipt:
+                args.receipt.write_text(json.dumps({'suite':'capture','migrations_applied':count,'cases':result.testsRun,'success':result.wasSuccessful(),'elapsed_seconds':round(time.monotonic()-started,2),'hosted_access':False},indent=2)+'\n')
+            return 0 if result.wasSuccessful() else 1
         if tests.exists() and args.suite == 'all':
             import importlib.util
             spec = importlib.util.spec_from_file_location('resumora_db_behavior', tests)
@@ -218,8 +228,17 @@ def main():
         cases += connected_result.testsRun
         if not connected_result.wasSuccessful():
             return 1
+        if args.suite == 'all':
+            count += db.migrate('P5')
+            capture_spec = importlib.util.spec_from_file_location('capture', ROOT / 'supabase/tests/capture.py')
+            capture = importlib.util.module_from_spec(capture_spec)
+            capture_spec.loader.exec_module(capture)
+            capture_result = unittest.TextTestRunner(verbosity=2).run(capture.suite(db))
+            cases += capture_result.testsRun
+            if not capture_result.wasSuccessful():
+                return 1
         receipt = {'migrations_applied':count,'normal_reapply_pending':0,
-                   'tables':48,'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),
+                   'tables':int(db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'")),'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),
                    'database_version':db.sql('SHOW server_version'),
                    'transport':'private Unix socket; no TCP listener',
                    'auth':'local test roles/auth.uid(); no hosted Auth/API assurance',
