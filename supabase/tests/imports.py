@@ -74,6 +74,45 @@ def suite(db):
             self.assertEqual(db.sql(f"SELECT jsonb_array_length(review_decisions) FROM app.cv_import_sessions WHERE source_id='{self.row['id']}'"),'1')
             self.assertEqual(json.loads(self.call('load_base_draft'))['payload']['answers'],payload['answers'])
             self.assertEqual(db.sql('SELECT count(*) FROM app.profile_versions WHERE tenant_id IN (SELECT id FROM app.tenants WHERE owner_user_id=\''+self.a+'\')'),'0')
+        def test_multilingual_ready_quotes_keep_full_review_and_byte_bounded_unicode_excerpts(self):
+            samples=[
+                ('界'*1500,'界'*1365),
+                ('界'*1300+'🙂'*60,'界'*1300+'🙂'*49),
+                ('界'*1365+'🙂','界'*1365),
+                ('a'+'界'*1365,'a'+'界'*1365),
+                ('界'*1364+'🙂','界'*1364+'🙂'),
+                ('a'+'界'*1364+'🙂','a'+'界'*1364),
+                ('Résumé 東京 🙂','Résumé 東京 🙂'),
+                ('x'*2000,'x'*2000),
+            ]
+            for fmt in ('pdf','docx','doc'):
+                with self.subTest(format=fmt):
+                    if fmt!='pdf':
+                        self.op=uid();self.row=json.loads(self.call('begin_cv_import',f"'{self.op}','{fmt}','{'a'*64}',1024,0"))['record']
+                    self.complete('uploaded');self.complete('processing')
+                    review=self.review();review['format']=fmt;review['pages']=1 if fmt=='pdf' else None
+                    review['admission']['pages']=[1] if fmt=='pdf' else []
+                    review['extraction']['candidates']=[{'id':f'quote-{i}','path':f'roles.0.bullets.{i}','value':'Contribution','page':1 if fmt=='pdf' else None,'quote':quote,'confidence':'high'} for i,(quote,_) in enumerate(samples)]
+                    ready=json.loads(self.complete('ready',review))
+                    self.assertEqual(ready['state'],'ready');self.assertEqual(ready['review'],review)
+                    self.assertEqual(json.loads(self.call('get_cv_import',f"'{self.op}'"))['review'],review)
+                    spans=json.loads(db.sql(f"SELECT jsonb_agg(jsonb_build_object('locator',locator,'excerpt',text_excerpt,'bytes',octet_length(text_excerpt),'profileId',profile_id) ORDER BY locator->>'candidateId') FROM app.source_spans WHERE source_document_id='{self.row['id']}'"))
+                    self.assertEqual(len(spans),len(samples))
+                    profile=db.sql(f"SELECT profile_id FROM app.source_documents WHERE id='{self.row['id']}' AND state='available'")
+                    for i,(quote,expected) in enumerate(samples):
+                        span=spans[i]
+                        self.assertEqual(span['locator'],{'candidateId':f'quote-{i}','page':1 if fmt=='pdf' else None,'kind':'pdf_page' if fmt=='pdf' else 'word_excerpt'})
+                        self.assertEqual(span['profileId'],profile)
+                        self.assertEqual(span['excerpt'],expected)
+                        self.assertEqual(span['bytes'],len(expected.encode('utf-8')))
+                        self.assertLessEqual(span['bytes'],4096);self.assertTrue(quote.startswith(span['excerpt']))
+                        if len(expected)<len(quote):
+                            self.assertGreater(len(quote[:len(expected)+1].encode('utf-8')),4096)
+                    self.assertEqual(json.loads(self.complete('ready',review)),ready)
+                    self.assertEqual(db.sql(f"SELECT count(*) FROM app.source_spans WHERE source_document_id='{self.row['id']}'"),str(len(samples)))
+                    changed=json.loads(json.dumps(review));changed['extraction']['candidates'][0]['quote']='Changed quotation'
+                    self.assertIn('VERSION_CONFLICT',self.complete('ready',changed,error=True))
+                    self.assertEqual(json.loads(self.call('get_cv_import',f"'{self.op}'"))['review'],review)
         def test_confirmed_checkpoint_survives_cleanup_without_new_or_forged_confirmations(self):
             self.complete('uploaded');self.complete('processing');review=self.review()
             review['extraction']['candidates'].append({'id':'title','path':'titles.0','value':'Engineer','page':1,'quote':'Engineer','confidence':'high'})

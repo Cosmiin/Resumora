@@ -63,7 +63,7 @@ BEGIN
 END $$;
 CREATE FUNCTION app.complete_cv_import(p_operation uuid,p_state text,p_review jsonb,p_error text,p_secret text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE w uuid:=app.tenant_for_user(); s app.cv_import_sessions; c jsonb;
+DECLARE w uuid:=app.tenant_for_user(); s app.cv_import_sessions; c jsonb; excerpt text;
 BEGIN
  PERFORM app.require_ai_worker(p_secret);
  SELECT * INTO s FROM app.cv_import_sessions WHERE tenant_id=w AND operation_id=p_operation FOR UPDATE;
@@ -81,8 +81,12 @@ BEGIN
  UPDATE app.source_documents SET state=CASE WHEN p_state='ready' THEN 'available' WHEN p_state IN ('failed','not_cv','uncertain') THEN 'quarantined' ELSE 'uploaded' END,retain_until=s.expires_at WHERE tenant_id=w AND id=s.source_id;
  IF p_state='ready' THEN
  FOR c IN SELECT * FROM jsonb_array_elements(p_review->'extraction'->'candidates') LOOP
+ excerpt:=c->>'quote';
+ WHILE octet_length(excerpt)>4096 LOOP
+ excerpt:=left(excerpt,length(excerpt)-1);
+ END LOOP;
  INSERT INTO app.source_spans(tenant_id,profile_id,source_document_id,locator,text_excerpt)
- VALUES(w,(SELECT profile_id FROM app.source_documents WHERE tenant_id=w AND id=s.source_id),s.source_id,jsonb_build_object('candidateId',c->>'id','page',c->'page','kind',CASE WHEN c->'page'='null'::jsonb THEN 'word_excerpt' ELSE 'pdf_page' END),c->>'quote');
+ VALUES(w,(SELECT profile_id FROM app.source_documents WHERE tenant_id=w AND id=s.source_id),s.source_id,jsonb_build_object('candidateId',c->>'id','page',c->'page','kind',CASE WHEN c->'page'='null'::jsonb THEN 'word_excerpt' ELSE 'pdf_page' END),excerpt);
  END LOOP;
  END IF;
  RETURN app.cv_import_json(s);
