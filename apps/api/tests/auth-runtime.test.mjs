@@ -7,7 +7,7 @@ import { saveSession, authHeaders } from '../src/auth/session.ts';
 import { readCookie, writeCookie } from '../src/auth/cookies.ts';
 import { Miniflare, Response as RuntimeResponse, convertV4MiniflareOptions } from 'miniflare';
 
-test('native composed Worker enforces identity/CSRF/recovery and forwards refreshed cookies across CV success and failures', async () => {
+test('native composed Worker enforces identity/CSRF/recovery and confines cookie refresh to session checks', async () => {
   const env = { APP_ENV: 'development', APP_ORIGIN: 'http://127.0.0.1:5173', API_ORIGIN: 'http://127.0.0.1:5173', SUPABASE_URL: 'https://synthetic.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic', AUTH_COOKIE_KEY: Buffer.alloc(32, 9).toString('base64') };
   const user = { id: '11111111-1111-4111-8111-111111111111', email: 'runtime@example.invalid', email_confirmed_at: '2026-01-01T00:00:00Z' };
   const token = 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url') + '.synthetic';
@@ -90,16 +90,18 @@ test('native composed Worker enforces identity/CSRF/recovery and forwards refres
       headers = authHeaders();
       await saveSession(headers, env, { access_token: token, refresh_token: 'expired-runtime-' + result, expires_at: 1, user }, false, signed.csrfToken);
       accept(new Response(null, { headers }));
+      const expired = await cv(); assert.equal(expired.status, 401); assert.equal(expired.headers.getSetCookie().length, 0);
+      const refreshed = await call('/session'); assert.equal(refreshed.status, 200); assert.match(refreshed.headers.get('set-cookie'), /resumora-local-session/);
       databaseFailure = result === 'database';
       const response = await cv('/save', { ...save, mode: result === 'validation' ? 'checkpoint' : 'autosave' }, { 'X-CSRF-Token': signed.csrfToken });
       assert.equal(response.status, result === 'success' ? 200 : result === 'validation' ? 422 : 503);
-      assert.match(response.headers.get('set-cookie'), /resumora-local-session/);
+      assert.equal(response.headers.getSetCookie().length, 0);
       assert.match(response.headers.get('cache-control'), /no-store/);
       const body = await response.json(); assert.equal(JSON.stringify(body).includes('runtime-refresh'), false); assert.equal(JSON.stringify(body).includes('private synthetic diagnostic'), false);
     }
     databaseFailure = false;
     jar.set('resumora-local-session.0', 'tampered');
-    const rejected = await cv(); assert.equal(rejected.status, 401); assert.match(rejected.headers.get('set-cookie'), /Max-Age=0/);
+    const rejected = await cv(); assert.equal(rejected.status, 401); assert.equal(rejected.headers.getSetCookie().length, 0);
     jar.clear(); for (const [k,v] of originalJar) jar.set(k,v);
     assert.equal((await call('/logout', {}, { 'X-CSRF-Token': signed.csrfToken })).status, 200); assert.equal(jar.size, 0);
     assert.equal((await (await call('/session')).json()).user, null);

@@ -106,7 +106,7 @@ test('signup and recovery are enumeration-resistant, preserve PKCE, refuse overl
     assert.deepEqual(values[0], values[1]); assert.deepEqual(cookieSizes[0], cookieSizes[1]);
   }
 });
-test('tampered, expired and provider-rejected sessions fail closed; rotated cookies forward on successful concurrent refresh', async () => {
+test('private authentication never mutates cookies; explicit concurrent session checks refresh', async () => {
   const p = provider(), b = new Browser(p); await b.login();
   const sessionCookie = await readCookie(b.request('/'), env, 'session');
   b.jar.set('resumora-local-session.0', 'tampered');
@@ -114,11 +114,13 @@ test('tampered, expired and provider-rejected sessions fail closed; rotated cook
   let headers = authHeaders(); await writeCookie(headers, env, 'session', sessionCookie, -1); b.accept(new Response(null, { headers }));
   assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 401);
   headers = authHeaders(); await saveSession(headers, env, { ...p.session(), expires_at: Math.floor(Date.now() / 1000) - 1 }, false, b.csrf); b.accept(new Response(null, { headers }));
-  const results = await Promise.all([authenticateRequest(b.request('/'), env, p.transport), authenticateRequest(b.request('/'), env, p.transport)]);
+  const denied = await authenticateRequest(b.request('/'), env, p.transport);
+  assert.equal(denied.response.status, 401); assert.equal(denied.response.headers.getSetCookie().length, 0); assert.equal(p.refreshCount, 0);
+  const results = await Promise.all([b.call('/session'), b.call('/session')]);
   assert.equal(p.refreshCount, 1);
-  for (const result of results) { assert.equal(result.user.id, user.id); assert.ok(result.headers.getSetCookie().length); }
-  b.accept(new Response(null, { headers: results[0].headers })); p.failUser = true;
-  const rejected = await authenticateRequest(b.request('/'), env, p.transport); assert.equal(rejected.response.status, 401); assert.match(rejected.response.headers.get('set-cookie'), /Max-Age=0/);
+  for (const result of results) { assert.equal((await result.json()).user.id, user.id); assert.ok(result.headers.getSetCookie().length); }
+  p.failUser = true;
+  const rejected = await authenticateRequest(b.request('/'), env, p.transport); assert.equal(rejected.response.status, 401); assert.equal(rejected.response.headers.getSetCookie().length, 0);
 });
 test('revoked refresh fails closed; provider redirects are not followed', async () => {
   const p = provider(), b = new Browser(p); p.rejectRefresh = true;
@@ -209,7 +211,7 @@ test('temporary identity and refresh failures preserve cookies and deny protecte
       assert.equal(response.headers.getSetCookie().length, 0);
       assert.equal(b.cookie(), originalCookie);
       const denied = await authenticateRequest(b.request('/v1/base-cv'), env, p.transport);
-      assert.equal(denied.response.status, 503);
+      assert.equal(denied.response.status, path === '/token' ? 401 : 503);
       assert.equal(denied.response.headers.getSetCookie().length, 0);
       p.failure = null;
       assert.equal((await b.status()).user.id, user.id);
@@ -257,7 +259,7 @@ test('logout and password failures that clear cookies can recover anonymous CSRF
 });
 
 
-test('SDK session_not_found definitively clears status, password, and protected CV sessions', async () => {
+test('SDK session_not_found clears short auth responses while private failures leave cookies untouched', async () => {
   for (const consumer of ['session', 'password', 'cv']) {
     for (const path of consumer === 'password' ? ['/user'] : ['/user', '/token']) {
       const p = provider(), b = new Browser(p), headers = authHeaders();
@@ -275,9 +277,15 @@ test('SDK session_not_found definitively clears status, password, and protected 
       const body = await response.json();
       if (consumer === 'session') assert.equal(body.user, null);
       else assert.equal(body.error.code, 'UNAUTHORIZED');
-      assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
-      assert.equal(await readCookie(b.request('/'), env, 'session'), null);
-      assert.ok(p.calls.some(call => call.path.endsWith(path)));
+      if (consumer === 'cv') {
+        assert.equal(response.headers.getSetCookie().length, 0);
+        assert.ok(await readCookie(b.request('/'), env, 'session'));
+        if (path === '/token') assert.equal(p.calls.length, 0);
+      } else {
+        assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
+        assert.equal(await readCookie(b.request('/'), env, 'session'), null);
+        assert.ok(p.calls.some(call => call.path.endsWith(path)));
+      }
     }
   }
 });

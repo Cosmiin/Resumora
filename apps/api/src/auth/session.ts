@@ -163,14 +163,16 @@ export async function verifySession(
   env: AuthConfig,
   headers: Headers,
   transport: typeof fetch = fetch,
+  updateCookie = true,
 ) {
   let cookie = await readCookie<SessionCookie>(request, env, "session");
   if (!cookie) {
-    clearCookie(headers, env, "session");
+    if (updateCookie) clearCookie(headers, env, "session");
     return null;
   }
   try {
     if (cookie.expires <= Date.now() / 1000 + 90) {
+      if (!updateCookie) return null;
       const session = cookie.recovery
         ? null
         : await refreshed(cookie, env, transport);
@@ -189,7 +191,7 @@ export async function verifySession(
     );
     if (error) throw error;
     if (!data.user?.email_confirmed_at) {
-      clearCookie(headers, env, "session");
+      if (updateCookie) clearCookie(headers, env, "session");
       return null;
     }
     return {
@@ -203,7 +205,7 @@ export async function verifySession(
       (!isAuthApiError(error) || ![400, 401, 403].includes(error.status))
     )
       throw error;
-    clearCookie(headers, env, "session");
+    if (updateCookie) clearCookie(headers, env, "session");
     return null;
   }
 }
@@ -219,7 +221,7 @@ export async function authenticateRequest(
     return { response: authError("AUTH_UNCONFIGURED", 503, headers) };
   }
   try {
-    const verified = await verifySession(request, env, headers, transport);
+    const verified = await verifySession(request, env, headers, transport, false);
     if (!verified || verified.cookie.recovery)
       return { response: authError("UNAUTHORIZED", 401, headers) };
     if (
