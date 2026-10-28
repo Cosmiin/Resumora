@@ -46,7 +46,9 @@ test('native composed Worker enforces identity/CSRF/recovery and forwards refres
       const response = await fetch(origin + '/v1/auth' + path, { method: body ? 'POST' : 'GET', headers: { Cookie: [...jar].map(([k,v]) => k + '=' + v).join('; '), ...(body ? { Origin: env.APP_ORIGIN, 'Content-Type': 'application/json' } : {}), ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) }); accept(response); return response;
     };
     const cv = async (path = '', body, headers = {}) => {
-      const response = await fetch(origin + '/v1/base-cv' + path, { method: body ? 'POST' : 'GET', headers: { Cookie: [...jar].map(([k,v]) => k + '=' + v).join('; '), ...(body ? { Origin: env.APP_ORIGIN, 'Content-Type': 'application/json' } : {}), ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) }); accept(response); return response;
+      const cookie = [...jar].map(([k,v]) => k + '=' + v).join('; ');
+      const session = await readCookie(new Request(env.APP_ORIGIN, { headers: { Cookie: cookie } }), env, 'session');
+      const response = await fetch(origin + '/v1/base-cv' + path, { method: body ? 'POST' : 'GET', headers: { Cookie: cookie, 'X-Resumora-Account': user.id, ...(!body ? { 'X-CSRF-Token': session?.csrf ?? '' } : {}), ...(body ? { Origin: env.APP_ORIGIN, 'Content-Type': 'application/json' } : {}), ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) }); accept(response); return response;
     };
     assert.equal((await cv()).status, 401); assert.equal(calls.length, 0);
     const initial = await (await call('/session')).json(); assert.equal(initial.user, null);

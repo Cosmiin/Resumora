@@ -222,6 +222,12 @@ export async function authenticateRequest(
     const verified = await verifySession(request, env, headers, transport);
     if (!verified || verified.cookie.recovery)
       return { response: authError("UNAUTHORIZED", 401, headers) };
+    if (
+      request.headers.get("X-Resumora-Account") !== verified.user.id ||
+      (request.method === "GET" &&
+        request.headers.get("X-CSRF-Token") !== verified.cookie.csrf)
+    )
+      return { response: authError("UNAUTHORIZED", 401, headers) };
     return { user: verified.user, accessToken: verified.accessToken, headers };
   } catch {
     return { response: authError("AUTH_UNAVAILABLE", 503, headers) };
