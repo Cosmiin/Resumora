@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   act,
@@ -435,5 +436,123 @@ it.each([
       ).getByText("Prepared clear reports."),
     ).toBeTruthy();
     preview.unmount();
+  },
+);
+
+it.each([
+  "role",
+  "projects",
+  "certifications",
+  "volunteering",
+  "custom",
+] as const)(
+  "%s accepted wording survives more than twenty later proposals for another experience",
+  async (kind) => {
+    const initial = base();
+    if (kind !== "role") {
+      const entry = newOptionalEntry();
+      entry.title = fact("Accepted experience");
+      entry.details = initial.roles[0].context;
+      entry.bullets = initial.roles[0].bullets;
+      initial.roles = [];
+      initial.optionalSections.push({
+        id: "accepted-section",
+        kind,
+        label: "Extra",
+        entries: [entry],
+      });
+      initial.presentation.order.push("accepted-section");
+    }
+    const target =
+      kind === "role"
+        ? initial.roles[0].id
+        : initial.optionalSections.at(-1)!.entries[0].id;
+    const other = newRole();
+    other.title = fact("Other experience");
+    other.context = fact("Prepared schedules.");
+    initial.roles.push(other);
+    let latest = saveAnswer(
+      initial,
+      {
+        id: "independent-answer",
+        targetId: target,
+        question: "tools",
+        questionText: "Tools?",
+        text: "Spreadsheet.",
+        status: "draft",
+      },
+      enrichmentTarget(initial, target)!.field.id,
+    );
+    const original = clone(latest);
+    function Surface() {
+      const [draft, setDraft] = useState(latest);
+      latest = draft;
+      return (
+        <LanguageContext value="en">
+          <Enrichment
+            draft={draft}
+            change={setDraft}
+            goEdit={() => {}}
+            asOf={{ year: "2026", month: "10" }}
+            rewriteRole={async (id) => result("rewrite", draft, id)}
+          />
+        </LanguageContext>
+      );
+    }
+    const view = render(<Surface />);
+    fireEvent.change(screen.getByLabelText("Entry"), {
+      target: { value: target },
+    });
+    await act(async () =>
+      fireEvent.click(
+        screen.getByRole("button", { name: "Propose experience rewrite" }),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Accept rewrite" }));
+    const acceptedId = latest.roleRewriteReviews!.find(
+      (r) => r.status === "accepted",
+    )!.id;
+    fireEvent.change(screen.getByLabelText("Entry"), {
+      target: { value: other.id },
+    });
+    for (let i = 0; i < 25; i++) {
+      await act(async () =>
+        fireEvent.click(
+          screen.getByRole("button", { name: "Propose experience rewrite" }),
+        ),
+      );
+      expect(currentWording(latest, target)).toBe("Prepared clear reports.");
+    }
+    expect(
+      latest.roleRewriteReviews!.some(
+        (r) => r.id === acceptedId && r.status === "accepted",
+      ),
+    ).toBe(true);
+    expect(latest.roleRewriteReviews!.length).toBeLessThanOrEqual(21);
+    expect(
+      new TextEncoder().encode(JSON.stringify(encodeDraft(latest))).byteLength,
+    ).toBeLessThan(1048576);
+    expect(latest.roles).toEqual(original.roles);
+    expect(latest.optionalSections).toEqual(original.optionalSections);
+    expect(latest.answers).toEqual(original.answers);
+    expect(latest.sources).toEqual(original.sources);
+    expect(latest.presentation.order).toEqual(original.presentation.order);
+    expect(latest.presentation.hidden).toEqual(original.presentation.hidden);
+    const persisted = decodeDraft(encodeDraft(latest));
+    expect(currentWording(persisted, target)).toBe("Prepared clear reports.");
+    view.unmount();
+    render(
+      <LanguageContext value="en">
+        <DocumentPreview
+          draft={persisted}
+          asOf={{ year: "2026", month: "10" }}
+        />
+      </LanguageContext>,
+    );
+    const preview = screen.getByRole("complementary", { name: "CV preview" });
+    expect(
+      within(preview).getAllByText("Prepared clear reports."),
+    ).toHaveLength(1);
+    expect(preview.textContent).not.toContain("Uncited contribution.");
   },
 );
