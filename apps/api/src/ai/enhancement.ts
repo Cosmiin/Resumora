@@ -413,7 +413,9 @@ export function prepareEnhancement(options: {
               (task?.fileBase64 ? 14_000_000 : task ? 65_536 : 32_768)
             )
               throw new Error("INPUT_LIMIT");
-            const response = await options.transport!(
+            // Native Worker fetch must be called without the options receiver.
+            const transport = options.transport!;
+            const response = await transport(
               live
                 ? word
                   ? "https://api.openai.com/v1/responses"
