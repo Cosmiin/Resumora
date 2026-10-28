@@ -21,8 +21,3 @@ export function cropRectangle(width: number, height: number, crop: PhotoCrop) {
   const y = Math.max(0, Math.min(height - size, Math.round(crop.centerY * height - size / 2)));
   return { x, y, size, crop: { ...crop, centerX: (x + size / 2) / width, centerY: (y + size / 2) / height } };
 }
-/** Call on each NEW job revision, never while reading a historical version. */
-export function photoForNextTailoredDraft(base: CvPhoto | null | undefined,
-  previous: CvPhoto | null | undefined, mode: 'base' | 'override' = 'base'): CvPhoto | null {
-  return structuredClone((mode === 'override' ? previous : base) ?? null);
-}

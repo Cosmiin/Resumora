@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { photoRoute, digestPhoto } from '../src/photos/routes.ts';
 import { inspectPhoto, PhotoError } from '../src/photos/format.ts';
-import { cropRectangle, defaultPhotoCrop, isPhoto, photoForNextTailoredDraft } from '../../../packages/contracts/src/editor/photo.ts';
+import { cropRectangle, defaultPhotoCrop, isPhoto } from '../../../packages/contracts/src/editor/photo.ts';
 const id='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222',secret='s'.repeat(40);
 const photo={assetId:id,crop:{...defaultPhotoCrop},shape:'circle',visible:true};
 function fixture(){const bytes=new Uint8Array([255,216,255,217]), calls=[];let asset=null,stored=null;
@@ -22,11 +22,6 @@ test('crop keeps all framing within source across dimensions/zoom; masks do not 
  }
  assert.equal(isPhoto({...photo,crop:{...photo.crop,zoom:Infinity}}),false);assert.equal(isPhoto({...photo,crop:{...photo.crop,centerX:NaN}}),false);
  assert.equal(isPhoto({...photo,assetId:'http://image.invalid'}),false);assert.equal(isPhoto({...photo,arbitrary:1}),false);
-});
-test('next inherited draft uses latest Base; explicit override including no photo wins; historical input unchanged',()=>{
- const old=structuredClone(photo),base={...photo,shape:'square'};
- assert.deepEqual(photoForNextTailoredDraft(base,old),base);assert.deepEqual(photoForNextTailoredDraft(base,old,'override'),old);assert.equal(photoForNextTailoredDraft(base,null,'override'),null);
- const next=photoForNextTailoredDraft(base,old);next.crop.zoom=2;assert.equal(base.crop.zoom,1);assert.equal(old.shape,'circle');
 });
 test('job checkpoint gateway sends photo policy through the existing authenticated revision command',async()=>{
  const {createDatabaseGateway,DatabaseError}=await import('../src/db/supabase.ts');const calls=[];
