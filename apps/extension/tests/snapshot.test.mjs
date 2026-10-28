@@ -10,7 +10,9 @@ function extract(url,markup){
   dom.window.HTMLElement.prototype.getClientRects=function(){return this.hidden?[]:[{width:100,height:30}];};
   Object.defineProperty(dom.window.HTMLElement.prototype,'innerText',{get(){return this.textContent;}});
   dom.window.TextEncoder=TextEncoder;
-  return dom.window.eval('('+capturePage.toString()+')()');
+  const result=dom.window.eval('('+capturePage.toString()+')()');
+  assert.equal(dom.window.pwned,undefined);
+  return result;
 }
 for(const [url,adapter,section] of [['https://boards.greenhouse.io/co/jobs/1','greenhouse','<div id="content">'],['https://jobs.ashbyhq.com/co/1','ashby','<main>'],['https://www.linkedin.com/jobs/view/1','linkedin','<div class="jobs-description">'],['https://www.bestjobs.eu/job/one','bestjobs','<div class="job-description">'],['https://jobs.lever.co/co/1','lever','<div class="posting-page">'],['https://co.wd3.myworkdayjobs.com/en-US/jobs/job/one','workday','<div data-automation-id="jobPostingDescription">'],['https://jobs.smartrecruiters.com/co/1','smartrecruiters','<div id="st-jobDescription">'],['https://careers-co.icims.com/jobs/1','icims','<div class="iCIMS_JobContent">'],['https://co.fa.oraclecloud.com/hcmUI/job/1','oracle','<div class="job-description">'],['https://co.taleo.net/careersection/jobdetail.ftl','oracle','<div class="jobdescr">'],['https://co.successfactors.eu/job/1','successfactors','<div id="jobdescription">'],['https://apply.workable.com/co/1','workable','<div data-ui="job-description">'],['https://co.recruitee.com/o/one','recruitee','<div data-testid="job-description">'],['https://co.bamboohr.com/careers/1','bamboohr','<div class="BambooRichText">'],['https://co.jobs.personio.de/job/1','personio','<div class="detail">'],['https://co.teamtailor.com/jobs/1','teamtailor','<div id="job-description">'],['https://www.indeed.com/viewjob?jk=1','indeed','<div id="jobDescriptionText">'],['https://other.invalid/job','generic','<article>']]) {
   test('synthetic rendered '+adapter,()=>{
@@ -57,4 +59,61 @@ test('job titles in rendered headers and non-English main sections retain the or
   const text='Développeur logiciel. Vous concevez des logiciels et accompagnez notre équipe sur des projets internationaux.';
   const result=extract('https://unknown.invalid/job','<main><header><h1>Développeur logiciel</h1></header><p>'+text+'</p></main>');
   assert.equal(result.title,'Développeur logiciel');assert.ok(result.text.includes(text));
+});
+
+const intro='About this role: '+('Build useful reporting tools with our team. '.repeat(3)).trim();
+const requirements='Required: SQL and five years of analytics experience.';
+const preferred='Preferred: Python and experience mentoring analysts.';
+for(const [name,url,markup] of [
+  ['unknown nested introduction','https://careers.unknown.invalid/job',
+    '<div><section><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section></div>'],
+  ['unknown paragraph sections','https://careers.unknown.invalid/job',
+    '<div><section><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section></div>'],
+  ['unknown direct body sections','https://careers.unknown.invalid/job',
+    '<section><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section><footer>PRIVATE FOOTER</footer>'],
+  ['unknown standalone paragraph siblings','https://careers.unknown.invalid/job',
+    '<p>'+intro+'</p><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p><footer>PRIVATE FOOTER</footer>'],
+  ['generic matching fragments','https://careers.unknown.invalid/job',
+    '<div><h1>Analyst</h1><div class="job-description"><p>'+intro+'</p></div><div class="job-description"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div>'],
+  ['generic introduction selector','https://careers.unknown.invalid/job',
+    '<div><section class="job-description"><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section></div>'],
+  ['generic selector body siblings','https://careers.unknown.invalid/job',
+    '<section class="job-description"><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section><footer>PRIVATE FOOTER</footer>'],
+  ['generic article fragments','https://careers.unknown.invalid/job',
+    '<div><article><h1>Analyst</h1><p>'+intro+'</p></article><article><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></article></div>'],
+  ['Lever sibling wrappers','https://jobs.lever.co/co/one',
+    '<div><h1>Analyst</h1><div class="section-wrapper"><p>'+intro+'</p></div><div class="section-wrapper"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div>'],
+  ['Lever nested wrappers','https://jobs.lever.co/co/one',
+    '<div class="posting-page"><h1>Analyst</h1><div class="section-wrapper"><p>'+intro+'</p></div><div class="section-wrapper"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div>'],
+  ['LinkedIn sibling descriptions','https://www.linkedin.com/jobs/view/one',
+    '<div><h1>Analyst</h1><div class="show-more-less-html__markup"><p>'+intro+'</p></div><div class="show-more-less-html__markup"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div>'],
+]) {
+  test('full bounded job capture retains later requirements: '+name,()=>{
+    const result=extract(url,'<nav>PRIVATE NAV</nav>'+markup+'<aside>PRIVATE PROFILE</aside>');
+    for(const text of [intro,requirements,preferred])assert.ok(result.text.includes(text),text+' must be captured');
+    assert.equal(result.text.split(intro).length-1,1);
+    assert.ok(result.text.indexOf(intro)<result.text.indexOf(requirements));
+    assert.ok(result.text.indexOf(requirements)<result.text.indexOf(preferred));
+    assert.ok(!result.text.includes('PRIVATE'));
+    const saved=parseCapture({requestId:'11111111-1111-4111-8111-111111111111',snapshot:JSON.parse(JSON.stringify(result))});
+    assert.equal(saved.snapshot.text,result.text);
+  });
+}
+test('structured descriptions preserve paragraph, list, block and br text boundaries as inert data',()=>{
+  const description='<h2>Analyst</h2><p>'+intro+'</p><p>Required: SQL</p><p>Preferred: Python</p><ul><li>English</li><li>Romanian</li></ul><div>Remote<br>Hybrid</div><p>Use <strong>SQL</strong> daily &amp; review results.</p><script>globalThis.pwned=true</script><form>PRIVATE FORM</form>';
+  const post={'@type':'JobPosting',title:'Analyst',description};
+  const markup='<script type="application/ld+json">'+JSON.stringify(post).replace(/</g,'\\u003c')+'</script>';
+  const result=extract('https://unknown.invalid/job',markup);
+  assert.match(result.text,/Required: SQL\n+Preferred: Python/);
+  assert.match(result.text,/English\n+Romanian/);
+  assert.match(result.text,/Remote\n+Hybrid/);
+  assert.ok(result.text.includes('Use SQL daily & review results.'));
+  assert.ok(!/pwned|PRIVATE/.test(result.text));
+  assert.equal(JSON.parse(result.structured).description,description);
+});
+test('aggregated rendered sections share the existing text bound and exclude hidden sibling content',()=>{
+  const first='About this role: '+('x'.repeat(70000));
+  const second='Required: '+('y'.repeat(70000));
+  const result=extract('https://jobs.lever.co/co/one','<div><h1>Analyst</h1><div class="section-wrapper"><p>'+first+'</p></div><div class="section-wrapper" hidden>PRIVATE HIDDEN</div><div class="section-wrapper"><p>'+second+'</p></div></div>');
+  assert.equal(result.text.length,120000);assert.ok(result.text.includes('Required: '));assert.ok(!result.text.includes('PRIVATE'));
 });
