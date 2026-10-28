@@ -1,4 +1,4 @@
-import type { BaseDraft, Fact } from "../editor/model.ts";
+import { equalValues, type BaseDraft, type Fact } from "../editor/model.ts";
 import { answerEvidenceText } from "./model.ts";
 export type CareerFact = {
   id: string;
@@ -48,15 +48,7 @@ export function careerContext(
       answerEvidenceText(a).trim(),
   )) {
     const value = answerEvidenceText(a);
-    if (
-      !fields.some(
-        (f) =>
-          f.fieldId === a.cvFieldId &&
-          f.value === value &&
-          f.sourceId === a.sourceId,
-      )
-    )
-      facts.push({ id: a.id, text: value, sourceId: a.sourceId! });
+    facts.push({ id: a.id, text: value, sourceId: a.sourceId! });
   }
   if (
     !facts.length ||
@@ -67,4 +59,23 @@ export function careerContext(
   )
     throw new Error("INVALID_SCOPED_CONTEXT");
   return { targetId, locale: draft.language, facts };
+}
+
+export function isCurrentExperienceWording(
+  draft: BaseDraft,
+  targetId: string,
+  text: string,
+): boolean {
+  const review = draft.roleRewriteReviews?.findLast(
+    (r) =>
+      r.status === "accepted" &&
+      r.proposal.targetId === targetId &&
+      r.proposal.text === text,
+  );
+  if (!review) return false;
+  try {
+    return equalValues(review.input, careerContext(draft, targetId));
+  } catch {
+    return false;
+  }
 }

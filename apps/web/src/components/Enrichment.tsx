@@ -74,8 +74,15 @@ export function Enrichment({
     [error, setError] = useState("");
   const [planning, setPlanning] = useState(false);
   const [goal, setGoal] = useState("contribution");
-  const currentDraft = useRef(d);
+  const currentDraft = useRef(d),
+    requestGeneration = useRef(0);
   currentDraft.current = d;
+  useEffect(() => {
+    setPlanning(false);
+    return () => {
+      requestGeneration.current++;
+    };
+  }, [targetId, goal]);
   const [editingAnswerId, setEditingAnswerId] = useState<string | null>(null);
   const editingAnswer = d.answers.find(
     (a) => a.id === editingAnswerId && a.targetId === targetId,
@@ -375,11 +382,14 @@ export function Enrichment({
               <Button
                 disabled={planning}
                 onClick={async () => {
-                  const before = currentDraft.current;
+                  const before = currentDraft.current,
+                    generation = ++requestGeneration.current;
+                  const active = () => generation === requestGeneration.current;
                   setPlanning(true);
                   setError("");
                   try {
                     const result = await prepareQuestions(targetId, goal);
+                    if (!active()) return;
                     if (currentDraft.current !== before)
                       throw new Error("stale");
                     const next = clone(before);
@@ -391,14 +401,15 @@ export function Enrichment({
                     change(next);
                     setIndex(0);
                   } catch {
-                    setError(
-                      t(
-                        "Întrebările AI nu sunt disponibile sau contextul s-a schimbat. Răspunsurile sunt păstrate; poți continua manual.",
-                        "AI questions are unavailable or context changed. Answers are retained; manual questions remain available.",
-                      ),
-                    );
+                    if (active())
+                      setError(
+                        t(
+                          "Întrebările AI nu sunt disponibile sau contextul s-a schimbat. Răspunsurile sunt păstrate; poți continua manual.",
+                          "AI questions are unavailable or context changed. Answers are retained; manual questions remain available.",
+                        ),
+                      );
                   } finally {
-                    setPlanning(false);
+                    if (active()) setPlanning(false);
                   }
                 }}
               >

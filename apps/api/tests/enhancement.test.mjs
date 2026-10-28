@@ -63,12 +63,12 @@ test('scoped projection omits contacts/identity/raw sources/unconfirmed facts an
 
 for (const kind of ['role', 'projects', 'certifications', 'volunteering', 'custom']) {
   for (const field of ['main', 'bullet']) {
-    test(`confirmed answer projection requires matching eligible text and source: ${kind} ${field}`, () => {
+    test(`confirmed answer projection retains answer identity independently of its eligible CV copy: ${kind} ${field}`, () => {
       const originalText = 'Maintained synthetic reports.';
       const originalSource = 'source-answer-original';
       const cases = [
-        { name: 'unchanged authored field', deduplicated: true },
-        { name: 'unchanged confirmed field', status: 'user_confirmed', deduplicated: true },
+        { name: 'unchanged authored field' },
+        { name: 'unchanged confirmed field', status: 'user_confirmed' },
         { name: 'revised answer', text: 'Automated synthetic reports.', sourceId: 'source-answer-revised' },
         { name: 'independently edited field', value: 'Reviewed synthetic reports.' },
         { name: 'same text from another source', sourceId: 'source-answer-reconfirmed' },
@@ -93,7 +93,7 @@ for (const kind of ['role', 'projects', 'certifications', 'volunteering', 'custo
         const before = structuredClone(draft);
         const expected = scenario.omitted ? [] : [{ id: linked.id, text: linked.value, sourceId: linked.sourceId,
           ...(linked.sourceLineage ? { sourceLineage: linked.sourceLineage } : {}) }];
-        if (!scenario.deduplicated) expected.push({ id: answer.id, text: answer.text, sourceId: answer.sourceId });
+        expected.push({ id: answer.id, text: answer.text, sourceId: answer.sourceId });
         assert.deepEqual(projectEnhancementContext(draft, 'target-1').facts, expected, scenario.name);
         assert.deepEqual(draft, before, scenario.name);
       }

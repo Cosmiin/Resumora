@@ -1,3 +1,4 @@
+import { isCurrentExperienceWording } from "@resumora/contracts/intelligence/context";
 export async function stageOperationId(
   parent: string,
   stage: string,
@@ -270,6 +271,12 @@ export function intelligenceOperations(run: StructuredRunner) {
         input.draft.presentation.approvedWording?.[input.targetId];
       const currentApprovedWording =
         approved &&
+        (approved.scope !== "experience" ||
+          isCurrentExperienceWording(
+            input.draft,
+            input.targetId,
+            approved.text,
+          )) &&
         approved.sources.every((s) =>
           context.facts.some(
             (f) =>

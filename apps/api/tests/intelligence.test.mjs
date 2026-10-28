@@ -1,3 +1,4 @@
+import { careerContext } from "../../../packages/contracts/src/intelligence/context.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -381,4 +382,72 @@ test("import workflow stores once, resumes without a paid rerun and fences cance
   assert.deepEqual([uploads, processed, extracts], [1, 1, 1]);
   await workflow.cancel("op");
   assert.equal((await workflow.status("op")).state, "cancelled");
+});
+
+test("whole-experience prior wording uses complete saved evidence, including copied confirmed answers", async () => {
+  const original = blankDraft(),
+    role = newRole();
+  role.context = fact("Prepared reports.");
+  role.bullets = [fact("Reviewed schedules.")];
+  original.roles.push(role);
+  original.answers.push({
+    id: "copied-answer",
+    targetId: role.id,
+    question: "tools",
+    questionText: "Tools?",
+    text: role.bullets[0].value,
+    status: "confirmed",
+    sourceId: role.bullets[0].sourceId,
+    cvFieldId: role.bullets[0].fieldId,
+  });
+  const input = careerContext(original, role.id);
+  assert.ok(input.facts.some((f) => f.id === "copied-answer"));
+  const proposal = {
+    schemaVersion: "career-role-rewrite/1",
+    targetId: role.id,
+    text: "Prepared clear reports.",
+    factIds: [role.context.id],
+    warnings: [],
+  };
+  original.roleRewriteReviews = [
+    { id: "review", status: "accepted", input, proposal },
+  ];
+  original.presentation.approvedWording = {
+    [role.id]: {
+      text: proposal.text,
+      scope: "experience",
+      sources: [input.facts[0]],
+    },
+  };
+  for (const mutation of [
+    "none",
+    "add bullet",
+    "edit uncited",
+    "remove answer",
+    "remove review",
+  ]) {
+    const draft = decodeDraft(encodeDraft(original)),
+      calls = [];
+    if (mutation === "add bullet")
+      draft.roles[0].bullets.push(fact("New contribution."));
+    if (mutation === "edit uncited")
+      draft.roles[0].bullets[0].value = "Changed schedule work.";
+    if (mutation === "remove answer") draft.answers = [];
+    if (mutation === "remove review") draft.roleRewriteReviews = [];
+    const ops = intelligenceOperations(async (task) => {
+      calls.push(task);
+      return proposal;
+    });
+    await ops.rewrite({
+      operationId: "synthetic",
+      userId: "synthetic",
+      draft,
+      targetId: role.id,
+    });
+    assert.equal(
+      calls[0].input.currentApprovedWording,
+      mutation === "none" ? proposal.text : null,
+    );
+    assert.deepEqual(original.roleRewriteReviews[0].input, input);
+  }
 });

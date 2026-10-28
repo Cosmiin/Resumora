@@ -740,12 +740,16 @@ function CvEditor({
                             !equalValues(latest.current, saved.draft)
                           )
                             throw new Error("SAVE_REQUIRED");
-                          return intelligence.rewrite({
+                          const started = generation.current;
+                          const result = await intelligence.rewrite({
                             snapshotId: saved.id,
                             revision: saved.revision,
                             targetId,
                             operationId: crypto.randomUUID(),
                           });
+                          if (started !== generation.current)
+                            throw new Error("STALE");
+                          return result;
                         }
                       : undefined
                   }
@@ -758,13 +762,17 @@ function CvEditor({
                             !equalValues(latest.current, saved.draft)
                           )
                             throw new Error("SAVE_REQUIRED");
-                          return intelligence.questions({
+                          const started = generation.current;
+                          const result = await intelligence.questions({
                             snapshotId: saved.id,
                             revision: saved.revision,
                             targetId,
                             goal,
                             operationId: crypto.randomUUID(),
                           });
+                          if (started !== generation.current)
+                            throw new Error("STALE");
+                          return result;
                         }
                       : undefined
                   }

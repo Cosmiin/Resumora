@@ -1,5 +1,5 @@
 import { currentWording } from "../base/wording";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   careerContext,
   type CareerFact,
@@ -31,8 +31,15 @@ export function RoleRewrite({
   const t = useCopy(),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const current = useRef(draft);
+  const current = useRef(draft),
+    requestGeneration = useRef(0);
   current.current = draft;
+  useEffect(() => {
+    setBusy(false);
+    return () => {
+      requestGeneration.current++;
+    };
+  }, [targetId]);
   const saved = draft.roleRewriteReviews
     ?.filter((r) => r.proposal.targetId === targetId && r.status === "pending")
     .at(-1);
@@ -77,19 +84,18 @@ export function RoleRewrite({
         targetId,
         saved.input.facts,
       );
-      if (accepted && (!valid || !accept)) throw new Error("STALE");
-      let next = accepted
-        ? accept!(
-            draft,
-            targetId,
-            proposal.text,
-            saved.input.facts.filter((f) => proposal.factIds.includes(f.id)),
-          )
-        : clone(draft);
-      next.roleRewriteReviews!.find((r) => r.id === saved.id)!.status = accepted
-        ? "accepted"
-        : "rejected";
-      change(next);
+      if (!valid || !accept) throw new Error("STALE");
+      const next = clone(draft);
+      next.roleRewriteReviews!.find((r) => r.id === saved.id)!.status =
+        "accepted";
+      change(
+        accept(
+          next,
+          targetId,
+          proposal.text,
+          saved.input.facts.filter((f) => proposal.factIds.includes(f.id)),
+        ),
+      );
       setError("");
     } catch {
       setError(
@@ -114,12 +120,15 @@ export function RoleRewrite({
       <Button
         disabled={busy || !targetId}
         onClick={async () => {
-          const source = current.current;
+          const source = current.current,
+            generation = ++requestGeneration.current;
+          const active = () => generation === requestGeneration.current;
           setBusy(true);
           setError("");
           try {
             const input = careerContext(source, targetId),
               proposal = await request(targetId);
+            if (!active()) return;
             if (current.current !== source) throw new Error("STALE");
             validateRewrite(proposal, targetId, input.facts);
             const next = clone(source);
@@ -129,14 +138,15 @@ export function RoleRewrite({
             ];
             change(next);
           } catch {
-            setError(
-              t(
-                "Propunerea nu este disponibilă sau contextul s-a schimbat. Răspunsurile sunt păstrate; continuă manual.",
-                "Proposal unavailable or context changed. Answers are retained; continue manually.",
-              ),
-            );
+            if (active())
+              setError(
+                t(
+                  "Propunerea nu este disponibilă sau contextul s-a schimbat. Răspunsurile sunt păstrate; continuă manual.",
+                  "Proposal unavailable or context changed. Answers are retained; continue manually.",
+                ),
+              );
           } finally {
-            setBusy(false);
+            if (active()) setBusy(false);
           }
         }}
       >
