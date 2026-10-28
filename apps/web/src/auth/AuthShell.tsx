@@ -67,6 +67,11 @@ export function AuthShell({
     },
     [],
   );
+  const afterRequests = useCallback(
+    <T,>(operation: () => Promise<T>) =>
+      independent.current.then(() => ordered(operation)),
+    [ordered],
+  );
   const transport: AuthTransport = useCallback(
     async (path, init = {}) => {
       const startedGeneration = generation.current,
@@ -207,7 +212,7 @@ export function AuthShell({
           "/v1/intelligence/rewrite",
         ].includes(path)
       )
-        return ordered(async () => {
+        return afterRequests(async () => {
           assertCurrent();
           const next = await load();
           if (next?.recovery) throw new Error("SESSION_CHANGED");
@@ -223,6 +228,7 @@ export function AuthShell({
     status?.recovery,
     transport,
     ordered,
+    afterRequests,
     load,
   ]);
   async function reloadAfterAction() {
@@ -233,9 +239,9 @@ export function AuthShell({
     return load(true);
   }
   useEffect(() => {
-    void ordered(() => load());
+    void afterRequests(() => load());
     const focus = () => {
-      void ordered(() => load());
+      void afterRequests(() => load());
     };
     const interval = window.setInterval(focus, 60_000);
     window.addEventListener("focus", focus);
@@ -244,7 +250,7 @@ export function AuthShell({
       window.clearInterval(interval);
       window.removeEventListener("focus", focus);
     };
-  }, [load, ordered]);
+  }, [load, afterRequests]);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -358,7 +364,7 @@ export function AuthShell({
             </p>
             <button
               className="btn btn-ghost"
-              onClick={() => void ordered(() => load())}
+              onClick={() => void afterRequests(() => load())}
             >
               Reîncearcă conexiunea
             </button>
@@ -469,7 +475,7 @@ export function AuthShell({
           className="btn btn-ghost"
           onClick={() => {
             if (loggingOut.current) void logout();
-            else void ordered(() => load());
+            else void afterRequests(() => load());
           }}
           disabled={busy}
         >

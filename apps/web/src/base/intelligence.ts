@@ -9,7 +9,6 @@ export type IntelligenceContext = {
   revision: number;
   targetId: string;
   operationId: string;
-  goal?: string;
 };
 export type ImportStatus = {
   id: string;

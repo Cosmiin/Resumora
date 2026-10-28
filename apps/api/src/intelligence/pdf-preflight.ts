@@ -120,8 +120,6 @@ export async function preflightPdf(
     parserVersion: "cantoo-pdf-lib/2.11.1-page-tree",
     pages: Array.from({ length: count }, (_, i) => ({
       number: i + 1,
-      text: "",
-      method: "visual",
       warnings: [
         "Original PDF page is passed to the model; transcription is not independently verified.",
       ],

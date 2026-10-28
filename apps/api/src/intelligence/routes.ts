@@ -134,22 +134,14 @@ export async function intelligenceRoute(
     if (
       Object.keys(body).some(
         (k) =>
-          ![
-            "snapshotId",
-            "revision",
-            "targetId",
-            "operationId",
-            "goal",
-          ].includes(k),
+          !["snapshotId", "revision", "targetId", "operationId"].includes(k),
       ) ||
       !uuid(body.operationId) ||
       !uuid(body.snapshotId) ||
       !Number.isSafeInteger(body.revision) ||
       Number(body.revision) < 1 ||
       typeof body.targetId !== "string" ||
-      !/^[-A-Za-z0-9_:]{1,128}$/.test(body.targetId) ||
-      (body.goal !== undefined &&
-        (typeof body.goal !== "string" || body.goal.length > 1000))
+      !/^[-A-Za-z0-9_:]{1,128}$/.test(body.targetId)
     )
       return fail("INVALID_REQUEST", 400);
     const [snapshot, head] = await Promise.all([
@@ -187,10 +179,7 @@ export async function intelligenceRoute(
     };
     return json(
       kind === "questions"
-        ? await options.operations.questions({
-            ...context,
-            goal: (body.goal as string) ?? "Explain my contribution",
-          })
+        ? await options.operations.questions(context)
         : await options.operations.rewrite(context),
     );
   } catch (error) {

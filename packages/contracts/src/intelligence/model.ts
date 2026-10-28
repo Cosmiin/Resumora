@@ -8,8 +8,6 @@ export const documentLimits = Object.freeze({
 export type DocumentFormat = "pdf" | "docx" | "doc";
 export type DocumentPage = {
   number: number;
-  text: string;
-  method: "text" | "scan" | "visual";
   warnings: string[];
 };
 export type ProcessedDocument = {
@@ -150,23 +148,17 @@ export function validatePages(v: unknown): ProcessedDocument {
     !v.warnings.every((x) => text(x, 500))
   )
     throw new IntelligenceError("PROCESSOR_OUTPUT");
-  let chars = 0;
   for (const [i, p] of v.pages.entries()) {
     if (
       !object(p) ||
-      !exact(p, ["number", "text", "method", "warnings"]) ||
+      !exact(p, ["number", "warnings"]) ||
       p.number !== i + 1 ||
-      !text(p.text, documentLimits.characters, true) ||
-      !["text", "scan", "visual"].includes(p.method as string) ||
       !Array.isArray(p.warnings) ||
       p.warnings.length > 20 ||
       !p.warnings.every((x) => text(x, 500))
     )
       throw new IntelligenceError("PROCESSOR_OUTPUT");
-    chars += p.text.length;
   }
-  if (chars > documentLimits.characters)
-    throw new IntelligenceError("DOCUMENT_TEXT_LIMIT");
   return structuredClone(v) as unknown as ProcessedDocument;
 }
 export function validateAdmission(v: unknown, pages: number): Admission {
@@ -232,13 +224,9 @@ export function validateExtraction(
       (c.warning !== undefined && !text(c.warning, 500))
     )
       throw new IntelligenceError("EXTRACTION_OUTPUT");
-    const source = pages[(c.page as number) - 1];
-    if (source?.method === "text" && !source.text.includes(c.quote))
-      throw new IntelligenceError("EVIDENCE_MISMATCH");
-    // Scan transcriptions are explicitly uncertain; a claimed confidence does not verify them.
-    if (source?.method !== "text" && !c.warning)
+    if (!c.warning)
       c.warning = pages.length
-        ? "Scan transcription requires review against the original page."
+        ? "Native PDF transcription requires review against the original page."
         : "Native Word excerpt requires review; original pagination is unknown.";
     if (
       /\.(start|end)$/.test(c.path) &&
@@ -381,8 +369,6 @@ export function isImportReview(v: unknown): v is ImportReview {
     validateAdmission(v.admission, (v.pages as number) ?? 0);
     const pages = Array.from({ length: (v.pages as number) ?? 0 }, (_, i) => ({
       number: i + 1,
-      text: "",
-      method: "scan" as const,
       warnings: [],
     }));
     const result = validateExtraction(structuredClone(v.extraction), pages);

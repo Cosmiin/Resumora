@@ -755,7 +755,7 @@ function CvEditor({
                   }
                   prepareQuestions={
                     intelligence
-                      ? async (targetId, goal) => {
+                      ? async (targetId) => {
                           const saved = headRef.current;
                           if (
                             !saved ||
@@ -767,7 +767,6 @@ function CvEditor({
                             snapshotId: saved.id,
                             revision: saved.revision,
                             targetId,
-                            goal,
                             operationId: crypto.randomUUID(),
                           });
                           if (started !== generation.current)
