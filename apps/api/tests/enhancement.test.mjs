@@ -116,11 +116,12 @@ test('one regional request, source-preserving proposal, no mutation or prompt/ke
     assert.equal(body.max_completion_tokens, 256);
     assert.deepEqual(body.provider, { only: [primary.upstreamEndpoint], allow_fallbacks: false, require_parameters: true, data_collection: 'deny', zdr: true });
     assert.equal(body.tools, undefined);
-    return response();
+    return response('openrouter', { provider: undefined });
   } }));
   const result = await adapter.propose(input());
   assert.equal(result.proposal.status, 'proposal');
   assert.deepEqual(result.proposal.sources, context.facts);
+  assert.equal(result.attempts[0].result.upstreamProvider, null);
   assert.equal(result.attempts[0].result.usage.cachedInput, 5);
   assert.equal(result.attempts[0].result.reportedCost.nanoUsd, '200000');
   assert.equal(JSON.stringify(result.attempts).includes(context.facts[0].text), false);

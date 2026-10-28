@@ -86,6 +86,49 @@ test('disabled with ambient keys does no DB or provider IO; ownership and exact 
   assert.equal((await enhancementRoute(req('/v1/enhancement',body),live,{loadSnapshot:async()=>null},uuid(),transport)).status,404);
   assert.equal((await enhancementRoute(req('/v1/enhancement',body),live,{loadSnapshot:async()=>({revision:2})},uuid(),transport)).status,404); assert.equal(calls,0);
 });
+test('optional routing metadata is independent of grounded completion validity on either route',async()=>{
+  for (const useFallback of [false,true]) {
+    for (const provider of [undefined,null,17,{},'unrecognized provider name','synthetic-upstream']) {
+      ledger=new SyntheticLedger(); let calls=0;
+      const transport=async()=>{
+        calls++;
+        if (useFallback && calls===1) throw new TypeError('Synthetic availability failure');
+        const data=await result(useFallback?fallback.model:primary.model).json();
+        data.provider=provider;
+        return Response.json(data);
+      };
+      const run=await prepareEnhancement(options(transport)).propose({operationId:uuid(),userId:uuid(),context});
+      assert.equal(calls,useFallback?2:1);
+      assert.deepEqual(run.proposal,{status:'proposal',targetId:context.targetId,text:composeGrounded(context.facts,'en'),sources:context.facts});
+      const completed=run.attempts.at(-1).result;
+      assert.equal(completed.status,'completed'); assert.equal(completed.errorCode,null);
+      assert.equal(completed.upstreamProvider,provider==='synthetic-upstream'?provider:null);
+      assert.equal(completed.usage.input,4); assert.equal(completed.usage.output,5);
+    }
+  }
+});
+test('missing routing metadata does not bypass output, grounding or refusal checks',async()=>{
+  for (const mutate of [
+    data=>{data.error={code:'denied'};},
+    data=>{data.choices[0].message.refusal='Declined';},
+    data=>{data.choices[0].message.content=JSON.stringify({text:'Invented 99% impact.',factIds:['f1']});},
+    data=>{data.choices[0].message.content=JSON.stringify({text:'Maintained reports.',factIds:['unknown']});},
+    data=>{data.choices[0].message.content='invalid JSON';},
+    data=>{data.choices[0].finish_reason='length';},
+    data=>{data.choices[0].finish_reason='content_filter';},
+    data=>{data.id='';},
+    data=>{data.model='unexpected-model';},
+    data=>{data.choices=[];},
+  ]) {
+    ledger=new SyntheticLedger(); let calls=0;
+    const data=await result().json(); delete data.provider; mutate(data);
+    const run=await prepareEnhancement(options(async()=>{calls++;return Response.json(data);})).propose({operationId:uuid(),userId:uuid(),context});
+    assert.equal(calls,1); assert.equal(run.proposal,null);
+    assert.notEqual(run.attempts[0].result.status,'completed');
+    assert.notEqual(run.attempts[0].result.errorCode,null);
+    assert.equal(run.attempts[0].result.upstreamProvider,null);
+  }
+});
 test('composition keeps exact evidence and rejects novel candidate claims and injected output',()=>{
   const text=composeGrounded(context.facts,'en'); assert.equal(text,'Maintained reports; Used SQL.');
   const p=validateGroundedProposal({text,factIds:['f1','f2']},context); assert.deepEqual(p.sources,context.facts);
@@ -119,7 +162,9 @@ test('endpoint loads owned persisted context and saves attempts without promotin
   const gateway={loadSnapshot:async()=>snap,reserveEnhancement:async()=>{const created=!reserved;reserved=true;return{created};},beginAttempt:s=>ledger.begin(s),finishAttempt:(id,r)=>ledger.finish(id,r)};
   const env={AI_PAID_INFERENCE:'on',AI_WORKER_SECRET:'x'.repeat(40),AI_PROCESSING_POLICY:'test',OPENROUTER_API_KEY:'placeholder-router',OPENAI_API_KEY:'placeholder-direct',OPENROUTER_MODEL:primary.model,OPENROUTER_ENDPOINT:primary.upstreamEndpoint,OPENAI_MODEL:fallback.model};
   const body={operationId:uuid(),snapshotId:snap.id,snapshotRevision:1,targetId:role.id};
-  const transport=async(_url,init)=>{network++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);assert.equal(input.facts.length,2);return result(primary.model,{text:'Maintained reports; Used SQL.',factIds:input.facts.map(f=>f.id)});};
+  const transport=async(_url,init)=>{network++;const input=JSON.parse(JSON.parse(init.body).messages[1].content);assert.equal(input.facts.length,2);
+    const data=await result(primary.model,{text:'Maintained reports; Used SQL.',factIds:input.facts.map(f=>f.id)}).json();
+    delete data.provider; return Response.json(data);};
   const response=await enhancementRoute(req('/v1/enhancement',body),env,gateway,uuid(),transport);
   assert.equal(response.status,200);assert.equal((await response.json()).proposal.text,'Maintained reports; Used SQL.');assert.deepEqual(d,original);
   assert.equal((await enhancementRoute(req('/v1/enhancement',body),env,gateway,uuid(),transport)).status,409);assert.equal(network,1);

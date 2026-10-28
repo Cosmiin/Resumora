@@ -132,8 +132,7 @@ export function prepareEnhancement(options: {
             result.status = 'failed'; result.errorCode = 'AVAILABILITY'; transient = true;
           } else if (status < 200 || status >= 300) {
             result.status = 'failed'; result.errorCode = 'PROVIDER_REJECTED';
-          } else if (choice.finish_reason !== 'stop' || !result.providerResponseId || result.modelResolved !== route.model
-            || (route.provider === 'openrouter' && !result.upstreamProvider)) {
+          } else if (choice.finish_reason !== 'stop' || !result.providerResponseId || result.modelResolved !== route.model) {
             result.status = choice.finish_reason === 'length' ? 'incomplete' : 'failed'; result.errorCode = 'OUTPUT_INVALID';
           } else {
             try {
