@@ -127,14 +127,11 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 ### AI provider: when extraction/generation using models begins
 
-**Purpose:** structured proposals and selective rewrites. Follow the [provider contract](research/architecture/provider-adapter-v2.md) for current provider order, EU route evidence and activation boundaries. Deterministic matching requires no provider call, vector DB or commercial ATS API. Mock outputs are sufficient initially.
+**Purpose:** structured proposals and selective rewrites. The [enhancement groundwork guide](docs/setup/openrouter-enhancement.md) owns the current provider order, strict EU evidence requirements, conditional cost candidates and activation checklist. Deterministic matching needs no model call, vector DB or commercial ATS API. Mock outputs are sufficient initially.
 
 The [OpenAI/admin preparation guide](docs/setup/openai-admin.md) owns the current synthetic preview, supported configuration, secure project-key setup and remaining integration requirements. Follow it rather than adding a configurable provider URL or enabling billing/inference as a setup check.
 
-Before extraction/generation is separately approved:
-
-1. Approve exact endpoint/model, minimal input, retention/residency terms and usage ceilings. `store:false` does not itself guarantee zero retention or EU-only processing. API data is not used for training by default; abuse monitoring can retain content for up to 30 days and endpoint exceptions apply. [Official data controls](https://developers.openai.com/api/docs/guides/your-data)
-2. Implement application quotas, token limits and a stop switch; provider alerts alone do not enforce them. Verify configuration read-only first; a later explicitly approved synthetic API call must return schema-valid output with usage recorded. That call consumes quota/possibly money and is not a non-destructive setup verification. [Spend controls](https://developers.openai.com/api/docs/guides/production-best-practices)
+Before extraction/generation is separately approved, follow the [activation checklist and owner inputs](docs/setup/openrouter-enhancement.md#activation-checklist-and-owner-inputs), including privacy review, application quotas, spend reservations and a disable path. Provider retention controls do not establish geographic guarantees; see the guide's [EU evidence matrix](docs/setup/openrouter-enhancement.md#eu-evidence-matrix). A live API call requires explicit authorization and can incur cost; it is not a read-only setup check.
 
 ### PDF export, parsing and OCR: when file features begin
 

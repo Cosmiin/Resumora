@@ -7,3 +7,4 @@ Start with the [customer-journey reference](product/customer-journeys.md) for re
 - [Design-system adoption](frontend/design-system-adoption.md) and [updated reference receipt](../references/design-system/cvizat/update-2.md).
 - [Synthetic examples](examples/README.md), [local development](setup/local-development.md) and [authentication setup](setup/authentication.md).
 - [OpenAI connection and owner usage dashboard preparation](setup/openai-admin.md): synthetic preview, safe setup and unconnected auth/persistence boundaries.
+- [CV enhancement provider groundwork](setup/openrouter-enhancement.md): current routing policy, EU evidence, cost candidates and activation requirements.

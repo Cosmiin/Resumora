@@ -23,6 +23,8 @@ For SQL migrations, database command contracts and native local verification, st
 
 For the synthetic OpenAI cost-dashboard preview and its integration limits, follow [OpenAI/admin preparation](docs/setup/openai-admin.md).
 
+For CV enhancement integration readiness and remaining owner inputs, follow [OpenRouter enhancement groundwork](docs/setup/openrouter-enhancement.md).
+
 ## Discovery prototype preview
 
 From the repository root, run:
