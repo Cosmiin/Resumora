@@ -15,6 +15,13 @@ export function ConnectedApp({
     () => new HttpBaseCvAdapter(transport),
     [account.id, transport],
   );
-  const photos = useMemo(() => createPhotoClient(transport), [account.id, transport]);
-  return <PhotoContext.Provider value={photos}><App key={account.id} adapter={adapter} transport={transport} /></PhotoContext.Provider>;
+  const photos = useMemo(
+    () => createPhotoClient(transport),
+    [account.id, transport],
+  );
+  return (
+    <PhotoContext.Provider value={photos}>
+      <App key={account.id} adapter={adapter} transport={transport} />
+    </PhotoContext.Provider>
+  );
 }

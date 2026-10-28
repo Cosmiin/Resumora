@@ -14,7 +14,7 @@ Revisions start at zero for new profiles/documents/jobs/applications/actions. A 
 
 ## IDs at the canonical boundary
 
-RPC arguments/results and all normalized keys are UUIDs. Portable canonical CV fields use `id_<lowercase UUID>` to satisfy the existing leading-letter ID grammar. This is a lossless codec, not a change to canonical CV 1.0.0.
+RPC arguments/results and all normalized keys are UUIDs. Portable canonical graph IDs use `id_<lowercase UUID>` to satisfy the existing leading-letter ID grammar. This is a lossless codec; photo asset IDs follow the separate [photo data contract](../frontend/profile-photo.md#data-and-image-boundary).
 
 | Context | Example |
 |---|---|
@@ -50,7 +50,7 @@ All signatures below return JSONB. Parameter order follows SQL migrations; use n
 | `publish_analysis` | `profile_version UUID/null, cv_version UUID/null, job_version UUID, evidence JSONB[], gate_assertions JSONB[], as_of date, locale text` | full analysis output; pinned deterministic inputs and complete explanation |
 | `publish_readiness` | `profile_version UUID/null, cv_version UUID/null, job_version UUID/null, checks JSONB` | readiness ID, rubric version, checks, `numericScore:null` |
 
-`layout` means the canonical `document` object (sections, item IDs, section order, visibility, contact presentation), not the complete CV envelope. `save_cv_checkpoint` is for Base CV; use the job command for job documents. Inputs must retain the exact profile/item/claim lineage, not just share a tenant. Optional `layout.photoMode` selects `base` (latest saved Base editor setting on each new revision) or `override` (explicit `layout.photo`, including null). Omitting the mode retains a job’s previous mode; new jobs follow Base. Canonical `document.photo` pins the resolved asset/crop/shape/visibility. Restore pins the historical setting and mode, and fails if its asset has been deleted. Asset references validate tenant and ready state in the same transaction as the version.
+`layout` means the canonical `document` object (sections, item IDs, section order, visibility, contact presentation), not the complete CV envelope. `save_cv_checkpoint` is for Base CV; use the job command for job documents. Inputs must retain the exact profile/item/claim lineage, not just share a tenant. The [photo contract](../frontend/profile-photo.md) owns optional photo layout fields, inheritance/override precedence, restore and transactional asset validation.
 
 Profile checkpoints validate the existing canonical schema plus relational/semantic invariants, then server-stamp explicitly selected confirmations. Imported `status`, timestamps or actor labels cannot confer confirmation. Every included claim must have a valid current confirmation before publication. Visible identity sections materialize name, both non-null title slots and the export contacts selected by `contactIds` as CV items for evidence binding. Hidden sections cannot supply selected CV evidence. Two title slots remain independent and may be null; professional and technical skills remain distinct. Partial year/month dates stay partial; chronology is checked without persisting invented days. Document/source/provenance/entity/claim links are normalized alongside immutable projections. P0–P3 rejects nonempty generated prose, section prose references, generations, interviews and template references. Draft columns retain the checkpoint payload; unconfirmed editor saves use the separate [snapshot contract](gateway.md#unconfirmed-editor-state). Frontend wiring remains pending.
 

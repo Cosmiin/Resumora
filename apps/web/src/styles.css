@@ -1825,17 +1825,71 @@ textarea.native {
 }
 
 /* Optional CV photo; the source crop is identical for square/circle masks. */
-.photo-editor { margin-block: 1rem; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: 12px; min-width: 0; }
-.photo-editor p { font-size: var(--text-sm); }
-.photo-editor label { display: block; margin-block: .65rem; }
-.photo-editor input[type=range] { display: block; width: 100%; min-height: 44px; accent-color: var(--pine-600); }
-.photo-editor input[type=file], .photo-editor select { max-width: 100%; }
-.photo-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: .75rem; }
-.photo-editor button { min-height: 44px; padding: .5rem .75rem; border: 1px solid var(--border-field); border-radius: 8px; background: var(--surface-card); color: var(--text-strong); }
-.photo-editor button:disabled { opacity: .6; }
-.photo-crop { display: block; max-width: 360px; width: 100%; height: auto; background: white; touch-action: none; cursor: grab; border: 1px solid var(--border-field); }
-.photo-circle { border-radius: 50%; }
-.document-photo { width: 88px; height: 88px; float: right; margin: 0 0 1rem 1rem; }
-.photo-unavailable { font: var(--type-body); color: var(--status-warn-fg); }
+.photo-editor {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  min-width: 0;
+}
+.photo-editor p {
+  font-size: var(--text-sm);
+}
+.photo-editor label {
+  display: block;
+  margin-block: 0.65rem;
+}
+.photo-editor input[type="range"] {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--pine-600);
+}
+.photo-editor input[type="file"],
+.photo-editor select {
+  max-width: 100%;
+}
+.photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0.75rem;
+}
+.photo-editor button {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-field);
+  border-radius: 8px;
+  background: var(--surface-card);
+  color: var(--text-strong);
+}
+.photo-editor button:disabled {
+  opacity: 0.6;
+}
+.photo-crop {
+  display: block;
+  max-width: 360px;
+  width: 100%;
+  height: auto;
+  background: white;
+  touch-action: none;
+  cursor: grab;
+  border: 1px solid var(--border-field);
+}
+.photo-circle {
+  border-radius: 50%;
+}
+.document-photo {
+  width: 88px;
+  height: 88px;
+  float: right;
+  margin: 0 0 1rem 1rem;
+}
+.photo-unavailable {
+  font: var(--type-body);
+  color: var(--status-warn-fg);
+}
 
-.document-identity { display: flow-root; }
+.document-identity {
+  display: flow-root;
+}

@@ -80,9 +80,11 @@ returns `404 SNAPSHOT_NOT_FOUND`, revealing no other account's existence. Direct
 table writes and the private shared writer are unavailable to authenticated users.
 
 The gateway also maps `provisionWorkspace(requestId)` to the existing
-`provision_workspace(request_key)` command. Its idempotency contract remains in
+`provision_workspace(request_key)` command and `saveJobCvCheckpoint(input)` to
+`save_job_cv_checkpoint`; their canonical command and idempotency contracts remain in
 [api.md](api.md). Editor persistence saves unconfirmed draft snapshots and does
-not invoke canonical publication; existing SQL publication commands are unchanged.
+not invoke canonical publication. The [photo extension](../frontend/profile-photo.md)
+owns the gateway's photo/storage methods and the settings pinned during canonical publication.
 
 ## Connected vacancy and enhancement operations
 

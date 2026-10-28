@@ -10,7 +10,7 @@ import type { AuthConfig } from './auth/session.ts';
 import { createDatabaseGateway } from './db/supabase.ts';
 import { cvRoute } from './cv/routes.ts';
 
-// Private endpoints use the authenticated user token; paid inference is OFF by default.
+// Supabase RPCs and Storage retain the verified user's scope; paid inference is OFF by default.
 interface Env extends AdminAuthConfig, AuthConfig, EnhancementConfig {
   APP_ENV: 'development';
   PHOTO_WORKER_SECRET?: string;
@@ -38,7 +38,7 @@ export default {
     if (cvPaths.has(path) || path === '/v1/jobs' || path.startsWith('/v1/jobs/') || path === '/v1/enhancement' || path === '/v1/photos' || path.startsWith('/v1/photos/')) {
       const identity = await authenticateRequest(request, env);
       if (identity.response) return identity.response;
-      // The route owns method/body validation; POST is the only supported write.
+      // Route validation must not bypass the shared Origin/CSRF boundary.
       if (!['GET','HEAD','OPTIONS'].includes(request.method) && !await checkWrite(request, env, path === "/v1/photos" ? ["image/jpeg", "image/png", "image/webp"] : undefined))
         return authError('FORBIDDEN', 403, identity.headers);
       let response: Response;
