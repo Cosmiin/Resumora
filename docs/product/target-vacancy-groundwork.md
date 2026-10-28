@@ -12,16 +12,8 @@ or evidence of a candidate fact.
 unknown JSON value and returns either normalized intake or field/code issues
 without source values. Import through `@resumora/contracts/jobs/intake`.
 
-```ts
-type JobIntake = {
-  text: string;                 // required original pasted description
-  title?: string;               // manually entered, not inferred
-  company?: string;
-  location?: string;
-  sourceUrl?: string;           // metadata only; never fetched
-  baseCv?: { documentId: string; versionId: string; profileVersionId: string };
-};
-```
+The exported `JobIntake` and `BaseCvSelection` types in that module own the input
+shape; `jobIntakeLimits` owns its character and normalized JSON byte limits.
 
 Only `text` is required for intake. Empty optional strings become absent; null,
 non-string metadata and unknown fields fail. Title, company and location may be
@@ -33,12 +25,12 @@ It carries no CV content and grants no access.
 
 Text is retained exactly, including whitespace, CRLF, Unicode composition and
 instruction-like sentences. Nonblank text is required. PostgreSQL-incompatible
-NUL/unpaired surrogates fail rather than silently changing evidence. Limits use
-Unicode code points: text 200,000; each manual metadata field 20,000 (the existing
-SQL upper bound); URL 2,048 (a preparation default). Normalized JSON is bounded
-to 1 MiB; a future HTTP adapter must also bound the raw body before parsing and
-reserve room for the command envelope. These are technical limits, not a new
-retention policy. Original *description* text is lossless; metadata is trimmed.
+NUL/unpaired surrogates fail rather than silently changing evidence. Character
+limits count Unicode code points and apply before optional metadata is trimmed.
+Text, title and company limits align with SQL; location and URL limits are
+preparation defaults. A future HTTP adapter must also bound the raw body before
+parsing and reserve room for the command envelope. These are technical limits,
+not a new retention policy. Original *description* text is lossless; metadata is trimmed.
 
 URLs must be absolute HTTP(S), with a hostname, no embedded credentials,
 whitespace/control characters or backslashes. Their trimmed spelling is retained
@@ -133,12 +125,11 @@ Never infer authorization from location or equate a credential by translation.
 Requirements retain exact source excerpts/locators; row IDs are allocated by
 `confirm_job` for each version, not copied from research fixture labels.
 
-Any later AI operation carrying CV/job content must use the AI worker's EU route
-evidence contract, shared through Firstmate. Its exact interface is pending here;
-no provider types are guessed or duplicated. Integration must bind evidence to
-the pinned job/CV versions and operation, require a proven EU route before any
-content leaves the boundary, and preserve that requirement through fallback.
-An unavailable/unproven route must fail closed without inference. No model calls,
+The [provider contract](../../research/architecture/provider-adapter-v2.md) owns
+provider order and the required EU route evidence for later AI operations.
+Its executable interface remains pending; no provider types are guessed or
+duplicated here. Vacancy integration must bind that evidence to the pinned
+job/CV versions and operation. No model calls,
 provider residency certification or EU-compliance claim is made by this change.
 Do not put raw job/CV text, URLs, tokens or keys in operation logs or proof records.
 
@@ -152,9 +143,9 @@ Do not put raw job/CV text, URLs, tokens or keys in operation logs or proof reco
 2. Implement narrow paste/review/save UI and editor→canonical publication bridge;
    preserve current manual Base UX and original source. Add actual two-account
    API persistence checks when that integration is authorized.
-3. Integrate Firstmate-shared EU route evidence gate and reviewed requirement
+3. Integrate the provider contract's EU route evidence gate and reviewed requirement
    extraction output contract, provenance and invalidation; only later evaluate
-   extraction quality. Provider/fallback/cost modules are another worker's scope.
+   extraction quality. Provider/fallback/cost implementation follows that contract.
 4. Implement evidence-based comparison and independent tailoring, explicit Base
    snapshot pinning in the existing command if older snapshots are selectable,
    and review/undo/version continuity. No ATS formula changes in this work.

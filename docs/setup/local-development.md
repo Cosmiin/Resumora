@@ -25,7 +25,7 @@ The proxy preserves the incoming host/origin context rather than claiming all re
 | --- | --- |
 | `apps/web/` | Romanian-first Base CV app, interaction tests, Vite config and frontend build; adapters described in the [Base CV guide](../frontend/base-cv.md#code-and-replacement-boundary) |
 | `apps/api/` | Worker entry point; [authentication](authentication.md#session-and-request-contract), [database gateway](../database/gateway.md), CV routes described in the [persistence handoff](../frontend/base-cv.md#persistence-component-handoff), protected admin preparation and internal OpenAI adapter |
-| `packages/contracts/` | Shared health/error response types and [editor modules](../frontend/base-cv.md#code-and-replacement-boundary); no server bindings or secret values |
+| `packages/contracts/` | Shared health/error response types, [editor modules](../frontend/base-cv.md#code-and-replacement-boundary) and [unwired vacancy intake](../product/target-vacancy-groundwork.md); no server bindings or secret values |
 | `scripts/dev.mjs` | Start/stop the local pair together |
 | `scripts/smoke.mjs` | Start a fresh local pair, verify HTTP/proxy behavior, then stop it |
 

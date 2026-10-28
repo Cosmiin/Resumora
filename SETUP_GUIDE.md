@@ -127,7 +127,7 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 ### AI provider: when extraction/generation using models begins
 
-**Purpose:** structured proposals and selective rewrites. The [provider contract](research/architecture/provider-adapter-v2.md) prefers direct OpenAI first; no router, vector DB or commercial ATS API is required for deterministic matching. Mock outputs are sufficient initially.
+**Purpose:** structured proposals and selective rewrites. Follow the [provider contract](research/architecture/provider-adapter-v2.md) for current provider order, EU route evidence and activation boundaries. Deterministic matching requires no provider call, vector DB or commercial ATS API. Mock outputs are sufficient initially.
 
 The [OpenAI/admin preparation guide](docs/setup/openai-admin.md) owns the current synthetic preview, supported configuration, secure project-key setup and remaining integration requirements. Follow it rather than adding a configurable provider URL or enabling billing/inference as a setup check.
 
