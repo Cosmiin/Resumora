@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
+import { bundleWorker as build } from './bundle-worker.mjs';
 import { Miniflare, Response as RuntimeResponse, convertV4MiniflareOptions } from 'miniflare';
 import { authHeaders, saveSession } from '../src/auth/session.ts';
 import { readCookie } from '../src/auth/cookies.ts';
@@ -41,7 +41,7 @@ test('mounted Worker private responses cannot replace newer cookies after refres
   let holdReads = false;
   const bundle = await build({ entryPoints: [fileURLToPath(new URL('../src/index.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'browser' });
   const runtime = new Miniflare(convertV4MiniflareOptions({
-    script: bundle.outputFiles[0].text, modules: true, compatibilityDate: '2026-10-25', host: '127.0.0.1', port: 0, unsafeRegisterWorker: false, bindings: env,
+    modules: [{ type: 'ESModule', path: 'entry.mjs', contents: bundle.outputFiles[0].text }, ...bundle.wasm], compatibilityDate: '2026-10-25', host: '127.0.0.1', port: 0, unsafeRegisterWorker: false, bindings: env,
     outboundService: async request => {
       const url = new URL(request.url);
       assert.equal(url.origin, env.SUPABASE_URL, 'Only synthetic Auth/database requests permitted');

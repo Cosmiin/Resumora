@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { build } from "esbuild";
+import { bundleWorker as build } from "./bundle-worker.mjs";
 import {
   Miniflare,
   Response as RuntimeResponse,
@@ -62,8 +62,7 @@ test("mounted native Worker keeps auth/CSRF on raw import and rejects paid-off b
   const calls = [];
   const runtime = new Miniflare(
     convertV4MiniflareOptions({
-      script: bundle.outputFiles[0].text,
-      modules: true,
+      modules: [{ type: "ESModule", path: "entry.mjs", contents: bundle.outputFiles[0].text }, ...bundle.wasm],
       compatibilityDate: "2026-10-25",
       host: "127.0.0.1",
       port: 0,

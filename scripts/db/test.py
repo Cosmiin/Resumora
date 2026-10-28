@@ -186,8 +186,8 @@ def main():
     try:
         db.start()
         if args.suite == 'imports':
-            # Minimal real RLS consumer for Supabase Storage policy behavior, not a cloud API claim.
-            db.sql("CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),bucket_id text,name text); ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY; GRANT USAGE ON SCHEMA storage TO authenticated,anon; GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated,anon; CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
+            # Exercise import restrictions against a permissive policy on the shared Storage fixture.
+            db.sql("CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
         count = db.migrate()
         assert db.migrate() == 0, 'Normal reapply must have no pending migrations'
         table_count = int(db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'"))

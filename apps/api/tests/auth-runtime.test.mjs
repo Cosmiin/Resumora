@@ -57,7 +57,7 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
     const login = await call('/login', credentials, { 'X-CSRF-Token': initial.csrfToken }); assert.equal(login.status, 200);
     assert.match(login.headers.get('set-cookie'), /HttpOnly/); assert.equal(login.headers.get('set-cookie').includes(token), false);
     const signed = await (await call('/session')).json(); assert.equal(signed.user.id, user.id); assert.equal(signed.recovery, false);
-    const photoWrite = headers => fetch(origin + '/v1/photos', {method:'POST',body:new Uint8Array([1]),headers:{Cookie:[...jar].map(([k,v])=>k+'='+v).join('; '),Origin:env.APP_ORIGIN,'Content-Type':'image/jpeg',...headers}});
+    const photoWrite = headers => fetch(origin + '/v1/photos', {method:'POST',body:new Uint8Array([1]),headers:{Cookie:[...jar].map(([k,v])=>k+'='+v).join('; '),Origin:env.APP_ORIGIN,'Content-Type':'image/jpeg','X-Resumora-Account':user.id,...headers}});
     assert.equal((await photoWrite({})).status,403);
     assert.equal((await photoWrite({'X-CSRF-Token':signed.csrfToken,Origin:'https://evil.invalid'})).status,403);
     const enabledGate=await photoWrite({'X-CSRF-Token':signed.csrfToken});

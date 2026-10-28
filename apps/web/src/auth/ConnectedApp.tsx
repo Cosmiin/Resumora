@@ -20,15 +20,18 @@ export function ConnectedApp({
     () => httpIntelligence(transport),
     [account.id, transport],
   );
-  const photos = useMemo(() => createPhotoClient(transport), [account.id, transport]);
+  const photos = useMemo(
+    () => createPhotoClient(transport),
+    [account.id, transport],
+  );
   return (
     <PhotoContext.Provider value={photos}>
-    <App
-      key={account.id}
-      adapter={adapter}
-      transport={transport}
-      intelligence={intelligence}
-    />
+      <App
+        key={account.id}
+        adapter={adapter}
+        transport={transport}
+        intelligence={intelligence}
+      />
     </PhotoContext.Provider>
   );
 }

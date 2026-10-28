@@ -57,7 +57,8 @@ export default {
       path === "/v1/jobs" ||
       path.startsWith("/v1/jobs/") ||
       path === "/v1/enhancement" ||
-      path === "/v1/photos" || path.startsWith("/v1/photos/")
+      path === "/v1/photos" ||
+      path.startsWith("/v1/photos/")
     ) {
       const identity = await authenticateRequest(request, env);
       if (identity.response) return identity.response;
@@ -90,7 +91,15 @@ export default {
             : path.startsWith("/v1/jobs")
               ? await jobsRoute(request, gateway)
               : path.startsWith("/v1/photos")
-                ? await photoRoute(request, gateway, env.PHOTO_WORKER_SECRET, bytes => import("./photos/normalize.ts").then(module => module.normalizePhoto(bytes)))
+                ? await photoRoute(
+                    request,
+                    gateway,
+                    env.PHOTO_WORKER_SECRET,
+                    (bytes) =>
+                      import("./photos/normalize.ts").then((module) =>
+                        module.normalizePhoto(bytes),
+                      ),
+                  )
                 : await cvRoute(request, gateway);
       } catch {
         response = Response.json(
@@ -99,8 +108,7 @@ export default {
         );
       }
       const headers = new Headers(response.headers);
-      for (const [name, value] of identity.headers)
-        headers.set(name, value);
+      for (const [name, value] of identity.headers) headers.set(name, value);
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,

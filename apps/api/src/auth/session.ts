@@ -221,7 +221,13 @@ export async function authenticateRequest(
     return { response: authError("AUTH_UNCONFIGURED", 503, headers) };
   }
   try {
-    const verified = await verifySession(request, env, headers, transport, false);
+    const verified = await verifySession(
+      request,
+      env,
+      headers,
+      transport,
+      false,
+    );
     if (!verified || verified.cookie.recovery)
       return { response: authError("UNAUTHORIZED", 401, headers) };
     if (
@@ -242,7 +248,9 @@ export async function checkWrite(
 ) {
   if (
     request.headers.get("origin") !== config(env).app ||
-    !contentTypes.includes(request.headers.get("content-type")?.split(";")[0] ?? "")
+    !contentTypes.includes(
+      request.headers.get("content-type")?.split(";")[0] ?? "",
+    )
   )
     return false;
   const browser = await readCookie<BrowserCookie>(request, env, "browser");

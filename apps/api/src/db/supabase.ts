@@ -186,24 +186,47 @@ export function createDatabaseGateway(
                 ? Array.isArray(result) && result.length <= 50
                 : name === "get_target_job" || name === "load_editor_snapshot"
                   ? result === null || record(result)
-      : name === 'save_job_cv_checkpoint' ? record(result) && typeof result.documentId === 'string' && uuid.test(result.documentId)
-        && typeof result.cvVersionId === 'string' && uuid.test(result.cvVersionId)
-        && result.revision === (args.p_expected_revision as number) + 1
-        && result.tailoringState === (args.p_tailored ? 'tailored' : 'not_tailored')
-      : name === 'expire_photo_uploads' ? Array.isArray(result) && result.length <= 10 : record(result);
+                  : name === "save_job_cv_checkpoint"
+                    ? record(result) &&
+                      typeof result.documentId === "string" &&
+                      uuid.test(result.documentId) &&
+                      typeof result.cvVersionId === "string" &&
+                      uuid.test(result.cvVersionId) &&
+                      result.revision ===
+                        (args.p_expected_revision as number) + 1 &&
+                      result.tailoringState ===
+                        (args.p_tailored ? "tailored" : "not_tailored")
+                    : name === "expire_photo_uploads"
+                      ? Array.isArray(result) && result.length <= 10
+                      : record(result);
 
     if (!valid) throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
     return result as T;
   }
   function objectPath(objectKey: string) {
-    if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(objectKey)) throw new DatabaseError(503, 'DATABASE_UNAVAILABLE');
+    if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(objectKey))
+      throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
     return objectKey;
   }
-  async function photoStorage(path: string, init: RequestInit): Promise<Response> {
+  async function photoStorage(
+    path: string,
+    init: RequestInit,
+  ): Promise<Response> {
     let response: Response;
-    try { response = await transport(`${origin}/storage/v1/${path}`, { ...init, redirect: 'manual', signal: AbortSignal.timeout(15000),
-      headers: { apikey: apiKey, Authorization: `Bearer ${token}`, ...init.headers } }); }
-    catch { throw new DatabaseError(503, 'DATABASE_UNAVAILABLE'); }
+    try {
+      response = await transport(`${origin}/storage/v1/${path}`, {
+        ...init,
+        redirect: "manual",
+        signal: AbortSignal.timeout(15000),
+        headers: {
+          apikey: apiKey,
+          Authorization: `Bearer ${token}`,
+          ...init.headers,
+        },
+      });
+    } catch {
+      throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
+    }
     return response;
   }
   async function storage(objectKey: string, bytes?: Uint8Array) {
@@ -306,47 +329,140 @@ export function createDatabaseGateway(
         p_result: result,
         p_secret: secret,
       }),
-    reservePhoto: (input: {id:string;sha256:string;width:number;height:number;byteSize:number}, secret:string) =>
-      rpc<PhotoAsset>('reserve_photo', {p_id:key(input.id),p_sha256:input.sha256,p_width:input.width,p_height:input.height,p_bytes:input.byteSize,p_worker_secret:secret}),
-    expirePhotos: (secret:string) => rpc<PhotoAsset[]>('expire_photo_uploads', {p_worker_secret:secret}),
-    readyPhoto: (id:string,secret:string) => rpc<PhotoAsset>('finish_photo', {p_id:key(id),p_worker_secret:secret}),
-    readPhoto: (id:string) => rpc<PhotoAsset>('read_photo', {p_id:key(id)}),
-    deletePhoto: (id:string,secret:string,complete=false) => rpc<PhotoAsset>('delete_photo', {p_id:key(id),p_complete:complete,p_worker_secret:secret}),
-    putPhoto: async (objectKey:string,bytes:Uint8Array) => {
-      const response=await photoStorage(`object/cv-photos/${objectPath(objectKey)}`,{method:'POST',headers:{'Content-Type':'image/jpeg','Cache-Control':'private, no-store','x-upsert':'false'},body:bytes.slice().buffer});
+    reservePhoto: (
+      input: {
+        id: string;
+        sha256: string;
+        width: number;
+        height: number;
+        byteSize: number;
+      },
+      secret: string,
+    ) =>
+      rpc<PhotoAsset>("reserve_photo", {
+        p_id: key(input.id),
+        p_sha256: input.sha256,
+        p_width: input.width,
+        p_height: input.height,
+        p_bytes: input.byteSize,
+        p_worker_secret: secret,
+      }),
+    expirePhotos: (secret: string) =>
+      rpc<PhotoAsset[]>("expire_photo_uploads", { p_worker_secret: secret }),
+    readyPhoto: (id: string, secret: string) =>
+      rpc<PhotoAsset>("finish_photo", {
+        p_id: key(id),
+        p_worker_secret: secret,
+      }),
+    readPhoto: (id: string) => rpc<PhotoAsset>("read_photo", { p_id: key(id) }),
+    deletePhoto: (id: string, secret: string, complete = false) =>
+      rpc<PhotoAsset>("delete_photo", {
+        p_id: key(id),
+        p_complete: complete,
+        p_worker_secret: secret,
+      }),
+    putPhoto: async (objectKey: string, bytes: Uint8Array) => {
+      const response = await photoStorage(
+        `object/cv-photos/${objectPath(objectKey)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "image/jpeg",
+            "Cache-Control": "private, no-store",
+            "x-upsert": "false",
+          },
+          body: bytes.slice().buffer,
+        },
+      );
       // 409 is only a possible replay; caller always checks existing bytes/hash.
       if (!response.ok) {
         let duplicate = response.status === 409;
         if (response.status === 400) {
           const error = await boundedJson(response, 4096).catch(() => null);
-          duplicate = record(error) && (error.code === 'ResourceAlreadyExists' || error.code === 'KeyAlreadyExists' ||
-            error.error === 'Duplicate' || error.message === 'The resource already exists' || error.message === 'Asset Already Exists');
+          duplicate =
+            record(error) &&
+            (error.code === "ResourceAlreadyExists" ||
+              error.code === "KeyAlreadyExists" ||
+              error.error === "Duplicate" ||
+              error.message === "The resource already exists" ||
+              error.message === "Asset Already Exists");
         }
-        if (!duplicate) throw new DatabaseError(503, 'DATABASE_UNAVAILABLE');
+        if (!duplicate) throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
       }
       await response.body?.cancel();
     },
-    getPhoto: async (objectKey:string) => {
-      const response=await photoStorage(`object/authenticated/cv-photos/${objectPath(objectKey)}`,{method:'GET'});
-      if(!response.ok)throw new DatabaseError(response.status===404?404:503,'DATABASE_UNAVAILABLE');
-      const reader=response.body?.getReader();if(!reader)throw new DatabaseError(503,'DATABASE_UNAVAILABLE');
-      const chunks:Uint8Array[]=[];let size=0;
-      while(true){const value=await reader.read();if(value.done)break;size+=value.value.length;
-        if(size>10485760){await reader.cancel();throw new DatabaseError(503,'DATABASE_UNAVAILABLE');}chunks.push(value.value);}
-      const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}return bytes;
+    getPhoto: async (objectKey: string) => {
+      const response = await photoStorage(
+        `object/authenticated/cv-photos/${objectPath(objectKey)}`,
+        { method: "GET" },
+      );
+      if (!response.ok)
+        throw new DatabaseError(
+          response.status === 404 ? 404 : 503,
+          "DATABASE_UNAVAILABLE",
+        );
+      const reader = response.body?.getReader();
+      if (!reader) throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      while (true) {
+        const value = await reader.read();
+        if (value.done) break;
+        size += value.value.length;
+        if (size > 10485760) {
+          await reader.cancel();
+          throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
+        }
+        chunks.push(value.value);
+      }
+      const bytes = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return bytes;
     },
-    purgePhoto: async (objectKey:string) => {
-      const response=await photoStorage('object/cv-photos',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefixes:[objectPath(objectKey)]})});
-      if(!response.ok && response.status!==404)throw new DatabaseError(503,'DATABASE_UNAVAILABLE');
+    purgePhoto: async (objectKey: string) => {
+      const response = await photoStorage("object/cv-photos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prefixes: [objectPath(objectKey)] }),
+      });
+      if (!response.ok && response.status !== 404)
+        throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
       await response.body?.cancel();
     },
-    saveJobCvCheckpoint: (input: { requestId: string; documentId: string | null; expectedRevision: number;
-      profileVersionId: string; jobVersionId: string; layout: Record<string, unknown>; locale: 'ro' | 'en'; tailored: boolean }) => {
-      if (typeof input.tailored !== 'boolean' || !['ro', 'en'].includes(input.locale)) throw new DatabaseError(400, 'INVALID_REQUEST');
-      return rpc<{ documentId: string; cvVersionId: string; revision: number; tailoringState: 'tailored' | 'not_tailored' }>(
-        'save_job_cv_checkpoint', { p_key: key(input.requestId), p_document: input.documentId === null ? null : key(input.documentId),
-          p_expected_revision: revision(input.expectedRevision), p_profile_version: key(input.profileVersionId),
-          p_job_version: key(input.jobVersionId), p_layout: input.layout, p_locale: input.locale, p_tailored: input.tailored });
+    saveJobCvCheckpoint: (input: {
+      requestId: string;
+      documentId: string | null;
+      expectedRevision: number;
+      profileVersionId: string;
+      jobVersionId: string;
+      layout: Record<string, unknown>;
+      locale: "ro" | "en";
+      tailored: boolean;
+    }) => {
+      if (
+        typeof input.tailored !== "boolean" ||
+        !["ro", "en"].includes(input.locale)
+      )
+        throw new DatabaseError(400, "INVALID_REQUEST");
+      return rpc<{
+        documentId: string;
+        cvVersionId: string;
+        revision: number;
+        tailoringState: "tailored" | "not_tailored";
+      }>("save_job_cv_checkpoint", {
+        p_key: key(input.requestId),
+        p_document: input.documentId === null ? null : key(input.documentId),
+        p_expected_revision: revision(input.expectedRevision),
+        p_profile_version: key(input.profileVersionId),
+        p_job_version: key(input.jobVersionId),
+        p_layout: input.layout,
+        p_locale: input.locale,
+        p_tailored: input.tailored,
+      });
     },
     provisionWorkspace: (requestId: string) =>
       rpc<{ tenantId: string; userId: string }>("provision_workspace", {
