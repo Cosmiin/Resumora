@@ -49,6 +49,26 @@ test('workspace provisioning maps the request key to the existing SQL command', 
   ]);
 });
 
+test('job metadata list stays bounded and opening a job preserves full capture and requirements', async () => {
+  const detail = { id, state: 'draft', versionId: null, createdAt: '2026-10-28T00:00:00Z',
+    snapshotId: requestId, snapshotRevision: 1,
+    intake: { text: 'a'.repeat(200000), title: '😀'.repeat(20000), company: 'b'.repeat(20000), sourceUrl: 'https://example.invalid/job' },
+    requirements: Array.from({length:100}, () => ({ text:'a'.repeat(1000), priority:'required' })) };
+  const summaries = Array.from({length:50}, (_,i) => ({ id: `11111111-1111-4111-8111-${String(i).padStart(12,'0')}`,
+    state:'draft', createdAt:detail.createdAt, title:'😀'.repeat(200) }));
+  const calls = [];
+  const gateway = createDatabaseGateway(env, identity, async (url, init) => {
+    const name = url.split('/').at(-1);
+    calls.push([name, JSON.parse(init.body)]);
+    assert.equal(init.headers.Authorization, `Bearer ${identity.accessToken}`);
+    return Response.json(name === 'list_target_jobs' ? summaries : JSON.parse(init.body).p_job === id ? detail : null);
+  });
+  assert.deepEqual(await gateway.listJobs(), summaries);
+  assert.deepEqual(await gateway.getJob(id), detail);
+  assert.equal(await gateway.getJob(requestId), null);
+  assert.deepEqual(calls, [['list_target_jobs', {}], ['get_target_job', { p_job: id }], ['get_target_job', { p_job: requestId }]]);
+});
+
 test('load/history/restore map cursors and snapshot identity; invalid inputs never reach transport', async () => {
   const calls = [];
   const gateway = createDatabaseGateway(env, identity, async (url, init) => {

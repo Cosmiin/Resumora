@@ -1,3 +1,4 @@
+import { currentWording } from "../base/wording";
 import { useContext, useLayoutEffect, useRef, type ReactNode } from "react";
 import { formatDate, durationBounds } from "../base/dates";
 import { hasValue, isAuthored, type BaseDraft, type Fact } from "../base/model";
@@ -78,6 +79,23 @@ export function DocumentPreview({
       );
     return block(text(f), id);
   }
+  function wording(target: string, field: Fact<string>): ReactNode {
+    const value = currentWording(d, target);
+    if (!value) return (text(field) || onTextEdit) && <p>{editable(field)}</p>;
+    return (
+      <>
+        <p>{block(value, field.fieldId)}</p>
+        {onTextEdit && (
+          <details>
+            <summary>
+              {t("Editează textul original", "Edit original text")}
+            </summary>
+            {editable(field)}
+          </details>
+        )}
+      </>
+    );
+  }
   const date = (f: BaseDraft["roles"][number]["start"]) =>
     hidden(f)
       ? ""
@@ -156,7 +174,7 @@ export function DocumentPreview({
                   <> · {block(text(r.location), r.location.fieldId)}</>
                 )}
               </p>
-              {(text(r.context) || onTextEdit) && <p>{editable(r.context)}</p>}
+              {wording(r.id, r.context)}
               {r.bullets.some((b) => text(b) || onTextEdit) &&
                 !d.presentation.hiddenFields?.includes(
                   `${r.id}-contributions`,
@@ -240,7 +258,7 @@ export function DocumentPreview({
                   </>
                 )}
             </h4>
-            {(text(e.details) || onTextEdit) && <p>{editable(e.details)}</p>}
+            {wording(e.id, e.details)}
             {e.bullets?.some((f) => text(f) || onTextEdit) && (
               <ul>
                 {e.bullets

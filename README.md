@@ -23,7 +23,7 @@ For SQL migrations, database command contracts and native local verification, st
 
 For the synthetic OpenAI cost-dashboard preview and its integration limits, follow [OpenAI/admin preparation](docs/setup/openai-admin.md).
 
-For CV enhancement integration readiness and remaining owner inputs, follow [OpenRouter enhancement groundwork](docs/setup/openrouter-enhancement.md).
+After the CV draft has saved, open **Jobs** to paste an advert and save it to your account, then review its details. In **Improve**, select an entry and use **Suggest wording**; suggestions are switched off by default. Review any proposal and its sources before **Accept wording**. See [connected vacancies and wording setup](docs/setup/connected-jobs-ai.md) for configuration and limits, and the [capture design](docs/product/vacancy-capture-design.md) for planned extension and URL intake.
 
 ## Discovery prototype preview
 

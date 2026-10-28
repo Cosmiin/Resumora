@@ -1,6 +1,6 @@
 # Local frontend and Worker foundation
 
-This workspace includes a runnable [**local Base CV slice**](../frontend/base-cv.md), plus the local Worker foundation. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. See [authentication setup](authentication.md) for the implemented auth boundary, private local configuration and hosted test dependencies, and the [Base CV guide](../frontend/base-cv.md#persistence-component-handoff) for the connected editor. Without auth configuration the app stays locked and does not call Supabase or send email. A configured admin verifier can fetch public Supabase signing keys; paid inference remains unmounted. No Cloudflare account, API token or environment file is needed to start the locked shell.
+This workspace includes a runnable [**local Base CV slice**](../frontend/base-cv.md), plus the local Worker foundation. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. See [authentication setup](authentication.md) for the implemented auth boundary, private local configuration and hosted test dependencies, and the [Base CV guide](../frontend/base-cv.md#persistence-component-handoff) for the connected editor. Without auth configuration the app stays locked and does not call Supabase or send email. A configured admin verifier can fetch public Supabase signing keys. Paid inference defaults OFF; its configuration is owned by [connected vacancies and wording](connected-jobs-ai.md). No Cloudflare account, API token or environment file is needed to start the locked shell.
 
 ## Start from a clean checkout
 
@@ -24,8 +24,8 @@ The proxy preserves the incoming host/origin context rather than claiming all re
 | Path | Purpose |
 | --- | --- |
 | `apps/web/` | Romanian-first Base CV app, interaction tests, Vite config and frontend build; adapters described in the [Base CV guide](../frontend/base-cv.md#code-and-replacement-boundary) |
-| `apps/api/` | Worker entry point; [authentication](authentication.md#session-and-request-contract), [database gateway](../database/gateway.md), CV routes described in the [persistence handoff](../frontend/base-cv.md#persistence-component-handoff), protected admin preparation and internal OpenAI adapter |
-| `packages/contracts/` | Shared health/error response types, [editor modules](../frontend/base-cv.md#code-and-replacement-boundary) and [unwired vacancy intake](../product/target-vacancy-groundwork.md); no server bindings or secret values |
+| `apps/api/` | Worker entry point; [authentication](authentication.md#session-and-request-contract), [database gateway](../database/gateway.md), CV routes described in the [persistence handoff](../frontend/base-cv.md#persistence-component-handoff), [connected jobs/wording](connected-jobs-ai.md) and protected admin preparation |
+| `packages/contracts/` | Shared health/error response types, [editor modules](../frontend/base-cv.md#code-and-replacement-boundary) and [vacancy contracts](../product/target-vacancy-groundwork.md); no server bindings or secret values |
 | `scripts/dev.mjs` | Start/stop the local pair together |
 | `scripts/smoke.mjs` | Start a fresh local pair, verify HTTP/proxy behavior, then stop it |
 
@@ -37,9 +37,9 @@ The discovery prototype remains under `prototype/` with its existing independent
 
 ## Configuration and secrets
 
-The [OpenAI/admin preparation guide](openai-admin.md) documents the isolated synthetic preview, Worker-only secret paths, narrow owner verifier and exact durable-ledger/session integration still required. No paid provider call is mounted in this foundation.
+The [OpenAI/admin preparation guide](openai-admin.md) documents the isolated synthetic preview, Worker-only secret paths, narrow owner verifier and exact durable-ledger/session integration still required. For the separate enhancement endpoint and its default-OFF configuration, use [connected vacancies and wording](connected-jobs-ai.md).
 
-The checked-in [Worker configuration](../../apps/api/wrangler.jsonc) contains only public `APP_ENV=development`, a proposed development Worker name and a compatibility date. No `account_id`, hosted routes, remote resource bindings or provider key is configured. The build script uses `wrangler deploy --dry-run` to bundle locally without uploading. `workers_dev` and preview URLs are disabled as additional publishing defaults; they do not prevent somebody manually invoking a deployment command. This task did not deploy.
+The checked-in [Worker configuration](../../apps/api/wrangler.jsonc) contains public `APP_ENV=development` and `AI_PAID_INFERENCE=off`, a proposed development Worker name and a compatibility date. No `account_id`, hosted routes, remote resource bindings or provider key is configured. The build script uses `wrangler deploy --dry-run` to bundle locally without uploading. `workers_dev` and preview URLs are disabled as additional publishing defaults; they do not prevent somebody manually invoking a deployment command. This task did not deploy.
 
 No frontend environment variables are needed. If future web configuration is introduced, Vite's client-prefixed values are public build output and must never contain secrets. Worker auth configuration (`SUPABASE_URL`, publishable key and exact same-origin proxy addresses) stays separate from the private cookie-protection key. Ordinary user-auth flows do not require a service-role key or database password.
 

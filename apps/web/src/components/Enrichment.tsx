@@ -1,3 +1,8 @@
+import { RoleRewrite } from "./RoleRewrite";
+import { acceptWording } from "../base/wording";
+import type { RoleRewrite as RoleProposal } from "@resumora/contracts/intelligence/model";
+import { AiSuggestions } from "./AiSuggestions";
+import type { AuthTransport } from "../auth/AuthShell";
 import { useEffect, useRef, useState } from "react";
 import {
   saveAnswer,
@@ -29,7 +34,14 @@ export function Enrichment({
   undoFrom,
   durable = false,
   prepareQuestions,
+  rewriteRole,
+  transport,
+  snapshot,
+  ready = false,
 }: {
+  transport?: AuthTransport;
+  snapshot?: { id: string; revision: number } | null;
+  ready?: boolean;
   draft: BaseDraft;
   change: (d: BaseDraft) => void;
   goEdit: () => void;
@@ -37,6 +49,7 @@ export function Enrichment({
   undoFrom?: BaseDraft | null;
   durable?: boolean;
   prepareQuestions?: (targetId: string) => Promise<QuestionPlan>;
+  rewriteRole?: (targetId: string) => Promise<RoleProposal>;
 }) {
   const t = useCopy();
   const targets = [
@@ -363,6 +376,18 @@ export function Enrichment({
             "Answers and choices stay separate from the CV. AI suggestions are not confirmed facts.",
           )}
         </p>
+        {rewriteRole && target && <RoleRewrite draft={d} targetId={targetId} request={rewriteRole} change={change}
+          accept={(draft, targetId, text, sources) => acceptWording(draft, targetId, {text, sources})} />}
+        {!rewriteRole && transport && target && (
+          <AiSuggestions
+            draft={d}
+            targetId={targetId}
+            snapshot={snapshot ?? null}
+            ready={ready}
+            transport={transport}
+            change={change}
+          />
+        )}
       </section>
       <div className="stack">
         <section
