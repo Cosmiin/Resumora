@@ -1,3 +1,5 @@
+import { jobsRoute } from './jobs/routes.ts';
+import { enhancementRoute, type EnhancementConfig } from './ai/routes.ts';
 import type { ApiError, HealthResponse } from '@resumora/contracts';
 import { adminRoute } from './admin/routes.ts';
 import type { AdminAuthConfig } from './admin/auth.ts';
@@ -7,8 +9,8 @@ import type { AuthConfig } from './auth/session.ts';
 import { createDatabaseGateway } from './db/supabase.ts';
 import { cvRoute } from './cv/routes.ts';
 
-// User-scoped Supabase RPCs only; no paid provider execution is mounted.
-interface Env extends AdminAuthConfig, AuthConfig {
+// Private endpoints use the authenticated user token; paid inference is OFF by default.
+interface Env extends AdminAuthConfig, AuthConfig, EnhancementConfig {
   APP_ENV: 'development';
 }
 
@@ -31,7 +33,7 @@ export default {
     const path = new URL(request.url).pathname;
     if (path === '/admin/ai' || path === '/v1/admin/ai/usage') return adminRoute(request, env);
     if (authMethods[path]) return authRoute(request, env);
-    if (cvPaths.has(path)) {
+    if (cvPaths.has(path) || path === '/v1/jobs' || path.startsWith('/v1/jobs/') || path === '/v1/enhancement') {
       const identity = await authenticateRequest(request, env);
       if (identity.response) return identity.response;
       // The route owns method/body validation; POST is the only supported write.
@@ -40,7 +42,8 @@ export default {
       let response: Response;
       try {
         const gateway = createDatabaseGateway(env, identity);
-        response = await cvRoute(request, gateway);
+        response = path === '/v1/enhancement' ? await enhancementRoute(request, env, gateway, identity.user.id)
+          : path.startsWith('/v1/jobs') ? await jobsRoute(request, gateway) : await cvRoute(request, gateway);
       } catch {
         response = Response.json({ error: { code: 'unavailable' } }, { status: 503 });
       }

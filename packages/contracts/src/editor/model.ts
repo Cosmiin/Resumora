@@ -121,6 +121,9 @@ export type BaseDraft = {
     hidden: string[];
     hiddenFields?: string[];
     contributionHtml?: Record<string, string>;
+    approvedWording?: Record<string, { text: string; sources: { id: string; text: string; sourceId: string;
+      sourceClaimId?: string; sourceLineage?: { sourceId: string; sourceClaimId?: string }[] }[] }>;
+
   };
 };
 export const coreSections = [

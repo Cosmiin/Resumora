@@ -49,3 +49,5 @@ The standalone `prototype/review.html` includes the same app source and is conve
 - [`reviews/ux/verification.md`](reviews/ux/verification.md) — browser and deterministic verification receipts, scope limits, and feedback dispositions. Local screenshot binaries and machine-specific browser tooling are excluded from the proposal package.
 
 All candidate/job examples use synthetic data. Estimates and score methods are illustrative and uncalibrated. PDF readability remains untested until an actual exported PDF is inspected. See each artifact's version and limitations before relying on its outputs.
+
+Connected paste-first vacancy drafts and default-OFF scoped wording: [setup and limits](docs/setup/connected-jobs-ai.md), [future capture design](docs/product/vacancy-capture-design.md). The new migration remains a separately reviewed apply step.

@@ -1,3 +1,5 @@
+import type { JobSave, SavedJob } from '@resumora/contracts/jobs/connected';
+import type { AttemptStart, AttemptResult, Attempt } from '../ai/ledger.ts';
 import { boundedJson } from '../ai/http.ts';
 import type { DraftSnapshot, EditorWireEnvelope } from '@resumora/contracts/editor/transport';
 
@@ -85,11 +87,24 @@ export function createDatabaseGateway(env: DatabaseConfig, identity: DatabaseIde
     const valid = name === 'load_base_draft' ? result === null || isSnapshot(result)
       : name === 'base_draft_history' ? Array.isArray(result) && result.length <= (args.p_limit as number) && result.every(isSnapshot)
       : name === 'save_base_draft' || name === 'restore_base_draft' ? isSnapshot(result)
+      : name === 'list_target_jobs' ? Array.isArray(result) && result.length <= 50
+      : name === 'get_target_job' || name === 'load_editor_snapshot' ? result === null || record(result)
       : record(result);
     if (!valid) throw new DatabaseError(503, 'DATABASE_UNAVAILABLE');
     return result as T;
   }
   return {
+    saveJob: (input: JobSave) => rpc<SavedJob>('save_target_job', { p_key: key(input.requestId),
+      p_snapshot: key(input.snapshotId), p_revision: revision(input.snapshotRevision), p_intake: input.intake, p_requirements: input.requirements }),
+    reviewJob: (input: { requestId: string; jobId: string; title: string; company: string; requirements: unknown[] }) => rpc<SavedJob>('review_target_job', { p_key: key(input.requestId), p_job: key(input.jobId), p_title: input.title, p_company: input.company, p_requirements: input.requirements }),
+    listJobs: () => rpc<SavedJob[]>('list_target_jobs', {}),
+    getJob: (id: string) => rpc<SavedJob | null>('get_target_job', { p_job: key(id) }),
+    loadSnapshot: (id: string) => rpc<DraftSnapshot | null>('load_editor_snapshot', { p_snapshot: key(id) }),
+    reserveEnhancement: (input: { operationId: string; snapshotId: string; revision: number; targetId: string; policy: string; secret: string }) =>
+      rpc<{ created: boolean }>('reserve_enhancement', { p_operation: key(input.operationId), p_snapshot: key(input.snapshotId),
+        p_revision: revision(input.revision), p_target: input.targetId, p_policy: input.policy, p_secret: input.secret }),
+    beginAttempt: (start: AttemptStart, secret: string) => rpc<{ created: boolean; attempt: Attempt }>('begin_ai_attempt', { p_start: start, p_secret: secret }),
+    finishAttempt: (id: string, result: AttemptResult, secret: string) => rpc<Attempt>('finish_ai_attempt', { p_attempt: id, p_result: result, p_secret: secret }),
     provisionWorkspace: (requestId: string) => rpc<{ tenantId: string; userId: string }>('provision_workspace', { request_key: key(requestId) }),
     loadDraft: () => rpc<DraftSnapshot | null>('load_base_draft', {}),
     draftHistory: (page: { beforeRevision?: number; limit?: number } = {}) => {

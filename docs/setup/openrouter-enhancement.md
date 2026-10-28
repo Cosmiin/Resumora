@@ -1,3 +1,5 @@
+> Historical offline groundwork. The connected default-OFF implementation and current processing policy are described in [connected jobs and AI](connected-jobs-ai.md); its global configured routes supersede the strict-EU activation requirement below. No live activation is claimed.
+
 # OpenRouter primary / direct OpenAI fallback: offline groundwork
 
 Prepared 2026-10-28. **Live CV generation remains disabled. Neither route is proven strict EU-only.** This is a technical readiness assessment for owner review, not a compliance certification. Nothing was deployed, enabled, purchased or sent for inference. No existing secret values were read.

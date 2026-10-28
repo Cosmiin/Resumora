@@ -1,3 +1,4 @@
+import { currentWording } from "../base/wording";
 import { useContext, useLayoutEffect, useRef, type ReactNode } from "react";
 import { formatDate, durationBounds } from "../base/dates";
 import { hasValue, isAuthored, type BaseDraft, type Fact } from "../base/model";
@@ -156,7 +157,11 @@ export function DocumentPreview({
                   <> · {block(text(r.location), r.location.fieldId)}</>
                 )}
               </p>
-              {(text(r.context) || onTextEdit) && <p>{editable(r.context)}</p>}
+              {currentWording(d, r.id) && !onTextEdit ? (
+                <p>{currentWording(d, r.id)}</p>
+              ) : (
+                (text(r.context) || onTextEdit) && <p>{editable(r.context)}</p>
+              )}
               {r.bullets.some((b) => text(b) || onTextEdit) &&
                 !d.presentation.hiddenFields?.includes(
                   `${r.id}-contributions`,
@@ -240,7 +245,11 @@ export function DocumentPreview({
                   </>
                 )}
             </h4>
-            {(text(e.details) || onTextEdit) && <p>{editable(e.details)}</p>}
+            {currentWording(d, e.id) && !onTextEdit ? (
+              <p>{currentWording(d, e.id)}</p>
+            ) : (
+              (text(e.details) || onTextEdit) && <p>{editable(e.details)}</p>
+            )}
             {e.bullets?.some((f) => text(f) || onTextEdit) && (
               <ul>
                 {e.bullets
