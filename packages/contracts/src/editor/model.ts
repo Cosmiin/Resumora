@@ -140,6 +140,7 @@ export type BaseDraft = {
       string,
       {
         text: string;
+        scope?: "experience";
         sources: {
           id: string;
           text: string;

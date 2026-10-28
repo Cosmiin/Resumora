@@ -248,15 +248,18 @@ const draftShape = obj(
           typeof v === "object" &&
           !Array.isArray(v) &&
           Object.values(v).every(
-            obj({
-              text: str,
-              sources: list(
-                obj(
-                  { id: str, text: str, sourceId: str },
-                  { sourceClaimId: str, sourceLineage: list(ref) },
+            obj(
+              {
+                text: str,
+                sources: list(
+                  obj(
+                    { id: str, text: str, sourceId: str },
+                    { sourceClaimId: str, sourceLineage: list(ref) },
+                  ),
                 ),
-              ),
-            }),
+              },
+              { scope: one("experience") },
+            ),
           ),
         contributionHtml: (v) =>
           !!v &&

@@ -74,6 +74,33 @@ def suite(db):
             self.assertEqual(db.sql(f"SELECT jsonb_array_length(review_decisions) FROM app.cv_import_sessions WHERE source_id='{self.row['id']}'"),'1')
             self.assertEqual(json.loads(self.call('load_base_draft'))['payload']['answers'],payload['answers'])
             self.assertEqual(db.sql('SELECT count(*) FROM app.profile_versions WHERE tenant_id IN (SELECT id FROM app.tenants WHERE owner_user_id=\''+self.a+'\')'),'0')
+        def test_confirmed_checkpoint_survives_cleanup_without_new_or_forged_confirmations(self):
+            self.complete('uploaded');self.complete('processing');review=self.review()
+            review['extraction']['candidates'].append({'id':'title','path':'titles.0','value':'Engineer','page':1,'quote':'Engineer','confidence':'high'})
+            self.complete('ready',review)
+            payload={'schemaVersion':'resumora-editor-draft/1','content':{'importReview':review,'photo':{'synthetic':'unchanged'},'presentation':{'hidden':['education']}},'answers':[]}
+            payload['content']['importReview']['confirmedIds']=['name']
+            def checkpoint(data,revision,selected,key=None,error=False):
+                return self.call('save_import_review_draft',f"'{key or uid()}',{revision},{literal(data)},'{self.row['id']}',{literal(selected)}",error=error)
+            first_key=uid();first=json.loads(checkpoint(payload,0,['name'],first_key))
+            db.sql(f"UPDATE app.cv_import_sessions SET expires_at=now()-interval '1 second' WHERE source_id='{self.row['id']}'")
+            self.assertEqual(len(json.loads(self.call('expired_cv_import_objects'))),1)
+            self.call('ack_cv_import_purge',f"'{self.op}','{self.secret}'")
+            self.assertIsNone(json.loads(self.call('get_cv_import',f"'{self.op}'"))['review'])
+            self.assertEqual(json.loads(checkpoint(payload,0,['name'],first_key)),first)
+            payload['content']['edited']='Ordinary later edit';key=uid()
+            second=json.loads(checkpoint(payload,1,['name'],key));self.assertEqual(second['revision'],2)
+            self.assertEqual(json.loads(checkpoint(payload,1,['name'],key)),second)
+            self.assertEqual(second['payload'],payload)
+            self.assertIn('VERSION_CONFLICT',checkpoint(payload,1,['name'],error=True))
+            forged=json.loads(json.dumps(payload));forged['content']['importReview']['confirmedIds']=['name','title']
+            self.call('save_base_draft',f"'{uid()}',2,{literal(forged)},'autosave'")
+            self.assertIn('SNAPSHOT_NOT_FOUND',checkpoint(forged,3,['name','title'],error=True))
+            forged['content']['importReview']['confirmedIds']=['name'];forged['content']['importReview']['extraction']['candidates'][0]['value']='Forged review'
+            self.assertIn('SNAPSHOT_NOT_FOUND',checkpoint(forged,3,['name'],error=True))
+            self.assertEqual(json.loads(checkpoint(payload,3,['name']))['revision'],4)
+            self.assertEqual(db.sql(f"SELECT jsonb_array_length(review_decisions) FROM app.cv_import_sessions WHERE source_id='{self.row['id']}'"),'1')
+            self.assertEqual(db.sql(f"SELECT state FROM app.source_documents WHERE id='{self.row['id']}'"),'purged')
         def test_word_stage_reuses_attempt_store_and_unknown_cost_settlement_after_cancel(self):
             self.call('cancel_cv_import',f"'{self.op}'");self.op=uid();self.row=json.loads(self.call('begin_cv_import',f"'{self.op}','doc','{'b'*64}',1024,0"))['record'];self.complete('uploaded');self.complete('processing')
             stage=uid();args=f"'{stage}','{self.row['id']}','admit','synthetic','{self.secret}'"

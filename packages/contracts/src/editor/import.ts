@@ -63,7 +63,7 @@ export function importedDraft(review: ImportReview): BaseDraft {
       parts[0] === "professionalSkills" ||
       parts[0] === "technicalSkills"
     )
-      draft[parts[0]].push(field(c.value) as Fact<string>);
+      draft[parts[0]][index] = field(c.value) as Fact<string>;
     else if (parts[0] === "roles" || parts[0] === "education") {
       const entries = parts[0] === "roles" ? draft.roles : draft.education;
       while (entries.length <= index) {
@@ -75,7 +75,9 @@ export function importedDraft(review: ImportReview): BaseDraft {
       }
       const item = entries[index] as unknown as Record<string, unknown>;
       if (parts[2] === "bullets")
-        (item.bullets as Fact<string>[]).push(field(c.value) as Fact<string>);
+        (item.bullets as Fact<string>[])[Number(parts[3])] = field(
+          c.value,
+        ) as Fact<string>;
       else
         item[parts[2]] = field(
           ["start", "end"].includes(parts[2])
@@ -92,6 +94,9 @@ export function importedDraft(review: ImportReview): BaseDraft {
       else entries[index].proficiency = field(c.value) as Fact<string>;
     }
   }
+  draft.professionalSkills = draft.professionalSkills.filter(Boolean);
+  draft.technicalSkills = draft.technicalSkills.filter(Boolean);
+  for (const role of draft.roles) role.bullets = role.bullets.filter(Boolean);
   return draft;
 }
 /** Explicit review selects facts; snapshot persistence remains a separate backend responsibility. */

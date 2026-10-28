@@ -67,6 +67,78 @@ test("unconfirmed mapping, source evidence and explicitly selected confirmation 
   assert.equal(copy.name.status, "extracted_unconfirmed");
   assert.throws(() => confirmImported(copy, ["foreign"]));
 });
+test("indexed import values retain numeric order and evidence across sparse out-of-order extraction", () => {
+  const paths = [
+    "roles.1.bullets.10",
+    "technicalSkills.10",
+    "professionalSkills.2",
+    "titles.1",
+    "roles.0.bullets.1",
+    "roles.1.bullets.2",
+    "professionalSkills.0",
+    "technicalSkills.0",
+    "roles.0.bullets.0",
+    "titles.0",
+    "professionalSkills.1",
+    "technicalSkills.2",
+    "languages.1.title",
+    "languages.0.title",
+    "education.1.institution",
+    "education.0.institution",
+  ];
+  const input = structuredClone(review);
+  input.extraction.candidates = paths.map((path) => ({
+    ...candidate,
+    id: path.replaceAll(".", "_"),
+    path,
+    value: path,
+  }));
+  const draft = decodeDraft(encodeDraft(importedDraft(input)));
+  for (const [fields, expected] of [
+    [draft.titles, ["titles.0", "titles.1"]],
+    [
+      draft.professionalSkills,
+      ["professionalSkills.0", "professionalSkills.1", "professionalSkills.2"],
+    ],
+    [
+      draft.technicalSkills,
+      ["technicalSkills.0", "technicalSkills.2", "technicalSkills.10"],
+    ],
+    [draft.roles[0].bullets, ["roles.0.bullets.0", "roles.0.bullets.1"]],
+    [draft.roles[1].bullets, ["roles.1.bullets.2", "roles.1.bullets.10"]],
+    [
+      draft.optionalSections[0].entries.map((entry) => entry.title),
+      ["languages.0.title", "languages.1.title"],
+    ],
+    [
+      draft.education.map((entry) => entry.institution),
+      ["education.0.institution", "education.1.institution"],
+    ],
+  ]) {
+    assert.deepEqual(
+      fields.map((field) => field.value),
+      expected,
+    );
+    assert.deepEqual(
+      fields.map((field) => field.sourceClaimId),
+      expected.map((path) => path.replaceAll(".", "_")),
+    );
+    assert.ok(
+      fields.every(
+        (field) =>
+          field.status === "extracted_unconfirmed" &&
+          draft.sources.some(
+            (source) =>
+              source.id === field.sourceId && source.text === candidate.quote,
+          ),
+      ),
+    );
+  }
+  assert.deepEqual(
+    input.extraction.candidates.map((c) => c.path),
+    paths,
+  );
+});
 test("actual-byte limits/type, source page/exact quote and partial-date contract reject unsupported output", () => {
   assert.throws(
     () => documentFormat("cv.pdf", new Uint8Array(10_000_001)),

@@ -135,8 +135,15 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE w uuid:=app.tenant_for_user(); s app.cv_import_sessions; selected text; result jsonb;
 BEGIN
  SELECT * INTO s FROM app.cv_import_sessions WHERE tenant_id=w AND source_id=p_import FOR UPDATE;
- IF s.source_id IS NULL OR s.state<>'ready' THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
- IF jsonb_typeof(p_selected) IS DISTINCT FROM 'array' OR jsonb_array_length(p_selected)>250 OR ((p_payload->'content'->'importReview')-'confirmedIds') IS DISTINCT FROM (s.review-'confirmedIds') OR p_payload->'content'->'importReview'->'confirmedIds' IS DISTINCT FROM p_selected THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD'; END IF;
+ IF s.source_id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
+ IF jsonb_typeof(p_selected) IS DISTINCT FROM 'array' OR jsonb_array_length(p_selected) NOT BETWEEN 1 AND 250 OR p_payload->'content'->'importReview'->'confirmedIds' IS DISTINCT FROM p_selected THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD'; END IF;
+ IF EXISTS(SELECT 1 FROM jsonb_array_elements(s.review_decisions) d
+ JOIN app.editor_draft_snapshots v ON v.tenant_id=w AND v.id=(d->>'snapshotId')::uuid
+ WHERE d->'selectedIds' @> p_selected AND (v.payload->'content'->'importReview'-'confirmedIds')=(p_payload->'content'->'importReview'-'confirmedIds')) THEN
+ RETURN app.write_base_draft(p_key,p_expected_revision,p_payload,'checkpoint',NULL);
+ END IF;
+ IF s.state<>'ready' OR s.expires_at<=transaction_timestamp() THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
+ IF ((p_payload->'content'->'importReview')-'confirmedIds') IS DISTINCT FROM (s.review-'confirmedIds') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD'; END IF;
  FOR selected IN SELECT jsonb_array_elements_text(p_selected) LOOP
  IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(s.review->'extraction'->'candidates') c WHERE c->>'id'=selected) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD'; END IF;
  END LOOP;

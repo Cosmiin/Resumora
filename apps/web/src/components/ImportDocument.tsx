@@ -71,16 +71,19 @@ export function ImportDocument({
   }
   async function run(checkOnly = false) {
     if (!operation.current || (!file && !checkOnly) || busy) return;
-    const generation = session.current;
+    const generation = session.current,
+      operationId = operation.current;
+    const active = () =>
+      generation === session.current && operationId === operation.current;
     setBusy(true);
     setError("");
     try {
       const result = checkOnly
-        ? await client.importStatus(operation.current)
-        : await client.importDocument(file!, operation.current, revision);
-      if (generation === session.current) setStatus(result);
+        ? await client.importStatus(operationId)
+        : await client.importDocument(file!, operationId, revision);
+      if (active()) setStatus(result);
     } catch (error) {
-      if (generation === session.current)
+      if (active())
         setError(
           error instanceof IntelligenceRequestError &&
             ["AI_DISABLED", "AI_UNCONFIGURED"].includes(error.code)
@@ -94,7 +97,7 @@ export function ImportDocument({
               ),
         );
     } finally {
-      if (generation === session.current) setBusy(false);
+      if (active()) setBusy(false);
     }
   }
   return (
@@ -121,22 +124,29 @@ export function ImportDocument({
             <Button
               key={row.id}
               onClick={async () => {
-                session.current++;
-                operation.current = row.id;
+                const generation = ++session.current,
+                  operationId = row.id;
+                operation.current = operationId;
+                const active = () =>
+                  generation === session.current &&
+                  operationId === operation.current;
                 setFile(null);
+                setStatus(null);
+                setError("");
                 setBusy(true);
                 try {
-                  setStatus(await client.importStatus(row.id));
-                  setError("");
+                  const result = await client.importStatus(operationId);
+                  if (active()) setStatus(result);
                 } catch {
-                  setError(
-                    t(
-                      "Importul nu poate fi deschis acum.",
-                      "Could not open import now.",
-                    ),
-                  );
+                  if (active())
+                    setError(
+                      t(
+                        "Importul nu poate fi deschis acum.",
+                        "Could not open import now.",
+                      ),
+                    );
                 } finally {
-                  setBusy(false);
+                  if (active()) setBusy(false);
                 }
               }}
             >
@@ -190,20 +200,27 @@ export function ImportDocument({
           disabled={!operation.current}
           onClick={async () => {
             if (!operation.current) return;
-            session.current++;
+            const generation = ++session.current,
+              operationId = operation.current;
+            const active = () =>
+              generation === session.current &&
+              operationId === operation.current;
+            setStatus(null);
+            setError("");
             setBusy(true);
             try {
-              await client.cancelImport(operation.current);
-              setStatus({ id: operation.current, state: "cancelled" });
+              await client.cancelImport(operationId);
+              if (active()) setStatus({ id: operationId, state: "cancelled" });
             } catch {
-              setError(
-                t(
-                  "Anularea nu este confirmată. Verifică operațiunea.",
-                  "Cancellation is unconfirmed. Check the operation.",
-                ),
-              );
+              if (active())
+                setError(
+                  t(
+                    "Anularea nu este confirmată. Verifică operațiunea.",
+                    "Cancellation is unconfirmed. Check the operation.",
+                  ),
+                );
             } finally {
-              setBusy(false);
+              if (active()) setBusy(false);
             }
           }}
         >
