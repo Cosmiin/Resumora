@@ -78,7 +78,12 @@ const draftShape = obj({
   sources: list(obj({ id: str, kind: one("manual", "fixture", "answer"), label: str }, { text: str, locator: str })),
   referenceProse: list(obj({ id: str, text: str, approval: str, claimIds: list(str) })),
   answers: list(answer),
-  presentation: obj({ order: list(str), hidden: list(str) }, { photo: isPhoto, hiddenFields: list(str),
+  presentation: obj({ order: list(str), hidden: list(str) }, {
+    photo: isPhoto,
+    // Same bounded ID grammar as canonical document.templateVersionId. Do not
+    // validate against today's registry: future/historical versions must survive.
+    templateVersionId: v => typeof v === "string" && /^[a-z][a-z0-9_-]{1,79}$/.test(v),
+    hiddenFields: list(str),
     approvedWording: v => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(obj({ text: str,
       sources: list(obj({ id: str, text: str, sourceId: str }, { sourceClaimId: str, sourceLineage: list(ref) })) })),
     contributionHtml: v => !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(str) }),

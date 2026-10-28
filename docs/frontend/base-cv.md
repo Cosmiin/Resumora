@@ -4,6 +4,8 @@ See [optional profile photo](profile-photo.md) for upload/crop/shape, trusted pr
 
 The React/Vite app implements the Base CV journey with the supplied Resumora design. The latest owner request replaces section modals and repeated confirmations with inline editing, compact fields, chip inputs and session autosave. The application entrypoint now requires Supabase authentication and uses the user-scoped Worker persistence gateway. PDF/DOCX extraction, the job tailoring UI and export remain deferred; [connected vacancies and scoped wording](../setup/connected-jobs-ai.md) owns the added job and default-OFF AI behavior. Use authorized synthetic accounts/data for controlled review.
 
+Use **Șablon / Template** beside the preview to change the layout. The [README](../../README.md#local-application-foundation) introduces the available layouts; the [template guide](TEMPLATE_AUTHORING.md) owns version persistence/fallback, authoring, licenses, print checks and precise job-tailored wiring gaps.
+
 ## Run and review
 
 Use the pinned Node/npm versions from `.nvmrc` and `package.json`, then run from the repository root:

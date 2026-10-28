@@ -21,6 +21,7 @@ import { clone, equalValues, type BaseDraft, type Locale } from "./base/model";
 import { prepareDraft, focusField } from "./base/editing";
 import { validateDraft, type Issue } from "./base/validation";
 import { DocumentPreview } from "./components/DocumentPreview";
+import { chooseTemplate } from "./templates/registry";
 import { Editor } from "./components/Editor";
 import { JobsScreen } from "./components/JobsScreen";
 import type { AuthTransport } from "./auth/AuthShell";
@@ -684,6 +685,9 @@ function CvEditor({
                     <DocumentPreview
                       draft={draft}
                       asOf={asOf}
+                      onTemplateChange={(versionId) =>
+                        change(chooseTemplate(draft, versionId))
+                      }
                       onEdit={(id) => {
                         go("base");
                         focusField(id);
