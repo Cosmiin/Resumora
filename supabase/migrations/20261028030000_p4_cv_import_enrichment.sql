@@ -81,6 +81,7 @@ BEGIN
  UPDATE app.source_documents SET state=CASE WHEN p_state='ready' THEN 'available' WHEN p_state IN ('failed','not_cv','uncertain') THEN 'quarantined' ELSE 'uploaded' END,retain_until=s.expires_at WHERE tenant_id=w AND id=s.source_id;
  IF p_state='ready' THEN
  FOR c IN SELECT * FROM jsonb_array_elements(p_review->'extraction'->'candidates') LOOP
+ -- Keep the full quote in review; only the span excerpt needs a Unicode-safe UTF-8 byte bound.
  excerpt:=c->>'quote';
  WHILE octet_length(excerpt)>4096 LOOP
  excerpt:=left(excerpt,length(excerpt)-1);

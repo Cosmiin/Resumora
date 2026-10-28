@@ -1,6 +1,6 @@
 # Resumora — Discovery proposal
 
-**Status: discovery proposal and local Base CV application slice.** This repository contains research, product/technical proposals, a local synthetic prototype, a [local frontend/Worker foundation](docs/setup/local-development.md), and the [approved database implementation](docs/database/README.md). It is not a production app; the local foundation does not authorize production launch, spending, real model calls, payments, or deployment. Product policy decisions D-01–14 remain open in [`research/strategy/publication/docs/product/decisions.md`](research/strategy/publication/docs/product/decisions.md).
+**Status: discovery proposal and local Base CV application slice.** This repository contains research, product/technical proposals, a local synthetic prototype, a [local frontend/Worker foundation](docs/setup/local-development.md), and the [approved database implementation](docs/database/README.md). It is not a production app; the local foundation does not authorize production launch, spending, real model calls, payments, or deployment. Remaining product policy decisions are tracked in [`research/strategy/publication/docs/product/decisions.md`](research/strategy/publication/docs/product/decisions.md).
 
 ## Start here
 
@@ -24,6 +24,8 @@ For SQL migrations, database command contracts and native local verification, st
 For the synthetic OpenAI cost-dashboard preview and its integration limits, follow [OpenAI/admin preparation](docs/setup/openai-admin.md).
 
 After the CV draft has saved, open **Jobs** to paste an advert and save it to your account, then review its details. In **Improve**, select an entry and use **Suggest wording**; suggestions are switched off by default. Review any proposal and its sources before **Accept wording**. See [connected vacancies and wording setup](docs/setup/connected-jobs-ai.md) for configuration and limits, and the [capture design](docs/product/vacancy-capture-design.md) for planned extension and URL intake.
+
+To start from an existing document, choose **I already have a CV**, select the file and explicitly upload/analyse it. Review the extracted fields before confirming and saving. **Improve** also offers AI questions and a whole-experience rewrite for a selected role. These AI actions are switched off by default; follow [CV import and career enrichment](docs/setup/cv-import-enrichment.md) for supported inputs, review controls and activation requirements.
 
 ## Discovery prototype preview
 

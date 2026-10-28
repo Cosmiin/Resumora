@@ -17,7 +17,7 @@ Indicators: **READY** = repository material inspected; **OWNER-CONFIRMED** = rep
 | Local credential protection | **PREPARED on this branch:** [root ignore rules](.gitignore) protect `.env*` and `.dev.vars*` at every depth; no credential files added | Verify ignored filenames and no tracked matches before future credential entry. Ignore rules do not untrack existing files. |
 | Dedicated Supabase project | **Dashboard-verified:** Resumora, `aquvhqbkvrtzhbmezkci`, West EU (Ireland), Free; Email and Confirm email enabled (25 October 2026) | Empty/development use owner-reported; machine region code, RLS/storage policies, login and email delivery unverified. Reuse existing project. |
 | Other cloud resources/accounts | **UNVERIFIED:** no account inventory is tracked; [architecture](research/architecture/README.md) explicitly describes discovery | Cloudflare/AI/Stripe resources may exist. Confirm Resumora ownership and environment before reuse. Never reuse CVTailor or shared tooling accounts by assumption. |
-| Release/privacy/commercial policy | **DECISION:** [D-01–14 register](research/strategy/publication/docs/product/decisions.md), [security proposal](research/architecture/security-ops.md), [cost model](research/costs/README.md) | Region/residency, retention, upload/OCR/export breadth, quotas, access and prices remain open. This guide closes none of them. |
+| Release/privacy/commercial policy | **DECISION:** [D-01–14 register](research/strategy/publication/docs/product/decisions.md), [security proposal](research/architecture/security-ops.md), [cost model](research/costs/README.md) | Region/residency, real-data retention, export breadth, quotas, access and prices remain open. Current input scope is owned by [import setup](docs/setup/cv-import-enrichment.md); this guide grants no activation authority. |
 
 The preferred **Pages frontend → Worker API → Supabase Postgres/Auth** remains the hosting design. The [local foundation](docs/setup/local-development.md) establishes the frontend toolchain; hosted deployment remains separate work. The current prototype could be served as static files, which would only publish the demonstration.
 
@@ -119,11 +119,13 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 ### Private upload/export storage: when retaining file bytes
 
-**Purpose:** source PDF/DOCX uploads and retained PDF exports, not manual text-only work. Reuse Supabase Storage rather than adding R2/S3 by default. Proposed buckets: `cv-uploads` and `cv-exports`; retention, quotas and MIME/size limits remain D-02/04/08 decisions.
+For implemented source-document storage, follow [CV import setup and activation](docs/setup/cv-import-enrichment.md#setup-and-activation-boundary). That guide owns the prepared bucket, policies, retention limits and migration boundary; do not create the older proposed `cv-uploads` bucket or configure an unused upload-bucket variable.
+
+**Future export storage:** reuse Supabase Storage rather than adding R2/S3 by default. The proposed `cv-exports` bucket and its retention, quotas and MIME/size policy remain unimplemented decisions.
 
 1. In the approved dev project's **Storage**, inspect existing buckets first. When approved, create the required bucket(s), keep **Public disabled**, and apply approved MIME/size limits. Supabase supports dashboard bucket creation; the exact current create-button label was not verified. [Bucket creation](https://supabase.com/docs/guides/storage/buckets/creating-buckets)
 2. Implement owner-scoped policies on `storage.objects`, opaque account-scoped paths, bounded signed download URLs and deletion/retention behavior before using real documents. Secret keys bypass storage RLS too. [Storage access control](https://supabase.com/docs/guides/storage/security/access-control)
-3. Configure proposed `SUPABASE_UPLOAD_BUCKET=cv-uploads` / `SUPABASE_EXPORT_BUCKET=cv-exports` as public server config; no new storage credential is needed for user-scoped access. With an existing synthetic object, later verify A can download its own file, B/anonymous cannot, and an expired signed URL fails. Expected: private access only; no public export URLs. Upload/write/delete checks require separate synthetic integration tests.
+3. Configure proposed `SUPABASE_EXPORT_BUCKET=cv-exports` only when export storage is implemented; no new storage credential is needed for user-scoped access. With an existing synthetic object, later verify A can download its own file, B/anonymous cannot, and an expired signed URL fails. Expected: private access only; no public export URLs. Upload/write/delete checks require separate synthetic integration tests.
 
 ### AI provider: when extraction/generation using models begins
 
@@ -131,13 +133,15 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 The [OpenAI/admin preparation guide](docs/setup/openai-admin.md) owns the current synthetic preview, supported configuration, secure project-key setup and remaining integration requirements. Follow it rather than adding a configurable provider URL or enabling billing/inference as a setup check.
 
-Before any separately authorized activation, follow [owner configuration](docs/setup/connected-jobs-ai.md#owner-configuration-paid-mode-remains-off). Extraction is future work; application quotas and monetary spend reservations remain unimplemented. Provider retention controls do not establish geographic guarantees; see the guide's [EU evidence matrix](docs/setup/openrouter-enhancement.md#eu-evidence-matrix). A live API call requires explicit authorization and can incur cost; it is not a read-only setup check.
+Before any separately authorized activation, follow [owner configuration](docs/setup/connected-jobs-ai.md#owner-configuration-paid-mode-remains-off) and the [import/enrichment activation requirements](docs/setup/cv-import-enrichment.md#setup-and-activation-boundary). Application quotas and monetary spend reservations remain unimplemented. Provider retention controls do not establish geographic guarantees; see the guide's [EU evidence matrix](docs/setup/openrouter-enhancement.md#eu-evidence-matrix). A live API call requires explicit authorization and can incur cost; it is not a read-only setup check.
 
 ### PDF export, parsing and OCR: when file features begin
 
-**Purpose:** a machine-readable PDF from an approved immutable CV snapshot, plus bounded input extraction. The kit's Download timer is not a renderer. Text PDF/DOCX libraries need package/runtime proof; no hosted parsing/OCR subscription is mandatory. Manual recovery remains a product path.
+The [import runtime guide](docs/setup/cv-import-enrichment.md#runtime-and-input-bounds) owns implemented input processing and remaining resource/quality evaluation. No hosted parsing/OCR subscription is required by that integration.
 
-1. Approve file formats/size/page limits and processing boundary. Try Worker-compatible parsing with synthetic fixtures in a later bounded implementation task. If native tools/OCR are required, compare the existing EU Node fallback with a separately approved document provider; do not provision both.
+**Future export:** a machine-readable PDF from an approved immutable CV snapshot. The kit's Download timer is not a renderer.
+
+1. Approve export formats, renderer limits and processing boundary before provisioning an export service.
 2. For Browser Run, use the existing Cloudflare account and follow [Get started](https://developers.cloudflare.com/browser-run/get-started/). Proposed Worker browser binding: `BROWSER` in future Wrangler configuration (a binding, not a string/secret). A Worker binding path avoids embedding an external REST API credential; if REST access is chosen instead, use a dedicated account-scoped token with **Browser Rendering Edit**, server-only, and reassess the setup.
 3. Do not run the tutorial's remote development/deployment steps during inventory: remote browser tests consume the real quota. After authorization, render one synthetic document, independently extract its text and check Romanian diacritics, reading order, pagination, links and private-contact exclusions. Expected: actual readable bytes, versioned renderer/template and measured browser seconds; not a simulated success badge. Read-only setup verification is limited to inspecting binding/configuration and plan quota. [Browser quota/pricing](https://developers.cloudflare.com/browser-run/pricing/)
 
@@ -168,7 +172,7 @@ The [local configuration contract](docs/setup/local-development.md#configuration
 | --- | --- | --- | --- |
 | `VITE_API_BASE_URL` | Public API origin, only if future deployment requires a separate origin; unused by the local proxy | Same web file, only if implemented | Corresponding dev/prod Worker origin in Pages build settings |
 | `SUPABASE_SECRET_KEY` | **Privileged secret**, bypasses RLS; only approved admin/job operation | Same API file if justified | Worker **Secret**; never frontend/build/extension |
-| `SUPABASE_UPLOAD_BUCKET`, `SUPABASE_EXPORT_BUCKET` | Public identifiers; proposed `cv-uploads`, `cv-exports` | Same API file, when storage needed | Worker variables |
+| `SUPABASE_EXPORT_BUCKET` | Public identifier; proposed `cv-exports` | Same API file, when export storage is implemented | Worker variable |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | **Secrets**, sandbox initially; API key and endpoint signing secret are different | Same API file, billing milestone | Worker **Secrets**, separate test/live |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Public test/live publishable key, only if browser integration needs it | Web file, billing milestone | Pages build setting; no secret key beside it |
 | `STRIPE_PRICE_1M`, `STRIPE_PRICE_3M`, `STRIPE_PRICE_6M` | Public identifiers, server allowlist; prices unselected | API file when approved | Worker variables; separate sandbox/live objects |
