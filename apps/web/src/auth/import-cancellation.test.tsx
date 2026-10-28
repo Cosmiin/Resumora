@@ -26,7 +26,7 @@ afterEach(() => {
 it.each(["none", "focus", "interval"] as const)(
   "connected cancellation survives %s session checks and queued save/precheck work during admission",
   async (check) => {
-    let intervalTick = () => {
+    let intervalTick: () => void = () => {
       throw new Error("INTERVAL_NOT_REGISTERED");
     };
     if (check === "interval") {
@@ -35,7 +35,9 @@ it.each(["none", "focus", "interval"] as const)(
         (handler, delay, ...args) => {
           if (delay === 60_000 && typeof handler === "function")
             intervalTick = () => handler(...args);
-          return schedule(handler, delay, ...args);
+          return schedule(handler, delay, ...args) as unknown as ReturnType<
+            typeof window.setInterval
+          >;
         },
       );
     }
