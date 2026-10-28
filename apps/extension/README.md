@@ -23,7 +23,8 @@ replacing the web login fences that login's connections. Pending transport is
 kept locally for at most 24 hours, at most ten unsent captures; three automatic
 delivery attempts then explicit retry. Accepted receipts continue polling even
 when acknowledgement took three attempts. Account changes require explicit
-reconciliation under the original account, never silent reassignment. Local
+reconciliation under the original account, never silent reassignment. A capture pins its account and connection generation
+before tab lookup/extraction; a connection change rejects enqueue. Local
 queued text is removed after acknowledgement or discard. Stored credentials
 and pending text are limited to trusted extension contexts.
 
@@ -66,10 +67,13 @@ performed here. See the repository's `docs/setup/job-extension.md`.
 Broad ATS support is the goal; synthetic fixtures do not prove all ATS work.
 Hidden text, form values, navigation, comments and unrelated page chrome are
 excluded from rendered text. The generic fallback reads bounded job sections
-or adjacent job-heading content, never the entire body. JSON-LD JobPosting
+or adjacent job-heading content within the local posting, never the entire body
+or page-wide job-word anchors. Recommendation and profile sections are excluded. JSON-LD JobPosting
 is serialized source data; its description can supply job text when rendered
 containers are unavailable. Scripts and forms in descriptions are not run.
-Missing fields remain unknown and saved metadata is unreviewed. Dynamic pages
+Missing fields remain unknown and saved metadata is unreviewed. Broad structured
+qualifications and content language remain original source data; they do not
+establish certifications or candidate language requirements. Dynamic pages
 must finish loading before click. For cross-origin embedded frames, open the
 posting directly; for restricted/unreadable pages, paste the advert in Jobs.
 

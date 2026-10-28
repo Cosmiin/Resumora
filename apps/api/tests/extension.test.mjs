@@ -106,3 +106,19 @@ test('structured single and multiple locations normalize explicit address data, 
   assert.equal(normalize({address:{addressLocality:'Bucharest'}},' '),'Bucharest');
   for(const value of [undefined,null,[],{}, {address:{}}, {address:{addressCountry:{'@type':'Country'}}}])assert.equal(normalize(value),null);
 });
+
+test('broad qualifications and content language never become candidate certifications or required languages',async()=>{
+  const source={'@type':'JobPosting',qualifications:'5 years of SQL experience',inLanguage:'en'};
+  const captured={...snapshot,structured:JSON.stringify(source)};
+  const original=structuredClone(captured);
+  for(const fields of [source,{...source,qualifications:['SQL experience','Degree'],inLanguage:['en','ro']}]) {
+    const metadata=normalizeCapture({...captured,structured:JSON.stringify(fields)});
+    assert.equal(metadata.certifications,null);assert.equal(metadata.languages,null);
+  }
+  let settled=false,claimed=false;
+  await processCaptures(env,async(url,init)=>{
+    if(url.endsWith('/claim_capture')){if(claimed)return Response.json(null);claimed=true;return Response.json({lease:device,snapshot:captured});}
+    const body=JSON.parse(init.body);assert.equal(body.p_metadata.certifications,null);assert.equal(body.p_metadata.languages,null);settled=true;return Response.json({state:'ready'});
+  });
+  assert.equal(settled,true);assert.deepEqual(captured,original);assert.deepEqual(JSON.parse(captured.structured),source);
+});

@@ -45,7 +45,7 @@ async function connect() {
     let {device}=await chrome.storage.local.get('device');if(!device){device=crypto.randomUUID();await chrome.storage.local.set({device});}
     // A changed account cannot keep sending an old connection while pairing.
     const old=await connection();if(old)await revoke(old);
-    await chrome.storage.local.remove('connection');await chrome.storage.session.remove('token');
+    await queue.changeConnection(async()=>{await chrome.storage.local.remove('connection');await chrome.storage.session.remove('token');});
     const verifier=encode(crypto.getRandomValues(new Uint8Array(32))),state=encode(crypto.getRandomValues(new Uint8Array(32)));
     const challenge=encode(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier))));
     const url=new URL(cfg.appOrigin+'/extension/connect');
@@ -56,8 +56,10 @@ async function connect() {
     if(result.origin!==new URL(chrome.identity.getRedirectURL()).origin||result.pathname!=='/capture'||result.searchParams.get('state')!==state||result.searchParams.getAll('code').length!==1)throw Error('Invalid connection response.');
     const paired=await api('/v1/extension/token',{code:result.searchParams.get('code'),verifier});
     const generation=crypto.randomUUID();
-    await chrome.storage.local.set({connection:{secret:paired.connection,userId:paired.userId,expiresAt:paired.expiresAt,generation}});
-    await chrome.storage.session.set({token:{value:paired.accessToken,until:Date.now()+paired.expiresIn*1000,generation}});
+    await queue.changeConnection(async()=>{
+      await chrome.storage.local.set({connection:{secret:paired.connection,userId:paired.userId,expiresAt:paired.expiresAt,generation}});
+      await chrome.storage.session.set({token:{value:paired.accessToken,until:Date.now()+paired.expiresIn*1000,generation}});
+    });
   }finally{connecting=false;}
 }
 async function handle(message) {
@@ -65,15 +67,16 @@ async function handle(message) {
   if(message.type==='connect'){await connect();return {connected:true};}
   if(message.type==='disconnect'){
     const c=await connection();if(c)await revoke(c);
-    await chrome.storage.local.remove('connection');await chrome.storage.session.remove('token');return {connected:false};
+    await queue.changeConnection(async()=>{await chrome.storage.local.remove('connection');await chrome.storage.session.remove('token');});return {connected:false};
   }
   if(message.type==='capture') {
-    if(!await connection())throw Error('Connect your Resumora account to capture jobs.');
+    const c=await connection();if(!c)throw Error('Connect your Resumora account to capture jobs.');
+    const expected={userId:c.userId,generation:c.generation};
     const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
     if(!tab?.id||!/^https?:\/\//.test(tab.url??''))throw Error('Open a job posting in a normal web tab.');
     const results=await chrome.scripting.executeScript({target:{tabId:tab.id},func:capturePage});
     const payload=results[0]?.result;if(!payload)throw Error('Unable to read this posting. Paste it in Resumora.');
-    const requestId=await queue.enqueue(payload);
+    const requestId=await queue.enqueue(payload,expected);
     // Network delivery is driven by persisted queue and alarms, independently of this response.
     await chrome.alarms.create('capture-delivery',{when:Date.now()+100,periodInMinutes:1});
     void queue.flush().catch(()=>{}); // Opportunistic delivery; persisted queue + alarm own recovery.

@@ -26,8 +26,8 @@ export function normalizeCapture(snapshot: CaptureSnapshot): Record<string, unkn
   const field = (v: unknown) => Array.isArray(v)?v.filter(x=>typeof x==='string').slice(0,30).map(x=>x.slice(0,2000)):scalar(v);
   return { reviewState:'unreviewed', title:scalar(post.title)??scalar(snapshot.title), company:scalar(org?.name)??scalar(snapshot.company),
     location:scalar(snapshot.location)??scalar([...new Set(locations)].join('; ')), remote:scalar(post.jobLocationType), skills:field(post.skills), requiredSkills:null, preferredSkills:null,
-    experience:field(post.experienceRequirements), education:field(post.educationRequirements), certifications:field(post.qualifications),
-    languages:field(post.inLanguage), statedSalary:post.baseSalary && typeof post.baseSalary==='object'?JSON.stringify(post.baseSalary).slice(0,4000):scalar(post.baseSalary),
+    experience:field(post.experienceRequirements), education:field(post.educationRequirements), certifications:null,
+    languages:null, statedSalary:post.baseSalary && typeof post.baseSalary==='object'?JSON.stringify(post.baseSalary).slice(0,4000):scalar(post.baseSalary),
     applicationUrl:typeof post.url==='string' && /^https?:\/\//i.test(post.url) && !new URL(post.url).username && !new URL(post.url).password?post.url.slice(0,2048):null,
   };
 }

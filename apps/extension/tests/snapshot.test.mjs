@@ -117,3 +117,23 @@ test('aggregated rendered sections share the existing text bound and exclude hid
   const result=extract('https://jobs.lever.co/co/one','<div><h1>Analyst</h1><div class="section-wrapper"><p>'+first+'</p></div><div class="section-wrapper" hidden>PRIVATE HIDDEN</div><div class="section-wrapper"><p>'+second+'</p></div></div>');
   assert.equal(result.text.length,120000);assert.ok(result.text.includes('Required: '));assert.ok(!result.text.includes('PRIVATE'));
 });
+
+for(const [name,url,advert] of [
+  ['named description inside main','https://unknown.invalid/job','<main><h1>Analyst</h1><div class="job-description"><p>'+intro+'</p><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></main>'],
+  ['unknown nested job sections','https://unknown.invalid/job','<div><section><div><h1>Analyst</h1><p>'+intro+'</p></div></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section></div>'],
+  ['Lever posting container','https://jobs.lever.co/co/one','<main><div class="posting-page"><h1>Analyst</h1><div class="section-wrapper"><p>'+intro+'</p></div><div class="section-wrapper"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div></main>'],
+  ['LinkedIn sibling markup','https://www.linkedin.com/jobs/view/one','<main><h1>Analyst</h1><div class="show-more-less-html__markup"><p>'+intro+'</p></div><div class="show-more-less-html__markup"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></main>'],
+  ['generic article sections','https://unknown.invalid/job','<div><article><h1>Analyst</h1><p>'+intro+'</p></article><article><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></article></div>'],
+  ['direct body sections','https://unknown.invalid/job','<section><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section>'],
+]) {
+  test('local advert excludes page-wide recommendation and profile anchors: '+name,()=>{
+    const result=extract(url,'<div id="app"><nav>PRIVATE NAVIGATION</nav>'+advert+'<section><p>another role: PRIVATE RECOMMENDATION, required experience in an unrelated job.</p></section><section><h2>Your profile</h2><p>PRIVATE PROFILE for another role.</p></section></div>');
+    for(const expected of [intro,requirements,preferred])assert.ok(result.text.includes(expected));
+    assert.ok(!result.text.includes('PRIVATE'));
+    assert.equal(result.text.split(intro).length-1,1);
+  });
+}
+test('semantic main excludes unrelated recommendation and profile sections nested beside the job',()=>{
+  const result=extract('https://unknown.invalid/job','<main><h1>Analyst</h1><p>'+intro+'</p><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p><section><h2>Recommended roles</h2><p>PRIVATE recommendation for another role</p></section><section><h2>Your profile</h2><p>PRIVATE PROFILE</p></section></main>');
+  assert.ok(result.text.includes(requirements));assert.ok(result.text.includes(preferred));assert.ok(!result.text.includes('PRIVATE'));
+});

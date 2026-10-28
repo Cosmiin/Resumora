@@ -5,11 +5,13 @@ export function createQueue({read,write,send,status,connection,now=Date.now,id=(
   const locked=fn=>{const next=chain.then(fn);chain=next.catch(()=>{});return next;};
   async function rows(){const all=await read(),live=all.filter(row=>now()-row.queuedAt<86400000);if(live.length!==all.length)await write(live);return live;}
   return {
+    changeConnection:update=>locked(update),
     list:()=>locked(async()=> (await rows()).map(({payload,...row})=>row)),
-    enqueue:payload=>locked(async()=> {
-      const c=await connection();if(!c) throw Error('Connect your Resumora account first.');
+    enqueue:(payload,expected)=>locked(async()=> {
       const q=await rows();if(q.filter(x=>x.payload).length>=10) throw Error('Ten captures are waiting. Retry or discard them before capturing more.');
-      const requestId=id();q.push({requestId,payload,owner:c.userId,generation:c.generation,queuedAt:now(),attempts:0,nextAt:0,state:'queued'});
+      const c=await connection();
+      if(!expected||!c||c.userId!==expected.userId||c.generation!==expected.generation)throw Error('Connection changed during capture. Capture again with the connected account.');
+      const requestId=id();q.push({requestId,payload,owner:expected.userId,generation:expected.generation,queuedAt:now(),attempts:0,nextAt:0,state:'queued'});
       await write([...q.filter(x=>x.payload),...q.filter(x=>!x.payload).slice(-20)].sort((a,b)=>a.queuedAt-b.queuedAt));return requestId;
     }),
     retry:requestId=>locked(async()=>{

@@ -56,3 +56,12 @@ The collector handles structured JobPosting descriptions before requiring a rend
 | Unknown host with JobPosting only, generic containers, heading siblings and sections | Unverified |
 
 Broad major-ATS support remains the goal, not a claim proven by fixtures. Installed Chrome identity/auth flow, Origin/CORS, permissions and worker lifecycle, live dynamic ATS pages, embedded frames, hosted proxy/SQL/cron and real account revocation still require separately authorized evidence. Store publication and deployment remain external operator steps.
+
+
+## Capture repair boundaries
+
+Rendered extraction starts from a local job selector or heading and gathers adjacent job sections within that context. It no longer merges page-wide job-word anchors or widens to the application wrapper. Existing requirements-section and structured paragraph/list/line-break regressions remain required; recommendation, account-profile and navigation content must stay outside captured text. Text and node budgets remain shared across the gathered sections.
+
+The worker pins user ID and connection generation before tab lookup and script injection. Enqueue requires that expected identity, rechecks it inside its serialized storage operation, and stamps the row with the pinned values. Connection writes use the same queue lock as enqueue, so the check and persistence are ordered atomically with disconnect/reconnect. Disconnect, account replacement and same-account reconnect during extraction reject that capture; already queued requests retain their original owner and remain fenced by the delivery checks.
+
+Certifications and candidate-language requirements remain unknown during deterministic normalization. Schema.org [qualifications](https://schema.org/qualifications) can describe broad experience or education; [inLanguage](https://schema.org/inLanguage) describes content language. Their original keyed values remain in the saved `capture.structured` JobPosting data, without being relabelled as certification or candidate requirements. The existing Jobs display shows unknown for these unsupported extracted fields.
