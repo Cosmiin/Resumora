@@ -143,7 +143,7 @@ BEGIN
  IF jsonb_typeof(p_selected) IS DISTINCT FROM 'array' OR jsonb_array_length(p_selected) NOT BETWEEN 1 AND 250 OR p_payload->'content'->'importReview'->'confirmedIds' IS DISTINCT FROM p_selected THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD'; END IF;
  IF EXISTS(SELECT 1 FROM jsonb_array_elements(s.review_decisions) d
  JOIN app.editor_draft_snapshots v ON v.tenant_id=w AND v.id=(d->>'snapshotId')::uuid
- WHERE d->'selectedIds' @> p_selected AND (v.payload->'content'->'importReview'-'confirmedIds')=(p_payload->'content'->'importReview'-'confirmedIds')) THEN
+ WHERE d->'selectedIds' @> p_selected AND ((v.payload->'content'->'importReview')-'confirmedIds')=((p_payload->'content'->'importReview')-'confirmedIds')) THEN
  RETURN app.write_base_draft(p_key,p_expected_revision,p_payload,'checkpoint',NULL);
  END IF;
  IF s.state<>'ready' OR s.expires_at<=transaction_timestamp() THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
