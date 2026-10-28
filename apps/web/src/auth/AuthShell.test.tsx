@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AuthShell, type AuthTransport } from "./AuthShell";
 import { ConnectedApp } from "./ConnectedApp";
@@ -472,6 +473,7 @@ function deferred() {
 it.each(["stop", "target", "snapshot", "unmount"])(
   "keeps the authenticated transport usable after suggestion %s cancellation",
   async (cause) => {
+    const user = userEvent.setup();
     const draft = blankDraft(),
       role = newRole(),
       other = newRole();
@@ -518,7 +520,7 @@ it.each(["stop", "target", "snapshot", "unmount"])(
       </AuthShell>
     );
     const view = render(tree());
-    fireEvent.click(
+    await user.click(
       await screen.findByRole("button", { name: "Suggest wording" }),
     );
     await waitFor(() =>
@@ -526,9 +528,9 @@ it.each(["stop", "target", "snapshot", "unmount"])(
         fetcher.mock.calls.some(([path]) => path === "/v1/enhancement"),
       ).toBe(true),
     );
+    const stopButton = await screen.findByRole("button", { name: "Stop" });
     const originalTransport = cvTransport;
-    if (cause === "stop")
-      fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    if (cause === "stop") await user.click(stopButton);
     else {
       if (cause === "target") targetId = other.id;
       if (cause === "snapshot")
