@@ -37,15 +37,36 @@ export function AuthShell({
   const loggingOut = useRef(false);
   const verified = useRef(false),
     accountId = useRef<string | null>(null);
-  const pending = useRef(Promise.resolve());
-  const ordered = useCallback(<T,>(operation: () => Promise<T>) => {
-    const result = pending.current.then(operation);
-    pending.current = result.then(
-      () => {},
-      () => {},
-    );
-    return result;
-  }, []);
+  const pending = useRef(Promise.resolve()),
+    accountPending = useRef(Promise.resolve()),
+    independent = useRef(Promise.resolve());
+  const ordered = useCallback(
+    <T,>(
+      operation: () => Promise<T>,
+      lane: "session" | "account" | "intelligence" = "session",
+    ) => {
+      const result = (
+        lane === "session"
+          ? Promise.all([pending.current, independent.current])
+          : lane === "account"
+            ? Promise.all([pending.current, accountPending.current])
+            : pending.current
+      ).then(operation);
+      const settled = result.then(
+        () => {},
+        () => {},
+      );
+      if (lane === "session") pending.current = settled;
+      else {
+        independent.current = Promise.all([independent.current, settled]).then(
+          () => {},
+        );
+        if (lane === "account") accountPending.current = settled;
+      }
+      return result;
+    },
+    [],
+  );
   const transport: AuthTransport = useCallback(
     async (path, init = {}) => {
       const startedGeneration = generation.current,
@@ -121,31 +142,6 @@ export function AuthShell({
     },
     [fetcher],
   );
-  // A retired adapter must never send old draft work under a replacement session.
-  const accountTransport = useMemo<AuthTransport>(() => {
-    const expectedCsrf = status?.csrfToken,
-      expectedAccount = status?.user?.id,
-      expectedGeneration = generation.current;
-    return (path, init) =>
-      ordered(async () => {
-        if (
-          !expectedCsrf ||
-          accountId.current !== expectedAccount ||
-          csrf.current !== expectedCsrf ||
-          loggingOut.current ||
-          generation.current !== expectedGeneration
-        )
-          throw new Error("SESSION_CHANGED");
-        if (!verified.current) throw new Error("SESSION_UNVERIFIED");
-        return transport(path, init);
-      });
-  }, [
-    status?.csrfToken,
-    status?.user?.id,
-    status?.recovery,
-    transport,
-    ordered,
-  ]);
   const load = useCallback(
     async (recoverLogout = false) => {
       if (loggingOut.current && !recoverLogout) return;
@@ -185,6 +181,53 @@ export function AuthShell({
     },
     [transport],
   );
+  // A retired adapter must never send old draft work under a replacement session.
+  const accountTransport = useMemo<AuthTransport>(() => {
+    const expectedCsrf = status?.csrfToken,
+      expectedAccount = status?.user?.id,
+      expectedGeneration = generation.current;
+    const assertCurrent = () => {
+      if (
+        !expectedCsrf ||
+        accountId.current !== expectedAccount ||
+        csrf.current !== expectedCsrf ||
+        loggingOut.current ||
+        generation.current !== expectedGeneration
+      )
+        throw new Error("SESSION_CHANGED");
+      if (!verified.current) throw new Error("SESSION_UNVERIFIED");
+    };
+    return (path, init) => {
+      const send = () => {
+        assertCurrent();
+        return transport(path, init);
+      };
+      if (
+        init?.method === "POST" &&
+        [
+          "/v1/intelligence/imports",
+          "/v1/intelligence/questions",
+          "/v1/intelligence/rewrite",
+        ].includes(path)
+      )
+        return ordered(async () => {
+          assertCurrent();
+          const next = await load();
+          if (next?.recovery) throw new Error("SESSION_CHANGED");
+        }).then(() => ordered(send, "intelligence"));
+      return ordered(
+        send,
+        path.startsWith("/v1/intelligence/") ? "intelligence" : "account",
+      );
+    };
+  }, [
+    status?.csrfToken,
+    status?.user?.id,
+    status?.recovery,
+    transport,
+    ordered,
+    load,
+  ]);
   async function reloadAfterAction() {
     generation.current++;
     verified.current = false;

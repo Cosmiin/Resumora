@@ -663,7 +663,7 @@ it("finishes anonymous cookie responses and CSRF updates before dispatching logi
   expect((input as HTMLInputElement).value).toBe("Unsaved CV");
 });
 
-it.each(["session", "anonymous-session", "cv"])(
+it.each(["session", "anonymous-session", "cv", "intelligence"])(
   "orders outstanding %s cookies before logout and discards queued retired CV work",
   async (source) => {
     const delayed = deferred();
@@ -678,8 +678,12 @@ it.each(["session", "anonymous-session", "cv"])(
         const path = String(input);
         if (path.endsWith("/session")) checks++;
         if (
-          (source !== "cv" && path.endsWith("/session") && checks === 2) ||
-          path === "/v1/base-cv"
+          (source !== "cv" &&
+            source !== "intelligence" &&
+            path.endsWith("/session") &&
+            checks === 2) ||
+          path === "/v1/base-cv" ||
+          path === "/v1/intelligence/imports"
         ) {
           events.push("old request sent");
           await delayed.promise;
@@ -728,8 +732,11 @@ it.each(["session", "anonymous-session", "cv"])(
     await screen.findByText("Private test@example.invalid");
     const retired = cvTransport;
     let oldRequest: Promise<Response> | undefined;
-    if (source !== "cv") fireEvent.focus(window);
-    else oldRequest = retired("/v1/base-cv");
+    if (source !== "cv" && source !== "intelligence") fireEvent.focus(window);
+    else
+      oldRequest = retired(
+        source === "intelligence" ? "/v1/intelligence/imports" : "/v1/base-cv",
+      );
     await waitFor(() => expect(events).toEqual(["old request sent"]));
     const queued = Promise.allSettled(
       ["/history", "/save", "/restore"].map((path) =>
@@ -741,6 +748,12 @@ it.each(["session", "anonymous-session", "cv"])(
     );
     fireEvent.click(screen.getByRole("button", { name: "Deconectare" }));
     expect(screen.queryByText("Private test@example.invalid")).toBeNull();
+    const retiredControl = Promise.allSettled([
+      retired("/v1/intelligence/imports/synthetic/cancel", {
+        method: "POST",
+        body: "{}",
+      }),
+    ]);
     await act(async () => {});
     expect(events).toEqual(["old request sent"]);
     delayed.resolve();
@@ -758,6 +771,10 @@ it.each(["session", "anonymous-session", "cv"])(
       "logout sent",
     ]);
     expect(cookie).toBeNull();
+    expect((await retiredControl)[0]).toMatchObject({
+      status: "rejected",
+      reason: { message: "SESSION_CHANGED" },
+    });
     expect(
       (await queued).every(
         (result) =>

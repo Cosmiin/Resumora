@@ -132,8 +132,26 @@ export function RoleRewrite({
             if (current.current !== source) throw new Error("STALE");
             validateRewrite(proposal, targetId, input.facts);
             const next = clone(source);
+            const history = next.roleRewriteReviews ?? [];
+            const pinned = new Set(
+              Object.entries(next.presentation.approvedWording ?? {})
+                .filter(([, wording]) => wording.scope === "experience")
+                .map(([target, wording]) =>
+                  history.findLast(
+                    (r) =>
+                      r.status === "accepted" &&
+                      r.proposal.targetId === target &&
+                      r.proposal.text === wording.text,
+                  ),
+                )
+                .filter((r) => r !== undefined),
+            );
+            const retained = new Set([
+              ...pinned,
+              ...history.filter((r) => !pinned.has(r)).slice(-19),
+            ]);
             next.roleRewriteReviews = [
-              ...(next.roleRewriteReviews ?? []).slice(-19),
+              ...history.filter((r) => retained.has(r)),
               { id: crypto.randomUUID(), input, proposal, status: "pending" },
             ];
             change(next);
