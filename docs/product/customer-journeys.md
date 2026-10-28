@@ -1,6 +1,6 @@
 # Resumora customer journeys for future frontend implementation
 
-Reference date: **2026-10-25**. Status: **journey reference; a bounded [local Base CV implementation](../frontend/base-cv.md) now begins J05–J08**. Full hosted journeys remain planned. This document consolidates the existing product and data rules into complete user flows. It does not approve release scope, commercial/privacy policies, providers or infrastructure. “Must” and acceptance criteria below describe the proposed future implementation contract, not working features or owner approval.
+Reference date: **2026-10-25**. Status: **journey reference; a bounded [local Base CV implementation](../frontend/base-cv.md) now begins J05–J08**. A bounded [connected vacancy/wording slice](../setup/connected-jobs-ai.md) also begins J07/J09/J10. Full hosted journeys remain planned. This document consolidates the existing product and data rules into complete user flows. It does not approve release scope, commercial/privacy policies, providers or infrastructure. “Must” and acceptance criteria below describe the proposed future implementation contract, not working features or owner approval.
 
 ## Authority, availability and evidence
 
@@ -11,7 +11,8 @@ Use the [PRD, especially §§15–16](prd.md), [decision register D-01–14](../
 | **Implemented local foundation** | See [local development](../setup/local-development.md#current-routes-and-auth-boundary) for current health/routes and [authentication setup](../setup/authentication.md) for the implemented local auth subset and hosted acceptance dependencies. These do not establish the full journeys below. |
 | **Reference/demo only** | The synthetic discovery prototype and imported design examples. They illustrate interactions; they do not establish real accounts, parsing, model analysis, persistent hosted versions, payments or PDF output. Some prototype JSON portability works only on synthetic local state. |
 | **Implemented local Base CV slice** | See the [Base CV guide](../frontend/base-cv.md) for the implemented J05–J08 behavior, review instructions and availability limits. |
-| **Planned** | Hosted customer product flows J01–J19 beyond that bounded local slice. They require separately authorized application work and relevant dependencies. No hosted end-to-end customer journey is implemented by this local slice. |
+| **Implemented connected vacancy/wording slice** | See [connected setup](../setup/connected-jobs-ai.md) for the current subset and [capture design](vacancy-capture-design.md) for future adapters. |
+| **Planned** | Hosted customer product flows J01–J19 beyond the bounded implemented slices. They require separately authorized application work and relevant dependencies. No hosted end-to-end customer journey is implemented by this local slice. |
 | **Owner decision** | Remaining depth, access, privacy, retention, policy and release choices. Recommendations are discussion options, not selections. |
 | **Deferred candidate** | URL fetching, extension, OCR, extra output formats/templates, Google and other later integrations. Discovery coverage is retained; inclusion/timing remains an owner choice. |
 
@@ -27,10 +28,10 @@ The [updated design receipt](../../references/design-system/cvizat/update-2.md),
 | [J04](#j04--recover-a-forgotten-password) | Recover a forgotten password | H; AUTH02–AUTH04, `ScrSystem.jsx` | Planned; purpose-bound recovery, email |
 | [J05](#j05--add-a-cv-by-upload-or-manual-entry) | Upload or manually add a CV | A; UX03–UX04, `OnbImport.jsx` | Planned; private upload/extraction; OCR deferred candidate |
 | [J06](#j06--review-confirm-and-save-base-cv) | Confirm, save and review Base CV | A; UX05–UX06, `OnbReview.jsx`, `ScrBase.jsx` | Planned; canonical persistence and conflict handling |
-| [J07](#j07--enrich-facts-skills-and-wording) | Enrich facts and improve wording | B; UX08, `ScrEnrich.jsx` | Planned; persisted answers; optional bounded AI |
+| [J07](#j07--enrich-facts-skills-and-wording) | Enrich facts and improve wording | B; UX08, `ScrEnrich.jsx` | Current subset: [connected setup](../setup/connected-jobs-ai.md); full journey planned |
 | [J08](#j08--edit-undo-and-restore-base-or-job-versions) | Edit, undo and restore versions | A/E; UX06–UX07/UX14, `ScrBase.jsx`, `ScrEditor.jsx` | Planned; independent version branches |
-| [J09](#j09--add-a-job-by-paste-url-or-manual-input) | Add a job and recover failed import | C; UX09, `ScrJobs.jsx` | Paste/manual planned; URL/extension deferred candidates |
-| [J10](#j10--review-requirements-match-and-eligibility) | Review requirements and evidence | C/D; UX10–UX12, `ScrJobs.jsx`, `MatchReport.jsx` | Planned; versioned requirements/evidence/method |
+| [J09](#j09--add-a-job-by-paste-url-or-manual-input) | Add a job and recover failed import | C; UX09, `ScrJobs.jsx` | Current subset: [connected setup](../setup/connected-jobs-ai.md); future adapters: [capture design](vacancy-capture-design.md) |
+| [J10](#j10--review-requirements-match-and-eligibility) | Review requirements and evidence | C/D; UX10–UX12, `ScrJobs.jsx`, `MatchReport.jsx` | Manual review subset: [connected setup](../setup/connected-jobs-ai.md); matching/eligibility UI planned |
 | [J11](#j11--tailor-approve-and-optionally-promote-to-base) | Tailor and approve a job CV | E; UX13–UX14, `Improve.jsx`, `ScrEditor.jsx` | Planned; explicit approval and scoped versions |
 | [J12](#j12--templates-language-preview-and-pdf-export) | Choose presentation, preview and export | E; UX15–UX16, `ScrEditor.jsx` | Planned; actual PDF renderer/readability; format breadth open |
 | [J13](#j13--applications-latest-cv-contact-and-sent-record) | Track an application and mark sent | G; UX20, `ScrApps.jsx` | Planned; manual application/sent records |
@@ -147,7 +148,7 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 ## J07 · Enrich facts, skills and wording
 
-**Goal, entry, preconditions:** from an immediate Base check, user explains a real contribution or fills a supported gap. Availability: planned; persisted section answers, revision-aware patches and optionally approved model operations are dependencies. Evidence: B/UX08, `ScrEnrich.jsx`, architecture helpers.
+**Goal, entry, preconditions:** from an immediate Base check, user explains a real contribution or fills a supported gap. Availability: the current bounded subset is owned by [connected setup](../setup/connected-jobs-ai.md); the full flow below remains planned. Evidence: B/UX08, `ScrEnrich.jsx`, architecture helpers.
 
 1. Open one relevant section/question linked to stable role/section IDs; show why asked. Answer contribution/tools/audience/result, revisit saved answer, Skip or I don't know. Qualitative/unmeasured results are valid.
 2. Inspect extracted proposed facts and before/after wording with source/claim links. Explicit factual confirmation is separate from approval of generated prose.
@@ -176,7 +177,7 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 ## J09 · Add a job by paste, URL or manual input
 
-**Goal, entry, preconditions:** user starts a job-specific application from Home/Applications, with or without an existing Base. Availability: paste/manual planned; URL fetch a deferred candidate pending D-01/security/site policy. Evidence: C/UX09, `ScrJobs.jsx`.
+**Goal, entry, preconditions:** user starts a job-specific application from Home/Applications, with or without an existing Base. Availability: the implemented subset is owned by [connected setup](../setup/connected-jobs-ai.md); future adapters are specified in [capture design](vacancy-capture-design.md). The full application/import flow below remains planned. Evidence: C/UX09, `ScrJobs.jsx`.
 
 1. Choose Paste, Manual or the proposed URL option. Paste text or enter known role/company/requirements; URL requires a supported public address and explicit intended capture. Preserve source and job language separately from UI/CV language.
 2. Parse once per new accepted text/context with loading/cancel; retain original text for correction. Detect a duplicate and offer existing job versus explicit new snapshot, not a silent merge.

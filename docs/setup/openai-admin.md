@@ -1,15 +1,15 @@
 # OpenAI connection and owner usage dashboard preparation
 
-This is working preparation code with **synthetic verification only**, not a connected spend monitor. No inference, hosted migration, deployment, customer read or account configuration was performed. The Worker never constructs the provider adapter. Merely supplying a key cannot enable paid calls.
+This is working preparation code with **synthetic verification only**, not a connected spend monitor. No inference, hosted migration, deployment, customer read or account configuration was performed. The Worker never constructs this fixed-prompt connection-check adapter; the separate enhancement endpoint is owned by [connected setup](connected-jobs-ai.md). Merely supplying a key cannot enable paid calls.
 
-**Approved milestone: finish preparation; integrate later.** Real accrued-cost monitoring is deferred until separately approved durable-ledger and full auth/session integration. No ledger or auth/session integration is delivered here. Every dashboard state carries this preparation notice, including empty and error states; the preview's token and cost examples remain explicitly synthetic.
+**Approved milestone: finish preparation; integrate later.** Real accrued-cost monitoring is deferred until separately approved durable-ledger and full auth/session integration. The admin reporting port and browser-session integration remain unconnected; enhancement accounting is a separate boundary in the connected setup guide. Every dashboard state carries this preparation notice, including empty and error states; the preview's token and cost examples remain explicitly synthetic.
 
 | Surface | Current state |
 | --- | --- |
 | `GET /admin/ai` on Worker port 8787 | Romanian server-rendered owner dashboard; locked until auth configured, then unavailable until durable ledger wired |
 | `GET /v1/admin/ai/usage` | Owner check on every request; fails closed with no real totals because no durable ledger is wired, no CORS access |
-| Internal `prepareConnection().check()` | Fixed `connection_check` using Responses; disabled by default, injected synthetic transport tested; no public generation/check route |
-| Ledger | Typed `UsageLedger` port; **no durable implementation/binding**, new tables or migrations |
+| Internal `prepareConnection().check()` | Fixed `connection_check` using Responses; disabled by default, injected synthetic transport tested; no public connection-check route |
+| Admin ledger | Typed `UsageLedger` report port remains unbound; separate enhancement accounting is documented in [connected setup](connected-jobs-ai.md#durable-operationattempt-accounting) |
 | Login/session | [Authentication setup](authentication.md#session-and-request-contract) owns application login/session flows; this admin boundary still uses separate bearer JWT verification |
 | Organization Costs API | Unimplemented; no organization admin key required |
 
@@ -50,9 +50,9 @@ Config alone still does not connect data or execute inference. Future browser ac
 
 ## Required integration before real usage
 
-The approved SQL [P0–P3 contract](../database/api.md) has no AI accounting commands. The [database plan P4](../database/plan-v2.0.0.md#8-migration-order-dependencies-and-approval-scopes) owns operations, attempts and usage. Reuse that planned boundary rather than create a competing billing schema. This branch changes no migration hashes, database roles, hosted schema or service bindings.
+The [connected accounting extension](connected-jobs-ai.md#durable-operationattempt-accounting) reserves enhancement operations/attempts but deliberately leaves `report` unimplemented. The [database plan P4](../database/plan-v2.0.0.md#8-migration-order-dependencies-and-approval-scopes) remains the broader roadmap, not an existing admin aggregation adapter. Reuse the existing accounting boundary rather than create a competing billing schema; no hosted migration is implied.
 
-Implement a **server-only durable `UsageLedger` adapter** in the P4 scope, then inject it at `adminRoute` and the internal adapter. Required semantics are documented in [`ledger.ts`](../../apps/api/src/ai/ledger.ts):
+Implement the missing **server-only durable reporting adapter** and inject the appropriate ledger at `adminRoute` and the fixed connection-check adapter. Required semantics are documented in [`ledger.ts`](../../apps/api/src/ai/ledger.ts):
 
 - Atomically reserve a unique attempt ID against server-derived user, operation ID/category, provider scope/model and exact request fingerprint; equal replay returns the original row, changed context rejects. No network call until reservation commits. A started row after a crash means unknown outcome.
 - Atomically finish once, preserve usage/price evidence, and enforce uniqueness of `(provider, providerScope, providerResponseId)` for counted responses. Equal redelivery is linked/excluded, conflicting evidence rejects for reconciliation. A true retry uses a new attempt ID under the same operation and each distinct provider response is counted. The client request ID is a trace ID, **not a provider deduplication guarantee**.
@@ -62,7 +62,7 @@ Implement a **server-only durable `UsageLedger` adapter** in the P4 scope, then 
 
 The fixture class is test/preview memory only; production routes reject it. No claim of durable accrued spend or end-to-end live readiness follows from a test double implementing this interface.
 
-After storage and approved auth/session integration, a separately approved **single fixed owner smoke check** could explicitly construct `prepareConnection` with `execution: 'live'`, a durable ledger and Worker-only secret. There is no runtime enable switch/public route in this branch. Live smoke, generation, enrichment, customer input, queues, streaming, reconciliation jobs and budget enforcement need their own bounded implementation/authorization; none are activated here.
+After storage and approved auth/session integration, a separately approved **single fixed owner smoke check** could explicitly construct `prepareConnection` with `execution: 'live'`, a durable ledger and Worker-only secret. There is no runtime switch or public route for this diagnostic. The separate enhancement endpoint follows [connected setup](connected-jobs-ai.md); live smoke, queues, streaming, reconciliation jobs and budget enforcement remain outside this diagnostic preparation.
 
 ## API and estimate rules
 
@@ -74,13 +74,7 @@ Both JWKS and provider fetches use `redirect: 'manual'`, the Worker-supported no
 
 Prices are a versioned **26 October 2026 observed standard text snapshot**; the effective date is this application's snapshot boundary, not a claimed vendor price-change date. No model is selected by default. The demo prices `gpt-5.4-nano` (input/cached/output $0.20/$0.02/$1.25 per million tokens) and `gpt-5.4-mini` ($0.75/$0.075/$4.50), including exact documented `2026-03-17` snapshots. These fixture models are not a recommendation; review availability/deprecation/quality before future live use. Unknown models/tiers, pre-snapshot dates, unsupported nonzero cache-write usage or missing/invalid counters have unknown cost. New prices require a new version; do not replace stored historical rates. [Official pricing](https://developers.openai.com/api/docs/pricing), [nano model](https://developers.openai.com/api/docs/models/gpt-5.4-nano), [mini model](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
 
-`(input − cached input) × input rate + cached input × cache rate + output × output rate` uses integer nano-USD. Cached input is a subset of input, reasoning is a subset of output; neither is added again. Missing reasoning detail remains null. Money rounds half up only for display (six decimals); persisted sums retain full integer precision. Connection-check attempts with missing usage/prices are excluded from the **known subtotal**, with separate unknown counters; an unknown subtotal is labeled unknown, never free. Enhancement reported-charge accounting follows the [enhancement groundwork guide](openrouter-enhancement.md#bounded-provider-flow-and-accounting). Provider usage is allowlisted to documented numeric token fields, not arbitrary response JSON. Estimates cover only this application's recorded attempts and are **not an OpenAI invoice**. [Reasoning and output limits](https://developers.openai.com/api/docs/guides/reasoning)
-
-## PR delivery scope
-
-Use this scope in the PR description alongside the final pipeline verification results:
-
-> Prepares the internal OpenAI adapter and a synthetic owner-dashboard preview. This is the approved preparation milestone; real accrued-cost monitoring is deferred. Production routes fail closed, provider calls remain disabled in the Worker, and browser auth/session and durable-ledger integration remain unconnected. Preview costs are synthetic examples, not actual spend. No live inference, invoice reconciliation, durable storage, or browser visual/accessibility approval is claimed.
+`(input − cached input) × input rate + cached input × cache rate + output × output rate` uses integer nano-USD. Cached input is a subset of input, reasoning is a subset of output; neither is added again. Missing reasoning detail remains null. Money rounds half up only for display (six decimals); persisted sums retain full integer precision. Connection-check attempts with missing usage/prices are excluded from the **known subtotal**, with separate unknown counters; an unknown subtotal is labeled unknown, never free. Enhancement reported-charge accounting follows the [connected accounting contract](connected-jobs-ai.md#durable-operationattempt-accounting). Provider usage is allowlisted to documented numeric token fields, not arbitrary response JSON. Estimates cover only this application's recorded attempts and are **not an OpenAI invoice**. [Reasoning and output limits](https://developers.openai.com/api/docs/guides/reasoning)
 
 ## Verification
 
@@ -91,4 +85,4 @@ npm run check
 
 The API tests generate ephemeral signing keys, inject provider/JWKS transports and run the synthetic preview on an ephemeral loopback port. They cover success/error/timeout/malformed/oversized responses, limits, no default execution or implicit retry, exact cached/reasoning arithmetic and decimal rounding, missing/unpriced data, duplicate ingestion and retry attempts, failed settlement replay, owner/nonowner/anonymous/malformed/expired/forged JWTs, configuration failure, dates/empty/error states, safe generated output and HTTP Host/file protection. CI runs these alongside existing type/build/HTTP/frontend secret-boundary checks. No test calls OpenAI, hosted Supabase or a browser.
 
-The workerd regression bundles the actual Worker and internal adapter in memory using the already locked Wrangler/esbuild/Miniflare tooling. Over real loopback HTTP it verifies both ES256/RS256 owners reach `LEDGER_UNCONNECTED`, verified nonowners receive 403 despite email/admin claims, and JWKS/provider 301/302/303/307/308 responses cannot be followed or counted as usage. All outbound subrequests are intercepted by synthetic services; no key, provider inference, hosted Auth or browser is involved. This regression failed with owner 401 before the redirect-mode fix. The production entrypoint still has no provider execution or durable-ledger binding.
+The workerd regression bundles the actual Worker and internal adapter in memory using the already locked Wrangler/esbuild/Miniflare tooling. Over real loopback HTTP it verifies both ES256/RS256 owners reach `LEDGER_UNCONNECTED`, verified nonowners receive 403 despite email/admin claims, and JWKS/provider 301/302/303/307/308 responses cannot be followed or counted as usage. All outbound subrequests are intercepted by synthetic services; no key, provider inference, hosted Auth or browser is involved. This regression failed with owner 401 before the redirect-mode fix. This regression covers the admin/connection-check boundary; it does not establish readiness of the separate enhancement endpoint.

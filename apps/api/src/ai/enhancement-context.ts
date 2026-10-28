@@ -6,7 +6,7 @@ export type EnhancementContext = { targetId: string; locale: 'ro' | 'en'; facts:
 
 /** Internal projection of an already ownership-verified draft, never a browser request parser.
  * No identity/contact/location/raw source/whole-CV/job text is projected. Free text still
- * needs an approved privacy review before any future live integration; this is not a PII detector.
+ * needs an approved privacy review before configured execution; this is not a PII detector.
  */
 export function projectEnhancementContext(draft: BaseDraft, targetId: string): EnhancementContext {
   const role = draft.roles.find(r => r.id === targetId);

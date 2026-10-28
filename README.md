@@ -23,7 +23,7 @@ For SQL migrations, database command contracts and native local verification, st
 
 For the synthetic OpenAI cost-dashboard preview and its integration limits, follow [OpenAI/admin preparation](docs/setup/openai-admin.md).
 
-For CV enhancement integration readiness and remaining owner inputs, follow [OpenRouter enhancement groundwork](docs/setup/openrouter-enhancement.md).
+After the CV draft has saved, open **Jobs** to paste an advert and save it to your account, then review its details. In **Improve**, select an entry and use **Suggest wording**; suggestions are switched off by default. Review any proposal and its sources before **Accept wording**. See [connected vacancies and wording setup](docs/setup/connected-jobs-ai.md) for configuration and limits, and the [capture design](docs/product/vacancy-capture-design.md) for planned extension and URL intake.
 
 ## Discovery prototype preview
 
@@ -49,5 +49,3 @@ The standalone `prototype/review.html` includes the same app source and is conve
 - [`reviews/ux/verification.md`](reviews/ux/verification.md) — browser and deterministic verification receipts, scope limits, and feedback dispositions. Local screenshot binaries and machine-specific browser tooling are excluded from the proposal package.
 
 All candidate/job examples use synthetic data. Estimates and score methods are illustrative and uncalibrated. PDF readability remains untested until an actual exported PDF is inspected. See each artifact's version and limitations before relying on its outputs.
-
-Connected paste-first vacancy drafts and default-OFF scoped wording: [setup and limits](docs/setup/connected-jobs-ai.md), [future capture design](docs/product/vacancy-capture-design.md). The new migration remains a separately reviewed apply step.

@@ -24,7 +24,8 @@ Missing configuration returns `enhancementUnconfigured`; ownership and snapshot 
 verified before operation reservation. Only saved scoped confirmed/authored context, bullets and
 independently confirmed answers are projected. Identity/contact fields, employer, raw source and
 job text are omitted. Free text may still contain personal information: this is data minimization,
-not anonymization or PII detection. The current enhancement is scoped career wording, not job tailoring.
+not anonymization or PII detection. Privacy review must address personal information embedded in
+scoped free text before real-data use. The current enhancement is scoped career wording, not job tailoring.
 
 The runner sends real HTTPS Chat Completions requests, with an injected transport for offline
 checks: OpenRouter primary, direct OpenAI one fallback. Fallback occurs only for transport
@@ -53,15 +54,20 @@ not durably stored before acceptance, and cancelled/replayed operations do not r
 
 ## Durable operation/attempt accounting
 
-The focused migration reserves one operation per user/snapshot/revision/target/policy and separate
-primary/fallback attempts using existing UsageLedger types. Replays never dispatch another provider
+The focused migration binds each operation ID to the verified user/snapshot/revision/target/policy
+and reserves separate primary/fallback attempts using existing UsageLedger types. Replays never dispatch another provider
 request. A crash after reservation remains an unknown liability; do not re-key an ambiguous request
 automatically. Tokens, allowlisted model/request IDs and numeric reported router costs are recorded;
-no prompt, CV text, raw response, credentials or provider diagnostics enter accounting. Provider
+no prompt, CV text, raw response, credentials or provider diagnostics enter accounting. Optional
+OpenRouter routing/provider metadata stays null when absent or not a safe identifier and does not invalidate
+an otherwise matching-model, valid-ID, stopped and grounded completion. Provider
 response uniqueness prevents double ingestion. Missing direct-provider prices, absent usage and
-all timeout costs stay unknown, not zero. Reported and estimated costs are alternatives, not added.
+all timeout costs stay unknown, not zero. Reported numeric costs finer than nano-USD or in
+unsupported forms also stay unknown. Reported and estimated costs are alternatives, not added.
 No monetary quota/budget product or admin aggregation adapter is added. Existing admin stays honestly
 unconnected until its report port is supplied. These are low token/time limits, **not a monetary cap**.
+Future monetary budget enforcement must reserve liability for both attempts, retain unknown primary
+charges, and stop when account or total budget cannot be established.
 
 Accounting mutation RPCs require `AI_WORKER_SECRET` in addition to the verified user token. The
 migration installs **no** secret/hash. A separately approved owner DB setup must install the SHA256
@@ -85,7 +91,8 @@ git check-ignore apps/api/.dev.vars
 The owner can privately edit that ignored file with owner-only permissions. Preserve existing
 authentication settings and secret values. When provider configuration is needed, add Worker-only
 bindings named `OPENROUTER_API_KEY`, `OPENAI_API_KEY` and `AI_WORKER_SECRET` through the approved
-private setup path. Keep `AI_PAID_INFERENCE=off` explicit in the file; `.dev.vars` overrides Wrangler's
+private setup path. The fallback OpenAI key is used only for direct OpenAI, never uploaded to
+OpenRouter. Keep `AI_PAID_INFERENCE=off` explicit in the file; `.dev.vars` overrides Wrangler's
 checked-in variables. Do not source or copy another credential file through a helper.
 
 Run `npm run dev` from the repository root. It starts the pinned `wrangler dev --local` from
