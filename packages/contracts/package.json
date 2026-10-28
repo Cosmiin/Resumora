@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./editor/*": "./src/editor/*.ts"
+    "./editor/*": "./src/editor/*.ts",
+    "./jobs/*": "./src/jobs/*.ts"
   }
 }
