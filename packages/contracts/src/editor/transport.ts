@@ -1,3 +1,4 @@
+import { isPhoto } from "./photo.ts";
 import type { Answer, BaseDraft } from "./model.ts";
 
 export type EditorEnvelope = {
@@ -77,7 +78,7 @@ const draftShape = obj({
   sources: list(obj({ id: str, kind: one("manual", "fixture", "answer"), label: str }, { text: str, locator: str })),
   referenceProse: list(obj({ id: str, text: str, approval: str, claimIds: list(str) })),
   answers: list(answer),
-  presentation: obj({ order: list(str), hidden: list(str) }, { hiddenFields: list(str),
+  presentation: obj({ order: list(str), hidden: list(str) }, { photo: isPhoto, hiddenFields: list(str),
     approvedWording: v => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(obj({ text: str,
       sources: list(obj({ id: str, text: str, sourceId: str }, { sourceClaimId: str, sourceLineage: list(ref) })) })),
     contributionHtml: v => !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(str) }),

@@ -1,6 +1,6 @@
 # Approved architecture 2.0.0 → implemented P0–P3
 
-The approved plan/catalog is a roadmap; this branch implements its explicitly selected P0–P3 prefix plus the additive [unconfirmed editor persistence component](gateway.md) and [connected vacancy/enhancement extension](../setup/connected-jobs-ai.md), with no P4–P7 tables. Counts below describe the resulting inventory, rather than a product requirement to reach a count. The frozen JSON catalog remains the detailed logical reference for the original model; it does not catalog these extensions. SQL is the exact physical implementation, including extra integrity/index columns below.
+The approved plan/catalog is a roadmap; this branch implements its explicitly selected P0–P3 prefix plus the additive [unconfirmed editor persistence component](gateway.md) and [connected vacancy/enhancement extension](../setup/connected-jobs-ai.md) and [optional CV photo extension](../frontend/profile-photo.md), with no P4–P7 tables. Counts below describe the resulting inventory, rather than a product requirement to reach a count. The frozen JSON catalog remains the detailed logical reference for the original model; it does not catalog these extensions. SQL is the exact physical implementation, including extra integrity/index columns below.
 
 ## Migration order and table coverage
 
@@ -14,6 +14,7 @@ All filenames below are in `supabase/migrations/`. Apply the complete ordered pr
 | P3 / 43 | `20261025040000_p3_tables.sql`, `20261025041000_p3_rules_duration.sql`, `20261025042000_p3_analysis.sql` | rule_versions, evidence_mappings, match_evidence, analysis_runs, analysis_components, recommendations, readiness_runs, recommendation_requirements, recommendation_claims |
 | Editor extension / 44 | `20261027010000_p1_editor_drafts.sql` | editor_draft_snapshots |
 | Connected extension / 48 | `20261028010000_p3_connected_jobs_ai.sql` | target_job_contexts, ai_worker_authorization, ai_enhancement_operations, ai_enhancement_attempts |
+| Photo extension / 51 | `20261028020000_p3_cv_photos.sql` | photo_worker_config, photo_assets, editor_photo_references |
 
 The editor extension follows P3 in filename chronology despite its P1 classification. The local runner's populated-upgrade check filters by phase, so it includes this extension at P1 and carries it through later phases; that fixture order is not the hosted apply order. The connected extension is included at P3. Its separate hosted apply boundary is owned by [connected setup](../setup/connected-jobs-ai.md).
 
@@ -29,7 +30,7 @@ The SQL canonical validator embeds the [canonical schema](../../schemas/cv/v1/sc
 
 ## Executable evidence
 
-`scripts/db/test.py` starts a private native PostgreSQL cluster and executes `supabase/tests/bootstrap.sql` plus all real migrations. Bootstrap Auth roles/subjects are local doubles. `supabase/tests/behavior.py`, `supabase/tests/editor_drafts.py` and `supabase/tests/connected.py` supply executable behavioral methods; several include multiple races, source vectors or rejection cases. These are database behavior checks, not assertions that SQL source text happens to contain an expected string. The default `--suite all` includes all three suites and populated upgrades. Both `--suite editor-drafts` and `--suite connected` run the editor and connected suites, skip the original behavior suite and populated upgrades, and still install all migrations and check normal reapply.
+`scripts/db/test.py` starts a private native PostgreSQL cluster and executes `supabase/tests/bootstrap.sql` plus all real migrations. Bootstrap Auth roles/subjects are local doubles. `supabase/tests/behavior.py`, `supabase/tests/editor_drafts.py` `supabase/tests/connected.py` and `supabase/tests/photos.py` supply executable behavioral methods; several include multiple races, source vectors or rejection cases. These are database behavior checks, not assertions that SQL source text happens to contain an expected string. The default `--suite all` includes all four suites and populated upgrades. `--suite photos` adds photo checks to the editor and connected suites. Both `--suite editor-drafts` and `--suite connected` run the editor and connected suites, skip the original behavior suite and populated upgrades, and still install all migrations and check normal reapply.
 
 | Acceptance area | Tests / concrete evidence |
 |---|---|
@@ -55,3 +56,5 @@ The local receipt records PostgreSQL version, test count and verification limits
 ## Explicit scope limits
 
 P0–P3 is synchronous manual/reviewed evidence work. The connected extension adds synchronous operation/attempt accounting; its default-OFF generation boundary is owned by [connected setup](../setup/connected-jobs-ai.md). No background worker, outbox/lease/fence job engine, webhook consumer, billing or rendering is activated. Those are later stages in the frozen plan, with their retry/unknown-effect requirements preserved there. This avoids adding a queue service before there is asynchronous work. Seven-day replay expiry is a technical guard, not an approved real-data retention policy. Deletion initiation/fencing exists; complete graph/object/Auth erasure and backup tombstone replay remain required before real personal data. Production data admission, automatic extraction/matching and P4–P7 are separate scopes. The [connected milestone's delivery ownership](gateway.md#pr-evidence-and-delivery-ownership) remains unchanged.
+
+Photo migration/Storage helper prerequisites, physical cleanup limits, source resolution bounds and actual versus unverified cloud/export behavior are documented in [profile-photo.md](../frontend/profile-photo.md). Storage in native fixtures is an RLS/operation test double, not the HTTP object service.
