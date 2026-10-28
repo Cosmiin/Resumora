@@ -24,8 +24,9 @@ migrations installed. Neither this module nor the local `supabase/config.toml`
 changes hosted API/Auth settings. Missing schema, transport or configuration fails
 with `DatabaseError(503, 'DATABASE_UNAVAILABLE')`. Existing `PT400/401/403/404/409/410/413/422`
 SQL states preserve their status; only known machine messages are returned.
-Arbitrary database diagnostics remain private. Auth composition must forward
-rotated/cleared cookies on error responses too.
+Arbitrary database diagnostics remain private. Follow the
+[authentication contract](../setup/authentication.md#session-and-request-contract)
+for protected-request markers and cookie mutation boundaries.
 
 ## Unconfirmed editor state
 

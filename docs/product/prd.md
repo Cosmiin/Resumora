@@ -156,7 +156,7 @@ The strategy publication candidate contains the current D-01–14 decision regis
 
 | Topic | Reviewable options / recommendation | Gate |
 |---|---|---|
-| First-release input/extension/OCR | Paste/manual+text PDF/DOCX first; URL/extension/OCR later vs immediate breadth | D-01/02/04, exact scope in strategy register |
+| First-release input/extension/OCR | Current CV intake: [import guide](../setup/cv-import-enrichment.md); URL/extension and export depth remain separate | D-01/02/04, remaining release choices in strategy register |
 | Score display/calibration | Uncalibrated0–100 with explicit required warning and separate format vs withhold numeric release until calibration; no employer equivalence | D-03 |
 | PDF/template scope | One tested PDF initially vs multiple templates/export formats | D-04 |
 | Terms/limits/entitlement/grace/refunds | Proposed1/3/6 terms and monthly allowances; amounts/limits/gates unknown | D-05/07 and commercial policy |

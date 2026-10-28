@@ -14,7 +14,7 @@ Use the [PRD, especially §§15–16](prd.md), [decision register D-01–14](../
 | **Implemented connected vacancy/wording slice** | See [connected setup](../setup/connected-jobs-ai.md) for the current subset and [capture design](vacancy-capture-design.md) for future adapters. |
 | **Planned** | Hosted customer product flows J01–J19 beyond the bounded implemented slices. They require separately authorized application work and relevant dependencies. No hosted end-to-end customer journey is implemented by this local slice. |
 | **Owner decision** | Remaining depth, access, privacy, retention, policy and release choices. Recommendations are discussion options, not selections. |
-| **Deferred candidate** | URL fetching, extension, OCR, extra output formats/templates, Google and other later integrations. Discovery coverage is retained; inclusion/timing remains an owner choice. |
+| **Deferred candidate** | URL fetching, extension, extra output formats/templates, Google and other later integrations. For current scanned-document support, see [import input bounds](../setup/cv-import-enrichment.md#runtime-and-input-bounds). |
 
 The [updated design receipt](../../references/design-system/cvizat/update-2.md), [ZIP](../../references/design-system/cvizat/CVizat%20Design%20System%20%282%29.zip) and [ordered inventory](../../references/design-system/cvizat/update-2.manifest.json) identify the current supplied reference. Paths such as `ScrBase.jsx` below are ZIP members under `ui_kits/web-app/`, not app modules or new filesystem routes. The original extracted tree remains the older reference. The [adoption guide](../frontend/design-system-adoption.md) records integration gaps.
 
@@ -26,9 +26,9 @@ The [updated design receipt](../../references/design-system/cvizat/update-2.md),
 | [J02](#j02--log-in-resume-and-log-out) | Log in, resume, log out | H; AUTH01/AUTH05, `ScrSystem.jsx` | Planned; Auth, session/draft ownership |
 | [J03](#j03--change-password-while-signed-in) | Change a known password while signed in | Account; auth policy gap | Planned; owner decision on reauthentication and sessions |
 | [J04](#j04--recover-a-forgotten-password) | Recover a forgotten password | H; AUTH02–AUTH04, `ScrSystem.jsx` | Planned; purpose-bound recovery, email |
-| [J05](#j05--add-a-cv-by-upload-or-manual-entry) | Upload or manually add a CV | A; UX03–UX04, `OnbImport.jsx` | Planned; private upload/extraction; OCR deferred candidate |
+| [J05](#j05--add-a-cv-by-upload-or-manual-entry) | Upload or manually add a CV | A; UX03–UX04, `OnbImport.jsx` | Current subset: [import setup](../setup/cv-import-enrichment.md); hosted activation pending |
 | [J06](#j06--review-confirm-and-save-base-cv) | Confirm, save and review Base CV | A; UX05–UX06, `OnbReview.jsx`, `ScrBase.jsx` | Planned; canonical persistence and conflict handling |
-| [J07](#j07--enrich-facts-skills-and-wording) | Enrich facts and improve wording | B; UX08, `ScrEnrich.jsx` | Current subset: [connected setup](../setup/connected-jobs-ai.md); full journey planned |
+| [J07](#j07--enrich-facts-skills-and-wording) | Enrich facts and improve wording | B; UX08, `ScrEnrich.jsx` | Current subsets: [career enrichment](../setup/cv-import-enrichment.md) and [scoped wording](../setup/connected-jobs-ai.md); full journey planned |
 | [J08](#j08--edit-undo-and-restore-base-or-job-versions) | Edit, undo and restore versions | A/E; UX06–UX07/UX14, `ScrBase.jsx`, `ScrEditor.jsx` | Planned; independent version branches |
 | [J09](#j09--add-a-job-by-paste-url-or-manual-input) | Add a job and recover failed import | C; UX09, `ScrJobs.jsx` | Current subset: [connected setup](../setup/connected-jobs-ai.md); future adapters: [capture design](vacancy-capture-design.md) |
 | [J10](#j10--review-requirements-match-and-eligibility) | Review requirements and evidence | C/D; UX10–UX12, `ScrJobs.jsx`, `MatchReport.jsx` | Manual review subset: [connected setup](../setup/connected-jobs-ai.md); matching/eligibility UI planned |
@@ -119,15 +119,15 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 ## J05 · Add a CV by upload or manual entry
 
-**Goal, entry, preconditions:** first-time user chooses Bring my CV, or returning user imports another source. Availability: planned; private object storage, extraction and operation ownership are dependencies; scan/OCR scope D-02 remains open. Evidence: UX03–UX04, `OnbImport.jsx`.
+**Goal, entry, preconditions:** first-time user chooses Bring my CV, or returning user imports another source. The [import guide](../setup/cv-import-enrichment.md) owns the implemented default-OFF subset and its activation dependencies; the broader hosted journey remains planned. Evidence: UX03–UX04, `OnbImport.jsx`.
 
-1. Explain supported types/size, handling and privacy from approved policy before upload; offer Start from scratch equally clearly. The demo's PDF/DOCX and 10MB limits are examples, not finalized service limits.
+1. Explain [supported inputs and bounds](../setup/cv-import-enrichment.md#runtime-and-input-bounds), handling and privacy before upload; offer Start from scratch equally clearly. Historical demo limits do not define the implemented contract.
 2. Select a file, validate actual type/size/safety server-side, upload privately and show named extraction stages with Cancel. A manual choice opens blank canonical fields without synthetic content.
 3. Extraction returns a reviewable draft with source references and uncertainty. Route to J06; a later import compares/reviews a new source rather than replacing the existing Base silently.
 
 **Boundaries/outcome:** original bytes and source provenance remain separate from normalized fields and generated text. Extraction produces unconfirmed claims, never a user-confirmed Base. Success is a usable review draft or manual draft; no “PDF readable” conclusion follows from import.
 
-**Recovery:** empty selection, wrong type/size, corrupt/encrypted/scanned document, timeout and partial parsing show safe reasons with manual/paste/try-another-file options. Retry preserves last saved Base and avoids duplicate source/version creation. Cancel cannot publish a late extraction into a newer draft. No OCR promise while deferred.
+**Recovery:** empty selection, wrong type/size, corrupt/encrypted document, unreadable scan, timeout and partial parsing show safe reasons with manual/try-another-file options. Follow the [import recovery contract](../setup/cv-import-enrichment.md#setup-and-activation-boundary) before retrying an unknown outcome. Cancel cannot publish a late extraction into a newer draft.
 
 **Language/acceptance:** preserve original language/diacritics; L1 document choice does not translate extraction silently. Missing name, two unknown titles, year-only roles and absent skills remain editable unknowns. Unsupported files reach manual entry without losing saved work; uploaded facts cannot be exported as confirmed before J06.
 
@@ -148,7 +148,7 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 ## J07 · Enrich facts, skills and wording
 
-**Goal, entry, preconditions:** from an immediate Base check, user explains a real contribution or fills a supported gap. Availability: the current bounded subset is owned by [connected setup](../setup/connected-jobs-ai.md); the full flow below remains planned. Evidence: B/UX08, `ScrEnrich.jsx`, architecture helpers.
+**Goal, entry, preconditions:** from an immediate Base check, user explains a real contribution or fills a supported gap. Current bounded behavior is owned by [career enrichment](../setup/cv-import-enrichment.md) and [scoped wording](../setup/connected-jobs-ai.md); the full flow below remains planned. Evidence: B/UX08, `ScrEnrich.jsx`, architecture helpers.
 
 1. Open one relevant section/question linked to stable role/section IDs; show why asked. Answer contribution/tools/audience/result, revisit saved answer, Skip or I don't know. Qualitative/unmeasured results are valid.
 2. Inspect extracted proposed facts and before/after wording with source/claim links. Explicit factual confirmation is separate from approval of generated prose.

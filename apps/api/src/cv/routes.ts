@@ -82,8 +82,8 @@ export async function readBody(
   }
 }
 
-// The caller must authenticate, enforce Origin/CSRF on writes and forward auth
-// cookie headers, supplying only that request's authenticated gateway.
+// The caller must authenticate without cookie mutation, enforce Origin/CSRF on
+// writes and supply only that request's authenticated gateway.
 export async function cvRoute(
   request: Request,
   gateway: CvDraftGateway,
