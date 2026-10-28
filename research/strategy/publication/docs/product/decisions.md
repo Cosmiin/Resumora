@@ -9,7 +9,7 @@
 - Application/job-CV/contact/next-action organization, latest CV with tailored/untailored label, search and sent-application count. Current CV and actual submitted snapshot/history are distinct; export is not submission.
 - Document/five-category readiness, LinkedIn review, versions/guided achievements, targeting/editing and job capture are included in discovery. Final depth/timing is explained below, never silently excluded.
 - ATS1.1 initial weights/graded evidence and separate Candidate Fit/CV Match, eligibility and actual PDF readability are directed. Numeric readiness rubric and UX hierarchy remain open; no arbitrary extra number.
-- Managed Supabase/Worker/Browser Run and free-first constrained pilot are preferences for discovery. Current provider direction and EU route requirements are owned by the [provider contract](../../../../architecture/provider-adapter-v2.md). Fully-free runtime unproven; no automatic paid upgrade or provisioned service.
+- Managed Supabase/Worker/Browser Run and free-first constrained pilot are preferences for discovery. Current provider direction and EU route requirements are owned by the [enhancement groundwork guide](../../../../../docs/setup/openrouter-enhancement.md). Fully-free runtime unproven; no automatic paid upgrade or provisioned service.
 
 [Owner-feedback continuity](../../research/strategy/iteration2/feedback-dispositions.md), [terminal request](../../research/strategy/iteration2/terminal-strategy-feedback.md), [archived prior register](../../research/strategy/iteration2/inputs/previous-decision-register-v1.3.md). “Approved direction” here means discovery instruction, never release approval.
 
@@ -26,7 +26,7 @@ Seven primary questions appear after the relevant action in UX's one persistent 
 | D-05 | J6 / I2-Q07 | Primary | 1/3/6-month concept directed; value/access/usage/renewal limits and prices unselected. |
 | D-06 | J1 / I2-Q01 | Primary | Job-specific outcome directed; initial candidate validation segment unresolved; job-specific focus is not re-opened. |
 | D-07 | J7 / I2-Q10 | Progressive | Cancellation distinct from deletion; post-cancellation editing/variant/export access unresolved. |
-| D-08 | J2/J7 / I2-Q11 | Progressive | Managed/free-first direction recorded; provider/residency requirements follow the linked provider contract. Retention, processing controls and operating feasibility unresolved. |
+| D-08 | J2/J7 / I2-Q11 | Progressive | Managed/free-first direction recorded; provider/residency requirements follow the linked enhancement groundwork guide. Retention, processing controls and operating feasibility unresolved. |
 | D-09 | J3–J4 / I2-Q02 | Primary | Immediate review/questions and reversible AI controls directed; progressive save/confirmation/blocking policy unresolved. |
 | D-10 | J4 / I2-Q12 | Progressive | Two fields/month-year/duration directed; truthful unknown-field completion/export edge policy unresolved. |
 | D-11 | J5 / I2-Q13 | Progressive | Five statuses and independent confirmation/inclusion/strength meanings directed; presentation precedence unresolved. |

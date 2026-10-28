@@ -6,7 +6,7 @@ export type AttemptStart = {
   attemptId: string;
   operationId: string;
   operation: Operation;
-  provider: 'openai';
+  provider: 'openai' | 'openrouter';
   providerScope: string;
   userId: string;
   modelRequested: string;
@@ -21,10 +21,14 @@ export type AttemptResult = {
   providerResponseId: string | null;
   providerStatus: 'completed' | 'incomplete' | 'failed' | null;
   httpStatus: number | null;
-  errorCode: 'PROVIDER_REJECTED' | 'PROVIDER_FAILED' | 'TIMEOUT' | 'NETWORK_OR_RESPONSE_UNKNOWN' | null;
+  errorCode: 'PROVIDER_REJECTED' | 'PROVIDER_FAILED' | 'TIMEOUT' | 'NETWORK_OR_RESPONSE_UNKNOWN' | 'AVAILABILITY' | 'CANCELLED' | 'POLICY_OR_VALIDATION' | 'OUTPUT_INVALID' | 'OUTPUT_UNSUPPORTED' | null;
   usage: Usage;
   price: PriceSnapshot | null;
   estimatedNanoUsd: string | null;
+  // Optional for existing historical/connection-check rows. No raw provider strings.
+  upstreamProvider?: string | null;
+  routeEvidenceId?: string;
+  reportedCost?: { nanoUsd: string; currency: 'USD'; source: 'openrouter.usage.cost'; observedAt: string } | null;
 };
 export type Attempt = AttemptStart & {
   result: AttemptResult | null;
@@ -90,9 +94,10 @@ export function summarize(attempts: readonly Attempt[], period: Period): UsageRe
       t.input += r.usage.input!; t.output += r.usage.output!;
       t.cachedInput += r.usage.cachedInput!; t.reasoning += r.usage.reasoning ?? 0;
       if (r.usage.reasoning === null) t.unknownReasoning++;
-      if (r.estimatedNanoUsd === null) t.unpricedUsage++;
+      if (r.estimatedNanoUsd === null && r.reportedCost == null) t.unpricedUsage++;
     } else t.unknownUsage++;
-    if (r?.estimatedNanoUsd != null) t.knownNanoUsd = (BigInt(t.knownNanoUsd) + BigInt(r.estimatedNanoUsd)).toString();
+    const knownCost = r?.reportedCost?.nanoUsd ?? r?.estimatedNanoUsd;
+    if (knownCost != null) t.knownNanoUsd = (BigInt(t.knownNanoUsd) + BigInt(knownCost)).toString();
     else t.unknownCost++;
     return t;
   }, { attempts: 0, completed: 0, failed: 0, unknown: 0, incomplete: 0, duplicates: 0, input: 0, output: 0, cachedInput: 0, reasoning: 0, unknownUsage: 0, unpricedUsage: 0, unknownReasoning: 0, unknownCost: 0, knownNanoUsd: '0' });

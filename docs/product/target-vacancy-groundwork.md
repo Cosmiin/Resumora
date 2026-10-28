@@ -125,10 +125,10 @@ Never infer authorization from location or equate a credential by translation.
 Requirements retain exact source excerpts/locators; row IDs are allocated by
 `confirm_job` for each version, not copied from research fixture labels.
 
-The [provider contract](../../research/architecture/provider-adapter-v2.md) owns
-provider order and the required EU route evidence for later AI operations.
-Its executable interface remains pending; no provider types are guessed or
-duplicated here. Vacancy integration must bind that evidence to the pinned
+The [enhancement groundwork guide](../setup/openrouter-enhancement.md) owns
+current provider policy, the evidence checklist and activation requirements.
+Vacancy integration remains pending; no provider types are guessed or
+duplicated here. It must bind that evidence to the pinned
 job/CV versions and operation. No model calls,
 provider residency certification or EU-compliance claim is made by this change.
 Do not put raw job/CV text, URLs, tokens or keys in operation logs or proof records.
@@ -143,7 +143,7 @@ Do not put raw job/CV text, URLs, tokens or keys in operation logs or proof reco
 2. Implement narrow paste/review/save UI and editor→canonical publication bridge;
    preserve current manual Base UX and original source. Add actual two-account
    API persistence checks when that integration is authorized.
-3. Integrate the provider contract's EU route evidence gate and reviewed requirement
+3. Integrate the groundwork guide's EU route evidence gate and reviewed requirement
    extraction output contract, provenance and invalidation; only later evaluate
    extraction quality. Provider/fallback/cost implementation follows that contract.
 4. Implement evidence-based comparison and independent tailoring, explicit Base
