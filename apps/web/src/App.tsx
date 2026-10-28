@@ -1,3 +1,5 @@
+import type { CvPhoto } from "@resumora/contracts/editor/photo";
+import { PhotoEditor } from "./photo/PhotoEditor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FileText,
@@ -205,6 +207,30 @@ function CvEditor({
       !pendingWrite.current
     )
       setError(null);
+  }
+  async function commitPhoto(photo: CvPhoto | null, expected: CvPhoto | null) {
+    // Merge against the latest text/presentation, not a closure captured before upload.
+    // An unresolved save must be reconciled by the existing coordinator first.
+    const current = latest.current;
+    if (
+      !current ||
+      lock.current ||
+      pendingWrite.current ||
+      headRef.current === undefined ||
+      error === "conflict"
+    )
+      return false;
+    if (
+      !equalValues(current.presentation.photo ?? null, expected) &&
+      !equalValues(current.presentation.photo ?? null, photo)
+    )
+      return false;
+    change({ ...current, presentation: { ...current.presentation, photo } });
+    await save("autosave");
+    return (
+      !pendingWrite.current &&
+      equalValues(headRef.current?.draft.presentation.photo ?? null, photo)
+    );
   }
   function openDraft(next: BaseDraft) {
     generation.current++;
@@ -636,7 +662,17 @@ function CvEditor({
                   <div className="editor-layout">
                     <div>
                       {route === "base" ? (
-                        <Editor draft={draft} issues={issues} change={change} />
+                        <Editor
+                          draft={draft}
+                          issues={issues}
+                          change={change}
+                          photoEditor={
+                            <PhotoEditor
+                              value={draft.presentation.photo}
+                              commit={commitPhoto}
+                            />
+                          }
+                        />
                       ) : (
                         <Review
                           draft={draft}

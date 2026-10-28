@@ -1,3 +1,4 @@
+import { PhotoContext, createPhotoClient } from "../photo/client";
 import { useMemo } from "react";
 import { App } from "../App";
 import { HttpBaseCvAdapter } from "../base/http-adapter";
@@ -14,5 +15,13 @@ export function ConnectedApp({
     () => new HttpBaseCvAdapter(transport),
     [account.id, transport],
   );
-  return <App key={account.id} adapter={adapter} transport={transport} />;
+  const photos = useMemo(
+    () => createPhotoClient(transport),
+    [account.id, transport],
+  );
+  return (
+    <PhotoContext.Provider value={photos}>
+      <App key={account.id} adapter={adapter} transport={transport} />
+    </PhotoContext.Provider>
+  );
 }

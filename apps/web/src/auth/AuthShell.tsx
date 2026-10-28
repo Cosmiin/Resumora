@@ -53,7 +53,8 @@ export function AuthShell({
       const headers = new Headers(init.headers);
       if (init.method && init.method !== "GET") {
         headers.set("X-CSRF-Token", csrf.current);
-        headers.set("Content-Type", "application/json");
+        if (!headers.has("Content-Type"))
+          headers.set("Content-Type", "application/json");
       }
       let response: Response;
       try {

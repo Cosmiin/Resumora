@@ -1,3 +1,4 @@
+import type { CvPhoto } from "./photo.ts";
 // Versioned editor projection, distinct from canonical CV publications.
 // IDs remain editor correlation handles; database resource IDs are separate UUIDs.
 export type Locale = "ro" | "en";
@@ -117,6 +118,7 @@ export type BaseDraft = {
   }[];
   answers: Answer[];
   presentation: {
+    photo?: CvPhoto | null;
     order: string[];
     hidden: string[];
     hiddenFields?: string[];
