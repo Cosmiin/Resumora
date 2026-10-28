@@ -1,10 +1,12 @@
 # AI provider boundary — preparation contract
 
-Current preparation direction supersedes the discovery round-1 provider order:
-OpenRouter is primary; direct OpenAI using the owner's own key is fallback.
-This authorizes groundwork only, preserving the current manual experience;
-it does not authorize paid calls, deployment or irreversible actions. Neither
-adapter is activated by the target-vacancy contract. The [enhancement groundwork guide](../../docs/setup/openrouter-enhancement.md) describes the disabled rehearsal, current EU evidence and activation checklist. Domain modules depend on a small structured generation/matching port; they do not depend on router-specific SDK objects or allow models to set final scores.
+The [enhancement groundwork guide](../../docs/setup/openrouter-enhancement.md)
+owns the current provider order, disabled rehearsal, EU evidence and activation
+requirements, superseding the discovery round-1 provider order. Neither adapter
+is activated by the target-vacancy contract. The architectural requirements below
+describe the future integration. Domain modules depend on a small structured
+generation/matching port; they do not depend on router-specific SDK objects or
+allow models to set final scores.
 
 Request contract: operation,tenant/operation IDs,selected confirmed evidence/requirements,locale,prompt/schema version,approved model/routing policy,max input/output/reasoning tokens,timeout,region policy and idempotency metadata. Response: proposed structured requirements/evidence/prose,validation errors,provider request ID,requested/resolved model,actual upstream provider,usage and billing provenance. Stream tokens may improve UX but only validated complete output can be accepted into facts/mappings. No raw source PII in meter logs.
 
@@ -15,8 +17,11 @@ boundary, including fallback. Each operation must retain evidence of the approve
 route configuration, actual upstream provider/model/endpoint and applicable
 region/data-policy version, bound to its pinned input versions. If that route
 cannot be proven before dispatch, fail closed without inference. The executable
-evidence interface is still pending; this groundwork certifies no provider or
-deployment. Proof records must exclude raw CV/job content, URLs, tokens and keys.
+evidence checklist and its activation limits are described in the
+[groundwork guide](../../docs/setup/openrouter-enhancement.md#activation-checklist-and-owner-inputs);
+production evidence binding to pinned input versions remains pending. This
+groundwork certifies no provider or deployment. Proof records must exclude raw
+CV/job content, URLs, tokens and keys.
 
 Allowlist approved providers/endpoints/models; disable unapproved fallbacks. Require structured-output parameter support and approved retention/training policy. A provider outage may queue/fail safely instead of transferring private CVs to another region. Router and upstream terms remain separate; a Europe routing label alone does not prove strict EU-only processing. The dated E-27 research snapshot is not proof that a route meets the requirement. Recheck exact account/model/endpoint eligibility before activation. Keep input/output logging off unless specifically justified/approved; minimize PII before either adapter.
 
