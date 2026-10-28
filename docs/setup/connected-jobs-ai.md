@@ -68,25 +68,29 @@ forging usage. Do not put provider keys into this table. No new user authenticat
 ## Owner configuration; paid mode remains OFF
 
 No private key file was read, no `.dev.vars` edited, no provider call made and no hosted setup
-verified during this implementation. Firstmate reported metadata-only verification of
-`/home/cosmin/.config/resumora/ai.env`: user-owned regular nonsymlink0600, parent0700. Contents and
-key validity remain untested. Expected format is exactly two unquoted assignments, with optional
-blank/comment lines: `OPENROUTER_API_KEY=...` and `OPENAI_API_KEY=...`. Never paste values into chat,
-shell arguments, Git, Vite variables, screenshots or logs. No credential is browser-side.
+verified during this implementation. Never paste values into chat, shell arguments, Git, Vite
+variables, screenshots or logs. No credential is browser-side.
 
-For explicit owner local opt-in, run from this worktree:
+Use the normal local Worker and its existing [authentication configuration](authentication.md#local-configuration).
+Before creating a local credential file, check the ignored path from the repository root:
 
 ```sh
-node scripts/local-ai-config.mjs --load-owner-keys-disabled
+git check-ignore apps/api/.dev.vars
 ```
 
-The helper checks permissions/ownership/nonsymlinks, parses only the two names without evaluating
-shell, creates a private temporary Worker env/config outside Git, suppresses child logs and starts
-only a local Worker on8799 (inspector9249). It forces OFF, ignores ambient config and does not touch
-existing5173/8787. Stop with Ctrl-C to remove temporary files. Abrupt process termination can leave
-a private temporary directory; remove only the directory belonging to that invocation. This helper
-is a disabled configuration handoff, not a usable authenticated preview: supply the existing
-reviewed Supabase/session setup separately before testing signed-in routes. It never validates keys.
+The owner can privately edit that ignored file with owner-only permissions. Preserve existing
+authentication settings and secret values. When provider configuration is needed, add Worker-only
+bindings named `OPENROUTER_API_KEY`, `OPENAI_API_KEY` and `AI_WORKER_SECRET` through the approved
+private setup path. Keep `AI_PAID_INFERENCE=off` explicit in the file; `.dev.vars` overrides Wrangler's
+checked-in variables. Do not source or copy another credential file through a helper.
+
+Run `npm run dev` from the repository root. It starts the pinned `wrangler dev --local` from
+`apps/api` with `apps/api/wrangler.jsonc`, which loads adjacent `apps/api/.dev.vars` into the Worker's `env`.
+The frontend uses port 5173 and proxies `/v1` to the Worker on port 8787. Restart the development pair after
+configuration changes. Authentication still requires the Supabase/session settings, and write
+requests still require the existing same-origin/CSRF protection. Signed-in vacancy intake does
+not need provider keys. With paid mode OFF, enhancement returns `enhancementDisabled` even when
+keys are configured; startup alone proves neither authenticated integration nor provider validity.
 
 Non-secret placeholder fields are in `apps/api/fixtures/worker-config.example.json`. For a later
 authorized deployment, configure Worker secrets named `OPENROUTER_API_KEY`, `OPENAI_API_KEY` and
