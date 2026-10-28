@@ -59,7 +59,7 @@ export function saveAnswer(
     ...next.answers.filter((a) => a.id !== answer.id),
     {
       ...answer,
-      cvFieldId: stored?.cvFieldId,
+      ...(stored?.cvFieldId ? { cvFieldId: stored.cvFieldId } : {}),
       targetLabel: target.label,
       status: "confirmed",
       sourceId,
@@ -92,7 +92,10 @@ export function addAnswerToCv(
       sourceId: saved.sourceId!,
     });
   else {
-    const added = { ...fact(answerEvidenceText(saved)), sourceId: saved.sourceId! };
+    const added = {
+      ...fact(answerEvidenceText(saved)),
+      sourceId: saved.sourceId!,
+    };
     (entry.bullets ??= []).push(added);
     saved.cvFieldId = added.fieldId;
     updateContributionHtml(next, entry.id, added.fieldId, added.value);
