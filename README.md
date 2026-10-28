@@ -52,4 +52,4 @@ The standalone `prototype/review.html` includes the same app source and is conve
 - [`research/strategy/publication/`](research/strategy/README.md) — portable strategy evidence, options, decision cards, backlog and sources.
 - [`reviews/ux/verification.md`](reviews/ux/verification.md) — browser and deterministic verification receipts, scope limits, and feedback dispositions. Local screenshot binaries and machine-specific browser tooling are excluded from the proposal package.
 
-All candidate/job examples use synthetic data. Estimates and score methods are illustrative and uncalibrated. PDF readability remains untested until an actual exported PDF is inspected. See each artifact's version and limitations before relying on its outputs.
+All candidate/job examples use synthetic data. Estimates and score methods are illustrative and uncalibrated. Production PDF export remains unimplemented; the [template guide](docs/frontend/TEMPLATE_AUTHORING.md#print-and-acceptance) owns the local print-proof limits and remaining export checks. See each artifact's version and limitations before relying on its outputs.

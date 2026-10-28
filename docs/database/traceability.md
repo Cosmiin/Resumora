@@ -15,8 +15,9 @@ All filenames below are in `supabase/migrations/`. Apply the complete ordered pr
 | Editor extension / 44 | `20261027010000_p1_editor_drafts.sql` | editor_draft_snapshots |
 | Connected extension / 48 | `20261028010000_p3_connected_jobs_ai.sql` | target_job_contexts, ai_worker_authorization, ai_enhancement_operations, ai_enhancement_attempts |
 | Photo extension / 52 | `20261028020000_p3_cv_photos.sql` | photo_worker_config, photo_assets, editor_photo_references, cv_photo_references |
+| Template foundation / 52 | `20261028050000_p6_templates.sql` | No new tables; canonical validator correction |
 
-The editor extension follows P3 in filename chronology despite its P1 classification. The local runner's populated-upgrade check filters by phase, so it includes this extension at P1 and carries it through later phases; that fixture order is not the hosted apply order. The connected extension is included at P3. Its separate hosted apply boundary is owned by [connected setup](../setup/connected-jobs-ai.md).
+The editor extension follows P3 in filename chronology despite its P1 classification. The local runner's populated-upgrade check filters by phase, so it includes this extension at P1 and carries it through later phases; that fixture order is not the hosted apply order. The connected and photo extensions are included at P3. The reserved template correction is ordered after the sibling extension40000 when present; it is explicitly included at the local harness's P3 extension boundary despite its `p6_templates` filename. Hosted apply remains separate; see [connected setup](../setup/connected-jobs-ai.md) and [photo prerequisites](../frontend/profile-photo.md#setup-and-remaining-acceptance).
 
 P2 adds nullable job context and compound FKs to P1 sources/spans/documents/versions. Existing Base rows remain valid. P1 has no FKs to future generation/extraction/operation/template tables. P4/P5 must introduce those columns/constraints in new migrations; no placeholder FK points to a nonexistent table. All installed constraints are validated in the local test run.
 
@@ -28,7 +29,7 @@ Entity kinds retain the canonical concepts: name, two positioning-title slots, c
 
 The SQL canonical validator embeds the [canonical schema](../../schemas/cv/v1/schema.json) without loosening its graph ID grammar. The [API contract](api.md#ids-at-the-canonical-boundary) owns ID allocation and decoding. Existing canonical fixtures and source ATS/duration calculators remain unchanged. Tests explicitly build separate relational evidence for the abstract ATS examples.
 
-`20261028050000_p6_templates.sql` is the reserved selected-template foundation forward correction, ordered after the sibling extension40000 when present. It adds no tables or policies: it replaces only `validate_canonical` to accept the five registered version references and legacy null, preserving schema, graph, permission and deferred-feature boundaries. The local harness includes this correction at its P3 extension boundary despite the reserved filename. End-to-end job tailoring/export remains PARTIAL; canonical acceptance requires an executed SQL test receipt, not this inventory.
+The template foundation changes only `validate_canonical`, with no new tables or policies. The [SQL API contract](api.md#template-publication) owns accepted references and publication limits; an inventory entry is not an executed SQL acceptance receipt.
 
 ## Executable evidence
 

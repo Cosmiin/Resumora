@@ -67,7 +67,7 @@ To run only the development secret-boundary regression: `npm run test:dev-secret
 
 The [GitHub Actions workflow](../../.github/workflows/ci.yml) runs these foundation checks for pull requests and pushes to `main`, using the pinned Node/npm toolchain and locked dependencies with lifecycle scripts disabled. It does not deploy the application or verify browser rendering, hosted services or working authentication. The discovery prototype and schema/research checks remain separate from this workflow.
 
-Run `npm test --workspace @resumora/api` for injected OpenAI/accounting/owner-verification tests, synthetic admin HTTP checks, database gateway checks and CV route/editor transport checks; CI runs this separately from `npm run check`. It requires no provider credentials, hosted database access or remote inference.
+Run `npm test --workspace @resumora/api` for injected OpenAI/accounting/owner-verification tests, synthetic admin HTTP checks, database gateway checks, CV route/editor transport checks and the [photo API/runtime checks](../frontend/profile-photo.md#setup-and-remaining-acceptance); CI runs this separately from `npm run check`. It requires no provider credentials, hosted database access or remote inference.
 
 ## Next milestones
 
