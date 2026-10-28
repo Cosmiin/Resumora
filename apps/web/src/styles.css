@@ -744,9 +744,19 @@ textarea.native {
 }
 .history-layout {
   display: grid;
+  align-items: start;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 28px;
   margin-top: 20px;
+}
+.history-versions {
+  grid-column: 1;
+  grid-row: 1;
+}
+.history-inspection {
+  grid-column: 2;
+  grid-row: 1;
+  align-content: start;
 }
 .version-card .btn {
   margin: 12px 8px 0 0;
@@ -818,6 +828,11 @@ dialog p {
   }
   .history-layout {
     grid-template-columns: 1fr;
+  }
+  .history-inspection,
+  .history-versions {
+    grid-column: auto;
+    grid-row: auto;
   }
   .home-grid {
     gap: 16px;

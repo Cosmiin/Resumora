@@ -1,4 +1,4 @@
-import { useContext, useState, useRef } from "react";
+import { useContext, useState, useRef, useEffect } from "react";
 import {
   ArrowRight,
   FileText,
@@ -304,6 +304,23 @@ export function HistoryScreen({
 }) {
   const t = useCopy(),
     locale = useContext(LanguageContext);
+  const inspectionHeading = useRef<HTMLHeadingElement>(null);
+  const pendingInspection = useRef<string | null>(null);
+  function revealInspection() {
+    inspectionHeading.current?.focus({ preventScroll: true });
+    inspectionHeading.current?.scrollIntoView?.({ block: "start" });
+  }
+  useEffect(() => {
+    if (inspected && pendingInspection.current === inspected.id) {
+      pendingInspection.current = null;
+      revealInspection();
+    }
+  }, [inspected]);
+  function inspect(snapshot: Snapshot) {
+    if (inspected?.id === snapshot.id) revealInspection();
+    else pendingInspection.current = snapshot.id;
+    setInspected(snapshot);
+  }
   return (
     <>
       <p className="muted">
@@ -327,45 +344,16 @@ export function HistoryScreen({
         </section>
       ) : (
         <div className="history-layout">
-          <div className="stack">
-            {versions.map((v) => (
-              <section className="card version-card" key={v.id}>
-                <div className="section-heading">
-                  <h2>
-                    v{v.revision} · {v.draft.name.value}
-                  </h2>
-                  {v.id === head?.id && (
-                    <Pill tone="good">{t("Curent", "Current")}</Pill>
-                  )}
-                </div>
-                <p>
-                  {new Intl.DateTimeFormat(locale, {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }).format(new Date(v.createdAt))}
-                </p>
-                <p className="small">
-                  {v.reason === "restore"
-                    ? t("Restaurare · copie nouă", "Restore · new copy")
-                    : v.reason === "autosave"
-                      ? t("Salvare automată", "Autosave")
-                      : t("Salvare explicită", "Explicit save")}{" "}
-                  · {v.draft.language.toUpperCase()}
-                </p>
-                <Button onClick={() => setInspected(v)}>
-                  {t("Inspectează", "Inspect")} v{v.revision}
-                </Button>
-                {v.id !== head?.id && (
-                  <Button onClick={() => restore(v)}>
-                    {t("Restaurează", "Restore")} v{v.revision}
-                  </Button>
-                )}
-              </section>
-            ))}
-          </div>
           {inspected && (
-            <section className="stack">
-              <h2>
+            <section
+              className="stack history-inspection"
+              aria-labelledby="history-inspection-heading"
+            >
+              <h2
+                id="history-inspection-heading"
+                ref={inspectionHeading}
+                tabIndex={-1}
+              >
                 {t("Inspectezi", "Inspecting")} v{inspected.revision}
               </h2>
               <DocumentPreview draft={inspected.draft} asOf={asOf} />
@@ -392,6 +380,42 @@ export function HistoryScreen({
               </Button>
             </section>
           )}
+          <div className="stack history-versions">
+            {versions.map((v) => (
+              <section className="card version-card" key={v.id}>
+                <div className="section-heading">
+                  <h2>
+                    v{v.revision} · {v.draft.name.value}
+                  </h2>
+                  {v.id === head?.id && (
+                    <Pill tone="good">{t("Curent", "Current")}</Pill>
+                  )}
+                </div>
+                <p>
+                  {new Intl.DateTimeFormat(locale, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(v.createdAt))}
+                </p>
+                <p className="small">
+                  {v.reason === "restore"
+                    ? t("Restaurare · copie nouă", "Restore · new copy")
+                    : v.reason === "autosave"
+                      ? t("Salvare automată", "Autosave")
+                      : t("Salvare explicită", "Explicit save")}{" "}
+                  · {v.draft.language.toUpperCase()}
+                </p>
+                <Button onClick={() => inspect(v)}>
+                  {t("Inspectează", "Inspect")} v{v.revision}
+                </Button>
+                {v.id !== head?.id && (
+                  <Button onClick={() => restore(v)}>
+                    {t("Restaurează", "Restore")} v{v.revision}
+                  </Button>
+                )}
+              </section>
+            ))}
+          </div>
         </div>
       )}
     </>

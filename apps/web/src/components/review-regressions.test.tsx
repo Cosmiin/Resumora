@@ -10,7 +10,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { App } from "../App";
-import { MemoryBaseCvAdapter } from "../base/adapter";
+import { MemoryBaseCvAdapter, type Snapshot } from "../base/adapter";
 import {
   saveAnswer,
   addAnswerToCv,
@@ -1649,4 +1649,92 @@ it("preserves unrelated bold, italic and ordered-list rendering through explicit
   expect(latest.answers[0].questionText).toBe(
     "What were your day-to-day responsibilities?",
   );
+});
+
+it("reveals and focuses selected history before a long revision list without changing snapshots", async () => {
+  const adapter = new MemoryBaseCvAdapter();
+  const saved = await adapter.save({
+    draft: completeIdentity(),
+    mode: "autosave",
+    expectedRevision: 0,
+    requestId: "history-focus",
+  });
+  const versions: Snapshot[] = Array.from({ length: 88 }, (_, index) => ({
+    ...clone(saved),
+    id: `history-${88 - index}`,
+    revision: 88 - index,
+  }));
+  const original = clone(versions);
+  const restore = vi.fn();
+  const scroll = vi.fn();
+  const descriptor = Object.getOwnPropertyDescriptor(
+    Element.prototype,
+    "scrollIntoView",
+  );
+  Object.defineProperty(Element.prototype, "scrollIntoView", {
+    configurable: true,
+    value: scroll,
+  });
+  function Surface() {
+    const [inspected, setInspected] = useState<Snapshot | null>(null);
+    return (
+      <LanguageContext.Provider value="en">
+        <HistoryScreen
+          durable
+          draft
+          versions={versions}
+          head={versions[0]}
+          inspected={inspected}
+          setInspected={setInspected}
+          restore={restore}
+          go={() => {}}
+          asOf={asOf}
+        />
+      </LanguageContext.Provider>
+    );
+  }
+  try {
+    render(<Surface />);
+    expect(
+      screen.queryByRole("complementary", { name: "CV preview" }),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect v1", exact: true }),
+    );
+    const heading = await screen.findByRole("heading", {
+      name: "Inspecting v1",
+    });
+    expect(document.activeElement).toBe(heading);
+    expect(scroll).toHaveBeenLastCalledWith({ block: "start" });
+    const preview = screen.getByRole("complementary", { name: "CV preview" });
+    const cards = Array.from(document.querySelectorAll(".version-card"));
+    expect(cards).toHaveLength(88);
+    expect(
+      preview.compareDocumentPosition(cards[0]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(cards.map((card) => card.querySelector("h2")?.textContent)).toEqual(
+      versions.map(
+        (version) => `v${version.revision} · ${version.draft.name.value}`,
+      ),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect v1", exact: true }),
+    );
+    expect(document.activeElement).toBe(heading);
+    expect(scroll).toHaveBeenCalledTimes(2);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Inspect v88", exact: true }),
+    );
+    expect(document.activeElement).toBe(
+      await screen.findByRole("heading", { name: "Inspecting v88" }),
+    );
+    expect(scroll).toHaveBeenCalledTimes(3);
+    expect(restore).not.toHaveBeenCalled();
+    expect(versions).toEqual(original);
+  } finally {
+    if (descriptor)
+      Object.defineProperty(Element.prototype, "scrollIntoView", descriptor);
+    else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  }
 });
