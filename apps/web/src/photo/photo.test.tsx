@@ -8,17 +8,42 @@ import { decodeDraft, encodeDraft, isBaseDraft } from '@resumora/contracts/edito
 import { AdapterError, MemoryBaseCvAdapter } from '../base/adapter';
 import { App } from '../App';
 import type { CvPhoto } from '@resumora/contracts/editor/photo';
+import { inspectPhoto } from '@resumora/contracts/editor/photo-format';
+import { readFileSync } from 'node:fs';
+import { Blob as NativeBlob } from 'node:buffer';
+// Actual Chrome 156 canvas.toBlob('image/jpeg', .95) output from a synthetic portrait.
+const canvasJpeg=readFileSync(`${import.meta.dirname}/fixtures/chrome-canvas.jpg`);
 const id='11111111-1111-4111-8111-111111111111';
 function client():PhotoClient{return {upload:vi.fn(async()=>({id})),read:vi.fn(async()=>new Blob()),delete:vi.fn(async()=>{}),subscribe:()=>()=>{},cleanup:vi.fn(async()=>{})};}
 function file(){const f=new File(['test'],'portrait.png',{type:'image/png'});Object.defineProperty(f,'arrayBuffer',{value:async()=>{const b=new Uint8Array(33),v=new DataView(b.buffer);b.set([137,80,78,71,13,10,26,10]);v.setUint32(8,13);b.set([73,72,68,82],12);v.setUint32(16,400);v.setUint32(20,600);return b.buffer;}});return f;}
 beforeEach(()=>{
+ vi.stubGlobal('Blob',NativeBlob);
  vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue({fillRect:vi.fn(),drawImage:vi.fn(),clearRect:vi.fn()} as unknown as CanvasRenderingContext2D);
- vi.spyOn(HTMLCanvasElement.prototype,'toBlob').mockImplementation(callback=>callback(new Blob(['normalized'],{type:'image/jpeg'})));
+ vi.spyOn(HTMLCanvasElement.prototype,'toBlob').mockImplementation(callback=>callback(new Blob([canvasJpeg],{type:'image/jpeg'})));
  vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:400,height:600,close:vi.fn()})));
  vi.stubGlobal('Image',class{naturalWidth=400;naturalHeight=600;onload:()=>void=()=>{};set src(v:string){if(v)queueMicrotask(()=>this.onload());}});
  URL.createObjectURL=vi.fn(()=> 'blob:synthetic');URL.revokeObjectURL=vi.fn();
 });
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
+it('uploads accepted canvas bytes from Chrome and saves a Base photo',async()=>{
+ const port=client(),adapter=new MemoryBaseCvAdapter();window.location.hash='#base';
+ await adapter.save({draft:blankDraft(),expectedRevision:0,mode:'autosave',requestId:crypto.randomUUID()});
+ const selected=new File([canvasJpeg],'portrait.jpg',{type:'image/jpeg'});
+ Object.defineProperty(selected,'arrayBuffer',{value:async()=>canvasJpeg.buffer.slice(canvasJpeg.byteOffset,canvasJpeg.byteOffset+canvasJpeg.byteLength)});
+ vi.mocked(createImageBitmap).mockResolvedValue({width:800,height:1000,close:vi.fn()} as unknown as ImageBitmap);
+ render(<PhotoContext.Provider value={port}><App adapter={adapter}/></PhotoContext.Provider>);
+ fireEvent.change(await screen.findByLabelText('Alege o fotografie'),{target:{files:[selected]}});
+ await screen.findByLabelText('Formă');expect(port.upload).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Salvează fotografia'}));
+ await waitFor(()=>expect(port.upload).toHaveBeenCalledTimes(1));
+ const uploaded=vi.mocked(port.upload).mock.calls[0][0];
+ const bytes=new Uint8Array(await uploaded.arrayBuffer());
+ expect(inspectPhoto(bytes)).toEqual({mime:'image/jpeg',width:800,height:1000});
+ // Direct metadata-bearing input still requires local normalization.
+ expect(()=>inspectPhoto(canvasJpeg)).toThrow('normalizeLocally');
+ await screen.findByText('Fotografie salvată în CV.');
+ expect((await adapter.load())?.draft.presentation.photo?.assetId).toBe(id);
+});
 it('keeps new image local until explicit save; sliders/shape serialize and cancel sends nothing',async()=>{
  const port=client(),commit=vi.fn(async(_photo:CvPhoto|null,_expected:CvPhoto|null)=>true);
  render(<PhotoContext.Provider value={port}><LanguageContext.Provider value="en"><PhotoEditor value={null} commit={commit}/></LanguageContext.Provider></PhotoContext.Provider>);

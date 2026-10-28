@@ -4,11 +4,12 @@ import { cropRectangle, defaultPhotoCrop, type CvPhoto, type PhotoCrop } from '@
 import { equalValues } from '@resumora/contracts/editor/model';
 import { PhotoContext, usePhotoUrl } from './client';
 import { useCopy } from '../components/ui';
+import { stripCanvasJpegMetadata } from './canvas-jpeg';
 
 type LocalImage={image:CanvasImageSource;width:number;height:number;blob:Blob|null;assetId?:string};
 async function prepare(file:File):Promise<LocalImage>{
   if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size===0||file.size>10485760)throw Error('file');
-  // Native decoder applies EXIF orientation once. Re-encoding strips metadata;
+  // Native decoder applies EXIF orientation once. Strip encoder metadata afterward;
   // server independently decodes/re-encodes the uploaded bounded full-frame source.
   const raw=new Uint8Array(await file.arrayBuffer());
   inspectPhoto(raw,{maxDimension:8192,maxPixels:24000000,allowMetadata:true});
@@ -19,7 +20,8 @@ async function prepare(file:File):Promise<LocalImage>{
     if(Math.min(width,height)<256)throw Error('dimensions');
     const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
     const ctx=canvas.getContext('2d');if(!ctx)throw Error('canvas');ctx.fillStyle='white';ctx.fillRect(0,0,width,height);ctx.drawImage(image,0,0,width,height);
-    const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(Error('canvas')),'image/jpeg',.95));
+    const encoded=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(Error('canvas')),'image/jpeg',.95));
+    const blob=new Blob([stripCanvasJpegMetadata(new Uint8Array(await encoded.arrayBuffer()))],{type:'image/jpeg'});
     return {image:canvas,width,height,blob};
   }finally{image.close();}
 }

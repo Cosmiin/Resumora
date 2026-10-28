@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { stripCanvasJpegMetadata } from '../../web/src/photo/canvas-jpeg.ts';
+import { inspectPhoto } from '../../../packages/contracts/src/editor/photo-format.ts';
 
 test('bounded photo codecs execute in native Worker without network and strip metadata', async () => {
   const wasm=[];
@@ -32,6 +34,13 @@ test('bounded photo codecs execute in native Worker without network and strip me
     const normalized=await fetch(origin,{method:'POST',body:fixture});
     assert.equal(normalized.status,200,await normalized.clone().text());assert.equal(normalized.headers.get('x-width'),'256');assert.equal(normalized.headers.get('content-type'),'image/jpeg');
     const bytes=new Uint8Array(await normalized.arrayBuffer());assert.ok(bytes.length>100);
+    // Captured Chrome 156 canvas output carries ICC even after browser re-encoding.
+    const canvasJpeg=new Uint8Array(await readFile(new URL('../../web/src/photo/fixtures/chrome-canvas.jpg',import.meta.url)));
+    const rawCanvas=await fetch(origin,{method:'POST',body:canvasJpeg});
+    assert.equal(rawCanvas.status,422);assert.equal((await rawCanvas.json()).code,'normalizeLocally');
+    const browserUpload=await fetch(origin,{method:'POST',body:stripCanvasJpegMetadata(canvasJpeg)});
+    assert.equal(browserUpload.status,200,await browserUpload.clone().text());
+    assert.deepEqual(inspectPhoto(new Uint8Array(await browserUpload.arrayBuffer())),{mime:'image/jpeg',width:800,height:1000});
     for(const mode of ['png','webp','large']){
       const sample=await (await fetch(origin+'?'+mode)).arrayBuffer();
       const began=Date.now(),response=await fetch(origin,{method:'POST',body:sample});
