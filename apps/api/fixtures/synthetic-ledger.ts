@@ -32,7 +32,7 @@ export class SyntheticLedger implements UsageLedger {
       && a.result?.providerResponseId === result.providerResponseId && !a.duplicateOf);
     // Preserve the delivered evidence, but count a known provider response once.
     if (duplicate) {
-      const evidence = (r: AttemptResult) => JSON.stringify([r.modelResolved, r.usage, r.price, r.estimatedNanoUsd, r.status]);
+      const evidence = (r: AttemptResult) => JSON.stringify([r.modelResolved, r.usage, r.price, r.estimatedNanoUsd, r.status, r.reportedCost?.nanoUsd ?? null, r.reportedCost?.currency ?? null, r.reportedCost?.source ?? null, r.upstreamProvider ?? null]);
       if (evidence(duplicate.result!) !== evidence(result)) throw new Error('PROVIDER_EVIDENCE_CONFLICT');
       attempt.duplicateOf = duplicate.attemptId;
     }

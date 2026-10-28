@@ -4,7 +4,7 @@ Current preparation direction supersedes the discovery round-1 provider order:
 OpenRouter is primary; direct OpenAI using the owner's own key is fallback.
 This authorizes groundwork only, preserving the current manual experience;
 it does not authorize paid calls, deployment or irreversible actions. Neither
-adapter is activated by the target-vacancy contract. Domain modules depend on a small structured generation/matching port; they do not depend on router-specific SDK objects or allow models to set final scores.
+adapter is activated by the target-vacancy contract. The [enhancement groundwork guide](../../docs/setup/openrouter-enhancement.md) describes the disabled rehearsal, current EU evidence and activation checklist. Domain modules depend on a small structured generation/matching port; they do not depend on router-specific SDK objects or allow models to set final scores.
 
 Request contract: operation,tenant/operation IDs,selected confirmed evidence/requirements,locale,prompt/schema version,approved model/routing policy,max input/output/reasoning tokens,timeout,region policy and idempotency metadata. Response: proposed structured requirements/evidence/prose,validation errors,provider request ID,requested/resolved model,actual upstream provider,usage and billing provenance. Stream tokens may improve UX but only validated complete output can be accepted into facts/mappings. No raw source PII in meter logs.
 
