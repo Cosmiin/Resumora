@@ -46,3 +46,28 @@ test('three bounded attempts, backpressure, discard and TTL; no false saved stat
   await f.queue.discard(id);assert.equal(f.disk.length,9);
   for(let i=0;i<300;i++)f.tick();assert.equal((await f.restart().list()).length,0);
 });
+test('third-attempt acknowledgement continues receipt polling after worker restart',async()=>{
+  let deliveries=0;
+  const f=setup(async body=>{
+    if(++deliveries<3)throw Error('offline');
+    return receipt(body);
+  });
+  const id=await f.queue.enqueue(snapshot);
+  for(let i=0;i<3;i++){await f.queue.flush();f.tick();}
+  assert.equal(deliveries,3);assert.equal(f.disk[0].attempts,3);assert.equal(f.disk[0].payload,undefined);
+  await f.restart().flush();
+  const row=(await f.queue.list()).find(row=>row.requestId===id);
+  assert.equal(row.state,'processing');assert.equal(row.receipt.state,'processing');assert.equal(deliveries,3);
+});
+test('accepted third-attempt receipts reach either terminal state without redelivery',async()=>{
+  for(const terminal of ['ready','failed']) {
+    let disk=[],clock=0,deliveries=0,polls=0;
+    const port={read:async()=>structuredClone(disk),write:async value=>{disk=structuredClone(value);},now:()=>clock,connection:async()=>({userId:'A',generation:'one'}),
+      send:async body=>{if(++deliveries<3)throw Error('offline');return receipt(body,'processing');},
+      status:async requestId=>{polls++;return receipt({requestId},terminal);}};
+    const q=createQueue(port);await q.enqueue(snapshot);
+    for(let n=0;n<3;n++){await q.flush();clock+=300001;}
+    await createQueue(port).flush();clock+=60001;await createQueue(port).flush();
+    assert.equal(disk[0].state,terminal);assert.equal(disk[0].receipt.state,terminal);assert.equal(deliveries,3);assert.equal(polls,1);
+  }
+});

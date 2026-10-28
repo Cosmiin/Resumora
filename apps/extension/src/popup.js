@@ -8,7 +8,7 @@ async function update(){
   for(const row of state.rows??[]){
     const li=document.createElement('li'),label=document.createElement('span');
     label.textContent=row.receipt?`Saved · ${row.state} · ${row.requestId.slice(0,8)}`:`Not yet acknowledged · ${row.requestId.slice(0,8)} · ${row.message??'queued for delivery'}`;li.append(label);
-    if(row.message||row.attempts>=3){const retry=document.createElement('button');retry.textContent='Retry / reconcile same request';retry.onclick=()=>run(async()=>{await call({type:'retry',requestId:row.requestId});notice('Retry queued. Waiting for server acknowledgement.');});li.append(retry);}
+    if(row.message||(!row.receipt&&row.attempts>=3)){const retry=document.createElement('button');retry.textContent='Retry / reconcile same request';retry.onclick=()=>run(async()=>{await call({type:'retry',requestId:row.requestId});notice('Retry queued. Waiting for server acknowledgement.');});li.append(retry);}
     const discard=document.createElement('button');discard.textContent=row.receipt?'Dismiss receipt':'Discard local pending capture';discard.onclick=()=>run(()=>call({type:'discard',requestId:row.requestId}));li.append(discard);$('queue').append(li);
   }
   return state;

@@ -70,8 +70,17 @@ the worker test mocks Chrome and the DOM tests mock layout. No end-to-end browse
 claim. Latest measured local SQL acceptance was **20.96 ms**, including a local `psql` process;
 this establishes only the local synthetic persistence boundary's observed timing.
 
-Other ATS adapters remain planned. Full analysis, translation, tailoring and catalog lifecycle are
+The initial four-adapter limitation and committed localhost ZIP described above are superseded by the review changes recorded below. Full analysis, translation, tailoring and catalog lifecycle are
 owned by the queued vacancy lane; capture performs no AI and does not enable paid policy. Billing,
 photo, PDF/template and unrelated import regression categories are not affected here. No additional
 framework/hosting/queue service was introduced. Ordinary Store installation still requires an
 actual published listing; the provided ZIP is explicitly for local developer unpacked loading.
+
+
+## Review fix scope (supersedes initial distribution/coverage claims)
+
+The source now emits the downloadable ZIP in the site build using required exact public APP_ORIGIN/API_ORIGIN values and a fixed manifest public key. There is no committed local archive. A standalone package command remains available; local Vite serves a generated local package. The default API accepts the shared packaged identity without per-user operator registration. Production setup, any eventual Store identity adoption/publication and installed Chrome verification remain operator-owned and unperformed.
+
+Focused regression scenarios execute two configured site builds and inspect their emitted ZIP contracts (origin, fixed identity, host policy, file allowlist, deterministic bytes), refuse an unconfigured release, and fetch the local generated download. Collector fixtures now include Lever, Workday, SmartRecruiters, iCIMS, Oracle/Taleo, SuccessFactors, Workable, Recruitee, BambooHR, Personio, Teamtailor, Indeed, structured-only unknown hosts and bounded generic heading/section fallback. These are synthetic DOM checks with mocked visibility, not live or installed-Chrome evidence. API cases cover default identity pairing/CORS and explicit structured locations; queue cases cover third-attempt acceptance through terminal polling without redelivery. The old ZIP hash above belongs only to the original superseded local archive.
+
+Review fix verification in the isolated worktree: `node --experimental-strip-types --test apps/extension/tests/*.test.mjs apps/api/tests/extension.test.mjs` passed 45 tests; `npm test --workspace @resumora/web -- src/components/ExtensionPage.test.tsx` passed 4 tests; `git diff --check` passed. Package tests exercised the real Vite build twice with synthetic HTTPS origins, refused a missing-origin release and fetched the development ZIP over local HTTP. No full repository test/lint suite, cloud action, Store action or installed-browser check ran in this review phase.

@@ -16,3 +16,5 @@ dist/
 
 # Python verification bytecode.
 __pycache__/
+
+/apps/web/public/downloads/resumora-extension.zip

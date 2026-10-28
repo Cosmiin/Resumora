@@ -33,10 +33,10 @@ export function createQueue({read,write,send,status,connection,now=Date.now,id=(
         });
         const c=await connection();
         if(!c||row.owner!==c.userId||row.generation!==c.generation) {row.message='Connection changed. Reconnect the original account and explicitly retry, or discard.';await patch();continue;}
-        if(row.nextAt>now()||row.attempts>=3)continue;
+        if(row.nextAt>now()||(row.payload&&row.attempts>=3))continue;
         if(!row.payload) {
           if(!['received','processing'].includes(row.state))continue;
-          try {const receipt=await status(row.requestId,c);if(receipt)row.state=receipt.state;}catch{row.message='Status unavailable. Saved receipt retained.';}
+          try {const receipt=await status(row.requestId,c);if(receipt){row.state=receipt.state;row.receipt=receipt;delete row.message;}}catch{row.message='Status unavailable. Saved receipt retained.';}
           row.nextAt=now()+60000;await patch();continue;
         }
         row.attempts++;row.nextAt=now()+Math.min(60000*2**(row.attempts-1),300000);

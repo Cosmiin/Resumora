@@ -8,10 +8,24 @@ export function normalizeCapture(snapshot: CaptureSnapshot): Record<string, unkn
     const value: unknown = JSON.parse(snapshot.structured);
     if(value && typeof value==='object' && !Array.isArray(value)) post=value as Record<string,unknown>;
   }
+  const place = (value: unknown): string | null => {
+    if(!value || typeof value!=='object' || Array.isArray(value)) return null;
+    const location = value as Record<string, unknown>;
+    const address = location.address;
+    if(typeof address==='string') return scalar(address);
+    if(address && typeof address==='object' && !Array.isArray(address)) {
+      const a = address as Record<string, unknown>;
+      const country = a.addressCountry;
+      const parts = [a.addressLocality,a.addressRegion,typeof country==='object' && country!==null ? (country as Record<string,unknown>).name : country].map(scalar).filter((v): v is string => v!==null);
+      if(parts.length) return [...new Set(parts)].join(', ');
+    }
+    return scalar(location.name);
+  };
+  const locations = (Array.isArray(post.jobLocation)?post.jobLocation.slice(0,30):[post.jobLocation]).map(place).filter((v): v is string => v!==null);
   const org = post.hiringOrganization as Record<string, unknown> | undefined;
   const field = (v: unknown) => Array.isArray(v)?v.filter(x=>typeof x==='string').slice(0,30).map(x=>x.slice(0,2000)):scalar(v);
   return { reviewState:'unreviewed', title:scalar(post.title)??scalar(snapshot.title), company:scalar(org?.name)??scalar(snapshot.company),
-    location:scalar(snapshot.location), remote:scalar(post.jobLocationType), skills:field(post.skills), requiredSkills:null, preferredSkills:null,
+    location:scalar(snapshot.location)??scalar([...new Set(locations)].join('; ')), remote:scalar(post.jobLocationType), skills:field(post.skills), requiredSkills:null, preferredSkills:null,
     experience:field(post.experienceRequirements), education:field(post.educationRequirements), certifications:field(post.qualifications),
     languages:field(post.inLanguage), statedSalary:post.baseSalary && typeof post.baseSalary==='object'?JSON.stringify(post.baseSalary).slice(0,4000):scalar(post.baseSalary),
     applicationUrl:typeof post.url==='string' && /^https?:\/\//i.test(post.url) && !new URL(post.url).username && !new URL(post.url).password?post.url.slice(0,2048):null,

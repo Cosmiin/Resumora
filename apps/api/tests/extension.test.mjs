@@ -85,3 +85,24 @@ test('confirmation callback replacement fences the previous web login capture co
   const result=await authRoute(new Request(env.APP_ORIGIN+'/v1/auth/callback/confirm?code=synthetic',{headers:{Cookie:cookie}}),env,transport);
   assert.equal(result.status,303);assert.equal(result.headers.get('Location'),env.APP_ORIGIN+'/');assert.equal(fenced,true);
 });
+
+test('packaged public identity pairs and passes exact CORS without per-install registration',async()=>{
+  const {captureExtensionId}=await import('@resumora/contracts/jobs/capture');
+  const publicEnv={...env,CAPTURE_EXTENSION_IDS:undefined};
+  const body={extensionId:captureExtensionId,deviceId:device,challenge:await challenge(verifier),state:verifier};
+  const response=await extensionRoute(req('/v1/extension/authorize',body,{Origin:env.APP_ORIGIN,Cookie:await webCookie(),'X-CSRF-Token':'csrf-test'}),publicEnv,async url=>Response.json(url.endsWith('/auth/v1/user')?user:{authorized:true}));
+  assert.equal(response.status,200);assert.equal(new URL((await response.json()).redirect).hostname,captureExtensionId+'.chromiumapp.org');
+  const request=new Request(env.APP_ORIGIN+'/v1/jobs',{method:'OPTIONS',headers:{Origin:'chrome-extension://'+captureExtensionId,'Access-Control-Request-Method':'POST'}});
+  const cors=await extensionRoute(request,publicEnv);assert.equal(cors.status,204);assert.equal(cors.headers.get('Access-Control-Allow-Origin'),'chrome-extension://'+captureExtensionId);
+});
+test('structured single and multiple locations normalize explicit address data, preserving snapshot precedence and unknowns',()=>{
+  const normalize=(jobLocation,location)=>normalizeCapture({...snapshot,...(location===undefined?{}:{location}),structured:JSON.stringify({'@type':'JobPosting',jobLocation})}).location;
+  assert.equal(normalize({address:{addressLocality:'Bucharest'}}),'Bucharest');
+  assert.equal(normalize({address:{addressLocality:'Bucharest',addressRegion:'Bucharest',addressCountry:{name:'Romania'}}}),'Bucharest, Romania');
+  assert.equal(normalize([{address:{addressLocality:'Bucharest',addressCountry:'RO'}},{address:{addressLocality:'Cluj',addressCountry:'RO'}}]),'Bucharest, RO; Cluj, RO');
+  assert.equal(normalize({address:'Bucharest, Romania'}),'Bucharest, Romania');
+  assert.equal(normalize({name:'Bucharest office'}),'Bucharest office');
+  assert.equal(normalize({address:{addressLocality:'Bucharest'}},'Stated snapshot location'),'Stated snapshot location');
+  assert.equal(normalize({address:{addressLocality:'Bucharest'}},' '),'Bucharest');
+  for(const value of [undefined,null,[],{}, {address:{}}, {address:{addressCountry:{'@type':'Country'}}}])assert.equal(normalize(value),null);
+});

@@ -51,9 +51,8 @@ export function ExtensionPage({
         Download developer ZIP · v0.1.0
       </a>
       <p>
-        This source ZIP uses local Resumora at 127.0.0.1:5173. It requires
-        developer setup and an explicitly configured extension ID. It does not
-        install by opening the ZIP.
+        This source ZIP is built for this site and has a stable extension ID. It
+        requires Chrome Developer mode and does not install by opening the ZIP.
       </p>
       <ol>
         <li>Extract the ZIP into a folder.</li>
@@ -62,9 +61,8 @@ export function ExtensionPage({
           and select the folder.
         </li>
         <li>
-          Ask the operator to allow your displayed extension ID for the
-          configured API. Connect your existing Resumora account and approve
-          capture-only access.
+          Connect your existing Resumora account and approve capture-only access.
+          Each installation uses the same public extension identity.
         </li>
         <li>
           Open the full job posting and click the toolbar. Wait for a saved
@@ -73,7 +71,7 @@ export function ExtensionPage({
       </ol>
       <p>
         Normal Chrome installation for Windows/macOS uses a published Store
-        listing. The ZIP is for local developers; downloading it does not
+        listing. The ZIP is for developer loading; downloading it does not
         configure or deploy the backend.
       </p>
       <h2>Site readiness</h2>
@@ -97,8 +95,23 @@ export function ExtensionPage({
             </td>
           </tr>
           <tr>
+            <td>Lever / Workday / SmartRecruiters / iCIMS</td>
+            <td>Synthetic rendered job sections; live sites unverified</td>
+          </tr>
+          <tr>
+            <td>Oracle / Taleo / SuccessFactors / Workable</td>
+            <td>Synthetic rendered job sections; live sites unverified</td>
+          </tr>
+          <tr>
+            <td>Recruitee / BambooHR / Personio / Teamtailor / Indeed</td>
+            <td>Synthetic rendered job sections; live sites unverified</td>
+          </tr>
+          <tr>
             <td>Other sites</td>
-            <td>Visible main/article fallback; broader ATS adapters planned</td>
+            <td>
+              Structured JobPosting and bounded visible job-text fallback; live
+              sites unverified
+            </td>
           </tr>
         </tbody>
       </table>

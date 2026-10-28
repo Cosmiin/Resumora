@@ -9,5 +9,6 @@
   "background": {"service_worker":"src/worker.js","type":"module"},
   "action": {"default_popup":"popup.html","default_title":"Capture this job in Resumora"},
   "icons": {"16":"icons/16.png","48":"icons/48.png","128":"icons/128.png"},
-  "content_security_policy": {"extension_pages":"script-src 'self'; object-src 'none'; base-uri 'none'"}
+  "content_security_policy": {"extension_pages":"script-src 'self'; object-src 'none'; base-uri 'none'"},
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsYFyfKOn7PebJnI62fX4ucvGa1un/k6nL99fjVUi/AzmAyai4o4uR9ZbgKQLYF4Yo/t12chmgC9MRFMcEkME1cf3eCJQnKIK4+prLWeMFaF1zV4NiBO9d/gml+CeyiZWCLWsQY5f8dK6LbmUpsOK+anAvriW1+ybEacnn5YhO9iBL8eQUqvs/oJuRySsI9hmRjb2ryjdc/8t6I4u9ScNTUGstiv6RT8y7eguHdUlIIiKHr2mnoSaSDn8l7buuLI2QQVS/1ORZsWkFuxbtFZBBcLA6CJeoVNIH/W9MP99aDCYpZb/5JS70pSKqcLOdVyAmHyRAFtt5pQAKhkWrDVQmQIDAQAB"
 }

@@ -1,3 +1,4 @@
+import { captureExtensionId } from '@resumora/contracts/jobs/capture';
 import type { AuthConfig } from '../auth/session.ts';
 import { config } from '../auth/cookies.ts';
 import { boundedJson } from '../ai/http.ts';
@@ -6,7 +7,7 @@ export const randomSecret = () => Array.from(crypto.getRandomValues(new Uint8Arr
 export async function digest(value: string) { return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))), b => b.toString(16).padStart(2,'0')).join(''); }
 export async function challenge(value: string) { const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))); return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 export function extensionIds(env: CaptureConfig) {
-  const ids = (env.CAPTURE_EXTENSION_IDS ?? '').split(',');
+  const ids = (env.CAPTURE_EXTENSION_IDS ?? captureExtensionId).split(',');
   if (!ids.length || ids.length>5 || ids.some(id => !/^[a-p]{32}$/.test(id)) || !env.CAPTURE_WORKER_SECRET || env.CAPTURE_WORKER_SECRET.length<32) throw Error('unconfigured');
   return ids;
 }
