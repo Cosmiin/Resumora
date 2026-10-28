@@ -61,6 +61,46 @@ test('scoped projection omits contacts/identity/raw sources/unconfirmed facts an
   assert.equal(draft.answers[0].status, 'confirmed');
 });
 
+for (const kind of ['role', 'projects', 'certifications', 'volunteering', 'custom']) {
+  for (const field of ['main', 'bullet']) {
+    test(`confirmed answer projection requires matching eligible text and source: ${kind} ${field}`, () => {
+      const originalText = 'Maintained synthetic reports.';
+      const originalSource = 'source-answer-original';
+      const cases = [
+        { name: 'unchanged authored field', deduplicated: true },
+        { name: 'unchanged confirmed field', status: 'user_confirmed', deduplicated: true },
+        { name: 'revised answer', text: 'Automated synthetic reports.', sourceId: 'source-answer-revised' },
+        { name: 'independently edited field', value: 'Reviewed synthetic reports.' },
+        { name: 'same text from another source', sourceId: 'source-answer-reconfirmed' },
+        { name: 'source retained only in lineage', fieldSourceId: 'local_manual', sourceLineage: [{ sourceId: originalSource }] },
+        { name: 'unconfirmed linked field', status: 'extracted_unconfirmed', omitted: true },
+        { name: 'draft linked field', status: 'draft', omitted: true },
+        { name: 'empty linked field', value: ' ', omitted: true },
+        { name: 'removed linked field', removed: true, omitted: true },
+      ];
+      for (const scenario of cases) {
+        const linked = { id: 'linked-fact', fieldId: 'stable-field', value: scenario.value ?? originalText,
+          status: scenario.status ?? 'user_authored', sourceId: scenario.fieldSourceId ?? originalSource,
+          ...(scenario.sourceLineage ? { sourceLineage: scenario.sourceLineage } : {}) };
+        const empty = { id: 'empty-fact', fieldId: 'empty-field', value: '', status: 'user_authored', sourceId: 'local_manual' };
+        const main = field === 'main' && !scenario.removed ? linked : empty;
+        const bullets = field === 'bullet' && !scenario.removed ? [linked] : [];
+        const answer = { id: 'confirmed-answer', targetId: 'target-1', cvFieldId: 'stable-field', status: 'confirmed',
+          text: scenario.text ?? originalText, sourceId: scenario.sourceId ?? originalSource };
+        const draft = { language: 'en', answers: [answer],
+          roles: kind === 'role' ? [{ id: 'target-1', context: main, bullets }] : [],
+          optionalSections: kind === 'role' ? [] : [{ kind, entries: [{ id: 'target-1', details: main, bullets }] }] };
+        const before = structuredClone(draft);
+        const expected = scenario.omitted ? [] : [{ id: linked.id, text: linked.value, sourceId: linked.sourceId,
+          ...(linked.sourceLineage ? { sourceLineage: linked.sourceLineage } : {}) }];
+        if (!scenario.deduplicated) expected.push({ id: answer.id, text: answer.text, sourceId: answer.sourceId });
+        assert.deepEqual(projectEnhancementContext(draft, 'target-1').facts, expected, scenario.name);
+        assert.deepEqual(draft, before, scenario.name);
+      }
+    });
+  }
+}
+
 test('one regional request, source-preserving proposal, no mutation or prompt/key/output in ledger; replay never regenerates', async () => {
   const ledger = new SyntheticLedger();
   let calls = 0;

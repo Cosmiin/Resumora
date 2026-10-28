@@ -12,15 +12,18 @@ export function projectEnhancementContext(draft: BaseDraft, targetId: string): E
   const role = draft.roles.find(r => r.id === targetId);
   const entry = draft.optionalSections.filter(s => s.kind !== 'languages').flatMap(s => s.entries).find(e => e.id === targetId);
   if (!role && !entry) throw new Error('INVALID_TARGET');
-  const fields: Fact<string>[] = role ? [role.context, ...role.bullets] : [entry!.details, ...(entry!.bullets ?? [])];
-  const facts: ScopedFact[] = fields.filter(f => ['user_confirmed', 'user_authored'].includes(f.status) && f.value.trim()).map(f => ({
+  const fields: Fact<string>[] = (role ? [role.context, ...role.bullets] : [entry!.details, ...(entry!.bullets ?? [])])
+    .filter(f => ['user_confirmed', 'user_authored'].includes(f.status) && f.value.trim());
+  const facts: ScopedFact[] = fields.map(f => ({
     id: f.id, text: f.value, sourceId: f.sourceId,
     ...(f.sourceClaimId ? { sourceClaimId: f.sourceClaimId } : {}),
     ...(f.sourceLineage ? { sourceLineage: structuredClone(f.sourceLineage) } : {}),
   }));
   for (const answer of draft.answers.filter(a => a.targetId === targetId && a.status === 'confirmed' && a.sourceId && a.text.trim())) {
     // An answer already represented by its CV field must not become duplicated evidence.
-    if (!fields.some(f => f.fieldId === answer.cvFieldId)) facts.push({ id: answer.id, text: answer.text, sourceId: answer.sourceId! });
+    if (!fields.some(f => f.fieldId === answer.cvFieldId && f.value === answer.text && f.sourceId === answer.sourceId)) {
+      facts.push({ id: answer.id, text: answer.text, sourceId: answer.sourceId! });
+    }
   }
   if (!facts.length || facts.length > 24 || new Set(facts.map(f => f.id)).size !== facts.length
     || facts.some(f => !f.sourceId || f.text.length > 2000)
