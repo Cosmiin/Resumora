@@ -1,6 +1,7 @@
 import { inspectPhoto } from '@resumora/contracts/editor/photo-format';
 import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { cropRectangle, defaultPhotoCrop, type CvPhoto, type PhotoCrop } from '@resumora/contracts/editor/photo';
+import { equalValues } from '@resumora/contracts/editor/model';
 import { PhotoContext, usePhotoUrl } from './client';
 import { useCopy } from '../components/ui';
 
@@ -27,10 +28,12 @@ export function PhotoEditor({value,commit}:{value:CvPhoto|null|undefined;commit:
   const client=useContext(PhotoContext),t=useCopy(),source=usePhotoUrl(value?.assetId);
   const [editing,setEditing]=useState(false),[local,setLocal]=useState<LocalImage|null>(null),[crop,setCrop]=useState<PhotoCrop>({...defaultPhotoCrop}),[shape,setShape]=useState<'circle'|'square'>('square'),[visible,setVisible]=useState(true),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[deleting,setDeleting]=useState(false),[confirm,setConfirm]=useState(false);
   const canvas=useRef<HTMLCanvasElement>(null),file=useRef<HTMLInputElement>(null),sequence=useRef(0),original=useRef<CvPhoto|null>(null),request=useRef(crypto.randomUUID()),uploaded=useRef<string|null>(null),drag=useRef<{x:number;y:number}|null>(null),alive=useRef(true);
+  const submitted=useRef<CvPhoto|null>(null);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;sequence.current++;};},[]);
+  useEffect(()=>{if(editing&&submitted.current&&equalValues(value,submitted.current)){original.current=structuredClone(submitted.current);submitted.current=null;}},[value,editing]);
   useEffect(()=>{if(!editing||!local||!canvas.current)return;const rect=cropRectangle(local.width,local.height,crop),ctx=canvas.current.getContext('2d');ctx?.clearRect(0,0,360,360);ctx?.drawImage(local.image,rect.x,rect.y,rect.size,rect.size,0,0,360,360);},[local,crop,editing]);
   useEffect(()=>{if(!editing)return;const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[editing]);
-  function start(image:LocalImage){original.current=structuredClone(value??null);setLocal(image);setCrop(value?.crop??{...defaultPhotoCrop});setShape(value?.shape??'square');setVisible(value?.visible??true);request.current=crypto.randomUUID();uploaded.current=null;setEditing(true);setMessage('');}
+  function start(image:LocalImage){original.current=structuredClone(value??null);submitted.current=null;setLocal(image);setCrop(value?.crop??{...defaultPhotoCrop});setShape(value?.shape??'square');setVisible(value?.visible??true);request.current=crypto.randomUUID();uploaded.current=null;setEditing(true);setMessage('');}
   async function select(selected:File|undefined){if(!selected)return;const token=++sequence.current;setBusy(true);try{const image=await prepare(selected);if(!alive.current||token!==sequence.current)return;start(image);setCrop({...defaultPhotoCrop});}catch{if(alive.current)setMessage(t('Alege JPEG, PNG sau WebP static, maximum 10 MB / 24 MP, minimum 256 px. HEIC și imaginile animate nu sunt acceptate. Exportă ca JPEG/PNG și reîncearcă.','Choose static JPEG, PNG or WebP, up to 10 MB / 24 MP, minimum 256 px. HEIC and animated images are unsupported. Export as JPEG/PNG and retry.'));}finally{if(alive.current&&token===sequence.current)setBusy(false);if(file.current)file.current.value='';}}
   function edit(){if(!source.url)return;const image=new Image(),token=++sequence.current;image.onload=()=>{if(alive.current&&token===sequence.current)start({image,width:image.naturalWidth,height:image.naturalHeight,blob:null,assetId:value?.assetId});};image.src=source.url;}
   function position(next:PhotoCrop){if(local)setCrop(cropRectangle(local.width,local.height,next).crop);}
@@ -40,6 +43,7 @@ export function PhotoEditor({value,commit}:{value:CvPhoto|null|undefined;commit:
     if(!id){await client.cleanup().catch(()=>{});id=(await client.upload(local.blob!,request.current)).id;uploaded.current=id;}
     if(!alive.current)return;
     const photo:CvPhoto={assetId:id,crop:cropRectangle(local.width,local.height,crop).crop,shape,visible};
+    submitted.current=structuredClone(photo);
     const saved=await commit(photo,original.current);
     if(!alive.current)return;
     if(saved){setEditing(false);setLocal(null);setMessage(t('Fotografie salvată în CV.','Photo saved in CV.'));}

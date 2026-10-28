@@ -211,6 +211,11 @@ BEGIN
    AND NOT EXISTS(SELECT 1 FROM app.cv_photo_references r WHERE r.tenant_id=p.tenant_id AND r.asset_id=p.id)))
   ORDER BY p.created_at LIMIT 10 FOR UPDATE SKIP LOCKED
  LOOP
+  IF row.state<>'purge_pending' AND
+   (EXISTS(SELECT 1 FROM app.editor_photo_references r WHERE r.tenant_id=row.tenant_id AND r.asset_id=row.id)
+    OR EXISTS(SELECT 1 FROM app.cv_photo_references r WHERE r.tenant_id=row.tenant_id AND r.asset_id=row.id)) THEN
+   CONTINUE;
+  END IF;
   UPDATE app.photo_assets SET state='purge_pending',deleted_at=coalesce(deleted_at,transaction_timestamp()) WHERE id=row.id;
   result:=result||jsonb_build_array(app.photo_manifest(row));
  END LOOP;

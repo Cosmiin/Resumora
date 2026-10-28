@@ -3,6 +3,7 @@ import concurrent.futures
 import copy
 import json
 import importlib.util
+import threading
 from pathlib import Path
 import unittest
 import uuid
@@ -192,6 +193,42 @@ def suite(db):
             db.sql(f"UPDATE app.photo_assets SET created_at=transaction_timestamp()-interval '25 hours' WHERE id IN ('{self.id}','{other}')")
             rows=json.loads(self.call('expire_photo_uploads',f"'{self.secret}'"))
             self.assertEqual([r['id'] for r in rows],[other]);self.assertEqual(json.loads(self.call('read_photo',f"'{self.id}'"))['state'],'ready')
+        def test_cleanup_racing_editor_and_canonical_attachment_retains_successful_saves(self):
+            w=self.workspace();job=w.job();revision=0
+            for path in ('editor','canonical'):
+                for _ in range(12):
+                    asset=uid();self.reserve(asset);self.call('finish_photo',f"'{asset}','{self.secret}'")
+                    db.sql(f"UPDATE app.photo_assets SET created_at=transaction_timestamp()-interval '25 hours' WHERE id='{asset}'")
+                    payload=copy.deepcopy(self.payload);payload['content']['presentation']['photo']['assetId']=asset
+                    layout=dict(w.cv['document'],photoMode='override',photo=payload['content']['presentation']['photo'])
+                    start=threading.Barrier(2)
+                    def attach():
+                        start.wait(timeout=10)
+                        if path=='editor':return json.loads(self.save(payload,revision))
+                        return self.checkpoint(w,job,layout)
+                    def cleanup():
+                        start.wait(timeout=10)
+                        return json.loads(self.call('expire_photo_uploads',f"'{self.secret}'"))
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                        saved=pool.submit(attach);expired=pool.submit(cleanup)
+                        rows=expired.result()
+                        try:result=saved.result()
+                        except AssertionError as error:
+                            self.assertIn('PHOTO_NOT_AVAILABLE',str(error))
+                            self.assertIn(asset,[row['id'] for row in rows])
+                        else:
+                            if path=='editor':revision=result['revision']
+                            self.assertNotIn(asset,[row['id'] for row in rows])
+                            self.assertEqual(json.loads(self.call('read_photo',f"'{asset}'"))['state'],'ready')
+                            self.assertEqual(json.loads(self.call('expire_photo_uploads',f"'{self.secret}'")),[])
+                        for row in rows:self.call('delete_photo',f"'{row['id']}',true,'{self.secret}'")
+        def test_cleanup_resumes_explicit_deletion_of_referenced_photos(self):
+            w=self.workspace();job=w.job();self.reserve();self.ready();self.save()
+            self.checkpoint(w,job)
+            self.call('delete_photo',f"'{self.id}',false,'{self.secret}'")
+            rows=json.loads(self.call('expire_photo_uploads',f"'{self.secret}'"))
+            self.assertEqual([row['id'] for row in rows],[self.id])
+            self.assertIn('PHOTO_NOT_FOUND',self.call('read_photo',f"'{self.id}'",error=True))
         def test_photo_read_and_storage_are_fenced_after_membership_revocation(self):
             row=self.reserve();self.ready()
             db.sql(f"UPDATE app.tenant_memberships SET state='revoked' WHERE tenant_id='{row['objectKey'].split('/')[0]}'")
