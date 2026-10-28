@@ -1,5 +1,9 @@
-export async function boundedJson(response: Response, maxBytes: number, signal?: AbortSignal): Promise<unknown> {
-  if (!response.body) throw new Error('INVALID_RESPONSE');
+export async function boundedJson(response: Response, maxBytes: number, signal?: AbortSignal, allowEmpty = false): Promise<unknown> {
+  if (signal?.aborted) throw new Error('RESPONSE_ABORTED');
+  if (!response.body) {
+    if (allowEmpty) return null;
+    throw new Error('INVALID_RESPONSE');
+  }
   const reader = response.body.getReader();
   const cancel = () => { void reader.cancel().catch(() => {}); };
   signal?.addEventListener('abort', cancel, { once: true });
@@ -19,6 +23,7 @@ export async function boundedJson(response: Response, maxBytes: number, signal?:
     await reader.cancel().catch(() => {});
     throw error;
   } finally { signal?.removeEventListener('abort', cancel); reader.releaseLock(); }
+  if (allowEmpty && bytes === 0) return null;
   const buffer = new Uint8Array(bytes);
   let offset = 0;
   for (const chunk of chunks) { buffer.set(chunk, offset); offset += chunk.byteLength; }

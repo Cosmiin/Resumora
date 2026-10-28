@@ -1,4 +1,4 @@
-import type { JobSave, SavedJob } from '@resumora/contracts/jobs/connected';
+import type { JobSave, SavedJob, JobSummary } from '@resumora/contracts/jobs/connected';
 import type { AttemptStart, AttemptResult, Attempt } from '../ai/ledger.ts';
 import { boundedJson } from '../ai/http.ts';
 import type { DraftSnapshot, EditorWireEnvelope } from '@resumora/contracts/editor/transport';
@@ -97,7 +97,7 @@ export function createDatabaseGateway(env: DatabaseConfig, identity: DatabaseIde
     saveJob: (input: JobSave) => rpc<SavedJob>('save_target_job', { p_key: key(input.requestId),
       p_snapshot: key(input.snapshotId), p_revision: revision(input.snapshotRevision), p_intake: input.intake, p_requirements: input.requirements }),
     reviewJob: (input: { requestId: string; jobId: string; title: string; company: string; requirements: unknown[] }) => rpc<SavedJob>('review_target_job', { p_key: key(input.requestId), p_job: key(input.jobId), p_title: input.title, p_company: input.company, p_requirements: input.requirements }),
-    listJobs: () => rpc<SavedJob[]>('list_target_jobs', {}),
+    listJobs: () => rpc<JobSummary[]>('list_target_jobs', {}),
     getJob: (id: string) => rpc<SavedJob | null>('get_target_job', { p_job: key(id) }),
     loadSnapshot: (id: string) => rpc<DraftSnapshot | null>('load_editor_snapshot', { p_snapshot: key(id) }),
     reserveEnhancement: (input: { operationId: string; snapshotId: string; revision: number; targetId: string; policy: string; secret: string }) =>

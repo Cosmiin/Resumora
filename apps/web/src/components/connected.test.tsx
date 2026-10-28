@@ -1,68 +1,190 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { it, expect, vi } from "vitest";
 import { JobsScreen } from "./JobsScreen";
 import { AiSuggestions } from "./AiSuggestions";
-import { blankDraft, newRole, fact } from "../base/model";
+import {
+  blankDraft,
+  newRole,
+  newOptionalEntry,
+  fact,
+  type Fact,
+} from "../base/model";
+import { DocumentPreview } from "./DocumentPreview";
 import { encodeDraft, decodeDraft } from "@resumora/contracts/editor/transport";
 import { cvRoute } from "../../../api/src/cv/routes";
-import { currentWording } from "../base/wording";
+import { acceptWording, currentWording } from "../base/wording";
 import { LanguageContext } from "./ui";
-it("paste saves raw draft first, then reviews details without changing source", async () => {
-  const calls: { path: string; body: any }[] = [];
+it.each(["none", "capture", "review"])(
+  "%s retry preserves unrelated intake while reviewing a saved capture",
+  async (failure) => {
+    const calls: { path: string; body: any }[] = [];
+    let failed = false;
+    const job = {
+      id: crypto.randomUUID(),
+      versionId: null,
+      state: "draft",
+      snapshotId: crypto.randomUUID(),
+      snapshotRevision: 1,
+      intake: { text: "Required SQL.", sourceUrl: "https://example.invalid/a" },
+      requirements: [],
+    };
+    const transport = vi.fn(async (path: string, init?: RequestInit) => {
+      if (init?.body) {
+        const body = JSON.parse(String(init.body));
+        calls.push({ path, body });
+        if (
+          !failed &&
+          (failure === "capture"
+            ? path === "/v1/jobs"
+            : failure === "review" && path.endsWith("review"))
+        ) {
+          failed = true;
+          throw new TypeError("Synthetic connection failure");
+        }
+        return Response.json({
+          ...job,
+          ...(path.endsWith("review")
+            ? {
+                state: "reviewed",
+                intake: {
+                  ...job.intake,
+                  title: body.title,
+                  company: body.company,
+                },
+              }
+            : {}),
+        });
+      }
+      return Response.json([]);
+    });
+    render(
+      <LanguageContext value="en">
+        <JobsScreen
+          transport={transport}
+          snapshot={{ id: job.snapshotId, revision: 1 }}
+          ready
+        />
+      </LanguageContext>,
+    );
+    fireEvent.change(screen.getByLabelText("Advert text"), {
+      target: { value: job.intake.text },
+    });
+    fireEvent.change(screen.getByLabelText("Source URL (optional)"), {
+      target: { value: job.intake.sourceUrl },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save job draft" }));
+    if (failure === "capture") {
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Retry same request" }),
+      );
+    }
+    await screen.findByLabelText("Title");
+    expect(calls[0].body.intake).toEqual(job.intake);
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText("Advert text") as HTMLTextAreaElement).value,
+      ).toBe(""),
+    );
+    expect(
+      (screen.getByLabelText("Source URL (optional)") as HTMLInputElement)
+        .value,
+    ).toBe("");
+    fireEvent.change(screen.getByLabelText("Advert text"), {
+      target: { value: "Unsubmitted advert B" },
+    });
+    fireEvent.change(screen.getByLabelText("Source URL (optional)"), {
+      target: { value: "https://example.invalid/b" },
+    });
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Synthetic role" },
+    });
+    fireEvent.change(screen.getByLabelText("Company"), {
+      target: { value: "Synthetic company" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm details" }));
+    if (failure === "review") {
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Retry same request" }),
+      );
+    }
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Confirm details" }),
+      ).toBeNull(),
+    );
+    expect(calls).toHaveLength(failure === "none" ? 2 : 3);
+    expect(calls.at(-1)!.path).toMatch(/review$/);
+    expect(calls.at(-1)!.body).not.toHaveProperty("text");
+    if (failure !== "none") {
+      const repeated = calls.filter((c) =>
+        failure === "capture"
+          ? c.path === "/v1/jobs"
+          : c.path.endsWith("review"),
+      );
+      expect(repeated[0]).toEqual(repeated[1]);
+    }
+    expect(
+      (screen.getByLabelText("Advert text") as HTMLTextAreaElement).value,
+    ).toBe("Unsubmitted advert B");
+    expect(
+      (screen.getByLabelText("Source URL (optional)") as HTMLInputElement)
+        .value,
+    ).toBe("https://example.invalid/b");
+  },
+);
+it("opens complete saved detail from compact job list metadata", async () => {
   const job = {
     id: crypto.randomUUID(),
-    versionId: null,
     state: "draft",
-    snapshotId: crypto.randomUUID(),
+    versionId: null,
+    createdAt: "2026-10-28T00:00:00Z",
     snapshotRevision: 1,
-    intake: { text: "Required SQL." },
-    requirements: [],
+    snapshotId: crypto.randomUUID(),
+    intake: {
+      text: "a".repeat(200000),
+      title: "Full saved title",
+      sourceUrl: "https://example.invalid/job",
+    },
+    requirements: [{ text: "aaa", priority: "required" }],
   };
-  const transport = vi.fn(async (path: string, init?: RequestInit) => {
-    if (init?.body) {
-      const body = JSON.parse(String(init.body));
-      calls.push({ path, body });
-      return Response.json({
-        ...job,
-        ...(path.endsWith("review")
-          ? {
-              state: "reviewed",
-              intake: {
-                ...job.intake,
-                title: body.title,
-                company: body.company,
-              },
-            }
-          : {}),
-      });
-    }
-    return Response.json([]);
-  });
-  render(
+  const transport = vi.fn(async (path: string) =>
+    Response.json(
+      path === "/v1/jobs"
+        ? [
+            {
+              id: job.id,
+              state: job.state,
+              createdAt: job.createdAt,
+              title: "Saved title",
+            },
+          ]
+        : job,
+    ),
+  );
+  const view = render(
     <LanguageContext value="en">
-      <JobsScreen
-        transport={transport}
-        snapshot={{ id: job.snapshotId, revision: 1 }}
-        ready
-      />
+      <JobsScreen transport={transport} snapshot={null} ready />
     </LanguageContext>,
   );
-  fireEvent.change(screen.getByLabelText("Advert text"), {
-    target: { value: job.intake.text },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Save job draft" }));
-  await screen.findByLabelText("Title");
-  expect(calls[0].body.intake).toEqual({ text: job.intake.text });
-  fireEvent.change(screen.getByLabelText("Title"), {
-    target: { value: "Synthetic role" },
-  });
-  fireEvent.change(screen.getByLabelText("Company"), {
-    target: { value: "Synthetic company" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Confirm details" }));
-  await waitFor(() => expect(calls).toHaveLength(2));
-  expect(calls[1].path).toMatch(/review$/);
-  expect(calls[1].body).not.toHaveProperty("text");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Saved title · Draft" }),
+  );
+  await screen.findByDisplayValue(job.intake.title);
+  expect(view.container.querySelector("pre")!.textContent).toBe(
+    job.intake.text,
+  );
+  expect(screen.getByText(job.intake.sourceUrl)).toBeTruthy();
+  expect(
+    screen.getByText("Required", { selector: "strong" }).parentElement!
+      .textContent,
+  ).toContain(": aaa");
+  expect(transport).toHaveBeenCalledWith("/v1/jobs/" + job.id);
 });
 it("proposal changes presentation only after acceptance; answers and career facts survive version serialization", async () => {
   const draft = blankDraft();
@@ -169,3 +291,137 @@ it("disabled response retains manual context and presents an honest state", asyn
   );
   expect(change).not.toHaveBeenCalled();
 });
+
+it.each([
+  "role",
+  "projects",
+  "certifications",
+  "volunteering",
+  "custom",
+] as const)(
+  "%s accepted wording respects slots and citations in editable and saved previews",
+  (kind) => {
+    let draft = blankDraft();
+    draft.language = "en";
+    const bullet = fact("I used SQL.");
+    const entry = newOptionalEntry(),
+      role = newRole();
+    const output: Fact<string> = kind === "role" ? role.context : entry.details;
+    output.value = "Original source context.";
+    let target: string, section: string;
+    if (kind === "role") {
+      role.bullets = [bullet];
+      draft.roles.push(role);
+      target = role.id;
+      section = "experience";
+    } else {
+      entry.bullets = [bullet];
+      section = "optional-test";
+      draft.optionalSections.push({
+        id: section,
+        kind,
+        label: "Extra",
+        entries: [entry],
+      });
+      draft.presentation.order.push(section);
+      target = entry.id;
+    }
+    const source = {
+      id: bullet.id,
+      text: bullet.value,
+      sourceId: bullet.sourceId,
+    };
+    draft = acceptWording(draft, target, {
+      text: "Used SQL.",
+      sources: [source],
+    });
+    const edit = vi.fn(),
+      navigate = vi.fn();
+    const preview = (editable: boolean) => (
+      <LanguageContext value="en">
+        <DocumentPreview
+          draft={draft}
+          asOf={{ year: "2026", month: "10" }}
+          {...(editable ? { onTextEdit: edit, onEdit: navigate } : {})}
+        />
+      </LanguageContext>
+    );
+    const view = render(preview(true));
+    fireEvent.click(screen.getByText("Used SQL."));
+    expect(navigate).toHaveBeenCalledWith(output.fieldId);
+    const originals = screen
+      .getByText("Edit original text")
+      .closest("details")!;
+    originals.open = true;
+    const editor = within(originals).getByRole("textbox", {
+      name: "Preview text",
+    });
+    expect(editor.textContent).toBe(output.value);
+    editor.textContent = "Revised original.";
+    fireEvent.input(editor);
+    expect(edit).toHaveBeenCalledWith(output.fieldId, "Revised original.");
+    view.rerender(preview(false));
+    expect(screen.getByText("Used SQL.")).toBeTruthy();
+    for (const hidden of [
+      output.fieldId,
+      bullet.fieldId,
+      ...(kind === "role" ? [`${target}-contributions`] : []),
+    ]) {
+      draft.presentation.hiddenFields = [hidden];
+      for (const editable of [true, false]) {
+        view.rerender(preview(editable));
+        expect(screen.queryByText("Used SQL.")).toBeNull();
+      }
+      expect(currentWording(draft, target)).toBeNull();
+    }
+    draft.presentation.hiddenFields = [draft.name.fieldId];
+    view.rerender(preview(true));
+    expect(screen.getByText("Used SQL.")).toBeTruthy();
+    draft.answers.push({
+      id: "linked-answer",
+      targetId: target,
+      question: "tools",
+      questionText: "Tools?",
+      text: bullet.value,
+      sourceId: bullet.sourceId,
+      status: "confirmed",
+      cvFieldId: bullet.fieldId,
+    });
+    draft.presentation.approvedWording![target].sources = [
+      { ...source, id: "linked-answer" },
+    ];
+    for (const hidden of [
+      bullet.fieldId,
+      ...(kind === "role" ? [`${target}-contributions`] : []),
+    ]) {
+      draft.presentation.hiddenFields = [hidden];
+      view.rerender(preview(true));
+      expect(screen.queryByText("Used SQL.")).toBeNull();
+    }
+    draft.presentation.hiddenFields = [];
+    draft.presentation.hidden.push(section);
+    view.rerender(preview(true));
+    expect(screen.queryByText("Used SQL.")).toBeNull();
+    expect(currentWording(draft, target)).toBeNull();
+    draft.presentation.hidden = [];
+    draft.presentation.approvedWording![target].sources = [source];
+    const changed =
+      kind === "role"
+        ? draft.roles[0].context
+        : draft.optionalSections.at(-1)!.entries[0].details;
+    draft.presentation.approvedWording![target] = {
+      text: "Accepted context.",
+      sources: [
+        { id: changed.id, text: changed.value, sourceId: changed.sourceId },
+      ],
+    };
+    changed.value = "Revised original.";
+    view.rerender(preview(true));
+    expect(screen.queryByText("Accepted context.")).toBeNull();
+    expect(
+      screen
+        .getAllByRole("textbox")
+        .some((e) => e.textContent === changed.value),
+    ).toBe(true);
+  },
+);

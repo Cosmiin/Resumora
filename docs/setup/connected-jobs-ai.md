@@ -5,7 +5,9 @@ manual review and a pinned immutable **editor draft** association. Raw text is p
 a source URL is metadata only. Saving a capture does not require title/company. Review requires
 both from the user, and optionally exact required/preferred excerpts. Unclassified text stays
 unclassified. No extraction, ATS score, scraping, extension, canonical CV publication or application
-submission is implemented here. The list shows the latest 50 captures.
+submission is implemented here. The list shows metadata for the latest 50 captures, with titles
+limited to 200 characters for display. Opening a job reads its complete owned detail, including
+the original source text, full title and requirements.
 
 The new migration `20261028010000_p3_connected_jobs_ai.sql` is prepared, not applied remotely.
 It reuses `jobs`, `confirm_job`, normalized requirements, sources and spans; focused context rows
@@ -42,8 +44,10 @@ injection is treated as data, and validation never trusts a model's assertion of
 must inspect meaning and sources. This limit is visible in the UI.
 
 Only **Accept wording** saves an approved presentation overlay through existing autosave/version
-persistence; facts and answer records remain unchanged. Preview falls back to original content if
-source text/confirmation changes. Manual editor fields remain accessible; removing accepted wording
+persistence; facts and answer records remain unchanged. Preview falls back to original visible content if
+source text/confirmation or cited-field visibility changes. Accepted wording also respects its output
+field's visibility. Editable previews show accepted wording with original text editing available
+under **Edit original text**; removing accepted wording
 restores original display. This does not confirm career facts or canonical claims. Proposals are
 not durably stored before acceptance, and cancelled/replayed operations do not regenerate them.
 

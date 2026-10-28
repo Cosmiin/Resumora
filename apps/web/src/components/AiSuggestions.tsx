@@ -190,8 +190,8 @@ export function AiSuggestions({
                   "Accepted wording in preview.",
                 )
               : t(
-                  "Sursele s-au schimbat; previzualizarea folosește faptele actuale.",
-                  "Sources changed; preview uses current facts.",
+                  "Sursele sau vizibilitatea s-au schimbat; previzualizarea folosește faptele vizibile actuale.",
+                  "Sources or visibility changed; preview uses current visible facts.",
                 )}
           </p>
           <Button

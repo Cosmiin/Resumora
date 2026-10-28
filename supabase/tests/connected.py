@@ -31,6 +31,8 @@ def suite(db):
             reviewed=json.loads(self.call('review_target_job',f"'{uid()}','{job['id']}','Synthetic role','Synthetic company',{literal(requirements)}"))
             self.assertEqual(reviewed['state'],'reviewed'); self.assertEqual(reviewed['intake']['text'],self.intake['text'])
             self.assertEqual(reviewed['requirements'],requirements)
+            listed = json.loads(self.call('list_target_jobs'))
+            self.assertEqual(listed,[{'id':job['id'],'createdAt':job['createdAt'],'state':'reviewed','title':'Synthetic role'}])
             self.assertEqual(json.loads(db.sql(f"SELECT to_json(reviewed_text) FROM app.job_versions WHERE id='{reviewed['versionId']}'")),self.intake['text'])
             self.assertEqual(db.sql(f"SELECT count(*) FROM app.job_requirements WHERE job_id='{job['id']}' AND priority IN ('required','preferred')"),'2')
             self.assertEqual(json.loads(self.call('load_editor_snapshot',f"'{self.snapshot['id']}'"))['payload'],self.payload)
@@ -46,6 +48,25 @@ def suite(db):
             self.assertIn('permission denied',self.call('list_target_jobs',role='anon',error=True))
             self.assertIn('permission denied',db.sql(f"UPDATE app.target_job_contexts SET snapshot_id='{self.other['id']}'",user=self.a,role='authenticated',expect_error=True))
             self.assertIn('INVALID_REQUIREMENT',self.call('review_target_job',f"'{uid()}','{job['id']}','Role','Co',{literal([{'text':'invented','priority':'required'}])}",error=True))
+        def test_large_captures_have_bounded_list_metadata_and_complete_owned_detail(self):
+            self.intake = {'text':'a'*200000, 'title':'😀'*20000, 'company':'b'*20000,
+                           'sourceUrl':'https://example.invalid/job'}
+            requirements = [{'text':'a'*1000,'priority':'required'}]*100
+            for _ in range(51):
+                saved = json.loads(self.call('save_target_job',f"'{uid()}','{self.snapshot['id']}',1,{literal(self.intake)},{literal(requirements)}"))
+            listed = json.loads(self.call('list_target_jobs'))
+            self.assertEqual(len(listed),50)
+            self.assertIn(saved['id'],[item['id'] for item in listed])
+            self.assertLess(len(json.dumps(listed).encode()),150000)
+            for item in listed:
+                self.assertEqual(set(item),{'id','createdAt','state','title'})
+                self.assertEqual(item['title'],'😀'*200)
+                self.assertEqual(item['state'],'draft')
+            detail = json.loads(self.call('get_target_job',f"'{saved['id']}'"))
+            self.assertEqual(detail['intake'],self.intake)
+            self.assertEqual(detail['requirements'],requirements)
+            self.assertEqual(json.loads(self.call('list_target_jobs',user=self.b)),[])
+            self.assertEqual(self.call('get_target_job',f"'{saved['id']}'",user=self.b),'')
         def test_operation_replay_secret_and_unknown_attempt(self):
             op=uid(); args=f"'{op}','{self.snapshot['id']}',1,'role-1','policy-1','{self.secret}'"
             self.assertTrue(json.loads(self.call('reserve_enhancement',args))['created'])

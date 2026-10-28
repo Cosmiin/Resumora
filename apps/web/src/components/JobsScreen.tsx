@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type {
   SavedJob,
+  JobSummary,
   RequirementEvidence,
 } from "@resumora/contracts/jobs/connected";
 import type { AuthTransport } from "../auth/AuthShell";
@@ -15,7 +16,7 @@ export function JobsScreen({
   ready: boolean;
 }) {
   const t = useCopy();
-  const [jobs, setJobs] = useState<SavedJob[]>([]),
+  const [jobs, setJobs] = useState<JobSummary[]>([]),
     [selected, setSelected] = useState<SavedJob | null>(null);
   const [text, setText] = useState(""),
     [sourceUrl, setUrl] = useState(""),
@@ -76,10 +77,22 @@ export function JobsScreen({
       }
       const job: SavedJob = await r.json();
       pending.current = null;
-      setJobs((old) => [job, ...old.filter((j) => j.id !== job.id)]);
+      setJobs((old) => [
+        {
+          id: job.id,
+          state: job.state,
+          createdAt: job.createdAt,
+          title: Array.from(job.intake.title ?? "")
+            .slice(0, 200)
+            .join(""),
+        },
+        ...old.filter((j) => j.id !== job.id),
+      ]);
       choose(job);
-      setText("");
-      setUrl("");
+      if (request.path === "/v1/jobs") {
+        setText("");
+        setUrl("");
+      }
       setMessage(t("Salvat în cont.", "Saved to your account."));
     } catch {
       setMessage(
@@ -202,7 +215,7 @@ export function JobsScreen({
             disabled={busy || !!pending.current}
             onClick={() => void detail(j.id)}
           >
-            {j.intake.title || t("Ciornă de revizuit", "Draft to review")} ·{" "}
+            {j.title || t("Ciornă de revizuit", "Draft to review")} ·{" "}
             {j.state === "reviewed"
               ? t("Revizuit", "Reviewed")
               : t("Ciornă", "Draft")}

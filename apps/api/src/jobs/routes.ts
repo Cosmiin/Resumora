@@ -1,9 +1,9 @@
-import { parseJobSave, isUuid, type JobSave, type SavedJob } from '@resumora/contracts/jobs/connected';
+import { parseJobSave, isUuid, type JobSave, type SavedJob, type JobSummary } from '@resumora/contracts/jobs/connected';
 import { readBody } from '../cv/routes.ts';
 export interface JobsGateway {
   saveJob(input: JobSave): Promise<SavedJob>;
   reviewJob(input: { requestId: string; jobId: string; title: string; company: string; requirements: unknown[] }): Promise<SavedJob>;
-  listJobs(): Promise<SavedJob[]>;
+  listJobs(): Promise<JobSummary[]>;
   getJob(id: string): Promise<SavedJob | null>;
 }
 export const privateJson = (body: unknown, status = 200) => Response.json(body, { status, headers: {

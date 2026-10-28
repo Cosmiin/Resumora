@@ -112,7 +112,7 @@ export function prepareEnhancement(options: {
             }).catch(error => { throw new Error(error instanceof TypeError ? 'TRANSPORT_UNAVAILABLE' : 'TRANSPORT_UNKNOWN'); });
             if (abort.signal.aborted) { await response.body?.cancel(); throw new Error('STOP'); }
             if (response.status >= 300 && response.status < 400) { await response.body?.cancel(); return { status: response.status, data: {}, requestId: null }; }
-            const data = object(await boundedJson(response, 65_536, abort.signal));
+            const data = object(await boundedJson(response, 65_536, abort.signal, [502, 503, 504].includes(response.status)));
             return { status: response.status, data, requestId: safeId(response.headers.get('x-request-id')) };
           };
           const { status, data, requestId } = await Promise.race([request(), stop]);

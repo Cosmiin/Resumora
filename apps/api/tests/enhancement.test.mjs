@@ -131,7 +131,9 @@ test('one regional request, source-preserving proposal, no mutation or prompt/ke
 });
 
 test('one fallback on bare availability or transport failure; attempts share operation and unknown primary cost stays unknown', async () => {
-  for (const failure of [() => Response.json({}, { status: 503 }), () => { throw new TypeError('private transport error'); }]) {
+  for (const failure of [() => Response.json({}, { status: 503 }),
+    ...[502, 503, 504].map(status => () => new Response(null, { status })),
+    () => { throw new TypeError('private transport error'); }]) {
     const ledger = new SyntheticLedger();
     let calls = 0;
     const result = await prepareEnhancement(options({ ledger, transport: async (url, init) => {

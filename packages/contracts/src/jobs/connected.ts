@@ -4,6 +4,7 @@ export type JobSave = { requestId: string; intake: JobIntake; snapshotId: string
   requirements: RequirementEvidence[] };
 export type SavedJob = { id: string; versionId: string | null; state: 'draft' | 'reviewed'; createdAt: string; intake: JobIntake;
   snapshotId: string; snapshotRevision: number; requirements: RequirementEvidence[] };
+export type JobSummary = Pick<SavedJob, 'id' | 'state' | 'createdAt'> & { title: string };
 export const isUuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export function parseJobSave(v: unknown): JobSave {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('invalidRequest');

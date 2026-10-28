@@ -48,7 +48,9 @@ BEGIN
  RETURN app.finish_request(w,r.request_id,app.target_job_json(saved));
 END $$;
 CREATE FUNCTION app.list_target_jobs() RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
- SELECT coalesce(pg_catalog.jsonb_agg(app.target_job_json(j) ORDER BY j.created_at DESC,j.job_id),'[]') FROM
+ SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('id',j.job_id,'createdAt',j.created_at,
+ 'state',CASE WHEN j.job_version_id IS NULL THEN 'draft' ELSE 'reviewed' END,
+ 'title',pg_catalog.left(coalesce(j.intake->>'title',''),200)) ORDER BY j.created_at DESC,j.job_id),'[]') FROM
  (SELECT * FROM app.target_job_contexts WHERE tenant_id=app.tenant_for_user() ORDER BY created_at DESC,job_id LIMIT 50) j
 $$;
 CREATE FUNCTION app.get_target_job(p_job uuid) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
