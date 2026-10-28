@@ -119,6 +119,8 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 ### Private upload/export storage: when retaining file bytes
 
+For optional CV photos, use the [profile photo guide](docs/frontend/profile-photo.md#setup-and-remaining-acceptance), which owns their implemented private storage setup and remaining acceptance requirements. The document upload/export proposal below is a separate scope.
+
 **Purpose:** source PDF/DOCX uploads and retained PDF exports, not manual text-only work. Reuse Supabase Storage rather than adding R2/S3 by default. Proposed buckets: `cv-uploads` and `cv-exports`; retention, quotas and MIME/size limits remain D-02/04/08 decisions.
 
 1. In the approved dev project's **Storage**, inspect existing buckets first. When approved, create the required bucket(s), keep **Public disabled**, and apply approved MIME/size limits. Supabase supports dashboard bucket creation; the exact current create-button label was not verified. [Bucket creation](https://supabase.com/docs/guides/storage/buckets/creating-buckets)

@@ -119,9 +119,6 @@ export type BaseDraft = {
   answers: Answer[];
   presentation: {
     photo?: CvPhoto | null;
-    // Compatible with the parallel connected-wording editor projection.
-    approvedWording?: Record<string, { text: string; sources: { id: string; text: string; sourceId: string;
-      sourceClaimId?: string; sourceLineage?: { sourceId: string; sourceClaimId?: string }[] }[] }>;
     order: string[];
     hidden: string[];
     hiddenFields?: string[];
