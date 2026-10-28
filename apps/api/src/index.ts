@@ -1,3 +1,6 @@
+import { jobsRoute } from './jobs/routes.ts';
+import { enhancementRoute, type EnhancementConfig } from './ai/routes.ts';
+import { photoRoute } from './photos/routes.ts';
 import type { ApiError, HealthResponse } from '@resumora/contracts';
 import { adminRoute } from './admin/routes.ts';
 import type { AdminAuthConfig } from './admin/auth.ts';
@@ -7,9 +10,10 @@ import type { AuthConfig } from './auth/session.ts';
 import { createDatabaseGateway } from './db/supabase.ts';
 import { cvRoute } from './cv/routes.ts';
 
-// User-scoped Supabase RPCs only; no paid provider execution is mounted.
-interface Env extends AdminAuthConfig, AuthConfig {
+// Supabase RPCs and Storage retain the verified user's scope; paid inference is OFF by default.
+interface Env extends AdminAuthConfig, AuthConfig, EnhancementConfig {
   APP_ENV: 'development';
+  PHOTO_WORKER_SECRET?: string;
 }
 
 const cvPaths = new Set(['/v1/base-cv', '/v1/base-cv/history', '/v1/base-cv/save', '/v1/base-cv/restore']);
@@ -31,16 +35,17 @@ export default {
     const path = new URL(request.url).pathname;
     if (path === '/admin/ai' || path === '/v1/admin/ai/usage') return adminRoute(request, env);
     if (authMethods[path]) return authRoute(request, env);
-    if (cvPaths.has(path)) {
+    if (cvPaths.has(path) || path === '/v1/jobs' || path.startsWith('/v1/jobs/') || path === '/v1/enhancement' || path === '/v1/photos' || path.startsWith('/v1/photos/')) {
       const identity = await authenticateRequest(request, env);
       if (identity.response) return identity.response;
-      // The route owns method/body validation; POST is the only supported write.
-      if (request.method === 'POST' && !await checkWrite(request, env))
+      // Route validation must not bypass the shared Origin/CSRF boundary.
+      if (!['GET','HEAD','OPTIONS'].includes(request.method) && !await checkWrite(request, env, path === "/v1/photos" ? ["image/jpeg", "image/png", "image/webp"] : undefined))
         return authError('FORBIDDEN', 403, identity.headers);
       let response: Response;
       try {
         const gateway = createDatabaseGateway(env, identity);
-        response = await cvRoute(request, gateway);
+        response = path === '/v1/enhancement' ? await enhancementRoute(request, env, gateway, identity.user.id)
+          : path.startsWith('/v1/jobs') ? await jobsRoute(request, gateway) : path.startsWith('/v1/photos') ? await photoRoute(request, gateway, env.PHOTO_WORKER_SECRET, bytes => import('./photos/normalize.ts').then(module => module.normalizePhoto(bytes))) : await cvRoute(request, gateway);
       } catch {
         response = Response.json({ error: { code: 'unavailable' } }, { status: 503 });
       }

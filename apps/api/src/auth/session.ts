@@ -74,8 +74,8 @@ export async function authenticateRequest(request: Request, env: AuthConfig, tra
     return { user: verified.user, accessToken: verified.accessToken, headers };
   } catch { return { response: authError('AUTH_UNAVAILABLE', 503, headers) }; }
 }
-export async function checkWrite(request: Request, env: AuthConfig) {
-  if (request.headers.get('origin') !== config(env).app || request.headers.get('content-type')?.split(';')[0] !== 'application/json') return false;
+export async function checkWrite(request: Request, env: AuthConfig, contentTypes: readonly string[] = ['application/json']) {
+  if (request.headers.get('origin') !== config(env).app || !contentTypes.includes(request.headers.get('content-type')?.split(';')[0] ?? '')) return false;
   const browser = await readCookie<BrowserCookie>(request, env, 'browser');
   const session = await readCookie<SessionCookie>(request, env, 'session');
   const csrf = request.headers.get('x-csrf-token');

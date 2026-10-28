@@ -119,6 +119,8 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 ### Private upload/export storage: when retaining file bytes
 
+For optional CV photos, use the [profile photo guide](docs/frontend/profile-photo.md#setup-and-remaining-acceptance), which owns their implemented private storage setup and remaining acceptance requirements. The document upload/export proposal below is a separate scope.
+
 **Purpose:** source PDF/DOCX uploads and retained PDF exports, not manual text-only work. Reuse Supabase Storage rather than adding R2/S3 by default. Proposed buckets: `cv-uploads` and `cv-exports`; retention, quotas and MIME/size limits remain D-02/04/08 decisions.
 
 1. In the approved dev project's **Storage**, inspect existing buckets first. When approved, create the required bucket(s), keep **Public disabled**, and apply approved MIME/size limits. Supabase supports dashboard bucket creation; the exact current create-button label was not verified. [Bucket creation](https://supabase.com/docs/guides/storage/buckets/creating-buckets)
@@ -127,11 +129,11 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 ### AI provider: when extraction/generation using models begins
 
-**Purpose:** structured proposals and selective rewrites. The [enhancement groundwork guide](docs/setup/openrouter-enhancement.md) owns the current provider order, strict EU evidence requirements, conditional cost candidates and activation checklist. Deterministic matching needs no model call, vector DB or commercial ATS API. Mock outputs are sufficient initially.
+**Purpose:** structured proposals and selective rewrites. The [connected setup guide](docs/setup/connected-jobs-ai.md) owns current provider configuration and limits; [historical enhancement research](docs/setup/openrouter-enhancement.md) retains the strict-EU assessment and dated conditional cost candidates. Deterministic matching needs no model call, vector DB or commercial ATS API. Mock outputs are sufficient initially.
 
 The [OpenAI/admin preparation guide](docs/setup/openai-admin.md) owns the current synthetic preview, supported configuration, secure project-key setup and remaining integration requirements. Follow it rather than adding a configurable provider URL or enabling billing/inference as a setup check.
 
-Before extraction/generation is separately approved, follow the [activation checklist and owner inputs](docs/setup/openrouter-enhancement.md#activation-checklist-and-owner-inputs), including privacy review, application quotas, spend reservations and a disable path. Provider retention controls do not establish geographic guarantees; see the guide's [EU evidence matrix](docs/setup/openrouter-enhancement.md#eu-evidence-matrix). A live API call requires explicit authorization and can incur cost; it is not a read-only setup check.
+Before any separately authorized activation, follow [owner configuration](docs/setup/connected-jobs-ai.md#owner-configuration-paid-mode-remains-off). Extraction is future work; application quotas and monetary spend reservations remain unimplemented. Provider retention controls do not establish geographic guarantees; see the guide's [EU evidence matrix](docs/setup/openrouter-enhancement.md#eu-evidence-matrix). A live API call requires explicit authorization and can incur cost; it is not a read-only setup check.
 
 ### PDF export, parsing and OCR: when file features begin
 

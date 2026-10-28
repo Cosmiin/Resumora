@@ -36,11 +36,12 @@ import { Contributions } from "./Contributions";
 import { MonthYearField } from "./MonthYearField";
 
 type Props = {
+  photoEditor?: ReactNode;
   draft: BaseDraft;
   issues: Issue[];
   change: (next: BaseDraft) => void;
 };
-export function Editor({ draft: d, issues, change }: Props) {
+export function Editor({ draft: d, issues, change, photoEditor }: Props) {
   const t = useCopy(),
     locale = useContext(LanguageContext);
   const [opened, setOpened] = useState<string | null>("identity");
@@ -324,6 +325,7 @@ export function Editor({ draft: d, issues, change }: Props) {
           {(secondTitle || d.titles[1].value) &&
             field(d.titles[1], t("Al doilea titlu", "Second title"))}
         </div>
+        {photoEditor}
         {!d.nameParts && (
           <p className="small muted">
             {t(

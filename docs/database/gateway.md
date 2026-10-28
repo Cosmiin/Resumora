@@ -80,9 +80,19 @@ returns `404 SNAPSHOT_NOT_FOUND`, revealing no other account's existence. Direct
 table writes and the private shared writer are unavailable to authenticated users.
 
 The gateway also maps `provisionWorkspace(requestId)` to the existing
-`provision_workspace(request_key)` command. Its idempotency contract remains in
+`provision_workspace(request_key)` command and `saveJobCvCheckpoint(input)` to
+`save_job_cv_checkpoint`; their canonical command and idempotency contracts remain in
 [api.md](api.md). Editor persistence saves unconfirmed draft snapshots and does
-not invoke canonical publication; existing SQL publication commands are unchanged.
+not invoke canonical publication. The [photo extension](../frontend/profile-photo.md)
+owns the gateway's photo/storage methods and the settings pinned during canonical publication.
+
+## Connected vacancy and enhancement operations
+
+The gateway also maps account-owned job save/list/detail/review, immutable snapshot lookup and
+server-authorized enhancement accounting. Their setup and limits are owned by
+[connected vacancies and wording](../setup/connected-jobs-ai.md); exact method/RPC argument mappings
+live in [`createDatabaseGateway`](../../apps/api/src/db/supabase.ts). These operations do not bridge
+editor snapshots into canonical CV publication or connect the admin report port.
 
 ## PR evidence and delivery ownership
 
@@ -107,7 +117,7 @@ synthetic Auth subjects; they do not establish hosted integration.
 Use the [runbook](runbook.md) after exact-head review, target/preflight, recovery
 readiness and explicit development execution authority. Follow the
 [migration inventory](traceability.md#migration-order-and-table-coverage) for
-chronological prefixes and the final editor extension. Verify byte-for-byte manifests, supported
+chronological prefixes and the separately scoped extensions. Verify byte-for-byte manifests, supported
 linked CLI dry-run, applied history, RLS/grants and no pending versions per prefix.
 No history repair, reset, force or retrospective migration editing is permitted.
 

@@ -5,10 +5,13 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AuthShell, type AuthTransport } from "./AuthShell";
 import { ConnectedApp } from "./ConnectedApp";
-import { blankDraft } from "../base/model";
+import { blankDraft, newRole } from "../base/model";
+import { AiSuggestions } from "../components/AiSuggestions";
+import { LanguageContext } from "../components/ui";
 const anonymous = { user: null, csrfToken: "synthetic-csrf", recovery: false };
 const signed = {
   ...anonymous,
@@ -466,6 +469,136 @@ function deferred() {
   });
   return { promise, resolve };
 }
+
+it.each(["stop", "target", "snapshot", "unmount"])(
+  "keeps the authenticated transport usable after suggestion %s cancellation",
+  async (cause) => {
+    const user = userEvent.setup();
+    const draft = blankDraft(),
+      role = newRole(),
+      other = newRole();
+    draft.roles.push(role, other);
+    let targetId = role.id,
+      visible = true;
+    let snapshot = { id: crypto.randomUUID(), revision: 1 };
+    let cvTransport: AuthTransport = async () => Response.json(null);
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).endsWith("/session")) return Response.json(signed);
+        if (String(input) === "/v1/enhancement") {
+          return new Promise<Response>((_resolve, reject) => {
+            init!.signal!.addEventListener(
+              "abort",
+              () => reject(new DOMException("Cancelled", "AbortError")),
+              { once: true },
+            );
+          });
+        }
+        return Response.json({ saved: true });
+      },
+    );
+    const tree = () => (
+      <AuthShell fetcher={fetcher}>
+        {(_, transport) => {
+          cvTransport = transport;
+          return (
+            <LanguageContext value="en">
+              <p>Private editor</p>
+              {visible && (
+                <AiSuggestions
+                  draft={draft}
+                  targetId={targetId}
+                  snapshot={snapshot}
+                  ready
+                  transport={transport}
+                  change={vi.fn()}
+                />
+              )}
+            </LanguageContext>
+          );
+        }}
+      </AuthShell>
+    );
+    const view = render(tree());
+    await user.click(
+      await screen.findByRole("button", { name: "Suggest wording" }),
+    );
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.some(([path]) => path === "/v1/enhancement"),
+      ).toBe(true),
+    );
+    const stopButton = await screen.findByRole("button", { name: "Stop" });
+    const originalTransport = cvTransport;
+    if (cause === "stop") await user.click(stopButton);
+    else {
+      if (cause === "target") targetId = other.id;
+      if (cause === "snapshot")
+        snapshot = { id: crypto.randomUUID(), revision: 2 };
+      if (cause === "unmount") visible = false;
+      view.rerender(tree());
+    }
+    await act(async () => {
+      for (const path of ["/v1/base-cv/save", "/v1/jobs"]) {
+        const response = await cvTransport(path, {
+          method: "POST",
+          body: "{}",
+        });
+        expect(response.ok).toBe(true);
+      }
+    });
+    expect(cvTransport).toBe(originalTransport);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("Private editor")).toBeTruthy();
+    expect(
+      fetcher.mock.calls.filter(([path]) => String(path).endsWith("/session")),
+    ).toHaveLength(1);
+  },
+);
+
+it.each(["network", "unexpected-abort", "cancelled-network", "unauthorized"])(
+  "still fences private requests after %s failure",
+  async (failure) => {
+    let cvTransport: AuthTransport = async () => Response.json(null);
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/session")) return Response.json(signed);
+      if (failure === "unauthorized") return Response.json({}, { status: 401 });
+      if (failure === "unexpected-abort")
+        throw new DOMException("Unexpected", "AbortError");
+      throw new TypeError("Connection failed");
+    });
+    render(
+      <AuthShell fetcher={fetcher}>
+        {(_, transport) => {
+          cvTransport = transport;
+          return <p>Private editor</p>;
+        }}
+      </AuthShell>,
+    );
+    await screen.findByText("Private editor");
+    const signal = new AbortController();
+    if (failure === "cancelled-network") signal.abort();
+    const retired = cvTransport;
+    await act(async () => {
+      const result = await Promise.allSettled([
+        cvTransport("/v1/enhancement", {
+          method: "POST",
+          signal: signal.signal,
+        }),
+      ]);
+      expect(result[0].status).toBe(
+        failure === "unauthorized" ? "fulfilled" : "rejected",
+      );
+    });
+    const calls = fetcher.mock.calls.length;
+    await expect(retired("/v1/jobs")).rejects.toThrow(
+      failure === "unauthorized" ? "SESSION_CHANGED" : "SESSION_UNVERIFIED",
+    );
+    expect(fetcher.mock.calls.length).toBe(calls);
+    if (failure === "unauthorized")
+      expect(screen.queryByText("Private editor")).toBeNull();
+  },
+);
 
 it("finishes anonymous cookie responses and CSRF updates before dispatching login", async () => {
   const delayed = deferred();

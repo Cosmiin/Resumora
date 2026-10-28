@@ -691,7 +691,7 @@ class Analysis(unittest.TestCase):
         self.assertIn('permission denied',DB.sql('UPDATE app.rule_versions SET config=\'{}\'',user=self.a,role='authenticated',expect_error=True))
         self.assertIn('IMMUTABLE_RULE_VERSION',DB.sql('UPDATE app.rule_versions SET config=\'{}\'',expect_error=True))
         self.assertIn('permission denied',self.call('calculate_scores',f"'{uid()}','{uid()}',true,true",error=True))
-        self.assertEqual(DB.sql("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relkind='r' AND c.relrowsecurity"),'44')
+        self.assertEqual(DB.sql("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relkind='r' AND NOT c.relrowsecurity ORDER BY c.relname"),'')
 
     def test_readiness_is_qualitative_pending_and_scope_checked(self):
         checks={k:{'state':'pending','reason':'Review not completed'} for k in ['content','structure','jobOptimization','writing','application']}

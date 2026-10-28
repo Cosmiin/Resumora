@@ -53,7 +53,8 @@ export function AuthShell({
       const headers = new Headers(init.headers);
       if (init.method && init.method !== "GET") {
         headers.set("X-CSRF-Token", csrf.current);
-        headers.set("Content-Type", "application/json");
+        if (!headers.has("Content-Type"))
+          headers.set("Content-Type", "application/json");
       }
       let response: Response;
       try {
@@ -65,6 +66,10 @@ export function AuthShell({
         });
       } catch (error) {
         if (
+          !(
+            init.signal?.aborted &&
+            (error as { name?: string } | null)?.name === "AbortError"
+          ) &&
           !path.startsWith("/v1/auth/") &&
           startedGeneration === generation.current &&
           startedCsrf === csrf.current

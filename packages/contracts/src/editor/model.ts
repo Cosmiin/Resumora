@@ -1,4 +1,5 @@
 import type { ImportReview, QuestionPlan, QuestionOption, RoleRewriteReview } from "../intelligence/model.ts";
+import type { CvPhoto } from "./photo.ts";
 // Versioned editor projection, distinct from canonical CV publications.
 // IDs remain editor correlation handles; database resource IDs are separate UUIDs.
 export type Locale = "ro" | "en";
@@ -125,10 +126,14 @@ export type BaseDraft = {
   }[];
   answers: Answer[];
   presentation: {
+    photo?: CvPhoto | null;
     order: string[];
     hidden: string[];
     hiddenFields?: string[];
     contributionHtml?: Record<string, string>;
+    approvedWording?: Record<string, { text: string; sources: { id: string; text: string; sourceId: string;
+      sourceClaimId?: string; sourceLineage?: { sourceId: string; sourceClaimId?: string }[] }[] }>;
+
   };
 };
 export const coreSections = [
