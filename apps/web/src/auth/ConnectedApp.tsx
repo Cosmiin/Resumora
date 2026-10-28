@@ -15,6 +15,16 @@ export function ConnectedApp({
     () => new HttpBaseCvAdapter(transport),
     [account.id, transport],
   );
-  const intelligence = useMemo(() => httpIntelligence(transport), [account.id, transport]);
-  return <App key={account.id} adapter={adapter} transport={transport} intelligence={intelligence} />;
+  const intelligence = useMemo(
+    () => httpIntelligence(transport),
+    [account.id, transport],
+  );
+  return (
+    <App
+      key={account.id}
+      adapter={adapter}
+      transport={transport}
+      intelligence={intelligence}
+    />
+  );
 }

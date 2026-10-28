@@ -16,7 +16,15 @@ import { maraReviewDraft } from "../base/fixture";
 import { selectDocument, type FileSelection } from "../base/validation";
 import { Button, Pill, LanguageContext, useCopy } from "./ui";
 import { DocumentPreview } from "./DocumentPreview";
-export function StartChooser({ start, intelligence, revision = 0 }: { start: (draft: BaseDraft) => void; intelligence?: IntelligenceClient; revision?: number }) {
+export function StartChooser({
+  start,
+  intelligence,
+  revision = 0,
+}: {
+  start: (draft: BaseDraft) => void;
+  intelligence?: IntelligenceClient;
+  revision?: number;
+}) {
   const t = useCopy(),
     locale = useContext(LanguageContext);
   const picker = useRef<HTMLInputElement>(null);
@@ -55,7 +63,13 @@ export function StartChooser({ start, intelligence, revision = 0 }: { start: (dr
           {t("Alege un document", "Choose a document")}
         </Button>
       </section>
-      {mode === "file" && intelligence && <ImportDocument client={intelligence} revision={revision} start={start} />}
+      {mode === "file" && intelligence && (
+        <ImportDocument
+          client={intelligence}
+          revision={revision}
+          start={start}
+        />
+      )}
       {mode === "file" && !intelligence && (
         <section className="card file-card">
           <h2>{t("Document existent", "Existing document")}</h2>

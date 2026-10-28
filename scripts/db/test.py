@@ -91,7 +91,7 @@ class Database:
             lines = lines[1:]
         return '\n'.join(lines)
 
-    def migrate(self, through='P3'):
+    def migrate(self, through='P4'):
         applied = 0
         for path in sorted((ROOT / 'supabase/migrations').glob('*.sql')):
             phase = path.name.split('_')[1].upper()
@@ -126,9 +126,10 @@ def check_populated_upgrade(db, behavior):
         f = behavior.Foundation()
         f.setUp()
         f.call('set_preferences', f"'{behavior.uid()}','en','{{}}'")
-        for phase, expected in [('P0', 7), ('P1', 27), ('P2', 35), ('P3', 48)]:
+        for phase in ['P0', 'P1', 'P2', 'P3', 'P4']:
             staged.migrate(phase)
-            assert staged.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'") == str(expected)
+            expected = int(staged.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'"))
+            assert staged.sql("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relkind='r' AND NOT c.relrowsecurity") == '0'
             assert staged.migrate(phase) == 0
             if phase == 'P1':
                 w = behavior.Workspace()
@@ -174,7 +175,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'imports'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -184,9 +185,13 @@ def main():
     started = time.monotonic()
     try:
         db.start()
+        if args.suite == 'imports':
+            # Minimal real RLS consumer for Supabase Storage policy behavior, not a cloud API claim.
+            db.sql("CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),bucket_id text,name text); ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY; GRANT USAGE ON SCHEMA storage TO authenticated,anon; GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated,anon; CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
         count = db.migrate()
         assert db.migrate() == 0, 'Normal reapply must have no pending migrations'
-        assert db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'") == '48'
+        table_count = int(db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'"))
+        assert db.sql("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relkind='r' AND NOT c.relrowsecurity") == '0'
         assert db.sql("SELECT count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='app' AND NOT c.convalidated") == '0'
         tests = ROOT / 'supabase/tests/behavior.py'
         cases = 2
@@ -204,22 +209,41 @@ def main():
             upgrade = check_populated_upgrade(db, module)
             cases += 2
         import importlib.util
-        draft_spec = importlib.util.spec_from_file_location('editor_drafts', ROOT / 'supabase/tests/editor_drafts.py')
-        drafts = importlib.util.module_from_spec(draft_spec)
-        draft_spec.loader.exec_module(drafts)
-        draft_result = unittest.TextTestRunner(verbosity=2).run(drafts.suite(db))
-        cases += draft_result.testsRun
-        if not draft_result.wasSuccessful():
-            return 1
-        connected_spec = importlib.util.spec_from_file_location('connected', ROOT / 'supabase/tests/connected.py')
-        connected = importlib.util.module_from_spec(connected_spec)
-        connected_spec.loader.exec_module(connected)
-        connected_result = unittest.TextTestRunner(verbosity=2).run(connected.suite(db))
-        cases += connected_result.testsRun
-        if not connected_result.wasSuccessful():
-            return 1
+        if args.suite != 'imports':
+            draft_spec = importlib.util.spec_from_file_location('editor_drafts', ROOT / 'supabase/tests/editor_drafts.py')
+            drafts = importlib.util.module_from_spec(draft_spec)
+            draft_spec.loader.exec_module(drafts)
+            draft_result = unittest.TextTestRunner(verbosity=2).run(drafts.suite(db))
+            cases += draft_result.testsRun
+            if not draft_result.wasSuccessful():
+                return 1
+            connected_spec = importlib.util.spec_from_file_location('connected', ROOT / 'supabase/tests/connected.py')
+            connected = importlib.util.module_from_spec(connected_spec)
+            connected_spec.loader.exec_module(connected)
+            connected_result = unittest.TextTestRunner(verbosity=2).run(connected.suite(db))
+            cases += connected_result.testsRun
+            if not connected_result.wasSuccessful():
+                return 1
+        if args.suite in ('imports','all'):
+            import_spec = importlib.util.spec_from_file_location('cv_imports', ROOT / 'supabase/tests/imports.py')
+            imports = importlib.util.module_from_spec(import_spec)
+            import_spec.loader.exec_module(imports)
+            import_result = unittest.TextTestRunner(verbosity=2).run(imports.suite(db))
+            cases += import_result.testsRun
+            if not import_result.wasSuccessful():
+                return 1
+        if args.suite == 'imports':
+            # Existing attempt-store behavior is affected; unrelated job capture tests are unchanged.
+            spec = importlib.util.spec_from_file_location('connected', ROOT / 'supabase/tests/connected.py')
+            connected = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(connected)
+            checks = [c for c in connected.suite(db) if c._testMethodName == 'test_operation_replay_secret_and_unknown_attempt']
+            prior = unittest.TextTestRunner(verbosity=2).run(unittest.TestSuite(checks))
+            cases += prior.testsRun
+            if not prior.wasSuccessful():
+                return 1
         receipt = {'migrations_applied':count,'normal_reapply_pending':0,
-                   'tables':48,'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),
+                   'tables':table_count,'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),
                    'database_version':db.sql('SHOW server_version'),
                    'transport':'private Unix socket; no TCP listener',
                    'auth':'local test roles/auth.uid(); no hosted Auth/API assurance',

@@ -48,7 +48,7 @@ export function Enrichment({
   asOf: { year: string; month: string };
   undoFrom?: BaseDraft | null;
   durable?: boolean;
-  prepareQuestions?: (targetId: string) => Promise<QuestionPlan>;
+  prepareQuestions?: (targetId: string, goal: string) => Promise<QuestionPlan>;
   rewriteRole?: (targetId: string) => Promise<RoleProposal>;
 }) {
   const t = useCopy();
@@ -73,8 +73,35 @@ export function Enrichment({
     [index, setIndex] = useState(0),
     [error, setError] = useState("");
   const [planning, setPlanning] = useState(false);
-  const currentDraft = useRef(d); currentDraft.current = d;
-  const activePlan = d.questionPlans?.filter(p => p.targetId === targetId).at(-1);
+  const [goal, setGoal] = useState("contribution");
+  const currentDraft = useRef(d);
+  currentDraft.current = d;
+  const [editingAnswerId, setEditingAnswerId] = useState<string | null>(null);
+  const editingAnswer = d.answers.find(
+    (a) => a.id === editingAnswerId && a.targetId === targetId,
+  );
+  const activePlan = editingAnswer
+    ? d.questionPlans?.find(
+        (p) =>
+          p.targetId === targetId &&
+          p.questions.some((q) => q.id === editingAnswer.plannedQuestionId),
+      )
+    : d.questionPlans?.filter((p) => p.targetId === targetId).at(-1);
+  const planKey = activePlan?.questions.map((q) => q.id).join("|");
+  useEffect(() => {
+    if (activePlan && !editingAnswerId) {
+      const next = activePlan.questions.findIndex(
+        (q) =>
+          !d.answers.some(
+            (a) =>
+              a.targetId === targetId &&
+              a.plannedQuestionId === q.id &&
+              ["confirmed", "skipped", "unknown"].includes(a.status),
+          ),
+      );
+      setIndex(next < 0 ? activePlan.questions.length : next);
+    }
+  }, [targetId, planKey]);
   const planned = activePlan?.questions[index];
   const planFinished = !!activePlan && !planned;
   const input = useRef<HTMLTextAreaElement>(null),
@@ -126,15 +153,28 @@ export function Enrichment({
     ),
   };
 
-  const current = d.answers.find(
-    (a) => a.targetId === targetId && (planned ? a.plannedQuestionId === planned.id : !a.plannedQuestionId && a.question === question),
-  );
+  const current =
+    editingAnswer ??
+    d.answers.find(
+      (a) =>
+        a.targetId === targetId &&
+        (planned
+          ? a.plannedQuestionId === planned.id
+          : !a.plannedQuestionId && a.question === question),
+    );
   const answer: Answer = current ?? {
     id: `answer_${targetId}_${planned?.id ?? question}`,
     targetId,
     question,
     questionText: planned?.text ?? questions[question],
-    ...(planned ? { plannedQuestionId: planned.id, options: planned.options, selectedOptionIds: [], selectionMode: planned.selectionMode } : {}),
+    ...(planned
+      ? {
+          plannedQuestionId: planned.id,
+          options: planned.options,
+          selectedOptionIds: [],
+          selectionMode: planned.selectionMode,
+        }
+      : {}),
     targetLabel: target?.label,
     text: "",
     status: "draft",
@@ -149,7 +189,12 @@ export function Enrichment({
     setError("");
   }
   function advance() {
-    setIndex((i) => activePlan ? Math.min(i + 1, activePlan.questions.length) : (i + 1) % dimensions.length);
+    setEditingAnswerId(null);
+    setIndex((i) =>
+      activePlan
+        ? Math.min(i + 1, activePlan.questions.length)
+        : (i + 1) % dimensions.length,
+    );
   }
   function failure() {
     setError(
@@ -213,7 +258,22 @@ export function Enrichment({
             <Button
               onClick={() => {
                 setTargetId(a.targetId);
-                setIndex(a.plannedQuestionId ? (activePlan?.questions.findIndex(q => q.id === a.plannedQuestionId) ?? 0) : dimensions.indexOf(a.question));
+                setEditingAnswerId(a.id);
+                const priorPlan = d.questionPlans?.find(
+                  (p) =>
+                    p.targetId === a.targetId &&
+                    p.questions.some((q) => q.id === a.plannedQuestionId),
+                );
+                setIndex(
+                  a.plannedQuestionId
+                    ? Math.max(
+                        0,
+                        priorPlan?.questions.findIndex(
+                          (q) => q.id === a.plannedQuestionId,
+                        ) ?? 0,
+                      )
+                    : dimensions.indexOf(a.question),
+                );
                 signature.current = destination.field.id;
                 input.current?.focus();
               }}
@@ -222,7 +282,10 @@ export function Enrichment({
             </Button>
             {a.targetId === targetId && (
               <Button
-                disabled={a.status !== "confirmed" || linked?.value === answerEvidenceText(a)}
+                disabled={
+                  a.status !== "confirmed" ||
+                  linked?.value === answerEvidenceText(a)
+                }
                 onClick={() => add(a)}
               >
                 {linked
@@ -270,6 +333,7 @@ export function Enrichment({
               id="enrich-target"
               value={target ? targetId : ""}
               onChange={(e) => {
+                setEditingAnswerId(null);
                 setTargetId(e.target.value);
                 signature.current = enrichmentTarget(d, e.target.value)?.field
                   .id;
@@ -288,39 +352,138 @@ export function Enrichment({
               ))}
             </select>
             <p className="entry-context">{target?.field.value}</p>
-            {prepareQuestions && <Button disabled={planning} onClick={async () => {
-              const before = currentDraft.current;
-              setPlanning(true); setError("");
-              try {
-                const result = await prepareQuestions(targetId);
-                if (currentDraft.current !== before) throw new Error("stale");
-                const next = clone(before);
-                next.questionPlans = [...(next.questionPlans ?? []).filter(p => p.targetId !== targetId), result];
-                change(next); setIndex(0);
-              } catch { setError(t("Întrebările AI nu sunt disponibile sau contextul s-a schimbat. Răspunsurile sunt păstrate; poți continua manual.", "AI questions are unavailable or context changed. Answers are retained; manual questions remain available.")); }
-              finally { setPlanning(false); }
-            }}>{planning ? t("Pregătim întrebările…", "Preparing questions…") : t("Pregătește întrebări AI", "Prepare AI questions")}</Button>}
+            {prepareQuestions && (
+              <label>
+                {t("Scopul întrebărilor", "Question goal")}
+                <select value={goal} onChange={(e) => setGoal(e.target.value)}>
+                  <option value="contribution">
+                    {t("Explică propria contribuție", "Explain contribution")}
+                  </option>
+                  <option value="ownership">
+                    {t("Clarifică autonomia", "Clarify ownership")}
+                  </option>
+                  <option value="impact">
+                    {t("Amintește-ți rezultate reale", "Recall real outcomes")}
+                  </option>
+                  <option value="tools">
+                    {t("Descrie instrumentele folosite", "Explain tools used")}
+                  </option>
+                </select>
+              </label>
+            )}
+            {prepareQuestions && (
+              <Button
+                disabled={planning}
+                onClick={async () => {
+                  const before = currentDraft.current;
+                  setPlanning(true);
+                  setError("");
+                  try {
+                    const result = await prepareQuestions(targetId, goal);
+                    if (currentDraft.current !== before)
+                      throw new Error("stale");
+                    const next = clone(before);
+                    next.questionPlans = [
+                      ...(next.questionPlans ?? []).slice(-19),
+                      result,
+                    ];
+                    setEditingAnswerId(null);
+                    change(next);
+                    setIndex(0);
+                  } catch {
+                    setError(
+                      t(
+                        "Întrebările AI nu sunt disponibile sau contextul s-a schimbat. Răspunsurile sunt păstrate; poți continua manual.",
+                        "AI questions are unavailable or context changed. Answers are retained; manual questions remain available.",
+                      ),
+                    );
+                  } finally {
+                    setPlanning(false);
+                  }
+                }}
+              >
+                {planning
+                  ? t("Pregătim întrebările…", "Preparing questions…")
+                  : t("Pregătește întrebări AI", "Prepare AI questions")}
+              </Button>
+            )}
             {planned && <p className="small muted">{planned.why}</p>}
             <p className="eyebrow">
-              {activePlan ? t("Întrebări AI · sugestii, nu fapte", "AI questions · suggestions, not facts") : t("Îndrumare manuală", "Manual guidance")} · {index + 1}/
-              {activePlan?.questions.length ?? dimensions.length}
+              {activePlan
+                ? t(
+                    "Întrebări AI · sugestii, nu fapte",
+                    "AI questions · suggestions, not facts",
+                  )
+                : t("Îndrumare manuală", "Manual guidance")}{" "}
+              · {index + 1}/{activePlan?.questions.length ?? dimensions.length}
             </p>
             <label className="question-title" htmlFor="enrichment-answer">
-              {planFinished ? t("Întrebările sunt încheiate. Contextul tău este păstrat.", "Questions completed. Your context is retained.") : answer.questionText}
+              {planFinished
+                ? t(
+                    "Întrebările sunt încheiate. Contextul tău este păstrat.",
+                    "Questions completed. Your context is retained.",
+                  )
+                : answer.questionText}
             </label>
-            {!!answer.options?.length && <fieldset>
-              <legend>{t("Alege una, mai multe sau niciuna; poți scrie propriul răspuns.", "Choose one, several or none; you can write your own answer.")}</legend>
-              {answer.options.map(option => <label key={option.id}>
-                <input type={answer.selectionMode === "single" ? "radio" : "checkbox"} name={`choices-${answer.id}`}
-                  checked={answer.selectedOptionIds?.includes(option.id) ?? false}
-                  onChange={() => {
-                    const ids = answer.selectionMode === "single" ? [option.id] : answer.selectedOptionIds?.includes(option.id)
-                      ? answer.selectedOptionIds.filter(id => id !== option.id) : [...(answer.selectedOptionIds ?? []), option.id];
-                    const next = clone(d); next.answers = [...next.answers.filter(a => a.id !== answer.id), {...answer, selectedOptionIds: ids, status: "draft"}]; change(next);
-                  }} /> {option.label}
-              </label>)}
-              <Button onClick={() => { const next = clone(d); next.answers = [...next.answers.filter(a => a.id !== answer.id), {...answer, selectedOptionIds: [], status: "draft"}]; change(next); }}>{t("Fără selecție", "Clear choices")}</Button>
-            </fieldset>}
+            {!!answer.options?.length && (
+              <fieldset>
+                <legend>
+                  {t(
+                    "Alege una, mai multe sau niciuna; poți scrie propriul răspuns.",
+                    "Choose one, several or none; you can write your own answer.",
+                  )}
+                </legend>
+                {answer.options.map((option) => (
+                  <label key={option.id}>
+                    <input
+                      type={
+                        answer.selectionMode === "single" ? "radio" : "checkbox"
+                      }
+                      name={`choices-${answer.id}`}
+                      checked={
+                        answer.selectedOptionIds?.includes(option.id) ?? false
+                      }
+                      onChange={() => {
+                        const ids =
+                          answer.selectionMode === "single"
+                            ? [option.id]
+                            : answer.selectedOptionIds?.includes(option.id)
+                              ? answer.selectedOptionIds.filter(
+                                  (id) => id !== option.id,
+                                )
+                              : [
+                                  ...(answer.selectedOptionIds ?? []),
+                                  option.id,
+                                ];
+                        const next = clone(d);
+                        next.answers = [
+                          ...next.answers.filter((a) => a.id !== answer.id),
+                          {
+                            ...answer,
+                            selectedOptionIds: ids,
+                            status: "draft",
+                          },
+                        ];
+                        change(next);
+                      }}
+                    />{" "}
+                    {option.label}
+                  </label>
+                ))}
+                <Button
+                  onClick={() => {
+                    const next = clone(d);
+                    next.answers = [
+                      ...next.answers.filter((a) => a.id !== answer.id),
+                      { ...answer, selectedOptionIds: [], status: "draft" },
+                    ];
+                    change(next);
+                  }}
+                >
+                  {t("Fără selecție", "Clear choices")}
+                </Button>
+              </fieldset>
+            )}
             <textarea
               ref={input}
               id="enrichment-answer"
@@ -376,8 +539,17 @@ export function Enrichment({
             "Answers and choices stay separate from the CV. AI suggestions are not confirmed facts.",
           )}
         </p>
-        {rewriteRole && target && <RoleRewrite draft={d} targetId={targetId} request={rewriteRole} change={change}
-          accept={(draft, targetId, text, sources) => acceptWording(draft, targetId, {text, sources})} />}
+        {rewriteRole && target && (
+          <RoleRewrite
+            draft={d}
+            targetId={targetId}
+            request={rewriteRole}
+            change={change}
+            accept={(draft, targetId, text, sources) =>
+              acceptWording(draft, targetId, { text, sources })
+            }
+          />
+        )}
         {!rewriteRole && transport && target && (
           <AiSuggestions
             draft={d}

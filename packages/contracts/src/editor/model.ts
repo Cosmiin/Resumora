@@ -1,4 +1,9 @@
-import type { ImportReview, QuestionPlan, QuestionOption, RoleRewriteReview } from "../intelligence/model.ts";
+import type {
+  ImportReview,
+  QuestionPlan,
+  QuestionOption,
+  RoleRewriteReview,
+} from "../intelligence/model.ts";
 // Versioned editor projection, distinct from canonical CV publications.
 // IDs remain editor correlation handles; database resource IDs are separate UUIDs.
 export type Locale = "ro" | "en";
@@ -129,9 +134,19 @@ export type BaseDraft = {
     hidden: string[];
     hiddenFields?: string[];
     contributionHtml?: Record<string, string>;
-    approvedWording?: Record<string, { text: string; sources: { id: string; text: string; sourceId: string;
-      sourceClaimId?: string; sourceLineage?: { sourceId: string; sourceClaimId?: string }[] }[] }>;
-
+    approvedWording?: Record<
+      string,
+      {
+        text: string;
+        sources: {
+          id: string;
+          text: string;
+          sourceId: string;
+          sourceClaimId?: string;
+          sourceLineage?: { sourceId: string; sourceClaimId?: string }[];
+        }[];
+      }
+    >;
   };
 };
 export const coreSections = [
@@ -148,7 +163,8 @@ export function equalValues(left: unknown, right: unknown): boolean {
   if (left === right) return true;
   if (Array.isArray(left) || Array.isArray(right))
     return (
-      Array.isArray(left) && Array.isArray(right) &&
+      Array.isArray(left) &&
+      Array.isArray(right) &&
       left.length === right.length &&
       left.every((value, i) => equalValues(value, right[i]))
     );
@@ -158,7 +174,8 @@ export function equalValues(left: unknown, right: unknown): boolean {
     b = right as Record<string, unknown>;
   const keys = Object.keys(a).filter((key) => a[key] !== undefined);
   return (
-    keys.length === Object.keys(b).filter((key) => b[key] !== undefined).length &&
+    keys.length ===
+      Object.keys(b).filter((key) => b[key] !== undefined).length &&
     keys.every((key) => Object.hasOwn(b, key) && equalValues(a[key], b[key]))
   );
 }

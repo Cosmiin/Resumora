@@ -138,8 +138,7 @@ verification and paid/live smoke need separate owner authorization.
 
 ## PDF/enrichment follow-up seam
 
-The separately scoped next task includes text/scanned/mixed PDFs and OCR/vision evidence review,
-plus AI-guided questions. This slice implements none of those. Reuse authenticated routes, bounded
+The [connected CV import/enrichment integration](cv-import-enrichment.md) now adds text/scanned/mixed PDFs, native Word reading, evidence review and AI-guided questions through a separate structured operation. This earlier scoped composition endpoint retains its own limits. Reuse authenticated routes, bounded
 provider transport and durable operation/attempt reservation; implement a distinct extraction
 schema and operation kind. Do not pass PDF contents through the constrained prose-composition
 validator, infer confirmation from extraction, or store generated questions as accepted facts.
