@@ -1,3 +1,4 @@
+import { httpIntelligence } from "../base/intelligence";
 import { useMemo } from "react";
 import { App } from "../App";
 import { HttpBaseCvAdapter } from "../base/http-adapter";
@@ -14,5 +15,6 @@ export function ConnectedApp({
     () => new HttpBaseCvAdapter(transport),
     [account.id, transport],
   );
-  return <App key={account.id} adapter={adapter} />;
+  const intelligence = useMemo(() => httpIntelligence(transport), [account.id, transport]);
+  return <App key={account.id} adapter={adapter} intelligence={intelligence} />;
 }

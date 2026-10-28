@@ -1823,3 +1823,7 @@ textarea.native {
   gap: 12px;
   padding: 4px 24px;
 }
+
+.import-evidence { display: flex; gap: .75rem; align-items: flex-start; padding: .75rem 0; border-bottom: 1px solid var(--border-subtle); font-weight: 400; }
+.import-evidence input { flex: 0 0 auto; margin-top: .3rem; }
+.import-evidence span { min-width: 0; overflow-wrap: anywhere; }

@@ -1,3 +1,4 @@
+import type { ImportReview, QuestionPlan, QuestionOption, RoleRewriteReview } from "../intelligence/model.ts";
 // Versioned editor projection, distinct from canonical CV publications.
 // IDs remain editor correlation handles; database resource IDs are separate UUIDs.
 export type Locale = "ro" | "en";
@@ -18,7 +19,7 @@ export type Fact<T extends FactValue = FactValue> = {
 };
 export type Source = {
   id: string;
-  kind: "manual" | "fixture" | "answer";
+  kind: "manual" | "fixture" | "answer" | "document";
   label: string;
   text?: string;
   locator?: string;
@@ -91,12 +92,19 @@ export type Answer = {
   text: string;
   status: "draft" | "confirmed" | "skipped" | "unknown";
   questionText: string;
+  plannedQuestionId?: string;
+  options?: QuestionOption[];
+  selectedOptionIds?: string[];
+  selectionMode?: "single" | "multiple";
   targetLabel?: string;
   sourceId?: string;
   cvFieldId?: string;
 };
 export type BaseDraft = {
   id: string;
+  importReview?: ImportReview;
+  questionPlans?: QuestionPlan[];
+  roleRewriteReviews?: RoleRewriteReview[];
   language: Locale;
   name: Fact<string>;
   nameParts?: { first: string; last: string };

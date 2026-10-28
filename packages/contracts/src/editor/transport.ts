@@ -1,3 +1,4 @@
+import { isImportReview, isRoleRewriteReview, answerEvidenceText, validateQuestionPlan } from "../intelligence/model.ts";
 import type { Answer, BaseDraft } from "./model.ts";
 
 export type EditorEnvelope = {
@@ -62,7 +63,8 @@ const prose = obj({ id: str, text: str, origin: one("user_authored"), approval: 
 const answer = obj({ id: str, targetId: str,
   question: one("contribution", "tools", "context", "ownership", "scale", "impact", "complexity"),
   text: str, status: one("draft", "confirmed", "skipped", "unknown"), questionText: str },
-  { targetLabel: str, sourceId: str, cvFieldId: str });
+  { targetLabel: str, sourceId: str, cvFieldId: str, plannedQuestionId: str,
+    options: list(obj({ id: str, label: str })), selectedOptionIds: list(str), selectionMode: one("single", "multiple") });
 const entry = obj({ id: str, title: text, details: text, start: partial, end: partial },
   { bullets: list(text), proficiency: text, ongoing: flag });
 const draftShape = obj({
@@ -74,10 +76,14 @@ const draftShape = obj({
   roles: list(obj({ id: str, title: text, company: text, location: text, start: partial, end: partial, ongoing: flag, context: text, bullets: list(text) })),
   education: list(obj({ id: str, institution: text, qualification: text, field: text, location: text, start: partial, end: partial, details: text }, { ongoing: flag })),
   optionalSections: list(obj({ id: str, kind: one("projects", "certifications", "languages", "volunteering", "custom"), label: str, entries: list(entry) })),
-  sources: list(obj({ id: str, kind: one("manual", "fixture", "answer"), label: str }, { text: str, locator: str })),
+  sources: list(obj({ id: str, kind: one("manual", "fixture", "answer", "document"), label: str }, { text: str, locator: str })),
   referenceProse: list(obj({ id: str, text: str, approval: str, claimIds: list(str) })),
   answers: list(answer),
   presentation: obj({ order: list(str), hidden: list(str) }, { hiddenFields: list(str),
     contributionHtml: v => !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(str) }),
-}, { nameParts: obj({ first: str, last: str }) });
-export function isBaseDraft(value: unknown): value is BaseDraft { return draftShape(value); }
+}, { nameParts: obj({ first: str, last: str }), importReview: isImportReview,
+  roleRewriteReviews: list(isRoleRewriteReview), questionPlans: list(v => { try { return !!v && typeof v === "object" && !!validateQuestionPlan(v, (v as {targetId:string}).targetId); } catch { return false; } }) });
+export function isBaseDraft(value: unknown): value is BaseDraft {
+  if (!draftShape(value)) return false;
+  try { return (value as BaseDraft).answers.every(a => { const evidence = answerEvidenceText(a); return a.status !== "confirmed" || !!evidence.trim(); }); } catch { return false; }
+}

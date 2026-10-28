@@ -1,3 +1,6 @@
+import { confirmImported } from "@resumora/contracts/editor/import";
+import { ImportReview } from "./components/ImportReview";
+import type { IntelligenceClient } from "./base/intelligence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FileText,
@@ -46,11 +49,11 @@ type PendingWrite = {
   | { kind: "save"; input: Parameters<BaseCvAdapter["save"]>[0] }
   | { kind: "restore"; input: Parameters<BaseCvAdapter["restore"]>[0] }
 );
-export function App({ adapter = sessionAdapter }: { adapter?: BaseCvAdapter }) {
+export function App({ adapter = sessionAdapter, intelligence }: { adapter?: BaseCvAdapter; intelligence?: IntelligenceClient }) {
   if (!adapterKeys.has(adapter)) adapterKeys.set(adapter, ++nextAdapterKey);
-  return <CvEditor key={adapterKeys.get(adapter)} adapter={adapter} />;
+  return <CvEditor key={adapterKeys.get(adapter)} adapter={adapter} intelligence={intelligence} />;
 }
-function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
+function CvEditor({ adapter, intelligence }: { adapter: BaseCvAdapter; intelligence?: IntelligenceClient }) {
   const durable = adapter.capability === "durable";
   const [locale, setLocale] = useState<Locale>("ro"),
     t = (ro: string, en: string) => (locale === "ro" ? ro : en);
@@ -604,7 +607,7 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
               )}
               {(route === "start" ||
                 (["base", "review", "enrich"].includes(route) && !draft)) && (
-                <StartChooser start={start} />
+                <StartChooser start={start} intelligence={intelligence} revision={head?.revision ?? 0} />
               )}
               {draft && ["base", "review"].includes(route) && (
                 <>
@@ -613,6 +616,13 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
                       {issueText(issues[0].code, t)}
                     </p>
                   )}
+                  {draft.importReview && <ImportReview key={draft.importReview.id} draft={draft} disabled={busy || !!pendingWrite.current || head===undefined}
+                    confirm={(ids) => {
+                      const next = confirmImported(latest.current!, ids);
+                      const found = validateDraft(next);
+                      if(found.length){setIssues(found);go("base");focusField(found[0].field);return;}
+                      change(next);void save("checkpoint");
+                    }} />}
                   <div className="editor-layout">
                     <div>
                       {route === "base" ? (
@@ -639,6 +649,11 @@ function CvEditor({ adapter }: { adapter: BaseCvAdapter }) {
               {draft && route === "enrich" && (
                 <Enrichment
                   durable={durable}
+                  prepareQuestions={intelligence ? async (targetId) => {
+                    const saved = headRef.current;
+                    if (!saved || !equalValues(latest.current, saved.draft)) throw new Error("SAVE_REQUIRED");
+                    return intelligence.questions({snapshotId:saved.id,revision:saved.revision,targetId,operationId:crypto.randomUUID()});
+                  } : undefined}
                   draft={draft}
                   undoFrom={undoFrom}
                   change={change}
