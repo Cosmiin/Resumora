@@ -47,7 +47,15 @@ def suite(db):
                 # filters rows. This specific denial also proves no anon read.
                 self.assertIn('permission denied for function photo_storage_access',str(error))
             self.complete('uploaded')
-            self.assertIn('row-level security',db.sql(f"UPDATE storage.objects SET name='{name}' WHERE name='{name}'",user=self.a,role='authenticated',expect_error=True))
+            try:
+                updated=db.sql(f"UPDATE storage.objects SET name='{name}' WHERE name='{name}' RETURNING id",user=self.a,role='authenticated')
+            except AssertionError as error:
+                # A permissive UPDATE policy exposes the row to WITH CHECK.
+                self.assertIn('row-level security',str(error))
+            else:
+                # Without one, RLS denies UPDATE by filtering out the row.
+                self.assertEqual(updated,'')
+            self.assertEqual(db.sql(f"SELECT name FROM storage.objects WHERE bucket_id='cv-imports' AND name='{name}'"),name)
             self.assertEqual(db.sql("SELECT count(*) FROM storage.objects",user=self.a,role='authenticated'),'1')
             self.call('cancel_cv_import',f"'{self.op}'")
             db.sql(f"DELETE FROM storage.objects WHERE name='{name}'",user=self.a,role='authenticated')
