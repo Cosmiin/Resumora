@@ -31,6 +31,7 @@ import {
   languageLevels,
   setContributions,
 } from "../base/editing";
+import { isWordingFieldVisible } from "../base/wording";
 import { sectionName } from "../base/sections";
 import type { Issue } from "../base/validation";
 import { Button, Field, LanguageContext, issueText, useCopy } from "./ui";
@@ -87,7 +88,7 @@ export function Editor({
   function toggle(id: string) {
     update((n) => {
       const c = n.contacts.find((c) => c.value.fieldId === id);
-      if (c) {
+      if (c && !jobMode) {
         c.visible = !visible(id);
         n.presentation.hiddenFields = (
           n.presentation.hiddenFields ?? []
@@ -868,12 +869,14 @@ export function Editor({
                 f.ref.entityId === target.id &&
                 ["context", "details", "bullet"].includes(f.key) &&
                 isAuthored(f.fact) &&
+                isWordingFieldVisible(d, target.id, f.fact.fieldId) &&
                 d.sources.some((s) => s.id === f.fact.sourceId),
             );
             const answers = d.answers.filter(
               (a) =>
                 a.targetId === target.id &&
                 a.status === "confirmed" &&
+                isWordingFieldVisible(d, target.id, a.cvFieldId) &&
                 a.sourceId &&
                 d.sources.some((s) => s.id === a.sourceId),
             );

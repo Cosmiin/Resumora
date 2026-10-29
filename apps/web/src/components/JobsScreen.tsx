@@ -11,13 +11,11 @@ export function JobsScreen({
   snapshot,
   ready,
   openCv,
-  canOpenCv = true,
 }: {
   transport?: AuthTransport;
   snapshot: { id: string; revision: number } | null;
   ready: boolean;
   openCv?: (job: { id: string; label: string }) => void;
-  canOpenCv?: boolean;
 }) {
   const t = useCopy();
   const [jobs, setJobs] = useState<JobSummary[]>([]),
@@ -232,7 +230,7 @@ export function JobsScreen({
             <h2>{t("Verifică anunțul", "Review advert")}</h2>
             {openCv && (
               <Button
-                disabled={busy || !!pending.current || !canOpenCv}
+                disabled={busy || !!pending.current || !ready}
                 onClick={() =>
                   openCv({
                     id: selected.id,
@@ -244,7 +242,7 @@ export function JobsScreen({
                 {t("Deschide CV-ul pentru acest job", "Open CV for this job")}
               </Button>
             )}
-            {!canOpenCv && (
+            {!ready && (
               <p>
                 {t(
                   "Salvează CV-ul de bază înainte de a deschide CV-ul jobului.",

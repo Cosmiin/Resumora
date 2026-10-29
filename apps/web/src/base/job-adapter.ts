@@ -19,6 +19,7 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
   private documentId: string | null = null;
   private payload!: JobEditorPayload;
   private source!: BaseDraft;
+  private job!: JobEditorPayload["job"];
   private requests = new Map<string, { input: unknown; body: unknown }>();
   private http: HttpBaseCvAdapter;
   constructor(
@@ -48,15 +49,16 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
   }
   async load() {
     const v = await this.http.request<Version | null>("");
-    if (v) {
-      this.source = clone(v.sourceDraft);
-      return this.accept(v);
-    }
     const context = await this.http.request<{
       job: JobEditorPayload["job"];
       source: JobEditorPayload["source"];
       draft: BaseDraft;
     }>("/context");
+    this.job = clone(context.job);
+    if (v) {
+      this.source = clone(v.sourceDraft);
+      return this.accept(v);
+    }
     this.source = clone(context.draft);
     this.payload = {
       schemaVersion: "resumora-job-editor/1",
@@ -81,7 +83,17 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
     return null;
   }
   initialDraft() {
-    return clone(this.source);
+    return projectJobEditor(encodeDraft(this.source), this.payload);
+  }
+  matchesDraft(saved: BaseDraft, draft: BaseDraft) {
+    try {
+      return equalValues(
+        saved,
+        projectJobEditor(encodeDraft(this.source), this.build(draft)),
+      );
+    } catch {
+      return false;
+    }
   }
   private build(draft: BaseDraft): JobEditorPayload {
     if (
@@ -92,6 +104,7 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
     )
       throw new AdapterError("rejected");
     const p = clone(this.payload);
+    p.job = clone(this.job);
     const { order, hidden, hiddenFields, templateVersionId, photo } =
       draft.presentation;
     p.presentation = {
@@ -107,7 +120,7 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
       ["professionalSkills", "professionalSkill", "professionalSkillIds"],
       ["technicalSkills", "technicalSkill", "technicalSkillIds"],
     ] as const) {
-      p.presentation[selection] = draft[group].map((f, i) => {
+      p.presentation[selection] = draft[group].map((f) => {
         const original = this.source[group].find(
           (s) => s.fieldId === f.fieldId && s.value === f.value,
         );
@@ -115,7 +128,7 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
         const existing = this.payload.localAdditions.find(
           (a) => a.id === f.id && a.kind === kind && a.text === f.value,
         );
-        const id = existing?.id ?? `job_local_${crypto.randomUUID()}`;
+        const id = existing?.id ?? `job_local_${f.id}`;
         p.localAdditions.push({
           id,
           targetId: group,
@@ -127,9 +140,7 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
         return id;
       });
     }
-    p.wording = p.wording.filter(
-      (w) => draft.presentation.approvedWording?.[w.targetId],
-    );
+    p.wording = [];
     for (const [targetId, wording] of Object.entries(
       draft.presentation.approvedWording ?? {},
     )) {
@@ -137,9 +148,6 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
         equalValues(
           wording,
           this.source.presentation.approvedWording?.[targetId],
-        ) ||
-        p.wording.some(
-          (w) => w.targetId === targetId && w.text === wording.text,
         )
       )
         continue;
@@ -162,11 +170,17 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
             p.selectedAnswerIds.push(evidence.id);
         } else throw new AdapterError("rejected");
       }
-      p.wording = p.wording.filter((w) => w.targetId !== targetId);
+      const existing = this.payload.wording.find(
+        (w) =>
+          w.targetId === targetId &&
+          w.text === wording.text &&
+          equalValues(w.valueIds, valueIds) &&
+          equalValues(w.answerIds, answerIds),
+      );
       p.wording.push({
         targetId,
         text: wording.text,
-        origin: "user_authored",
+        origin: existing?.origin ?? "user_authored",
         acceptance: "accepted",
         valueIds,
         answerIds,

@@ -1,13 +1,28 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../App";
+import { Editor } from "../components/Editor";
+import { currentWording } from "./wording";
 import { MemoryBaseCvAdapter } from "./adapter";
 import { prepareDraft } from "./editing";
 import { expect, it, vi } from "vitest";
 import { HttpJobCvAdapter } from "./job-adapter";
 import { jobDocumentsRoute } from "../../../api/src/jobs/documents";
 import { encodeDraft } from "@resumora/contracts/editor/transport";
-import { blankDraft, fact, newRole } from "./model";
+import {
+  blankDraft,
+  fact,
+  newRole,
+  newOptionalEntry,
+  editFact,
+  localId,
+} from "./model";
 import type {
   JobEditorPayload,
   JobEditorVersion,
@@ -42,10 +57,16 @@ export function jobHarness() {
   };
   const snapshotId = crypto.randomUUID();
   const jobs = [crypto.randomUUID(), crypto.randomUUID()];
+  const pins = new Map(
+    jobs.map((id) => [
+      id,
+      { id, versionId: null as string | null, fingerprint: "a".repeat(64) },
+    ]),
+  );
   const versions = new Map<string, JobEditorVersion[]>();
   const requests = new Map<string, JobEditorVersion>();
   const context = (id: string) => ({
-    job: { id, versionId: null, fingerprint: "a".repeat(64) },
+    job: pins.get(id)!,
     source: { snapshotId, revision: 7 },
   });
   const gateway = {
@@ -84,8 +105,11 @@ export function jobHarness() {
     ) => {
       if (requests.has(input.requestId)) return requests.get(input.requestId)!;
       const rows = versions.get(id) ?? [];
-      if (rows.length !== input.expectedRevision)
-        throw { status: 409, code: "PT409" };
+      if (
+        rows.length !== input.expectedRevision ||
+        JSON.stringify(input.payload.job) !== JSON.stringify(context(id).job)
+      )
+        throw { status: 409, code: "VERSION_CONFLICT" };
       const v: JobEditorVersion = {
         id: crypto.randomUUID(),
         documentId: rows[0]?.documentId ?? crypto.randomUUID(),
@@ -126,7 +150,7 @@ export function jobHarness() {
   const transport = vi.fn(async (path: string, init?: RequestInit) =>
     jobDocumentsRoute(new Request(`http://localhost${path}`, init), gateway),
   );
-  return { source, jobs, versions, transport, gateway, snapshotId };
+  return { source, jobs, versions, transport, gateway, snapshotId, pins };
 }
 
 it("creates, reopens, revises and restores one job independently with exact pins and metadata", async () => {
@@ -453,4 +477,401 @@ it("fences a delayed previous-account job load and cannot save it through the ne
     true,
   );
   expect(h.versions.size).toBe(0);
+});
+
+it("saves contact visibility through presentation in both directions, including contacts hidden in Base", async () => {
+  const h = jobHarness();
+  h.source.contacts[0].value.value = "owner@example.invalid";
+  h.source.contacts[1].value.value = "0700000000";
+  h.source.contacts[1].visible = false;
+  const original = structuredClone(h.source);
+  const adapter = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+  await adapter.load();
+  let draft = adapter.initialDraft();
+  const view = render(
+    <Editor
+      jobMode
+      draft={draft}
+      issues={[]}
+      change={(next) => {
+        draft = next;
+      }}
+    />,
+  );
+  expect(draft.presentation.hiddenFields).toContain(
+    h.source.contacts[1].value.fieldId,
+  );
+  for (const label of [
+    "Ascunde: owner@example.invalid",
+    "Arată: owner@example.invalid",
+    "Arată: 0700000000",
+    "Ascunde: 0700000000",
+  ]) {
+    const revision = h.versions.get(h.jobs[0])?.length ?? 0;
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const saved = await adapter.save({
+      draft,
+      expectedRevision: revision,
+      requestId: crypto.randomUUID(),
+    });
+    expect(adapter.matchesDraft(saved.draft, draft)).toBe(true);
+    expect(saved.draft.presentation.hiddenFields).toEqual(
+      draft.presentation.hiddenFields,
+    );
+    draft = saved.draft;
+    view.rerender(
+      <Editor
+        jobMode
+        draft={draft}
+        issues={[]}
+        change={(next) => {
+          draft = next;
+        }}
+      />,
+    );
+  }
+  expect(h.source).toEqual(original);
+});
+
+it.each([
+  ["professionalSkills", "Competențe profesionale", "Leadership"],
+  ["technicalSkills", "Competențe tehnice", "SQL"],
+] as const)(
+  "keeps pending and edited %s controls intact across autosaves",
+  async (group, label, initial) => {
+    const h = jobHarness();
+    const adapter = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    render(<App adapter={adapter} />);
+    await waitFor(() => expect(h.versions.get(h.jobs[0])?.length).toBe(1), {
+      timeout: 3000,
+    });
+    const user = userEvent.setup();
+    await user.click(screen.getByText(label, { selector: "summary" }));
+    const pending = screen.getByRole("textbox", {
+      name: label,
+    }) as HTMLInputElement;
+    await user.type(pending, "New");
+    await waitFor(() => expect(h.versions.get(h.jobs[0])?.length).toBe(2), {
+      timeout: 3000,
+    });
+    expect(pending.value).toBe("New");
+    expect(document.activeElement).toBe(pending);
+    await user.type(pending, " skill{Enter}");
+    await waitFor(() => expect(h.versions.get(h.jobs[0])?.length).toBe(3), {
+      timeout: 3000,
+    });
+    expect(
+      screen.getByRole("button", { name: "New skill", exact: true }),
+    ).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", { name: initial, exact: true }),
+    );
+    const editing = screen.getByRole("textbox", {
+      name: "Editează competența",
+    }) as HTMLInputElement;
+    await user.type(editing, " extended");
+    await waitFor(() => expect(h.versions.get(h.jobs[0])?.length).toBe(4), {
+      timeout: 3000,
+    });
+    expect(document.activeElement).toBe(editing);
+    expect(editing.value).toBe(`${initial} extended`);
+    await user.type(editing, " again{Enter}");
+    await waitFor(() => expect(h.versions.get(h.jobs[0])?.length).toBe(5), {
+      timeout: 3000,
+    });
+    const saved = (await adapter.load())!;
+    expect(saved.draft[group].map((f) => f.value)).toEqual([
+      `${initial} extended again`,
+      ...(group === "professionalSkills" ? ["Planning"] : []),
+      "New skill",
+    ]);
+    expect(screen.queryByText("Modificări în ciornă…")).toBeNull();
+  },
+  15000,
+);
+
+it("recognizes an applied expired write with client summary and skill identities", async () => {
+  const h = jobHarness();
+  let expire = false;
+  const transport = async (path: string, init?: RequestInit) => {
+    const response = await h.transport(path, init);
+    return expire && path.endsWith("/save")
+      ? Response.json({ error: { code: "expired" } }, { status: 410 })
+      : response;
+  };
+  const adapter = new HttpJobCvAdapter(transport, h.jobs[0]);
+  await adapter.load();
+  const draft = adapter.initialDraft();
+  draft.professionalSkills.push(fact("Coaching"));
+  draft.technicalSkills[0] = editFact(draft.technicalSkills[0], "PostgreSQL");
+  await adapter.save({
+    draft,
+    expectedRevision: 0,
+    requestId: crypto.randomUUID(),
+  });
+  const view = render(<App adapter={adapter} />);
+  await screen.findByRole("region", { name: "Job CV context" });
+  await waitFor(() =>
+    expect(screen.queryByText("Deschidem sesiunea…")).toBeNull(),
+  );
+  fireEvent.click(
+    screen.getByText("Rezumat profesional", { selector: "summary" }),
+  );
+  expire = true;
+  fireEvent.change(
+    screen.getByRole("textbox", {
+      name: "Rezumat profesional în cuvintele tale",
+    }),
+    { target: { value: "Updated summary" } },
+  );
+  await screen.findByRole(
+    "button",
+    { name: "Verifică starea salvată" },
+    { timeout: 3000 },
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Verifică starea salvată" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(screen.getByDisplayValue("Updated summary")).toBeTruthy();
+  expect(h.versions.get(h.jobs[0])).toHaveLength(2);
+  expect(screen.queryByText("Modificări în ciornă…")).toBeNull();
+  view.unmount();
+  draft.summary = {
+    ...draft.summary,
+    id: localId(),
+    text: "Another summary",
+    approval: "approved",
+  };
+  draft.professionalSkills.push(fact("Mentoring"));
+  const input = { draft, expectedRevision: 2, requestId: crypto.randomUUID() };
+  await expect(adapter.save(input)).rejects.toMatchObject({ code: "expired" });
+  expect(adapter.matchesDraft((await adapter.load())!.draft, draft)).toBe(true);
+});
+
+it.each(["role-bullet", "role-contributions", "optional-bullet"])(
+  "uses only visible %s evidence for job wording",
+  async (mode) => {
+    const h = jobHarness();
+    const entry = newOptionalEntry();
+    entry.title.value = "Source project";
+    entry.details.value = "Confirmed project context";
+    const target = mode.startsWith("role") ? h.source.roles[0] : entry;
+    const hidden = fact("Irrelevant hidden evidence");
+    target.bullets = [hidden];
+    if (target === entry) {
+      h.source.optionalSections.push({
+        id: "projects",
+        kind: "projects",
+        label: "Projects",
+        entries: [entry],
+      });
+      h.source.presentation.order.push("projects");
+    }
+    h.source.answers = [
+      {
+        ...h.source.answers[0],
+        targetId: target.id,
+        cvFieldId: hidden.fieldId,
+      },
+      { ...h.source.answers[0], id: "visible-answer", targetId: target.id },
+    ];
+    const adapter = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    await adapter.load();
+    let draft = adapter.initialDraft();
+    const context = "context" in target ? target.context : target.details;
+    draft.presentation.approvedWording = {
+      [target.id]: {
+        text: "Wording based on visible evidence",
+        sources: [context, hidden].map((f) => ({
+          id: f.id,
+          text: f.value,
+          sourceId: f.sourceId,
+        })),
+      },
+    };
+    await adapter.save({
+      draft,
+      expectedRevision: 0,
+      requestId: crypto.randomUUID(),
+    });
+    draft.presentation.hiddenFields = [
+      mode === "role-contributions"
+        ? `${target.id}-contributions`
+        : hidden.fieldId,
+    ];
+    const view = render(
+      <Editor
+        jobMode
+        draft={draft}
+        issues={[]}
+        change={(next) => {
+          draft = next;
+        }}
+      />,
+    );
+    fireEvent.click(
+      screen.getByText(
+        target === entry ? "Projects" : "Experiență profesională",
+        { selector: "summary" },
+      ),
+    );
+    const wordingField = () =>
+      within(
+        screen
+          .getByText(
+            target === entry ? "Projects" : "Experiență profesională",
+            { selector: "summary" },
+          )
+          .closest("details")!,
+      ).getByRole("textbox", { name: "Formulare pentru acest job" });
+    fireEvent.change(wordingField(), { target: { value: "Interim wording" } });
+    view.rerender(
+      <Editor
+        jobMode
+        draft={draft}
+        issues={[]}
+        change={(next) => {
+          draft = next;
+        }}
+      />,
+    );
+    fireEvent.change(wordingField(), {
+      target: { value: "Wording based on visible evidence" },
+    });
+    const sources = draft.presentation.approvedWording![target.id].sources;
+    expect(sources.map((s) => s.id)).not.toContain(hidden.id);
+    expect(sources.map((s) => s.id)).not.toContain("selected-answer");
+    expect(sources.map((s) => s.id)).toContain("visible-answer");
+    const saved = await adapter.save({
+      draft,
+      expectedRevision: 1,
+      requestId: crypto.randomUUID(),
+    });
+    expect(currentWording(saved.draft, target.id)).toBe(
+      "Wording based on visible evidence",
+    );
+  },
+);
+
+it("refreshes vacancy pins on reopen while preserving pinned Base and historical restore conflicts", async () => {
+  const h = jobHarness();
+  const adapter = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+  await adapter.load();
+  const first = await adapter.save({
+    draft: adapter.initialDraft(),
+    expectedRevision: 0,
+    requestId: crypto.randomUUID(),
+  });
+  const oldPin = structuredClone(h.pins.get(h.jobs[0])!);
+  const pin = {
+    id: h.jobs[0],
+    versionId: crypto.randomUUID(),
+    fingerprint: "b".repeat(64),
+  };
+  h.pins.set(h.jobs[0], pin);
+  const nextSnapshotId = crypto.randomUUID();
+  const nextSource = structuredClone(h.source);
+  nextSource.roles[0].title.value = "New Base title";
+  const loadSnapshot = h.gateway.loadSnapshot;
+  h.gateway.jobEditorContext = async (id) => ({
+    job: h.pins.get(id)!,
+    source: { snapshotId: nextSnapshotId, revision: 8 },
+  });
+  h.gateway.loadSnapshot = async (id) =>
+    id === nextSnapshotId
+      ? {
+          id,
+          revision: 8,
+          parentId: null,
+          reason: "save",
+          createdAt: "2026-10-29T00:00:00Z",
+          payload: encodeDraft(nextSource),
+        }
+      : loadSnapshot(id);
+  await adapter.load();
+  const draft = structuredClone(first.draft);
+  draft.summary.text = "Summary after vacancy review";
+  const saved = await adapter.save({
+    draft,
+    expectedRevision: 1,
+    requestId: crypto.randomUUID(),
+  });
+  expect(saved.revision).toBe(2);
+  expect(h.versions.get(h.jobs[0])![1].payload.job).toEqual(pin);
+  expect(h.versions.get(h.jobs[0])![0].payload.job).toEqual(oldPin);
+  expect(h.versions.get(h.jobs[0])![1].payload.source).toEqual({
+    snapshotId: h.snapshotId,
+    revision: 7,
+  });
+  expect(saved.draft.roles).toEqual(h.source.roles);
+  await expect(
+    adapter.restore({
+      snapshotId: first.id,
+      expectedRevision: 2,
+      requestId: crypto.randomUUID(),
+    }),
+  ).rejects.toMatchObject({ code: "conflict" });
+  const reopened = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+  expect(await reopened.load()).toEqual(saved);
+  expect(
+    (
+      await reopened.restore({
+        snapshotId: saved.id,
+        expectedRevision: 2,
+        requestId: crypto.randomUUID(),
+      })
+    ).revision,
+  ).toBe(3);
+});
+
+it("allows returning to Base after a failed job context load without showing Base creation", async () => {
+  const h = jobHarness();
+  const base = new MemoryBaseCvAdapter();
+  await base.save({
+    draft: prepareDraft(h.source),
+    expectedRevision: 0,
+    requestId: crypto.randomUUID(),
+    mode: "autosave",
+  });
+  const transport = async (path: string, init?: RequestInit) => {
+    if (path === "/v1/jobs")
+      return Response.json([
+        {
+          id: h.jobs[0],
+          title: "Vacancy",
+          state: "draft",
+          createdAt: "2026-10-29",
+        },
+      ]);
+    if (path === `/v1/jobs/${h.jobs[0]}`)
+      return Response.json({
+        id: h.jobs[0],
+        state: "draft",
+        snapshotRevision: 7,
+        intake: { text: "Vacancy", title: "Vacancy" },
+        requirements: [],
+      });
+    if (path.endsWith("/context")) return Response.json({}, { status: 503 });
+    return h.transport(path, init);
+  };
+  window.location.hash = "jobs";
+  render(<App adapter={base} transport={transport} />);
+  fireEvent.click(await screen.findByRole("button", { name: /Vacancy ·/ }));
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: "Deschide CV-ul pentru acest job",
+    }),
+  );
+  await screen.findByRole("alert");
+  expect(
+    screen.queryByRole("button", { name: "Completează manual" }),
+  ).toBeNull();
+  const back = screen.getByRole("button", {
+    name: "Înapoi la CV-ul de bază",
+  }) as HTMLButtonElement;
+  expect(back.disabled).toBe(false);
+  fireEvent.click(back);
+  await screen.findByRole("textbox", { name: /Prenume/ });
+  expect(screen.queryByRole("region", { name: "Job CV context" })).toBeNull();
 });

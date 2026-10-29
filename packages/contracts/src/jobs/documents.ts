@@ -120,6 +120,9 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
     (draft.presentation.approvedWording ??= {})[w.targetId] = { text: w.text, sources: evidence };
     delete draft.presentation.contributionHtml?.[w.targetId];
   }
+  const hiddenContacts = draft.contacts.filter(c => !c.visible).map(c => c.value.fieldId);
+  if (hiddenContacts.length) draft.presentation.hiddenFields = [...new Set([...(draft.presentation.hiddenFields ?? []), ...hiddenContacts])];
+  draft.contacts.forEach(c => { c.visible = true; });
   const { summaryText, professionalSkillIds, technicalSkillIds, ...presentation } = payload.presentation;
   Object.assign(draft.presentation, structuredClone(presentation));
   if (summaryText !== undefined) draft.summary = { ...draft.summary, text: summaryText, approval: 'approved' };

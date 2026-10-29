@@ -153,7 +153,12 @@ function CvEditor({
       month: String(n.getUTCMonth() + 1),
     };
   });
-  const dirty = !!draft && (!head || !equalValues(draft, head.draft));
+  function matchesSavedDraft(saved: BaseDraft, current: BaseDraft) {
+    return jobMode
+      ? adapter.matchesDraft(saved, current)
+      : equalValues(saved, current);
+  }
+  const dirty = !!draft && (!head || !matchesSavedDraft(head.draft, draft));
   const pending = pendingWrite.current;
   const uncertainDraft =
     !!pending &&
@@ -195,7 +200,7 @@ function CvEditor({
             setDraft(adapter.initialDraft());
           setLoading(false);
           setError(
-            s && latest.current && !equalValues(latest.current, s.draft)
+            s && latest.current && !matchesSavedDraft(s.draft, latest.current)
               ? "conflict"
               : null,
           );
@@ -343,14 +348,6 @@ function CvEditor({
       headRef.current = saved;
       setHead(saved);
       setError(null);
-      if (
-        jobMode &&
-        operation.kind === "save" &&
-        operation.generation === generation.current
-      ) {
-        latest.current = clone(saved.draft);
-        setDraft(latest.current);
-      }
       if (operation.kind === "restore") {
         if (operation.generation === generation.current) {
           openDraft(saved.draft);
@@ -416,7 +413,7 @@ function CvEditor({
       const applied =
         !!saved &&
         (operation.kind === "save"
-          ? equalValues(saved.draft, operation.input.draft)
+          ? matchesSavedDraft(saved.draft, operation.input.draft)
           : saved.restoredFrom === operation.input.snapshotId);
       pendingWrite.current = null;
       if (!unchanged && !applied) {
@@ -629,13 +626,17 @@ function CvEditor({
               </p>
               <Button
                 disabled={
-                  dirty || busy || loading || !!pendingWrite.current || !!error
+                  dirty ||
+                  busy ||
+                  loading ||
+                  !!pendingWrite.current ||
+                  (!!draft && !!error)
                 }
                 onClick={() => switchDocument?.(null)}
               >
                 {t("Înapoi la CV-ul de bază", "Return to Base CV")}
               </Button>
-              {(dirty || pendingWrite.current || error) && (
+              {(dirty || pendingWrite.current || (draft && error)) && (
                 <p>
                   {t(
                     "Salvează sau rezolvă salvarea înainte de schimbarea CV-ului.",
@@ -743,14 +744,15 @@ function CvEditor({
                   }
                 />
               )}
-              {(route === "start" ||
-                (["base", "review", "enrich"].includes(route) && !draft)) && (
-                <StartChooser
-                  start={start}
-                  intelligence={intelligence}
-                  revision={head?.revision ?? 0}
-                />
-              )}
+              {!jobMode &&
+                (route === "start" ||
+                  (["base", "review", "enrich"].includes(route) && !draft)) && (
+                  <StartChooser
+                    start={start}
+                    intelligence={intelligence}
+                    revision={head?.revision ?? 0}
+                  />
+                )}
               {draft && ["base", "review"].includes(route) && (
                 <>
                   {!!issues.length && (
@@ -899,7 +901,6 @@ function CvEditor({
                   snapshot={head ?? null}
                   ready={!dirty && !busy && !error && !pendingWrite.current}
                   openCv={switchDocument}
-                  canOpenCv={!dirty && !busy && !error && !pendingWrite.current}
                 />
               )}
               {["account", "missing"].includes(route) && (
