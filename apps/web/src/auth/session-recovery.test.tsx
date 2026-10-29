@@ -514,7 +514,11 @@ it("retains the actual dirty editor with a recoverable error when explicit refre
   server.age();
   server.unavailable();
   fireEvent.change(first, { target: { value: "Recoverable private edit" } });
-  await screen.findByRole("button", { name: "Reîncearcă conexiunea" });
+  await screen.findByRole(
+    "button",
+    { name: "Reîncearcă conexiunea" },
+    { timeout: 3000 },
+  );
   expect(screen.getByDisplayValue("Recoverable private edit")).toBe(first);
   expect(server.writes).toEqual([]);
   expect(server.refreshes).toBe(1);

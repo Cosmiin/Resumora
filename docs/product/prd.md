@@ -152,7 +152,7 @@ Responsive/accessibility proposal: desktop split view, tablet stacked content, m
 
 ## 13. Release gates and unresolved decisions
 
-The strategy publication candidate contains the current D-01–14 decision register and seven-question review blueprint. These product choices remain open; this discovery proposal can be reviewed without closing them. Local prototype controls and terminal visual feedback are not approvals.
+The strategy publication candidate contains the current D-01–14 decision register and seven-question review blueprint. See the register for remaining product choices; this discovery proposal can be reviewed without closing them. Local prototype controls and terminal visual feedback are not approvals.
 
 | Topic | Reviewable options / recommendation | Gate |
 |---|---|---|
@@ -213,7 +213,7 @@ The job-specific entry focus with a visible Base alternative is recorded directi
 4. Value before payment: useful Base advice plus one job-CV comparison (shared recommendation) / Base advice only / earlier analysis or export gate.
 5. Quota fallback: bounded queue and manual editing during limits (architecture recommendation) / capped paid upgrade after an owner-approved ceiling / pause the affected feature.
 
-Each option has visible consequences. Selections remain local and reversible and never constitute approval. The prototype and linked technical artifacts now share Mara / Northstar People — Business Systems Analyst — Automation and the versioned IDs above. This resolves example coherence only; D-01–14 product-policy choices remain open in the linked decision register.
+Each option has visible consequences. Selections remain local and reversible and never constitute approval. The prototype and linked technical artifacts now share Mara / Northstar People — Business Systems Analyst — Automation and the versioned IDs above. This resolves example coherence only; the linked D-01–14 decision register tracks remaining product-policy choices.
 
 ### Acceptance / visual follow-up
 
@@ -227,7 +227,7 @@ Inbox 012 relayed the current architecture v3 case, the complete strategy public
 
 The example keeps Candidate–Job Fit at 90 and changes CV–Job Match from 62.5 to 90 when the tailored CV represents already confirmed API, HR/payroll, outcome and context evidence. No time-saving metric is supplied or invented. The non-compensatory right-to-work requirement is `needs_verification`, not a claim that the candidate lacks authorization; actual PDF readability is `untested`. These synthetic review inputs and uncalibrated example weights do not estimate hiring likelihood or establish legal eligibility. Score is secondary to the evidence-backed readiness checklist.
 
-The prototype's local Guide retains five UX-level interaction choices. The integrated strategy package maintains the full D-01–14 register and its seven primary decision cards, consequences and recommendations; all remain **unresolved** unless the owner separately records a decision. The synthetic fixture selection above is resolved for demo coherence only. This package is ready for review as a discovery proposal; review is not policy approval, implementation authorization or a paid-service decision.
+The prototype's local Guide retains five UX-level interaction choices. The integrated strategy package maintains the full D-01–14 register and its seven primary decision cards, consequences and recommendations; consult that register for current status. The synthetic fixture selection above is resolved for demo coherence only. This package is ready for review as a discovery proposal; review is not policy approval, implementation authorization or a paid-service decision.
 
 Architecture and strategy contributions are included as versioned snapshots under `research/architecture/`, `research/ats/`, `research/costs/`, `schemas/cv/v1/`, and `research/strategy/publication/`. The architecture/strategy teams own their technical and research artifacts. Do not treat their methods, cost scenarios, source summaries, or test receipts as production guarantees.
 
