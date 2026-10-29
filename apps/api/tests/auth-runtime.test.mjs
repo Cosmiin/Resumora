@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
+import { bundleWorker as build } from './bundle-worker.mjs';
 import { blankDraft } from '@resumora/contracts/editor/model';
 import { saveSession, authHeaders } from '../src/auth/session.ts';
 import { readCookie, writeCookie } from '../src/auth/cookies.ts';
@@ -15,7 +15,7 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
   const calls = [];
   let databaseFailure = false, authFailure = false;
   const runtime = new Miniflare(convertV4MiniflareOptions({
-    script: bundle.outputFiles[0].text, modules: true, compatibilityDate: '2026-10-25', host: '127.0.0.1', port: 0, unsafeRegisterWorker: false, bindings: env,
+    modules: [{type:'ESModule',path:'entry.mjs',contents:bundle.outputFiles[0].text},...bundle.wasm], compatibilityDate: '2026-10-25', host: '127.0.0.1', port: 0, unsafeRegisterWorker: false, bindings: env,
     outboundService: async request => {
       const url = new URL(request.url); assert.equal(url.origin, env.SUPABASE_URL); calls.push(url.pathname);
       if (url.pathname === '/auth/v1/token') return RuntimeResponse.json({ access_token: token, refresh_token: 'runtime-refresh', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user });
@@ -57,6 +57,11 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
     const login = await call('/login', credentials, { 'X-CSRF-Token': initial.csrfToken }); assert.equal(login.status, 200);
     assert.match(login.headers.get('set-cookie'), /HttpOnly/); assert.equal(login.headers.get('set-cookie').includes(token), false);
     const signed = await (await call('/session')).json(); assert.equal(signed.user.id, user.id); assert.equal(signed.recovery, false);
+    const photoWrite = headers => fetch(origin + '/v1/photos', {method:'POST',body:new Uint8Array([1]),headers:{Cookie:[...jar].map(([k,v])=>k+'='+v).join('; '),Origin:env.APP_ORIGIN,'Content-Type':'image/jpeg','X-Resumora-Account':user.id,...headers}});
+    assert.equal((await photoWrite({})).status,403);
+    assert.equal((await photoWrite({'X-CSRF-Token':signed.csrfToken,Origin:'https://evil.invalid'})).status,403);
+    const enabledGate=await photoWrite({'X-CSRF-Token':signed.csrfToken});
+    assert.equal(enabledGate.status,503);assert.equal((await enabledGate.json()).error.code,'photoUnavailable');
     const before = calls.length;
     assert.equal(await (await cv()).json(), null);
     assert.deepEqual(calls.slice(before), ['/auth/v1/user', '/rest/v1/rpc/load_base_draft']);
@@ -90,7 +95,7 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
       headers = authHeaders();
       await saveSession(headers, env, { access_token: token, refresh_token: 'expired-runtime-' + result, expires_at: 1, user }, false, signed.csrfToken);
       accept(new Response(null, { headers }));
-      const expired = await cv(); assert.equal(expired.status, 401); assert.equal(expired.headers.getSetCookie().length, 0);
+      const expired = await cv(); assert.equal(expired.status, 409); assert.equal((await expired.json()).error.code, "SESSION_REFRESH_REQUIRED"); assert.equal(expired.headers.getSetCookie().length, 0);
       const refreshed = await call('/session'); assert.equal(refreshed.status, 200); assert.match(refreshed.headers.get('set-cookie'), /resumora-local-session/);
       databaseFailure = result === 'database';
       const response = await cv('/save', { ...save, mode: result === 'validation' ? 'checkpoint' : 'autosave' }, { 'X-CSRF-Token': signed.csrfToken });

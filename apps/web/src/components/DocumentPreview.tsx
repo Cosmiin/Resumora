@@ -1,4 +1,5 @@
 import { currentWording } from "../base/wording";
+import { PhotoPreview } from "../photo/PhotoPreview";
 import { useContext, useLayoutEffect, useRef, type ReactNode } from "react";
 import { formatDate, durationBounds } from "../base/dates";
 import { hasValue, isAuthored, type BaseDraft, type Fact } from "../base/model";
@@ -117,6 +118,7 @@ export function DocumentPreview({
     if (id === "identity")
       return (
         <>
+          <PhotoPreview photo={d.presentation.photo} />
           {!hidden(d.name) && (
             <h2>
               {block(

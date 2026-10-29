@@ -175,7 +175,7 @@ export function validateAdmission(v: unknown, pages: number): Admission {
   return structuredClone(v) as unknown as Admission;
 }
 export const candidatePath =
-  /^(name|titles\.[01]|contacts\.(email|phone|location|linkedin)|professionalSkills\.\d{1,2}|technicalSkills\.\d{1,2}|roles\.\d\.(title|company|location|start|end|ongoing|context|bullets\.\d{1,2})|education\.\d\.(institution|qualification|field|location|start|end|details)|languages\.\d\.(title|proficiency))$/;
+  /^(name|titles\.[01]|contacts\.(email|phone|location|linkedin)|professionalSkills\.(0|[1-9][0-9]?)|technicalSkills\.(0|[1-9][0-9]?)|roles\.\d\.(title|company|location|start|end|ongoing|context|bullets\.(0|[1-9][0-9]?))|education\.\d\.(institution|qualification|field|location|start|end|details)|languages\.\d\.(title|proficiency))$/;
 export function validateExtraction(
   v: unknown,
   pages: DocumentPage[],

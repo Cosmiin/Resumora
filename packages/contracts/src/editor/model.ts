@@ -1,3 +1,4 @@
+import type { CvPhoto } from "./photo.ts";
 import type {
   ImportReview,
   QuestionPlan,
@@ -130,6 +131,7 @@ export type BaseDraft = {
   }[];
   answers: Answer[];
   presentation: {
+    photo?: CvPhoto | null;
     order: string[];
     hidden: string[];
     hiddenFields?: string[];

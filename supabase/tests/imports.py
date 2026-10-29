@@ -40,7 +40,12 @@ def suite(db):
             db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.a,role='authenticated')
             self.assertEqual(db.sql("SELECT count(*) FROM storage.objects",user=self.b,role='authenticated'),'0')
             self.assertIn('row-level security',db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.b,role='authenticated',expect_error=True))
-            self.assertEqual(db.sql("SELECT count(*) FROM storage.objects",role='anon'),'0')
+            try:
+                self.assertEqual(db.sql("SELECT count(*) FROM storage.objects",role='anon'),'0')
+            except AssertionError as error:
+                # The shared photo guard can deny the query before import RLS
+                # filters rows. This specific denial also proves no anon read.
+                self.assertIn('permission denied for function photo_storage_access',str(error))
             self.complete('uploaded')
             self.assertIn('row-level security',db.sql(f"UPDATE storage.objects SET name='{name}' WHERE name='{name}'",user=self.a,role='authenticated',expect_error=True))
             self.assertEqual(db.sql("SELECT count(*) FROM storage.objects",user=self.a,role='authenticated'),'1')

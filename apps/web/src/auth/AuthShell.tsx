@@ -89,10 +89,7 @@ export function AuthShell({
       const headers = new Headers(init.headers);
       if (init.method && init.method !== "GET") {
         headers.set("X-CSRF-Token", csrf.current);
-        if (
-          path !== "/v1/intelligence/imports" ||
-          headers.get("Content-Type") !== "application/octet-stream"
-        )
+        if (!headers.has("Content-Type"))
           headers.set("Content-Type", "application/json");
       }
       let response: Response;
@@ -223,7 +220,42 @@ export function AuthShell({
         const headers = new Headers(init?.headers);
         headers.set("X-Resumora-Account", expectedAccount!);
         headers.set("X-CSRF-Token", expectedCsrf!);
-        const response = await transport(path, { ...init, headers });
+        let response = await transport(path, { ...init, headers });
+        const refreshRequired =
+          response.status === 409 &&
+          (
+            await response
+              .clone()
+              .json()
+              .catch(() => null)
+          )?.error?.code === "SESSION_REFRESH_REQUIRED";
+        if (refreshRequired) {
+          assertCurrent();
+          init?.signal?.throwIfAborted();
+          await verify();
+          assertCurrent();
+          init?.signal?.throwIfAborted();
+          if (
+            (init?.method === "POST" &&
+              path.startsWith("/v1/intelligence/") &&
+              !init.signal) ||
+            init?.body instanceof ReadableStream
+          ) {
+            setError("Reverifică sesiunea. Ciorna ta este păstrată.");
+            return response;
+          }
+          response = await transport(path, { ...init, headers });
+          if (
+            response.status === 409 &&
+            (
+              await response
+                .clone()
+                .json()
+                .catch(() => null)
+            )?.error?.code === "SESSION_REFRESH_REQUIRED"
+          )
+            setError("Reverifică sesiunea. Ciorna ta este păstrată.");
+        }
         assertCurrent();
         return response;
       };
@@ -253,6 +285,7 @@ export function AuthShell({
     ordered,
     afterRequests,
     load,
+    verify,
   ]);
   async function reloadAfterAction() {
     generation.current++;

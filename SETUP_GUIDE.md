@@ -119,6 +119,8 @@ Credential-file ignores are included on this branch, pending merge. Do not enter
 
 ### Private upload/export storage: when retaining file bytes
 
+For optional CV photos, follow the [profile photo guide](docs/frontend/profile-photo.md#setup-and-remaining-acceptance), which owns their private storage setup and remaining acceptance requirements.
+
 For implemented source-document storage, follow [CV import setup and activation](docs/setup/cv-import-enrichment.md#setup-and-activation-boundary). That guide owns the prepared bucket, policies, retention limits and migration boundary; do not create the older proposed `cv-uploads` bucket or configure an unused upload-bucket variable.
 
 **Future export storage:** reuse Supabase Storage rather than adding R2/S3 by default. The proposed `cv-exports` bucket and its retention, quotas and MIME/size policy remain unimplemented decisions.

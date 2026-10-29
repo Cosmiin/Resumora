@@ -1,5 +1,7 @@
 # Local Base CV editor · J05–J08
 
+See [optional profile photo](profile-photo.md) for upload/crop/shape, trusted private storage setup and the exact preview/tailoring/export acceptance boundary.
+
 The React/Vite app implements the Base CV journey with the supplied Resumora design. The latest owner request replaces section modals and repeated confirmations with inline editing, compact fields, chip inputs and session autosave. The application entrypoint now requires Supabase authentication and uses the user-scoped Worker persistence gateway. PDF (including scans/mixed), DOCX/DOC import review and career questions/rewrite now have a [connected default-OFF integration](../setup/cv-import-enrichment.md). Job tailoring and export remain deferred; [connected vacancies and scoped wording](../setup/connected-jobs-ai.md) owns the added job and default-OFF AI behavior. Use authorized synthetic accounts/data for controlled review.
 
 ## Run and review

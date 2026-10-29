@@ -175,7 +175,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'imports'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -186,8 +186,8 @@ def main():
     try:
         db.start()
         if args.suite == 'imports':
-            # Minimal real RLS consumer for Supabase Storage policy behavior, not a cloud API claim.
-            db.sql("CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]); CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),bucket_id text,name text); ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY; GRANT USAGE ON SCHEMA storage TO authenticated,anon; GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated,anon; CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
+            # Exercise import restrictions against a permissive policy on the shared Storage fixture.
+            db.sql("CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
         count = db.migrate()
         assert db.migrate() == 0, 'Normal reapply must have no pending migrations'
         table_count = int(db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'"))
@@ -223,6 +223,14 @@ def main():
             connected_result = unittest.TextTestRunner(verbosity=2).run(connected.suite(db))
             cases += connected_result.testsRun
             if not connected_result.wasSuccessful():
+                return 1
+        if args.suite in ('all', 'photos'):
+            photo_spec = importlib.util.spec_from_file_location('photos', ROOT / 'supabase/tests/photos.py')
+            photos = importlib.util.module_from_spec(photo_spec)
+            photo_spec.loader.exec_module(photos)
+            photo_result = unittest.TextTestRunner(verbosity=2).run(photos.suite(db))
+            cases += photo_result.testsRun
+            if not photo_result.wasSuccessful():
                 return 1
         if args.suite in ('imports','all'):
             import_spec = importlib.util.spec_from_file_location('cv_imports', ROOT / 'supabase/tests/imports.py')

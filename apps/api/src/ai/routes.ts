@@ -6,7 +6,11 @@ import { isUuid } from "@resumora/contracts/jobs/connected";
 import { readBody } from "../cv/routes.ts";
 import { privateJson, routeError } from "../jobs/routes.ts";
 import { projectEnhancementContext } from "./enhancement-context.ts";
-import { prepareEnhancement } from "./enhancement.ts";
+import {
+  prepareEnhancement,
+  validateReasoningEffort,
+  type ReasoningEffort,
+} from "./enhancement.ts";
 import type {
   UsageLedger,
   AttemptStart,
@@ -16,6 +20,7 @@ import type {
 export interface EnhancementConfig {
   AI_PAID_INFERENCE?: string;
   AI_PROCESSING_POLICY?: string;
+  AI_REASONING_EFFORT?: string;
   AI_WORKER_SECRET?: string;
   OPENROUTER_API_KEY?: string;
   OPENAI_API_KEY?: string;
@@ -80,6 +85,12 @@ export async function enhancementRoute(
     !configId(env.AI_PROCESSING_POLICY)
   )
     return privateJson({ error: { code: "enhancementUnconfigured" } }, 503);
+  let reasoningEffort: ReasoningEffort | undefined;
+  try {
+    reasoningEffort = validateReasoningEffort(env.AI_REASONING_EFFORT);
+  } catch {
+    return privateJson({ error: { code: "enhancementUnconfigured" } }, 503);
+  }
   try {
     const body = await readBody(request);
     if (body instanceof Response) return body;
@@ -139,6 +150,7 @@ export async function enhancementRoute(
       transport,
       groundedComposition: true,
       processingPolicy: env.AI_PROCESSING_POLICY,
+      reasoningEffort,
       credentials: {
         openrouter: env.OPENROUTER_API_KEY,
         openai: env.OPENAI_API_KEY,

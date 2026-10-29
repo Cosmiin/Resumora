@@ -32,10 +32,14 @@ export interface IntelligenceClient {
     file: File,
     operationId: string,
     expectedRevision: number,
+    signal?: AbortSignal,
   ): Promise<ImportStatus>;
   listImports(): Promise<ImportStatus[]>;
-  importStatus(operationId: string): Promise<ImportStatus>;
-  cancelImport(operationId: string): Promise<void>;
+  importStatus(
+    operationId: string,
+    signal?: AbortSignal,
+  ): Promise<ImportStatus>;
+  cancelImport(operationId: string, signal?: AbortSignal): Promise<void>;
   questions(context: IntelligenceContext): Promise<QuestionPlan>;
   rewrite(context: IntelligenceContext): Promise<RoleRewrite>;
 }
@@ -55,14 +59,15 @@ export function httpIntelligence(transport: CvTransport): IntelligenceClient {
       throw new IntelligenceRequestError(value?.error?.code ?? "UNAVAILABLE");
     return value as T;
   }
-  const command = <T>(path: string, input: unknown) =>
+  const command = <T>(path: string, input: unknown, signal?: AbortSignal) =>
     request<T>(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
+      signal,
     });
   return {
-    importDocument: (file, operationId, expectedRevision) =>
+    importDocument: (file, operationId, expectedRevision, signal) =>
       request<ImportStatus>("/imports", {
         method: "POST",
         headers: {
@@ -72,14 +77,20 @@ export function httpIntelligence(transport: CvTransport): IntelligenceClient {
           "X-Expected-Revision": String(expectedRevision),
         },
         body: file,
+        signal,
       }),
     listImports: () => request<ImportStatus[]>("/imports", { method: "GET" }),
-    importStatus: (operationId) =>
+    importStatus: (operationId, signal) =>
       request<ImportStatus>(`/imports/${encodeURIComponent(operationId)}`, {
         method: "GET",
+        signal,
       }),
-    cancelImport: (operationId) =>
-      command<void>(`/imports/${encodeURIComponent(operationId)}/cancel`, {}),
+    cancelImport: (operationId, signal) =>
+      command<void>(
+        `/imports/${encodeURIComponent(operationId)}/cancel`,
+        {},
+        signal,
+      ),
     questions: (context) => command<QuestionPlan>("/questions", context),
     rewrite: (context) => command<RoleRewrite>("/rewrite", context),
   };

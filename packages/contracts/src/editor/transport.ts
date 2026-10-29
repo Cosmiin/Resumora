@@ -1,3 +1,4 @@
+import { isPhoto } from "./photo.ts";
 import {
   isImportReview,
   isRoleRewriteReview,
@@ -240,6 +241,7 @@ const draftShape = obj(
     presentation: obj(
       { order: list(str), hidden: list(str) },
       {
+        photo: isPhoto,
         hiddenFields: list(str),
         approvedWording: (v) =>
           !!v &&

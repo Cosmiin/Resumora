@@ -17,3 +17,13 @@ CREATE TABLE test_support.migrations (
   version text PRIMARY KEY,
   sha256 text NOT NULL
 );
+-- Storage RLS semantics only: no object server/HTTP or hosted bucket assurance.
+CREATE SCHEMA storage;
+CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),bucket_id text REFERENCES storage.buckets(id),name text,UNIQUE(bucket_id,name));
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+GRANT USAGE ON SCHEMA storage TO authenticated,anon;
+GRANT SELECT,INSERT,UPDATE,DELETE ON storage.objects TO authenticated,anon;
+
+-- Implements only the documented operation equality contract for policy tests.
+CREATE FUNCTION storage.allow_only_operation(expected text) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('test_support.storage_operation',true)=expected,false) $$;

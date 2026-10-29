@@ -267,7 +267,7 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 **Goal, entry, preconditions:** user deliberately purchases approved access after seeing useful product value. Availability: planned; D-05 / D-07 / D-12 commercial terms, sender/provider setup and server entitlements remain dependencies. Evidence: F/UX17, `ScrAccount.jsx`.
 
-1. Show free/paid scope and 1/3/6-month concepts with approved price, currency, tax, total, renewal/cancellation and usage reset explanation. Until approved retain `— RON`; no purchasable invented amount or unlimited/free promise.
+1. Show free/paid scope and proposed terms with approved price, currency, tax, total and renewal/cancellation explanation. Follow [PRD section 10](prd.md#10-account-subscriptions-entitlements-and-privacy) for accepted credit and renewal policy. Until money prices are approved retain `— RON`; no purchasable invented amount or unlimited/free promise.
 2. Select term, review summary and explicit renewal acknowledgment if applicable; hand off to authorized provider checkout. No card fields or card storage in Resumora.
 3. Return to visible Pending/Declined/Active state. Only validated signed, idempotent server confirmation activates access; redirect or UI timer cannot.
 4. Resume the original CV/export action after confirmed entitlement, preserving saved version context and any required new user confirmation.
@@ -282,7 +282,7 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 
 **Goal, entry, preconditions:** subscribed user opens Account to understand access or stop renewal. Availability: planned; approved term/allowance/grace/proration/refund/cancellation policy and provider integration are dependencies. Evidence: F/UX18, `ScrAccount.jsx`.
 
-1. Show current term/status/renewal date and approved allowance/reset information. Active, Pending, Cancel scheduled, Payment failed and Free states are distinct.
+1. Show current term/status/renewal date and credit balance according to [PRD section 10](prd.md#10-account-subscriptions-entitlements-and-privacy). Active, Pending, Cancel scheduled, Payment failed and Free states are distinct.
 2. Choose Cancel renewal → review effective date/consequences → explicitly confirm. Proposed cancel-at-period-end preserves access until the stated end; it is separate from deletion.
 3. Where policy permits, Resume before end or update payment through provider. Show confirmation only after server/provider acknowledgment; reconcile failed renewal and any approved grace/access state.
 
@@ -339,10 +339,10 @@ This table records unresolved work for the relevant owners; it does not block ke
 
 | Decision / owner | Recommendation and reason | Still unresolved / affected flows |
 |---|---|---|
-| D-01 / D-02 · Product + architecture | Paste/manual and text PDF/DOCX with explicit fallback first, to make review/recovery testable. | URL/extension permissions/sites, file limits, OCR timing; J05/J09/J18. |
+| D-01 / D-02 · Product + architecture | Follow the [implemented intake contract](../setup/cv-import-enrichment.md), including recovery and activation limits. | URL/extension permissions/sites and hosted/real-data activation; J05/J09/J18. |
 | D-03 / D-11 · Product + ATS/UX | Separate four assessments, explain evidence and show strict-gate warnings; qualitative five checks only. | Hierarchy, calibration acceptance, primary-status presentation; J06/J10–J12. |
 | D-04 · Product + renderer | One actually tested readable PDF before wider formats/templates. | Template/style/DOCX breadth and rights; J12. |
-| D-05 / D-07 · Product + commercial | Explain value before gate, exact terms/access and cancel-at-end consequences. | Prices, discounts, VAT/refund/usage/grace/renewal, post-cancel access; J12/J15/J16. |
+| D-05 / D-07 · Product + commercial | Follow [accepted billing direction](prd.md#10-account-subscriptions-entitlements-and-privacy); explain value before gate and exact terms/access. | Money prices, discounts, VAT/refunds, action costs, grace and post-cancel access/rollover; J12/J15/J16. |
 | D-06 · Product | Validate the intended job-seeker segment without reopening recorded job-specific focus. | Candidate validation approach; J01 and first-use paths. |
 | D-08 · Product/privacy + architecture | Minimize input retention, publish actual subprocessors/processing/portability/deletion boundaries. | Raw/version/contact retention, backup erasure, residency, lawful policy and free-tier feasibility; all data flows, especially J05/J14/J17. |
 | D-09 / D-10 · Product + UX | Immediate Base review with progressive skippable questions; allow truthful unknowns and optional second title. | First-save blocking/minimum export completion and edge policy; J05–J08/J12. |

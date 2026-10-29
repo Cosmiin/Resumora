@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { enhancementRoute } from "../src/ai/routes.ts";
 import { configuredIntelligenceRoute } from "../src/intelligence/configured.ts";
 import { SyntheticLedger } from "../fixtures/synthetic-ledger.ts";
 import { blankDraft, newRole, fact } from "@resumora/contracts/editor/model";
@@ -469,4 +470,296 @@ test("owned saved context drives choices and semantic whole-role proposals; fore
   );
   assert.equal(bad.status, 503);
   assert.equal(f.draft.presentation.approvedWording, undefined);
+});
+
+for (const effort of [undefined, "none", "low"]) {
+  for (const format of ["pdf", "docx", "doc"]) {
+    test(`server effort ${effort ?? "omitted"} binds both ${format} stages and eligible fallback without changing guards`, async () => {
+      const f = setup(),
+        configured = {
+          ...env,
+          ...(effort === undefined ? {} : { AI_REASONING_EFFORT: effort }),
+        },
+        calls = [];
+      const word = format !== "pdf";
+      const transport = async (url, init) => {
+        const body = JSON.parse(init.body);
+        calls.push({ url, body });
+        configured.AI_REASONING_EFFORT = effort === "none" ? "low" : "none";
+        const router = url.includes("openrouter");
+        if (effort === undefined) {
+          assert.equal(Object.hasOwn(body, "reasoning"), false);
+          assert.equal(Object.hasOwn(body, "reasoning_effort"), false);
+        } else if (router || word) {
+          assert.deepEqual(body.reasoning, { effort });
+          assert.equal(Object.hasOwn(body, "reasoning_effort"), false);
+        } else {
+          assert.equal(body.reasoning_effort, effort);
+          assert.equal(Object.hasOwn(body, "reasoning"), false);
+        }
+        assert.equal(body.store, false);
+        assert.equal(body.stream, false);
+        assert.equal(init.redirect, "manual");
+        assert.ok(init.signal);
+        const admission = body.model.endsWith("small");
+        assert.equal(
+          body[word ? "max_output_tokens" : "max_completion_tokens"],
+          admission ? 300 : 8000,
+        );
+        if (router) {
+          assert.deepEqual(body.provider, {
+            only: [env.OPENROUTER_ENDPOINT],
+            allow_fallbacks: false,
+            require_parameters: true,
+            data_collection: "deny",
+            zdr: true,
+          });
+          assert.equal(body.plugins[0].pdf.engine, "native");
+          return Response.json({}, { status: 503 });
+        }
+        assert.equal(
+          url,
+          word
+            ? "https://api.openai.com/v1/responses"
+            : "https://api.openai.com/v1/chat/completions",
+        );
+        return reply(
+          body,
+          admission
+            ? { kind: "cv", reason: "Synthetic career", pages: word ? [] : [1] }
+            : {
+                schemaVersion: "cv-extraction/1",
+                candidates: [
+                  {
+                    id: "name",
+                    path: "name",
+                    value: "Mara Ionescu",
+                    quote: "Mara Ionescu",
+                    page: word ? null : 1,
+                    confidence: "high",
+                    warning: "",
+                  },
+                ],
+                warnings: [],
+                omittedPages: [],
+              },
+          word,
+        );
+      };
+      const operationId = crypto.randomUUID(),
+        bytes =
+          format === "pdf" ? pdfFixture() : format === "docx" ? docx() : doc();
+      const request = () => upload(format, bytes, operationId);
+      const response = await configuredIntelligenceRoute(
+        request(),
+        configured,
+        f.gateway,
+        f.user,
+        transport,
+      );
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).state, "ready");
+      assert.equal(calls.length, word ? 2 : 4);
+      const report = await f.ledger.report({
+        from: "2000-01-01",
+        to: "2099-01-01",
+      });
+      assert.equal(report.totals.attempts, calls.length);
+      assert.equal(report.totals.unknownCost, calls.length);
+      for (const attempt of report.recent) {
+        const fp = JSON.parse(attempt.requestFingerprint);
+        assert.equal(fp.length, effort === undefined ? 4 : 5);
+        if (effort !== undefined)
+          assert.deepEqual(fp[4], { reasoningEffort: effort });
+        assert.equal(
+          attempt.requestFingerprint.includes("Mara Ionescu"),
+          false,
+        );
+      }
+      const before = calls.length;
+      assert.equal(
+        (
+          await configuredIntelligenceRoute(
+            request(),
+            configured,
+            f.gateway,
+            f.user,
+            transport,
+          )
+        ).status,
+        200,
+      );
+      assert.equal(calls.length, before);
+    });
+  }
+}
+
+test("invalid effort fails before storage, reservations or network; clients cannot override server effort", async () => {
+  for (const effort of [
+    "",
+    "NONE",
+    " low",
+    "false",
+    false,
+    null,
+    "ultra",
+    {},
+  ]) {
+    const response = await configuredIntelligenceRoute(
+      upload("pdf", pdfFixture()),
+      { ...env, AI_REASONING_EFFORT: effort },
+      {},
+      crypto.randomUUID(),
+      () => assert.fail("No provider dispatch"),
+    );
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).error.code, "AI_UNCONFIGURED");
+  }
+  const f = setup();
+  const req = new Request(
+    "https://resumora.invalid/v1/intelligence/questions",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operationId: crypto.randomUUID(),
+        snapshotId: f.snapshot.id,
+        revision: 1,
+        targetId: f.role.id,
+        reasoningEffort: "high",
+      }),
+    },
+  );
+  const denied = await configuredIntelligenceRoute(
+    req,
+    { ...env, AI_REASONING_EFFORT: "low" },
+    f.gateway,
+    f.user,
+    () => assert.fail("No client effort override"),
+  );
+  assert.equal(denied.status, 400);
+  assert.equal(f.reservations.size, 0);
+  const saved = await configuredIntelligenceRoute(
+    new Request("https://resumora.invalid/v1/intelligence/imports"),
+    { ...env, AI_REASONING_EFFORT: "invalid" },
+    f.gateway,
+    f.user,
+    () => assert.fail("No inference for reads"),
+  );
+  assert.equal(saved.status, 200);
+});
+
+for (const kind of ["questions", "rewrite"]) {
+  test(`career ${kind} uses configured low effort and the unchanged 1800-token cap`, async () => {
+    const f = setup();
+    const req = new Request(
+      `https://resumora.invalid/v1/intelligence/${kind}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operationId: crypto.randomUUID(),
+          snapshotId: f.snapshot.id,
+          revision: 1,
+          targetId: f.role.id,
+        }),
+      },
+    );
+    const response = await configuredIntelligenceRoute(
+      req,
+      { ...env, AI_REASONING_EFFORT: "low" },
+      f.gateway,
+      f.user,
+      async (_url, init) => {
+        const b = JSON.parse(init.body);
+        assert.deepEqual(b.reasoning, { effort: "low" });
+        assert.equal(b.max_completion_tokens, 1800);
+        const data =
+          kind === "rewrite"
+            ? {
+                schemaVersion: "career-role-rewrite/1",
+                targetId: f.role.id,
+                text: "Prepared weekly Excel reports.",
+                factIds: [f.role.context.id],
+                warnings: [],
+              }
+            : {
+                schemaVersion: "career-question-plan/1",
+                targetId: f.role.id,
+                questions: [
+                  {
+                    id: "q",
+                    dimension: "ownership",
+                    text: "Which work did you do?",
+                    why: "Clarify ownership",
+                    selectionMode: "single",
+                    options: [{ id: "a", label: "Consolidated reports" }],
+                  },
+                ],
+              };
+        return reply(b, data, false);
+      },
+    );
+    assert.equal(response.status, 200);
+  });
+}
+
+test("existing enhancement endpoint validates server effort before reservation and preserves client isolation", async () => {
+  for (const effort of [undefined, "none", "low", "invalid"]) {
+    const f = setup();
+    const req = (extra = {}) =>
+      new Request("https://resumora.invalid/v1/enhancement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operationId: crypto.randomUUID(),
+          snapshotId: f.snapshot.id,
+          snapshotRevision: 1,
+          targetId: f.role.id,
+          ...extra,
+        }),
+      });
+    let calls = 0;
+    const response = await enhancementRoute(
+      req(),
+      {
+        ...env,
+        ...(effort === undefined ? {} : { AI_REASONING_EFFORT: effort }),
+      },
+      f.gateway,
+      f.user,
+      async (_url, init) => {
+        calls++;
+        const b = JSON.parse(init.body);
+        if (effort === undefined)
+          assert.equal(Object.hasOwn(b, "reasoning"), false);
+        else assert.deepEqual(b.reasoning, { effort });
+        return reply(
+          b,
+          {
+            text: "Prepare weekly Excel reports.",
+            factIds: [f.role.context.id],
+          },
+          false,
+        );
+      },
+    );
+    assert.equal(response.status, effort === "invalid" ? 503 : 200);
+    assert.equal(calls, effort === "invalid" ? 0 : 1);
+    assert.equal(f.reservations.size, effort === "invalid" ? 0 : 1);
+    if (effort !== "invalid") {
+      assert.equal(
+        (
+          await enhancementRoute(
+            req({ reasoningEffort: "high" }),
+            env,
+            f.gateway,
+            f.user,
+            () => assert.fail("No override"),
+          )
+        ).status,
+        400,
+      );
+    }
+  }
 });
