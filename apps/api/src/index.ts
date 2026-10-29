@@ -1,3 +1,4 @@
+import { jobDocumentsRoute } from './jobs/documents.ts';
 import { jobsRoute } from './jobs/routes.ts';
 import { enhancementRoute, type EnhancementConfig } from './ai/routes.ts';
 import { photoRoute } from './photos/routes.ts';
@@ -45,6 +46,7 @@ export default {
       try {
         const gateway = createDatabaseGateway(env, identity);
         response = path === '/v1/enhancement' ? await enhancementRoute(request, env, gateway, identity.user.id)
+          : /^\/v1\/jobs\/[^/]+\/cv(?:\/|$)/.test(path) ? await jobDocumentsRoute(request, gateway)
           : path.startsWith('/v1/jobs') ? await jobsRoute(request, gateway) : path.startsWith('/v1/photos') ? await photoRoute(request, gateway, env.PHOTO_WORKER_SECRET, bytes => import('./photos/normalize.ts').then(module => module.normalizePhoto(bytes))) : await cvRoute(request, gateway);
       } catch {
         response = Response.json({ error: { code: 'unavailable' } }, { status: 503 });

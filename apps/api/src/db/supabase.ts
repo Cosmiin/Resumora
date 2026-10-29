@@ -1,3 +1,4 @@
+import { isJobEditorPayload, isJobPin, positiveRevision, type JobEditorVersion, type JobEditorSave, type JobEditorPayload, type JobPin } from '@resumora/contracts/jobs/documents';
 import type { JobSave, SavedJob, JobSummary } from '@resumora/contracts/jobs/connected';
 import type { AttemptStart, AttemptResult, Attempt } from '../ai/ledger.ts';
 import type { PhotoAsset } from '../photos/routes.ts';
@@ -34,6 +35,11 @@ function isSnapshot(value: unknown): boolean {
     && ['save', 'autosave', 'restore'].includes(value.reason as string)
     && record(value.payload) && value.payload.schemaVersion === 'resumora-editor-draft/1'
     && record(value.payload.content) && Array.isArray(value.payload.answers);
+}
+function isJobEditorVersion(value: unknown): boolean {
+  return record(value) && isSnapshot({ ...value, payload: value.sourcePayload })
+    && typeof value.documentId === 'string' && uuid.test(value.documentId)
+    && ['save', 'restore'].includes(value.reason as string) && isJobEditorPayload(value.payload);
 }
 function key(value: string) {
   if (!uuid.test(value)) throw new DatabaseError(400, 'INVALID_REQUEST');
@@ -85,7 +91,13 @@ export function createDatabaseGateway(env: DatabaseConfig, identity: DatabaseIde
       if (response.status === 401 || response.status === 403) throw new DatabaseError(response.status, 'UNAUTHORIZED');
       throw new DatabaseError(503, 'DATABASE_UNAVAILABLE');
     }
-    const valid = name === 'load_base_draft' ? result === null || isSnapshot(result)
+    const valid = name === 'job_editor_context' ? record(result) && isJobPin(result.job) && record(result.source)
+        && typeof result.source.snapshotId === 'string' && uuid.test(result.source.snapshotId) && positiveRevision(result.source.revision)
+      : name === 'load_job_editor' ? result === null || isJobEditorVersion(result)
+      : name === 'job_editor_history' ? Array.isArray(result) && result.length <= (args.p_limit as number) && result.every(isJobEditorVersion)
+      : name === 'save_job_editor' || name === 'restore_job_editor' ? isJobEditorVersion(result)
+      : name === 'delete_job_editor' ? record(result) && result.documentId === args.p_document && result.deleted === true
+      : name === 'load_base_draft' ? result === null || isSnapshot(result)
       : name === 'base_draft_history' ? Array.isArray(result) && result.length <= (args.p_limit as number) && result.every(isSnapshot)
       : name === 'save_base_draft' || name === 'restore_base_draft' ? isSnapshot(result)
       : name === 'list_target_jobs' ? Array.isArray(result) && result.length <= 50
@@ -164,6 +176,29 @@ export function createDatabaseGateway(env: DatabaseConfig, identity: DatabaseIde
           p_expected_revision: revision(input.expectedRevision), p_profile_version: key(input.profileVersionId),
           p_job_version: key(input.jobVersionId), p_layout: input.layout, p_locale: input.locale, p_tailored: input.tailored });
     },
+    jobEditorContext: (jobId: string) => rpc<{ job: JobPin; source: JobEditorPayload['source'] }>('job_editor_context', { p_job: key(jobId) }),
+    loadJobEditor: (jobId: string, documentId?: string, versionId?: string) => {
+      if ((documentId === undefined) !== (versionId === undefined)) throw new DatabaseError(400, 'INVALID_REQUEST');
+      return rpc<JobEditorVersion | null>('load_job_editor', { p_job: key(jobId),
+        p_document: documentId === undefined ? null : key(documentId), p_version: versionId === undefined ? null : key(versionId) });
+    },
+    jobEditorHistory: (jobId: string, documentId: string, page: { beforeRevision?: number; limit?: number } = {}) => {
+      const limit = page.limit ?? 20;
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20 || (page.beforeRevision !== undefined && !positiveRevision(page.beforeRevision))) throw new DatabaseError(400, 'INVALID_REQUEST');
+      return rpc<JobEditorVersion[]>('job_editor_history', { p_job: key(jobId), p_document: key(documentId),
+        p_before_revision: page.beforeRevision ?? null, p_limit: limit }, 32 * 1048576);
+    },
+    saveJobEditor: (jobId: string, input: JobEditorSave) => {
+      if (!isJobEditorPayload(input.payload) || input.payload.job.id !== jobId) throw new DatabaseError(400, 'INVALID_REQUEST');
+      return rpc<JobEditorVersion>('save_job_editor', { p_key: key(input.requestId), p_job: key(jobId),
+        p_document: input.documentId === null ? null : key(input.documentId), p_expected_revision: revision(input.expectedRevision), p_payload: input.payload });
+    },
+    restoreJobEditor: (jobId: string, input: { requestId: string; documentId: string; expectedRevision: number; versionId: string }) =>
+      rpc<JobEditorVersion>('restore_job_editor', { p_key: key(input.requestId), p_job: key(jobId), p_document: key(input.documentId),
+        p_expected_revision: revision(input.expectedRevision), p_version: key(input.versionId) }),
+    deleteJobEditor: (jobId: string, input: { requestId: string; documentId: string; expectedRevision: number }) =>
+      rpc<{ documentId: string; deleted: true }>('delete_job_editor', { p_key: key(input.requestId), p_job: key(jobId),
+        p_document: key(input.documentId), p_expected_revision: revision(input.expectedRevision) }),
     loadDraft: () => rpc<DraftSnapshot | null>('load_base_draft', {}),
     draftHistory: (page: { beforeRevision?: number; limit?: number } = {}) => {
       const limit = page.limit ?? 20;

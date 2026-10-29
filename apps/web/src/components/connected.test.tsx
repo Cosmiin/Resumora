@@ -1,4 +1,9 @@
 import {
+  projectJobEditor,
+  jobEditorFacts,
+  type JobEditorPayload,
+} from "@resumora/contracts/jobs/documents";
+import {
   render,
   screen,
   fireEvent,
@@ -425,3 +430,62 @@ it.each([
     ).toBe(true);
   },
 );
+
+it("renders accepted job wording through existing preview while Base facts and answers stay independent", () => {
+  const base = blankDraft();
+  base.language = "en";
+  const role = newRole();
+  role.title.value = "Engineer";
+  role.company.value = "Original employer";
+  role.context.value = "Maintained PLC systems";
+  base.roles.push(role);
+  base.answers.push({
+    id: "context-answer",
+    targetId: role.id,
+    question: "impact",
+    questionText: "Exact question?",
+    text: "Exact answer",
+    status: "confirmed",
+    sourceId: "local_manual",
+  });
+  const source = encodeDraft(base);
+  const payload: JobEditorPayload = {
+    schemaVersion: "resumora-job-editor/1",
+    acceptance: "accepted",
+    source: { snapshotId: crypto.randomUUID(), revision: 1 },
+    job: {
+      id: crypto.randomUUID(),
+      versionId: null,
+      fingerprint: "a".repeat(64),
+    },
+    selectedFacts: jobEditorFacts(base).map((row) => row.ref),
+    selectedAnswerIds: ["context-answer"],
+    wording: [
+      {
+        targetId: role.id,
+        text: "Accepted job-specific description.",
+        origin: "ai_generated",
+        acceptance: "accepted",
+        valueIds: [role.context.id],
+        answerIds: ["context-answer"],
+      },
+    ],
+    presentation: { templateVersionId: "unknown-future-template" },
+    localAdditions: [],
+  };
+  const jobDraft = projectJobEditor(source, payload);
+  expect(currentWording(jobDraft, role.id)).toBe(
+    "Accepted job-specific description.",
+  );
+  render(
+    <LanguageContext value="en">
+      <DocumentPreview draft={jobDraft} asOf={{ year: "2026", month: "10" }} />
+    </LanguageContext>,
+  );
+  expect(screen.getByText("Accepted job-specific description.")).toBeTruthy();
+  expect(screen.getByText("Original employer")).toBeTruthy();
+  expect(jobDraft.roles[0].context).toEqual(base.roles[0].context);
+  expect(jobDraft.answers).toEqual(base.answers);
+  expect(source).toEqual(encodeDraft(base));
+  expect(base.presentation.approvedWording).toBeUndefined();
+});

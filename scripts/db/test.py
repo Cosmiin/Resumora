@@ -126,7 +126,7 @@ def check_populated_upgrade(db, behavior):
         f = behavior.Foundation()
         f.setUp()
         f.call('set_preferences', f"'{behavior.uid()}','en','{{}}'")
-        for phase, expected in [('P0', 7), ('P1', 27), ('P2', 35), ('P3', 52)]:
+        for phase, expected in [('P0', 7), ('P1', 27), ('P2', 35), ('P3', 54)]:
             staged.migrate(phase)
             assert staged.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'") == str(expected)
             assert staged.migrate(phase) == 0
@@ -174,7 +174,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'templates'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'templates', 'job-documents'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -186,7 +186,7 @@ def main():
         db.start()
         count = db.migrate()
         assert db.migrate() == 0, 'Normal reapply must have no pending migrations'
-        assert db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'") == '52'
+        assert db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'") == '54'
         assert db.sql("SELECT count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='app' AND NOT c.convalidated") == '0'
         tests = ROOT / 'supabase/tests/behavior.py'
         cases = 2
@@ -204,7 +204,7 @@ def main():
             upgrade = check_populated_upgrade(db, module)
             cases += 2
         import importlib.util
-        if args.suite != 'templates':
+        if args.suite in ('all', 'editor-drafts', 'connected', 'photos'):
             draft_spec = importlib.util.spec_from_file_location('editor_drafts', ROOT / 'supabase/tests/editor_drafts.py')
             drafts = importlib.util.module_from_spec(draft_spec)
             draft_spec.loader.exec_module(drafts)
@@ -235,8 +235,16 @@ def main():
             cases += template_result.testsRun
             if not template_result.wasSuccessful():
                 return 1
+        if args.suite in ('all', 'job-documents'):
+            job_spec = importlib.util.spec_from_file_location('job_documents', ROOT / 'supabase/tests/job_documents.py')
+            jobs = importlib.util.module_from_spec(job_spec)
+            job_spec.loader.exec_module(jobs)
+            job_result = unittest.TextTestRunner(verbosity=2).run(jobs.suite(db))
+            cases += job_result.testsRun
+            if not job_result.wasSuccessful():
+                return 1
         receipt = {'migrations_applied':count,'normal_reapply_pending':0,
-                   'tables':52,'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),
+                   'tables':54,'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),
                    'database_version':db.sql('SHOW server_version'),
                    'transport':'private Unix socket; no TCP listener',
                    'auth':'local test roles/auth.uid(); no hosted Auth/API assurance',
