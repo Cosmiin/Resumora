@@ -1910,3 +1910,47 @@ textarea.native {
 .document-identity {
   display: flow-root;
 }
+
+.enrichment-choices {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.enrichment-choices legend {
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.enrichment-choices .enrichment-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  margin: 0;
+  border: 1px solid var(--border-field);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface-card);
+  color: var(--text-body);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.enrichment-choice:hover {
+  background: var(--surface-hover);
+}
+.enrichment-choice:has(input:checked) {
+  background: var(--surface-selected);
+  border-color: var(--border-selected);
+}
+.enrichment-choice:has(input:focus-visible) {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.enrichment-choice input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--action-primary);
+}

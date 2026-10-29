@@ -1,3 +1,7 @@
+import {
+  careerContext,
+  type CareerContext,
+} from "@resumora/contracts/intelligence/context";
 import { RoleRewrite } from "./RoleRewrite";
 import { acceptWording } from "../base/wording";
 import type { RoleRewrite as RoleProposal } from "@resumora/contracts/intelligence/model";
@@ -38,7 +42,7 @@ export function Enrichment({
   rewriteRole,
   transport,
   snapshot,
-  ready = false,
+  ready = true,
 }: {
   transport?: AuthTransport;
   snapshot?: { id: string; revision: number } | null;
@@ -74,11 +78,18 @@ export function Enrichment({
     [index, setIndex] = useState(0),
     [error, setError] = useState("");
   const [planning, setPlanning] = useState(false);
+  const [manual, setManual] = useState(false);
+  const [rewriteCycle, setRewriteCycle] = useState<{
+    id: string;
+    input: CareerContext;
+  } | null>(null);
   const currentDraft = useRef(d),
     requestGeneration = useRef(0);
   currentDraft.current = d;
   useEffect(() => {
     setPlanning(false);
+    setManual(false);
+    setRewriteCycle(null);
     return () => {
       requestGeneration.current++;
     };
@@ -195,6 +206,28 @@ export function Enrichment({
     change(next);
     setError("");
   }
+  function queueRewrite(next: BaseDraft) {
+    if (
+      !rewriteRole ||
+      !activePlan ||
+      editingAnswerId ||
+      index !== activePlan.questions.length - 1
+    )
+      return;
+    try {
+      setRewriteCycle({
+        id: crypto.randomUUID(),
+        input: careerContext(next, targetId),
+      });
+    } catch {
+      setError(
+        t(
+          "Adaugă detalii despre această experiență înainte de rescriere.",
+          "Add details about this experience before rewriting.",
+        ),
+      );
+    }
+  }
   function advance() {
     setEditingAnswerId(null);
     setIndex((i) =>
@@ -219,8 +252,14 @@ export function Enrichment({
     }
     try {
       if (!signature.current) throw new Error("staleTarget");
-      change(saveAnswer(d, { ...answer, status: "draft" }, signature.current));
+      const next = saveAnswer(
+        d,
+        { ...answer, status: "draft" },
+        signature.current,
+      );
+      change(next);
       setError("");
+      queueRewrite(next);
       advance();
     } catch {
       failure();
@@ -234,6 +273,7 @@ export function Enrichment({
       { ...answer, status },
     ];
     change(next);
+    queueRewrite(next);
     advance();
   }
   function add(saved: Answer) {
@@ -316,7 +356,12 @@ export function Enrichment({
     <div
       className="editor-layout enrichment-inline"
       onKeyDown={(e) => {
-        if (!target || e.nativeEvent.isComposing || !(e.ctrlKey || e.metaKey))
+        if (
+          (!activePlan && prepareQuestions && !manual) ||
+          !target ||
+          e.nativeEvent.isComposing ||
+          !(e.ctrlKey || e.metaKey)
+        )
           return;
         if (e.key === "Enter") {
           e.preventDefault();
@@ -335,7 +380,26 @@ export function Enrichment({
       <section className="card question-card">
         {targets.length ? (
           <>
-            <label htmlFor="enrich-target">{t("Intrare", "Entry")}</label>
+            <div>
+              <p className="eyebrow">
+                {t(
+                  "Un rol, o descriere mai clară",
+                  "One role, a clearer description",
+                )}
+              </p>
+              <h2>
+                {t("Îmbunătățește experiența", "Improve your experience")}
+              </h2>
+              <p>
+                {t(
+                  "Alege un rol și apasă Îmbunătățește. Răspunde la câteva întrebări, apoi verifică descrierea propusă.",
+                  "Choose a role and click Improve. Answer a few questions, then review the proposed description.",
+                )}
+              </p>
+            </div>
+            <label htmlFor="enrich-target">
+              {t("Rol sau experiență", "Role or experience")}
+            </label>
             <select
               id="enrich-target"
               value={target ? targetId : ""}
@@ -359,14 +423,16 @@ export function Enrichment({
               ))}
             </select>
             <p className="entry-context">{target?.field.value}</p>
-            {prepareQuestions && (
+            {prepareQuestions && !activePlan && (
               <Button
-                disabled={planning}
+                variant="primary"
+                disabled={planning || !target || !ready}
                 onClick={async () => {
                   const before = currentDraft.current,
                     generation = ++requestGeneration.current;
                   const active = () => generation === requestGeneration.current;
                   setPlanning(true);
+                  setManual(false);
                   setError("");
                   try {
                     const result = await prepareQuestions(targetId);
@@ -396,122 +462,185 @@ export function Enrichment({
               >
                 {planning
                   ? t("Pregătim întrebările…", "Preparing questions…")
-                  : t("Pregătește întrebări AI", "Prepare AI questions")}
+                  : t("Îmbunătățește", "Improve")}
               </Button>
             )}
-            {planned && <p className="small muted">{planned.why}</p>}
-            <p className="eyebrow">
-              {activePlan
-                ? t(
-                    "Întrebări AI · sugestii, nu fapte",
-                    "AI questions · suggestions, not facts",
-                  )
-                : t("Îndrumare manuală", "Manual guidance")}{" "}
-              · {index + 1}/{activePlan?.questions.length ?? dimensions.length}
-            </p>
-            <label className="question-title" htmlFor="enrichment-answer">
-              {planFinished
-                ? t(
-                    "Întrebările sunt încheiate. Contextul tău este păstrat.",
-                    "Questions completed. Your context is retained.",
-                  )
-                : answer.questionText}
-            </label>
-            {!!answer.options?.length && (
-              <fieldset>
-                <legend>
-                  {t(
-                    "Alege una, mai multe sau niciuna; poți scrie propriul răspuns.",
-                    "Choose one, several or none; you can write your own answer.",
-                  )}
-                </legend>
-                {answer.options.map((option) => (
-                  <label key={option.id}>
-                    <input
-                      type={
-                        answer.selectionMode === "single" ? "radio" : "checkbox"
-                      }
-                      name={`choices-${answer.id}`}
-                      checked={
-                        answer.selectedOptionIds?.includes(option.id) ?? false
-                      }
-                      onChange={() => {
-                        const ids =
-                          answer.selectionMode === "single"
-                            ? [option.id]
-                            : answer.selectedOptionIds?.includes(option.id)
-                              ? answer.selectedOptionIds.filter(
-                                  (id) => id !== option.id,
-                                )
-                              : [
-                                  ...(answer.selectedOptionIds ?? []),
-                                  option.id,
-                                ];
-                        const next = clone(d);
-                        next.answers = [
-                          ...next.answers.filter((a) => a.id !== answer.id),
-                          {
-                            ...answer,
-                            selectedOptionIds: ids,
-                            status: "draft",
-                          },
-                        ];
-                        change(next);
-                      }}
-                    />{" "}
-                    {option.label}
-                  </label>
-                ))}
-                <Button
-                  onClick={() => {
-                    const next = clone(d);
-                    next.answers = [
-                      ...next.answers.filter((a) => a.id !== answer.id),
-                      { ...answer, selectedOptionIds: [], status: "draft" },
-                    ];
-                    change(next);
-                  }}
-                >
-                  {t("Fără selecție", "Clear choices")}
-                </Button>
-              </fieldset>
+            {prepareQuestions && !activePlan && !planning && !ready && (
+              <p role="status" className="small muted">
+                {t(
+                  "Salvăm modificările. Vei putea continua imediat după salvare.",
+                  "Saving your changes. You can continue once they are saved.",
+                )}
+              </p>
             )}
-            <textarea
-              ref={input}
-              id="enrichment-answer"
-              className="native"
-              disabled={planFinished}
-              rows={5}
-              value={answer.text}
-              onChange={(e) => put(e.target.value)}
-            />
-            <p className="small muted">
-              {durable
-                ? t(
-                    "Contextul se salvează automat în contul tău. Salvarea răspunsului nu modifică CV-ul.",
-                    "Context autosaves to your account. Saving an answer does not change the CV.",
-                  )
-                : t(
-                    "Contextul rămâne în memoria paginii. Salvarea răspunsului nu modifică CV-ul.",
-                    "Context stays in page memory. Saving an answer does not change the CV.",
+            {prepareQuestions && !activePlan && error && (
+              <Button onClick={() => setManual(true)}>
+                {t(
+                  "Continuă cu întrebări manuale",
+                  "Continue with manual questions",
+                )}
+              </Button>
+            )}
+            {(!prepareQuestions || activePlan || manual) && (
+              <>
+                {planned && <p className="small muted">{planned.why}</p>}
+                <p className="eyebrow">
+                  {activePlan
+                    ? t(
+                        "Întrebări AI · sugestii, nu fapte",
+                        "AI questions · suggestions, not facts",
+                      )
+                    : t("Îndrumare manuală", "Manual guidance")}{" "}
+                  ·{" "}
+                  {Math.min(
+                    index + 1,
+                    activePlan?.questions.length ?? dimensions.length,
                   )}
-            </p>
-            <div className="actions">
-              <Button
-                variant="primary"
-                disabled={planFinished || !answerEvidenceText(answer).trim()}
-                onClick={submit}
-              >
-                {t("Salvează și continuă", "Save and next")}{" "}
-                <kbd>⌘/Ctrl Enter</kbd>
-              </Button>
-              <Button disabled={planFinished} onClick={() => skip("unknown")}>
-                {t("Nu știu", "I don't know")} <kbd>⌘/Ctrl ⇧ K</kbd>
-              </Button>
-              <Button disabled={planFinished} onClick={() => skip("skipped")}>
-                {t("Omit", "Skip")} <kbd>⌘/Ctrl ⇧ J</kbd>
-              </Button>
-            </div>
+                  /{activePlan?.questions.length ?? dimensions.length}
+                </p>
+                <label className="question-title" htmlFor="enrichment-answer">
+                  {planFinished
+                    ? t(
+                        "Întrebările sunt încheiate. Contextul tău este păstrat.",
+                        "Questions completed. Your context is retained.",
+                      )
+                    : answer.questionText}
+                </label>
+                {!planFinished && !!answer.options?.length && (
+                  <fieldset className="enrichment-choices">
+                    <legend>
+                      {t(
+                        "Alege una, mai multe sau niciuna; poți scrie propriul răspuns.",
+                        "Choose one, several or none; you can write your own answer.",
+                      )}
+                    </legend>
+                    {answer.options.map((option) => (
+                      <label className="enrichment-choice" key={option.id}>
+                        <input
+                          type={
+                            answer.selectionMode === "single"
+                              ? "radio"
+                              : "checkbox"
+                          }
+                          name={`choices-${answer.id}`}
+                          checked={
+                            answer.selectedOptionIds?.includes(option.id) ??
+                            false
+                          }
+                          onClick={(e) => {
+                            if (
+                              answer.selectionMode === "single" &&
+                              answer.selectedOptionIds?.includes(option.id)
+                            ) {
+                              e.preventDefault();
+                              const next = clone(d);
+                              next.answers = [
+                                ...next.answers.filter(
+                                  (a) => a.id !== answer.id,
+                                ),
+                                {
+                                  ...answer,
+                                  selectedOptionIds: [],
+                                  status: "draft",
+                                },
+                              ];
+                              change(next);
+                            }
+                          }}
+                          onChange={() => {
+                            const ids =
+                              answer.selectionMode === "single"
+                                ? answer.selectedOptionIds?.includes(option.id)
+                                  ? []
+                                  : [option.id]
+                                : answer.selectedOptionIds?.includes(option.id)
+                                  ? answer.selectedOptionIds.filter(
+                                      (id) => id !== option.id,
+                                    )
+                                  : [
+                                      ...(answer.selectedOptionIds ?? []),
+                                      option.id,
+                                    ];
+                            const next = clone(d);
+                            next.answers = [
+                              ...next.answers.filter((a) => a.id !== answer.id),
+                              {
+                                ...answer,
+                                selectedOptionIds: ids,
+                                status: "draft",
+                              },
+                            ];
+                            change(next);
+                          }}
+                        />{" "}
+                        {option.label}
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
+                {!planFinished && (
+                  <>
+                    <p className="small muted">
+                      {t(
+                        "Selectează doar ce ai făcut. Apasă din nou o opțiune pentru a o deselecta sau scrie în cuvintele tale.",
+                        "Select only what you did. Click an option again to deselect it, or use your own words.",
+                      )}
+                    </p>
+                    <textarea
+                      ref={input}
+                      id="enrichment-answer"
+                      className="native"
+                      disabled={planFinished}
+                      rows={5}
+                      value={answer.text}
+                      onChange={(e) => put(e.target.value)}
+                    />
+                    <p className="small muted">
+                      {durable
+                        ? t(
+                            "Contextul se salvează automat în contul tău. Salvarea răspunsului nu modifică CV-ul.",
+                            "Context autosaves to your account. Saving an answer does not change the CV.",
+                          )
+                        : t(
+                            "Contextul rămâne în memoria paginii. Salvarea răspunsului nu modifică CV-ul.",
+                            "Context stays in page memory. Saving an answer does not change the CV.",
+                          )}
+                    </p>
+                    <div className="actions">
+                      <Button
+                        variant="primary"
+                        disabled={
+                          planFinished || !answerEvidenceText(answer).trim()
+                        }
+                        onClick={submit}
+                      >
+                        {activePlan &&
+                        index === activePlan.questions.length - 1 &&
+                        rewriteRole
+                          ? t(
+                              "Salvează și creează descrierea",
+                              "Save and create description",
+                            )
+                          : t("Salvează și continuă", "Save and next")}{" "}
+                        <kbd>⌘/Ctrl Enter</kbd>
+                      </Button>
+                      <Button
+                        disabled={planFinished}
+                        onClick={() => skip("unknown")}
+                      >
+                        {t("Nu știu", "I don't know")} <kbd>⌘/Ctrl ⇧ K</kbd>
+                      </Button>
+                      <Button
+                        disabled={planFinished}
+                        onClick={() => skip("skipped")}
+                      >
+                        {t("Omit", "Skip")} <kbd>⌘/Ctrl ⇧ J</kbd>
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </>
         ) : (
           <>
@@ -531,11 +660,14 @@ export function Enrichment({
             "Answers and choices stay separate from the CV. AI suggestions are not confirmed facts.",
           )}
         </p>
-        {rewriteRole && target && (
+        {rewriteRole && target && (!prepareQuestions || planFinished) && (
           <RoleRewrite
             draft={d}
             targetId={targetId}
             request={rewriteRole}
+            autoRequest={rewriteCycle ?? undefined}
+            ready={ready}
+            onAutoRequest={() => setRewriteCycle(null)}
             change={change}
             accept={(draft, targetId, text, sources) =>
               acceptWording(draft, targetId, {
@@ -562,19 +694,21 @@ export function Enrichment({
           className="card"
           aria-label={t("Context profesional", "Career context")}
         >
-          {target && (
-            <>
-              <p>
-                <strong>{answer.questionText}</strong>
-              </p>
-              <PreviewText
-                key={answer.id}
-                value={answer.text}
-                label={t("Previzualizare răspuns", "Answer preview")}
-                change={put}
-              />
-            </>
-          )}
+          {target &&
+            !planFinished &&
+            (!prepareQuestions || activePlan || manual) && (
+              <>
+                <p>
+                  <strong>{answer.questionText}</strong>
+                </p>
+                <PreviewText
+                  key={answer.id}
+                  value={answer.text}
+                  label={t("Previzualizare răspuns", "Answer preview")}
+                  change={put}
+                />
+              </>
+            )}
           {!!saved.length && (
             <>
               <h3>{t("Ultimul răspuns salvat", "Latest saved answer")}</h3>

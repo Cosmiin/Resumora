@@ -97,9 +97,7 @@ describe("CV import and career intelligence integration", () => {
       );
     }
     const view = render(<Harness initial={latest} />);
-    await user.click(
-      screen.getByRole("button", { name: "Prepare AI questions" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Improve" }));
     expect(prepareQuestions).toHaveBeenCalledWith(target);
     expect(screen.queryByLabelText("Question goal")).toBeNull();
     await user.click(await screen.findByLabelText("Consolidated reports"));
@@ -109,7 +107,8 @@ describe("CV import and career intelligence integration", () => {
     expect(latest.answers[0].text).toBe("");
     expect(latest.roles[0].bullets).toEqual([]);
     await user.click(await screen.findByLabelText("Team meeting"));
-    await user.click(screen.getByRole("button", { name: "Clear choices" }));
+    expect(screen.queryByRole("button", { name: "Clear choices" })).toBeNull();
+    await user.click(screen.getByLabelText("Team meeting"));
     await user.type(
       screen.getByLabelText("Who used the report?"),
       "The operations team.",
