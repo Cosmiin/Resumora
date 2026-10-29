@@ -161,3 +161,28 @@ test('I0 integration preserves imported metadata and selected answer evidence in
   });
   assert.equal(response.status, 200); assert.deepEqual((await response.json()).draft, projection);
 });
+
+
+test('job-local summary and ordered competence selection preserve source facts and reject foreign handles', async () => {
+  const { d, source, payload } = fixture();
+  payload.presentation.summaryText = 'Professional summary for this vacancy';
+  payload.presentation.professionalSkillIds = ['job_local_p'];
+  payload.presentation.technicalSkillIds = ['job_local_t'];
+  payload.localAdditions = [
+    { id: 'job_local_p', targetId: 'professionalSkills', kind: 'professionalSkill', text: 'Planning', scope: 'job-only', origin: 'user_authored' },
+    { id: 'job_local_t', targetId: 'technicalSkills', kind: 'technicalSkill', text: 'SQL', scope: 'job-only', origin: 'user_authored' },
+  ];
+  const result = projectJobEditor(source.payload, payload);
+  assert.equal(result.summary.text, payload.presentation.summaryText);
+  assert.deepEqual(result.professionalSkills.map(f => f.value), ['Planning']);
+  assert.deepEqual(result.technicalSkills.map(f => f.value), ['SQL']);
+  assert.deepEqual(decodeDraft(source.payload), d);
+  payload.presentation.technicalSkillIds = ['job_local_p'];
+  assert.throws(() => projectJobEditor(source.payload, payload));
+  payload.presentation.technicalSkillIds = ['foreign'];
+  assert.throws(() => projectJobEditor(source.payload, payload));
+  const context = await jobDocumentsRoute(req(payload.job.id, '/context'), {
+    jobEditorContext: async () => ({ job: payload.job, source: payload.source }), loadSnapshot: async () => source,
+  });
+  assert.deepEqual((await context.json()).draft, d);
+});

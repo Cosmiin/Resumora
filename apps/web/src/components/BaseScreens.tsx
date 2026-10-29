@@ -356,7 +356,7 @@ export function HistoryScreen({
           <History size={32} />
           <h2>{t("Nicio versiune salvată", "No saved versions")}</h2>
           <Button onClick={() => go(draft ? "base" : "start")}>
-            {t("Deschide CV-ul de bază", "Open Base CV")}
+            {t("Deschide editorul", "Open editor")}
           </Button>
         </section>
       ) : (

@@ -1,3 +1,4 @@
+import { decodeDraft } from '@resumora/contracts/editor/transport';
 import { isUuid } from '@resumora/contracts/jobs/connected';
 import { isJobEditorPayload, positiveRevision, projectJobEditor, type JobEditorGateway, type JobEditorVersion } from '@resumora/contracts/jobs/documents';
 import { readBody } from '../cv/routes.ts';
@@ -6,7 +7,7 @@ const revision = (v: unknown) => Number.isSafeInteger(v) && Number(v) >= 0;
 const exact = (r: Record<string, unknown>, expected: string[]) => Object.keys(r).sort().join(',') === expected.sort().join(',');
 const projection = (row: JobEditorVersion) => {
   const { sourcePayload, ...version } = row;
-  return { ...version, draft: projectJobEditor(sourcePayload, row.payload) };
+  return { ...version, draft: projectJobEditor(sourcePayload, row.payload), sourceDraft: decodeDraft(sourcePayload) };
 };
 // The Worker mounts this route behind its existing verified-session/CSRF gate.
 // Accept an immutable source reference, never a caller-supplied Base payload.
@@ -27,7 +28,10 @@ export async function jobDocumentsRoute(request: Request, gateway: JobEditorGate
       if ([...q.keys()].some(k => q.getAll(k).length !== 1)) throw new Error('invalidRequest');
       if (action === 'context') {
         if (url.search) throw new Error('invalidRequest');
-        return privateJson(await gateway.jobEditorContext(jobId));
+        const context = await gateway.jobEditorContext(jobId);
+        const source = await gateway.loadSnapshot(context.source.snapshotId);
+        if (!source || source.revision !== context.source.revision) return privateJson({ error: { code: 'missing' } }, 404);
+        return privateJson({ ...context, draft: decodeDraft(source.payload) });
       }
       if (action === 'history') {
         if ([...q.keys()].some(k => !['documentId','beforeRevision'].includes(k)) || !isUuid(q.get('documentId'))) throw new Error('invalidRequest');
