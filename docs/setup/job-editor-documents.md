@@ -2,6 +2,10 @@
 
 This bounded editor adapter saves durable, accepted job-specific revisions without advancing the Base editing head. It reuses `resumora-editor-draft/1`, the current editor/preview shapes, owned `target_job_contexts`, and the existing verified-session/Origin/CSRF boundary. It does not publish a canonical CV, create career claims, implement matching/tailoring/translation, call a provider, consume tailoring credit, or add a UI workflow. Canonical publication and its confirmations/FKs remain unchanged.
 
+I2 delivers backend contracts, RPCs, API endpoints and version history only. There is no application caller for the job-document endpoints yet: `ConnectedApp` still supplies `HttpBaseCvAdapter`, and `JobsScreen` saves and reviews vacancies. Users cannot yet create, reopen, revise or restore job-specific CVs through the application. This staged foundation does not complete the R12 end-user journey or establish the five-minute tailoring goal.
+
+The following integration slice must wire a job-scoped adapter into the existing editor and history, selected from the saved vacancy. It must use these context/load/save/history/restore/delete endpoints, preserve source and job pins, request IDs and revision checks, and keep job saves separate from the Base adapter. Existing projection/preview tests demonstrate compatibility, not application workflow completion.
+
 The forward migrations `20261029010000_p3_job_editor_documents.sql` and `20261029020000_p3_job_editor_source_refresh.sql` are local implementation only. Hosted application, migration and deployment remain separately gated.
 
 ## Stored contract

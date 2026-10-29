@@ -312,7 +312,7 @@ def suite(db):
 
         def test_races_waiting_save_is_fenced_by_deleted_photo(self):
             secret='synthetic-job-photo-worker-secret-32chars'
-            db.sql("INSERT INTO app.photo_worker_config VALUES(true,sha256(convert_to('"+secret+"','UTF8'))) ON CONFLICT(singleton) DO NOTHING")
+            db.sql("INSERT INTO app.photo_worker_config VALUES(true,sha256(convert_to('"+secret+"','UTF8'))) ON CONFLICT(singleton) DO UPDATE SET secret_hash=EXCLUDED.secret_hash")
             asset=uid()
             self.call('reserve_photo',f"'{asset}','{'a'*64}',500,500,1000,'{secret}'")
             self.call('finish_photo',f"'{asset}','{secret}'")
@@ -353,7 +353,7 @@ def suite(db):
 
         def test_photo_owner_ready_state_inheritance_override_retention_and_restore(self):
             secret='synthetic-job-photo-worker-secret-32chars'
-            db.sql("INSERT INTO app.photo_worker_config VALUES(true,sha256(convert_to('"+secret+"','UTF8'))) ON CONFLICT(singleton) DO NOTHING")
+            db.sql("INSERT INTO app.photo_worker_config VALUES(true,sha256(convert_to('"+secret+"','UTF8'))) ON CONFLICT(singleton) DO UPDATE SET secret_hash=EXCLUDED.secret_hash")
             def photo(user):
                 ident=uid()
                 self.call('reserve_photo',f"'{ident}','{'a'*64}',500,500,1000,'{secret}'",user=user)

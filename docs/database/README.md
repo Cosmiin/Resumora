@@ -6,6 +6,8 @@ The frozen [plan](plan-v2.0.0.md) and [catalog](catalog-v2.0.0.json) remain the 
 
 The [migration/test traceability](traceability.md) owns the ordered migration inventory, including the editor, connected vacancy/enhancement, photo, import/enrichment and job editor document extensions. The connected and import extensions remain subject to the separate apply boundaries in [connected setup](../setup/connected-jobs-ai.md) and [import setup](../setup/cv-import-enrichment.md#setup-and-activation-boundary). The [API contract](api.md) covers canonical publication, RLS and deterministic reviewed-evidence analysis; the [gateway contract](gateway.md) covers unconfirmed editor persistence; the [job editor adapter](../setup/job-editor-documents.md) documents independent accepted job revisions and their source boundary. Follow the [execution/recovery runbook](runbook.md) for hosted prerequisites and its [evidence limits](runbook.md#3-read-only-target-history-drift-and-data-classification) for the credential-free hosted TLS handshake and the still-unperformed authenticated SQL inventory and hosted migrations. Native SQL tests do not establish hosted Supabase or application integration.
 
+The I2 job editor delivery is a backend foundation with no application caller yet. Wiring a job-scoped adapter into the existing editor and history from a saved vacancy belongs to the following integration slice; the R12 end-user journey remains incomplete.
+
 ## Canonical IDs and ownership
 
 The [API contract](api.md#ids-at-the-canonical-boundary) owns database/canonical ID allocation, encoding and fixture mapping, including the separate photo asset ID contract.
