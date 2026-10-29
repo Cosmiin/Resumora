@@ -16,12 +16,22 @@ type Rpc = <T>(
 export function importGateway(
   rpc: Rpc,
   storage: (key: string, bytes?: Uint8Array) => Promise<void>,
+  readOriginal: (key: string) => Promise<Uint8Array>,
 ) {
   return {
     createImportStore(
       secret: string,
     ): ImportStore & { list(): Promise<ImportRecord[]> } {
       return {
+        source: async (importId) => {
+          const row = await rpc<ImportRecord>("get_cv_import_source", {
+            p_source: importId,
+          });
+          return {
+            bytes: await readOriginal(row.objectKey),
+            format: row.format,
+          };
+        },
         begin: (input) =>
           rpc("begin_cv_import", {
             p_operation: input.operationId,

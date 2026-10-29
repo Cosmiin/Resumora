@@ -29,6 +29,7 @@ export type ImportRecord = {
   error: string | null;
 };
 export interface ImportStore {
+  source?(importId: string): Promise<{ bytes: Uint8Array; format: string }>;
   begin(input: {
     operationId: string;
     format: string;
@@ -204,6 +205,10 @@ export function importWorkflow(options: {
         }
       }
       return (await store.list()).map(publicRecord);
+    },
+    async source(importId: string) {
+      if (!store.source) throw new Error("SOURCE_UNAVAILABLE");
+      return store.source(importId);
     },
     async status(operationId: string) {
       return publicRecord(await store.get(operationId));

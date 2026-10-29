@@ -5,6 +5,7 @@ import {
   localId,
   newEducation,
   newOptionalEntry,
+  fact,
   newRole,
   type BaseDraft,
   type Fact,
@@ -49,7 +50,51 @@ export function importedDraft(review: ImportReview): BaseDraft {
         ? { year: p[0], month: "" }
         : { year: p[1], month: String(Number(p[0])) };
     };
-    if (c.path === "name") draft.name = field(c.value) as Fact<string>;
+    if (
+      c.path === "summary" ||
+      parts[0] === "certifications" ||
+      parts[0] === "custom"
+    ) {
+      const group =
+        c.path === "summary"
+          ? "import-summary"
+          : parts[0] === "custom"
+            ? `import-custom-${index}`
+            : "import-certifications";
+      let section = draft.optionalSections.find((s) => s.id === group);
+      if (!section) {
+        section = {
+          id: group,
+          kind: parts[0] === "certifications" ? "certifications" : "custom",
+          label:
+            c.path === "summary"
+              ? "Summary"
+              : parts[0] === "certifications"
+                ? "Certifications"
+                : "Other",
+          entries: [],
+        };
+        draft.optionalSections.push(section);
+        if (c.path === "summary") draft.presentation.order.splice(1, 0, group);
+        else draft.presentation.order.push(group);
+      }
+      const entryIndex = parts[0] === "certifications" ? index : 0;
+      while (section.entries.length <= entryIndex)
+        section.entries.push(newOptionalEntry());
+      const entry = section.entries[entryIndex];
+      if (c.path === "summary") {
+        entry.title = fact("");
+        entry.details = field(c.value) as Fact<string>;
+      } else if (parts[2] === "title") {
+        entry.title = field(c.value) as Fact<string>;
+        if (parts[0] === "custom") section.label = c.value;
+      } else if (parts[2] === "details")
+        entry.details = field(c.value) as Fact<string>;
+      else if (parts[2] === "start")
+        entry.start = field(date()) as Fact<ReturnType<typeof date>>;
+      else if (parts[2] === "end")
+        entry.end = field(date()) as Fact<ReturnType<typeof date>>;
+    } else if (c.path === "name") draft.name = field(c.value) as Fact<string>;
     else if (parts[0] === "titles")
       draft.titles[index] = field(c.value) as Fact<string>;
     else if (parts[0] === "contacts") {
