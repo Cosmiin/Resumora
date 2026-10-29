@@ -525,12 +525,11 @@ export function Enrichment({
                             answer.selectedOptionIds?.includes(option.id) ??
                             false
                           }
-                          onClick={(e) => {
+                          onClick={() => {
                             if (
                               answer.selectionMode === "single" &&
                               answer.selectedOptionIds?.includes(option.id)
                             ) {
-                              e.preventDefault();
                               const next = clone(d);
                               next.answers = [
                                 ...next.answers.filter(
