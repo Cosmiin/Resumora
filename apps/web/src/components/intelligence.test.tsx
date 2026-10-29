@@ -226,7 +226,7 @@ describe("CV import and career intelligence integration", () => {
     expect(currentWording(latest, target)).toBeNull();
     expect(latest.answers[0].text).toBe("I consolidated three files.");
   });
-  it("one Confirm and save reviewed CV click persists selected confirmation and checkpoint without a second completion action", async () => {
+  it("one section confirmation persists visible data without a second completion action", async () => {
     const user = userEvent.setup(),
       initial = maraReviewDraft();
     initial.name.status = "extracted_unconfirmed";
@@ -288,17 +288,16 @@ describe("CV import and career intelligence integration", () => {
     render(<App adapter={adapter} />);
     await user.click(
       await screen.findByRole("button", {
-        name: "Selectează informațiile fără avertismente",
-      }),
-    );
-    await user.click(
-      screen.getByRole("button", {
-        name: "Confirmă și salvează CV-ul verificat",
+        name: "Confirmă și deschide editorul",
       }),
     );
     await waitFor(() =>
       expect(
-        save.mock.calls.filter(([v]) => v.mode === "checkpoint"),
+        save.mock.calls.filter(
+          ([v]) =>
+            v.mode === "autosave" &&
+            v.draft.importReview?.confirmedIds.includes("name"),
+        ),
       ).toHaveLength(1),
     );
     const saved = await adapter.load();

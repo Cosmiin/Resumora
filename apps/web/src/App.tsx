@@ -772,63 +772,64 @@ function CvEditor({
                     <ImportReview
                       key={draft.importReview.id}
                       draft={draft}
+                      client={intelligence}
+                      change={change}
                       disabled={
                         busy || !!pendingWrite.current || head === undefined
                       }
                       confirm={(ids) => {
                         const next = confirmImported(latest.current!, ids);
-                        const found = validateDraft(next);
-                        if (found.length) {
-                          setIssues(found);
-                          go("base");
-                          focusField(found[0].field);
-                          return;
-                        }
                         change(next);
-                        void save("checkpoint");
+                        void save("autosave");
                       }}
                     />
                   )}
-                  <div className="editor-layout">
-                    <div>
-                      {route === "base" ? (
-                        <Editor
-                          jobMode={jobMode}
-                          draft={draft}
-                          issues={issues}
-                          change={change}
-                          photoEditor={
-                            <PhotoEditor
-                              value={draft.presentation.photo}
-                              commit={commitPhoto}
-                            />
-                          }
-                        />
-                      ) : (
-                        <Review
-                          draft={draft}
-                          edit={() => go("base")}
-                          enrich={() => go("enrich")}
-                        />
-                      )}
-                    </div>
-                    <DocumentPreview
-                      livePreview
-                      draft={draft}
-                      asOf={asOf}
-                      onTemplateChange={(versionId) =>
-                        change(chooseTemplate(draft, versionId))
-                      }
-                      onEdit={
-                        jobMode
-                          ? undefined
-                          : (id) => {
-                              go("base");
-                              focusField(id);
+                  {(jobMode ||
+                    !draft.importReview ||
+                    draft.importReview.extraction.candidates.every((c) =>
+                      draft.importReview!.confirmedIds.includes(c.id),
+                    )) && (
+                    <div className="editor-layout">
+                      <div>
+                        {route === "base" ? (
+                          <Editor
+                            jobMode={jobMode}
+                            draft={draft}
+                            issues={issues}
+                            change={change}
+                            photoEditor={
+                              <PhotoEditor
+                                value={draft.presentation.photo}
+                                commit={commitPhoto}
+                              />
                             }
-                      }
-                    />
-                  </div>
+                          />
+                        ) : (
+                          <Review
+                            draft={draft}
+                            edit={() => go("base")}
+                            enrich={() => go("enrich")}
+                          />
+                        )}
+                      </div>
+                      <DocumentPreview
+                        livePreview
+                        draft={draft}
+                        asOf={asOf}
+                        onTemplateChange={(versionId) =>
+                          change(chooseTemplate(draft, versionId))
+                        }
+                        onEdit={
+                          jobMode
+                            ? undefined
+                            : (id) => {
+                                go("base");
+                                focusField(id);
+                              }
+                        }
+                      />
+                    </div>
+                  )}
                 </>
               )}
               {draft && !jobMode && route === "enrich" && (

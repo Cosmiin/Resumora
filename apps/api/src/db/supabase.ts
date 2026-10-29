@@ -315,7 +315,45 @@ export function createDatabaseGateway(
       );
   }
   return {
-    ...importGateway(rpc, storage),
+    ...importGateway(rpc, storage, async (objectKey) => {
+      if (
+        !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/original\.(pdf|docx|doc)$/.test(
+          objectKey,
+        )
+      )
+        throw new DatabaseError(400, "INVALID_REQUEST");
+      const response = await photoStorage(
+        `object/authenticated/cv-imports/${objectKey}`,
+        { method: "GET" },
+      );
+      if (!response.ok || !response.body) {
+        await response.body?.cancel();
+        throw new DatabaseError(404, "SOURCE_UNAVAILABLE");
+      }
+      const reader = response.body.getReader(),
+        chunks: Uint8Array[] = [];
+      let size = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > 10_000_000)
+            throw new DatabaseError(503, "SOURCE_UNAVAILABLE");
+          chunks.push(value);
+        }
+      } finally {
+        await reader.cancel();
+        reader.releaseLock();
+      }
+      const bytes = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return bytes;
+    }),
     saveJob: (input: JobSave) =>
       rpc<SavedJob>("save_target_job", {
         p_key: key(input.requestId),

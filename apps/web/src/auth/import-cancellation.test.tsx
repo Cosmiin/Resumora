@@ -268,7 +268,9 @@ it.each(["none", "focus", "interval"] as const)(
       );
       await waitFor(() => expect(events).toContain("cancel fenced"));
       expect(events).not.toContain("admission completed");
-      await screen.findByText("cancelled");
+      await screen.findByText(
+        "Import anulat. Alege un document pentru a continua.",
+      );
     } finally {
       await act(async () => {
         finishAdmission();

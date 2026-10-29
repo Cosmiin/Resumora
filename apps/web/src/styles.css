@@ -731,7 +731,7 @@ textarea.native {
 .answer-card blockquote {
   margin: 0;
   padding: 20px;
-  background: var(--sage-50);
+  background: var(--sage-25);
   border-left: 3px solid var(--pine-300);
   border-radius: 8px;
   white-space: pre-wrap;
@@ -1121,7 +1121,7 @@ textarea.native {
   z-index: 5;
   left: 0;
   top: 100%;
-  background: var(--sage-50);
+  background: var(--sage-25);
   box-shadow: var(--shadow-card);
   padding: 4px 6px;
   border-radius: 4px;
@@ -1192,7 +1192,7 @@ textarea.native {
 .structure-panel,
 .add-section {
   border: 1px solid var(--sage-200);
-  background: var(--sage-50);
+  background: var(--sage-25);
   border-radius: 9px;
   padding: 10px 14px;
   font-size: 0.86rem;
@@ -1909,4 +1909,149 @@ textarea.native {
 
 .document-identity {
   display: flow-root;
+}
+
+/* Import uses the same pine/sage cards and controls as the Base CV editor. */
+.file-select {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  position: relative;
+}
+.file-select input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+.file-select:focus-within {
+  outline: 3px solid var(--pine-700);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.import-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+}
+.import-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--sage-200);
+  border-top-color: var(--pine-700);
+  border-radius: 50%;
+  animation: import-spin 0.8s linear infinite;
+}
+@keyframes import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .import-spinner {
+    animation: none;
+  }
+}
+.import-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.import-review-fields {
+  min-width: 0;
+}
+.review-source-field {
+  padding: 14px;
+  margin: 16px 0;
+  border: 1px solid var(--sage-200);
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+}
+.review-source-field.is-active {
+  border-color: var(--pine-700);
+  background: var(--sage-25);
+}
+.review-source-field label {
+  font-weight: 600;
+}
+.review-source-field textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  padding: 10px;
+  border: 1px solid var(--sage-200);
+  border-radius: 8px;
+  background: white;
+  color: var(--text-body);
+  box-sizing: border-box;
+}
+.review-source-field small {
+  color: var(--text-muted);
+}
+.review-source-field .btn {
+  justify-self: start;
+}
+.original-source {
+  min-width: 0;
+  position: sticky;
+  top: 20px;
+}
+.original-source blockquote {
+  margin: 16px 0 0;
+  padding: 12px;
+  border-left: 3px solid var(--pine-700);
+  overflow-wrap: anywhere;
+}
+.source-controls {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.source-scroll {
+  overflow: auto;
+  max-height: 65vh;
+  background: var(--sage-100);
+}
+.source-page {
+  position: relative;
+  background: white;
+}
+.source-page canvas {
+  display: block;
+  max-width: none;
+}
+.source-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--pine-700);
+  background: rgb(130 170 120 / 20%);
+  pointer-events: none;
+}
+.document .document-contributions li > p:first-child {
+  display: inline;
+  margin-top: 0;
+}
+.document .document-contributions li {
+  padding-left: 3px;
+  list-style-position: outside;
+}
+.document .document-contributions li > [contenteditable] {
+  display: inline;
+  vertical-align: baseline;
+}
+@media (max-width: 760px) {
+  .import-review {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .original-source {
+    position: static;
+  }
+  .source-scroll {
+    max-height: 50vh;
+  }
 }

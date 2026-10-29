@@ -139,10 +139,7 @@ export async function cvRoute(
       if (issues.length)
         return json({ error: { code: "validation", issues } }, 422);
       const payload = encodeDraft(body.draft);
-      if (
-        mode === "checkpoint" &&
-        body.draft.importReview?.confirmedIds.length
-      ) {
+      if (body.draft.importReview?.confirmedIds.length) {
         if (!gateway.saveReviewedImport) return failure("unavailable", 503);
         return json(
           snapshot(
