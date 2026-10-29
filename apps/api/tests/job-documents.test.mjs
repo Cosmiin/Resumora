@@ -131,3 +131,33 @@ test('gateway sends only authenticated RPC arguments and validates job editor re
     { user: { id: uid() }, accessToken: 'synthetic-token' }, async () => Response.json({ ...row, payload: { ...payload, acceptance: 'pending' } }));
   await assert.rejects(bad.loadJobEditor(payload.job.id), error => error.status === 503);
 });
+
+test('I0 integration preserves imported metadata and selected answer evidence in the job projection', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { answerEvidenceText } = await import('../../../packages/contracts/src/intelligence/model.ts');
+  const sourcePayload = JSON.parse(readFileSync(new URL('../../../packages/contracts/fixtures/job-editor-import.json', import.meta.url), 'utf8'));
+  const d = decodeDraft(sourcePayload), original = structuredClone(sourcePayload);
+  const f = fixture(); f.source.payload = sourcePayload;
+  f.payload.selectedFacts = jobEditorFacts(d).map(row => row.ref);
+  f.payload.selectedAnswerIds = ['selected-answer'];
+  f.payload.wording = [{ targetId: 'imported-role', text: 'Explicitly accepted job description with reviewed controls.',
+    origin: 'ai_generated', acceptance: 'accepted', valueIds: [d.roles[0].context.id], answerIds: ['selected-answer'] }];
+  const projection = projectJobEditor(sourcePayload, f.payload);
+  assert.equal(projection.presentation.approvedWording['imported-role'].sources.at(-1).text, answerEvidenceText(d.answers[0]));
+  assert.equal(projection.presentation.approvedWording['imported-role'].sources.at(-1).text,
+    'Reviewed controls\nOwned rollout\nExact free-text detail');
+  for (const key of ['answers','sources','importReview','questionPlans','roleRewriteReviews']) assert.deepEqual(projection[key], d[key]);
+  assert.deepEqual(projection.presentation.approvedWording['other-role'], d.presentation.approvedWording['other-role']);
+  assert.equal(projection.presentation.approvedWording['other-role'].scope, 'experience');
+  assert.equal(projection.presentation.templateVersionId, 'unknown-import-template');
+  assert.equal(projection.roles[0].context.value, 'Maintained PLC systems');
+  assert.equal(JSON.stringify(projection.presentation.approvedWording).includes('Pending Base proposal must not be applied'), false);
+  assert.deepEqual(decodeDraft(encodeDraft(projection)), projection); assert.deepEqual(sourcePayload, original);
+  // The authenticated route must return the same projection from the owned pin,
+  // and cannot receive import metadata as caller-supplied career facts.
+  f.row.payload = f.payload; f.row.sourcePayload = sourcePayload;
+  const response = await jobDocumentsRoute(req(f.payload.job.id, '/save', { requestId: uid(), documentId: null, expectedRevision: 0, payload: f.payload }), {
+    loadSnapshot: async () => f.source, saveJobEditor: async () => f.row,
+  });
+  assert.equal(response.status, 200); assert.deepEqual((await response.json()).draft, projection);
+});

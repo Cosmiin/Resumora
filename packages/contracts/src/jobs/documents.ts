@@ -1,3 +1,4 @@
+import { answerEvidenceText } from '../intelligence/model.ts';
 import { type BaseDraft, type Fact, type DocumentPresentation, isAuthored, coreSections } from '../editor/model.ts';
 import { decodeDraft, isBaseDraft, type EditorWireEnvelope } from '../editor/transport.ts';
 import { isPhoto } from '../editor/photo.ts';
@@ -113,7 +114,7 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
       const a = answers.find(a => a.id === id && a.targetId === w.targetId);
       // Existing renderer's wording provenance requires a real source handle.
       if (!a || !a.sourceId || !draft.sources.some(s => s.id === a.sourceId)) invalid();
-      evidence.push({ id: a.id, text: a.text, sourceId: a.sourceId });
+      evidence.push({ id: a.id, text: answerEvidenceText(a), sourceId: a.sourceId });
     }
     (draft.presentation.approvedWording ??= {})[w.targetId] = { text: w.text, sources: evidence };
     delete draft.presentation.contributionHtml?.[w.targetId];

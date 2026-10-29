@@ -3,6 +3,7 @@ import concurrent.futures
 import copy
 import json
 import subprocess
+from pathlib import Path
 import unittest
 import uuid
 
@@ -72,6 +73,29 @@ def suite(db):
         def restore(self, saved, version, revision, key=None, job=None, error=False):
             args=f"'{key or uid()}','{job or self.job1['id']}','{saved['documentId']}',{revision},'{version}'"
             return self.call('restore_job_editor', args, error=True) if error else self.jsoncall('restore_job_editor', args)
+
+        def test_i0_import_metadata_selected_options_and_accepted_wording_roundtrip(self):
+            imported=json.loads((Path(__file__).resolve().parents[2]/'packages/contracts/fixtures/job-editor-import.json').read_text())
+            imported_base=self.jsoncall('save_base_draft',f"'{uid()}',1,{literal(imported)},'autosave'")
+            role=imported['content']['roles'][0]; fact=role['context']
+            payload=copy.deepcopy(self.payload)
+            payload['source']=dict(snapshotId=imported_base['id'],revision=2)
+            payload['selectedFacts']=[dict(entityId=role['id'],fieldId=fact['fieldId'],valueId=fact['id'],sourceId=fact['sourceId'])]
+            payload['selectedAnswerIds']=['selected-answer']
+            payload['wording']=[dict(targetId=role['id'],text='Explicitly accepted imported job wording',origin='ai_generated',acceptance='accepted',valueIds=[fact['id']],answerIds=['selected-answer'])]
+            first=self.save(payload)
+            changed=copy.deepcopy(payload);changed['wording'][0]['text']='Another accepted job revision'
+            self.save(changed,doc=first['documentId'],revision=1)
+            restored=self.restore(first,first['id'],2)
+            self.assertEqual(restored['payload'],payload)
+            for version in self.history(self.job1['id'],first['documentId']):
+                self.assertEqual(version['sourcePayload'],imported)
+                self.assertEqual(version['sourcePayload']['answers'][0]['selectedOptionIds'],['own','review'])
+                self.assertEqual(version['sourcePayload']['content']['roleRewriteReviews'][1]['status'],'pending')
+                self.assertEqual(version['sourcePayload']['content']['presentation']['approvedWording']['other-role']['scope'],'experience')
+            self.assertEqual(self.jsoncall('load_base_draft'),imported_base)
+            self.assertEqual(self.history(self.job1['id'],first['documentId'],user=self.b),[])
+            self.assertEqual(db.sql(f"SELECT count(*) FROM app.profile_versions WHERE tenant_id=(SELECT id FROM app.tenants WHERE owner_user_id='{self.a}')"),'0')
 
         def test_two_job_documents_history_restore_preserve_base_and_sources(self):
             first = self.save()
@@ -287,7 +311,7 @@ def suite(db):
             self.race_fence(f"UPDATE app.job_editor_documents SET deleted_at=now() WHERE id='{first['documentId']}'",first,'SNAPSHOT_NOT_FOUND')
 
         def test_races_waiting_save_is_fenced_by_deleted_photo(self):
-            secret='synthetic-job-race-photo-worker-secret-32chars'
+            secret='synthetic-job-photo-worker-secret-32chars'
             db.sql("INSERT INTO app.photo_worker_config VALUES(true,sha256(convert_to('"+secret+"','UTF8'))) ON CONFLICT(singleton) DO NOTHING")
             asset=uid()
             self.call('reserve_photo',f"'{asset}','{'a'*64}',500,500,1000,'{secret}'")

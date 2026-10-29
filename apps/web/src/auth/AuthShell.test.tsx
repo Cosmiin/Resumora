@@ -233,7 +233,9 @@ it.each(["changed", "same"])(
       resolveOld(
         Response.json({ error: { code: "unauthorized" } }, { status: 401 }),
       );
-      await pending;
+      await expect(pending).rejects.toThrow(
+        /SESSION_CHANGED|SESSION_UNVERIFIED/,
+      );
     });
     await screen.findByText("Private b@example.invalid");
     const count = fetcher.mock.calls.length;
@@ -343,7 +345,9 @@ it("fences CV requests after a protected verification failure and resumes the sa
   );
   const input = await screen.findByLabelText("Draft");
   await act(async () => {
-    expect((await cvTransport("/v1/base-cv")).status).toBe(503);
+    await expect(cvTransport("/v1/base-cv")).rejects.toThrow(
+      "SESSION_UNVERIFIED",
+    );
   });
   const calls = fetcher.mock.calls.length;
   await expect(
@@ -353,7 +357,9 @@ it("fences CV requests after a protected verification failure and resumes the sa
   fireEvent.focus(window);
   await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   expect(screen.getByLabelText("Draft")).toBe(input);
-  expect((await cvTransport("/v1/base-cv")).status).toBe(503);
+  await expect(cvTransport("/v1/base-cv")).rejects.toThrow(
+    "SESSION_UNVERIFIED",
+  );
 });
 
 it.each(["cleared", "retained", "unavailable"])(
@@ -586,9 +592,7 @@ it.each(["network", "unexpected-abort", "cancelled-network", "unauthorized"])(
           signal: signal.signal,
         }),
       ]);
-      expect(result[0].status).toBe(
-        failure === "unauthorized" ? "fulfilled" : "rejected",
-      );
+      expect(result[0].status).toBe("rejected");
     });
     const calls = fetcher.mock.calls.length;
     await expect(retired("/v1/jobs")).rejects.toThrow(
@@ -663,7 +667,7 @@ it("finishes anonymous cookie responses and CSRF updates before dispatching logi
   expect((input as HTMLInputElement).value).toBe("Unsaved CV");
 });
 
-it.each(["session", "anonymous-session", "cv"])(
+it.each(["session", "anonymous-session", "cv", "intelligence"])(
   "orders outstanding %s cookies before logout and discards queued retired CV work",
   async (source) => {
     const delayed = deferred();
@@ -678,8 +682,12 @@ it.each(["session", "anonymous-session", "cv"])(
         const path = String(input);
         if (path.endsWith("/session")) checks++;
         if (
-          (source !== "cv" && path.endsWith("/session") && checks === 2) ||
-          path === "/v1/base-cv"
+          (source !== "cv" &&
+            source !== "intelligence" &&
+            path.endsWith("/session") &&
+            checks === 2) ||
+          path === "/v1/base-cv" ||
+          path === "/v1/intelligence/imports"
         ) {
           events.push("old request sent");
           await delayed.promise;
@@ -728,8 +736,12 @@ it.each(["session", "anonymous-session", "cv"])(
     await screen.findByText("Private test@example.invalid");
     const retired = cvTransport;
     let oldRequest: Promise<Response> | undefined;
-    if (source !== "cv") fireEvent.focus(window);
-    else oldRequest = retired("/v1/base-cv");
+    if (source !== "cv" && source !== "intelligence") fireEvent.focus(window);
+    else
+      oldRequest = retired(
+        source === "intelligence" ? "/v1/intelligence/imports" : "/v1/base-cv",
+      );
+    const oldOutcome = Promise.allSettled(oldRequest ? [oldRequest] : []);
     await waitFor(() => expect(events).toEqual(["old request sent"]));
     const queued = Promise.allSettled(
       ["/history", "/save", "/restore"].map((path) =>
@@ -741,10 +753,20 @@ it.each(["session", "anonymous-session", "cv"])(
     );
     fireEvent.click(screen.getByRole("button", { name: "Deconectare" }));
     expect(screen.queryByText("Private test@example.invalid")).toBeNull();
+    const retiredControl = Promise.allSettled([
+      retired("/v1/intelligence/imports/synthetic/cancel", {
+        method: "POST",
+        body: "{}",
+      }),
+    ]);
     await act(async () => {});
     expect(events).toEqual(["old request sent"]);
     delayed.resolve();
-    await oldRequest;
+    if (oldRequest)
+      expect((await oldOutcome)[0]).toMatchObject({
+        status: "rejected",
+        reason: { message: "SESSION_CHANGED" },
+      });
     await waitFor(() =>
       expect(
         screen
@@ -758,6 +780,10 @@ it.each(["session", "anonymous-session", "cv"])(
       "logout sent",
     ]);
     expect(cookie).toBeNull();
+    expect((await retiredControl)[0]).toMatchObject({
+      status: "rejected",
+      reason: { message: "SESSION_CHANGED" },
+    });
     expect(
       (await queued).every(
         (result) =>

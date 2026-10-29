@@ -1,6 +1,6 @@
 # AI CV Maker V2 — integrated product requirements draft v1.0
 
-Date:2026-10-23. **Discovery review draft; production implementation, release scope, weights, prices and commercial/privacy policy are unapproved.** For the later authorized local implementation and its scoped behavior, see the [Base CV guide](../frontend/base-cv.md). Consolidated review decisions: D-01–14 remain open in the linked strategy register; these do not block review of the discovery proposal. Opening a review is not approval. No production app/backend/infrastructure/payments or model calls have been built or tested.
+Date:2026-10-23. **Discovery review draft; production implementation, release scope, weights, prices and remaining commercial/privacy choices are unapproved.** For the later authorized local implementation and its scoped behavior, see the [Base CV guide](../frontend/base-cv.md). Remaining review decisions are tracked in the linked strategy register; these do not block review of the discovery proposal. Opening a review is not approval. No production app/backend/infrastructure/payments or model calls have been built or tested.
 
 ## 1. Product problem and desired behavior
 
@@ -41,9 +41,9 @@ Proposed first-use experience: account→upload/manual→structured review→Bas
 
 Discovery/prototype covers every baseline journey, URL/text/manual/extension import, distinct templates, PDF concept, error/empty/validation/retry and 1/3/6-month subscription lifecycle. Staging a feature for later implementation does not remove discovery coverage.
 
-**Recommended smallest useful release, pending review of D-01–14:** persistent versioned Base; PDF text/DOCX/manual import with confirmation; targeted enrichment; pasted/manual job text; required/preferred requirements; deterministic explainable matching with curated RO/EN aliases; truthful approved job variant; structured editor/history; one tested single-column PDF; RO/EN UI and independent CV language; privacy/account/server entitlements if commercial launch is approved.
+**Recommended smallest useful release, pending remaining review decisions:** persistent versioned Base; [implemented CV intake and confirmation scope](../setup/cv-import-enrichment.md#customer-journey-and-saved-truth); targeted enrichment; pasted/manual job text; required/preferred requirements; deterministic explainable matching with curated RO/EN aliases; truthful approved job variant; structured editor/history; one tested single-column PDF; RO/EN UI and independent CV language; privacy/account/server entitlements if commercial launch is approved.
 
-**Reviewable later scope:** URL fetch behind security limits, minimal extension, OCR, more templates, wider language coverage, DOCX export, broad semantic embeddings. The lean manual application record is specified in section 15. Automated job applications, job discovery, cover letters and predicted interview timelines are outside this proposed core. Their marketing presence is not evidence they are needed in the MVP. Implementation agents may begin only after explicit requirements/UX/architecture/MVP/budget approval.
+**Reviewable later scope:** URL fetch behind security limits, minimal extension, more templates, wider language coverage, DOCX export, broad semantic embeddings. The lean manual application record is specified in section 15. Automated job applications, job discovery, cover letters and predicted interview timelines are outside this proposed core. Their marketing presence is not evidence they are needed in the MVP. Implementation agents may begin only after explicit requirements/UX/architecture/MVP/budget approval.
 
 ## 5. Canonical career record
 
@@ -121,7 +121,7 @@ Prototype has HTML preview, simulated PDF preparation and actual synthetic JSON 
 
 ## 10. Account, subscriptions, entitlements and privacy
 
-Discovery covers1/3/6-month terms, recurring renewal concept, pending/declined/active, cancel-at-period-end and resume. Prices are `— RON` placeholders; commercial amounts/discounts/refunds/VAT/limit/grace policy are unapproved. No cards/real payments/invoices. Proposed monthly allowance windows for every term avoid front-loaded6-month usage, but final limits remain D-05/07 decisions.
+Accepted billing direction supersedes the earlier allowance proposal: subscriptions allocate 30/45/150/350 credits upfront and auto-renew. Unused subscription credits roll over at renewal. Credit packs do not expire and can be combined with subscription credits. Credit quantities are separate from monetary pricing; money prices, refund terms and post-cancellation rollover rules remain unset. Stripe implementation is deferred until real AI testing and stability; no billing integration is implemented here.
 
 Production Checkout success redirects never authorize access. Signed/idempotent webhook handling and server-side entitlement reservation/enforcement are required. Entitlement read is informational with revision/status/period/features/remaining/reserved/resetAt. Editing/history/preview should not consume AI units; export/analysis/AI gates are commercial choices. Prototype illustrates one export activation path, not an approved monetization gate.
 
@@ -152,14 +152,14 @@ Responsive/accessibility proposal: desktop split view, tablet stacked content, m
 
 ## 13. Release gates and unresolved decisions
 
-The strategy publication candidate contains the current D-01–14 decision register and seven-question review blueprint. These product choices remain open; this discovery proposal can be reviewed without closing them. Local prototype controls and terminal visual feedback are not approvals.
+The strategy publication candidate contains the current D-01–14 decision register and seven-question review blueprint. See the register for remaining product choices; this discovery proposal can be reviewed without closing them. Local prototype controls and terminal visual feedback are not approvals.
 
 | Topic | Reviewable options / recommendation | Gate |
 |---|---|---|
-| First-release input/extension/OCR | Paste/manual+text PDF/DOCX first; URL/extension/OCR later vs immediate breadth | D-01/02/04, exact scope in strategy register |
+| First-release input/extension/OCR | Current CV intake: [import guide](../setup/cv-import-enrichment.md); URL/extension and export depth remain separate | D-01/02/04, remaining release choices in strategy register |
 | Score display/calibration | Uncalibrated0–100 with explicit required warning and separate format vs withhold numeric release until calibration; no employer equivalence | D-03 |
 | PDF/template scope | One tested PDF initially vs multiple templates/export formats | D-04 |
-| Terms/limits/entitlement/grace/refunds | Proposed1/3/6 terms and monthly allowances; amounts/limits/gates unknown | D-05/07 and commercial policy |
+| Terms/limits/entitlement/grace/refunds | Accepted credits and renewal/rollover in section 10; remaining terms, limits and gates unset | D-05/07 and commercial policy |
 | Stack, budget, EU processing/retention | Architecture alternatives; budget ceiling and strictness need owner direction | Consolidated technical/privacy decisions |
 | First-use/enrichment | Quick Base then optional targeted interview (recommended) vs mandatory guided interview | D-09 / final register mapping |
 | Two titles | Optional second/unknown without invention (recommended) vs require confirmed two-title positioning later | D-10 |
@@ -213,7 +213,7 @@ The job-specific entry focus with a visible Base alternative is recorded directi
 4. Value before payment: useful Base advice plus one job-CV comparison (shared recommendation) / Base advice only / earlier analysis or export gate.
 5. Quota fallback: bounded queue and manual editing during limits (architecture recommendation) / capped paid upgrade after an owner-approved ceiling / pause the affected feature.
 
-Each option has visible consequences. Selections remain local and reversible and never constitute approval. The prototype and linked technical artifacts now share Mara / Northstar People — Business Systems Analyst — Automation and the versioned IDs above. This resolves example coherence only; D-01–14 product-policy choices remain open in the linked decision register.
+Each option has visible consequences. Selections remain local and reversible and never constitute approval. The prototype and linked technical artifacts now share Mara / Northstar People — Business Systems Analyst — Automation and the versioned IDs above. This resolves example coherence only; the linked D-01–14 decision register tracks remaining product-policy choices.
 
 ### Acceptance / visual follow-up
 
@@ -227,7 +227,7 @@ Inbox 012 relayed the current architecture v3 case, the complete strategy public
 
 The example keeps Candidate–Job Fit at 90 and changes CV–Job Match from 62.5 to 90 when the tailored CV represents already confirmed API, HR/payroll, outcome and context evidence. No time-saving metric is supplied or invented. The non-compensatory right-to-work requirement is `needs_verification`, not a claim that the candidate lacks authorization; actual PDF readability is `untested`. These synthetic review inputs and uncalibrated example weights do not estimate hiring likelihood or establish legal eligibility. Score is secondary to the evidence-backed readiness checklist.
 
-The prototype's local Guide retains five UX-level interaction choices. The integrated strategy package maintains the full D-01–14 register and its seven primary decision cards, consequences and recommendations; all remain **unresolved** unless the owner separately records a decision. The synthetic fixture selection above is resolved for demo coherence only. This package is ready for review as a discovery proposal; review is not policy approval, implementation authorization or a paid-service decision.
+The prototype's local Guide retains five UX-level interaction choices. The integrated strategy package maintains the full D-01–14 register and its seven primary decision cards, consequences and recommendations; consult that register for current status. The synthetic fixture selection above is resolved for demo coherence only. This package is ready for review as a discovery proposal; review is not policy approval, implementation authorization or a paid-service decision.
 
 Architecture and strategy contributions are included as versioned snapshots under `research/architecture/`, `research/ats/`, `research/costs/`, `schemas/cv/v1/`, and `research/strategy/publication/`. The architecture/strategy teams own their technical and research artifacts. Do not treat their methods, cost scenarios, source summaries, or test receipts as production guarantees.
 

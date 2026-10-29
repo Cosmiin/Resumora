@@ -63,12 +63,12 @@ test('scoped projection omits contacts/identity/raw sources/unconfirmed facts an
 
 for (const kind of ['role', 'projects', 'certifications', 'volunteering', 'custom']) {
   for (const field of ['main', 'bullet']) {
-    test(`confirmed answer projection requires matching eligible text and source: ${kind} ${field}`, () => {
+    test(`confirmed answer projection retains answer identity independently of its eligible CV copy: ${kind} ${field}`, () => {
       const originalText = 'Maintained synthetic reports.';
       const originalSource = 'source-answer-original';
       const cases = [
-        { name: 'unchanged authored field', deduplicated: true },
-        { name: 'unchanged confirmed field', status: 'user_confirmed', deduplicated: true },
+        { name: 'unchanged authored field' },
+        { name: 'unchanged confirmed field', status: 'user_confirmed' },
         { name: 'revised answer', text: 'Automated synthetic reports.', sourceId: 'source-answer-revised' },
         { name: 'independently edited field', value: 'Reviewed synthetic reports.' },
         { name: 'same text from another source', sourceId: 'source-answer-reconfirmed' },
@@ -93,7 +93,7 @@ for (const kind of ['role', 'projects', 'certifications', 'volunteering', 'custo
         const before = structuredClone(draft);
         const expected = scenario.omitted ? [] : [{ id: linked.id, text: linked.value, sourceId: linked.sourceId,
           ...(linked.sourceLineage ? { sourceLineage: linked.sourceLineage } : {}) }];
-        if (!scenario.deduplicated) expected.push({ id: answer.id, text: answer.text, sourceId: answer.sourceId });
+        expected.push({ id: answer.id, text: answer.text, sourceId: answer.sourceId });
         assert.deepEqual(projectEnhancementContext(draft, 'target-1').facts, expected, scenario.name);
         assert.deepEqual(draft, before, scenario.name);
       }
@@ -274,4 +274,39 @@ test('duplicate provider response cannot carry conflicting router cost evidence'
   await ledger.begin({ ...previous, attemptId: 'other-delivery' });
   await assert.rejects(ledger.finish('other-delivery', { ...previous.result,
     reportedCost: { ...previous.result.reportedCost, nanoUsd: '999999' } }), /PROVIDER_EVIDENCE_CONFLICT/);
+});
+
+test('optional reasoning effort is snapshotted for ordinary Chat attempts and opaque fingerprints, including fallback', async () => {
+  for (const effort of [undefined, 'none', 'low']) {
+    const calls = [], opts = options({ reasoningEffort: effort, transport: async (_url, init) => {
+      const body = JSON.parse(init.body); calls.push(body);
+      assert.equal(body.store, false); assert.equal(body.stream, false); assert.equal(body.max_completion_tokens, 256);
+      if (calls.length === 1) {
+        if (effort === undefined) assert.equal(Object.hasOwn(body, 'reasoning'), false);
+        else assert.deepEqual(body.reasoning, { effort });
+        assert.equal(Object.hasOwn(body, 'reasoning_effort'), false);
+        return Response.json({}, { status: 503 });
+      }
+      if (effort === undefined) assert.equal(Object.hasOwn(body, 'reasoning_effort'), false);
+      else assert.equal(body.reasoning_effort, effort);
+      assert.equal(Object.hasOwn(body, 'reasoning'), false);
+      return response('openai');
+    } });
+    const runner = prepareEnhancement(opts);
+    opts.reasoningEffort = effort === 'none' ? 'low' : 'none';
+    const result = await runner.propose(input());
+    assert.equal(calls.length, 2); assert.ok(result.proposal);
+    for (const attempt of result.attempts) {
+      const fingerprint = JSON.parse(attempt.requestFingerprint);
+      assert.equal(fingerprint.length, effort === undefined ? 4 : 5);
+      if (effort !== undefined) assert.deepEqual(fingerprint[4], { reasoningEffort: effort });
+      assert.equal(attempt.requestFingerprint.includes(context.facts[0].text), false);
+    }
+    assert.equal((await runner.propose(input())).attempts.length, 1);
+    assert.equal(calls.length, 2);
+  }
+});
+test('invalid effort fails runner preparation before ledger or transport access', () => {
+  for (const effort of [null, false, '', 'None', ' low', 'ultra', {}])
+    assert.throws(() => prepareEnhancement(options({ reasoningEffort: effort, ledger: {}, transport: () => assert.fail('No transport') })), /INVALID_REASONING_EFFORT/);
 });

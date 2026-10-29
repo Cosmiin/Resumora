@@ -1,0 +1,362 @@
+{
+  "schemaVersion": "resumora-editor-draft/1",
+  "content": {
+    "id": "dev_a1d7bf45-f322-47be-a6a1-e38fee9c5ef6",
+    "language": "en",
+    "name": {
+      "id": "dev_8636d85c-b291-4e37-a2e8-ef7eee58e0fe",
+      "fieldId": "dev_8636d85c-b291-4e37-a2e8-ef7eee58e0fe",
+      "value": "Synthetic imported candidate",
+      "status": "user_authored",
+      "sourceId": "local_manual"
+    },
+    "nameParts": {
+      "first": "",
+      "last": ""
+    },
+    "titles": [
+      {
+        "id": "dev_e0ea2574-8eb0-4359-8717-556cd8e91c08",
+        "fieldId": "dev_e0ea2574-8eb0-4359-8717-556cd8e91c08",
+        "value": "",
+        "status": "user_authored",
+        "sourceId": "local_manual"
+      },
+      {
+        "id": "dev_66bcd824-6eec-4525-bac7-c12dde302bbc",
+        "fieldId": "dev_66bcd824-6eec-4525-bac7-c12dde302bbc",
+        "value": "",
+        "status": "user_authored",
+        "sourceId": "local_manual"
+      }
+    ],
+    "contacts": [],
+    "summary": {
+      "id": "dev_e2da1ea0-f4f3-4eee-bc35-e82b46f59aac",
+      "text": "",
+      "origin": "user_authored",
+      "approval": "pending",
+      "claimIds": []
+    },
+    "professionalSkills": [],
+    "technicalSkills": [],
+    "roles": [
+      {
+        "id": "imported-role",
+        "title": {
+          "id": "dev_5c86b3ff-9d3f-45da-91c7-5fb87855e427",
+          "fieldId": "dev_5c86b3ff-9d3f-45da-91c7-5fb87855e427",
+          "value": "Engineer",
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "company": {
+          "id": "dev_800ce583-aae4-4215-8f2a-95ab90b36cd3",
+          "fieldId": "dev_800ce583-aae4-4215-8f2a-95ab90b36cd3",
+          "value": "Source employer",
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "location": {
+          "id": "dev_a7f80598-32a7-41bf-b207-5ee24fe353ca",
+          "fieldId": "dev_a7f80598-32a7-41bf-b207-5ee24fe353ca",
+          "value": "",
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "context": {
+          "id": "dev_127866a5-5733-47f2-b60a-7eb3e37f5845",
+          "fieldId": "dev_127866a5-5733-47f2-b60a-7eb3e37f5845",
+          "value": "Maintained PLC systems",
+          "status": "user_confirmed",
+          "sourceId": "imported-document",
+          "sourceClaimId": "imported-context"
+        },
+        "start": {
+          "id": "dev_30b601da-038d-48a6-867f-cab0a5e2dfd8",
+          "fieldId": "dev_30b601da-038d-48a6-867f-cab0a5e2dfd8",
+          "value": {
+            "year": "",
+            "month": ""
+          },
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "end": {
+          "id": "dev_e0d1b166-9919-4419-8bd8-71d120f8fe33",
+          "fieldId": "dev_e0d1b166-9919-4419-8bd8-71d120f8fe33",
+          "value": {
+            "year": "",
+            "month": ""
+          },
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "ongoing": {
+          "id": "dev_d4f6f792-d44f-4127-8b77-d4abbeccea10",
+          "fieldId": "dev_d4f6f792-d44f-4127-8b77-d4abbeccea10",
+          "value": false,
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "bullets": []
+      },
+      {
+        "id": "other-role",
+        "title": {
+          "id": "dev_4f6ac17d-c4ff-4cf1-a68a-32b6f4068d27",
+          "fieldId": "dev_4f6ac17d-c4ff-4cf1-a68a-32b6f4068d27",
+          "value": "Analyst",
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "company": {
+          "id": "dev_6cc55902-1798-4f7e-a3c7-b3e4e14fed0a",
+          "fieldId": "dev_6cc55902-1798-4f7e-a3c7-b3e4e14fed0a",
+          "value": "Earlier employer",
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "location": {
+          "id": "dev_5215f69c-9ae3-4011-baef-fded1abbbe05",
+          "fieldId": "dev_5215f69c-9ae3-4011-baef-fded1abbbe05",
+          "value": "",
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "context": {
+          "id": "dev_ca00def5-bc62-47eb-961b-4cf0e973cb31",
+          "fieldId": "dev_ca00def5-bc62-47eb-961b-4cf0e973cb31",
+          "value": "Prepared clear reports",
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "start": {
+          "id": "dev_725f70c5-8466-4412-bbf4-a03b36dfe0b0",
+          "fieldId": "dev_725f70c5-8466-4412-bbf4-a03b36dfe0b0",
+          "value": {
+            "year": "",
+            "month": ""
+          },
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "end": {
+          "id": "dev_85c64f86-bbb1-4fd7-83ec-4eab37782ff0",
+          "fieldId": "dev_85c64f86-bbb1-4fd7-83ec-4eab37782ff0",
+          "value": {
+            "year": "",
+            "month": ""
+          },
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "ongoing": {
+          "id": "dev_28d0a0ea-0ba1-4a1a-b019-35465de502e4",
+          "fieldId": "dev_28d0a0ea-0ba1-4a1a-b019-35465de502e4",
+          "value": false,
+          "status": "user_authored",
+          "sourceId": "local_manual"
+        },
+        "bullets": []
+      }
+    ],
+    "education": [],
+    "optionalSections": [],
+    "sources": [
+      {
+        "id": "local_manual",
+        "kind": "manual",
+        "label": "manual"
+      },
+      {
+        "id": "imported-document",
+        "kind": "document",
+        "label": "Synthetic uploaded CV",
+        "locator": "page 1",
+        "text": "Maintained PLC systems"
+      },
+      {
+        "id": "career-answer-source",
+        "kind": "answer",
+        "label": "Exact career answer"
+      }
+    ],
+    "referenceProse": [],
+    "presentation": {
+      "order": [
+        "identity",
+        "summary",
+        "professionalSkills",
+        "technicalSkills",
+        "experience",
+        "education"
+      ],
+      "hidden": [],
+      "approvedWording": {
+        "other-role": {
+          "text": "Prepared clear reports for the team.",
+          "scope": "experience",
+          "sources": [
+            {
+              "id": "dev_ca00def5-bc62-47eb-961b-4cf0e973cb31",
+              "text": "Prepared clear reports",
+              "sourceId": "local_manual"
+            }
+          ]
+        }
+      },
+      "templateVersionId": "unknown-import-template"
+    },
+    "questionPlans": [
+      {
+        "schemaVersion": "career-question-plan/1",
+        "goal": "Retain exact historical interview goal",
+        "targetId": "imported-role",
+        "questions": [
+          {
+            "id": "ownership-q",
+            "dimension": "ownership",
+            "text": "Which responsibilities did you hold?",
+            "why": "Clarify contribution",
+            "selectionMode": "multiple",
+            "options": [
+              {
+                "id": "review",
+                "label": "Reviewed controls"
+              },
+              {
+                "id": "own",
+                "label": "Owned rollout"
+              },
+              {
+                "id": "unused",
+                "label": "Unselected option must stay out of prose support"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "importReview": {
+      "id": "imported-document",
+      "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "format": "pdf",
+      "parserVersion": "synthetic-parser/1",
+      "pages": 1,
+      "admission": {
+        "kind": "cv",
+        "reason": "Synthetic CV",
+        "pages": [
+          1
+        ]
+      },
+      "extraction": {
+        "schemaVersion": "cv-extraction/1",
+        "candidates": [
+          {
+            "id": "imported-context",
+            "path": "roles.0.context",
+            "value": "Maintained PLC systems",
+            "page": 1,
+            "quote": "Maintained PLC systems",
+            "confidence": "high"
+          }
+        ],
+        "warnings": [],
+        "omittedPages": []
+      },
+      "confirmedIds": [
+        "imported-context"
+      ]
+    },
+    "roleRewriteReviews": [
+      {
+        "id": "base-accepted-review",
+        "status": "accepted",
+        "input": {
+          "targetId": "other-role",
+          "locale": "en",
+          "facts": [
+            {
+              "id": "dev_ca00def5-bc62-47eb-961b-4cf0e973cb31",
+              "text": "Prepared clear reports",
+              "sourceId": "local_manual"
+            }
+          ]
+        },
+        "proposal": {
+          "schemaVersion": "career-role-rewrite/1",
+          "targetId": "other-role",
+          "text": "Prepared clear reports for the team.",
+          "factIds": [
+            "dev_ca00def5-bc62-47eb-961b-4cf0e973cb31"
+          ],
+          "warnings": []
+        }
+      },
+      {
+        "id": "base-pending-review",
+        "status": "pending",
+        "input": {
+          "targetId": "imported-role",
+          "locale": "en",
+          "facts": [
+            {
+              "id": "dev_127866a5-5733-47f2-b60a-7eb3e37f5845",
+              "text": "Maintained PLC systems",
+              "sourceId": "imported-document",
+              "sourceClaimId": "imported-context"
+            },
+            {
+              "id": "selected-answer",
+              "text": "Reviewed controls\nOwned rollout\nExact free-text detail",
+              "sourceId": "career-answer-source"
+            }
+          ]
+        },
+        "proposal": {
+          "schemaVersion": "career-role-rewrite/1",
+          "targetId": "imported-role",
+          "text": "Pending Base proposal must not be applied",
+          "factIds": [
+            "dev_127866a5-5733-47f2-b60a-7eb3e37f5845"
+          ],
+          "warnings": []
+        }
+      }
+    ]
+  },
+  "answers": [
+    {
+      "id": "selected-answer",
+      "targetId": "imported-role",
+      "question": "ownership",
+      "questionText": "Which responsibilities did you hold?",
+      "plannedQuestionId": "ownership-q",
+      "text": "Exact free-text detail",
+      "status": "confirmed",
+      "sourceId": "career-answer-source",
+      "cvFieldId": "dev_127866a5-5733-47f2-b60a-7eb3e37f5845",
+      "options": [
+        {
+          "id": "review",
+          "label": "Reviewed controls"
+        },
+        {
+          "id": "own",
+          "label": "Owned rollout"
+        },
+        {
+          "id": "unused",
+          "label": "Unselected option must stay out of prose support"
+        }
+      ],
+      "selectedOptionIds": [
+        "own",
+        "review"
+      ],
+      "selectionMode": "multiple"
+    }
+  ]
+}

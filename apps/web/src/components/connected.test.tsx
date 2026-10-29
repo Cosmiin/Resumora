@@ -1,3 +1,4 @@
+import importedJobSource from "../../../../packages/contracts/fixtures/job-editor-import.json?raw";
 import {
   projectJobEditor,
   jobEditorFacts,
@@ -488,4 +489,58 @@ it("renders accepted job wording through existing preview while Base facts and a
   expect(jobDraft.answers).toEqual(base.answers);
   expect(source).toEqual(encodeDraft(base));
   expect(base.presentation.approvedWording).toBeUndefined();
+});
+
+it("I0 integration renders selected-option-supported job wording and retained Base approval", () => {
+  const source = JSON.parse(importedJobSource);
+  const base = decodeDraft(source);
+  const payload: JobEditorPayload = {
+    schemaVersion: "resumora-job-editor/1",
+    acceptance: "accepted",
+    source: { snapshotId: crypto.randomUUID(), revision: 1 },
+    job: {
+      id: crypto.randomUUID(),
+      versionId: null,
+      fingerprint: "a".repeat(64),
+    },
+    selectedFacts: jobEditorFacts(base).map((row) => row.ref),
+    selectedAnswerIds: ["selected-answer"],
+    wording: [
+      {
+        targetId: "imported-role",
+        text: "Accepted job wording grounded in selected career options.",
+        origin: "ai_generated",
+        acceptance: "accepted",
+        valueIds: [base.roles[0].context.id],
+        answerIds: ["selected-answer"],
+      },
+    ],
+    presentation: {},
+    localAdditions: [],
+  };
+  const projected = projectJobEditor(source, payload);
+  expect(currentWording(projected, "imported-role")).toBe(
+    payload.wording[0].text,
+  );
+  expect(currentWording(projected, "other-role")).toBe(
+    "Prepared clear reports for the team.",
+  );
+  render(
+    <LanguageContext value="en">
+      <DocumentPreview draft={projected} asOf={{ year: "2026", month: "10" }} />
+    </LanguageContext>,
+  );
+  expect(screen.getByText(payload.wording[0].text)).toBeTruthy();
+  expect(screen.getByText("Prepared clear reports for the team.")).toBeTruthy();
+  expect(
+    screen.queryByText("Pending Base proposal must not be applied"),
+  ).toBeNull();
+  expect(projected.answers).toEqual(base.answers);
+  expect(projected.questionPlans).toEqual(base.questionPlans);
+  expect(projected.importReview).toEqual(base.importReview);
+  expect(projected.roleRewriteReviews).toEqual(base.roleRewriteReviews);
+  expect(projected.presentation.approvedWording!["other-role"]).toEqual(
+    base.presentation.approvedWording!["other-role"],
+  );
+  expect(encodeDraft(base)).toEqual(source);
 });
