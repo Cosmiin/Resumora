@@ -5,13 +5,26 @@ import {
   localId,
   newEducation,
   newOptionalEntry,
-  fact,
   newRole,
   type BaseDraft,
   type Fact,
   type FactValue,
 } from "./model.ts";
-import { isImportReview, type ImportReview } from "../intelligence/model.ts";
+import {
+  isImportReview,
+  type Candidate,
+  type ImportReview,
+} from "../intelligence/model.ts";
+
+export const requiresImportReview = (candidate: Candidate): boolean =>
+  candidate.confidence !== "high" ||
+  !!(
+    candidate.warning &&
+    !/^Native (PDF transcription|Word excerpt) requires review/.test(
+      candidate.warning,
+    )
+  );
+
 /** Maps validated extraction into a NEW unconfirmed draft; never mutates an existing Base. */
 export function importedDraft(review: ImportReview): BaseDraft {
   if (!isImportReview(review) || review.admission.kind !== "cv")
@@ -71,11 +84,14 @@ export function importedDraft(review: ImportReview): BaseDraft {
               ? "Summary"
               : parts[0] === "certifications"
                 ? "Certifications"
-                : "Other",
+                : "",
           entries: [],
         };
         draft.optionalSections.push(section);
-        if (c.path === "summary") draft.presentation.order.splice(1, 0, group);
+        if (c.path === "summary")
+          draft.presentation.order = draft.presentation.order.map((id) =>
+            id === "summary" ? group : id,
+          );
         else draft.presentation.order.push(group);
       }
       const entryIndex = parts[0] === "certifications" ? index : 0;
@@ -83,11 +99,9 @@ export function importedDraft(review: ImportReview): BaseDraft {
         section.entries.push(newOptionalEntry());
       const entry = section.entries[entryIndex];
       if (c.path === "summary") {
-        entry.title = fact("");
         entry.details = field(c.value) as Fact<string>;
       } else if (parts[2] === "title") {
         entry.title = field(c.value) as Fact<string>;
-        if (parts[0] === "custom") section.label = c.value;
       } else if (parts[2] === "details")
         entry.details = field(c.value) as Fact<string>;
       else if (parts[2] === "start")
@@ -161,7 +175,7 @@ export function confirmImported(
     throw new Error("INVALID_REVIEW_SELECTION");
   const next = clone(draft),
     at = new Date().toISOString();
-  for (const f of allFacts(next))
+  for (const f of allFacts(next, true))
     if (
       f.sourceClaimId &&
       selectedIds.includes(f.sourceClaimId) &&

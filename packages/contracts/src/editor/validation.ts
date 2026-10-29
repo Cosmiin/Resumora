@@ -84,7 +84,7 @@ export function validateDraft(d: BaseDraft): Issue[] {
   }
   for (const s of d.optionalSections)
     for (const e of s.entries) {
-      if (!e.title.value.trim())
+      if (s.id !== "import-summary" && !e.title.value.trim())
         issues.push({ field: e.title.fieldId, code: "required" });
       for (const b of e.bullets ?? [])
         if (!b.value.trim())

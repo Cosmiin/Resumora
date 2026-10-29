@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { requiresImportReview } from "@resumora/contracts/editor/import";
 import type { Candidate } from "@resumora/contracts/intelligence/model";
 import { allFacts, type BaseDraft, type FactValue } from "../base/model";
 import { dateError } from "../base/dates";
@@ -44,7 +45,7 @@ const labels: Record<string, [string, string]> = {
   label: ["Categorie", "Category"],
 };
 const factFor = (draft: BaseDraft, c: Candidate) =>
-  allFacts(draft).find(
+  allFacts(draft, true).find(
     (f) =>
       f.sourceClaimId === c.id ||
       f.sourceLineage?.some((s) => s.sourceClaimId === c.id),
@@ -64,8 +65,10 @@ export function ImportReview({
 }) {
   const t = useCopy(),
     review = draft.importReview!;
+  const reviewCandidates =
+    review.extraction.candidates.filter(requiresImportReview);
   const groups = [
-    ...new Set(review.extraction.candidates.map((c) => importSection(c.path))),
+    ...new Set(reviewCandidates.map((c) => importSection(c.path))),
   ];
   groups.sort((a, b) => {
     const order = (s: string) =>
@@ -81,13 +84,14 @@ export function ImportReview({
     return order(a) - order(b);
   });
   const pendingGroups = groups.filter((g) =>
-    review.extraction.candidates.some(
+    reviewCandidates.some(
       (c) => importSection(c.path) === g && !review.confirmedIds.includes(c.id),
     ),
   );
   const section = pendingGroups[0];
-  const candidates = review.extraction.candidates.filter(
-    (c) => importSection(c.path) === section,
+  const candidates = reviewCandidates.filter(
+    (c) =>
+      importSection(c.path) === section && !review.confirmedIds.includes(c.id),
   );
   const [focused, setFocused] = useState<string>();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -153,7 +157,6 @@ export function ImportReview({
             !/^Native (PDF transcription|Word excerpt) requires review/.test(
               c.warning,
             );
-          const uncertain = c.confidence !== "high" || !!specificWarning;
           function update(text: string) {
             if (!field || !change) return;
             let next: FactValue = text;
@@ -180,9 +183,7 @@ export function ImportReview({
             >
               <label htmlFor={`review-${c.id}`}>
                 {t(...label)}
-                {uncertain && (
-                  <small> · {t("De verificat", "Please check")}</small>
-                )}
+                <small> · {t("De verificat", "Please check")}</small>
               </label>
               {typeof value === "boolean" ? (
                 <select

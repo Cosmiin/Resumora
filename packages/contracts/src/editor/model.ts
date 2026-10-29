@@ -307,7 +307,11 @@ export function blankDraft(): BaseDraft {
     presentation: { order: [...coreSections, "languages"], hidden: [] },
   };
 }
-export function sectionFacts(d: BaseDraft, section: string): Fact[] {
+export function sectionFacts(
+  d: BaseDraft,
+  section: string,
+  includeInactive = false,
+): Fact[] {
   if (section === "identity")
     return [d.name, ...d.titles, ...d.contacts.map((c) => c.value)];
   if (section === "professionalSkills" || section === "technicalSkills")
@@ -319,7 +323,7 @@ export function sectionFacts(d: BaseDraft, section: string): Fact[] {
       r.location,
       r.start,
       r.ongoing,
-      ...(!r.ongoing.value ? [r.end] : []),
+      ...(includeInactive || !r.ongoing.value ? [r.end] : []),
       r.context,
       ...r.bullets,
     ]);
@@ -330,7 +334,7 @@ export function sectionFacts(d: BaseDraft, section: string): Fact[] {
       e.field,
       e.location,
       e.start,
-      ...(!e.ongoing?.value ? [e.end] : []),
+      ...(includeInactive || !e.ongoing?.value ? [e.end] : []),
       e.details,
       ...(e.ongoing ? [e.ongoing] : []),
     ]);
@@ -342,15 +346,15 @@ export function sectionFacts(d: BaseDraft, section: string): Fact[] {
         e.details,
         ...(e.bullets ?? []),
         e.start,
-        ...(!e.ongoing?.value ? [e.end] : []),
+        ...(includeInactive || !e.ongoing?.value ? [e.end] : []),
         ...(e.ongoing ? [e.ongoing] : []),
         ...(e.proficiency ? [e.proficiency] : []),
       ]) ?? []
   );
 }
-export function allFacts(d: BaseDraft): Fact[] {
+export function allFacts(d: BaseDraft, includeInactive = false): Fact[] {
   return [...coreSections, ...d.optionalSections.map((s) => s.id)].flatMap(
-    (s) => sectionFacts(d, s),
+    (s) => sectionFacts(d, s, includeInactive),
   );
 }
 export const isAuthored = (f: Fact) =>

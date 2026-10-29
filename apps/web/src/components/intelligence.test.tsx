@@ -281,7 +281,7 @@ describe("CV import and career intelligence integration", () => {
             value: initial.name.value,
             page: 1,
             quote: initial.name.value,
-            confidence: "high",
+            confidence: "low",
           },
         ],
         warnings: [],

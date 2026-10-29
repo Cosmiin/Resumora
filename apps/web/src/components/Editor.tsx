@@ -624,10 +624,19 @@ export function Editor({
   function optional(section: string) {
     const s = d.optionalSections.find((s) => s.id === section);
     if (!s) return null;
+    if (s.id === "import-summary")
+      return s.entries.map((e) => (
+        <div key={e.id}>
+          {field(e.details, t("Rezumat profesional", "Professional summary"), {
+            multiline: true,
+          })}
+        </div>
+      ));
     const isLanguage = s.kind === "languages";
+    const isImportedCategory = s.id.startsWith("import-custom-");
     return (
       <>
-        {!isLanguage && (
+        {!isLanguage && !isImportedCategory && (
           <Field
             label={t("Denumirea secțiunii", "Section label")}
             value={s.label}
@@ -678,7 +687,11 @@ export function Editor({
               <div className="field-grid">
                 {field(
                   e.title,
-                  isLanguage ? t("Limbă", "Language") : t("Denumire", "Title"),
+                  isLanguage
+                    ? t("Limbă", "Language")
+                    : isImportedCategory && i === 0
+                      ? t("Categorie", "Category")
+                      : t("Denumire", "Title"),
                   { required: true },
                 )}
                 {isLanguage ? (

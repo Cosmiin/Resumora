@@ -376,23 +376,26 @@ export function DocumentPreview({
     return s?.entries.length
       ? s.entries.map((e) => (
           <div className="document-entry" key={e.id}>
-            <h4 className="document-primary">
-              {block(text(e.title), e.title.fieldId)}
-              {s.kind === "languages" &&
-                e.proficiency?.value &&
-                !hidden(e.proficiency) && (
-                  <>
-                    {" "}
-                    ·{" "}
-                    {block(
-                      e.proficiency.value === "Native"
-                        ? cv("Nativ", "Native")
-                        : e.proficiency.value,
-                      e.proficiency.fieldId,
+            {s.id !== "import-summary" &&
+              !(s.id.startsWith("import-custom-") && s.entries[0] === e) && (
+                <h4 className="document-primary">
+                  {block(text(e.title), e.title.fieldId)}
+                  {s.kind === "languages" &&
+                    e.proficiency?.value &&
+                    !hidden(e.proficiency) && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        {block(
+                          e.proficiency.value === "Native"
+                            ? cv("Nativ", "Native")
+                            : e.proficiency.value,
+                          e.proficiency.fieldId,
+                        )}
+                      </>
                     )}
-                  </>
-                )}
-            </h4>
+                </h4>
+              )}
             {wording(e.id, e.details)}
             {!hasExperienceWording(e.id) &&
               e.bullets?.some((f) => text(f) || onTextEdit) && (
@@ -458,9 +461,18 @@ export function DocumentPreview({
           .filter((id) => !d.presentation.hidden.includes(id))
           .map((id) => {
             const body = content(id);
+            const categoryTitle = d.optionalSections.find(
+              (s) => s.id === id && s.id.startsWith("import-custom-"),
+            )?.entries[0]?.title;
             return body ? (
               <section key={id} className={`document-section document-${id}`}>
-                {id !== "identity" && <h3>{sectionName(id, d.language, d)}</h3>}
+                {id !== "identity" && (
+                  <h3>
+                    {categoryTitle
+                      ? block(text(categoryTitle), categoryTitle.fieldId)
+                      : sectionName(id, d.language, d)}
+                  </h3>
+                )}
                 {body}
               </section>
             ) : null;
