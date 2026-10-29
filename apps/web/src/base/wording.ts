@@ -31,6 +31,7 @@ export function currentWording(d: BaseDraft, target: string): string | null {
   if (
     !p ||
     (p.scope === "experience" &&
+      !p.origin &&
       !isCurrentExperienceWording(d, target, p.text)) ||
     !isWordingFieldVisible(d, target)
   )

@@ -186,3 +186,27 @@ test('job-local summary and ordered competence selection preserve source facts a
   });
   assert.deepEqual((await context.json()).draft, d);
 });
+
+
+test('whole-experience scope is optional, strict, and preserved in the projected editor codec', () => {
+  const { source, payload, role } = fixture();
+  const original = structuredClone(source);
+  for (const origin of ['user_authored', 'ai_generated']) {
+    const scoped = structuredClone(payload);
+    scoped.wording[0] = { ...scoped.wording[0], origin, scope: 'experience' };
+    assert.equal(isJobEditorPayload(scoped), true);
+    const draft = projectJobEditor(source.payload, scoped);
+    assert.deepEqual(decodeDraft(encodeDraft(draft)), draft);
+    assert.equal(draft.presentation.approvedWording[role.id].scope, 'experience');
+    assert.equal(draft.presentation.approvedWording[role.id].origin, origin);
+    assert.deepEqual(draft.roles, decodeDraft(source.payload).roles);
+    for (const scope of ['paragraph', 'career', null, 1]) {
+      scoped.wording[0].scope = scope;
+      assert.equal(isJobEditorPayload(scoped), false);
+      assert.throws(() => projectJobEditor(source.payload, scoped));
+    }
+  }
+  assert.equal(isJobEditorPayload(payload), true);
+  assert.equal(projectJobEditor(source.payload, payload).presentation.approvedWording[role.id].scope, undefined);
+  assert.deepEqual(source, original);
+});

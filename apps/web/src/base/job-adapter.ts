@@ -174,13 +174,15 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
         (w) =>
           w.targetId === targetId &&
           w.text === wording.text &&
+          w.scope === wording.scope &&
           equalValues(w.valueIds, valueIds) &&
           equalValues(w.answerIds, answerIds),
       );
       p.wording.push({
         targetId,
         text: wording.text,
-        origin: existing?.origin ?? "user_authored",
+        origin: wording.origin ?? existing?.origin ?? "user_authored",
+        ...(wording.scope ? { scope: wording.scope } : {}),
         acceptance: "accepted",
         valueIds,
         answerIds,

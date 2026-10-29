@@ -16,7 +16,7 @@ export type JobEditorPayload = {
   selectedAnswerIds: string[];
   // Pending proposals belong to the proposal workflow, never to saved versions.
   wording: { targetId: string; text: string; origin: 'ai_generated' | 'user_authored';
-    acceptance: 'accepted'; valueIds: string[]; answerIds: string[] }[];
+    acceptance: 'accepted'; scope?: 'experience'; valueIds: string[]; answerIds: string[] }[];
   presentation: Partial<Pick<DocumentPresentation, 'order' | 'hidden' | 'hiddenFields' | 'templateVersionId' | 'photo'>> & { summaryText?: string; professionalSkillIds?: string[]; technicalSkillIds?: string[] };
   localAdditions: { id: string; targetId: string; kind: 'bullet' | 'professionalSkill' | 'technicalSkill';
     text: string; scope: 'job-only'; origin: 'user_authored' }[];
@@ -53,8 +53,8 @@ export function isJobEditorPayload(v: unknown): v is JobEditorPayload {
       keys(f, ['entityId','fieldId','valueId','sourceId']) && Object.values(f).every(handle)) ||
     new Set(v.selectedFacts.map(f => f.valueId)).size !== v.selectedFacts.length || !strings(v.selectedAnswerIds) ||
     !Array.isArray(v.wording) || v.wording.length > 200 || !v.wording.every(w => record(w) &&
-      keys(w, ['targetId','text','origin','acceptance','valueIds','answerIds']) && handle(w.targetId) && text(w.text) &&
-      ['ai_generated','user_authored'].includes(w.origin as string) && w.acceptance === 'accepted' && strings(w.valueIds) && strings(w.answerIds) && w.valueIds.length + w.answerIds.length > 0) ||
+      keys(w, ['targetId','text','origin','acceptance','valueIds','answerIds','scope'], ['targetId','text','origin','acceptance','valueIds','answerIds']) && handle(w.targetId) && text(w.text) &&
+      ['ai_generated','user_authored'].includes(w.origin as string) && w.acceptance === 'accepted' && (!Object.hasOwn(w, 'scope') || w.scope === 'experience') && strings(w.valueIds) && strings(w.answerIds) && w.valueIds.length + w.answerIds.length > 0) ||
     new Set(v.wording.map(w => w.targetId)).size !== v.wording.length || !record(v.presentation) ||
     !keys(v.presentation, ['order','hidden','hiddenFields','templateVersionId','photo','summaryText','professionalSkillIds','technicalSkillIds'], []) ||
     ['order','hidden','hiddenFields','professionalSkillIds','technicalSkillIds'].some(k => Object.hasOwn(v.presentation as object, k) && !strings((v.presentation as Record<string, unknown>)[k])) ||
@@ -117,7 +117,7 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
       if (!a || !a.sourceId || !draft.sources.some(s => s.id === a.sourceId)) invalid();
       evidence.push({ id: a.id, text: answerEvidenceText(a), sourceId: a.sourceId });
     }
-    (draft.presentation.approvedWording ??= {})[w.targetId] = { text: w.text, sources: evidence };
+    (draft.presentation.approvedWording ??= {})[w.targetId] = { text: w.text, sources: evidence, ...(w.scope ? { scope: w.scope, origin: w.origin } : {}) };
     delete draft.presentation.contributionHtml?.[w.targetId];
   }
   const hiddenContacts = draft.contacts.filter(c => !c.visible).map(c => c.value.fieldId);

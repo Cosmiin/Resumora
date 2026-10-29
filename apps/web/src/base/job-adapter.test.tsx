@@ -9,12 +9,14 @@ import userEvent from "@testing-library/user-event";
 import { App } from "../App";
 import { Editor } from "../components/Editor";
 import { currentWording } from "./wording";
+import { DocumentPreview } from "../components/DocumentPreview";
+import { careerContext } from "@resumora/contracts/intelligence/context";
 import { MemoryBaseCvAdapter } from "./adapter";
 import { prepareDraft } from "./editing";
 import { expect, it, vi } from "vitest";
 import { HttpJobCvAdapter } from "./job-adapter";
 import { jobDocumentsRoute } from "../../../api/src/jobs/documents";
-import { encodeDraft } from "@resumora/contracts/editor/transport";
+import { decodeDraft, encodeDraft } from "@resumora/contracts/editor/transport";
 import {
   blankDraft,
   fact,
@@ -518,6 +520,25 @@ it("saves contact visibility through presentation in both directions, including 
     expect(saved.draft.presentation.hiddenFields).toEqual(
       draft.presentation.hiddenFields,
     );
+    const preview = render(
+      <DocumentPreview
+        draft={saved.draft}
+        asOf={{ year: "2026", month: "10" }}
+      />,
+    );
+    const cv = within(
+      screen.getByRole("complementary", { name: "Previzualizare CV" }),
+    );
+    for (const contact of saved.draft.contacts.filter((c) => c.value.value)) {
+      expect(!!cv.queryByText(contact.value.value)).toBe(
+        !saved.draft.presentation.hiddenFields?.includes(contact.value.fieldId),
+      );
+    }
+    preview.unmount();
+    const history = await adapter.history();
+    expect(history[0].draft.presentation.hiddenFields).toEqual(
+      draft.presentation.hiddenFields,
+    );
     draft = saved.draft;
     view.rerender(
       <Editor
@@ -751,6 +772,17 @@ it.each(["role-bullet", "role-contributions", "optional-bullet"])(
     expect(currentWording(saved.draft, target.id)).toBe(
       "Wording based on visible evidence",
     );
+    expect(saved.draft.presentation.approvedWording![target.id].scope).toBe(
+      "experience",
+    );
+    expect(decodeDraft(encodeDraft(saved.draft))).toEqual(saved.draft);
+    const reopened = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    expect(currentWording((await reopened.load())!.draft, target.id)).toBe(
+      "Wording based on visible evidence",
+    );
+    expect(currentWording((await reopened.history())[0].draft, target.id)).toBe(
+      "Wording based on visible evidence",
+    );
   },
 );
 
@@ -875,3 +907,180 @@ it("allows returning to Base after a failed job context load without showing Bas
   await screen.findByRole("textbox", { name: /Prenume/ });
   expect(screen.queryByRole("region", { name: "Job CV context" })).toBeNull();
 });
+
+it.each([
+  "role",
+  "projects",
+  "certifications",
+  "volunteering",
+  "custom",
+] as const)(
+  "round-trips whole %s wording without duplicate contributions or changes to Base",
+  async (kind) => {
+    for (const inherited of ["none", "paragraph", "experience"] as const) {
+      const h = jobHarness();
+      const entry = newOptionalEntry();
+      entry.title.value = "Source entry";
+      const role = h.source.roles[0];
+      const target = kind === "role" ? role : entry;
+      const context = kind === "role" ? role.context : entry.details;
+      context.value = "Built tools";
+      target.bullets = [fact("Reduced downtime")];
+      if (kind !== "role") {
+        h.source.optionalSections.push({
+          id: "extra",
+          kind,
+          label: "Extra",
+          entries: [entry],
+        });
+        h.source.presentation.order.push("extra");
+      }
+      h.source.answers = h.source.answers.map((a) => ({
+        ...a,
+        targetId: target.id,
+      }));
+      const approved =
+        inherited === "experience"
+          ? "Built improved tools\nReduced downtime"
+          : "Built improved tools";
+      if (inherited !== "none")
+        h.source.presentation.approvedWording = {
+          [target.id]: {
+            text: approved,
+            ...(inherited === "experience"
+              ? { scope: "experience" as const }
+              : {}),
+            sources: [
+              {
+                id: context.id,
+                text: context.value,
+                sourceId: context.sourceId,
+              },
+            ],
+          },
+        };
+      if (inherited === "experience")
+        h.source.roleRewriteReviews = [
+          {
+            id: "original-review",
+            status: "accepted",
+            input: careerContext(h.source, target.id),
+            proposal: {
+              schemaVersion: "career-role-rewrite/1",
+              targetId: target.id,
+              text: approved,
+              factIds: [context.id],
+              warnings: [],
+            },
+          },
+        ];
+      const source = structuredClone(h.source);
+      const adapter = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+      await adapter.load();
+      let draft = adapter.initialDraft();
+      const view = render(
+        <Editor
+          jobMode
+          draft={draft}
+          issues={[]}
+          change={(next) => {
+            draft = next;
+          }}
+        />,
+      );
+      const panel = screen.getByText(
+        kind === "role" ? "Experiență profesională" : "Extra",
+        { selector: "summary" },
+      );
+      fireEvent.click(panel);
+      const input = within(panel.closest("details")!).getByRole("textbox", {
+        name: "Formulare pentru acest job",
+      }) as HTMLTextAreaElement;
+      expect(input.value).toContain("Reduced downtime");
+      expect(input.value).toContain(
+        inherited === "none" ? "Built tools" : "Built improved tools",
+      );
+      const text = input.value.replace("Built", "Developed");
+      fireEvent.change(input, { target: { value: "" } });
+      view.rerender(
+        <Editor
+          jobMode
+          draft={draft}
+          issues={[]}
+          change={(next) => {
+            draft = next;
+          }}
+        />,
+      );
+      expect(input.value).toBe("");
+      fireEvent.change(input, { target: { value: text } });
+      view.unmount();
+      expect(draft.presentation.approvedWording![target.id]).toMatchObject({
+        scope: "experience",
+        origin: "user_authored",
+        text,
+      });
+      const first = await adapter.save({
+        draft,
+        expectedRevision: 0,
+        requestId: crypto.randomUUID(),
+      });
+      expect(h.versions.get(h.jobs[0])![0].payload.wording[0]).toMatchObject({
+        scope: "experience",
+        origin: "user_authored",
+      });
+      draft = structuredClone(first.draft);
+      draft.presentation.approvedWording![target.id].text =
+        "Second description";
+      await adapter.save({
+        draft,
+        expectedRevision: 1,
+        requestId: crypto.randomUUID(),
+      });
+      const reopened = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+      expect(currentWording((await reopened.load())!.draft, target.id)).toBe(
+        "Second description",
+      );
+      const historical = (await reopened.history()).find(
+        (s) => s.id === first.id,
+      )!;
+      const restored = await reopened.restore({
+        snapshotId: first.id,
+        expectedRevision: 2,
+        requestId: crypto.randomUUID(),
+      });
+      for (const saved of [first, historical, restored]) {
+        expect(saved.draft.roles).toEqual(source.roles);
+        expect(saved.draft.optionalSections).toEqual(source.optionalSections);
+        expect(saved.draft.answers).toEqual(source.answers);
+        expect(saved.draft.roleRewriteReviews).toEqual(
+          source.roleRewriteReviews,
+        );
+        expect(decodeDraft(encodeDraft(saved.draft))).toEqual(saved.draft);
+        expect(currentWording(saved.draft, target.id)).toBe(text);
+        const preview = render(
+          <DocumentPreview
+            draft={saved.draft}
+            asOf={{ year: "2026", month: "10" }}
+          />,
+        );
+        const cv = screen.getByRole("complementary", {
+          name: "Previzualizare CV",
+        });
+        expect(cv.textContent?.split("Reduced downtime")).toHaveLength(2);
+        expect(cv.textContent).toContain(text);
+        preview.unmount();
+      }
+      const hidden = structuredClone(restored.draft);
+      hidden.presentation.hiddenFields = [target.bullets![0].fieldId];
+      expect(currentWording(hidden, target.id)).toBeNull();
+      expect(h.source).toEqual(source);
+      expect(h.versions.has(h.jobs[1])).toBe(false);
+      expect(
+        h.transport.mock.calls.every(([path]) =>
+          path.startsWith(`/v1/jobs/${h.jobs[0]}/cv`),
+        ),
+      ).toBe(true);
+    }
+  },
+);

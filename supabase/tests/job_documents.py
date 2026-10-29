@@ -74,6 +74,23 @@ def suite(db):
             args=f"'{key or uid()}','{job or self.job1['id']}','{saved['documentId']}',{revision},'{version}'"
             return self.call('restore_job_editor', args, error=True) if error else self.jsoncall('restore_job_editor', args)
 
+        def test_whole_experience_scope_save_history_and_restore(self):
+            payload = copy.deepcopy(self.payload)
+            payload['wording'][0].update(scope='experience', origin='user_authored')
+            first = self.save(payload)
+            self.assertEqual(first['payload'], payload)
+            for scope in ['paragraph', 'career', None, 1]:
+                bad = copy.deepcopy(payload)
+                bad['wording'][0]['scope'] = scope
+                self.assertIn('INVALID_EDITOR_PAYLOAD', self.save(bad, doc=first['documentId'], revision=1, error=True))
+            paragraph = copy.deepcopy(payload)
+            del paragraph['wording'][0]['scope']
+            second = self.save(paragraph, doc=first['documentId'], revision=1)
+            restored = self.restore(second, first['id'], 2)
+            self.assertEqual(restored['payload'], payload)
+            self.assertEqual(self.history(self.job1['id'], first['documentId']), [restored, second, first])
+            self.assertEqual(self.jsoncall('load_base_draft')['payload'], self.source)
+
         def test_manual_summary_and_ordered_competence_selections(self):
             payload=copy.deepcopy(self.payload)
             payload['presentation']=dict(summaryText='Job-local professional summary', professionalSkillIds=['job_local_p'], technicalSkillIds=['job_local_t'])

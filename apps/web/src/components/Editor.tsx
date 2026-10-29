@@ -31,7 +31,7 @@ import {
   languageLevels,
   setContributions,
 } from "../base/editing";
-import { isWordingFieldVisible } from "../base/wording";
+import { currentWording, isWordingFieldVisible } from "../base/wording";
 import { sectionName } from "../base/sections";
 import type { Issue } from "../base/validation";
 import { Button, Field, LanguageContext, issueText, useCopy } from "./ui";
@@ -898,6 +898,22 @@ export function Editor({
                 sourceId: a.sourceId!,
               })),
             ];
+            const accepted = currentWording(d, target.id);
+            const text =
+              accepted !== null &&
+              d.presentation.approvedWording?.[target.id]?.scope ===
+                "experience"
+                ? accepted
+                : [
+                    accepted ??
+                      fields.find((f) => f.key !== "bullet")?.fact.value,
+                    ...fields
+                      .filter((f) => f.key === "bullet")
+                      .map((f) => f.fact.value),
+                    ...answers.map(answerEvidenceText),
+                  ]
+                    .filter(Boolean)
+                    .join("\n");
             return (
               <div key={target.id} className="stack">
                 <strong>{target.title.value}</strong>
@@ -909,13 +925,7 @@ export function Editor({
                       "Wording for this job",
                     )}
                     multiline
-                    value={
-                      d.presentation.approvedWording?.[target.id]?.text ??
-                      sources
-                        .map((s) => s.text)
-                        .filter(Boolean)
-                        .join("\n")
-                    }
+                    value={text}
                     hint={t(
                       "Salvarea acceptă formularea ta. Pentru a ascunde conținutul folosește vizibilitatea.",
                       "Saving accepts your wording. Use visibility to hide content.",
@@ -925,6 +935,8 @@ export function Editor({
                         (n.presentation.approvedWording ??= {})[target.id] = {
                           text,
                           sources,
+                          scope: "experience",
+                          origin: "user_authored",
                         };
                         delete n.presentation.contributionHtml?.[target.id];
                       })
