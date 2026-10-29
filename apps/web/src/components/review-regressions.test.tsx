@@ -925,7 +925,7 @@ it.each(["role", ...kinds] as const)(
     );
     await user.click(screen.getByRole("link", { name: "Îmbunătățește" }));
     const select = screen.getByRole("combobox", {
-      name: "Intrare",
+      name: "Rol sau experiență",
     }) as HTMLSelectElement;
     const removedId = Array.from(select.options).find(
       (option) => option.value !== remainingId,

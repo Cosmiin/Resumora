@@ -1,4 +1,5 @@
 import { answerEvidenceText } from "@resumora/contracts/intelligence/model";
+import type { QuestionPlan } from "@resumora/contracts/intelligence/model";
 import {
   clone,
   editFact,
@@ -11,6 +12,21 @@ import {
   type OptionalEntry,
 } from "./model";
 import { replaceFact, updateContributionHtml } from "./editing";
+export function nextQuestionIndex(
+  draft: BaseDraft,
+  plan: QuestionPlan,
+): number {
+  const index = plan.questions.findIndex(
+    (q) =>
+      !draft.answers.some(
+        (a) =>
+          a.targetId === plan.targetId &&
+          a.plannedQuestionId === q.id &&
+          ["confirmed", "skipped", "unknown"].includes(a.status),
+      ),
+  );
+  return index < 0 ? plan.questions.length : index;
+}
 export function enrichmentTarget(
   draft: BaseDraft,
   id: string,

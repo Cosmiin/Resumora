@@ -3,11 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   careerContext,
   type CareerFact,
+  type CareerContext,
 } from "@resumora/contracts/intelligence/context";
 import {
   validateRewrite,
   type RoleRewrite as Proposal,
+  type QuestionPlan,
 } from "@resumora/contracts/intelligence/model";
+import { nextQuestionIndex } from "../base/enrichment";
 import { clone, equalValues, type BaseDraft } from "../base/model";
 import { Button, useCopy } from "./ui";
 export function RoleRewrite({
@@ -16,7 +19,13 @@ export function RoleRewrite({
   request,
   accept,
   change,
+  autoRequest,
+  ready = true,
+  onAutoRequest,
 }: {
+  autoRequest?: { id: string; input: CareerContext; plan: QuestionPlan };
+  onAutoRequest?: () => void;
+  ready?: boolean;
   draft: BaseDraft;
   targetId: string;
   request: (target: string) => Promise<Proposal>;
@@ -33,9 +42,11 @@ export function RoleRewrite({
     [error, setError] = useState("");
   const current = useRef(draft),
     requestGeneration = useRef(0);
+  const inFlight = useRef(false);
   current.current = draft;
   useEffect(() => {
     setBusy(false);
+    inFlight.current = false;
     return () => {
       requestGeneration.current++;
     };
@@ -106,6 +117,93 @@ export function RoleRewrite({
       );
     }
   }
+  const consumed = useRef<string | null>(null);
+  async function generate() {
+    if (inFlight.current || !ready) return;
+    inFlight.current = true;
+    const source = current.current,
+      generation = ++requestGeneration.current;
+    const active = () => generation === requestGeneration.current;
+    setBusy(true);
+    setError("");
+    try {
+      const input = careerContext(source, targetId),
+        proposal = await request(targetId);
+      if (!active()) return;
+      if (current.current !== source) throw new Error("STALE");
+      validateRewrite(proposal, targetId, input.facts);
+      const next = clone(source);
+      const history = next.roleRewriteReviews ?? [];
+      const pinned = new Set(
+        Object.entries(next.presentation.approvedWording ?? {})
+          .filter(([, wording]) => wording.scope === "experience")
+          .map(([target, wording]) =>
+            history.findLast(
+              (r) =>
+                r.status === "accepted" &&
+                r.proposal.targetId === target &&
+                r.proposal.text === wording.text,
+            ),
+          )
+          .filter((r) => r !== undefined),
+      );
+      const retained = new Set([
+        ...pinned,
+        ...history.filter((r) => !pinned.has(r)).slice(-19),
+      ]);
+      next.roleRewriteReviews = [
+        ...history.filter((r) => retained.has(r)),
+        { id: crypto.randomUUID(), input, proposal, status: "pending" },
+      ];
+      change(next);
+    } catch {
+      if (active())
+        setError(
+          t(
+            "Propunerea nu este disponibilă sau contextul s-a schimbat. Răspunsurile sunt păstrate; continuă manual.",
+            "Proposal unavailable or context changed. Answers are retained; continue manually.",
+          ),
+        );
+    } finally {
+      if (active()) {
+        setBusy(false);
+        inFlight.current = false;
+      }
+    }
+  }
+  useEffect(() => {
+    if (!autoRequest || consumed.current === autoRequest.id || !ready) return;
+    let cancelled = false;
+    // Defer until mount effects settle so StrictMode's setup/cleanup probe cannot
+    // consume a cycle and fence its only response.
+    queueMicrotask(() => {
+      if (cancelled || consumed.current === autoRequest.id) return;
+      consumed.current = autoRequest.id;
+      onAutoRequest?.();
+      try {
+        if (
+          nextQuestionIndex(current.current, autoRequest.plan) !==
+            autoRequest.plan.questions.length ||
+          !equalValues(
+            autoRequest.input,
+            careerContext(current.current, targetId),
+          )
+        )
+          throw new Error("STALE");
+        void generate();
+      } catch {
+        setError(
+          t(
+            "Context modificat. Verifică răspunsurile și reîncearcă rescrierea.",
+            "Context changed. Review your answers and retry the rewrite.",
+          ),
+        );
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [autoRequest?.id, ready]);
   return (
     <section className="card">
       <h3>
@@ -117,60 +215,23 @@ export function RoleRewrite({
           "Uses current context and saved answers. The result is a proposal: original questions, answers and facts remain saved.",
         )}
       </p>
+      {autoRequest && !ready && (
+        <p role="status">
+          {t(
+            "Salvăm răspunsurile înainte de a crea descrierea…",
+            "Saving answers before creating the description…",
+          )}
+        </p>
+      )}
       <Button
-        disabled={busy || !targetId}
-        onClick={async () => {
-          const source = current.current,
-            generation = ++requestGeneration.current;
-          const active = () => generation === requestGeneration.current;
-          setBusy(true);
-          setError("");
-          try {
-            const input = careerContext(source, targetId),
-              proposal = await request(targetId);
-            if (!active()) return;
-            if (current.current !== source) throw new Error("STALE");
-            validateRewrite(proposal, targetId, input.facts);
-            const next = clone(source);
-            const history = next.roleRewriteReviews ?? [];
-            const pinned = new Set(
-              Object.entries(next.presentation.approvedWording ?? {})
-                .filter(([, wording]) => wording.scope === "experience")
-                .map(([target, wording]) =>
-                  history.findLast(
-                    (r) =>
-                      r.status === "accepted" &&
-                      r.proposal.targetId === target &&
-                      r.proposal.text === wording.text,
-                  ),
-                )
-                .filter((r) => r !== undefined),
-            );
-            const retained = new Set([
-              ...pinned,
-              ...history.filter((r) => !pinned.has(r)).slice(-19),
-            ]);
-            next.roleRewriteReviews = [
-              ...history.filter((r) => retained.has(r)),
-              { id: crypto.randomUUID(), input, proposal, status: "pending" },
-            ];
-            change(next);
-          } catch {
-            if (active())
-              setError(
-                t(
-                  "Propunerea nu este disponibilă sau contextul s-a schimbat. Răspunsurile sunt păstrate; continuă manual.",
-                  "Proposal unavailable or context changed. Answers are retained; continue manually.",
-                ),
-              );
-          } finally {
-            if (active()) setBusy(false);
-          }
-        }}
+        disabled={busy || !targetId || !ready}
+        onClick={() => void generate()}
       >
         {busy
           ? t("Pregătim…", "Preparing…")
-          : t("Propune rescrierea experienței", "Propose experience rewrite")}
+          : autoRequest
+            ? t("Reîncearcă rescrierea", "Retry rewrite")
+            : t("Propune rescrierea experienței", "Propose experience rewrite")}
       </Button>
       {saved && (
         <div className="stack">

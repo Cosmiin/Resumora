@@ -84,9 +84,7 @@ function result(
       };
 }
 const buttonName = (action: "questions" | "rewrite") =>
-  action === "questions"
-    ? "Prepare AI questions"
-    : "Propose experience rewrite";
+  action === "questions" ? "Improve" : "Propose experience rewrite";
 afterEach(() => {
   vi.unstubAllGlobals();
   window.location.hash = "";
@@ -107,7 +105,9 @@ for (const action of ["questions", "rewrite"] as const) {
       mode: "autosave",
     });
     const client: IntelligenceClient = {
-      questions: vi.fn(() => pending.promise),
+      questions: vi.fn(async () =>
+        action === "questions" ? pending.promise : result("questions", d),
+      ),
       rewrite: vi.fn(() => pending.promise),
       importDocument: vi.fn(),
       listImports: vi.fn(),
@@ -117,12 +117,22 @@ for (const action of ["questions", "rewrite"] as const) {
     window.location.hash = "#enrich";
     render(<App adapter={adapter} intelligence={client} />);
     await screen.findByRole("button", {
-      name: "Propune rescrierea experienței",
+      name: "Îmbunătățește",
     });
     fireEvent.change(screen.getByLabelText("Limba interfeței"), {
       target: { value: "en" },
     });
-    fireEvent.click(screen.getByRole("button", { name: buttonName(action) }));
+    if (action === "rewrite") {
+      fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+      fireEvent.click(await screen.findByLabelText("Spreadsheet"));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Save and create description/ }),
+      );
+      await waitFor(() => expect(client.rewrite).toHaveBeenCalledTimes(1), {
+        timeout: 2500,
+      });
+    } else
+      fireEvent.click(screen.getByRole("button", { name: buttonName(action) }));
     expect(client[action]).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Editor" }));
     const firstName = await screen.findByRole("textbox", {
@@ -135,7 +145,8 @@ for (const action of ["questions", "rewrite"] as const) {
       async () => {
         const saved = (await adapter.load())!.draft;
         expect(saved.nameParts?.first).toBe("Newer edit");
-        expect(saved.questionPlans).toBeUndefined();
+        if (action === "questions") expect(saved.questionPlans).toBeUndefined();
+        else expect(saved.questionPlans?.[0].targetId).toBe(d.roles[0].id);
         expect(saved.roleRewriteReviews).toBeUndefined();
       },
       { timeout: 2500 },
@@ -153,7 +164,9 @@ for (const action of ["questions", "rewrite"] as const) {
           change={change}
           goEdit={() => {}}
           asOf={{ year: "2026", month: "10" }}
-          prepareQuestions={() => pending.promise}
+          prepareQuestions={
+            action === "questions" ? () => pending.promise : undefined
+          }
           rewriteRole={() => pending.promise}
         />
       </LanguageContext>,
@@ -185,13 +198,13 @@ for (const action of ["questions", "rewrite"] as const) {
             change={change}
             goEdit={() => {}}
             asOf={{ year: "2026", month: "10" }}
-            prepareQuestions={request}
+            prepareQuestions={action === "questions" ? request : undefined}
             rewriteRole={request}
           />
         </LanguageContext>,
       );
       fireEvent.click(screen.getByRole("button", { name: buttonName(action) }));
-      fireEvent.change(screen.getByLabelText("Entry"), {
+      fireEvent.change(screen.getByLabelText("Role or experience"), {
         target: { value: second.id },
       });
       fireEvent.click(screen.getByRole("button", { name: buttonName(action) }));
@@ -509,7 +522,7 @@ it.each([
       );
     }
     const view = render(<Surface />);
-    fireEvent.change(screen.getByLabelText("Entry"), {
+    fireEvent.change(screen.getByLabelText("Role or experience"), {
       target: { value: target },
     });
     await act(async () =>
@@ -521,7 +534,7 @@ it.each([
     const acceptedId = latest.roleRewriteReviews!.find(
       (r) => r.status === "accepted",
     )!.id;
-    fireEvent.change(screen.getByLabelText("Entry"), {
+    fireEvent.change(screen.getByLabelText("Role or experience"), {
       target: { value: other.id },
     });
     for (let i = 0; i < 25; i++) {
