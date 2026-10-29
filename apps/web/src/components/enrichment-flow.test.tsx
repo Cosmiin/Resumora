@@ -9,9 +9,17 @@ import {
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "../App";
 import { MemoryBaseCvAdapter } from "../base/adapter";
-import { blankDraft, fact, newRole, type BaseDraft } from "../base/model";
+import {
+  blankDraft,
+  clone,
+  fact,
+  newRole,
+  type BaseDraft,
+} from "../base/model";
+import { saveAnswer } from "../base/enrichment";
 import { careerContext } from "@resumora/contracts/intelligence/context";
 import { Enrichment } from "./Enrichment";
+import { RoleRewrite } from "./RoleRewrite";
 import { LanguageContext } from "./ui";
 import type { IntelligenceClient } from "../base/intelligence";
 
@@ -279,3 +287,242 @@ it("failed questions and automatic rewrite retry only on a deliberate click and 
   expect(questions).toHaveBeenCalledTimes(2);
   expect(latest.answers[0].status).toBe("confirmed");
 });
+
+it.each(["manual", "pruned", "completed"] as const)(
+  "edits a saved %s answer through its editor, preview and keyboard without replacing its provenance or role facts",
+  async (kind) => {
+    const original = fixture(),
+      batch = plan(original),
+      question = batch.questions[0],
+      role = original.roles[0];
+    const initial = saveAnswer(
+      original,
+      {
+        id: "saved-answer",
+        targetId: role.id,
+        question: "ownership",
+        questionText: question.text,
+        text: "Original personal contribution.",
+        status: "draft",
+        ...(kind === "manual"
+          ? {}
+          : {
+              plannedQuestionId: question.id,
+              options: question.options,
+              selectedOptionIds: ["merge"],
+              selectionMode: question.selectionMode,
+            }),
+      },
+      role.context.id,
+    );
+    if (kind === "completed") initial.questionPlans = [batch];
+    const oldSource = initial.sources.at(-1)!;
+    const ai = client(initial);
+    let latest = initial;
+    function Surface() {
+      const [draft, setDraft] = useState(initial);
+      latest = draft;
+      return (
+        <LanguageContext value="en">
+          <Enrichment
+            draft={draft}
+            change={setDraft}
+            goEdit={() => {}}
+            asOf={{ year: "2026", month: "10" }}
+            prepareQuestions={async () => batch}
+            rewriteRole={() =>
+              ai.rewrite({
+                snapshotId: "synthetic",
+                revision: 1,
+                targetId: role.id,
+                operationId: "synthetic",
+              })
+            }
+          />
+        </LanguageContext>
+      );
+    }
+    render(<Surface />);
+    expect(
+      screen.getByRole("button", { name: "Propose experience rewrite" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Edit answer" }));
+    const editor = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: question.text,
+    });
+    expect(editor.value).toBe("Original personal contribution.");
+    const preview = screen.getByRole("textbox", { name: "Answer preview" });
+    expect(preview.textContent).toBe(editor.value);
+    if (kind !== "manual") {
+      expect(
+        screen.getByRole<HTMLInputElement>("checkbox", {
+          name: "Consolidated team reports",
+        }).checked,
+      ).toBe(true);
+    }
+    fireEvent.change(editor, {
+      target: { value: "Updated personal contribution." },
+    });
+    expect(preview.textContent).toBe("Updated personal contribution.");
+    fireEvent.input(preview, {
+      target: { innerHTML: "Final personal contribution." },
+    });
+    expect(editor.value).toBe("Final personal contribution.");
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    expect(latest.answers).toHaveLength(1);
+    expect(latest.answers[0]).toMatchObject({
+      id: "saved-answer",
+      status: "confirmed",
+      text: "Final personal contribution.",
+    });
+    expect(latest.answers[0].sourceId).not.toBe(oldSource.id);
+    expect(latest.sources).toContainEqual(oldSource);
+    expect(latest.sources.at(-1)?.text).toContain(
+      "Final personal contribution.",
+    );
+    expect(latest.roles).toEqual(initial.roles);
+    await act(async () => {});
+    expect(ai.rewrite).not.toHaveBeenCalled();
+  },
+);
+
+it("allows a saved manual fallback answer to be rewritten after durable save", async () => {
+  const d = fixture(),
+    adapter = new MemoryBaseCvAdapter(),
+    ai = client(d);
+  vi.mocked(ai.questions).mockRejectedValue(new Error("Unavailable"));
+  vi.mocked(ai.rewrite).mockImplementation(async () => {
+    const persisted = (await adapter.load())!.draft;
+    expect(persisted.answers[0].status).toBe("confirmed");
+    expect(
+      persisted.sources.find((s) => s.id === persisted.answers[0].sourceId)
+        ?.text,
+    ).toBe("I checked source records each week.");
+    expect(persisted.roles).toEqual(d.roles);
+    return {
+      schemaVersion: "career-role-rewrite/1",
+      targetId: d.roles[0].id,
+      text: "Prepared weekly reports and checked source records.",
+      factIds: careerContext(persisted, d.roles[0].id).facts.map((f) => f.id),
+      warnings: [],
+    };
+  });
+  await open(adapter, ai, d);
+  fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: "Continue with manual questions",
+    }),
+  );
+  fireEvent.change(
+    screen.getByRole("textbox", {
+      name: "What were your day-to-day responsibilities?",
+    }),
+    {
+      target: { value: "I checked source records each week." },
+    },
+  );
+  fireEvent.click(screen.getByRole("button", { name: /Save and next/ }));
+  const rewrite = screen.getByRole<HTMLButtonElement>("button", {
+    name: "Propose experience rewrite",
+  });
+  expect(rewrite.disabled).toBe(true);
+  expect(ai.rewrite).not.toHaveBeenCalled();
+  await waitFor(() => expect(rewrite.disabled).toBe(false), { timeout: 3000 });
+  expect(ai.rewrite).not.toHaveBeenCalled();
+  fireEvent.click(rewrite);
+  await screen.findByLabelText("Proposal — review before acceptance");
+  expect(ai.questions).toHaveBeenCalledTimes(1);
+  expect(ai.rewrite).toHaveBeenCalledTimes(1);
+});
+
+it.each(["Skip", "I don't know"])(
+  "Undo of final %s before autosave cancels automatic rewriting and restores the question",
+  async (action) => {
+    const d = fixture(),
+      adapter = new MemoryBaseCvAdapter(),
+      ai = client(d);
+    await open(adapter, ai, d);
+    fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+    await screen.findByLabelText("Consolidated team reports");
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(action) }));
+    expect(ai.rewrite).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+    await screen.findByText(/Draft saved in session/, {}, { timeout: 3000 });
+    await act(async () => {});
+    const persisted = (await adapter.load())!.draft;
+    expect(persisted.answers).toEqual([]);
+    expect(persisted.questionPlans).toHaveLength(1);
+    expect(
+      screen.getByRole("textbox", { name: "How did you prepare reports?" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Propose experience rewrite" }),
+    ).toBeNull();
+    expect(ai.rewrite).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(action) }));
+    await screen.findByLabelText(
+      "Proposal — review before acceptance",
+      {},
+      { timeout: 3000 },
+    );
+    expect(ai.rewrite).toHaveBeenCalledTimes(1);
+    expect((await adapter.load())!.draft.roles).toEqual(d.roles);
+  },
+);
+
+it.each(["skipped", "unknown"] as const)(
+  "rechecks a queued %s batch at dispatch even when its evidence is unchanged",
+  async (status) => {
+    const d = fixture(),
+      batch = plan(d),
+      ai = client(d);
+    d.questionPlans = [batch];
+    d.answers = [
+      {
+        id: "last-answer",
+        targetId: batch.targetId,
+        plannedQuestionId: batch.questions[0].id,
+        question: "ownership",
+        questionText: batch.questions[0].text,
+        text: "",
+        status,
+      },
+    ];
+    const autoRequest = {
+      id: "queued",
+      input: careerContext(d, batch.targetId),
+      plan: batch,
+    };
+    function Surface({ draft, ready }: { draft: BaseDraft; ready: boolean }) {
+      return (
+        <LanguageContext value="en">
+          <RoleRewrite
+            draft={draft}
+            targetId={batch.targetId}
+            ready={ready}
+            autoRequest={autoRequest}
+            change={vi.fn()}
+            request={() =>
+              ai.rewrite({
+                snapshotId: "synthetic",
+                revision: 1,
+                targetId: batch.targetId,
+                operationId: "synthetic",
+              })
+            }
+          />
+        </LanguageContext>
+      );
+    }
+    const view = render(<Surface draft={d} ready={false} />);
+    const undone = clone(d);
+    undone.answers = [];
+    expect(careerContext(undone, batch.targetId)).toEqual(autoRequest.input);
+    await act(async () => view.rerender(<Surface draft={undone} ready />));
+    expect(ai.rewrite).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/Context changed. Review your answers/),
+    ).toBeTruthy();
+  },
+);

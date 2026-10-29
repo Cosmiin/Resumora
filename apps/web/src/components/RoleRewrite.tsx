@@ -8,7 +8,9 @@ import {
 import {
   validateRewrite,
   type RoleRewrite as Proposal,
+  type QuestionPlan,
 } from "@resumora/contracts/intelligence/model";
+import { nextQuestionIndex } from "../base/enrichment";
 import { clone, equalValues, type BaseDraft } from "../base/model";
 import { Button, useCopy } from "./ui";
 export function RoleRewrite({
@@ -21,7 +23,7 @@ export function RoleRewrite({
   ready = true,
   onAutoRequest,
 }: {
-  autoRequest?: { id: string; input: CareerContext };
+  autoRequest?: { id: string; input: CareerContext; plan: QuestionPlan };
   onAutoRequest?: () => void;
   ready?: boolean;
   draft: BaseDraft;
@@ -180,6 +182,8 @@ export function RoleRewrite({
       onAutoRequest?.();
       try {
         if (
+          nextQuestionIndex(current.current, autoRequest.plan) !==
+            autoRequest.plan.questions.length ||
           !equalValues(
             autoRequest.input,
             careerContext(current.current, targetId),

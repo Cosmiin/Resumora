@@ -14,6 +14,7 @@ import {
   removeAnswerFromCv,
   answerEvidenceText,
   enrichmentTarget,
+  nextQuestionIndex,
 } from "../base/enrichment";
 import { clone, type Answer, type BaseDraft } from "../base/model";
 import { focusField, patchFact } from "../base/editing";
@@ -82,6 +83,7 @@ export function Enrichment({
   const [rewriteCycle, setRewriteCycle] = useState<{
     id: string;
     input: CareerContext;
+    plan: QuestionPlan;
   } | null>(null);
   const currentDraft = useRef(d),
     requestGeneration = useRef(0);
@@ -105,23 +107,18 @@ export function Enrichment({
           p.questions.some((q) => q.id === editingAnswer.plannedQuestionId),
       )
     : d.questionPlans?.filter((p) => p.targetId === targetId).at(-1);
-  const planKey = activePlan?.questions.map((q) => q.id).join("|");
+  const questionIndex =
+    activePlan && !editingAnswer ? nextQuestionIndex(d, activePlan) : index;
+  const planned = activePlan?.questions[questionIndex];
+  const planFinished =
+    !!activePlan &&
+    !editingAnswer &&
+    questionIndex === activePlan.questions.length;
+  const showAnswer =
+    !prepareQuestions || !!activePlan || manual || !!editingAnswer;
   useEffect(() => {
-    if (activePlan && !editingAnswerId) {
-      const next = activePlan.questions.findIndex(
-        (q) =>
-          !d.answers.some(
-            (a) =>
-              a.targetId === targetId &&
-              a.plannedQuestionId === q.id &&
-              ["confirmed", "skipped", "unknown"].includes(a.status),
-          ),
-      );
-      setIndex(next < 0 ? activePlan.questions.length : next);
-    }
-  }, [targetId, planKey]);
-  const planned = activePlan?.questions[index];
-  const planFinished = !!activePlan && !planned;
+    if (!planFinished) setRewriteCycle(null);
+  }, [planFinished]);
   const input = useRef<HTMLTextAreaElement>(null),
     target = enrichmentTarget(d, targetId),
     question = planned?.dimension ?? dimensions[index % dimensions.length];
@@ -211,13 +208,14 @@ export function Enrichment({
       !rewriteRole ||
       !activePlan ||
       editingAnswerId ||
-      index !== activePlan.questions.length - 1
+      nextQuestionIndex(next, activePlan) !== activePlan.questions.length
     )
       return;
     try {
       setRewriteCycle({
         id: crypto.randomUUID(),
         input: careerContext(next, targetId),
+        plan: activePlan,
       });
     } catch {
       setError(
@@ -232,7 +230,7 @@ export function Enrichment({
     setEditingAnswerId(null);
     setIndex((i) =>
       activePlan
-        ? Math.min(i + 1, activePlan.questions.length)
+        ? Math.min(questionIndex + 1, activePlan.questions.length)
         : (i + 1) % dimensions.length,
     );
   }
@@ -357,7 +355,7 @@ export function Enrichment({
       className="editor-layout enrichment-inline"
       onKeyDown={(e) => {
         if (
-          (!activePlan && prepareQuestions && !manual) ||
+          !showAnswer ||
           !target ||
           e.nativeEvent.isComposing ||
           !(e.ctrlKey || e.metaKey)
@@ -481,7 +479,7 @@ export function Enrichment({
                 )}
               </Button>
             )}
-            {(!prepareQuestions || activePlan || manual) && (
+            {showAnswer && (
               <>
                 {planned && <p className="small muted">{planned.why}</p>}
                 <p className="eyebrow">
@@ -493,7 +491,7 @@ export function Enrichment({
                     : t("Îndrumare manuală", "Manual guidance")}{" "}
                   ·{" "}
                   {Math.min(
-                    index + 1,
+                    questionIndex + 1,
                     activePlan?.questions.length ?? dimensions.length,
                   )}
                   /{activePlan?.questions.length ?? dimensions.length}
@@ -615,7 +613,8 @@ export function Enrichment({
                         onClick={submit}
                       >
                         {activePlan &&
-                        index === activePlan.questions.length - 1 &&
+                        !editingAnswer &&
+                        questionIndex === activePlan.questions.length - 1 &&
                         rewriteRole
                           ? t(
                               "Salvează și creează descrierea",
@@ -660,24 +659,31 @@ export function Enrichment({
             "Answers and choices stay separate from the CV. AI suggestions are not confirmed facts.",
           )}
         </p>
-        {rewriteRole && target && (!prepareQuestions || planFinished) && (
-          <RoleRewrite
-            draft={d}
-            targetId={targetId}
-            request={rewriteRole}
-            autoRequest={rewriteCycle ?? undefined}
-            ready={ready}
-            onAutoRequest={() => setRewriteCycle(null)}
-            change={change}
-            accept={(draft, targetId, text, sources) =>
-              acceptWording(draft, targetId, {
-                text,
-                sources,
-                scope: "experience",
-              })
-            }
-          />
-        )}
+        {rewriteRole &&
+          target &&
+          (!prepareQuestions ||
+            planFinished ||
+            (!activePlan &&
+              saved.some(
+                (a) => a.targetId === targetId && a.status === "confirmed",
+              ))) && (
+            <RoleRewrite
+              draft={d}
+              targetId={targetId}
+              request={rewriteRole}
+              autoRequest={rewriteCycle ?? undefined}
+              ready={ready}
+              onAutoRequest={() => setRewriteCycle(null)}
+              change={change}
+              accept={(draft, targetId, text, sources) =>
+                acceptWording(draft, targetId, {
+                  text,
+                  sources,
+                  scope: "experience",
+                })
+              }
+            />
+          )}
         {!rewriteRole && transport && target && (
           <AiSuggestions
             draft={d}
@@ -694,21 +700,19 @@ export function Enrichment({
           className="card"
           aria-label={t("Context profesional", "Career context")}
         >
-          {target &&
-            !planFinished &&
-            (!prepareQuestions || activePlan || manual) && (
-              <>
-                <p>
-                  <strong>{answer.questionText}</strong>
-                </p>
-                <PreviewText
-                  key={answer.id}
-                  value={answer.text}
-                  label={t("Previzualizare răspuns", "Answer preview")}
-                  change={put}
-                />
-              </>
-            )}
+          {target && !planFinished && showAnswer && (
+            <>
+              <p>
+                <strong>{answer.questionText}</strong>
+              </p>
+              <PreviewText
+                key={answer.id}
+                value={answer.text}
+                label={t("Previzualizare răspuns", "Answer preview")}
+                change={put}
+              />
+            </>
+          )}
           {!!saved.length && (
             <>
               <h3>{t("Ultimul răspuns salvat", "Latest saved answer")}</h3>
