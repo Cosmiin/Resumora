@@ -1084,3 +1084,239 @@ it.each([
     }
   },
 );
+
+it.each(["save", "restore"] as const)(
+  "recovers a stale job %s through confirmed reopen from editor and history",
+  async (operation) => {
+    const h = jobHarness();
+    const original = structuredClone(h.source);
+    const firstTab = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    await firstTab.load();
+    const first = await firstTab.save({
+      draft: firstTab.initialDraft(),
+      expectedRevision: 0,
+      requestId: crypto.randomUUID(),
+    });
+    const secondTab = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    const load = vi.spyOn(secondTab, "load");
+    render(<App adapter={secondTab} />);
+    await waitFor(() =>
+      expect(screen.queryByText("Deschidem sesiunea…")).toBeNull(),
+    );
+    await screen.findByRole("region", { name: "Job CV context" });
+    fireEvent.click(
+      screen.getByText("Rezumat profesional", { selector: "summary" }),
+    );
+    const summary = screen.getByRole("textbox", {
+      name: "Rezumat profesional în cuvintele tale",
+    });
+    const remote = structuredClone(first.draft);
+    remote.summary.text = "Saved by another tab";
+    const current = await firstTab.save({
+      draft: remote,
+      expectedRevision: 1,
+      requestId: crypto.randomUUID(),
+    });
+    if (operation === "save") {
+      fireEvent.change(summary, { target: { value: "Retained local draft" } });
+      fireEvent.click(screen.getByRole("button", { name: /Salvează acum/ }));
+    } else {
+      fireEvent.click(screen.getByRole("button", { name: "Istoric" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Restaurează v2" }),
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "Restaurează versiunea" }),
+      );
+    }
+    const conflict = await screen.findByRole("alert");
+    expect(conflict.textContent).toContain("Sesiunea s-a schimbat");
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Înapoi la CV-ul de bază",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.click(
+      within(conflict).getByRole("button", {
+        name: "Redeschide versiunea salvată",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Păstrează ciorna" }));
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(h.versions.get(h.jobs[0])).toHaveLength(2);
+    if (operation === "save") {
+      expect(screen.getByDisplayValue("Retained local draft")).toBeTruthy();
+      fireEvent.click(
+        within(conflict).getByRole("button", { name: "Istoric" }),
+      );
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Inspectează v2" }),
+      );
+      expect(
+        screen.getByRole("region", { name: "Inspectezi v2" }).textContent,
+      ).toContain("Saved by another tab");
+    }
+    const pin = {
+      id: h.jobs[0],
+      versionId: crypto.randomUUID(),
+      fingerprint: "b".repeat(64),
+    };
+    h.pins.set(h.jobs[0], pin);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Redeschide versiunea salvată" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Înlocuiește ciorna" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(screen.getByDisplayValue("Saved by another tab")).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Înapoi la CV-ul de bază",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+    fireEvent.click(
+      screen.getByText("Rezumat profesional", { selector: "summary" }),
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", {
+        name: "Rezumat profesional în cuvintele tale",
+      }),
+      { target: { value: "Accepted after reopen" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Salvează acum/ }));
+    await waitFor(() => expect(h.versions.get(h.jobs[0])).toHaveLength(3));
+    const saved = h.versions.get(h.jobs[0])![2];
+    expect(saved.parentId).toBe(current.id);
+    expect(saved.payload.job).toEqual(pin);
+    expect(saved.payload.presentation.summaryText).toBe(
+      "Accepted after reopen",
+    );
+    expect(h.source).toEqual(original);
+    expect(h.versions.has(h.jobs[1])).toBe(false);
+  },
+);
+
+it.each(["role", "projects"] as const)(
+  "edits whole %s wording containing a job-local bullet without citing that bullet",
+  async (kind) => {
+    const h = jobHarness();
+    const entry = newOptionalEntry();
+    entry.title.value = "Source project";
+    entry.details.value = "Built tools";
+    const target = kind === "role" ? h.source.roles[0] : entry;
+    if (kind === "projects") {
+      h.source.optionalSections.push({
+        id: "projects",
+        kind,
+        label: "Projects",
+        entries: [entry],
+      });
+      h.source.presentation.order.push("projects");
+    }
+    const original = structuredClone(h.source);
+    const initial = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    await initial.load();
+    const first = await initial.save({
+      draft: initial.initialDraft(),
+      expectedRevision: 0,
+      requestId: crypto.randomUUID(),
+    });
+    const payload = structuredClone(h.versions.get(h.jobs[0])![0].payload);
+    const addition = {
+      id: "job_local_bullet",
+      targetId: target.id,
+      kind: "bullet" as const,
+      text: "Reduced downtime for this job",
+      scope: "job-only" as const,
+      origin: "user_authored" as const,
+    };
+    payload.localAdditions.push(addition);
+    const added = await h.transport(`/v1/jobs/${h.jobs[0]}/cv/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestId: crypto.randomUUID(),
+        documentId: h.versions.get(h.jobs[0])![0].documentId,
+        expectedRevision: first.revision,
+        payload,
+      }),
+    });
+    expect(added.status).toBe(200);
+    const adapter = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    let draft = (await adapter.load())!.draft;
+    const view = render(
+      <Editor
+        jobMode
+        draft={draft}
+        issues={[]}
+        change={(next) => {
+          draft = next;
+        }}
+      />,
+    );
+    const panel = screen.getByText(
+      kind === "role" ? "Experiență profesională" : "Projects",
+      { selector: "summary" },
+    );
+    fireEvent.click(panel);
+    const input = within(panel.closest("details")!).getByRole("textbox", {
+      name: "Formulare pentru acest job",
+    }) as HTMLTextAreaElement;
+    expect(input.value).toContain(addition.text);
+    const text = `${input.value}\nAccepted wording`;
+    fireEvent.change(input, { target: { value: text } });
+    view.unmount();
+    const wording = draft.presentation.approvedWording![target.id];
+    expect(wording.scope).toBe("experience");
+    expect(wording.sources.length).toBeGreaterThan(0);
+    expect(
+      wording.sources.some(
+        (s) => s.id === addition.id || s.sourceId === "job_local_manual",
+      ),
+    ).toBe(false);
+    const saved = await adapter.save({
+      draft,
+      expectedRevision: 2,
+      requestId: crypto.randomUUID(),
+    });
+    const persisted = h.versions.get(h.jobs[0])![2].payload;
+    expect(persisted.localAdditions).toContainEqual(addition);
+    expect(
+      persisted.wording.find((w) => w.targetId === target.id)!.valueIds,
+    ).not.toContain(addition.id);
+    const reopened = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    const loaded = (await reopened.load())!;
+    const historical = (await reopened.history()).find(
+      (s) => s.id === saved.id,
+    )!;
+    const restored = await reopened.restore({
+      snapshotId: saved.id,
+      expectedRevision: 3,
+      requestId: crypto.randomUUID(),
+    });
+    for (const snapshot of [loaded, historical, restored]) {
+      expect(currentWording(snapshot.draft, target.id)).toBe(text);
+      expect(
+        snapshot.draft.presentation.approvedWording![target.id].scope,
+      ).toBe("experience");
+      const preview = render(
+        <DocumentPreview
+          draft={snapshot.draft}
+          asOf={{ year: "2026", month: "10" }}
+        />,
+      );
+      expect(
+        screen
+          .getByRole("complementary", { name: "Previzualizare CV" })
+          .textContent?.split(addition.text),
+      ).toHaveLength(2);
+      preview.unmount();
+    }
+    expect(h.source).toEqual(original);
+    expect(h.versions.has(h.jobs[1])).toBe(false);
+  },
+);

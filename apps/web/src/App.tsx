@@ -716,6 +716,14 @@ function CvEditor({
                       : t("Reîncearcă", "Retry")}
                 </Button>
               )}
+              {jobMode && error === "conflict" && (
+                <Button
+                  disabled={busy || loading || !!pendingWrite.current}
+                  onClick={() => setDialog({ kind: "reopen" })}
+                >
+                  {t("Redeschide versiunea salvată", "Reopen saved version")}
+                </Button>
+              )}
             </div>
           )}
           {route === "history" && historyError && (

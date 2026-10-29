@@ -881,17 +881,19 @@ export function Editor({
                 d.sources.some((s) => s.id === a.sourceId),
             );
             const sources = [
-              ...fields.map((f) => ({
-                id: f.fact.id,
-                text: String(f.fact.value),
-                sourceId: f.fact.sourceId,
-                ...(f.fact.sourceClaimId
-                  ? { sourceClaimId: f.fact.sourceClaimId }
-                  : {}),
-                ...(f.fact.sourceLineage
-                  ? { sourceLineage: f.fact.sourceLineage }
-                  : {}),
-              })),
+              ...fields
+                .filter((f) => f.fact.sourceId !== "job_local_manual")
+                .map((f) => ({
+                  id: f.fact.id,
+                  text: String(f.fact.value),
+                  sourceId: f.fact.sourceId,
+                  ...(f.fact.sourceClaimId
+                    ? { sourceClaimId: f.fact.sourceClaimId }
+                    : {}),
+                  ...(f.fact.sourceLineage
+                    ? { sourceLineage: f.fact.sourceLineage }
+                    : {}),
+                })),
               ...answers.map((a) => ({
                 id: a.id,
                 text: answerEvidenceText(a),
