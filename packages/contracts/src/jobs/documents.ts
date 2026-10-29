@@ -130,6 +130,7 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
       const matches = targets.filter(t => t.id === addition.targetId);
       if (matches.length !== 1) invalid(); const target = matches[0];
       (target.bullets ??= []).push(f);
+      delete draft.presentation.contributionHtml?.[addition.targetId];
     } else {
       const group = addition.kind === 'professionalSkill' ? 'professionalSkills' : 'technicalSkills';
       if (addition.targetId !== group) invalid(); draft[group].push(f);

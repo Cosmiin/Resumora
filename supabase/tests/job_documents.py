@@ -264,6 +264,42 @@ def suite(db):
             wrong=copy.deepcopy(fresh); wrong['job']['fingerprint']='0'*64
             self.assertIn('VERSION_CONFLICT',self.save(wrong,doc=first['documentId'],revision=2,error=True))
 
+        def test_concurrent_vacancy_review_fences_waiting_job_save_without_deadlock(self):
+            first=self.save()
+            process=subprocess.Popen(db.command(),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=db.env,text=True,bufsize=1)
+            try:
+                process.stdin.write(f"BEGIN; DO $$ BEGIN PERFORM 1 FROM app.target_job_contexts WHERE job_id='{self.job1['id']}' FOR UPDATE; END $$; SELECT 'locked';\n")
+                process.stdin.flush()
+                self.assertEqual(process.stdout.readline().strip(),'locked')
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future=pool.submit(self.save,None,first['documentId'],1,None,None,None,True)
+                    import time
+                    deadline=time.monotonic()+5
+                    while time.monotonic()<deadline:
+                        waiting=db.sql("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT app.save_job_editor(%'")
+                        if int(waiting)>0:
+                            break
+                        time.sleep(.01)
+                    else:
+                        process.stdin.write('ROLLBACK;\n');process.stdin.flush()
+                        self.fail('Save did not reach the expected lock wait')
+                    output,errors=process.communicate(f"SET LOCAL ROLE authenticated; SET LOCAL \"request.jwt.claim.sub\"='{self.a}'; SELECT app.review_target_job('{uid()}','{self.job1['id']}','Engineer','Reviewed employer','[]'); COMMIT;\n",timeout=10)
+                    self.assertEqual(process.returncode,0,errors)
+                    reviewed=json.loads(output.strip())
+                    self.assertEqual(reviewed['state'],'reviewed')
+                    rejection=future.result(timeout=10)
+                    self.assertIn('VERSION_CONFLICT',rejection)
+                    self.assertNotIn('deadlock',rejection.lower())
+                self.assertEqual(self.history(self.job1['id'],first['documentId']),[first])
+                self.assertEqual(self.jsoncall('load_base_draft'),self.base)
+                fresh=self.payload_for(reviewed)
+                saved=self.save(fresh,doc=first['documentId'],revision=1)
+                self.assertEqual(saved['revision'],2)
+                self.assertEqual(saved['payload']['job']['versionId'],reviewed['versionId'])
+            finally:
+                if process.poll() is None:
+                    process.communicate('ROLLBACK;\n',timeout=10)
+
         def test_history_pagination_owned_version_lookup_and_limits(self):
             first=self.save()
             for revision in range(1,4):

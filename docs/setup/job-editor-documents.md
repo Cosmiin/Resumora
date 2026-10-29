@@ -6,7 +6,7 @@ I2 delivers backend contracts, RPCs, API endpoints and version history only. The
 
 The following integration slice must wire a job-scoped adapter into the existing editor and history, selected from the saved vacancy. It must use these context/load/save/history/restore/delete endpoints, preserve source and job pins, request IDs and revision checks, and keep job saves separate from the Base adapter. Existing projection/preview tests demonstrate compatibility, not application workflow completion.
 
-The forward migrations `20261029010000_p3_job_editor_documents.sql` and `20261029020000_p3_job_editor_source_refresh.sql` are local implementation only. Hosted application, migration and deployment remain separately gated.
+The forward migrations `20261029010000_p3_job_editor_documents.sql`, `20261029020000_p3_job_editor_source_refresh.sql` and `20261029030000_p3_job_editor_lock_order.sql` are local implementation only. Hosted application, migration and deployment remain separately gated.
 
 ## Stored contract
 
