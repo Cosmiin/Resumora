@@ -17,6 +17,12 @@ import {
   type SourceBox,
   type SourceRun,
 } from "../base/source-location";
+import {
+  locateOcrQuote,
+  ocrSourceBox,
+  type LocalPageOcr,
+  type OcrPage,
+} from "../base/local-ocr";
 import { Button, useCopy } from "./ui";
 export function OriginalSource({
   review,
@@ -30,6 +36,16 @@ export function OriginalSource({
   const t = useCopy(),
     canvas = useRef<HTMLCanvasElement>(null),
     scroll = useRef<HTMLDivElement>(null);
+  const ocr = useRef<LocalPageOcr | undefined>(undefined);
+  const [ocrPage, setOcrPage] = useState<{
+    pdf: PDFDocumentProxy;
+    page: number;
+    data: OcrPage;
+  }>();
+  const [needsOcr, setNeedsOcr] = useState(false),
+    [ocrBusy, setOcrBusy] = useState(false),
+    [ocrAttempt, retryOcr] = useState(0);
+  const [boxKind, setBoxKind] = useState<"native" | "ocr">("native");
   const [paneWidth, setPaneWidth] = useState(400);
   const [pdf, setPdf] = useState<PDFDocumentProxy>(),
     [error, setError] = useState(false),
@@ -62,6 +78,11 @@ export function OriginalSource({
   useEffect(() => {
     const controller = new AbortController();
     let document: PDFDocumentProxy | undefined;
+    ocr.current?.dispose();
+    ocr.current = undefined;
+    setOcrPage(undefined);
+    setNeedsOcr(false);
+    setOcrBusy(false);
     setPdf(undefined);
     setError(false);
     setRendered(false);
@@ -113,6 +134,8 @@ export function OriginalSource({
     });
     return () => {
       controller.abort();
+      ocr.current?.dispose();
+      ocr.current = undefined;
       void document?.destroy();
     };
   }, [client, review.id, review.sourceHash, review.format, attempt]);
@@ -162,7 +185,32 @@ export function OriginalSource({
           ),
         ];
       });
-      setBoxes(located.length === matched.length ? located : []);
+      const native = located.length === matched.length ? located : [];
+      setNeedsOcr(!native.length && candidate?.page === page);
+      if (native.length) {
+        setBoxes(native);
+        setBoxKind("native");
+      } else if (
+        ocrPage?.pdf === pdf &&
+        ocrPage.page === page &&
+        candidate?.page === page
+      ) {
+        const rasterViewport = original.getViewport({
+          scale: ocrPage.data.scale,
+          rotation: original.rotate,
+        });
+        const words = locateOcrQuote(ocrPage.data.words, candidate.quote);
+        setBoxes(
+          words.map((word) =>
+            ocrSourceBox(
+              word,
+              (x, y) => rasterViewport.convertToPdfPoint(x, y),
+              (x, y) => viewport.convertToViewportPoint(x, y),
+            ),
+          ),
+        );
+        setBoxKind("ocr");
+      }
       setRendered(true);
     })().catch(() => {
       if (active) setError(true);
@@ -171,7 +219,67 @@ export function OriginalSource({
       active = false;
       task?.cancel();
     };
-  }, [pdf, page, zoom, rotation, candidate?.id, paneWidth]);
+  }, [pdf, page, zoom, rotation, candidate?.id, paneWidth, ocrPage]);
+  useEffect(() => {
+    if (!pdf || !needsOcr || candidate?.page !== page) {
+      setOcrBusy(false);
+      return;
+    }
+    const controller = new AbortController();
+    let render: { cancel(): void } | undefined;
+    let raster: HTMLCanvasElement | undefined;
+    setOcrBusy(true);
+    void (async () => {
+      const { browserPageOcr } = await import("../base/local-ocr-browser");
+      if (controller.signal.aborted) return;
+      const engine = ocr.current ?? (ocr.current = browserPageOcr());
+      let data = engine.get(page);
+      if (!data) {
+        const original = await pdf.getPage(page);
+        if (controller.signal.aborted) return;
+        const natural = original.getViewport({
+          scale: 1,
+          rotation: original.rotate,
+        });
+        const scale = Math.min(2, 1600 / natural.width, 2400 / natural.height);
+        const viewport = original.getViewport({
+          scale,
+          rotation: original.rotate,
+        });
+        raster = document.createElement("canvas");
+        raster.width = Math.ceil(viewport.width);
+        raster.height = Math.ceil(viewport.height);
+        const task = original.render({ canvas: raster, viewport });
+        render = task;
+        await task.promise;
+        if (controller.signal.aborted) return;
+        const blob = await new Promise<Blob | null>((resolve) =>
+          raster!.toBlob(resolve, "image/png"),
+        );
+        if (!blob) throw new Error("OCR_RASTER_UNAVAILABLE");
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        if (controller.signal.aborted) return;
+        data = await engine.recognize(
+          page,
+          { bytes, width: raster.width, height: raster.height, scale },
+          controller.signal,
+        );
+      }
+      if (!controller.signal.aborted) setOcrPage({ pdf, page, data });
+    })()
+      .catch(() => {
+        /* An unmatched/failed page remains explicitly unlocated, with a retry control. */
+      })
+      .finally(() => {
+        if (raster) raster.width = 0;
+        if (!controller.signal.aborted) setOcrBusy(false);
+      });
+    return () => {
+      controller.abort();
+      render?.cancel();
+      ocr.current?.cancel();
+    };
+  }, [pdf, page, needsOcr, ocrAttempt]);
   return (
     <aside
       className="card original-source"
@@ -235,16 +343,37 @@ export function OriginalSource({
           <p role="status" className="small">
             {!rendered
               ? t("Deschidem pagina…", "Opening page…")
-              : boxes.length
+              : ocrBusy
                 ? t(
-                    "Potrivire exactă în textul original, marcată mai jos.",
-                    "Exact match in original text, boxed below.",
+                    "Căutăm sursa în această pagină…",
+                    "Locating the source on this page…",
                   )
-                : t(
-                    "Locație indisponibilă: scanare, text diferit sau potrivire ambiguă. Verifică pagina originală.",
-                    "Location unavailable: scan, differing text or ambiguous match. Check the original page.",
-                  )}
+                : boxes.length
+                  ? boxKind === "ocr"
+                    ? t(
+                        "Potrivire unică în textul recunoscut local; verifică zona marcată.",
+                        "Unique match in locally recognized text; check the boxed area.",
+                      )
+                    : t(
+                        "Potrivire exactă în textul original, marcată mai jos.",
+                        "Exact match in original text, boxed below.",
+                      )
+                  : t(
+                      "Locație indisponibilă: text ilizibil, diferit sau potrivire ambiguă. Verifică pagina originală.",
+                      "Location unavailable: unreadable, differing text or ambiguous match. Check the original page.",
+                    )}
           </p>
+          {rendered && !boxes.length && !ocrBusy && needsOcr && (
+            <Button
+              onClick={() => {
+                ocr.current?.forget(page);
+                setOcrPage(undefined);
+                retryOcr((n) => n + 1);
+              }}
+            >
+              {t("Reîncearcă localizarea", "Retry source location")}
+            </Button>
+          )}
           <div
             ref={scroll}
             className="source-scroll"
