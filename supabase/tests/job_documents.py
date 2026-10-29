@@ -74,6 +74,41 @@ def suite(db):
             args=f"'{key or uid()}','{job or self.job1['id']}','{saved['documentId']}',{revision},'{version}'"
             return self.call('restore_job_editor', args, error=True) if error else self.jsoncall('restore_job_editor', args)
 
+        def test_whole_experience_scope_save_history_and_restore(self):
+            payload = copy.deepcopy(self.payload)
+            payload['wording'][0].update(scope='experience', origin='user_authored')
+            first = self.save(payload)
+            self.assertEqual(first['payload'], payload)
+            for scope in ['paragraph', 'career', None, 1]:
+                bad = copy.deepcopy(payload)
+                bad['wording'][0]['scope'] = scope
+                self.assertIn('INVALID_EDITOR_PAYLOAD', self.save(bad, doc=first['documentId'], revision=1, error=True))
+            paragraph = copy.deepcopy(payload)
+            del paragraph['wording'][0]['scope']
+            second = self.save(paragraph, doc=first['documentId'], revision=1)
+            restored = self.restore(second, first['id'], 2)
+            self.assertEqual(restored['payload'], payload)
+            self.assertEqual(self.history(self.job1['id'], first['documentId']), [restored, second, first])
+            self.assertEqual(self.jsoncall('load_base_draft')['payload'], self.source)
+
+        def test_manual_summary_and_ordered_competence_selections(self):
+            payload=copy.deepcopy(self.payload)
+            payload['presentation']=dict(summaryText='Job-local professional summary', professionalSkillIds=['job_local_p'], technicalSkillIds=['job_local_t'])
+            payload['localAdditions']=[dict(id='job_local_p',targetId='professionalSkills',kind='professionalSkill',text='Planning',scope='job-only',origin='user_authored'),
+                                       dict(id='job_local_t',targetId='technicalSkills',kind='technicalSkill',text='SQL',scope='job-only',origin='user_authored')]
+            first=self.save(payload)
+            self.assertEqual(first['payload'],payload)
+            bad=copy.deepcopy(payload);bad['presentation']['technicalSkillIds']=['job_local_p']
+            self.assertIn('INVALID_EDITOR_PAYLOAD',self.save(bad,doc=first['documentId'],revision=1,error=True))
+            bad['presentation']['technicalSkillIds']=['foreign']
+            self.assertIn('INVALID_EDITOR_PAYLOAD',self.save(bad,doc=first['documentId'],revision=1,error=True))
+            payload['presentation']['summaryText']=''
+            second=self.save(payload,doc=first['documentId'],revision=1)
+            restored=self.restore(second,first['id'],2)
+            self.assertEqual(restored['payload'],first['payload'])
+            self.assertEqual(self.jsoncall('load_base_draft')['payload'],self.source)
+            self.assertIsNone(self.jsoncall('load_job_editor',f"'{self.job2['id']}'"))
+
         def test_i0_import_metadata_selected_options_and_accepted_wording_roundtrip(self):
             imported=json.loads((Path(__file__).resolve().parents[2]/'packages/contracts/fixtures/job-editor-import.json').read_text())
             imported_base=self.jsoncall('save_base_draft',f"'{uid()}',1,{literal(imported)},'autosave'")

@@ -1,3 +1,5 @@
+import { answerEvidenceText } from "@resumora/contracts/intelligence/model";
+import { jobEditorFacts } from "@resumora/contracts/jobs/documents";
 import {
   useContext,
   useState,
@@ -7,6 +9,7 @@ import {
 } from "react";
 import { Info, Plus, X } from "lucide-react";
 import {
+  isAuthored,
   clone,
   editFact,
   fact,
@@ -28,6 +31,7 @@ import {
   languageLevels,
   setContributions,
 } from "../base/editing";
+import { currentWording, isWordingFieldVisible } from "../base/wording";
 import { sectionName } from "../base/sections";
 import type { Issue } from "../base/validation";
 import { Button, Field, LanguageContext, issueText, useCopy } from "./ui";
@@ -36,12 +40,19 @@ import { Contributions } from "./Contributions";
 import { MonthYearField } from "./MonthYearField";
 
 type Props = {
+  jobMode?: boolean;
   photoEditor?: ReactNode;
   draft: BaseDraft;
   issues: Issue[];
   change: (next: BaseDraft) => void;
 };
-export function Editor({ draft: d, issues, change, photoEditor }: Props) {
+export function Editor({
+  draft: d,
+  issues,
+  change,
+  photoEditor,
+  jobMode = false,
+}: Props) {
   const t = useCopy(),
     locale = useContext(LanguageContext);
   const [opened, setOpened] = useState<string | null>("identity");
@@ -77,7 +88,7 @@ export function Editor({ draft: d, issues, change, photoEditor }: Props) {
   function toggle(id: string) {
     update((n) => {
       const c = n.contacts.find((c) => c.value.fieldId === id);
-      if (c) {
+      if (c && !jobMode) {
         c.visible = !visible(id);
         n.presentation.hiddenFields = (
           n.presentation.hiddenFields ?? []
@@ -87,6 +98,22 @@ export function Editor({ draft: d, issues, change, photoEditor }: Props) {
         n.presentation.hiddenFields = hidden.includes(id)
           ? hidden.filter((x) => x !== id)
           : [...hidden, id];
+      }
+      if (jobMode) {
+        const target = jobEditorFacts(n).find(
+          (f) =>
+            f.key === "bullet" &&
+            f.fact.fieldId === id &&
+            f.fact.sourceId === "job_local_manual",
+        )?.ref.entityId;
+        if (
+          target &&
+          n.presentation.approvedWording?.[target]?.scope === "experience"
+        ) {
+          delete n.presentation.approvedWording[target];
+          if (!Object.keys(n.presentation.approvedWording).length)
+            delete n.presentation.approvedWording;
+        }
       }
     });
   }
@@ -826,6 +853,127 @@ export function Editor({ draft: d, issues, change, photoEditor }: Props) {
     );
   }
   function content(section: string) {
+    if (
+      jobMode &&
+      !["summary", "professionalSkills", "technicalSkills"].includes(section)
+    ) {
+      const targets =
+        section === "experience"
+          ? d.roles
+          : (d.optionalSections.find(
+              (s) => s.id === section && s.kind !== "languages",
+            )?.entries ?? []);
+      return (
+        <>
+          <p>
+            {t(
+              "Faptele provin din versiunea fixată a CV-ului de bază. Aici poți schimba formularea fără a inventa experiență.",
+              "Facts come from the pinned Base CV. Change wording here without inventing experience.",
+            )}
+          </p>
+          {section === "identity" && photoEditor}
+          {sectionFacts(d, section)
+            .filter((f) => typeof f.value === "string" && f.value)
+            .map((f) => (
+              <div key={f.fieldId}>
+                {box(f.fieldId, String(f.value), <p>{String(f.value)}</p>)}
+              </div>
+            ))}
+          {targets.map((target) => {
+            const fields = jobEditorFacts(d).filter(
+              (f) =>
+                f.ref.entityId === target.id &&
+                ["context", "details", "bullet"].includes(f.key) &&
+                isAuthored(f.fact) &&
+                isWordingFieldVisible(d, target.id, f.fact.fieldId) &&
+                d.sources.some((s) => s.id === f.fact.sourceId),
+            );
+            const answers = d.answers.filter(
+              (a) =>
+                a.targetId === target.id &&
+                a.status === "confirmed" &&
+                isWordingFieldVisible(d, target.id, a.cvFieldId) &&
+                a.sourceId &&
+                d.sources.some((s) => s.id === a.sourceId),
+            );
+            const sources = [
+              ...fields
+                .filter((f) => f.fact.sourceId !== "job_local_manual")
+                .map((f) => ({
+                  id: f.fact.id,
+                  text: String(f.fact.value),
+                  sourceId: f.fact.sourceId,
+                  ...(f.fact.sourceClaimId
+                    ? { sourceClaimId: f.fact.sourceClaimId }
+                    : {}),
+                  ...(f.fact.sourceLineage
+                    ? { sourceLineage: f.fact.sourceLineage }
+                    : {}),
+                })),
+              ...answers.map((a) => ({
+                id: a.id,
+                text: answerEvidenceText(a),
+                sourceId: a.sourceId!,
+              })),
+            ];
+            const accepted = currentWording(d, target.id);
+            const text =
+              accepted !== null &&
+              d.presentation.approvedWording?.[target.id]?.scope ===
+                "experience"
+                ? accepted
+                : [
+                    accepted ??
+                      fields.find((f) => f.key !== "bullet")?.fact.value,
+                    ...fields
+                      .filter((f) => f.key === "bullet")
+                      .map((f) => f.fact.value),
+                    ...answers.map(answerEvidenceText),
+                  ]
+                    .filter(Boolean)
+                    .join("\n");
+            return (
+              <div key={target.id} className="stack">
+                <strong>{target.title.value}</strong>
+                {sources.length ? (
+                  <Field
+                    id={`job-wording-${target.id}`}
+                    label={t(
+                      "Formulare pentru acest job",
+                      "Wording for this job",
+                    )}
+                    multiline
+                    value={text}
+                    hint={t(
+                      "Salvarea acceptă formularea ta. Pentru a ascunde conținutul folosește vizibilitatea.",
+                      "Saving accepts your wording. Use visibility to hide content.",
+                    )}
+                    onChange={(text) =>
+                      update((n) => {
+                        (n.presentation.approvedWording ??= {})[target.id] = {
+                          text,
+                          sources,
+                          scope: "experience",
+                          origin: "user_authored",
+                        };
+                        delete n.presentation.contributionHtml?.[target.id];
+                      })
+                    }
+                  />
+                ) : (
+                  <p>
+                    {t(
+                      "Adaugă mai întâi context confirmat în CV-ul de bază.",
+                      "Add confirmed context in Base CV first.",
+                    )}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </>
+      );
+    }
     if (section === "identity") return identity();
     if (section === "summary")
       return box(
@@ -929,35 +1077,42 @@ export function Editor({ draft: d, issues, change, photoEditor }: Props) {
           </Sortable>
         ))}
       </details>
-      <details className="add-section">
-        <summary>{t("Adaugă secțiune", "Add section")}</summary>
-        <div className="optional-contacts">
-          {(
-            [
-              "projects",
-              "certifications",
-              "volunteering",
-              "custom",
-            ] as OptionalKind[]
-          ).map((kind) => (
-            <button
-              type="button"
-              key={kind}
-              onClick={() => {
-                const id = localId();
-                update((n) => {
-                  n.optionalSections.push({ id, kind, label: "", entries: [] });
-                  n.presentation.order.push(id);
-                });
-                setOpened(id);
-                focusFirstField(`section-${id}`);
-              }}
-            >
-              {sectionName(kind, locale)}
-            </button>
-          ))}
-        </div>
-      </details>
+      {!jobMode && (
+        <details className="add-section">
+          <summary>{t("Adaugă secțiune", "Add section")}</summary>
+          <div className="optional-contacts">
+            {(
+              [
+                "projects",
+                "certifications",
+                "volunteering",
+                "custom",
+              ] as OptionalKind[]
+            ).map((kind) => (
+              <button
+                type="button"
+                key={kind}
+                onClick={() => {
+                  const id = localId();
+                  update((n) => {
+                    n.optionalSections.push({
+                      id,
+                      kind,
+                      label: "",
+                      entries: [],
+                    });
+                    n.presentation.order.push(id);
+                  });
+                  setOpened(id);
+                  focusFirstField(`section-${id}`);
+                }}
+              >
+                {sectionName(kind, locale)}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

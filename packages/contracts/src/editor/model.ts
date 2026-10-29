@@ -123,6 +123,7 @@ export type DocumentPresentation = {
     {
       text: string;
       scope?: "experience";
+      origin?: "user_authored" | "ai_generated";
       sources: {
         id: string;
         text: string;

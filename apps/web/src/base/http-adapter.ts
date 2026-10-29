@@ -12,10 +12,11 @@ export class HttpBaseCvAdapter implements BaseCvAdapter {
   constructor(
     private readonly transport: CvTransport = (path, init) =>
       fetch(path, { ...init, credentials: "same-origin", cache: "no-store" }),
+    private readonly prefix = "/v1/base-cv",
   ) {}
 
-  private async request<T>(path: string, input?: unknown): Promise<T> {
-    const response = await this.transport(`/v1/base-cv${path}`, {
+  async request<T>(path: string, input?: unknown): Promise<T> {
+    const response = await this.transport(`${this.prefix}${path}`, {
       method: input === undefined ? "GET" : "POST",
       cache: "no-store",
       ...(input === undefined

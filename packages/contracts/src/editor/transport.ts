@@ -261,7 +261,10 @@ const draftShape = obj(
                   ),
                 ),
               },
-              { scope: one("experience") },
+              {
+                scope: one("experience"),
+                origin: one("user_authored", "ai_generated"),
+              },
             ),
           ),
         contributionHtml: (v) =>

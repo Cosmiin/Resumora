@@ -16,8 +16,8 @@ export type JobEditorPayload = {
   selectedAnswerIds: string[];
   // Pending proposals belong to the proposal workflow, never to saved versions.
   wording: { targetId: string; text: string; origin: 'ai_generated' | 'user_authored';
-    acceptance: 'accepted'; valueIds: string[]; answerIds: string[] }[];
-  presentation: Partial<Pick<DocumentPresentation, 'order' | 'hidden' | 'hiddenFields' | 'templateVersionId' | 'photo'>>;
+    acceptance: 'accepted'; scope?: 'experience'; valueIds: string[]; answerIds: string[] }[];
+  presentation: Partial<Pick<DocumentPresentation, 'order' | 'hidden' | 'hiddenFields' | 'templateVersionId' | 'photo'>> & { summaryText?: string; professionalSkillIds?: string[]; technicalSkillIds?: string[] };
   localAdditions: { id: string; targetId: string; kind: 'bullet' | 'professionalSkill' | 'technicalSkill';
     text: string; scope: 'job-only'; origin: 'user_authored' }[];
 };
@@ -53,11 +53,12 @@ export function isJobEditorPayload(v: unknown): v is JobEditorPayload {
       keys(f, ['entityId','fieldId','valueId','sourceId']) && Object.values(f).every(handle)) ||
     new Set(v.selectedFacts.map(f => f.valueId)).size !== v.selectedFacts.length || !strings(v.selectedAnswerIds) ||
     !Array.isArray(v.wording) || v.wording.length > 200 || !v.wording.every(w => record(w) &&
-      keys(w, ['targetId','text','origin','acceptance','valueIds','answerIds']) && handle(w.targetId) && text(w.text) &&
-      ['ai_generated','user_authored'].includes(w.origin as string) && w.acceptance === 'accepted' && strings(w.valueIds) && strings(w.answerIds) && w.valueIds.length + w.answerIds.length > 0) ||
+      keys(w, ['targetId','text','origin','acceptance','valueIds','answerIds','scope'], ['targetId','text','origin','acceptance','valueIds','answerIds']) && handle(w.targetId) && text(w.text) &&
+      ['ai_generated','user_authored'].includes(w.origin as string) && w.acceptance === 'accepted' && (!Object.hasOwn(w, 'scope') || w.scope === 'experience') && strings(w.valueIds) && strings(w.answerIds) && w.valueIds.length + w.answerIds.length > 0) ||
     new Set(v.wording.map(w => w.targetId)).size !== v.wording.length || !record(v.presentation) ||
-    !keys(v.presentation, ['order','hidden','hiddenFields','templateVersionId','photo'], []) ||
-    ['order','hidden','hiddenFields'].some(k => Object.hasOwn(v.presentation as object, k) && !strings((v.presentation as Record<string, unknown>)[k])) ||
+    !keys(v.presentation, ['order','hidden','hiddenFields','templateVersionId','photo','summaryText','professionalSkillIds','technicalSkillIds'], []) ||
+    ['order','hidden','hiddenFields','professionalSkillIds','technicalSkillIds'].some(k => Object.hasOwn(v.presentation as object, k) && !strings((v.presentation as Record<string, unknown>)[k])) ||
+    (Object.hasOwn(v.presentation, 'summaryText') && (typeof v.presentation.summaryText !== 'string' || v.presentation.summaryText.length > 20000)) ||
     (Object.hasOwn(v.presentation, 'templateVersionId') && (typeof v.presentation.templateVersionId !== 'string' || !/^[a-z][a-z0-9_-]{1,79}$/.test(v.presentation.templateVersionId))) ||
     (Object.hasOwn(v.presentation, 'photo') && !isPhoto(v.presentation.photo)) ||
     !Array.isArray(v.localAdditions) || v.localAdditions.length > 200 || !v.localAdditions.every(a => record(a) &&
@@ -116,10 +117,15 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
       if (!a || !a.sourceId || !draft.sources.some(s => s.id === a.sourceId)) invalid();
       evidence.push({ id: a.id, text: answerEvidenceText(a), sourceId: a.sourceId });
     }
-    (draft.presentation.approvedWording ??= {})[w.targetId] = { text: w.text, sources: evidence };
+    (draft.presentation.approvedWording ??= {})[w.targetId] = { text: w.text, sources: evidence, ...(w.scope ? { scope: w.scope, origin: w.origin } : {}) };
     delete draft.presentation.contributionHtml?.[w.targetId];
   }
-  Object.assign(draft.presentation, structuredClone(payload.presentation));
+  const hiddenContacts = draft.contacts.filter(c => !c.visible).map(c => c.value.fieldId);
+  if (hiddenContacts.length) draft.presentation.hiddenFields = [...new Set([...(draft.presentation.hiddenFields ?? []), ...hiddenContacts])];
+  draft.contacts.forEach(c => { c.visible = true; });
+  const { summaryText, professionalSkillIds, technicalSkillIds, ...presentation } = payload.presentation;
+  Object.assign(draft.presentation, structuredClone(presentation));
+  if (summaryText !== undefined) draft.summary = { ...draft.summary, text: summaryText, approval: 'approved' };
   const sections = [...coreSections, ...draft.optionalSections.map(s => s.id)];
   if (draft.presentation.order.some(id => !sections.includes(id)) || draft.presentation.hidden.some(id => !sections.includes(id))) invalid();
   const ids = new Set([...facts.flatMap(f => [f.ref.valueId, f.ref.fieldId, f.ref.entityId]), ...draft.sources.map(s => s.id), ...draft.answers.map(a => a.id)]);
@@ -139,6 +145,13 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
   if (payload.localAdditions.length) {
     if (draft.sources.some(s => s.id === 'job_local_manual')) invalid();
     draft.sources.push({ id: 'job_local_manual', kind: 'manual', label: 'Job-only manual additions' });
+  }
+  for (const [group, selection] of [['professionalSkills', professionalSkillIds], ['technicalSkills', technicalSkillIds]] as const) {
+    if (selection !== undefined) draft[group] = selection.map(id => {
+      const matches = draft[group].filter(f => f.id === id);
+      if (matches.length !== 1) invalid();
+      return matches[0];
+    });
   }
   if (!isBaseDraft(draft)) invalid();
   return draft;

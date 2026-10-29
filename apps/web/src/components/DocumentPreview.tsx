@@ -51,8 +51,10 @@ export function DocumentPreview({
   onEdit,
   onTextEdit,
   onTemplateChange,
+  livePreview,
 }: {
   draft: BaseDraft;
+  livePreview?: boolean;
   asOf: { year: string; month: string };
   onEdit?: (id: string) => void;
   onTextEdit?: (id: string, text: string) => void;
@@ -62,7 +64,7 @@ export function DocumentPreview({
     uiLocale = useContext(LanguageContext),
     cv = (ro: string, en: string) => (d.language === "ro" ? ro : en);
   const template = resolveTemplate(d.presentation.templateVersionId);
-  const live = !!onEdit || !!onTextEdit,
+  const live = livePreview ?? (!!onEdit || !!onTextEdit),
     hidden = (f: Fact) => d.presentation.hiddenFields?.includes(f.fieldId);
   const text = (f: Fact<string>) => (!hidden(f) ? f.value : "");
   function block(value: ReactNode, id: string, label?: string): ReactNode {
