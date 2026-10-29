@@ -175,7 +175,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates', 'job-documents'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -209,7 +209,7 @@ def main():
             upgrade = check_populated_upgrade(db, module)
             cases += 2
         import importlib.util
-        if args.suite not in ('imports', 'templates'):
+        if args.suite not in ('imports', 'templates', 'job-documents'):
             draft_spec = importlib.util.spec_from_file_location('editor_drafts', ROOT / 'supabase/tests/editor_drafts.py')
             drafts = importlib.util.module_from_spec(draft_spec)
             draft_spec.loader.exec_module(drafts)
@@ -257,6 +257,14 @@ def main():
             prior = unittest.TextTestRunner(verbosity=2).run(unittest.TestSuite(checks))
             cases += prior.testsRun
             if not prior.wasSuccessful():
+                return 1
+        if args.suite in ('all', 'job-documents'):
+            job_spec = importlib.util.spec_from_file_location('job_documents', ROOT / 'supabase/tests/job_documents.py')
+            jobs = importlib.util.module_from_spec(job_spec)
+            job_spec.loader.exec_module(jobs)
+            job_result = unittest.TextTestRunner(verbosity=2).run(jobs.suite(db))
+            cases += job_result.testsRun
+            if not job_result.wasSuccessful():
                 return 1
         receipt = {'migrations_applied':count,'normal_reapply_pending':0,
                    'tables':table_count,'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),

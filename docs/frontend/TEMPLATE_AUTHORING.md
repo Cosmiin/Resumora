@@ -2,7 +2,7 @@
 
 The [product registry](../../apps/web/src/templates/registry.ts) owns the selected designs and immutable version IDs. The native **Șablon / Template** control changes the existing document preview immediately and uses normal autosave/history. Classic is a display fallback for legacy documents and unavailable versions, not a selectable design. An unavailable version displays an explicit fallback notice while retaining the saved reference and every content field.
 
-**FOUNDATION delivery — end-to-end job tailoring/export PARTIAL:** the Base/review/enrichment preview is connected. Job-tailored selection/preview/export is a core acceptance requirement, but this base has no tailored-document editor/HTTP persistence/export path. The reusable renderer and typed document-presentation seam are implemented; end-to-end tailoring remains partial until the vacancy owner wires those paths below. No template change requests inference. Downloadable PDF export is not implemented by adding a stylesheet.
+**FOUNDATION delivery — end-to-end job tailoring/export PARTIAL:** the Base/review/enrichment preview is connected. Job-tailored selection/preview/export is a core acceptance requirement; the remaining application paths are listed [below](#required-job-tailored-wiring). The reusable renderer and typed document-presentation seam are implemented; the [I2 guide](../setup/job-editor-documents.md) owns job-document persistence and its delivery boundary. No template change requests inference. Downloadable PDF export is not implemented by adding a stylesheet.
 
 ## Files and boundaries
 
@@ -80,7 +80,7 @@ Template selection must belong to the current tailored document/revision indepen
 Current missing paths are concrete:
 
 1. `JobsScreen` captures/reviews vacancies and pins an editor snapshot; it has no tailored editor route. `App`/`base/routes.ts` need the independently loaded job-CV document view.
-2. The Worker router exposes Base editor snapshots and vacancy context, with no job-CV document HTTP load/save/history/export routes. `db/supabase.ts` already exposes the canonical save adapter, mapped in the [gateway contract](../database/gateway.md#unconfirmed-editor-state). The vacancy work must connect that adapter and add the missing authenticated, owner-scoped routes/gateway calls with existing Origin/CSRF/revision/replay rules.
+2. Use the [I2 contract and integration handoff](../setup/job-editor-documents.md) for the implemented job-document HTTP persistence and the next existing-editor adapter wiring.
 3. Existing SQL `save_job_cv_checkpoint` persists a job-kind document/version under the [canonical template publication contract](../database/api.md#template-publication). `cv_versions.canonical_json.document` and `cv_documents.draft_payload` retain that per-document layout. However, the editor→confirmed profile/Base publication bridge is missing; do not send an unconfirmed editor envelope as canonical layout or invent its mapping.
 4. The future exporter must consume that exact saved tailored version and the same renderer/style. No production exporter exists here. Switching presentation must not regenerate tailoring or call an AI/provider.
 

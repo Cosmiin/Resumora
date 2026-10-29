@@ -1,3 +1,4 @@
+import { jobDocumentsRoute } from "./jobs/documents.ts";
 import { photoRoute } from "./photos/routes.ts";
 import {
   configuredIntelligenceRoute,
@@ -88,19 +89,21 @@ export default {
             )
           : path === "/v1/enhancement"
             ? await enhancementRoute(request, env, gateway, identity.user.id)
-            : path.startsWith("/v1/jobs")
-              ? await jobsRoute(request, gateway)
-              : path.startsWith("/v1/photos")
-                ? await photoRoute(
-                    request,
-                    gateway,
-                    env.PHOTO_WORKER_SECRET,
-                    (bytes) =>
-                      import("./photos/normalize.ts").then((module) =>
-                        module.normalizePhoto(bytes),
-                      ),
-                  )
-                : await cvRoute(request, gateway);
+            : /^\/v1\/jobs\/[^/]+\/cv(?:\/|$)/.test(path)
+              ? await jobDocumentsRoute(request, gateway)
+              : path.startsWith("/v1/jobs")
+                ? await jobsRoute(request, gateway)
+                : path.startsWith("/v1/photos")
+                  ? await photoRoute(
+                      request,
+                      gateway,
+                      env.PHOTO_WORKER_SECRET,
+                      (bytes) =>
+                        import("./photos/normalize.ts").then((module) =>
+                          module.normalizePhoto(bytes),
+                        ),
+                    )
+                  : await cvRoute(request, gateway);
       } catch {
         response = Response.json(
           { error: { code: "unavailable" } },
