@@ -2,7 +2,7 @@
 
 The [product registry](../../apps/web/src/templates/registry.ts) owns the selected designs and immutable version IDs. The native **Șablon / Template** control changes the existing document preview immediately and uses normal autosave/history. Classic is a display fallback for legacy documents and unavailable versions, not a selectable design. An unavailable version displays an explicit fallback notice while retaining the saved reference and every content field.
 
-**FOUNDATION delivery — end-to-end job tailoring/export PARTIAL:** the Base/review/enrichment preview is connected. Job-tailored selection/preview/export is a core acceptance requirement; the remaining application paths are listed [below](#required-job-tailored-wiring). The reusable renderer and typed document-presentation seam are implemented; the [I2 guide](../setup/job-editor-documents.md) owns job-document persistence and its delivery boundary. No template change requests inference. Downloadable PDF export is not implemented by adding a stylesheet.
+**FOUNDATION delivery — end-to-end job tailoring/export PARTIAL:** the [job editor guide](../setup/job-editor-documents.md) owns the current application integration and job-document persistence boundary. The remaining publication/export paths are listed [below](#required-job-tailored-wiring). No template change requests inference. Downloadable PDF export is not implemented by adding a stylesheet.
 
 ## Files and boundaries
 
@@ -75,18 +75,16 @@ Use `PhotoPreview` before the name for `photoPlacement: "above"`, or after the n
 
 ## Required job-tailored wiring
 
-Template selection must belong to the current tailored document/revision independently from Base and older tailored versions. Use the same executing `DocumentPreview` and chooser, passing that document's content and a callback that saves that document. `chooseTemplate(tailoredDraft, selectedVersionId)` preserves its summary, both skills and accepted experience wording; do not pass the latest Base draft or mutate a Base adapter. The shared `DocumentPresentation`/editor codec can carry that reference. This is a reusable seam, not a claim that the job screen already calls it.
+Template selection must belong to the current tailored document/revision independently from Base and older tailored versions. Use the same executing `DocumentPreview` and chooser, passing that document's content and a callback that saves that document. `chooseTemplate(tailoredDraft, selectedVersionId)` preserves its summary, both skills and accepted experience wording; do not pass the latest Base draft or mutate a Base adapter. The shared `DocumentPresentation`/editor codec carries that reference. See the [job editor guide](../setup/job-editor-documents.md) for the existing editor integration.
 
-Current missing paths are concrete:
+Remaining publication/export paths are concrete:
 
-1. `JobsScreen` captures/reviews vacancies and pins an editor snapshot; it has no tailored editor route. `App`/`base/routes.ts` need the independently loaded job-CV document view.
-2. Use the [I2 contract and integration handoff](../setup/job-editor-documents.md) for the implemented job-document HTTP persistence and the next existing-editor adapter wiring.
-3. Existing SQL `save_job_cv_checkpoint` persists a job-kind document/version under the [canonical template publication contract](../database/api.md#template-publication). `cv_versions.canonical_json.document` and `cv_documents.draft_payload` retain that per-document layout. However, the editor→confirmed profile/Base publication bridge is missing; do not send an unconfirmed editor envelope as canonical layout or invent its mapping.
-4. The future exporter must consume that exact saved tailored version and the same renderer/style. No production exporter exists here. Switching presentation must not regenerate tailoring or call an AI/provider.
+1. Existing SQL `save_job_cv_checkpoint` persists a job-kind document/version under the [canonical template publication contract](../database/api.md#template-publication). `cv_versions.canonical_json.document` and `cv_documents.draft_payload` retain that per-document layout. However, the editor→confirmed profile/Base publication bridge is missing; do not send an unconfirmed editor envelope as canonical layout or invent its mapping.
+2. The future exporter must consume that exact saved tailored version and the same renderer/style. No production exporter exists here. Switching presentation must not regenerate tailoring or call an AI/provider.
 
-The queued vacancy-owner handoff must connect independently loaded per-job content/revision, that document’s versioned template choice, the confirmed editor→canonical publication bridge and export of the exact saved version. Import validation belongs to the separate sibling lane. The owner approved “Publish foundation; complete wiring next (Recommended)”; PR title/body must describe FOUNDATION and keep end-to-end job tailoring/import/export explicitly PARTIAL. No production migration/activation is authorized here.
+The remaining vacancy-owner handoff must connect the confirmed editor→canonical publication bridge and export of the exact saved version. Import validation belongs to the separate sibling lane. The owner approved “Publish foundation; complete wiring next (Recommended)”; PR title/body must describe FOUNDATION and keep end-to-end job tailoring/import/export explicitly PARTIAL. No production migration/activation is authorized here.
 
-Until those are wired, report acceptance as PARTIAL rather than displaying an inactive tailored chooser. No generic job-only helper or second CV model substitutes for integration.
+Until those are wired, report end-to-end acceptance as PARTIAL. No generic job-only helper or second CV model substitutes for integration.
 
 ## Print and acceptance
 
@@ -112,6 +110,6 @@ Acceptance checklist:
 - Actual saved photo visibility/shape/crop are honored; no-photo releases space.
 - Native chooser and real preview work at1366×768 and390×844 with readable controls and no horizontal clipping.
 - Actual renderer/export text, fonts, safe bounds, dates and multipage flow checked; no fabricated metrics or ATS score.
-- Clearly distinguish active Base behavior, reusable tailored seam and missing job/export wiring; no paid inference for changing a template.
+- Clearly distinguish editor integration from missing canonical publication/export wiring; no paid inference for changing a template.
 
 Canonical SQL verification uses `python3 scripts/db/test.py --suite templates` with PostgreSQL 16+ on PATH (or an explicitly supplied tool path). It executes the actual validator/profile/Base/job save and restore interfaces for all five choices, legacy null and invalid/unregistered references, plus focused existing permission/ownership/integrity checks. Migration inclusion in the disposable P0–P3 harness is explicit despite the reserved `p6_templates` filename. SQL acceptance/publication is unproven until that command passes; no hosted apply is implied.
