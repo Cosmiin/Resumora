@@ -242,6 +242,9 @@ const draftShape = obj(
       { order: list(str), hidden: list(str) },
       {
         photo: isPhoto,
+        // Preserve well-formed unknown template references across historical snapshots.
+        templateVersionId: (v) =>
+          typeof v === "string" && /^[a-z][a-z0-9_-]{1,79}$/.test(v),
         hiddenFields: list(str),
         approvedWording: (v) =>
           !!v &&

@@ -94,7 +94,7 @@ class Database:
     def migrate(self, through='P4'):
         applied = 0
         for path in sorted((ROOT / 'supabase/migrations').glob('*.sql')):
-            phase = path.name.split('_')[1].upper()
+            phase = 'P3' if path.name == '20261028050000_p6_templates.sql' else path.name.split('_')[1].upper()
             if phase > through:
                 continue
             version = path.name.split('_')[0]
@@ -175,7 +175,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -209,7 +209,7 @@ def main():
             upgrade = check_populated_upgrade(db, module)
             cases += 2
         import importlib.util
-        if args.suite != 'imports':
+        if args.suite not in ('imports', 'templates'):
             draft_spec = importlib.util.spec_from_file_location('editor_drafts', ROOT / 'supabase/tests/editor_drafts.py')
             drafts = importlib.util.module_from_spec(draft_spec)
             draft_spec.loader.exec_module(drafts)
@@ -231,6 +231,14 @@ def main():
             photo_result = unittest.TextTestRunner(verbosity=2).run(photos.suite(db))
             cases += photo_result.testsRun
             if not photo_result.wasSuccessful():
+                return 1
+        if args.suite in ('all', 'templates'):
+            template_spec = importlib.util.spec_from_file_location('templates', ROOT / 'supabase/tests/templates.py')
+            templates = importlib.util.module_from_spec(template_spec)
+            template_spec.loader.exec_module(templates)
+            template_result = unittest.TextTestRunner(verbosity=2).run(templates.suite(db))
+            cases += template_result.testsRun
+            if not template_result.wasSuccessful():
                 return 1
         if args.suite in ('imports','all'):
             import_spec = importlib.util.spec_from_file_location('cv_imports', ROOT / 'supabase/tests/imports.py')

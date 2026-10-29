@@ -29,6 +29,8 @@ After the CV draft has saved, open **Jobs** to paste an advert and save it to yo
 
 To start from an existing document, choose **I already have a CV**, select the file and explicitly upload/analyse it. Review the extracted fields before confirming and saving. **Improve** also offers AI questions and a whole-experience rewrite for a selected role. These AI actions are switched off by default; follow [CV import and career enrichment](docs/setup/cv-import-enrichment.md) for supported inputs, review controls and activation requirements.
 
+The CV preview offers the five selected layouts—Folio, Meridian, Signal, Archive and Monograph—with a versioned choice saved through the existing editor history. See [template authoring and integration](docs/frontend/TEMPLATE_AUTHORING.md) for adding designs, font licenses and print checks. Job-tailored template selection/export remains a core integration requirement: the shared renderer/transport seam is available, but the current Jobs screen does not yet provide a tailored-document editor or exporter. This is partial tailoring delivery, with no inference triggered by a layout change.
+
 ## Discovery prototype preview
 
 From the repository root, run:
@@ -52,4 +54,4 @@ The standalone `prototype/review.html` includes the same app source and is conve
 - [`research/strategy/publication/`](research/strategy/README.md) — portable strategy evidence, options, decision cards, backlog and sources.
 - [`reviews/ux/verification.md`](reviews/ux/verification.md) — browser and deterministic verification receipts, scope limits, and feedback dispositions. Local screenshot binaries and machine-specific browser tooling are excluded from the proposal package.
 
-All candidate/job examples use synthetic data. Estimates and score methods are illustrative and uncalibrated. PDF readability remains untested until an actual exported PDF is inspected. See each artifact's version and limitations before relying on its outputs.
+All candidate/job examples use synthetic data. Estimates and score methods are illustrative and uncalibrated. Production PDF export remains unimplemented; the [template guide](docs/frontend/TEMPLATE_AUTHORING.md#print-and-acceptance) owns the local print-proof limits and remaining export checks. See each artifact's version and limitations before relying on its outputs.

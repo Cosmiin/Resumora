@@ -280,6 +280,39 @@ it.each([
       );
     }
     accepted = addAnswerToCv(accepted, "copied", field.id);
+    // Import, career and main presentation extensions must coexist in one persisted envelope.
+    accepted.presentation.templateVersionId = "template_folio_2_1_0";
+    accepted.presentation.photo = {
+      assetId: "11111111-1111-4111-8111-111111111111",
+      crop: { version: 1, centerX: 0.5, centerY: 0.5, zoom: 1 },
+      shape: "circle",
+      visible: true,
+    };
+    accepted.questionPlans = [result("questions", accepted, target)];
+    accepted.importReview = {
+      id: "synthetic-import",
+      sourceHash: "a".repeat(64),
+      format: "pdf",
+      parserVersion: "synthetic",
+      pages: 1,
+      admission: { kind: "cv", reason: "CV", pages: [1] },
+      extraction: {
+        schemaVersion: "cv-extraction/1",
+        candidates: [
+          {
+            id: "name",
+            path: "name",
+            value: "Mara Ionescu",
+            page: 1,
+            quote: "Mara Ionescu",
+            confidence: "high",
+          },
+        ],
+        warnings: [],
+        omittedPages: [],
+      },
+      confirmedIds: ["name"],
+    };
     const original = clone(accepted);
     const view = render(
       <LanguageContext value="en">
@@ -322,6 +355,15 @@ it.each([
     expect(accepted.roles).toEqual(original.roles);
     expect(accepted.optionalSections).toEqual(original.optionalSections);
     expect(accepted.answers).toEqual(original.answers);
+    expect(accepted.importReview).toEqual(original.importReview);
+    expect(accepted.questionPlans).toEqual(original.questionPlans);
+    expect(accepted.presentation.templateVersionId).toBe(
+      original.presentation.templateVersionId,
+    );
+    expect(accepted.presentation.photo).toEqual(original.presentation.photo);
+    const future = clone(accepted);
+    future.presentation.templateVersionId = "template_future_9_0_0";
+    expect(decodeDraft(encodeDraft(future))).toEqual(future);
     view.unmount();
     for (const mutation of mutations) {
       let next = clone(accepted);

@@ -17,6 +17,7 @@ import { formatDate } from "../base/dates";
 import { Button, useCopy } from "./ui";
 import type { QuestionPlan } from "@resumora/contracts/intelligence/model";
 import { DocumentPreview, PreviewText } from "./DocumentPreview";
+import { chooseTemplate } from "../templates/registry";
 const dimensions: Answer["question"][] = [
   "context",
   "ownership",
@@ -593,6 +594,7 @@ export function Enrichment({
         <DocumentPreview
           draft={d}
           asOf={asOf}
+          onTemplateChange={(versionId) => change(chooseTemplate(d, versionId))}
           onTextEdit={(id, text) => {
             const f = [
               ...d.roles.flatMap((r) => [r.context, ...r.bullets]),

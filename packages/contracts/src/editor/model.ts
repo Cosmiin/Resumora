@@ -106,6 +106,34 @@ export type Answer = {
   sourceId?: string;
   cvFieldId?: string;
 };
+// Shared by the existing editor content projection and any independent tailored
+// document using that projection. Choice belongs to this document/revision; it
+// is never read from a global preference or the latest Base draft.
+export type DocumentPresentation = {
+  photo?: CvPhoto | null;
+  order: string[];
+  hidden: string[];
+  // Immutable registry version reference; absence retains the legacy layout.
+  // Unknown future references remain stored and render through a safe fallback.
+  templateVersionId?: string;
+  hiddenFields?: string[];
+  contributionHtml?: Record<string, string>;
+  approvedWording?: Record<
+    string,
+    {
+      text: string;
+      scope?: "experience";
+      sources: {
+        id: string;
+        text: string;
+        sourceId: string;
+        sourceClaimId?: string;
+        sourceLineage?: { sourceId: string; sourceClaimId?: string }[];
+      }[];
+    }
+  >;
+};
+
 export type BaseDraft = {
   id: string;
   importReview?: ImportReview;
@@ -130,27 +158,7 @@ export type BaseDraft = {
     claimIds: string[];
   }[];
   answers: Answer[];
-  presentation: {
-    photo?: CvPhoto | null;
-    order: string[];
-    hidden: string[];
-    hiddenFields?: string[];
-    contributionHtml?: Record<string, string>;
-    approvedWording?: Record<
-      string,
-      {
-        text: string;
-        scope?: "experience";
-        sources: {
-          id: string;
-          text: string;
-          sourceId: string;
-          sourceClaimId?: string;
-          sourceLineage?: { sourceId: string; sourceClaimId?: string }[];
-        }[];
-      }
-    >;
-  };
+  presentation: DocumentPresentation;
 };
 export const coreSections = [
   "identity",
