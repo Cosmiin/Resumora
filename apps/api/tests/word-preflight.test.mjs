@@ -57,6 +57,58 @@ test("actual workerd admits bounded native Word containers without inventing pag
       (await call("docx", docx("x".repeat(40001)))).data.error,
       "DOCUMENT_TEXT_LIMIT",
     );
+    const cdataText = Array.from({ length: 10000 }, (_, i) => `<&${i}>\n`)
+      .join("")
+      .slice(0, 40000);
+    for (const length of [40000, 40001, 100000]) {
+      const result = await call(
+        "docx",
+        docx(`<![CDATA[${"x".repeat(length)}]]>`),
+      );
+      assert.equal(result.status, length === 40000 ? 200 : 422);
+      if (length > 40000)
+        assert.equal(result.data.error, "DOCUMENT_TEXT_LIMIT");
+    }
+    for (const suffix of ["", "x"]) {
+      const result = await call(
+        "docx",
+        docx(
+          `ab<![CDATA[${cdataText.slice(0, 20000)}]]>cd<![CDATA[${cdataText.slice(20004)}]]>${suffix}`,
+        ),
+      );
+      assert.equal(result.status, suffix ? 422 : 200);
+      if (suffix) assert.equal(result.data.error, "DOCUMENT_TEXT_LIMIT");
+    }
+    for (const [name, root] of [
+      ["document", "document"],
+      ["header1", "hdr"],
+      ["footer1", "ftr"],
+      ["footnotes", "footnotes"],
+      ["endnotes", "endnotes"],
+      ["comments", "comments"],
+    ]) {
+      for (const level of [0, 6]) {
+        for (const suffix of ["", "x"]) {
+          const result = await call(
+            "docx",
+            docx(name === "document" ? "" : "x".repeat(20000), {
+              [`word/${name}.xml`]: [
+                strToU8(
+                  `<w:${root} xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t><![CDATA[${name === "document" ? cdataText : cdataText.slice(20000)}${suffix}]]></w:t></w:r></w:p></w:${root}>`,
+                ),
+                { level },
+              ],
+            }),
+          );
+          assert.equal(
+            result.status,
+            suffix ? 422 : 200,
+            `${name}, level ${level}`,
+          );
+          if (suffix) assert.equal(result.data.error, "DOCUMENT_TEXT_LIMIT");
+        }
+      }
+    }
     assert.equal(
       (
         await call(

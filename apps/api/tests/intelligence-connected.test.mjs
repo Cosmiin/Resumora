@@ -7,6 +7,7 @@ import { blankDraft, newRole, fact } from "@resumora/contracts/editor/model";
 import { encodeDraft } from "@resumora/contracts/editor/transport";
 import { pdfFixture } from "./fixtures/pdf.mjs";
 import { docx, doc } from "./fixtures/word.mjs";
+import { strToU8 } from "fflate";
 const originalFetch = globalThis.fetch;
 globalThis.fetch = () => {
   throw new Error("REAL_NETWORK_DENIED");
@@ -227,6 +228,7 @@ test("DOC and DOCX native reading uses only documented OpenAI Responses, bounded
   for (const [format, bytes] of [
     ["doc", doc()],
     ["docx", docx()],
+    ["docx", docx(`<![CDATA[${"x".repeat(40000)}]]>`)],
   ]) {
     const f = setup(),
       calls = [];
@@ -238,7 +240,10 @@ test("DOC and DOCX native reading uses only documented OpenAI Responses, bounded
       assert.equal(b.store, false);
       const file = b.input[1].content.find((p) => p.type === "input_file");
       assert.equal(file.filename, "upload." + format);
-      assert.ok(file.file_data.includes(";base64,"));
+      assert.equal(
+        file.file_data.split(";base64,")[1],
+        Buffer.from(bytes).toString("base64"),
+      );
       assert.ok(b.max_output_tokens <= 8000);
       return reply(
         b,
@@ -276,6 +281,32 @@ test("DOC and DOCX native reading uses only documented OpenAI Responses, bounded
     assert.equal(result.review.pages, null);
     assert.equal(result.review.extraction.candidates[0].page, null);
     assert.equal(calls.length, 2);
+  }
+});
+test("oversized DOCX CDATA fails preflight without admission or extraction attempts", async () => {
+  for (const bytes of [
+    docx(`<![CDATA[${"x".repeat(100000)}]]>`),
+    docx("x".repeat(20000), {
+      "word/header1.xml": strToU8(
+        `<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t><![CDATA[${"x".repeat(20001)}]]></w:t></w:r></w:p></w:hdr>`,
+      ),
+    }),
+  ]) {
+    const f = setup();
+    const response = await configuredIntelligenceRoute(
+      upload("docx", bytes),
+      env,
+      f.gateway,
+      f.user,
+      () => assert.fail("Oversized text must not reach a provider"),
+    );
+    const result = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(result.state, "failed");
+    assert.equal(result.error, "DOCUMENT_TEXT_LIMIT");
+    assert.equal(f.reservations.size, 0);
+    const report = await f.ledger.report({ from: "2000-01-01", to: "2099-01-01" });
+    assert.equal(report.totals.attempts, 0);
   }
 });
 test("non-CV and invalid input never dispatch stronger extraction; ambient keys do not enable OFF", async () => {

@@ -207,7 +207,10 @@ function validateDocx(bytes: Uint8Array) {
         name.startsWith("word/") &&
         !/styles|settings|fontTable|numbering|theme/i.test(name)
       ) {
-        text += xml.replace(/<[^>]*>/g, "").length;
+        text += xml.replace(
+          /<!\[CDATA\[([\s\S]*?)\]\]>|<[^>]*>/g,
+          (_, cdata: string | undefined) => cdata ?? "",
+        ).length;
         if (text > documentLimits.characters)
           throw new Error("DOCUMENT_TEXT_LIMIT");
       }
