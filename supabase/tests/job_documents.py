@@ -178,17 +178,57 @@ def suite(db):
             self.assertEqual(self.save(good)['payload'],good)
             self.assertEqual(self.jsoncall('load_base_draft'),self.base)
 
-        def test_source_snapshot_is_explicit_and_pinned_not_latest_base(self):
+        def test_source_snapshot_is_explicit_and_refresh_preserves_per_revision_history(self):
             first=self.save()
-            later_source=copy.deepcopy(self.source); later_source['answers'][0]['text']='Later career answer'
+            other_job=self.save(self.payload_for(self.job2),job=self.job2['id'])
+            later_source=copy.deepcopy(self.source)
+            later_source['answers'][0]['text']='Later career answer'
+            changed_fact=later_source['content']['roles'][0]['context']
+            changed_fact.update(id='context-v2',value='Maintained PLC systems and new controls',previousFactId='context')
             later=self.jsoncall('save_base_draft',f"'{uid()}',1,{literal(later_source)},'autosave'")
+            # The current job revision still uses its explicitly selected old
+            # source; a newer Base head never remaps the document by itself.
             saved=self.save(doc=first['documentId'],revision=1)
             self.assertEqual(saved['sourcePayload']['answers'][0]['text'],'Exact answer')
-            mismatch=copy.deepcopy(self.payload); mismatch['source']=dict(snapshotId=later['id'],revision=2)
-            self.assertIn('VERSION_CONFLICT',self.save(mismatch,doc=first['documentId'],revision=2,error=True))
-            mismatch=copy.deepcopy(self.payload); mismatch['source']['revision']=2
-            self.assertIn('SNAPSHOT_NOT_FOUND',self.save(mismatch,doc=first['documentId'],revision=2,error=True))
+            refreshed=copy.deepcopy(self.payload)
+            refreshed['source']=dict(snapshotId=later['id'],revision=2)
+            refreshed['selectedFacts'][0]['valueId']='context-v2'
+            refreshed['wording'][0].update(text='Explicitly accepted updated controls wording',valueIds=['context-v2','bullet'])
+            refresh_key=uid()
+            refreshed_version=self.save(refreshed,doc=first['documentId'],revision=2,key=refresh_key)
+            self.assertEqual(refreshed_version['documentId'],first['documentId'])
+            self.assertEqual(refreshed_version['revision'],3)
+            self.assertEqual(refreshed_version['parentId'],saved['id'])
+            self.assertEqual(refreshed_version['sourcePayload'],later_source)
+            self.assertEqual(self.history(self.job1['id'],first['documentId']),[refreshed_version,saved,first])
+            self.assertEqual(self.jsoncall('load_job_editor',f"'{self.job1['id']}','{first['documentId']}','{first['id']}'"),first)
+            self.assertEqual(self.jsoncall('load_job_editor',f"'{self.job2['id']}'"),other_job)
+            # Old accepted references cannot be silently rebound to edited
+            # values just by swapping the Base pin in an otherwise old payload.
+            stale=copy.deepcopy(self.payload);stale['source']=refreshed['source']
+            self.assertIn('INVALID_EDITOR_PAYLOAD',self.save(stale,doc=first['documentId'],revision=3,error=True))
+            self.assertIn('VERSION_CONFLICT',self.save(refreshed,doc=first['documentId'],revision=2,error=True))
+            foreign=copy.deepcopy(refreshed);foreign['source']=dict(snapshotId=self.foreign_base['id'],revision=1)
+            self.assertIn('SNAPSHOT_NOT_FOUND',self.save(foreign,doc=first['documentId'],revision=3,error=True))
+            mismatch=copy.deepcopy(refreshed);mismatch['source']['revision']=1
+            self.assertIn('SNAPSHOT_NOT_FOUND',self.save(mismatch,doc=first['documentId'],revision=3,error=True))
+            # Explicit restore appends an accepted historical version with its
+            # original source/answers/prose; it never relabels them as current.
+            restored=self.restore(first,first['id'],3)
+            self.assertEqual(restored['payload'],first['payload'])
+            self.assertEqual(restored['sourcePayload'],self.source)
+            self.assertEqual(restored['reason'],'restore')
+            self.assertEqual(restored['restoredFrom'],first['id'])
+            returned=self.restore(first,refreshed_version['id'],4)
+            self.assertEqual(returned['payload'],refreshed)
+            self.assertEqual(returned['sourcePayload'],later_source)
+            self.assertEqual(self.save(refreshed,doc=first['documentId'],revision=2,key=refresh_key),refreshed_version)
+            self.assertIn('IDEMPOTENCY_BODY_MISMATCH',self.save(stale,doc=first['documentId'],revision=2,key=refresh_key,error=True))
             self.assertEqual(self.jsoncall('load_base_draft'),later)
+            self.assertEqual([row['payload']['source']['revision'] for row in self.history(self.job1['id'],first['documentId'])],[2,1,2,1,1])
+            self.jsoncall('review_target_job',f"'{uid()}','{self.job1['id']}','Engineer','Updated vacancy','[]'")
+            self.assertIn('VERSION_CONFLICT',self.save(refreshed,doc=first['documentId'],revision=5,error=True))
+            self.assertIn('VERSION_CONFLICT',self.restore(first,first['id'],5,error=True))
 
         def test_job_fingerprint_and_review_version_fence_stale_acceptance_and_restore(self):
             first=self.save()

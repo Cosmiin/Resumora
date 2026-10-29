@@ -17,6 +17,7 @@ All filenames below are in `supabase/migrations/`. Apply the complete ordered pr
 | Photo extension / 52 | `20261028020000_p3_cv_photos.sql` | photo_worker_config, photo_assets, editor_photo_references, cv_photo_references |
 | Template foundation / 52 | `20261028050000_p6_templates.sql` | No new tables; canonical validator correction |
 | Job editor adapter / 54 | `20261029010000_p3_job_editor_documents.sql` | job_editor_documents, job_editor_versions; RPC-only independent accepted revisions |
+| Job editor source refresh / 54 | `20261029020000_p3_job_editor_source_refresh.sql` | No new tables; explicit accepted source changes retain document history and per-version source pins |
 
 The editor extension follows P3 in filename chronology despite its P1 classification. The local runner's populated-upgrade check filters by phase, so it includes this extension at P1 and carries it through later phases; that fixture order is not the hosted apply order. The connected and photo extensions are included at P3. The reserved template correction is ordered after the sibling extension40000 when present; it is explicitly included at the local harness's P3 extension boundary despite its `p6_templates` filename. Hosted apply remains separate; see [connected setup](../setup/connected-jobs-ai.md) and [photo prerequisites](../frontend/profile-photo.md#setup-and-remaining-acceptance).
 
