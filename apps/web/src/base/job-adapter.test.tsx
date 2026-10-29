@@ -59,7 +59,7 @@ export function jobHarness() {
   };
   const snapshotId = crypto.randomUUID();
   const jobs = [crypto.randomUUID(), crypto.randomUUID()];
-  const pins = new Map(
+  const pins = new Map<string, JobEditorPayload["job"]>(
     jobs.map((id) => [
       id,
       { id, versionId: null as string | null, fingerprint: "a".repeat(64) },
@@ -581,12 +581,8 @@ it.each([
     await waitFor(() => expect(h.versions.get(h.jobs[0])?.length).toBe(3), {
       timeout: 3000,
     });
-    expect(
-      screen.getByRole("button", { name: "New skill", exact: true }),
-    ).toBeTruthy();
-    await user.click(
-      screen.getByRole("button", { name: initial, exact: true }),
-    );
+    expect(screen.getByRole("button", { name: "New skill" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: initial }));
     const editing = screen.getByRole("textbox", {
       name: "Editează competența",
     }) as HTMLInputElement;
