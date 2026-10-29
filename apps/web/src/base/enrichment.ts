@@ -38,12 +38,19 @@ export function enrichmentTarget(
       entry: role,
       label: [role.title.value, role.company.value].filter(Boolean).join(" · "),
     };
-  const entry = draft.optionalSections
-    .filter((s) => s.kind !== "languages")
-    .flatMap((s) => s.entries)
-    .find((e) => e.id === id);
+  const section = draft.optionalSections.find(
+    (s) => s.kind !== "languages" && s.entries.some((e) => e.id === id),
+  );
+  const entry = section?.entries.find((e) => e.id === id);
   return entry
-    ? { field: entry.details, label: entry.title.value, entry }
+    ? {
+        field: entry.details,
+        label:
+          section?.heading && entry.id === section.id
+            ? section.heading.value
+            : entry.title.value || section?.label || "",
+        entry,
+      }
     : null;
 }
 export { answerEvidenceText } from "@resumora/contracts/intelligence/model";

@@ -57,3 +57,26 @@ export function sourceBox(
     height: Math.max(...ys) - Math.min(...ys),
   };
 }
+
+export function locateTextQuote(
+  text: string,
+  quote: string,
+): { start: number; end: number } | null {
+  const spans = [...text.matchAll(/\S+|\s+/gu)];
+  let normalized = "";
+  const starts: number[] = [],
+    ends: number[] = [];
+  for (const span of spans) {
+    const value = /^\s/u.test(span[0]) ? " " : span[0];
+    for (let i = 0; i < value.length; i++) {
+      normalized += value[i];
+      starts.push(span.index + (value === " " ? 0 : i));
+      ends.push(span.index + (value === " " ? span[0].length : i + 1));
+    }
+  }
+  const target = quote.replace(/\s+/gu, " ").trim();
+  const start = normalized.indexOf(target);
+  if (!target || start < 0 || normalized.indexOf(target, start + 1) !== -1)
+    return null;
+  return { start: starts[start], end: ends[start + target.length - 1] };
+}

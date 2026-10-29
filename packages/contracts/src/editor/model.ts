@@ -17,6 +17,7 @@ export type Fact<T extends FactValue = FactValue> = {
   status:
     "draft" | "extracted_unconfirmed" | "user_confirmed" | "user_authored";
   sourceId: string;
+  acceptance?: "automatic";
   sourceClaimId?: string;
   sourceLineage?: { sourceId: string; sourceClaimId?: string }[];
   evidenceClaimIds?: string[];
@@ -83,6 +84,7 @@ export type OptionalSection = {
   kind: OptionalKind;
   label: string;
   entries: OptionalEntry[];
+  heading?: Fact<string>;
 };
 export type Answer = {
   id: string;
@@ -231,6 +233,7 @@ export function editFact<T extends FactValue>(
   }
   return {
     ...fact(value),
+    ...(current.acceptance ? { acceptance: current.acceptance } : {}),
     fieldId: current.fieldId,
     previousFactId:
       current.status === "user_confirmed"
@@ -338,10 +341,11 @@ export function sectionFacts(
       e.details,
       ...(e.ongoing ? [e.ongoing] : []),
     ]);
-  return (
-    d.optionalSections
-      .find((s) => s.id === section)
-      ?.entries.flatMap((e) => [
+  return d.optionalSections
+    .filter((s) => s.id === section)
+    .flatMap((s) => [
+      ...(s.heading ? [s.heading] : []),
+      ...s.entries.flatMap((e) => [
         e.title,
         e.details,
         ...(e.bullets ?? []),
@@ -349,13 +353,15 @@ export function sectionFacts(
         ...(includeInactive || !e.ongoing?.value ? [e.end] : []),
         ...(e.ongoing ? [e.ongoing] : []),
         ...(e.proficiency ? [e.proficiency] : []),
-      ]) ?? []
-  );
+      ]),
+    ]);
 }
 export function allFacts(d: BaseDraft, includeInactive = false): Fact[] {
   return [...coreSections, ...d.optionalSections.map((s) => s.id)].flatMap(
     (s) => sectionFacts(d, s, includeInactive),
   );
 }
-export const isAuthored = (f: Fact) =>
-  f.status === "user_confirmed" || f.status === "user_authored";
+export const isAccepted = (f: Fact) =>
+  f.status === "user_confirmed" ||
+  f.status === "user_authored" ||
+  (f.status === "extracted_unconfirmed" && f.acceptance === "automatic");

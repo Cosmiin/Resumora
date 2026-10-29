@@ -1,5 +1,4 @@
-import { requiresImportReview } from "@resumora/contracts/editor/import";
-import { allFacts, hasValue, isAuthored, type BaseDraft } from "../base/model";
+import { allFacts, hasValue, isAccepted, type BaseDraft } from "../base/model";
 import { validateDraft } from "../base/validation";
 import { Button, Pill, useCopy } from "./ui";
 export function Review({
@@ -13,16 +12,11 @@ export function Review({
 }) {
   const t = useCopy(),
     pending = allFacts(draft).filter(
-      (f) =>
-        hasValue(f.value) &&
-        !isAuthored(f) &&
-        !draft.importReview?.extraction.candidates.some(
-          (c) => c.id === f.sourceClaimId && !requiresImportReview(c),
-        ),
+      (f) => hasValue(f.value) && !isAccepted(f),
     ).length;
   const incomplete = validateDraft(draft).length;
-  const imported = draft.importReview?.extraction.candidates.some(
-    (c) => !requiresImportReview(c),
+  const imported = allFacts(draft).some(
+    (f) => f.acceptance === "automatic" && isAccepted(f),
   );
   const checks = [
     {

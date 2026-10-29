@@ -19,6 +19,8 @@ import { LanguageContext } from "./ui";
 import {
   importedDraft,
   confirmImported,
+  pendingImportedCandidates,
+  requiresImportReview,
 } from "@resumora/contracts/editor/import";
 import {
   allFacts,
@@ -28,6 +30,15 @@ import {
   type BaseDraft,
 } from "../base/model";
 import { encodeDraft, decodeDraft } from "@resumora/contracts/editor/transport";
+import { careerContext } from "@resumora/contracts/intelligence/context";
+import {
+  jobEditorFacts,
+  projectJobEditor,
+  type JobEditorPayload,
+} from "@resumora/contracts/jobs/documents";
+import { isAccepted } from "../base/model";
+import { enrichmentTarget } from "../base/enrichment";
+import { acceptWording, currentWording } from "../base/wording";
 import type { ImportReview as Review } from "@resumora/contracts/intelligence/model";
 const paths = [
   "name",
@@ -158,7 +169,7 @@ it("reviews one editable section at a time, confirms only visible facts and reta
   expect(
     restored.optionalSections.some(
       (s) =>
-        s.entries[0]?.title.value === "Honors" &&
+        s.heading?.value === "Honors" &&
         s.entries[0].details.value === "Original award",
     ),
   ).toBe(true);
@@ -319,6 +330,7 @@ it("omits high-confidence fields and confirms only uncertain or specifically war
   );
   expect(latest.importReview!.confirmedIds).toEqual(["c1", "c2"]);
   expect(latest.name.status).toBe("extracted_unconfirmed");
+  expect(latest.name.acceptance).toBe("automatic");
   expect(latest.name.confirmedAt).toBeUndefined();
   expect(latest.name.sourceClaimId).toBe("c0");
   expect(screen.queryByRole("region", { name: "Review Base CV" })).toBeNull();
@@ -347,6 +359,7 @@ it("opens the editor for an entirely high-confidence import without false confir
     const saved = (await adapter.load())!.draft;
     expect(saved.importReview!.confirmedIds).toEqual([]);
     expect(saved.name.status).toBe("extracted_unconfirmed");
+    expect(saved.name.acceptance).toBe("automatic");
     expect(saved.name.confirmedAt).toBeUndefined();
   } finally {
     view.unmount();
@@ -466,9 +479,11 @@ it("uses one sourced category heading in the editor and preview after further ed
   expect(within(paper as HTMLElement).getAllByText("Honors")).toHaveLength(1);
   expect(paper.textContent).not.toContain("Awards");
   expect(category.querySelector("summary")!.textContent).toBe("Honors");
-  const title = latest.optionalSections.find((s) => s.id === "import-custom-0")!
-    .entries[0].title;
+  const title = latest.optionalSections.find(
+    (s) => s.id === "import-custom-0",
+  )!.heading!;
   expect(title.sourceLineage?.[0].sourceClaimId).toBe("c7");
+  expect(enrichmentTarget(latest, "import-custom-0")!.label).toBe("Honors");
   fireEvent.click(
     within(category as HTMLElement).getByRole("button", { name: "Add entry" }),
   );
@@ -476,6 +491,34 @@ it("uses one sourced category heading in the editor and preview after further ed
     within(category as HTMLElement).getByRole("textbox", { name: "Title" }),
     { target: { value: "Second award" } },
   );
+  expect(within(paper as HTMLElement).getByText("Second award")).toBeTruthy();
+  const entryId = latest.optionalSections.find(
+    (s) => s.id === "import-custom-0",
+  )!.entries[1].id;
+  const handle = within(category as HTMLElement).getByRole("button", {
+    name: "Reorder: Second award",
+  });
+  fireEvent.keyDown(handle, { key: "ArrowUp", altKey: true });
+  expect(
+    latest.optionalSections.find((s) => s.id === "import-custom-0")!.entries[0]
+      .id,
+  ).toBe(entryId);
+  expect(category.querySelector("summary")!.textContent).toBe("Honors");
+  expect(within(paper as HTMLElement).getAllByText("Honors")).toHaveLength(1);
+  const content = Array.from(category.querySelectorAll(".optional-entry")).find(
+    (node) => within(node as HTMLElement).queryByDisplayValue("Original award"),
+  )!;
+  fireEvent.click(
+    within(content as HTMLElement).getByRole("button", {
+      name: "Remove entry",
+    }),
+  );
+  const restored = decodeDraft(encodeDraft(latest));
+  expect(
+    restored.optionalSections.find((s) => s.id === "import-custom-0")!.heading!
+      .fieldId,
+  ).toBe(title.fieldId);
+  expect(within(paper as HTMLElement).getAllByText("Honors")).toHaveLength(1);
   expect(within(paper as HTMLElement).getByText("Second award")).toBeTruthy();
 });
 
@@ -533,3 +576,168 @@ it.each(["education", "certifications"] as const)(
     ).toBe(true);
   },
 );
+
+it("shares persisted automatic acceptance with enrichment, wording, duration and job projection", () => {
+  const input = clone(review);
+  input.extraction.candidates = [
+    ["roles.0.context", "Maintained records"],
+    ["roles.0.bullets.0", "Reduced delays"],
+    ["roles.0.start", "01/2020"],
+    ["roles.0.end", "01/2021"],
+    ["roles.0.ongoing", "false"],
+  ].map(([path, value], i) => ({
+    id: `auto${i}`,
+    path,
+    value,
+    quote: value,
+    page: 1,
+    confidence: "high",
+  }));
+  const draft = decodeDraft(encodeDraft(importedDraft(input)));
+  const role = draft.roles[0];
+  const context = careerContext(draft, role.id);
+  expect(context.facts.map((f) => f.text)).toEqual([
+    "Maintained records",
+    "Reduced delays",
+  ]);
+  expect(pendingImportedCandidates(draft)).toEqual([]);
+  const wording = acceptWording(draft, role.id, {
+    text: "Maintained records and reduced delays",
+    scope: "experience",
+    origin: "user_authored",
+    sources: context.facts,
+  });
+  expect(currentWording(wording, role.id)).toBe(
+    "Maintained records and reduced delays",
+  );
+  const payload: JobEditorPayload = {
+    schemaVersion: "resumora-job-editor/1",
+    acceptance: "accepted",
+    source: { snapshotId: crypto.randomUUID(), revision: 1 },
+    job: {
+      id: crypto.randomUUID(),
+      versionId: null,
+      fingerprint: "a".repeat(64),
+    },
+    selectedFacts: jobEditorFacts(draft)
+      .filter((f) => isAccepted(f.fact))
+      .map((f) => f.ref),
+    selectedAnswerIds: [],
+    wording: [],
+    presentation: {},
+    localAdditions: [],
+  };
+  const projected = projectJobEditor(encodeDraft(draft), payload);
+  expect(projected.presentation.hiddenFields ?? []).not.toContain(
+    role.context.fieldId,
+  );
+  expect(projected.roles[0].context.acceptance).toBe("automatic");
+  expect(projected.roles[0].context.status).toBe("extracted_unconfirmed");
+  const view = render(
+    <LanguageContext value="en">
+      <DocumentPreview draft={draft} asOf={{ year: "2026", month: "10" }} />
+    </LanguageContext>,
+  );
+  expect(screen.getByText(/months/).textContent).not.toContain("unreviewed");
+  view.unmount();
+  const historical = clone(draft);
+  for (const field of allFacts(historical, true)) delete field.acceptance;
+  expect(pendingImportedCandidates(historical)).toHaveLength(5);
+  expect(() => careerContext(historical, role.id)).toThrow(
+    "INVALID_SCOPED_CONTEXT",
+  );
+  expect(() => projectJobEditor(encodeDraft(historical), payload)).toThrow(
+    "invalidJobEditor",
+  );
+  for (const field of allFacts(historical, true))
+    if (field.sourceClaimId) {
+      field.status = "draft";
+      field.acceptance = "automatic";
+    }
+  expect(pendingImportedCandidates(historical)).toHaveLength(5);
+  expect(() => careerContext(historical, role.id)).toThrow(
+    "INVALID_SCOPED_CONTEXT",
+  );
+});
+
+it("stages specific prefix-like warnings and retains historical high-confidence review", () => {
+  const input = clone(review);
+  input.extraction.candidates = input.extraction.candidates.slice(0, 1);
+  const candidate = input.extraction.candidates[0];
+  candidate.confidence = "high";
+  for (const notice of [
+    "Native PDF transcription requires review against the original page.",
+    "Native Word excerpt requires review; original pagination is unknown.",
+  ]) {
+    candidate.warning = notice;
+    expect(requiresImportReview(candidate)).toBe(false);
+    candidate.warning = notice + " Email is partly illegible.";
+    expect(requiresImportReview(candidate)).toBe(true);
+  }
+  candidate.warning =
+    "Native PDF transcription requires review: email is partly illegible";
+  const draft = importedDraft(input);
+  expect(draft.name.acceptance).toBeUndefined();
+  const view = render(
+    <LanguageContext value="en">
+      <ImportReview draft={draft} disabled={false} confirm={() => {}} />
+    </LanguageContext>,
+  );
+  expect(screen.getByText(candidate.warning)).toBeTruthy();
+  expect(screen.getByDisplayValue("Synthetic Owner")).toBeTruthy();
+  view.unmount();
+  delete candidate.warning;
+  const historical = importedDraft(input);
+  delete historical.name.acceptance;
+  render(
+    <LanguageContext value="en">
+      <ImportReview draft={historical} disabled={false} confirm={() => {}} />
+    </LanguageContext>,
+  );
+  expect(screen.getByDisplayValue("Synthetic Owner")).toBeTruthy();
+});
+
+it("keeps a details-only custom import in one editable category without inventing a title", () => {
+  const input = clone(review);
+  input.extraction.candidates = input.extraction.candidates.filter(
+    (c) => c.path === "custom.0.details",
+  );
+  let latest = importedDraft(input);
+  const section = latest.optionalSections.find(
+    (s) => s.id === "import-custom-0",
+  )!;
+  expect(section.heading!.value).toBe("");
+  expect(
+    validateDraft(latest).some((i) => i.field === section.heading!.fieldId),
+  ).toBe(true);
+  expect(
+    validateDraft(latest).some(
+      (i) => i.field === section.entries[0].title.fieldId,
+    ),
+  ).toBe(false);
+  function Surface() {
+    const [draft, setDraft] = useState(latest);
+    return (
+      <LanguageContext value="en">
+        <Editor
+          draft={draft}
+          issues={[]}
+          change={(next) => {
+            latest = next;
+            setDraft(next);
+          }}
+        />
+      </LanguageContext>
+    );
+  }
+  render(<Surface />);
+  const category = document.querySelector("#section-import-custom-0")!;
+  fireEvent.click(category.querySelector("summary")!);
+  fireEvent.change(
+    within(category as HTMLElement).getByRole("textbox", { name: "Category" }),
+    { target: { value: "Honors" } },
+  );
+  expect(
+    latest.optionalSections.find((s) => s.id === section.id)!.heading!.value,
+  ).toBe("Honors");
+});

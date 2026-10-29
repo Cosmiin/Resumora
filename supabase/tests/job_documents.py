@@ -74,6 +74,23 @@ def suite(db):
             args=f"'{key or uid()}','{job or self.job1['id']}','{saved['documentId']}',{revision},'{version}'"
             return self.call('restore_job_editor', args, error=True) if error else self.jsoncall('restore_job_editor', args)
 
+        def test_automatic_import_acceptance_and_heading_survive_eligibility_validation(self):
+            source = copy.deepcopy(self.source)
+            for key in ('context',):
+                source['content']['roles'][0][key].update(status='extracted_unconfirmed', acceptance='automatic')
+            source['content']['roles'][0]['bullets'][0].update(status='extracted_unconfirmed', acceptance='automatic')
+            heading = dict(id='heading', fieldId='heading-field', value='Awards', status='extracted_unconfirmed', acceptance='automatic', sourceId='manual')
+            source['content']['optionalSections'] = [dict(id='awards', kind='custom', label='', heading=heading, entries=[])]
+            payload = copy.deepcopy(self.payload)
+            payload['selectedFacts'].append(dict(entityId='awards', fieldId='heading-field', valueId='heading', sourceId='manual'))
+            self.call('validate_job_editor', f"{literal(payload)},{literal(source)}")
+            for rejected in ('extracted_unconfirmed', 'draft'):
+                invalid = copy.deepcopy(source)
+                field = invalid['content']['roles'][0]['context']
+                field['status'] = rejected
+                if rejected == 'extracted_unconfirmed': del field['acceptance']
+                self.assertIn('INVALID_EDITOR_PAYLOAD', self.call('validate_job_editor', f"{literal(payload)},{literal(invalid)}", error=True))
+
         def test_whole_experience_scope_save_history_and_restore(self):
             payload = copy.deepcopy(self.payload)
             payload['wording'][0].update(scope='experience', origin='user_authored')

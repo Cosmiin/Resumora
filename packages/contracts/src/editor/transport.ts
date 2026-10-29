@@ -114,6 +114,7 @@ const fact = (value: Check): Check =>
       sourceId: str,
     },
     {
+      acceptance: one("automatic"),
       sourceClaimId: str,
       sourceLineage: list(ref),
       evidenceClaimIds: list(str),
@@ -211,18 +212,21 @@ const draftShape = obj(
       ),
     ),
     optionalSections: list(
-      obj({
-        id: str,
-        kind: one(
-          "projects",
-          "certifications",
-          "languages",
-          "volunteering",
-          "custom",
-        ),
-        label: str,
-        entries: list(entry),
-      }),
+      obj(
+        {
+          id: str,
+          kind: one(
+            "projects",
+            "certifications",
+            "languages",
+            "volunteering",
+            "custom",
+          ),
+          label: str,
+          entries: list(entry),
+        },
+        { heading: text },
+      ),
     ),
     sources: list(
       obj(

@@ -1,5 +1,5 @@
 import { answerEvidenceText } from '../intelligence/model.ts';
-import { type BaseDraft, type Fact, type DocumentPresentation, isAuthored, coreSections } from '../editor/model.ts';
+import { type BaseDraft, type Fact, type DocumentPresentation, isAccepted, coreSections } from '../editor/model.ts';
 import { decodeDraft, isBaseDraft, type EditorWireEnvelope } from '../editor/transport.ts';
 import { isPhoto } from '../editor/photo.ts';
 import { isUuid } from './connected.ts';
@@ -80,7 +80,10 @@ export function jobEditorFacts(d: BaseDraft): { ref: JobFactRef; fact: Fact; key
     }
   };
   d.roles.forEach(r => entity(r, r)); d.education.forEach(e => entity(e, e));
-  d.optionalSections.forEach(s => s.entries.forEach(e => entity(e, e)));
+  d.optionalSections.forEach(s => {
+    if (s.heading) add(s.id, 'heading', s.heading);
+    s.entries.forEach(e => entity(e, e));
+  });
   return rows;
 }
 function invalid(): never { throw new Error('invalidJobEditor'); }
@@ -92,7 +95,7 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
   if (new Set(facts.map(f => f.ref.valueId)).size !== facts.length || new Set(facts.map(f => f.ref.fieldId)).size !== facts.length) invalid();
   const selected = payload.selectedFacts.map(ref => {
     const row = facts.find(f => Object.entries(ref).every(([k,v]) => f.ref[k as keyof JobFactRef] === v));
-    if (!row || !isAuthored(row.fact) || !draft.sources.some(s => s.id === ref.sourceId)) invalid();
+    if (!row || !isAccepted(row.fact) || !draft.sources.some(s => s.id === ref.sourceId)) invalid();
     return row;
   });
   const answers = payload.selectedAnswerIds.map(id => {

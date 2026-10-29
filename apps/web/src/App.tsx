@@ -1,7 +1,7 @@
 import { HttpJobCvAdapter } from "./base/job-adapter";
 import {
   confirmImported,
-  requiresImportReview,
+  pendingImportedCandidates,
 } from "@resumora/contracts/editor/import";
 import { ImportReview } from "./components/ImportReview";
 import type { IntelligenceClient } from "./base/intelligence";
@@ -789,11 +789,7 @@ function CvEditor({
                   )}
                   {(jobMode ||
                     !draft.importReview ||
-                    draft.importReview.extraction.candidates.every(
-                      (c) =>
-                        !requiresImportReview(c) ||
-                        draft.importReview!.confirmedIds.includes(c.id),
-                    )) && (
+                    !pendingImportedCandidates(draft).length) && (
                     <div className="editor-layout">
                       <div>
                         {route === "base" ? (

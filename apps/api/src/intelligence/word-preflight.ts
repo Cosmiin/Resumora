@@ -82,8 +82,9 @@ function validateDoc(bytes: Uint8Array) {
   // Byte cap conservatively bounds either encoding; do not guess pages from ccpText metadata.
   if (word.length > documentLimits.characters || metadata > 160_000)
     throw new Error("DOCUMENT_TEXT_LIMIT");
+  return { cfb, word };
 }
-function validateDocx(bytes: Uint8Array) {
+function validateDocx(bytes: Uint8Array, includeText = false): string {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     u16 = (p: number) => view.getUint16(p, true),
     u32 = (p: number) => view.getUint32(p, true);
@@ -112,6 +113,7 @@ function validateDocx(bytes: Uint8Array) {
     xmlTotal = 0,
     text = 0,
     hasDocument = false;
+  const content: string[] = [];
   const names = new Set(),
     regions: { from: number; to: number }[] = [];
   for (let i = 0; i < entries; i++) {
@@ -213,6 +215,7 @@ function validateDocx(bytes: Uint8Array) {
         ).length;
         if (text > documentLimits.characters)
           throw new Error("DOCUMENT_TEXT_LIMIT");
+        if (includeText) content.push(xmlText(xml));
       }
       if (name === "word/document.xml") hasDocument = true;
     }
@@ -220,4 +223,130 @@ function validateDocx(bytes: Uint8Array) {
   }
   if (p !== end || !hasDocument || !names.has("[Content_Types].xml"))
     throw new Error("DOCUMENT_MALFORMED");
+  return content.join("\n");
+}
+
+function xmlText(xml: string): string {
+  let inText = false,
+    result = "";
+  const entities: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'",
+  };
+  for (const token of xml.match(
+    /<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<[^>]*>|[^<]+/g,
+  ) ?? []) {
+    if (/^<(?:[\w.-]+:)?t(?:\s|>)/.test(token)) inText = true;
+    else if (/^<\/(?:[\w.-]+:)?t\s*>/.test(token)) inText = false;
+    else if (/^<(?:[\w.-]+:)?(?:tab|br|cr)(?:\s|\/|>)/.test(token))
+      result += /^<[^>]*tab/.test(token) ? "\t" : "\n";
+    else if (/^<\/(?:[\w.-]+:)?(?:p|tr)\s*>/.test(token)) result += "\n";
+    else if (inText && token.startsWith("<![CDATA["))
+      result += token.slice(9, -3);
+    else if (inText && !token.startsWith("<"))
+      result += token.replace(
+        /&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi,
+        (whole, entity: string) => {
+          if (entities[entity] !== undefined) return entities[entity];
+          const point = entity.startsWith("#x")
+            ? parseInt(entity.slice(2), 16)
+            : Number(entity.slice(1));
+          if (
+            !Number.isInteger(point) ||
+            point < 1 ||
+            point > 0x10ffff ||
+            (point >= 0xd800 && point <= 0xdfff)
+          )
+            throw new Error("DOCUMENT_MALFORMED");
+          return String.fromCodePoint(point);
+        },
+      );
+  }
+  return result;
+}
+
+export function extractWordText(
+  format: "doc" | "docx",
+  bytes: Uint8Array,
+): string {
+  documentFormat(`upload.${format}`, bytes);
+  let text: string;
+  if (format === "docx") text = validateDocx(bytes, true);
+  else {
+    const { cfb, word } = validateDoc(bytes);
+    const view = new DataView(word.buffer, word.byteOffset, word.byteLength);
+    const u16 = (at: number) => view.getUint16(at, true),
+      u32 = (at: number) => view.getUint32(at, true);
+    const tableName = u16(10) & 0x0200 ? "1Table" : "0Table";
+    const tableStream = cfb.FileIndex.find(
+      (f) => f.name === tableName,
+    )?.content;
+    if (!tableStream) throw new Error("SOURCE_TEXT_UNAVAILABLE");
+    const table = new Uint8Array(tableStream as ArrayLike<number>);
+    let at = 34 + u16(32) * 2;
+    if (at + 2 > word.length) throw new Error("DOCUMENT_MALFORMED");
+    at += 2 + u16(at) * 4;
+    if (at + 2 + 34 * 8 > word.length || u16(at) < 34)
+      throw new Error("DOCUMENT_MALFORMED");
+    const clx = at + 2 + 33 * 8,
+      end = u32(clx) + u32(clx + 4);
+    at = u32(clx);
+    if (end > table.length) throw new Error("DOCUMENT_MALFORMED");
+    const tableView = new DataView(
+      table.buffer,
+      table.byteOffset,
+      table.byteLength,
+    );
+    while (at < end && table[at] === 1) {
+      if (at + 3 > end) throw new Error("DOCUMENT_MALFORMED");
+      at += 3 + tableView.getUint16(at + 1, true);
+    }
+    if (at + 5 > end || table[at] !== 2) throw new Error("DOCUMENT_MALFORMED");
+    const length = tableView.getUint32(at + 1, true),
+      pieces = (length - 4) / 12;
+    at += 5;
+    if (
+      !Number.isInteger(pieces) ||
+      pieces < 1 ||
+      pieces > documentLimits.characters ||
+      at + length > end
+    )
+      throw new Error("DOCUMENT_MALFORMED");
+    const chunks: string[] = [];
+    for (let i = 0; i < pieces; i++) {
+      const start = tableView.getUint32(at + i * 4, true),
+        finish = tableView.getUint32(at + (i + 1) * 4, true);
+      if (
+        (i === 0 && start !== 0) ||
+        finish < start ||
+        finish > documentLimits.characters
+      )
+        throw new Error("DOCUMENT_TEXT_LIMIT");
+      const encoded = tableView.getUint32(
+        at + (pieces + 1) * 4 + i * 8 + 2,
+        true,
+      );
+      const compressed = !!(encoded & 0x40000000),
+        offset = (encoded & 0x3fffffff) / (compressed ? 2 : 1);
+      const count = (finish - start) * (compressed ? 1 : 2);
+      if (!Number.isInteger(offset) || offset + count > word.length)
+        throw new Error("DOCUMENT_MALFORMED");
+      chunks.push(
+        new TextDecoder(compressed ? "windows-1252" : "utf-16le", {
+          fatal: true,
+        }).decode(word.subarray(offset, offset + count)),
+      );
+    }
+    text = chunks
+      .join("")
+      .replace(/[\r\x07]/g, "\n")
+      .replace(/[\x00-\x08\x0b-\x1f]/g, "");
+  }
+  if (text.length > documentLimits.characters)
+    throw new Error("DOCUMENT_TEXT_LIMIT");
+  if (!text.trim()) throw new Error("SOURCE_TEXT_UNAVAILABLE");
+  return text;
 }

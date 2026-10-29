@@ -4,7 +4,9 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type {
   Candidate,
   ImportReview,
+  WordSourceText,
 } from "@resumora/contracts/intelligence/model";
+import { documentLimits } from "@resumora/contracts/intelligence/model";
 import type { IntelligenceClient } from "../base/intelligence";
 import {
   LocalFontData,
@@ -13,6 +15,7 @@ import {
 } from "../base/pdf-assets";
 import {
   locateQuote,
+  locateTextQuote,
   sourceBox,
   type SourceBox,
   type SourceRun,
@@ -24,15 +27,134 @@ import {
   type OcrPage,
 } from "../base/local-ocr";
 import { Button, useCopy } from "./ui";
-export function OriginalSource({
-  review,
-  candidate,
-  client,
-}: {
+type SourceProps = {
   review: ImportReview;
   candidate?: Candidate;
   client?: IntelligenceClient;
-}) {
+};
+export function OriginalSource(props: SourceProps) {
+  return props.review.format === "pdf" ? (
+    <PdfSource {...props} />
+  ) : (
+    <WordSource {...props} />
+  );
+}
+function WordSource({ review, candidate, client }: SourceProps) {
+  const t = useCopy();
+  const [result, setResult] = useState<{
+    client: IntelligenceClient;
+    source: WordSourceText;
+  }>();
+  const [error, setError] = useState(false),
+    [attempt, retry] = useState(0);
+  const highlight = useRef<HTMLElement>(null);
+  const source =
+    result?.client === client &&
+    result?.source.importId === review.id &&
+    result.source.sourceHash === review.sourceHash &&
+    result.source.format === review.format
+      ? result.source
+      : undefined;
+  const match =
+    source && candidate ? locateTextQuote(source.text, candidate.quote) : null;
+  useEffect(() => {
+    const controller = new AbortController();
+    setResult(undefined);
+    setError(false);
+    if (!client?.sourceText) {
+      setError(true);
+      return;
+    }
+    void client
+      .sourceText(review.id, controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        if (
+          data.importId !== review.id ||
+          data.sourceHash !== review.sourceHash ||
+          data.format !== review.format ||
+          typeof data.text !== "string" ||
+          !data.text.trim() ||
+          data.text.length > documentLimits.characters
+        )
+          throw new Error("SOURCE_MISMATCH");
+        setResult({ client, source: data });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setError(true);
+      });
+    return () => controller.abort();
+  }, [client, review.id, review.sourceHash, review.format, attempt]);
+  useEffect(() => {
+    highlight.current?.scrollIntoView?.({ block: "nearest" });
+  }, [candidate?.id, source]);
+  return (
+    <aside
+      className="card original-source"
+      aria-label={t("CV original", "Original CV")}
+    >
+      <h3>{t("Text extras din Word", "Extracted Word text")}</h3>
+      <p className="small muted">
+        {t(
+          "Text extras din documentul încărcat. Aspectul și paginarea Word nu sunt reproduse.",
+          "Text extracted from your uploaded document. Word layout and pagination are not reproduced.",
+        )}
+      </p>
+      {error ? (
+        <div role="status">
+          <p>
+            {t(
+              "Textul sursă nu este disponibil. Locația nu poate fi verificată.",
+              "Source text unavailable. Source location cannot be verified.",
+            )}
+          </p>
+          <Button onClick={() => retry((n) => n + 1)}>
+            {t("Reîncearcă", "Retry")}
+          </Button>
+        </div>
+      ) : !source ? (
+        <p role="status">{t("Deschidem textul…", "Opening text…")}</p>
+      ) : (
+        <>
+          <p role="status" className="small">
+            {match
+              ? t(
+                  "Potrivire unică în textul extras, marcată mai jos.",
+                  "Unique match in extracted text, highlighted below.",
+                )
+              : t(
+                  "Locație indisponibilă: text diferit sau potrivire ambiguă.",
+                  "Location unavailable: differing text or ambiguous match.",
+                )}
+          </p>
+          <div
+            className="source-word-text"
+            aria-label={t("Text sursă Word", "Word source text")}
+          >
+            {match ? (
+              <>
+                {source.text.slice(0, match.start)}
+                <mark ref={highlight} className="source-text-match">
+                  {source.text.slice(match.start, match.end)}
+                </mark>
+                {source.text.slice(match.end)}
+              </>
+            ) : (
+              source.text
+            )}
+          </div>
+        </>
+      )}
+      {candidate && (
+        <blockquote>
+          <p>{candidate.quote}</p>
+          <small>{t("Citat extras", "Extracted quote")}</small>
+        </blockquote>
+      )}
+    </aside>
+  );
+}
+function PdfSource({ review, candidate, client }: SourceProps) {
   const t = useCopy(),
     canvas = useRef<HTMLCanvasElement>(null),
     scroll = useRef<HTMLDivElement>(null);
@@ -88,7 +210,7 @@ export function OriginalSource({
     setRendered(false);
     setBoxes([]);
     if (canvas.current) canvas.current.width = 0;
-    if (review.format !== "pdf" || !client?.original) {
+    if (!client?.original) {
       setError(true);
       return;
     }
@@ -296,8 +418,8 @@ export function OriginalSource({
         <div role="status">
           <p>
             {t(
-              "Previzualizarea originalului nu este disponibilă. Locația nu poate fi verificată. Documentele Word nu au previzualizare PDF.",
-              "Original preview unavailable. Source location cannot be verified. Word documents have no PDF preview.",
+              "Previzualizarea originalului nu este disponibilă. Locația nu poate fi verificată.",
+              "Original preview unavailable. Source location cannot be verified.",
             )}
           </p>
           <Button onClick={() => retry((n) => n + 1)}>

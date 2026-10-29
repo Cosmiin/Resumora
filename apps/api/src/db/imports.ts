@@ -30,6 +30,7 @@ export function importGateway(
           return {
             bytes: await readOriginal(row.objectKey),
             format: row.format,
+            sourceHash: row.sourceHash,
           };
         },
         begin: (input) =>

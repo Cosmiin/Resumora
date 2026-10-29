@@ -2099,3 +2099,19 @@ textarea.native {
     max-height: 50vh;
   }
 }
+
+.source-word-text {
+  max-height: 65vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+}
+.source-text-match {
+  color: var(--text-strong);
+  background: var(--status-warn-bg);
+  outline: 2px solid var(--border-selected);
+  border-radius: 0.15rem;
+}

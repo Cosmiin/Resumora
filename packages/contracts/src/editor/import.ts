@@ -1,8 +1,10 @@
 import {
   allFacts,
+  isAccepted,
   blankDraft,
   clone,
   localId,
+  fact,
   newEducation,
   newOptionalEntry,
   newRole,
@@ -12,18 +14,26 @@ import {
 } from "./model.ts";
 import {
   isImportReview,
+  hasSpecificImportWarning,
   type Candidate,
   type ImportReview,
 } from "../intelligence/model.ts";
 
 export const requiresImportReview = (candidate: Candidate): boolean =>
-  candidate.confidence !== "high" ||
-  !!(
-    candidate.warning &&
-    !/^Native (PDF transcription|Word excerpt) requires review/.test(
-      candidate.warning,
-    )
+  candidate.confidence !== "high" || hasSpecificImportWarning(candidate);
+
+export const importedFact = (draft: BaseDraft, candidate: Candidate) =>
+  allFacts(draft, true).find(
+    (f) =>
+      f.sourceClaimId === candidate.id ||
+      f.sourceLineage?.some((s) => s.sourceClaimId === candidate.id),
   );
+export const pendingImportedCandidates = (draft: BaseDraft): Candidate[] =>
+  draft.importReview?.extraction.candidates.filter((c) => {
+    if (draft.importReview!.confirmedIds.includes(c.id)) return false;
+    const field = importedFact(draft, c);
+    return !field || field.acceptance !== "automatic" || !isAccepted(field);
+  }) ?? [];
 
 /** Maps validated extraction into a NEW unconfirmed draft; never mutates an existing Base. */
 export function importedDraft(review: ImportReview): BaseDraft {
@@ -52,6 +62,7 @@ export function importedDraft(review: ImportReview): BaseDraft {
       fieldId: localId(),
       value,
       status: "extracted_unconfirmed",
+      ...(!requiresImportReview(c) ? { acceptance: "automatic" as const } : {}),
       sourceId,
       sourceClaimId: c.id,
     });
@@ -86,6 +97,7 @@ export function importedDraft(review: ImportReview): BaseDraft {
                 ? "Certifications"
                 : "",
           entries: [],
+          ...(parts[0] === "custom" ? { heading: fact("") } : {}),
         };
         draft.optionalSections.push(section);
         if (c.path === "summary")
@@ -95,13 +107,18 @@ export function importedDraft(review: ImportReview): BaseDraft {
         else draft.presentation.order.push(group);
       }
       const entryIndex = parts[0] === "certifications" ? index : 0;
-      while (section.entries.length <= entryIndex)
-        section.entries.push(newOptionalEntry());
+      while (section.entries.length <= entryIndex) {
+        const entry = newOptionalEntry();
+        if (parts[0] === "custom") entry.id = section.id;
+        section.entries.push(entry);
+      }
       const entry = section.entries[entryIndex];
       if (c.path === "summary") {
         entry.details = field(c.value) as Fact<string>;
       } else if (parts[2] === "title") {
-        entry.title = field(c.value) as Fact<string>;
+        if (parts[0] === "custom")
+          section.heading = field(c.value) as Fact<string>;
+        else entry.title = field(c.value) as Fact<string>;
       } else if (parts[2] === "details")
         entry.details = field(c.value) as Fact<string>;
       else if (parts[2] === "start")
