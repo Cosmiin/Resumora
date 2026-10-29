@@ -1,3 +1,6 @@
+import { confirmImported } from "@resumora/contracts/editor/import";
+import { ImportReview } from "./components/ImportReview";
+import type { IntelligenceClient } from "./base/intelligence";
 import type { CvPhoto } from "@resumora/contracts/editor/photo";
 import { PhotoEditor } from "./photo/PhotoEditor";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -53,9 +56,11 @@ type PendingWrite = {
 );
 export function App({
   adapter = sessionAdapter,
+  intelligence,
   transport,
 }: {
   adapter?: BaseCvAdapter;
+  intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
   if (!adapterKeys.has(adapter)) adapterKeys.set(adapter, ++nextAdapterKey);
@@ -64,14 +69,17 @@ export function App({
       key={adapterKeys.get(adapter)}
       adapter={adapter}
       transport={transport}
+      intelligence={intelligence}
     />
   );
 }
 function CvEditor({
   adapter,
+  intelligence,
   transport,
 }: {
   adapter: BaseCvAdapter;
+  intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
   const durable = adapter.capability === "durable";
@@ -651,7 +659,11 @@ function CvEditor({
               )}
               {(route === "start" ||
                 (["base", "review", "enrich"].includes(route) && !draft)) && (
-                <StartChooser start={start} />
+                <StartChooser
+                  start={start}
+                  intelligence={intelligence}
+                  revision={head?.revision ?? 0}
+                />
               )}
               {draft && ["base", "review"].includes(route) && (
                 <>
@@ -659,6 +671,27 @@ function CvEditor({
                     <p role="alert" className="notice notice-error">
                       {issueText(issues[0].code, t)}
                     </p>
+                  )}
+                  {draft.importReview && (
+                    <ImportReview
+                      key={draft.importReview.id}
+                      draft={draft}
+                      disabled={
+                        busy || !!pendingWrite.current || head === undefined
+                      }
+                      confirm={(ids) => {
+                        const next = confirmImported(latest.current!, ids);
+                        const found = validateDraft(next);
+                        if (found.length) {
+                          setIssues(found);
+                          go("base");
+                          focusField(found[0].field);
+                          return;
+                        }
+                        change(next);
+                        void save("checkpoint");
+                      }}
+                    />
                   )}
                   <div className="editor-layout">
                     <div>
@@ -702,6 +735,50 @@ function CvEditor({
                   snapshot={head ?? null}
                   ready={!dirty && !busy && !error && !pendingWrite.current}
                   durable={durable}
+                  rewriteRole={
+                    intelligence
+                      ? async (targetId) => {
+                          const saved = headRef.current;
+                          if (
+                            !saved ||
+                            !equalValues(latest.current, saved.draft)
+                          )
+                            throw new Error("SAVE_REQUIRED");
+                          const started = generation.current;
+                          const result = await intelligence.rewrite({
+                            snapshotId: saved.id,
+                            revision: saved.revision,
+                            targetId,
+                            operationId: crypto.randomUUID(),
+                          });
+                          if (started !== generation.current)
+                            throw new Error("STALE");
+                          return result;
+                        }
+                      : undefined
+                  }
+                  prepareQuestions={
+                    intelligence
+                      ? async (targetId) => {
+                          const saved = headRef.current;
+                          if (
+                            !saved ||
+                            !equalValues(latest.current, saved.draft)
+                          )
+                            throw new Error("SAVE_REQUIRED");
+                          const started = generation.current;
+                          const result = await intelligence.questions({
+                            snapshotId: saved.id,
+                            revision: saved.revision,
+                            targetId,
+                            operationId: crypto.randomUUID(),
+                          });
+                          if (started !== generation.current)
+                            throw new Error("STALE");
+                          return result;
+                        }
+                      : undefined
+                  }
                   draft={draft}
                   undoFrom={undoFrom}
                   change={change}

@@ -1,3 +1,5 @@
+import type { IntelligenceClient } from "../base/intelligence";
+import { ImportDocument } from "./ImportDocument";
 import { useContext, useState, useRef, useEffect } from "react";
 import {
   ArrowRight,
@@ -14,7 +16,15 @@ import { maraReviewDraft } from "../base/fixture";
 import { selectDocument, type FileSelection } from "../base/validation";
 import { Button, Pill, LanguageContext, useCopy } from "./ui";
 import { DocumentPreview } from "./DocumentPreview";
-export function StartChooser({ start }: { start: (draft: BaseDraft) => void }) {
+export function StartChooser({
+  start,
+  intelligence,
+  revision = 0,
+}: {
+  start: (draft: BaseDraft) => void;
+  intelligence?: IntelligenceClient;
+  revision?: number;
+}) {
   const t = useCopy(),
     locale = useContext(LanguageContext);
   const picker = useRef<HTMLInputElement>(null);
@@ -45,15 +55,22 @@ export function StartChooser({ start }: { start: (draft: BaseDraft) => void }) {
         <h2>{t("Am deja un CV", "I already have a CV")}</h2>
         <p>
           {t(
-            "Selectarea unui fișier poate fi verificată local. Încărcarea și extragerea PDF/DOCX nu sunt conectate.",
-            "File selection can be checked locally. PDF/DOCX upload and extraction are not connected.",
+            "Importă un PDF, DOCX sau DOC pentru verificare asistată de AI când procesarea este configurată. Poți completa și manual.",
+            "Import a PDF, DOCX or DOC for AI-assisted review when document processing is configured. Manual entry is always available.",
           )}
         </p>
         <Button onClick={() => setMode("file")}>
           {t("Alege un document", "Choose a document")}
         </Button>
       </section>
-      {mode === "file" && (
+      {mode === "file" && intelligence && (
+        <ImportDocument
+          client={intelligence}
+          revision={revision}
+          start={start}
+        />
+      )}
+      {mode === "file" && !intelligence && (
         <section className="card file-card">
           <h2>{t("Document existent", "Existing document")}</h2>
           <p>

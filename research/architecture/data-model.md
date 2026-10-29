@@ -38,7 +38,7 @@ A fact entity (role, skill, education entry) has a stable identity. Snapshot ass
 | template, template_version | Reviewed print source,section capabilities,font/renderer dependencies and layout constraints; global read-only assets vs private user content |
 | export, export_check | Exact document/template/language/privacy hash; operation/object checksum/TTL and PDF extraction report/renderer version; re-export identical bytes can use private cache |
 | subscription, provider_event | Stripe customer/subscription/price IDs,term,state,renewal times; signature-verified event ID unique; no PAN/card data stored |
-| entitlement_revision, entitlement_period | Effective feature rules andmonthly quota window independent of1/3/6month payment term; current provider state reconciliation |
+| entitlement_revision, entitlement_period | Effective feature rules under the [accepted billing direction](../../docs/product/prd.md#10-account-subscriptions-entitlements-and-privacy); current provider state reconciliation |
 | quota_reservation, usage_event, usage_aggregate | Operation and period unique reservations; every provider attempt/token/cache/output/price version/cost state; settled/released/refunded with idempotent transitions |
 | operation, job_lease, outbox | Durable async state,phase,attempt,lease owner/expiry,idempotency key,deadline,cancellation fence; commit effects+outbox in same transaction |
 | audit_event, consent_record, deletion_request | Actor/action/resource IDs/safe deltas; policy/provider disclosure version/time/scope; resumable rights workflow with tombstone/backup expiry |

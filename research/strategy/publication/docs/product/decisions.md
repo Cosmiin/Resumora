@@ -20,10 +20,10 @@ Seven primary questions appear after the relevant action in UX's one persistent 
 | Decision | Journey / card | Review priority | Remaining question / partial status |
 |---|---|---|---|
 | D-01 | J5 / I2-Q05 | Primary | Capture requested; consent/site/permission/launch depth unresolved. |
-| D-02 | J2 / I2-Q08 | Progressive | Upload/manual recovery directed; file/OCR launch boundary unresolved. |
+| D-02 | J2 / I2-Q08 | Progressive | Current implemented intake and scan support follow the later [import guide](../../../../../docs/setup/cv-import-enrichment.md); hosted/real-data activation remains separate from this discovery register. |
 | D-03 | J5 / I2-Q03 | Primary | ATS1.1 meanings/parameters directed; action hierarchy/readiness rubric/calibration acceptance unresolved. |
 | D-04 | J6 / I2-Q09 | Progressive | Modern full-size readable output directed; template/style/DOCX breadth unresolved. |
-| D-05 | J6 / I2-Q07 | Primary | 1/3/6-month concept directed; value/access/usage/renewal limits and prices unselected. |
+| D-05 | J6 / I2-Q07 | Primary | Later accepted billing direction is owned by [PRD section 10](../../../../../docs/product/prd.md#10-account-subscriptions-entitlements-and-privacy); remaining commercial choices stay open. |
 | D-06 | J1 / I2-Q01 | Primary | Job-specific outcome directed; initial candidate validation segment unresolved; job-specific focus is not re-opened. |
 | D-07 | J7 / I2-Q10 | Progressive | Cancellation distinct from deletion; post-cancellation editing/variant/export access unresolved. |
 | D-08 | J2/J7 / I2-Q11 | Progressive | Managed/free-first direction recorded; provider/residency requirements follow the linked enhancement groundwork guide. Retention, processing controls and operating feasibility unresolved. |
