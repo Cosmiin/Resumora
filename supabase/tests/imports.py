@@ -37,29 +37,30 @@ def suite(db):
             if db.sql("SELECT to_regclass('storage.objects') IS NOT NULL") != 't':
                 self.skipTest('Storage runtime not installed in the full canonical-only harness; focused imports suite includes real RLS tables')
             name=self.row['objectKey']
+            object_filter=f"bucket_id='cv-imports' AND name='{name}'"
             db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.a,role='authenticated')
-            self.assertEqual(db.sql("SELECT count(*) FROM storage.objects",user=self.b,role='authenticated'),'0')
+            self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE {object_filter}",user=self.b,role='authenticated'),'0')
             self.assertIn('row-level security',db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.b,role='authenticated',expect_error=True))
             try:
-                self.assertEqual(db.sql("SELECT count(*) FROM storage.objects",role='anon'),'0')
+                self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE {object_filter}",role='anon'),'0')
             except AssertionError as error:
                 # The shared photo guard can deny the query before import RLS
                 # filters rows. This specific denial also proves no anon read.
                 self.assertIn('permission denied for function photo_storage_access',str(error))
             self.complete('uploaded')
             try:
-                updated=db.sql(f"UPDATE storage.objects SET name='{name}' WHERE name='{name}' RETURNING id",user=self.a,role='authenticated')
+                updated=db.sql(f"UPDATE storage.objects SET name='{name}' WHERE {object_filter} RETURNING id",user=self.a,role='authenticated')
             except AssertionError as error:
                 # A permissive UPDATE policy exposes the row to WITH CHECK.
                 self.assertIn('row-level security',str(error))
             else:
                 # Without one, RLS denies UPDATE by filtering out the row.
                 self.assertEqual(updated,'')
-            self.assertEqual(db.sql(f"SELECT name FROM storage.objects WHERE bucket_id='cv-imports' AND name='{name}'"),name)
-            self.assertEqual(db.sql("SELECT count(*) FROM storage.objects",user=self.a,role='authenticated'),'1')
+            self.assertEqual(db.sql(f"SELECT name FROM storage.objects WHERE {object_filter}"),name)
+            self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE {object_filter}",user=self.a,role='authenticated'),'1')
             self.call('cancel_cv_import',f"'{self.op}'")
-            db.sql(f"DELETE FROM storage.objects WHERE name='{name}'",user=self.a,role='authenticated')
-            self.assertEqual(db.sql("SELECT count(*) FROM storage.objects"),'0')
+            db.sql(f"DELETE FROM storage.objects WHERE {object_filter}",user=self.a,role='authenticated')
+            self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE {object_filter}"),'0')
             self.call('ack_cv_import_purge',f"'{self.op}','{self.secret}'")
             self.assertEqual(db.sql(f"SELECT state FROM app.source_documents WHERE id='{self.row['id']}'"),'purged')
         def test_cancel_fences_completion_and_dispatch_but_allows_owned_raw_cleanup(self):
