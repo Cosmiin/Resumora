@@ -99,6 +99,22 @@ export function Editor({
           ? hidden.filter((x) => x !== id)
           : [...hidden, id];
       }
+      if (jobMode) {
+        const target = jobEditorFacts(n).find(
+          (f) =>
+            f.key === "bullet" &&
+            f.fact.fieldId === id &&
+            f.fact.sourceId === "job_local_manual",
+        )?.ref.entityId;
+        if (
+          target &&
+          n.presentation.approvedWording?.[target]?.scope === "experience"
+        ) {
+          delete n.presentation.approvedWording[target];
+          if (!Object.keys(n.presentation.approvedWording).length)
+            delete n.presentation.approvedWording;
+        }
+      }
     });
   }
   function field(

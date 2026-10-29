@@ -195,6 +195,11 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
       normalized.professionalSkills = projected.professionalSkills;
       normalized.technicalSkills = projected.technicalSkills;
       normalized.sources = projected.sources;
+      if (this.source.presentation.approvedWording)
+        normalized.presentation.approvedWording = {
+          ...clone(this.source.presentation.approvedWording),
+          ...normalized.presentation.approvedWording,
+        };
       // The adapter accepts only controls exposed in job mode, never arbitrary facts.
       if (!equalValues(normalized, projected)) throw new Error();
     } catch {

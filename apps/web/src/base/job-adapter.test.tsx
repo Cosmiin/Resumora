@@ -1320,3 +1320,198 @@ it.each(["role", "projects"] as const)(
     expect(h.versions.has(h.jobs[1])).toBe(false);
   },
 );
+
+it.each([
+  ["role", "none"],
+  ["role", "paragraph"],
+  ["role", "experience"],
+  ["projects", "none"],
+  ["projects", "paragraph"],
+  ["projects", "experience"],
+] as const)(
+  "resets whole %s wording on local bullet visibility changes with %s inherited wording",
+  async (kind, inherited) => {
+    const h = jobHarness();
+    const entry = newOptionalEntry();
+    entry.title.value = "Source project";
+    entry.details.value = "Built tools";
+    const target = kind === "role" ? h.source.roles[0] : entry;
+    const context = "context" in target ? target.context : target.details;
+    if (kind === "projects") {
+      h.source.optionalSections.push({
+        id: "projects",
+        kind,
+        label: "Projects",
+        entries: [entry],
+      });
+      h.source.presentation.order.push("projects");
+    }
+    if (inherited !== "none")
+      h.source.presentation.approvedWording = {
+        [target.id]: {
+          text: "Pinned Base wording",
+          ...(inherited === "experience"
+            ? { scope: "experience" as const }
+            : {}),
+          sources: [
+            { id: context.id, text: context.value, sourceId: context.sourceId },
+          ],
+        },
+      };
+    if (inherited === "experience")
+      h.source.roleRewriteReviews = [
+        {
+          id: "base-review",
+          status: "accepted",
+          input: careerContext(h.source, target.id),
+          proposal: {
+            schemaVersion: "career-role-rewrite/1",
+            targetId: target.id,
+            text: "Pinned Base wording",
+            factIds: [context.id],
+            warnings: [],
+          },
+        },
+      ];
+    const source = structuredClone(h.source);
+    const adapter = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    await adapter.load();
+    const first = await adapter.save({
+      draft: adapter.initialDraft(),
+      expectedRevision: 0,
+      requestId: crypto.randomUUID(),
+    });
+    const payload = structuredClone(h.versions.get(h.jobs[0])![0].payload);
+    const addition = {
+      id: "job_local_visibility_bullet",
+      targetId: target.id,
+      kind: "bullet" as const,
+      text: "Local contribution to hide",
+      scope: "job-only" as const,
+      origin: "user_authored" as const,
+    };
+    payload.localAdditions.push(addition);
+    expect(
+      (
+        await h.transport(`/v1/jobs/${h.jobs[0]}/cv/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requestId: crypto.randomUUID(),
+            documentId: h.versions.get(h.jobs[0])![0].documentId,
+            expectedRevision: first.revision,
+            payload,
+          }),
+        })
+      ).status,
+    ).toBe(200);
+    let draft = (await adapter.load())!.draft;
+    const surface = () => (
+      <>
+        <Editor
+          jobMode
+          draft={draft}
+          issues={[]}
+          change={(next) => {
+            draft = next;
+            view.rerender(surface());
+          }}
+        />
+        <DocumentPreview draft={draft} asOf={{ year: "2026", month: "10" }} />
+      </>
+    );
+    const view = render(surface());
+    fireEvent.click(
+      screen.getByText(
+        kind === "role" ? "Experiență profesională" : "Projects",
+        { selector: "summary" },
+      ),
+    );
+    const wordingField = () =>
+      within(
+        screen
+          .getByText(kind === "role" ? "Experiență profesională" : "Projects", {
+            selector: "summary",
+          })
+          .closest("details")!,
+      ).getByRole("textbox", {
+        name: "Formulare pentru acest job",
+      }) as HTMLTextAreaElement;
+    const previewText = () =>
+      screen.getByRole("complementary", { name: "Previzualizare CV" })
+        .textContent;
+    expect(wordingField().value).toContain(addition.text);
+    const text = `${wordingField().value}\nAccepted whole experience`;
+    fireEvent.change(wordingField(), { target: { value: text } });
+    const authored = await adapter.save({
+      draft,
+      expectedRevision: 2,
+      requestId: crypto.randomUUID(),
+    });
+    expect(authored.draft.presentation.approvedWording![target.id].scope).toBe(
+      "experience",
+    );
+    expect(
+      authored.draft.presentation.approvedWording![target.id].sources.some(
+        (s) => s.id === addition.id,
+      ),
+    ).toBe(false);
+    draft = authored.draft;
+    view.rerender(surface());
+    expect(previewText()).toContain(text);
+    fireEvent.click(
+      screen.getByRole("button", { name: `Ascunde: ${addition.text}` }),
+    );
+    expect(draft.presentation.approvedWording?.[target.id]).toBeUndefined();
+    expect(previewText()).not.toContain(addition.text);
+    expect(wordingField().value).not.toContain(addition.text);
+    const hidden = await adapter.save({
+      draft,
+      expectedRevision: 3,
+      requestId: crypto.randomUUID(),
+    });
+    const reopened = new HttpJobCvAdapter(h.transport, h.jobs[0]);
+    draft = (await reopened.load())!.draft;
+    expect(draft.presentation.hiddenFields).toContain(addition.id);
+    view.rerender(surface());
+    expect(previewText()).not.toContain(addition.text);
+    expect(wordingField().value).not.toContain(addition.text);
+    const history = await reopened.history();
+    expect(history.find((s) => s.id === authored.id)!.draft).toEqual(
+      authored.draft,
+    );
+    expect(history.find((s) => s.id === hidden.id)!.draft).toEqual(
+      hidden.draft,
+    );
+    fireEvent.change(wordingField(), {
+      target: { value: "Accepted without the local contribution" },
+    });
+    const withoutLocal = await reopened.save({
+      draft,
+      expectedRevision: 4,
+      requestId: crypto.randomUUID(),
+    });
+    expect(
+      withoutLocal.draft.presentation.approvedWording![target.id].scope,
+    ).toBe("experience");
+    draft = withoutLocal.draft;
+    view.rerender(surface());
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: `Arată: ${addition.text}` }),
+      { key: "v", altKey: true },
+    );
+    expect(draft.presentation.approvedWording?.[target.id]).toBeUndefined();
+    expect(previewText()).toContain(addition.text);
+    await reopened.save({
+      draft,
+      expectedRevision: 5,
+      requestId: crypto.randomUUID(),
+    });
+    draft = (await reopened.load())!.draft;
+    view.rerender(surface());
+    expect(previewText()).toContain(addition.text);
+    expect(h.source).toEqual(source);
+    expect(h.versions.get(h.jobs[0])![2].payload.wording[0].text).toBe(text);
+    expect(h.versions.has(h.jobs[1])).toBe(false);
+  },
+);
