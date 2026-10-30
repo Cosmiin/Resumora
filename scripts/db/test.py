@@ -175,7 +175,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates', 'job-documents', 'capture', 'workflow', 'languages'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates', 'job-documents', 'capture', 'workflow', 'languages', 'legacy-preservation'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -188,13 +188,20 @@ def main():
         if args.suite == 'imports':
             # Exercise import restrictions against a permissive policy on the shared Storage fixture.
             db.sql("CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
-        through = 'P8' if args.suite in ('languages','all') else 'P7' if args.suite in ('workflow','all','job-documents') else 'P4'
+        through = 'P8' if args.suite in ('languages','all') else 'P7' if args.suite in ('workflow','all','job-documents','legacy-preservation') else 'P4'
         if args.suite in ('job-documents','all'):
             db.migrate('P5')
             import importlib.util
             spec=importlib.util.spec_from_file_location('current_job_documents', ROOT/'supabase/tests/current_job_documents.py')
             current=importlib.util.module_from_spec(spec);spec.loader.exec_module(current);current.prepare_upgrade(db)
         count = db.migrate(through)
+        if args.suite in ('legacy-preservation','job-documents','all'):
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('legacy_current_preservation', ROOT/'supabase/tests/legacy_current_preservation.py')
+            legacy=importlib.util.module_from_spec(spec);spec.loader.exec_module(legacy);legacy.install_purge_fixture(db)
+            if args.suite == 'legacy-preservation':
+                result=unittest.TextTestRunner(verbosity=2).run(legacy.suite(db))
+                return 0 if result.wasSuccessful() else 1
         assert db.migrate(through) == 0, 'Normal reapply must have no pending migrations'
         table_count = int(db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'"))
         assert db.sql("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relkind='r' AND NOT c.relrowsecurity") == '0'
