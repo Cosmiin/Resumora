@@ -38,7 +38,7 @@ export const pendingImportedCandidates = (draft: BaseDraft): Candidate[] =>
     );
   }) ?? [];
 
-/** Maps validated extraction into a NEW unconfirmed draft; never mutates an existing Base. */
+/** Maps validated extraction into a NEW draft; never mutates an existing Base. */
 export function importedDraft(review: ImportReview): BaseDraft {
   if (!isImportReview(review) || review.admission.kind !== "cv")
     throw new Error("INVALID_IMPORT_REVIEW");

@@ -337,6 +337,7 @@ export function extractWordText(
       chunks.push(
         new TextDecoder(compressed ? "windows-1252" : "utf-16le", {
           fatal: true,
+          ignoreBOM: false,
         }).decode(word.subarray(offset, offset + count)),
       );
     }

@@ -83,13 +83,20 @@ def suite(db):
             source['content']['optionalSections'] = [dict(id='awards', kind='custom', label='', heading=heading, entries=[])]
             payload = copy.deepcopy(self.payload)
             payload['selectedFacts'].append(dict(entityId='awards', fieldId='heading-field', valueId='heading', sourceId='manual'))
-            self.call('validate_job_editor', f"{literal(payload)},{literal(source)}")
+            saved_source = self.jsoncall('save_base_draft', f"'{uid()}',1,{literal(source)},'autosave'")
+            payload['source'] = dict(snapshotId=saved_source['id'], revision=saved_source['revision'])
+            saved = self.save(payload)
+            self.assertEqual(saved['payload'], payload)
+            self.assertEqual(self.history(self.job1['id'], saved['documentId']), [saved])
             for rejected in ('extracted_unconfirmed', 'draft'):
                 invalid = copy.deepcopy(source)
                 field = invalid['content']['roles'][0]['context']
                 field['status'] = rejected
                 if rejected == 'extracted_unconfirmed': del field['acceptance']
-                self.assertIn('INVALID_EDITOR_PAYLOAD', self.call('validate_job_editor', f"{literal(payload)},{literal(invalid)}", error=True))
+                saved_source = self.jsoncall('save_base_draft', f"'{uid()}',{saved_source['revision']},{literal(invalid)},'autosave'")
+                payload['source'] = dict(snapshotId=saved_source['id'], revision=saved_source['revision'])
+                self.assertIn('INVALID_EDITOR_PAYLOAD', self.save(payload, doc=saved['documentId'], revision=1, error=True))
+                self.assertEqual(self.history(self.job1['id'], saved['documentId']), [saved])
 
         def test_whole_experience_scope_save_history_and_restore(self):
             payload = copy.deepcopy(self.payload)
