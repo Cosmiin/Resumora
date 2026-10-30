@@ -123,7 +123,7 @@ it("uploads accepted canvas bytes from Chrome and saves a Base photo", async () 
   });
   await screen.findByLabelText("Formă");
   expect(port.upload).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Salvează fotografia" }));
+
   await waitFor(() => expect(port.upload).toHaveBeenCalledTimes(1));
   const uploaded = vi.mocked(port.upload).mock.calls[0][0];
   const bytes = new Uint8Array(await uploaded.arrayBuffer());
@@ -134,10 +134,10 @@ it("uploads accepted canvas bytes from Chrome and saves a Base photo", async () 
   });
   // Direct metadata-bearing input still requires local normalization.
   expect(() => inspectPhoto(canvasJpeg)).toThrow("normalizeLocally");
-  await screen.findByText("Fotografie salvată în CV.");
+  await screen.findByText("Fotografie salvată automat în CV.");
   expect((await adapter.load())?.draft.presentation.photo?.assetId).toBe(id);
 });
-it("keeps new image local until explicit save; sliders/shape serialize and cancel sends nothing", async () => {
+it("automatically coalesces photo/crop changes; sliders serialize and closing before debounce sends nothing", async () => {
   const port = client(),
     commit = vi.fn(
       async (_photo: CvPhoto | null, _expected: CvPhoto | null) => true,
@@ -164,7 +164,7 @@ it("keeps new image local until explicit save; sliders/shape serialize and cance
   fireEvent.change(screen.getByLabelText("Shape"), {
     target: { value: "circle" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save photo" }));
+
   await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
   const photo = commit.mock.calls[0][0] as unknown as CvPhoto;
   expect(photo).toMatchObject({
@@ -178,7 +178,7 @@ it("keeps new image local until explicit save; sliders/shape serialize and cance
     target: { files: [file()] },
   });
   await screen.findByLabelText("Shape");
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  fireEvent.click(screen.getByRole("button", { name: "Close adjustments" }));
   expect(commit).toHaveBeenCalledTimes(1);
 });
 it("uncertain CV save retains uploaded asset for retry; component unmount discards late upload reply", async () => {
@@ -197,9 +197,10 @@ it("uncertain CV save retains uploaded asset for retry; component unmount discar
     target: { files: [file()] },
   });
   await screen.findByLabelText("Shape");
-  fireEvent.click(screen.getByRole("button", { name: "Save photo" }));
+
   await screen.findByText(/Photo is not yet saved/);
-  fireEvent.click(screen.getByRole("button", { name: "Save photo" }));
+  fireEvent.click(screen.getByRole("button", {name:"Retry photo save"}));
+
   await waitFor(() => expect(commit).toHaveBeenCalledTimes(2));
   expect(port.upload).toHaveBeenCalledTimes(1);
   view.unmount();
@@ -222,7 +223,7 @@ it("uncertain CV save retains uploaded asset for retry; component unmount discar
     target: { files: [file()] },
   });
   await screen.findByLabelText("Shape");
-  fireEvent.click(screen.getByRole("button", { name: "Save photo" }));
+
   await waitFor(() => expect(port.upload).toHaveBeenCalledTimes(1));
   second.unmount();
   await act(async () => resolve({ id }));
@@ -323,7 +324,7 @@ it("actual App photo commit merges late text edits and preserves presentation ov
     target: { files: [file()] },
   });
   await screen.findByLabelText("Formă");
-  fireEvent.click(screen.getByRole("button", { name: "Salvează fotografia" }));
+
   await waitFor(() => expect(port.upload).toHaveBeenCalledTimes(1));
   fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
     target: { value: "Mara" },
@@ -332,7 +333,7 @@ it("actual App photo commit merges late text edits and preserves presentation ov
     target: { value: "template_archive_2_1_0" },
   });
   await act(async () => release({ id }));
-  await screen.findByText("Fotografie salvată în CV.");
+  await screen.findByText("Fotografie salvată automat în CV.");
   const head = await adapter.load();
   expect(head?.draft.name.value).toBe("Mara");
   expect(head?.draft.presentation.templateVersionId).toBe(
@@ -382,9 +383,6 @@ it.each(["replay", "expired"] as const)(
       target: { files: [file()] },
     });
     await screen.findByLabelText("Formă");
-    fireEvent.click(
-      screen.getByRole("button", { name: "Salvează fotografia" }),
-    );
     await screen.findByText(/Fotografia nu este încă salvată/);
     fireEvent.change(screen.getByRole("slider", { name: /Zoom/ }), {
       target: { value: "2" },
@@ -402,12 +400,12 @@ it.each(["replay", "expired"] as const)(
       screen.getByRole("checkbox", { name: /Afișează în acest CV/ }),
     );
     fireEvent.click(
-      screen.getByRole("button", { name: "Salvează fotografia" }),
+      screen.getByRole("button", { name: "Reîncearcă salvarea fotografiei" }),
     );
     await waitFor(() =>
       expect(
         screen
-          .getByRole("button", { name: "Salvează fotografia" })
+          .getByRole("button", { name: "Reîncearcă salvarea fotografiei" })
           .hasAttribute("disabled"),
       ).toBe(false),
     );
@@ -419,9 +417,9 @@ it.each(["replay", "expired"] as const)(
       );
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
     fireEvent.click(
-      screen.getByRole("button", { name: "Salvează fotografia" }),
+      screen.getByRole("button", { name: "Reîncearcă salvarea fotografiei" }),
     );
-    await screen.findByText("Fotografie salvată în CV.");
+    await screen.findByText("Fotografie salvată automat în CV.");
     expect((await adapter.load())?.draft.presentation.photo).toMatchObject({
       assetId: id,
       shape: "circle",
@@ -433,6 +431,7 @@ it.each(["replay", "expired"] as const)(
     expect((await adapter.history()).at(-1)?.draft.presentation.photo).toEqual(
       draft.presentation.photo,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Închide ajustările" }));
     fireEvent.click(
       screen.getByRole("button", { name: "Ajustează fotografia" }),
     );
@@ -440,15 +439,15 @@ it.each(["replay", "expired"] as const)(
     fireEvent.click(
       screen.getByRole("button", { name: "Anulează ultima modificare" }),
     );
+    // Undo has its own existing App autosave; settle that unrelated write first.
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(4));
+    const unrelatedPhoto = structuredClone((await adapter.load())?.draft.presentation.photo);
     fireEvent.change(screen.getByRole("slider", { name: /Zoom/ }), {
       target: { value: "3" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Salvează fotografia" }),
-    );
     await screen.findByText(/Fotografia nu este încă salvată/);
-    expect(save).toHaveBeenCalledTimes(3);
-    expect((await adapter.load())?.draft.presentation.photo?.crop.zoom).toBe(2);
+    expect(save).toHaveBeenCalledTimes(4);
+    expect((await adapter.load())?.draft.presentation.photo).toEqual(unrelatedPhoto);
   },
 );
 
@@ -515,7 +514,7 @@ it.each([
     if (Number(vertical.min) < Number(vertical.max))
       expect(Number(vertical.value)).toBeLessThan(Number(vertical.max));
     fireEvent.pointerUp(canvas);
-    fireEvent.click(screen.getByRole("button", { name: "Save photo" }));
+
     await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
     const saved = commit.mock.calls[0][0]!;
     expect(isPhoto(saved)).toBe(true);
@@ -531,3 +530,27 @@ it.each([
     }
   },
 );
+
+it("opening a saved frame does not autosave and upload failure retains the prior asset without retry loop", async () => {
+  const port=client(),commit=vi.fn(async()=>true),value:CvPhoto={assetId:id,crop:{version:1,centerX:.5,centerY:.5,zoom:1},shape:"square",visible:true};
+  render(<PhotoContext.Provider value={port}><LanguageContext.Provider value="en"><PhotoEditor value={value} commit={commit}/></LanguageContext.Provider></PhotoContext.Provider>);
+  fireEvent.click(await screen.findByRole("button",{name:"Adjust photo"}));
+  await screen.findByLabelText("Shape");
+  await act(async()=>{await new Promise(r=>setTimeout(r,750));});
+  expect(commit).not.toHaveBeenCalled();expect(port.upload).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button",{name:"Zoom in"})).toBeNull();expect(screen.queryByRole("button",{name:"Center"})).toBeNull();expect(screen.queryByRole("button",{name:"Save photo"})).toBeNull();
+  vi.mocked(port.upload).mockRejectedValue(new Error("photoUnavailable"));
+  fireEvent.change(screen.getByLabelText("Choose a photo"),{target:{files:[file()]}});
+  await screen.findByText(/Photo upload failed/);
+  expect(commit).not.toHaveBeenCalled();expect(value.assetId).toBe(id);
+  await act(async()=>{await new Promise(r=>setTimeout(r,750));});expect(port.upload).toHaveBeenCalledTimes(1);
+});
+it("holding a drag never dispatches an upload; release coalesces one automatic save",async()=>{
+  vi.stubGlobal("PointerEvent",MouseEvent);const port=client(),commit=vi.fn(async()=>true);
+  render(<PhotoContext.Provider value={port}><LanguageContext.Provider value="en"><PhotoEditor value={null} commit={commit}/></LanguageContext.Provider></PhotoContext.Provider>);
+  fireEvent.change(screen.getByLabelText("Choose a photo"),{target:{files:[file()]}});const canvas=await screen.findByRole("img",{name:/Photo framing/});
+  Object.defineProperty(canvas,"setPointerCapture",{value:vi.fn()});vi.spyOn(canvas,"getBoundingClientRect").mockReturnValue({width:88} as DOMRect);
+  fireEvent.pointerDown(canvas,{clientX:0,clientY:0});fireEvent.pointerMove(canvas,{clientX:8,clientY:8});
+  await act(async()=>{await new Promise(r=>setTimeout(r,750));});expect(port.upload).not.toHaveBeenCalled();
+  fireEvent.pointerUp(canvas);await waitFor(()=>expect(commit).toHaveBeenCalledTimes(1));expect(port.upload).toHaveBeenCalledTimes(1);
+});
