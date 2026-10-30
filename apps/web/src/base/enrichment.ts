@@ -1,3 +1,5 @@
+import { answerEvidenceText } from "@resumora/contracts/intelligence/model";
+import type { QuestionPlan } from "@resumora/contracts/intelligence/model";
 import {
   clone,
   editFact,
@@ -10,6 +12,21 @@ import {
   type OptionalEntry,
 } from "./model";
 import { replaceFact, updateContributionHtml } from "./editing";
+export function nextQuestionIndex(
+  draft: BaseDraft,
+  plan: QuestionPlan,
+): number {
+  const index = plan.questions.findIndex(
+    (q) =>
+      !draft.answers.some(
+        (a) =>
+          a.targetId === plan.targetId &&
+          a.plannedQuestionId === q.id &&
+          ["confirmed", "skipped", "unknown"].includes(a.status),
+      ),
+  );
+  return index < 0 ? plan.questions.length : index;
+}
 export function enrichmentTarget(
   draft: BaseDraft,
   id: string,
@@ -29,6 +46,7 @@ export function enrichmentTarget(
     ? { field: entry.details, label: entry.title.value, entry }
     : null;
 }
+export { answerEvidenceText } from "@resumora/contracts/intelligence/model";
 export function saveAnswer(
   draft: BaseDraft,
   answer: Answer,
@@ -39,7 +57,7 @@ export function saveAnswer(
     throw new Error("staleTarget");
   if (
     answer.status !== "draft" ||
-    !answer.text.trim() ||
+    !answerEvidenceText(answer).trim() ||
     !answer.questionText.trim()
   )
     throw new Error("emptyAnswer");
@@ -49,7 +67,7 @@ export function saveAnswer(
     id: sourceId,
     kind: "answer",
     label: answer.questionText,
-    text: answer.text,
+    text: answerEvidenceText(answer),
     locator: answer.targetId,
   });
   const stored = next.answers.find((a) => a.id === answer.id);
@@ -57,7 +75,7 @@ export function saveAnswer(
     ...next.answers.filter((a) => a.id !== answer.id),
     {
       ...answer,
-      cvFieldId: stored?.cvFieldId,
+      ...(stored?.cvFieldId ? { cvFieldId: stored.cvFieldId } : {}),
       targetLabel: target.label,
       status: "confirmed",
       sourceId,
@@ -83,14 +101,17 @@ export function addAnswerToCv(
   const saved = next.answers.find((a) => a.id === answerId)!;
   const entry = enrichmentTarget(next, saved.targetId)!.entry;
   const current = entry.bullets?.find((f) => f.fieldId === saved.cvFieldId);
-  if (current?.value === saved.text) return next;
+  if (current?.value === answerEvidenceText(saved)) return next;
   if (current)
     replaceFact(next, current, {
-      ...editFact(current, saved.text),
+      ...editFact(current, answerEvidenceText(saved)),
       sourceId: saved.sourceId!,
     });
   else {
-    const added = { ...fact(saved.text), sourceId: saved.sourceId! };
+    const added = {
+      ...fact(answerEvidenceText(saved)),
+      sourceId: saved.sourceId!,
+    };
     (entry.bullets ??= []).push(added);
     saved.cvFieldId = added.fieldId;
     updateContributionHtml(next, entry.id, added.fieldId, added.value);

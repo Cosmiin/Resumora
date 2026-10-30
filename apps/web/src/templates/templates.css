@@ -1,0 +1,797 @@
+/* Accepted T01/T02/T05/T06/T08 2.1.0. Shared product renderer; no CV facts. */
+.template-chooser {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 16px;
+  min-width: 0;
+}
+.template-chooser label {
+  font-size: 0.83rem;
+  font-weight: 650;
+}
+.template-chooser select {
+  width: 100%;
+  max-width: 100%;
+}
+.template-chooser p,
+.template-fallback {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+.template-fallback {
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 12px;
+}
+.document.document-template,
+.document.document-template * {
+  box-sizing: border-box;
+}
+.document.document-template {
+  width: 100%;
+  min-width: 0;
+  min-height: 410px;
+  padding: clamp(20px, 3vw, 40px);
+  overflow-wrap: anywhere;
+}
+.document.document-template h2,
+.document.document-template h3,
+.document.document-template h4,
+.document.document-template p,
+.document.document-template ul {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: inherit;
+}
+.document.document-template .document-titles,
+.document.document-template .document-contacts {
+  display: block;
+}
+.document.document-template .document-positioning-title {
+  display: block;
+}
+.document.document-template {
+  margin: 0;
+  background: #fff;
+  color: #172b29;
+  font: 400 10.7pt/1.4 var(--font-sans);
+}
+.document.document-template .document-identity {
+  margin: 0 0 5mm;
+  padding: 0 0 4mm;
+  border: 0;
+}
+.document.document-template .document-nameband {
+  display: flex;
+  align-items: center;
+  gap: 7mm;
+}
+.document.document-template .document-nameband h2 {
+  flex: 1;
+  min-width: 0;
+}
+.document.document-template .document-entry > h4 {
+  break-after: avoid;
+  break-inside: avoid;
+}
+.document.document-template .document-photo {
+  display: block;
+  flex: none;
+  float: none;
+  margin: 0;
+  width: 23mm;
+  height: 23mm;
+  object-fit: cover;
+  object-position: center;
+}
+.document.document-template.shape-circle .document-photo {
+  border-radius: 50%;
+}
+.document.document-template.shape-square .document-photo {
+  border-radius: 0;
+}
+.document.document-template.photo-off .document-photo {
+  display: none;
+}
+.document.document-template.photo-off .document-nameband {
+  gap: 0;
+}
+.document.document-template h2,
+.document.document-template h3,
+.document.document-template h4,
+.document.document-template p,
+.document.document-template ul,
+.document.document-template address {
+  margin: 0;
+}
+.document.document-template h2 {
+  font-size: 28pt;
+  font-weight: 650;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+.document.document-template h3 {
+  font-size: 10pt;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 2mm;
+}
+.document.document-template h4 {
+  font-size: 11.5pt;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.document.document-template .document-titles {
+  margin-top: 2mm;
+}
+.document.document-template .document-positioning-title {
+  font-size: 11pt;
+  line-height: 1.4;
+  font-weight: 550;
+}
+.document.document-template .document-contacts {
+  font-size: 10pt;
+  line-height: 1.5;
+  font-style: normal;
+  color: #536b69;
+  margin-top: 3mm;
+}
+.document.document-template .document-contact {
+  display: inline-block;
+  margin-right: 5mm;
+}
+.document.document-template .document-contact:last-child {
+  margin-right: 0;
+}
+.document.document-template .document-section + .document-section {
+  margin-top: 4.5mm;
+}
+.document.document-template .document-profile-copy {
+  line-height: 1.5;
+}
+.document.document-template .document-skill-line .document-skill {
+  display: inline-block;
+  margin-right: 4mm;
+}
+.document.document-template .document-skill-line .document-skill:last-child {
+  margin-right: 0;
+}
+.document.document-template .document-entry + .document-entry {
+  margin-top: 4mm;
+}
+.document.document-template .document-secondary {
+  font-size: 10.8pt;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-top: 0.7mm;
+}
+.document.document-template .document-meta {
+  font-size: 10pt;
+  line-height: 1.4;
+  color: #536b69;
+  margin-top: 1.2mm;
+}
+.document.document-template .document-location {
+  display: inline-block;
+  margin-left: 4mm;
+}
+.document.document-template .document-contributions {
+  padding-left: 4.5mm;
+  margin-top: 2mm;
+}
+.document.document-template .document-contributions li {
+  padding-left: 0.4mm;
+  margin-bottom: 1mm;
+  orphans: 2;
+  widows: 2;
+}
+.document.document-template .document-entry-head {
+  break-inside: avoid;
+  break-after: avoid;
+}
+.document.document-template h3 {
+  break-after: avoid;
+  break-inside: avoid;
+}
+.document.document-template .document-identity {
+  break-inside: avoid;
+}
+.document.document-template p {
+  orphans: 2;
+  widows: 2;
+}
+.document.document-template .document-education .document-entry > p,
+.document.document-template .document-section .document-entry > p {
+  margin-top: 2mm;
+}
+.document.document-template.template-folio h2 {
+  font-size: 27pt;
+  font-weight: 650;
+  letter-spacing: -0.045em;
+}
+.document.document-template.template-folio .document-identity {
+  border-bottom: 1px solid #bdcec7;
+}
+.document.document-template.template-folio .document-positioning-title {
+  display: inline;
+  font-weight: 450;
+  font-size: 11.5pt;
+}
+.document.document-template.template-folio
+  .document-positioning-title
+  + .document-positioning-title {
+  margin-left: 4mm;
+  padding-left: 4mm;
+  border-left: 1px solid #bdcec7;
+}
+.document.document-template.template-folio .document-contacts {
+  margin-top: 4mm;
+}
+.document.document-template.template-folio h3 {
+  font-size: 10.5pt;
+  letter-spacing: 0.005em;
+  font-weight: 700;
+}
+.document.document-template.template-folio .document-summary {
+  padding-left: 4mm;
+  border-left: 1px solid #bdcec7;
+}
+.document.document-template.template-folio .document-profile-copy {
+  max-width: 161mm;
+  font-size: 10.7pt;
+}
+.document.document-template.template-folio
+  .document-skill-line
+  .document-skill
+  + .document-skill {
+  border-left: 1px solid #bdcec7;
+  padding-left: 3mm;
+}
+.document.document-template.template-folio h4.document-primary {
+  font-size: 12pt;
+}
+.document.document-template.template-folio .document-secondary {
+  font-size: 10.7pt;
+  color: #536b69;
+}
+.document.document-template.template-folio .document-meta {
+  font-size: 10pt;
+}
+.document.document-template.template-folio .document-entry + .document-entry {
+  margin-top: 4.5mm;
+}
+.document.document-template.template-folio .document-contributions {
+  margin-top: 1.8mm;
+}
+.document.document-template.template-meridian h2 {
+  font-size: 14pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.document.document-template.template-meridian .document-photo {
+  width: 19mm;
+  height: 19mm;
+}
+.document.document-template.template-meridian .document-titles {
+  margin-top: 2mm;
+}
+.document.document-template.template-meridian
+  .document-positioning-title:first-child {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 27pt;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+.document.document-template.template-meridian
+  .document-positioning-title
+  + .document-positioning-title {
+  font-size: 18pt;
+  line-height: 1.2;
+  font-weight: 450;
+  margin-top: 1.5mm;
+  letter-spacing: -0.025em;
+}
+.document.document-template.template-meridian .document-contacts {
+  border-top: 1px solid #173b39;
+  border-bottom: 1px solid #173b39;
+  padding: 2mm 0;
+  margin-top: 5mm;
+  font-size: 10pt;
+}
+.document.document-template.template-meridian h3 {
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #17695d;
+  margin-bottom: 2.2mm;
+}
+.document.document-template.template-meridian .document-profile-copy {
+  font-size: 12pt;
+  font-weight: 550;
+  line-height: 1.45;
+  max-width: 170mm;
+}
+.document.document-template.template-meridian h4.document-primary {
+  font-size: 13pt;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.document.document-template.template-meridian .document-secondary {
+  font-size: 10.7pt;
+  font-weight: 600;
+}
+.document.document-template.template-meridian .document-date-range {
+  font-weight: 650;
+}
+.document.document-template.template-meridian
+  .document-entry
+  + .document-entry {
+  padding-top: 3mm;
+  border-top: 1px solid #d8e3df;
+}
+.document.document-template.template-meridian .document-contributions {
+  list-style-type: square;
+  padding-left: 4mm;
+}
+.document.document-template.template-meridian .document-contributions li {
+  padding-left: 1mm;
+  margin-bottom: 1.3mm;
+}
+.document.document-template.template-signal h2 {
+  font-size: 33pt;
+  font-weight: 750;
+  letter-spacing: -0.05em;
+}
+.document.document-template.template-signal .document-positioning-title {
+  display: inline;
+  font-size: 11.5pt;
+  font-weight: 650;
+}
+.document.document-template.template-signal
+  .document-positioning-title
+  + .document-positioning-title {
+  margin-left: 4mm;
+}
+.document.document-template.template-signal .document-contacts {
+  text-align: right;
+  padding-top: 2mm;
+  border-top: 1px solid #bdcec7;
+}
+.document.document-template.template-signal .document-contact {
+  display: block;
+  margin: 0;
+}
+.document.document-template.template-signal .document-identity {
+  margin-bottom: 5mm;
+  padding-bottom: 0;
+}
+.document.document-template.template-signal .document-summary {
+  padding-left: 5mm;
+  border-left: 3px solid #17695d;
+}
+.document.document-template.template-signal .document-summary h3 {
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #17695d;
+}
+.document.document-template.template-signal .document-profile-copy {
+  font-size: 11.5pt;
+  line-height: 1.45;
+}
+.document.document-template.template-signal h3 {
+  font-size: 11pt;
+  font-weight: 750;
+  border-bottom: 1px solid #bdcec7;
+  padding-bottom: 1.5mm;
+}
+.document.document-template.template-signal
+  .document-skill-line
+  .document-skill {
+  font-size: 11pt;
+  font-weight: 550;
+  padding-right: 3mm;
+  border-right: 1px solid #bdcec7;
+}
+.document.document-template.template-signal
+  .document-skill-line
+  .document-skill:last-child {
+  border: 0;
+}
+.document.document-template.template-signal h4 {
+  font-size: 12pt;
+  line-height: 1.4;
+  font-weight: 750;
+}
+.document.document-template.template-signal h4 .document-secondary {
+  font-size: 10.5pt;
+  font-weight: 450;
+  margin-left: 3mm;
+}
+.document.document-template.template-signal .document-meta {
+  margin-top: 1mm;
+}
+.document.document-template.template-signal .document-location {
+  display: block;
+  margin-left: 0;
+}
+.document.document-template.template-signal .document-contributions {
+  padding-left: 5mm;
+  margin-top: 2mm;
+}
+.document.document-template.template-signal .document-entry + .document-entry {
+  margin-top: 4mm;
+  padding-top: 3mm;
+  border-top: 1px solid #d8e3df;
+}
+.document.document-template.template-archive {
+  font-family: var(--font-document);
+  font-size: 11pt;
+  line-height: 1.45;
+}
+.document.document-template.template-archive .document-identity {
+  text-align: center;
+  border-bottom: 3px double #173b39;
+  padding-bottom: 5mm;
+  margin-bottom: 5mm;
+}
+.document.document-template.template-archive
+  .document-identity
+  > .document-photo {
+  margin: 0 auto 3mm;
+  width: 21mm;
+  height: 21mm;
+}
+.document.document-template.template-archive .document-nameband {
+  display: block;
+}
+.document.document-template.template-archive h2 {
+  font-family: var(--font-document);
+  font-size: 30pt;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-variant: small-caps;
+}
+.document.document-template.template-archive .document-positioning-title {
+  font-family: var(--font-document);
+  font-size: 12pt;
+  font-style: italic;
+  font-weight: 450;
+  line-height: 1.4;
+}
+.document.document-template.template-archive .document-contacts {
+  font-family: var(--font-sans);
+  font-size: 10pt;
+  text-align: center;
+}
+.document.document-template.template-archive .document-contact {
+  margin: 0 2.5mm;
+}
+.document.document-template.template-archive h3 {
+  text-align: center;
+  font-family: var(--font-document);
+  font-size: 11.5pt;
+  font-variant: small-caps;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 650;
+  margin-bottom: 2.5mm;
+}
+.document.document-template.template-archive .document-profile-copy {
+  font-size: 11pt;
+  line-height: 1.5;
+}
+.document.document-template.template-archive .document-skill-line {
+  text-align: center;
+}
+.document.document-template.template-archive
+  .document-skill-line
+  .document-skill {
+  font-family: var(--font-sans);
+  font-size: 10.7pt;
+}
+.document.document-template.template-archive h4.document-primary {
+  font-family: var(--font-document);
+  font-size: 14pt;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.document.document-template.template-archive .document-secondary {
+  font-size: 11pt;
+  font-family: var(--font-document);
+  font-weight: 450;
+}
+.document.document-template.template-archive .document-meta {
+  font-family: var(--font-sans);
+  font-size: 10pt;
+  margin-top: 1mm;
+}
+.document.document-template.template-archive .document-location {
+  margin-left: 4mm;
+}
+.document.document-template.template-archive .document-contributions {
+  list-style-type: square;
+  padding-left: 5mm;
+  margin-top: 2mm;
+}
+.document.document-template.template-archive .document-contributions li {
+  padding-left: 0.8mm;
+  margin-bottom: 1.2mm;
+}
+.document.document-template.template-archive .document-entry + .document-entry {
+  margin-top: 4mm;
+}
+.document.document-template.template-monograph {
+  color: #202523;
+  font-size: 10.7pt;
+  line-height: 1.38;
+}
+.document.document-template.template-monograph .document-identity {
+  border-top: 4px solid #202523;
+  border-bottom: 1px solid #202523;
+  padding-top: 4mm;
+  padding-bottom: 3mm;
+  margin-bottom: 4mm;
+}
+.document.document-template.template-monograph h2 {
+  text-transform: uppercase;
+  font-size: 31pt;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+.document.document-template.template-monograph
+  .document-positioning-title:first-child {
+  font-size: 17pt;
+  line-height: 1.2;
+  font-weight: 700;
+}
+.document.document-template.template-monograph
+  .document-positioning-title
+  + .document-positioning-title {
+  font-size: 12pt;
+  font-weight: 500;
+  margin-top: 1mm;
+}
+.document.document-template.template-monograph .document-contacts {
+  margin-top: 3mm;
+  font-size: 10pt;
+  color: #3d4541;
+}
+.document.document-template.template-monograph h3 {
+  border-bottom: 2px solid #202523;
+  padding-bottom: 1.5mm;
+  text-transform: uppercase;
+  font-size: 9.5pt;
+  letter-spacing: 0.1em;
+  font-weight: 750;
+}
+.document.document-template.template-monograph .document-profile-copy {
+  font-size: 10.7pt;
+  line-height: 1.45;
+}
+.document.document-template.template-monograph h4.document-primary {
+  text-transform: uppercase;
+  font-size: 12.5pt;
+  letter-spacing: 0.015em;
+  font-weight: 750;
+}
+.document.document-template.template-monograph .document-secondary {
+  font-size: 10.5pt;
+  font-weight: 700;
+  margin-top: 1mm;
+}
+.document.document-template.template-monograph .document-meta {
+  font-size: 10pt;
+  color: #3d4541;
+}
+.document.document-template.template-monograph .document-date-range {
+  font-weight: 700;
+}
+.document.document-template.template-monograph .document-location {
+  display: block;
+  margin: 0;
+}
+.document.document-template.template-monograph .document-contributions {
+  list-style-type: square;
+  padding-left: 5mm;
+  margin-top: 2mm;
+}
+.document.document-template.template-monograph .document-contributions li {
+  padding-left: 0.8mm;
+  margin-bottom: 1.1mm;
+}
+.document.document-template.template-monograph
+  .document-entry
+  + .document-entry {
+  border-top: 1px solid #bdcec7;
+  padding-top: 3mm;
+  margin-top: 4mm;
+}
+.document.document-template .document-contact {
+  margin-right: 0;
+}
+.document.document-template .document-contact-separator {
+  margin: 0 2mm;
+}
+.document.document-template.template-signal .document-contact-separator {
+  display: none;
+}
+.document.document-template .document-meta-separator {
+  margin: 0 1mm;
+}
+.document.document-template .document-location {
+  margin-left: 0;
+}
+.document.document-template.template-signal .document-meta-separator,
+.document.document-template.template-monograph .document-meta-separator {
+  display: none;
+}
+@media print {
+  /* Expanded tracking and synthetic small caps split words in PDF extraction. */
+  .document.document-template h2,
+  .document.document-template h3 {
+    letter-spacing: normal !important;
+  }
+  .document.document-template.template-archive h2 {
+    font-variant: normal;
+  }
+  .document.document-template.template-meridian
+    .document-section
+    + .document-section {
+    margin-top: 3.4mm;
+  }
+  .document.document-template.template-meridian h3 {
+    margin-bottom: 1.4mm;
+  }
+  .document.document-template.template-meridian
+    .document-entry
+    + .document-entry {
+    padding-top: 2mm;
+    margin-top: 3mm;
+  }
+  .document.document-template.template-meridian .document-identity {
+    padding-bottom: 2mm;
+    margin-bottom: 4mm;
+  }
+  .document.document-template.template-meridian .document-contacts {
+    padding-top: 1.5mm;
+    padding-bottom: 1.5mm;
+  }
+  .document.document-template.template-signal
+    .document-section
+    + .document-section {
+    margin-top: 3.4mm;
+  }
+  .document.document-template.template-signal
+    .document-entry
+    + .document-entry {
+    margin-top: 3mm;
+    padding-top: 2mm;
+  }
+  .document.document-template.template-signal .document-contacts {
+    margin-top: 2mm;
+    padding-top: 1mm;
+  }
+  .document.document-template.template-signal .document-identity {
+    margin-bottom: 3mm;
+  }
+  .document.document-template.template-signal h3 {
+    padding-bottom: 1mm;
+  }
+  .document.document-template.template-signal .document-contributions {
+    margin-top: 1.5mm;
+  }
+  .document.document-template.template-signal .document-contributions li {
+    margin-bottom: 0.7mm;
+  }
+  .document.document-template.template-archive
+    .document-identity
+    > .document-photo {
+    width: 18mm;
+    height: 18mm;
+    margin-bottom: 2mm;
+  }
+  .document.document-template.template-archive
+    .document-section
+    + .document-section {
+    margin-top: 3.4mm;
+  }
+  .document.document-template.template-archive h3 {
+    margin-bottom: 1.5mm;
+  }
+  .document.document-template.template-archive
+    .document-entry
+    + .document-entry {
+    margin-top: 3mm;
+  }
+  .document.document-template.template-archive .document-identity {
+    padding-bottom: 3mm;
+    margin-bottom: 4mm;
+  }
+  .document.document-template.template-archive h2 {
+    font-size: 28pt;
+  }
+  .document.document-template.template-monograph
+    .document-section
+    + .document-section {
+    margin-top: 2.6mm;
+  }
+  .document.document-template.template-monograph
+    .document-entry
+    + .document-entry {
+    padding-top: 1.8mm;
+    margin-top: 2.5mm;
+  }
+  .document.document-template.template-monograph .document-identity {
+    margin-bottom: 2mm;
+    padding-top: 3mm;
+    padding-bottom: 2mm;
+  }
+  .document.document-template.template-monograph h3 {
+    padding-bottom: 1mm;
+  }
+}
+.document.document-template .document-skill-line .document-skill,
+.document.document-template
+  .document-skill-line
+  .document-skill
+  + .document-skill {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.document.document-template .document-skill-line {
+  display: block;
+}
+.document.document-template .document-skill {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.document.document-template div.document-contributions {
+  padding-left: 0;
+}
+.document.document-template div.document-contributions ul {
+  padding-left: 4.5mm;
+  margin-top: 2mm;
+}
+.document.document-template .document-nameband h2 {
+  flex: 1;
+  min-width: 0;
+}
+@page {
+  size: A4;
+  margin: 15mm 17mm;
+}
+@media print {
+  .template-chooser,
+  .template-fallback {
+    display: none;
+  }
+  .document.document-template {
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  .document.document-template {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+@media (max-width: 600px) {
+  .document.document-template {
+    padding: 20px;
+  }
+  .document.document-template .document-nameband {
+    gap: 12px;
+  }
+}

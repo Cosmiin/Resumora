@@ -1,6 +1,6 @@
 # Resumora — Discovery proposal
 
-**Status: discovery proposal and local Base CV application slice.** This repository contains research, product/technical proposals, a local synthetic prototype, a [local frontend/Worker foundation](docs/setup/local-development.md), and the [approved database implementation](docs/database/README.md). It is not a production app; the local foundation does not authorize production launch, spending, real model calls, payments, or deployment. Product policy decisions D-01–14 remain open in [`research/strategy/publication/docs/product/decisions.md`](research/strategy/publication/docs/product/decisions.md).
+**Status: discovery proposal and local Base/job CV application slice.** This repository contains research, product/technical proposals, a local synthetic prototype, a [local frontend/Worker foundation](docs/setup/local-development.md), and the [approved database implementation](docs/database/README.md). It is not a production app; the local foundation does not authorize production launch, spending, real model calls, payments, or deployment. Remaining product policy decisions are tracked in [`research/strategy/publication/docs/product/decisions.md`](research/strategy/publication/docs/product/decisions.md).
 
 ## Start here
 
@@ -21,9 +21,17 @@ For the runnable React Base CV journey, follow [Base CV review instructions](doc
 
 For SQL migrations, database command contracts and native local verification, start with the [database guide](docs/database/README.md). The [gateway contract](docs/database/gateway.md) owns the Worker’s user-scoped persistence boundary.
 
+For optional CV photos, follow the [profile photo guide](docs/frontend/profile-photo.md), including private storage setup and remaining acceptance requirements.
+
 For the synthetic OpenAI cost-dashboard preview and its integration limits, follow [OpenAI/admin preparation](docs/setup/openai-admin.md).
 
 After the CV draft has saved, open **Jobs** to paste an advert and save it to your account, then review its details. In **Improve**, select an entry and use **Suggest wording**; suggestions are switched off by default. Review any proposal and its sources before **Accept wording**. See [connected vacancies and wording setup](docs/setup/connected-jobs-ai.md) for configuration and limits, and the [capture design](docs/product/vacancy-capture-design.md) for planned extension and URL intake.
+
+Choose **Open CV for this job** in the saved vacancy to edit its CV independently of Base. Follow the [job editor guide](docs/setup/job-editor-documents.md) for supported edits, save/reopen, History/restore and setup limits.
+
+To start from an existing document, choose **I already have a CV**, select the file and explicitly upload/analyse it. Review the extracted fields before confirming and saving. **Improve** also offers AI questions and a whole-experience rewrite for a selected role. These AI actions are switched off by default; follow [CV import and career enrichment](docs/setup/cv-import-enrichment.md) for supported inputs, review controls and activation requirements.
+
+The CV preview offers the five selected layouts—Folio, Meridian, Signal, Archive and Monograph—with a versioned choice saved through the existing editor history. See [template authoring and integration](docs/frontend/TEMPLATE_AUTHORING.md) for adding designs, font licenses, print checks and remaining publication/export wiring. Layout changes do not trigger inference.
 
 ## Discovery prototype preview
 
@@ -48,4 +56,4 @@ The standalone `prototype/review.html` includes the same app source and is conve
 - [`research/strategy/publication/`](research/strategy/README.md) — portable strategy evidence, options, decision cards, backlog and sources.
 - [`reviews/ux/verification.md`](reviews/ux/verification.md) — browser and deterministic verification receipts, scope limits, and feedback dispositions. Local screenshot binaries and machine-specific browser tooling are excluded from the proposal package.
 
-All candidate/job examples use synthetic data. Estimates and score methods are illustrative and uncalibrated. PDF readability remains untested until an actual exported PDF is inspected. See each artifact's version and limitations before relying on its outputs.
+All candidate/job examples use synthetic data. Estimates and score methods are illustrative and uncalibrated. Production PDF export remains unimplemented; the [template guide](docs/frontend/TEMPLATE_AUTHORING.md#print-and-acceptance) owns the local print-proof limits and remaining export checks. See each artifact's version and limitations before relying on its outputs.

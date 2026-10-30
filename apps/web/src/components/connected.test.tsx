@@ -1,3 +1,9 @@
+import importedJobSource from "../../../../packages/contracts/fixtures/job-editor-import.json?raw";
+import {
+  projectJobEditor,
+  jobEditorFacts,
+  type JobEditorPayload,
+} from "@resumora/contracts/jobs/documents";
 import {
   render,
   screen,
@@ -466,3 +472,191 @@ it.each([
     ).toBe(true);
   },
 );
+
+it("renders accepted job wording through existing preview while Base facts and answers stay independent", () => {
+  const base = blankDraft();
+  base.language = "en";
+  const role = newRole();
+  role.title.value = "Engineer";
+  role.company.value = "Original employer";
+  role.context.value = "Maintained PLC systems";
+  base.roles.push(role);
+  base.answers.push({
+    id: "context-answer",
+    targetId: role.id,
+    question: "impact",
+    questionText: "Exact question?",
+    text: "Exact answer",
+    status: "confirmed",
+    sourceId: "local_manual",
+  });
+  const source = encodeDraft(base);
+  const payload: JobEditorPayload = {
+    schemaVersion: "resumora-job-editor/1",
+    acceptance: "accepted",
+    source: { snapshotId: crypto.randomUUID(), revision: 1 },
+    job: {
+      id: crypto.randomUUID(),
+      versionId: null,
+      fingerprint: "a".repeat(64),
+    },
+    selectedFacts: jobEditorFacts(base).map((row) => row.ref),
+    selectedAnswerIds: ["context-answer"],
+    wording: [
+      {
+        targetId: role.id,
+        text: "Accepted job-specific description.",
+        origin: "ai_generated",
+        acceptance: "accepted",
+        valueIds: [role.context.id],
+        answerIds: ["context-answer"],
+      },
+    ],
+    presentation: { templateVersionId: "unknown-future-template" },
+    localAdditions: [],
+  };
+  const jobDraft = projectJobEditor(source, payload);
+  expect(currentWording(jobDraft, role.id)).toBe(
+    "Accepted job-specific description.",
+  );
+  render(
+    <LanguageContext value="en">
+      <DocumentPreview draft={jobDraft} asOf={{ year: "2026", month: "10" }} />
+    </LanguageContext>,
+  );
+  expect(screen.getByText("Accepted job-specific description.")).toBeTruthy();
+  expect(screen.getByText("Original employer")).toBeTruthy();
+  expect(jobDraft.roles[0].context).toEqual(base.roles[0].context);
+  expect(jobDraft.answers).toEqual(base.answers);
+  expect(source).toEqual(encodeDraft(base));
+  expect(base.presentation.approvedWording).toBeUndefined();
+});
+
+it.each(["role", "optional"])(
+  "renders job-local bullets for %s targets with inherited contribution HTML",
+  (kind) => {
+    const base = blankDraft();
+    base.language = "en";
+    const role = newRole();
+    role.title.value = "Engineer";
+    role.bullets.push(fact("Original role contribution"));
+    base.roles.push(role);
+    const entry = newOptionalEntry();
+    entry.title.value = "Project";
+    entry.bullets = [fact("Original project contribution")];
+    base.optionalSections.push({
+      id: "projects",
+      kind: "projects",
+      label: "Projects",
+      entries: [entry],
+    });
+    base.presentation.order.push("projects");
+    base.presentation.contributionHtml = {
+      [role.id]: "<ul><li>Formatted role contribution</li></ul>",
+      [entry.id]: "<ul><li>Formatted project contribution</li></ul>",
+    };
+    const target = kind === "role" ? role : entry;
+    const other = kind === "role" ? entry : role;
+    const source = encodeDraft(base);
+    const original = structuredClone(source);
+    const payload: JobEditorPayload = {
+      schemaVersion: "resumora-job-editor/1",
+      acceptance: "accepted",
+      source: { snapshotId: crypto.randomUUID(), revision: 1 },
+      job: {
+        id: crypto.randomUUID(),
+        versionId: null,
+        fingerprint: "a".repeat(64),
+      },
+      selectedFacts: [],
+      selectedAnswerIds: [],
+      wording: [],
+      presentation: {},
+      localAdditions: [
+        {
+          id: "job_local_bullet",
+          targetId: target.id,
+          kind: "bullet",
+          text: "Job-only contribution",
+          scope: "job-only",
+          origin: "user_authored",
+        },
+      ],
+    };
+    const projected = projectJobEditor(source, payload);
+    render(
+      <LanguageContext value="en">
+        <DocumentPreview
+          draft={projected}
+          asOf={{ year: "2026", month: "10" }}
+        />
+      </LanguageContext>,
+    );
+    expect(screen.getByText("Job-only contribution")).toBeTruthy();
+    expect(
+      projected.presentation.contributionHtml?.[target.id],
+    ).toBeUndefined();
+    expect(projected.presentation.contributionHtml?.[other.id]).toBe(
+      base.presentation.contributionHtml[other.id],
+    );
+    expect(projected.roles[0].bullets.slice(0, role.bullets.length)).toEqual(
+      role.bullets,
+    );
+    expect(source).toEqual(original);
+    expect(encodeDraft(base)).toEqual(original);
+  },
+);
+
+it("I0 integration renders selected-option-supported job wording and retained Base approval", () => {
+  const source = JSON.parse(importedJobSource);
+  const base = decodeDraft(source);
+  const payload: JobEditorPayload = {
+    schemaVersion: "resumora-job-editor/1",
+    acceptance: "accepted",
+    source: { snapshotId: crypto.randomUUID(), revision: 1 },
+    job: {
+      id: crypto.randomUUID(),
+      versionId: null,
+      fingerprint: "a".repeat(64),
+    },
+    selectedFacts: jobEditorFacts(base).map((row) => row.ref),
+    selectedAnswerIds: ["selected-answer"],
+    wording: [
+      {
+        targetId: "imported-role",
+        text: "Accepted job wording grounded in selected career options.",
+        origin: "ai_generated",
+        acceptance: "accepted",
+        valueIds: [base.roles[0].context.id],
+        answerIds: ["selected-answer"],
+      },
+    ],
+    presentation: {},
+    localAdditions: [],
+  };
+  const projected = projectJobEditor(source, payload);
+  expect(currentWording(projected, "imported-role")).toBe(
+    payload.wording[0].text,
+  );
+  expect(currentWording(projected, "other-role")).toBe(
+    "Prepared clear reports for the team.",
+  );
+  render(
+    <LanguageContext value="en">
+      <DocumentPreview draft={projected} asOf={{ year: "2026", month: "10" }} />
+    </LanguageContext>,
+  );
+  expect(screen.getByText(payload.wording[0].text)).toBeTruthy();
+  expect(screen.getByText("Prepared clear reports for the team.")).toBeTruthy();
+  expect(
+    screen.queryByText("Pending Base proposal must not be applied"),
+  ).toBeNull();
+  expect(projected.answers).toEqual(base.answers);
+  expect(projected.questionPlans).toEqual(base.questionPlans);
+  expect(projected.importReview).toEqual(base.importReview);
+  expect(projected.roleRewriteReviews).toEqual(base.roleRewriteReviews);
+  expect(projected.presentation.approvedWording!["other-role"]).toEqual(
+    base.presentation.approvedWording!["other-role"],
+  );
+  expect(encodeDraft(base)).toEqual(source);
+});

@@ -8,8 +8,8 @@ Current endpoint, configuration, context minimization, wording approval and exec
 owned by [connected vacancies and scoped wording](connected-jobs-ai.md). This document retains
 only historical strict-EU research and dated cost candidates, not the activation policy.
 
-The exact projection and source-deduplication rules live in
-[`projectEnhancementContext`](../../apps/api/src/ai/enhancement-context.ts), with synthetic
+The exact context projection lives in
+[`careerContext`](../../packages/contracts/src/intelligence/context.ts), with synthetic
 [enhancement checks](../../apps/api/tests/enhancement.test.mjs). The separate fixed-prompt
 connection check and synthetic dashboard are documented in [OpenAI/admin preparation](openai-admin.md).
 

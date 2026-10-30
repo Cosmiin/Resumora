@@ -24,8 +24,9 @@ migrations installed. Neither this module nor the local `supabase/config.toml`
 changes hosted API/Auth settings. Missing schema, transport or configuration fails
 with `DatabaseError(503, 'DATABASE_UNAVAILABLE')`. Existing `PT400/401/403/404/409/410/413/422`
 SQL states preserve their status; only known machine messages are returned.
-Arbitrary database diagnostics remain private. Auth composition must forward
-rotated/cleared cookies on error responses too.
+Arbitrary database diagnostics remain private. Follow the
+[authentication contract](../setup/authentication.md#session-and-request-contract)
+for protected-request markers and cookie mutation boundaries.
 
 ## Unconfirmed editor state
 
@@ -57,6 +58,7 @@ No history pruning or lifetime byte limit is introduced.
 | `loadDraft()` | `load_base_draft()` |
 | `draftHistory({beforeRevision?,limit?} = {})` | `base_draft_history(p_before_revision,p_limit)` |
 | `saveDraft({requestId,expectedRevision,mode,payload})` | `save_base_draft(p_key,p_expected_revision,p_payload,p_mode)` |
+| `saveReviewedImport({requestId,expectedRevision,payload,importId,selected})` | `save_import_review_draft(p_key,p_expected_revision,p_payload,p_import,p_selected)` |
 | `restoreDraft({requestId,expectedRevision,snapshotId})` | `restore_base_draft(p_key,p_expected_revision,p_snapshot)` |
 
 Results are `{id,revision,parentId,createdAt,reason,payload,restoredFrom?}`. Revisions
@@ -65,6 +67,9 @@ Modes are `autosave` and `checkpoint`; the latter has reason `save`. Restore app
 a new snapshot with the historical payload and a new parent/revision. Reads never
 create data; first save transactionally provisions the personal workspace using
 the existing provision command. A revoked/deleting account cannot replay writes.
+The save route selects `saveReviewedImport` for checkpoints with selected imported
+confirmations; the [import review contract](../setup/cv-import-enrichment.md#customer-journey-and-saved-truth)
+owns confirmation and atomic checkpoint behavior.
 
 History defaults to 20 snapshots, maximum 20, newest first. Supply the last
 returned revision as the exclusive cursor; an empty page ends traversal. Callers
@@ -80,9 +85,11 @@ returns `404 SNAPSHOT_NOT_FOUND`, revealing no other account's existence. Direct
 table writes and the private shared writer are unavailable to authenticated users.
 
 The gateway also maps `provisionWorkspace(requestId)` to the existing
-`provision_workspace(request_key)` command. Its idempotency contract remains in
+`provision_workspace(request_key)` command and `saveJobCvCheckpoint(input)` to
+`save_job_cv_checkpoint`; their canonical command and idempotency contracts remain in
 [api.md](api.md). Editor persistence saves unconfirmed draft snapshots and does
-not invoke canonical publication; existing SQL publication commands are unchanged.
+not invoke canonical publication. The [photo extension](../frontend/profile-photo.md)
+owns the gateway's photo/storage methods and the settings pinned during canonical publication.
 
 ## Connected vacancy and enhancement operations
 

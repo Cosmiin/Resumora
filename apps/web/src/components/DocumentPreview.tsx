@@ -1,10 +1,20 @@
 import { currentWording } from "../base/wording";
-import { useContext, useLayoutEffect, useRef, type ReactNode } from "react";
+import { PhotoPreview } from "../photo/PhotoPreview";
+import {
+  Fragment,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+} from "react";
 import { formatDate, durationBounds } from "../base/dates";
 import { hasValue, isAuthored, type BaseDraft, type Fact } from "../base/model";
 import { richText, safeRichHtml } from "../base/editing";
 import { sectionName } from "../base/sections";
 import { LanguageContext, useCopy } from "./ui";
+import { resolveTemplate } from "../templates/registry";
+import { TemplateChooser } from "../templates/TemplateChooser";
+import "../templates/templates.css";
 export function PreviewText({
   value,
   label,
@@ -40,16 +50,21 @@ export function DocumentPreview({
   asOf,
   onEdit,
   onTextEdit,
+  onTemplateChange,
+  livePreview,
 }: {
   draft: BaseDraft;
+  livePreview?: boolean;
   asOf: { year: string; month: string };
   onEdit?: (id: string) => void;
   onTextEdit?: (id: string, text: string) => void;
+  onTemplateChange?: (versionId: string) => void;
 }) {
   const t = useCopy(),
     uiLocale = useContext(LanguageContext),
     cv = (ro: string, en: string) => (d.language === "ro" ? ro : en);
-  const live = !!onEdit || !!onTextEdit,
+  const template = resolveTemplate(d.presentation.templateVersionId);
+  const live = livePreview ?? (!!onEdit || !!onTextEdit),
     hidden = (f: Fact) => d.presentation.hiddenFields?.includes(f.fieldId);
   const text = (f: Fact<string>) => (!hidden(f) ? f.value : "");
   function block(value: ReactNode, id: string, label?: string): ReactNode {
@@ -96,6 +111,9 @@ export function DocumentPreview({
       </>
     );
   }
+  const hasExperienceWording = (target: string) =>
+    d.presentation.approvedWording?.[target]?.scope === "experience" &&
+    !!currentWording(d, target);
   const date = (f: BaseDraft["roles"][number]["start"]) =>
     hidden(f)
       ? ""
@@ -110,31 +128,102 @@ export function DocumentPreview({
   );
   const bounds = durationBounds(eligible, asOf),
     unknown = bounds.unknown + d.roles.length - eligible.length;
+  function entryHeading(primary: ReactNode, secondary: ReactNode) {
+    return template?.entry === "stacked" ? (
+      <>
+        <h4 className="document-primary">
+          {primary}
+          {"\u00a0"}
+        </h4>
+        <p className="document-secondary">
+          {secondary}
+          {"\u00a0"}
+        </p>
+      </>
+    ) : (
+      <h4>
+        <span className="document-primary">
+          {primary}
+          {template ? "\u00a0" : ""}
+        </span>
+        {" · "}
+        <span className="document-secondary">
+          {secondary}
+          {template ? "\u00a0" : ""}
+        </span>
+      </h4>
+    );
+  }
   function content(id: string): ReactNode {
     if (id === "identity")
       return (
         <>
-          {!hidden(d.name) && (
-            <h2>
-              {block(
-                text(d.name) || cv("Numele tău", "Your name"),
-                "first-name",
-                t("Prenume", "First name"),
-              )}
-            </h2>
+          {(!template || template.photoPlacement === "above") && (
+            <PhotoPreview photo={d.presentation.photo} />
           )}
+          <div className="document-nameband">
+            {!hidden(d.name) && (
+              <h2>
+                {block(
+                  <>
+                    {text(d.name) || cv("Numele tău", "Your name")}
+                    {template ? "\u00a0" : ""}
+                  </>,
+                  "first-name",
+                  t("Prenume", "First name"),
+                )}
+              </h2>
+            )}
+            {template?.photoPlacement === "nameband" && (
+              <PhotoPreview photo={d.presentation.photo} />
+            )}
+          </div>
           <div className="document-titles">
             {d.titles
               .filter((f) => text(f))
               .map((f) => (
-                <span key={f.fieldId}>{block(text(f), f.fieldId)}</span>
+                <span className="document-positioning-title" key={f.fieldId}>
+                  {block(
+                    <>
+                      {text(f)}
+                      {template ? "\u00a0" : ""}
+                    </>,
+                    f.fieldId,
+                  )}
+                </span>
               ))}
           </div>
           <div className="document-contacts">
             {d.contacts
               .filter((c) => c.visible && text(c.value))
-              .map((c) => (
-                <span key={c.id}>{block(text(c.value), c.value.fieldId)}</span>
+              .map((c, index) => (
+                <Fragment key={c.id}>
+                  {!!template && index > 0 && (
+                    <span
+                      className="document-contact-separator"
+                      aria-hidden="true"
+                    >
+                      {" · "}
+                    </span>
+                  )}
+                  <span className="document-contact">
+                    {!!template && (
+                      <>
+                        {
+                          {
+                            email: cv("E-mail", "Email"),
+                            phone: cv("Telefon", "Phone"),
+                            location: cv("Localitate", "Location"),
+                            address: cv("Adresă", "Address"),
+                            social: cv("Link", "Link"),
+                          }[c.kind]
+                        }
+                        :{" "}
+                      </>
+                    )}
+                    {block(text(c.value), c.value.fieldId)}
+                  </span>
+                </Fragment>
               ))}
           </div>
         </>
@@ -142,13 +231,15 @@ export function DocumentPreview({
     if (id === "summary")
       return d.summary.text &&
         !d.presentation.hiddenFields?.includes("summary") ? (
-        <p>{block(d.summary.text, "summary", sectionName(id, uiLocale, d))}</p>
+        <p className="document-profile-copy">
+          {block(d.summary.text, "summary", sectionName(id, uiLocale, d))}
+        </p>
       ) : null;
     if (id === "professionalSkills" || id === "technicalSkills")
       return d[id].some((f) => text(f)) ? (
-        <p>
+        <p className="document-skill-line">
           {block(
-            d[id].map(text).filter(Boolean).join(" · "),
+            d[id].map(text).filter(Boolean).join(", "),
             `chip-${sectionName(id, uiLocale)}`,
             sectionName(id, uiLocale),
           )}
@@ -158,31 +249,41 @@ export function DocumentPreview({
       return d.roles.length
         ? d.roles.map((r) => (
             <div key={r.id} className="document-entry">
-              <h4>
-                {block(text(r.title) || cv("Rol", "Role"), r.title.fieldId)} ·{" "}
-                {block(
-                  text(r.company) || cv("Companie", "Company"),
-                  r.company.fieldId,
+              <div className="document-entry-head">
+                {entryHeading(
+                  block(text(r.title) || cv("Rol", "Role"), r.title.fieldId),
+                  block(
+                    text(r.company) || cv("Companie", "Company"),
+                    r.company.fieldId,
+                  ),
                 )}
-              </h4>
-              <p className="document-meta">
-                {block(date(r.start), r.start.fieldId)} —{" "}
-                {r.ongoing.value
-                  ? block(cv("Prezent", "Present"), r.ongoing.fieldId)
-                  : block(date(r.end), r.end.fieldId)}
-                {text(r.location) && (
-                  <> · {block(text(r.location), r.location.fieldId)}</>
-                )}
-              </p>
+                <p className="document-meta">
+                  <span className="document-date-range">
+                    {block(date(r.start), r.start.fieldId)} —{" "}
+                    {r.ongoing.value
+                      ? block(cv("Prezent", "Present"), r.ongoing.fieldId)
+                      : block(date(r.end), r.end.fieldId)}
+                  </span>
+                  {text(r.location) && (
+                    <>
+                      <span className="document-meta-separator">{" · "}</span>
+                      <span className="document-location">
+                        {block(text(r.location), r.location.fieldId)}
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
               {wording(r.id, r.context)}
-              {r.bullets.some((b) => text(b) || onTextEdit) &&
+              {!hasExperienceWording(r.id) &&
+                r.bullets.some((b) => text(b) || onTextEdit) &&
                 !d.presentation.hiddenFields?.includes(
                   `${r.id}-contributions`,
                 ) &&
                 (d.presentation.contributionHtml?.[r.id] &&
                 !r.bullets.some(hidden) &&
                 !onTextEdit ? (
-                  <div>
+                  <div className="document-contributions">
                     {block(
                       <div
                         dangerouslySetInnerHTML={{
@@ -195,7 +296,7 @@ export function DocumentPreview({
                     )}
                   </div>
                 ) : (
-                  <ul>
+                  <ul className="document-contributions">
                     {r.bullets
                       .filter((b) => !hidden(b) && (text(b) || onTextEdit))
                       .map((b) => (
@@ -212,25 +313,59 @@ export function DocumentPreview({
       return d.education.length
         ? d.education.map((e) => (
             <div key={e.id} className="document-entry">
-              <h4>
-                {block(
-                  text(e.institution) || cv("Instituție", "Institution"),
-                  e.institution.fieldId,
+              <div className="document-entry-head">
+                {template ? (
+                  entryHeading(
+                    <>
+                      {[e.qualification, e.field]
+                        .filter((f) => text(f))
+                        .map((f) => (
+                          <span key={f.fieldId}>
+                            {block(text(f), f.fieldId)}{" "}
+                          </span>
+                        ))}
+                    </>,
+                    block(
+                      text(e.institution) || cv("Instituție", "Institution"),
+                      e.institution.fieldId,
+                    ),
+                  )
+                ) : (
+                  <>
+                    <h4>
+                      {block(
+                        text(e.institution) || cv("Instituție", "Institution"),
+                        e.institution.fieldId,
+                      )}
+                    </h4>
+                    <p>
+                      {[e.qualification, e.field, e.location]
+                        .filter((f) => text(f))
+                        .map((f) => (
+                          <span key={f.fieldId}>
+                            {block(text(f), f.fieldId)}{" "}
+                          </span>
+                        ))}
+                    </p>
+                  </>
                 )}
-              </h4>
-              <p>
-                {[e.qualification, e.field, e.location]
-                  .filter((f) => text(f))
-                  .map((f) => (
-                    <span key={f.fieldId}>{block(text(f), f.fieldId)} </span>
-                  ))}
-              </p>
-              <p className="document-meta">
-                {block(date(e.start), e.start.fieldId)} —{" "}
-                {e.ongoing?.value
-                  ? block(cv("În curs", "Ongoing"), e.ongoing.fieldId)
-                  : block(date(e.end), e.end.fieldId)}
-              </p>
+                <p className="document-meta">
+                  <span className="document-date-range">
+                    {block(date(e.start), e.start.fieldId)} —{" "}
+                    {e.ongoing?.value
+                      ? block(cv("În curs", "Ongoing"), e.ongoing.fieldId)
+                      : block(date(e.end), e.end.fieldId)}
+                  </span>
+                  {!!template && text(e.location) && (
+                    <>
+                      <span className="document-meta-separator">{" · "}</span>
+                      <span className="document-location">
+                        {block(text(e.location), e.location.fieldId)}
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
               {text(e.details) && (
                 <p>{block(text(e.details), e.details.fieldId)}</p>
               )}
@@ -241,7 +376,7 @@ export function DocumentPreview({
     return s?.entries.length
       ? s.entries.map((e) => (
           <div className="document-entry" key={e.id}>
-            <h4>
+            <h4 className="document-primary">
               {block(text(e.title), e.title.fieldId)}
               {s.kind === "languages" &&
                 e.proficiency?.value &&
@@ -259,15 +394,16 @@ export function DocumentPreview({
                 )}
             </h4>
             {wording(e.id, e.details)}
-            {e.bullets?.some((f) => text(f) || onTextEdit) && (
-              <ul>
-                {e.bullets
-                  .filter((f) => !hidden(f) && (text(f) || onTextEdit))
-                  .map((f) => (
-                    <li key={f.fieldId}>{editable(f)}</li>
-                  ))}
-              </ul>
-            )}
+            {!hasExperienceWording(e.id) &&
+              e.bullets?.some((f) => text(f) || onTextEdit) && (
+                <ul>
+                  {e.bullets
+                    .filter((f) => !hidden(f) && (text(f) || onTextEdit))
+                    .map((f) => (
+                      <li key={f.fieldId}>{editable(f)}</li>
+                    ))}
+                </ul>
+              )}
             {s.kind !== "languages" &&
               (hasValue(e.start.value) ||
                 hasValue(e.end.value) ||
@@ -288,15 +424,36 @@ export function DocumentPreview({
       className="preview-column"
       aria-label={t("Previzualizare CV", "CV preview")}
     >
+      {onTemplateChange && (
+        <TemplateChooser
+          value={d.presentation.templateVersionId}
+          onChange={onTemplateChange}
+        />
+      )}
+      {!!d.presentation.templateVersionId && !template && (
+        <p className="template-fallback" role="status">
+          {t(
+            "Șablonul salvat nu este disponibil. Afișăm aspectul clasic; conținutul și alegerea salvată se păstrează.",
+            "The saved template is unavailable. The classic layout is shown; your content and saved choice are preserved.",
+          )}
+        </p>
+      )}
       <div className="preview-heading">
         <span>
           {live
             ? t("Previzualizare ciornă", "Draft preview")
             : t("Versiune salvată", "Saved version")}
         </span>
-        <small>{d.language.toUpperCase()}</small>
+        <small>
+          {d.language.toUpperCase()}
+          {template ? ` · ${template.name}` : ""}
+        </small>
       </div>
-      <article className="document" lang={d.language}>
+      <article
+        className={`document${template ? ` document-template ${template.className}` : ""}`}
+        lang={d.language}
+        data-template-version={d.presentation.templateVersionId}
+      >
         {d.presentation.order
           .filter((id) => !d.presentation.hidden.includes(id))
           .map((id) => {

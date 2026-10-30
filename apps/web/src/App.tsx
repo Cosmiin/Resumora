@@ -1,3 +1,9 @@
+import { HttpJobCvAdapter } from "./base/job-adapter";
+import { confirmImported } from "@resumora/contracts/editor/import";
+import { ImportReview } from "./components/ImportReview";
+import type { IntelligenceClient } from "./base/intelligence";
+import type { CvPhoto } from "@resumora/contracts/editor/photo";
+import { PhotoEditor } from "./photo/PhotoEditor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FileText,
@@ -19,6 +25,7 @@ import { clone, equalValues, type BaseDraft, type Locale } from "./base/model";
 import { prepareDraft, focusField } from "./base/editing";
 import { validateDraft, type Issue } from "./base/validation";
 import { DocumentPreview } from "./components/DocumentPreview";
+import { chooseTemplate } from "./templates/registry";
 import { Editor } from "./components/Editor";
 import { JobsScreen } from "./components/JobsScreen";
 import type { AuthTransport } from "./auth/AuthShell";
@@ -50,31 +57,66 @@ type PendingWrite = {
 );
 export function App({
   adapter = sessionAdapter,
+  intelligence,
   transport,
 }: {
   adapter?: BaseCvAdapter;
+  intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
+  const [job, setJob] = useState<{
+    id: string;
+    label: string;
+    adapter: HttpJobCvAdapter;
+  } | null>(null);
+  const active = job?.adapter ?? adapter;
+  if (!adapterKeys.has(active)) adapterKeys.set(active, ++nextAdapterKey);
   if (!adapterKeys.has(adapter)) adapterKeys.set(adapter, ++nextAdapterKey);
   return (
     <CvEditor
-      key={adapterKeys.get(adapter)}
-      adapter={adapter}
+      key={adapterKeys.get(active)}
+      adapter={active}
+      jobLabel={job?.label}
+      switchDocument={
+        transport
+          ? (selected) => {
+              setJob(
+                selected
+                  ? {
+                      ...selected,
+                      adapter: new HttpJobCvAdapter(transport, selected.id),
+                    }
+                  : null,
+              );
+              window.location.hash = "base";
+            }
+          : undefined
+      }
       transport={transport}
+      intelligence={job ? undefined : intelligence}
     />
   );
 }
 function CvEditor({
+  jobLabel,
+  switchDocument,
   adapter,
+  intelligence,
   transport,
 }: {
   adapter: BaseCvAdapter;
+  jobLabel?: string;
+  switchDocument?: (job: { id: string; label: string } | null) => void;
+  intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
+  const jobMode = adapter instanceof HttpJobCvAdapter;
   const durable = adapter.capability === "durable";
   const [locale, setLocale] = useState<Locale>("ro"),
     t = (ro: string, en: string) => (locale === "ro" ? ro : en);
-  const [route, setRoute] = useState<Route>(currentRoute),
+  const [route, setRoute] = useState<Route>(() =>
+      jobMode ? "base" : currentRoute(),
+    ),
     [draft, setDraft] = useState<BaseDraft | null>(null),
     [head, setHead] = useState<Snapshot | null | undefined>(undefined);
   const [past, setPast] = useState<BaseDraft[]>([]),
@@ -111,7 +153,12 @@ function CvEditor({
       month: String(n.getUTCMonth() + 1),
     };
   });
-  const dirty = !!draft && (!head || !equalValues(draft, head.draft));
+  function matchesSavedDraft(saved: BaseDraft, current: BaseDraft) {
+    return jobMode
+      ? adapter.matchesDraft(saved, current)
+      : equalValues(saved, current);
+  }
+  const dirty = !!draft && (!head || !matchesSavedDraft(head.draft, draft));
   const pending = pendingWrite.current;
   const uncertainDraft =
     !!pending &&
@@ -125,7 +172,10 @@ function CvEditor({
     setRoute(next);
   }, []);
   useEffect(() => {
-    const change = () => setRoute(currentRoute());
+    const change = () => {
+      const next = currentRoute();
+      setRoute(jobMode && !["base", "history"].includes(next) ? "base" : next);
+    };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
   }, []);
@@ -134,7 +184,7 @@ function CvEditor({
   }, [route]);
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.title = `Resumora · ${t("CV de bază", "Base CV")}`;
+    document.title = `Resumora · ${jobLabel ?? t("CV de bază", "Base CV")}`;
   }, [locale]);
   useEffect(() => {
     let cancelled = false;
@@ -144,10 +194,13 @@ function CvEditor({
       .then((s) => {
         if (!cancelled) {
           setHead(s);
-          if (s && !latest.current) setDraft(prepareDraft(s.draft));
+          if (s && !latest.current)
+            setDraft(jobMode ? clone(s.draft) : prepareDraft(s.draft));
+          if (!s && jobMode && !latest.current)
+            setDraft(adapter.initialDraft());
           setLoading(false);
           setError(
-            s && latest.current && !equalValues(latest.current, s.draft)
+            s && latest.current && !matchesSavedDraft(s.draft, latest.current)
               ? "conflict"
               : null,
           );
@@ -206,9 +259,33 @@ function CvEditor({
     )
       setError(null);
   }
+  async function commitPhoto(photo: CvPhoto | null, expected: CvPhoto | null) {
+    // Merge against the latest text/presentation, not a closure captured before upload.
+    // An unresolved save must be reconciled by the existing coordinator first.
+    const current = latest.current;
+    if (
+      !current ||
+      lock.current ||
+      pendingWrite.current ||
+      headRef.current === undefined ||
+      error === "conflict"
+    )
+      return false;
+    if (
+      !equalValues(current.presentation.photo ?? null, expected) &&
+      !equalValues(current.presentation.photo ?? null, photo)
+    )
+      return false;
+    change({ ...current, presentation: { ...current.presentation, photo } });
+    await save("autosave");
+    return (
+      !pendingWrite.current &&
+      equalValues(headRef.current?.draft.presentation.photo ?? null, photo)
+    );
+  }
   function openDraft(next: BaseDraft) {
     generation.current++;
-    const ready = prepareDraft(next);
+    const ready = jobMode ? clone(next) : prepareDraft(next);
     latest.current = ready;
     setDraft(ready);
     setPast([]);
@@ -230,7 +307,7 @@ function CvEditor({
       pendingWrite.current
     )
       return;
-    if (mode === "checkpoint") {
+    if (mode === "checkpoint" && !jobMode) {
       const found = validateDraft(current);
       setIssues(found);
       if (found.length) {
@@ -336,7 +413,7 @@ function CvEditor({
       const applied =
         !!saved &&
         (operation.kind === "save"
-          ? equalValues(saved.draft, operation.input.draft)
+          ? matchesSavedDraft(saved.draft, operation.input.draft)
           : saved.restoredFrom === operation.input.snapshotId);
       pendingWrite.current = null;
       if (!unchanged && !applied) {
@@ -439,7 +516,13 @@ function CvEditor({
   }
   const nav = [
     { route: "home", label: t("Acasă", "Home"), Icon: Home },
-    { route: "base", label: t("CV de bază", "Base CV"), Icon: FileText },
+    {
+      route: "base",
+      label: jobMode
+        ? t("CV pentru job", "Job CV")
+        : t("CV de bază", "Base CV"),
+      Icon: FileText,
+    },
     {
       route: "enrich",
       label: t("Îmbunătățește", "Improve"),
@@ -448,8 +531,9 @@ function CvEditor({
     { route: "jobs", label: t("Joburi", "Jobs"), Icon: BriefcaseBusiness },
     { route: "account", label: t("Cont", "Account"), Icon: UserRound },
   ];
-  const editingTitle =
-    route === "enrich"
+  const editingTitle = jobMode
+    ? `${t("CV pentru job", "Job CV")} · ${jobLabel}`
+    : route === "enrich"
       ? t("Mai mult context, pas cu pas", "More context, one step at a time")
       : t("CV-ul tău de bază", "Your Base CV");
   return (
@@ -490,6 +574,7 @@ function CvEditor({
               {t("CV", "CV")}
               <select
                 aria-label={t("Limba CV-ului", "CV language")}
+                disabled={jobMode}
                 value={draft.language}
                 onChange={(e) =>
                   change({
@@ -507,18 +592,19 @@ function CvEditor({
       </header>
       <div className="app-layout">
         <aside className="sidebar">
-          <nav aria-label={t("Navigare principală", "Main navigation")}>
-            <a href="/extension">{t("Extensie Chrome", "Chrome extension")}</a>
-            {nav.map((n) => (
-              <a
-                key={n.route}
-                href={`#${n.route}`}
-                aria-current={route === n.route ? "page" : undefined}
-              >
-                <n.Icon size={19} />
-                <span>{n.label}</span>
-              </a>
-            ))}
+          <nav aria-label={t("Navigare principală", "Main navigation")}><a href="/extension">{t("Extensie Chrome", "Chrome extension")}</a>
+            {nav
+              .filter((n) => !jobMode || n.route === "base")
+              .map((n) => (
+                <a
+                  key={n.route}
+                  href={`#${n.route}`}
+                  aria-current={route === n.route ? "page" : undefined}
+                >
+                  <n.Icon size={19} />
+                  <span>{n.label}</span>
+                </a>
+              ))}
           </nav>
         </aside>
         <main
@@ -527,6 +613,39 @@ function CvEditor({
           tabIndex={-1}
           className={editing ? "editing-page" : ""}
         >
+          {jobMode && (
+            <section className="notice" aria-label="Job CV context">
+              <strong>
+                {t("CV pentru job", "Job CV")} · {jobLabel}
+              </strong>
+              <p>
+                {t(
+                  "Editări doar pentru acest job. CV-ul de bază și istoricul lui rămân independente. Modifică faptele și răspunsurile în CV-ul de bază.",
+                  "Edits apply only to this job. Base CV and its history stay independent. Edit source facts and answers in Base CV.",
+                )}
+              </p>
+              <Button
+                disabled={
+                  dirty ||
+                  busy ||
+                  loading ||
+                  !!pendingWrite.current ||
+                  (!!draft && !!error)
+                }
+                onClick={() => switchDocument?.(null)}
+              >
+                {t("Înapoi la CV-ul de bază", "Return to Base CV")}
+              </Button>
+              {(dirty || pendingWrite.current || (draft && error)) && (
+                <p>
+                  {t(
+                    "Salvează sau rezolvă salvarea înainte de schimbarea CV-ului.",
+                    "Save or resolve the write before switching CVs.",
+                  )}
+                </p>
+              )}
+            </section>
+          )}
           <div className="page-heading">
             <h1>
               {editing
@@ -543,13 +662,15 @@ function CvEditor({
                   <History size={16} />
                   {t("Istoric", "History")}
                 </Button>
-                <Button
-                  onClick={() => go(route === "enrich" ? "base" : "enrich")}
-                >
-                  {route === "enrich"
-                    ? t("Editor", "Editor")
-                    : t("Întrebări", "Questions")}
-                </Button>
+                {!jobMode && (
+                  <Button
+                    onClick={() => go(route === "enrich" ? "base" : "enrich")}
+                  >
+                    {route === "enrich"
+                      ? t("Editor", "Editor")
+                      : t("Întrebări", "Questions")}
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -595,6 +716,14 @@ function CvEditor({
                       : t("Reîncearcă", "Retry")}
                 </Button>
               )}
+              {jobMode && error === "conflict" && (
+                <Button
+                  disabled={busy || loading || !!pendingWrite.current}
+                  onClick={() => setDialog({ kind: "reopen" })}
+                >
+                  {t("Redeschide versiunea salvată", "Reopen saved version")}
+                </Button>
+              )}
             </div>
           )}
           {route === "history" && historyError && (
@@ -623,10 +752,15 @@ function CvEditor({
                   }
                 />
               )}
-              {(route === "start" ||
-                (["base", "review", "enrich"].includes(route) && !draft)) && (
-                <StartChooser start={start} />
-              )}
+              {!jobMode &&
+                (route === "start" ||
+                  (["base", "review", "enrich"].includes(route) && !draft)) && (
+                  <StartChooser
+                    start={start}
+                    intelligence={intelligence}
+                    revision={head?.revision ?? 0}
+                  />
+                )}
               {draft && ["base", "review"].includes(route) && (
                 <>
                   {!!issues.length && (
@@ -634,10 +768,42 @@ function CvEditor({
                       {issueText(issues[0].code, t)}
                     </p>
                   )}
+                  {!jobMode && draft.importReview && (
+                    <ImportReview
+                      key={draft.importReview.id}
+                      draft={draft}
+                      disabled={
+                        busy || !!pendingWrite.current || head === undefined
+                      }
+                      confirm={(ids) => {
+                        const next = confirmImported(latest.current!, ids);
+                        const found = validateDraft(next);
+                        if (found.length) {
+                          setIssues(found);
+                          go("base");
+                          focusField(found[0].field);
+                          return;
+                        }
+                        change(next);
+                        void save("checkpoint");
+                      }}
+                    />
+                  )}
                   <div className="editor-layout">
                     <div>
                       {route === "base" ? (
-                        <Editor draft={draft} issues={issues} change={change} />
+                        <Editor
+                          jobMode={jobMode}
+                          draft={draft}
+                          issues={issues}
+                          change={change}
+                          photoEditor={
+                            <PhotoEditor
+                              value={draft.presentation.photo}
+                              commit={commitPhoto}
+                            />
+                          }
+                        />
                       ) : (
                         <Review
                           draft={draft}
@@ -647,22 +813,74 @@ function CvEditor({
                       )}
                     </div>
                     <DocumentPreview
+                      livePreview
                       draft={draft}
                       asOf={asOf}
-                      onEdit={(id) => {
-                        go("base");
-                        focusField(id);
-                      }}
+                      onTemplateChange={(versionId) =>
+                        change(chooseTemplate(draft, versionId))
+                      }
+                      onEdit={
+                        jobMode
+                          ? undefined
+                          : (id) => {
+                              go("base");
+                              focusField(id);
+                            }
+                      }
                     />
                   </div>
                 </>
               )}
-              {draft && route === "enrich" && (
+              {draft && !jobMode && route === "enrich" && (
                 <Enrichment
                   transport={transport}
                   snapshot={head ?? null}
                   ready={!dirty && !busy && !error && !pendingWrite.current}
                   durable={durable}
+                  rewriteRole={
+                    intelligence
+                      ? async (targetId) => {
+                          const saved = headRef.current;
+                          if (
+                            !saved ||
+                            !equalValues(latest.current, saved.draft)
+                          )
+                            throw new Error("SAVE_REQUIRED");
+                          const started = generation.current;
+                          const result = await intelligence.rewrite({
+                            snapshotId: saved.id,
+                            revision: saved.revision,
+                            targetId,
+                            operationId: crypto.randomUUID(),
+                          });
+                          if (started !== generation.current)
+                            throw new Error("STALE");
+                          return result;
+                        }
+                      : undefined
+                  }
+                  prepareQuestions={
+                    intelligence
+                      ? async (targetId) => {
+                          const saved = headRef.current;
+                          if (
+                            !saved ||
+                            !equalValues(latest.current, saved.draft)
+                          )
+                            throw new Error("SAVE_REQUIRED");
+                          const started = generation.current;
+                          const result = await intelligence.questions({
+                            snapshotId: saved.id,
+                            revision: saved.revision,
+                            targetId,
+                            operationId: crypto.randomUUID(),
+                          });
+                          if (started !== generation.current)
+                            throw new Error("STALE");
+                          return result;
+                        }
+                      : undefined
+                  }
                   draft={draft}
                   undoFrom={undoFrom}
                   change={change}
@@ -685,11 +903,12 @@ function CvEditor({
                   asOf={asOf}
                 />
               )}
-              {route === "jobs" && (
+              {!jobMode && route === "jobs" && (
                 <JobsScreen
                   transport={transport}
                   snapshot={head ?? null}
                   ready={!dirty && !busy && !error && !pendingWrite.current}
+                  openCv={switchDocument}
                 />
               )}
               {["account", "missing"].includes(route) && (

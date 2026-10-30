@@ -1,28 +1,46 @@
+import { isCurrentExperienceWording } from "@resumora/contracts/intelligence/context";
+import { answerEvidenceText } from "@resumora/contracts/intelligence/model";
 import { clone, type BaseDraft } from "./model";
 export type Wording = NonNullable<
   BaseDraft["presentation"]["approvedWording"]
 >[string];
-export function currentWording(d: BaseDraft, target: string): string | null {
-  const p = d.presentation.approvedWording?.[target];
-  if (!p) return null;
+export function isWordingFieldVisible(
+  d: BaseDraft,
+  target: string,
+  fieldId?: string,
+): boolean {
   const role = d.roles.find((r) => r.id === target);
   const section = d.optionalSections.find(
     (s) => s.kind !== "languages" && s.entries.some((e) => e.id === target),
   );
   const entry = section?.entries.find((e) => e.id === target);
-  if (!role && !entry) return null;
+  if (!role && !entry) return false;
   const hidden = d.presentation.hiddenFields ?? [];
-  const visible = (fieldId?: string) =>
+  return (
+    !d.presentation.hidden.includes(role ? "experience" : section!.id) &&
+    !hidden.includes(role ? role.context.fieldId : entry!.details.fieldId) &&
     !hidden.includes(fieldId ?? "") &&
     !(
       role?.bullets.some((b) => b.fieldId === fieldId) &&
       hidden.includes(`${target}-contributions`)
-    );
+    )
+  );
+}
+export function currentWording(d: BaseDraft, target: string): string | null {
+  const p = d.presentation.approvedWording?.[target];
   if (
-    d.presentation.hidden.includes(role ? "experience" : section!.id) ||
-    !visible(role ? role.context.fieldId : entry!.details.fieldId)
+    !p ||
+    (p.scope === "experience" &&
+      !p.origin &&
+      !isCurrentExperienceWording(d, target, p.text)) ||
+    !isWordingFieldVisible(d, target)
   )
     return null;
+  const role = d.roles.find((r) => r.id === target);
+  const entry = d.optionalSections
+    .filter((s) => s.kind !== "languages")
+    .flatMap((s) => s.entries)
+    .find((e) => e.id === target);
   const fields = role
     ? [role.context, ...role.bullets]
     : [entry!.details, ...(entry!.bullets ?? [])];
@@ -32,7 +50,7 @@ export function currentWording(d: BaseDraft, target: string): string | null {
         fields.some(
           (f) =>
             f.id === s.id &&
-            visible(f.fieldId) &&
+            isWordingFieldVisible(d, target, f.fieldId) &&
             f.value === s.text &&
             f.sourceId === s.sourceId &&
             ["user_authored", "user_confirmed"].includes(f.status),
@@ -40,10 +58,10 @@ export function currentWording(d: BaseDraft, target: string): string | null {
         d.answers.some(
           (a) =>
             a.targetId === target &&
-            visible(a.cvFieldId) &&
+            isWordingFieldVisible(d, target, a.cvFieldId) &&
             a.id === s.id &&
             a.status === "confirmed" &&
-            a.text === s.text &&
+            answerEvidenceText(a) === s.text &&
             a.sourceId === s.sourceId,
         ),
     )

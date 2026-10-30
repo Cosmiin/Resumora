@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { build } from 'esbuild';
+import { bundleWorker as build } from './bundle-worker.mjs';
 import { Miniflare, Response as RuntimeResponse, convertV4MiniflareOptions } from 'miniflare';
 import { authConfig, ownerId, otherId, signingFixture, providerUsage } from './helpers.mjs';
 
@@ -32,7 +32,7 @@ test('native workerd verifies signed owners/nonowners and rejects JWKS/provider 
   let providerRedirect = 0;
   const destinations = [];
   const runtime = new Miniflare(convertV4MiniflareOptions({
-    script: bundle.outputFiles[0].text, modules: true, compatibilityDate: '2026-10-25',
+    modules: [{type:'ESModule',path:'entry.mjs',contents:bundle.outputFiles[0].text},...bundle.wasm], compatibilityDate: '2026-10-25',
     host: '127.0.0.1', port: 0, unsafeRegisterWorker: false,
     bindings: { APP_ENV: 'development', ...authConfig },
     // Every native Worker subrequest is intercepted. There is no real provider/JWKS egress.

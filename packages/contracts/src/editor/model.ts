@@ -1,3 +1,10 @@
+import type { CvPhoto } from "./photo.ts";
+import type {
+  ImportReview,
+  QuestionPlan,
+  QuestionOption,
+  RoleRewriteReview,
+} from "../intelligence/model.ts";
 // Versioned editor projection, distinct from canonical CV publications.
 // IDs remain editor correlation handles; database resource IDs are separate UUIDs.
 export type Locale = "ro" | "en";
@@ -18,7 +25,7 @@ export type Fact<T extends FactValue = FactValue> = {
 };
 export type Source = {
   id: string;
-  kind: "manual" | "fixture" | "answer";
+  kind: "manual" | "fixture" | "answer" | "document";
   label: string;
   text?: string;
   locator?: string;
@@ -91,12 +98,48 @@ export type Answer = {
   text: string;
   status: "draft" | "confirmed" | "skipped" | "unknown";
   questionText: string;
+  plannedQuestionId?: string;
+  options?: QuestionOption[];
+  selectedOptionIds?: string[];
+  selectionMode?: "single" | "multiple";
   targetLabel?: string;
   sourceId?: string;
   cvFieldId?: string;
 };
+// Shared by the existing editor content projection and any independent tailored
+// document using that projection. Choice belongs to this document/revision; it
+// is never read from a global preference or the latest Base draft.
+export type DocumentPresentation = {
+  photo?: CvPhoto | null;
+  order: string[];
+  hidden: string[];
+  // Immutable registry version reference; absence retains the legacy layout.
+  // Unknown future references remain stored and render through a safe fallback.
+  templateVersionId?: string;
+  hiddenFields?: string[];
+  contributionHtml?: Record<string, string>;
+  approvedWording?: Record<
+    string,
+    {
+      text: string;
+      scope?: "experience";
+      origin?: "user_authored" | "ai_generated";
+      sources: {
+        id: string;
+        text: string;
+        sourceId: string;
+        sourceClaimId?: string;
+        sourceLineage?: { sourceId: string; sourceClaimId?: string }[];
+      }[];
+    }
+  >;
+};
+
 export type BaseDraft = {
   id: string;
+  importReview?: ImportReview;
+  questionPlans?: QuestionPlan[];
+  roleRewriteReviews?: RoleRewriteReview[];
   language: Locale;
   name: Fact<string>;
   nameParts?: { first: string; last: string };
@@ -116,15 +159,7 @@ export type BaseDraft = {
     claimIds: string[];
   }[];
   answers: Answer[];
-  presentation: {
-    order: string[];
-    hidden: string[];
-    hiddenFields?: string[];
-    contributionHtml?: Record<string, string>;
-    approvedWording?: Record<string, { text: string; sources: { id: string; text: string; sourceId: string;
-      sourceClaimId?: string; sourceLineage?: { sourceId: string; sourceClaimId?: string }[] }[] }>;
-
-  };
+  presentation: DocumentPresentation;
 };
 export const coreSections = [
   "identity",
@@ -140,7 +175,8 @@ export function equalValues(left: unknown, right: unknown): boolean {
   if (left === right) return true;
   if (Array.isArray(left) || Array.isArray(right))
     return (
-      Array.isArray(left) && Array.isArray(right) &&
+      Array.isArray(left) &&
+      Array.isArray(right) &&
       left.length === right.length &&
       left.every((value, i) => equalValues(value, right[i]))
     );
@@ -150,7 +186,8 @@ export function equalValues(left: unknown, right: unknown): boolean {
     b = right as Record<string, unknown>;
   const keys = Object.keys(a).filter((key) => a[key] !== undefined);
   return (
-    keys.length === Object.keys(b).filter((key) => b[key] !== undefined).length &&
+    keys.length ===
+      Object.keys(b).filter((key) => b[key] !== undefined).length &&
     keys.every((key) => Object.hasOwn(b, key) && equalValues(a[key], b[key]))
   );
 }

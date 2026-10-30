@@ -39,7 +39,7 @@ class Browser {
   constructor(p) { this.p = p; }
   cookie() { return [...this.jar].map(([k, v]) => k + '=' + v).join('; '); }
   accept(response) { for (const value of response.headers.getSetCookie()) { const [part] = value.split(';'); const at = part.indexOf('='); const k = part.slice(0, at), v = part.slice(at + 1); if (v) this.jar.set(k, v); else this.jar.delete(k); } }
-  request(path, init = {}) { return new Request(env.APP_ORIGIN + path, { ...init, headers: { Cookie: this.cookie(), ...(init.method === 'POST' ? { Origin: env.APP_ORIGIN, 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf } : {}), ...init.headers } }); }
+  request(path, init = {}) { return new Request(env.APP_ORIGIN + path, { ...init, headers: { Cookie: this.cookie(), 'X-Resumora-Account': user.id, 'X-CSRF-Token': this.csrf, ...(init.method === 'POST' ? { Origin: env.APP_ORIGIN, 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf } : {}), ...init.headers } }); }
   async call(path, body, overrides = {}) {
     const response = await authRoute(this.request('/v1/auth' + path, body === undefined ? overrides : { method: 'POST', body: JSON.stringify(body), ...overrides }), env, this.p.transport);
     this.accept(response);
@@ -106,24 +106,26 @@ test('signup and recovery are enumeration-resistant, preserve PKCE, refuse overl
     assert.deepEqual(values[0], values[1]); assert.deepEqual(cookieSizes[0], cookieSizes[1]);
   }
 });
-test('tampered, expired and provider-rejected sessions fail closed; rotated cookies forward on successful concurrent refresh', async () => {
+test('private authentication never mutates cookies; explicit concurrent session checks refresh', async () => {
   const p = provider(), b = new Browser(p); await b.login();
   const sessionCookie = await readCookie(b.request('/'), env, 'session');
   b.jar.set('resumora-local-session.0', 'tampered');
   assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 401);
   let headers = authHeaders(); await writeCookie(headers, env, 'session', sessionCookie, -1); b.accept(new Response(null, { headers }));
   assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 401);
-  headers = authHeaders(); await saveSession(headers, env, { ...p.session(), expires_at: Math.floor(Date.now() / 1000) - 1 }, false); b.accept(new Response(null, { headers }));
-  const results = await Promise.all([authenticateRequest(b.request('/'), env, p.transport), authenticateRequest(b.request('/'), env, p.transport)]);
+  headers = authHeaders(); await saveSession(headers, env, { ...p.session(), expires_at: Math.floor(Date.now() / 1000) - 1 }, false, b.csrf); b.accept(new Response(null, { headers }));
+  const denied = await authenticateRequest(b.request('/'), env, p.transport);
+  assert.equal(denied.response.status, 409); assert.equal((await denied.response.json()).error.code, "SESSION_REFRESH_REQUIRED"); assert.equal(denied.response.headers.getSetCookie().length, 0); assert.equal(p.refreshCount, 0);
+  const results = await Promise.all([b.call('/session'), b.call('/session')]);
   assert.equal(p.refreshCount, 1);
-  for (const result of results) { assert.equal(result.user.id, user.id); assert.ok(result.headers.getSetCookie().length); }
-  b.accept(new Response(null, { headers: results[0].headers })); p.failUser = true;
-  const rejected = await authenticateRequest(b.request('/'), env, p.transport); assert.equal(rejected.response.status, 401); assert.match(rejected.response.headers.get('set-cookie'), /Max-Age=0/);
+  for (const result of results) { assert.equal((await result.json()).user.id, user.id); assert.ok(result.headers.getSetCookie().length); }
+  p.failUser = true;
+  const rejected = await authenticateRequest(b.request('/'), env, p.transport); assert.equal(rejected.response.status, 401); assert.equal(rejected.response.headers.getSetCookie().length, 0);
 });
 test('revoked refresh fails closed; provider redirects are not followed', async () => {
   const p = provider(), b = new Browser(p); p.rejectRefresh = true;
   const headers = authHeaders(); await saveSession(headers, env, { ...p.session(), refresh_token: 'different-revoked-refresh', expires_at: 1 }, false); b.accept(new Response(null, { headers }));
-  assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 401);
+  assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 409);
   await b.status(); p.redirect = true;
   assert.equal((await b.call('/login', { email: user.email, password: 'synthetic-password' })).status, 401);
   assert.equal(p.calls.at(-1).path, '/auth/v1/token');
@@ -209,7 +211,7 @@ test('temporary identity and refresh failures preserve cookies and deny protecte
       assert.equal(response.headers.getSetCookie().length, 0);
       assert.equal(b.cookie(), originalCookie);
       const denied = await authenticateRequest(b.request('/v1/base-cv'), env, p.transport);
-      assert.equal(denied.response.status, 503);
+      assert.equal(denied.response.status, path === '/token' ? 409 : 503);
       assert.equal(denied.response.headers.getSetCookie().length, 0);
       p.failure = null;
       assert.equal((await b.status()).user.id, user.id);
@@ -257,7 +259,7 @@ test('logout and password failures that clear cookies can recover anonymous CSRF
 });
 
 
-test('SDK session_not_found definitively clears status, password, and protected CV sessions', async () => {
+test('SDK session_not_found clears short auth responses while private failures leave cookies untouched', async () => {
   for (const consumer of ['session', 'password', 'cv']) {
     for (const path of consumer === 'password' ? ['/user'] : ['/user', '/token']) {
       const p = provider(), b = new Browser(p), headers = authHeaders();
@@ -271,13 +273,37 @@ test('SDK session_not_found definitively clears status, password, and protected 
         response = (await authenticateRequest(b.request('/v1/base-cv'), env, p.transport)).response;
         b.accept(response);
       } else response = await b.call('/' + consumer, consumer === 'password' ? { password: 'new-password' } : undefined);
-      assert.equal(response.status, consumer === 'session' ? 200 : 401);
+      assert.equal(response.status, consumer === 'session' ? 200 : consumer === 'cv' && path === '/token' ? 409 : 401);
       const body = await response.json();
       if (consumer === 'session') assert.equal(body.user, null);
-      else assert.equal(body.error.code, 'UNAUTHORIZED');
-      assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
-      assert.equal(await readCookie(b.request('/'), env, 'session'), null);
-      assert.ok(p.calls.some(call => call.path.endsWith(path)));
+      else assert.equal(body.error.code, consumer === 'cv' && path === '/token' ? 'SESSION_REFRESH_REQUIRED' : 'UNAUTHORIZED');
+      if (consumer === 'cv') {
+        assert.equal(response.headers.getSetCookie().length, 0);
+        assert.ok(await readCookie(b.request('/'), env, 'session'));
+        if (path === '/token') assert.equal(p.calls.length, 0);
+      } else {
+        assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
+        assert.equal(await readCookie(b.request('/'), env, 'session'), null);
+        assert.ok(p.calls.some(call => call.path.endsWith(path)));
+      }
     }
+  }
+});
+
+test('private reads reject a captured foreign account or session even with a valid replacement cookie', async () => {
+  const p = provider(), b = new Browser(p); await b.login();
+  for (const path of ['/v1/base-cv/history', '/v1/jobs', '/v1/intelligence/imports', '/v1/intelligence/imports/11111111-1111-4111-8111-111111111111']) {
+    for (const headers of [
+      { 'X-Resumora-Account': '' },
+      { 'X-Resumora-Account': '22222222-2222-4222-8222-222222222222' },
+      { 'X-CSRF-Token': '' },
+      { 'X-CSRF-Token': 'retired-session-csrf' },
+    ]) {
+      const result = await authenticateRequest(b.request(path, { headers }), env, p.transport);
+      assert.equal(result.response.status, 401);
+      assert.equal(result.accessToken, undefined);
+      assert.deepEqual((await result.response.json()).error.code, 'UNAUTHORIZED');
+    }
+    assert.equal((await authenticateRequest(b.request(path), env, p.transport)).user.id, user.id);
   }
 });
