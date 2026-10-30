@@ -141,6 +141,7 @@ test('missing ledger result is uncertain rather than a definite validation failu
  const draft=blankDraft(),role=newRole();role.context=fact('Prepared reports.');draft.roles=[role];const ledger=new SyntheticLedger();
  const durable={durability:'durable',begin:s=>ledger.begin(s),finish:async(id,r)=>({...await ledger.finish(id,r),result:null}),report:p=>ledger.report(p)};
  const transport=async()=>Response.json({id:'synthetic-response',model:'synthetic/model',provider:'synthetic',usage:{prompt_tokens:10,completion_tokens:10,total_tokens:20,prompt_tokens_details:{cached_tokens:0},completion_tokens_details:{reasoning_tokens:0},cost:0.001},choices:[{finish_reason:'stop',message:{content:'{}'}}]});
- const ops=intelligenceOperations(configuredStructuredRunner(env,crypto.randomUUID(),durable,new AbortController().signal,transport));
- await assert.rejects(ops.rewrite({operationId:crypto.randomUUID(),userId:crypto.randomUUID(),draft,targetId:role.id}),/AI_REQUEST_UNKNOWN/);
+ const userId=crypto.randomUUID();
+ const ops=intelligenceOperations(configuredStructuredRunner(env,userId,durable,new AbortController().signal,transport));
+ await assert.rejects(ops.rewrite({operationId:crypto.randomUUID(),userId,draft,targetId:role.id}),/AI_REQUEST_UNKNOWN/);
 });
