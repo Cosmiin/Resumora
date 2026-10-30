@@ -181,7 +181,7 @@ export function validateAdmission(v: unknown, pages: number): Admission {
   return structuredClone(v) as unknown as Admission;
 }
 export const candidatePath =
-  /^(name|summary|certifications\.\d\.(title|details|start|end)|custom\.\d\.(title|details)|titles\.[01]|contacts\.(email|phone|location|linkedin)|professionalSkills\.(0|[1-9][0-9]?)|technicalSkills\.(0|[1-9][0-9]?)|roles\.\d\.(title|company|location|start|end|ongoing|context|bullets\.(0|[1-9][0-9]?))|education\.\d\.(institution|qualification|field|location|start|end|details)|languages\.\d\.(title|proficiency))$/;
+  /^(name|nameParts\.(first|last)|summary|certifications\.\d\.(title|details|start|end)|custom\.\d\.(title|details)|titles\.[01]|contacts\.(email|phone|location|linkedin)|professionalSkills\.(0|[1-9][0-9]?)|technicalSkills\.(0|[1-9][0-9]?)|roles\.\d\.(title|company|location|start|end|ongoing|context|bullets\.(0|[1-9][0-9]?))|education\.\d\.(institution|qualification|field|location|start|end|details)|languages\.\d\.(title|proficiency))$/;
 export const pdfExtractionNotice =
   "Native PDF transcription requires review against the original page.";
 export const wordExtractionNotice =
@@ -239,6 +239,12 @@ export function validateExtraction(
       (c.warning !== undefined && !text(c.warning, 500))
     )
       throw new IntelligenceError("EXTRACTION_OUTPUT");
+    if (c.path.startsWith("nameParts.")) {
+      const normalized = (value: string) =>
+        value.normalize("NFC").replace(/\s+/g, " ").trim();
+      if (!normalized(c.quote).includes(normalized(c.value)))
+        throw new IntelligenceError("EXTRACTION_OUTPUT");
+    }
     if (!c.warning)
       c.warning = pages.length ? pdfExtractionNotice : wordExtractionNotice;
     if (

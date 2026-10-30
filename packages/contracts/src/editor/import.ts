@@ -1,6 +1,7 @@
 import {
   allFacts,
   isAccepted,
+  editFact,
   blankDraft,
   clone,
   localId,
@@ -47,6 +48,7 @@ export function importedDraft(review: ImportReview): BaseDraft {
   draft.importReview.confirmedIds = [];
   // Arbitrary imported name order is never automatically split into first/last name.
   delete draft.nameParts;
+  const nameFields = new Map<string, Fact<string>>();
   for (const c of review.extraction.candidates) {
     const sourceId = localId();
     draft.sources.push({
@@ -77,11 +79,22 @@ export function importedDraft(review: ImportReview): BaseDraft {
         ? { year: p[0], month: "" }
         : { year: p[1], month: String(Number(p[0])) };
     };
-    if(c.path==='summary'){
-      const {value,...provenance}=field(c.value) as Fact<string>;
-      draft.summary={...draft.summary,id:provenance.fieldId,text:value,origin:'extracted',approval:requiresImportReview(c)?'pending':'approved',claimIds:[],provenance};
-    } else if (parts[0] === 'certifications' || parts[0] === 'custom') {
-      const group=parts[0]==='custom'?`import-custom-${index}`:'import-certifications';
+    if (c.path === "summary") {
+      const { value, ...provenance } = field(c.value) as Fact<string>;
+      draft.summary = {
+        ...draft.summary,
+        id: provenance.fieldId,
+        text: value,
+        origin: "extracted",
+        approval: requiresImportReview(c) ? "pending" : "approved",
+        claimIds: [],
+        provenance,
+      };
+    } else if (parts[0] === "certifications" || parts[0] === "custom") {
+      const group =
+        parts[0] === "custom"
+          ? `import-custom-${index}`
+          : "import-certifications";
       let section = draft.optionalSections.find((s) => s.id === group);
       if (!section) {
         section = {
@@ -112,6 +125,8 @@ export function importedDraft(review: ImportReview): BaseDraft {
       else if (parts[2] === "end")
         entry.end = field(date()) as Fact<ReturnType<typeof date>>;
     } else if (c.path === "name") draft.name = field(c.value) as Fact<string>;
+    else if (c.path === "nameParts.first" || c.path === "nameParts.last")
+      nameFields.set(c.path, field(c.value) as Fact<string>);
     else if (parts[0] === "titles")
       draft.titles[index] = field(c.value) as Fact<string>;
     else if (parts[0] === "contacts") {
@@ -156,10 +171,53 @@ export function importedDraft(review: ImportReview): BaseDraft {
       else entries[index].proficiency = field(c.value) as Fact<string>;
     }
   }
+  const first = nameFields.get("nameParts.first"),
+    last = nameFields.get("nameParts.last");
+  if (first || last) {
+    draft.nameParts = { first: first?.value ?? "", last: last?.value ?? "" };
+    const parts = [first, last].filter((f): f is Fact<string> => !!f);
+    // A complete explicit pair owns the display name. Keep an unsplit source
+    // name when only one part is known; never infer the missing part.
+    const fields =
+      first && last
+        ? parts
+        : [...(draft.name.value ? [draft.name] : []), ...parts];
+    const owner = fields[0];
+    draft.name = {
+      ...owner,
+      value:
+        first && last
+          ? `${first.value} ${last.value}`
+          : draft.name.value || owner.value,
+      sourceLineage: fields
+        .slice(1)
+        .map((f) => ({ sourceId: f.sourceId, sourceClaimId: f.sourceClaimId })),
+    };
+    if (fields.some((f) => f.acceptance !== "automatic"))
+      delete draft.name.acceptance;
+  }
   draft.professionalSkills = draft.professionalSkills.filter(Boolean);
   draft.technicalSkills = draft.technicalSkills.filter(Boolean);
   for (const role of draft.roles) role.bullets = role.bullets.filter(Boolean);
   return draft;
+}
+/** User edits one identified name part without clearing its counterpart or source history. */
+export function editImportedNamePart(
+  draft: BaseDraft,
+  part: "first" | "last",
+  value: string,
+): BaseDraft {
+  const next = clone(draft);
+  next.nameParts = {
+    first: draft.nameParts?.first ?? "",
+    last: draft.nameParts?.last ?? "",
+    [part]: value,
+  };
+  next.name = editFact(
+    next.name,
+    `${next.nameParts.first} ${next.nameParts.last}`.trim(),
+  );
+  return next;
 }
 /** Explicit review selects facts; snapshot persistence remains a separate backend responsibility. */
 export function confirmImported(
@@ -185,13 +243,41 @@ export function confirmImported(
   for (const f of allFacts(next, true))
     if (
       f.sourceClaimId &&
-      selectedIds.includes(f.sourceClaimId) &&
+      (selectedIds.includes(f.sourceClaimId) ||
+        (f === next.name &&
+          f.sourceLineage?.some(
+            (ref) =>
+              ref.sourceClaimId && selectedIds.includes(ref.sourceClaimId),
+          ))) &&
       f.status === "extracted_unconfirmed"
     ) {
+      const identityIds =
+        f === next.name
+          ? [
+              f.sourceClaimId,
+              ...(f.sourceLineage ?? []).map((ref) => ref.sourceClaimId),
+            ].filter((id): id is string => !!id)
+          : [f.sourceClaimId];
+      // Confirming one part must not attest the other, still-unreviewed part.
+      if (
+        !identityIds.every(
+          (id) => selectedIds.includes(id) || review.confirmedIds.includes(id),
+        )
+      )
+        continue;
       f.status = "user_confirmed";
       f.confirmedAt = at;
     }
-  if(next.summary.provenance&&[next.summary.provenance.sourceClaimId,...(next.summary.provenance.sourceLineage??[]).map(s=>s.sourceClaimId)].some(id=>id&&selectedIds.includes(id)))next.summary.approval='approved';
+  if (
+    next.summary.provenance &&
+    [
+      next.summary.provenance.sourceClaimId,
+      ...(next.summary.provenance.sourceLineage ?? []).map(
+        (s) => s.sourceClaimId,
+      ),
+    ].some((id) => id && selectedIds.includes(id))
+  )
+    next.summary.approval = "approved";
   next.importReview!.confirmedIds = [
     ...new Set([...review.confirmedIds, ...selectedIds]),
   ];

@@ -340,6 +340,28 @@ export function Editor({
     }
     return (
       <>
+        {(!d.nameParts ||
+          (!!d.importReview && (!d.nameParts.first || !d.nameParts.last))) &&
+          !!d.name.value && (
+            <div className="compact-field">
+              <Field
+                id="import-full-name"
+                label={t("Nume complet din CV", "Full name from CV")}
+                value={d.name.value}
+                onChange={(v) =>
+                  update((n) => {
+                    n.name = editFact(n.name, v);
+                  })
+                }
+              />
+              <p className="small muted">
+                {t(
+                  "Numele complet este păstrat. Completează prenumele și numele de familie doar dacă le poți identifica; ordinea nu este ghicită automat.",
+                  "Your full name is preserved. Fill in first and last names only when you can identify them; their order is not guessed automatically.",
+                )}
+              </p>
+            </div>
+          )}
         <div className="identity-grid">
           {namePart("first", t("Prenume", "First name"))}
           {namePart("last", t("Nume de familie", "Last name"))}
@@ -355,15 +377,6 @@ export function Editor({
             field(d.titles[1], t("Al doilea titlu", "Second title"))}
         </div>
         {photoEditor}
-        {!d.nameParts && (
-          <p className="small muted">
-            {t(
-              "Numele original se păstrează în sursă:",
-              "Original name remains in the source:",
-            )}{" "}
-            {d.name.value}
-          </p>
-        )}
         <div className="optional-contacts">
           {!d.titles[1].value && (
             <button
@@ -1000,7 +1013,7 @@ export function Editor({
           )}
           onChange={(v) =>
             update((n) => {
-              writeSummary(n,v);
+              writeSummary(n, v);
             })
           }
         />,
