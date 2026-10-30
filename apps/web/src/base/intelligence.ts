@@ -28,6 +28,11 @@ export type ImportStatus = {
   review?: ImportReview;
 };
 export interface IntelligenceClient {
+  original?(importId: string, signal?: AbortSignal): Promise<Uint8Array>;
+  sourceText?(
+    importId: string,
+    signal?: AbortSignal,
+  ): Promise<import("@resumora/contracts/intelligence/model").WordSourceText>;
   importDocument(
     file: File,
     operationId: string,
@@ -67,6 +72,21 @@ export function httpIntelligence(transport: CvTransport): IntelligenceClient {
       signal,
     });
   return {
+    original: async (importId, signal) => {
+      const response = await transport(
+        `/v1/intelligence/imports/${encodeURIComponent(importId)}/source`,
+        { method: "GET", cache: "no-store", signal },
+      );
+      if (!response.ok)
+        throw new IntelligenceRequestError("SOURCE_UNAVAILABLE");
+      return new Uint8Array(await response.arrayBuffer());
+    },
+    sourceText: (importId, signal) =>
+      request(`/imports/${encodeURIComponent(importId)}/source`, {
+        method: "GET",
+        cache: "no-store",
+        signal,
+      }),
     importDocument: (file, operationId, expectedRevision, signal) =>
       request<ImportStatus>("/imports", {
         method: "POST",

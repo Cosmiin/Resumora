@@ -35,6 +35,8 @@ const cvPaths = new Set([
   "/v1/base-cv/history",
   "/v1/base-cv/save",
   "/v1/base-cv/restore",
+  "/v1/base-cv/remove",
+  "/v1/base-cv/removal-cleanup",
 ]);
 
 function json(

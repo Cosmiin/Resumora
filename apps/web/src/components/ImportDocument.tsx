@@ -33,6 +33,29 @@ export function ImportDocument({
     },
     [],
   );
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      status?.state === "ready" &&
+      status.review &&
+      opened.current !== status.id
+    ) {
+      opened.current = status.id;
+      start(importedDraft(status.review));
+    }
+  }, [status, start]);
+  useEffect(() => {
+    if (
+      !status ||
+      !["uploading", "uploaded", "processing"].includes(status.state) ||
+      busy
+    )
+      return;
+    const timer = window.setTimeout(() => {
+      void run(true);
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [status, busy]);
   useEffect(() => {
     let active = true;
     void client.listImports().then(
@@ -141,6 +164,7 @@ export function ImportDocument({
                 const generation = ++session.current,
                   operationId = row.id;
                 operation.current = operationId;
+                opened.current = null;
                 const active = () =>
                   generation === session.current &&
                   operationId === operation.current;
@@ -181,14 +205,19 @@ export function ImportDocument({
           select(e.dataTransfer.files);
         }}
       >
-        <label>
-          {t("Alege documentul", "Choose document")}
+        <label className="file-select">
+          <span className="btn btn-primary">
+            {t("Alege documentul", "Choose document")}
+          </span>
           <input
             aria-label={t("Document CV", "CV document")}
             type="file"
             accept=".pdf,.docx,.doc"
             disabled={busy}
-            onChange={(e) => select(e.target.files)}
+            onChange={(e) => {
+              select(e.target.files);
+              e.target.value = "";
+            }}
           />
         </label>
         {file && (
@@ -207,63 +236,87 @@ export function ImportDocument({
             ? t("Verificăm documentul…", "Checking document…")
             : t("Încarcă și analizează", "Upload and analyse")}
         </Button>
-        <Button
-          disabled={!operation.current || busy}
-          onClick={() => void run(true)}
-        >
-          {t("Verifică operațiunea", "Check operation")}
-        </Button>
-        <Button
-          disabled={!operation.current}
-          onClick={async () => {
-            if (!operation.current) return;
-            request.current?.abort();
-            const controller = new AbortController();
-            request.current = controller;
-            const generation = ++session.current,
-              operationId = operation.current;
-            const active = () =>
-              generation === session.current &&
-              operationId === operation.current;
-            setStatus(null);
-            setError("");
-            setBusy(true);
-            try {
-              await client.cancelImport(operationId, controller.signal);
-              if (active()) setStatus({ id: operationId, state: "cancelled" });
-            } catch {
-              if (active())
-                setError(
-                  t(
-                    "Anularea nu este confirmată. Verifică operațiunea.",
-                    "Cancellation is unconfirmed. Check the operation.",
-                  ),
-                );
-            } finally {
-              if (active()) setBusy(false);
-            }
-          }}
-        >
-          {t("Anulează importul", "Cancel import")}
-        </Button>
+        {(busy || status || error) && (
+          <Button
+            disabled={!operation.current || busy}
+            onClick={() => void run(true)}
+          >
+            {t("Verifică operațiunea", "Check operation")}
+          </Button>
+        )}
+        {(busy || status || error) && (
+          <Button
+            disabled={!operation.current}
+            onClick={async () => {
+              if (!operation.current) return;
+              request.current?.abort();
+              const controller = new AbortController();
+              request.current = controller;
+              const generation = ++session.current,
+                operationId = operation.current;
+              const active = () =>
+                generation === session.current &&
+                operationId === operation.current;
+              setStatus(null);
+              setError("");
+              setBusy(true);
+              try {
+                await client.cancelImport(operationId, controller.signal);
+                if (active())
+                  setStatus({ id: operationId, state: "cancelled" });
+              } catch {
+                if (active())
+                  setError(
+                    t(
+                      "Anularea nu este confirmată. Verifică operațiunea.",
+                      "Cancellation is unconfirmed. Check the operation.",
+                    ),
+                  );
+              } finally {
+                if (active()) setBusy(false);
+              }
+            }}
+          >
+            {t("Anulează importul", "Cancel import")}
+          </Button>
+        )}
       </div>
-      {status && (
-        <p role="status">
-          {status.state}
-          {status.error ? ` · ${status.error}` : ""}
-        </p>
+      {(busy ||
+        (status &&
+          ["uploading", "uploaded", "processing"].includes(status.state))) && (
+        <div className="import-loading" role="status">
+          <span className="import-spinner" aria-hidden="true" />
+          <span>
+            {t(
+              "Pregătim CV-ul pentru verificare…",
+              "Preparing your CV for review…",
+            )}
+          </span>
+        </div>
       )}
+      {status &&
+        [
+          "failed",
+          "unknown",
+          "uncertain",
+          "not_cv",
+          "disabled",
+          "cancelled",
+        ].includes(status.state) && (
+          <p role="status">
+            {status.state === "cancelled"
+              ? t(
+                  "Import anulat. Alege un document pentru a continua.",
+                  "Import cancelled. Choose a document to continue.",
+                )
+              : t(
+                  "Importul nu este gata. Verifică operațiunea sau alege din nou documentul. Poți continua și manual.",
+                  "Import is not ready. Check the operation or choose the document again. You can also continue manually.",
+                )}
+            {status.error ? ` · ${status.error}` : ""}
+          </p>
+        )}
       {error && <p role="alert">{error}</p>}
-      {status?.review && (
-        <Button
-          variant="primary"
-          onClick={() => {
-            if (status.review) start(importedDraft(status.review));
-          }}
-        >
-          {t("Deschide informațiile neconfirmate", "Open unconfirmed facts")}
-        </Button>
-      )}
     </section>
   );
 }

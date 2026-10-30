@@ -1,4 +1,9 @@
-import { equalValues, type BaseDraft, type Fact } from "../editor/model.ts";
+import {
+  isAccepted,
+  equalValues,
+  type BaseDraft,
+  type Fact,
+} from "../editor/model.ts";
 import { answerEvidenceText } from "./model.ts";
 export type CareerFact = {
   id: string;
@@ -27,10 +32,7 @@ export function careerContext(
     role
       ? [role.context, ...role.bullets]
       : [entry!.details, ...(entry!.bullets ?? [])]
-  ).filter(
-    (f) =>
-      ["user_confirmed", "user_authored"].includes(f.status) && f.value.trim(),
-  );
+  ).filter((f) => isAccepted(f) && f.value.trim());
   const facts: CareerFact[] = fields.map((f) => ({
     id: f.id,
     text: f.value,

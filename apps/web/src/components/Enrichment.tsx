@@ -72,7 +72,10 @@ export function Enrichment({
     ...d.optionalSections
       .filter((s) => s.kind !== "languages")
       .flatMap((s) =>
-        s.entries.map((e) => ({ id: e.id, label: e.title.value })),
+        s.entries.map((e) => ({
+          id: e.id,
+          label: enrichmentTarget(d, e.id)!.label,
+        })),
       ),
   ];
   const [targetId, setTargetId] = useState(targets[0]?.id ?? ""),

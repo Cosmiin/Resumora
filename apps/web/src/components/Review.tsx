@@ -1,4 +1,4 @@
-import { allFacts, hasValue, isAuthored, type BaseDraft } from "../base/model";
+import { allFacts, hasValue, isAccepted, type BaseDraft } from "../base/model";
 import { validateDraft } from "../base/validation";
 import { Button, Pill, useCopy } from "./ui";
 export function Review({
@@ -12,24 +12,34 @@ export function Review({
 }) {
   const t = useCopy(),
     pending = allFacts(draft).filter(
-      (f) => hasValue(f.value) && !isAuthored(f),
+      (f) => hasValue(f.value) && !isAccepted(f),
     ).length;
   const incomplete = validateDraft(draft).length;
+  const imported = allFacts(draft).some(
+    (f) => f.acceptance === "automatic" && isAccepted(f),
+  );
   const checks = [
     {
       title: t("Conținut", "Content"),
       state:
         pending || incomplete
           ? t("Necesită atenție", "Needs action")
-          : t("Informații auto-declarate", "Self-reported facts"),
+          : imported
+            ? t("Informații importate", "Imported facts")
+            : t("Informații auto-declarate", "Self-reported facts"),
       text: pending
         ? `${pending} ${t("informații necesită verificare.", "facts need review.")}`
         : incomplete
           ? `${incomplete} ${t("câmpuri necesită completare.", "fields need completion.")}`
-          : t(
-              "Informațiile introduse sunt auto-declarate. Secțiunile opționale pot rămâne goale.",
-              "Entered facts are self-reported. Optional sections may remain empty.",
-            ),
+          : imported
+            ? t(
+                "Informațiile cu încredere ridicată sunt acceptate automat. Proveniența extrasă rămâne păstrată în editor.",
+                "High-confidence facts are accepted automatically. Extracted provenance is retained in the editor.",
+              )
+            : t(
+                "Informațiile introduse sunt auto-declarate. Secțiunile opționale pot rămâne goale.",
+                "Entered facts are self-reported. Optional sections may remain empty.",
+              ),
       action: edit,
     },
     {

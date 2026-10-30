@@ -35,7 +35,9 @@ const fail = (code: string, status: number) =>
   json({ error: { code } }, status);
 export const isIntelligencePath = (path: string) =>
   path === "/v1/intelligence/imports" ||
-  /^\/v1\/intelligence\/imports\/[0-9a-f-]+(?:\/cancel)?$/i.test(path) ||
+  /^\/v1\/intelligence\/imports\/[0-9a-f-]+(?:\/(?:cancel|source))?$/i.test(
+    path,
+  ) ||
   ["/v1/intelligence/questions", "/v1/intelligence/rewrite"].includes(path);
 async function readDocument(request: Request): Promise<Uint8Array> {
   if (request.headers.get("Content-Type") !== "application/octet-stream")
@@ -90,13 +92,32 @@ export async function intelligenceRoute(
   },
 ) {
   const path = new URL(request.url).pathname,
-    match = path.match(/^\/v1\/intelligence\/imports\/([^/]+)(\/cancel)?$/);
+    match = path.match(
+      /^\/v1\/intelligence\/imports\/([^/]+)(\/(?:cancel|source))?$/,
+    );
   try {
     if (match) {
       if (!uuid(match[1])) return fail("INVALID_REQUEST", 400);
+      if (match[2] === "/source" && request.method === "GET") {
+        const source = await options.workflow.source(match[1]);
+        if ("text" in source) return json(source);
+        return new Response(source.bytes as Uint8Array<ArrayBuffer>, {
+          headers: {
+            "Content-Type":
+              source.format === "pdf"
+                ? "application/pdf"
+                : "application/octet-stream",
+            "Content-Disposition": "attachment",
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Referrer-Policy": "no-referrer",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+          },
+        });
+      }
       if (!match[2] && request.method === "GET")
         return json(await options.workflow.status(match[1]));
-      if (match[2] && request.method === "POST")
+      if (match[2] === "/cancel" && request.method === "POST")
         return json(await options.workflow.cancel(match[1]));
       return fail("METHOD", 405);
     }

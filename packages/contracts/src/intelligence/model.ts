@@ -6,6 +6,12 @@ export const documentLimits = Object.freeze({
   candidates: 250,
 });
 export type DocumentFormat = "pdf" | "docx" | "doc";
+export type WordSourceText = {
+  importId: string;
+  sourceHash: string;
+  format: "doc" | "docx";
+  text: string;
+};
 export type DocumentPage = {
   number: number;
   warnings: string[];
@@ -175,7 +181,16 @@ export function validateAdmission(v: unknown, pages: number): Admission {
   return structuredClone(v) as unknown as Admission;
 }
 export const candidatePath =
-  /^(name|titles\.[01]|contacts\.(email|phone|location|linkedin)|professionalSkills\.(0|[1-9][0-9]?)|technicalSkills\.(0|[1-9][0-9]?)|roles\.\d\.(title|company|location|start|end|ongoing|context|bullets\.(0|[1-9][0-9]?))|education\.\d\.(institution|qualification|field|location|start|end|details)|languages\.\d\.(title|proficiency))$/;
+  /^(name|summary|certifications\.\d\.(title|details|start|end)|custom\.\d\.(title|details)|titles\.[01]|contacts\.(email|phone|location|linkedin)|professionalSkills\.(0|[1-9][0-9]?)|technicalSkills\.(0|[1-9][0-9]?)|roles\.\d\.(title|company|location|start|end|ongoing|context|bullets\.(0|[1-9][0-9]?))|education\.\d\.(institution|qualification|field|location|start|end|details)|languages\.\d\.(title|proficiency))$/;
+export const pdfExtractionNotice =
+  "Native PDF transcription requires review against the original page.";
+export const wordExtractionNotice =
+  "Native Word excerpt requires review; original pagination is unknown.";
+export const hasSpecificImportWarning = (candidate: Candidate): boolean =>
+  !!candidate.warning &&
+  candidate.warning !== pdfExtractionNotice &&
+  candidate.warning !== wordExtractionNotice;
+
 export function validateExtraction(
   v: unknown,
   pages: DocumentPage[],
@@ -225,9 +240,7 @@ export function validateExtraction(
     )
       throw new IntelligenceError("EXTRACTION_OUTPUT");
     if (!c.warning)
-      c.warning = pages.length
-        ? "Native PDF transcription requires review against the original page."
-        : "Native Word excerpt requires review; original pagination is unknown.";
+      c.warning = pages.length ? pdfExtractionNotice : wordExtractionNotice;
     if (
       /\.(start|end)$/.test(c.path) &&
       !/^(\d{4}|(0[1-9]|1[0-2])\/\d{4})$/.test(c.value)

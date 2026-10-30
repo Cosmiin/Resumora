@@ -1,4 +1,4 @@
-import { isAuthored, type BaseDraft } from '../editor/model.ts';
+import { isAccepted, type BaseDraft } from '../editor/model.ts';
 import { jobEditorFacts } from './documents.ts';
 import { answerEvidenceText } from '../intelligence/model.ts';
 export const categories = ['technical','responsibilities','experience','achievements','qualifications','professional','title','domain','languages','conditions'] as const;
@@ -39,7 +39,7 @@ export function validateVacancy(value:unknown,source:string,manual=false):Vacanc
 export function eligibleEvidence(draft:BaseDraft):Evidence[]{
  const hidden=new Set(draft.presentation.hidden),fields=new Set(draft.presentation.hiddenFields??[]);
  const targets=new Map<string,string>();draft.roles.forEach(r=>targets.set(r.id,'experience'));draft.education.forEach(e=>targets.set(e.id,'education'));draft.optionalSections.forEach(s=>s.entries.forEach(e=>targets.set(e.id,s.id)));
- const rows:Evidence[]=jobEditorFacts(draft).filter(r=>isAuthored(r.fact)&&typeof r.fact.value==='string'&&!!r.fact.value.trim()&&r.key!=='contact'&&r.key!=='name'&&draft.sources.some(s=>s.id===r.ref.sourceId)).map(r=>({id:r.fact.id,targetId:r.ref.entityId,key:r.key,text:String(r.fact.value),sourceId:r.fact.sourceId,kind:'fact',inCv:!hidden.has(targets.get(r.ref.entityId)??r.ref.entityId)&&!fields.has(r.fact.fieldId)&&!(draft.presentation.approvedWording?.[r.ref.entityId]&&['context','details','bullet'].includes(r.key)&&!draft.presentation.approvedWording[r.ref.entityId].sources.some(s=>s.id===r.fact.id))}));
+ const rows:Evidence[]=jobEditorFacts(draft).filter(r=>isAccepted(r.fact)&&typeof r.fact.value==='string'&&!!r.fact.value.trim()&&r.key!=='contact'&&r.key!=='name'&&draft.sources.some(s=>s.id===r.ref.sourceId)).map(r=>({id:r.fact.id,targetId:r.ref.entityId,key:r.key,text:String(r.fact.value),sourceId:r.fact.sourceId,kind:'fact',inCv:!hidden.has(targets.get(r.ref.entityId)??r.ref.entityId)&&!fields.has(r.fact.fieldId)&&!(draft.presentation.approvedWording?.[r.ref.entityId]&&['context','details','bullet'].includes(r.key)&&!draft.presentation.approvedWording[r.ref.entityId].sources.some(s=>s.id===r.fact.id))}));
  for(const a of draft.answers)if(a.status==='confirmed'&&a.sourceId&&draft.sources.some(s=>s.id===a.sourceId))rows.push({id:a.id,targetId:a.targetId,key:'answer',text:answerEvidenceText(a),sourceId:a.sourceId,kind:'answer',inCv:!hidden.has(targets.get(a.targetId)??a.targetId)&&!!draft.presentation.approvedWording?.[a.targetId]?.sources.some(s=>s.id===a.id)});
  return rows;
 }
@@ -72,7 +72,7 @@ export function validateTailor(value:unknown,draft:BaseDraft,vacancy:Vacancy,evi
  for(const s of value.sections){if(!object(s)||!exact(s,['targetId','action','text','skillIds','evidenceIds','requirementIds','reason','warnings'])||!targets.includes(s.targetId)||!['retain','rewrite','reorder'].includes(s.action)||typeof s.text!=='string'||s.text.length>20000||!strings(s.skillIds,200)||!strings(s.evidenceIds,500)||!strings(s.requirementIds,200)||!text(s.reason,1000)||!Array.isArray(s.warnings)||s.warnings.length>20||!s.warnings.every((w:unknown)=>text(w,1000))||!s.requirementIds.every((id:string)=>vacancy.requirements.some(r=>r.id===id)))fail();
   const cited=s.evidenceIds.map((id:string)=>{const row=evidence.find(e=>e.id===id);if(!row||(!['summary','professionalSkills','technicalSkills'].includes(s.targetId)&&(row.targetId!==s.targetId||!['context','details','bullet','answer'].includes(row.key))))fail();return row;});
   if(s.action!=='retain'&&!cited.length)fail();
-  if(['professionalSkills','technicalSkills'].includes(s.targetId)){if(s.text!==''||!s.skillIds.every((id:string)=>draft[s.targetId as 'professionalSkills'|'technicalSkills'].some(f=>f.id===id&&isAuthored(f))))fail();}else if(s.skillIds.length)fail();
+  if(['professionalSkills','technicalSkills'].includes(s.targetId)){if(s.text!==''||!s.skillIds.every((id:string)=>draft[s.targetId as 'professionalSkills'|'technicalSkills'].some(f=>f.id===id&&isAccepted(f))))fail();}else if(s.skillIds.length)fail();
   if(s.action==='rewrite'&&!s.text.trim()&&!s.skillIds.length)fail();
   const support=cited.map((e:Evidence)=>e.text).join('\n'),numbers=new Set(support.match(/\d+(?:[.,]\d+)*%?/g)??[]);for(const n of s.text.match(/\d+(?:[.,]\d+)*%?/g)??[])if(!numbers.has(n))fail();
  }

@@ -1,3 +1,4 @@
+import { extractWordText } from "./word-preflight.ts";
 import {
   documentFormat,
   documentLimits,
@@ -29,6 +30,13 @@ export type ImportRecord = {
   error: string | null;
 };
 export interface ImportStore {
+  source?(
+    importId: string,
+  ): Promise<{
+    bytes: Uint8Array;
+    format: "pdf" | "docx" | "doc";
+    sourceHash: string;
+  }>;
   begin(input: {
     operationId: string;
     format: string;
@@ -204,6 +212,28 @@ export function importWorkflow(options: {
         }
       }
       return (await store.list()).map(publicRecord);
+    },
+    async source(importId: string) {
+      if (!store.source) throw new Error("SOURCE_UNAVAILABLE");
+      const source = await store.source(importId);
+      if (source.format === "pdf") return source;
+      const hash = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest(
+            "SHA-256",
+            source.bytes as Uint8Array<ArrayBuffer>,
+          ),
+        ),
+      )
+        .map((n) => n.toString(16).padStart(2, "0"))
+        .join("");
+      if (hash !== source.sourceHash) throw new Error("SOURCE_MISMATCH");
+      return {
+        importId,
+        format: source.format,
+        sourceHash: hash,
+        text: extractWordText(source.format, source.bytes),
+      };
     },
     async status(operationId: string) {
       return publicRecord(await store.get(operationId));

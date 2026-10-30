@@ -36,7 +36,7 @@ import {
   type ProcessedDocument,
 } from "@resumora/contracts/intelligence/model";
 import { projectEnhancementContext } from "../ai/enhancement-context.ts";
-import type { BaseDraft } from "@resumora/contracts/editor/model";
+import { isAccepted, type BaseDraft } from "@resumora/contracts/editor/model";
 export type StructuredOperation = {
   operationId: string;
   userId: string;
@@ -183,7 +183,7 @@ export const operationSchemas = {
   }),
 };
 const paths =
-  "Allowed paths: name; titles.0 or titles.1; contacts.email|phone|location|linkedin; professionalSkills.N; technicalSkills.N; roles.N.title|company|location|start|end|ongoing|context|bullets.N; education.N.institution|qualification|field|location|start|end|details; languages.N.title|proficiency. Role/education/language N is 0..9, skill/bullet N is 0..99. Date values YYYY or MM/YYYY only when supported, else omit with a warning. Ongoing is true/false only when explicit. Do not split arbitrary names. Keep Romanian diacritics, source language and original factual precision. Each value requires its exact source quote and page. Empty warning string means no specific warning. Summary/prose stays reference text; do not invent a polished summary. List every omitted page.";
+  "Allowed paths: name; titles.0 or titles.1; contacts.email|phone|location|linkedin; professionalSkills.N; technicalSkills.N; roles.N.title|company|location|start|end|ongoing|context|bullets.N; education.N.institution|qualification|field|location|start|end|details; languages.N.title|proficiency; summary; certifications.N.title|details|start|end; custom.N.title|details. Use custom.N.title as the original category heading and custom.N.details for its complete source content when no standard category fits. Preserve all certifications and optional categories. Role/education/language/certification/custom N is 0..9, skill/bullet N is 0..99. Date values YYYY or MM/YYYY only when supported, else omit with a warning. Ongoing is true/false only when explicit. Do not split arbitrary names. Keep Romanian diacritics, source language and original factual precision. Each value requires its exact source quote and page. Empty warning string means no specific warning. Extract the original summary verbatim as summary; do not invent a polished summary. List every omitted page.";
 function validateExtractedOutput(
   value: unknown,
   pages: ProcessedDocument["pages"],
@@ -389,14 +389,15 @@ export function intelligenceOperations(run: StructuredRunner) {
   };
 }
 
-/** Role title frames questions only; unconfirmed extraction never enters this hint. */
+/** Accepted title frames questions only; it is not accomplishment evidence. */
 function questionRoleTitle(draft: BaseDraft, targetId: string): string | null {
+  const section = draft.optionalSections.find((s) =>
+    s.entries.some((e) => e.id === targetId),
+  );
   const title =
     draft.roles.find((r) => r.id === targetId)?.title ??
-    draft.optionalSections
-      .flatMap((s) => s.entries)
-      .find((e) => e.id === targetId)?.title;
-  return title && ["user_authored", "user_confirmed"].includes(title.status)
-    ? title.value.slice(0, 200)
-    : null;
+    (section?.heading && targetId === section.id
+      ? section.heading
+      : section?.entries.find((e) => e.id === targetId)?.title);
+  return title && isAccepted(title) ? title.value.slice(0, 200) : null;
 }

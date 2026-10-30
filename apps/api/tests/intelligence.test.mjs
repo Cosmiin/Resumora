@@ -677,3 +677,78 @@ test("role-guided questions and rewrite receive only selected eligible career ev
   });
   assert.equal(calls[2].input.roleTitle, null);
 });
+
+test("question framing uses accepted role, category-heading and entry titles after import", async () => {
+  const draft = importedDraft({
+    ...review,
+    extraction: {
+      ...extraction,
+      candidates: [
+        ["roles.0.title", "Coordinator"],
+        ["roles.0.context", "Prepared weekly reports."],
+        ["custom.0.title", "Awards"],
+        ["custom.0.details", "Recognised for mentoring."],
+        ["certifications.0.title", "Safety training"],
+        ["certifications.0.details", "Completed safety training."],
+      ].map(([path, value]) => ({
+        ...candidate,
+        id: path.replaceAll(".", "_"),
+        path,
+        value,
+      })),
+    },
+  });
+  const custom = draft.optionalSections.find((s) => s.heading);
+  const certification = draft.optionalSections.find(
+    (s) => s.kind === "certifications",
+  );
+  const inputs = [];
+  const operations = intelligenceOperations(async ({ input }) => {
+    inputs.push(input);
+    return {
+      schemaVersion: "career-question-plan/1",
+      targetId: input.targetId,
+      questions: [
+        {
+          id: "q",
+          dimension: "ownership",
+          text: "What was your contribution?",
+          why: "Clarify individual responsibility.",
+          selectionMode: "multiple",
+          options: [],
+        },
+      ],
+    };
+  });
+  for (const [targetId, title] of [
+    [draft.roles[0].id, draft.roles[0].title],
+    [custom.entries[0].id, custom.heading],
+    [certification.entries[0].id, certification.entries[0].title],
+  ]) {
+    for (const status of [
+      "extracted_unconfirmed",
+      "user_confirmed",
+      "user_authored",
+      "draft",
+    ]) {
+      title.status = status;
+      for (const acceptance of ["automatic", undefined]) {
+        if (acceptance) title.acceptance = acceptance;
+        else delete title.acceptance;
+        await operations.questions({
+          operationId: "framing",
+          userId: "tenant-one",
+          draft,
+          targetId,
+        });
+        const input = inputs.at(-1);
+        const accepted =
+          status === "user_confirmed" ||
+          status === "user_authored" ||
+          (status === "extracted_unconfirmed" && acceptance === "automatic");
+        assert.equal(input.roleTitle, accepted ? title.value : null);
+        assert.equal(input.facts.some((f) => f.id === title.id), false);
+      }
+    }
+  }
+});

@@ -175,7 +175,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates', 'job-documents', 'capture', 'workflow', 'legacy-preservation', 'languages'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates', 'job-documents', 'capture', 'workflow', 'legacy-preservation', 'languages', 'base-removal'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -188,7 +188,7 @@ def main():
         if args.suite == 'imports':
             # Exercise import restrictions against a permissive policy on the shared Storage fixture.
             db.sql("CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
-        through = 'P8' if args.suite in ('languages','all') else 'P7' if args.suite in ('workflow','job-documents','legacy-preservation') else 'P4'
+        through = 'P8' if args.suite in ('languages','base-removal','all') else 'P7' if args.suite in ('workflow','job-documents','legacy-preservation') else 'P4'
         if args.suite in ('job-documents','all'):
             db.migrate('P5')
             import importlib.util
@@ -209,6 +209,13 @@ def main():
         tests = ROOT / 'supabase/tests/behavior.py'
         cases = 2
         upgrade = None
+        if args.suite == 'base-removal':
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('base_removal', ROOT/'supabase/tests/base_removal.py')
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+            if args.receipt: args.receipt.write_text(json.dumps({'suite':'base-removal','migrations_applied':count,'cases':result.testsRun,'success':result.wasSuccessful(),'hosted_access':False},indent=2)+'\n')
+            return 0 if result.wasSuccessful() else 1
         if args.suite == 'languages':
             import importlib.util
             spec=importlib.util.spec_from_file_location('document_languages', ROOT/'supabase/tests/document_languages.py')

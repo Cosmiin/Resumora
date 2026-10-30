@@ -1,6 +1,6 @@
 import { isCurrentExperienceWording } from "../intelligence/context.ts";
 import { answerEvidenceText } from "../intelligence/model.ts";
-import { clone, type BaseDraft } from "./model.ts";
+import { isAccepted, clone, type BaseDraft } from "./model.ts";
 export type Wording = NonNullable<
   BaseDraft["presentation"]["approvedWording"]
 >[string];
@@ -53,7 +53,7 @@ export function currentWording(d: BaseDraft, target: string): string | null {
             isWordingFieldVisible(d, target, f.fieldId) &&
             f.value === s.text &&
             f.sourceId === s.sourceId &&
-            ["user_authored", "user_confirmed"].includes(f.status),
+            isAccepted(f),
         ) ||
         d.answers.some(
           (a) =>

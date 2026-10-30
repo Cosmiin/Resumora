@@ -124,6 +124,7 @@ for (const action of ["open", "check", "upload", "cancel"] as const) {
               screen.getByRole("button", { name: "Cancel import" }),
             );
         }
+        start.mockClear();
         fireEvent.click(openB);
         expect(
           screen.queryByRole("button", { name: "Open unconfirmed facts" }),
@@ -141,21 +142,20 @@ for (const action of ["open", "check", "upload", "cancel"] as const) {
               name: "Check operation",
             }).disabled,
           ).toBe(true);
-          expect(screen.queryByRole("status")).toBeNull();
+          expect(screen.getByRole("status").textContent).toContain(
+            "Preparing your CV",
+          );
           expect(screen.queryByRole("alert")).toBeNull();
         }
         await act(async () => current.resolve(b));
         if (!staleFirst) await settleStale();
-        expect(screen.getByRole("status").textContent).toBe("ready");
+        expect(screen.queryByRole("status")).toBeNull();
         expect(screen.queryByRole("alert")).toBeNull();
         expect(
           screen.getByRole<HTMLButtonElement>("button", {
             name: "Check operation",
           }).disabled,
         ).toBe(false);
-        fireEvent.click(
-          screen.getByRole("button", { name: "Open unconfirmed facts" }),
-        );
         expect(start.mock.calls[0][0].importReview.id).toBe("source-b");
         await act(async () =>
           fireEvent.click(
@@ -166,7 +166,9 @@ for (const action of ["open", "check", "upload", "cancel"] as const) {
           "b",
           expect.any(AbortSignal),
         );
-        expect(screen.getByRole("status").textContent).toBe("cancelled");
+        expect(screen.getByRole("status").textContent).toContain(
+          "Import cancelled",
+        );
         expect(
           screen.queryByRole("button", { name: "Open unconfirmed facts" }),
         ).toBeNull();
@@ -205,9 +207,6 @@ it("fences earlier generations when reopening the same import", async () => {
   );
   await act(async () =>
     old.resolve({ ...row, review: review("old-generation") }),
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Open unconfirmed facts" }),
   );
   expect(start.mock.calls[0][0].importReview.id).toBe("current-generation");
 });

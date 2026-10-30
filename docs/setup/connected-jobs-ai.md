@@ -23,9 +23,10 @@ Optional server-only `AI_REASONING_EFFORT` configures the shared runner; see the
 exactly `on` to permit provider execution. With OFF, the authenticated endpoint returns HTTP503
 `enhancementDisabled`, even with ambient keys. No provider call is needed to discover this state.
 Missing configuration returns `enhancementUnconfigured`; ownership and snapshot revision are
-verified before operation reservation. Only saved scoped confirmed/authored context, bullets and
-independently confirmed answers are projected. Identity/contact fields, employer, raw source and
-job text are omitted. Free text may still contain personal information: this is data minimization,
+verified before operation reservation. Only saved scoped context and bullets meeting the
+[editor acceptance rule](cv-import-enrichment.md#customer-journey-and-saved-truth) and independently
+confirmed answers are projected. Identity/contact fields, employer, raw source and job text are
+omitted. Free text may still contain personal information: this is data minimization,
 not anonymization or PII detection. Privacy review must address personal information embedded in
 scoped free text before real-data use. The current enhancement is scoped career wording, not job tailoring.
 

@@ -31,7 +31,20 @@ export type DraftSnapshot = {
   reason: "save" | "autosave" | "restore";
   payload: EditorWireEnvelope;
 };
+export type BaseLifecycle = {
+  generation: number;
+  revision: number;
+  cleanupPending: boolean;
+};
+export type BaseRemoval = BaseLifecycle & { removed: true };
 export interface CvDraftGateway {
+  loadBaseState?(): Promise<BaseLifecycle & { snapshot: DraftSnapshot | null }>;
+  retryBaseCleanup?(): Promise<BaseLifecycle>;
+  removeBase?(input: {
+    requestId: string;
+    expectedRevision: number;
+    expectedGeneration: number;
+  }): Promise<BaseRemoval>;
   loadDraft(): Promise<DraftSnapshot | null>;
   draftHistory(input?: {
     beforeRevision?: number;
@@ -118,6 +131,7 @@ const fact = (value: Check): Check =>
       sourceId: str,
     },
     {
+      acceptance: one("automatic"),
       sourceClaimId: str,
       sourceLineage: list(ref),
       evidenceClaimIds: list(str),
@@ -215,18 +229,21 @@ const draftShape = obj(
       ),
     ),
     optionalSections: list(
-      obj({
-        id: str,
-        kind: one(
-          "projects",
-          "certifications",
-          "languages",
-          "volunteering",
-          "custom",
-        ),
-        label: str,
-        entries: list(entry),
-      }),
+      obj(
+        {
+          id: str,
+          kind: one(
+            "projects",
+            "certifications",
+            "languages",
+            "volunteering",
+            "custom",
+          ),
+          label: str,
+          entries: list(entry),
+        },
+        { heading: text },
+      ),
     ),
     sources: list(
       obj(

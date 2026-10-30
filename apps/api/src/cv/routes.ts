@@ -13,6 +13,8 @@ const routes: Record<string, string> = {
   "/v1/base-cv/history": "GET",
   "/v1/base-cv/save": "POST",
   "/v1/base-cv/restore": "POST",
+  "/v1/base-cv/remove": "POST",
+  "/v1/base-cv/removal-cleanup": "POST",
 };
 const uuid = (value: unknown): value is string =>
   typeof value === "string" &&
@@ -95,6 +97,14 @@ export async function cvRoute(
     return json({ error: { code: "method" } }, 405, { Allow: method });
   try {
     if (path === "/v1/base-cv") {
+      if (gateway.loadBaseState) {
+        const state = await gateway.loadBaseState();
+        return json(state.snapshot ? snapshot(state.snapshot) : null, 200, {
+          "X-Base-Generation": String(state.generation),
+          "X-Base-Revision": String(state.revision),
+          "X-Base-Cleanup-Pending": String(state.cleanupPending),
+        });
+      }
       const row = await gateway.loadDraft();
       return json(row ? snapshot(row) : null);
     }
@@ -120,8 +130,18 @@ export async function cvRoute(
     }
     const body = await readBody(request);
     if (body instanceof Response) return body;
+    if (path === "/v1/base-cv/removal-cleanup") {
+      if (Object.keys(body).length) return failure("invalidRequest", 400);
+      if (!gateway.retryBaseCleanup) return failure("unavailable", 503);
+      return json(await gateway.retryBaseCleanup());
+    }
     if (!uuid(body.requestId) || !revision(body.expectedRevision))
       return failure("invalidRequest", 400);
+    if (path === "/v1/base-cv/remove") {
+      if (Object.keys(body).some((key) => !["requestId", "expectedRevision", "expectedGeneration"].includes(key)) || !revision(body.expectedGeneration)) return failure("invalidRequest", 400);
+      if (!gateway.removeBase) return failure("unavailable", 503);
+      return json(await gateway.removeBase({ requestId: body.requestId, expectedRevision: body.expectedRevision, expectedGeneration: body.expectedGeneration }));
+    }
     if (path === "/v1/base-cv/save") {
       if (
         Object.keys(body).some(
@@ -139,10 +159,7 @@ export async function cvRoute(
       if (issues.length)
         return json({ error: { code: "validation", issues } }, 422);
       const payload = encodeDraft(body.draft);
-      if (
-        mode === "checkpoint" &&
-        body.draft.importReview?.confirmedIds.length
-      ) {
+      if (body.draft.importReview?.confirmedIds.length) {
         if (!gateway.saveReviewedImport) return failure("unavailable", 503);
         return json(
           snapshot(
@@ -185,6 +202,7 @@ export async function cvRoute(
     );
   } catch (error) {
     const e = error as { status?: number; code?: string } | null;
+    if (e?.code === "LEGACY_JOB_DOCUMENT_CONVERSION_REQUIRED" || e?.code === "LEGACY_JOB_DOCUMENT_COLLISION") return failure("preservationRequired", 409);
     if (e?.code === "IDEMPOTENCY_BODY_MISMATCH")
       return failure("requestMismatch", 409);
     if (e?.code === "VERSION_CONFLICT" || e?.code === "BASE_VERSION_CONFLICT")

@@ -5,7 +5,6 @@ import { isUuid,type SavedJob } from '@resumora/contracts/jobs/connected';
 import { tailorTargets,deriveJobSuggestions,fingerprint,jobClarificationQuestion,validateVacancy,validateTailor,eligibleEvidence,evidenceCoverage,type JobWorkflow,type Vacancy,type WorkflowOperation,type TailorProposal,type MatchResult } from '@resumora/contracts/jobs/workflow';
 import { jobEditorFacts,type JobEditorPayload,type JobEditorGateway } from '@resumora/contracts/jobs/documents';
 import { decodeDraft,encodeDraft,type DraftSnapshot } from '@resumora/contracts/editor/transport';
-import { isAuthored } from '@resumora/contracts/editor/model';
 import { privateJson,routeError } from './routes.ts';
 import { readBody } from '../cv/routes.ts';
 export interface WorkflowGateway extends CurrentDocumentGateway {
