@@ -45,7 +45,7 @@ export async function jobWorkflowRoute(request:Request,gateway:WorkflowGateway,a
    const proposal:TailorProposal={schemaVersion:'job-tailor/1',sections:[...combined.values()]};
    if(!proposal||proposal.schemaVersion!=='job-tailor/1')throw Error('invalidRequest');
    const evidence=eligibleEvidence(draft),accepted=prior&&prior.provenance.sourceSnapshotId===base.id?decodeDraft(prior.payload):structuredClone(draft);
-   if(prior){const p=decodeDraft(prior.payload).presentation;accepted.presentation.templateVersionId=p.templateVersionId;accepted.presentation.photo=p.photo;}
+   if(prior){const p=decodeDraft(prior.payload).presentation;for(const key of ['templateVersionId','photo'] as const){if(p[key]===undefined)delete accepted.presentation[key];else Object.assign(accepted.presentation,{[key]:p[key]});}}
    const targets=new Set<string>();
    for(const d of body.decisions){if(!d||typeof d!=='object'||Array.isArray(d)||Object.keys(d).some(k=>!['targetId','accept','text'].includes(k))||typeof d.targetId!=='string'||typeof d.accept!=='boolean'||(d.text!==undefined&&(typeof d.text!=='string'||!d.text.trim()||d.text.length>20000))||targets.has(d.targetId))throw Error('invalidRequest');targets.add(d.targetId);
     const s=proposal.sections.find(s=>s.targetId===d.targetId);if(!s)throw Error('invalidRequest');if(!d.accept||s.action==='retain')continue;
