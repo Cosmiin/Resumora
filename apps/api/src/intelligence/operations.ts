@@ -30,7 +30,7 @@ import {
   type ProcessedDocument,
 } from "@resumora/contracts/intelligence/model";
 import { projectEnhancementContext } from "../ai/enhancement-context.ts";
-import type { BaseDraft } from "@resumora/contracts/editor/model";
+import { isAccepted, type BaseDraft } from "@resumora/contracts/editor/model";
 export type StructuredOperation = {
   operationId: string;
   userId: string;
@@ -318,14 +318,15 @@ export function intelligenceOperations(run: StructuredRunner) {
   };
 }
 
-/** Role title frames questions only; unconfirmed extraction never enters this hint. */
+/** Accepted title frames questions only; it is not accomplishment evidence. */
 function questionRoleTitle(draft: BaseDraft, targetId: string): string | null {
+  const section = draft.optionalSections.find((s) =>
+    s.entries.some((e) => e.id === targetId),
+  );
   const title =
     draft.roles.find((r) => r.id === targetId)?.title ??
-    draft.optionalSections
-      .flatMap((s) => s.entries)
-      .find((e) => e.id === targetId)?.title;
-  return title && ["user_authored", "user_confirmed"].includes(title.status)
-    ? title.value.slice(0, 200)
-    : null;
+    (section?.heading && targetId === section.id
+      ? section.heading
+      : section?.entries.find((e) => e.id === targetId)?.title);
+  return title && isAccepted(title) ? title.value.slice(0, 200) : null;
 }
