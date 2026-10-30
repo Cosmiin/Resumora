@@ -1,3 +1,4 @@
+import { exportRoute, type ExportConfig } from "./export/routes.ts";
 import { jobDocumentsRoute } from "./jobs/documents.ts";
 import { photoRoute } from "./photos/routes.ts";
 import {
@@ -18,7 +19,7 @@ import { cvRoute } from "./cv/routes.ts";
 
 // Private endpoints use the authenticated user token; paid inference is OFF by default.
 interface Env
-  extends AdminAuthConfig, AuthConfig, EnhancementConfig, IntelligenceConfig {
+  extends AdminAuthConfig, AuthConfig, EnhancementConfig, IntelligenceConfig, ExportConfig {
   APP_ENV: "development";
   PHOTO_WORKER_SECRET?: string;
 }
@@ -55,6 +56,7 @@ export default {
     if (
       isIntelligencePath(path) ||
       cvPaths.has(path) ||
+      path === "/v1/exports/pdf" ||
       path === "/v1/jobs" ||
       path.startsWith("/v1/jobs/") ||
       path === "/v1/enhancement" ||
@@ -80,7 +82,9 @@ export default {
       let response: Response;
       try {
         const gateway = createDatabaseGateway(env, identity);
-        response = isIntelligencePath(path)
+        response = path === "/v1/exports/pdf"
+          ? await exportRoute(request,gateway,env)
+          : isIntelligencePath(path)
           ? await configuredIntelligenceRoute(
               request,
               env,

@@ -7,6 +7,7 @@ export function PhotoPreview({ photo }: { photo: CvPhoto | null | undefined }) {
     source = usePhotoUrl(photo?.visible ? photo.assetId : undefined),
     canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
+    if (canvas.current) delete canvas.current.dataset.photoReady;
     if (!source.url || !photo) return;
     let active = true;
     const image = new Image();
@@ -30,6 +31,7 @@ export function PhotoPreview({ photo }: { photo: CvPhoto | null | undefined }) {
         320,
         320,
       );
+      if (ctx) canvas.current.dataset.photoReady = "true";
     };
     image.src = source.url;
     return () => {

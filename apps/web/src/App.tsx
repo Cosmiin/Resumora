@@ -1,3 +1,4 @@
+import { AppearanceExport } from "./export/AppearanceExport";
 import { HttpJobCvAdapter } from "./base/job-adapter";
 import { confirmImported } from "@resumora/contracts/editor/import";
 import { ImportReview } from "./components/ImportReview";
@@ -812,22 +813,53 @@ function CvEditor({
                         />
                       )}
                     </div>
-                    <DocumentPreview
-                      livePreview
-                      draft={draft}
-                      asOf={asOf}
-                      onTemplateChange={(versionId) =>
-                        change(chooseTemplate(draft, versionId))
-                      }
-                      onEdit={
-                        jobMode
-                          ? undefined
-                          : (id) => {
-                              go("base");
-                              focusField(id);
-                            }
-                      }
-                    />
+                    <div>
+                      <AppearanceExport
+                        draft={draft}
+                        snapshot={head ?? null}
+                        ready={
+                          !dirty && !busy && !error && !pendingWrite.current
+                        }
+                        transport={transport}
+                        change={change}
+                        asOf={asOf}
+                        pin={
+                          head
+                            ? jobMode
+                              ? adapter.exportDocumentId()
+                                ? {
+                                    kind: "job",
+                                    jobId: adapter.jobId,
+                                    documentId: adapter.exportDocumentId()!,
+                                    versionId: head.id,
+                                    revision: head.revision,
+                                  }
+                                : null
+                              : {
+                                  kind: "base",
+                                  versionId: head.id,
+                                  revision: head.revision,
+                                }
+                            : null
+                        }
+                      />
+                      <DocumentPreview
+                        livePreview
+                        draft={draft}
+                        asOf={asOf}
+                        onTemplateChange={(versionId) =>
+                          change(chooseTemplate(draft, versionId))
+                        }
+                        onEdit={
+                          jobMode
+                            ? undefined
+                            : (id) => {
+                                go("base");
+                                focusField(id);
+                              }
+                        }
+                      />
+                    </div>
                   </div>
                 </>
               )}

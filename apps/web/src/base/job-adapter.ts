@@ -31,6 +31,7 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
       `/v1/jobs/${encodeURIComponent(jobId)}/cv`,
     );
   }
+  exportDocumentId() { return this.documentId; }
   private snapshot(v: Version): Snapshot {
     return {
       id: v.id,
