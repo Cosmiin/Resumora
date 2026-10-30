@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { PhotoEditor } from "./PhotoEditor";
-import { PhotoContext, createPhotoClient, type PhotoClient } from "./client";
+import { PhotoContext, PhotoClientError, createPhotoClient, type PhotoClient } from "./client";
 import { LanguageContext } from "../components/ui";
 import { blankDraft } from "../base/model";
 import {
@@ -553,4 +553,23 @@ it("holding a drag never dispatches an upload; release coalesces one automatic s
   fireEvent.pointerDown(canvas,{clientX:0,clientY:0});fireEvent.pointerMove(canvas,{clientX:8,clientY:8});
   await act(async()=>{await new Promise(r=>setTimeout(r,750));});expect(port.upload).not.toHaveBeenCalled();
   fireEvent.pointerUp(canvas);await waitFor(()=>expect(commit).toHaveBeenCalledTimes(1));expect(port.upload).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  ["configuration", /photo service is not configured/],
+  ["reserve", /prepare the photo save in your account/],
+  ["storage_write", /save or verify the photo file/],
+  ["finalize", /photo save could not be confirmed/],
+] as const)("typed photo failure %s preserves prior photo with a specific reason",async(phase,reason)=>{
+  const port=client(),commit=vi.fn(async()=>true),prior:CvPhoto={assetId:id,crop:{version:1,centerX:.5,centerY:.5,zoom:1},shape:"square",visible:true};
+  vi.mocked(port.upload).mockRejectedValue(new PhotoClientError("photoUnavailable",503,phase));
+  render(<PhotoContext.Provider value={port}><LanguageContext.Provider value="en"><PhotoEditor value={prior} commit={commit}/></LanguageContext.Provider></PhotoContext.Provider>);
+  fireEvent.change(screen.getByLabelText("Choose a photo"),{target:{files:[file()]}});
+  await screen.findByText(reason);expect(commit).not.toHaveBeenCalled();expect(prior.assetId).toBe(id);expect(screen.getByRole("button",{name:"Retry photo save"})).toBeTruthy();
+});
+it("typed photo client accepts only known failure phases",async()=>{
+  const port=createPhotoClient(async()=>Response.json({error:{code:"photoUnavailable",phase:"storage_write"}},{status:503}));
+  await expect(port.upload(new Blob(),id)).rejects.toMatchObject({phase:"storage_write",status:503,message:"photoUnavailable"});
+  const unknown=createPhotoClient(async()=>Response.json({error:{code:"photoUnavailable",phase:"PRIVATE_UNTRUSTED_PHASE"}},{status:503}));
+  await expect(unknown.upload(new Blob(),id)).rejects.toMatchObject({phase:undefined,status:503});
 });

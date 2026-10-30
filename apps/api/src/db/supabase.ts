@@ -185,6 +185,13 @@ export function createDatabaseGateway(
       throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
     }
     if (!response.ok) {
+      if (["reserve_photo", "finish_photo", "read_photo", "delete_photo", "expire_photo_uploads"].includes(name)) {
+        const codes = new Set(["PT400", "PT401", "PT403", "PT404", "PT409", "PT410", "PT413", "PT422", "42501", "23502", "23503", "23505", "23514", "40001", "40P01", "55P03", "42883", "PGRST202", "PGRST301"]);
+        const reasons = new Set(["AUTHENTICATION_REQUIRED", "RESOURCE_FORBIDDEN", "ACTIVE_WORKSPACE_REQUIRED", "PHOTO_NOT_FOUND", "PHOTO_NOT_AVAILABLE", "IDEMPOTENCY_BODY_MISMATCH", "INVALID_COMMAND_ENVELOPE", "VERSION_CONFLICT"]);
+        console.warn("photo-database", { operation: name, httpStatus: response.status,
+          code: record(result) && typeof result.code === "string" && codes.has(result.code) ? result.code : "UNCLASSIFIED",
+          reason: record(result) && typeof result.message === "string" && reasons.has(result.message) ? result.message : "UNCLASSIFIED" });
+      }
       if (
         record(result) &&
         typeof result.code === "string" &&
@@ -290,6 +297,11 @@ export function createDatabaseGateway(
       throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
     }
     return response;
+  }
+  function photoStorageDiagnostic(response: Response, operation: "write" | "read", detail: unknown) {
+    const codes = new Set(["AccessDenied", "InvalidJWT", "InvalidSignature", "InvalidRequest", "NoSuchBucket", "EntityTooLarge", "DatabaseError", "InternalError", "InternalServerError", "InvalidMimeType", "KeyAlreadyExists", "ResourceAlreadyExists", "ResourceNotFound", "Duplicate"]);
+    const candidate = record(detail) ? detail.code ?? detail.error : undefined;
+    console.warn("photo-storage-response", { operation, httpStatus: response.status, code: typeof candidate === "string" && codes.has(candidate) ? candidate : "UNCLASSIFIED" });
   }
   async function storage(objectKey: string, bytes?: Uint8Array) {
     if (
@@ -524,9 +536,10 @@ export function createDatabaseGateway(
       );
       // 409 is only a possible replay; caller always checks existing bytes/hash.
       if (!response.ok) {
+        const error = await boundedJson(response, 4096).catch(() => null);
+        photoStorageDiagnostic(response, "write", error);
         let duplicate = response.status === 409;
         if (response.status === 400) {
-          const error = await boundedJson(response, 4096).catch(() => null);
           duplicate =
             record(error) &&
             (error.code === "ResourceAlreadyExists" ||
@@ -544,11 +557,13 @@ export function createDatabaseGateway(
         `object/authenticated/cv-photos/${objectPath(objectKey)}`,
         { method: "GET" },
       );
-      if (!response.ok)
+      if (!response.ok) {
+        photoStorageDiagnostic(response, "read", await boundedJson(response, 4096).catch(() => null));
         throw new DatabaseError(
           response.status === 404 ? 404 : 503,
           "DATABASE_UNAVAILABLE",
         );
+      }
       const reader = response.body?.getReader();
       if (!reader) throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
       const chunks: Uint8Array[] = [];

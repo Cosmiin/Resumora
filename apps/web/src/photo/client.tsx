@@ -1,5 +1,15 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import {isPhotoFailurePhase, type PhotoFailurePhase} from "@resumora/contracts/editor/photo";
 import type { AuthTransport } from "../auth/AuthShell";
+export class PhotoClientError extends Error {
+  phase?: PhotoFailurePhase;
+  status: number;
+  constructor(code: string, status: number, phase?: PhotoFailurePhase) {
+    super(code);
+    this.status = status;
+    this.phase = phase;
+  }
+}
 export interface PhotoClient {
   upload(blob: Blob, requestId: string): Promise<{ id: string }>;
   read(id: string): Promise<Blob>;
@@ -14,7 +24,7 @@ export function createPhotoClient(transport: AuthTransport): PhotoClient {
   async function check(response: Response) {
     if (!response.ok) {
       const data = await response.json().catch(() => null);
-      throw new Error(data?.error?.code ?? "photoUnavailable");
+      throw new PhotoClientError(typeof data?.error?.code === "string" ? data.error.code : "photoUnavailable", response.status, isPhotoFailurePhase(data?.error?.phase) ? data.error.phase : undefined);
     }
     return response;
   }
