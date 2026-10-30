@@ -27,6 +27,7 @@ export type JobEditorVersion = {
 };
 export type JobEditorSave = { requestId: string; documentId: string | null; expectedRevision: number; payload: JobEditorPayload };
 export interface JobEditorGateway {
+  jobEditorPin?(jobId:string):Promise<JobPin>;
   jobEditorContext(jobId: string): Promise<{ job: JobPin; source: JobEditorPayload['source'] }>;
   loadJobEditor(jobId: string, documentId?: string, versionId?: string): Promise<JobEditorVersion | null>;
   jobEditorHistory(jobId: string, documentId: string, page?: { beforeRevision?: number; limit?: number }): Promise<JobEditorVersion[]>;

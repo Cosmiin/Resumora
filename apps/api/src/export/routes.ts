@@ -10,7 +10,6 @@ import type { BaseDraft } from "@resumora/contracts/editor/model";
 import type { PhotoGateway } from "../photos/routes.ts";
 import { digestPhoto } from "../photos/routes.ts";
 import { readBody } from "../cv/routes.ts";
-import { renderPrintHtml, css } from "../../.generated/print-assets.mjs";
 import { renderAndValidatePdf } from "./browser.ts";
 import type { Browser } from "@cloudflare/puppeteer";
 export interface ExportGateway extends Pick<
@@ -138,6 +137,7 @@ export async function exportRoute(
         height: asset.height,
       };
     }
+    const { renderPrintHtml, css } = await import("../../.generated/print-assets.mjs");
     const html = renderPrintHtml(draft, css, photo);
     const browser = await (launch
       ? launch()

@@ -3,7 +3,7 @@ import {build} from 'esbuild';
 import {readFile} from 'node:fs/promises';
 export async function bundleWorker(options){
  const sources=[];
- const result=await build({...options,plugins:[...(options.plugins??[]),{name:'native-wasm',setup(b){
+ const result=await build({...options,external:['node:*',...(options.external??[])],plugins:[...(options.plugins??[]),{name:'native-wasm',setup(b){
   b.onResolve({filter:/\.wasm$/},async args=>{
    if(args.pluginData?.wasmResolved)return;
    const resolved=await b.resolve(args.path,{resolveDir:args.resolveDir,kind:args.kind,pluginData:{wasmResolved:true}});

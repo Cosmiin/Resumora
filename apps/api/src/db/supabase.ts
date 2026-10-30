@@ -1,3 +1,5 @@
+import type { CurrentJobDocument } from "@resumora/contracts/jobs/current-document";
+import type { JobWorkflow,WorkflowOperation,Vacancy } from "@resumora/contracts/jobs/workflow";
 import {
   isJobEditorPayload,
   isJobPin,
@@ -316,11 +318,19 @@ export function createDatabaseGateway(
   }
   return {
     ...importGateway(rpc, storage),
+    saveJobUrl:(requestId:string,url:string)=>rpc<SavedJob>('save_target_url',{p_key:key(requestId),p_url:url}),
+    linkJobSourceVersion:(i:{requestId:string;jobId:string;parentId:string;revision:number})=>rpc<JobWorkflow>('link_job_source_version',{p_key:key(i.requestId),p_job:key(i.jobId),p_parent:key(i.parentId),p_revision:revision(i.revision)}),
+    getJobWorkflow:(jobId:string)=>rpc<JobWorkflow>('get_job_workflow',{p_job:key(jobId)}),
+    reviewJobWorkflow:(i:{requestId:string;jobId:string;revision:number;value:Vacancy})=>rpc<JobWorkflow>('review_job_workflow',{p_key:key(i.requestId),p_job:key(i.jobId),p_revision:revision(i.revision),p_value:i.value}),
+    requestJobWorkflow:(i:{requestId:string;jobId:string;kind:string;revision:number;targetId?:string})=>rpc<WorkflowOperation>('request_job_workflow',{p_key:key(i.requestId),p_job:key(i.jobId),p_kind:i.kind,p_revision:revision(i.revision),p_target:i.targetId??null}),
+    cancelJobWorkflow:(jobId:string,operationId:string)=>rpc('cancel_job_workflow',{p_job:key(jobId),p_operation:key(operationId)}),
+    jobWorkflowAction:(i:{requestId:string;jobId:string;revision:number;id:string;state:string})=>rpc<JobWorkflow>('job_workflow_action',{p_key:key(i.requestId),p_job:key(i.jobId),p_revision:revision(i.revision),p_id:i.id,p_state:i.state}),
+    acceptJobTailor:(i:{requestId:string;jobId:string;operationId:string;documentId:string|null;expectedRevision:number;payload:JobEditorPayload})=>rpc<JobEditorVersion>('accept_job_tailor',{p_key:key(i.requestId),p_job:key(i.jobId),p_operation:key(i.operationId),p_document:i.documentId===null?null:key(i.documentId),p_expected_revision:revision(i.expectedRevision),p_payload:i.payload}),
     saveJob: (input: JobSave) =>
       rpc<SavedJob>("save_target_job", {
         p_key: key(input.requestId),
-        p_snapshot: key(input.snapshotId),
-        p_revision: revision(input.snapshotRevision),
+        p_snapshot: input.snapshotId === null ? null : key(input.snapshotId),
+        p_revision: input.snapshotRevision === null ? null : revision(input.snapshotRevision),
         p_intake: input.intake,
         p_requirements: input.requirements,
       }),
@@ -355,7 +365,7 @@ export function createDatabaseGateway(
     }) =>
       rpc<{ created: boolean }>("reserve_enhancement", {
         p_operation: key(input.operationId),
-        p_snapshot: key(input.snapshotId),
+        p_snapshot: input.snapshotId === null ? null : key(input.snapshotId),
         p_revision: revision(input.revision),
         p_target: input.targetId,
         p_policy: input.policy,
@@ -511,11 +521,14 @@ export function createDatabaseGateway(
       rpc<{ tenantId: string; userId: string }>("provision_workspace", {
         request_key: key(requestId),
       }),
+    jobEditorPin:(jobId:string)=>rpc<JobPin>('job_editor_current_pin',{p_job:key(jobId)}),
     jobEditorContext: (jobId: string) =>
       rpc<{ job: JobPin; source: JobEditorPayload["source"] }>(
         "job_editor_context",
         { p_job: key(jobId) },
       ),
+    loadCurrentJobDocument:(jobId:string,locale?:string)=>rpc<CurrentJobDocument|null>('load_current_job_document',{p_job:key(jobId),p_locale:locale??null}),
+    saveCurrentJobDocument:(i:{requestId:string;jobId:string;locale:string;documentId:string|null;expectedRevision:number;payload:EditorWireEnvelope;baseSnapshotId:string|null;operationId?:string;provenance?:Record<string,unknown>})=>rpc<CurrentJobDocument>('save_current_job_document',{p_key:key(i.requestId),p_job:key(i.jobId),p_locale:i.locale,p_document:i.documentId===null?null:key(i.documentId),p_expected_revision:revision(i.expectedRevision),p_payload:i.payload,p_base_snapshot:i.baseSnapshotId,p_provenance:i.provenance??null,p_operation:i.operationId??null}),
     loadJobEditor: (jobId: string, documentId?: string, versionId?: string) => {
       if ((documentId === undefined) !== (versionId === undefined))
         throw new DatabaseError(400, "INVALID_REQUEST");
@@ -631,7 +644,7 @@ export function createDatabaseGateway(
       rpc<DraftSnapshot>("restore_base_draft", {
         p_key: key(input.requestId),
         p_expected_revision: revision(input.expectedRevision),
-        p_snapshot: key(input.snapshotId),
+        p_snapshot: input.snapshotId === null ? null : key(input.snapshotId),
       }),
   };
 }

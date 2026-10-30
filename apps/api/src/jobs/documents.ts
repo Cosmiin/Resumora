@@ -15,7 +15,7 @@ export async function jobDocumentsRoute(request: Request, gateway: JobEditorGate
   loadSnapshot(id: string): Promise<import('@resumora/contracts/editor/transport').DraftSnapshot | null>;
 }) {
   const url = new URL(request.url);
-  const match = /^\/v1\/jobs\/([^/]+)\/cv(?:\/(context|history|save|restore|delete))?$/.exec(url.pathname);
+  const match = /^\/v1\/jobs\/([^/]+)\/cv(?:\/(context|pin|history|save|restore|delete))?$/.exec(url.pathname);
   if (!match) return privateJson({ error: { code: 'missing' } }, 404);
   const [, jobId, action = 'load'] = match;
   if (!isUuid(jobId)) return privateJson({ error: { code: 'invalidRequest' } }, 400);
@@ -26,6 +26,7 @@ export async function jobDocumentsRoute(request: Request, gateway: JobEditorGate
     if (method === 'GET') {
       const q = url.searchParams;
       if ([...q.keys()].some(k => q.getAll(k).length !== 1)) throw new Error('invalidRequest');
+      if(action==='pin'){if(url.search)throw Error('invalidRequest');return privateJson(gateway.jobEditorPin?await gateway.jobEditorPin(jobId):(await gateway.jobEditorContext(jobId)).job);}
       if (action === 'context') {
         if (url.search) throw new Error('invalidRequest');
         const context = await gateway.jobEditorContext(jobId);
