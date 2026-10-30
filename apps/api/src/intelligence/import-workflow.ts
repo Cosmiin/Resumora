@@ -221,7 +221,6 @@ export function importWorkflow(options: {
     async source(importId: string) {
       if (!store.source) throw new Error("SOURCE_UNAVAILABLE");
       const source = await store.source(importId);
-      if (source.format === "pdf") return source;
       const hash = Array.from(
         new Uint8Array(
           await crypto.subtle.digest(
@@ -233,6 +232,7 @@ export function importWorkflow(options: {
         .map((n) => n.toString(16).padStart(2, "0"))
         .join("");
       if (hash !== source.sourceHash) throw new Error("SOURCE_MISMATCH");
+      if (source.format === "pdf") return source;
       return {
         importId,
         format: source.format,
