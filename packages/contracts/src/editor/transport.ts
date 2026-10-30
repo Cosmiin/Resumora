@@ -1,3 +1,7 @@
+import {
+  isCanonicalDocumentLocale,
+  isTranslationLineage,
+} from "./languages.ts";
 import { isPhoto } from "./photo.ts";
 import {
   isImportReview,
@@ -276,6 +280,9 @@ const draftShape = obj(
     ),
   },
   {
+    documentLocale: isCanonicalDocumentLocale,
+    sourceLocale: isCanonicalDocumentLocale,
+    translation: isTranslationLineage,
     nameParts: obj({ first: str, last: str }),
     importReview: isImportReview,
     roleRewriteReviews: list(isRoleRewriteReview),

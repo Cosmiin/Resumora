@@ -1,4 +1,5 @@
-import { decodeDraft } from '@resumora/contracts/editor/transport';
+import { languageGateway } from "./languages.ts";
+import { decodeDraft } from "@resumora/contracts/editor/transport";
 import type { CurrentJobWrite,CurrentJobDocument } from "@resumora/contracts/jobs/current-document";
 import type { JobWorkflow,WorkflowOperation,Vacancy } from "@resumora/contracts/jobs/workflow";
 import {
@@ -323,6 +324,7 @@ export function createDatabaseGateway(
   }
   return {
     ...importGateway(rpc, storage),
+    ...languageGateway(rpc),
     saveJobUrl:(requestId:string,url:string)=>rpc<SavedJob>('save_target_url',{p_key:key(requestId),p_url:url}),
     linkJobSourceVersion:(i:{requestId:string;jobId:string;parentId:string;revision:number})=>rpc<JobWorkflow>('link_job_source_version',{p_key:key(i.requestId),p_job:key(i.jobId),p_parent:key(i.parentId),p_revision:revision(i.revision)}),
     getJobWorkflow:(jobId:string)=>rpc<JobWorkflow>('get_job_workflow',{p_job:key(jobId)}),
