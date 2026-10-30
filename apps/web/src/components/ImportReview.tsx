@@ -64,7 +64,11 @@ export function ImportReview({
     review = draft.importReview!;
   const reviewCandidates = pendingImportedCandidates(draft);
   const groups = [
-    ...new Set(review.extraction.candidates.map((c) => importSection(c.path))),
+    ...new Set(
+      review.extraction.candidates
+        .filter((c) => importedFact(draft, c))
+        .map((c) => importSection(c.path)),
+    ),
   ];
   groups.sort((a, b) => {
     const order = (s: string) =>
@@ -94,7 +98,7 @@ export function ImportReview({
   }, [section]);
   if (!section) return null;
   const invalidDate = candidates.some((c) => {
-    const value = importedFact(draft, c)?.value;
+    const value = importedFact(draft, c)!.value;
     return typeof value === "object" && dateError(value);
   });
   const current = candidates.find((c) => c.id === focused) ?? candidates[0];
@@ -132,14 +136,14 @@ export function ImportReview({
           </p>
         )}
         {candidates.map((c) => {
-          const field = importedFact(draft, c);
+          const field = importedFact(draft, c)!;
           const key = c.path
             .split(".")
             .filter((p) => !/^\d+$/.test(p))
             .at(-1)!;
           const label = labels[key] ??
             labels[c.path.split(".")[0]] ?? [key, key];
-          const value = field?.value ?? c.value;
+          const value = field.value;
           const display =
             typeof value === "object"
               ? (value.month ? value.month.padStart(2, "0") + "/" : "") +
@@ -147,7 +151,7 @@ export function ImportReview({
               : String(value);
           const specificWarning = hasSpecificImportWarning(c);
           function update(text: string) {
-            if (!field || !change) return;
+            if (!change) return;
             let next: FactValue = text;
             if (typeof value === "boolean") next = text === "true";
             else if (typeof value === "object") {

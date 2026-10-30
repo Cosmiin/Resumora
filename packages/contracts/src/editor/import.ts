@@ -30,9 +30,12 @@ export const importedFact = (draft: BaseDraft, candidate: Candidate) =>
   );
 export const pendingImportedCandidates = (draft: BaseDraft): Candidate[] =>
   draft.importReview?.extraction.candidates.filter((c) => {
-    if (draft.importReview!.confirmedIds.includes(c.id)) return false;
     const field = importedFact(draft, c);
-    return !field || field.acceptance !== "automatic" || !isAccepted(field);
+    return (
+      !!field &&
+      !draft.importReview!.confirmedIds.includes(c.id) &&
+      (field.acceptance !== "automatic" || !isAccepted(field))
+    );
   }) ?? [];
 
 /** Maps validated extraction into a NEW unconfirmed draft; never mutates an existing Base. */
@@ -185,9 +188,13 @@ export function confirmImported(
     !review ||
     !selectedIds.length ||
     new Set(selectedIds).size !== selectedIds.length ||
-    selectedIds.some(
-      (id) => !review.extraction.candidates.some((c) => c.id === id),
-    )
+    selectedIds.some((id) => {
+      const candidate = review.extraction.candidates.find((c) => c.id === id);
+      return (
+        !candidate ||
+        (!review.confirmedIds.includes(id) && !importedFact(draft, candidate))
+      );
+    })
   )
     throw new Error("INVALID_REVIEW_SELECTION");
   const next = clone(draft),
