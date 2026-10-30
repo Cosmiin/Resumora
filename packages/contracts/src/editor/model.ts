@@ -35,7 +35,8 @@ export type Source = {
 export type Prose = {
   id: string;
   text: string;
-  origin: "user_authored";
+  origin: "user_authored" | "extracted" | "ai_generated";
+  provenance?: Omit<Fact<string>, "value">;
   approval: "pending" | "approved";
   claimIds: string[];
 };
@@ -319,6 +320,7 @@ export function sectionFacts(
   section: string,
   includeInactive = false,
 ): Fact[] {
+  if (section === "summary") {const f=summaryFact(d);return f?[f]:[];}
   if (section === "identity")
     return [d.name, ...d.titles, ...d.contacts.map((c) => c.value)];
   if (section === "professionalSkills" || section === "technicalSkills")
@@ -359,6 +361,19 @@ export function sectionFacts(
         ...(e.proficiency ? [e.proficiency] : []),
       ]),
     ]);
+}
+export function writeSummary(d:BaseDraft,text:string,origin:Prose['origin']='user_authored'){
+  if(text===d.summary.text&&origin==='user_authored')return;
+  const source=summaryFact(d);
+  if(origin==='user_authored'&&source){const {value,...provenance}=editFact(source,text);d.summary.provenance=provenance;}
+  else delete d.summary.provenance;
+  d.summary.text=text;d.summary.origin=origin;d.summary.approval='approved';
+}
+export function summaryFact(d: BaseDraft): Fact<string> | null {
+  if(!d.summary.provenance)return null;
+  const result={} as Fact<string>;
+  for(const key of new Set([...Object.keys(d.summary.provenance),'value']))Object.defineProperty(result,key,{enumerable:true,configurable:true,get:()=>key==='value'?d.summary.text:(d.summary.provenance as unknown as Record<string,unknown>)[key],set:(v)=>{if(key==='value')d.summary.text=v;else (d.summary.provenance as unknown as Record<string,unknown>)[key]=v;}});
+  return result;
 }
 export function allFacts(d: BaseDraft, includeInactive = false): Fact[] {
   return [...coreSections, ...d.optionalSections.map((s) => s.id)].flatMap(

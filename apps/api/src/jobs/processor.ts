@@ -5,9 +5,9 @@ import { configuredStructuredRunner,type IntelligenceConfig } from '../intellige
 import type { UsageLedger,Attempt,AttemptStart,AttemptResult } from '../ai/ledger.ts';
 import { jobOperations } from './operations.ts';
 import { decodeDraft,type EditorWireEnvelope } from '@resumora/contracts/editor/transport';
-import { deriveJobSuggestions,eligibleEvidence,type WorkflowOperation,type Vacancy,type MatchResult } from '@resumora/contracts/jobs/workflow';
+import { projectCvEvidence,eligibleEvidence,type WorkflowOperation,type Vacancy,type MatchResult } from '@resumora/contracts/jobs/workflow';
 import type { CurrentJobDocument } from '@resumora/contracts/jobs/current-document';
-export type ClaimedJob={operation:WorkflowOperation;lease:string;jobId:string;userId:string;text:string;sourceUrl?:string;vacancy:Vacancy|null;base:EditorWireEnvelope|null;document:CurrentJobDocument|null;match:MatchResult|null;targetId:string|null;actions:unknown};
+export type ClaimedJob={operation:WorkflowOperation;lease:string;jobId:string;userId:string;text:string;sourceUrl?:string;vacancy:Vacancy|null;base:EditorWireEnvelope|null;document:CurrentJobDocument|null;targetDocument?:CurrentJobDocument|null;match:MatchResult|null;targetId:string|null;actions:unknown};
 export interface JobWorkerStore {claim():Promise<ClaimedJob|null>;finish(lease:string,result:unknown,error:string|null):Promise<unknown>;ledger(lease:string):UsageLedger;}
 export function jobWorkerStore(env:IntelligenceConfig & DatabaseConfig,transport:typeof fetch=fetch):JobWorkerStore{
  const url=new URL(env.SUPABASE_URL??'');if(url.protocol!=='https:'||!url.hostname.match(/^[a-z0-9]+\.supabase\.co$/)||url.username||url.password||url.port||url.search||url.hash||url.pathname!=='/'||!env.SUPABASE_PUBLISHABLE_KEY||!env.AI_WORKER_SECRET||env.AI_WORKER_SECRET.length<32)throw new Error('AI_UNCONFIGURED');
@@ -22,19 +22,15 @@ export async function processJobWorkflow(env:IntelligenceConfig & DatabaseConfig
  try{
   if(task.operation.kind==='fetch'){const text=await retrieveJobUrl(task.sourceUrl,options.transport);await store.finish(task.lease,{text},null);return {processed:1};}
   if(env.AI_PAID_INFERENCE!=='on')throw Error('AI_DISABLED');
-  const run=options.run??configuredStructuredRunner(env,task.userId,store.ledger(task.lease),AbortSignal.timeout(90000),options.transport),operations=jobOperations(run);
+  const run=options.run??configuredStructuredRunner(env,task.userId,store.ledger(task.lease),AbortSignal.timeout(120000),options.transport),operations=jobOperations(run);
   const common={operationId:task.operation.id,userId:task.userId};let result:unknown;
   if(task.operation.kind==='extract')result=await operations.extract({...common,text:task.text});
   else {
    if(!task.base||!task.vacancy)throw Error('INVALID_WORKFLOW_OUTPUT');
-   const draft=decodeDraft(task.base);if(task.operation.kind==='tailor'&&task.operation.targetLocale)draft.language=task.operation.targetLocale;const evidence=eligibleEvidence(draft);
-   // Profile uses latest immutable Base/context, CV presence uses the pinned
-   // accepted document projection only when it shares that exact source.
-   if(task.document){const rendered=decodeDraft(task.document.payload),visible=eligibleEvidence(rendered);for(const e of evidence){const exact=visible.find(v=>v.id===e.id&&v.text===e.text&&v.inCv);e.inCv=!!exact;
-    const target=rendered.roles.find(r=>r.id===e.targetId)??rendered.optionalSections.flatMap(s=>s.entries).find(s=>s.id===e.targetId);
-    if(target&&['context','details','bullet','answer'].includes(e.key)){const body='context' in target?target.context.value:target.details.value;const section=rendered.roles.includes(target as typeof rendered.roles[number])?'experience':rendered.optionalSections.find(s=>s.entries.some(v=>v.id===target.id))?.id;const field='context' in target?target.context:target.details;if(!rendered.presentation.hidden.includes(section??'')&&!rendered.presentation.hiddenFields?.includes(field.fieldId)){e.cvText=[body,...(target.bullets??[]).filter(b=>!rendered.presentation.hiddenFields?.includes(b.fieldId)).map(b=>b.value)].join('\n');e.inCv=!!e.cvText.trim();}}
-   }}
-   result=task.operation.kind==='match'?await operations.match({...common,draft,vacancy:task.vacancy,evidence}):await operations.tailor({...common,draft,vacancy:task.vacancy,match:task.match!,...(task.targetId?{onlyTarget:task.targetId}:{}),actions:await deriveJobSuggestions(task.vacancy,task.match!,evidence,{revision:task.operation.jobRevision,snapshotId:task.operation.snapshotId!,actions:task.actions as Record<string,string>})});
+   const draft=decodeDraft(task.base),target=task.targetDocument?decodeDraft(task.targetDocument.payload):task.document&&task.document.locale===task.operation.targetLocale?decodeDraft(task.document.payload):structuredClone(draft);
+   if(task.operation.targetLocale)target.language=task.operation.targetLocale;
+   const evidence=projectCvEvidence(eligibleEvidence(draft),task.document?decodeDraft(task.document.payload):draft);
+   result=task.operation.kind==='match'?await operations.match({...common,draft,vacancy:task.vacancy,evidence}):await operations.tailor({...common,draft:target,evidence,vacancy:task.vacancy,match:task.match!,...(task.targetId?{onlyTarget:task.targetId}:{}),actions:(task.match?.suggestions??[]).map(s=>({...s,state:(task.actions as Record<string,string>)?.[s.id]??s.state}))});
   }
   await store.finish(task.lease,result,null);
  }catch(error){await store.finish(task.lease,null,error instanceof Error&&error.message==='INVALID_WORKFLOW_OUTPUT'?'OUTPUT_INVALID':error instanceof Error&&error.message==='WORKFLOW_INPUT_TOO_LARGE'?'INPUT_TOO_LARGE':'PROVIDER_UNAVAILABLE');}

@@ -2,49 +2,64 @@
 -- destructive forward ARTIFACT removes old tailored content. Apply only through
 -- separately approved backup/data-safeguard activation; tests use disposable PG.
 -- Existing tables/CAS engine are retained; no new factual or version store.
-CREATE FUNCTION app.clean_job_document_json(v jsonb,hidden jsonb) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE SET search_path='' AS $$
+CREATE FUNCTION app.clean_job_document_json(v jsonb) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE SET search_path='' AS $$
 DECLARE result jsonb; k text; x jsonb;
 BEGIN
- IF jsonb_typeof(v)='array' THEN SELECT coalesce(jsonb_agg(app.clean_job_document_json(e,hidden)),'[]') INTO result FROM jsonb_array_elements(v) e;RETURN result;END IF;
+ IF jsonb_typeof(v)='array' THEN SELECT coalesce(jsonb_agg(app.clean_job_document_json(e)),'[]') INTO result FROM jsonb_array_elements(v) e;RETURN result;END IF;
  IF jsonb_typeof(v)<>'object' THEN RETURN v;END IF;
  result:='{}';FOR k,x IN SELECT * FROM jsonb_each(v) LOOP
-  IF k NOT IN ('sourceClaimId','sourceLineage') THEN result:=result||jsonb_build_object(k,app.clean_job_document_json(x,hidden));END IF;
+  IF k NOT IN ('sourceClaimId','sourceLineage') THEN result:=result||jsonb_build_object(k,app.clean_job_document_json(x));END IF;
  END LOOP;
- IF result ? 'fieldId' AND result ? 'value' THEN
+ IF result ? 'fieldId' AND result ? 'sourceId' THEN
   result:=jsonb_set(result,'{sourceId}','"job_document"');
-  IF hidden @> jsonb_build_array(result->>'fieldId') THEN result:=jsonb_set(result,'{value}',CASE jsonb_typeof(result->'value') WHEN 'boolean' THEN 'false'::jsonb WHEN 'object' THEN '{"year":"","month":""}'::jsonb ELSE '""'::jsonb END);END IF;
+
  END IF;RETURN result;
 END $$;
 CREATE FUNCTION app.freeze_job_document(p jsonb,source jsonb) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE SET search_path='' AS $$
 DECLARE c jsonb:=source->'content'; presentation jsonb; words jsonb; word jsonb; additions jsonb:=coalesce(p->'localAdditions','[]');
- r jsonb; s jsonb; e jsonb; entries jsonb; roles jsonb:='[]'; groups jsonb; group_name text; key text; hidden jsonb; fields jsonb; i integer;
+ r jsonb; s jsonb; e jsonb; candidate jsonb; valid_word boolean; entries jsonb; roles jsonb:='[]'; groups jsonb; group_name text; key text; i integer;
 BEGIN
  -- Apply the existing accepted projection before removing its source context.
  presentation:=coalesce(c->'presentation','{}')||coalesce(p->'presentation','{}');
- hidden:=coalesce(presentation->'hidden','[]');fields:=coalesce(presentation->'hiddenFields','[]');
  words:=coalesce(c#>'{presentation,approvedWording}','{}');
- FOR word IN SELECT * FROM jsonb_array_elements(coalesce(p->'wording','[]')) LOOP words:=words||jsonb_build_object(word->>'targetId',word);END LOOP;
- IF p#>'{presentation,summaryText}' IS NOT NULL THEN c:=jsonb_set(c,'{summary,text}',p#>'{presentation,summaryText}');END IF;
+ IF jsonb_array_length(coalesce(p->'wording','[]'))>0 THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='WORDING_MATERIALIZATION_REQUIRED';END IF;
+ IF p#>'{presentation,summaryText}' IS NOT NULL AND p#>'{presentation,summaryText}' IS DISTINCT FROM c#>'{summary,text}' THEN
+  IF c#>'{summary,provenance}' IS NOT NULL THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='WORDING_MATERIALIZATION_REQUIRED';END IF;
+  c:=jsonb_set(c,'{summary,text}',p#>'{presentation,summaryText}');c:=jsonb_set(c,'{summary,origin}','"user_authored"');c:=jsonb_set(c,'{summary,approval}','"approved"');
+ END IF;
  FOR group_name,key IN SELECT * FROM (VALUES('professionalSkills','professionalSkillIds'),('technicalSkills','technicalSkillIds')) keys LOOP
   groups:=coalesce(c->group_name,'[]');
   FOR r IN SELECT * FROM jsonb_array_elements(additions) WHERE value->>'kind'=CASE group_name WHEN 'professionalSkills' THEN 'professionalSkill' ELSE 'technicalSkill' END LOOP
    groups:=groups||jsonb_build_array(jsonb_build_object('id',r->>'id','fieldId',r->>'id','value',r->>'text','status','user_authored','sourceId','job_document'));
   END LOOP;
   IF p#>ARRAY['presentation',key] IS NOT NULL THEN SELECT coalesce(jsonb_agg(f ORDER BY selection.ordinality),'[]') INTO groups FROM jsonb_array_elements(p#>ARRAY['presentation',key]) WITH ORDINALITY selection(id,ordinality) JOIN LATERAL jsonb_array_elements(groups) f ON f->'id'=selection.id;END IF;
-  IF hidden @> jsonb_build_array(group_name) THEN groups:='[]';END IF;
-  SELECT coalesce(jsonb_agg(f),'[]') INTO groups FROM jsonb_array_elements(groups) f WHERE NOT fields @> jsonb_build_array(f->>'fieldId');
   c:=jsonb_set(c,ARRAY[group_name],groups);
  END LOOP;
  FOR i IN 0..1 LOOP
   groups:=CASE i WHEN 0 THEN coalesce(c->'roles','[]') ELSE coalesce(c->'optionalSections','[]') END;roles:='[]';
   FOR s IN SELECT * FROM jsonb_array_elements(groups) LOOP
-   IF i=1 AND hidden @> jsonb_build_array(s->>'id') THEN CONTINUE;END IF;
    entries:='[]';
    FOR e IN SELECT * FROM jsonb_array_elements(CASE i WHEN 0 THEN jsonb_build_array(s) ELSE coalesce(s->'entries','[]') END) LOOP
     key:=CASE WHEN i=0 THEN 'context' ELSE 'details' END;
-    IF words ? (e->>'id') AND NOT fields @> jsonb_build_array(e#>>ARRAY[key,'fieldId']) THEN
-     e:=jsonb_set(e,ARRAY[key,'value'],words#>ARRAY[e->>'id','text']);e:=jsonb_set(e,ARRAY[key,'status'],'"draft"');e:=jsonb_set(e,'{bullets}','[]');
-    ELSIF fields @> jsonb_build_array((e->>'id')||'-contributions') THEN e:=jsonb_set(e,'{bullets}','[]');END IF;
+    word:=words->(e->>'id');
+    IF i=1 AND s->>'kind'='languages' THEN word:=NULL;END IF;
+    IF word IS NOT NULL THEN
+     IF word->>'scope'='experience' AND NOT word ? 'origin' THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='WORDING_MATERIALIZATION_REQUIRED';END IF;
+     valid_word:=jsonb_typeof(word->'sources')='array' AND jsonb_array_length(word->'sources')>0;
+     FOR candidate IN SELECT * FROM jsonb_array_elements(coalesce(word->'sources','[]')) LOOP
+      IF EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(source->'answers','[]')) a WHERE a->>'id'=candidate->>'id' AND a->>'targetId'=e->>'id' AND a ? 'selectedOptionIds') THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='WORDING_MATERIALIZATION_REQUIRED';END IF;
+      IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(jsonb_build_array(e->key)||coalesce(e->'bullets','[]')) f
+       WHERE f->>'id'=candidate->>'id' AND f->>'value'=candidate->>'text' AND f->>'sourceId'=candidate->>'sourceId'
+        AND (f->>'status' IN ('user_authored','user_confirmed') OR (f->>'status'='extracted_unconfirmed' AND f->>'acceptance'='automatic')))
+       AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(source->'answers','[]')) a
+        WHERE a->>'id'=candidate->>'id' AND a->>'targetId'=e->>'id' AND a->>'status'='confirmed' AND a->>'sourceId'=candidate->>'sourceId'
+         AND a->>'text'=candidate->>'text' AND NOT a ? 'selectedOptionIds') THEN valid_word:=false;END IF;
+     END LOOP;
+     IF valid_word THEN
+      e:=jsonb_set(e,ARRAY[key,'value'],word->'text');e:=jsonb_set(e,ARRAY[key,'status'],'"draft"');
+      IF word->>'scope'='experience' THEN e:=jsonb_set(e,'{bullets}','[]');END IF;
+     END IF;
+    END IF;
     FOR r IN SELECT * FROM jsonb_array_elements(additions) WHERE value->>'kind'='bullet' AND value->>'targetId'=e->>'id' LOOP
      e:=jsonb_set(e,'{bullets}',coalesce(e->'bullets','[]')||jsonb_build_array(jsonb_build_object('id',r->>'id','fieldId',r->>'id','value',r->>'text','status','user_authored','sourceId','job_document')));
     END LOOP;
@@ -54,14 +69,9 @@ BEGIN
   END LOOP;
   c:=jsonb_set(c,ARRAY[CASE i WHEN 0 THEN 'roles' ELSE 'optionalSections' END],roles);
  END LOOP;
- IF hidden @> '["experience"]' THEN c:=jsonb_set(c,'{roles}','[]');END IF;
- IF hidden @> '["education"]' THEN c:=jsonb_set(c,'{education}','[]');END IF;
- IF hidden @> '["summary"]' THEN c:=jsonb_set(c,'{summary,text}','""');END IF;
- IF hidden @> '["identity"]' THEN c:=jsonb_set(c,'{name,value}','""');c:=jsonb_set(c,'{titles,0,value}','""');c:=jsonb_set(c,'{titles,1,value}','""');c:=jsonb_set(c,'{contacts}','[]');c:=c-'nameParts';END IF;
- SELECT coalesce(jsonb_agg(contact_row),'[]') INTO groups FROM jsonb_array_elements(coalesce(c->'contacts','[]')) contact_row WHERE coalesce((contact_row->>'visible')::boolean,true) AND NOT fields @> jsonb_build_array(contact_row#>>'{value,fieldId}');c:=jsonb_set(c,'{contacts}',groups);
  c:=c-'nameParts'-'importReview'-'questionPlans'-'roleRewriteReviews';c:=jsonb_set(c,'{referenceProse}','[]');
  presentation:=presentation-'approvedWording'-'contributionHtml'-'summaryText'-'professionalSkillIds'-'technicalSkillIds';c:=jsonb_set(c,'{presentation}',presentation);
- c:=app.clean_job_document_json(c,fields);c:=jsonb_set(c,'{sources}','[{"id":"job_document","kind":"document","label":"Accepted job CV content"}]');
+ c:=app.clean_job_document_json(c);c:=jsonb_set(c,'{sources}','[{"id":"job_document","kind":"document","label":"Accepted job CV content"}]');
  RETURN jsonb_build_object('schemaVersion','resumora-editor-draft/1','content',c,'answers','[]'::jsonb);
 END $$;
 -- Remove immutable-history mechanics only for job documents. Base engine stays
@@ -126,7 +136,7 @@ BEGIN
   SELECT * INTO f FROM app.job_workflows WHERE tenant_id=w AND job_id=p_job;
   SELECT id INTO latest FROM app.editor_draft_snapshots WHERE tenant_id=w AND coalesce(to_jsonb(editor_draft_snapshots)->>'variant_id','default')='default' ORDER BY revision DESC LIMIT 1;
   SELECT id INTO current_source FROM app.current_job_document_row(w,p_job,op.requested_locale);
-  IF op.id IS NULL OR op.job_revision<>f.revision OR op.snapshot_id IS DISTINCT FROM latest OR op.document_version_id IS DISTINCT FROM current_source OR op.target_locale IS DISTINCT FROM p_locale OR op.target_document_version_id IS DISTINCT FROM head.id THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+  IF f.reviewed IS NULL OR op.id IS NULL OR op.job_revision<>f.revision OR op.snapshot_id IS DISTINCT FROM latest OR op.document_version_id IS DISTINCT FROM current_source OR op.target_locale IS DISTINCT FROM p_locale OR op.target_document_version_id IS DISTINCT FROM head.id THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
  END IF;
  IF p_provenance IS NOT NULL AND (jsonb_typeof(p_provenance)<>'object' OR octet_length(p_provenance::text)>8192 OR EXISTS(SELECT 1 FROM jsonb_object_keys(p_provenance) k WHERE k NOT IN ('sourceSnapshotId','sourceRevision','sourceFingerprint','jobFingerprint','jobRevision','acceptedTargets','generatedTargets','sourceDocumentId','sourceCurrentId','sourceDocumentFingerprint','sourceDocumentRevision'))) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
  origin_meta:=head.provenance;
@@ -149,7 +159,7 @@ BEGIN
  UPDATE app.job_workflow_operations SET result=NULL,state=CASE WHEN state IN ('queued','processing','ready') AND kind IN ('match','tailor') THEN 'cancelled' ELSE state END,lease=NULL,snapshot_id=NULL,snapshot_revision=NULL,document_version_id=NULL WHERE tenant_id=p_tenant AND kind IN ('match','tailor');
  UPDATE app.ai_enhancement_operations SET snapshot_id=NULL,revision=NULL WHERE tenant_id=p_tenant AND job_id IS NOT NULL;
 END $$;
-REVOKE EXECUTE ON FUNCTION app.clean_job_document_json(jsonb,jsonb),app.freeze_job_document(jsonb,jsonb),app.current_job_document_json(app.job_editor_versions),app.load_current_job_document(uuid,text),app.save_current_job_document(uuid,uuid,text,uuid,bigint,jsonb,uuid,jsonb,uuid),app.prepare_job_documents_for_base_removal(uuid) FROM PUBLIC,anon,authenticated;
+REVOKE EXECUTE ON FUNCTION app.clean_job_document_json(jsonb),app.freeze_job_document(jsonb,jsonb),app.current_job_document_json(app.job_editor_versions),app.load_current_job_document(uuid,text),app.save_current_job_document(uuid,uuid,text,uuid,bigint,jsonb,uuid,jsonb,uuid),app.prepare_job_documents_for_base_removal(uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION app.load_current_job_document(uuid,text),app.save_current_job_document(uuid,uuid,text,uuid,bigint,jsonb,uuid,jsonb,uuid) TO authenticated;
 -- Retire historical-content and legacy writer backdoors, not only the UI.
 REVOKE EXECUTE ON FUNCTION app.load_job_editor(uuid,uuid,uuid),app.job_editor_history(uuid,uuid,bigint,integer),app.save_job_editor(uuid,uuid,uuid,bigint,jsonb),app.restore_job_editor(uuid,uuid,uuid,bigint,uuid),app.delete_job_editor(uuid,uuid,uuid,bigint),app.accept_job_tailor(uuid,uuid,uuid,uuid,bigint,jsonb) FROM PUBLIC,anon,authenticated;

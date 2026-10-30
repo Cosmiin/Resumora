@@ -136,12 +136,12 @@ export function LanguageVersions({
     const changed = stale[version.locale] ?? [],
       sections = [
         ...new Set(
-          context.source.items
+          [...context.source.items, ...version.translation.components]
             .filter((i) => changed.includes(i.id))
             .map((i) => i.sectionId),
         ),
       ];
-    if (!sections.length) {
+    if (!sections.length || sections.some(id=>!context.source!.items.some(i=>i.sectionId===id))) {
       setError("sourceStructureChanged");
       return;
     }
@@ -233,7 +233,8 @@ export function LanguageVersions({
           )}
         </p>
       )}
-      {!!stale[target]?.length && (
+      {version && isTranslationLineage(version.translation) && version.translation.linguistic && <aside>{version.translation.linguistic.warnings.map((w,i)=><p key={'w'+i}>{w.code}: {w.message}</p>)}{version.translation.linguistic.ambiguousTerms.map((w,i)=><p key={'a'+i}>{w.term}</p>)}{version.translation.linguistic.suggestedGlossary.map((w,i)=><p key={'g'+i}>{w.originalTerm} → {w.preferredTranslation}</p>)}</aside>}
+      {!!stale[version?.locale??target]?.length && (
         <p role="status">
           {t(
             "Unele secțiuni din sursă s-au schimbat. Traducerea salvată rămâne disponibilă.",

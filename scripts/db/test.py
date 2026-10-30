@@ -197,6 +197,8 @@ def main():
             import importlib.util
             spec=importlib.util.spec_from_file_location('current_job_documents', ROOT/'supabase/tests/current_job_documents.py')
             current=importlib.util.module_from_spec(spec);spec.loader.exec_module(current);current.prepare_upgrade(db)
+            spec=importlib.util.spec_from_file_location('legacy_current_preservation',ROOT/'supabase/tests/legacy_current_preservation.py')
+            legacy=importlib.util.module_from_spec(spec);spec.loader.exec_module(legacy);legacy.prepare_upgrade(db)
         count = db.migrate(through)
         if args.suite in ('legacy-preservation','job-documents','all'):
             import importlib.util

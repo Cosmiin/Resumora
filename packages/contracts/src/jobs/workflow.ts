@@ -1,4 +1,5 @@
 import { isAccepted, type BaseDraft } from '../editor/model.ts';
+import { currentWording } from '../editor/wording.ts';
 import { jobEditorFacts } from './documents.ts';
 import { answerEvidenceText } from '../intelligence/model.ts';
 export const categories = ['technical','responsibilities','experience','achievements','qualifications','professional','title','domain','languages','conditions'] as const;
@@ -7,10 +8,10 @@ export type Span = { start: number; end: number; quote: string };
 export type JobRequirement = { id: string; text: string; categories: Category[]; priority: 'required'|'preferred'|'unspecified'; emphasis: 'central'|'supporting'|'unknown'; operator: 'and'|'or'; components: {id:string;text:string}[]; evidence: Span[]; eligibility: boolean; origin: 'extracted'|'manual' };
 export const overviewFields = ['title','company','location','workArrangement','geographicEligibility','employmentType','contractDuration','workingHours','travel','salary','experience','education','certifications','languages','postedAt','updatedAt','deadline','applicationUrl'] as const;
 export type Vacancy = { schemaVersion:'vacancy-extraction/3'; sourceLocale:string|null; overview: Record<typeof overviewFields[number], {value:string;evidence:Span[]}|null>; requirements:JobRequirement[]; issues:{kind:'ambiguity'|'conflict'|'incomplete';message:string;evidence:Span[]}[]; completeness:'complete'|'partial' };
-export type Evidence = {id:string;targetId:string;key:string;text:string;sourceId:string;kind:'fact'|'answer';inCv:boolean;cvText?:string};
+export type Evidence = {id:string;targetId:string;key:string;text:string;sourceId:string;kind:'fact'|'answer'|'cv';inCv:boolean;cvText?:string};
 export type MatchClass = 'demonstrated'|'claimed_limited'|'transferable'|'not_evidenced'|'unknown'|'conflict';
 export type ComponentMatch = { requirementId:string;componentId:string;scope:'profile'|'cv';matchClass:MatchClass;evidence:{id:string;quote:string}[];reason:string };
-export type MatchResult = {schemaVersion:'job-evidence-match/1';components:ComponentMatch[]};
+export type MatchResult = {schemaVersion:'job-evidence-match/1';components:ComponentMatch[];suggestions?:JobSuggestion[]};
 export type TailorSection = {targetId:string;action:'retain'|'rewrite'|'reorder';text:string;skillIds:string[];evidenceIds:string[];requirementIds:string[];reason:string;warnings:string[]};
 export type TailorProposal = {schemaVersion:'job-tailor/1';sections:TailorSection[]};
 export type WorkflowOperation = {id:string;kind:'fetch'|'extract'|'match'|'tailor';state:'queued'|'processing'|'ready'|'failed'|'cancelled'|'stale'|'unknown';jobRevision:number;snapshotId:string|null;snapshotRevision:number|null;documentVersionId?:string|null;documentLocale?:'ro'|'en'|null;targetLocale?:'ro'|'en';targetDocumentVersionId?:string|null;result:Vacancy|MatchResult|TailorProposal|null;error:string|null;createdAt:string};
@@ -37,10 +38,33 @@ export function validateVacancy(value:unknown,source:string,manual=false):Vacanc
  return structuredClone(value) as Vacancy;
 }
 export function eligibleEvidence(draft:BaseDraft):Evidence[]{
- const hidden=new Set(draft.presentation.hidden),fields=new Set(draft.presentation.hiddenFields??[]);
- const targets=new Map<string,string>();draft.roles.forEach(r=>targets.set(r.id,'experience'));draft.education.forEach(e=>targets.set(e.id,'education'));draft.optionalSections.forEach(s=>s.entries.forEach(e=>targets.set(e.id,s.id)));
- const rows:Evidence[]=jobEditorFacts(draft).filter(r=>isAccepted(r.fact)&&typeof r.fact.value==='string'&&!!r.fact.value.trim()&&r.key!=='contact'&&r.key!=='name'&&draft.sources.some(s=>s.id===r.ref.sourceId)).map(r=>({id:r.fact.id,targetId:r.ref.entityId,key:r.key,text:String(r.fact.value),sourceId:r.fact.sourceId,kind:'fact',inCv:!hidden.has(targets.get(r.ref.entityId)??r.ref.entityId)&&!fields.has(r.fact.fieldId)&&!(draft.presentation.approvedWording?.[r.ref.entityId]&&['context','details','bullet'].includes(r.key)&&!draft.presentation.approvedWording[r.ref.entityId].sources.some(s=>s.id===r.fact.id))}));
- for(const a of draft.answers)if(a.status==='confirmed'&&a.sourceId&&draft.sources.some(s=>s.id===a.sourceId))rows.push({id:a.id,targetId:a.targetId,key:'answer',text:answerEvidenceText(a),sourceId:a.sourceId,kind:'answer',inCv:!hidden.has(targets.get(a.targetId)??a.targetId)&&!!draft.presentation.approvedWording?.[a.targetId]?.sources.some(s=>s.id===a.id)});
+ const visible=new Map(visibleCvFields(draft).map(f=>[f.id,f.text]));
+ const rows:Evidence[]=jobEditorFacts(draft).filter(r=>isAccepted(r.fact)&&typeof r.fact.value==='string'&&!!r.fact.value.trim()&&!['contact','name'].includes(r.key)&&draft.sources.some(s=>s.id===r.ref.sourceId)).map(r=>({id:r.fact.id,targetId:r.ref.entityId,key:r.key,text:String(r.fact.value),sourceId:r.fact.sourceId,kind:'fact',inCv:visible.has(r.fact.id),...(visible.has(r.fact.id)?{cvText:visible.get(r.fact.id)}:{})}));
+ for(const a of draft.answers)if(a.status==='confirmed'&&a.sourceId&&draft.sources.some(s=>s.id===a.sourceId))rows.push({id:a.id,targetId:a.targetId,key:'answer',text:answerEvidenceText(a),sourceId:a.sourceId,kind:'answer',inCv:visible.has(a.id),...(visible.has(a.id)?{cvText:visible.get(a.id)}:{})});
+ return rows;
+}
+export function visibleCvFields(d:BaseDraft):{id:string;targetId:string;text:string}[]{
+ const rows:{id:string;targetId:string;text:string}[]=[],hidden=new Set(d.presentation.hiddenFields??[]);
+ const add=(targetId:string,f:BaseDraft['name'])=>{if(typeof f.value==='string'&&f.value.trim()&&!hidden.has(f.fieldId))rows.push({id:f.id,targetId,text:f.value});};
+ const entry=(targetId:string,field:BaseDraft['name'],bullets:BaseDraft['name'][]=[])=>{
+  const wording=currentWording(d,targetId),p=d.presentation.approvedWording?.[targetId];
+  if(wording){for(const source of p!.sources)rows.push({id:source.id,targetId,text:wording});}else add(targetId,field);
+  if(!(wording&&p?.scope==='experience')&&!hidden.has(targetId+'-contributions'))bullets.forEach(f=>add(targetId,f));
+ };
+ for(const section of d.presentation.order){if(d.presentation.hidden.includes(section))continue;
+  if(section==='identity')d.titles.forEach(f=>add(d.id,f));
+  else if(section==='summary'&&d.summary.text&&!hidden.has('summary'))rows.push({id:d.summary.provenance?.id??d.summary.id,targetId:'summary',text:d.summary.text});
+  else if(section==='professionalSkills'||section==='technicalSkills')d[section].forEach(f=>add(section,f));
+  else if(section==='experience')for(const r of d.roles){[r.title,r.company,r.location].forEach(f=>add(r.id,f));entry(r.id,r.context,r.bullets);}
+  else if(section==='education')for(const e of d.education)[e.qualification,e.field,e.institution,e.location,e.details].forEach(f=>add(e.id,f));
+  else {const s=d.optionalSections.find(s=>s.id===section);if(!s)continue;if(s.heading)add(s.id,s.heading);for(const e of s.entries){if(!(s.heading&&e.id===s.id))add(e.id,e.title);if(s.kind==='languages'&&e.proficiency)add(e.id,e.proficiency);entry(e.id,e.details,e.bullets);}}
+ }
+ return rows;
+}
+export function projectCvEvidence(evidence:Evidence[],document:BaseDraft):Evidence[]{
+ const visible=visibleCvFields(document);
+ const rows=evidence.filter(e=>e.kind!=='cv').map(e=>{const exact=visible.find(v=>v.id===e.id);return {...e,inCv:!!exact,cvText:exact?.text??''};});
+ for(const field of visible)if(!rows.some(e=>e.inCv&&e.cvText===field.text))rows.push({id:'cv:'+field.id,targetId:field.targetId,key:'document',text:'',cvText:field.text,sourceId:'current_document',kind:'cv',inCv:true});
  return rows;
 }
 export function validateMatch(value:unknown,vacancy:Vacancy,evidence:Evidence[]):MatchResult{
@@ -49,46 +73,56 @@ export function validateMatch(value:unknown,vacancy:Vacancy,evidence:Evidence[])
  if(value.components.length!==expected.length)fail();const found:string[]=[];
  for(const c of value.components){if(!object(c)||!exact(c,['requirementId','componentId','scope','matchClass','evidence','reason'])||!expected.includes(`${c.requirementId}:${c.componentId}:${c.scope}`)||!['demonstrated','claimed_limited','transferable','not_evidenced','unknown','conflict'].includes(c.matchClass)||!text(c.reason,1500)||!Array.isArray(c.evidence)||c.evidence.length>20)fail();found.push(`${c.requirementId}:${c.componentId}:${c.scope}`);
   if(['demonstrated','claimed_limited','transferable','conflict'].includes(c.matchClass)&&!c.evidence.length)fail();
-  for(const s of c.evidence){if(!object(s)||!exact(s,['id','quote'])||!text(s.quote)||!evidence.some(e=>e.id===s.id&&(c.scope==='profile'?e.text:(e.cvText??e.text)).includes(s.quote)&&(c.scope==='profile'||e.inCv)))fail();}
+  for(const s of c.evidence){if(!object(s)||!exact(s,['id','quote'])||!text(s.quote)||!evidence.some(e=>e.id===s.id&&(c.scope!=='profile'||e.kind!=='cv')&&(c.scope==='profile'?e.text:(e.cvText??e.text)).includes(s.quote)&&(c.scope==='profile'||e.inCv)))fail();}
   const r=vacancy.requirements.find(r=>r.id===c.requirementId)!;if(r.eligibility&&c.matchClass==='transferable')fail();
  }
  if(!unique(found))fail();
  for(const r of vacancy.requirements)for(const component of r.components){const profile=value.components.find((m:ComponentMatch)=>m.requirementId===r.id&&m.componentId===component.id&&m.scope==='profile'),cv=value.components.find((m:ComponentMatch)=>m.requirementId===r.id&&m.componentId===component.id&&m.scope==='cv');if(coverageMethod.strength[cv.matchClass as MatchClass]>coverageMethod.strength[profile.matchClass as MatchClass])fail();}
  return structuredClone(value) as MatchResult;
 }
-export const coverageMethod={version:'compatibility-1.1.0',weights:{technical:30,responsibilities:25,experience:15,achievements:10,qualifications:10,professional:5,title:5},priorities:{required:3,unspecified:2,preferred:1},strength:{demonstrated:1,claimed_limited:.75,transferable:.4,not_evidenced:0,unknown:0,conflict:0}} as const;
+export const coverageMethod={version:'compatibility-1.2.0',weights:{technical:30,responsibilities:25,experience:15,achievements:10,qualifications:10,professional:5,title:5},priorities:{required:3,unspecified:2,preferred:1},strength:{demonstrated:1,claimed_limited:.75,transferable:.4,not_evidenced:0,unknown:0,conflict:0}} as const;
 const primary=(r:JobRequirement):keyof typeof coverageMethod.weights=>{const c=r.categories[0];return c==='domain'?'responsibilities':c==='languages'||c==='conditions'?'qualifications':c;};
 export function evidenceCoverage(vacancy:Vacancy,match:MatchResult,scope:'profile'|'cv'){
  const groups=new Map<string,{nominalWeight:number;numerator:number;denominator:number}>();
  const requirements=vacancy.requirements.map(r=>{const values=r.components.map(c=>{const m=match.components.find(m=>m.requirementId===r.id&&m.componentId===c.id&&m.scope===scope);return m?coverageMethod.strength[m.matchClass]:0;});const strength=r.operator==='or'?Math.max(...values):values.reduce<number>((a,b)=>a+b,0)/values.length;
- const category=primary(r),priority=coverageMethod.priorities[r.priority],g=groups.get(category)??{nominalWeight:coverageMethod.weights[category],numerator:0,denominator:0};g.numerator+=strength*priority;g.denominator+=priority;groups.set(category,g);return {id:r.id,strength,eligibility:r.eligibility,state:strength===1?'supported':strength>0?'partially_supported':match.components.some(c=>c.requirementId===r.id&&c.scope===scope&&c.matchClass==='conflict')?'conflict':match.components.some(c=>c.requirementId===r.id&&c.scope===scope&&c.matchClass==='unknown')?'needs_confirmation':'not_evidenced'};});
+ const category=primary(r),priority=coverageMethod.priorities[r.priority],g=groups.get(category)??{nominalWeight:coverageMethod.weights[category],numerator:0,denominator:0};if(!r.eligibility){g.numerator+=strength*priority;g.denominator+=priority;groups.set(category,g);}return {id:r.id,strength,eligibility:r.eligibility,state:strength===1?'supported':strength>0?'partially_supported':match.components.some(c=>c.requirementId===r.id&&c.scope===scope&&c.matchClass==='conflict')?'conflict':match.components.some(c=>c.requirementId===r.id&&c.scope===scope&&c.matchClass==='unknown')?'needs_confirmation':'not_evidenced'};});
  const weight=[...groups.values()].reduce((n,g)=>n+g.nominalWeight,0),categories=[...groups.entries()].map(([category,g])=>({category,...g,effectiveWeight:100*g.nominalWeight/weight,coverage:g.numerator/g.denominator}));
  return {method:coverageMethod.version,score:weight?Math.round(categories.reduce((n,g)=>n+g.effectiveWeight*g.coverage,0)*100)/100:null,categories,requirements,eligibility:requirements.filter(r=>r.eligibility).map(r=>({id:r.id,state:r.strength===1?'supported':r.state==='conflict'?'conflict':'needs_confirmation'}))};
 }
-export function tailorTargets(d:BaseDraft){return ['summary','professionalSkills','technicalSkills',...d.roles.map(r=>r.id),...d.optionalSections.filter(s=>s.kind!=='languages').flatMap(s=>s.entries.map(e=>e.id))];}
+export function tailorTargets(d:BaseDraft){return ['summary','professionalSkills','technicalSkills',...d.titles.map(f=>f.fieldId),...d.roles.map(r=>r.id),...d.education.map(e=>e.id),...d.optionalSections.flatMap(s=>s.entries.map(e=>e.id))];}
+export function tailorTargetText(d:BaseDraft,id:string):string{
+ if(id==='summary')return d.summary.text;
+ if(id==='professionalSkills'||id==='technicalSkills')return d[id].map(f=>f.value).join(', ');
+ const title=d.titles.find(f=>f.fieldId===id);if(title)return title.value;
+ const role=d.roles.find(r=>r.id===id);if(role)return [currentWording(d,id)??role.context.value,...(currentWording(d,id)&&d.presentation.approvedWording?.[id]?.scope==='experience'?[]:role.bullets.map(b=>b.value))].join('\n');
+ const edu=d.education.find(e=>e.id===id);if(edu)return edu.details.value;
+ const entry=d.optionalSections.flatMap(s=>s.entries).find(e=>e.id===id);if(!entry)throw Error('INVALID_WORKFLOW_OUTPUT');
+ return [currentWording(d,id)??entry.details.value,...(currentWording(d,id)&&d.presentation.approvedWording?.[id]?.scope==='experience'?[]:(entry.bullets??[]).map(b=>b.value))].join('\n');
+}
 export function validateTailor(value:unknown,draft:BaseDraft,vacancy:Vacancy,evidence:Evidence[],onlyTarget?:string):TailorProposal{
  const targets=onlyTarget?[onlyTarget]:tailorTargets(draft);
  if(!object(value)||!exact(value,['schemaVersion','sections'])||value.schemaVersion!=='job-tailor/1'||!Array.isArray(value.sections)||value.sections.length!==targets.length)fail();
  for(const s of value.sections){if(!object(s)||!exact(s,['targetId','action','text','skillIds','evidenceIds','requirementIds','reason','warnings'])||!targets.includes(s.targetId)||!['retain','rewrite','reorder'].includes(s.action)||typeof s.text!=='string'||s.text.length>20000||!strings(s.skillIds,200)||!strings(s.evidenceIds,500)||!strings(s.requirementIds,200)||!text(s.reason,1000)||!Array.isArray(s.warnings)||s.warnings.length>20||!s.warnings.every((w:unknown)=>text(w,1000))||!s.requirementIds.every((id:string)=>vacancy.requirements.some(r=>r.id===id)))fail();
-  const cited=s.evidenceIds.map((id:string)=>{const row=evidence.find(e=>e.id===id);if(!row||(!['summary','professionalSkills','technicalSkills'].includes(s.targetId)&&(row.targetId!==s.targetId||!['context','details','bullet','answer'].includes(row.key))))fail();return row;});
+  const cited=s.evidenceIds.map((id:string)=>{const row=evidence.find(e=>e.id===id&&e.kind!=='cv');if(!row||(!['summary','professionalSkills','technicalSkills',...draft.titles.map(f=>f.fieldId)].includes(s.targetId)&&(row.targetId!==s.targetId||!['context','details','bullet','answer','qualification','field','title','proficiency'].includes(row.key))))fail();return row;});
+  if(s.action==='reorder'&&!['professionalSkills','technicalSkills'].includes(s.targetId))fail();
   if(s.action!=='retain'&&!cited.length)fail();
-  if(['professionalSkills','technicalSkills'].includes(s.targetId)){if(s.text!==''||!s.skillIds.every((id:string)=>draft[s.targetId as 'professionalSkills'|'technicalSkills'].some(f=>f.id===id&&isAccepted(f))))fail();}else if(s.skillIds.length)fail();
+  if(['professionalSkills','technicalSkills'].includes(s.targetId)){if(s.text!==''||!s.skillIds.every((id:string)=>evidence.some(e=>e.kind!=='cv'&&e.id===id&&e.targetId===s.targetId&&e.key==='skill')))fail();}else if(s.skillIds.length)fail();
   if(s.action==='rewrite'&&!s.text.trim()&&!s.skillIds.length)fail();
   const support=cited.map((e:Evidence)=>e.text).join('\n'),numbers=new Set(support.match(/\d+(?:[.,]\d+)*%?/g)??[]);for(const n of s.text.match(/\d+(?:[.,]\d+)*%?/g)??[])if(!numbers.has(n))fail();
  }
  if(!unique(value.sections.map((s:TailorSection)=>s.targetId)))fail();return structuredClone(value) as TailorProposal;
 }
 export function jobClarificationQuestion(requirement:string,target:string){return `What, if any, work in ${target.slice(0,200)} supports this employer requirement: “${requirement.slice(0,1200)}”? Describe only activities you personally performed. You may answer no, unknown, or skip.`;}
-export type JobSuggestion={id:string;type:'include'|'clarify'|'verify'|'gap';requirementIds:string[];evidenceIds:string[];targetId:string|null;state:string;priority:number};
-/** Deterministic actions from a cached assessment; one experience/action groups
- * related requirements. No inference request, probability or invented delta. */
-export async function deriveJobSuggestions(vacancy:Vacancy,match:MatchResult,evidence:Evidence[],context:{revision:number;snapshotId:string;actions:Record<string,string>}){
- const profile=evidenceCoverage(vacancy,match,'profile'),cv=evidenceCoverage(vacancy,match,'cv'),groups=new Map<string,Omit<JobSuggestion,'id'|'state'>>();
- for(const r of vacancy.requirements){const p=profile.requirements.find(q=>q.id===r.id)!,c=cv.requirements.find(q=>q.id===r.id)!;if(p.strength===1&&c.strength===1)continue;
-  const type=p.strength>c.strength?'include':p.state==='partially_supported'?'clarify':p.state==='needs_confirmation'||p.state==='conflict'?'verify':'gap';
-  const evidenceIds=[...new Set(match.components.filter(m=>m.requirementId===r.id&&m.scope==='profile').flatMap(m=>m.evidence.map(e=>e.id)))];
-  const targetId=evidence.find(e=>evidenceIds.includes(e.id)&&!['professionalSkills','technicalSkills'].includes(e.targetId))?.targetId??null;
-  const key=type+':'+(targetId??r.id),g=groups.get(key)??{type,requirementIds:[],evidenceIds:[],targetId,priority:0};g.requirementIds.push(r.id);g.evidenceIds=[...new Set([...g.evidenceIds,...evidenceIds])];g.priority=Math.max(g.priority,coverageMethod.priorities[r.priority]*10+(r.eligibility?40:0)+(type==='include'?8:type==='clarify'?6:type==='verify'?4:0));groups.set(key,g);
+export type JobSuggestion={id:string;type:'include'|'clarify'|'verify'|'gap';requirementIds:string[];evidenceIds:string[];targetId:string|null;state:string;priority:number;reason:string};
+export type SuggestionResult={schemaVersion:'job-suggestions/1';suggestions:JobSuggestion[]};
+export async function validateSuggestions(value:unknown,vacancy:Vacancy,evidence:Evidence[]):Promise<SuggestionResult>{
+ if(!object(value)||!exact(value,['schemaVersion','suggestions'])||value.schemaVersion!=='job-suggestions/1'||!Array.isArray(value.suggestions)||value.suggestions.length>40)fail();
+ const suggestions:JobSuggestion[]=[];
+ for(const s of value.suggestions){
+  if(!object(s)||!exact(s,['type','requirementIds','evidenceIds','targetId','priority','reason'])||!['include','clarify','verify','gap'].includes(s.type)||!strings(s.requirementIds,200)||!s.requirementIds.length||!s.requirementIds.every((id:string)=>vacancy.requirements.some(r=>r.id===id))||!strings(s.evidenceIds,500)||!s.evidenceIds.every((id:string)=>evidence.some(e=>e.id===id&&e.kind!=='cv'))||!(s.targetId===null||evidence.some(e=>e.targetId===s.targetId))||!Number.isInteger(s.priority)||s.priority<1||s.priority>100||!text(s.reason,1000))fail();
+  if(s.type==='include'&&(!s.evidenceIds.length||!s.targetId))fail();
+  const id='suggestion_'+(await fingerprint({target:s.targetId,requirements:vacancy.requirements.filter(r=>s.requirementIds.includes(r.id)).map(r=>({text:r.text,priority:r.priority,components:r.components.map(c=>c.text)})).sort((a,b)=>a.text.localeCompare(b.text)),evidence:evidence.filter(e=>s.evidenceIds.includes(e.id)).map(e=>({id:e.id,text:e.text,target:e.targetId})).sort((a,b)=>a.id.localeCompare(b.id))})).slice(0,48);
+  if(suggestions.some(s=>s.id===id))fail();suggestions.push({...s,id,state:'new'} as JobSuggestion);
  }
- return Promise.all([...groups.values()].sort((a,b)=>b.priority-a.priority||a.requirementIds[0].localeCompare(b.requirementIds[0])).map(async g=>{const id='suggestion_'+(await fingerprint({revision:context.revision,snapshot:context.snapshotId,type:g.type,target:g.targetId,requirements:g.requirementIds.slice().sort()})).slice(0,48);return {...g,id,state:context.actions[id]??'new'};}));
+ return {schemaVersion:'job-suggestions/1',suggestions};
 }

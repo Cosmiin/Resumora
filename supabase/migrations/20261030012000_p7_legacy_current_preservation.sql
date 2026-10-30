@@ -34,7 +34,6 @@ BEGIN
  FOR entry IN SELECT jsonb_array_elements_text(layout->'sectionOrder') LOOP
   SELECT count(*),jsonb_agg(x)->0 INTO n,s FROM jsonb_array_elements(layout->'sections') x WHERE x->>'id'=entry;
   IF n<>1 THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='LEGACY_JOB_DOCUMENT_CONVERSION_REQUIRED',DETAIL='section_reference';END IF;
-  IF NOT (s->>'visible')::boolean THEN CONTINUE;END IF;
   k:=s->>'kind';
   IF k=ANY(seen) THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='LEGACY_JOB_DOCUMENT_CONVERSION_REQUIRED',DETAIL='duplicate_section';END IF;
   seen:=array_append(seen,k);
@@ -51,6 +50,7 @@ BEGIN
    RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='LEGACY_JOB_DOCUMENT_CONVERSION_REQUIRED',DETAIL='section_heading';
   END IF;
   order_ids:=order_ids||jsonb_build_array(mapped);
+  IF NOT (s->>'visible')::boolean THEN hidden:=hidden||jsonb_build_array(mapped);END IF;
   IF k='identity' THEN
    IF jsonb_array_length(s->'entryIds')<>0 OR jsonb_array_length(s->'proseIds')<>0 THEN
     RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='LEGACY_JOB_DOCUMENT_CONVERSION_REQUIRED',DETAIL='identity_rendering';END IF;
@@ -185,38 +185,29 @@ CREATE TRIGGER application_cv_metadata BEFORE INSERT OR UPDATE ON app.applicatio
 CREATE TRIGGER event_cv_metadata BEFORE INSERT ON app.application_events FOR EACH ROW EXECUTE FUNCTION app.validate_application_cv_metadata();
 REVOKE EXECUTE ON FUNCTION app.validate_application_cv_metadata() FROM PUBLIC,anon,authenticated;
 
--- Retire canonical job commands for a converted/removed Base family. Existing
--- unconverted canonical accounts still need their supported command behavior
--- until strict preservation can succeed; no migration-time semantic rewrite.
-CREATE FUNCTION app.legacy_job_commands_retired(w uuid) RETURNS boolean
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
-DECLARE removed boolean:=false;
-BEGIN
- IF to_regclass('app.base_cv_lifecycle') IS NOT NULL THEN
-  SELECT generation>0 INTO removed FROM app.base_cv_lifecycle WHERE tenant_id=w;
- END IF;
- RETURN coalesce(removed,false) OR EXISTS(SELECT 1 FROM app.job_editor_versions WHERE tenant_id=w AND provenance ? 'legacyDocumentId');
-END $$;
-REVOKE EXECUTE ON FUNCTION app.legacy_job_commands_retired(uuid) FROM PUBLIC,anon,authenticated;
-ALTER FUNCTION app.save_job_cv_checkpoint(uuid,uuid,bigint,uuid,uuid,jsonb,text,boolean) RENAME TO save_legacy_job_checkpoint_internal;
-REVOKE EXECUTE ON FUNCTION app.save_legacy_job_checkpoint_internal(uuid,uuid,bigint,uuid,uuid,jsonb,text,boolean) FROM PUBLIC,anon,authenticated;
-CREATE FUNCTION app.save_job_cv_checkpoint(p_key uuid,p_document uuid,p_expected_revision bigint,p_profile_version uuid,p_job_version uuid,p_layout jsonb,p_locale text,p_tailored boolean) RETURNS jsonb
+CREATE OR REPLACE FUNCTION app.save_job_cv_checkpoint(p_key uuid,p_document uuid,p_expected_revision bigint,p_profile_version uuid,p_job_version uuid,p_layout jsonb,p_locale text,p_tailored boolean) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 BEGIN
- IF app.legacy_job_commands_retired(app.tenant_for_user()) THEN RAISE EXCEPTION USING ERRCODE='PT410',MESSAGE='CURRENT_JOB_DOCUMENT_REQUIRED';END IF;
- RETURN app.save_legacy_job_checkpoint_internal(p_key,p_document,p_expected_revision,p_profile_version,p_job_version,p_layout,p_locale,p_tailored);
+ PERFORM app.tenant_for_user();
+ RAISE EXCEPTION USING ERRCODE='PT410',MESSAGE='CURRENT_JOB_DOCUMENT_REQUIRED';
 END $$;
 REVOKE EXECUTE ON FUNCTION app.save_job_cv_checkpoint(uuid,uuid,bigint,uuid,uuid,jsonb,text,boolean) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION app.save_job_cv_checkpoint(uuid,uuid,bigint,uuid,uuid,jsonb,text,boolean) TO authenticated;
--- The existing Base restore engine is retained behind a narrow wrapper.
-ALTER FUNCTION app.restore_cv_version(uuid,uuid,bigint,uuid) RENAME TO restore_base_cv_version_internal;
-REVOKE EXECUTE ON FUNCTION app.restore_base_cv_version_internal(uuid,uuid,bigint,uuid) FROM PUBLIC,anon,authenticated;
-CREATE FUNCTION app.restore_cv_version(p_key uuid,p_document uuid,p_expected_revision bigint,p_historical_version uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION app.restore_cv_version(p_key uuid,p_document uuid,p_expected_revision bigint,p_historical_version uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE w uuid:=app.tenant_for_user();r record;old_version app.cv_versions;document app.cv_documents;version uuid;
 BEGIN
- IF app.legacy_job_commands_retired(app.tenant_for_user()) AND EXISTS(SELECT 1 FROM app.cv_documents WHERE tenant_id=app.tenant_for_user() AND id=p_document AND document_kind='job') THEN
-  RAISE EXCEPTION USING ERRCODE='PT410',MESSAGE='CURRENT_JOB_DOCUMENT_REQUIRED';END IF;
- RETURN app.restore_base_cv_version_internal(p_key,p_document,p_expected_revision,p_historical_version);
+ SELECT * INTO document FROM app.cv_documents WHERE tenant_id=w AND id=p_document FOR UPDATE;
+ IF document.document_kind='job' THEN RAISE EXCEPTION USING ERRCODE='PT410',MESSAGE='CURRENT_JOB_DOCUMENT_REQUIRED';END IF;
+ SELECT * INTO r FROM app.begin_request(w,'restore_cv_version',p_key,jsonb_build_object('document',p_document,'expectedRevision',p_expected_revision,'historicalVersion',p_historical_version));
+ IF r.cached IS NOT NULL THEN RETURN r.cached;END IF;
+ SELECT * INTO old_version FROM app.cv_versions WHERE tenant_id=w AND id=p_historical_version AND document_id=p_document;
+ IF old_version.id IS NULL OR document.id IS NULL OR document.document_kind<>'base' THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='RESTORE_LINEAGE_FORBIDDEN';END IF;
+ PERFORM app.assert_profile_usable(w,old_version.profile_version_id);
+ IF document.draft_revision IS DISTINCT FROM p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+ version:=app.insert_cv_version(w,p_document,old_version.profile_version_id,r.request_id,old_version.canonical_json->'document',old_version.locale);
+ PERFORM app.audit(w,'cv.restore','cv_version',version);
+ RETURN app.finish_request(w,r.request_id,jsonb_build_object('cvVersionId',version,'documentId',p_document,'revision',document.draft_revision+1,'restoredFrom',p_historical_version));
 END $$;
 REVOKE EXECUTE ON FUNCTION app.restore_cv_version(uuid,uuid,bigint,uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION app.restore_cv_version(uuid,uuid,bigint,uuid) TO authenticated;
@@ -230,7 +221,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE plan jsonb; item jsonb; target uuid;
 BEGIN
  -- Deferred dependency supplied by import30030000; no conversion is executed
- -- at migration time. Same-transaction tenant/epoch authority, never a GUC or
+ -- by this helper. Same-transaction tenant/epoch authority, never a GUC or
  -- an account-deletion state. Failure leaves ALL content untouched.
  PERFORM app.require_base_cv_purge(p_tenant);
  plan:=app.preflight_legacy_current_jobs(p_tenant);
@@ -267,17 +258,15 @@ BEGIN
  v_pattern:='%'||pg_catalog.replace(pg_catalog.replace(pg_catalog.replace(p_query,E'\\',E'\\\\'),'%',E'\\%'),'_',E'\\_')||'%';
  SELECT COALESCE(pg_catalog.jsonb_agg(x.result ORDER BY x.created_at DESC,x.id DESC),'[]') INTO v_items FROM (
   SELECT a.id,a.created_at,pg_catalog.jsonb_build_object('applicationId',a.id,'createdAt',a.created_at,'jobId',a.job_id,'jobVersionId',a.job_version_id,
-   'title',j.title,'company',j.company,'stage',a.user_stage,'revision',a.revision,'documentId',coalesce(a.current_job_document_id,a.cv_document_id),'legacyDocumentId',a.cv_document_id,
-   'latestCvVersionId',coalesce(accepted.id,cv.id),'currentDocumentLocale',current_doc.document_locale,'latestGenerationId',NULL,'tailoringState',CASE WHEN accepted.id IS NOT NULL THEN 'tailored' ELSE cv.tailoring_state END,
-   'targetChanged',CASE WHEN coalesce(accepted.id,cv.id) IS NULL THEN false ELSE coalesce(accepted.job_version_id,cv.job_version_id) IS DISTINCT FROM current_job.head_version_id END,
+   'title',j.title,'company',j.company,'stage',a.user_stage,'revision',a.revision,'documentId',a.current_job_document_id,'legacyDocumentId',a.cv_document_id,
+   'latestCvVersionId',accepted.id,'currentDocumentLocale',current_doc.document_locale,'latestGenerationId',NULL,'tailoringState',CASE WHEN accepted.id IS NOT NULL THEN 'tailored' ELSE NULL END,
+   'targetChanged',CASE WHEN accepted.id IS NULL THEN false ELSE accepted.job_version_id IS DISTINCT FROM current_job.head_version_id END,
    'chosenCvVersionId',a.chosen_cv_version_id,
    'lastSentCvVersionId',(SELECT e.cv_version_id FROM app.application_events e WHERE e.tenant_id=a.tenant_id AND e.application_id=a.id AND e.event_kind='mark_sent'
      AND NOT EXISTS(SELECT 1 FROM app.application_events retraction WHERE retraction.tenant_id=e.tenant_id AND retraction.retracts_event_id=e.id) ORDER BY e.event_sequence DESC LIMIT 1),
    'nextAction',(SELECT pg_catalog.jsonb_build_object('id',n.id,'label',n.label,'dueDate',n.due_date,'state',n.state) FROM app.next_actions n WHERE n.tenant_id=a.tenant_id AND n.application_id=a.id AND n.state='open' ORDER BY n.due_date NULLS LAST,n.id LIMIT 1)) AS result
   FROM app.applications a JOIN app.job_versions j ON (j.tenant_id,j.id)=(a.tenant_id,a.job_version_id)
    JOIN app.jobs current_job ON (current_job.tenant_id,current_job.id)=(a.tenant_id,a.job_id)
-   LEFT JOIN app.cv_documents d ON (d.tenant_id,d.id)=(a.tenant_id,a.cv_document_id)
-   LEFT JOIN app.cv_versions cv ON (cv.tenant_id,cv.id)=(d.tenant_id,d.head_version_id)
    LEFT JOIN app.job_editor_documents current_doc ON (current_doc.tenant_id,current_doc.job_id,current_doc.id)=(a.tenant_id,a.job_id,a.current_job_document_id) AND current_doc.deleted_at IS NULL
    LEFT JOIN app.job_editor_versions accepted ON (accepted.tenant_id,accepted.document_id)=(current_doc.tenant_id,current_doc.id)
   WHERE a.tenant_id=v_workspace AND (p_stage IS NULL OR a.user_stage=p_stage)
@@ -288,4 +277,46 @@ BEGIN
  )x;
  RETURN pg_catalog.jsonb_build_object('items',v_items,'resultCount',pg_catalog.jsonb_array_length(v_items),'sentCount',app.sent_count(),
   'nextCursor',CASE WHEN pg_catalog.jsonb_array_length(v_items)=p_limit THEN pg_catalog.jsonb_build_object('createdAt',v_items->-1->'createdAt','id',v_items->-1->'applicationId') ELSE NULL END);
+END $$;
+DO $$
+DECLARE owner record; plan jsonb; item jsonb; target uuid; t text; previous_user text:=current_setting('request.jwt.claim.sub',true);
+BEGIN
+ FOR t IN SELECT unnest(ARRAY['recommendation_claims','recommendation_requirements','recommendations','analysis_components','analysis_runs','readiness_runs','match_evidence','evidence_mappings','cv_photo_references','cv_items','cv_sections','cv_versions']) LOOP
+  EXECUTE format('ALTER TABLE app.%I DISABLE TRIGGER immutable',t);
+ END LOOP;
+ FOR owner IN SELECT DISTINCT tenants.id,tenants.owner_user_id FROM app.tenants JOIN app.cv_documents ON cv_documents.tenant_id=tenants.id WHERE cv_documents.document_kind='job' ORDER BY tenants.id LOOP
+  PERFORM set_config('request.jwt.claim.sub',owner.owner_user_id::text,true);
+  plan:=app.preflight_legacy_current_jobs(owner.id);
+  FOR item IN SELECT * FROM jsonb_array_elements(plan) LOOP
+   target:=(item->>'targetDocumentId')::uuid;
+   INSERT INTO app.target_job_contexts(tenant_id,job_id,job_version_id,snapshot_id,snapshot_revision,intake,requirements)
+    VALUES(owner.id,(item->>'jobId')::uuid,(item->>'jobVersionId')::uuid,NULL,NULL,item->'intake','[]') ON CONFLICT(job_id) DO NOTHING;
+   IF NOT EXISTS(SELECT 1 FROM app.job_editor_documents WHERE tenant_id=owner.id AND id=target) THEN
+    INSERT INTO app.job_editor_documents(id,tenant_id,job_id,document_locale,is_primary)
+     VALUES(target,owner.id,(item->>'jobId')::uuid,item->>'locale',NOT EXISTS(SELECT 1 FROM app.job_editor_documents WHERE tenant_id=owner.id AND job_id=(item->>'jobId')::uuid AND deleted_at IS NULL));
+    INSERT INTO app.job_editor_versions(tenant_id,job_id,document_id,revision,job_version_id,reason,payload,request_id,photo_asset_id,provenance)
+     VALUES(owner.id,(item->>'jobId')::uuid,target,1,(item->>'jobVersionId')::uuid,'save',item->'payload',(item->>'publicationRequestId')::uuid,(item->>'photoAssetId')::uuid,jsonb_build_object('legacyDocumentId',item->>'canonicalDocumentId','legacyCurrentId',item->>'canonicalVersionId'));
+   END IF;
+   UPDATE app.applications SET current_job_document_id=target WHERE tenant_id=owner.id AND cv_document_id=(item->>'canonicalDocumentId')::uuid;
+  END LOOP;
+ END LOOP;
+ PERFORM set_config('request.jwt.claim.sub',coalesce(previous_user,''),true);
+ DELETE FROM app.recommendation_claims WHERE recommendation_id IN(SELECT r.id FROM app.recommendations r JOIN app.analysis_runs a ON a.id=r.analysis_run_id JOIN app.cv_versions v ON v.id=a.cv_version_id WHERE v.job_id IS NOT NULL);
+ DELETE FROM app.recommendation_requirements WHERE recommendation_id IN(SELECT r.id FROM app.recommendations r JOIN app.analysis_runs a ON a.id=r.analysis_run_id JOIN app.cv_versions v ON v.id=a.cv_version_id WHERE v.job_id IS NOT NULL);
+ DELETE FROM app.recommendations WHERE analysis_run_id IN(SELECT a.id FROM app.analysis_runs a JOIN app.cv_versions v ON v.id=a.cv_version_id WHERE v.job_id IS NOT NULL);
+ DELETE FROM app.analysis_components WHERE analysis_run_id IN(SELECT a.id FROM app.analysis_runs a JOIN app.cv_versions v ON v.id=a.cv_version_id WHERE v.job_id IS NOT NULL);
+ DELETE FROM app.analysis_runs WHERE cv_version_id IN(SELECT id FROM app.cv_versions WHERE job_id IS NOT NULL);
+ DELETE FROM app.readiness_runs WHERE cv_version_id IN(SELECT id FROM app.cv_versions WHERE job_id IS NOT NULL);
+ DELETE FROM app.match_evidence WHERE cv_version_id IN(SELECT id FROM app.cv_versions WHERE job_id IS NOT NULL) OR evidence_mapping_id IN(SELECT id FROM app.evidence_mappings WHERE cv_version_id IN(SELECT id FROM app.cv_versions WHERE job_id IS NOT NULL));
+ DELETE FROM app.evidence_mappings WHERE cv_version_id IN(SELECT id FROM app.cv_versions WHERE job_id IS NOT NULL);
+ DELETE FROM app.cv_photo_references WHERE cv_version_id IN(SELECT id FROM app.cv_versions WHERE job_id IS NOT NULL);
+ DELETE FROM app.cv_items WHERE cv_version_id IN(SELECT id FROM app.cv_versions WHERE job_id IS NOT NULL);
+ DELETE FROM app.cv_sections WHERE cv_version_id IN(SELECT id FROM app.cv_versions WHERE job_id IS NOT NULL);
+ UPDATE app.idempotency_requests SET result_refs='{}',expires_at=transaction_timestamp() WHERE command_kind='save_job_cv_checkpoint' OR command_kind='restore_cv_version' AND result_refs->>'documentId' IN(SELECT id::text FROM app.cv_documents WHERE document_kind='job');
+ UPDATE app.cv_documents SET head_version_id=NULL WHERE document_kind='job';
+ DELETE FROM app.cv_versions WHERE job_id IS NOT NULL;
+ DELETE FROM app.cv_documents WHERE document_kind='job';
+ FOR t IN SELECT unnest(ARRAY['recommendation_claims','recommendation_requirements','recommendations','analysis_components','analysis_runs','readiness_runs','match_evidence','evidence_mappings','cv_photo_references','cv_items','cv_sections','cv_versions']) LOOP
+  EXECUTE format('ALTER TABLE app.%I ENABLE TRIGGER immutable',t);
+ END LOOP;
 END $$;

@@ -5,6 +5,33 @@ ROOT=Path(__file__).resolve().parents[2]
 uid=lambda:str(uuid.uuid4())
 lit=lambda v:"'"+json.dumps(v).replace("'","''")+"'::jsonb"
 
+
+def prepare_upgrade(db):
+    spec=importlib.util.spec_from_file_location('legacy_upgrade_behavior',ROOT/'supabase/tests/behavior.py')
+    b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b);b.DB=db
+    w=b.Workspace();w.setUp();job=w.job()
+    first=json.loads(w.call('save_job_cv_checkpoint',f"'{uid()}',NULL,0,'{w.profile['profileVersionId']}','{job['jobVersionId']}',{lit(w.cv['document'])},'ro',true"))
+    current=json.loads(w.call('save_job_cv_checkpoint',f"'{uid()}','{first['documentId']}',1,'{w.profile['profileVersionId']}','{job['jobVersionId']}',{lit(w.cv['document'])},'ro',true"))
+    app=w.application(job,current);w.mark(app,1,current)
+    db.sql(f"CREATE TABLE test_support.legacy_upgrade(data jsonb);INSERT INTO test_support.legacy_upgrade VALUES({lit({'user':w.a,'tenant':w.wa,'job':job['jobId'],'document':current['documentId'],'current':current['cvVersionId']})})")
+
+def install_legacy_fixture(db):
+    db.sql("""
+    CREATE OR REPLACE FUNCTION test_support.legacy_job_checkpoint(p_key uuid,p_document uuid,p_expected_revision bigint,p_profile_version uuid,p_job_version uuid,p_layout jsonb,p_locale text,p_tailored boolean) RETURNS jsonb
+    LANGUAGE plpgsql SET search_path='' AS $$
+    DECLARE w uuid:=app.tenant_for_user();profile uuid;job uuid;doc uuid:=coalesce(p_document,gen_random_uuid());base uuid;version uuid;r record;
+    BEGIN
+     SELECT profile_id INTO profile FROM app.profile_versions WHERE tenant_id=w AND id=p_profile_version;
+     SELECT job_id INTO job FROM app.job_versions WHERE tenant_id=w AND id=p_job_version;
+     SELECT * INTO r FROM app.begin_request(w,'synthetic_legacy_fixture',p_key,jsonb_build_object('document',doc));
+     IF p_document IS NULL THEN INSERT INTO app.cv_documents(id,tenant_id,profile_id,job_id,document_kind,draft_revision,draft_payload) VALUES(doc,w,profile,job,'job',0,'{}');END IF;
+     SELECT v.id INTO base FROM app.cv_versions v JOIN app.cv_documents d ON d.id=v.document_id WHERE v.tenant_id=w AND v.profile_version_id=p_profile_version AND d.document_kind='base' ORDER BY v.sequence DESC LIMIT 1;
+     version:=app.insert_job_cv_version(w,doc,p_profile_version,r.request_id,p_layout,p_locale,p_job_version,p_tailored,base);
+     RETURN app.finish_request(w,r.request_id,jsonb_build_object('cvVersionId',version,'documentId',doc,'revision',p_expected_revision+1));
+    END $$;
+    REVOKE ALL ON FUNCTION test_support.legacy_job_checkpoint(uuid,uuid,bigint,uuid,uuid,jsonb,text,boolean) FROM PUBLIC,anon,authenticated;
+    """)
+
 def install_purge_fixture(db):
     # Exact deferred import boundary, only when its real later migration has
     # not been included. No settings/global trigger changes or account state.
@@ -25,6 +52,7 @@ def arm(tenant):
     return f"INSERT INTO app.base_cv_lifecycle(tenant_id,purge_transaction) VALUES('{tenant}',pg_current_xact_id()) ON CONFLICT(tenant_id) DO UPDATE SET purge_transaction=EXCLUDED.purge_transaction;"
 
 def suite(db):
+    install_legacy_fixture(db)
     spec=importlib.util.spec_from_file_location('legacy_fixture_behavior',ROOT/'supabase/tests/behavior.py')
     b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b);b.DB=db
     class Preservation(unittest.TestCase):
@@ -32,7 +60,7 @@ def suite(db):
             self.w=b.Workspace();self.w.setUp();self.job=self.w.job()
             # Privileged synthetic creation of the retired representation;
             # public legacy writes are deliberately no longer authorized.
-            self.cv=json.loads(db.sql(f"SELECT app.save_job_cv_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)",user=self.w.a))
+            self.cv=json.loads(db.sql(f"SELECT test_support.legacy_job_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)",user=self.w.a))
         def internal(self,sql,error=False,user=None):return db.sql(sql,user=user or self.w.a,expect_error=error)
         def preflight(self,error=False):return self.internal(f"SELECT app.preflight_legacy_current_jobs('{self.w.wa}')",error)
         def transfer(self,error=False):return self.internal(f"BEGIN;{arm(self.w.wa)} SELECT app.prepare_job_documents_for_base_removal('{self.w.wa}');COMMIT;",error)
@@ -70,7 +98,7 @@ def suite(db):
             layout={**self.w.cv['document'],'photoMode':'override','photo':photo}
             # Overwrite canonical CURRENT head via privileged retired command;
             # old no-photo version must not be selected for preservation.
-            self.cv=json.loads(self.internal(f"SELECT app.save_job_cv_checkpoint('{uid()}','{self.cv['documentId']}',1,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(layout)},'ro',true)"))
+            self.cv=json.loads(self.internal(f"SELECT test_support.legacy_job_checkpoint('{uid()}','{self.cv['documentId']}',1,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(layout)},'ro',true)"))
             self.transfer();current=json.loads(self.w.call('load_current_job_document',f"'{self.job['jobId']}',NULL"))
             self.assertEqual(current['payload']['content']['name']['value'],'Ana Exemplu')
             self.assertEqual(current['payload']['content']['presentation']['photo'],photo)
@@ -86,14 +114,14 @@ def suite(db):
             self.assertIn('LEGACY_JOB_DOCUMENT_COLLISION',self.transfer(True))
             self.assertEqual(before,db.sql(f"SELECT payload FROM app.job_editor_versions WHERE tenant_id='{self.w.wa}'"))
         def test_equivalent_canonical_heads_deduplicate_without_content_winner(self):
-            duplicate=json.loads(self.internal(f"SELECT app.save_job_cv_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)"))
+            duplicate=json.loads(self.internal(f"SELECT test_support.legacy_job_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)"))
             plan=json.loads(self.preflight());self.assertEqual(len(plan),2)
             target=min(self.cv['documentId'],duplicate['documentId'])
             self.assertEqual({p['targetDocumentId'] for p in plan},{target})
             self.transfer();self.assertEqual(db.sql(f"SELECT count(*) FROM app.job_editor_versions WHERE tenant_id='{self.w.wa}'"),'1')
             self.assertEqual(db.sql(f"SELECT id FROM app.job_editor_documents WHERE tenant_id='{self.w.wa}'"),target)
         def test_two_legacy_locales_without_primary_refuse_without_invented_default(self):
-            self.internal(f"SELECT app.save_job_cv_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(self.w.cv['document'])},'en',true)")
+            self.internal(f"SELECT test_support.legacy_job_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(self.w.cv['document'])},'en',true)")
             self.assertIn('primary_locale_selection',self.transfer(True))
             self.assertEqual(db.sql(f"SELECT count(*) FROM app.job_editor_documents WHERE tenant_id='{self.w.wa}'"),'0')
         def test_one_unsupported_head_rolls_back_entire_transfer(self):
@@ -101,7 +129,7 @@ def suite(db):
             layout=json.loads(json.dumps(self.w.cv['document']));layout['sections'].append(section);layout['sectionOrder'].append(section['id'])
             # Physical canonical identifiers must retain the portable UUID form.
             section['id']='id_'+uid();layout['sectionOrder'][-1]=section['id']
-            self.internal(f"SELECT app.save_job_cv_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(layout)},'ro',true)")
+            self.internal(f"SELECT test_support.legacy_job_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(layout)},'ro',true)")
             self.assertIn('LEGACY_JOB_DOCUMENT_CONVERSION_REQUIRED',self.transfer(True))
             self.assertEqual(db.sql(f"SELECT count(*) FROM app.job_editor_documents WHERE tenant_id='{self.w.wa}'"),'0')
             self.assertEqual(db.sql(f"SELECT count(*) FROM app.target_job_contexts WHERE tenant_id='{self.w.wa}'"),'0')
@@ -127,8 +155,8 @@ def suite(db):
             # sent rows remain immutable; stage-only updates still work.
             self.assertIn('CV_JOB_LINEAGE_FORBIDDEN',db.sql(f"UPDATE app.applications SET chosen_cv_version_id='{uid()}' WHERE tenant_id='{self.w.wa}'",expect_error=True))
         def test_retired_legacy_publication_and_history_do_not_recreate_content(self):
-            self.transfer()
             args=f"'{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{self.job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true"
             self.assertIn('CURRENT_JOB_DOCUMENT_REQUIRED',self.w.call('save_job_cv_checkpoint',args,error=True))
+            self.transfer()
             self.assertIn('CURRENT_JOB_DOCUMENT_REQUIRED',self.w.call('restore_cv_version',f"'{uid()}','{self.cv['documentId']}',1,'{self.cv['cvVersionId']}'",error=True))
     return unittest.defaultTestLoader.loadTestsFromTestCase(Preservation)

@@ -42,6 +42,7 @@ export type StructuredOperation = {
   userId: string;
   operation: "cv_parse" | "cv_rewrite" | "job_parse" | "cv_tailor";
   promptVersion: string;
+  attemptPhase?: "verify" | "suggest";
   tier: "admission" | "extraction" | "career";
   system: string;
   input: unknown;

@@ -300,6 +300,12 @@ export function languageWorkflow(
       sourceLocale: input.sourceLocale,
       source: proposal.request.source,
       glossaryVersion: input.glossaryVersion,
+      linguistic: {
+        promptVersion: 'P09.cv-translation.v1',
+        warnings: [...(existing ? decodeDraft(existing.payload).translation?.linguistic?.warnings.filter(w=>!translatedIds.has(w.itemId))??[] : []), ...output.warnings],
+        ambiguousTerms: [...(existing ? decodeDraft(existing.payload).translation?.linguistic?.ambiguousTerms.filter(w=>!translatedIds.has(w.itemId))??[] : []), ...output.ambiguousTerms],
+        suggestedGlossary: [...(existing?decodeDraft(existing.payload).translation?.linguistic?.suggestedGlossary.filter(g=>!output.suggestedGlossary.some(n=>n.originalTerm===g.originalTerm))??[]:[]),...output.suggestedGlossary],
+      },
       components: [
         ...previous.filter((i) => !translatedIds.has(i.id)),
         ...input.items.map(({ text, protectedTerms, ...item }) => item),

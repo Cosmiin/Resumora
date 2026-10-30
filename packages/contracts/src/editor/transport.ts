@@ -78,7 +78,16 @@ export function decodeDraft(payload: EditorWireEnvelope): BaseDraft {
     throw new Error("unsupportedEditorVersion");
   const draft = { ...payload.content, answers: payload.answers };
   if (!isBaseDraft(draft)) throw new Error("invalidEditorDraft");
-  return structuredClone(draft);
+  const result=structuredClone(draft);
+  const legacy=result.optionalSections.find(s=>s.id==='import-summary');
+  if(legacy){
+    const f=legacy.entries[0]?.details;
+    if(f&&!result.summary.text){const {value,...provenance}=f;result.summary={...result.summary,id:f.fieldId,text:value,origin:'extracted',approval:f.status==='user_confirmed'||f.acceptance==='automatic'?'approved':'pending',provenance};}
+    result.optionalSections=result.optionalSections.filter(s=>s!==legacy);
+    result.presentation.order=[...new Set(result.presentation.order.map(id=>id==='import-summary'?'summary':id))];
+    result.presentation.hidden=[...new Set(result.presentation.hidden.map(id=>id==='import-summary'?'summary':id))];
+  }
+  return result;
 }
 
 // Structural validation permits incomplete values, including blank/partial dates.
@@ -145,10 +154,10 @@ const text = fact(str),
 const prose = obj({
   id: str,
   text: str,
-  origin: one("user_authored"),
+  origin: one("user_authored", "extracted", "ai_generated"),
   approval: one("pending", "approved"),
   claimIds: list(str),
-});
+}, {provenance: v=>!!v&&typeof v==='object'&&!Object.hasOwn(v,'value')&&text({...v,value:''})});
 const answer = obj(
   {
     id: str,

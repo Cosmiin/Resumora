@@ -35,6 +35,27 @@ def suite(db):
   def save(self,locale='en',payload=None,document=None,revision=0,key=None,user=None,error=False):
    args=f"'{key or uid()}','{self.job['id']}','{locale}',"+(f"'{document}'" if document else 'NULL')+f",{revision},{lit(payload or self.payload)},'{self.base['id']}',NULL,NULL"
    return self.raw('save_current_job_document',args,user=user,error=True) if error else self.call('save_current_job_document',args,user=user)
+  def test_legacy_upgrade_keeps_current_content_and_sent_metadata_without_history(self):
+   row=json.loads(db.sql('SELECT data FROM test_support.legacy_upgrade'))
+   current=self.call('load_current_job_document',f"'{row['job']}',NULL",user=row['user'])
+   self.assertEqual(current['payload']['content']['name']['value'],'Ana Exemplu')
+   self.assertEqual(db.sql(f"SELECT count(*) FROM app.cv_versions WHERE tenant_id='{row['tenant']}' AND job_id IS NOT NULL"),'0')
+   self.assertEqual(db.sql(f"SELECT current_job_document_id FROM app.applications WHERE tenant_id='{row['tenant']}'"),current['documentId'])
+   self.assertEqual(db.sql(f"SELECT cv_version_id FROM app.application_events WHERE tenant_id='{row['tenant']}' AND event_kind='mark_sent'"),row['current'])
+  def test_hidden_sections_fields_and_paragraph_bullets_are_preserved(self):
+   source=json.loads(json.dumps(self.source));content=source['content'];role=content['roles'][0]
+   content['presentation']['hidden']=['experience','summary','education','identity','technicalSkills','professionalSkills']
+   content['presentation']['hiddenFields']=[role['context']['fieldId'],role['id']+'-contributions']
+   content['presentation']['approvedWording']={role['id']:{'text':'Accepted paragraph','sources':[{'id':role['context']['id'],'text':role['context']['value'],'sourceId':role['context']['sourceId']}]}}
+   materialized=self.call('freeze_job_document',f"'{{}}',{lit(source)}",role=None)
+   self.assertEqual(materialized['content']['roles'][0]['context']['value'],'Accepted paragraph')
+   self.assertEqual([b['value'] for b in materialized['content']['roles'][0]['bullets']],[b['value'] for b in role['bullets']])
+   self.assertEqual(materialized['content']['summary']['text'],content['summary']['text'])
+   self.assertEqual(materialized['content']['education'],self.payload['content']['education'])
+   self.assertEqual(materialized['content']['contacts'],self.payload['content']['contacts'])
+   source['content']['roles'][0]['context']['value']='Changed support'
+   stale=self.call('freeze_job_document',f"'{{}}',{lit(source)}",role=None)
+   self.assertEqual(stale['content']['roles'][0]['context']['value'],'Changed support')
   def test_forward_retains_only_current_no_base_archive_and_SQL_TS_projection_parity(self):
    row=json.loads(db.sql('SELECT data FROM test_support.current_job_upgrade'));current=self.call('load_current_job_document',f"'{row['job']}',NULL",user=row['user'])
    self.assertEqual(current['payload']['content']['summary']['text'],'Current accepted summary')

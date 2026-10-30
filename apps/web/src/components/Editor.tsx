@@ -12,6 +12,7 @@ import {
   isAccepted,
   clone,
   editFact,
+  writeSummary,
   fact,
   localId,
   newRole,
@@ -625,14 +626,6 @@ export function Editor({
   function optional(section: string) {
     const s = d.optionalSections.find((s) => s.id === section);
     if (!s) return null;
-    if (s.id === "import-summary")
-      return s.entries.map((e) => (
-        <div key={e.id}>
-          {field(e.details, t("Rezumat profesional", "Professional summary"), {
-            multiline: true,
-          })}
-        </div>
-      ));
     const isLanguage = s.kind === "languages";
     return (
       <>
@@ -1007,12 +1000,7 @@ export function Editor({
           )}
           onChange={(v) =>
             update((n) => {
-              n.summary = {
-                ...n.summary,
-                id: localId(),
-                text: v,
-                approval: "approved",
-              };
+              writeSummary(n,v);
             })
           }
         />,

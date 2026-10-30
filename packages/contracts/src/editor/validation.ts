@@ -87,7 +87,6 @@ export function validateDraft(d: BaseDraft): Issue[] {
       issues.push({ field: s.heading.fieldId, code: "required" });
     for (const e of s.entries) {
       if (
-        s.id !== "import-summary" &&
         !(s.heading && e.id === s.id) &&
         !e.title.value.trim()
       )

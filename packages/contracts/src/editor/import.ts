@@ -77,37 +77,22 @@ export function importedDraft(review: ImportReview): BaseDraft {
         ? { year: p[0], month: "" }
         : { year: p[1], month: String(Number(p[0])) };
     };
-    if (
-      c.path === "summary" ||
-      parts[0] === "certifications" ||
-      parts[0] === "custom"
-    ) {
-      const group =
-        c.path === "summary"
-          ? "import-summary"
-          : parts[0] === "custom"
-            ? `import-custom-${index}`
-            : "import-certifications";
+    if(c.path==='summary'){
+      const {value,...provenance}=field(c.value) as Fact<string>;
+      draft.summary={...draft.summary,id:provenance.fieldId,text:value,origin:'extracted',approval:requiresImportReview(c)?'pending':'approved',claimIds:[],provenance};
+    } else if (parts[0] === 'certifications' || parts[0] === 'custom') {
+      const group=parts[0]==='custom'?`import-custom-${index}`:'import-certifications';
       let section = draft.optionalSections.find((s) => s.id === group);
       if (!section) {
         section = {
           id: group,
           kind: parts[0] === "certifications" ? "certifications" : "custom",
-          label:
-            c.path === "summary"
-              ? "Summary"
-              : parts[0] === "certifications"
-                ? "Certifications"
-                : "",
+          label: parts[0] === "certifications" ? "Certifications" : "",
           entries: [],
           ...(parts[0] === "custom" ? { heading: fact("") } : {}),
         };
         draft.optionalSections.push(section);
-        if (c.path === "summary")
-          draft.presentation.order = draft.presentation.order.map((id) =>
-            id === "summary" ? group : id,
-          );
-        else draft.presentation.order.push(group);
+        draft.presentation.order.push(group);
       }
       const entryIndex = parts[0] === "certifications" ? index : 0;
       while (section.entries.length <= entryIndex) {
@@ -116,9 +101,7 @@ export function importedDraft(review: ImportReview): BaseDraft {
         section.entries.push(entry);
       }
       const entry = section.entries[entryIndex];
-      if (c.path === "summary") {
-        entry.details = field(c.value) as Fact<string>;
-      } else if (parts[2] === "title") {
+      if (parts[2] === "title") {
         if (parts[0] === "custom")
           section.heading = field(c.value) as Fact<string>;
         else entry.title = field(c.value) as Fact<string>;
@@ -208,6 +191,7 @@ export function confirmImported(
       f.status = "user_confirmed";
       f.confirmedAt = at;
     }
+  if(next.summary.provenance&&[next.summary.provenance.sourceClaimId,...(next.summary.provenance.sourceLineage??[]).map(s=>s.sourceClaimId)].some(id=>id&&selectedIds.includes(id)))next.summary.approval='approved';
   next.importReview!.confirmedIds = [
     ...new Set([...review.confirmedIds, ...selectedIds]),
   ];

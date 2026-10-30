@@ -5,6 +5,8 @@ ROOT=Path(__file__).resolve().parents[2]
 uid=lambda:str(uuid.uuid4())
 lit=lambda v:"'"+json.dumps(v).replace("'","''")+"'::jsonb"
 def suite(db):
+ legacy_spec=importlib.util.spec_from_file_location('removal_legacy_fixture',ROOT/'supabase/tests/legacy_current_preservation.py')
+ legacy=importlib.util.module_from_spec(legacy_spec);legacy_spec.loader.exec_module(legacy);legacy.install_legacy_fixture(db)
  spec=importlib.util.spec_from_file_location('removal_canonical',ROOT/'supabase/tests/behavior.py')
  b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b);b.DB=db
  class Removal(unittest.TestCase):
@@ -20,7 +22,7 @@ def suite(db):
   def count(self,t):return db.sql(f"SELECT count(*) FROM app.{t} WHERE tenant_id='{self.w.wa}'")
   def test_full_canonical_closure_current_job_and_application_metadata_survive(self):
    job=self.w.job()
-   cv=json.loads(db.sql(f"SELECT app.save_job_cv_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)",user=self.w.a))
+   cv=json.loads(db.sql(f"SELECT test_support.legacy_job_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)",user=self.w.a))
    application=self.w.application(job,cv);self.w.mark(application,1,cv)
    events=db.sql(f"SELECT row_to_json(e) FROM app.application_events e WHERE tenant_id='{self.w.wa}'")
    result=json.loads(self.remove());self.assertEqual(events,db.sql(f"SELECT row_to_json(e) FROM app.application_events e WHERE tenant_id='{self.w.wa}'"));self.assertTrue(result['removed']);self.assertEqual((result['generation'],result['revision']),(1,2))
@@ -123,7 +125,7 @@ def suite(db):
    self.assertIn('VERSION_CONFLICT',self.raw('begin_ai_attempt',f"{lit(attempt)},'{secret}'",error=True))
    self.assertEqual(db.sql(f"SELECT base_removed AND snapshot_id IS NULL AND import_id IS NULL FROM app.ai_enhancement_operations WHERE id='{op}'"),'t')
   def test_preservation_collision_rolls_back_every_removal_effect(self):
-   job=self.w.job();cv=json.loads(db.sql(f"SELECT app.save_job_cv_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)",user=self.w.a))
+   job=self.w.job();cv=json.loads(db.sql(f"SELECT test_support.legacy_job_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)",user=self.w.a))
    # Two independently accepted representations with differing visible text.
    db.sql(f"BEGIN;UPDATE app.base_cv_lifecycle SET purge_transaction=pg_current_xact_id() WHERE tenant_id='{self.w.wa}';SELECT app.prepare_job_documents_for_base_removal('{self.w.wa}');UPDATE app.base_cv_lifecycle SET purge_transaction=NULL WHERE tenant_id='{self.w.wa}';COMMIT;",user=self.w.a)
    db.sql(f"UPDATE app.job_editor_versions SET payload=jsonb_set(payload,'{{content,name,value}}','\"Different accepted name\"') WHERE tenant_id='{self.w.wa}'")

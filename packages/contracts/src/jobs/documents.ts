@@ -1,5 +1,5 @@
 import { answerEvidenceText } from '../intelligence/model.ts';
-import { type BaseDraft, type Fact, type DocumentPresentation, isAccepted, coreSections } from '../editor/model.ts';
+import { type BaseDraft, type Fact, type DocumentPresentation, summaryFact, writeSummary, isAccepted, coreSections } from '../editor/model.ts';
 import { decodeDraft, isBaseDraft, type EditorWireEnvelope } from '../editor/transport.ts';
 import { isPhoto } from '../editor/photo.ts';
 import { isUuid } from './connected.ts';
@@ -71,6 +71,7 @@ export function isJobEditorPayload(v: unknown): v is JobEditorPayload {
 export function jobEditorFacts(d: BaseDraft): { ref: JobFactRef; fact: Fact; key: string }[] {
   const rows: ReturnType<typeof jobEditorFacts> = [];
   const add = (entityId: string, key: string, f: Fact) => rows.push({ ref: { entityId, fieldId: f.fieldId, valueId: f.id, sourceId: f.sourceId }, fact: f, key });
+  const summary=summaryFact(d);if(summary)add('summary','summary',summary);
   add(d.id, 'name', d.name); d.titles.forEach(f => add(d.id, 'title', f));
   d.contacts.forEach(c => add(c.id, 'contact', c.value));
   for (const group of ['professionalSkills','technicalSkills'] as const) d[group].forEach(f => add(group, 'skill', f));
@@ -129,7 +130,7 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
   draft.contacts.forEach(c => { c.visible = true; });
   const { summaryText, professionalSkillIds, technicalSkillIds, ...presentation } = payload.presentation;
   Object.assign(draft.presentation, structuredClone(presentation));
-  if (summaryText !== undefined) draft.summary = { ...draft.summary, text: summaryText, approval: 'approved' };
+  if (summaryText !== undefined) writeSummary(draft,summaryText);
   const sections = [...coreSections, ...draft.optionalSections.map(s => s.id)];
   if (draft.presentation.order.some(id => !sections.includes(id)) || draft.presentation.hidden.some(id => !sections.includes(id))) invalid();
   const ids = new Set([...facts.flatMap(f => [f.ref.valueId, f.ref.fieldId, f.ref.entityId]), ...draft.sources.map(s => s.id), ...draft.answers.map(a => a.id)]);

@@ -71,6 +71,29 @@ def suite(db):
    foreign={**start,'userId':self.b};self.assertIn('RESOURCE_FORBIDDEN',self.raw('job_workflow_attempt',f"'{secret}','{t['lease']}',{lit(foreign)},NULL,NULL",role='anon',error=True))
    self.call('cancel_job_workflow',f"'{self.job['id']}','{operation}'")
    self.assertIn('VERSION_CONFLICT',self.raw('job_workflow_attempt',f"'{secret}','{t['lease']}',NULL,'{operation}-primary','{{}}'",role='anon',error=True))
+  def test_review_required_and_changed_requirement_decomposition(self):
+   db.sql(f"UPDATE app.job_workflow_operations SET state='cancelled' WHERE job_id='{self.job['id']}'")
+   for kind in ['match','prepare','tailor']:
+    self.assertIn('INVALID_REVIEWED_JOB',self.raw('request_job_workflow',f"'{uid()}','{self.job['id']}','{kind}',1,NULL",error=True))
+   original={'schemaVersion':'vacancy-extraction/3','overview':{},'requirements':[{'id':'r','text':'SQL required','components':[{'id':'sql','text':'SQL'}]}]}
+   db.sql(f"UPDATE app.job_workflows SET extracted={lit(original)} WHERE job_id='{self.job['id']}'")
+   changed=json.loads(json.dumps(original));changed['requirements'][0]['text']='Python required'
+   reviewed=self.call('review_job_workflow',f"'{uid()}','{self.job['id']}',1,{lit(changed)}")
+   self.assertEqual(reviewed['reviewed']['requirements'][0]['components'],[{'id':'r_manual','text':'Python required'}])
+  def test_match_child_attempts_are_owned_accounted_and_cancel_fenced(self):
+   db.sql(f"UPDATE app.job_workflow_operations SET state='cancelled' WHERE job_id='{self.job['id']}';UPDATE app.job_workflows SET reviewed='{{}}' WHERE job_id='{self.job['id']}'")
+   source={'schemaVersion':'resumora-editor-draft/1','content':{},'answers':[]}
+   self.call('save_base_draft',f"'{uid()}',0,{lit(source)},'autosave'")
+   self.call('request_job_workflow',f"'{uid()}','{self.job['id']}','match',1,NULL")
+   task=self.claim();op=task['operation']['id']
+   for phase in ['','-verify','-suggest']:
+    start={'attemptId':op+phase+'-primary','operationId':op,'userId':self.a,'provider':'openrouter','operation':'cv_tailor','modelRequested':'synthetic','providerScope':'synthetic','requestFingerprint':phase or 'generation','startedAt':'2026-10-30T00:00:00Z'}
+    args=f"'{secret}','{task['lease']}',{lit(start)},NULL,NULL"
+    self.assertTrue(self.call('job_workflow_attempt',args,role='anon')['created'])
+    self.assertFalse(self.call('job_workflow_attempt',args,role='anon')['created'])
+   self.call('save_base_draft',f"'{uid()}',1,{lit(source)},'autosave'")
+   start['attemptId']=op+'-verify-fallback';start['provider']='openai'
+   self.assertIn('VERSION_CONFLICT',self.raw('job_workflow_attempt',f"'{secret}','{task['lease']}',{lit(start)},NULL,NULL",role='anon',error=True))
   def test_url_receipt_retry_failed_capture_truth_and_source_versions(self):
    key=uid();args=f"'{key}','https://jobs.ashbyhq.com/synthetic/one'"
    j=self.call('save_target_url',args);self.assertEqual(j,self.call('save_target_url',args));self.assertEqual(j['intake']['text'],'')

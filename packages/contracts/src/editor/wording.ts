@@ -21,19 +21,19 @@ export function isWordingFieldVisible(
     !hidden.includes(role ? role.context.fieldId : entry!.details.fieldId) &&
     !hidden.includes(fieldId ?? "") &&
     !(
-      role?.bullets.some((b) => b.fieldId === fieldId) &&
+      (role?.bullets ?? entry?.bullets)?.some((b) => b.fieldId === fieldId) &&
       hidden.includes(`${target}-contributions`)
     )
   );
 }
-export function currentWording(d: BaseDraft, target: string): string | null {
+export function currentWording(d: BaseDraft, target: string, includeHidden = false): string | null {
   const p = d.presentation.approvedWording?.[target];
   if (
     !p ||
     (p.scope === "experience" &&
       !p.origin &&
       !isCurrentExperienceWording(d, target, p.text)) ||
-    !isWordingFieldVisible(d, target)
+    (!includeHidden && !isWordingFieldVisible(d, target))
   )
     return null;
   const role = d.roles.find((r) => r.id === target);
@@ -50,7 +50,7 @@ export function currentWording(d: BaseDraft, target: string): string | null {
         fields.some(
           (f) =>
             f.id === s.id &&
-            isWordingFieldVisible(d, target, f.fieldId) &&
+            (includeHidden || isWordingFieldVisible(d, target, f.fieldId)) &&
             f.value === s.text &&
             f.sourceId === s.sourceId &&
             isAccepted(f),
@@ -58,7 +58,7 @@ export function currentWording(d: BaseDraft, target: string): string | null {
         d.answers.some(
           (a) =>
             a.targetId === target &&
-            isWordingFieldVisible(d, target, a.cvFieldId) &&
+            (includeHidden || isWordingFieldVisible(d, target, a.cvFieldId)) &&
             a.id === s.id &&
             a.status === "confirmed" &&
             answerEvidenceText(a) === s.text &&

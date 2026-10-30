@@ -4,7 +4,7 @@
 export const publicJobHosts=['boards.greenhouse.io','job-boards.greenhouse.io','jobs.ashbyhq.com','jobs.lever.co','jobs.smartrecruiters.com'] as const;
 export function publicJobUrl(value:unknown):URL{
  if(typeof value!=='string'||value.length>2048||/[\s\\\u0000-\u001f\u007f]/u.test(value))throw Error('URL_UNAVAILABLE');
- const u=new URL(value);if(u.protocol!=='https:'||u.port||u.username||u.password||u.hash||!publicJobHosts.includes(u.hostname as typeof publicJobHosts[number])||u.pathname==='/'||/\/(?:login|signin|account|profile|apply)(?:\/|$)/i.test(u.pathname))throw Error('URL_UNAVAILABLE');return u;
+ let u:URL;try{u=new URL(value);}catch{throw Error('URL_UNAVAILABLE');}if(u.protocol!=='https:'||u.port||u.username||u.password||u.hash||!publicJobHosts.includes(u.hostname as typeof publicJobHosts[number])||u.pathname==='/'||/\/(?:login|signin|account|profile|apply)(?:\/|$)/i.test(u.pathname))throw Error('URL_UNAVAILABLE');return u;
 }
 export async function retrieveJobUrl(value:unknown,transport:typeof fetch=fetch):Promise<string>{
  const url=publicJobUrl(value),response=await transport(url.href,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(7000),headers:{Accept:'text/html,application/xhtml+xml','User-Agent':'Resumora-Public-Job-Capture/1'}});

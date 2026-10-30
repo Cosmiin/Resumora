@@ -23,6 +23,16 @@ export function capturePage() {
   const matched=adapters.find(([,pattern])=>pattern.test(host));
   const adapter=matched?.[0]??'generic';
   const excluded='script,style,noscript,template,nav,header,footer,aside,form,input,textarea,select,button,[role="navigation"],[role="banner"],[role="contentinfo"],[role="search"],[role="dialog"],[contenteditable],.comments,.jobs-similar-jobs,.recommendations,.recommended-jobs,.related-jobs,.similar-jobs,.user-profile,.recruiter-profile,.account-profile';
+  const privateHeading=/^(?:(?:my|your)\s+)?(?:profile|account|candidate(?:\s+profile)?|recruiter(?:\s+profile)?|personal information|profil(?:ul)?|cont(?:ul)?)(?:\s+(?:details|information|settings))?$/i;
+  const semanticPrivate=el=>{
+    for(let node=el;node&&node!==document.body;node=node.parentElement){
+      if(node.children.length){
+        const label=node.getAttribute('aria-label')??Array.from(node.children).find(c=>c.matches('h1,h2,h3,h4,h5,h6'))?.textContent??'';
+        if(privateHeading.test(label.trim()))return true;
+      }
+    }
+    return false;
+  };
   const visible=el=>{
     if(!el || el.closest('[hidden], [aria-hidden="true"]') || !el.getClientRects().length)return false;
     for(let node=el;node;node=node.parentElement) {
@@ -38,7 +48,7 @@ export function capturePage() {
         if(++nodes>20000||length>120000)throw Error('Posting exceeds capture limits. Select the relevant job text or paste it in Resumora; nothing was sent.');
         if(child.nodeType===Node.TEXT_NODE) {
           const t=child.textContent?.trim();if(t){lines.push(t);length+=t.length+1;}
-        } else if(child.nodeType===Node.ELEMENT_NODE && !child.matches(excluded) && visible(child))walk(child);
+        } else if(child.nodeType===Node.ELEMENT_NODE && !child.matches(excluded) && visible(child)){if(semanticPrivate(child))throw Error('Profile or account content is ambiguous. Select only the advert or paste it in Resumora; nothing was sent.');walk(child);}
       }
     };
     for(const root of roots)if(root!==document.documentElement&&visible(root)&&!root.closest(excluded))walk(root);
@@ -65,7 +75,7 @@ export function capturePage() {
     const nodes=root.nodeType===Node.TEXT_NODE?[root]:[];
     for(let n=iterator.nextNode();n;n=iterator.nextNode()){if(nodes.length>=20000)throw Error('Selection exceeds capture limits. Select less text or paste it in Resumora; nothing was sent.');nodes.push(n);}
     const lines=[];
-    for(const n of nodes){if(!range.intersectsNode(n)||!n.parentElement||n.parentElement.closest(excluded)||!visible(n.parentElement))continue;let value=n.textContent??'';if(n===range.endContainer)value=value.slice(0,range.endOffset);if(n===range.startContainer)value=value.slice(range.startOffset);if(value.trim())lines.push(value.trim());}
+    for(const n of nodes){if(!range.intersectsNode(n)||!n.parentElement||n.parentElement.closest(excluded)||!visible(n.parentElement))continue;if(semanticPrivate(n.parentElement))throw Error('Selection includes profile or account content. Select only the advert or paste it in Resumora; nothing was sent.');let value=n.textContent??'';if(n===range.endContainer)value=value.slice(0,range.endOffset);if(n===range.startContainer)value=value.slice(range.startOffset);if(value.trim())lines.push(value.trim());}
     text=lines.join('\n');selected=true;
   }
   posting=postings.length===1?postings[0]:undefined;
@@ -87,6 +97,10 @@ export function capturePage() {
   // The explicit click captures the bounded rendered page for BACKEND
   // extraction. A short/missing primary container must not narrow the source
   // or let hidden JSON-LD description text substitute for visible content.
+  const visibleJobs=Array.from(document.querySelectorAll('h1,article:has(h2),[itemtype*="JobPosting"],[data-job-id],.job-card,.job-listing')).filter(el=>visible(el)&&!el.closest(excluded)&&!semanticPrivate(el));
+  const candidates=visibleJobs.some(el=>!el.matches('h1'))?visibleJobs.filter(el=>!el.matches('h1')):visibleJobs;
+  const independentJobs=candidates.filter(el=>!candidates.some(other=>other!==el&&other.contains(el)));
+  if((!selected&&(postings.length>1||headings.length>1||independentJobs.length>1))||(selected&&independentJobs.filter(el=>selection.getRangeAt(0).intersectsNode(el)).length>1))throw Error('Multiple or ambiguous jobs are visible. Select one complete advert or paste it in Resumora; nothing was sent.');
   if(!selected)text=read(document.body?[document.body]:[]);
   // Metadata is ancillary. Conflicting/multiple structured postings cannot
   // replace the visible source or attach a conflicting employer interpretation.

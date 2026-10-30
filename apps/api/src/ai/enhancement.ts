@@ -158,6 +158,7 @@ export function prepareEnhancement(options: {
         task &&
         (task.operationId !== input.operationId ||
           task.userId !== input.userId ||
+          (task.attemptPhase !== undefined && !["verify", "suggest"].includes(task.attemptPhase)) ||
           task.maxOutputTokens < 1 ||
           task.maxOutputTokens > 8000 ||
           !Number.isInteger(task.maxOutputTokens))
@@ -199,7 +200,7 @@ export function prepareEnhancement(options: {
         if (input.signal?.aborted || Date.now() >= expires) break;
         if (!live) assertRouteEvidence(route, approvals[index]);
         const startedAt = new Date().toISOString();
-        const attemptId = `${input.operationId}-${index === 0 ? "primary" : "fallback"}`;
+        const attemptId = `${input.operationId}${task?.attemptPhase ? "-" + task.attemptPhase : ""}-${index === 0 ? "primary" : "fallback"}`;
         const reservation = await options.ledger.begin({
           attemptId,
           operationId: input.operationId,

@@ -23,6 +23,7 @@ export function patchFact<T extends FactValue>(
 }
 export function replaceFact(draft: BaseDraft, current: Fact, updated: Fact) {
   if (current === updated) return;
+  if(draft.summary.provenance?.fieldId===current.fieldId){const {value,...provenance}=updated as Fact<string>;draft.summary.text=value;draft.summary.provenance=provenance;draft.summary.origin=provenance.status==='user_authored'?'user_authored':'extracted';if(provenance.status==='user_authored')draft.summary.approval='approved';return;}
   for (const role of draft.roles)
     if (
       role.bullets.includes(current as Fact<string>) &&

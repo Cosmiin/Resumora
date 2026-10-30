@@ -21,6 +21,12 @@ export type TranslationLineage = {
   sourceLocale: string;
   source: TranslationSource;
   glossaryVersion: string;
+  linguistic?: {
+    promptVersion: string;
+    warnings: TranslationOutput['warnings'];
+    ambiguousTerms: TranslationOutput['ambiguousTerms'];
+    suggestedGlossary: TranslationOutput['suggestedGlossary'];
+  };
   components: Pick<
     TranslationItem,
     | "id"
@@ -129,7 +135,8 @@ export async function translationItems(
     });
   for (const section of draft.optionalSections)
     if (sectionVisible(section.id)) {
-      if (section.kind === "custom" && section.label.trim())
+      if (section.heading) add(section.id, section.heading);
+      else if (section.kind === "custom" && section.label.trim())
         result.push({
           id: `section:${section.id}:label`,
           sectionId: section.id,
@@ -216,13 +223,10 @@ export async function staleTranslationComponents(
   currentSource: BaseDraft,
 ): Promise<string[]> {
   const items = await translationItems(currentSource);
-  return lineage.components
-    .filter(
-      (c) =>
-        items.find((i) => i.id === c.id)?.sourceFingerprint !==
-        c.sourceFingerprint,
-    )
-    .map((c) => c.id);
+  return [...new Set([
+    ...lineage.components.filter(c => items.find(i => i.id === c.id)?.sourceFingerprint !== c.sourceFingerprint).map(c => c.id),
+    ...items.filter(i => !lineage.components.some(c => c.id === i.id)).map(i => i.id),
+  ])];
 }
 /** Materialized document representation, never a write-back or new career fact.
  * The CURRENT target holds only its own accepted wording plus opaque lineage;
@@ -287,22 +291,6 @@ export async function materializeTranslation(
     if (matches.length !== 1) throw new Error("TRANSLATION_FIELD_MISSING");
     matches[0].value = item.text;
   }
-  // Accepted whole-experience prose already includes its visible bullets. The
-  // target must not resurrect untranslated inherited bullets or rich HTML.
-  for (const role of [
-    ...target.roles,
-    ...target.optionalSections.flatMap((s) => s.entries),
-  ]) {
-    if (
-      target.presentation.approvedWording?.[role.id]?.scope === "experience" &&
-      input.items.some(
-        (i) =>
-          i.fieldId ===
-          ("context" in role ? role.context.fieldId : role.details.fieldId),
-      )
-    )
-      role.bullets = [];
-  }
   delete target.presentation.approvedWording;
   delete target.presentation.contributionHtml;
   return target;
@@ -346,7 +334,7 @@ export function isTranslationLineage(
       "source",
       "glossaryVersion",
       "components",
-    ]) ||
+    ], ["linguistic"]) ||
     value.schemaVersion !== "cv-language/1" ||
     !isCanonicalDocumentLocale(value.documentLocale) ||
     !isCanonicalDocumentLocale(value.sourceLocale) ||
@@ -359,6 +347,13 @@ export function isTranslationLineage(
     )
   )
     return false;
+  if (value.linguistic !== undefined) {
+    const m=value.linguistic;
+    if(!object(m)||!keys(m,['promptVersion','warnings','ambiguousTerms','suggestedGlossary'])||!handle(m.promptVersion)||JSON.stringify(m).length>16000||!Array.isArray(m.warnings)||!Array.isArray(m.ambiguousTerms)||!Array.isArray(m.suggestedGlossary))return false;
+    if(m.warnings.some(w=>!object(w)||!keys(w,['itemId','code','message'])||!handle(w.itemId)||!['qualification_equivalence','title_uncertain','term_preserved','untranslated'].includes(String(w.code))||typeof w.message!=='string'||w.message.length>2000))return false;
+    if(m.ambiguousTerms.some(w=>!object(w)||!keys(w,['itemId','term'])||!handle(w.itemId)||!handle(w.term)))return false;
+    if(m.suggestedGlossary.some(w=>!object(w)||!keys(w,['originalTerm','preferredTranslation','context'])||!handle(w.originalTerm)||!handle(w.preferredTranslation)||typeof w.context!=='string'||w.context.length>2000))return false;
+  }
   const source = value.source;
   if (
     !["base", "job"].includes(String(source.kind)) ||

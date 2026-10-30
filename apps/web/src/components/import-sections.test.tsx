@@ -173,7 +173,7 @@ it("reviews one editable section at a time, confirms only visible facts and reta
         s.entries[0].details.value === "Original award",
     ),
   ).toBe(true);
-  expect(restored.summary.text).toBe("");
+  expect(restored.summary.text).toBe("Original summary");
   render(
     <DocumentPreview draft={restored} asOf={{ year: "2026", month: "10" }} />,
   );
@@ -266,8 +266,8 @@ it("saves, reloads and edits a single sourced summary without inventing an entry
     );
   }
   render(<Surface />);
-  expect(document.querySelector("#section-summary")).toBeNull();
-  const summary = document.querySelector("#section-import-summary")!;
+  expect(document.querySelector("#section-import-summary")).toBeNull();
+  const summary = document.querySelector("#section-summary")!;
   fireEvent.click(summary.querySelector("summary")!);
   expect(within(summary as HTMLElement).getAllByRole("textbox")).toHaveLength(
     1,
@@ -282,10 +282,9 @@ it("saves, reloads and edits a single sourced summary without inventing an entry
   expect(paper.textContent).not.toContain("Original summary");
   expect(latest.presentation.order.slice(0, 2)).toEqual([
     "identity",
-    "import-summary",
+    "summary",
   ]);
-  const field = latest.optionalSections.find((s) => s.id === "import-summary")!
-    .entries[0].details;
+  const field = latest.summary.provenance!;
   expect(field.sourceLineage?.[0].sourceClaimId).toBe("c2");
   expect(
     latest.importReview!.extraction.candidates.find(

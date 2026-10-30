@@ -21,7 +21,7 @@ export async function jobsRoute(request: Request, gateway: JobsGateway) {
   const path = new URL(request.url).pathname;
   if(path==='/v1/jobs/url'){
     if(request.method!=='POST')return privateJson({error:{code:'method'}},405);
-    try{const body=await readBody(request);if(body instanceof Response)return body;if(!isUuid(body.requestId)||Object.keys(body).sort().join(',')!=='requestId,url'||!gateway.saveJobUrl)throw Error('invalidRequest');const url=publicJobUrl(body.url);return privateJson(await gateway.saveJobUrl(body.requestId,url.href),202);}catch{return privateJson({error:{code:'urlFallback',message:"We couldn't read this job automatically. Paste the description or capture it with the browser extension."}},422);}
+    try{const body=await readBody(request);if(body instanceof Response)return body;if(!isUuid(body.requestId)||Object.keys(body).sort().join(',')!=='requestId,url'||!gateway.saveJobUrl)throw Error('invalidRequest');const url=publicJobUrl(body.url);return privateJson(await gateway.saveJobUrl(body.requestId,url.href),202);}catch(error){if(error instanceof Error&&error.message==='URL_UNAVAILABLE')return privateJson({error:{code:'urlFallback',message:"We couldn't read this job automatically. Paste the description or capture it with the browser extension."}},422);return routeError(error);}
   }
   const reviewing = path.endsWith('/review');
   const id = path.startsWith('/v1/jobs/') ? path.slice('/v1/jobs/'.length).replace(/\/review$/, '') : null;

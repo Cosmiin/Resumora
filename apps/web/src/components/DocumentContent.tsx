@@ -395,7 +395,7 @@ export function DocumentPreview({
     return s && (s.entries.length || s.heading)
       ? s.entries.map((e) => (
           <div className="document-entry" key={e.id}>
-            {s.id !== "import-summary" && !(s.heading && e.id === s.id) && (
+            {!(s.heading && e.id === s.id) && (
               <h4 className="document-primary">
                 {block(text(e.title), e.title.fieldId)}
                 {s.kind === "languages" &&
@@ -416,6 +416,7 @@ export function DocumentPreview({
             )}
             {wording(e.id, e.details)}
             {!hasExperienceWording(e.id) &&
+              !d.presentation.hiddenFields?.includes(`${e.id}-contributions`) &&
               e.bullets?.some((f) => text(f) || onTextEdit) && (
                 <ul>
                   {e.bullets

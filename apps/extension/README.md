@@ -82,4 +82,4 @@ posting directly; for restricted/unreadable pages, paste the advert in Jobs.
 MIT licensed source; icons are original code-drawn document marks. No external
 runtime libraries or remote executable assets are packaged.
 
-Missing/too-short visible content, restricted frames and oversized captures require opening the original posting, explicit selection or manual paste. Oversized captures are rejected without silent truncation. The popup discloses visible page/selected-text transmission. Named adapters label synthetic-fixture coverage only; live-site and installed Chrome verification remain pending. No metadata description HTML is submitted as source text.
+Ambiguous profile/account regions, multiple visible/structured jobs, missing/too-short visible content, restricted frames and oversized captures require opening the original posting, explicit selection or manual paste. Oversized captures are rejected without silent truncation. The popup discloses visible page/selected-text transmission. Named adapters label synthetic-fixture coverage only; live-site and installed Chrome verification remain pending. No metadata description HTML is submitted as source text.
