@@ -79,7 +79,7 @@ def suite(db):
    p=json.loads(json.dumps(self.payload));p['content']['presentation']['photo']={'assetId':foreign,'shape':'circle','visible':True,'crop':{'version':1,'centerX':0.5,'centerY':0.5,'zoom':1}}
    self.assertIn('PHOTO_NOT_AVAILABLE',self.save(payload=p,error=True))
    p['content']['presentation']['photo']['assetId']=own;self.save(payload=p)
-   self.raw('prepare_job_documents_for_base_removal',f"'{a}'",role=None)
+   db.sql(f"BEGIN;INSERT INTO app.base_cv_lifecycle(tenant_id,purge_transaction) VALUES('{a}',pg_current_xact_id()) ON CONFLICT(tenant_id) DO UPDATE SET purge_transaction=EXCLUDED.purge_transaction;SELECT app.prepare_job_documents_for_base_removal('{a}');COMMIT;",user=self.a)
    self.call('expire_photo_uploads',f"'{secret}'")
    self.assertEqual(db.sql(f"SELECT state FROM app.photo_assets WHERE id='{own}'"),'ready')
   def test_two_parallel_current_saves_have_one_winner_and_no_content_archive(self):
@@ -103,7 +103,7 @@ def suite(db):
    for role in ['authenticated','anon']:self.assertIn('permission denied',self.raw('prepare_job_documents_for_base_removal',f"'{tenant}'",role=role,error=True))
   def test_base_removal_helper_detaches_only_current_and_reopen_save_needs_no_base(self):
    saved=self.save();tenant=self.call('provision_workspace',f"'{uid()}'")['tenantId']
-   self.raw('prepare_job_documents_for_base_removal',f"'{tenant}'",role=None)
+   db.sql(f"BEGIN;INSERT INTO app.base_cv_lifecycle(tenant_id,purge_transaction) VALUES('{tenant}',pg_current_xact_id()) ON CONFLICT(tenant_id) DO UPDATE SET purge_transaction=EXCLUDED.purge_transaction;SELECT app.prepare_job_documents_for_base_removal('{tenant}');COMMIT;",user=self.a)
    # The import-owned destructive command performs actual deletion. Simulate
    # that boundary ONLY in this disposable cluster, never an owner database.
    db.sql(f"ALTER TABLE app.editor_draft_snapshots DISABLE TRIGGER immutable_editor_snapshot;DELETE FROM app.editor_draft_snapshots WHERE id='{self.base['id']}';ALTER TABLE app.editor_draft_snapshots ENABLE TRIGGER immutable_editor_snapshot")
