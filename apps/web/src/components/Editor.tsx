@@ -9,7 +9,7 @@ import {
 } from "react";
 import { Info, Plus, X } from "lucide-react";
 import {
-  isAuthored,
+  isAccepted,
   clone,
   editFact,
   fact,
@@ -31,6 +31,7 @@ import {
   languageLevels,
   setContributions,
 } from "../base/editing";
+import { enrichmentTarget } from "../base/enrichment";
 import { currentWording, isWordingFieldVisible } from "../base/wording";
 import { sectionName } from "../base/sections";
 import type { Issue } from "../base/validation";
@@ -624,10 +625,20 @@ export function Editor({
   function optional(section: string) {
     const s = d.optionalSections.find((s) => s.id === section);
     if (!s) return null;
+    if (s.id === "import-summary")
+      return s.entries.map((e) => (
+        <div key={e.id}>
+          {field(e.details, t("Rezumat profesional", "Professional summary"), {
+            multiline: true,
+          })}
+        </div>
+      ));
     const isLanguage = s.kind === "languages";
     return (
       <>
-        {!isLanguage && (
+        {s.heading &&
+          field(s.heading, t("Categorie", "Category"), { required: true })}
+        {!isLanguage && !s.heading && (
           <Field
             label={t("Denumirea secțiunii", "Section label")}
             value={s.label}
@@ -676,11 +687,14 @@ export function Editor({
           >
             <div className="optional-entry">
               <div className="field-grid">
-                {field(
-                  e.title,
-                  isLanguage ? t("Limbă", "Language") : t("Denumire", "Title"),
-                  { required: true },
-                )}
+                {!(s.heading && e.id === s.id) &&
+                  field(
+                    e.title,
+                    isLanguage
+                      ? t("Limbă", "Language")
+                      : t("Denumire", "Title"),
+                    { required: true },
+                  )}
                 {isLanguage ? (
                   box(
                     e.proficiency?.fieldId ?? `${e.id}-level`,
@@ -884,7 +898,7 @@ export function Editor({
               (f) =>
                 f.ref.entityId === target.id &&
                 ["context", "details", "bullet"].includes(f.key) &&
-                isAuthored(f.fact) &&
+                isAccepted(f.fact) &&
                 isWordingFieldVisible(d, target.id, f.fact.fieldId) &&
                 d.sources.some((s) => s.id === f.fact.sourceId),
             );
@@ -934,7 +948,7 @@ export function Editor({
                     .join("\n");
             return (
               <div key={target.id} className="stack">
-                <strong>{target.title.value}</strong>
+                <strong>{enrichmentTarget(d, target.id)?.label}</strong>
                 {sources.length ? (
                   <Field
                     id={`job-wording-${target.id}`}

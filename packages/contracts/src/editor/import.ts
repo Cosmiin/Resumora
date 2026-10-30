@@ -1,18 +1,44 @@
 import {
   allFacts,
+  isAccepted,
   blankDraft,
   clone,
   localId,
+  fact,
   newEducation,
   newOptionalEntry,
-  fact,
   newRole,
   type BaseDraft,
   type Fact,
   type FactValue,
 } from "./model.ts";
-import { isImportReview, type ImportReview } from "../intelligence/model.ts";
-/** Maps validated extraction into a NEW unconfirmed draft; never mutates an existing Base. */
+import {
+  isImportReview,
+  hasSpecificImportWarning,
+  type Candidate,
+  type ImportReview,
+} from "../intelligence/model.ts";
+
+export const requiresImportReview = (candidate: Candidate): boolean =>
+  candidate.confidence !== "high" || hasSpecificImportWarning(candidate);
+
+export const importedFact = (draft: BaseDraft, candidate: Candidate) =>
+  allFacts(draft, true).find(
+    (f) =>
+      f.sourceClaimId === candidate.id ||
+      f.sourceLineage?.some((s) => s.sourceClaimId === candidate.id),
+  );
+export const pendingImportedCandidates = (draft: BaseDraft): Candidate[] =>
+  draft.importReview?.extraction.candidates.filter((c) => {
+    const field = importedFact(draft, c);
+    return (
+      !!field &&
+      !draft.importReview!.confirmedIds.includes(c.id) &&
+      (field.acceptance !== "automatic" || !isAccepted(field))
+    );
+  }) ?? [];
+
+/** Maps validated extraction into a NEW draft; never mutates an existing Base. */
 export function importedDraft(review: ImportReview): BaseDraft {
   if (!isImportReview(review) || review.admission.kind !== "cv")
     throw new Error("INVALID_IMPORT_REVIEW");
@@ -39,6 +65,7 @@ export function importedDraft(review: ImportReview): BaseDraft {
       fieldId: localId(),
       value,
       status: "extracted_unconfirmed",
+      ...(!requiresImportReview(c) ? { acceptance: "automatic" as const } : {}),
       sourceId,
       sourceClaimId: c.id,
     });
@@ -71,23 +98,30 @@ export function importedDraft(review: ImportReview): BaseDraft {
               ? "Summary"
               : parts[0] === "certifications"
                 ? "Certifications"
-                : "Other",
+                : "",
           entries: [],
+          ...(parts[0] === "custom" ? { heading: fact("") } : {}),
         };
         draft.optionalSections.push(section);
-        if (c.path === "summary") draft.presentation.order.splice(1, 0, group);
+        if (c.path === "summary")
+          draft.presentation.order = draft.presentation.order.map((id) =>
+            id === "summary" ? group : id,
+          );
         else draft.presentation.order.push(group);
       }
       const entryIndex = parts[0] === "certifications" ? index : 0;
-      while (section.entries.length <= entryIndex)
-        section.entries.push(newOptionalEntry());
+      while (section.entries.length <= entryIndex) {
+        const entry = newOptionalEntry();
+        if (parts[0] === "custom") entry.id = section.id;
+        section.entries.push(entry);
+      }
       const entry = section.entries[entryIndex];
       if (c.path === "summary") {
-        entry.title = fact("");
         entry.details = field(c.value) as Fact<string>;
       } else if (parts[2] === "title") {
-        entry.title = field(c.value) as Fact<string>;
-        if (parts[0] === "custom") section.label = c.value;
+        if (parts[0] === "custom")
+          section.heading = field(c.value) as Fact<string>;
+        else entry.title = field(c.value) as Fact<string>;
       } else if (parts[2] === "details")
         entry.details = field(c.value) as Fact<string>;
       else if (parts[2] === "start")
@@ -154,14 +188,18 @@ export function confirmImported(
     !review ||
     !selectedIds.length ||
     new Set(selectedIds).size !== selectedIds.length ||
-    selectedIds.some(
-      (id) => !review.extraction.candidates.some((c) => c.id === id),
-    )
+    selectedIds.some((id) => {
+      const candidate = review.extraction.candidates.find((c) => c.id === id);
+      return (
+        !candidate ||
+        (!review.confirmedIds.includes(id) && !importedFact(draft, candidate))
+      );
+    })
   )
     throw new Error("INVALID_REVIEW_SELECTION");
   const next = clone(draft),
     at = new Date().toISOString();
-  for (const f of allFacts(next))
+  for (const f of allFacts(next, true))
     if (
       f.sourceClaimId &&
       selectedIds.includes(f.sourceClaimId) &&

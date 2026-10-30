@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { Candidate } from "@resumora/contracts/intelligence/model";
-import { allFacts, type BaseDraft, type FactValue } from "../base/model";
+import {
+  importedFact,
+  pendingImportedCandidates,
+} from "@resumora/contracts/editor/import";
+import { hasSpecificImportWarning } from "@resumora/contracts/intelligence/model";
+import { type BaseDraft, type FactValue } from "../base/model";
 import { dateError } from "../base/dates";
 import { patchFact } from "../base/editing";
 import type { IntelligenceClient } from "../base/intelligence";
@@ -43,12 +47,6 @@ const labels: Record<string, [string, string]> = {
   proficiency: ["Nivel", "Level"],
   label: ["Categorie", "Category"],
 };
-const factFor = (draft: BaseDraft, c: Candidate) =>
-  allFacts(draft).find(
-    (f) =>
-      f.sourceClaimId === c.id ||
-      f.sourceLineage?.some((s) => s.sourceClaimId === c.id),
-  );
 export function ImportReview({
   draft,
   confirm,
@@ -64,8 +62,13 @@ export function ImportReview({
 }) {
   const t = useCopy(),
     review = draft.importReview!;
+  const reviewCandidates = pendingImportedCandidates(draft);
   const groups = [
-    ...new Set(review.extraction.candidates.map((c) => importSection(c.path))),
+    ...new Set(
+      review.extraction.candidates
+        .filter((c) => importedFact(draft, c))
+        .map((c) => importSection(c.path)),
+    ),
   ];
   groups.sort((a, b) => {
     const order = (s: string) =>
@@ -81,12 +84,10 @@ export function ImportReview({
     return order(a) - order(b);
   });
   const pendingGroups = groups.filter((g) =>
-    review.extraction.candidates.some(
-      (c) => importSection(c.path) === g && !review.confirmedIds.includes(c.id),
-    ),
+    reviewCandidates.some((c) => importSection(c.path) === g),
   );
   const section = pendingGroups[0];
-  const candidates = review.extraction.candidates.filter(
+  const candidates = reviewCandidates.filter(
     (c) => importSection(c.path) === section,
   );
   const [focused, setFocused] = useState<string>();
@@ -97,7 +98,7 @@ export function ImportReview({
   }, [section]);
   if (!section) return null;
   const invalidDate = candidates.some((c) => {
-    const value = factFor(draft, c)?.value;
+    const value = importedFact(draft, c)!.value;
     return typeof value === "object" && dateError(value);
   });
   const current = candidates.find((c) => c.id === focused) ?? candidates[0];
@@ -135,27 +136,22 @@ export function ImportReview({
           </p>
         )}
         {candidates.map((c) => {
-          const field = factFor(draft, c);
+          const field = importedFact(draft, c)!;
           const key = c.path
             .split(".")
             .filter((p) => !/^\d+$/.test(p))
             .at(-1)!;
           const label = labels[key] ??
             labels[c.path.split(".")[0]] ?? [key, key];
-          const value = field?.value ?? c.value;
+          const value = field.value;
           const display =
             typeof value === "object"
               ? (value.month ? value.month.padStart(2, "0") + "/" : "") +
                 value.year
               : String(value);
-          const specificWarning =
-            c.warning &&
-            !/^Native (PDF transcription|Word excerpt) requires review/.test(
-              c.warning,
-            );
-          const uncertain = c.confidence !== "high" || !!specificWarning;
+          const specificWarning = hasSpecificImportWarning(c);
           function update(text: string) {
-            if (!field || !change) return;
+            if (!change) return;
             let next: FactValue = text;
             if (typeof value === "boolean") next = text === "true";
             else if (typeof value === "object") {
@@ -180,9 +176,7 @@ export function ImportReview({
             >
               <label htmlFor={`review-${c.id}`}>
                 {t(...label)}
-                {uncertain && (
-                  <small> · {t("De verificat", "Please check")}</small>
-                )}
+                <small> · {t("De verificat", "Please check")}</small>
               </label>
               {typeof value === "boolean" ? (
                 <select

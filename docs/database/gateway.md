@@ -67,9 +67,8 @@ Modes are `autosave` and `checkpoint`; the latter has reason `save`. Restore app
 a new snapshot with the historical payload and a new parent/revision. Reads never
 create data; first save transactionally provisions the personal workspace using
 the existing provision command. A revoked/deleting account cannot replay writes.
-The save route selects `saveReviewedImport` for checkpoints with selected imported
-confirmations; the [import review contract](../setup/cv-import-enrichment.md#customer-journey-and-saved-truth)
-owns confirmation and atomic checkpoint behavior.
+The [import review contract](../setup/cv-import-enrichment.md#customer-journey-and-saved-truth)
+owns confirmation and atomic review-save behavior, including save-route selection.
 
 History defaults to 20 snapshots, maximum 20, newest first. Supply the last
 returned revision as the exclusive cursor; an empty page ends traversal. Callers

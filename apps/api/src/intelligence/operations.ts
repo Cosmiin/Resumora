@@ -21,6 +21,7 @@ export async function stageOperationId(
   return `${v.slice(0, 8)}-${v.slice(8, 12)}-${v.slice(12, 16)}-${v.slice(16, 20)}-${v.slice(20)}`;
 }
 import {
+  answerEvidenceText,
   validateAdmission,
   validateExtraction,
   validateQuestionPlan,
@@ -29,7 +30,7 @@ import {
   type ProcessedDocument,
 } from "@resumora/contracts/intelligence/model";
 import { projectEnhancementContext } from "../ai/enhancement-context.ts";
-import type { BaseDraft } from "@resumora/contracts/editor/model";
+import { isAccepted, type BaseDraft } from "@resumora/contracts/editor/model";
 export type StructuredOperation = {
   operationId: string;
   userId: string;
@@ -86,6 +87,7 @@ export const operationSchemas = {
     targetId: str,
     questions: {
       type: "array",
+      minItems: 1,
       maxItems: 3,
       items: schema({
         id: str,
@@ -101,12 +103,22 @@ export const operationSchemas = {
             "complexity",
           ],
         },
-        text: str,
-        why: str,
+        text: {
+          type: "string",
+          description:
+            "A concise question tied to this role and an identified gap in its current evidence, without assuming missing experience.",
+        },
+        why: {
+          type: "string",
+          description:
+            "The specific missing detail this question clarifies for this experience.",
+        },
         selectionMode: { type: "string", enum: ["single", "multiple"] },
         options: {
           type: "array",
           maxItems: 6,
+          description:
+            "Zero options for open questions; otherwise 2–6 distinct, role-relevant possible activities or contexts to confirm. Avoid generic yes/no, skill ratings, assumed achievements or invented metrics.",
           items: schema({ id: str, label: str }),
         },
       }),
@@ -211,13 +223,17 @@ export function intelligenceOperations(run: StructuredRunner) {
         operationId: input.operationId,
         userId: input.userId,
         operation: "cv_rewrite",
-        promptVersion: "career.questions.v1-provisional",
+        promptVersion: "career.questions.v2-role-guided",
         tier: "career",
         validateOutput: (v) => validateQuestionPlan(v, input.targetId),
         system:
           common +
-          " Return at most 3 neutral questions for the selected experience and saved answers, each with short optional answer suggestions. Selection modes allow one or multiple choices; users may always choose none and write only text. Do not preselect anything. Do not repeat prior answered/skipped/unknown questions or require numerical achievements. Explain why asked. These suggestions are not facts. Use the requested locale.",
-        input: { ...context, previous },
+          " Return 1–3 concise questions targeting the most useful missing details in the selected role's existing description, bullets and saved answers. Use roleTitle only to frame questions, never as evidence of responsibilities or achievements. Refer to concrete work already mentioned rather than repeating a generic career questionnaire. Ask about personal contribution, workflow, audience, tools or observed outcomes only where unclear. Each question should resolve a different gap; explain that specific gap in why. For choices, offer 2–6 distinct plausible activities or contexts relevant to that work, phrased as possibilities for the user to confirm, not assertions. Avoid generic yes/no, proficiency ratings, vague teamwork/communication lists and invented tools, numbers or accomplishments. Use zero options when a free-text question is more honest than speculative choices. Use multiple selection for activities that may coexist and single selection only for mutually exclusive contexts. Users may always choose none and write text. Do not preselect anything, repeat prior answered/skipped/unknown questions, or require numerical achievements. Choices are prompts, not facts until explicitly confirmed. Use the requested locale.",
+        input: {
+          ...context,
+          roleTitle: questionRoleTitle(input.draft, input.targetId),
+          previous,
+        },
         schema: operationSchemas.questions,
         maxOutputTokens: 1800,
       });
@@ -271,18 +287,46 @@ export function intelligenceOperations(run: StructuredRunner) {
         operationId: input.operationId,
         userId: input.userId,
         operation: "cv_rewrite",
-        promptVersion: "career.role-rewrite.v1-provisional",
+        promptVersion: "career.role-rewrite.v2-saved-context",
         tier: "career",
         validateOutput: (v) =>
           validateRewrite(v, input.targetId, context.facts),
         system:
           common +
-          " Rewrite the WHOLE selected experience text coherently using its current eligible evidence and saved answers, not just the last answer. Preserve individual attribution and all supported factual precision. Do not alter employer/title/dates. Cite every used fact ID; output stays pending until the user accepts. Questions and original answers remain saved. Prior approved wording is style context only; support factual assertions solely with cited evidence. Return warnings for unsupported detail; never fill it in. Use the requested locale.",
-        input: { ...context, currentApprovedWording },
+          " Rewrite the WHOLE selected experience description and contribution bullets into clear, concise professional wording using all relevant current eligible evidence and saved answers, not just the last answer. Use short paragraphs or newline-separated bullets where helpful. Saved questions explain the answers; they are not factual evidence. Keep responsibilities distinct from accomplishments and never turn an activity or selected possibility into a measured result. Preserve individual attribution and all supported factual precision. Do not alter employer/title/dates. Cite every used fact ID; output stays pending until the user accepts. Questions and original answers remain saved. Prior approved wording is style context only; support factual assertions solely with cited evidence. Return warnings for unsupported detail; never fill it in. Use the requested locale.",
+        input: {
+          ...context,
+          currentApprovedWording,
+          savedAnswers: input.draft.answers
+            .filter(
+              (a) =>
+                a.targetId === input.targetId &&
+                a.status === "confirmed" &&
+                a.sourceId,
+            )
+            .map((a) => ({
+              factId: a.id,
+              question: a.questionText,
+              answer: answerEvidenceText(a),
+            })),
+        },
         schema: operationSchemas.rewrite,
         maxOutputTokens: 1800,
       });
       return validateRewrite(output, input.targetId, context.facts);
     },
   };
+}
+
+/** Accepted title frames questions only; it is not accomplishment evidence. */
+function questionRoleTitle(draft: BaseDraft, targetId: string): string | null {
+  const section = draft.optionalSections.find((s) =>
+    s.entries.some((e) => e.id === targetId),
+  );
+  const title =
+    draft.roles.find((r) => r.id === targetId)?.title ??
+    (section?.heading && targetId === section.id
+      ? section.heading
+      : section?.entries.find((e) => e.id === targetId)?.title);
+  return title && isAccepted(title) ? title.value.slice(0, 200) : null;
 }

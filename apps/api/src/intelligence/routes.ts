@@ -100,6 +100,7 @@ export async function intelligenceRoute(
       if (!uuid(match[1])) return fail("INVALID_REQUEST", 400);
       if (match[2] === "/source" && request.method === "GET") {
         const source = await options.workflow.source(match[1]);
+        if ("text" in source) return json(source);
         return new Response(source.bytes as Uint8Array<ArrayBuffer>, {
           headers: {
             "Content-Type":

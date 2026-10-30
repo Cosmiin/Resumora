@@ -6,7 +6,7 @@ import {
 } from "@resumora/contracts/jobs/documents";
 import { encodeDraft } from "@resumora/contracts/editor/transport";
 import { AdapterError, type BaseCvAdapter, type Snapshot } from "./adapter";
-import { clone, equalValues, isAuthored, type BaseDraft } from "./model";
+import { clone, equalValues, isAccepted, type BaseDraft } from "./model";
 import { HttpBaseCvAdapter, type CvTransport } from "./http-adapter";
 
 type Version = Omit<JobEditorVersion, "sourcePayload"> & {
@@ -68,7 +68,7 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
       selectedFacts: jobEditorFacts(this.source)
         .filter(
           (f) =>
-            isAuthored(f.fact) &&
+            isAccepted(f.fact) &&
             this.source.sources.some((s) => s.id === f.ref.sourceId),
         )
         .map((f) => f.ref),

@@ -29,7 +29,7 @@ After the CV draft has saved, open **Jobs** to paste an advert and save it to yo
 
 Choose **Open CV for this job** in the saved vacancy to edit its CV independently of Base. Follow the [job editor guide](docs/setup/job-editor-documents.md) for supported edits, save/reopen, History/restore and setup limits.
 
-To start from an existing document, choose **I already have a CV**, select the file and explicitly upload/analyse it. Review the extracted fields before confirming and saving. **Improve** also offers AI questions and a whole-experience rewrite for a selected role. These AI actions are switched off by default; follow [CV import and career enrichment](docs/setup/cv-import-enrichment.md) for supported inputs, review controls and activation requirements.
+To start from an existing document, choose **I already have a CV** and follow the [document intake and section review flow](docs/setup/cv-import-enrichment.md#customer-journey-and-saved-truth). **Improve** also offers AI questions and a whole-experience rewrite for a selected role. These AI actions are switched off by default; follow [CV import and career enrichment](docs/setup/cv-import-enrichment.md) for supported inputs, review controls and activation requirements.
 
 The CV preview offers the five selected layouts—Folio, Meridian, Signal, Archive and Monograph—with a versioned choice saved through the existing editor history. See [template authoring and integration](docs/frontend/TEMPLATE_AUTHORING.md) for adding designs, font licenses, print checks and remaining publication/export wiring. Layout changes do not trigger inference.
 

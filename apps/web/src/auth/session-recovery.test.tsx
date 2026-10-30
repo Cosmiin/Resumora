@@ -133,6 +133,7 @@ async function backend() {
     entries: [language],
   });
   draft.technicalSkills[0].status = "extracted_unconfirmed";
+  draft.technicalSkills[0].acceptance = "automatic";
   draft.technicalSkills[0].sourceClaimId = "skill";
   draft.importReview = {
     id: crypto.randomUUID(),
@@ -292,12 +293,7 @@ it.each(["autosave", "checkpoint"] as const)(
     if (mode === "checkpoint") {
       fireEvent.click(
         screen.getByRole("button", {
-          name: "Selectează informațiile fără avertismente",
-        }),
-      );
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: "Confirmă și salvează CV-ul verificat",
+          name: /Salvează acum/,
         }),
       );
     }
@@ -311,9 +307,12 @@ it.each(["autosave", "checkpoint"] as const)(
     expect(screen.getByRole("textbox", { name: /Prenume/ })).toBe(first);
     expect(first.value).toBe("Edited");
     expect(server.snapshot.draft.nameParts?.first).toBe("Edited");
-    expect(server.snapshot.draft.importReview?.confirmedIds).toEqual(
-      mode === "checkpoint" ? ["skill"] : [],
-    );
+    expect(server.snapshot.draft.importReview?.confirmedIds).toEqual([]);
+    expect(server.snapshot.draft.technicalSkills[0]).toMatchObject({
+      status: "extracted_unconfirmed",
+      acceptance: "automatic",
+      sourceClaimId: "skill",
+    });
     expect(server.snapshot.draft.answers).toEqual(server.draft.answers);
     expect(server.snapshot.draft.presentation).toEqual(
       server.draft.presentation,
@@ -325,6 +324,43 @@ it.each(["autosave", "checkpoint"] as const)(
     expect(server.writes[0].mode).toBe(mode);
   },
 );
+it("refreshes while saving staged confirmation and opens the editor only after an unaccepted historical fact is reviewed", async () => {
+  const server = await backend(),
+    gate = deferred();
+  delete server.draft.technicalSkills[0].acceptance;
+  server.hold(gate.promise);
+  window.location.hash = "#base";
+  render(
+    <AuthShell fetcher={server.fetcher}>
+      {(account, transport) => (
+        <ConnectedApp account={account} transport={transport} />
+      )}
+    </AuthShell>,
+  );
+  const confirm = await screen.findByRole("button", {
+    name: "Confirmă și deschide editorul",
+  });
+  expect(screen.queryByRole("textbox", { name: /Prenume/ })).toBeNull();
+  expect(server.writes).toEqual([]);
+  server.age();
+  fireEvent.click(confirm);
+  await waitFor(() => expect(server.refreshes).toBe(1));
+  const first = await screen.findByRole("textbox", { name: /Prenume/ });
+  expect(server.writes).toEqual([]);
+  await act(async () => gate.resolve());
+  await waitFor(() => expect(server.writes).toHaveLength(1));
+  expect(screen.getByRole("textbox", { name: /Prenume/ })).toBe(first);
+  expect(server.snapshot.draft.importReview?.confirmedIds).toEqual(["skill"]);
+  expect(server.snapshot.draft.technicalSkills[0]).toMatchObject({
+    status: "user_confirmed",
+    sourceClaimId: "skill",
+  });
+  expect(server.writes[0].mode).toBe("autosave");
+  const sent = server.attempts.filter((a) => a.path.endsWith("/save"));
+  expect(sent).toHaveLength(2);
+  expect(sent[0].body).toBe(sent[1].body);
+  expect(server.refreshes).toBe(1);
+});
 it.each(["invalid", "switch"] as const)(
   "fails closed on %s refresh without dispatching the old draft",
   async (outcome) => {
@@ -386,7 +422,10 @@ it.each(["cancel", "unmount"] as const)(
       );
     else view.unmount();
     await act(async () => gate.resolve());
-    if (action === "cancel") await screen.findByText("cancelled");
+    if (action === "cancel")
+      await screen.findByText(
+        "Import anulat. Alege un document pentru a continua.",
+      );
     expect(
       server.attempts.filter(
         (a) => a.path === "/v1/intelligence/imports" && a.signal,

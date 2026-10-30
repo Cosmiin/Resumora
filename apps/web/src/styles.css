@@ -1911,6 +1911,50 @@ textarea.native {
   display: flow-root;
 }
 
+.enrichment-choices {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.enrichment-choices legend {
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.enrichment-choices .enrichment-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  margin: 0;
+  border: 1px solid var(--border-field);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface-card);
+  color: var(--text-body);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.enrichment-choice:hover {
+  background: var(--surface-hover);
+}
+.enrichment-choice:has(input:checked) {
+  background: var(--surface-selected);
+  border-color: var(--border-selected);
+}
+.enrichment-choice:has(input:focus-visible) {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.enrichment-choice input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--action-primary);
+}
+
 /* Import uses the same pine/sage cards and controls as the Base CV editor. */
 .file-select {
   display: inline-flex;
@@ -2054,4 +2098,20 @@ textarea.native {
   .source-scroll {
     max-height: 50vh;
   }
+}
+
+.source-word-text {
+  max-height: 65vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+}
+.source-text-match {
+  color: var(--text-strong);
+  background: var(--status-warn-bg);
+  outline: 2px solid var(--border-selected);
+  border-radius: 0.15rem;
 }

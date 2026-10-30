@@ -97,9 +97,7 @@ describe("CV import and career intelligence integration", () => {
       );
     }
     const view = render(<Harness initial={latest} />);
-    await user.click(
-      screen.getByRole("button", { name: "Prepare AI questions" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Improve" }));
     expect(prepareQuestions).toHaveBeenCalledWith(target);
     expect(screen.queryByLabelText("Question goal")).toBeNull();
     await user.click(await screen.findByLabelText("Consolidated reports"));
@@ -108,12 +106,43 @@ describe("CV import and career intelligence integration", () => {
     expect(latest.answers[0].selectedOptionIds).toEqual(["merge", "review"]);
     expect(latest.answers[0].text).toBe("");
     expect(latest.roles[0].bullets).toEqual([]);
-    await user.click(await screen.findByLabelText("Team meeting"));
-    await user.click(screen.getByRole("button", { name: "Clear choices" }));
     await user.type(
       screen.getByLabelText("Who used the report?"),
       "The operations team.",
     );
+    const team = screen.getByRole<HTMLInputElement>("radio", {
+      name: "Team meeting",
+    });
+    const manager = screen.getByRole<HTMLInputElement>("radio", {
+      name: "Management",
+    });
+    await user.click(team);
+    expect(team.checked).toBe(true);
+    expect(manager.checked).toBe(false);
+    expect(screen.queryByRole("button", { name: "Clear choices" })).toBeNull();
+    await user.click(team);
+    expect(team.checked).toBe(false);
+    expect(manager.checked).toBe(false);
+    expect(
+      latest.answers.find((a) => a.plannedQuestionId === "q2")
+        ?.selectedOptionIds,
+    ).toEqual([]);
+    await user.click(team);
+    expect(team.checked).toBe(true);
+    await user.click(manager);
+    expect(team.checked).toBe(false);
+    expect(manager.checked).toBe(true);
+    expect(
+      latest.answers.find((a) => a.plannedQuestionId === "q2")
+        ?.selectedOptionIds,
+    ).toEqual(["manager"]);
+    await user.click(manager);
+    expect(team.checked).toBe(false);
+    expect(manager.checked).toBe(false);
+    expect(
+      latest.answers.find((a) => a.plannedQuestionId === "q2")
+        ?.selectedOptionIds,
+    ).toEqual([]);
     await user.click(screen.getByRole("button", { name: /Save and next/ }));
     expect(latest.answers[1].selectedOptionIds).toEqual([]);
     expect(latest.answers[1].text).toBe("The operations team.");
@@ -122,6 +151,11 @@ describe("CV import and career intelligence integration", () => {
       screen.getByText("Questions completed. Your context is retained."),
     ).toBeTruthy();
     const persisted = decodeDraft(encodeDraft(latest));
+    expect(persisted.answers[1].selectedOptionIds).toEqual([]);
+    expect(
+      persisted.sources.find((s) => s.id === persisted.answers[1].sourceId)
+        ?.text,
+    ).toBe("The operations team.");
     expect(persisted.questionPlans?.[0].goal).toBe("Historical saved goal");
     view.unmount();
     render(<Harness initial={persisted} />);
@@ -247,7 +281,7 @@ describe("CV import and career intelligence integration", () => {
             value: initial.name.value,
             page: 1,
             quote: initial.name.value,
-            confidence: "high",
+            confidence: "low",
           },
         ],
         warnings: [],

@@ -13,7 +13,7 @@ export type EnhancementProposal = {
   text: string;
   sources: ScopedFact[];
 };
-/** Conservative groundwork truth boundary: only exact quotations of verified evidence.
+/** Conservative grounding boundary: only exact quotations of eligible saved evidence.
  * Paraphrasing/semantic entailment is deliberately deferred. IDs alone do not prove truth.
  */
 export function validateProposal(

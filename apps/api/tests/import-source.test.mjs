@@ -14,9 +14,9 @@ test('original retrieval keeps user token, performs tenant lookup before storage
     calls.push({url,init});
     assert.equal(init.headers.Authorization,'Bearer synthetic-user-token');
     assert.equal(init.redirect,'manual');
-    return url.includes('/rpc/') ? Response.json({objectKey:`${id}/${id}/original.pdf`,format:'pdf'}) : new Response(bytes);
+    return url.includes('/rpc/') ? Response.json({objectKey:`${id}/${id}/original.pdf`,format:'pdf',sourceHash:'a'.repeat(64)}) : new Response(bytes);
   });
-  assert.deepEqual(await gateway.createImportStore('').source(id),{bytes,format:'pdf'});
+  assert.deepEqual(await gateway.createImportStore('').source(id),{bytes,format:'pdf',sourceHash:'a'.repeat(64)});
   assert.equal(calls[0].url,env.SUPABASE_URL+'/rest/v1/rpc/get_cv_import_source');
   assert.deepEqual(JSON.parse(calls[0].init.body),{p_source:id});
   assert.equal(calls[1].url,env.SUPABASE_URL+`/storage/v1/object/authenticated/cv-imports/${id}/${id}/original.pdf`);

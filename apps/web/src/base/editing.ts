@@ -15,7 +15,7 @@ export function patchFact<T extends FactValue>(
   value: T,
 ) {
   const next = clone(draft);
-  const current = allFacts(next).find((f) => f.fieldId === field.fieldId);
+  const current = allFacts(next, true).find((f) => f.fieldId === field.fieldId);
   if (current) {
     replaceFact(next, current, editFact(current as Fact<T>, value));
   }

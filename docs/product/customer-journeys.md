@@ -122,7 +122,7 @@ These J IDs are document-local navigation aids. Do not rename canonical journeys
 **Goal, entry, preconditions:** first-time user chooses Bring my CV, or returning user imports another source. The [import guide](../setup/cv-import-enrichment.md) owns the implemented default-OFF subset and its activation dependencies; the broader hosted journey remains planned. Evidence: UX03–UX04, `OnbImport.jsx`.
 
 1. Explain [supported inputs and bounds](../setup/cv-import-enrichment.md#runtime-and-input-bounds), handling and privacy before upload; offer Start from scratch equally clearly. Historical demo limits do not define the implemented contract.
-2. Select a file, validate actual type/size/safety server-side, upload privately and show named extraction stages with Cancel. A manual choice opens blank canonical fields without synthetic content.
+2. Select a file; follow the [implemented intake flow](../setup/cv-import-enrichment.md#customer-journey-and-saved-truth) for validation, progress and cancellation. A manual choice opens blank canonical fields without synthetic content.
 3. Extraction returns a reviewable draft with source references and uncertainty. Route to J06; a later import compares/reviews a new source rather than replacing the existing Base silently.
 
 **Boundaries/outcome:** original bytes and source provenance remain separate from normalized fields and generated text. Extraction produces unconfirmed claims, never a user-confirmed Base. Success is a usable review draft or manual draft; no “PDF readable” conclusion follows from import.

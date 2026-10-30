@@ -563,3 +563,192 @@ test("canonical numeric extraction paths reject aliases before they can overwrit
     ["roles.9.bullets.0", "roles.9.bullets.99"],
   );
 });
+
+test("role-guided questions and rewrite receive only selected eligible career evidence and confirmed Q&A", async () => {
+  const draft = blankDraft(),
+    role = newRole(),
+    other = newRole();
+  draft.language = "ro";
+  draft.name = fact("Private synthetic identity");
+  role.title = fact("Coordonator operațional");
+  role.context = fact("Pregăteam rapoarte săptămânale.");
+  other.title = fact("Unrelated role");
+  other.context = fact("Unrelated evidence");
+  draft.roles.push(role, other);
+  draft.answers = [
+    {
+      id: "answer",
+      targetId: role.id,
+      question: "ownership",
+      questionText: "Cum pregăteai rapoartele?",
+      text: "Verificam datele.",
+      status: "confirmed",
+      sourceId: "answer-source",
+    },
+    {
+      id: "draft-answer",
+      targetId: role.id,
+      question: "tools",
+      questionText: "Instrumente?",
+      text: "Unconfirmed tool",
+      status: "draft",
+    },
+    {
+      id: "other-answer",
+      targetId: other.id,
+      question: "tools",
+      questionText: "Other question",
+      text: "Other private answer",
+      status: "confirmed",
+      sourceId: "other-source",
+    },
+  ];
+  const calls = [];
+  const operations = intelligenceOperations(async (input) => {
+    calls.push(input);
+    return input.schema === undefined
+      ? null
+      : input.promptVersion.includes("questions")
+        ? {
+            schemaVersion: "career-question-plan/1",
+            targetId: role.id,
+            questions: [
+              {
+                id: "q",
+                dimension: "ownership",
+                text: "Cine folosea rapoartele?",
+                why: "Publicul lipsește.",
+                selectionMode: "multiple",
+                options: [
+                  { id: "team", label: "Echipa operațională" },
+                  { id: "management", label: "Conducerea" },
+                ],
+              },
+            ],
+          }
+        : {
+            schemaVersion: "career-role-rewrite/1",
+            targetId: role.id,
+            text: "Pregăteam rapoarte săptămânale și verificam datele.",
+            factIds: [role.context.id, "answer"],
+            warnings: [],
+          };
+  });
+  await operations.questions({
+    operationId: "question-cycle",
+    userId: "tenant-one",
+    draft,
+    targetId: role.id,
+  });
+  await operations.rewrite({
+    operationId: "rewrite-cycle",
+    userId: "tenant-one",
+    draft,
+    targetId: role.id,
+  });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].input.roleTitle, role.title.value);
+  assert.equal(calls[0].input.locale, "ro");
+  for (const call of calls) {
+    assert.equal(call.userId, "tenant-one");
+    assert.deepEqual(
+      call.input.facts.map((f) => f.id),
+      [role.context.id, "answer"],
+    );
+    assert.equal(
+      call.input.facts.some((f) => f.id === other.context.id),
+      false,
+    );
+    assert.equal(call.input.name, undefined);
+  }
+  assert.deepEqual(calls[1].input.savedAnswers, [
+    {
+      factId: "answer",
+      question: "Cum pregăteai rapoartele?",
+      answer: "Verificam datele.",
+    },
+  ]);
+  role.title.status = "extracted_unconfirmed";
+  await operations.questions({
+    operationId: "new-cycle",
+    userId: "tenant-one",
+    draft,
+    targetId: role.id,
+  });
+  assert.equal(calls[2].input.roleTitle, null);
+});
+
+test("question framing uses accepted role, category-heading and entry titles after import", async () => {
+  const draft = importedDraft({
+    ...review,
+    extraction: {
+      ...extraction,
+      candidates: [
+        ["roles.0.title", "Coordinator"],
+        ["roles.0.context", "Prepared weekly reports."],
+        ["custom.0.title", "Awards"],
+        ["custom.0.details", "Recognised for mentoring."],
+        ["certifications.0.title", "Safety training"],
+        ["certifications.0.details", "Completed safety training."],
+      ].map(([path, value]) => ({
+        ...candidate,
+        id: path.replaceAll(".", "_"),
+        path,
+        value,
+      })),
+    },
+  });
+  const custom = draft.optionalSections.find((s) => s.heading);
+  const certification = draft.optionalSections.find(
+    (s) => s.kind === "certifications",
+  );
+  const inputs = [];
+  const operations = intelligenceOperations(async ({ input }) => {
+    inputs.push(input);
+    return {
+      schemaVersion: "career-question-plan/1",
+      targetId: input.targetId,
+      questions: [
+        {
+          id: "q",
+          dimension: "ownership",
+          text: "What was your contribution?",
+          why: "Clarify individual responsibility.",
+          selectionMode: "multiple",
+          options: [],
+        },
+      ],
+    };
+  });
+  for (const [targetId, title] of [
+    [draft.roles[0].id, draft.roles[0].title],
+    [custom.entries[0].id, custom.heading],
+    [certification.entries[0].id, certification.entries[0].title],
+  ]) {
+    for (const status of [
+      "extracted_unconfirmed",
+      "user_confirmed",
+      "user_authored",
+      "draft",
+    ]) {
+      title.status = status;
+      for (const acceptance of ["automatic", undefined]) {
+        if (acceptance) title.acceptance = acceptance;
+        else delete title.acceptance;
+        await operations.questions({
+          operationId: "framing",
+          userId: "tenant-one",
+          draft,
+          targetId,
+        });
+        const input = inputs.at(-1);
+        const accepted =
+          status === "user_confirmed" ||
+          status === "user_authored" ||
+          (status === "extracted_unconfirmed" && acceptance === "automatic");
+        assert.equal(input.roleTitle, accepted ? title.value : null);
+        assert.equal(input.facts.some((f) => f.id === title.id), false);
+      }
+    }
+  }
+});

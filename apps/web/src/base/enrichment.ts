@@ -1,4 +1,5 @@
 import { answerEvidenceText } from "@resumora/contracts/intelligence/model";
+import type { QuestionPlan } from "@resumora/contracts/intelligence/model";
 import {
   clone,
   editFact,
@@ -11,6 +12,21 @@ import {
   type OptionalEntry,
 } from "./model";
 import { replaceFact, updateContributionHtml } from "./editing";
+export function nextQuestionIndex(
+  draft: BaseDraft,
+  plan: QuestionPlan,
+): number {
+  const index = plan.questions.findIndex(
+    (q) =>
+      !draft.answers.some(
+        (a) =>
+          a.targetId === plan.targetId &&
+          a.plannedQuestionId === q.id &&
+          ["confirmed", "skipped", "unknown"].includes(a.status),
+      ),
+  );
+  return index < 0 ? plan.questions.length : index;
+}
 export function enrichmentTarget(
   draft: BaseDraft,
   id: string,
@@ -22,12 +38,19 @@ export function enrichmentTarget(
       entry: role,
       label: [role.title.value, role.company.value].filter(Boolean).join(" · "),
     };
-  const entry = draft.optionalSections
-    .filter((s) => s.kind !== "languages")
-    .flatMap((s) => s.entries)
-    .find((e) => e.id === id);
+  const section = draft.optionalSections.find(
+    (s) => s.kind !== "languages" && s.entries.some((e) => e.id === id),
+  );
+  const entry = section?.entries.find((e) => e.id === id);
   return entry
-    ? { field: entry.details, label: entry.title.value, entry }
+    ? {
+        field: entry.details,
+        label:
+          section?.heading && entry.id === section.id
+            ? section.heading.value
+            : entry.title.value || section?.label || "",
+        entry,
+      }
     : null;
 }
 export { answerEvidenceText } from "@resumora/contracts/intelligence/model";
