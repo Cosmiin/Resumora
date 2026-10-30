@@ -34,8 +34,10 @@ for (const format of ['doc', 'docx']) {
     assert.match(response.headers.get('Content-Type'), /application\/json/);
     const data = await response.json();
     assert.deepEqual(data, { importId: id, format, sourceHash, text: format === 'doc' ? text : text + '\n' });
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
     assert.match(calls[0], /get_cv_import_source$/);
+    assert.match(calls[1], /storage\/v1\/object\/authenticated\/cv-imports\//);
+    assert.equal(calls[2], calls[0], "reauthorize the same owned source after Storage read");
     hash = 'a'.repeat(64);
     assert.equal((await request()).status, 503);
     denied = true;

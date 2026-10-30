@@ -27,11 +27,20 @@ export function importGateway(
           const row = await rpc<ImportRecord>("get_cv_import_source", {
             p_source: importId,
           });
-          return {
-            bytes: await readOriginal(row.objectKey),
-            format: row.format,
-            sourceHash: row.sourceHash,
-          };
+          const bytes = await readOriginal(row.objectKey);
+          // Storage is nontransactional. Recheck the owned live source after the
+          // asynchronous read so removal/revocation cannot serve a late original.
+          const current = await rpc<ImportRecord>("get_cv_import_source", {
+            p_source: importId,
+          });
+          if (
+            current.id !== row.id ||
+            current.operationId !== row.operationId ||
+            current.objectKey !== row.objectKey ||
+            current.format !== row.format ||
+            current.sourceHash !== row.sourceHash
+          ) throw new Error("SOURCE_MISMATCH");
+          return { bytes, format: row.format, sourceHash: row.sourceHash };
         },
         begin: (input) =>
           rpc("begin_cv_import", {
