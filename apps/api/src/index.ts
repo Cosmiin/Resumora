@@ -1,4 +1,4 @@
-import { processJobWorkflow } from "./jobs/processor.ts";
+import { processJobWorkflow,drainJobWorkflows } from "./jobs/processor.ts";
 import { jobWorkflowRoute } from "./jobs/workflow.ts";
 import { extensionRoute } from "./extension/routes.ts";
 import { processCaptures } from "./extension/processor.ts";
@@ -54,7 +54,7 @@ function json(
 export default {
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
     await processCaptures(env);
-    await processJobWorkflow(env);
+    await drainJobWorkflows(env);
   },
   async fetch(request: Request, env: Env, context?: Pick<ExecutionContext,"waitUntil">): Promise<Response> {
     const path = new URL(request.url).pathname;
@@ -127,7 +127,7 @@ export default {
           { status: 503 },
         );
       }
-      if(response.ok && request.method==='POST' && ((path==='/v1/jobs'||path==='/v1/jobs/url') || /\/workflow\/(extract|match|tailor|prepare)$/.test(path)))context?.waitUntil(processJobWorkflow(env).catch(()=>undefined));
+      if(response.ok && request.method==='POST' && ((path==='/v1/jobs'||path==='/v1/jobs/url') || /\/workflow\/(fetch|extract|match|tailor|prepare)$/.test(path)))context?.waitUntil(processJobWorkflow(env).catch(()=>undefined));
       const headers = new Headers(response.headers);
       for (const [name, value] of identity.headers) headers.set(name, value);
       return new Response(response.body, {

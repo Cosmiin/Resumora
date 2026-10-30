@@ -1,11 +1,11 @@
 import { decodeDraft,encodeDraft,type DraftSnapshot } from '@resumora/contracts/editor/transport';
-import { selfContainedJobDraft,type CurrentJobDocument } from '@resumora/contracts/jobs/current-document';
+import { selfContainedJobDraft,type CurrentJobWrite,type CurrentJobDocument } from '@resumora/contracts/jobs/current-document';
 import type { BaseDraft } from '@resumora/contracts/editor/model';
 import { isUuid } from '@resumora/contracts/jobs/connected';
 import { readBody } from '../cv/routes.ts';import { privateJson,routeError } from './routes.ts';
 export interface CurrentDocumentGateway{
  loadCurrentJobDocument(jobId:string,locale?:string):Promise<CurrentJobDocument|null>;
- saveCurrentJobDocument(input:{requestId:string;jobId:string;locale:string;documentId:string|null;expectedRevision:number;payload:ReturnType<typeof encodeDraft>;baseSnapshotId:string|null;operationId?:string;provenance?:Record<string,unknown>}):Promise<CurrentJobDocument>;
+ saveCurrentJobDocument(input:CurrentJobWrite):Promise<CurrentJobDocument>;
  jobEditorContext(jobId:string):Promise<{job:unknown;source:{snapshotId:string;revision:number}}>;
  loadSnapshot(id:string):Promise<DraftSnapshot|null>;
 }

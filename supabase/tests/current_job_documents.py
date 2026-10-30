@@ -1,5 +1,5 @@
 """Current-only job CV lifecycle and destructive-forward preservation proof."""
-import json,uuid,unittest,subprocess
+import json,uuid,unittest,subprocess,concurrent.futures
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 uid=lambda:str(uuid.uuid4())
@@ -53,6 +53,48 @@ def suite(db):
    self.assertIn('REQUEST_EXPIRED',self.save(key=key,error=True));self.assertIn('VERSION_CONFLICT',self.save(payload=updated,document=first['documentId'],revision=1,error=True))
    self.assertEqual(self.call('load_current_job_document',f"'{self.job['id']}','ro'")['id'],other['id'])
    self.assertEqual(self.call('load_current_job_document',f"'{self.job['id']}',NULL")['id'],second['id'])
+  def test_primary_default_and_explicit_locale_workflow_pins_do_not_follow_last_translated_save(self):
+   ro=json.loads(json.dumps(self.payload));ro['content']['language']='ro';primary=self.save(locale='ro',payload=ro);en=self.save(locale='en')
+   translated=json.loads(json.dumps(self.payload));translated['content']['summary']['text']='Latest EN text'
+   en=self.save(locale='en',payload=translated,document=en['documentId'],revision=1)
+   self.assertEqual(self.call('load_current_job_document',f"'{self.job['id']}',NULL")['id'],primary['id'])
+   self.assertEqual(self.call('load_current_job_document',f"'{self.job['id']}','en'")['id'],en['id'])
+   secret='synthetic-primary-workflow-worker-secret-32-characters'
+   db.sql(f"INSERT INTO app.ai_worker_authorization VALUES(true,sha256(convert_to('{secret}','UTF8'))) ON CONFLICT(singleton) DO UPDATE SET secret_hash=EXCLUDED.secret_hash;UPDATE app.job_workflow_operations SET state='cancelled',lease=NULL WHERE state IN ('queued','processing');UPDATE app.job_workflows SET reviewed='{{}}' WHERE job_id='{self.job['id']}'")
+   request=lambda kind,locale='NULL':self.call('request_job_workflow',f"'{uid()}','{self.job['id']}','{kind}',1,NULL,{locale}")
+   claim=lambda:self.call('claim_job_workflow',f"'{secret}',false",role='anon')
+   finish=lambda task:self.call('finish_job_workflow',f"'{secret}','{task['lease']}','{{}}',NULL",role='anon')
+   operation=request('match');self.assertEqual(operation['documentVersionId'],primary['id']);self.assertEqual(operation['targetLocale'],'en');self.assertEqual(operation['targetDocumentVersionId'],en['id'])
+   task=claim();en=self.save(locale='en',document=en['documentId'],revision=2);self.assertEqual(finish(task)['state'],'ready')
+   # New generation has an independent EN target pin while matching source is primary RO.
+   operation=request('prepare');self.assertEqual(operation['documentVersionId'],primary['id']);self.assertEqual(operation['targetDocumentVersionId'],en['id'])
+   task=claim();en=self.save(locale='en',document=en['documentId'],revision=3);self.assertEqual(finish(task)['state'],'stale')
+   operation=request('match',"'en'");self.assertEqual(operation['documentVersionId'],en['id']);task=claim();en=self.save(locale='en',document=en['documentId'],revision=4);self.assertEqual(finish(task)['state'],'stale')
+   self.assertEqual(self.call('load_current_job_document',f"'{self.job['id']}',NULL")['id'],primary['id'])
+  def test_current_photo_asset_is_owned_and_survives_base_detachment(self):
+   own,foreign=uid(),uid();a=self.call('provision_workspace',f"'{uid()}'")['tenantId'];b=self.call('provision_workspace',f"'{uid()}'",user=self.b)['tenantId']
+   secret='synthetic-photo-worker-secret-at-least-32-characters'
+   db.sql(f"INSERT INTO app.photo_worker_config VALUES(true,sha256(convert_to('{secret}','UTF8'))) ON CONFLICT(singleton) DO UPDATE SET secret_hash=EXCLUDED.secret_hash")
+   for tenant,photo in [(a,own),(b,foreign)]:db.sql(f"INSERT INTO app.photo_assets(id,tenant_id,object_key,sha256,width,height,byte_size,state,created_at) VALUES('{photo}','{tenant}','{tenant}/{photo}.jpg','{'a'*64}',256,256,100,'ready',now()-interval '2 days')")
+   p=json.loads(json.dumps(self.payload));p['content']['presentation']['photo']={'assetId':foreign,'shape':'circle','visible':True,'crop':{'version':1,'centerX':0.5,'centerY':0.5,'zoom':1}}
+   self.assertIn('PHOTO_NOT_AVAILABLE',self.save(payload=p,error=True))
+   p['content']['presentation']['photo']['assetId']=own;self.save(payload=p)
+   self.raw('prepare_job_documents_for_base_removal',f"'{a}'",role=None)
+   self.call('expire_photo_uploads',f"'{secret}'")
+   self.assertEqual(db.sql(f"SELECT state FROM app.photo_assets WHERE id='{own}'"),'ready')
+  def test_two_parallel_current_saves_have_one_winner_and_no_content_archive(self):
+   first=self.save()
+   def attempt(_):
+    try:return self.save(document=first['documentId'],revision=1)
+    except AssertionError as error:return str(error)
+   with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(attempt,range(2)))
+   self.assertEqual(sum(isinstance(r,dict) for r in results),1);self.assertEqual(sum('VERSION_CONFLICT' in str(r) for r in results),1)
+   self.assertEqual(db.sql(f"SELECT count(*) FROM app.job_editor_versions WHERE document_id='{first['documentId']}'"),'1')
+  def test_source_context_cannot_be_hidden_in_current_document_payload(self):
+   bad=json.loads(json.dumps(self.payload));bad['answers']=[{'text':'PRIVATE_ANSWER'}]
+   self.assertIn('INVALID_EDITOR_PAYLOAD',self.save(payload=bad,error=True))
+   bad=json.loads(json.dumps(self.payload));bad['content']['sources'][0]['text']='PRIVATE_SOURCE'
+   self.assertIn('INVALID_EDITOR_PAYLOAD',self.save(payload=bad,error=True))
   def test_foreign_account_historical_backdoors_and_public_helper_execution_denied(self):
    self.save();self.assertIn('SNAPSHOT_NOT_FOUND',self.raw('load_current_job_document',f"'{self.job['id']}',NULL",user=self.b,error=True))
    self.assertIn('SNAPSHOT_NOT_FOUND',self.save(user=self.b,error=True))

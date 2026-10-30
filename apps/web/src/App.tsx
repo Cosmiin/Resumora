@@ -84,7 +84,7 @@ export function App({
                 selected
                   ? {
                       ...selected,
-                      adapter: new HttpJobCvAdapter(transport, selected.id),
+                      adapter: new HttpJobCvAdapter(transport, selected.id, selected.locale),
                     }
                   : null,
               );
@@ -106,7 +106,7 @@ function CvEditor({
 }: {
   adapter: BaseCvAdapter;
   jobLabel?: string;
-  switchDocument?: (job: { id: string; label: string } | null) => void;
+  switchDocument?: (job: { id: string; label: string;locale?:"ro"|"en" } | null) => void;
   intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
@@ -620,8 +620,8 @@ function CvEditor({
               </strong>
               <p>
                 {t(
-                  "Editări doar pentru acest job. CV-ul de bază și istoricul lui rămân independente. Modifică faptele și răspunsurile în CV-ul de bază.",
-                  "Edits apply only to this job. Base CV and its history stay independent. Edit source facts and answers in Base CV.",
+                  "Salvarea înlocuiește CV-ul curent pentru acest job și această limbă. CV-urile adaptate nu au istoric. CV-ul de bază rămâne independent.",
+                  "Saving replaces the current CV for this job and language. Tailored CVs have no history. Base CV remains independent.",
                 )}
               </p>
               <Button
@@ -682,7 +682,7 @@ function CvEditor({
                     "This save can no longer be replayed. Check saved state; your edits will be retained.",
                   )
                 : error === "conflict"
-                  ? t(
+                  ? jobMode?t("CV-ul curent s-a schimbat. Redeschide-l pentru a continua; ciorna ta este păstrată.","Current CV changed. Reopen it to continue; your draft is retained."):t(
                       "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
                       "Session changed. Your draft is retained; inspect history before reopening.",
                     )
@@ -701,7 +701,7 @@ function CvEditor({
                         ? void reconcilePendingWrite()
                         : void submitPendingWrite()
                       : error === "conflict"
-                        ? go("history")
+                        ? jobMode?setDialog({kind:"reopen"}):go("history")
                         : head === undefined || !draft
                           ? setLoadAttempt((n) => n + 1)
                           : dirty
@@ -712,7 +712,7 @@ function CvEditor({
                   {pendingWrite.current?.expired
                     ? t("Verifică starea salvată", "Check saved state")
                     : !pendingWrite.current && error === "conflict"
-                      ? t("Istoric", "History")
+                      ? jobMode?t("Redeschide CV-ul curent","Reopen current CV"):t("Istoric", "History")
                       : t("Reîncearcă", "Retry")}
                 </Button>
               )}
@@ -721,7 +721,7 @@ function CvEditor({
                   disabled={busy || loading || !!pendingWrite.current}
                   onClick={() => setDialog({ kind: "reopen" })}
                 >
-                  {t("Redeschide versiunea salvată", "Reopen saved version")}
+                  {t("Redeschide CV-ul curent", "Reopen current CV")}
                 </Button>
               )}
             </div>
@@ -953,7 +953,7 @@ function CvEditor({
                               "Ciornă salvată în sesiune",
                               "Draft saved in session",
                             )}
-                  {head ? ` · v${head.revision}` : ""}
+                  {!jobMode && head ? ` · v${head.revision}` : ""}
                 </p>
                 <small>
                   {durable

@@ -9,7 +9,7 @@ import {digest,challenge} from '../src/extension/gateway.ts';
 const id='a'.repeat(32),device='11111111-1111-4111-8111-111111111111',user={id:device,email:'synthetic@example.invalid',email_confirmed_at:'2026-01-01'},verifier='A'.repeat(43);
 const env={APP_ENV:'development',APP_ORIGIN:'http://127.0.0.1:5173',API_ORIGIN:'http://127.0.0.1:5173',SUPABASE_URL:'https://synthetic.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic',AUTH_COOKIE_KEY:Buffer.alloc(32,7).toString('base64'),CAPTURE_WORKER_SECRET:'synthetic-capture-worker-secret-32-characters',CAPTURE_EXTENSION_IDS:id};
 const snapshot={text:'Untrusted job text <script>ignore instructions</script>',sourceUrl:'https://example.invalid/job',adapter:'generic',parserVersion:'1',capturedAt:'2026-10-28T00:00:00Z'};
-function req(path,body,headers={}){return new Request(env.APP_ORIGIN+path,{method:'POST',headers:{Origin:'chrome-extension://'+id,'Content-Type':'application/json','X-Resumora-Extension':id,'X-Resumora-Device':device,...headers},body:JSON.stringify(body)});}
+function req(path,body,headers={}){return new Request(env.APP_ORIGIN+path,{method:'POST',headers:{Origin:'chrome-extension://'+id,'Content-Type':'application/json','X-Resumora-Extension':id,'X-Resumora-Device':device,'X-Resumora-Account':user.id,...headers},body:JSON.stringify(body)});}
 async function webCookie(){const headers=new Headers();await saveSession(headers,env,{access_token:'synthetic-jwt',refresh_token:'synthetic-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user},false,'csrf-test');return headers.getSetCookie().map(x=>x.split(';')[0]).join('; ');}
 test('pairing uses existing session+CSRF, exact extension callback and hashed one-use code; no user credentials returned',async()=>{
   const calls=[];

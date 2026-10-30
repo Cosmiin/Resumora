@@ -9,7 +9,7 @@ CREATE TABLE app.job_workflows (
 CREATE TABLE app.job_workflow_operations (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),tenant_id uuid NOT NULL,user_id uuid NOT NULL,job_id uuid NOT NULL,
  kind text NOT NULL CHECK(kind IN ('fetch','extract','match','tailor')),job_revision bigint NOT NULL,
- snapshot_id uuid,snapshot_revision bigint,document_version_id uuid,match_id uuid,target_id text, then_tailor boolean NOT NULL DEFAULT false,
+ snapshot_id uuid,snapshot_revision bigint,document_version_id uuid,requested_locale text CHECK(requested_locale IN ('ro','en')),target_locale text NOT NULL DEFAULT 'ro' CHECK(target_locale IN ('ro','en')),target_document_version_id uuid,match_id uuid,target_id text, then_tailor boolean NOT NULL DEFAULT false,
  state text NOT NULL DEFAULT 'queued' CHECK(state IN ('queued','processing','ready','failed','cancelled','stale','unknown')),
  result jsonb CHECK(result IS NULL OR octet_length(result::text)<=524288),error text,
  created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),started_at timestamptz,lease uuid,
@@ -33,7 +33,7 @@ INSERT INTO app.job_workflows(tenant_id,job_id) SELECT tenant_id,job_id FROM app
 -- Historical jobs are not automatically sent to a model on migration.
 CREATE FUNCTION app.job_workflow_json(o app.job_workflow_operations) RETURNS jsonb LANGUAGE sql STABLE SET search_path='' AS $$
  SELECT jsonb_build_object('id',o.id,'kind',o.kind,'state',CASE WHEN o.state='processing' AND o.started_at<now()-interval '3 minutes' THEN 'unknown' ELSE o.state END,
- 'jobRevision',o.job_revision,'snapshotId',o.snapshot_id,'snapshotRevision',o.snapshot_revision,'documentVersionId',o.document_version_id,'result',o.result,'error',o.error,'createdAt',o.created_at)
+ 'jobRevision',o.job_revision,'snapshotId',o.snapshot_id,'snapshotRevision',o.snapshot_revision,'documentVersionId',o.document_version_id,'documentLocale',o.requested_locale,'targetLocale',o.target_locale,'targetDocumentVersionId',o.target_document_version_id,'result',o.result,'error',o.error,'createdAt',o.created_at)
 $$;
 CREATE FUNCTION app.get_job_workflow(p_job uuid) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
 DECLARE w uuid:=app.tenant_for_user(); f app.job_workflows; c app.target_job_contexts; operations jsonb; duplicates jsonb;
@@ -62,28 +62,32 @@ BEGIN
  UPDATE app.job_workflow_operations SET state='stale',lease=NULL WHERE job_id=p_job AND state IN ('queued','processing');
  RETURN app.finish_request(w,r.request_id,app.get_job_workflow(p_job));
 END $$;
-CREATE FUNCTION app.request_job_workflow(p_key uuid,p_job uuid,p_kind text,p_revision bigint,p_target text DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE w uuid:=app.tenant_for_user(); f app.job_workflows; s app.editor_draft_snapshots; o app.job_workflow_operations; r record; m uuid; doc uuid;
+CREATE FUNCTION app.request_job_workflow(p_key uuid,p_job uuid,p_kind text,p_revision bigint,p_target text DEFAULT NULL,p_locale text DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE w uuid:=app.tenant_for_user(); f app.job_workflows; s app.editor_draft_snapshots; o app.job_workflow_operations; r record; m uuid; doc uuid; target_doc uuid; target_locale text;
 BEGIN
- SELECT * INTO r FROM app.begin_request(w,'request_job_workflow',p_key,jsonb_build_object('job',p_job,'kind',p_kind,'revision',p_revision,'target',p_target));
+ SELECT * INTO r FROM app.begin_request(w,'request_job_workflow',p_key,jsonb_build_object('job',p_job,'kind',p_kind,'revision',p_revision,'target',p_target,'locale',p_locale));
  IF r.cached IS NOT NULL THEN RETURN r.cached; END IF;
  SELECT * INTO f FROM app.job_workflows WHERE tenant_id=w AND job_id=p_job FOR UPDATE;
  IF f.job_id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
  IF f.revision<>p_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
- IF p_kind IS NULL OR p_kind NOT IN ('extract','match','tailor','prepare') OR (p_target IS NOT NULL AND (p_kind<>'tailor' OR length(p_target) NOT BETWEEN 1 AND 256)) THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE'; END IF;
+ IF (p_locale IS NOT NULL AND p_locale NOT IN ('ro','en')) OR p_kind IS NULL OR p_kind NOT IN ('fetch','extract','match','tailor','prepare') OR (p_target IS NOT NULL AND (p_kind<>'tailor' OR length(p_target) NOT BETWEEN 1 AND 256)) THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE'; END IF;
  IF EXISTS(SELECT 1 FROM app.job_workflow_operations WHERE job_id=p_job AND state IN ('queued','processing') AND created_at>now()-interval '3 minutes') THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='COMMAND_IN_PROGRESS'; END IF;
- IF p_kind<>'extract' THEN
+ IF (p_kind='fetch' AND NOT EXISTS(SELECT 1 FROM app.target_job_contexts WHERE tenant_id=w AND job_id=p_job AND intake->>'text'='' AND intake->>'sourceUrl' IS NOT NULL)) OR (p_kind='extract' AND NOT EXISTS(SELECT 1 FROM app.target_job_contexts WHERE tenant_id=w AND job_id=p_job AND length(intake->>'text')>0)) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_REVIEWED_JOB';END IF;
+ IF p_kind NOT IN ('fetch','extract') THEN
   IF coalesce(f.reviewed,f.extracted) IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_REVIEWED_JOB'; END IF;
   SELECT * INTO s FROM app.editor_draft_snapshots WHERE tenant_id=w AND coalesce(to_jsonb(editor_draft_snapshots)->>'variant_id','default')='default' ORDER BY revision DESC LIMIT 1;
   IF s.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
-  SELECT v.id INTO doc FROM app.job_editor_versions v JOIN app.job_editor_documents d ON d.id=v.document_id WHERE v.tenant_id=w AND v.job_id=p_job AND d.deleted_at IS NULL AND coalesce(to_jsonb(d)->>'variant_id','default')='default' ORDER BY v.revision DESC LIMIT 1;
+  SELECT id INTO doc FROM app.current_job_document_row(w,p_job,p_locale);
+  target_locale:=coalesce(p_locale,s.payload#>>'{content,language}','ro');
+  SELECT id INTO target_doc FROM app.current_job_document_row(w,p_job,target_locale);
  END IF;
+ IF p_target IS NOT NULL AND p_target NOT IN ('summary','professionalSkills','technicalSkills') AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(s.payload#>'{content,roles}','[]')) e WHERE e->>'id'=p_target) AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(s.payload#>'{content,optionalSections}','[]')) section,LATERAL jsonb_array_elements(coalesce(section->'entries','[]')) e WHERE section->>'kind'<>'languages' AND e->>'id'=p_target) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
  IF p_kind='tailor' THEN
-  SELECT id INTO m FROM app.job_workflow_operations WHERE tenant_id=w AND job_id=p_job AND kind='match' AND state='ready' AND job_revision=f.revision AND snapshot_id=s.id AND document_version_id IS NOT DISTINCT FROM doc ORDER BY created_at DESC LIMIT 1;
+  SELECT id INTO m FROM app.job_workflow_operations WHERE tenant_id=w AND job_id=p_job AND kind='match' AND state='ready' AND job_revision=f.revision AND snapshot_id=s.id AND document_version_id IS NOT DISTINCT FROM doc AND requested_locale IS NOT DISTINCT FROM p_locale ORDER BY created_at DESC,id DESC LIMIT 1;
   IF m IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
  END IF;
- INSERT INTO app.job_workflow_operations(id,tenant_id,user_id,job_id,kind,job_revision,snapshot_id,snapshot_revision,document_version_id,match_id,target_id,then_tailor)
- VALUES(p_key,w,app.require_user(),p_job,CASE WHEN p_kind='prepare' THEN 'match' ELSE p_kind END,f.revision,s.id,s.revision,doc,m,p_target,p_kind='prepare') RETURNING * INTO o;
+ INSERT INTO app.job_workflow_operations(id,tenant_id,user_id,job_id,kind,job_revision,snapshot_id,snapshot_revision,document_version_id,requested_locale,target_locale,target_document_version_id,match_id,target_id,then_tailor)
+ VALUES(p_key,w,app.require_user(),p_job,CASE WHEN p_kind='prepare' THEN 'match' ELSE p_kind END,f.revision,s.id,s.revision,doc,p_locale,coalesce(target_locale,'ro'),target_doc,m,p_target,p_kind='prepare') RETURNING * INTO o;
  RETURN app.finish_request(w,r.request_id,app.job_workflow_json(o));
 END $$;
 CREATE FUNCTION app.cancel_job_workflow(p_job uuid,p_operation uuid) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
@@ -102,6 +106,7 @@ BEGIN
  IF f.job_id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
  IF f.revision<>p_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
  IF p_id IS NULL OR length(p_id) NOT BETWEEN 1 AND 256 OR p_state IS NULL OR p_state NOT IN ('include','dismissed','skipped','completed') THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE'; END IF;
+ IF octet_length(f.actions::text)>131072 THEN RAISE EXCEPTION USING ERRCODE='PT413',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
  UPDATE app.job_workflows SET actions=jsonb_set(actions,ARRAY[p_id],to_jsonb(p_state)) WHERE job_id=p_job;
  RETURN app.finish_request(w,r.request_id,app.get_job_workflow(p_job));
 END $$;
@@ -134,16 +139,18 @@ BEGIN
  RETURN jsonb_build_object('operation',app.job_workflow_json(o),'userId',o.user_id,'lease',o.lease,'jobId',o.job_id,'text',c.intake->>'text','sourceUrl',c.intake->>'sourceUrl','vacancy',coalesce(f.reviewed,f.extracted),'base',s.payload,'document',CASE WHEN d.id IS NULL THEN NULL ELSE app.current_job_document_json(d) END,'match',(SELECT result FROM app.job_workflow_operations WHERE id=o.match_id),'targetId',o.target_id,'actions',f.actions);
 END $$;
 CREATE FUNCTION app.finish_job_workflow(p_secret text,p_lease uuid,p_result jsonb,p_error text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE o app.job_workflow_operations; f app.job_workflows; latest uuid; doc uuid;
+DECLARE o app.job_workflow_operations; f app.job_workflows; latest uuid; doc uuid; target_doc uuid;
 BEGIN
  PERFORM app.require_ai_worker(p_secret);
  SELECT * INTO o FROM app.job_workflow_operations WHERE lease=p_lease AND state='processing' FOR UPDATE;
  IF o.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM app.tenants t JOIN app.tenant_memberships m ON m.tenant_id=t.id AND m.user_id=o.user_id WHERE t.id=o.tenant_id AND t.owner_user_id=o.user_id AND t.state='active' AND m.state='active') THEN UPDATE app.job_workflow_operations SET state='cancelled',result=NULL,lease=NULL WHERE id=o.id RETURNING * INTO o;RETURN app.job_workflow_json(o);END IF;
  SELECT * INTO f FROM app.job_workflows WHERE job_id=o.job_id FOR UPDATE;
  SELECT id INTO latest FROM app.editor_draft_snapshots WHERE tenant_id=o.tenant_id AND coalesce(to_jsonb(editor_draft_snapshots)->>'variant_id','default')='default' ORDER BY revision DESC LIMIT 1;
- SELECT v.id INTO doc FROM app.job_editor_versions v JOIN app.job_editor_documents d ON d.id=v.document_id WHERE v.tenant_id=o.tenant_id AND v.job_id=o.job_id AND d.deleted_at IS NULL AND coalesce(to_jsonb(d)->>'variant_id','default')='default' ORDER BY v.revision DESC LIMIT 1;
- IF o.job_revision<>f.revision OR (o.kind NOT IN ('fetch','extract') AND (latest IS DISTINCT FROM o.snapshot_id OR doc IS DISTINCT FROM o.document_version_id)) THEN UPDATE app.job_workflow_operations SET state='stale',lease=NULL WHERE id=o.id RETURNING * INTO o;RETURN app.job_workflow_json(o);END IF;
- IF (p_result IS NOT NULL AND (jsonb_typeof(p_result)<>'object' OR octet_length(p_result::text)>524288)) OR (p_error IS NOT NULL AND p_error NOT IN ('OUTPUT_INVALID','PROVIDER_UNAVAILABLE','INTERRUPTED')) THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE'; END IF;
+ SELECT id INTO doc FROM app.current_job_document_row(o.tenant_id,o.job_id,o.requested_locale);
+ SELECT id INTO target_doc FROM app.current_job_document_row(o.tenant_id,o.job_id,o.target_locale);
+ IF o.job_revision<>f.revision OR (o.kind NOT IN ('fetch','extract') AND (latest IS DISTINCT FROM o.snapshot_id OR doc IS DISTINCT FROM o.document_version_id OR ((o.kind='tailor' OR o.then_tailor) AND target_doc IS DISTINCT FROM o.target_document_version_id))) THEN UPDATE app.job_workflow_operations SET state='stale',lease=NULL WHERE id=o.id RETURNING * INTO o;RETURN app.job_workflow_json(o);END IF;
+ IF (p_result IS NOT NULL AND (jsonb_typeof(p_result)<>'object' OR octet_length(p_result::text)>524288)) OR (p_error IS NOT NULL AND p_error NOT IN ('OUTPUT_INVALID','PROVIDER_UNAVAILABLE','INTERRUPTED','INPUT_TOO_LARGE')) THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE'; END IF;
  UPDATE app.job_workflow_operations SET state=CASE WHEN p_result IS NULL THEN 'failed' ELSE 'ready' END,result=p_result,error=p_error,lease=NULL WHERE id=o.id RETURNING * INTO o;
  IF o.kind='fetch' AND p_result IS NOT NULL THEN
   IF jsonb_typeof(p_result->'text') IS DISTINCT FROM 'string' OR length(p_result->>'text') NOT BETWEEN 80 AND 200000 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_REVIEWED_JOB';END IF;
@@ -151,7 +158,7 @@ BEGIN
   INSERT INTO app.job_workflow_operations(tenant_id,user_id,job_id,kind,job_revision) VALUES(o.tenant_id,o.user_id,o.job_id,'extract',o.job_revision);
  END IF;
  IF o.kind='match' AND o.then_tailor AND p_result IS NOT NULL THEN
-  INSERT INTO app.job_workflow_operations(tenant_id,user_id,job_id,kind,job_revision,snapshot_id,snapshot_revision,document_version_id,match_id) VALUES(o.tenant_id,o.user_id,o.job_id,'tailor',o.job_revision,o.snapshot_id,o.snapshot_revision,o.document_version_id,o.id);
+  INSERT INTO app.job_workflow_operations(tenant_id,user_id,job_id,kind,job_revision,snapshot_id,snapshot_revision,document_version_id,requested_locale,target_locale,target_document_version_id,match_id) VALUES(o.tenant_id,o.user_id,o.job_id,'tailor',o.job_revision,o.snapshot_id,o.snapshot_revision,o.document_version_id,o.requested_locale,o.target_locale,o.target_document_version_id,o.id);
  END IF;
  IF o.kind='extract' AND p_result IS NOT NULL THEN UPDATE app.job_workflows SET extracted=p_result,revision=revision+1 WHERE job_id=o.job_id;UPDATE app.job_workflow_operations SET job_revision=job_revision+1 WHERE id=o.id RETURNING * INTO o; END IF;
  RETURN app.job_workflow_json(o);
@@ -162,7 +169,7 @@ CREATE FUNCTION app.job_workflow_attempt(p_secret text,p_lease uuid,p_start json
 DECLARE o app.job_workflow_operations; a app.ai_enhancement_attempts; created boolean;
 BEGIN
  PERFORM app.require_ai_worker(p_secret);
- SELECT * INTO o FROM app.job_workflow_operations WHERE lease=p_lease AND state='processing' AND started_at>now()-interval '3 minutes';
+ SELECT * INTO o FROM app.job_workflow_operations WHERE lease=p_lease AND state='processing' AND started_at>now()-interval '3 minutes' AND EXISTS(SELECT 1 FROM app.tenants t JOIN app.tenant_memberships m ON m.tenant_id=t.id AND m.user_id=job_workflow_operations.user_id WHERE t.id=job_workflow_operations.tenant_id AND t.owner_user_id=job_workflow_operations.user_id AND t.state='active' AND m.state='active');
  IF o.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
  IF p_start IS NOT NULL THEN
   IF p_start->>'operationId' IS DISTINCT FROM o.id::text OR p_start->>'userId' IS DISTINCT FROM o.user_id::text OR p_start->>'provider' NOT IN ('openrouter','openai') OR p_start->>'attemptId' IS DISTINCT FROM (o.id::text||CASE p_start->>'provider' WHEN 'openrouter' THEN '-primary' ELSE '-fallback' END) THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='RESOURCE_FORBIDDEN';END IF;
@@ -177,8 +184,8 @@ BEGIN
  UPDATE app.ai_enhancement_attempts SET result_data=p_result WHERE id=a.id;
  RETURN a.start_data||jsonb_build_object('result',p_result,'duplicateOf',NULL);
 END $$;
-REVOKE EXECUTE ON FUNCTION app.initialize_job_workflow(),app.job_workflow_json(app.job_workflow_operations),app.get_job_workflow(uuid),app.review_job_workflow(uuid,uuid,bigint,jsonb),app.request_job_workflow(uuid,uuid,text,bigint,text),app.cancel_job_workflow(uuid,uuid),app.job_workflow_action(uuid,uuid,bigint,text,text),app.claim_job_workflow(text,boolean),app.finish_job_workflow(text,uuid,jsonb,text),app.job_workflow_attempt(text,uuid,jsonb,text,jsonb) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION app.get_job_workflow(uuid),app.review_job_workflow(uuid,uuid,bigint,jsonb),app.request_job_workflow(uuid,uuid,text,bigint,text),app.cancel_job_workflow(uuid,uuid),app.job_workflow_action(uuid,uuid,bigint,text,text) TO authenticated;
+REVOKE EXECUTE ON FUNCTION app.initialize_job_workflow(),app.job_workflow_json(app.job_workflow_operations),app.get_job_workflow(uuid),app.review_job_workflow(uuid,uuid,bigint,jsonb),app.request_job_workflow(uuid,uuid,text,bigint,text,text),app.cancel_job_workflow(uuid,uuid),app.job_workflow_action(uuid,uuid,bigint,text,text),app.claim_job_workflow(text,boolean),app.finish_job_workflow(text,uuid,jsonb,text),app.job_workflow_attempt(text,uuid,jsonb,text,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION app.get_job_workflow(uuid),app.review_job_workflow(uuid,uuid,bigint,jsonb),app.request_job_workflow(uuid,uuid,text,bigint,text,text),app.cancel_job_workflow(uuid,uuid),app.job_workflow_action(uuid,uuid,bigint,text,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION app.claim_job_workflow(text,boolean),app.finish_job_workflow(text,uuid,jsonb,text),app.job_workflow_attempt(text,uuid,jsonb,text,jsonb) TO anon;
 -- Context for a NEW job document always resolves latest saved Base. Existing
 -- document versions retain their original source and independent history.
@@ -214,7 +221,7 @@ DECLARE w uuid; r record; job uuid; c app.target_job_contexts;
 BEGIN
  PERFORM app.provision_workspace(p_key);w:=app.tenant_for_user();
  SELECT * INTO r FROM app.begin_request(w,'save_target_url',p_key,jsonb_build_object('url',p_url));IF r.cached IS NOT NULL THEN RETURN r.cached;END IF;
- IF p_url IS NULL OR length(p_url)>2048 OR p_url !~ '^https://(boards.greenhouse.io|job-boards.greenhouse.io|jobs.ashbyhq.com|jobs.lever.co|jobs.smartrecruiters.com)/[^/]' OR p_url ~ '[[:space:]]' THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
+ IF p_url IS NULL OR length(p_url)>2048 OR p_url !~ '^https://(boards[.]greenhouse[.]io|job-boards[.]greenhouse[.]io|jobs[.]ashbyhq[.]com|jobs[.]lever[.]co|jobs[.]smartrecruiters[.]com)/[^/]' OR p_url ~ '[[:space:]]' THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
  INSERT INTO app.jobs(tenant_id,draft_payload) VALUES(w,jsonb_build_object('text','','sourceUrl',p_url)) RETURNING id INTO job;
  INSERT INTO app.target_job_contexts(tenant_id,job_id,intake,requirements) VALUES(w,job,jsonb_build_object('text','','sourceUrl',p_url),'[]') RETURNING * INTO c;
  RETURN app.finish_request(w,r.request_id,app.target_job_json(c));
@@ -230,6 +237,7 @@ GRANT EXECUTE ON FUNCTION app.job_editor_current_pin(uuid) TO authenticated;
 CREATE FUNCTION app.link_job_source_version(p_key uuid,p_job uuid,p_parent uuid,p_revision bigint) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE w uuid:=app.tenant_for_user(); f app.job_workflows; r record;
 BEGIN
+ PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;
  SELECT * INTO r FROM app.begin_request(w,'link_job_source_version',p_key,jsonb_build_object('job',p_job,'parent',p_parent,'revision',p_revision));IF r.cached IS NOT NULL THEN RETURN r.cached;END IF;
  SELECT * INTO f FROM app.job_workflows WHERE tenant_id=w AND job_id=p_job FOR UPDATE;
  IF f.job_id IS NULL OR NOT EXISTS(SELECT 1 FROM app.job_workflows WHERE tenant_id=w AND job_id=p_parent) THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
@@ -239,3 +247,12 @@ BEGIN
 END $$;
 REVOKE EXECUTE ON FUNCTION app.link_job_source_version(uuid,uuid,uuid,bigint) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION app.link_job_source_version(uuid,uuid,uuid,bigint) TO authenticated;
+CREATE OR REPLACE FUNCTION app.list_target_jobs() RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT coalesce(jsonb_agg(jsonb_build_object('id',j.job_id,'createdAt',j.created_at,'state',CASE WHEN f.reviewed IS NOT NULL OR j.job_version_id IS NOT NULL THEN 'reviewed' ELSE 'draft' END,
+ 'title',left(coalesce(f.reviewed#>>'{overview,title,value}',f.extracted#>>'{overview,title,value}',j.intake->>'title',''),200),
+ 'company',coalesce(f.reviewed#>>'{overview,company,value}',f.extracted#>>'{overview,company,value}',j.intake->>'company'),
+ 'location',coalesce(f.reviewed#>>'{overview,location,value}',f.extracted#>>'{overview,location,value}',j.intake->>'location'),
+ 'workArrangement',coalesce(f.reviewed#>>'{overview,workArrangement,value}',f.extracted#>>'{overview,workArrangement,value}'),
+ 'analysisState',(SELECT state FROM app.job_workflow_operations o WHERE o.job_id=j.job_id AND o.kind='extract' ORDER BY created_at DESC,id DESC LIMIT 1)) ORDER BY j.created_at DESC,j.job_id),'[]')
+ FROM (SELECT * FROM app.target_job_contexts WHERE tenant_id=app.tenant_for_user() ORDER BY created_at DESC,job_id LIMIT 50) j LEFT JOIN app.job_workflows f ON f.job_id=j.job_id
+$$;

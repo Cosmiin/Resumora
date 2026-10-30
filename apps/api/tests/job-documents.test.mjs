@@ -71,67 +71,6 @@ test('pending proposals, fact/title/date/source re-attestation, wrong entity/val
   assert.equal(isJobEditorPayload(payload), true);
 });
 
-test('route uses pinned owned snapshot; save/load/history/version/restore/delete remain scoped with strict bodies and cursors', async () => {
-  const { source, payload, row } = fixture(); const calls = [];
-  const gateway = {
-    loadSnapshot: async id => { calls.push(['source', id]); return source; },
-    jobEditorContext: async id => ({ job: payload.job, source: payload.source }),
-    saveJobEditor: async (id, input) => { calls.push(['save',id,input]); return row; },
-    loadJobEditor: async (...args) => { calls.push(['load',...args]); return row; },
-    jobEditorHistory: async (...args) => { calls.push(['history',...args]); return [row]; },
-    restoreJobEditor: async (...args) => { calls.push(['restore',...args]); return { ...row, revision: 2, reason: 'restore', restoredFrom: row.id }; },
-    deleteJobEditor: async (...args) => { calls.push(['delete',...args]); return { documentId: row.documentId, deleted: true }; },
-  };
-  const save = { requestId: uid(), expectedRevision: 0, documentId: null, payload };
-  let response = await jobDocumentsRoute(req(payload.job.id, '/save', save), gateway); assert.equal(response.status, 200);
-  const saved = await response.json(); assert.equal(saved.draft.presentation.templateVersionId, 'future-template-v9');
-  assert.equal('sourcePayload' in saved, false); assert.deepEqual(saved.payload, payload);
-  assert.equal(calls[1][1], payload.job.id); assert.deepEqual(calls[1][2], save);
-  assert.equal((await jobDocumentsRoute(req(payload.job.id), gateway)).status, 200);
-  await jobDocumentsRoute(req(payload.job.id, '', undefined, `?documentId=${row.documentId}&versionId=${row.id}`), gateway);
-  assert.deepEqual(calls.at(-1), ['load',payload.job.id,row.documentId,row.id]);
-  await jobDocumentsRoute(req(payload.job.id, '/history', undefined, `?documentId=${row.documentId}&beforeRevision=2`), gateway);
-  assert.deepEqual(calls.at(-1), ['history',payload.job.id,row.documentId,{ beforeRevision: 2, limit: 20 }]);
-  const command = { requestId: uid(), documentId: row.documentId, expectedRevision: 1 };
-  assert.equal((await jobDocumentsRoute(req(payload.job.id, '/restore', { ...command, versionId: row.id }), gateway)).status, 200);
-  assert.equal((await jobDocumentsRoute(req(payload.job.id, '/delete', command), gateway)).status, 200);
-  for (const query of ['?documentId=foreign', `?documentId=${row.documentId}&beforeRevision=0`, `?documentId=${row.documentId}&beforeRevision=2&beforeRevision=3`, '?tenantId=spoofed'])
-    assert.equal((await jobDocumentsRoute(req(payload.job.id, '/history', undefined, query), gateway)).status, 400);
-  for (const body of [{ ...save, userId: uid() }, { ...save, payload: { ...payload, acceptance: 'pending' } }, { ...save, expectedRevision: -1 }])
-    assert.equal((await jobDocumentsRoute(req(payload.job.id, '/save', body), gateway)).status, 400);
-  const count = calls.length;
-  assert.equal((await jobDocumentsRoute(req(payload.job.id, '/save', { ...save, payload: { ...payload, job: { ...payload.job, id: uid() } } }), gateway)).status, 400);
-  assert.equal(calls.length, count);
-  assert.equal((await jobDocumentsRoute(req(payload.job.id, '/save', save), { ...gateway, loadSnapshot: async () => null })).status, 404);
-  assert.equal((await jobDocumentsRoute(req(payload.job.id, '/save'), gateway)).status, 405);
-  assert.equal((await jobDocumentsRoute(req(payload.job.id, '/restore', { ...command, versionId: uid() }), { ...gateway,
-    restoreJobEditor: async () => { throw { status: 409, code: 'IDEMPOTENCY_BODY_MISMATCH' }; } })).status, 409);
-});
-
-test('gateway sends only authenticated RPC arguments and validates job editor responses', async () => {
-  const { source, payload, row } = fixture(); const calls = [];
-  const gateway = createDatabaseGateway({ SUPABASE_URL: 'https://synthetic.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic' },
-    { user: { id: uid() }, accessToken: 'synthetic-token' }, async (url, init) => {
-      const args = JSON.parse(init.body); const name = url.split('/').at(-1); calls.push({ name,args,headers:init.headers });
-      return Response.json(name === 'job_editor_context' ? { job: payload.job, source: payload.source }
-        : name === 'job_editor_history' ? [row] : name === 'delete_job_editor' ? { documentId: row.documentId, deleted: true } : row);
-    });
-  const input = { requestId: uid(), documentId: null, expectedRevision: 0, payload, userId: 'spoofed' };
-  assert.deepEqual(await gateway.saveJobEditor(payload.job.id, input), row);
-  assert.deepEqual(calls[0].args, { p_key: input.requestId, p_job: payload.job.id, p_document: null, p_expected_revision: 0, p_payload: payload });
-  assert.equal(calls[0].headers.Authorization, 'Bearer synthetic-token');
-  await gateway.jobEditorContext(payload.job.id); await gateway.loadJobEditor(payload.job.id, row.documentId, row.id);
-  await gateway.jobEditorHistory(payload.job.id, row.documentId, { beforeRevision: 4 });
-  await gateway.restoreJobEditor(payload.job.id, { ...input, documentId: row.documentId, versionId: row.id });
-  await gateway.deleteJobEditor(payload.job.id, { ...input, documentId: row.documentId });
-  assert.deepEqual(calls.map(c => c.name), ['save_job_editor','job_editor_context','load_job_editor','job_editor_history','restore_job_editor','delete_job_editor']);
-  for (const run of [() => gateway.loadJobEditor(payload.job.id, row.documentId), () => gateway.jobEditorHistory(payload.job.id,row.documentId,{ beforeRevision: 0 }),
-    () => gateway.saveJobEditor(payload.job.id,{ ...input,payload:{ ...payload, acceptance:'pending' } })]) assert.throws(run);
-  const bad = createDatabaseGateway({ SUPABASE_URL: 'https://synthetic.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic' },
-    { user: { id: uid() }, accessToken: 'synthetic-token' }, async () => Response.json({ ...row, payload: { ...payload, acceptance: 'pending' } }));
-  await assert.rejects(bad.loadJobEditor(payload.job.id), error => error.status === 503);
-});
-
 test('I0 integration preserves imported metadata and selected answer evidence in the job projection', async () => {
   const { readFileSync } = await import('node:fs');
   const { answerEvidenceText } = await import('../../../packages/contracts/src/intelligence/model.ts');
@@ -153,13 +92,7 @@ test('I0 integration preserves imported metadata and selected answer evidence in
   assert.equal(projection.roles[0].context.value, 'Maintained PLC systems');
   assert.equal(JSON.stringify(projection.presentation.approvedWording).includes('Pending Base proposal must not be applied'), false);
   assert.deepEqual(decodeDraft(encodeDraft(projection)), projection); assert.deepEqual(sourcePayload, original);
-  // The authenticated route must return the same projection from the owned pin,
-  // and cannot receive import metadata as caller-supplied career facts.
-  f.row.payload = f.payload; f.row.sourcePayload = sourcePayload;
-  const response = await jobDocumentsRoute(req(f.payload.job.id, '/save', { requestId: uid(), documentId: null, expectedRevision: 0, payload: f.payload }), {
-    loadSnapshot: async () => f.source, saveJobEditor: async () => f.row,
-  });
-  assert.equal(response.status, 200); assert.deepEqual((await response.json()).draft, projection);
+
 });
 
 
@@ -181,10 +114,7 @@ test('job-local summary and ordered competence selection preserve source facts a
   assert.throws(() => projectJobEditor(source.payload, payload));
   payload.presentation.technicalSkillIds = ['foreign'];
   assert.throws(() => projectJobEditor(source.payload, payload));
-  const context = await jobDocumentsRoute(req(payload.job.id, '/context'), {
-    jobEditorContext: async () => ({ job: payload.job, source: payload.source }), loadSnapshot: async () => source,
-  });
-  assert.deepEqual((await context.json()).draft, d);
+
 });
 
 
@@ -210,3 +140,5 @@ test('whole-experience scope is optional, strict, and preserved in the projected
   assert.equal(projectJobEditor(source.payload, payload).presentation.approvedWording[role.id].scope, undefined);
   assert.deepEqual(source, original);
 });
+
+test('mounted current-only route refuses historical selectors before any storage read',async()=>{const id=uid();let reads=0;const gateway={loadCurrentJobDocument:async()=>{reads++;return null;}};for(const action of ['/history','/restore'])assert.equal((await jobDocumentsRoute(req(id,action),gateway)).status,410);assert.equal((await jobDocumentsRoute(req(id,'',undefined,'?versionId='+uid()),gateway)).status,400);assert.equal(reads,0);});

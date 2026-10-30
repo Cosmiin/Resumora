@@ -5,7 +5,7 @@ import { configuredStructuredRunner,type IntelligenceConfig } from '../intellige
 import type { UsageLedger,Attempt,AttemptStart,AttemptResult } from '../ai/ledger.ts';
 import { jobOperations } from './operations.ts';
 import { decodeDraft,type EditorWireEnvelope } from '@resumora/contracts/editor/transport';
-import { eligibleEvidence,type WorkflowOperation,type Vacancy,type MatchResult } from '@resumora/contracts/jobs/workflow';
+import { deriveJobSuggestions,eligibleEvidence,type WorkflowOperation,type Vacancy,type MatchResult } from '@resumora/contracts/jobs/workflow';
 import type { CurrentJobDocument } from '@resumora/contracts/jobs/current-document';
 export type ClaimedJob={operation:WorkflowOperation;lease:string;jobId:string;userId:string;text:string;sourceUrl?:string;vacancy:Vacancy|null;base:EditorWireEnvelope|null;document:CurrentJobDocument|null;match:MatchResult|null;targetId:string|null;actions:unknown};
 export interface JobWorkerStore {claim():Promise<ClaimedJob|null>;finish(lease:string,result:unknown,error:string|null):Promise<unknown>;ledger(lease:string):UsageLedger;}
@@ -27,13 +27,20 @@ export async function processJobWorkflow(env:IntelligenceConfig & DatabaseConfig
   if(task.operation.kind==='extract')result=await operations.extract({...common,text:task.text});
   else {
    if(!task.base||!task.vacancy)throw Error('INVALID_WORKFLOW_OUTPUT');
-   const draft=decodeDraft(task.base),evidence=eligibleEvidence(draft);
+   const draft=decodeDraft(task.base);if(task.operation.kind==='tailor'&&task.operation.targetLocale)draft.language=task.operation.targetLocale;const evidence=eligibleEvidence(draft);
    // Profile uses latest immutable Base/context, CV presence uses the pinned
    // accepted document projection only when it shares that exact source.
-   if(task.document){const visible=eligibleEvidence(decodeDraft(task.document.payload));for(const e of evidence)e.inCv=visible.some(v=>v.id===e.id&&v.text===e.text&&v.inCv);}
-   result=task.operation.kind==='match'?await operations.match({...common,draft,vacancy:task.vacancy,evidence}):await operations.tailor({...common,draft,vacancy:task.vacancy,match:task.match!,...(task.targetId?{onlyTarget:task.targetId}:{}),actions:task.actions});
+   if(task.document){const rendered=decodeDraft(task.document.payload),visible=eligibleEvidence(rendered);for(const e of evidence){const exact=visible.find(v=>v.id===e.id&&v.text===e.text&&v.inCv);e.inCv=!!exact;
+    const target=rendered.roles.find(r=>r.id===e.targetId)??rendered.optionalSections.flatMap(s=>s.entries).find(s=>s.id===e.targetId);
+    if(target&&['context','details','bullet','answer'].includes(e.key)){const body='context' in target?target.context.value:target.details.value;const section=rendered.roles.includes(target as typeof rendered.roles[number])?'experience':rendered.optionalSections.find(s=>s.entries.some(v=>v.id===target.id))?.id;const field='context' in target?target.context:target.details;if(!rendered.presentation.hidden.includes(section??'')&&!rendered.presentation.hiddenFields?.includes(field.fieldId)){e.cvText=[body,...(target.bullets??[]).filter(b=>!rendered.presentation.hiddenFields?.includes(b.fieldId)).map(b=>b.value)].join('\n');e.inCv=!!e.cvText.trim();}}
+   }}
+   result=task.operation.kind==='match'?await operations.match({...common,draft,vacancy:task.vacancy,evidence}):await operations.tailor({...common,draft,vacancy:task.vacancy,match:task.match!,...(task.targetId?{onlyTarget:task.targetId}:{}),actions:await deriveJobSuggestions(task.vacancy,task.match!,evidence,{revision:task.operation.jobRevision,snapshotId:task.operation.snapshotId!,actions:task.actions as Record<string,string>})});
   }
   await store.finish(task.lease,result,null);
- }catch(error){await store.finish(task.lease,null,error instanceof Error&&error.message==='INVALID_WORKFLOW_OUTPUT'?'OUTPUT_INVALID':'PROVIDER_UNAVAILABLE');}
+ }catch(error){await store.finish(task.lease,null,error instanceof Error&&error.message==='INVALID_WORKFLOW_OUTPUT'?'OUTPUT_INVALID':error instanceof Error&&error.message==='WORKFLOW_INPUT_TOO_LARGE'?'INPUT_TOO_LARGE':'PROVIDER_UNAVAILABLE');}
  return {processed:1};
+}
+
+export async function drainJobWorkflows(env:IntelligenceConfig & DatabaseConfig){
+ for(let n=0;n<3;n++){const result=await processJobWorkflow(env);if(!result.processed)return;}
 }
