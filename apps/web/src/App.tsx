@@ -174,7 +174,7 @@ function CvEditor({
   useEffect(() => {
     const change = () => {
       const next = currentRoute();
-      setRoute(jobMode && !["base", "history"].includes(next) ? "base" : next);
+      setRoute(jobMode && next!=="base" ? "base" : next);
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
@@ -658,10 +658,10 @@ function CvEditor({
             </h1>
             {editing && (
               <div className="actions">
-                <Button onClick={() => go("history")}>
+                {!jobMode&&<Button onClick={() => go("history")}>
                   <History size={16} />
                   {t("Istoric", "History")}
-                </Button>
+                </Button>}
                 {!jobMode && (
                   <Button
                     onClick={() => go(route === "enrich" ? "base" : "enrich")}
@@ -888,7 +888,7 @@ function CvEditor({
                   asOf={asOf}
                 />
               )}
-              {route === "history" && (
+              {!jobMode && route === "history" && (
                 <HistoryScreen
                   durable={durable}
                   draft={!!draft}

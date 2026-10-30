@@ -65,6 +65,47 @@ export async function configuredIntelligenceRoute(
       throw new Error("REPORT_UNCONNECTED");
     },
   };
+  const run = configuredStructuredRunner(env, userId, ledger, signal, transport, gateway.reserveDocumentOperation);
+  const operations = intelligenceOperations(run),
+    store = gateway.createImportStore(secret);
+  const workflow = importWorkflow({
+    userId,
+    store,
+    operations,
+    aiEnabled: enabled,
+    processor: ({ format, bytes }) =>
+      format === "pdf"
+        ? preflightPdf(bytes)
+        : preflightWord(format as "doc" | "docx", bytes),
+  });
+  return intelligenceRoute(request, {
+    enabled,
+    userId,
+    signal,
+    operations,
+    workflow,
+    gateway: {
+      loadSnapshot: gateway.loadSnapshot,
+      loadDraft: gateway.loadDraft,
+      reserveCareer: async (input) =>
+        (
+          await gateway.reserveEnhancement({
+            operationId: input.operationId,
+            snapshotId: input.snapshotId,
+            revision: input.revision,
+            targetId: input.targetId,
+            policy: `${policy.slice(0, 100)}:${input.kind}`,
+            secret,
+          })
+        ).created,
+    },
+  });
+}
+
+/** Shared bounded provider/usage runner used by CV import and queued job operations. */
+export function configuredStructuredRunner(env: IntelligenceConfig,userId:string,ledger:UsageLedger,signal:AbortSignal,transport:typeof fetch=fetch,reserveDocument?:ReturnType<typeof createDatabaseGateway>['reserveDocumentOperation']):StructuredRunner {
+  const enabled=env.AI_PAID_INFERENCE==='on',secret=env.AI_WORKER_SECRET??'',policy=env.AI_PROCESSING_POLICY??'';
+  const reasoningEffort=validateReasoningEffort(env.AI_REASONING_EFFORT);
   const run: StructuredRunner = async (task) => {
     if (!enabled) throw new Error("AI_DISABLED");
     const word = task.fileFormat === "doc" || task.fileFormat === "docx";
@@ -90,7 +131,8 @@ export async function configuredIntelligenceRoute(
     )
       throw new Error("AI_UNCONFIGURED");
     if (task.importId) {
-      const reserved = await gateway.reserveDocumentOperation({
+      if (!reserveDocument) throw new Error("AI_UNCONFIGURED");
+      const reserved = await reserveDocument!({
         operationId: task.operationId,
         importId: task.importId,
         stage: task.stage!,
@@ -164,38 +206,5 @@ export async function configuredIntelligenceRoute(
       throw new Error("PROVIDER_OUTPUT_UNAVAILABLE");
     return result.output;
   };
-  const operations = intelligenceOperations(run),
-    store = gateway.createImportStore(secret);
-  const workflow = importWorkflow({
-    userId,
-    store,
-    operations,
-    aiEnabled: enabled,
-    processor: ({ format, bytes }) =>
-      format === "pdf"
-        ? preflightPdf(bytes)
-        : preflightWord(format as "doc" | "docx", bytes),
-  });
-  return intelligenceRoute(request, {
-    enabled,
-    userId,
-    signal,
-    operations,
-    workflow,
-    gateway: {
-      loadSnapshot: gateway.loadSnapshot,
-      loadDraft: gateway.loadDraft,
-      reserveCareer: async (input) =>
-        (
-          await gateway.reserveEnhancement({
-            operationId: input.operationId,
-            snapshotId: input.snapshotId,
-            revision: input.revision,
-            targetId: input.targetId,
-            policy: `${policy.slice(0, 100)}:${input.kind}`,
-            secret,
-          })
-        ).created,
-    },
-  });
+  return run;
 }

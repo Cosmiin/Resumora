@@ -1,7 +1,9 @@
+import { processJobWorkflow } from "./jobs/processor.ts";
+import { jobWorkflowRoute } from "./jobs/workflow.ts";
 import { extensionRoute } from "./extension/routes.ts";
 import { processCaptures } from "./extension/processor.ts";
 import type { CaptureConfig } from "./extension/gateway.ts";
-import { jobDocumentsRoute } from "./jobs/documents.ts";
+import { currentJobDocumentsRoute } from "./jobs/current-documents.ts";
 import { photoRoute } from "./photos/routes.ts";
 import {
   configuredIntelligenceRoute,
@@ -52,12 +54,16 @@ function json(
 export default {
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
     await processCaptures(env);
+    await processJobWorkflow(env);
   },
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, context?: Pick<ExecutionContext,"waitUntil">): Promise<Response> {
     const path = new URL(request.url).pathname;
     if (path.startsWith('/v1/extension/') || path === '/v1/jobs/capture-status' ||
       (path === '/v1/jobs' && (request.headers.has('Authorization') || request.method === 'OPTIONS' || request.headers.get('Origin')?.startsWith('chrome-extension://'))))
-      return extensionRoute(request, env);
+      { const response=await extensionRoute(request, env);
+        if(response.ok && path==='/v1/jobs')context?.waitUntil(processJobWorkflow(env).catch(()=>undefined));
+        return response;
+      }
     if (path === "/admin/ai" || path === "/v1/admin/ai/usage")
       return adminRoute(request, env);
     if (authMethods[path]) return authRoute(request, env);
@@ -99,8 +105,10 @@ export default {
           : path === "/v1/enhancement"
             ? await enhancementRoute(request, env, gateway, identity.user.id)
             : /^\/v1\/jobs\/[^/]+\/cv(?:\/|$)/.test(path)
-              ? await jobDocumentsRoute(request, gateway)
-              : path.startsWith("/v1/jobs")
+              ? await currentJobDocumentsRoute(request, gateway)
+              : /^\/v1\/jobs\/[^/]+\/workflow(?:\/|$)/.test(path)
+                ? await jobWorkflowRoute(request,gateway,env.AI_PAID_INFERENCE==='on')
+                : path.startsWith("/v1/jobs")
                 ? await jobsRoute(request, gateway)
                 : path.startsWith("/v1/photos")
                   ? await photoRoute(
@@ -119,6 +127,7 @@ export default {
           { status: 503 },
         );
       }
+      if(response.ok && request.method==='POST' && ((path==='/v1/jobs'||path==='/v1/jobs/url') || /\/workflow\/(extract|match|tailor|prepare)$/.test(path)))context?.waitUntil(processJobWorkflow(env).catch(()=>undefined));
       const headers = new Headers(response.headers);
       for (const [name, value] of identity.headers) headers.set(name, value);
       return new Response(response.body, {

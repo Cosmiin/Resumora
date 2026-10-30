@@ -1,139 +1,17 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {JSDOM} from 'jsdom';
-import {parseCapture} from '../../../packages/contracts/src/jobs/capture.ts';
-import {capturePage} from '../src/snapshot.js';
+import test from 'node:test';import assert from 'node:assert/strict';import {JSDOM} from 'jsdom';
+import {parseCapture} from '../../../packages/contracts/src/jobs/capture.ts';import {capturePage} from '../src/snapshot.js';
 const job='Build useful synthetic reports. Required SQL and English. Preferred analytics experience. Stated salary EUR 1000 per month.';
-function extract(url,markup){
-  const dom=new JSDOM(markup,{url,runScripts:'outside-only'});
-  // jsdom has no layout; this synthetic visibility model is not installed-Chrome proof.
-  dom.window.HTMLElement.prototype.getClientRects=function(){return this.hidden?[]:[{width:100,height:30}];};
-  Object.defineProperty(dom.window.HTMLElement.prototype,'innerText',{get(){return this.textContent;}});
-  dom.window.TextEncoder=TextEncoder;
-  const result=dom.window.eval('('+capturePage.toString()+')()');
-  assert.equal(dom.window.pwned,undefined);
-  return result;
-}
-for(const [url,adapter,section] of [['https://boards.greenhouse.io/co/jobs/1','greenhouse','<div id="content">'],['https://jobs.ashbyhq.com/co/1','ashby','<main>'],['https://www.linkedin.com/jobs/view/1','linkedin','<div class="jobs-description">'],['https://www.bestjobs.eu/job/one','bestjobs','<div class="job-description">'],['https://jobs.lever.co/co/1','lever','<div class="posting-page">'],['https://co.wd3.myworkdayjobs.com/en-US/jobs/job/one','workday','<div data-automation-id="jobPostingDescription">'],['https://jobs.smartrecruiters.com/co/1','smartrecruiters','<div id="st-jobDescription">'],['https://careers-co.icims.com/jobs/1','icims','<div class="iCIMS_JobContent">'],['https://co.fa.oraclecloud.com/hcmUI/job/1','oracle','<div class="job-description">'],['https://co.taleo.net/careersection/jobdetail.ftl','oracle','<div class="jobdescr">'],['https://co.successfactors.eu/job/1','successfactors','<div id="jobdescription">'],['https://apply.workable.com/co/1','workable','<div data-ui="job-description">'],['https://co.recruitee.com/o/one','recruitee','<div data-testid="job-description">'],['https://co.bamboohr.com/careers/1','bamboohr','<div class="BambooRichText">'],['https://co.jobs.personio.de/job/1','personio','<div class="detail">'],['https://co.teamtailor.com/jobs/1','teamtailor','<div id="job-description">'],['https://www.indeed.com/viewjob?jk=1','indeed','<div id="jobDescriptionText">'],['https://other.invalid/job','generic','<article>']]) {
-  test('synthetic rendered '+adapter,()=>{
-    const result=extract(url,'<h1>Analyst</h1>'+section+'<p>'+job+'</p><nav>SECRET NAVIGATION</nav><form><input value="password"><p>PRIVATE FORM</p></form><p hidden>HIDDEN DATA</p><div class="comments">PROFILE COMMENT</div></div></main></article>');
-    assert.equal(result.adapter,adapter);assert.equal(result.title,'Analyst');assert.ok(result.text.includes(job));assert.ok(!/SECRET|PRIVATE|HIDDEN|PROFILE|password/.test(result.text));assert.equal(result.sourceUrl,url);assert.equal(parseCapture({requestId:'11111111-1111-4111-8111-111111111111',snapshot:JSON.parse(JSON.stringify(result))}).snapshot.adapter,adapter);
-  });
-}
-test('JSON-LD stays serialized data; malicious job text never executes; unknown fields omitted',()=>{
-  const post={'@type':'JobPosting',title:'Analyst',hiringOrganization:{name:'Synthetic Co'},baseSalary:{currency:'EUR',value:{minValue:1000}},skills:'SQL'};
-  const result=extract('https://jobs.ashbyhq.com/co/1','<main><p>'+job+'&lt;script&gt;globalThis.pwned=true&lt;/script&gt;</p></main><script type="application/ld+json">'+JSON.stringify(post)+'</script>');
-  assert.equal(JSON.parse(result.structured).skills,'SQL');assert.ok(result.text.includes('<script>'));assert.equal(result.company,undefined);assert.equal(globalThis.pwned,undefined);
-});
-test('unreadable/dynamic/iframe-only pages fail with manual recovery instead of body scrape',()=>{
-  for(const markup of ['<body>private unrelated full page</body>','<main></main>','<iframe src="https://other.invalid/job"></iframe>'])assert.throws(()=>extract('https://example.invalid',markup),/paste|Embedded/i);
-});
-
-test('unknown hosts capture job-focused containers and heading siblings without main/article',()=>{
-  for(const markup of [
-    '<div><h1>Analyst</h1><div><p>'+job+'</p></div><nav>PRIVATE NAV</nav><div style="display:none"><p>SECRET ANCESTOR</p></div></div>',
-    '<h1>Analyst</h1><p>'+job+'</p><footer>PRIVATE FOOTER</footer>',
-    '<div><h2>Job responsibilities</h2><p>'+job+'</p></div>',
-    '<p>Job responsibilities: '+job+'</p>',
-  ]) {
-    const result=extract('https://careers.unknown.invalid/opening',markup);
-    assert.equal(result.adapter,'generic');assert.ok(result.text.includes(job));assert.ok(!/PRIVATE|SECRET/.test(result.text));
-  }
-});
-test('JobPosting description works without rendered containers, including graph and type arrays',()=>{
-  const post={'@type':['Thing','JobPosting'],title:'Analyst',description:'<p>'+job+'</p><script>globalThis.pwned=true</script><form>PRIVATE FORM</form>',jobLocation:{address:{addressLocality:'Bucharest'}}};
-  const result=extract('https://unknown.invalid/job','<div>Loading</div><script type="application/ld+json">'+JSON.stringify({'@graph':[post]}).replace(/</g,'\\u003c')+'</script>');
-  assert.ok(result.text.includes(job));assert.ok(!/pwned|PRIVATE/.test(result.text));assert.equal(JSON.parse(result.structured).jobLocation.address.addressLocality,'Bucharest');
-});
-test('generic fallback excludes unrelated and nonvisible content and keeps text bounded',()=>{
-  for(const markup of [
-    '<h1>Sign in</h1><form><p>'+job+'</p><input value="PRIVATE"></form>',
-    '<div style="display:none"><div class="job-description">'+job+'</div></div>',
-    '<nav><h2>Job responsibilities</h2><p>'+job+'</p></nav>',
-  ])assert.throws(()=>extract('https://unknown.invalid',markup),/paste/i);
-  const result=extract('https://unknown.invalid/job','<div><h1>Analyst</h1><p>Job responsibilities: '+('x'.repeat(130000))+'</p></div>');
-  assert.equal(result.text.length,120000);
-});
-
-test('job titles in rendered headers and non-English main sections retain the ordinary capture path',()=>{
-  const text='Développeur logiciel. Vous concevez des logiciels et accompagnez notre équipe sur des projets internationaux.';
-  const result=extract('https://unknown.invalid/job','<main><header><h1>Développeur logiciel</h1></header><p>'+text+'</p></main>');
-  assert.equal(result.title,'Développeur logiciel');assert.ok(result.text.includes(text));
-});
-
-const intro='About this role: '+('Build useful reporting tools with our team. '.repeat(3)).trim();
-const requirements='Required: SQL and five years of analytics experience.';
-const preferred='Preferred: Python and experience mentoring analysts.';
-for(const [name,url,markup] of [
-  ['unknown nested introduction','https://careers.unknown.invalid/job',
-    '<div><section><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section></div>'],
-  ['unknown paragraph sections','https://careers.unknown.invalid/job',
-    '<div><section><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section></div>'],
-  ['unknown direct body sections','https://careers.unknown.invalid/job',
-    '<section><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section><footer>PRIVATE FOOTER</footer>'],
-  ['unknown standalone paragraph siblings','https://careers.unknown.invalid/job',
-    '<p>'+intro+'</p><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p><footer>PRIVATE FOOTER</footer>'],
-  ['generic matching fragments','https://careers.unknown.invalid/job',
-    '<div><h1>Analyst</h1><div class="job-description"><p>'+intro+'</p></div><div class="job-description"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div>'],
-  ['generic introduction selector','https://careers.unknown.invalid/job',
-    '<div><section class="job-description"><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section></div>'],
-  ['generic selector body siblings','https://careers.unknown.invalid/job',
-    '<section class="job-description"><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section><footer>PRIVATE FOOTER</footer>'],
-  ['generic article fragments','https://careers.unknown.invalid/job',
-    '<div><article><h1>Analyst</h1><p>'+intro+'</p></article><article><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></article></div>'],
-  ['Lever sibling wrappers','https://jobs.lever.co/co/one',
-    '<div><h1>Analyst</h1><div class="section-wrapper"><p>'+intro+'</p></div><div class="section-wrapper"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div>'],
-  ['Lever nested wrappers','https://jobs.lever.co/co/one',
-    '<div class="posting-page"><h1>Analyst</h1><div class="section-wrapper"><p>'+intro+'</p></div><div class="section-wrapper"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div>'],
-  ['LinkedIn sibling descriptions','https://www.linkedin.com/jobs/view/one',
-    '<div><h1>Analyst</h1><div class="show-more-less-html__markup"><p>'+intro+'</p></div><div class="show-more-less-html__markup"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div>'],
-]) {
-  test('full bounded job capture retains later requirements: '+name,()=>{
-    const result=extract(url,'<nav>PRIVATE NAV</nav>'+markup+'<aside>PRIVATE PROFILE</aside>');
-    for(const text of [intro,requirements,preferred])assert.ok(result.text.includes(text),text+' must be captured');
-    assert.equal(result.text.split(intro).length-1,1);
-    assert.ok(result.text.indexOf(intro)<result.text.indexOf(requirements));
-    assert.ok(result.text.indexOf(requirements)<result.text.indexOf(preferred));
-    assert.ok(!result.text.includes('PRIVATE'));
-    const saved=parseCapture({requestId:'11111111-1111-4111-8111-111111111111',snapshot:JSON.parse(JSON.stringify(result))});
-    assert.equal(saved.snapshot.text,result.text);
-  });
-}
-test('structured descriptions preserve paragraph, list, block and br text boundaries as inert data',()=>{
-  const description='<h2>Analyst</h2><p>'+intro+'</p><p>Required: SQL</p><p>Preferred: Python</p><ul><li>English</li><li>Romanian</li></ul><div>Remote<br>Hybrid</div><p>Use <strong>SQL</strong> daily &amp; review results.</p><script>globalThis.pwned=true</script><form>PRIVATE FORM</form>';
-  const post={'@type':'JobPosting',title:'Analyst',description};
-  const markup='<script type="application/ld+json">'+JSON.stringify(post).replace(/</g,'\\u003c')+'</script>';
-  const result=extract('https://unknown.invalid/job',markup);
-  assert.match(result.text,/Required: SQL\n+Preferred: Python/);
-  assert.match(result.text,/English\n+Romanian/);
-  assert.match(result.text,/Remote\n+Hybrid/);
-  assert.ok(result.text.includes('Use SQL daily & review results.'));
-  assert.ok(!/pwned|PRIVATE/.test(result.text));
-  assert.equal(JSON.parse(result.structured).description,description);
-});
-test('aggregated rendered sections share the existing text bound and exclude hidden sibling content',()=>{
-  const first='About this role: '+('x'.repeat(70000));
-  const second='Required: '+('y'.repeat(70000));
-  const result=extract('https://jobs.lever.co/co/one','<div><h1>Analyst</h1><div class="section-wrapper"><p>'+first+'</p></div><div class="section-wrapper" hidden>PRIVATE HIDDEN</div><div class="section-wrapper"><p>'+second+'</p></div></div>');
-  assert.equal(result.text.length,120000);assert.ok(result.text.includes('Required: '));assert.ok(!result.text.includes('PRIVATE'));
-});
-
-for(const [name,url,advert] of [
-  ['named description inside main','https://unknown.invalid/job','<main><h1>Analyst</h1><div class="job-description"><p>'+intro+'</p><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></main>'],
-  ['unknown nested job sections','https://unknown.invalid/job','<div><section><div><h1>Analyst</h1><p>'+intro+'</p></div></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section></div>'],
-  ['Lever posting container','https://jobs.lever.co/co/one','<main><div class="posting-page"><h1>Analyst</h1><div class="section-wrapper"><p>'+intro+'</p></div><div class="section-wrapper"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></div></main>'],
-  ['LinkedIn sibling markup','https://www.linkedin.com/jobs/view/one','<main><h1>Analyst</h1><div class="show-more-less-html__markup"><p>'+intro+'</p></div><div class="show-more-less-html__markup"><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></div></main>'],
-  ['generic article sections','https://unknown.invalid/job','<div><article><h1>Analyst</h1><p>'+intro+'</p></article><article><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></article></div>'],
-  ['direct body sections','https://unknown.invalid/job','<section><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p></section>'],
-]) {
-  test('local advert excludes page-wide recommendation and profile anchors: '+name,()=>{
-    const result=extract(url,'<div id="app"><nav>PRIVATE NAVIGATION</nav>'+advert+'<section><p>another role: PRIVATE RECOMMENDATION, required experience in an unrelated job.</p></section><section><h2>Your profile</h2><p>PRIVATE PROFILE for another role.</p></section></div>');
-    for(const expected of [intro,requirements,preferred])assert.ok(result.text.includes(expected));
-    assert.ok(!result.text.includes('PRIVATE'));
-    assert.equal(result.text.split(intro).length-1,1);
-  });
-}
-test('semantic main excludes unrelated recommendation and profile sections nested beside the job',()=>{
-  const result=extract('https://unknown.invalid/job','<main><h1>Analyst</h1><p>'+intro+'</p><h2>Requirements</h2><p>'+requirements+'</p><p>'+preferred+'</p><section><h2>Recommended roles</h2><p>PRIVATE recommendation for another role</p></section><section><h2>Your profile</h2><p>PRIVATE PROFILE</p></section></main>');
-  assert.ok(result.text.includes(requirements));assert.ok(result.text.includes(preferred));assert.ok(!result.text.includes('PRIVATE'));
-});
+function extract(url,markup,select){const dom=new JSDOM(markup,{url,runScripts:'outside-only'});dom.window.HTMLElement.prototype.getClientRects=function(){return this.hidden?[]:[{width:100,height:30}];};Object.defineProperty(dom.window.HTMLElement.prototype,'innerText',{get(){return this.textContent;}});dom.window.TextEncoder=TextEncoder;if(select){const range=dom.window.document.createRange();range.selectNodeContents(dom.window.document.querySelector(select));dom.window.getSelection().addRange(range);}const result=dom.window.eval('('+capturePage.toString()+')()');assert.equal(dom.window.pwned,undefined);return result;}
+for(const [url,adapter,section] of [['https://boards.greenhouse.io/co/jobs/1','greenhouse','<div id="content">'],['https://jobs.ashbyhq.com/co/1','ashby','<div class="jobPosting-description">'],['https://www.linkedin.com/jobs/view/1','linkedin','<div class="jobs-description">'],['https://www.bestjobs.eu/job/one','bestjobs','<div class="job-description">'],['https://jobs.lever.co/co/1','lever','<div class="posting-page">'],['https://co.wd3.myworkdayjobs.com/en-US/jobs/job/one','workday','<div data-automation-id="jobPostingDescription">'],['https://jobs.smartrecruiters.com/co/1','smartrecruiters','<div id="st-jobDescription">'],['https://careers-co.icims.com/jobs/1','icims','<div class="iCIMS_JobContent">'],['https://co.fa.oraclecloud.com/hcmUI/job/1','oracle','<div class="job-description">'],['https://co.taleo.net/careersection/jobdetail.ftl','oracle','<div class="jobdescr">'],['https://co.successfactors.eu/job/1','successfactors','<div id="jobdescription">'],['https://apply.workable.com/co/1','workable','<div data-ui="job-description">'],['https://co.recruitee.com/o/one','recruitee','<div data-testid="job-description">'],['https://co.bamboohr.com/careers/1','bamboohr','<div class="BambooRichText">'],['https://co.jobs.personio.de/job/1','personio','<div class="detail">'],['https://co.teamtailor.com/jobs/1','teamtailor','<div id="job-description">'],['https://www.indeed.com/viewjob?jk=1','indeed','<div id="jobDescriptionText">'],['https://other.invalid/job','generic','<div class="job-description">']])test('synthetic bounded '+adapter,()=>{const result=extract(url,'<h1>Analyst</h1>'+section+'<p>'+job+'</p><nav>SECRET NAVIGATION</nav><form><input value="password"><p>PRIVATE FORM</p></form><p hidden>HIDDEN DATA</p><div class="comments">PROFILE COMMENT</div></div>');assert.equal(result.adapter,adapter);assert.equal(result.title,'Analyst');assert.ok(result.text.includes(job));assert.ok(!/SECRET|PRIVATE|HIDDEN|PROFILE|password/.test(result.text));assert.equal(parseCapture({requestId:'11111111-1111-4111-8111-111111111111',snapshot:JSON.parse(JSON.stringify(result))}).snapshot.adapter,adapter);});
+const intro='About this role: '+('Build useful reporting tools with our team. '.repeat(3)).trim(),required='Required: SQL and five years of analytics experience.',preferred='Preferred: Python and experience mentoring analysts.';
+// Latest R07 replaces automatic English-heading/common-ancestor widening with
+// explicit selection for ambiguous pages. Former dropped-tail/privacy failures
+// must recover the COMPLETE selected posting, not waive or truncate a finding.
+for(const [name,inside] of [['nested introduction','<section><h1>Analyst</h1><p>'+intro+'</p></section><section><h2>Who we are</h2><p>We build useful tools.</p></section><section><h2>Requirements</h2><p>'+required+'</p><p>'+preferred+'</p></section>'],['paragraph sections','<p>'+intro+'</p><h2>Who we are</h2><p>We build tools.</p><h2>Requirements</h2><p>'+required+'</p><p>'+preferred+'</p>'],['non-English sections','<section><h1>Développeur</h1><p>'+intro+'</p></section><section><h2>Qui sommes-nous</h2><p>Notre équipe.</p><p>'+required+'</p><p>'+preferred+'</p></section>']])test('ambiguous '+name+' requires selection and retains full selected advert',()=>{const html='<div id="selected-job">'+inside+'</div><section><h2>Profile</h2><p>PRIVATE candidate@example.invalid</p></section><section>PRIVATE recommended role</section>';assert.throws(()=>extract('https://unknown.invalid/job',html),/paste|Select/i);const result=extract('https://unknown.invalid/job',html,'#selected-job');for(const expected of [intro,required,preferred])assert.ok(result.text.includes(expected));assert.ok(!result.text.includes('PRIVATE'));assert.equal(result.structured,undefined);});
+test('no body-wide fallback, no frames/forms or arbitrary main/profile scraping',()=>{for(const html of ['<body>unrelated account page</body>','<main><p>'+job+'</p><h2>Profile</h2>candidate@example.invalid</main>','<iframe src="https://other.invalid/job"></iframe>','<form><p>'+job+'</p><input value="password"></form>'])assert.throws(()=>extract('https://unknown.invalid',html),/paste|Embedded/i);});
+test('multiple bounded sections require selection instead of collecting recommendation siblings',()=>{const html='<div id="intended"><div class="job-description">'+intro+'</div><div class="job-description">'+required+' '+preferred+'</div></div><div class="job-description">PRIVATE other job</div>';assert.throws(()=>extract('https://unknown.invalid/job',html),/ambiguous|Select/i);const result=extract('https://unknown.invalid/job',html,'#intended');assert.ok(result.text.includes(preferred));assert.ok(!result.text.includes('PRIVATE'));});
+test('selected fallback excludes hidden/form/input/contenteditable/account navigation',()=>{const html='<main id="intended"><p>'+job+'</p><form>PRIVATE FORM<input value="password"></form><p hidden>PRIVATE HIDDEN</p><nav>PRIVATE NAVIGATION</nav><div contenteditable>PRIVATE EDITABLE</div><div class="user-profile">PRIVATE PROFILE</div></main>';const result=extract('https://unknown.invalid/job',html,'#intended');assert.equal(result.text,job);});
+test('oversized source fails without silent truncation or partial persistence',()=>{for(const selected of [false,true])assert.throws(()=>extract('https://unknown.invalid/job','<div id="selected" class="job-description">'+('x'.repeat(130000))+'</div>',selected?'#selected':undefined),/exceeds|limits|large/i);});
+test('JSON-LD description preserves block and br separators as inert data; private form excluded from payload',()=>{const description='<h2>Analyst</h2><p>'+intro+'</p><p>Required: SQL</p><p>Preferred: Python</p><ul><li>English</li><li>Romanian</li></ul><div>Remote<br>Hybrid</div><script>globalThis.pwned=true</script><form>PRIVATE FORM</form>';const post={'@type':['Thing','JobPosting'],title:'Analyst',description,hiringOrganization:{name:'Synthetic Co',password:'PRIVATE'},privateAccount:'PRIVATE'};const result=extract('https://unknown.invalid/job','<script type="application/ld+json">'+JSON.stringify({'@graph':[post]}).replace(/</g,'\\u003c')+'</script>');assert.match(result.text,/Required: SQL\n+Preferred: Python/);assert.match(result.text,/English\n+Romanian/);assert.match(result.text,/Remote\n+Hybrid/);assert.ok(!JSON.stringify(result).includes('PRIVATE'));assert.equal(JSON.parse(result.structured).description,undefined);});
+test('multiple structured jobs and visible/structured conflicts require selection/manual review',()=>{for(const posts of [[{'@type':'JobPosting',title:'One',description:job},{'@type':'JobPosting',title:'Two',description:job}],[{'@type':'JobPosting',title:'Different position',description:job}]]){const html='<h1>Analyst</h1><div id="selected">'+job+'</div><script type="application/ld+json">'+JSON.stringify(posts)+'</script>';assert.throws(()=>extract('https://unknown.invalid/job',html),/Multiple|disagree/i);const result=extract('https://unknown.invalid/job',html,'#selected');assert.equal(result.text,job);assert.equal(result.structured,undefined);}});
+test('detected visible description takes precedence; JSON-LD metadata never replaces employer text',()=>{const post={'@type':'JobPosting',title:'Analyst',description:'Contradictory structured description',skills:'SQL'};const result=extract('https://unknown.invalid/job','<h1>Analyst</h1><div class="job-description">'+job+'</div><script type="application/ld+json">'+JSON.stringify(post)+'</script>');assert.equal(result.text,job);assert.equal(JSON.parse(result.structured).skills,'SQL');});

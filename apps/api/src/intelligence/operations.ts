@@ -34,7 +34,7 @@ import type { BaseDraft } from "@resumora/contracts/editor/model";
 export type StructuredOperation = {
   operationId: string;
   userId: string;
-  operation: "cv_parse" | "cv_rewrite";
+  operation: "cv_parse" | "cv_rewrite" | "job_parse" | "cv_tailor";
   promptVersion: string;
   tier: "admission" | "extraction" | "career";
   system: string;

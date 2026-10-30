@@ -65,3 +65,20 @@ Rendered extraction starts from a local job selector or heading and gathers adja
 The worker pins user ID and connection generation before tab lookup and script injection. Enqueue requires that expected identity, rechecks it inside its serialized storage operation, and stamps the row with the pinned values. Connection writes use the same queue lock as enqueue, so the check and persistence are ordered atomically with disconnect/reconnect. Disconnect, account replacement and same-account reconnect during extraction reject that capture; already queued requests retain their original owner and remain fenced by the delivery checks.
 
 Certifications and candidate-language requirements remain unknown during deterministic normalization. Schema.org [qualifications](https://schema.org/qualifications) can describe broad experience or education; [inLanguage](https://schema.org/inLanguage) describes content language. Their original keyed values remain in the saved `capture.structured` JobPosting data, without being relabelled as certification or candidate requirements. The existing Jobs display shows unknown for these unsupported extracted fields.
+
+## 30 October capture boundary
+
+The collector now uses one bounded primary description or one unambiguous structured JobPosting. It no longer expands an introduction using English heading heuristics or widens to a generic main/common ancestor. Split/ambiguous pages, multiple postings and conflicting titles require explicit selection of the full advert or manual paste. Selecting text explicitly transmits only selected visible text outside forms/navigation/profile containers. Oversized content fails without sending a silently truncated fragment. JSON-LD description HTML is converted to inert text with paragraph/list/br separators; raw description/forms and arbitrary nested metadata are excluded from the submitted structured metadata.
+
+Greenhouse/Ashby/LinkedIn/BestJobs and the bundled other named selectors have synthetic fixture coverage only. Generic main/article pages require selection unless a specific job-description container or structured posting exists. Live provider layouts, installed-Chrome permissions and real account launchWebAuthFlow remain unverified; fixtures do not establish universal site support. Server-side URL retrieval has a separate smaller matrix: exact vendor-owned Greenhouse, Ashby, Lever and SmartRecruiters hosts with a single public structured posting; no redirects, credentials, arbitrary hosts or authenticated pages. Failures preserve the saved URL record and offer paste/extension recovery.
+
+Rechecked public authoritative Chrome documentation on 2026-10-30 (no personal browser/account used):
+
+| Source | Page's reported update date | Relevant contract |
+| --- | --- | --- |
+| [activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab) | 2012-09-21 UTC | Temporary explicit-action page access; scripting permission is separate. |
+| [Alternative installation](https://developer.chrome.com/docs/extensions/how-to/distribute/install-extensions) | 2012-09-17 UTC | Ordinary installation comes from a Store listing; Windows/macOS external update URLs must point to the Store. The ZIP is developer load-unpacked source, not one-click normal installation. |
+| [Identity](https://developer.chrome.com/docs/extensions/reference/api/identity) | 2026-10-29 UTC | Exact extension callback and explicit interactive launchWebAuthFlow. |
+| [MV3 remote code](https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code) | 2023-12-13 UTC | Executable code is bundled; remote JSON is data, never executed. |
+
+No Store listing/publication or deployment is implied. Dates above are the pages' reported dates, distinct from this verification date.

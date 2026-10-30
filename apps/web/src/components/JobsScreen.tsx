@@ -1,3 +1,4 @@
+import { JobWorkflowPanel } from "./JobWorkflow";
 import { useEffect, useRef, useState } from "react";
 import type {
   SavedJob,
@@ -177,8 +178,8 @@ export function JobsScreen({
         />
         <p className="small muted">
           {t(
-            "URL-ul este doar metadată; nu accesăm pagina. Asociem automat cel mai recent CV salvat, dacă există.",
-            "The URL is metadata only; we do not retrieve the page. The server associates the latest saved Base when available.",
+            "Salvează textul cu link sursă sau importă dintr-un URL public. Asociem cel mai recent CV salvat, dacă există.",
+            "Save text with a source link, or import from a public URL. The server associates the latest saved Base when available.",
           )}
         </p>
         <Button
@@ -198,6 +199,11 @@ export function JobsScreen({
             ? t("Se salvează…", "Saving…")
             : t("Salvează ciorna jobului", "Save job draft")}
         </Button>
+        <Button disabled={!transport||!sourceUrl.trim()||busy||!!pending.current}
+          onClick={()=>void send('/v1/jobs/url',{requestId:crypto.randomUUID(),url:sourceUrl})}>
+          {t('Importă din URL public','Import from public URL')}
+        </Button>
+        <p className="small">{t('Importul public acceptă momentan Greenhouse, Ashby, Lever și SmartRecruiters când oferă un JobPosting public. Pentru alte pagini, lipește textul sau folosește extensia.','Public URL import currently reads Greenhouse, Ashby, Lever and SmartRecruiters when a public JobPosting is provided. For other pages, paste text or use the extension.')}</p>
         {!snapshot && (
           <p>
             {t(
@@ -231,212 +237,9 @@ export function JobsScreen({
         ))}
       </section>
       <section className="card stack">
-        {selected ? (
-          <>
-            <h2>{t("Verifică anunțul", "Review advert")}</h2>
-            {openCv && (
-              <Button
-                disabled={busy || !!pending.current || !ready}
-                onClick={() =>
-                  openCv({
-                    id: selected.id,
-                    label:
-                      selected.intake.title || t("Ciornă de job", "Job draft"),
-                  })
-                }
-              >
-                {t("Deschide CV-ul pentru acest job", "Open CV for this job")}
-              </Button>
-            )}
-            {!ready && (
-              <p>
-                {t(
-                  "Salvează CV-ul de bază înainte de a deschide CV-ul jobului.",
-                  "Save Base CV before opening the job CV.",
-                )}
-              </p>
-            )}
-            <p className="small">
-              {selected.snapshotId
-                ? `${t("Ciornă CV asociată", "Associated CV draft")} · v${selected.snapshotRevision}`
-                : t(
-                    "Salvat fără CV de bază. Adaugă un CV înainte de analiză/adaptare.",
-                    "Saved without a Base CV. Add a saved Base before analysis/tailoring.",
-                  )}
-            </p>
-            <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
-              {selected.intake.text}
-            </pre>
-            {selected.intake.sourceUrl && <p>{selected.intake.sourceUrl}</p>}
-            {!selected.intake.sourceUrl && (
-              <p>
-                {t(
-                  "Salvat fără un link sursă. Păstrează anunțul original pentru a reveni și a trimite CV-ul acolo.",
-                  "Saved without a source link. Keep the original posting so you can return and submit your CV there.",
-                )}
-              </p>
-            )}
-            {selected.intake.capture !== undefined && (
-              <details>
-                <summary>
-                  {t(
-                    "Câmpuri capturate · neverificate",
-                    "Captured fields · unreviewed",
-                  )}
-                </summary>
-                <dl>
-                  {(
-                    [
-                      "title",
-                      "company",
-                      "location",
-                      "remote",
-                      "skills",
-                      "requiredSkills",
-                      "preferredSkills",
-                      "experience",
-                      "education",
-                      "certifications",
-                      "languages",
-                      "statedSalary",
-                      "applicationUrl",
-                    ] as const
-                  ).map((field) => (
-                    <div key={field}>
-                      <dt>{field}</dt>
-                      <dd>
-                        {typeof selected.intake.extracted?.[field] === "string"
-                          ? (selected.intake.extracted[field] as string)
-                          : Array.isArray(selected.intake.extracted?.[field])
-                            ? (
-                                selected.intake.extracted[field] as string[]
-                              ).join(", ")
-                            : t(
-                                "Necunoscut / indisponibil",
-                                "Unknown / not available",
-                              )}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-                <p>
-                  {t(
-                    "Păstrăm doar salariul declarat, fără estimări. Verifică aceste informații.",
-                    "Only stated salary is retained, without estimates. Review these details.",
-                  )}
-                </p>
-              </details>
-            )}
-            <label htmlFor="job-title">{t("Titlu", "Title")}</label>
-            <input
-              id="job-title"
-              ref={reviewTitle}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={
-                selected.state === "reviewed" || busy || !!pending.current
-              }
-            />
-            <label htmlFor="job-company">{t("Companie", "Company")}</label>
-            <input
-              id="job-company"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              disabled={
-                selected.state === "reviewed" || busy || !!pending.current
-              }
-            />
-            <p className="small">
-              {t(
-                "Copiază cerințe exacte din anunț și confirmă prioritatea. Restul textului rămâne neclasificat. Fără scor ATS sau extragere AI în această etapă.",
-                "Copy exact requirements from the advert and confirm priority. Other text stays unclassified. No ATS score or AI extraction in this stage.",
-              )}
-            </p>
-            {requirements.map((q, i) => (
-              <p key={i}>
-                <strong>
-                  {q.priority === "required"
-                    ? t("Obligatoriu", "Required")
-                    : t("Preferat", "Preferred")}
-                </strong>
-                : {q.text}{" "}
-                {selected.state === "draft" && (
-                  <Button
-                    disabled={busy || !!pending.current}
-                    onClick={() =>
-                      setRequirements(requirements.filter((_, n) => n !== i))
-                    }
-                  >
-                    {t("Elimină", "Remove")}
-                  </Button>
-                )}
-              </p>
-            ))}
-            {selected.state === "draft" && (
-              <>
-                <label htmlFor="requirement-excerpt">
-                  {t("Fragment exact", "Exact excerpt")}
-                </label>
-                <textarea
-                  id="requirement-excerpt"
-                  value={excerpt}
-                  onChange={(e) => setExcerpt(e.target.value)}
-                  disabled={busy || !!pending.current}
-                />
-                <select
-                  aria-label={t("Prioritate", "Priority")}
-                  value={priority}
-                  onChange={(e) =>
-                    setPriority(e.target.value as typeof priority)
-                  }
-                >
-                  <option value="required">
-                    {t("Obligatoriu", "Required")}
-                  </option>
-                  <option value="preferred">
-                    {t("Preferat", "Preferred")}
-                  </option>
-                </select>
-                <Button
-                  disabled={
-                    busy ||
-                    !!pending.current ||
-                    !excerpt.trim() ||
-                    excerpt.length > 1000 ||
-                    !selected.intake.text.includes(excerpt)
-                  }
-                  onClick={() => {
-                    setRequirements([
-                      ...requirements,
-                      { text: excerpt, priority },
-                    ]);
-                    setExcerpt("");
-                  }}
-                >
-                  {t("Adaugă cerința", "Add requirement")}
-                </Button>
-                <Button
-                  variant="primary"
-                  disabled={
-                    busy ||
-                    !!pending.current ||
-                    !title.trim() ||
-                    !company.trim()
-                  }
-                  onClick={() =>
-                    void send("/v1/jobs/" + selected.id + "/review", {
-                      requestId: crypto.randomUUID(),
-                      title,
-                      company,
-                      requirements,
-                    })
-                  }
-                >
-                  {t("Confirmă detaliile", "Confirm details")}
-                </Button>
-              </>
-            )}
-          </>
+        {selected && transport ? (
+          <JobWorkflowPanel key={selected.id} job={selected} transport={transport} ready={ready} onOpenJob={id=>void detail(id)}
+            openCv={openCv?()=>openCv({id:selected.id,label:selected.intake.title||t('Ciornă de job','Job draft')}):undefined}/>
         ) : (
           <p>
             {t(

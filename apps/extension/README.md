@@ -79,3 +79,5 @@ posting directly; for restricted/unreadable pages, paste the advert in Jobs.
 
 MIT licensed source; icons are original code-drawn document marks. No external
 runtime libraries or remote executable assets are packaged.
+
+Capture now fails closed on ambiguous generic/split pages: select the full intended job text and click the extension again, or paste it in Resumora. The popup discloses selected-text transmission. Form inputs, hidden content and unrelated profile/navigation containers are excluded. Oversized captures are rejected without silent truncation. Automatic broad main/article/heading-based capture is no longer used. Named adapters are synthetic-fixture verified only; live-site and installed Chrome verification remain pending. Raw JSON-LD description HTML is not sent as metadata.
