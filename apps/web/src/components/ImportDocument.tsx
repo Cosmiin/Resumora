@@ -273,13 +273,10 @@ export function ImportDocument({
                 if (active())
                   setStatus({ id: operationId, state: "cancelled" });
               } catch {
-                if (active())
-                  setError(
-                    t(
-                      "Anularea nu este confirmată. Verifică operațiunea.",
-                      "Cancellation is unconfirmed. Check the operation.",
-                    ),
-                  );
+                if (active()) {
+                  setStatus({ id: operationId, state: "unknown", error: "CANCELLATION_OUTCOME_UNKNOWN" });
+                  setError(t("Anularea nu este confirmată. Verifică aceeași operațiune înainte de o nouă încărcare.", "Cancellation is unconfirmed. Check the same operation before another upload."));
+                }
               } finally {
                 if (active()) setBusy(false);
               }

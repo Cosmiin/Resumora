@@ -50,3 +50,16 @@ it('opens a successful reviewed import exactly once',async()=>{
  const review={id:crypto.randomUUID(),format:'pdf' as const,sourceHash:'a'.repeat(64),parserVersion:'synthetic',pages:1,admission:{kind:'cv' as const,reason:'Synthetic CV',pages:[1]},confirmedIds:[],extraction:{schemaVersion:'cv-extraction/1' as const,warnings:[],omittedPages:[],candidates:[{id:'name',path:'name',value:'Synthetic candidate',quote:'Synthetic candidate',page:1,confidence:'high' as const}]}};
  const {start}=setup('en',{id:'existing',state:'ready',review});await waitFor(()=>expect(start).toHaveBeenCalledTimes(1));
 });
+
+it('does not unlock a duplicate upload when cancellation has an unknown outcome',async()=>{
+ const {client,input}=setup('en',{id:'existing',state:'unknown',error:'PROCESSING_OUTCOME_UNKNOWN'});
+ await screen.findByText(/We cannot confirm this upload/);
+ vi.mocked(client.cancelImport).mockRejectedValueOnce(new TypeError('Synthetic lost cancellation response'));
+ fireEvent.click(screen.getByRole('button',{name:'Cancel import'}));
+ await screen.findByRole('alert');expect(input.disabled).toBe(true);
+ expect(client.importDocument).toHaveBeenCalledTimes(1);
+ const originalId=vi.mocked(client.importDocument).mock.calls[0][1];
+ fireEvent.click(screen.getByRole('button',{name:'Check operation'}));
+ await waitFor(()=>expect(client.importStatus).toHaveBeenCalledWith(originalId,expect.any(AbortSignal)));
+ expect(client.importDocument).toHaveBeenCalledTimes(1);
+});
