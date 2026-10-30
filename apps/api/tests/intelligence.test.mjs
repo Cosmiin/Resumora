@@ -690,7 +690,12 @@ test("question framing uses accepted role, category-heading and entry titles aft
         ["custom.0.details", "Recognised for mentoring."],
         ["certifications.0.title", "Safety training"],
         ["certifications.0.details", "Completed safety training."],
-      ].map(([path, value]) => ({ ...candidate, id: path, path, value })),
+      ].map(([path, value]) => ({
+        ...candidate,
+        id: path.replaceAll(".", "_"),
+        path,
+        value,
+      })),
     },
   });
   const custom = draft.optionalSections.find((s) => s.heading);
