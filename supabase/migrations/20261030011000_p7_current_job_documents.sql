@@ -59,7 +59,7 @@ BEGIN
  IF hidden @> '["summary"]' THEN c:=jsonb_set(c,'{summary,text}','""');END IF;
  IF hidden @> '["identity"]' THEN c:=jsonb_set(c,'{name,value}','""');c:=jsonb_set(c,'{titles,0,value}','""');c:=jsonb_set(c,'{titles,1,value}','""');c:=jsonb_set(c,'{contacts}','[]');c:=c-'nameParts';END IF;
  SELECT coalesce(jsonb_agg(contact_row),'[]') INTO groups FROM jsonb_array_elements(coalesce(c->'contacts','[]')) contact_row WHERE coalesce((contact_row->>'visible')::boolean,true) AND NOT fields @> jsonb_build_array(contact_row#>>'{value,fieldId}');c:=jsonb_set(c,'{contacts}',groups);
- c:=c-'importReview'-'questionPlans'-'roleRewriteReviews';c:=jsonb_set(c,'{referenceProse}','[]');
+ c:=c-'nameParts'-'importReview'-'questionPlans'-'roleRewriteReviews';c:=jsonb_set(c,'{referenceProse}','[]');
  presentation:=presentation-'approvedWording'-'contributionHtml'-'summaryText'-'professionalSkillIds'-'technicalSkillIds';c:=jsonb_set(c,'{presentation}',presentation);
  c:=app.clean_job_document_json(c,fields);c:=jsonb_set(c,'{sources}','[{"id":"job_document","kind":"document","label":"Accepted job CV content"}]');
  RETURN jsonb_build_object('schemaVersion','resumora-editor-draft/1','content',c,'answers','[]'::jsonb);
@@ -88,16 +88,21 @@ UPDATE app.idempotency_requests SET result_refs=jsonb_build_object('currentOnly'
 CREATE FUNCTION app.current_job_document_json(v app.job_editor_versions) RETURNS jsonb LANGUAGE sql STABLE SET search_path='' AS $$
  SELECT jsonb_build_object('id',v.id,'documentId',v.document_id,'revision',v.revision,'fingerprint',encode(app.hash_json(v.payload),'hex'),'createdAt',v.created_at,'locale',d.document_locale,'provenance',v.provenance,'payload',v.payload) FROM app.job_editor_documents d WHERE d.id=v.document_id
 $$;
+-- Sole selector shared by authenticated reads and trusted worker settlement.
+CREATE FUNCTION app.current_job_document_row(p_tenant uuid,p_job uuid,p_locale text DEFAULT NULL) RETURNS app.job_editor_versions LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+ SELECT v.* FROM app.job_editor_documents d JOIN app.job_editor_versions v ON v.document_id=d.id WHERE d.tenant_id=p_tenant AND d.job_id=p_job AND d.deleted_at IS NULL AND CASE WHEN p_locale IS NULL THEN d.is_primary ELSE d.document_locale=p_locale END
+$$;
+REVOKE EXECUTE ON FUNCTION app.current_job_document_row(uuid,uuid,text) FROM PUBLIC,anon,authenticated;
 CREATE FUNCTION app.load_current_job_document(p_job uuid,p_locale text DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
 DECLARE w uuid:=app.tenant_for_user();v app.job_editor_versions;
 BEGIN
  IF NOT EXISTS(SELECT 1 FROM app.target_job_contexts WHERE tenant_id=w AND job_id=p_job) THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
  IF p_locale IS NOT NULL AND p_locale NOT IN ('ro','en') THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
- SELECT c.* INTO v FROM app.job_editor_documents d JOIN app.job_editor_versions c ON c.document_id=d.id WHERE d.tenant_id=w AND d.job_id=p_job AND d.deleted_at IS NULL AND CASE WHEN p_locale IS NULL THEN d.is_primary ELSE d.document_locale=p_locale END;
+ SELECT * INTO v FROM app.current_job_document_row(w,p_job,p_locale);
  RETURN CASE WHEN v.id IS NULL THEN NULL ELSE app.current_job_document_json(v) END;
 END $$;
 CREATE FUNCTION app.save_current_job_document(p_key uuid,p_job uuid,p_locale text,p_document uuid,p_expected_revision bigint,p_payload jsonb,p_base_snapshot uuid,p_provenance jsonb DEFAULT NULL,p_operation uuid DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE w uuid:=app.tenant_for_user();d app.job_editor_documents;v app.job_editor_versions;head app.job_editor_versions;r record;photo uuid;old_id uuid; op app.job_workflow_operations; f app.job_workflows; latest uuid;
+DECLARE w uuid:=app.tenant_for_user();d app.job_editor_documents;v app.job_editor_versions;head app.job_editor_versions;r record;photo uuid;old_id uuid; origin_meta jsonb; op app.job_workflow_operations; f app.job_workflows; latest uuid; current_source uuid;
 BEGIN
  PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;PERFORM app.assert_tenant(w);
  IF NOT EXISTS(SELECT 1 FROM app.target_job_contexts WHERE tenant_id=w AND job_id=p_job) THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
@@ -106,25 +111,31 @@ BEGIN
   SELECT * INTO v FROM app.job_editor_versions WHERE tenant_id=w AND id=(r.cached->>'id')::uuid;
   IF v.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT410',MESSAGE='REQUEST_EXPIRED_RECOVER_EXISTING_RESOURCE';END IF;RETURN app.current_job_document_json(v);
  END IF;
- IF p_locale IS NULL OR p_locale NOT IN ('ro','en') OR p_expected_revision IS NULL OR p_expected_revision<0 OR p_payload#>>'{content,language}' IS DISTINCT FROM p_locale OR p_payload->>'schemaVersion' IS DISTINCT FROM 'resumora-editor-draft/1' OR p_payload->'answers' IS DISTINCT FROM '[]'::jsonb OR p_payload#>'{content,referenceProse}' IS DISTINCT FROM '[]'::jsonb OR p_payload->'content' ?| ARRAY['importReview','questionPlans','roleRewriteReviews'] OR octet_length(p_payload::text)>524288 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
+ IF p_locale IS NULL OR p_locale NOT IN ('ro','en') OR p_expected_revision IS NULL OR p_expected_revision<0 OR p_payload#>>'{content,language}' IS DISTINCT FROM p_locale OR p_payload->>'schemaVersion' IS DISTINCT FROM 'resumora-editor-draft/1' OR p_payload->'answers' IS DISTINCT FROM '[]'::jsonb OR p_payload#>'{content,referenceProse}' IS DISTINCT FROM '[]'::jsonb OR p_payload->'content' ?| ARRAY['importReview','questionPlans','roleRewriteReviews'] OR p_payload IS DISTINCT FROM app.freeze_job_document('{}',p_payload) OR octet_length(p_payload::text)>524288 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
  SELECT * INTO d FROM app.job_editor_documents WHERE tenant_id=w AND job_id=p_job AND document_locale=p_locale AND deleted_at IS NULL FOR UPDATE;
  IF p_document IS NOT NULL AND d.id IS DISTINCT FROM p_document THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
  SELECT * INTO head FROM app.job_editor_versions WHERE tenant_id=w AND document_id=d.id;
  IF coalesce(head.revision,0)<>p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
  IF d.id IS NULL THEN
-  IF NOT EXISTS(SELECT 1 FROM app.editor_draft_snapshots WHERE tenant_id=w AND id=p_base_snapshot) THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+  SELECT id INTO latest FROM app.editor_draft_snapshots WHERE tenant_id=w AND coalesce(to_jsonb(editor_draft_snapshots)->>'variant_id','default')='default' ORDER BY revision DESC LIMIT 1;
+  IF p_base_snapshot IS DISTINCT FROM latest OR latest IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
   INSERT INTO app.job_editor_documents(tenant_id,job_id,document_locale,is_primary) VALUES(w,p_job,p_locale,NOT EXISTS(SELECT 1 FROM app.job_editor_documents WHERE tenant_id=w AND job_id=p_job AND deleted_at IS NULL)) RETURNING * INTO d;
  END IF;
  IF p_operation IS NOT NULL THEN
   SELECT * INTO op FROM app.job_workflow_operations WHERE tenant_id=w AND job_id=p_job AND id=p_operation AND kind='tailor' AND state='ready';
   SELECT * INTO f FROM app.job_workflows WHERE tenant_id=w AND job_id=p_job;
   SELECT id INTO latest FROM app.editor_draft_snapshots WHERE tenant_id=w AND coalesce(to_jsonb(editor_draft_snapshots)->>'variant_id','default')='default' ORDER BY revision DESC LIMIT 1;
-  IF op.id IS NULL OR op.job_revision<>f.revision OR op.snapshot_id IS DISTINCT FROM latest OR op.document_version_id IS DISTINCT FROM head.id THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+  SELECT id INTO current_source FROM app.current_job_document_row(w,p_job,op.requested_locale);
+  IF op.id IS NULL OR op.job_revision<>f.revision OR op.snapshot_id IS DISTINCT FROM latest OR op.document_version_id IS DISTINCT FROM current_source OR op.target_locale IS DISTINCT FROM p_locale OR op.target_document_version_id IS DISTINCT FROM head.id THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
  END IF;
+ IF p_provenance IS NOT NULL AND (jsonb_typeof(p_provenance)<>'object' OR octet_length(p_provenance::text)>8192 OR EXISTS(SELECT 1 FROM jsonb_object_keys(p_provenance) k WHERE k NOT IN ('sourceSnapshotId','sourceRevision','sourceFingerprint','jobFingerprint','jobRevision','acceptedTargets','generatedTargets','sourceDocumentId','sourceCurrentId','sourceDocumentFingerprint','sourceDocumentRevision'))) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
+ origin_meta:=head.provenance;
+ IF (origin_meta IS NULL OR p_operation IS NOT NULL) AND p_base_snapshot IS NOT NULL THEN SELECT jsonb_build_object('sourceSnapshotId',id,'sourceRevision',revision,'sourceFingerprint',encode(app.hash_json(payload),'hex')) INTO origin_meta FROM app.editor_draft_snapshots WHERE tenant_id=w AND id=p_base_snapshot;END IF;
+ origin_meta:=coalesce(origin_meta,'{}')||coalesce(p_provenance,'{}');
  photo:=app.validate_photo_reference(w,p_payload#>'{content,presentation,photo}');old_id:=head.id;
  DELETE FROM app.job_editor_versions WHERE tenant_id=w AND document_id=d.id;
  INSERT INTO app.job_editor_versions(tenant_id,job_id,document_id,revision,job_version_id,reason,payload,request_id,photo_asset_id,provenance)
- VALUES(w,p_job,d.id,coalesce(head.revision,0)+1,(SELECT job_version_id FROM app.target_job_contexts WHERE job_id=p_job),'save',p_payload,r.request_id,photo,coalesce(p_provenance,head.provenance,'{}')) RETURNING * INTO v;
+ VALUES(w,p_job,d.id,coalesce(head.revision,0)+1,(SELECT job_version_id FROM app.target_job_contexts WHERE job_id=p_job),'save',p_payload,r.request_id,photo,origin_meta) RETURNING * INTO v;
  -- Once replaced, no old proposals/results survive as an alternative CV archive.
  UPDATE app.job_workflow_operations SET result=NULL,state=CASE WHEN state IN ('queued','processing') THEN 'stale' ELSE state END,lease=NULL WHERE tenant_id=w AND job_id=p_job AND kind='tailor' AND result IS NOT NULL;
  PERFORM app.finish_request(w,r.request_id,jsonb_build_object('id',v.id));RETURN app.current_job_document_json(v);

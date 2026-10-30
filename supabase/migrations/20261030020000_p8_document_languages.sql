@@ -4,67 +4,20 @@ ALTER TABLE app.editor_draft_snapshots ADD COLUMN variant_id text NOT NULL DEFAU
 ALTER TABLE app.editor_draft_snapshots ADD CHECK(variant_id='default' OR variant_id ~ '^lang_[a-f0-9]{64}$');
 ALTER TABLE app.editor_draft_snapshots DROP CONSTRAINT editor_draft_snapshots_tenant_id_revision_key;
 ALTER TABLE app.editor_draft_snapshots ADD UNIQUE(tenant_id,variant_id,revision);
-CREATE OR REPLACE FUNCTION app.load_base_draft() RETURNS jsonb
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
-DECLARE actor uuid := app.require_user(); workspace uuid; result jsonb;
+-- Predicate-only correction preserves import-owned deletion/current-head guards.
+DO $scope$
+DECLARE signature text; original text; scoped text;
 BEGIN
- SELECT t.id INTO workspace FROM app.tenants t
- WHERE t.owner_user_id=actor AND t.kind='personal' AND app.is_active_member(t.id);
- SELECT app.editor_snapshot_json(s) INTO result FROM app.editor_draft_snapshots s
- WHERE s.tenant_id=workspace AND s.variant_id='default' ORDER BY s.revision DESC LIMIT 1;
- RETURN result;
-END $$;
-CREATE OR REPLACE FUNCTION app.base_draft_history(p_before_revision bigint DEFAULT NULL,p_limit integer DEFAULT 20) RETURNS jsonb
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
-DECLARE actor uuid := app.require_user(); workspace uuid; result jsonb;
-BEGIN
- IF p_limit IS NULL OR p_limit<1 OR p_limit>20 OR p_before_revision<=0 THEN
-   RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';
- END IF;
- SELECT t.id INTO workspace FROM app.tenants t
- WHERE t.owner_user_id=actor AND t.kind='personal' AND app.is_active_member(t.id);
- SELECT coalesce(pg_catalog.jsonb_agg(app.editor_snapshot_json(s) ORDER BY s.revision DESC),'[]'::jsonb) INTO result
- FROM (SELECT * FROM app.editor_draft_snapshots s WHERE s.tenant_id=workspace AND s.variant_id='default'
-   AND (p_before_revision IS NULL OR s.revision<p_before_revision) ORDER BY s.revision DESC LIMIT p_limit) s;
- RETURN result;
-END $$;
-CREATE OR REPLACE FUNCTION app.write_base_draft(p_key uuid,p_expected_revision bigint,p_payload jsonb,p_mode text,p_snapshot uuid)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE workspace uuid; head app.editor_draft_snapshots; saved app.editor_draft_snapshots; r record; old jsonb;
- command text := CASE WHEN p_snapshot IS NULL THEN 'save_base_draft' ELSE 'restore_base_draft' END;
-BEGIN
- IF p_snapshot IS NULL THEN PERFORM app.provision_workspace(p_key); END IF;
- workspace := app.tenant_for_user();
- SELECT * INTO r FROM app.begin_request(workspace,command,p_key,pg_catalog.jsonb_build_object(
-   'revision',p_expected_revision,'payload',p_payload,'mode',p_mode,'snapshot',p_snapshot));
- IF r.cached IS NOT NULL THEN RETURN r.cached; END IF;
- IF p_expected_revision IS NULL OR p_expected_revision<0 THEN
-   RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';
- END IF;
- PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('resumora:editor:'||workspace::text,0));
- SELECT * INTO head FROM app.editor_draft_snapshots WHERE tenant_id=workspace AND variant_id='default' ORDER BY revision DESC LIMIT 1;
- IF coalesce(head.revision,0)<>p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT'; END IF;
- IF p_snapshot IS NOT NULL THEN
-   SELECT payload INTO old FROM app.editor_draft_snapshots WHERE tenant_id=workspace AND variant_id='default' AND id=p_snapshot;
-   IF old IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
-   p_payload := old;
- END IF;
- IF p_payload#>'{content,translation}' IS NOT NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
- IF p_payload IS NULL OR pg_catalog.jsonb_typeof(p_payload)<>'object'
-   OR p_payload->>'schemaVersion' IS DISTINCT FROM 'resumora-editor-draft/1'
-   OR pg_catalog.jsonb_typeof(p_payload->'content') IS DISTINCT FROM 'object'
-   OR pg_catalog.jsonb_typeof(p_payload->'answers') IS DISTINCT FROM 'array' THEN
-   RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';
- END IF;
- IF pg_catalog.octet_length(p_payload::text)>1048576 THEN
-   RAISE EXCEPTION USING ERRCODE='PT413',MESSAGE='INVALID_COMMAND_ENVELOPE';
- END IF;
- INSERT INTO app.editor_draft_snapshots(tenant_id,revision,parent_id,restored_from,reason,payload,request_id)
- VALUES(workspace,coalesce(head.revision,0)+1,head.id,p_snapshot,
-   CASE p_mode WHEN 'checkpoint' THEN 'save' ELSE p_mode END,p_payload,r.request_id) RETURNING * INTO saved;
- PERFORM app.audit(workspace,'editor.'||p_mode,'editor_snapshot',saved.id);
- RETURN app.finish_request(workspace,r.request_id,app.editor_snapshot_json(saved));
-END $$;
+ FOREACH signature IN ARRAY ARRAY['app.load_base_draft()','app.base_draft_history(bigint,integer)','app.write_base_draft(uuid,bigint,jsonb,text,uuid)','app.begin_cv_import(uuid,text,text,bigint,bigint)'] LOOP
+  original:=pg_get_functiondef(to_regprocedure(signature));
+  scoped:=replace(original,'s.tenant_id=workspace ORDER BY','s.tenant_id=workspace AND s.variant_id=''default'' ORDER BY');
+  scoped:=replace(scoped,'s.tenant_id=workspace\n   AND','s.tenant_id=workspace AND s.variant_id=''default''\n   AND');
+  scoped:=replace(scoped,'WHERE tenant_id=workspace ORDER BY revision','WHERE tenant_id=workspace AND variant_id=''default'' ORDER BY revision');
+  scoped:=replace(scoped,'WHERE tenant_id=workspace AND id=p_snapshot','WHERE tenant_id=workspace AND variant_id=''default'' AND id=p_snapshot');
+  scoped:=replace(scoped,'max(revision),0) INTO head_revision FROM app.editor_draft_snapshots WHERE tenant_id=w;','max(revision),0) INTO head_revision FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id=''default'';');
+  IF scoped IS DISTINCT FROM original THEN EXECUTE scoped;END IF;
+ END LOOP;
+END $scope$;
 CREATE OR REPLACE FUNCTION app.load_editor_snapshot(p_snapshot uuid) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT app.editor_snapshot_json(s) FROM app.editor_draft_snapshots s WHERE s.tenant_id=app.tenant_for_user() AND s.variant_id='default' AND s.id=p_snapshot
 $$;
@@ -122,7 +75,7 @@ REVOKE EXECUTE ON FUNCTION app.translation_source_current(uuid,jsonb,text) FROM 
 REVOKE EXECUTE ON FUNCTION app.load_base_language(text,uuid),app.base_language_history(text,bigint),app.document_language_context(uuid),app.write_base_language(uuid,text,bigint,jsonb,uuid,boolean) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION app.load_base_language(text,uuid),app.base_language_history(text,bigint),app.document_language_context(uuid),app.write_base_language(uuid,text,bigint,jsonb,uuid,boolean) TO authenticated;
 CREATE OR REPLACE FUNCTION app.save_current_job_document(p_key uuid,p_job uuid,p_locale text,p_document uuid,p_expected_revision bigint,p_payload jsonb,p_base_snapshot uuid,p_provenance jsonb DEFAULT NULL,p_operation uuid DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE w uuid:=app.tenant_for_user();d app.job_editor_documents;v app.job_editor_versions;head app.job_editor_versions;r record;photo uuid;old_id uuid; op app.job_workflow_operations; f app.job_workflows; latest uuid;
+DECLARE w uuid:=app.tenant_for_user();d app.job_editor_documents;v app.job_editor_versions;head app.job_editor_versions;r record;photo uuid;old_id uuid; origin_meta jsonb; op app.job_workflow_operations; f app.job_workflows; latest uuid; current_source uuid;
 BEGIN
  PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;PERFORM app.assert_tenant(w);
  IF NOT EXISTS(SELECT 1 FROM app.target_job_contexts WHERE tenant_id=w AND job_id=p_job) THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
@@ -131,7 +84,7 @@ BEGIN
   SELECT * INTO v FROM app.job_editor_versions WHERE tenant_id=w AND id=(r.cached->>'id')::uuid;
   IF v.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT410',MESSAGE='REQUEST_EXPIRED_RECOVER_EXISTING_RESOURCE';END IF;RETURN app.current_job_document_json(v);
  END IF;
- IF p_locale IS NULL OR p_locale NOT IN ('ro','en') OR p_expected_revision IS NULL OR p_expected_revision<0 OR p_payload#>>'{content,language}' IS DISTINCT FROM p_locale OR p_payload->>'schemaVersion' IS DISTINCT FROM 'resumora-editor-draft/1' OR p_payload->'answers' IS DISTINCT FROM '[]'::jsonb OR p_payload#>'{content,referenceProse}' IS DISTINCT FROM '[]'::jsonb OR p_payload->'content' ?| ARRAY['importReview','questionPlans','roleRewriteReviews'] OR octet_length(p_payload::text)>524288 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
+ IF p_locale IS NULL OR p_locale NOT IN ('ro','en') OR p_expected_revision IS NULL OR p_expected_revision<0 OR p_payload#>>'{content,language}' IS DISTINCT FROM p_locale OR p_payload->>'schemaVersion' IS DISTINCT FROM 'resumora-editor-draft/1' OR p_payload->'answers' IS DISTINCT FROM '[]'::jsonb OR p_payload#>'{content,referenceProse}' IS DISTINCT FROM '[]'::jsonb OR p_payload->'content' ?| ARRAY['importReview','questionPlans','roleRewriteReviews'] OR p_payload IS DISTINCT FROM app.freeze_job_document('{}',p_payload) OR octet_length(p_payload::text)>524288 THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
  SELECT * INTO d FROM app.job_editor_documents WHERE tenant_id=w AND job_id=p_job AND document_locale=p_locale AND deleted_at IS NULL FOR UPDATE;
  IF p_document IS NOT NULL AND d.id IS DISTINCT FROM p_document THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
  SELECT * INTO head FROM app.job_editor_versions WHERE tenant_id=w AND document_id=d.id;
@@ -143,19 +96,25 @@ BEGIN
   IF p_payload#>>'{content,translation,source,kind}' IS DISTINCT FROM 'job' OR p_payload#>>'{content,translation,source,jobId}' IS DISTINCT FROM p_job::text OR NOT app.translation_source_current(w,p_payload#>'{content,translation,source}',p_payload#>>'{content,translation,sourceLocale}') THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
  END IF;
  IF d.id IS NULL THEN
-  IF NOT coalesce(p_provenance ? 'sourceCurrentId',false) AND NOT EXISTS(SELECT 1 FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id='default' AND id=p_base_snapshot) THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+  SELECT id INTO latest FROM app.editor_draft_snapshots WHERE tenant_id=w AND coalesce(to_jsonb(editor_draft_snapshots)->>'variant_id','default')='default' ORDER BY revision DESC LIMIT 1;
+  IF NOT coalesce(p_provenance ? 'sourceCurrentId',false) AND (p_base_snapshot IS DISTINCT FROM latest OR latest IS NULL) THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
   INSERT INTO app.job_editor_documents(tenant_id,job_id,document_locale,is_primary) VALUES(w,p_job,p_locale,NOT EXISTS(SELECT 1 FROM app.job_editor_documents WHERE tenant_id=w AND job_id=p_job AND deleted_at IS NULL)) RETURNING * INTO d;
  END IF;
  IF p_operation IS NOT NULL THEN
   SELECT * INTO op FROM app.job_workflow_operations WHERE tenant_id=w AND job_id=p_job AND id=p_operation AND kind='tailor' AND state='ready';
   SELECT * INTO f FROM app.job_workflows WHERE tenant_id=w AND job_id=p_job;
   SELECT id INTO latest FROM app.editor_draft_snapshots WHERE tenant_id=w AND coalesce(to_jsonb(editor_draft_snapshots)->>'variant_id','default')='default' ORDER BY revision DESC LIMIT 1;
-  IF op.id IS NULL OR op.job_revision<>f.revision OR op.snapshot_id IS DISTINCT FROM latest OR op.document_version_id IS DISTINCT FROM head.id THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+  SELECT id INTO current_source FROM app.current_job_document_row(w,p_job,op.requested_locale);
+  IF op.id IS NULL OR op.job_revision<>f.revision OR op.snapshot_id IS DISTINCT FROM latest OR op.document_version_id IS DISTINCT FROM current_source OR op.target_locale IS DISTINCT FROM p_locale OR op.target_document_version_id IS DISTINCT FROM head.id THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
  END IF;
+ IF p_provenance IS NOT NULL AND (jsonb_typeof(p_provenance)<>'object' OR octet_length(p_provenance::text)>8192 OR EXISTS(SELECT 1 FROM jsonb_object_keys(p_provenance) k WHERE k NOT IN ('sourceSnapshotId','sourceRevision','sourceFingerprint','jobFingerprint','jobRevision','acceptedTargets','generatedTargets','sourceDocumentId','sourceCurrentId','sourceDocumentFingerprint','sourceDocumentRevision'))) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
+ origin_meta:=head.provenance;
+ IF (origin_meta IS NULL OR p_operation IS NOT NULL) AND p_base_snapshot IS NOT NULL THEN SELECT jsonb_build_object('sourceSnapshotId',id,'sourceRevision',revision,'sourceFingerprint',encode(app.hash_json(payload),'hex')) INTO origin_meta FROM app.editor_draft_snapshots WHERE tenant_id=w AND id=p_base_snapshot;END IF;
+ origin_meta:=coalesce(origin_meta,'{}')||coalesce(p_provenance,'{}');
  photo:=app.validate_photo_reference(w,p_payload#>'{content,presentation,photo}');old_id:=head.id;
  DELETE FROM app.job_editor_versions WHERE tenant_id=w AND document_id=d.id;
  INSERT INTO app.job_editor_versions(tenant_id,job_id,document_id,revision,job_version_id,reason,payload,request_id,photo_asset_id,provenance)
- VALUES(w,p_job,d.id,coalesce(head.revision,0)+1,(SELECT job_version_id FROM app.target_job_contexts WHERE job_id=p_job),'save',p_payload,r.request_id,photo,coalesce(p_provenance,head.provenance,'{}')) RETURNING * INTO v;
+ VALUES(w,p_job,d.id,coalesce(head.revision,0)+1,(SELECT job_version_id FROM app.target_job_contexts WHERE job_id=p_job),'save',p_payload,r.request_id,photo,origin_meta) RETURNING * INTO v;
  -- Once replaced, no old proposals/results survive as an alternative CV archive.
  UPDATE app.job_workflow_operations SET result=NULL,state=CASE WHEN state IN ('queued','processing') THEN 'stale' ELSE state END,lease=NULL WHERE tenant_id=w AND job_id=p_job AND kind='tailor' AND result IS NOT NULL;
  PERFORM app.finish_request(w,r.request_id,jsonb_build_object('id',v.id));RETURN app.current_job_document_json(v);

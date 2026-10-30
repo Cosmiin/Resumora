@@ -40,6 +40,29 @@ def suite(db):
    self.assertEqual(self.state()['revision'],2);self.assertEqual(self.state()['reviewed'],value)
    self.assertIn('VERSION_CONFLICT',self.raw('finish_job_workflow',f"'{secret}','{t['lease']}','{{}}',NULL",role='anon',error=True))
    self.assertEqual(self.call('get_target_job',f"'{self.job['id']}'")['intake']['text'],self.source)
+  def test_account_revocation_cancels_late_result_and_prevents_more_attempts(self):
+   task=self.claim();db.sql(f"UPDATE app.tenant_memberships SET state='revoked' WHERE user_id='{self.a}'")
+   settled=self.finish(task,{'schemaVersion':'vacancy-extraction/3'})
+   self.assertEqual(settled['state'],'cancelled');self.assertIsNone(settled['result'])
+   self.assertIn('VERSION_CONFLICT',self.raw('job_workflow_attempt',f"'{secret}','{task['lease']}','{{}}',NULL,NULL",role='anon',error=True))
+  def test_source_version_links_are_explicit_owned_and_cannot_form_cycle(self):
+   newer=self.call('save_target_job',f"'{uid()}',NULL,NULL,{lit({'text':self.source+' New requirements.'})},'[]'")
+   key=uid();args=f"'{key}','{newer['id']}','{self.job['id']}',1"
+   linked=self.call('link_job_source_version',args);self.assertEqual(linked['sourceParentId'],self.job['id']);self.assertEqual(linked,self.call('link_job_source_version',args))
+   self.assertIn('VERSION_CONFLICT',self.raw('link_job_source_version',f"'{uid()}','{self.job['id']}','{newer['id']}',1",error=True))
+   self.assertIn('SNAPSHOT_NOT_FOUND',self.raw('link_job_source_version',f"'{uid()}','{newer['id']}','{uid()}',1",error=True))
+  def test_base_changes_stale_semantic_results_and_prepare_can_queue_one_tailor(self):
+   # Extraction is already settled; use a manually reviewed synthetic vacancy.
+   db.sql(f"UPDATE app.job_workflow_operations SET state='cancelled' WHERE job_id='{self.job['id']}';UPDATE app.job_workflows SET reviewed='{{}}' WHERE job_id='{self.job['id']}'")
+   source={'schemaVersion':'resumora-editor-draft/1','content':{},'answers':[]}
+   base=self.call('save_base_draft',f"'{uid()}',0,{lit(source)},'autosave'")
+   self.call('request_job_workflow',f"'{uid()}','{self.job['id']}','prepare',1,NULL")
+   t=self.claim();self.assertEqual(t['operation']['snapshotId'],base['id'])
+   self.call('save_base_draft',f"'{uid()}',1,{lit(source)},'autosave'")
+   result=self.finish(t,{'schemaVersion':'job-evidence-match/1','components':[]});self.assertEqual(result['state'],'stale')
+   self.call('request_job_workflow',f"'{uid()}','{self.job['id']}','prepare',1,NULL")
+   t=self.claim();self.finish(t,{'schemaVersion':'job-evidence-match/1','components':[]})
+   self.assertEqual(self.claim()['operation']['kind'],'tailor')
   def test_worker_attempt_account_binding_cancel_and_usage(self):
    t=self.claim();operation=t['operation']['id']
    start={'attemptId':operation+'-primary','operationId':operation,'userId':self.a,'provider':'openrouter','operation':'job_parse','modelRequested':'synthetic','providerScope':'synthetic','requestFingerprint':'a'*64,'startedAt':'2026-10-30T00:00:00Z'}

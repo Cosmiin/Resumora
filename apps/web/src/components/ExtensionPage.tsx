@@ -109,8 +109,7 @@ export function ExtensionPage({
           <tr>
             <td>Other sites</td>
             <td>
-              Structured JobPosting and bounded visible job-text fallback; live
-              sites unverified
+              Structured JobPosting or a bounded job-description container; ambiguous pages require explicit text selection or manual paste. Live sites unverified
             </td>
           </tr>
         </tbody>
@@ -201,7 +200,7 @@ export function ExtensionConnection({
       <p>
         {managing
           ? "Revoke all extension connections for this account. New captures will require connecting again."
-          : "Allow this extension installation to save jobs and check its own capture receipts. It cannot read/edit your CV, administer your account or spend on AI."}
+          : "Allow this installation to save jobs and check capture receipts. It cannot read/edit your CV or administer your account. Saved jobs may be analyzed automatically if enabled in your Resumora settings."}
       </p>
       {!managing && valid && (
         <p>

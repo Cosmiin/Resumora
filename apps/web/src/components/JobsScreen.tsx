@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import type {
   SavedJob,
   JobSummary,
-  RequirementEvidence,
 } from "@resumora/contracts/jobs/connected";
 import type { AuthTransport } from "../auth/AuthShell";
 import { Button, useCopy } from "./ui";
@@ -16,22 +15,16 @@ export function JobsScreen({
   transport?: AuthTransport;
   snapshot: { id: string; revision: number } | null;
   ready: boolean;
-  openCv?: (job: { id: string; label: string }) => void;
+  openCv?: (job: { id: string; label: string;locale?:"ro"|"en" }) => void;
 }) {
   const t = useCopy();
   const [jobs, setJobs] = useState<JobSummary[]>([]),
     [selected, setSelected] = useState<SavedJob | null>(null);
   const [text, setText] = useState(""),
-    [sourceUrl, setUrl] = useState(""),
-    [title, setTitle] = useState(""),
-    [company, setCompany] = useState("");
-  const [requirements, setRequirements] = useState<RequirementEvidence[]>([]),
-    [excerpt, setExcerpt] = useState(""),
-    [priority, setPriority] = useState<"required" | "preferred">("required");
+    [sourceUrl, setUrl] = useState("");
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
-  const input = useRef<HTMLTextAreaElement>(null),
-    reviewTitle = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const pending = useRef<{ path: string; body: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -55,21 +48,7 @@ export function JobsScreen({
   }, [transport]);
   function choose(j: SavedJob) {
     setSelected(j);
-    setTitle(
-      j.intake.title ??
-        (typeof j.intake.extracted?.title === "string"
-          ? j.intake.extracted.title
-          : ""),
-    );
-    setCompany(
-      j.intake.company ??
-        (typeof j.intake.extracted?.company === "string"
-          ? j.intake.extracted.company
-          : ""),
-    );
-    setRequirements(j.requirements);
     setMessage("");
-    setTimeout(() => reviewTitle.current?.focus(), 0);
   }
   async function send(path: string, body: unknown) {
     if (!transport || busy) return;
@@ -224,8 +203,7 @@ export function JobsScreen({
         <h3>{t("Joburi salvate", "Saved jobs")}</h3>
         {!jobs.length && <p>{t("Niciun job încă.", "No jobs yet.")}</p>}
         {jobs.map((j) => (
-          <Button
-            key={j.id}
+          <article key={j.id}><Button
             disabled={busy || !!pending.current}
             onClick={() => void detail(j.id)}
           >
@@ -233,13 +211,13 @@ export function JobsScreen({
             {j.state === "reviewed"
               ? t("Revizuit", "Reviewed")
               : t("Ciornă", "Draft")}
-          </Button>
+          </Button><p className="small muted">{[j.company,j.location,j.workArrangement].filter(Boolean).join(' · ')} · {t('Salvat','Saved')} {new Date(j.createdAt).toLocaleDateString()} · {j.analysisState==='ready'?t('Pregătit pentru revizuire','Ready to review'):j.analysisState==='failed'?t('Analiza necesită atenție','Analysis needs attention'):j.analysisState?t('Analiză în așteptare','Analysis pending'):t('Salvat','Saved')}</p></article>
         ))}
       </section>
       <section className="card stack">
         {selected && transport ? (
           <JobWorkflowPanel key={selected.id} job={selected} transport={transport} ready={ready} onOpenJob={id=>void detail(id)}
-            openCv={openCv?()=>openCv({id:selected.id,label:selected.intake.title||t('Ciornă de job','Job draft')}):undefined}/>
+            openCv={openCv?(locale)=>openCv({id:selected.id,locale,label:selected.intake.title||t('Ciornă de job','Job draft')}):undefined}/>
         ) : (
           <p>
             {t(

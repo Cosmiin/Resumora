@@ -7,13 +7,13 @@ export type Span = { start: number; end: number; quote: string };
 export type JobRequirement = { id: string; text: string; categories: Category[]; priority: 'required'|'preferred'|'unspecified'; emphasis: 'central'|'supporting'|'unknown'; operator: 'and'|'or'; components: {id:string;text:string}[]; evidence: Span[]; eligibility: boolean; origin: 'extracted'|'manual' };
 export const overviewFields = ['title','company','location','workArrangement','geographicEligibility','employmentType','contractDuration','workingHours','travel','salary','experience','education','certifications','languages','postedAt','updatedAt','deadline','applicationUrl'] as const;
 export type Vacancy = { schemaVersion:'vacancy-extraction/3'; sourceLocale:string|null; overview: Record<typeof overviewFields[number], {value:string;evidence:Span[]}|null>; requirements:JobRequirement[]; issues:{kind:'ambiguity'|'conflict'|'incomplete';message:string;evidence:Span[]}[]; completeness:'complete'|'partial' };
-export type Evidence = {id:string;targetId:string;key:string;text:string;sourceId:string;kind:'fact'|'answer';inCv:boolean};
+export type Evidence = {id:string;targetId:string;key:string;text:string;sourceId:string;kind:'fact'|'answer';inCv:boolean;cvText?:string};
 export type MatchClass = 'demonstrated'|'claimed_limited'|'transferable'|'not_evidenced'|'unknown'|'conflict';
 export type ComponentMatch = { requirementId:string;componentId:string;scope:'profile'|'cv';matchClass:MatchClass;evidence:{id:string;quote:string}[];reason:string };
 export type MatchResult = {schemaVersion:'job-evidence-match/1';components:ComponentMatch[]};
 export type TailorSection = {targetId:string;action:'retain'|'rewrite'|'reorder';text:string;skillIds:string[];evidenceIds:string[];requirementIds:string[];reason:string;warnings:string[]};
 export type TailorProposal = {schemaVersion:'job-tailor/1';sections:TailorSection[]};
-export type WorkflowOperation = {id:string;kind:'fetch'|'extract'|'match'|'tailor';state:'queued'|'processing'|'ready'|'failed'|'cancelled'|'stale'|'unknown';jobRevision:number;snapshotId:string|null;snapshotRevision:number|null;documentVersionId?:string|null;result:Vacancy|MatchResult|TailorProposal|null;error:string|null;createdAt:string};
+export type WorkflowOperation = {id:string;kind:'fetch'|'extract'|'match'|'tailor';state:'queued'|'processing'|'ready'|'failed'|'cancelled'|'stale'|'unknown';jobRevision:number;snapshotId:string|null;snapshotRevision:number|null;documentVersionId?:string|null;documentLocale?:'ro'|'en'|null;targetLocale?:'ro'|'en';targetDocumentVersionId?:string|null;result:Vacancy|MatchResult|TailorProposal|null;error:string|null;createdAt:string};
 export type JobWorkflow = {revision:number;extracted:Vacancy|null;reviewed:Vacancy|null;operations:WorkflowOperation[];sourceParentId:string|null;duplicates:{id:string;title:string;kind:'exact'|'updated'}[]};
 const object=(v:unknown):v is Record<string,any>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const text=(v:unknown,max=6000):v is string=>typeof v==='string'&&!!v.trim()&&v.length<=max&&!/[\u0000\uD800-\uDFFF]/u.test(v);
@@ -49,10 +49,12 @@ export function validateMatch(value:unknown,vacancy:Vacancy,evidence:Evidence[])
  if(value.components.length!==expected.length)fail();const found:string[]=[];
  for(const c of value.components){if(!object(c)||!exact(c,['requirementId','componentId','scope','matchClass','evidence','reason'])||!expected.includes(`${c.requirementId}:${c.componentId}:${c.scope}`)||!['demonstrated','claimed_limited','transferable','not_evidenced','unknown','conflict'].includes(c.matchClass)||!text(c.reason,1500)||!Array.isArray(c.evidence)||c.evidence.length>20)fail();found.push(`${c.requirementId}:${c.componentId}:${c.scope}`);
   if(['demonstrated','claimed_limited','transferable','conflict'].includes(c.matchClass)&&!c.evidence.length)fail();
-  for(const s of c.evidence){if(!object(s)||!exact(s,['id','quote'])||!text(s.quote)||!evidence.some(e=>e.id===s.id&&e.text.includes(s.quote)&&(c.scope==='profile'||e.inCv)))fail();}
+  for(const s of c.evidence){if(!object(s)||!exact(s,['id','quote'])||!text(s.quote)||!evidence.some(e=>e.id===s.id&&(c.scope==='profile'?e.text:(e.cvText??e.text)).includes(s.quote)&&(c.scope==='profile'||e.inCv)))fail();}
   const r=vacancy.requirements.find(r=>r.id===c.requirementId)!;if(r.eligibility&&c.matchClass==='transferable')fail();
  }
- if(!unique(found))fail();return structuredClone(value) as MatchResult;
+ if(!unique(found))fail();
+ for(const r of vacancy.requirements)for(const component of r.components){const profile=value.components.find((m:ComponentMatch)=>m.requirementId===r.id&&m.componentId===component.id&&m.scope==='profile'),cv=value.components.find((m:ComponentMatch)=>m.requirementId===r.id&&m.componentId===component.id&&m.scope==='cv');if(coverageMethod.strength[cv.matchClass as MatchClass]>coverageMethod.strength[profile.matchClass as MatchClass])fail();}
+ return structuredClone(value) as MatchResult;
 }
 export const coverageMethod={version:'compatibility-1.1.0',weights:{technical:30,responsibilities:25,experience:15,achievements:10,qualifications:10,professional:5,title:5},priorities:{required:3,unspecified:2,preferred:1},strength:{demonstrated:1,claimed_limited:.75,transferable:.4,not_evidenced:0,unknown:0,conflict:0}} as const;
 const primary=(r:JobRequirement):keyof typeof coverageMethod.weights=>{const c=r.categories[0];return c==='domain'?'responsibilities':c==='languages'||c==='conditions'?'qualifications':c;};
@@ -75,4 +77,18 @@ export function validateTailor(value:unknown,draft:BaseDraft,vacancy:Vacancy,evi
   const support=cited.map((e:Evidence)=>e.text).join('\n'),numbers=new Set(support.match(/\d+(?:[.,]\d+)*%?/g)??[]);for(const n of s.text.match(/\d+(?:[.,]\d+)*%?/g)??[])if(!numbers.has(n))fail();
  }
  if(!unique(value.sections.map((s:TailorSection)=>s.targetId)))fail();return structuredClone(value) as TailorProposal;
+}
+export function jobClarificationQuestion(requirement:string,target:string){return `What, if any, work in ${target.slice(0,200)} supports this employer requirement: “${requirement.slice(0,1200)}”? Describe only activities you personally performed. You may answer no, unknown, or skip.`;}
+export type JobSuggestion={id:string;type:'include'|'clarify'|'verify'|'gap';requirementIds:string[];evidenceIds:string[];targetId:string|null;state:string;priority:number};
+/** Deterministic actions from a cached assessment; one experience/action groups
+ * related requirements. No inference request, probability or invented delta. */
+export async function deriveJobSuggestions(vacancy:Vacancy,match:MatchResult,evidence:Evidence[],context:{revision:number;snapshotId:string;actions:Record<string,string>}){
+ const profile=evidenceCoverage(vacancy,match,'profile'),cv=evidenceCoverage(vacancy,match,'cv'),groups=new Map<string,Omit<JobSuggestion,'id'|'state'>>();
+ for(const r of vacancy.requirements){const p=profile.requirements.find(q=>q.id===r.id)!,c=cv.requirements.find(q=>q.id===r.id)!;if(p.strength===1&&c.strength===1)continue;
+  const type=p.strength>c.strength?'include':p.state==='partially_supported'?'clarify':p.state==='needs_confirmation'||p.state==='conflict'?'verify':'gap';
+  const evidenceIds=[...new Set(match.components.filter(m=>m.requirementId===r.id&&m.scope==='profile').flatMap(m=>m.evidence.map(e=>e.id)))];
+  const targetId=evidence.find(e=>evidenceIds.includes(e.id)&&!['professionalSkills','technicalSkills'].includes(e.targetId))?.targetId??null;
+  const key=type+':'+(targetId??r.id),g=groups.get(key)??{type,requirementIds:[],evidenceIds:[],targetId,priority:0};g.requirementIds.push(r.id);g.evidenceIds=[...new Set([...g.evidenceIds,...evidenceIds])];g.priority=Math.max(g.priority,coverageMethod.priorities[r.priority]*10+(r.eligibility?40:0)+(type==='include'?8:type==='clarify'?6:type==='verify'?4:0));groups.set(key,g);
+ }
+ return Promise.all([...groups.values()].sort((a,b)=>b.priority-a.priority||a.requirementIds[0].localeCompare(b.requirementIds[0])).map(async g=>{const id='suggestion_'+(await fingerprint({revision:context.revision,snapshot:context.snapshotId,type:g.type,target:g.targetId,requirements:g.requirementIds.slice().sort()})).slice(0,48);return {...g,id,state:context.actions[id]??'new'};}));
 }
