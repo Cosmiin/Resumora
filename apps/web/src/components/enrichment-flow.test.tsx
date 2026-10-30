@@ -268,7 +268,7 @@ it("failed questions and automatic rewrite retry only on a deliberate click and 
   }
   render(<Surface />);
   fireEvent.click(screen.getByRole("button", { name: "Improve" }));
-  await screen.findByText(/AI questions are unavailable/);
+  await screen.findByText(/We cannot confirm the question request/);
   expect(questions).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole("button", { name: "Improve" }));
   fireEvent.click(await screen.findByLabelText("Consolidated team reports"));
@@ -524,5 +524,91 @@ it.each(["skipped", "unknown"] as const)(
     expect(
       screen.getByText(/Context changed. Review your answers/),
     ).toBeTruthy();
+  },
+);
+
+it.each([
+  ["en", "AI_OUTPUT_TRUNCATED", "AI stopped before finishing"],
+  ["ro", "AI_OUTPUT_TRUNCATED", "Răspunsul AI s-a oprit"],
+  ["en", "AI_OUTPUT_INVALID", "AI returned questions we cannot safely use"],
+  ["ro", "AI_OUTPUT_INVALID", "AI a returnat întrebări"],
+  ["en", "VERSION_CONFLICT", "The saved context changed"],
+  ["ro", "VERSION_CONFLICT", "Contextul salvat s-a schimbat"],
+  ["en", "AI_DISABLED", "AI processing is off"],
+  ["ro", "AI_DISABLED", "Procesarea AI este dezactivată"],
+] as const)(
+  "%s questions %s preserves answers without automatic retry",
+  async (locale, code, message) => {
+    const d = fixture();
+    d.answers = [
+      {
+        id: "kept",
+        targetId: d.roles[0].id,
+        question: "ownership",
+        questionText: "Previous detail?",
+        text: "Existing saved answer",
+        status: "confirmed",
+      },
+    ];
+    const before = clone(d),
+      prepareQuestions = vi.fn().mockRejectedValue(new Error(code)),
+      change = vi.fn();
+    render(
+      <LanguageContext value={locale}>
+        <Enrichment
+          draft={d}
+          change={change}
+          goEdit={() => {}}
+          asOf={{ year: "2026", month: "10" }}
+          prepareQuestions={prepareQuestions}
+        />
+      </LanguageContext>,
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: locale === "en" ? "Improve" : "Îmbunătățește",
+      }),
+    );
+    await screen.findByText(new RegExp(message));
+    expect(prepareQuestions).toHaveBeenCalledTimes(1);
+    expect(change).not.toHaveBeenCalled();
+    expect(d).toEqual(before);
+  },
+);
+
+it.each([false, true])(
+  "pending question result checks content rather than reference; changed=%s",
+  async (changed) => {
+    const d = fixture();
+    let resolve!: (value: ReturnType<typeof plan>) => void;
+    const prepareQuestions = vi.fn(
+        () =>
+          new Promise<ReturnType<typeof plan>>((done) => {
+            resolve = done;
+          }),
+      ),
+      change = vi.fn();
+    const surface = (draft: BaseDraft) => (
+      <LanguageContext value="en">
+        <Enrichment
+          draft={draft}
+          change={change}
+          goEdit={() => {}}
+          asOf={{ year: "2026", month: "10" }}
+          prepareQuestions={prepareQuestions}
+        />
+      </LanguageContext>
+    );
+    const view = render(surface(d));
+    fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+    const next = clone(d);
+    if (changed) next.roles[0].context.value = "Changed responsibilities";
+    view.rerender(surface(next));
+    await act(async () => resolve(plan(d)));
+    if (changed) {
+      expect(change).not.toHaveBeenCalled();
+      await screen.findByText(/The saved context changed/);
+    } else expect(change).toHaveBeenCalledTimes(1);
+    expect(prepareQuestions).toHaveBeenCalledTimes(1);
   },
 );

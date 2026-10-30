@@ -160,7 +160,7 @@ export function prepareEnhancement(options: {
           task.userId !== input.userId ||
           (task.attemptPhase !== undefined && !["verify", "suggest"].includes(task.attemptPhase)) ||
           task.maxOutputTokens < 1 ||
-          task.maxOutputTokens > 8000 ||
+          task.maxOutputTokens > (task.promptVersion === "career.questions.v3-complete" && task.operation === "cv_rewrite" ? 16000 : 8000) ||
           !Number.isInteger(task.maxOutputTokens))
       )
         throw new Error("INVALID_CONTEXT");

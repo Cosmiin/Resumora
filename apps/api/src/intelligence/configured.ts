@@ -164,6 +164,7 @@ export function configuredStructuredRunner(env: IntelligenceConfig,userId:string
             providerScope: "configured-direct",
           },
         };
+    let validationReason = "NOT_REACHED";
     const runner = prepareEnhancement({
       execution: "configured",
       processingPolicy: policy,
@@ -183,7 +184,15 @@ export function configuredStructuredRunner(env: IntelligenceConfig,userId:string
           input: structuredClone(task.input),
           schema: structuredClone(task.schema),
         },
-        validate: task.validateOutput ?? ((value) => value),
+        validate: (value) => {
+          validationReason = "VALIDATING";
+          try { const result = task.validateOutput ? task.validateOutput(value) : value; validationReason = "VALID"; return result; }
+          catch(error) {
+            const code = error instanceof Error ? error.message : "";
+            validationReason = ["QUESTION_OUTPUT", "QUESTION_REPEATED", "INVALID_WORKFLOW_OUTPUT", "REWRITE_OUTPUT", "OUTPUT_UNSUPPORTED", "UNSUPPORTED_METRIC"].includes(code) ? code : "STRUCTURE_REJECTED";
+            throw error;
+          }
+        },
       },
     });
     const result = await runner.propose({
@@ -202,8 +211,18 @@ export function configuredStructuredRunner(env: IntelligenceConfig,userId:string
       },
       signal,
     });
-    if (result.output === undefined)
-      throw new Error("PROVIDER_OUTPUT_UNAVAILABLE");
+    if (result.output === undefined) {
+      const last = result.attempts.at(-1)?.result;
+      const truncated = last?.status === "incomplete" && last.errorCode === "OUTPUT_INVALID";
+      const invalid = last?.errorCode === "OUTPUT_INVALID" || last?.errorCode === "OUTPUT_UNSUPPORTED";
+      const questions = task.promptVersion.startsWith("career.questions.");
+      const code = questions && truncated ? "AI_OUTPUT_TRUNCATED" : questions && invalid ? "AI_OUTPUT_INVALID" : "PROVIDER_OUTPUT_UNAVAILABLE";
+      if (questions) console.warn("ai-questions-outcome", {
+        code, validationReason, outputLimit: task.maxOutputTokens,
+        outputTokens: last?.usage.output ?? null, httpStatus: last?.httpStatus ?? null,
+      });
+      throw new Error(code);
+    }
     return result.output;
   };
   return run;

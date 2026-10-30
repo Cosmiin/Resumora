@@ -3,6 +3,7 @@ import {
   type CareerContext,
 } from "@resumora/contracts/intelligence/context";
 import { RoleRewrite } from "./RoleRewrite";
+import { IntelligenceRequestError } from "../base/intelligence";
 import { acceptWording } from "../base/wording";
 import type { RoleRewrite as RoleProposal } from "@resumora/contracts/intelligence/model";
 import { AiSuggestions } from "./AiSuggestions";
@@ -16,7 +17,7 @@ import {
   enrichmentTarget,
   nextQuestionIndex,
 } from "../base/enrichment";
-import { clone, type Answer, type BaseDraft } from "../base/model";
+import { clone, equalValues, type Answer, type BaseDraft } from "../base/model";
 import { focusField, patchFact } from "../base/editing";
 import { formatDate } from "../base/dates";
 import { Button, useCopy } from "./ui";
@@ -438,8 +439,8 @@ export function Enrichment({
                   try {
                     const result = await prepareQuestions(targetId);
                     if (!active()) return;
-                    if (currentDraft.current !== before)
-                      throw new Error("stale");
+                    if (!equalValues(currentDraft.current, before))
+                      throw new Error("STALE_INPUT");
                     const next = clone(before);
                     next.questionPlans = [
                       ...(next.questionPlans ?? []).slice(-19),
@@ -448,14 +449,52 @@ export function Enrichment({
                     setEditingAnswerId(null);
                     change(next);
                     setIndex(0);
-                  } catch {
-                    if (active())
+                  } catch (error) {
+                    if (active()) {
+                      const code =
+                        error instanceof IntelligenceRequestError
+                          ? error.code
+                          : error instanceof Error
+                            ? error.message
+                            : "";
                       setError(
-                        t(
-                          "Întrebările AI nu sunt disponibile sau contextul s-a schimbat. Răspunsurile sunt păstrate; poți continua manual.",
-                          "AI questions are unavailable or context changed. Answers are retained; manual questions remain available.",
-                        ),
+                        code === "AI_OUTPUT_TRUNCATED"
+                          ? t(
+                              "Răspunsul AI s-a oprit înainte de a termina întrebările. Nu am aplicat întrebări incomplete; răspunsurile tale sunt păstrate. Poți apăsa din nou Îmbunătățește pentru o cerere nouă.",
+                              "AI stopped before finishing the questions. Incomplete questions were not applied; your answers are kept. You can click Improve again for a new request.",
+                            )
+                          : [
+                                "AI_OUTPUT_INVALID",
+                                "QUESTION_OUTPUT",
+                                "QUESTION_REPEATED",
+                              ].includes(code)
+                            ? t(
+                                "AI a returnat întrebări pe care nu le putem folosi în siguranță. Nu au fost aplicate, iar răspunsurile tale sunt păstrate. Poți cere din nou întrebări.",
+                                "AI returned questions we cannot safely use. They were not applied, and your answers are kept. You can request questions again.",
+                              )
+                            : [
+                                  "STALE_INPUT",
+                                  "STALE",
+                                  "SAVE_REQUIRED",
+                                  "VERSION_CONFLICT",
+                                ].includes(code)
+                              ? t(
+                                  "Contextul salvat s-a schimbat. Așteaptă salvarea modificărilor, apoi apasă Îmbunătățește. Răspunsurile tale sunt păstrate.",
+                                  "The saved context changed. Wait for your changes to save, then click Improve. Your answers are kept.",
+                                )
+                              : ["AI_DISABLED", "AI_UNCONFIGURED"].includes(
+                                    code,
+                                  )
+                                ? t(
+                                    "Procesarea AI este dezactivată sau neconfigurată. Răspunsurile tale sunt păstrate; întrebările manuale rămân disponibile.",
+                                    "AI processing is off or unconfigured. Your answers are kept; manual questions remain available.",
+                                  )
+                                : t(
+                                    "Nu putem confirma rezultatul cererii de întrebări. Răspunsurile tale sunt păstrate. Nu relansăm automat cererea; verifică starea înainte de o nouă încercare.",
+                                    "We cannot confirm the question request's outcome. Your answers are kept. We do not rerun it automatically; check its status before another attempt.",
+                                  ),
                       );
+                    }
                   } finally {
                     if (active()) setPlanning(false);
                   }

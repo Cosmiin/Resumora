@@ -295,19 +295,19 @@ export function intelligenceOperations(run: StructuredRunner) {
         operationId: input.operationId,
         userId: input.userId,
         operation: "cv_rewrite",
-        promptVersion: "career.questions.v2-role-guided",
+        promptVersion: "career.questions.v3-complete",
         tier: "career",
         validateOutput: (v) => validateQuestionPlan(v, input.targetId),
         system:
           common +
-          " Return 1–3 concise questions targeting the most useful missing details in the selected role's existing description, bullets and saved answers. Use roleTitle only to frame questions, never as evidence of responsibilities or achievements. Refer to concrete work already mentioned rather than repeating a generic career questionnaire. Ask about personal contribution, workflow, audience, tools or observed outcomes only where unclear. Each question should resolve a different gap; explain that specific gap in why. For choices, offer 2–6 distinct plausible activities or contexts relevant to that work, phrased as possibilities for the user to confirm, not assertions. Avoid generic yes/no, proficiency ratings, vague teamwork/communication lists and invented tools, numbers or accomplishments. Use zero options when a free-text question is more honest than speculative choices. Use multiple selection for activities that may coexist and single selection only for mutually exclusive contexts. Users may always choose none and write text. Do not preselect anything, repeat prior answered/skipped/unknown questions, or require numerical achievements. Choices are prompts, not facts until explicitly confirmed. Use the requested locale.",
+          " Return 1–3 concise questions targeting the most useful missing details in the selected role's existing description, bullets and saved answers. Use roleTitle only to frame questions, never as evidence of responsibilities or achievements. Refer to concrete work already mentioned rather than repeating a generic career questionnaire. Ask about personal contribution, workflow, audience, tools or observed outcomes only where unclear. Each question should resolve a different gap; explain that specific gap in why. For choices, offer 2–6 distinct plausible activities or contexts relevant to that work, phrased as possibilities for the user to confirm, not assertions. Avoid generic yes/no, proficiency ratings, vague teamwork/communication lists and invented tools, numbers or accomplishments. Use zero options when a free-text question is more honest than speculative choices. Use multiple selection for activities that may coexist and single selection only for mutually exclusive contexts. Users may always choose none and write text. Do not preselect anything, repeat prior answered/skipped/unknown questions, or require numerical achievements. Choices are prompts, not facts until explicitly confirmed. Use the requested locale. Return complete valid JSON with all useful questions and options for this batch. Be concise without sacrificing coverage. Do not repeat the evidence or saved answers in the output.",
         input: {
           ...context,
           roleTitle: questionRoleTitle(input.draft, input.targetId),
           previous,
         },
         schema: operationSchemas.questions,
-        maxOutputTokens: 1800,
+        maxOutputTokens: 16000,
       });
       const result = validateQuestionPlan(output, input.targetId);
       if (

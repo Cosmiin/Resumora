@@ -207,6 +207,11 @@ export async function intelligenceRoute(
     const e = error as { code?: string; status?: number; message?: string };
     if (e.status && [400, 401, 403, 404, 409, 410, 413, 422].includes(e.status))
       return fail(e.code ?? "REJECTED", e.status);
+    const questionErrors: Record<string, number> = {
+      AI_OUTPUT_TRUNCATED: 502, AI_OUTPUT_INVALID: 502, AI_UNCONFIGURED: 503,
+      QUESTION_OUTPUT: 502, QUESTION_REPEATED: 422, INVALID_SCOPED_CONTEXT: 422,
+    };
+    if (Object.hasOwn(questionErrors, e.message ?? "")) return fail(e.message!, questionErrors[e.message!]);
     const safe = new Set(["DOCUMENT_SIZE", "DOCUMENT_TYPE", "UPLOAD_TIMEOUT"]);
     return fail(
       safe.has(e.message ?? "") ? e.message! : "INTELLIGENCE_UNAVAILABLE",
