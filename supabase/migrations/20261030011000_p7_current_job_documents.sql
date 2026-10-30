@@ -18,6 +18,7 @@ END $$;
 CREATE FUNCTION app.freeze_job_document(p jsonb,source jsonb) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE SET search_path='' AS $$
 DECLARE c jsonb:=source->'content'; presentation jsonb; words jsonb; word jsonb; additions jsonb:=coalesce(p->'localAdditions','[]');
  r jsonb; s jsonb; e jsonb; candidate jsonb; valid_word boolean; entries jsonb; roles jsonb:='[]'; groups jsonb; group_name text; key text; i integer;
+ review jsonb; context_facts jsonb; context_fact jsonb; answer_text text; context_valid boolean;
 BEGIN
  -- Apply the existing accepted projection before removing its source context.
  presentation:=coalesce(c->'presentation','{}')||coalesce(p->'presentation','{}');
@@ -43,8 +44,38 @@ BEGIN
     key:=CASE WHEN i=0 THEN 'context' ELSE 'details' END;
     word:=words->(e->>'id');
     IF i=1 AND s->>'kind'='languages' THEN word:=NULL;END IF;
+    -- Match currentWording/isCurrentExperienceWording before discarding review
+    -- context. Missing origin alone does not make an overlay current or invalid:
+    -- a stale review is inactive, while an exact accepted legacy review is valid.
+    IF word->>'scope'='experience' AND coalesce(word->>'origin','')='' THEN
+     SELECT item INTO review FROM jsonb_array_elements(coalesce(c->'roleRewriteReviews','[]')) WITH ORDINALITY reviews(item,ordinality)
+      WHERE item->>'status'='accepted' AND item#>>'{proposal,targetId}'=e->>'id' AND item#>>'{proposal,text}'=word->>'text'
+      ORDER BY ordinality DESC LIMIT 1;
+     context_facts:='[]';context_valid:=true;
+     FOR candidate IN SELECT * FROM jsonb_array_elements(jsonb_build_array(e->key)||coalesce(e->'bullets','[]')) LOOP
+      IF (candidate->>'status' IN ('user_authored','user_confirmed') OR (candidate->>'status'='extracted_unconfirmed' AND candidate->>'acceptance'='automatic')) AND btrim(candidate->>'value')<>'' THEN
+       context_fact:=jsonb_build_object('id',candidate->>'id','text',candidate->>'value','sourceId',candidate->>'sourceId');
+       IF coalesce(candidate->>'sourceClaimId','')<>'' THEN context_fact:=context_fact||jsonb_build_object('sourceClaimId',candidate->'sourceClaimId');END IF;
+       IF candidate ? 'sourceLineage' THEN context_fact:=context_fact||jsonb_build_object('sourceLineage',candidate->'sourceLineage');END IF;
+       context_facts:=context_facts||jsonb_build_array(context_fact);
+      END IF;
+     END LOOP;
+     FOR candidate IN SELECT * FROM jsonb_array_elements(coalesce(source->'answers','[]')) a
+      WHERE a->>'targetId'=e->>'id' AND a->>'status'='confirmed' AND coalesce(a->>'sourceId','')<>'' LOOP
+      SELECT coalesce(string_agg(part,E'\n' ORDER BY ordinal),'') INTO answer_text FROM (
+       SELECT option->>'label' AS part,ordinality AS ordinal FROM jsonb_array_elements(coalesce(candidate->'options','[]')) WITH ORDINALITY options(option,ordinality)
+        WHERE coalesce(candidate->'selectedOptionIds','[]') ? (option->>'id')
+       UNION ALL SELECT candidate->>'text',7
+      ) parts WHERE btrim(part)<>'';
+      IF answer_text<>'' THEN context_facts:=context_facts||jsonb_build_array(jsonb_build_object('id',candidate->>'id','text',answer_text,'sourceId',candidate->>'sourceId'));END IF;
+     END LOOP;
+     IF jsonb_array_length(context_facts) NOT BETWEEN 1 AND 24 OR
+       (SELECT count(DISTINCT f->>'id') FROM jsonb_array_elements(context_facts) f)<>jsonb_array_length(context_facts) OR
+       EXISTS(SELECT 1 FROM jsonb_array_elements(context_facts) f WHERE coalesce(f->>'sourceId','')='' OR length(f->>'text')>2000) OR
+       (SELECT sum(length(f->>'text')) FROM jsonb_array_elements(context_facts) f)>8000 THEN context_valid:=false;END IF;
+     IF NOT context_valid OR review IS NULL OR review->'input' IS DISTINCT FROM jsonb_build_object('targetId',e->>'id','locale',c->>'language','facts',context_facts) THEN word:=NULL;END IF;
+    END IF;
     IF word IS NOT NULL THEN
-     IF word->>'scope'='experience' AND NOT word ? 'origin' THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='WORDING_MATERIALIZATION_REQUIRED';END IF;
      valid_word:=jsonb_typeof(word->'sources')='array' AND jsonb_array_length(word->'sources')>0;
      FOR candidate IN SELECT * FROM jsonb_array_elements(coalesce(word->'sources','[]')) LOOP
       IF EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(source->'answers','[]')) a WHERE a->>'id'=candidate->>'id' AND a->>'targetId'=e->>'id' AND a ? 'selectedOptionIds') THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='WORDING_MATERIALIZATION_REQUIRED';END IF;

@@ -56,6 +56,33 @@ def suite(db):
    source['content']['roles'][0]['context']['value']='Changed support'
    stale=self.call('freeze_job_document',f"'{{}}',{lit(source)}",role=None)
    self.assertEqual(stale['content']['roles'][0]['context']['value'],'Changed support')
+  def test_originless_experience_wording_matches_current_renderer_before_context_is_removed(self):
+   script="import {decodeDraft,encodeDraft} from './packages/contracts/src/editor/transport.ts';import {selfContainedJobDraft} from './packages/contracts/src/jobs/current-document.ts';let s='';for await(const c of process.stdin)s+=c;process.stdout.write(JSON.stringify(encodeDraft(selfContainedJobDraft(decodeDraft(JSON.parse(s))))));"
+   for state in ['missing_review','changed_context','new_bullet','current_review']:
+    with self.subTest(state=state):
+     source=json.loads(json.dumps(self.source));content=source['content'];role=next(r for r in content['roles'] if r['id']=='other-role')
+     word=content['presentation']['approvedWording'][role['id']]
+     self.assertNotIn('origin',word)
+     if state=='missing_review':content['roleRewriteReviews']=[]
+     if state=='changed_context':role['context']['value']='Changed baseline context'
+     if state in ['new_bullet','current_review']:
+      bullet={'id':'separate-current-bullet','fieldId':'separate-current-bullet','value':'Retained separate reporting responsibility','status':'user_authored','sourceId':'local_manual'}
+      role['bullets']=[bullet]
+      if state=='current_review':
+       review=next(r for r in content['roleRewriteReviews'] if r['status']=='accepted' and r['proposal']['targetId']==role['id'])
+       review['input']['facts'].append({'id':bullet['id'],'text':bullet['value'],'sourceId':bullet['sourceId']})
+       review['proposal']['factIds'].append(bullet['id'])
+     actual=self.call('freeze_job_document',f"'{{}}',{lit(source)}",role=None)
+     result=subprocess.run(['node','--experimental-strip-types','--input-type=module','-e',script],input=json.dumps(source),cwd=ROOT,text=True,capture_output=True,check=True)
+     self.assertEqual(actual,json.loads(result.stdout))
+     rendered=next(r for r in actual['content']['roles'] if r['id']==role['id'])
+     self.assertNotIn('approvedWording',actual['content']['presentation'])
+     self.assertNotIn('roleRewriteReviews',actual['content'])
+     if state=='current_review':
+      self.assertEqual(rendered['context']['value'],word['text']);self.assertEqual(rendered['bullets'],[])
+     else:
+      self.assertEqual(rendered['context']['value'],role['context']['value'])
+      self.assertEqual([b['value'] for b in rendered['bullets']],[b['value'] for b in role['bullets']])
   def test_forward_retains_only_current_no_base_archive_and_SQL_TS_projection_parity(self):
    row=json.loads(db.sql('SELECT data FROM test_support.current_job_upgrade'));current=self.call('load_current_job_document',f"'{row['job']}',NULL",user=row['user'])
    self.assertEqual(current['payload']['content']['summary']['text'],'Current accepted summary')
