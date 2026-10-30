@@ -68,9 +68,11 @@ def suite(db):
   def test_job_source_creates_locale_after_Base_removal_and_stale_or_foreign_source_is_refused(self):
    job,current,pin=self.job_source();target,metadata=self.job_translation(current,pin)
    tenant=db.sql(f"SELECT id FROM app.tenants WHERE owner_user_id='{self.a}' AND kind='personal'")
-   self.raw('prepare_job_documents_for_base_removal',f"'{tenant}'",error=True)
-   db.sql(f"SELECT set_config('request.jwt.claim.sub','{self.a}',false);SELECT app.prepare_job_documents_for_base_removal('{tenant}')")
-   db.sql(f"ALTER TABLE app.editor_draft_snapshots DISABLE TRIGGER immutable_editor_snapshot;DELETE FROM app.editor_draft_snapshots WHERE tenant_id='{tenant}';ALTER TABLE app.editor_draft_snapshots ENABLE TRIGGER immutable_editor_snapshot;")
+   self.assertIn('permission denied',self.raw('prepare_job_documents_for_base_removal',f"'{tenant}'",error=True))
+   state=self.call('load_base_state')
+   removed=self.call('remove_base_cv',f"'{uid()}',{state['revision']},{state['generation']}")
+   self.assertTrue(removed['removed']);self.assertIsNone(self.call('load_base_draft'))
+   self.assertEqual(db.sql(f"SELECT count(*) FROM app.editor_draft_snapshots WHERE tenant_id='{tenant}'"),'0')
    accepted=self.call('save_current_job_document',f"'{uid()}','{job['id']}','{self.locale.split('-')[0]}',NULL,0,{lit(target)},NULL,{lit(metadata)},NULL")
    self.assertEqual(accepted['payload'],target);self.assertEqual(self.call('load_current_job_document',f"'{job['id']}','{current['locale']}'")['id'],current['id'])
    newer=json.loads(json.dumps(current['payload']));newer['content']['summary']['text']='Updated source'
