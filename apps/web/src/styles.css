@@ -1885,8 +1885,8 @@ textarea.native {
 }
 .photo-crop {
   display: block;
-  max-width: 360px;
-  width: 100%;
+  width: 88px;
+  max-width: 100%;
   height: auto;
   background: white;
   touch-action: none;

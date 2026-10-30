@@ -89,6 +89,9 @@ export function PhotoEditor({
     [visible, setVisible] = useState(true),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
+    [retry, setRetry] = useState(0),
+    [failed, setFailed] = useState(false),
+    [dragging, setDragging] = useState(false),
     [deleting, setDeleting] = useState(false),
     [confirm, setConfirm] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null),
@@ -99,7 +102,11 @@ export function PhotoEditor({
     uploaded = useRef<string | null>(null),
     drag = useRef<{ x: number; y: number } | null>(null),
     alive = useRef(true);
-  const submitted = useRef<CvPhoto | null>(null);
+  const submitted = useRef<CvPhoto | null>(null),
+    attempted = useRef(""),
+    saving = useRef(false);
+  const assetId = local?.assetId ?? uploaded.current;
+  const pendingChanges = !!local && (!assetId || !equalValues({assetId, crop, shape, visible}, original.current));
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -131,14 +138,14 @@ export function PhotoEditor({
     );
   }, [local, crop, editing]);
   useEffect(() => {
-    if (!editing) return;
+    if (!editing || (!busy && !pendingChanges)) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [editing]);
+  }, [editing, busy, pendingChanges]);
   function start(image: LocalImage) {
     original.current = structuredClone(value ?? null);
     submitted.current = null;
@@ -148,6 +155,8 @@ export function PhotoEditor({
     setVisible(value?.visible ?? true);
     request.current = crypto.randomUUID();
     uploaded.current = null;
+    attempted.current = "";
+    setFailed(false);
     setEditing(true);
     setMessage("");
   }
@@ -209,11 +218,14 @@ export function PhotoEditor({
     });
   }
   async function save() {
-    if (!client || !local || busy) return;
+    if (!client || !local || busy || saving.current) return;
+    saving.current = true;
     setBusy(true);
+    setFailed(false);
     setMessage(
       t("Validăm și salvăm fotografia…", "Validating and saving photo…"),
     );
+    let phase: "upload" | "document" = "upload";
     try {
       let id = local.assetId ?? uploaded.current;
       if (!id) {
@@ -228,32 +240,54 @@ export function PhotoEditor({
         shape,
         visible,
       };
+      phase = "document";
       submitted.current = structuredClone(photo);
       const saved = await commit(photo, original.current);
       if (!alive.current) return;
       if (saved) {
-        setEditing(false);
-        setLocal(null);
-        setMessage(t("Fotografie salvată în CV.", "Photo saved in CV."));
-      } else
+        original.current = structuredClone(photo);
+        setMessage(t("Fotografie salvată automat în CV.", "Photo saved automatically in CV."));
+      } else {
+        setFailed(true);
         setMessage(
           t(
             "Fotografia nu este încă salvată în CV. Rezolvă salvarea/conflictul din bara CV; editările sunt păstrate.",
             "Photo is not yet saved in the CV. Resolve the save/conflict in the CV bar; edits are retained.",
           ),
         );
-    } catch {
-      if (alive.current)
+      }
+    } catch (error) {
+      if (alive.current) {
+        setFailed(true);
+        const code = error instanceof Error ? error.message : "";
         setMessage(
-          t(
-            "Salvarea fotografiei nu a reușit. Reîncearcă; fotografia salvată anterior rămâne până la confirmarea salvării CV.",
-            "Photo save failed. Retry; the prior saved photo remains until the CV save is confirmed.",
-          ),
+          phase === "document"
+            ? t("Salvarea în CV nu a reușit. Fotografia anterioară rămâne salvată; reîncearcă după rezolvarea salvării CV.", "CV save failed. The prior photo remains saved; retry after resolving the CV save.")
+            : ["invalidPhoto", "photoDimensions", "photoSize", "animatedPhoto", "normalizeLocally"].includes(code)
+              ? t("Fișierul nu a trecut validarea fotografiei. Alege o altă imagine JPEG, PNG sau WebP; fotografia anterioară se păstrează.", "The file failed photo validation. Choose another JPEG, PNG or WebP image; the prior photo is retained.")
+              : t("Încărcarea fotografiei nu a reușit. Serviciul de fotografii poate fi indisponibil. Fotografia anterioară se păstrează; poți reîncerca.", "Photo upload failed. The photo service may be unavailable. The prior photo is retained; you can retry."),
         );
+      }
     } finally {
+      saving.current = false;
       if (alive.current) setBusy(false);
     }
   }
+  const saveLatest = useRef(save);
+  saveLatest.current = save;
+  useEffect(() => {
+    if (!editing || !local || busy || dragging) return;
+    const key = JSON.stringify([request.current, crop, shape, visible, retry]);
+    if (attempted.current === key) return;
+    const id = local.assetId ?? uploaded.current;
+    if (id && equalValues({assetId:id, crop, shape, visible}, original.current)) return;
+    setMessage(t("Modificările fotografiei se salvează automat…", "Photo changes save automatically…"));
+    const timer = setTimeout(() => {
+      attempted.current = key;
+      void saveLatest.current();
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [editing, local, crop, shape, visible, retry, busy, dragging]);
   async function remove() {
     setBusy(true);
     try {
@@ -313,8 +347,8 @@ export function PhotoEditor({
       <h3>{t("Fotografie (opțional)", "Photo (optional)")}</h3>
       <p>
         {t(
-          "Fără AI. Fișierul este trimis doar când alegi Salvează fotografia. Sursa completă este redusă la maximum 1600 px; decuparea rămâne reversibilă.",
-          "No AI. The file is uploaded only when you choose Save photo. The full-frame source is reduced to at most 1600px; cropping remains reversible.",
+          "Fără AI. Fotografia și ajustările se salvează automat. Trage imaginea pentru încadrare; sursa redusă la maximum 1600 px păstrează decuparea reversibilă.",
+          "No AI. Your photo and adjustments save automatically. Drag the image to frame it; the source reduced to at most 1600px keeps cropping reversible.",
         )}
       </p>
       {!client ? (
@@ -390,6 +424,7 @@ export function PhotoEditor({
                 }}
                 onPointerDown={(e) => {
                   if (busy) return;
+                  setDragging(true);
                   drag.current = { x: e.clientX, y: e.clientY };
                   e.currentTarget.setPointerCapture(e.pointerId);
                   e.currentTarget.focus();
@@ -401,10 +436,11 @@ export function PhotoEditor({
                     (e.clientX - drag.current.x) / w,
                     (e.clientY - drag.current.y) / w,
                   );
+                  setDragging(true);
                   drag.current = { x: e.clientX, y: e.clientY };
                 }}
-                onPointerUp={() => (drag.current = null)}
-                onPointerCancel={() => (drag.current = null)}
+                onPointerUp={() => {drag.current = null; setDragging(false);}}
+                onPointerCancel={() => {drag.current = null; setDragging(false);}}
               />
               <label htmlFor={controlId + "-horizontal"}>
                 {t("Poziție orizontală", "Horizontal framing")}{" "}
@@ -458,66 +494,6 @@ export function PhotoEditor({
                   onChange={(e) => position({ ...crop, zoom: +e.target.value })}
                 />
               </label>
-              <div className="photo-actions">
-                <button
-                  type="button"
-                  disabled={busy || crop.zoom <= 1}
-                  aria-label={t("Micșorează", "Zoom out")}
-                  onClick={() =>
-                    position({ ...crop, zoom: Math.max(1, crop.zoom - 0.1) })
-                  }
-                >
-                  −
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || crop.zoom >= 3}
-                  aria-label={t("Mărește", "Zoom in")}
-                  onClick={() =>
-                    position({ ...crop, zoom: Math.min(3, crop.zoom + 0.1) })
-                  }
-                >
-                  +
-                </button>
-              </div>
-              <div className="photo-actions">
-                {(
-                  [
-                    [-1, 0, "←"],
-                    [1, 0, "→"],
-                    [0, -1, "↑"],
-                    [0, 1, "↓"],
-                  ] as const
-                ).map(([x, y, label]) => (
-                  <button
-                    type="button"
-                    key={label}
-                    disabled={busy}
-                    aria-label={
-                      t("Deplasează imaginea", "Move picture") + " " + label
-                    }
-                    onClick={() => move(x * 0.04, y * 0.04)}
-                  >
-                    {label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    position({ ...crop, centerX: 0.5, centerY: 0.5 })
-                  }
-                >
-                  {t("Centrează", "Center")}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => position({ ...defaultPhotoCrop })}
-                >
-                  {t("Resetează", "Reset")}
-                </button>
-              </div>
               <label>
                 {t("Formă", "Shape")}
                 <select
@@ -542,13 +518,6 @@ export function PhotoEditor({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => void save()}
-                >
-                  {t("Salvează fotografia", "Save photo")}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
                   onClick={() => {
                     sequence.current++;
                     setEditing(false);
@@ -556,7 +525,7 @@ export function PhotoEditor({
                     setMessage("");
                   }}
                 >
-                  {t("Anulează", "Cancel")}
+                  {t("Închide ajustările", "Close adjustments")}
                 </button>
               </div>
             </>
@@ -597,6 +566,7 @@ export function PhotoEditor({
         </>
       )}
       {message && <p role="status">{message}</p>}
+      {failed && editing && <button type="button" disabled={busy} onClick={() => {attempted.current=""; setRetry(n=>n+1);}}>{t("Reîncearcă salvarea fotografiei", "Retry photo save")}</button>}
       {source.unavailable && !editing && value && (
         <div>
           <p role="status">
