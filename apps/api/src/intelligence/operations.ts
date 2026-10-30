@@ -184,7 +184,7 @@ export const operationSchemas = {
   }),
 };
 const paths =
-  "Allowed paths: name; titles.0 or titles.1; contacts.email|phone|location|linkedin; professionalSkills.N; technicalSkills.N; roles.N.title|company|location|start|end|ongoing|context|bullets.N; education.N.institution|qualification|field|location|start|end|details; languages.N.title|proficiency; summary; certifications.N.title|details|start|end; custom.N.title|details. Use custom.N.title as the original category heading and custom.N.details for its complete source content when no standard category fits. Preserve all certifications and optional categories. Role/education/language/certification/custom N is 0..9, skill/bullet N is 0..99. Date values YYYY or MM/YYYY only when supported, else omit with a warning. Ongoing is true/false only when explicit. Do not split arbitrary names. Keep Romanian diacritics, source language and original factual precision. Each value requires its exact source quote and page. Empty warning string means no specific warning. Extract the original summary verbatim as summary; do not invent a polished summary. List every omitted page.";
+  "Allowed paths: name; nameParts.first; nameParts.last; titles.0 or titles.1; contacts.email|phone|location|linkedin; professionalSkills.N; technicalSkills.N; roles.N.title|company|location|start|end|ongoing|context|bullets.N; education.N.institution|qualification|field|location|start|end|details; languages.N.title|proficiency; summary; certifications.N.title|details|start|end; custom.N.title|details. Use custom.N.title as the original category heading and custom.N.details for its complete source content when no standard category fits. Preserve all certifications and optional categories. Role/education/language/certification/custom N is 0..9, skill/bullet N is 0..99. Date values YYYY or MM/YYYY only when supported, else omit with a warning. Ongoing is true/false only when explicit. Extract name as the complete source name. Additionally use nameParts.first and nameParts.last when the given/first and family/last components are unambiguous from the source name line or its context; literal labels are not required. Respect Romanian family-first order when the source establishes it. Labels such as Prenume/Nume de familie or Given name/Surname are explicit evidence. Preserve compound names and their exact spelling; each part needs its own source quote. Never guess parts from token order, capitalization, email or cultural assumptions. If only a full name is available or the parts are ambiguous, keep name, omit unsupported parts and add a warning that first/last names need confirmation. Keep Romanian diacritics, source language and original factual precision. Each value requires its exact source quote and page. Empty warning string means no specific warning. Extract the original summary verbatim as summary; do not invent a polished summary. List every omitted page.";
 function validateExtractedOutput(
   value: unknown,
   pages: ProcessedDocument["pages"],
@@ -257,7 +257,7 @@ export function intelligenceOperations(run: StructuredRunner) {
         operationId: await stageOperationId(input.operationId, "extract"),
         userId: input.userId,
         operation: "cv_parse",
-        promptVersion: "cv.extract.v1-provisional",
+        promptVersion: "cv.extract.v2-identity",
         tier: "extraction",
         validateOutput: (v) => validateExtractedOutput(v, pages),
         system:

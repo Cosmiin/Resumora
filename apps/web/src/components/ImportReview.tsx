@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   importedFact,
+  editImportedNamePart,
   pendingImportedCandidates,
 } from "@resumora/contracts/editor/import";
 import { hasSpecificImportWarning } from "@resumora/contracts/intelligence/model";
@@ -28,6 +29,8 @@ const labels: Record<string, [string, string]> = {
   languages: ["Limbi", "Languages"],
   optional: ["Alte categorii", "Other categories"],
   name: ["Nume", "Name"],
+  first: ["Prenume", "First name"],
+  last: ["Nume de familie", "Last name"],
   titles: ["Titlu profesional", "Professional title"],
   email: ["Email", "Email"],
   phone: ["Telefon", "Phone"],
@@ -143,7 +146,15 @@ export function ImportReview({
             .at(-1)!;
           const label = labels[key] ??
             labels[c.path.split(".")[0]] ?? [key, key];
-          const value = field.value;
+          const namePart =
+            c.path === "nameParts.first"
+              ? "first"
+              : c.path === "nameParts.last"
+                ? "last"
+                : undefined;
+          const value = namePart
+            ? (draft.nameParts?.[namePart] ?? "")
+            : field.value;
           const display =
             typeof value === "object"
               ? (value.month ? value.month.padStart(2, "0") + "/" : "") +
@@ -152,6 +163,10 @@ export function ImportReview({
           const specificWarning = hasSpecificImportWarning(c);
           function update(text: string) {
             if (!change) return;
+            if (namePart) {
+              change(editImportedNamePart(draft, namePart, text));
+              return;
+            }
             let next: FactValue = text;
             if (typeof value === "boolean") next = text === "true";
             else if (typeof value === "object") {
