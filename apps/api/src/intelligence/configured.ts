@@ -216,7 +216,14 @@ export function configuredStructuredRunner(env: IntelligenceConfig,userId:string
       const truncated = last?.status === "incomplete" && last.errorCode === "OUTPUT_INVALID";
       const invalid = last?.errorCode === "OUTPUT_INVALID" || last?.errorCode === "OUTPUT_UNSUPPORTED";
       const questions = task.promptVersion.startsWith("career.questions.");
-      const code = questions && truncated ? "AI_OUTPUT_TRUNCATED" : questions && invalid ? "AI_OUTPUT_INVALID" : "PROVIDER_OUTPUT_UNAVAILABLE";
+      const rewrite = task.promptVersion.startsWith("career.role-rewrite.");
+      const uncertain = result.attempts.some(a => a.result == null || a.result.status === "unknown" || ["TIMEOUT", "NETWORK_OR_RESPONSE_UNKNOWN", "CANCELLED"].includes(a.result?.errorCode ?? ""));
+      const timedOut = result.attempts.some(a => a.result?.errorCode === "TIMEOUT");
+      const code = (questions || rewrite) && uncertain ? (timedOut ? "AI_TIMEOUT_UNKNOWN" : "AI_REQUEST_UNKNOWN") :
+        (questions || rewrite) && truncated ? "AI_OUTPUT_TRUNCATED" :
+        (questions || rewrite) && invalid ? "AI_OUTPUT_INVALID" :
+        rewrite && last?.errorCode === "PROVIDER_REJECTED" ? "AI_PROVIDER_REJECTED" :
+        rewrite ? "AI_REQUEST_UNKNOWN" : "PROVIDER_OUTPUT_UNAVAILABLE";
       if (questions) console.warn("ai-questions-outcome", {
         code, validationReason, outputLimit: task.maxOutputTokens,
         outputTokens: last?.usage.output ?? null, httpStatus: last?.httpStatus ?? null,

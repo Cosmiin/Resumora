@@ -241,7 +241,7 @@ it("failed questions and automatic rewrite retry only on a deliberate click and 
     .mockResolvedValue(plan(d));
   const rewrite = vi
     .fn()
-    .mockRejectedValueOnce(new Error("Unavailable"))
+    .mockRejectedValueOnce(new Error("AI_OUTPUT_INVALID"))
     .mockResolvedValue({
       schemaVersion: "career-role-rewrite/1",
       targetId: d.roles[0].id,
@@ -275,12 +275,12 @@ it("failed questions and automatic rewrite retry only on a deliberate click and 
   fireEvent.click(
     screen.getByRole("button", { name: /Save and create description/ }),
   );
-  await screen.findByText(/Proposal unavailable/);
+  await screen.findByText(/did not pass structure or evidence/);
   expect(rewrite).toHaveBeenCalledTimes(1);
   expect(latest.answers[0].status).toBe("confirmed");
   expect(latest.roles).toEqual(d.roles);
   fireEvent.click(
-    screen.getByRole("button", { name: "Propose experience rewrite" }),
+    screen.getByRole("button", { name: "Retry rewrite" }),
   );
   await screen.findByLabelText("Proposal — review before acceptance");
   expect(rewrite).toHaveBeenCalledTimes(2);

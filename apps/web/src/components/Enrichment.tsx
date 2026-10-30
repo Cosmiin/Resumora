@@ -1,3 +1,4 @@
+import { AutoTextarea } from "./AutoTextarea";
 import {
   careerContext,
   type CareerContext,
@@ -625,7 +626,7 @@ export function Enrichment({
                         "Select only what you did. Click an option again to deselect it, or use your own words.",
                       )}
                     </p>
-                    <textarea
+                    <AutoTextarea
                       ref={input}
                       id="enrichment-answer"
                       className="native"

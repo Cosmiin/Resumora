@@ -209,6 +209,7 @@ export async function intelligenceRoute(
       return fail(e.code ?? "REJECTED", e.status);
     const questionErrors: Record<string, number> = {
       AI_OUTPUT_TRUNCATED: 502, AI_OUTPUT_INVALID: 502, AI_UNCONFIGURED: 503,
+      AI_TIMEOUT_UNKNOWN: 504, AI_REQUEST_UNKNOWN: 503, AI_PROVIDER_REJECTED: 502, REWRITE_OUTPUT: 502,
       QUESTION_OUTPUT: 502, QUESTION_REPEATED: 422, INVALID_SCOPED_CONTEXT: 422,
     };
     if (Object.hasOwn(questionErrors, e.message ?? "")) return fail(e.message!, questionErrors[e.message!]);

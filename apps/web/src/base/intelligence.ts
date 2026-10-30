@@ -49,11 +49,56 @@ export interface IntelligenceClient {
   rewrite(context: IntelligenceContext): Promise<RoleRewrite>;
 }
 export class IntelligenceRequestError extends Error {
-  constructor(public code: string) {
+  constructor(
+    public code: string,
+    public operationId?: string,
+  ) {
     super(code);
   }
 }
+export const uncertainRewriteCodes = new Set([
+  "AI_TIMEOUT_UNKNOWN",
+  "AI_REQUEST_UNKNOWN",
+  "ALREADY_REQUESTED",
+  "INTELLIGENCE_UNAVAILABLE",
+  "PROVIDER_OUTPUT_UNAVAILABLE",
+  "UNAVAILABLE",
+]);
+const definiteRewriteCodes = new Set([
+  "AI_OUTPUT_TRUNCATED",
+  "AI_OUTPUT_INVALID",
+  "AI_PROVIDER_REJECTED",
+  "AI_DISABLED",
+  "AI_UNCONFIGURED",
+  "STALE_INPUT",
+  "VERSION_CONFLICT",
+  "INVALID_TARGET",
+  "INVALID_REQUEST",
+  "INVALID_SCOPED_CONTEXT",
+  "REWRITE_OUTPUT",
+  "OUTPUT_UNSUPPORTED",
+]);
 export function httpIntelligence(transport: CvTransport): IntelligenceClient {
+  // Only request identity is retained, never draft, answer, provider output or credentials.
+  const unresolved = new Map<string, string>();
+  const prefix = "resumora:rewrite:uncertain:";
+  const stored = (key: string) => {
+    try {
+      return sessionStorage.getItem(prefix + key);
+    } catch {
+      return null;
+    }
+  };
+  const retain = (key: string, id: string | null) => {
+    if (id) unresolved.set(key, id);
+    else unresolved.delete(key);
+    try {
+      if (id) sessionStorage.setItem(prefix + key, id);
+      else sessionStorage.removeItem(prefix + key);
+    } catch {
+      /* In-memory receipt still fences this client. */
+    }
+  };
   async function request<T>(path: string, init: RequestInit): Promise<T> {
     const response = await transport(`/v1/intelligence${path}`, {
       cache: "no-store",
@@ -112,6 +157,35 @@ export function httpIntelligence(transport: CvTransport): IntelligenceClient {
         signal,
       ),
     questions: (context) => command<QuestionPlan>("/questions", context),
-    rewrite: (context) => command<RoleRewrite>("/rewrite", context),
+    rewrite: async (context) => {
+      const key = `${context.snapshotId}:${context.revision}:${context.targetId}`;
+      const previous = unresolved.get(key) ?? stored(key);
+      if (previous)
+        throw new IntelligenceRequestError("AI_REQUEST_UNKNOWN", previous);
+      retain(key, context.operationId);
+      try {
+        const result = await command<RoleRewrite>("/rewrite", context);
+        if (
+          !result ||
+          typeof result !== "object" ||
+          result.schemaVersion !== "career-role-rewrite/1"
+        )
+          throw new IntelligenceRequestError("AI_REQUEST_UNKNOWN");
+        retain(key, null);
+        return result;
+      } catch (error) {
+        const code =
+          error instanceof IntelligenceRequestError
+            ? error.code
+            : "AI_REQUEST_UNKNOWN";
+        if (definiteRewriteCodes.has(code)) retain(key, null);
+        throw new IntelligenceRequestError(
+          definiteRewriteCodes.has(code) || uncertainRewriteCodes.has(code)
+            ? code
+            : "AI_REQUEST_UNKNOWN",
+          context.operationId,
+        );
+      }
+    },
   };
 }

@@ -1,3 +1,8 @@
+import {
+  IntelligenceRequestError,
+  uncertainRewriteCodes,
+} from "../base/intelligence";
+import { AutoTextarea } from "./AutoTextarea";
 import { currentWording } from "../base/wording";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -39,7 +44,11 @@ export function RoleRewrite({
 }) {
   const t = useCopy(),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [failure, setFailure] = useState<{
+      uncertain: boolean;
+      operationId?: string;
+    } | null>(null);
   const current = useRef(draft),
     requestGeneration = useRef(0);
   const inFlight = useRef(false);
@@ -47,6 +56,8 @@ export function RoleRewrite({
   useEffect(() => {
     setBusy(false);
     inFlight.current = false;
+    setFailure(null);
+    setError("");
     return () => {
       requestGeneration.current++;
     };
@@ -119,18 +130,19 @@ export function RoleRewrite({
   }
   const consumed = useRef<string | null>(null);
   async function generate() {
-    if (inFlight.current || !ready) return;
+    if (inFlight.current || !ready || failure?.uncertain) return;
     inFlight.current = true;
     const source = current.current,
       generation = ++requestGeneration.current;
     const active = () => generation === requestGeneration.current;
     setBusy(true);
     setError("");
+    setFailure(null);
     try {
       const input = careerContext(source, targetId),
         proposal = await request(targetId);
       if (!active()) return;
-      if (current.current !== source) throw new Error("STALE");
+      if (!equalValues(current.current, source)) throw new Error("STALE");
       validateRewrite(proposal, targetId, input.facts);
       const next = clone(source);
       const history = next.roleRewriteReviews ?? [];
@@ -156,14 +168,102 @@ export function RoleRewrite({
         { id: crypto.randomUUID(), input, proposal, status: "pending" },
       ];
       change(next);
-    } catch {
-      if (active())
+    } catch (error) {
+      if (active()) {
+        const code =
+          error instanceof IntelligenceRequestError
+            ? error.code
+            : error instanceof Error
+              ? error.message
+              : "";
+        const known = [
+          "AI_OUTPUT_TRUNCATED",
+          "AI_OUTPUT_INVALID",
+          "REWRITE_OUTPUT",
+          "OUTPUT_UNSUPPORTED",
+          "AI_PROVIDER_REJECTED",
+          "STALE",
+          "STALE_INPUT",
+          "SAVE_REQUIRED",
+          "VERSION_CONFLICT",
+          "AI_DISABLED",
+          "AI_UNCONFIGURED",
+          "INVALID_SCOPED_CONTEXT",
+        ].includes(code);
+        const uncertain = uncertainRewriteCodes.has(code) || !known;
+        setFailure({
+          uncertain,
+          operationId:
+            error instanceof IntelligenceRequestError &&
+            /^[a-f0-9-]{36}$/i.test(error.operationId ?? "")
+              ? error.operationId
+              : undefined,
+        });
+        const reason =
+          code === "AI_OUTPUT_TRUNCATED"
+            ? t(
+                "AI s-a oprit înainte de a termina descrierea. Poți cere explicit o rescriere nouă.",
+                "AI stopped before finishing the description. You can explicitly request a new rewrite.",
+              )
+            : [
+                  "AI_OUTPUT_INVALID",
+                  "REWRITE_OUTPUT",
+                  "OUTPUT_UNSUPPORTED",
+                ].includes(code)
+              ? t(
+                  "Descrierea returnată nu a trecut verificările de structură sau dovezi. Poți reîncerca explicit.",
+                  "The returned description did not pass structure or evidence checks. You can explicitly retry.",
+                )
+              : [
+                    "STALE",
+                    "STALE_INPUT",
+                    "SAVE_REQUIRED",
+                    "VERSION_CONFLICT",
+                  ].includes(code)
+                ? t(
+                    "Contextul s-a schimbat sau nu este încă salvat. Așteaptă salvarea și verifică răspunsurile înainte de a reîncerca.",
+                    "Context changed or is not saved yet. Wait for saving and review your answers before retrying.",
+                  )
+                : ["AI_DISABLED", "AI_UNCONFIGURED"].includes(code)
+                  ? t(
+                      "Procesarea AI este dezactivată sau neconfigurată. Reîncearcă numai după activare; editarea manuală rămâne disponibilă.",
+                      "AI processing is off or unconfigured. Retry only after activation; manual editing remains available.",
+                    )
+                  : code === "INVALID_SCOPED_CONTEXT"
+                    ? t(
+                        "Contextul experienței nu este eligibil. Verifică și salvează dovezile înainte de a reîncerca.",
+                        "The experience context is not eligible. Review and save its evidence before retrying.",
+                      )
+                    : code === "AI_PROVIDER_REJECTED"
+                      ? t(
+                          "Serviciul AI a respins cererea. Poți reîncerca explicit mai târziu.",
+                          "The AI service rejected the request. You can explicitly retry later.",
+                        )
+                      : code === "AI_TIMEOUT_UNKNOWN"
+                        ? t(
+                            "Cererea a depășit timpul de așteptare; rezultatul și costul pot fi încă necunoscute.",
+                            "The request timed out; its outcome and cost may still be unknown.",
+                          )
+                        : t(
+                            "Nu putem confirma rezultatul cererii. Aceasta poate fi încă în curs sau răspunsul s-a pierdut.",
+                            "We cannot confirm the request outcome. It may still be running or its response was lost.",
+                          );
         setError(
-          t(
-            "Propunerea nu este disponibilă sau contextul s-a schimbat. Răspunsurile sunt păstrate; continuă manual.",
-            "Proposal unavailable or context changed. Answers are retained; continue manually.",
-          ),
+          reason +
+            " " +
+            t(
+              "Răspunsurile și experiența salvată rămân păstrate.",
+              "Your answers and saved experience are retained.",
+            ) +
+            (uncertain
+              ? " " +
+                t(
+                  "Nu trimitem o cerere duplicată. Verifică propunerile salvate; dacă rezultatul lipsește, cere verificarea referinței cererii înainte de o nouă încercare. Această rută nu poate recupera automat rezultatul unei cereri necunoscute.",
+                  "We do not send a duplicate request. Check saved proposals; if the result is missing, ask for the request reference to be checked before another attempt. This route cannot automatically recover an unknown request's result.",
+                )
+              : ""),
         );
+      }
     } finally {
       if (active()) {
         setBusy(false);
@@ -224,12 +324,12 @@ export function RoleRewrite({
         </p>
       )}
       <Button
-        disabled={busy || !targetId || !ready}
+        disabled={busy || !targetId || !ready || !!failure?.uncertain}
         onClick={() => void generate()}
       >
         {busy
           ? t("Pregătim…", "Preparing…")
-          : autoRequest
+          : autoRequest || failure
             ? t("Reîncearcă rescrierea", "Retry rewrite")
             : t("Propune rescrierea experienței", "Propose experience rewrite")}
       </Button>
@@ -244,7 +344,7 @@ export function RoleRewrite({
               "Propunere — verifică înainte de acceptare",
               "Proposal — review before acceptance",
             )}
-            <textarea
+            <AutoTextarea
               onKeyDown={(e) => {
                 if ((e.ctrlKey || e.metaKey) && e.key === "Enter")
                   e.stopPropagation();
@@ -288,6 +388,12 @@ export function RoleRewrite({
         </div>
       )}
       {error && <p role="status">{error}</p>}
+      {failure?.operationId && (
+        <p>
+          {t("Referința cererii", "Request reference")}:{" "}
+          <code>{failure.operationId}</code>
+        </p>
+      )}
     </section>
   );
 }
