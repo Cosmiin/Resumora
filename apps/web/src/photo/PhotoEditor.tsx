@@ -7,7 +7,7 @@ import {
   type PhotoCrop,
 } from "@resumora/contracts/editor/photo";
 import { equalValues } from "@resumora/contracts/editor/model";
-import { PhotoContext, usePhotoUrl } from "./client";
+import { PhotoContext, PhotoClientError, usePhotoUrl } from "./client";
 import { useCopy } from "../components/ui";
 import { stripCanvasJpegMetadata } from "./canvas-jpeg";
 
@@ -260,9 +260,18 @@ export function PhotoEditor({
       if (alive.current) {
         setFailed(true);
         const code = error instanceof Error ? error.message : "";
+        const failurePhase = error instanceof PhotoClientError ? error.phase : undefined;
         setMessage(
           phase === "document"
             ? t("Salvarea în CV nu a reușit. Fotografia anterioară rămâne salvată; reîncearcă după rezolvarea salvării CV.", "CV save failed. The prior photo remains saved; retry after resolving the CV save.")
+            : failurePhase === "configuration"
+              ? t("Serviciul de fotografii nu este configurat. Fotografia anterioară se păstrează.", "The photo service is not configured. The prior photo is retained.")
+            : failurePhase === "reserve"
+              ? t("Nu am putut pregăti salvarea fotografiei în cont. Fotografia anterioară se păstrează; poți reîncerca.", "We could not prepare the photo save in your account. The prior photo is retained; you can retry.")
+            : failurePhase === "storage_write" || failurePhase === "storage_verify"
+              ? t("Nu am putut salva sau verifica fișierul fotografiei. Fotografia anterioară se păstrează; poți reîncerca.", "We could not save or verify the photo file. The prior photo is retained; you can retry.")
+            : failurePhase === "finalize"
+              ? t("Fișierul a fost trimis, dar confirmarea salvării fotografiei nu a reușit. Fotografia anterioară se păstrează; poți reîncerca.", "The file was sent, but the photo save could not be confirmed. The prior photo is retained; you can retry.")
             : ["invalidPhoto", "photoDimensions", "photoSize", "animatedPhoto", "normalizeLocally"].includes(code)
               ? t("Fișierul nu a trecut validarea fotografiei. Alege o altă imagine JPEG, PNG sau WebP; fotografia anterioară se păstrează.", "The file failed photo validation. Choose another JPEG, PNG or WebP image; the prior photo is retained.")
               : t("Încărcarea fotografiei nu a reușit. Serviciul de fotografii poate fi indisponibil. Fotografia anterioară se păstrează; poți reîncerca.", "Photo upload failed. The photo service may be unavailable. The prior photo is retained; you can retry."),

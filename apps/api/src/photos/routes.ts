@@ -1,4 +1,4 @@
-import { photoUuid } from '@resumora/contracts/editor/photo';
+import { photoUuid, type PhotoFailurePhase } from '@resumora/contracts/editor/photo';
 import { PhotoError, maxPhotoBytes } from './format.ts';
 export type PhotoAsset = { id: string; objectKey: string; sha256: string; width: number; height: number; byteSize: number; state: 'reserved'|'ready'|'purge_pending'|'purged' };
 export interface PhotoGateway {
@@ -27,26 +27,34 @@ async function body(request: Request) {
 }
 /** Mounted only after real Auth and Origin/CSRF checks. */
 export async function photoRoute(request:Request,gateway:PhotoGateway,secret:string|undefined,normalize:Normalizer) {
+  let phase: PhotoFailurePhase = "input";
   try {
-    if(!secret || !/^[A-Za-z0-9_-]{32,128}$/.test(secret))return json({error:{code:'photoUnavailable'}},503);
+    if(!secret || !/^[A-Za-z0-9_-]{32,128}$/.test(secret)){console.warn('photo-failure',{phase:'configuration',httpStatus:503,code:'photoUnavailable'});return json({error:{code:'photoUnavailable',phase:'configuration'}},503);}
     const path=new URL(request.url).pathname;
     if(path==='/v1/photos/cleanup' && request.method==='POST') {
+      phase='cleanup';
       for(const asset of await gateway.expirePhotos(secret)){await gateway.purgePhoto(asset.objectKey);await gateway.deletePhoto(asset.id,secret,true);}
       return json({cleaned:true});
     }
     if(path==='/v1/photos' && request.method==='POST') {
-      const id=request.headers.get('X-Request-Id');if(!photoUuid(id))return json({error:{code:'invalidRequest'}},400);
-      if(!['image/jpeg','image/png','image/webp'].includes(request.headers.get('Content-Type')?.split(';')[0]??''))return json({error:{code:'invalidPhoto'}},415);
-      const result=await normalize(await body(request));
+      const id=request.headers.get('X-Request-Id');if(!photoUuid(id))return json({error:{code:'invalidRequest',phase:'input'}},400);
+      if(!['image/jpeg','image/png','image/webp'].includes(request.headers.get('Content-Type')?.split(';')[0]??''))return json({error:{code:'invalidPhoto',phase:'input'}},415);
+      const bytes=await body(request);
+      phase='normalize';
+      const result=await normalize(bytes);
       const sha256=await digestPhoto(result.bytes);
+      phase='reserve';
       let asset=await gateway.reservePhoto({id,sha256,width:result.width,height:result.height,byteSize:result.bytes.length},secret);
       if(asset.state==='purge_pending'||asset.state==='purged')return json({error:{code:'missing'}},404);
       if(asset.state!=='ready'){
         // Storage is immutable. A duplicate PUT is reconciled by reading and hashing
         // the actual stored bytes; client metadata can never finalize an asset.
+        phase='storage_write';
         await gateway.putPhoto(asset.objectKey,result.bytes);
+        phase='storage_verify';
         const stored=await gateway.getPhoto(asset.objectKey);
         if(await digestPhoto(stored)!==sha256)throw new PhotoError('photoStorageConflict',409);
+        phase='finalize';
         asset=await gateway.readyPhoto(id,secret);
       }
       return json({asset:{id:asset.id,width:asset.width,height:asset.height}});
@@ -54,6 +62,7 @@ export async function photoRoute(request:Request,gateway:PhotoGateway,secret:str
     const match=path.match(/^\/v1\/photos\/([^/]+)$/),id=match?.[1];
     if(!photoUuid(id))return json({error:{code:'missing'}},404);
     if(request.method==='GET'){
+      phase='read';
       const asset=await gateway.readPhoto(id);
       const bytes=await gateway.getPhoto(asset.objectKey);
       if(await digestPhoto(bytes)!==asset.sha256)throw new PhotoError('photoUnavailable',503);
@@ -63,6 +72,7 @@ export async function photoRoute(request:Request,gateway:PhotoGateway,secret:str
         'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'",'Referrer-Policy':'no-referrer'}});
     }
     if(request.method==='DELETE'){
+      phase='delete';
       const asset=await gateway.deletePhoto(id,secret);
       // Logical deletion revokes every reference immediately. Retry resumes this
       // same tombstone if external byte removal failed; never resurrect an asset.
@@ -73,6 +83,10 @@ export async function photoRoute(request:Request,gateway:PhotoGateway,secret:str
     return json({error:{code:'method'}},405);
   }catch(error){const e=error as {status?:number;code?:string};
     const status=e.status===403||e.status===404?404:[400,409,410,413,415,422,429,503].includes(e.status??0)?e.status!:503;
-    return json({error:{code:error instanceof PhotoError?error.code:status===404?'missing':status===409?'conflict':status===410?'expired':'photoUnavailable'}},status);
+    const code=error instanceof PhotoError?error.code:status===404?'missing':status===409?'conflict':status===410?'expired':'photoUnavailable';
+    const safeCodes=new Set(['invalidPhoto','photoDimensions','photoSize','animatedPhoto','normalizeLocally','photoBusy','photoStorageConflict','photoUnavailable','missing','conflict','expired','DATABASE_UNAVAILABLE','DATABASE_REQUEST_REJECTED','RESOURCE_FORBIDDEN','PHOTO_NOT_FOUND','UNAUTHORIZED','IDEMPOTENCY_BODY_MISMATCH']);
+    const diagnostic=typeof e.code==='string' && safeCodes.has(e.code)?e.code:code;
+    console.warn('photo-failure',{phase,httpStatus:status,code:safeCodes.has(diagnostic)?diagnostic:'photoUnavailable'});
+    return json({error:{code,phase}},status);
   }
 }

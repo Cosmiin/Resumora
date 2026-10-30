@@ -21,3 +21,8 @@ export function cropRectangle(width: number, height: number, crop: PhotoCrop) {
   const y = Math.max(0, Math.min(height - size, Math.round(crop.centerY * height - size / 2)));
   return { x, y, size, crop: { ...crop, centerX: (x + size / 2) / width, centerY: (y + size / 2) / height } };
 }
+
+/** Allowlisted operational metadata; never file names, paths, bytes or credentials. */
+export const photoFailurePhases = ["configuration", "input", "normalize", "reserve", "storage_write", "storage_verify", "finalize", "cleanup", "read", "delete"] as const;
+export type PhotoFailurePhase = typeof photoFailurePhases[number];
+export const isPhotoFailurePhase = (value: unknown): value is PhotoFailurePhase => typeof value === "string" && photoFailurePhases.some(phase => phase === value);
