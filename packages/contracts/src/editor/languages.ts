@@ -9,6 +9,7 @@ import {
 } from "../intelligence/translation.ts";
 export type TranslationSource = {
   kind: "base" | "job";
+  jobId?: string;
   documentId: string;
   currentId: string;
   revision: number;
@@ -158,6 +159,44 @@ export async function translationItems(
       ].filter(Boolean),
     ),
   ];
+  const factualContext = (fieldId: string) => {
+    const role = draft.roles.find((r) =>
+      [r.title, r.context, ...r.bullets].some((f) => f.fieldId === fieldId),
+    );
+    if (role)
+      return {
+        company: role.company.value,
+        location: role.location.value,
+        start: role.start.value,
+        end: role.end.value,
+        ongoing: role.ongoing.value,
+      };
+    const education = draft.education.find((e) =>
+      [e.qualification, e.field, e.details].some((f) => f.fieldId === fieldId),
+    );
+    if (education)
+      return {
+        institution: education.institution.value,
+        location: education.location.value,
+        start: education.start.value,
+        end: education.end.value,
+        ongoing: education.ongoing?.value,
+      };
+    const entry = draft.optionalSections
+      .flatMap((s) => s.entries)
+      .find((e) =>
+        [e.title, e.details, ...(e.bullets ?? [])].some(
+          (f) => f.fieldId === fieldId,
+        ),
+      );
+    return entry
+      ? {
+          start: entry.start.value,
+          end: entry.end.value,
+          ongoing: entry.ongoing?.value,
+        }
+      : null;
+  };
   return Promise.all(
     result.map(async (item) => ({
       ...item,
@@ -167,6 +206,7 @@ export async function translationItems(
         text: item.text,
         factIds: item.factIds,
         evidenceIds: item.evidenceIds,
+        factualContext: factualContext(item.fieldId),
       }),
     })),
   );
@@ -211,7 +251,9 @@ export async function materializeTranslation(
   const accepted = validateTranslationOutput(output, input),
     target = clone(source);
   validateDocumentLocale(input.targetLocale);
-  target.language = input.targetLocale.split("-")[0] as BaseDraft["language"];
+  target.language = input.targetLocale.startsWith("ro-") ? "ro" : "en";
+  target.documentLocale = input.targetLocale;
+  target.sourceLocale = input.sourceLocale;
   for (const role of [
     ...target.roles,
     ...target.optionalSections.flatMap((s) => s.entries),
@@ -263,5 +305,133 @@ export async function materializeTranslation(
   }
   delete target.presentation.approvedWording;
   delete target.presentation.contributionHtml;
+  return target;
+}
+
+export function isCanonicalDocumentLocale(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 35) return false;
+  try {
+    return Intl.getCanonicalLocales(value)[0] === value;
+  } catch {
+    return false;
+  }
+}
+export function isTranslationLineage(
+  value: unknown,
+): value is TranslationLineage {
+  const object = (v: unknown): v is Record<string, unknown> =>
+    !!v && typeof v === "object" && !Array.isArray(v);
+  const keys = (
+    v: Record<string, unknown>,
+    required: string[],
+    optional: string[] = [],
+  ) =>
+    required.every((k) => Object.hasOwn(v, k)) &&
+    Object.keys(v).every((k) => [...required, ...optional].includes(k));
+  const handle = (v: unknown): v is string =>
+    typeof v === "string" && v.length > 0 && v.length <= 256;
+  const ids = (v: unknown): v is string[] =>
+    Array.isArray(v) &&
+    v.length <= 500 &&
+    v.every(handle) &&
+    new Set(v).size === v.length;
+  const hash = (v: unknown) =>
+    typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
+  if (
+    !object(value) ||
+    !keys(value, [
+      "schemaVersion",
+      "documentLocale",
+      "sourceLocale",
+      "source",
+      "glossaryVersion",
+      "components",
+    ]) ||
+    value.schemaVersion !== "cv-language/1" ||
+    !isCanonicalDocumentLocale(value.documentLocale) ||
+    !isCanonicalDocumentLocale(value.sourceLocale) ||
+    !handle(value.glossaryVersion) ||
+    !object(value.source) ||
+    !keys(
+      value.source,
+      ["kind", "documentId", "currentId", "revision", "fingerprint"],
+      ["jobId"],
+    )
+  )
+    return false;
+  const source = value.source;
+  if (
+    !["base", "job"].includes(String(source.kind)) ||
+    !handle(source.documentId) ||
+    !handle(source.currentId) ||
+    !Number.isSafeInteger(source.revision) ||
+    Number(source.revision) < 1 ||
+    !hash(source.fingerprint) ||
+    (source.kind === "job"
+      ? !handle(source.jobId)
+      : Object.hasOwn(source, "jobId"))
+  )
+    return false;
+  if (
+    !Array.isArray(value.components) ||
+    !value.components.length ||
+    value.components.length > 2000
+  )
+    return false;
+  const seen = new Set<string>();
+  for (const c of value.components) {
+    if (
+      !object(c) ||
+      !keys(c, [
+        "id",
+        "fieldId",
+        "sectionId",
+        "sourceFingerprint",
+        "factIds",
+        "evidenceIds",
+      ]) ||
+      !handle(c.id) ||
+      c.id !== c.fieldId ||
+      !handle(c.sectionId) ||
+      !hash(c.sourceFingerprint) ||
+      !ids(c.factIds) ||
+      !ids(c.evidenceIds) ||
+      seen.has(c.id)
+    )
+      return false;
+    seen.add(c.id);
+  }
+  return true;
+}
+
+/** Shared proposed/accepted projection; scoped refresh never replaces untouched
+ * accepted target sections or their presentation/manual wording. */
+export async function composeTranslation(
+  source: BaseDraft,
+  input: TranslationInput,
+  output: TranslationOutput,
+  existing?: BaseDraft,
+): Promise<BaseDraft> {
+  const target = await materializeTranslation(source, input, output);
+  if (!existing) return target;
+  const sections = new Set(input.items.map((i) => i.sectionId));
+  if (!sections.has("identity")) target.titles = clone(existing.titles);
+  target.name = clone(existing.name);
+  target.contacts = clone(existing.contacts);
+  if (existing.nameParts) target.nameParts = clone(existing.nameParts);
+  if (!sections.has("summary")) target.summary = clone(existing.summary);
+  for (const group of ["professionalSkills", "technicalSkills"] as const)
+    if (!sections.has(group)) target[group] = clone(existing[group]);
+  if (!sections.has("experience")) target.roles = clone(existing.roles);
+  if (!sections.has("education")) target.education = clone(existing.education);
+  for (const section of existing.optionalSections)
+    if (!sections.has(section.id)) {
+      const index = target.optionalSections.findIndex(
+        (s) => s.id === section.id,
+      );
+      if (index < 0) target.optionalSections.push(clone(section));
+      else target.optionalSections[index] = clone(section);
+    }
+  target.presentation = clone(existing.presentation);
   return target;
 }

@@ -63,5 +63,5 @@ export function renderPrintHtml(
       }}
     />,
   );
-  return `<!doctype html><html lang="${draft.language}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:"><style>${css}\nhtml,body{margin:0;padding:0;background:white}</style></head><body>${html}</body></html>`;
+  return `<!doctype html><html lang="${draft.documentLocale ?? draft.language}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:"><style>${css}\nhtml,body{margin:0;padding:0;background:white}</style></head><body>${html}</body></html>`;
 }

@@ -8,11 +8,13 @@ import { chooseTemplate } from "../templates/registry";
 import { Button, useCopy } from "../components/ui";
 import { validatePdf } from "./pdf";
 export type ExportPin =
-  | { kind: "base"; versionId: string; revision: number }
+  | { kind: "base"; versionId: string; revision: number;variantId?:string }
   | {
       kind: "job";
       jobId: string;
       documentId: string;
+      locale: "ro" | "en";
+      fingerprint: string;
       versionId: string;
       revision: number;
     };

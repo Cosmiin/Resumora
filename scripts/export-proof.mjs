@@ -74,7 +74,7 @@ try {
               reads++;
               return row;
             },
-            loadJobEditor: async () => null,
+            loadCurrentJobDocument: async () => null,
             readPhoto: async () => ({
               id,
               objectKey: "synthetic-local-photo",
@@ -129,7 +129,7 @@ try {
               payload: encodeDraft(deletedDraft),
             }
           : null,
-      loadJobEditor: async () => null,
+      loadCurrentJobDocument: async () => null,
       readPhoto: async () => {
         throw new Error("unused");
       },

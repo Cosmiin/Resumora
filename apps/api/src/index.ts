@@ -1,3 +1,4 @@
+import { isLanguagePath, configuredLanguageRoute } from "./languages/routes.ts";
 import { exportRoute, type ExportConfig } from "./export/routes.ts";
 import { processJobWorkflow } from "./jobs/processor.ts";
 import { jobWorkflowRoute } from "./jobs/workflow.ts";
@@ -70,6 +71,7 @@ export default {
     if (authMethods[path]) return authRoute(request, env);
     if (
       isIntelligencePath(path) ||
+      isLanguagePath(path) ||
       cvPaths.has(path) ||
       path === "/v1/exports/pdf" ||
       path === "/v1/jobs" ||
@@ -97,7 +99,7 @@ export default {
       let response: Response;
       try {
         const gateway = createDatabaseGateway(env, identity);
-        response = path === "/v1/exports/pdf"
+        response = isLanguagePath(path) ? await configuredLanguageRoute(request,env,gateway,identity.user.id) : path === "/v1/exports/pdf"
           ? await exportRoute(request,gateway,env)
           : isIntelligencePath(path)
           ? await configuredIntelligenceRoute(

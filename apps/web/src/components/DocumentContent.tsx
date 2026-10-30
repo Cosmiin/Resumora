@@ -441,7 +441,7 @@ export function DocumentPreview({
   const document = (
     <article
       className={`document${template ? ` document-template ${template.className}` : ""}`}
-      lang={d.language}
+      lang={d.documentLocale ?? d.language}
       data-template-version={d.presentation.templateVersionId}
     >
       {d.presentation.order
