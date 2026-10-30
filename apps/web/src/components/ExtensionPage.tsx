@@ -109,7 +109,7 @@ export function ExtensionPage({
           <tr>
             <td>Other sites</td>
             <td>
-              Structured JobPosting or a bounded job-description container; ambiguous pages require explicit text selection or manual paste. Live sites unverified
+              Bounded visible page text or explicit visible selection; backend extraction follows your settings. Metadata is ancillary. Live sites unverified
             </td>
           </tr>
         </tbody>
@@ -121,8 +121,9 @@ export function ExtensionPage({
       </p>
       <h2>Your data</h2>
       <p>
-        Only your selected job text, source URL and available job metadata are
-        sent. Missing fields stay unknown. No browser history, cookies,
+        Bounded visible page text (or your explicit visible selection), source URL
+        and ancillary job metadata are sent. Forms, hidden content, navigation
+        and recognized account/recommendation areas are excluded. Missing fields stay unknown. No browser history, cookies,
         passwords or CV contents are collected. AI is off. Queued local
         snapshots expire after 24 hours and are removed after acknowledgement or
         discard. The extension can only capture jobs and check its receipts.

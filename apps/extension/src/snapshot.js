@@ -22,12 +22,12 @@ export function capturePage() {
   ];
   const matched=adapters.find(([,pattern])=>pattern.test(host));
   const adapter=matched?.[0]??'generic';
-  const excluded='script,style,noscript,template,nav,header,footer,aside,form,input,textarea,select,button,[role="navigation"],[role="dialog"],[contenteditable],.comments,.jobs-similar-jobs,.recommendations,.recommended-jobs,.related-jobs,.similar-jobs,.user-profile';
+  const excluded='script,style,noscript,template,nav,header,footer,aside,form,input,textarea,select,button,[role="navigation"],[role="banner"],[role="contentinfo"],[role="search"],[role="dialog"],[contenteditable],.comments,.jobs-similar-jobs,.recommendations,.recommended-jobs,.related-jobs,.similar-jobs,.user-profile,.recruiter-profile,.account-profile';
   const visible=el=>{
     if(!el || el.closest('[hidden], [aria-hidden="true"]') || !el.getClientRects().length)return false;
     for(let node=el;node;node=node.parentElement) {
       const style=getComputedStyle(node);
-      if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse')return false;
+      if(style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||style.opacity==='0'||style.contentVisibility==='hidden')return false;
     }
     return true;
   };
@@ -41,7 +41,7 @@ export function capturePage() {
         } else if(child.nodeType===Node.ELEMENT_NODE && !child.matches(excluded) && visible(child))walk(child);
       }
     };
-    for(const root of roots)if(root!==document.body&&root!==document.documentElement&&visible(root)&&!root.closest(excluded))walk(root);
+    for(const root of roots)if(root!==document.documentElement&&visible(root)&&!root.closest(excluded))walk(root);
     if(length>120000)throw Error('Posting exceeds capture limits. Select relevant job text or paste it in Resumora; nothing was sent.');
     return lines.join('\n');
   };
@@ -63,16 +63,15 @@ export function capturePage() {
     const range=selection.getRangeAt(0),root=range.commonAncestorContainer;
     const iterator=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     const nodes=root.nodeType===Node.TEXT_NODE?[root]:[];
-    for(let n=iterator.nextNode();n;n=iterator.nextNode())nodes.push(n);
+    for(let n=iterator.nextNode();n;n=iterator.nextNode()){if(nodes.length>=20000)throw Error('Selection exceeds capture limits. Select less text or paste it in Resumora; nothing was sent.');nodes.push(n);}
     const lines=[];
     for(const n of nodes){if(!range.intersectsNode(n)||!n.parentElement||n.parentElement.closest(excluded)||!visible(n.parentElement))continue;let value=n.textContent??'';if(n===range.endContainer)value=value.slice(0,range.endOffset);if(n===range.startContainer)value=value.slice(range.startOffset);if(value.trim())lines.push(value.trim());}
     text=lines.join('\n');selected=true;
   }
-  if(postings.length>1&&!selected)throw Error('Multiple job postings detected. Select only the intended job text, then click Capture again, or paste it in Resumora. Nothing was sent.');
   posting=postings.length===1?postings[0]:undefined;
   // Structured fields are source metadata only; arbitrary JSON-LD extensions
   // and account/contact/application-form objects never enter the payload.
-  const metadata=posting?Object.fromEntries(['@type','title','hiringOrganization','jobLocation','jobLocationType','applicantLocationRequirements','employmentType','baseSalary','datePosted','validThrough','skills','qualifications','experienceRequirements','educationRequirements','url'].filter(k=>posting[k]!==undefined).map(k=>[k,posting[k]])):undefined;
+  let metadata=posting?Object.fromEntries(['@type','title','hiringOrganization','jobLocation','jobLocationType','applicantLocationRequirements','employmentType','baseSalary','datePosted','validThrough','skills','qualifications','experienceRequirements','educationRequirements','url'].filter(k=>posting[k]!==undefined).map(k=>[k,posting[k]])):undefined;
   if(metadata?.hiringOrganization)metadata.hiringOrganization={name:typeof posting.hiringOrganization?.name==='string'?posting.hiringOrganization.name:undefined};
   const scrub=(v,depth=0)=>{
     if(depth>5)return undefined;
@@ -84,27 +83,18 @@ export function capturePage() {
   };
   if(metadata)for(const key of Object.keys(metadata))metadata[key]=scrub(metadata[key]);
   const headings=Array.from(document.querySelectorAll('h1')).filter(visible),heading=headings.length===1?headings[0]:undefined;
-  if(!selected){
-    const selectors=[matched?.[2],'[itemprop="description"], #job-description, #jobDescriptionText, .job-description, [data-automation-id="jobPostingDescription"]'].filter(Boolean);
-    for(const selector of selectors){
-      const roots=Array.from(document.querySelectorAll(selector)).filter(root=>visible(root)&&!root.closest(excluded));
-      const outer=roots.filter(root=>!roots.some(other=>other!==root&&other.contains(root)));
-      if(outer.length>1)throw Error('The job content is split or ambiguous. Select the complete intended job text, then click Capture again. Nothing was sent.');
-      if(outer.length===1){text=read(outer);if(text.length>=80)break;}
-    }
-    if(text.length<80&&typeof posting?.description==='string'){
-      const template=document.createElement('template');template.innerHTML=posting.description;
-      template.content.querySelectorAll(excluded).forEach(el=>el.remove());
-      template.content.querySelectorAll('br,hr').forEach(el=>el.replaceWith(document.createTextNode('\n')));
-      template.content.querySelectorAll('p,div,li,ul,ol,dl,dt,dd,section,article,h1,h2,h3,h4,h5,h6,blockquote,pre,tr,td,th').forEach(el=>{el.prepend(document.createTextNode('\n'));el.append(document.createTextNode('\n'));});
-      text=(template.content.textContent??'').trim();
-    }
-    if(posting?.title&&heading&&!String(posting.title).toLocaleLowerCase().includes(heading.innerText.trim().toLocaleLowerCase())&&!heading.innerText.trim().toLocaleLowerCase().includes(String(posting.title).toLocaleLowerCase()))throw Error('Structured and visible job titles disagree. Select the intended job text or paste it in Resumora for review. Nothing was sent.');
-  }
+  const headingText=!selected&&heading?read([heading]):'';
+  // The explicit click captures the bounded rendered page for BACKEND
+  // extraction. A short/missing primary container must not narrow the source
+  // or let hidden JSON-LD description text substitute for visible content.
+  if(!selected)text=read(document.body?[document.body]:[]);
+  // Metadata is ancillary. Conflicting/multiple structured postings cannot
+  // replace the visible source or attach a conflicting employer interpretation.
+  if(posting?.title&&heading&&!String(posting.title).toLocaleLowerCase().includes(headingText.trim().toLocaleLowerCase())&&!headingText.trim().toLocaleLowerCase().includes(String(posting.title).toLocaleLowerCase()))metadata=undefined;
   if(text.length>120000)throw Error('Posting exceeds capture limits. Select relevant job text or paste it in Resumora; nothing was sent.');
-  if(text.length<80)throw Error('No readable job section. Open the full posting, wait for it to load, or paste the advert in Resumora. Embedded cross-origin frames require opening the original job page.');
+  if(text.length<80)throw Error('No meaningful visible job text. Open the full posting, wait for it to load, or paste the advert in Resumora. Embedded cross-origin frames require opening the original job page.');
   const structured=metadata&&!selected?JSON.stringify(metadata):undefined;
-  const title=(heading?.innerText??'').trim().slice(0,2000);
+  const title=headingText.trim().slice(0,2000);
   const snapshot={text,sourceUrl:location.href,...(title?{title}:{}),...(structured&&structured.length<=60000?{structured}:{}),adapter,capturedAt:new Date().toISOString(),parserVersion:'1'};
   if(new TextEncoder().encode(JSON.stringify(snapshot)).length>260000)throw Error('Posting is too large. Paste the relevant job section in Resumora.');
   return snapshot;

@@ -44,7 +44,7 @@ This source change does not publish a Store listing, deploy a site, apply a host
 
 ## Capture coverage and remaining evidence
 
-The collector handles structured JobPosting descriptions before requiring a rendered job container, known ATS sections, and bounded generic job-heading/section text even without main/article. The API snapshot contract accepts every emitted adapter label. Forms, navigation, comments, hidden elements and unrelated page chrome are excluded from rendered text; there is no body-wide traversal, background browsing collection or login bypass. Structured locations normalize explicit locality/region/country, string addresses, named places and location arrays when snapshot location is missing. Unknowns stay unknown and review remains required.
+The explicit-click collector sends bounded sanitized rendered page text (or explicit visible selection) for backend extraction. It does not narrow the source to a detected primary container, and hidden JSON-LD descriptions cannot replace missing/short visible text. Allowlisted structured metadata is ancillary; conflicting/multiple posting metadata is omitted. Forms, navigation, comments, hidden elements and recognized account/profile/recommendation areas are excluded. No background browsing, login bypass or frame crawling. Source metadata normalization preserves explicit locations; missing fields remain unknown and require review.
 
 | Synthetic fixture path | Installed Chrome / live platform |
 | --- | --- |
@@ -53,7 +53,7 @@ The collector handles structured JobPosting descriptions before requiring a rend
 | Lever / Workday / SmartRecruiters / iCIMS rendered | Unverified |
 | Oracle / Taleo / SuccessFactors / Workable rendered | Unverified |
 | Recruitee / BambooHR / Personio / Teamtailor / Indeed rendered | Unverified |
-| Unknown host with JobPosting only, generic containers, heading siblings and sections | Unverified |
+| Unknown host with bounded sanitized visible text or explicit visible selection | Unverified |
 
 Broad major-ATS support remains the goal, not a claim proven by fixtures. Installed Chrome identity/auth flow, Origin/CORS, permissions and worker lifecycle, live dynamic ATS pages, embedded frames, hosted proxy/SQL/cron and real account revocation still require separately authorized evidence. Store publication and deployment remain external operator steps.
 
@@ -68,7 +68,7 @@ Certifications and candidate-language requirements remain unknown during determi
 
 ## 30 October capture boundary
 
-The collector now uses one bounded primary description or one unambiguous structured JobPosting. It no longer expands an introduction using English heading heuristics or widens to a generic main/common ancestor. Split/ambiguous pages, multiple postings and conflicting titles require explicit selection of the full advert or manual paste. Selecting text explicitly transmits only selected visible text outside forms/navigation/profile containers. Oversized content fails without sending a silently truncated fragment. JSON-LD description HTML is converted to inert text with paragraph/list/br separators; raw description/forms and arbitrary nested metadata are excluded from the submitted structured metadata.
+Latest owner capture override: copy bounded rendered visible page text on explicit action, then extract vacancy information in the backend. Structured metadata and primary containers never substitute for or silently narrow the source. A user may explicitly select only intended visible text. Hidden/form/account/profile/navigation/recommendation areas remain excluded; limits reject rather than truncate; missing meaningful visible content offers manual paste/original-page fallback. Conflicting or hidden JSON-LD never becomes source text.
 
 Greenhouse/Ashby/LinkedIn/BestJobs and the bundled other named selectors have synthetic fixture coverage only. Generic main/article pages require selection unless a specific job-description container or structured posting exists. Live provider layouts, installed-Chrome permissions and real account launchWebAuthFlow remain unverified; fixtures do not establish universal site support. Server-side URL retrieval has a separate smaller matrix: exact vendor-owned Greenhouse, Ashby, Lever and SmartRecruiters hosts with a single public structured posting; no redirects, credentials, arbitrary hosts or authenticated pages. Failures preserve the saved URL record and offer paste/extension recovery.
 

@@ -57,20 +57,22 @@ performed here. See the repository's `docs/setup/job-extension.md`.
 
 | Path | Synthetic fixture coverage | Live installed Chrome |
 | --- | --- | --- |
-| Greenhouse, Ashby | Rendered sections and JobPosting | Unverified |
+| Greenhouse, Ashby | Visible page text and ancillary JobPosting metadata | Unverified |
 | LinkedIn, BestJobs | Rendered sections | Unverified |
 | Lever, Workday, SmartRecruiters, iCIMS | Rendered sections | Unverified |
 | Oracle/Taleo, SuccessFactors, Workable | Rendered sections | Unverified |
 | Recruitee, BambooHR, Personio, Teamtailor, Indeed | Rendered sections | Unverified |
-| Unknown hosts | JobPosting description; job containers; heading/section-anchored visible text without main/article | Unverified |
+| Unknown hosts | Bounded sanitized visible page text or explicit visible selection; ancillary metadata only | Unverified |
 
 Broad ATS support is the goal; synthetic fixtures do not prove all ATS work.
-Hidden text, form values, navigation, comments and unrelated page chrome are
-excluded from rendered text. The generic fallback reads bounded job sections
-or adjacent job-heading content within the local posting, never the entire body
-or page-wide job-word anchors. Recommendation and profile sections are excluded. JSON-LD JobPosting
-is serialized source data; its description can supply job text when rendered
-containers are unavailable. Scripts and forms in descriptions are not run.
+Hidden text, form values, navigation, comments and recognized account/profile,
+recommendation and page-chrome containers are excluded from rendered text. On
+an explicit click, the collector reads bounded sanitized visible page text for
+backend AI extraction; a short/missing primary job container does not narrow
+that source. Explicit selection limits capture to selected visible text.
+JSON-LD is ancillary allowlisted metadata only: hidden descriptions never
+supply or replace source text, and conflicting/multiple posting metadata is
+omitted. Scripts and forms are never executed or collected.
 Missing fields remain unknown and saved metadata is unreviewed. Broad structured
 qualifications and content language remain original source data; they do not
 establish certifications or candidate language requirements. Dynamic pages
@@ -80,4 +82,4 @@ posting directly; for restricted/unreadable pages, paste the advert in Jobs.
 MIT licensed source; icons are original code-drawn document marks. No external
 runtime libraries or remote executable assets are packaged.
 
-Capture now fails closed on ambiguous generic/split pages: select the full intended job text and click the extension again, or paste it in Resumora. The popup discloses selected-text transmission. Form inputs, hidden content and unrelated profile/navigation containers are excluded. Oversized captures are rejected without silent truncation. Automatic broad main/article/heading-based capture is no longer used. Named adapters are synthetic-fixture verified only; live-site and installed Chrome verification remain pending. Raw JSON-LD description HTML is not sent as metadata.
+Missing/too-short visible content, restricted frames and oversized captures require opening the original posting, explicit selection or manual paste. Oversized captures are rejected without silent truncation. The popup discloses visible page/selected-text transmission. Named adapters label synthetic-fixture coverage only; live-site and installed Chrome verification remain pending. No metadata description HTML is submitted as source text.
