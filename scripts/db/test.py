@@ -175,7 +175,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates', 'job-documents'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates', 'job-documents', 'capture', 'workflow'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -188,14 +188,36 @@ def main():
         if args.suite == 'imports':
             # Exercise import restrictions against a permissive policy on the shared Storage fixture.
             db.sql("CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
-        count = db.migrate()
-        assert db.migrate() == 0, 'Normal reapply must have no pending migrations'
+        through = 'P7' if args.suite in ('workflow','all','job-documents') else 'P4'
+        if args.suite in ('job-documents','all'):
+            db.migrate('P5')
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('current_job_documents', ROOT/'supabase/tests/current_job_documents.py')
+            current=importlib.util.module_from_spec(spec);spec.loader.exec_module(current);current.prepare_upgrade(db)
+        count = db.migrate(through)
+        assert db.migrate(through) == 0, 'Normal reapply must have no pending migrations'
         table_count = int(db.sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='app'"))
         assert db.sql("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relkind='r' AND NOT c.relrowsecurity") == '0'
         assert db.sql("SELECT count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='app' AND NOT c.convalidated") == '0'
         tests = ROOT / 'supabase/tests/behavior.py'
         cases = 2
         upgrade = None
+        if args.suite == 'workflow':
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('job_workflow', ROOT/'supabase/tests/job_workflow.py')
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+            return 0 if result.wasSuccessful() else 1
+        if args.suite == 'capture':
+            count += db.migrate('P5')
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('capture', ROOT / 'supabase/tests/capture.py')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            result = unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+            if args.receipt:
+                args.receipt.write_text(json.dumps({'suite':'capture','migrations_applied':count,'cases':result.testsRun,'success':result.wasSuccessful(),'elapsed_seconds':round(time.monotonic()-started,2),'hosted_access':False},indent=2)+'\n')
+            return 0 if result.wasSuccessful() else 1
         if tests.exists() and args.suite == 'all':
             import importlib.util
             spec = importlib.util.spec_from_file_location('resumora_db_behavior', tests)
@@ -209,7 +231,7 @@ def main():
             upgrade = check_populated_upgrade(db, module)
             cases += 2
         import importlib.util
-        if args.suite not in ('imports', 'templates', 'job-documents'):
+        if args.suite not in ('imports', 'templates', 'job-documents', 'capture'):
             draft_spec = importlib.util.spec_from_file_location('editor_drafts', ROOT / 'supabase/tests/editor_drafts.py')
             drafts = importlib.util.module_from_spec(draft_spec)
             draft_spec.loader.exec_module(drafts)
@@ -259,12 +281,25 @@ def main():
             if not prior.wasSuccessful():
                 return 1
         if args.suite in ('all', 'job-documents'):
-            job_spec = importlib.util.spec_from_file_location('job_documents', ROOT / 'supabase/tests/job_documents.py')
+            job_spec = importlib.util.spec_from_file_location('job_documents', ROOT / 'supabase/tests/current_job_documents.py')
             jobs = importlib.util.module_from_spec(job_spec)
             job_spec.loader.exec_module(jobs)
             job_result = unittest.TextTestRunner(verbosity=2).run(jobs.suite(db))
             cases += job_result.testsRun
             if not job_result.wasSuccessful():
+                return 1
+        if args.suite=='all':
+            spec=importlib.util.spec_from_file_location('job_workflow', ROOT/'supabase/tests/job_workflow.py')
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            result=unittest.TextTestRunner(verbosity=2).run(module.suite(db));cases+=result.testsRun
+            if not result.wasSuccessful():return 1
+        if args.suite in ('all', 'capture'):
+            spec = importlib.util.spec_from_file_location('capture', ROOT / 'supabase/tests/capture.py')
+            capture = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(capture)
+            result = unittest.TextTestRunner(verbosity=2).run(capture.suite(db))
+            cases += result.testsRun
+            if not result.wasSuccessful():
                 return 1
         receipt = {'migrations_applied':count,'normal_reapply_pending':0,
                    'tables':table_count,'cases':cases,'elapsed_seconds':round(time.monotonic()-started,2),

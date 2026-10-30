@@ -2,6 +2,7 @@ import { boundedJson } from '../ai/http.ts';
 import { config, readCookie, writeCookie, clearCookie } from './cookies.ts';
 import { createAuth, authHeaders, authJson, authError, saveSession, verifySession, checkWrite, clearAuth } from './session.ts';
 import type { AuthConfig, SessionCookie, BrowserCookie, FlowCookie } from './session.ts';
+import { revokeSessionConnections } from '../extension/gateway.ts';
 
 export const authMethods: Readonly<Record<string, string>> = {
   '/v1/auth/session': 'GET', '/v1/auth/signup': 'POST', '/v1/auth/login': 'POST', '/v1/auth/logout': 'POST',
@@ -32,6 +33,8 @@ export async function authRoute(request: Request, env: AuthConfig, transport: ty
         if (!error && data.session && (purpose !== 'recovery' || recoveryEvent)) {
           const verified = await auth.getUser(data.session.access_token);
           if (!verified.error && verified.data.user?.id === data.session.user.id && verified.data.user.email_confirmed_at) {
+            const previous = await readCookie<SessionCookie>(request, env, 'session');
+            if (previous) await revokeSessionConnections(env, previous.csrf, transport);
             await saveSession(headers, env, data.session, purpose === 'recovery');
             success = true;
           }
@@ -59,6 +62,7 @@ export async function authRoute(request: Request, env: AuthConfig, transport: ty
     } catch { return authError('INVALID_INPUT', 400, headers); }
     if (path === '/v1/auth/logout') {
       const cookie = await readCookie<SessionCookie>(request, env, 'session');
+      if (cookie) await revokeSessionConnections(env, cookie.csrf, transport);
       clearAuth(headers, env);
       if (cookie) {
         // Supported Auth admin signOut calls /logout with the user's JWT, never a service role key.
@@ -98,6 +102,8 @@ export async function authRoute(request: Request, env: AuthConfig, transport: ty
       if (error || !data.session) return authError(error?.status === 429 ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS', error?.status === 429 ? 429 : 401, headers);
       const verified = await auth.getUser(data.session.access_token);
       if (verified.error || verified.data.user?.id !== data.user?.id) return authError('INVALID_CREDENTIALS', 401, headers);
+      const previous = await readCookie<SessionCookie>(request, env, 'session');
+      if (previous) await revokeSessionConnections(env, previous.csrf, transport);
       await saveSession(headers, env, data.session, false);
       clearCookie(headers, env, 'flow');
       return authJson({ user: { id: data.user!.id, email: data.user!.email } }, 200, headers);

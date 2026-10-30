@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 15
     env:
       WRANGLER_SEND_METRICS: 'false'
+      APP_ORIGIN: 'https://resumora-build.invalid'
+      API_ORIGIN: 'https://resumora-build.invalid'
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,3 +35,5 @@ jobs:
         run: npm run check
       - name: Check synthetic OpenAI accounting and protected admin routes
         run: npm test --workspace @resumora/api
+      - name: Check capture queue, synthetic rendered adapters and reproducible developer package
+        run: npm test --workspace @resumora/extension

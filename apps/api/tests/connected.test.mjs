@@ -21,7 +21,7 @@ const options = transport => ({ execution:'configured',primary,fallback,processi
 let ledger;
 const result = (model=primary.model, content={text:composeGrounded(context.facts,'en'),factIds:['f1','f2']}) => Response.json({id:'response-'+model,model,provider:'synthetic',usage:{prompt_tokens:4,completion_tokens:5,total_tokens:9,cost:0.0001},choices:[{finish_reason:'stop',message:{content:JSON.stringify(content)}}]});
 test('mounted private endpoints deny anonymous access before any provider or database', async()=>{
-  for (const path of ['/v1/jobs','/v1/jobs/'+uuid(),'/v1/enhancement']) {
+  for (const path of ['/v1/jobs','/v1/jobs/'+uuid(),'/v1/jobs/'+uuid()+'/workflow','/v1/jobs/'+uuid()+'/workflow/accept','/v1/jobs/'+uuid()+'/cv','/v1/jobs/url','/v1/enhancement']) {
     const env={APP_ENV:'development',APP_ORIGIN:'http://127.0.0.1:5173',API_ORIGIN:'http://127.0.0.1:5173',SUPABASE_URL:'https://synthetic.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic',AUTH_COOKIE_KEY:Buffer.alloc(32,9).toString('base64')};
     const r=await worker.fetch(req(path,path.endsWith('enhancement')?{}:undefined),env);
     assert.equal(r.status,401);

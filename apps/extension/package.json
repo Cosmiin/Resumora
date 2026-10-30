@@ -1,0 +1,4 @@
+{
+  "name": "@resumora/extension", "version": "0.1.0", "private": true, "type": "module",
+  "scripts": { "test": "node --experimental-strip-types --test tests/*.test.mjs", "package": "node --experimental-strip-types package.mjs" }
+}
