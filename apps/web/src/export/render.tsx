@@ -1,3 +1,4 @@
+import { validateDocumentLocale } from "@resumora/contracts/intelligence/translation";
 import { renderToStaticMarkup } from "react-dom/server.browser";
 import { DocumentPreview } from "../components/DocumentContent";
 import { resolveTemplate } from "../templates/registry";
@@ -10,6 +11,7 @@ export function renderPrintHtml(
   css: string,
   photo?: PrintPhoto,
 ): string {
+  validateDocumentLocale(draft.documentLocale ?? (draft.language==="ro"?"ro-RO":"en-GB"));
   if (
     draft.presentation.templateVersionId &&
     !resolveTemplate(draft.presentation.templateVersionId)

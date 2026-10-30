@@ -9,7 +9,7 @@ const id='11111111-1111-4111-8111-111111111111';
 const payload=JSON.parse(await readFile(new URL('../../../packages/contracts/fixtures/job-editor-import.json',import.meta.url),'utf8'));
 const row={id,revision:1,reason:'save',parentId:null,payload,createdAt:'2026-10-30T00:00:00Z'};
 function request(body={kind:'base',versionId:id,revision:1}) {return new Request('https://api.example.test/v1/exports/pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
-const gateway=(value=null)=>({loadSnapshot:async()=>value,loadJobEditor:async()=>null,readPhoto:async()=>{throw new Error('unavailable');},getPhoto:async()=>{throw new Error('unavailable');}});
+const gateway=(value=null)=>({loadSnapshot:async()=>value,loadCurrentJobDocument:async()=>null,readPhoto:async()=>{throw new Error('unavailable');},getPhoto:async()=>{throw new Error('unavailable');}});
 test('export accepts immutable pins only, never client HTML/template/contact/resource URLs',async()=>{
  let launches=0;const launch=async()=>{launches++;throw new Error('must not launch');};
  for(const body of [{kind:'base',versionId:id,revision:1,html:'private'},{kind:'base',versionId:id,revision:1,templateVersionId:'bad'},{kind:'base',versionId:'foreign',revision:1},{kind:'job',versionId:id,revision:1,jobId:id,documentId:'foreign'}])assert.equal((await exportRoute(request(body),gateway(),{PDF_EXPORT_ENABLED:'on'},launch)).status,400);
@@ -27,8 +27,8 @@ test('an unconfigured renderer reports unavailable rather than fake PDF success'
  // Job accepted projection uses the existing source, including any scoped wording.
  const source=decodeDraft(payload);
  const job={schemaVersion:'resumora-job-editor/1',acceptance:'accepted',source:{snapshotId:id,revision:1},job:{id,versionId:null,fingerprint:'a'.repeat(64)},selectedFacts:[],selectedAnswerIds:[],wording:[],presentation:{},localAdditions:[]};
- const db=gateway();db.loadJobEditor=async()=>({id,documentId:id,revision:1,parentId:null,createdAt:'now',reason:'save',payload:job,sourcePayload:payload});
- const response=await exportRoute(request({kind:'job',jobId:id,documentId:id,versionId:id,revision:1}),db,{});
+ const db=gateway();db.loadCurrentJobDocument=async()=>({id,documentId:id,revision:1,createdAt:"now",locale:"ro",fingerprint:"a".repeat(64),provenance:{},payload});
+ const response=await exportRoute(request({kind:'job',jobId:id,documentId:id,versionId:id,revision:1,locale:'ro',fingerprint:'a'.repeat(64)}),db,{});
  assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:{code:'pdfExportUnavailable'}});assert.equal(source.name.value,decodeDraft(payload).name.value);
 });
 test('professional names omit internal IDs and reject path/control characters',()=>{

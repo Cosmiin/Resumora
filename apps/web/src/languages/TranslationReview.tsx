@@ -25,7 +25,7 @@ export function TranslationReview({
   save,
   cancel,
 }: {
-  client: LanguageClient;
+  client: Pick<LanguageClient, "review" | "accept" | "cancel" | "start" | "advance">;
   context: NonNullable<DocumentLanguageContext["source"]>;
   proposal: LanguageProposal;
   existing?: BaseDraft;

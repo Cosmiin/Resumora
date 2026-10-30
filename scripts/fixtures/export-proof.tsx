@@ -123,3 +123,31 @@ Object.assign(window, {
     },
   },
 });
+
+// Real affected controls with an injected offline boundary for local product inspection.
+import { useState } from "react";
+import { AppearanceExport } from "../../apps/web/src/export/AppearanceExport";
+import { TranslationReview } from "../../apps/web/src/languages/TranslationReview";
+import { translationItems } from "@resumora/contracts/editor/languages";
+import type { LanguageProposal } from "@resumora/contracts/editor/language-transport";
+function AppearanceProof() {
+  const [draft, setDraft] = useState(() => maraReviewDraft());
+  return <LanguageContext.Provider value="ro"><AppearanceExport draft={draft}
+    snapshot={{id:"11111111-1111-4111-8111-111111111111",revision:1,parentId:null,createdAt:"now",reason:"save",draft}}
+    pin={{kind:"base",versionId:"11111111-1111-4111-8111-111111111111",revision:1}}
+    ready change={setDraft} asOf={asOf} transport={async()=>Response.json({error:{code:"pdfExportUnavailable"}},{status:503})}/></LanguageContext.Provider>;
+}
+Object.assign((window as any).exportProof, {
+  appearance() { root.render(<AppearanceProof/>); },
+  async review() {
+    const draft=maraReviewDraft(),items=await translationItems(draft);
+    const source={kind:"base" as const,documentId:draft.id,currentId:"synthetic-source",revision:1,fingerprint:"a".repeat(64)};
+    let proposal:LanguageProposal={id:"synthetic-proposal",state:"ready",step:1,reviewRevision:0,review:null,accepted:null,
+      request:{source,sourceLocale:"ro-RO",targetLocale:"en-GB",targetRevision:0,targetDocumentId:null,variantId:"lang_"+"b".repeat(64),sectionIds:[],glossary:[]},
+      output:{schemaVersion:"cv-translation/1",sourceLocale:"ro-RO",targetLocale:"en-GB",completion:"complete",items:items.map(i=>({id:i.id,fieldId:i.fieldId,text:"Proposed: "+i.text,factIds:i.factIds,evidenceIds:i.evidenceIds})),warnings:[],ambiguousTerms:[],suggestedGlossary:[]}};
+    const client={review:async(_id:string,_rev:number,review:NonNullable<LanguageProposal["review"]>)=>proposal={...proposal,review,reviewRevision:proposal.reviewRevision+1},
+      accept:async()=>({kind:"base" as const,id:"synthetic-target",revision:1}),cancel:async()=>proposal,
+      start:async()=>proposal,advance:async()=>proposal};
+    root.render(<LanguageContext.Provider value="ro"><TranslationReview client={client} context={{pin:source,locale:"ro-RO",draft,items,accepted:true}} proposal={proposal} save={()=>{}} cancel={()=>{}}/></LanguageContext.Provider>);
+  },
+});

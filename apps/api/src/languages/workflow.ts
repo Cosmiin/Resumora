@@ -7,6 +7,7 @@ import {
 import { selfContainedJobDraft } from "@resumora/contracts/jobs/current-document";
 import {
   translationItems,
+  defaultDocumentLocale,
   componentFingerprint,
   composeTranslation,
   type TranslationSource,
@@ -29,11 +30,12 @@ import type {
   LanguageReview,
 } from "./model.ts";
 export class LanguageError extends Error {
-  constructor(
-    public code: string,
-    public status = 409,
-  ) {
+  code: string;
+  status: number;
+  constructor(code: string, status = 409) {
     super(code);
+    this.code = code;
+    this.status = status;
   }
 }
 function fail(code: string, status = 409): never {
@@ -61,7 +63,8 @@ export function languageWorkflow(
     const draft = decodeDraft(row.payload);
     if (
       (pin.kind === "base" ? draft.id : row.documentId) !== pin.documentId ||
-      draft.translation
+      draft.translation ||
+      (draft.documentLocale ?? defaultDocumentLocale(draft)) !== locale
     )
       fail("authoritativeSourceRequired");
     if ("reason" in row && row.reason === "autosave")

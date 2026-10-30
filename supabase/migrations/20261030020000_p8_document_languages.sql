@@ -6,12 +6,21 @@ ALTER TABLE app.editor_draft_snapshots DROP CONSTRAINT editor_draft_snapshots_te
 ALTER TABLE app.editor_draft_snapshots ADD UNIQUE(tenant_id,variant_id,revision);
 -- Predicate-only correction preserves import-owned deletion/current-head guards.
 DO $scope$
-DECLARE signature text; original text; scoped text;
+DECLARE signature text; original text; scoped text; predicate text; replacement text;
 BEGIN
  FOREACH signature IN ARRAY ARRAY['app.load_base_draft()','app.base_draft_history(bigint,integer)','app.write_base_draft(uuid,bigint,jsonb,text,uuid)','app.begin_cv_import(uuid,text,text,bigint,bigint)'] LOOP
   original:=pg_get_functiondef(to_regprocedure(signature));
   scoped:=replace(original,'s.tenant_id=workspace ORDER BY','s.tenant_id=workspace AND s.variant_id=''default'' ORDER BY');
-  scoped:=replace(scoped,'s.tenant_id=workspace\n   AND','s.tenant_id=workspace AND s.variant_id=''default''\n   AND');
+  IF signature='app.base_draft_history(bigint,integer)' THEN
+   -- Match the observed pg_get_functiondef body, not a literal backslash-n.
+   predicate:='s.tenant_id=workspace'||chr(10)||'   AND';
+   replacement:='s.tenant_id=workspace AND s.variant_id=''default'''||chr(10)||'   AND';
+   IF (length(scoped)-length(replace(scoped,predicate,'')))/length(predicate)<>1 THEN
+    RAISE EXCEPTION 'Base history scope predicate must match exactly once';
+   END IF;
+   scoped:=replace(scoped,predicate,replacement);
+   IF position(replacement IN scoped)=0 THEN RAISE EXCEPTION 'Base history default scope missing';END IF;
+  END IF;
   scoped:=replace(scoped,'WHERE tenant_id=workspace ORDER BY revision','WHERE tenant_id=workspace AND variant_id=''default'' ORDER BY revision');
   scoped:=replace(scoped,'WHERE tenant_id=workspace AND id=p_snapshot','WHERE tenant_id=workspace AND variant_id=''default'' AND id=p_snapshot');
   scoped:=replace(scoped,'max(revision),0) INTO head_revision FROM app.editor_draft_snapshots WHERE tenant_id=w;','max(revision),0) INTO head_revision FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id=''default'';');
@@ -31,9 +40,9 @@ CREATE FUNCTION app.translation_source_current(w uuid,s jsonb,source_locale text
 DECLARE result boolean;
 BEGIN
  IF s->>'kind'='base' THEN
-  SELECT EXISTS(SELECT 1 FROM app.editor_draft_snapshots b WHERE b.tenant_id=w AND b.variant_id='default' AND b.id=(s->>'currentId')::uuid AND b.revision=(s->>'revision')::bigint AND b.payload#>>'{content,id}'=s->>'documentId' AND b.reason IN ('save','restore') AND NOT b.payload->'content' ? 'translation' AND encode(app.hash_json(b.payload),'hex')=s->>'fingerprint' AND b.id=(SELECT id FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id='default' ORDER BY revision DESC LIMIT 1)) INTO result;
+  SELECT EXISTS(SELECT 1 FROM app.editor_draft_snapshots b WHERE b.tenant_id=w AND b.variant_id='default' AND b.id=(s->>'currentId')::uuid AND b.revision=(s->>'revision')::bigint AND b.payload#>>'{content,id}'=s->>'documentId' AND b.reason IN ('save','restore') AND coalesce(b.payload#>>'{content,documentLocale}',CASE b.payload#>>'{content,language}' WHEN 'ro' THEN 'ro-RO' WHEN 'en' THEN 'en-GB' END)=source_locale AND NOT b.payload->'content' ? 'translation' AND encode(app.hash_json(b.payload),'hex')=s->>'fingerprint' AND b.id=(SELECT id FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id='default' ORDER BY revision DESC LIMIT 1)) INTO result;
  ELSIF s->>'kind'='job' THEN
-  SELECT EXISTS(SELECT 1 FROM app.job_editor_documents d JOIN app.job_editor_versions v ON v.document_id=d.id WHERE d.tenant_id=w AND d.id=(s->>'documentId')::uuid AND d.job_id=(s->>'jobId')::uuid AND d.document_locale=split_part(source_locale,'-',1) AND d.deleted_at IS NULL AND v.id=(s->>'currentId')::uuid AND v.revision=(s->>'revision')::bigint AND encode(app.hash_json(v.payload),'hex')=s->>'fingerprint' AND NOT v.payload->'content' ? 'translation') INTO result;
+  SELECT EXISTS(SELECT 1 FROM app.job_editor_documents d JOIN app.job_editor_versions v ON v.document_id=d.id WHERE d.tenant_id=w AND d.id=(s->>'documentId')::uuid AND d.job_id=(s->>'jobId')::uuid AND d.document_locale=split_part(source_locale,'-',1) AND coalesce(v.payload#>>'{content,documentLocale}',CASE v.payload#>>'{content,language}' WHEN 'ro' THEN 'ro-RO' WHEN 'en' THEN 'en-GB' END)=source_locale AND d.deleted_at IS NULL AND v.id=(s->>'currentId')::uuid AND v.revision=(s->>'revision')::bigint AND encode(app.hash_json(v.payload),'hex')=s->>'fingerprint' AND NOT v.payload->'content' ? 'translation') INTO result;
  ELSE RETURN false;END IF;
  RETURN coalesce(result,false);
 END $$;
@@ -147,6 +156,7 @@ BEGIN
   END IF;
  END IF;
  IF p.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
+ IF p_action='cancel' AND p.state='accepted' THEN RETURN app.language_proposal_json(p);END IF;
  IF p_action='cancel' THEN UPDATE app.document_language_proposals SET state='cancelled',output=NULL,review=NULL,work_id=NULL WHERE id=p.id AND state<>'accepted' RETURNING * INTO p;RETURN app.language_proposal_json(p);END IF;
  IF p.state IN ('pending','processing','ready') AND NOT app.translation_source_current(w,p.request->'source',p.request->>'sourceLocale') THEN UPDATE app.document_language_proposals SET state='stale',output=NULL,review=NULL,work_id=NULL WHERE id=p.id RETURNING * INTO p;END IF;
  IF p.state='processing' AND p.started_at<now()-interval '3 minutes' THEN UPDATE app.document_language_proposals SET state='unknown',work_id=NULL WHERE id=p.id RETURNING * INTO p;END IF;
@@ -205,3 +215,13 @@ END $$;
 CREATE TRIGGER invalidate_overwritten_job_language_proposals AFTER DELETE ON app.job_editor_versions FOR EACH ROW EXECUTE FUNCTION app.invalidate_job_language_proposals();
 REVOKE EXECUTE ON FUNCTION app.language_proposal_json(app.document_language_proposals),app.language_proposal_command(text,uuid,jsonb,text),app.accept_language_proposal(uuid,uuid,bigint,jsonb,text),app.purge_base_language_proposals(),app.invalidate_job_language_proposals() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION app.language_proposal_command(text,uuid,jsonb,text),app.accept_language_proposal(uuid,uuid,bigint,jsonb,text) TO authenticated;
+-- Default Base remains the sole career source. Parent/restore links cannot cross
+-- language scopes; deletion adds no restrictive FK back to a source archive.
+CREATE FUNCTION app.guard_language_snapshot_scope() RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $$
+BEGIN
+ IF NEW.variant_id='default' AND NEW.payload->'content' ? 'translation' THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
+ IF (NEW.parent_id IS NOT NULL AND EXISTS(SELECT 1 FROM app.editor_draft_snapshots WHERE tenant_id=NEW.tenant_id AND id=NEW.parent_id AND variant_id<>NEW.variant_id)) OR (NEW.restored_from IS NOT NULL AND EXISTS(SELECT 1 FROM app.editor_draft_snapshots WHERE tenant_id=NEW.tenant_id AND id=NEW.restored_from AND variant_id<>NEW.variant_id)) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER guard_language_snapshot_scope BEFORE INSERT ON app.editor_draft_snapshots FOR EACH ROW EXECUTE FUNCTION app.guard_language_snapshot_scope();
+REVOKE EXECUTE ON FUNCTION app.guard_language_snapshot_scope() FROM PUBLIC,anon,authenticated;
