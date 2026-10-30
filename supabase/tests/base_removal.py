@@ -107,6 +107,35 @@ def suite(db):
       if held.poll() is None:
        send('ROLLBACK;\\q');held.wait(timeout=10)
       held.stdin.close();held.stdout.close();held.stderr.close()
+  def test_managed_storage_completion_keeps_owner_reservation_and_removal_fences(self):
+   # Model Storage's caller permission probe followed by service-role metadata
+   # completion. Roles/owner column below exist only in this isolated fixture.
+   db.sql("ALTER TABLE storage.objects ADD COLUMN IF NOT EXISTS owner_id text;DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN BYPASSRLS;END IF;IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='supabase_storage_admin') THEN CREATE ROLE supabase_storage_admin NOLOGIN;END IF;END $$;GRANT service_role TO supabase_storage_admin;GRANT USAGE ON SCHEMA storage TO service_role;GRANT INSERT ON storage.objects TO service_role;")
+   upload=self.call('begin_cv_import',f"'{uid()}','pdf','{'a'*64}',100,1")
+   key=upload['record']['objectKey'];owner=self.w.a
+   insert=lambda path,actor:f"INSERT INTO storage.objects(bucket_id,name,owner_id) VALUES('cv-imports','{path}','{actor}')"
+   db.sql('BEGIN;'+insert(key,owner)+';ROLLBACK;',user=owner,role='authenticated')
+   prefix="SET SESSION AUTHORIZATION supabase_storage_admin;SET ROLE service_role;SELECT set_config('request.jwt.claim.sub','',false);"
+   db.sql('BEGIN;'+prefix+insert(key,owner)+';ROLLBACK;')
+   # A spoofed owner without the actual privileged DB role is never accepted.
+   self.assertIn('AUTHENTICATION_REQUIRED',db.sql(insert(key,owner),role='authenticated',expect_error=True))
+   self.assertIn('RESOURCE_FORBIDDEN',db.sql(prefix+insert(key,self.w.b),expect_error=True))
+   self.assertIn('RESOURCE_FORBIDDEN',db.sql(prefix+insert(key,'not-a-uuid'),expect_error=True))
+   self.assertIn('RESOURCE_FORBIDDEN',db.sql(prefix+insert(key+'-foreign',owner),expect_error=True))
+   db.sql(f"UPDATE app.tenants SET state='deleting' WHERE id='{self.w.wa}'")
+   self.assertIn('RESOURCE_FORBIDDEN',db.sql(prefix+insert(key,owner),expect_error=True))
+   db.sql(f"UPDATE app.tenants SET state='active' WHERE id='{self.w.wa}'")
+   photo=uid();photo_key=f"{self.w.wa}/{photo}.jpg"
+   db.sql(f"INSERT INTO app.photo_assets(id,tenant_id,object_key,state,byte_size,width,height,sha256) VALUES('{photo}','{self.w.wa}','{photo_key}','reserved',100,800,800,repeat('a',64))")
+   photo_insert=f"INSERT INTO storage.objects(bucket_id,name,owner_id) VALUES('cv-photos','{photo_key}','{owner}')"
+   db.sql('BEGIN;'+prefix+photo_insert+';ROLLBACK;')
+   db.sql(f"UPDATE app.cv_import_sessions SET expires_at=now()-interval '1 second' WHERE source_id='{upload['record']['id']}'")
+   self.assertIn('RESOURCE_FORBIDDEN',db.sql(prefix+insert(key,owner),expect_error=True))
+   db.sql(f"UPDATE app.cv_import_sessions SET expires_at=now()+interval '1 hour' WHERE source_id='{upload['record']['id']}'")
+   self.remove()
+   self.assertIn('RESOURCE_FORBIDDEN',db.sql(prefix+insert(key,owner),expect_error=True))
+   self.assertIn('RESOURCE_FORBIDDEN',db.sql(prefix+photo_insert,expect_error=True))
+   self.assertEqual(db.sql("SELECT count(*) FROM storage.objects WHERE bucket_id IN ('cv-imports','cv-photos')"),'0')
   def test_language_variants_proposals_and_provider_dispatch_are_retired(self):
    context=self.call('document_language_context')['source']
    pin={'kind':'base','documentId':self.source['content']['id'],'currentId':context['id'],'revision':context['revision'],'fingerprint':context['fingerprint']}
