@@ -20,20 +20,28 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
   const sourcePayload = encodeDraft(blankDraft());
   const calls = [];
   let databaseFailure = false, authFailure = false;
+  let runtimeUser=user,runtimeToken=token,storageFailure=true,storageMissing=false;
+  const importKey=`${user.id}/${sourceId}/original.pdf`,photoKey=`${user.id}/${sourceId}.jpg`;
+  let cleanupRows=[{bucket:'cv-imports',objectKey:importKey},{bucket:'cv-photos',objectKey:photoKey}];
+  const storageCalls=[];let removeCalls=0;
   const runtime = new Miniflare(convertV4MiniflareOptions({
     modules: [{type:'ESModule',path:'entry.mjs',contents:bundle.outputFiles[0].text},...bundle.wasm], compatibilityDate: '2026-10-25', compatibilityFlags:['nodejs_compat'], host: '127.0.0.1', port: 0, unsafeRegisterWorker: false, bindings: env,
     outboundService: async request => {
       const url = new URL(request.url); assert.equal(url.origin, env.SUPABASE_URL); calls.push(url.pathname);
       if (url.pathname === '/auth/v1/token') return RuntimeResponse.json({ access_token: token, refresh_token: 'runtime-refresh', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user });
       if (url.pathname === '/auth/v1/user' && authFailure) return RuntimeResponse.json({ message: 'synthetic auth failure' }, { status: 429 });
-      if (url.pathname === '/auth/v1/user') { assert.equal(request.headers.get('authorization'), 'Bearer ' + token); return RuntimeResponse.json(user); }
+      if (url.pathname === '/auth/v1/user') { assert.equal(request.headers.get('authorization'), 'Bearer ' + runtimeToken); return RuntimeResponse.json(runtimeUser); }
       if (url.pathname === '/auth/v1/logout') return RuntimeResponse.json({});
       if (url.pathname.startsWith('/rest/v1/rpc/')) {
-        assert.equal(request.headers.get('authorization'), 'Bearer ' + token);
+        assert.equal(request.headers.get('authorization'), 'Bearer ' + runtimeToken);
         assert.equal(request.headers.get('content-profile'), 'app');
         assert.equal(request.headers.get('accept-profile'), 'app');
         assert.equal(request.method, 'POST');
         if (databaseFailure) return RuntimeResponse.json({ message: 'private synthetic diagnostic' }, { status: 500 });
+        if(url.pathname.endsWith('/remove_base_cv')) {removeCalls++;return RuntimeResponse.json({removed:true,generation:1,revision:2,cleanupPending:true});}
+        if(url.pathname.endsWith('/base_removal_objects')) return RuntimeResponse.json(cleanupRows);
+        if(url.pathname.endsWith('/ack_base_removal_object')) {const i=await request.json();cleanupRows=cleanupRows.filter(r=>r.bucket!==i.p_bucket||r.objectKey!==i.p_object_key);return RuntimeResponse.json(null);}
+        if(url.pathname.endsWith('/load_base_state')) return RuntimeResponse.json({snapshot:null,generation:1,revision:2,cleanupPending:cleanupRows.length>0});
         if (url.pathname.endsWith('/load_base_draft')) return RuntimeResponse.json(null);
         if (url.pathname.endsWith('/save_base_draft')) {
           const input = await request.json();
@@ -49,6 +57,11 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
             revision: 1, createdAt: new Date().toISOString(),locale:input.p_locale,fingerprint:'b'.repeat(64),provenance:{},payload:input.p_payload });
         }
         assert.fail('Unexpected RPC');
+      }
+      if(url.pathname.startsWith('/storage/v1/object/')) {
+        assert.equal(request.method,'DELETE');assert.equal(request.headers.get('authorization'),'Bearer '+runtimeToken);
+        const body=await request.json();assert.equal(body.prefixes.length,1);assert.ok([importKey,photoKey].includes(body.prefixes[0]));storageCalls.push({path:url.pathname,key:body.prefixes[0]});
+        return RuntimeResponse.json(storageFailure?{message:'private storage diagnostic'}:{}, {status:storageFailure?503:storageMissing?404:200});
       }
       assert.fail('Unexpected outbound request');
     },
@@ -68,7 +81,9 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
     const cv = (...args) => resource('/v1/base-cv', ...args);
     const jobCv = (...args) => resource('/v1/jobs/22222222-2222-4222-8222-222222222222/cv', ...args);
     for (const path of ['', '/context', '/history', '/save', '/restore', '/delete']) assert.equal((await jobCv(path)).status, 401);
-    assert.equal((await cv()).status, 401); assert.equal(calls.length, 0);
+    assert.equal((await cv()).status, 401);
+    for(const path of ['/remove','/removal-cleanup'])assert.equal((await cv(path,{})).status,401);
+    assert.equal(calls.length, 0);
     const initial = await (await call('/session')).json(); assert.equal(initial.user, null);
     const credentials = { email: user.email, password: 'synthetic-password' };
     assert.equal((await call('/login', credentials)).status, 403); assert.equal(calls.length, 0);
@@ -82,10 +97,12 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
     assert.equal(enabledGate.status,503);assert.equal((await enabledGate.json()).error.code,'photoUnavailable');
     const before = calls.length;
     assert.equal(await (await cv()).json(), null);
-    assert.deepEqual(calls.slice(before), ['/auth/v1/user', '/rest/v1/rpc/load_base_draft']);
+    assert.deepEqual(calls.slice(before), ['/auth/v1/user', '/rest/v1/rpc/load_base_state']);
     const save = { requestId: crypto.randomUUID(), expectedRevision: 0, mode: 'autosave', draft: blankDraft() };
     const rpcCount = () => calls.filter(path => path.startsWith('/rest/')).length;
     const priorRpcs = rpcCount();
+    for(const path of ['/remove','/removal-cleanup'])for(const headers of [{},{'X-CSRF-Token':signed.csrfToken,Origin:'https://evil.invalid'},{'X-CSRF-Token':signed.csrfToken,'X-Resumora-Account':jobId}])
+      assert.equal((await cv(path,{requestId:crypto.randomUUID(),expectedRevision:1,expectedGeneration:0},headers)).status,headers['X-Resumora-Account']?401:403);
     for (const headers of [{}, { 'X-CSRF-Token': signed.csrfToken, Origin: 'https://evil.invalid' }]) assert.equal((await cv('/save', save, headers)).status, 403);
     for (const path of ['/save','/restore','/delete']) {
       for (const headers of [{}, { 'X-CSRF-Token': signed.csrfToken, Origin: 'https://evil.invalid' }])
@@ -145,6 +162,20 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
     const exportBody={kind:'base',versionId:sourceId,revision:1};
     for(const headers of [{},{'X-CSRF-Token':signed.csrfToken,Origin:'https://evil.invalid'},{'X-CSRF-Token':signed.csrfToken,'X-Resumora-Account':jobId}])
       assert.equal((await resource('/v1/exports/pdf','',exportBody,headers)).status,headers['X-Resumora-Account']?401:403);
+    const removalBody={requestId:crypto.randomUUID(),expectedRevision:1,expectedGeneration:0};
+    const removed=await cv('/remove',removalBody,{'X-CSRF-Token':signed.csrfToken});assert.equal(removed.status,200);
+    assert.equal((await removed.json()).cleanupPending,true);assert.equal(removeCalls,1);assert.equal(storageCalls.length,2);
+    assert.equal(cleanupRows.length,2);assert.match(removed.headers.get('cache-control'),/no-store/);
+    const pending=await cv('/removal-cleanup',{}, {'X-CSRF-Token':signed.csrfToken});assert.equal(pending.status,200);assert.equal((await pending.json()).cleanupPending,true);
+    storageFailure=false;storageMissing=true;
+    const cleaned=await cv('/removal-cleanup',{}, {'X-CSRF-Token':signed.csrfToken});assert.equal(cleaned.status,200);assert.equal((await cleaned.json()).cleanupPending,false);
+    assert.equal(cleanupRows.length,0);assert.equal(removeCalls,1);
+    const beforeSwitch=rpcCount(),switchJar=new Map(jar);
+    runtimeUser={...user,id:jobId};runtimeToken='eyJhbGciOiJIUzI1NiJ9.'+Buffer.from(JSON.stringify({sub:jobId,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.synthetic';
+    headers=authHeaders();await saveSession(headers,env,{access_token:runtimeToken,refresh_token:'synthetic-switch',expires_at:Math.floor(Date.now()/1000)+3600,user:runtimeUser},false,signed.csrfToken);accept(new Response(null,{headers}));
+    for(const path of ['/remove','/removal-cleanup'])assert.equal((await cv(path,path==='/remove'?removalBody:{},{'X-CSRF-Token':signed.csrfToken})).status,401);
+    assert.equal(rpcCount(),beforeSwitch);
+    runtimeUser=user;runtimeToken=token;jar.clear();for(const [k,v] of switchJar)jar.set(k,v);
     jar.set('resumora-local-session.0', 'tampered');
     const rejected = await cv(); assert.equal(rejected.status, 401); assert.equal(rejected.headers.getSetCookie().length, 0);
     jar.clear(); for (const [k,v] of originalJar) jar.set(k,v);

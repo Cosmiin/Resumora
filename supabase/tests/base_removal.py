@@ -1,5 +1,5 @@
 """Real synthetic Base purge, canonical preservation and authorization checks."""
-import json,uuid,unittest,importlib.util
+import json,uuid,unittest,importlib.util,subprocess,concurrent.futures,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 uid=lambda:str(uuid.uuid4())
@@ -61,6 +61,50 @@ def suite(db):
    self.call('ack_base_removal_object',f"'cv-imports','{key}'");self.assertFalse(self.call('load_base_state')['cleanupPending'])
    self.assertIn('REQUEST_EXPIRED',self.raw('begin_cv_import',f"'{op}','pdf','{'a'*64}',100,1",error=True))
    self.assertIn('VERSION_CONFLICT',self.raw('begin_cv_import',f"'{uid()}','pdf','{'a'*64}',100,0",error=True))
+  def test_upload_and_remove_serialize_in_both_orders_without_source_resurrection(self):
+   for index,upload_first in enumerate([True,False]):
+    with self.subTest(upload_first=upload_first):
+     if index:self.setUp()
+     admission=self.call('begin_cv_import',f"'{uid()}','pdf','{'a'*64}',100,1")
+     key=admission['record']['objectKey'];tenant=self.w.wa;user=self.w.a
+     held=subprocess.Popen(db.command(),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=db.env)
+     def send(sql):held.stdin.write(sql+'\n');held.stdin.flush()
+     try:
+      send(f"SELECT set_config('request.jwt.claim.sub','{user}',false);BEGIN;SET LOCAL statement_timeout='10s';")
+      send(f"SELECT 1 FROM app.tenants WHERE id='{tenant}' FOR UPDATE;SET LOCAL ROLE authenticated;" if upload_first else f"SET LOCAL ROLE authenticated;SELECT app.remove_base_cv('{uid()}',1,0);")
+      send("SELECT 'held_ready';")
+      while True:
+       line=held.stdout.readline()
+       if not line:raise AssertionError(held.stderr.read())
+       if line.strip()=='held_ready':break
+      with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+       if upload_first:
+        blocked=pool.submit(db.sql,f"SET application_name='synthetic_remove_wait';SELECT app.remove_base_cv('{uid()}',1,0)",user=user,role='authenticated')
+       else:
+        blocked=pool.submit(db.sql,f"SET application_name='synthetic_upload_wait';INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{key}')",user=user,role='authenticated',expect_error=True)
+       name='synthetic_remove_wait' if upload_first else 'synthetic_upload_wait'
+       deadline=time.monotonic()+3
+       while db.sql(f"SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name='{name}' AND wait_event_type='Lock')")!='t':
+        if time.monotonic()>deadline:raise AssertionError('Expected tenant lock interleaving was not observed')
+        time.sleep(.02)
+       if upload_first:send(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{key}');")
+       send("COMMIT;\\q")
+       held.wait(timeout=10)
+       outcome=blocked.result(timeout=10)
+       if upload_first:
+        self.assertTrue(json.loads(outcome)['cleanupPending'])
+        self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE name='{key}'"),'1')
+       else:
+        self.assertIn('RESOURCE_FORBIDDEN',outcome)
+        self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE name='{key}'"),'0')
+      self.assertEqual(self.count('source_documents'),'0')
+      self.assertFalse(self.call('can_access_cv_import_object',f"'{key}',true"))
+      self.assertFalse(self.call('can_access_cv_import_object',f"'{key}',false"))
+      self.assertIsNone(self.call('load_base_draft'))
+     finally:
+      if held.poll() is None:
+       send('ROLLBACK;\\q');held.wait(timeout=10)
+      held.stdin.close();held.stdout.close();held.stderr.close()
   def test_language_variants_proposals_and_provider_dispatch_are_retired(self):
    context=self.call('document_language_context')['source']
    pin={'kind':'base','documentId':self.source['content']['id'],'currentId':context['id'],'revision':context['revision'],'fingerprint':context['fingerprint']}

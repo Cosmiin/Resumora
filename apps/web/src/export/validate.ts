@@ -1,4 +1,4 @@
-import { getDocument } from "pdfjs-dist";
+import { getDocument } from "pdfjs-dist-export";
 export type PdfExpectation = {
   text: string;
   links: string[];

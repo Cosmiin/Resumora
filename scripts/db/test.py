@@ -94,7 +94,10 @@ class Database:
     def migrate(self, through='P4'):
         applied = 0
         for path in sorted((ROOT / 'supabase/migrations').glob('*.sql')):
-            phase = 'P3' if path.name == '20261028050000_p6_templates.sql' else path.name.split('_')[1].upper()
+            # These forward artifacts retain their owning lane name but depend
+            # on later shared schema. Do not preload removal before P7/P8.
+            phase = {'20261028050000_p6_templates.sql': 'P3',
+                     '20261030030000_p1_remove_base.sql': 'P8'}.get(path.name, path.name.split('_')[1].upper())
             if phase > through:
                 continue
             version = path.name.split('_')[0]

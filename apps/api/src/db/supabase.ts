@@ -342,7 +342,7 @@ export function createDatabaseGateway(
         else {
           if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(row.objectKey)) throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
           const response = await photoStorage("object/cv-photos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [row.objectKey] }) });
-          if (!response.ok) { await response.body?.cancel(); throw new DatabaseError(503, "DATABASE_UNAVAILABLE"); }
+          if (!response.ok && response.status !== 404) { await response.body?.cancel(); throw new DatabaseError(503, "DATABASE_UNAVAILABLE"); }
           await response.body?.cancel();
         }
         await rpc("ack_base_removal_object", { p_bucket: row.bucket, p_object_key: row.objectKey });

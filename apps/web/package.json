@@ -19,6 +19,7 @@
     "@tesseract.js-data/ron": "1.0.0",
     "lucide-react": "1.61.0",
     "pdfjs-dist": "5.4.624",
+    "pdfjs-dist-export": "npm:pdfjs-dist@6.4.299",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "tesseract.js": "6.0.1",
