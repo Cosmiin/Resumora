@@ -68,8 +68,22 @@ export function ImportDocument({
       active = false;
     };
   }, [client]);
+  const unresolved = status && ["uploading", "uploaded", "processing", "unknown"].includes(status.state);
+  function statusMessage(value: ImportStatus) {
+    if (value.error === "STORAGE_OUTCOME_UNKNOWN") return t("Nu putem confirma salvarea fișierului. Procesarea AI nu a început. Păstrăm aceeași operațiune; verifică starea înainte de o nouă încărcare.", "We cannot confirm that the file was saved. AI processing has not started. The same operation is kept; check its status before another upload.");
+    if (value.state === "unknown") return t(
+      "Nu putem confirma rezultatul acestei încărcări. Fișierul ales și operațiunea sunt păstrate. Verifică operațiunea; nu încărca din nou cât timp rezultatul este necunoscut.",
+      "We cannot confirm this upload's outcome. Your selected file and operation are kept. Check this operation; do not upload it again while the outcome is unknown.");
+    if (value.state === "cancelled") return t("Import anulat. Poți alege un document pentru o operațiune nouă.", "Import cancelled. You can choose a document for a new operation.");
+    if (value.state === "not_cv") return t("Documentul nu a fost identificat ca CV. Alege un CV sau continuă manual.", "This document was not identified as a CV. Choose a CV or continue manually.");
+    if (value.state === "uncertain") return t("Nu am putut identifica sigur documentul ca CV. Verifică documentul sau continuă manual.", "We could not confidently identify this document as a CV. Check the document or continue manually.");
+    if (value.state === "disabled" || ["AI_DISABLED", "AI_UNCONFIGURED"].includes(value.error ?? "")) return t("Procesarea AI este dezactivată sau neconfigurată. Poți continua manual; nu este necesară o nouă încărcare pentru a verifica starea.", "AI processing is off or unconfigured. You can continue manually; another upload is not needed to check its status.");
+    if (["STORAGE_UPLOAD_REJECTED", "STORAGE_UNAVAILABLE"].includes(value.error ?? "")) return t("Fișierul nu a putut fi salvat pentru import. Procesarea AI nu a început. Verifică operațiunea înainte de o nouă încercare.", "The file could not be saved for import. AI processing did not start. Check the operation before another attempt.");
+    if ((value.error ?? "").startsWith("DOCUMENT_") || value.error === "ACTIVE_DOCUMENT_CONTENT") return t("Acest document nu poate fi procesat în siguranță sau depășește limitele afișate. Alege un document acceptat sau continuă manual.", "This document cannot be processed safely or exceeds the displayed limits. Choose a supported document or continue manually.");
+    return t("Procesarea acestui import nu s-a încheiat cu un rezultat utilizabil. Verifică operațiunea sau continuă manual; nu relansăm automat cereri AI.", "This import did not produce a usable result. Check the operation or continue manually; we do not rerun AI requests automatically.");
+  }
   function select(files: FileList | null) {
-    if (busy) return;
+    if (busy || unresolved) return;
     if (!files || files.length !== 1) {
       setError(t("Alege un singur document.", "Choose one document."));
       return;
@@ -117,19 +131,12 @@ export function ImportDocument({
           );
       if (active()) setStatus(result);
     } catch (error) {
-      if (active())
-        setError(
-          error instanceof IntelligenceRequestError &&
-            ["AI_DISABLED", "AI_UNCONFIGURED"].includes(error.code)
-            ? t(
-                "Procesarea AI este dezactivată sau neconfigurată. Documentul nu a fost salvat prin import. Poți continua manual.",
-                "AI processing is off or unconfigured. The import did not save this document. Continue manually.",
-              )
-            : t(
-                "Rezultatul este necunoscut. Verifică operațiunea înainte de o nouă încărcare; nu relansăm automat.",
-                "Outcome unknown. Check the existing operation before a new upload; no automatic rerun.",
-              ),
-        );
+      if (active()) {
+        const code = error instanceof IntelligenceRequestError ? error.code : "REQUEST_OUTCOME_UNKNOWN";
+        const definite = ["AI_DISABLED", "AI_UNCONFIGURED", "DOCUMENT_TYPE", "DOCUMENT_SIZE", "DOCUMENT_PAGES", "DOCUMENT_ENCRYPTED", "DOCUMENT_MALFORMED", "ACTIVE_DOCUMENT_CONTENT"].includes(code);
+        setStatus({ id: operationId, state: definite ? "failed" : "unknown", error: code });
+        setError("");
+      }
     } finally {
       if (active()) setBusy(false);
     }
@@ -157,6 +164,7 @@ export function ImportDocument({
           {recent.map((row) => (
             <Button
               key={row.id}
+              disabled={!!unresolved || busy}
               onClick={async () => {
                 request.current?.abort();
                 const controller = new AbortController();
@@ -213,7 +221,7 @@ export function ImportDocument({
             aria-label={t("Document CV", "CV document")}
             type="file"
             accept=".pdf,.docx,.doc"
-            disabled={busy}
+            disabled={busy || !!unresolved}
             onChange={(e) => {
               select(e.target.files);
               e.target.value = "";
@@ -288,8 +296,8 @@ export function ImportDocument({
           <span className="import-spinner" aria-hidden="true" />
           <span>
             {t(
-              "Pregătim CV-ul pentru verificare…",
-              "Preparing your CV for review…",
+              status?.state === "processing" ? "Procesăm CV-ul. Păstrăm aceeași operațiune; poți verifica starea." : status?.state === "uploaded" ? "Fișier salvat. Pregătim procesarea CV-ului…" : "Încărcăm documentul și verificăm salvarea…",
+              status?.state === "processing" ? "Processing your CV. The same operation is kept; you can check its status." : status?.state === "uploaded" ? "File saved. Preparing CV processing…" : "Uploading the document and confirming storage…",
             )}
           </span>
         </div>
@@ -304,18 +312,10 @@ export function ImportDocument({
           "cancelled",
         ].includes(status.state) && (
           <p role="status">
-            {status.state === "cancelled"
-              ? t(
-                  "Import anulat. Alege un document pentru a continua.",
-                  "Import cancelled. Choose a document to continue.",
-                )
-              : t(
-                  "Importul nu este gata. Verifică operațiunea sau alege din nou documentul. Poți continua și manual.",
-                  "Import is not ready. Check the operation or choose the document again. You can also continue manually.",
-                )}
-            {status.error ? ` · ${status.error}` : ""}
+            {statusMessage(status)}
           </p>
         )}
+      {status?.error && <details className="small"><summary>{t("Detalii de diagnostic", "Diagnostic details")}</summary><code>{status.error}</code></details>}
       {error && <p role="alert">{error}</p>}
     </section>
   );

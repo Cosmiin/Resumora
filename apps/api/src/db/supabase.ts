@@ -303,7 +303,8 @@ export function createDatabaseGateway(
       : objectKey.endsWith(".doc")
         ? "application/msword"
         : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    const response = await transport(
+    let response: Response;
+    try { response = await transport(
       bytes
         ? `${origin}/storage/v1/object/cv-imports/${objectKey}`
         : `${origin}/storage/v1/object/cv-imports`,
@@ -321,17 +322,30 @@ export function createDatabaseGateway(
           ? (bytes as Uint8Array<ArrayBuffer>)
           : JSON.stringify({ prefixes: [objectKey] }),
       },
-    );
+    ); } catch {
+      if (bytes) console.warn("import-storage", { phase: "upload", httpStatus: null, code: "STORAGE_OUTCOME_UNKNOWN" });
+      throw new DatabaseError(503, bytes ? "STORAGE_OUTCOME_UNKNOWN" : "STORAGE_UNAVAILABLE");
+    }
     if (!bytes && response.status === 404) {
       await response.body?.cancel();
       return;
     }
-    await boundedJson(response, 65536);
-    if (!response.ok)
-      throw new DatabaseError(
-        response.status === 403 ? 403 : 503,
-        "STORAGE_UNAVAILABLE",
-      );
+    if (bytes && !response.ok) {
+      const value = await boundedJson(response, 65536).catch(() => null);
+      const diagnosticCodes = new Set(["AccessDenied", "InvalidJWT", "InvalidSignature", "InvalidRequest", "NoSuchBucket", "EntityTooLarge", "DatabaseError", "InternalError", "InternalServerError", "InvalidMimeType", "KeyAlreadyExists", "ResourceNotFound"]);
+      const diagnostic = record(value) && typeof value.code === "string" && diagnosticCodes.has(value.code) ? value.code : "UNCLASSIFIED_STORAGE_ERROR";
+      const knownReasons = ["AUTHENTICATION_REQUIRED", "RESOURCE_FORBIDDEN", "VERSION_CONFLICT", "permission denied", "row-level security", "lock timeout", "deadlock detected"];
+      const description = record(value) ? [value.message, value.error].filter(v => typeof v === "string").join(" ") : "";
+      const reason = knownReasons.find(code => description.includes(code)) ?? "UNCLASSIFIED";
+      console.warn("import-storage", { phase: "upload", httpStatus: response.status, code: diagnostic, reason });
+      const definite = response.status >= 400 && response.status < 500;
+      throw new DatabaseError(definite ? response.status : 503, definite ? "STORAGE_UPLOAD_REJECTED" : "STORAGE_OUTCOME_UNKNOWN");
+    }
+    try { await boundedJson(response, 65536); } catch {
+      if (bytes) console.warn("import-storage", { phase: "upload", httpStatus: response.status, code: "STORAGE_ACK_UNKNOWN" });
+      throw new DatabaseError(503, bytes ? "STORAGE_OUTCOME_UNKNOWN" : "STORAGE_UNAVAILABLE");
+    }
+    if (!response.ok) throw new DatabaseError(response.status === 403 ? 403 : 503, "STORAGE_UNAVAILABLE");
   }
   const loadBaseState = () => rpc<BaseLifecycle & { snapshot: DraftSnapshot | null }>("load_base_state", {});
   const cleanupBaseSources = async (): Promise<BaseLifecycle> => {

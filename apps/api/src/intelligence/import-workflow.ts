@@ -71,6 +71,7 @@ const publicRecord = (r: ImportRecord) => ({
   ...(r.error ? { error: r.error } : {}),
 });
 const safe = new Set([
+  "STORAGE_UPLOAD_REJECTED",
   "WORD_CONVERTER_UNAVAILABLE",
   "PROCESSOR_UNAVAILABLE",
   "PROCESSOR_TIMEOUT",
@@ -128,9 +129,11 @@ export function importWorkflow(options: {
       });
       if (!begun.created)
         return publicRecord(await store.get(input.operationId)); // NEVER redispatch on HTTP retry.
+      let phase: "upload" | "preflight" | "processing" = "upload";
       try {
         await store.putObject(begun.record.objectKey, input.bytes);
         await store.complete(input.operationId, "uploaded", null, null);
+        phase = "preflight";
         const doc = validatePages(
           await options.processor({
             format,
@@ -155,6 +158,7 @@ export function importWorkflow(options: {
             ),
           );
         await store.complete(input.operationId, "processing", null, null);
+        phase = "processing";
         const result = await options.operations.extract({
           operationId: input.operationId,
           userId: options.userId,
@@ -191,7 +195,8 @@ export function importWorkflow(options: {
         // Cancellation is fenced in storage first. Completion cannot overwrite a cancellation/deletion.
         const current = await store.get(input.operationId);
         if (current.state === "cancelled") return publicRecord(current);
-        const safeCode = safe.has(code) ? code : "PROCESSING_OUTCOME_UNKNOWN";
+        const safeCode = safe.has(code) ? code : phase === "upload" ? "STORAGE_OUTCOME_UNKNOWN" : "PROCESSING_OUTCOME_UNKNOWN";
+        console.warn("cv-import-outcome", { phase, state: safe.has(code) ? "failed" : "unknown", code: safeCode });
         return publicRecord(
           await store.complete(
             input.operationId,
