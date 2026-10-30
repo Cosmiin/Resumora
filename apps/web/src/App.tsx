@@ -1,3 +1,6 @@
+import { LanguageVersions } from "./languages/LanguageVersions";
+import { HttpLanguageCvAdapter } from "./languages/adapter";
+import { AppearanceExport } from "./export/AppearanceExport";
 import { HttpJobCvAdapter } from "./base/job-adapter";
 import {
   confirmImported,
@@ -67,22 +70,53 @@ export function App({
   intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
+  const [uiLocale, setUiLocale] = useState<Locale>("ro");
+  const [language, setLanguage] = useState<HttpLanguageCvAdapter | null>(null);
   const [job, setJob] = useState<{
     id: string;
     label: string;
     adapter: HttpJobCvAdapter;
   } | null>(null);
-  const active = job?.adapter ?? adapter;
+  const active = job?.adapter ?? language ?? adapter;
   if (!adapterKeys.has(active)) adapterKeys.set(active, ++nextAdapterKey);
   if (!adapterKeys.has(adapter)) adapterKeys.set(adapter, ++nextAdapterKey);
   return (
     <CvEditor
       key={adapterKeys.get(active)}
       adapter={active}
+      uiLocale={uiLocale}
+      onUiLocaleChange={setUiLocale}
+      switchLanguage={
+        transport
+          ? (value) => {
+              if (job) {
+                setJob({
+                  ...job,
+                  adapter: new HttpJobCvAdapter(
+                    transport,
+                    job.id,
+                    value.locale.split("-")[0] as Locale,
+                  ),
+                });
+              } else
+                setLanguage(
+                  value.variantId
+                    ? new HttpLanguageCvAdapter(
+                        transport,
+                        value.variantId,
+                        value.locale,
+                      )
+                    : null,
+                );
+              window.location.hash = "base";
+            }
+          : undefined
+      }
       jobLabel={job?.label}
       switchDocument={
         transport
           ? (selected) => {
+              setLanguage(null);
               setJob(
                 selected
                   ? {
@@ -100,11 +134,14 @@ export function App({
           : undefined
       }
       transport={transport}
-      intelligence={job ? undefined : intelligence}
+      intelligence={job || language ? undefined : intelligence}
     />
   );
 }
 function CvEditor({
+  uiLocale,
+  onUiLocaleChange,
+  switchLanguage,
   jobLabel,
   switchDocument,
   adapter,
@@ -112,6 +149,9 @@ function CvEditor({
   transport,
 }: {
   adapter: BaseCvAdapter;
+  uiLocale: Locale;
+  onUiLocaleChange: (locale: Locale) => void;
+  switchLanguage?: (value: { locale: string; variantId?: string }) => void;
   jobLabel?: string;
   switchDocument?: (
     job: { id: string; label: string; locale?: "ro" | "en" } | null,
@@ -120,11 +160,14 @@ function CvEditor({
   transport?: AuthTransport;
 }) {
   const jobMode = adapter instanceof HttpJobCvAdapter;
+  const languageMode = adapter instanceof HttpLanguageCvAdapter;
+  const representationMode = jobMode || languageMode;
   const durable = adapter.capability === "durable";
-  const [locale, setLocale] = useState<Locale>("ro"),
+  const locale = uiLocale,
+    setLocale = onUiLocaleChange,
     t = (ro: string, en: string) => (locale === "ro" ? ro : en);
   const [route, setRoute] = useState<Route>(() =>
-      jobMode ? "base" : currentRoute(),
+      representationMode ? "base" : currentRoute(),
     ),
     [draft, setDraft] = useState<BaseDraft | null>(null),
     [head, setHead] = useState<Snapshot | null | undefined>(undefined);
@@ -205,7 +248,12 @@ function CvEditor({
   useEffect(() => {
     const change = () => {
       const next = currentRoute();
-      setRoute(jobMode && next !== "base" ? "base" : next);
+      setRoute(
+        (jobMode && next !== "base") ||
+          (languageMode && !["base", "history"].includes(next))
+          ? "base"
+          : next,
+      );
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
@@ -226,7 +274,9 @@ function CvEditor({
         if (!cancelled) {
           setHead(s);
           if (s && !latest.current)
-            setDraft(jobMode ? clone(s.draft) : prepareDraft(s.draft));
+            setDraft(
+              representationMode ? clone(s.draft) : prepareDraft(s.draft),
+            );
           if (!s && jobMode && !latest.current)
             setDraft(adapter.initialDraft());
           setLoading(false);
@@ -318,7 +368,7 @@ function CvEditor({
   function openDraft(next: BaseDraft) {
     if (removalBlocked) return;
     generation.current++;
-    const ready = jobMode ? clone(next) : prepareDraft(next);
+    const ready = representationMode ? clone(next) : prepareDraft(next);
     latest.current = ready;
     setDraft(ready);
     setPast([]);
@@ -341,7 +391,7 @@ function CvEditor({
       pendingWrite.current
     )
       return;
-    if (mode === "checkpoint" && !jobMode) {
+    if (mode === "checkpoint" && !representationMode) {
       const found = validateDraft(current);
       setIssues(found);
       if (found.length) {
@@ -769,7 +819,7 @@ function CvEditor({
               {t("CV", "CV")}
               <select
                 aria-label={t("Limba CV-ului", "CV language")}
-                disabled={jobMode}
+                disabled={representationMode}
                 value={draft.language}
                 onChange={(e) =>
                   change({
@@ -790,7 +840,12 @@ function CvEditor({
           <nav aria-label={t("Navigare principală", "Main navigation")}>
             <a href="/extension">{t("Extensie Chrome", "Chrome extension")}</a>
             {nav
-              .filter((n) => !jobMode || n.route === "base")
+              .filter(
+                (n) =>
+                  !representationMode ||
+                  n.route === "base" ||
+                  (languageMode && n.route === "history"),
+              )
               .map((n) => (
                 <a
                   key={n.route}
@@ -809,6 +864,22 @@ function CvEditor({
           tabIndex={-1}
           className={editing ? "editing-page" : ""}
         >
+          {languageMode && (
+            <section className="notice">
+              <p>
+                {t(
+                  "Versiune de limbă independentă. CV-ul de bază sursă rămâne neschimbat.",
+                  "Independent language copy. The source Base CV remains unchanged.",
+                )}
+              </p>
+              <Button
+                disabled={dirty || busy || !!pendingWrite.current}
+                onClick={() => switchLanguage?.({ locale: "" })}
+              >
+                {t("Înapoi la CV-ul de bază", "Return to Base CV")}
+              </Button>
+            </section>
+          )}
           {jobMode && (
             <section className="notice" aria-label="Job CV context">
               <strong>
@@ -854,7 +925,7 @@ function CvEditor({
             </h1>
             {editing && (
               <div className="actions">
-                {!jobMode && route === "base" && adapter.remove && (
+                {!representationMode && route === "base" && adapter.remove && (
                   <Button
                     disabled={busy || loading || !!pendingWrite.current}
                     onClick={() => setDialog({ kind: "remove" })}
@@ -868,7 +939,7 @@ function CvEditor({
                     {t("Istoric", "History")}
                   </Button>
                 )}
-                {!jobMode && (
+                {!representationMode && (
                   <Button
                     onClick={() => go(route === "enrich" ? "base" : "enrich")}
                   >
@@ -1003,7 +1074,7 @@ function CvEditor({
                       {issueText(issues[0].code, t)}
                     </p>
                   )}
-                  {!jobMode && draft.importReview && (
+                  {!representationMode && draft.importReview && (
                     <ImportReview
                       key={draft.importReview.id}
                       draft={draft}
@@ -1019,7 +1090,7 @@ function CvEditor({
                       }}
                     />
                   )}
-                  {(jobMode ||
+                  {(representationMode ||
                     !draft.importReview ||
                     !pendingImportedCandidates(draft).length) && (
                     <div className="editor-layout">
@@ -1045,27 +1116,78 @@ function CvEditor({
                           />
                         )}
                       </div>
-                      <DocumentPreview
-                        livePreview
-                        draft={draft}
-                        asOf={asOf}
-                        onTemplateChange={(versionId) =>
-                          change(chooseTemplate(draft, versionId))
-                        }
-                        onEdit={
-                          jobMode
-                            ? undefined
-                            : (id) => {
-                                go("base");
-                                focusField(id);
-                              }
-                        }
-                      />
+                      <div>
+                        {transport && switchLanguage && head && (
+                          <LanguageVersions
+                            transport={transport}
+                            jobId={jobMode ? adapter.jobId : undefined}
+                            currentLocale={
+                              draft.documentLocale ??
+                              (draft.language === "ro" ? "ro-RO" : "en-GB")
+                            }
+                            ready={
+                              !dirty && !busy && !error && !pendingWrite.current
+                            }
+                            revisionKey={`${head.id}:${head.revision}`}
+                            open={switchLanguage}
+                          />
+                        )}
+                        <AppearanceExport
+                          draft={draft}
+                          snapshot={head ?? null}
+                          ready={
+                            !dirty && !busy && !error && !pendingWrite.current
+                          }
+                          transport={transport}
+                          change={change}
+                          asOf={asOf}
+                          pin={
+                            head
+                              ? jobMode
+                                ? adapter.exportDocumentId()
+                                  ? {
+                                      kind: "job",
+                                      jobId: adapter.jobId,
+                                      documentId: adapter.exportDocumentId()!,
+                                      locale: head.draft.language,
+                                      fingerprint: adapter.exportFingerprint(),
+                                      versionId: head.id,
+                                      revision: head.revision,
+                                    }
+                                  : null
+                                : {
+                                    kind: "base",
+                                    ...(languageMode
+                                      ? { variantId: adapter.variantId }
+                                      : {}),
+                                    versionId: head.id,
+                                    revision: head.revision,
+                                  }
+                              : null
+                          }
+                        />
+                        <DocumentPreview
+                          livePreview
+                          draft={draft}
+                          asOf={asOf}
+                          onTemplateChange={(versionId) =>
+                            change(chooseTemplate(draft, versionId))
+                          }
+                          onEdit={
+                            jobMode
+                              ? undefined
+                              : (id) => {
+                                  go("base");
+                                  focusField(id);
+                                }
+                          }
+                        />
+                      </div>
                     </div>
                   )}
                 </>
               )}
-              {draft && !jobMode && route === "enrich" && (
+              {draft && !representationMode && route === "enrich" && (
                 <Enrichment
                   transport={transport}
                   snapshot={head ?? null}
@@ -1137,7 +1259,7 @@ function CvEditor({
                   asOf={asOf}
                 />
               )}
-              {!jobMode && route === "jobs" && (
+              {!representationMode && route === "jobs" && (
                 <JobsScreen
                   transport={transport}
                   snapshot={head ?? null}
@@ -1187,7 +1309,7 @@ function CvEditor({
                               "Ciornă salvată în sesiune",
                               "Draft saved in session",
                             )}
-                  {!jobMode && head ? ` · v${head.revision}` : ""}
+                  {head && !jobMode ? ` · v${head.revision}` : ""}
                 </p>
                 <small>
                   {durable

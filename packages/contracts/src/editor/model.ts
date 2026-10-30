@@ -1,3 +1,4 @@
+import type { TranslationLineage } from "./languages.ts";
 import type { CvPhoto } from "./photo.ts";
 import type {
   ImportReview,
@@ -143,6 +144,9 @@ export type BaseDraft = {
   questionPlans?: QuestionPlan[];
   roleRewriteReviews?: RoleRewriteReview[];
   language: Locale;
+  documentLocale?: string;
+  sourceLocale?: string;
+  translation?: TranslationLineage;
   name: Fact<string>;
   nameParts?: { first: string; last: string };
   titles: [Fact<string>, Fact<string>];

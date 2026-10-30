@@ -2115,3 +2115,17 @@ textarea.native {
   outline: 2px solid var(--border-selected);
   border-radius: 0.15rem;
 }
+
+.export-panel { display:grid; gap:16px; padding:20px; border:1px solid var(--border-subtle); border-radius:var(--radius-lg); background:var(--surface-page); margin:16px 0; min-width:0; }
+.export-panel .actions { flex-wrap:wrap; }
+.export-document { overflow:auto; max-height:70vh; }
+.export-pdf { width:100%; height:75vh; border:1px solid var(--border-subtle); }
+.export-panel input:not([type="checkbox"]) { width:100%; }
+
+.language-versions,.translation-review { display:grid;gap:16px;min-width:0;margin:16px 0;padding:16px;border:1px solid var(--border-subtle);border-radius:var(--radius-lg);background:var(--surface-page); }
+.language-versions select,.translation-review textarea { width:100%;min-width:0; }
+.translation-item { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:16px 0;border-bottom:1px solid var(--border-subtle); }
+.translation-item p { white-space:pre-wrap;overflow-wrap:anywhere; }
+.translation-item textarea { min-height:120px;resize:vertical; }
+.translation-item [role="note"] { grid-column:1 / -1;font-size:.85rem;color:var(--text-muted); }
+@media(max-width:600px) { .translation-item { grid-template-columns:minmax(0,1fr); } .translation-review { padding:12px; } }

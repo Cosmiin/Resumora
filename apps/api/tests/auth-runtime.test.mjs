@@ -3,6 +3,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { bundleWorker as build } from './bundle-worker.mjs';
 import { encodeDraft } from '@resumora/contracts/editor/transport';
+import { selfContainedJobDraft } from '@resumora/contracts/jobs/current-document';
 import { blankDraft } from '@resumora/contracts/editor/model';
 import { saveSession, authHeaders } from '../src/auth/session.ts';
 import { readCookie, writeCookie } from '../src/auth/cookies.ts';
@@ -20,7 +21,7 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
   const calls = [];
   let databaseFailure = false, authFailure = false;
   const runtime = new Miniflare(convertV4MiniflareOptions({
-    modules: [{type:'ESModule',path:'entry.mjs',contents:bundle.outputFiles[0].text},...bundle.wasm], compatibilityDate: '2026-10-25', host: '127.0.0.1', port: 0, unsafeRegisterWorker: false, bindings: env,
+    modules: [{type:'ESModule',path:'entry.mjs',contents:bundle.outputFiles[0].text},...bundle.wasm], compatibilityDate: '2026-10-25', compatibilityFlags:['nodejs_compat'], host: '127.0.0.1', port: 0, unsafeRegisterWorker: false, bindings: env,
     outboundService: async request => {
       const url = new URL(request.url); assert.equal(url.origin, env.SUPABASE_URL); calls.push(url.pathname);
       if (url.pathname === '/auth/v1/token') return RuntimeResponse.json({ access_token: token, refresh_token: 'runtime-refresh', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user });
@@ -40,12 +41,12 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
         }
         if (url.pathname.endsWith('/job_editor_context')) return RuntimeResponse.json({ job: jobPin, source: { snapshotId: sourceId, revision: 1 } });
         if (url.pathname.endsWith('/load_editor_snapshot')) return RuntimeResponse.json({ id: sourceId, parentId: null, revision: 1, createdAt: new Date().toISOString(), reason: 'save', payload: sourcePayload });
-        if (url.pathname.endsWith('/save_job_editor')) {
+        if (url.pathname.endsWith('/save_current_job_document')) {
           const input = await request.json();
-          assert.equal(input.p_job, jobId);
+          assert.equal(input.p_job, jobId);assert.equal(input.p_base_snapshot,sourceId);
           assert.equal('userId' in input, false);
-          return RuntimeResponse.json({ id: crypto.randomUUID(), documentId: crypto.randomUUID(), parentId: null,
-            revision: 1, createdAt: new Date().toISOString(), reason: 'save', payload: input.p_payload, sourcePayload });
+          return RuntimeResponse.json({ id: crypto.randomUUID(), documentId: crypto.randomUUID(),
+            revision: 1, createdAt: new Date().toISOString(),locale:input.p_locale,fingerprint:'b'.repeat(64),provenance:{},payload:input.p_payload });
         }
         assert.fail('Unexpected RPC');
       }
@@ -135,12 +136,15 @@ test('native composed Worker enforces identity/CSRF/recovery and confines cookie
     const context = await jobCv('/context'); assert.equal(context.status, 200);
     assert.deepEqual((await context.json()).job, jobPin);
     const beforeJobSave = calls.length;
-    const jobSaved = await jobCv('/save', { requestId: crypto.randomUUID(), documentId: null, expectedRevision: 0,
-      payload: { schemaVersion: 'resumora-job-editor/1', acceptance: 'accepted', source: { snapshotId: sourceId, revision: 1 },
-        job: jobPin, selectedFacts: [], selectedAnswerIds: [], wording: [], presentation: {}, localAdditions: [] } }, { 'X-CSRF-Token': signed.csrfToken });
-    assert.equal(jobSaved.status, 200);
-    assert.deepEqual((await jobSaved.json()).draft, { ...sourcePayload.content, answers: sourcePayload.answers });
-    assert.deepEqual(calls.slice(beforeJobSave), ['/auth/v1/user','/rest/v1/rpc/load_editor_snapshot','/rest/v1/rpc/save_job_editor']);
+    const document=selfContainedJobDraft({...sourcePayload.content,answers:sourcePayload.answers});
+    const jobSaved = await jobCv('/save', {requestId:crypto.randomUUID(),documentId:null,expectedRevision:0,
+      locale:document.language,baseSnapshotId:sourceId,draft:document},{'X-CSRF-Token':signed.csrfToken});
+    assert.equal(jobSaved.status,200);
+    assert.deepEqual((await jobSaved.json()).draft,document);
+    assert.deepEqual(calls.slice(beforeJobSave),['/auth/v1/user','/rest/v1/rpc/save_current_job_document']);
+    const exportBody={kind:'base',versionId:sourceId,revision:1};
+    for(const headers of [{},{'X-CSRF-Token':signed.csrfToken,Origin:'https://evil.invalid'},{'X-CSRF-Token':signed.csrfToken,'X-Resumora-Account':jobId}])
+      assert.equal((await resource('/v1/exports/pdf','',exportBody,headers)).status,headers['X-Resumora-Account']?401:403);
     jar.set('resumora-local-session.0', 'tampered');
     const rejected = await cv(); assert.equal(rejected.status, 401); assert.equal(rejected.headers.getSetCookie().length, 0);
     jar.clear(); for (const [k,v] of originalJar) jar.set(k,v);
