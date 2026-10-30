@@ -27,7 +27,20 @@ export type DraftSnapshot = {
   reason: "save" | "autosave" | "restore";
   payload: EditorWireEnvelope;
 };
+export type BaseLifecycle = {
+  generation: number;
+  revision: number;
+  cleanupPending: boolean;
+};
+export type BaseRemoval = BaseLifecycle & { removed: true };
 export interface CvDraftGateway {
+  loadBaseState?(): Promise<BaseLifecycle & { snapshot: DraftSnapshot | null }>;
+  retryBaseCleanup?(): Promise<BaseLifecycle>;
+  removeBase?(input: {
+    requestId: string;
+    expectedRevision: number;
+    expectedGeneration: number;
+  }): Promise<BaseRemoval>;
   loadDraft(): Promise<DraftSnapshot | null>;
   draftHistory(input?: {
     beforeRevision?: number;

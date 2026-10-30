@@ -1,5 +1,9 @@
 import { clone, equalValues, localId, type BaseDraft } from "./model";
 import { validateDraft, type Issue } from "./validation";
+import type {
+  BaseLifecycle,
+  BaseRemoval,
+} from "@resumora/contracts/editor/transport";
 export type Snapshot = {
   id: string;
   revision: number;
@@ -19,7 +23,8 @@ export class AdapterError extends Error {
       | "rejected"
       | "unauthenticated"
       | "forbidden"
-      | "expired",
+      | "expired"
+      | "preservationRequired",
     public issues: Issue[] = [],
   ) {
     super(code);
@@ -27,6 +32,13 @@ export class AdapterError extends Error {
 }
 export interface BaseCvAdapter {
   readonly capability: "session-memory" | "durable";
+  lifecycle?(): BaseLifecycle;
+  cleanup?(): Promise<BaseLifecycle>;
+  remove?(input: {
+    requestId: string;
+    expectedRevision: number;
+    expectedGeneration: number;
+  }): Promise<BaseRemoval>;
   load(): Promise<Snapshot | null>;
   history(): Promise<Snapshot[]>;
   save(input: {
@@ -47,6 +59,45 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
   readonly capability = "session-memory" as const;
   private versions: Snapshot[] = [];
   private requests = new Map<string, { body: string; snapshot: Snapshot }>();
+  private epoch = 0;
+  private revisionFloor = 0;
+  private removals = new Map<string, { body: string; result: BaseRemoval }>();
+  private retiredRequests = new Set<string>();
+  lifecycle(): BaseLifecycle {
+    return {
+      generation: this.epoch,
+      revision: this.versions.at(-1)?.revision ?? this.revisionFloor,
+      cleanupPending: false,
+    };
+  }
+  async remove(input: {
+    requestId: string;
+    expectedRevision: number;
+    expectedGeneration: number;
+  }): Promise<BaseRemoval> {
+    const body = JSON.stringify(input),
+      prior = this.removals.get(input.requestId);
+    if (prior) {
+      if (prior.body !== body) throw new AdapterError("requestMismatch");
+      if (prior.result.generation !== this.epoch || this.versions.length)
+        throw new AdapterError("expired");
+      return clone(prior.result);
+    }
+    const current = this.lifecycle();
+    if (
+      input.expectedRevision !== current.revision ||
+      input.expectedGeneration !== current.generation
+    )
+      throw new AdapterError("conflict");
+    this.revisionFloor = current.revision + 1;
+    this.epoch++;
+    this.versions = [];
+    for (const id of this.requests.keys()) this.retiredRequests.add(id);
+    this.requests.clear();
+    const result: BaseRemoval = { ...this.lifecycle(), removed: true };
+    this.removals.set(input.requestId, { body, result });
+    return clone(result);
+  }
   async load() {
     return clone(this.versions.at(-1) ?? null);
   }
@@ -54,6 +105,7 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
     return clone(this.versions).reverse();
   }
   private replay(requestId: string, body: string) {
+    if (this.retiredRequests.has(requestId)) throw new AdapterError("expired");
     const old = this.requests.get(requestId);
     if (old && old.body !== body) throw new AdapterError("requestMismatch");
     return old ? clone(old.snapshot) : null;
@@ -66,7 +118,7 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
     const parent = this.versions.at(-1);
     const snapshot: Snapshot = {
       id: localId(),
-      revision: (parent?.revision ?? 0) + 1,
+      revision: (parent?.revision ?? this.revisionFloor) + 1,
       parentId: parent?.id ?? null,
       createdAt: new Date().toISOString(),
       reason,
@@ -86,7 +138,7 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
       prior = this.replay(input.requestId, body);
     if (prior) return prior;
     const head = this.versions.at(-1);
-    if (input.expectedRevision !== (head?.revision ?? 0))
+    if (input.expectedRevision !== (head?.revision ?? this.revisionFloor))
       throw new AdapterError("conflict");
     // Autosave preserves incomplete drafts without attesting imported facts.
     const issues = input.mode === "autosave" ? [] : validateDraft(input.draft);
@@ -110,7 +162,7 @@ export class MemoryBaseCvAdapter implements BaseCvAdapter {
       prior = this.replay(input.requestId, body);
     if (prior) return prior;
     const head = this.versions.at(-1);
-    if (input.expectedRevision !== (head?.revision ?? 0))
+    if (input.expectedRevision !== (head?.revision ?? this.revisionFloor))
       throw new AdapterError("conflict");
     const old = this.versions.find((s) => s.id === input.snapshotId);
     if (!old) throw new AdapterError("missing");

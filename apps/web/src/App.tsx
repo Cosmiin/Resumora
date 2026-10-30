@@ -87,7 +87,11 @@ export function App({
                 selected
                   ? {
                       ...selected,
-                      adapter: new HttpJobCvAdapter(transport, selected.id, selected.locale),
+                      adapter: new HttpJobCvAdapter(
+                        transport,
+                        selected.id,
+                        selected.locale,
+                      ),
                     }
                   : null,
               );
@@ -109,7 +113,9 @@ function CvEditor({
 }: {
   adapter: BaseCvAdapter;
   jobLabel?: string;
-  switchDocument?: (job: { id: string; label: string;locale?:"ro"|"en" } | null) => void;
+  switchDocument?: (
+    job: { id: string; label: string; locale?: "ro" | "en" } | null,
+  ) => void;
   intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
@@ -138,8 +144,29 @@ function CvEditor({
     | { kind: "replace"; next: BaseDraft }
     | { kind: "reopen" }
     | { kind: "restore"; snapshot: Snapshot }
+    | { kind: "remove" }
     | null
   >(null);
+  type RemovalInput = {
+    requestId: string;
+    expectedRevision: number;
+    expectedGeneration: number;
+  };
+  const [removal, setRemoval] = useState<{
+    input: RemovalInput;
+    phase: "unknown" | "cleanup";
+  } | null>(null);
+  const removalBlocked = removal?.phase === "unknown";
+  const documentEpoch = useRef(0),
+    alive = useRef(true),
+    removalChannel = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      documentEpoch.current++;
+    };
+  }, []);
   const generation = useRef(0),
     lock = useRef(false),
     latest = useRef(draft),
@@ -169,7 +196,8 @@ function CvEditor({
   const warnOnUnload = durable
     ? dirty || uncertainDraft || error === "conflict"
     : !!(draft || head);
-  const editing = !!draft && ["base", "enrich", "review"].includes(route);
+  const editing =
+    !!draft && !removalBlocked && ["base", "enrich", "review"].includes(route);
   const go = useCallback((next: Route) => {
     window.location.hash = next;
     setRoute(next);
@@ -177,7 +205,7 @@ function CvEditor({
   useEffect(() => {
     const change = () => {
       const next = currentRoute();
-      setRoute(jobMode && next!=="base" ? "base" : next);
+      setRoute(jobMode && next !== "base" ? "base" : next);
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
@@ -247,6 +275,7 @@ function CvEditor({
     };
   }, [route, head?.id, adapter, historyAttempt]);
   function change(next: BaseDraft) {
+    if (removalBlocked) return;
     const current = latest.current;
     if (equalValues(next, current)) return;
     generation.current++;
@@ -287,6 +316,7 @@ function CvEditor({
     );
   }
   function openDraft(next: BaseDraft) {
+    if (removalBlocked) return;
     generation.current++;
     const ready = jobMode ? clone(next) : prepareDraft(next);
     latest.current = ready;
@@ -305,6 +335,7 @@ function CvEditor({
     const current = latest.current;
     if (
       !current ||
+      removalBlocked ||
       headRef.current === undefined ||
       lock.current ||
       pendingWrite.current
@@ -330,7 +361,8 @@ function CvEditor({
       generation: generation.current,
       input: {
         draft: clone(current),
-        expectedRevision: headRef.current?.revision ?? 0,
+        expectedRevision:
+          headRef.current?.revision ?? adapter.lifecycle?.().revision ?? 0,
         mode,
         requestId: crypto.randomUUID(),
       },
@@ -342,11 +374,13 @@ function CvEditor({
     if (!operation || operation.expired || lock.current) return;
     lock.current = true;
     setBusy(true);
+    const epoch = documentEpoch.current;
     try {
       const saved =
         operation.kind === "save"
           ? await adapter.save(clone(operation.input))
           : await adapter.restore(clone(operation.input));
+      if (!alive.current || epoch !== documentEpoch.current) return;
       pendingWrite.current = null;
       headRef.current = saved;
       setHead(saved);
@@ -377,6 +411,7 @@ function CvEditor({
               : t("Salvat în sesiune.", "Saved in session."),
         );
     } catch (e) {
+      if (!alive.current || epoch !== documentEpoch.current) return;
       if (e instanceof AdapterError) {
         if (e.code === "expired") operation.expired = true;
         else if (
@@ -398,9 +433,11 @@ function CvEditor({
             : "save",
       );
     } finally {
-      lock.current = false;
-      setBusy(false);
-      if (operation.kind === "restore") setDialog(null);
+      if (alive.current && epoch === documentEpoch.current) {
+        lock.current = false;
+        setBusy(false);
+        if (operation.kind === "restore") setDialog(null);
+      }
     }
   }
   async function reconcilePendingWrite() {
@@ -460,13 +497,168 @@ function CvEditor({
     return () => window.removeEventListener("keydown", key);
   }, []);
   useEffect(() => {
-    if (!dirty || !draft || busy || loading || error || pendingWrite.current)
+    if (
+      !dirty ||
+      !draft ||
+      busy ||
+      loading ||
+      error ||
+      pendingWrite.current ||
+      removalBlocked
+    )
       return;
     const timer = setTimeout(() => {
       void save("autosave");
     }, 650);
     return () => clearTimeout(timer);
-  }, [draft, dirty, busy, loading, error]);
+  }, [draft, dirty, busy, loading, error, removalBlocked]);
+  function discardRemovedDraft(saved: Snapshot | null = null) {
+    documentEpoch.current++;
+    generation.current++;
+    pendingWrite.current = null;
+    latest.current = saved?.draft ?? null;
+    headRef.current = saved;
+    setDraft(saved?.draft ?? null);
+    setHead(saved);
+    setPast([]);
+    setUndoFrom(null);
+    setVersions([]);
+    setInspected(null);
+    setIssues([]);
+    setHistoryError(false);
+    setError(null);
+    lock.current = false;
+    setBusy(false);
+    go("base");
+  }
+  async function removeBase(input?: RemovalInput) {
+    if (!adapter.remove || lock.current || pendingWrite.current || jobMode)
+      return;
+    const state = adapter.lifecycle?.();
+    const operation = input ?? {
+      requestId: crypto.randomUUID(),
+      expectedRevision: headRef.current?.revision ?? state?.revision ?? 0,
+      expectedGeneration: state?.generation ?? 0,
+    };
+    lock.current = true;
+    setBusy(true);
+    const epoch = documentEpoch.current;
+    try {
+      const result = await adapter.remove(operation);
+      if (!alive.current || epoch !== documentEpoch.current) return;
+      discardRemovedDraft();
+      setDialog(null);
+      setRemoval(
+        result.cleanupPending ? { input: operation, phase: "cleanup" } : null,
+      );
+      setNotice(
+        result.cleanupPending
+          ? t(
+              "CV-ul de bază a fost eliminat. Ștergerea fișierelor nu este încă finalizată.",
+              "Base CV removed. Source file deletion is not complete yet.",
+            )
+          : t(
+              "CV-ul de bază, istoricul și contextul au fost eliminate.",
+              "Base CV, history and context removed.",
+            ),
+      );
+      removalChannel.current?.postMessage("base-state-changed");
+    } catch (e) {
+      if (!alive.current || epoch !== documentEpoch.current) return;
+      setDialog(null);
+      if (e instanceof AdapterError) {
+        setRemoval(null);
+        setNotice(
+          e.code === "preservationRequired"
+            ? t(
+                "Eliminarea nu a fost efectuată. Un CV adaptat mai vechi necesită reconciliere pentru a-i păstra conținutul.",
+                "Nothing was removed. An older tailored CV needs reconciliation to preserve its current content.",
+              )
+            : t(
+                "Eliminarea nu a fost efectuată. Redeschide starea salvată înainte de a reîncerca.",
+                "Nothing was removed. Reopen saved state before trying again.",
+              ),
+        );
+      } else setRemoval({ input: operation, phase: "unknown" });
+    } finally {
+      if (alive.current && epoch === documentEpoch.current) {
+        lock.current = false;
+        setBusy(false);
+      }
+    }
+  }
+  async function retryRemovedSourceCleanup() {
+    if (!adapter.cleanup || lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    try {
+      const state = await adapter.cleanup();
+      if (!alive.current) return;
+      if (!state.cleanupPending) setRemoval(null);
+      setNotice(
+        state.cleanupPending
+          ? t(
+              "Ștergerea fișierelor sursă nu este încă finalizată. Poți reîncerca.",
+              "Source file deletion is not complete yet. You can retry.",
+            )
+          : t("Fișierele sursă au fost șterse.", "Source files deleted."),
+      );
+    } catch {
+      if (alive.current)
+        setNotice(
+          t(
+            "Ștergerea fișierelor nu este confirmată. Reîncearcă aceeași curățare.",
+            "Source file deletion is unconfirmed. Retry cleanup.",
+          ),
+        );
+    } finally {
+      if (alive.current) {
+        lock.current = false;
+        setBusy(false);
+      }
+    }
+  }
+  useEffect(() => {
+    if (jobMode || !adapter.lifecycle) return;
+    let disposed = false;
+    const inspect = async () => {
+      const before = adapter.lifecycle!().generation;
+      try {
+        const saved = await adapter.load();
+        if (
+          !disposed &&
+          alive.current &&
+          adapter.lifecycle!().generation > before
+        ) {
+          discardRemovedDraft(saved);
+          setRemoval(null);
+          setNotice(
+            t(
+              "CV-ul de bază a fost eliminat într-o altă filă. Starea curentă a fost redeschisă.",
+              "Base CV was removed in another tab. Current saved state reopened.",
+            ),
+          );
+        }
+      } catch {
+        /* Keep local state; server CAS remains authoritative. */
+      }
+    };
+    const focus = () => {
+      void inspect();
+    };
+    window.addEventListener("focus", focus);
+    if (typeof BroadcastChannel !== "undefined") {
+      const channel = new BroadcastChannel("resumora-base-state");
+      removalChannel.current = channel;
+      channel.onmessage = focus; // Signal only; each tab rechecks its own authenticated scope.
+    }
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", focus);
+      removalChannel.current?.close();
+      removalChannel.current = null;
+    };
+  }, [adapter, jobMode]);
   async function reopen() {
     if (lock.current || pendingWrite.current) return;
     lock.current = true;
@@ -595,7 +787,8 @@ function CvEditor({
       </header>
       <div className="app-layout">
         <aside className="sidebar">
-          <nav aria-label={t("Navigare principală", "Main navigation")}><a href="/extension">{t("Extensie Chrome", "Chrome extension")}</a>
+          <nav aria-label={t("Navigare principală", "Main navigation")}>
+            <a href="/extension">{t("Extensie Chrome", "Chrome extension")}</a>
             {nav
               .filter((n) => !jobMode || n.route === "base")
               .map((n) => (
@@ -661,10 +854,20 @@ function CvEditor({
             </h1>
             {editing && (
               <div className="actions">
-                {!jobMode&&<Button onClick={() => go("history")}>
-                  <History size={16} />
-                  {t("Istoric", "History")}
-                </Button>}
+                {!jobMode && route === "base" && adapter.remove && (
+                  <Button
+                    disabled={busy || loading || !!pendingWrite.current}
+                    onClick={() => setDialog({ kind: "remove" })}
+                  >
+                    {t("Elimină CV-ul de bază", "Remove Base CV")}
+                  </Button>
+                )}
+                {!jobMode && (
+                  <Button onClick={() => go("history")}>
+                    <History size={16} />
+                    {t("Istoric", "History")}
+                  </Button>
+                )}
                 {!jobMode && (
                   <Button
                     onClick={() => go(route === "enrich" ? "base" : "enrich")}
@@ -685,10 +888,15 @@ function CvEditor({
                     "This save can no longer be replayed. Check saved state; your edits will be retained.",
                   )
                 : error === "conflict"
-                  ? jobMode?t("CV-ul curent s-a schimbat. Redeschide-l pentru a continua; ciorna ta este păstrată.","Current CV changed. Reopen it to continue; your draft is retained."):t(
-                      "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
-                      "Session changed. Your draft is retained; inspect history before reopening.",
-                    )
+                  ? jobMode
+                    ? t(
+                        "CV-ul curent s-a schimbat. Redeschide-l pentru a continua; ciorna ta este păstrată.",
+                        "Current CV changed. Reopen it to continue; your draft is retained.",
+                      )
+                    : t(
+                        "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
+                        "Session changed. Your draft is retained; inspect history before reopening.",
+                      )
                   : t(
                       "Acțiunea a eșuat; ciorna este păstrată.",
                       "The action failed; your draft is retained.",
@@ -704,7 +912,9 @@ function CvEditor({
                         ? void reconcilePendingWrite()
                         : void submitPendingWrite()
                       : error === "conflict"
-                        ? jobMode?setDialog({kind:"reopen"}):go("history")
+                        ? jobMode
+                          ? setDialog({ kind: "reopen" })
+                          : go("history")
                         : head === undefined || !draft
                           ? setLoadAttempt((n) => n + 1)
                           : dirty
@@ -715,7 +925,9 @@ function CvEditor({
                   {pendingWrite.current?.expired
                     ? t("Verifică starea salvată", "Check saved state")
                     : !pendingWrite.current && error === "conflict"
-                      ? jobMode?t("Redeschide CV-ul curent","Reopen current CV"):t("Istoric", "History")
+                      ? jobMode
+                        ? t("Redeschide CV-ul curent", "Reopen current CV")
+                        : t("Istoric", "History")
                       : t("Reîncearcă", "Retry")}
                 </Button>
               )}
@@ -740,7 +952,25 @@ function CvEditor({
               </Button>
             </div>
           )}
-          {loading ? (
+          {removalBlocked ? (
+            <section className="card" role="alert">
+              <h2>
+                {t("Eliminarea nu este confirmată", "Removal is not confirmed")}
+              </h2>
+              <p>
+                {t(
+                  "Păstrăm ciorna fără a o salva din nou. Reîncearcă aceeași operațiune pentru a verifica rezultatul.",
+                  "Your draft is retained without saving it again. Retry the same operation to check its outcome.",
+                )}
+              </p>
+              <Button
+                disabled={busy}
+                onClick={() => void removeBase(removal.input)}
+              >
+                {t("Verifică eliminarea", "Check removal")}
+              </Button>
+            </section>
+          ) : loading ? (
             <p role="status">{t("Deschidem sesiunea…", "Opening session…")}</p>
           ) : (
             <>
@@ -761,7 +991,9 @@ function CvEditor({
                   <StartChooser
                     start={start}
                     intelligence={intelligence}
-                    revision={head?.revision ?? 0}
+                    revision={
+                      head?.revision ?? adapter.lifecycle?.().revision ?? 0
+                    }
                   />
                 )}
               {draft && ["base", "review"].includes(route) && (
@@ -968,9 +1200,6 @@ function CvEditor({
                         "Page memory only · reloading clears data",
                       )}
                 </small>
-                <span className="sr-only" role="status">
-                  {notice}
-                </span>
               </div>
               <div className="actions">
                 <Button
@@ -1024,30 +1253,58 @@ function CvEditor({
                   )}
             </p>
           )}
+          {!!notice && (
+            <p role="status" className="notice">
+              {notice}
+            </p>
+          )}
+          {(removal?.phase === "cleanup" ||
+            adapter.lifecycle?.().cleanupPending) &&
+            adapter.cleanup && (
+              <Button
+                disabled={busy}
+                onClick={() => void retryRemovedSourceCleanup()}
+              >
+                {t(
+                  "Reîncearcă ștergerea fișierelor sursă",
+                  "Retry source file deletion",
+                )}
+              </Button>
+            )}
         </main>
       </div>
       {dialog && (
         <Dialog
           title={
-            dialog.kind === "restore"
+            dialog.kind === "remove"
               ? t(
-                  `Restaurezi v${dialog.snapshot.revision}?`,
-                  `Restore v${dialog.snapshot.revision}?`,
+                  "Elimini definitiv CV-ul de bază?",
+                  "Permanently remove Base CV?",
                 )
-              : t("Înlocuiești ciorna?", "Replace draft?")
+              : dialog.kind === "restore"
+                ? t(
+                    `Restaurezi v${dialog.snapshot.revision}?`,
+                    `Restore v${dialog.snapshot.revision}?`,
+                  )
+                : t("Înlocuiești ciorna?", "Replace draft?")
           }
           onClose={() => !busy && setDialog(null)}
         >
           <p>
-            {durable
+            {dialog.kind === "remove"
               ? t(
-                  "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric.",
-                  "Your current draft will be replaced. Previous versions stay in history.",
+                  "CV-ul de bază, versiunile, contextul, răspunsurile, variantele de limbă și documentele încărcate vor fi șterse. Rămân doar CV-urile adaptate curente pentru fiecare job și limbă. Această acțiune nu poate fi anulată.",
+                  "Your Base CV, versions, context, answers, language copies and uploaded documents will be deleted. Current tailored CVs for each job and language remain. This cannot be undone.",
                 )
-              : t(
-                  "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric până la reîncărcare.",
-                  "The current draft will be replaced. Prior versions remain in history until reload.",
-                )}
+              : durable
+                ? t(
+                    "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric.",
+                    "Your current draft will be replaced. Previous versions stay in history.",
+                  )
+                : t(
+                    "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric până la reîncărcare.",
+                    "The current draft will be replaced. Prior versions remain in history until reload.",
+                  )}
           </p>
           <div className="actions">
             <Button onClick={() => setDialog(null)} disabled={busy}>
@@ -1064,13 +1321,19 @@ function CvEditor({
                 if (dialog.kind === "replace") {
                   openDraft(dialog.next);
                   setDialog(null);
-                } else if (dialog.kind === "reopen") void reopen();
+                } else if (dialog.kind === "remove") void removeBase();
+                else if (dialog.kind === "reopen") void reopen();
                 else void restore(dialog.snapshot);
               }}
             >
-              {dialog.kind === "restore"
-                ? t("Restaurează versiunea", "Restore version")
-                : t("Înlocuiește ciorna", "Replace draft")}
+              {dialog.kind === "remove"
+                ? t(
+                    "Elimină definitiv CV-ul de bază",
+                    "Permanently remove Base CV",
+                  )
+                : dialog.kind === "restore"
+                  ? t("Restaurează versiunea", "Restore version")
+                  : t("Înlocuiește ciorna", "Replace draft")}
             </Button>
           </div>
         </Dialog>

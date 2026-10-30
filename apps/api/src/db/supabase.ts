@@ -22,6 +22,8 @@ import { boundedJson } from "../ai/http.ts";
 import type {
   DraftSnapshot,
   EditorWireEnvelope,
+  BaseLifecycle,
+  BaseRemoval,
 } from "@resumora/contracts/editor/transport";
 
 /** Worker bindings only. Never use a service-role/secret key at this boundary. */
@@ -58,9 +60,14 @@ const safeCodes = new Set([
   "INVALID_EDITOR_PAYLOAD",
   "EDITOR_HISTORY_TOO_LARGE",
   "EDITOR_PROFILE_CONFLICT",
+  "LEGACY_JOB_DOCUMENT_CONVERSION_REQUIRED",
+  "LEGACY_JOB_DOCUMENT_COLLISION",
 ]);
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
+const isBaseLifecycle = (value: unknown): value is BaseLifecycle => record(value) &&
+  Number.isSafeInteger(value.generation) && Number(value.generation) >= 0 &&
+  Number.isSafeInteger(value.revision) && Number(value.revision) >= 0 && typeof value.cleanupPending === "boolean";
 function isSnapshot(value: unknown): boolean {
   return (
     record(value) &&
@@ -195,7 +202,11 @@ export function createDatabaseGateway(
     }
     const currentDocument=(v:unknown)=>{if(!record(v)||typeof v.id!=='string'||!uuid.test(v.id)||typeof v.documentId!=='string'||!uuid.test(v.documentId)||!positiveRevision(v.revision)||!['ro','en'].includes(String(v.locale))||typeof v.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(v.fingerprint)||!record(v.provenance)||!record(v.payload))return false;try{decodeDraft(v.payload as unknown as EditorWireEnvelope);return true;}catch{return false;}};
     const valid =
-      name==='load_current_job_document' ? result===null||currentDocument(result)
+      name === "load_base_state" ? isBaseLifecycle(result) && "snapshot" in result && (result.snapshot === null || isSnapshot(result.snapshot))
+      : name === "remove_base_cv" ? isBaseLifecycle(result) && "removed" in result && result.removed === true
+      : name === "base_removal_objects" ? Array.isArray(result) && result.length <= 20 && result.every((v) => record(v) && ["cv-imports", "cv-photos"].includes(String(v.bucket)) && typeof v.objectKey === "string")
+      : name === "ack_base_removal_object" ? record(result) && result.acknowledged === true
+      : name==='load_current_job_document' ? result===null||currentDocument(result)
       : name==='save_current_job_document' ? currentDocument(result)
       :
       name === "job_editor_context"
@@ -321,7 +332,32 @@ export function createDatabaseGateway(
         "STORAGE_UNAVAILABLE",
       );
   }
+  const loadBaseState = () => rpc<BaseLifecycle & { snapshot: DraftSnapshot | null }>("load_base_state", {});
+  const cleanupBaseSources = async (): Promise<BaseLifecycle> => {
+    const rows = await rpc<{ bucket: "cv-imports" | "cv-photos"; objectKey: string }[]>("base_removal_objects", {});
+    for (const row of rows) {
+      try {
+        if (row.bucket === "cv-imports") await storage(row.objectKey);
+        else {
+          if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(row.objectKey)) throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
+          const response = await photoStorage("object/cv-photos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [row.objectKey] }) });
+          if (!response.ok) { await response.body?.cancel(); throw new DatabaseError(503, "DATABASE_UNAVAILABLE"); }
+          await response.body?.cancel();
+        }
+        await rpc("ack_base_removal_object", { p_bucket: row.bucket, p_object_key: row.objectKey });
+      } catch { /* Keep the owned manifest for an explicit bounded retry. */ }
+    }
+    const { snapshot: _snapshot, ...state } = await loadBaseState();
+    return state;
+  };
   return {
+    loadBaseState,
+    retryBaseCleanup: cleanupBaseSources,
+    removeBase: async (input: { requestId: string; expectedRevision: number; expectedGeneration: number }): Promise<BaseRemoval> => {
+      const result = await rpc<BaseRemoval>("remove_base_cv", { p_key: key(input.requestId), p_expected_revision: revision(input.expectedRevision), p_expected_generation: revision(input.expectedGeneration) });
+      try { return { ...result, ...await cleanupBaseSources() }; }
+      catch { return { ...result, cleanupPending: true }; }
+    },
     ...importGateway(rpc, storage, async (objectKey) => {
       if (
         !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/original\.(pdf|docx|doc)$/.test(
