@@ -21,12 +21,17 @@ type Props = {
 
 type TextField = "title" | "company" | "location" | "description";
 
+/** What a role is called: its title, else its company, else "<Section> role". */
+export function roleName(role: Experience, list: "experience" | "volunteering"): string {
+  return role.title || role.company || t(`edit.role.untitled.${list}`);
+}
+
 /** One role on the page. Memoised: typing in one role leaves the others alone. */
 export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
   const itemId = role.id;
-  const name = role.title || role.company || t("edit.role.untitled");
+  const name = roleName(role, list);
 
   const owner = useMemo(() => ({ list, itemId }), [list, itemId]);
   const remove = useCallback(() => dispatch({ type: "removeItem", list, itemId }), [dispatch, list, itemId]);
@@ -63,7 +68,7 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch }:
   );
 
   return (
-    <div className="cv-line cv-role" data-item={itemId} ref={root}>
+    <div className="cv-line cv-role" data-item={itemId} ref={root} role="group" aria-label={name}>
       <div className="cv-item-head">
         {field("title", "edit.role.title", "edit.role.titlePlaceholder", "cv-item-title")}
         <span className="cv-item-dates cv-role-dates">
@@ -89,6 +94,7 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch }:
             </button>
           ) : (
             <DateField
+              wide
               fieldKey={`${list}-${itemId}-endDate`}
               value={role.endDate}
               locale={locale}

@@ -3,6 +3,7 @@ import { newId, type CvContent, type Locale } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { MessageKey } from "../../../i18n/en.ts";
 import type { CvAction } from "../cvReducer.ts";
+import { DragList } from "../DragList.tsx";
 import { ItemDate } from "../ItemDate.tsx";
 import { ItemField } from "../ItemField.tsx";
 import { useFocusAfterRender } from "../useFocusAfterRender.ts";
@@ -11,6 +12,7 @@ import { RemoveButton } from "./RemoveButton.tsx";
 
 type Dispatch = (a: CvAction) => void;
 type Education = CvContent["education"][number];
+const educationName = (e: Education) => e.degree || e.school || t("edit.education.untitledGroup");
 
 const EducationItem = memo(function EducationItem({
   item,
@@ -55,7 +57,7 @@ const EducationItem = memo(function EducationItem({
     />
   );
   return (
-    <div className="cv-line cv-role" data-item={itemId}>
+    <div className="cv-line cv-role" data-item={itemId} role="group" aria-label={educationName(item)}>
       <div className="cv-item-head">
         {field("degree", "edit.education.degree", "cv-item-title")}
         <span className="cv-item-dates cv-role-dates">
@@ -85,11 +87,12 @@ export function EducationEdit({ items, locale, dispatch }: { items: Education[];
     dispatch({ type: "addItem", list: "education", id });
     focusLater(`education-${id}-degree`);
   }, [dispatch, focusLater]);
+  const move = useCallback((from: number, to: number) => dispatch({ type: "moveItem", list: "education", from, to }), [dispatch]);
   return (
     <div ref={root}>
-      {items.map((item) => (
-        <EducationItem key={item.id} item={item} locale={locale} dispatch={dispatch} />
-      ))}
+      <DragList items={items} onMove={move} label={educationName}>
+        {(item) => <EducationItem item={item} locale={locale} dispatch={dispatch} />}
+      </DragList>
       <AddButton label={t("edit.add.education")} onClick={add} />
     </div>
   );

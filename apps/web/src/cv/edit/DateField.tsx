@@ -11,10 +11,12 @@ type Props = {
   onCommit(value: string): void;
   onPresent?(): void;
   fieldKey: string;
+  /** Room for a long placeholder such as "Mon YYYY or present". */
+  wide?: boolean;
 };
 
 /** A date typed in free form: valid text is saved at once, anything else waits with a hint. */
-export function DateField({ value, locale, label, placeholder, onCommit, onPresent, fieldKey }: Props) {
+export function DateField({ value, locale, label, placeholder, onCommit, onPresent, fieldKey, wide }: Props) {
   const shown = formatYearMonth(value, locale);
   const [text, setText] = useState(shown);
   const [invalid, setInvalid] = useState(false);
@@ -50,7 +52,7 @@ export function DateField({ value, locale, label, placeholder, onCommit, onPrese
   }, [shown]);
 
   return (
-    <span className="cv-date-field">
+    <span className={wide ? "cv-date-field is-wide" : "cv-date-field"}>
       <PageField
         fieldKey={fieldKey}
         label={label}

@@ -3,6 +3,7 @@ import { newId, type Locale } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { MessageKey } from "../../../i18n/en.ts";
 import type { CvAction } from "../cvReducer.ts";
+import { DragList } from "../DragList.tsx";
 import { ItemDate } from "../ItemDate.tsx";
 import { ItemField } from "../ItemField.tsx";
 import { useFocusAfterRender } from "../useFocusAfterRender.ts";
@@ -95,7 +96,7 @@ const ListRow = memo(function ListRow({
     />
   );
   return (
-    <div className="cv-line" data-item={item.id}>
+    <div className="cv-line" data-item={item.id} role="group" aria-label={mainText || t(main.label)}>
       <div className="cv-item-head">
         {field(main, "cv-item-title")}
         {date && (
@@ -150,11 +151,16 @@ export function SimpleListEdit({
     dispatch({ type: "addItem", list, id });
     focusLater(`${list}-${id}-${CONFIG[list].main.field}`);
   }, [dispatch, list, focusLater]);
+  const move = useCallback((from: number, to: number) => dispatch({ type: "moveItem", list, from, to }), [dispatch, list]);
+  const label = useCallback(
+    (item: Row) => String(item[CONFIG[list].main.field] ?? "") || t(CONFIG[list].main.label),
+    [list],
+  );
   return (
     <div ref={root}>
-      {items.map((item) => (
-        <ListRow key={item.id} list={list} item={item} locale={locale} dispatch={dispatch} />
-      ))}
+      <DragList items={items} onMove={move} label={label}>
+        {(item) => <ListRow list={list} item={item} locale={locale} dispatch={dispatch} />}
+      </DragList>
       <AddButton label={t("edit.add.item")} onClick={add} />
     </div>
   );
