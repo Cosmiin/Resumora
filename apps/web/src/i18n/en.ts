@@ -28,6 +28,72 @@ export const en = {
   "auth.genericError": "Something went wrong. Please try again.",
 
   "api.network": "Can't reach Resumora. Check your connection.",
+
+  "cv.loadError": "Couldn't load your CV.",
+  "cv.retry": "Try again",
+  "cv.status.saved": "Saved",
+  "cv.status.dirty": "Unsaved changes",
+  "cv.status.saving": "Saving…",
+  "cv.status.error": "Couldn't save — retrying",
+  "cv.status.conflict": "Not saved",
+  "cv.conflict.title": "This CV was saved in another tab or device.",
+  "cv.conflict.body": "Load the latest version, or keep your version and overwrite it.",
+  "cv.conflict.loadLatest": "Load latest",
+  "cv.conflict.keepMine": "Keep my version",
+
+  "cv.basics": "Personal details",
+  "cv.fullName": "Full name",
+  "cv.headline": "Headline",
+  "cv.email": "Email",
+  "cv.phone": "Phone",
+  "cv.location": "Location",
+  "cv.website": "Website",
+  "cv.linkedin": "LinkedIn",
+  "cv.summary": "Summary",
+
+  "cv.experience": "Experience",
+  "cv.experience.add": "Add experience",
+  "cv.company": "Company",
+  "cv.title": "Job title",
+  "cv.startDate": "Start",
+  "cv.endDate": "End",
+  "cv.current": "I work here now",
+  "cv.bullet": "Bullet {n}",
+  "cv.bullet.add": "Add bullet",
+  "cv.bullet.remove": "Remove bullet {n}",
+
+  "cv.education": "Education",
+  "cv.education.add": "Add education",
+  "cv.school": "School",
+  "cv.degree": "Degree",
+  "cv.field": "Field of study",
+  "cv.notes": "Notes",
+
+  "cv.skills": "Skills",
+  "cv.skills.add": "Add skill",
+  "cv.skill": "Skill",
+  "cv.category": "Category",
+
+  "cv.languages": "Languages",
+  "cv.languages.add": "Add language",
+  "cv.language": "Language",
+  "cv.level": "Level",
+
+  "cv.certifications": "Certifications",
+  "cv.certifications.add": "Add certification",
+  "cv.certification": "Certification",
+  "cv.issuer": "Issuer",
+  "cv.date": "Date",
+
+  "cv.projects": "Projects",
+  "cv.projects.add": "Add project",
+  "cv.project": "Project",
+  "cv.description": "Description",
+  "cv.url": "Link",
+
+  "cv.item.moveUp": "Move up",
+  "cv.item.moveDown": "Move down",
+  "cv.item.remove": "Remove",
 } as const;
 
 export type MessageKey = keyof typeof en;

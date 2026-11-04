@@ -1,17 +1,9 @@
 import type { z } from "zod";
 import { ErrorBodySchema } from "@resumora/shared";
 import { supabase } from "./supabase.ts";
+import { ApiClientError } from "./api-error.ts";
 
-export class ApiClientError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-    readonly body: unknown = null,
-  ) {
-    super(message);
-  }
-}
+export { ApiClientError };
 
 type ApiInit = Omit<RequestInit, "body"> & { schema: z.ZodType<unknown>; json?: unknown };
 

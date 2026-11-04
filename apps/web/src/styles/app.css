@@ -100,3 +100,94 @@ label {
 .page-loading {
   padding: 2rem;
 }
+
+.cv-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+.editor {
+  display: grid;
+  gap: 1.25rem;
+}
+.editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0;
+  background: var(--sage-50, #f4f7f4);
+}
+.save-status {
+  font-size: 0.9rem;
+  color: var(--sage-600, #536b69);
+}
+.save-status-error,
+.save-status-conflict {
+  color: #a33a2b;
+}
+.cv-section {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.25rem;
+  background: var(--white, #fff);
+  border: 1px solid var(--sage-200, #d8e3df);
+  border-radius: 12px;
+}
+.cv-section h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.cv-section > button {
+  justify-self: start;
+}
+.cv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.cv-item {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--sage-200, #d8e3df);
+  border-radius: 10px;
+}
+.cv-item-actions,
+.conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cv-item-actions button {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+}
+.cv-bullets {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.cv-bullets li > button {
+  margin-top: 0.25rem;
+}
+label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+label.checkbox input {
+  width: auto;
+}
+.conflict-banner {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--marigold-500, #e9a23b);
+  background: var(--marigold-50, #fffaf0);
+  border-radius: 12px;
+}
+.conflict-banner p {
+  margin: 0.35rem 0 0.75rem;
+}
