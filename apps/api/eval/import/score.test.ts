@@ -103,6 +103,43 @@ describe("scoreCase", () => {
     expect(score.sectionProblems).toEqual(['"Aptitudini" -> got other, expected skills']);
   });
 
+  it("a filled first/last name pair is right when it spells the full name, in either order", () => {
+    const e = clone(expected);
+    Object.assign(e.content.basics as object, { firstName: "", lastName: "" });
+    const withNames = (firstName: string, lastName: string) => {
+      const c = clone(content);
+      Object.assign(c.basics, { firstName, lastName });
+      return scoreCase(e, actualFrom(c)).fieldAccuracy;
+    };
+    expect(withNames("Ana", "Șerban")).toBe(1);
+    expect(withNames("Șerban", "Ana")).toBe(1);
+    expect(withNames("Ana", "")).toBeLessThan(1);
+    expect(withNames("Ana", "Serban")).toBeLessThan(1);
+    const keyed = clone(content);
+    Object.assign(keyed.basics, { firstName: "Ana", lastName: "Șerban" });
+    expect(scoreCase({ ...expected, content: keyed }, actualFrom({ ...keyed, basics: { ...keyed.basics, firstName: "Șerban", lastName: "Ana" } })).fieldAccuracy).toBeLessThan(1);
+  });
+
+  it("a skill in the wrong group counts as one miss, not also as extra", () => {
+    const c = clone(content) as Record<string, unknown>;
+    c.technicalSkills = [{ name: "TypeScript" }, { name: "comunicare" }];
+    c.professionalSkills = [];
+    const score = scoreCase(expected, actualFrom(c));
+    expect(score.misplaced).toEqual(["comunicare: got technicalSkills, expected professionalSkills"]);
+    expect(score.extra).toEqual([]);
+    expect(score.fieldAccuracy).toBeLessThan(1);
+    const leaves = scoreCase(expected, actualFrom(content));
+    expect(leaves.misplaced).toEqual([]);
+  });
+
+  it("a skill that is in its right group too is still extra in the other one", () => {
+    const c = clone(content) as Record<string, unknown>;
+    c.technicalSkills = [{ name: "TypeScript" }, { name: "Comunicare" }];
+    const score = scoreCase(expected, actualFrom(c));
+    expect(score.misplaced).toEqual([]);
+    expect(score.extra).toEqual(["technicalSkills: Comunicare"]);
+  });
+
   it("flags match in any order", () => {
     const flags = [{ key: "summary", level: "missing" }, { key: "languages", level: "tip" }];
     const e: Expected = { ...expected, flags: [...flags].reverse() };

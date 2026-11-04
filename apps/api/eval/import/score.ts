@@ -1,4 +1,4 @@
-import { missingCategories, type CvContent, type ImportResult, type SourceHeading } from "@resumora/shared";
+import { SKILL_GROUPS, missingCategories, type CvContent, type ImportResult, type SourceHeading } from "@resumora/shared";
 import { findUnsourcedLines } from "../../src/imports/source-check.ts";
 
 /** The answer key of a case: the CV without ids or layout, the headings as printed, the flags. */
@@ -18,6 +18,8 @@ export type CaseScore = {
   flagsOk: boolean;
   /** Items in the result that the answer key does not have (they lower fieldAccuracy). */
   extra: string[];
+  /** Skills found in the wrong skill group ("name: got X, expected Y"); each counts as one miss. */
+  misplaced: string[];
   sectionProblems: string[];
   brokenAccents: string[];
 };
@@ -126,12 +128,48 @@ function sectionProblems(expected: SourceHeading[], actual: SourceHeading[]): st
     });
 }
 
+const skillName = (item: unknown) => (isRecord(item) && typeof item.name === "string" ? squash(item.name).toLowerCase() : "");
+const skillNames = (content: Record<string, unknown>, group: string) =>
+  new Set((Array.isArray(content[group]) ? (content[group] as unknown[]) : []).map(skillName));
+
+/**
+ * The actual content prepared for comparison, plus the skills it has in the wrong group.
+ * - The key leaves first/last name empty when the CV does not make them clear. A filled pair is
+ *   still right when "first last" (either order) is exactly the full name.
+ * - A skill in the wrong group is taken out of that group, so it counts once (missing where the
+ *   key has it), not twice (missing and extra).
+ */
+function forComparison(expected: Record<string, unknown>, actual: Record<string, unknown>) {
+  const content = JSON.parse(JSON.stringify(actual)) as Record<string, unknown>;
+  const want = isRecord(expected.basics) ? expected.basics : {};
+  const got = isRecord(content.basics) ? content.basics : undefined;
+  if (got && want.firstName === "" && want.lastName === "" && typeof got.firstName === "string" && typeof got.lastName === "string") {
+    const [first, last, full] = [squash(got.firstName), squash(got.lastName), squash(String(want.fullName ?? ""))];
+    if (first && last && (`${first} ${last}` === full || `${last} ${first}` === full)) [got.firstName, got.lastName] = ["", ""];
+  }
+  const misplaced: string[] = [];
+  for (const group of SKILL_GROUPS) {
+    const list = content[group];
+    if (!Array.isArray(list)) continue;
+    const wanted = skillNames(expected, group);
+    content[group] = list.filter((item) => {
+      const name = skillName(item);
+      if (!name || wanted.has(name)) return true;
+      const home = SKILL_GROUPS.find((g) => g !== group && skillNames(expected, g).has(name) && !skillNames(actual, g).has(name));
+      if (home) misplaced.push(`${(item as { name: string }).name}: got ${group}, expected ${home}`);
+      return !home;
+    });
+  }
+  return { content, misplaced };
+}
+
 /**
  * Scores one imported CV against its answer key. `source` is the text of the file; when given,
  * lines of the result that cannot be found in it are reported as invented.
  */
 export function scoreCase(expected: Expected, actual: ImportResult, source?: string): CaseScore {
-  const { total, hits, extra } = compare(expected.content, actual.content);
+  const prepared = forComparison(expected.content, actual.content as unknown as Record<string, unknown>);
+  const { total, hits, extra } = compare(expected.content, prepared.content);
   const flags = missingCategories(actual.content as CvContent).map(flagKey).sort();
   const problems = sectionProblems(expected.headings, actual.sourceHeadings);
   const accents = brokenAccents(expected.content, actual.content);
@@ -142,6 +180,7 @@ export function scoreCase(expected: Expected, actual: ImportResult, source?: str
     diacriticsOk: accents.length === 0,
     flagsOk: JSON.stringify(flags) === JSON.stringify(expected.flags.map(flagKey).sort()),
     extra,
+    misplaced: prepared.misplaced,
     sectionProblems: problems,
     brokenAccents: accents,
   };

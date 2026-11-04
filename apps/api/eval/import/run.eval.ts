@@ -1,7 +1,8 @@
 // Manual evaluation: imports each of the 12 evaluation CVs with the real AI providers and scores
 // the result against the answer key. Run from the repo root: npm run eval:import
 // Only one case: EVAL_CASE=01 npm run eval:import   (matches the start of the folder name)
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+// Each result is saved to apps/api/node_modules/.cache/eval/results/<case>.json for a closer look.
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 import { providersFromEnv, type AiCallLog } from "../../src/ai/call-model.ts";
@@ -10,6 +11,7 @@ import { processImport } from "../../src/imports/process.ts";
 import { scoreCase, type CaseScore, type Expected } from "./score.ts";
 
 const CASES = join(import.meta.dirname, "cases");
+const RESULTS = join(import.meta.dirname, "../../node_modules/.cache/eval/results");
 /** USD per token, from openrouter.ai/api/v1/models on 2026-11-04 (gpt-5.4-mini: its `openai/gpt-5.4-mini` entry). */
 const PRICES: Record<string, { input: number; output: number }> = {
   "openrouter:google/gemini-3.1-flash-lite": { input: 0.00000025, output: 0.0000015 },
@@ -65,6 +67,8 @@ async function runCase(folder: string): Promise<Row> {
   }, 0);
   if (unpriced) error = `no price for ${unpriced.provider}:${unpriced.model}`;
   if (!result) return { id: folder, seconds, cost, error, pass: false };
+  mkdirSync(RESULTS, { recursive: true });
+  writeFileSync(join(RESULTS, `${folder}.json`), JSON.stringify(result, null, 2));
   const score = scoreCase(expected, result, await sourceText(folder));
   const pass =
     score.sectionsOk && score.fieldAccuracy >= MIN_ACCURACY && score.invented.length === 0 &&
@@ -88,6 +92,7 @@ function printTable(rows: Row[]): void {
     detail("section", s?.sectionProblems);
     detail("accents", s?.brokenAccents);
     detail("extra item", s?.extra);
+    detail("wrong skill group", s?.misplaced);
   }
   const scored = rows.filter((r) => r.score);
   const all = scored.length === rows.length;
