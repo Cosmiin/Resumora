@@ -4,6 +4,8 @@ import type { AuthUser } from "./env.ts";
 import type { CvRepo } from "./cv/repo.ts";
 import { ApiError, errorBody, toErrorResponse, type LogFn } from "./errors.ts";
 import { cvRoutes } from "./cv/routes.ts";
+import type { ImportMessage, ImportRepo } from "./imports/repo.ts";
+import { importRoutes } from "./imports/routes.ts";
 
 export type AppDeps = {
   /** The only browser origin allowed to call the API cross-origin. */
@@ -11,6 +13,11 @@ export type AppDeps = {
   /** Returns the user for a valid access token, null for an invalid one. */
   verifyToken(token: string): Promise<AuthUser | null>;
   cvRepo(user: AuthUser): CvRepo;
+  importRepo(user: AuthUser): ImportRepo;
+  /** Where new imports are sent for processing. */
+  queue: { send(message: ImportMessage): Promise<void> };
+  /** Injectable clock for the daily import limit. */
+  now?: () => Date;
   log: LogFn;
 };
 
@@ -48,6 +55,10 @@ export function createApp(deps: AppDeps) {
   });
 
   app.route("/v1/cv", cvRoutes((c) => deps.cvRepo(c.get("user"))));
+  app.route(
+    "/v1/imports",
+    importRoutes({ repoFor: (c) => deps.importRepo(c.get("user")), queue: deps.queue, now: deps.now ?? (() => new Date()) }),
+  );
 
   app.notFound((c) => c.json(errorBody("not_found", "Not found.", c.get("requestId")), 404));
 

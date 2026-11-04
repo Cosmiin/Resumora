@@ -24,6 +24,10 @@ beforeEach(() => {
     appOrigin: "http://127.0.0.1:5173",
     verifyToken: async (token) => (token === "good" ? { id: "user-1", token } : null),
     cvRepo: () => repo,
+    importRepo: () => {
+      throw new Error("not used");
+    },
+    queue: { send: async () => {} },
     log: vi.fn(),
   });
 });

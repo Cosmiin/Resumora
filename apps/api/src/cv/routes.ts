@@ -25,7 +25,7 @@ function tooLarge() {
   return new ApiError(413, "content_too_large", "This CV is too large to save (limit 256 KB).");
 }
 
-function saveResponse(c: Context<AppEnv>, result: SaveResult) {
+export function saveResponse(c: Context<AppEnv>, result: SaveResult) {
   if (result.ok) return c.json({ version: result.version, updatedAt: result.updatedAt });
   return c.json(
     {

@@ -9,6 +9,10 @@ function deps(overrides: Partial<AppDeps> = {}): AppDeps {
     cvRepo: () => {
       throw new Error("cv repo not used in these tests");
     },
+    importRepo: () => {
+      throw new Error("import repo not used in these tests");
+    },
+    queue: { send: async () => {} },
     log: vi.fn(),
     ...overrides,
   };

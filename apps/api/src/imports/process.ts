@@ -27,7 +27,7 @@ export async function processImport(
       maxOutputTokens: 300,
     });
     if (admit.kind === "not_cv") {
-      throw new ImportFailure("not_a_cv", "This doesn't look like a CV. Upload your CV as PDF or Word.");
+      throw new ImportFailure("not_a_cv");
     }
 
     const draft = await callModel(deps.model, {
@@ -41,12 +41,12 @@ export async function processImport(
     const result = toCvContent(draft);
     if (admit.kind === "uncertain") result.warnings.unshift("This may not be a CV. Check the result carefully.");
     if (new TextEncoder().encode(JSON.stringify(result.content)).length > MAX_CV_BYTES) {
-      throw new ImportFailure("too_long", "This file has too much text for a CV.");
+      throw new ImportFailure("too_long");
     }
     return result;
   } catch (err) {
     if (err instanceof AiUnavailableError) {
-      throw new ImportFailure("ai_unavailable", "Our AI service is busy right now. Please try again in a few minutes.");
+      throw new ImportFailure("ai_unavailable");
     }
     throw err;
   }

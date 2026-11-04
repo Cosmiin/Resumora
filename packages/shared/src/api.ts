@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CvContentSchema } from "./cv.ts";
+import { ImportResultSchema } from "./imports.ts";
 
 export const CvResponseSchema = z.object({
   content: CvContentSchema,
@@ -29,3 +30,16 @@ export const ErrorBodySchema = z.object({
   }),
 });
 export type ErrorBody = z.infer<typeof ErrorBodySchema>;
+
+export const ImportStatusSchema = z.enum(["queued", "processing", "ready", "failed", "applied"]);
+export type ImportStatus = z.infer<typeof ImportStatusSchema>;
+
+export const ImportResponseSchema = z.object({
+  id: z.string(),
+  status: ImportStatusSchema,
+  fileName: z.string(),
+  error: z.object({ code: z.string(), message: z.string() }).nullable(),
+  result: ImportResultSchema.nullable(),
+  createdAt: z.string(),
+});
+export type ImportResponse = z.infer<typeof ImportResponseSchema>;

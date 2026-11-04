@@ -3,15 +3,21 @@ import mammoth from "mammoth";
 
 export type FileFormat = "pdf" | "docx";
 
-export type ImportFailureCode = "no_text" | "too_long" | "unreadable_file" | "not_a_cv" | "ai_unavailable";
+/** Why an import failed, with the message the user sees. */
+export const IMPORT_FAILURES = {
+  not_a_cv: "This doesn't look like a CV. Upload your CV as PDF or Word.",
+  no_text: "We couldn't read text from this file. Scanned CVs aren't supported yet.",
+  too_long: "This file has too much text for a CV.",
+  unreadable_file: "We couldn't open this file. Try saving it again as PDF or Word.",
+  ai_unavailable: "Our AI service is busy right now. Please try again in a few minutes.",
+  internal: "Something went wrong while reading your CV. Please try again.",
+} as const;
+export type ImportFailureCode = keyof typeof IMPORT_FAILURES;
 
-/** An import that can't succeed, however often it is retried. `message` is shown to the user. */
+/** An import that can't succeed, however often it is retried. */
 export class ImportFailure extends Error {
-  constructor(
-    readonly code: ImportFailureCode,
-    message: string,
-  ) {
-    super(message);
+  constructor(readonly code: ImportFailureCode) {
+    super(IMPORT_FAILURES[code]);
   }
 }
 
@@ -58,13 +64,13 @@ export async function extractText(bytes: Uint8Array, format: FileFormat): Promis
   try {
     text = normalize(await rawText(bytes, format));
   } catch {
-    throw new ImportFailure("unreadable_file", "We couldn't open this file. Try saving it again as PDF or Word.");
+    throw new ImportFailure("unreadable_file");
   }
   if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS) {
-    throw new ImportFailure("no_text", "We couldn't read text from this file. Scanned CVs aren't supported yet.");
+    throw new ImportFailure("no_text");
   }
   if (text.length > MAX_TEXT_CHARS) {
-    throw new ImportFailure("too_long", "This file has too much text for a CV.");
+    throw new ImportFailure("too_long");
   }
   return text;
 }
