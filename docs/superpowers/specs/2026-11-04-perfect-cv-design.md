@@ -167,16 +167,25 @@ The review screen gains the table from mockup 2: *In your file → Placed in →
 
 - **With nothing selected (overview):**
   - "Needs attention": the flags from `missingCategories`, each with **Add** (it creates the section and puts the cursor in it) or **Fill in** (for the name or email).
-  - "Sections": the list in page order with show/hide and ↑↓. Hidden sections are struck through and labelled "Hidden".
+  - "Sections": the list in page order with show/hide. **Reorder by dragging** a row by its grip (⠿); there are no ↑↓ arrows. Hidden sections are struck through and labelled "Hidden".
   - "Add section": a dropdown of the categories not yet on the CV, plus "Custom section".
 - **With the cursor in a section:**
-  - its heading, ↑↓ and hide
+  - its heading and hide
   - a note when the heading was renamed
-  - section-specific tools: for a role, the "I work here now" switch plus move and remove; for skills, sorting the "to sort" chips into a group
+  - section-specific tools: for a role, the "I work here now" switch and remove; for skills, sorting the "to sort" chips into a group
   - short tips
   - **"Improve with AI"** buttons marked **Coming next**, for Summary, Key achievements, Experience and Skills
 - **The panel follows the cursor:** moving into another role or section switches it. Clicking empty page space or pressing Esc goes back to the overview.
 - **Under 900 px** the panel becomes a bottom sheet. It is short while typing (the tools for the current role) and can be dragged up to the full overview (mockup 3).
+
+### Reordering by dragging (changed after the mockups)
+
+No ↑↓ arrows anywhere. Order changes by drag and drop:
+
+- **Sections:** drag a row in the panel's section list by its grip (⠿).
+- **Roles, schools and other items inside a section:** drag by a grip that appears in the left margin of the page when the pointer is over the item or the cursor is inside it, the same way the "+ Add" buttons appear. Bullets keep Enter/Backspace and are not dragged.
+- **Works on touch and with the keyboard.** We use `@dnd-kit` (`core` + `sortable`), which handles mouse, touch (long-press on phones) and keyboard: Tab to the grip, Space to pick up, ↑/↓ to move, Space to drop, Esc to cancel. A screen-reader message announces the new position. The native HTML drag API is not used, because it doesn't work on touch screens and has no keyboard support.
+- A drop is one reducer action (`moveSection` / `moveItem`), so it autosaves and shows up in History like any edit.
 
 ### What is removed and what stays
 
@@ -196,10 +205,12 @@ Three plans. **A comes first. B and C both depend on A, but not on each other**,
 
 - **Shared:** `missingCategories` (hidden, header fields, levels); `upgradeCv` (every v1 field kept); `parseTypedDate` (EN and RO months, bad input); a check that every category has labels and synonyms in both languages.
 - **API:** v1 rows come back as v2; saving v1 is rejected; the invention check (passes, misses, a lost diacritic counts as a miss); `toCvContent` v2 with `sourceHeadings`; Move to splits into items.
-- **Web:** the bullet keys (Enter at middle/start/end, Backspace joining, deleting an empty bullet), chips, dates (invalid not saved), renaming and resetting a heading, the panel following focus, hide/show/move, and a keyboard-only walk-through of adding a role.
+- **Web:** the bullet keys (Enter at middle/start/end, Backspace joining, deleting an empty bullet), chips, dates (invalid not saved), renaming and resetting a heading, the panel following focus, hide/show, reordering sections and roles with the keyboard (Space, ↑/↓, Space) and by pointer, and a keyboard-only walk-through of adding a role.
 - **Eval:** the pass bar above, run by hand before each merge of Plan B.
 
-## Open points for review
+## Decisions from review (2026-11-04)
 
-1. **The fallback if PDF files are rejected:** the text path plus a warning, in place of page images (reason above).
-2. **Move to targets:** the six list-shaped categories only. Moving into Experience or Education would need fields the Other text doesn't split into reliably.
+1. Approved: if PDF files are rejected, the fallback is the text path plus a warning, in place of page images.
+2. Approved: Move to offers the six list-shaped categories only.
+3. Added: sections can be renamed, and custom sections can be added with your own name.
+4. Changed: reorder by dragging, with no arrows (see "Reordering by dragging").
