@@ -145,11 +145,6 @@
 .ghost .note { flex: 1; min-width: 12ch; }
 .ghost .btn { font-size: 12px; padding: 2px 10px; }
 
-@media (hover: none) {
-  .adder, .remover, .drag-grip { opacity: 0.55; }
-  .cv-role-desc.is-empty { opacity: 0.55; }
-}
-
 .cv-role-dates { display: flex; align-items: baseline; gap: 2px; flex: none; }
 .cv-role-dates input { width: 8ch; text-align: center; }
 .cv-role-dates .cv-date-field.is-wide input { width: 19ch; }
@@ -158,6 +153,11 @@
 .cv-role + .cv-role { margin-block-start: 6px; }
 .cv-role-desc.is-empty { opacity: 0; }
 .cv-role:hover .cv-role-desc.is-empty, .cv-role:focus-within .cv-role-desc.is-empty { opacity: 1; }
+
+@media (hover: none) {
+  .adder, .remover, .drag-grip { opacity: 0.55; }
+  .cv-role-desc.is-empty { opacity: 0.55; }
+}
 
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .drag-row { position: relative; }
