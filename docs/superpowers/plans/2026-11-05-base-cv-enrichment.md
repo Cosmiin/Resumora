@@ -8,13 +8,15 @@
 - The model returns categorical grades; `packages/shared/src/enrich.ts` computes every number.
 - Scores are a cache in a new `cv_insights` table, keyed by a text fingerprint.
 - The person's answers are hidden `notes` inside the CV itself.
-- The API reads the **saved** CV, calls `callModel`, and returns proposals.
+- The API reads the **saved** CV, calls `callModel` (scores, skills) or the new `streamModel` (rewrites), and returns proposals.
+- Rewrites stream to the browser as server-sent events. Each proposal is shown live but gets its buttons only after it passes the checks.
+- Questions are answered by picking option chips, typing, or speaking. Voice uses a short-lived OpenAI realtime transcription key from our API, so the browser streams the microphone to OpenAI and shows the words live.
 - The browser applies the accepted proposals through `cvReducer`, so undo, autosave and History cover AI changes for free.
 
-**Tech Stack:** Cloudflare Worker (Hono), Supabase (Postgres + RLS), zod 4, vitest, React 19, `callModel` (OpenRouter `google/gemini-3.1-flash-lite`, then OpenAI `gpt-5.4-mini`).
+**Tech Stack:** Cloudflare Worker (Hono, `streamSSE`), Supabase (Postgres + RLS), zod 4, vitest, React 19, `callModel` / `streamModel` (OpenRouter `google/gemini-3.1-flash-lite`, then OpenAI `gpt-5.4-mini`), OpenAI realtime transcription `gpt-4o-mini-transcribe`.
 
 **Spec:** `docs/superpowers/specs/2026-11-05-base-cv-enrichment-design.md` (binding). Scoring prompt source material: `docs/superpowers/specs/reference/codex-experience-scoring.md` (Appendix C).
-**Mockups:** https://claude.ai/artifact/RjBScDyPRxNtsmYMMAYF4y. Its look, copy and flow are binding for Tasks 8–11. Controllers save its HTML into the plan workspace and hand implementers the file path.
+**Mockups:** https://claude.ai/artifact/RjBScDyPRxNtsmYMMAYF4y. Its look, copy and flow are binding for Tasks 10–14. Controllers save its HTML into the plan workspace and hand implementers the file path.
 **Depends on:** Plans A–C on `rebuild/perfect-cv`. It uses `cvReducer`, `SectionTools`, `EditablePage`, `useAutosave` (`status: "saved" | …`), `HistoryItem.reason` (already includes `"ai"`), `callModel`, `cv.locale: "en" | "ro"`, and `BulletSchema = { id, text }`.
 
 ## Global Constraints
@@ -25,7 +27,9 @@
 - Always `git add` explicit paths, and check `git diff --cached --name-only`. Never stage `AGENTS.md`, `docs/decisions/0001–0008`, `docs/learning/`, or the architecture-companion spec and plan.
 - Commit subjects: conventional, one line, followed by a blank line and `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Secrets live only in `apps/api/.dev.vars` and `apps/web/.env.local`. Never print them. The eval reads keys from `.dev.vars`.
-- Every model call goes through `callModel`. Task names: `enrich_score`, `enrich_rewrite_role`, `enrich_rewrite_summary`, `enrich_skills`.
+- Every model call goes through the AI gateway in `apps/api/src/ai/`: `callModel` for JSON, `streamModel` for streamed text, and `createVoiceSession` for voice. Task names: `enrich_score`, `enrich_rewrite_role`, `enrich_rewrite_summary`, `enrich_skills`, `enrich_voice`.
+- Streamed text is shown live but can only be accepted after it passes every check. Voice: at most 60 s per recording and 20 sessions per user per day; our OpenAI key never reaches the browser; no audio is stored.
+- Answer options may contain a number only as a range (`10–50`, `Under 10`, `50+`, `Peste 50`). Chips never submit on their own.
 - Every enrich route reads the saved CV on the server and never trusts CV text sent by the browser.
 - Weights are exactly contribution **35**, clarity **25**, specificity **20**, impact **20**. Multipliers: missing 0, partial 0.5, specific 1. Rounding is `Math.round`. Policy id: `score/1`.
 - Bands: 0–39 "Needs work", 40–74 "A good start", 75–100 "Clear". "Clear bullet" means a score of 75 or more.
@@ -36,11 +40,13 @@
 
 ## Review Focus
 
-1. **A role is edited while its score request is in flight.** The late result must be ignored, not shown against the new text → test in Task 8.
-2. **A bullet that a proposal replaces is deleted before the person clicks "Use this".** The proposal is skipped, and nothing else changes → test in Task 10.
+1. **A role is edited while its score request is in flight.** The late result must be ignored, not shown against the new text → test in Task 10.
+2. **A bullet that a proposal replaces is deleted before the person clicks "Use this".** The proposal is skipped, and nothing else changes → test in Task 13.
 3. **Numbers written differently in the source and the proposal.** "1.2M" against "1,2 mil", or "20 min" against "20 minutes", must pass. A number that appears nowhere must drop the proposal → tests in Task 2.
-4. **A Romanian CV.** First-person words in Romanian are caught, and questions and rewrites come back in Romanian → tests in Task 2, plus eval cases in Task 12.
-5. **The model grades a bullet id that wasn't sent, or skips one.** The call fails as a 502 and never stores a partial score. A placeholder bullet the model calls "specific" still scores 0 → tests in Tasks 1 and 5.
+4. **A Romanian CV.** First-person words in Romanian are caught, and questions and rewrites come back in Romanian → tests in Task 2, plus eval cases in Task 15.
+5. **The stream breaks halfway through a rewrite** (a network drop, or the provider stopping). Proposals already marked ready stay usable, the half-written one never gets buttons, and the person sees "The rest didn't come through. Try again" → tests in Tasks 6, 7 and 13.
+
+Also covered by the tests (from the spec): the model grading a bullet id that wasn't sent, or skipping one (Tasks 1 and 5), and a placeholder bullet scoring 0 even when the model calls it "specific" (Task 1).
 
 ---
 
@@ -55,9 +61,11 @@
   - `SCORE_POLICY = "score/1"`, `WEIGHTS = { contribution: 35, clarity: 25, specificity: 20, impact: 20 }`.
   - `GradeSchema = z.enum(["missing","partial","specific"])`.
   - `IssueSchema = z.enum(["example","duplicate","contribution","clarity","specificity","impact","none"])`.
-  - `ModelBulletSchema = { id, meaningful: boolean, contribution, clarity, specificity, impact: Grade, issue: Issue, duplicateOf: string|null, tip: string(≤240)|null, question: string(≤240)|null }`.
+  - `ModelBulletSchema = { id, meaningful: boolean, contribution, clarity, specificity, impact: Grade, issue: Issue, duplicateOf: string|null, tip: string(≤240)|null, question: string(≤240)|null, options: string(≤60)[] (max 4) }`.
   - `ModelScoreSchema = { bullets: ModelBullet[], nextStepId: string|null }`.
-  - `RoleResultSchema = { policy, fingerprint, score: number|null, bullets: [{ id, score, contribution, clarity, specificity, impact, issue, tip: string|null, question: string|null }], nextStep: { bulletId, issue, tip: string|null } | null, questions: string[] (max 3) }`.
+  - `QuestionSchema = { bulletId: string, text: string, options: string[] }`.
+  - `RoleResultSchema = { policy, fingerprint, score: number|null, bullets: [{ id, score, contribution, clarity, specificity, impact, issue, tip: string|null, question: string|null }], nextStep: { bulletId, issue, tip: string|null } | null, questions: Question[] (max 3) }`.
+  - `isAllowedOption(option: string): boolean`. It is true when the option has no digits, or its only number is a range: `\d+\s*[–-]\s*\d+`, `\d+\+`, or `(under|over|sub|peste)\s+\d+`, case-insensitive.
   - `bulletScore(g): number`.
   - `isPlaceholder(text: string): boolean`.
   - `buildRoleResult(role: Experience, model: ModelScore, fingerprint: string): RoleResult`. It throws `EnrichParseError` when the model's ids don't match the role's bullet ids exactly.
@@ -86,7 +94,8 @@
     - at most 3;
     - ordered by issue priority (example, duplicate, contribution, clarity, specificity, impact), then by lower score;
     - non-null only;
-    - duplicates never ask.
+    - duplicates never ask;
+    - each keeps its bullet's options after `isAllowedOption` filtering (`"About 40 a week"` dropped; `"10–50 a week"`, `"Under 10"`, `"50+"`, `"Peste 50"`, `"Customs papers"` kept).
   - `nextStep`:
     - the model's `nextStepId` is used when that bullet's issue is in the highest-priority tier present;
     - otherwise the lowest-scoring bullet of that tier;
@@ -162,7 +171,7 @@
 
 **Interfaces:**
 - Produces:
-  - `NoteSchema = { id, question: text(MAX_TEXT), answer: text(MAX_LONG_TEXT), askedAt: z.iso.datetime() }`.
+  - `NoteSchema = { id, question: text(MAX_TEXT), answer: text(MAX_LONG_TEXT), via: z.array(z.enum(["pick","type","voice"])).min(1).max(3), askedAt: z.iso.datetime() }`.
   - `Experience.notes: Note[]`, defaulting to `[]`, max `MAX_NOTES`.
   - `carryNotes(current: CvContent, incoming: CvContent): CvContent`. Notes of each current role whose `company` and `title` (trimmed, lowercased, spaces collapsed) match exactly one incoming role are copied onto it. Incoming notes win on equal ids. The result is capped at `MAX_NOTES`, keeping the newest by `askedAt`.
   - Reducer action `{ type: "setNote"; roleId: string; note: Note }`, which inserts or replaces by `note.id`.
@@ -241,43 +250,88 @@
 - [ ] **Step 2: Run** `npm test -w apps/api -- enrich`. Expected: FAIL.
 - [ ] **Step 3: Implement.**
   - The prompt is the spec's "Score prompt" section, built from Appendix C of `docs/superpowers/specs/reference/codex-experience-scoring.md`.
-  - Keep, in this order: the role and purpose, untrusted-input and no-tools, title-as-context, the recruiter comprehension test, the GRADING definitions (contribution, clarity, specificity copied, plus **impact**, worded from the spec's table), SUFFICIENCY TEST, the 7 CALIBRATION lines from the spec's table with all four grades, MEANINGFULNESS AND REPETITION, ACTIONABLE FEEDBACK (only `tip` and `question` fields, priority contribution → clarity → specificity → impact), and OUTPUT ("return grades, not numbers; every supplied id exactly once").
+  - Keep, in this order: the role and purpose, untrusted-input and no-tools, title-as-context, the recruiter comprehension test, the GRADING definitions (contribution, clarity, specificity copied, plus **impact**, worded from the spec's table), SUFFICIENCY TEST, the 7 CALIBRATION lines from the spec's table with all four grades, MEANINGFULNESS AND REPETITION, ACTIONABLE FEEDBACK (only `tip`, `question` and `options` fields, priority contribution → clarity → specificity → impact; `options` are 2–4 short likely answers drawn only from the role's own words and the job's common tasks, never an exact number, only ranges; an empty list when the question is open), and OUTPUT ("return grades, not numbers; every supplied id exactly once").
   - Drop Codex's EXPERIENCE-LEVEL REVIEW, coverage, scope and documentLocale text.
   - Prefix the Codex language instruction (Appendix B) with the CV locale.
   - `maxOutputTokens: Math.min(4000, 600 + 180 * bullets.length)`.
 - [ ] **Step 4: Run** the full check. Expected: green.
 - [ ] **Step 5: Commit** `feat(api): score one experience with cached grades`.
 
-### Task 6: Rewrite routes (role and summary)
+### Task 6: Streaming in the AI gateway, and the line format
+
+**Files:**
+- Create: `apps/api/src/ai/stream-model.ts`, `apps/api/src/ai/stream-model.test.ts`, `apps/api/src/enrich/blocks.ts`, `apps/api/src/enrich/blocks.test.ts`
+- Modify: `apps/api/src/ai/call-model.ts` only to export what both need (provider request building, privacy routing, the `AiCallLog` type). Behaviour stays unchanged.
+
+**Interfaces:**
+- Consumes: `Provider`, `ModelDeps`, `AiUnavailableError` from `call-model.ts`.
+- Produces:
+  - `streamModel(deps: ModelDeps, req: { userId; task; system; user: string; maxOutputTokens }): AsyncIterable<string>`. It yields text chunks.
+    - It tries providers in order with `stream: true` (and `stream_options: { include_usage: true }` for OpenAI), using the same privacy routing as `callModel`.
+    - On a failure or timeout **before the first chunk**, it moves to the next provider. After the first chunk it never switches; a failure throws `AiStreamBrokenError`.
+    - If every provider fails before the first chunk, it throws `AiUnavailableError`.
+    - It logs one `AiCallLog` when the stream ends or fails, with tokens if the provider reported usage.
+  - `BlockParser` in `blocks.ts`: `new BlockParser()`, `push(chunk): BlockEvent[]`, `end(): BlockEvent[]`. Events are `{ type: "start"; index; key: string }` (`key` is a bullet id, `"new"`, or `"summary"`), `{ type: "delta"; index; text }`, and `{ type: "end"; index; text }`. A block starts at a line `### <key>`; `### end` or the end of input closes the open block.
+
+- [ ] **Step 1: Write failing tests:**
+  - **`BlockParser`:**
+    - a full input in one chunk;
+    - the same input split at every character gives the same `end` texts;
+    - a `###` marker split across two chunks;
+    - a missing `### end` still closes the last block on `end()`;
+    - text before the first marker is ignored;
+    - leading and trailing spaces in a block are trimmed in `end`.
+  - **`streamModel`**, with a fake `fetch` returning SSE bodies:
+    - chunks are yielded in order from `choices[0].delta.content`;
+    - the first provider returning 500 makes the second answer;
+    - the first provider failing after one chunk throws `AiStreamBrokenError` and does not try the second;
+    - all failing before the first chunk throws `AiUnavailableError`;
+    - exactly one log entry per call, with `status` and tokens from the final usage chunk.
+- [ ] **Step 2: Run** `npm test -w apps/api -- stream-model blocks`. Expected: FAIL.
+- [ ] **Step 3: Implement.** Read the provider's SSE with a `TextDecoderStream` and a line splitter. Ignore `: keep-alive` comments and `[DONE]`. The timeout applies to the first chunk (default 20 s) and to gaps between chunks (15 s).
+- [ ] **Step 4: Run** the full check. Expected: green, and the existing `callModel` tests unchanged.
+- [ ] **Step 5: Commit** `feat(api): streamed model answers with fallback before the first word`.
+
+### Task 7: Rewrite routes (role and summary), streamed
 
 **Files:**
 - Create: `apps/api/src/enrich/rewrite.ts`, `apps/api/src/enrich/rewrite.test.ts`
-- Modify: `apps/api/src/enrich/prompts.ts`, `apps/api/src/enrich/routes.ts`
+- Modify: `apps/api/src/enrich/prompts.ts`, `apps/api/src/enrich/routes.ts`, `apps/api/src/app.ts` (the `model(user)` deps also serve `streamModel`)
+- Create: `packages/shared/src/enrich-stream.ts` (the event schemas below, so the web parses the same shapes)
 
 **Interfaces:**
-- Consumes: Task 2 (`hasUnknownNumber`, `PROPOSAL_MAX`), Task 3 (notes), Task 4 (`CvRepo.snapshot`), and the Task 5 router.
+- Consumes: Task 2 (`hasUnknownNumber`, `PROPOSAL_MAX`), Task 3 (notes), Task 4 (`CvRepo.snapshot`), the Task 5 router, and Task 6 (`streamModel`, `BlockParser`).
 - Produces:
-  - `POST /v1/enrich/rewrite-role { roleId }` → `{ proposals: [{ replaces: string | null, text: string }] }`.
-  - `POST /v1/enrich/rewrite-summary` → `{ proposal: string | null }`.
-  - Model schemas: `ModelRoleRewriteSchema = { proposals: [{ replaces: string | null, text: string }] }` and `ModelSummarySchema = { proposal: string | null }`.
+  - `POST /v1/enrich/rewrite-role { roleId }` and `POST /v1/enrich/rewrite-summary` respond with `text/event-stream` (Hono `streamSSE`).
+  - Events, with schemas in `enrich-stream.ts`:
+    - `start { index, replaces: string | null }`. For the summary, `replaces` is `"summary"`.
+    - `delta { index, text }`.
+    - `ready { index, text }`.
+    - `dropped { index, reason: "number" | "length" | "unknownBullet" | "unchanged" | "newWithoutNote" }`.
+    - `error { code, message }`.
+    - `done {}`.
+  - Errors before the stream starts (404, 503) are normal JSON errors. `AiStreamBrokenError` after the start becomes an `error` event with code `stream_broken`, followed by `done`.
+  - `checkProposal(role, key, text, notes): "ok" | DropReason` in `rewrite.ts`, which runs the spec's rewrite checks.
 
-- [ ] **Step 1: Write failing tests**, with a fake model:
+- [ ] **Step 1: Write failing tests**, with a fake `streamModel` that yields scripted chunks:
   - each route calls `snapshot("ai")` once, before the model call;
-  - a proposal with an invented number is dropped;
-  - a proposal of 221 characters or more is dropped;
-  - a proposal whose `replaces` id isn't a bullet of the role is dropped;
-  - `replaces: null` is kept only when the role has at least one note;
-  - a proposal identical to its original (after trimming) is dropped;
+  - the event order for two blocks is `start, delta…, ready, start, delta…, ready, done`;
+  - a block with an invented number ends in `dropped { reason: "number" }`;
+  - a block of 221 characters or more → `length`;
+  - an unknown bullet id → `unknownBullet`;
+  - `### new` with no notes → `newWithoutNote`;
+  - a block identical to its original → `unchanged`;
+  - a range picked in a note ("10–50 a week") may appear in a proposal, and an exact number never in any source is still dropped;
+  - a fake stream that throws `AiStreamBrokenError` after the first block gives `ready` for block 0, then `error { code: "stream_broken" }`, then `done`, with no `ready` for the broken block;
   - the role's notes are in the user message as `Q:`/`A:` pairs;
-  - bullets whose cached score is 100 are marked "keep as is" in the message;
-  - the summary message includes every role's title, company, dates, bullets and notes;
-  - an empty model list → `{ proposals: [] }` with 200.
+  - bullets whose cached score is 100 are marked "keep as is";
+  - the summary message includes every role's title, company, dates, bullets and notes.
 - [ ] **Step 2: Run** `npm test -w apps/api -- rewrite`. Expected: FAIL.
-- [ ] **Step 3: Implement.** The prompts state the spec's "Rewrite rules" list word for word, then tell the model to return only proposals that improve a bullet's grades without new facts. Task names: `enrich_rewrite_role` and `enrich_rewrite_summary`. `maxOutputTokens`: 2500 and 800.
+- [ ] **Step 3: Implement.** The prompts state the spec's "Rewrite rules" word for word, plus the line format from the spec's "Streaming" section with one example, and "write nothing outside the blocks". Task names `enrich_rewrite_role` and `enrich_rewrite_summary`; `maxOutputTokens` 2500 and 800.
 - [ ] **Step 4: Run** the full check. Expected: green.
-- [ ] **Step 5: Commit** `feat(api): rewrite a role's bullets or the summary without new facts`.
+- [ ] **Step 5: Commit** `feat(api): stream rewritten bullets and summaries, checked before they count`.
 
-### Task 7: Skills route
+### Task 8: Skills route
 
 **Files:**
 - Create: `apps/api/src/enrich/skills.ts`, `apps/api/src/enrich/skills.test.ts`
@@ -298,7 +352,35 @@
 - [ ] **Step 4: Run** the full check. Expected: green.
 - [ ] **Step 5: Commit** `feat(api): suggest and sort skills from the experience`.
 
-### Task 8: Web: score loading and the score pill
+### Task 9: Voice session route (check the live API first)
+
+**Files:**
+- Create: `apps/api/scripts/check-voice-session.ts` (kept as a tool; tiny), `apps/api/src/ai/voice-session.ts`, `apps/api/src/ai/voice-session.test.ts`
+- Modify: `apps/api/src/enrich/routes.ts`, `apps/api/src/env.ts` (no new secret; it reuses the existing OpenAI key)
+
+**Interfaces:**
+- Produces:
+  - `createVoiceSession(deps: { fetch; apiKey; logCall }, { userId, locale: "en" | "ro" }): Promise<{ clientSecret: string; expiresAt: string; model: string }>`.
+  - `POST /v1/enrich/voice-session` → that object.
+    - 429 `voice_limit` when the user already has 20 `enrich_voice` rows in `ai_calls` from the last 24 h. Count them through the user's own read policy, with a new `countAiCallsSince(task, sinceIso)` on the insights repo.
+    - 503 when OpenAI fails.
+  - A `VOICE` constant in shared: `{ maxSeconds: 60, perDay: 20, model: "gpt-4o-mini-transcribe" }`.
+
+- [ ] **Step 1: Probe the live API.** The script reads the OpenAI key from `apps/api/.dev.vars` (never prints it). It creates a realtime **transcription** session with `gpt-4o-mini-transcribe`, language `ro`, and server voice-activity detection. It prints the HTTP status, the response's top-level keys and its expiry time, but never the secret. Run it the way Plan B ran `check-pdf-input.ts`: bundle with esbuild, then `node`.
+  - Write the confirmed endpoint, request body and the transcript event names (the partial/delta and the completed event) into the top of `voice-session.ts` as a comment.
+  - If the endpoint differs from the spec's assumption, follow the live API and note it in the task report. The spec's behaviour (a short-lived key, live words, our key never in the browser) is what binds.
+- [ ] **Step 2: Write failing tests**, with a fake fetch:
+  - the request uses the confirmed endpoint, the model and the locale's language;
+  - the response maps to `{ clientSecret, expiresAt, model }` and nothing else;
+  - our API key never appears in the response body;
+  - the 21st call in 24 h → 429 `voice_limit`;
+  - each successful call logs one `enrich_voice` row with provider `openai`;
+  - an OpenAI 500 → 503, logged as an error.
+- [ ] **Step 3: Run** `npm test -w apps/api -- voice-session`. Expected: FAIL.
+- [ ] **Step 4: Implement.** Then run the full check. Expected: green.
+- [ ] **Step 5: Commit** `feat(api): short-lived voice sessions for live answers`.
+
+### Task 10: Web: score loading and the score pill
 
 **Files:**
 - Create: `apps/web/src/cv/enrich/enrich-api.ts`, `apps/web/src/cv/enrich/useRoleScores.ts`, `apps/web/src/cv/enrich/ScorePill.tsx`, `apps/web/src/cv/enrich/scores.test.tsx`
@@ -326,14 +408,14 @@
 - [ ] **Step 4: Run** the full check. Expected: green, with the speed test still green (`scores` must not change identity for rows whose state didn't change).
 - [ ] **Step 5: Commit** `feat(web): experience score pill that stays fresh after saves`.
 
-### Task 9: Web: the score card in a role's tools
+### Task 11: Web: the score card in a role's tools
 
 **Files:**
 - Create: `apps/web/src/cv/enrich/ScoreCard.tsx`, `apps/web/src/cv/enrich/score-card.test.tsx`
 - Modify: `apps/web/src/cv/panel/SectionTools.tsx` (render `ScoreCard` at the top of a role's tools), `apps/web/src/cv/panel/HelperPanel.tsx` (pass `scores`, `retry`), the role component (weak-bullet markers while the card is shown), `en.ts`
 
 **Interfaces:**
-- Consumes: Task 2 (`atsChecks`) and Task 8 (`RoleScoreState`).
+- Consumes: Task 2 (`atsChecks`) and Task 10 (`RoleScoreState`).
 - Produces: `ScoreCard { role: Experience; score: RoleScoreState; onAnswer(): void; onRewrite(): void; onRetry(): void }`. Weak-bullet markers are shown for bullets with a score below 75, with that bullet's `tip` (or the generic tip for its issue) as `title` and `aria-describedby` text.
 
 - [ ] **Step 1: Write failing tests:**
@@ -348,53 +430,91 @@
 - [ ] **Step 4: Run** the full check. Expected: green.
 - [ ] **Step 5: Commit** `feat(web): score card with tips in a role's tools`.
 
-### Task 10: Web: questions and the rewrite review
+### Task 12: Web: the answer box (pick, type, speak)
+
+**Files:**
+- Create: `apps/web/src/cv/enrich/AnswerBox.tsx`, `apps/web/src/cv/enrich/useVoice.ts`, `apps/web/src/cv/enrich/answer-box.test.tsx`
+- Modify: `apps/web/src/cv/enrich/enrich-api.ts` (`createVoiceSession()`), `en.ts`
+
+**Interfaces:**
+- Consumes: Task 1 (`Question`), Task 9 route, `VOICE`.
+- Produces:
+  - `AnswerBox { question: Question; value: string; via: Via[]; onChange(value, via): void }`. It is a controlled text box, a row of option chips plus "Something else", and the mic button.
+    - Picking a chip appends its text, joined with ", ", and adds `"pick"` to `via`. Picking it again removes that text.
+    - Typing adds `"type"`. Voice text adds `"voice"`.
+  - `useVoice({ locale }): { state: "idle" | "asking" | "recording" | "stopping" | "denied" | "unavailable" | "limit"; partial: string; start(): void; stop(): void; onFinal(cb: (text: string) => void) }`.
+    - It gets a session from the API, opens the realtime connection with the temporary key (WebRTC or WebSocket, whichever Task 9's probe confirmed), streams the microphone, and exposes partial text as it arrives. Final segments go to `onFinal`.
+    - It stops automatically at `VOICE.maxSeconds`, with a visible countdown for the last 10 s.
+    - It closes the connection and the microphone on stop and on unmount.
+
+- [ ] **Step 1: Write failing tests**, with mocked `getUserMedia` and a fake transport that emits partial and final events:
+  - chips render from `question.options`, plus a last "Something else" chip that focuses the text box;
+  - picking two chips gives `"Customs papers, Carrier invoices"` with `via` `["pick"]`, and picking one again removes it;
+  - a chip never calls any save;
+  - typing after picking gives `via` `["pick","type"]`;
+  - the mic shows live partial text in a muted span while `recording`, and final text lands in the box with `"voice"` in `via`;
+  - auto-stop at 60 s (fake timers);
+  - a `getUserMedia` rejection → `denied`, the mic is hidden, and "Microphone blocked. You can still type or pick." is shown;
+  - no `navigator.mediaDevices` → `unavailable`, mic hidden;
+  - a 429 → `limit` with "You've used today's voice answers. You can still type or pick.";
+  - the one-time notice "Your voice goes to OpenAI to be turned into text. We don't keep the recording." shows before the first recording only (stored per browser in `localStorage`, wrapped in try/catch).
+- [ ] **Step 2: Run** `npm test -w apps/web -- answer-box`. Expected: FAIL.
+- [ ] **Step 3: Implement.** The mic button is a real `<button>` with `aria-pressed` while recording, an `aria-live="polite"` region for the partial text, and a visible recording dot. It respects `prefers-reduced-motion` for the pulse.
+- [ ] **Step 4: Run** the full check. Expected: green. Then try a real recording in the browser pane at `localhost:5173` (the user signs in) in EN and RO, and note in the report how fast the words appear.
+- [ ] **Step 5: Commit** `feat(web): answer by picking, typing or speaking, with live words`.
+
+### Task 13: Web: questions and the rewrite review
 
 **Files:**
 - Create: `apps/web/src/cv/enrich/QuestionFlow.tsx`, `apps/web/src/cv/enrich/RewriteReview.tsx`, `apps/web/src/cv/enrich/rewrite.test.tsx`
 - Modify: `apps/web/src/cv/edit/cvReducer.ts` and its test (`applyProposals`), `ScoreCard` / `SectionTools` (switch views), `en.ts`
 
 **Interfaces:**
-- Consumes: Task 3 (`setNote`), Task 6 routes, Task 9 (`onAnswer`, `onRewrite`).
+- Consumes: Task 3 (`setNote`), Task 7 routes and `enrich-stream.ts` schemas, Task 11 (`onAnswer`, `onRewrite`), Task 12 (`AnswerBox`).
 - Produces:
   - Reducer action `{ type: "applyProposals"; roleId; accepted: [{ replaces: string | null; text: string }] }`. It replaces each bullet by id, skips any `replaces` id that no longer exists, and appends `replaces: null` items with new ids, up to `MAX_BULLETS`. It is one action, so one history (undo) step.
-  - `QuestionFlow { role, questions: string[], dispatch, waitForSave(): Promise<void>, onDone(proposals) }`.
-  - `RewriteReview { role, proposals, dispatch, onClose() }`.
+  - `QuestionFlow { role, questions: Question[], dispatch, waitForSave(): Promise<void>, onDraft(): void }`.
+  - `streamRewrite(path, body, onEvent): AbortController` in `enrich-api.ts`. It POSTs with the auth header (the same token refresh as `apiFetch`), reads `text/event-stream` with a `ReadableStream` reader, and validates each event with the shared schemas.
+  - `RewriteReview { role, dispatch, onClose() }`. It starts the stream on mount, aborts it on unmount, and keeps `proposals: { index, replaces, text, state: "streaming" | "ready" | "dropped" | "used" | "kept"; reason? }[]`.
   - `waitForSave` resolves when autosave status is next `"saved"`. Expose it from `Editor` via the existing `useAutosave` status.
 
 - [ ] **Step 1: Write failing tests:**
   - **Question flow:**
-    - questions are shown one at a time;
-    - Next with text dispatches `setNote` with that question and answer;
+    - questions are shown one at a time, each in an `AnswerBox`;
+    - "Save answer" dispatches `setNote` with the question, answer and `via`;
     - Skip dispatches nothing;
-    - after the last question, "Draft improved bullets" waits for save and then calls `rewrite-role`.
-  - **Review:**
-    - each proposal shows under its original bullet's text, or as "New bullet";
+    - after the last question, "Draft improved bullets" waits for save, then opens the review.
+  - **Review**, with a fake event stream:
+    - a `start` plus `delta`s shows the growing text muted, under its original bullet (or as "New bullet"), with no buttons;
+    - `ready` shows "Use this" / "Keep mine";
+    - `dropped { reason: "number" }` shows "Left out: it added a number you didn't give us" and no buttons;
     - "Use this" on one, then "Done", dispatches one `applyProposals` with that one;
-    - "Use all" applies all in one action, and a single undo restores every original bullet;
-    - zero proposals shows "Couldn't improve this without adding facts. Try answering a question first.".
+    - "Use all" applies only `ready` ones in one action, and a single undo restores every original bullet;
+    - an `error` event keeps ready proposals usable and shows "The rest didn't come through. Try again", where "Try again" restarts the stream;
+    - unmounting aborts the stream;
+    - `done` with no ready proposals shows "Couldn't improve this without adding facts. Try answering a question first.".
   - **Reducer:**
     - a proposal whose `replaces` bullet was deleted is skipped and the others apply (Review Focus 2);
     - appending stops at `MAX_BULLETS`.
 - [ ] **Step 2: Run** `npm test -w apps/web -- rewrite cvReducer`. Expected: FAIL.
-- [ ] **Step 3: Implement** the two views inside the role's tools, replacing the card while open. "← Back to score" returns. The Rewrite button goes straight to the review: it calls `rewrite-role` after `waitForSave`, and shows "Drafting…" while the call runs.
+- [ ] **Step 3: Implement** the two views inside the role's tools, replacing the card while open. "← Back to score" returns. The Rewrite button goes straight to the review after `waitForSave`, showing "Drafting…" until the first `start` event. Streaming text uses a blinking caret, which respects `prefers-reduced-motion`.
 - [ ] **Step 4: Run** the full check. Expected: green.
 - [ ] **Step 5: Commit** `feat(web): answer questions and review rewritten bullets one by one`.
 
-### Task 11: Web: Summary and Skills tools
+### Task 14: Web: Summary and Skills tools
 
 **Files:**
 - Create: `apps/web/src/cv/enrich/SummaryTools.tsx`, `apps/web/src/cv/enrich/SkillsTools.tsx`, `apps/web/src/cv/enrich/summary-skills.test.tsx`
 - Modify: `SectionTools.tsx` (render them for `summary` / `skills` in place of their "Coming next" AI buttons), `sectionTips.ts`, `en.ts`
 
 **Interfaces:**
-- Consumes: Task 2 (`summaryChecklist`, `skillsChecklist`), Task 6 (`rewrite-summary`), Task 7 (`skills`), and the existing reducer actions for summary text, `addSkill` and `moveSkill`.
+- Consumes: Task 2 (`summaryChecklist`, `skillsChecklist`), Task 7 (`rewrite-summary`), Task 8 (`skills`), and the existing reducer actions for summary text, `addSkill` and `moveSkill`.
 
 - [ ] **Step 1: Write failing tests:**
   - **Summary:**
     - the checklist shows each item with ✓ or a short fix;
-    - "Rewrite my summary" waits for save, then calls `rewrite-summary`;
-    - the proposal shows with "Use this" / "Keep mine";
+    - "Rewrite my summary" waits for save, then streams `rewrite-summary` with `streamRewrite`;
+    - the text grows muted while streaming, and "Use this" / "Keep mine" appear only on `ready`;
     - "Use this" dispatches one summary edit, undoable in one step;
     - a null proposal shows the "without adding facts" message.
   - **Skills:**
@@ -407,14 +527,14 @@
 - [ ] **Step 4: Run** the full check. Expected: green.
 - [ ] **Step 5: Commit** `feat(web): summary and skills checklists with AI helpers`.
 
-### Task 12: Evaluation set
+### Task 15: Evaluation set
 
 **Files:**
 - Create: `apps/api/eval/enrich/cases.ts`, `apps/api/eval/enrich/run.eval.ts`, `apps/api/eval/enrich/RESULTS.md`
 - Modify: `apps/api/vitest.eval.config.ts` (include `eval/enrich/**`), `apps/api/package.json` and root `package.json` (`eval:enrich`)
 
 **Interfaces:**
-- Consumes: Task 5 (`scoreSystemPrompt`, `scoreUserMessage`, `buildRoleResult`), Task 6 rewrite prompts and checks, and the real `callModel` with `providersFromEnv` read from `.dev.vars`, like `eval/import/run.eval.ts`.
+- Consumes: Task 5 (`scoreSystemPrompt`, `scoreUserMessage`, `buildRoleResult`), Task 6 (`streamModel`, `BlockParser`), Task 7 rewrite prompts and `checkProposal`, and the real gateway with `providersFromEnv` read from `.dev.vars`, like `eval/import/run.eval.ts`. Record time to first word for each rewrite as well as total time.
 
 - [ ] **Step 1: Write the cases.**
   - **15 synthetic score roles**, fictional people only, 9 EN and 6 RO.
@@ -431,7 +551,9 @@
     - an answer that adds a real number (it may be used);
     - no answers (no new numbers allowed);
     - a duplicate pair;
-    - a Romanian role (the output must stay Romanian, checked by a diacritics or stop-word heuristic).
+    - a Romanian role (the output must stay Romanian, checked by a diacritics or stop-word heuristic);
+    - an answer made only of picked range options ("10–50 a week") where the rewrite may use the range but no exact number.
+  - **Options check:** on the score cases, count how many model options contained an exact number before `isAllowedOption` filtered them. The target is 0, and it is reported, not a fail.
 - [ ] **Step 2: Implement `run.eval.ts`.** It scores each case and prints per-case pass/fail, cost and duration. The pass bar:
   - each grade is within one step of expected on ≥ 90% of bullets;
   - placeholder and exact duplicate score 0;
@@ -440,7 +562,7 @@
 - [ ] **Step 3: Run** `npm run eval:enrich` twice. Record both runs in `RESULTS.md`: the pass rate, slowest case, most expensive case, and total cost per run. If the bar fails, adjust only the prompt wording (not the weights or the checks), bump nothing else, and re-run. Note each prompt change in `RESULTS.md`.
 - [ ] **Step 4: Commit** `test(api): live evaluation for experience scores and rewrites`. The eval is never run in CI.
 
-### Task 13: Re-import keeps notes
+### Task 16: Re-import keeps notes
 
 **Files:**
 - Create: `supabase/migrations/20261106010000_apply_import_content.sql` (re-create `apply_import` with an extra `p_content jsonb default null`; when given, it is saved instead of the stored import result, with the same version check and the same `import` History copy)
@@ -458,7 +580,7 @@
 - [ ] **Step 4: Run** the full check. Expected: green. Add the new migration to the db steps file.
 - [ ] **Step 5: Commit** `feat(api): keep a role's notes when the CV is imported again`.
 
-### Task 14: Decision record
+### Task 17: Decision record
 
 - [ ] **Step 1: Write** `docs/decisions/NNNN-ai-enrichment-scores-and-notes.md`, with the next free number. Follow the front matter of `0010`:
   - `affects: [table:cv_insights, file:packages/shared/src/enrich.ts, file:apps/api/src/enrich/routes.ts, file:packages/shared/src/notes.ts]`.
@@ -466,6 +588,8 @@
     - answers are notes inside the CV (source data: History, restore, and job tailoring later);
     - scores live in `cv_insights` (a recomputable cache, with no autosave conflicts);
     - the model grades and the app computes the numbers;
-    - the numbers check drops any proposal that contains a number not found in the person's own text or answers.
-  - Options considered: everything inside the CV; everything in separate tables; nothing stored.
+    - the numbers check drops any proposal that contains a number not found in the person's own text or answers;
+    - rewrites stream in a simple line format and are shown live, but can be accepted only after they pass the checks;
+    - voice uses a short-lived OpenAI key from our API, so audio goes straight to OpenAI, our key never reaches the browser, and nothing is stored.
+  - Options considered: everything inside the CV; everything in separate tables; nothing stored; voice through our Worker; browser dictation.
 - [ ] **Step 2: Commit** only that file: `docs: decision record for AI enrichment scores and notes`.

@@ -22,8 +22,9 @@ It does this in two ways: **rewriting** the existing text, and **asking short qu
 - the experience score (per role, 0–100);
 - ATS tips without AI;
 - the question flow, with answers saved as hidden notes on the role;
-- role rewrites with per-bullet accept;
-- the summary checklist and summary rewrite;
+- answering by **picking options, typing or speaking**, with the spoken text appearing live;
+- role rewrites with per-bullet accept, **streamed** so suggestions appear as they are written;
+- the summary checklist and summary rewrite (also streamed);
 - the skills checklist and skill suggestions, including sorting "to sort" items;
 - the `cv_insights` table;
 - an evaluation set.
@@ -57,7 +58,9 @@ For each bullet the model returns four independent grades, each `missing | parti
 | **specificity** | only a generic responsibility or value claim | some context, but still broad | enough context to tell the work apart: the document, task, audience, workflow, deliverable, problem or purpose |
 | **impact** | no result, scale, frequency or reason stated | stated vaguely ("improved efficiency") | a concrete result, scale, frequency or reason ("for 1.2M customers", "weekly", "so payroll closed on time") |
 
-Plus `meaningful: boolean`, `issue`, `duplicateOf`, `tip` (≤ 1 sentence) and `question` (≤ 1, or null).
+Plus `meaningful: boolean`, `issue`, `duplicateOf`, `tip` (≤ 1 sentence), `question` (≤ 1, or null) and `options` (0–4 short answer choices for that question, each ≤ 60 characters; see "Answering").
+
+The stored role result keeps up to 3 questions as `[{ bulletId, text, options }]`.
 
 `issue` is one of: `example`, `duplicate`, `contribution`, `clarity`, `specificity`, `impact`, `none`.
 
@@ -128,7 +131,7 @@ Questions are written in the CV's locale. Calibration lines with their impact gr
 
 ## Notes: the person's answers, stored with the CV
 
-`ExperienceSchema` gains `notes: z.array(NoteSchema).max(10).default([])`, where `NoteSchema = { id, question: text(MAX_TEXT), answer: text(MAX_LONG_TEXT), askedAt: ISO string }`.
+`ExperienceSchema` gains `notes: z.array(NoteSchema).max(10).default([])`, where `NoteSchema = { id, question: text(MAX_TEXT), answer: text(MAX_LONG_TEXT), via: ("pick" | "type" | "voice")[], askedAt: ISO string }`. `via` records how the answer was given, so later phases can tell a tapped option from the person's own words.
 
 - No migration: `content` is jsonb. Old CVs parse with `notes: []`.
 - Notes are never rendered on the page, in `CvDocument` or in the PDF.
@@ -153,14 +156,15 @@ Questions are written in the CV's locale. Calibration lines with their impact gr
 
 ## API (`apps/api/src/enrich/`)
 
-Every route needs sign-in and reads the **saved** CV on the server, never CV text sent by the browser. Every model call goes through `callModel` (decision 0007).
+Every route needs sign-in and reads the **saved** CV on the server, never CV text sent by the browser. Every model call goes through the AI gateway (decision 0007): `callModel` for JSON answers, and a new `streamModel` beside it for streamed text (same providers, logging and fallback; see "Streaming").
 
 | Route | Behaviour |
 |---|---|
 | `GET /v1/enrich/scores` | All of the user's `cv_insights` rows |
 | `POST /v1/enrich/score { roleId, fingerprint }` | If the role is missing from the saved CV, or its fingerprint ≠ the one sent → 409 `not_saved`. If a cached row has that fingerprint and policy → return it. Else call `enrich_score`, validate, normalize, store, return. |
-| `POST /v1/enrich/rewrite-role { roleId }` | Save a History copy with reason `ai`. Call `enrich_rewrite_role` with the role, its notes and the CV locale. Run the numbers check. Return `{ proposals: [{ replaces: bulletId \| null, text }] }`. |
-| `POST /v1/enrich/rewrite-summary` | History copy `ai`. `enrich_rewrite_summary` with the summary, the roles (titles, companies, dates, bullets, notes) and the locale. Numbers check. Return `{ proposal: string \| null }`. |
+| `POST /v1/enrich/rewrite-role { roleId }` | Save a History copy with reason `ai`. Stream `enrich_rewrite_role` with the role, its notes and the CV locale. Responds with server-sent events (see "Streaming"); each finished proposal passes the rewrite checks before it is marked ready. |
+| `POST /v1/enrich/rewrite-summary` | History copy `ai`. Stream `enrich_rewrite_summary` with the summary, the roles (titles, companies, dates, bullets, notes) and the locale. Same events, with one proposal whose `replaces` is `"summary"`. |
+| `POST /v1/enrich/voice-session` | Checks the daily voice limit, creates a short-lived OpenAI transcription session for the CV's locale, logs it, and returns only `{ clientSecret, expiresAt, model }`. See "Voice". |
 | `POST /v1/enrich/skills` | `enrich_skills` with the roles and current skills. Return `{ suggestions: [{ name, group: "technicalSkills" \| "professionalSkills", evidence }], sort: [{ skillId, group }] }`. Drop suggestions whose `name` is not found in the roles' text (case-insensitive), or that are already listed. No History copy, because nothing is applied yet. |
 
 Errors use the existing error shape. `AiUnavailableError` → 503. Validation failures after retries → 502.
@@ -176,6 +180,65 @@ Errors use the existing error shape. `AiUnavailableError` → 503. Validation fa
 - One result per bullet. Do not merge unrelated bullets. A rewrite may propose a new bullet (`replaces: null`) only when it comes from a note.
 - Bullets already scoring 100 are not rewritten.
 - If nothing can be improved without new facts, return no proposals.
+- An answer the person picked from options counts as their answer, like typed text. A range they picked ("10–50 a week") may appear in a proposal as that range, never as an exact number.
+
+## Answering: pick, type or speak
+
+Each question has one answer box with three ways in. They can be mixed.
+
+- **Pick.** The question's `options` show as chips, and the person can pick more than one. Picking a chip adds its text to the answer box; picking it again removes it. Chips never submit on their own.
+  - Options come only from the role's own words and the job's common tasks. They are guesses for the person to confirm, not facts.
+  - An option may contain a number only as a range: `10–50`, `Under 10`, `50+`, `Peste 50`. The score route drops options with any other number.
+  - A **"Something else"** chip is always last and focuses the text box.
+- **Type.** As before.
+- **Speak.** A mic button records up to 60 s, and the words appear in the box **while the person speaks** (provisional words in grey, final words in the normal colour). Tapping again stops. The text stays editable.
+- **Save answer** writes one note: `answer` is the box's final text, and `via` lists the ways used.
+
+## Voice
+
+- **Live transcription:** OpenAI realtime transcription with `gpt-4o-mini-transcribe`. Our real API key never reaches the browser.
+  1. The browser asks `POST /v1/enrich/voice-session`.
+  2. The API checks the limit and creates a transcription session with OpenAI for the CV's language (`en` or `ro`), valid for about 1 minute.
+  3. The API returns only that session's temporary key.
+  4. The browser streams the microphone straight to OpenAI and shows the partial and final transcript events as they arrive.
+- **Limits:** 60 s per recording. 20 voice sessions per user per day, counted from `ai_calls` rows with task `enrich_voice`, since the owner can already read their own rows. Over the limit → 429 `voice_limit`, "You've used today's voice answers. You can still type or pick."
+- **Logging:** each session is one `ai_calls` row (task `enrich_voice`, provider `openai`, model, status). There are no tokens to count.
+- **Privacy:** we never store audio. The first time the mic is used, a one-line notice says: "Your voice goes to OpenAI to be turned into text. We don't keep the recording." The mic button is hidden when the browser has no microphone access or the person declines it.
+- The exact OpenAI endpoint and event names are checked with a probe script against the live API before the route is built, because this API has changed recently.
+
+## Streaming
+
+`streamModel(deps, { userId, task, system, user, maxOutputTokens })` lives in `apps/api/src/ai/`, next to `callModel`.
+- It returns the text as it arrives.
+- It uses the same providers in order, and falls back to the next provider only if the current one fails **before the first word**.
+- It logs one `ai_calls` row when the stream ends, with tokens when the provider reports them.
+
+For streaming, the rewrite prompts ask for a **line format** instead of JSON, because half-finished JSON is fragile to read mid-stream:
+
+```
+### b2
+Called 6 regional suppliers and compared prices to plan winter storage.
+### new
+Trained 3 new dispatchers on the route planner.
+### end
+```
+
+`### <bulletId>` starts a proposal that replaces that bullet, and `### new` starts a new bullet. Text runs until the next `###`. For the summary there is one block, `### summary`.
+
+The API turns this into **server-sent events** for the browser:
+
+| Event | Data | Meaning |
+|---|---|---|
+| `start` | `{ index, replaces }` | a new proposal began |
+| `delta` | `{ index, text }` | more words for that proposal |
+| `ready` | `{ index, text }` | finished, and it passed every rewrite check |
+| `dropped` | `{ index, reason: "number" \| "length" \| "unknownBullet" \| "unchanged" \| "newWithoutNote" }` | finished, and failed a check |
+| `error` | `{ code, message }` | the stream broke; earlier `ready` proposals still stand |
+| `done` | `{}` | end |
+
+The rule is **show it live, offer it only once it is checked.** While a proposal streams, it is shown muted and has no buttons. On `ready` it gets **Use this / Keep mine**. On `dropped` it fades out with a reason in plain words ("Left out: it added a number you didn't give us").
+
+Scoring is **not** streamed. It runs in the background and nobody watches it being written.
 
 ## Web (`apps/web/src/cv/enrich/`)
 
@@ -193,11 +256,14 @@ Errors use the existing error shape. `AiUnavailableError` → 503. Validation fa
   - **Answer questions** (hidden when there are no questions) and **Rewrite bullets**.
   - While the card is shown, bullets below 75 get a faint marker on the page, with the bullet's tip on hover or focus.
 - **`QuestionFlow`:**
-  - one question at a time, with a textarea, **Skip** and **Next**;
+  - one question at a time, with the `AnswerBox`, **Skip** and **Save answer**;
   - each answer dispatches `setNote` right away;
   - after the last question, **Draft improved bullets** waits for the save, then calls `rewrite-role`.
+- **`AnswerBox`:** the chips, the text box and the mic, as described in "Answering". `useVoice()` holds the recording state (`idle | asking | recording | stopping | denied | unavailable`) and the live transcript.
 - **`RewriteReview`:**
-  - shows each proposal under the bullet it replaces (or as "New bullet"), with **Use this** / **Keep mine**, plus **Use all** and **Done**;
+  - reads the event stream;
+  - shows each proposal under the bullet it replaces (or as "New bullet") as it streams, muted until `ready`, then with **Use this** / **Keep mine**, plus **Use all** (ready ones only) and **Done**;
+  - a stream `error` keeps the ready proposals and shows "The rest didn't come through. Try again";
   - accepted proposals are applied with one `applyProposals` action, so one undo step;
   - "Couldn't improve this without adding facts. Try answering a question first." when there are no proposals.
 - **Summary tools:** `summaryChecklist(cv)`, plus **Rewrite my summary** → one proposal with **Use this** / **Keep mine**. The checklist items:
@@ -217,7 +283,8 @@ All of this runs on the existing cheap models (OpenRouter `google/gemini-3.1-fla
 Expected:
 - about $0.0005–0.001 per role score;
 - about $0.001–0.002 per rewrite;
-- about $0.01 for a 5-role CV scored and rewritten once.
+- about $0.01 for a 5-role CV scored and rewritten once;
+- voice at about $0.003 per minute, so at most about $0.06 per user per day at the limit.
 
 There is only one score request in flight at a time, and only for saved, changed roles. The eval records real numbers.
 
@@ -236,12 +303,20 @@ There is only one score request in flight at a time, and only for saved, changed
   - an invented number in a proposal is dropped;
   - the rewrite makes the `ai` History copy;
   - a skill not found in the text is dropped;
-  - another user's rows are never returned.
+  - another user's rows are never returned;
+  - the line parser handles a block split across chunks, a missing `### end`, and an unknown id;
+  - the stream emits `ready` or `dropped` for every proposal, and `error` after a mid-stream break while keeping earlier `ready` events;
+  - `streamModel` falls back only before the first word;
+  - an option with an exact number is dropped, and a range is kept;
+  - `voice-session` returns only the temporary key, enforces 20 a day, and logs `enrich_voice`.
 - **Web:**
   - the pill shows, and is absent from `CvDocument`;
   - a stale result is ignored;
   - a 409 waits for the next save;
-  - the question flow writes notes;
+  - the question flow writes notes with the right `via`;
+  - a picked chip fills the box and never submits;
+  - live voice text appears as fake transcript events arrive, and the denied or unavailable mic hides the button;
+  - a streamed proposal has no buttons until `ready`, and a `dropped` one shows its reason;
   - **Use all** is one undo step;
   - "unavailable" keeps the previous score.
 - **Eval (`apps/api/eval/enrich/`, run like the import eval, results in `RESULTS.md`):**
@@ -259,4 +334,6 @@ There is only one score request in flight at a time, and only for saved, changed
 - answers are stored as notes inside the CV, as source data that travels with History and feeds tailoring;
 - scores are stored in `cv_insights`, a recomputable cache that never conflicts with autosave;
 - the model grades and the app computes the numbers;
-- the numbers check guards against invented facts.
+- the numbers check guards against invented facts;
+- streamed rewrites are shown live but can only be accepted once checked;
+- voice uses a short-lived OpenAI key, so the browser talks to OpenAI directly without seeing our key, and we never store audio.
