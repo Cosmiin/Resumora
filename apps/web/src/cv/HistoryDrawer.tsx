@@ -22,7 +22,7 @@ export function HistoryDrawer(props: {
   onRestore(id: string): Promise<void>;
 }) {
   const { onClose, canRestore, onRestore } = props;
-  const history = useQuery({ queryKey: ["cv-history"], queryFn: listHistory, staleTime: 0 });
+  const history = useQuery({ queryKey: ["cv-history"], queryFn: listHistory, staleTime: 0, gcTime: 0 });
   const [preview, setPreview] = useState<{ id: string; content: CvContent } | null>(null);
   const [busy, setBusy] = useState(false);
 

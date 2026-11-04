@@ -3,10 +3,13 @@ import { z } from "zod";
 /** Max serialized size of a CV body accepted by the API. */
 export const MAX_CV_BYTES = 256 * 1024;
 
-const MAX_ITEMS = 40;
-const MAX_BULLETS = 20;
+/** Limits shared by the schema and the editor UI. */
+export const MAX_ITEMS = 40;
+export const MAX_BULLETS = 20;
+export const MAX_TEXT = 2000;
+export const MAX_LONG_TEXT = 4000;
 
-const text = (max = 2000) => z.string().max(max);
+const text = (max = MAX_TEXT) => z.string().max(max);
 const id = z.string().min(1).max(64);
 
 /** "YYYY-MM" or "" (unknown / not set). */
@@ -45,7 +48,7 @@ export const CertificationSchema = z
   .object({ id, name: text(), issuer: text(), date: YearMonthSchema })
   .strict();
 export const ProjectSchema = z
-  .object({ id, name: text(), description: text(4000), url: text() })
+  .object({ id, name: text(), description: text(MAX_LONG_TEXT), url: text() })
   .strict();
 
 export const BasicsSchema = z
@@ -57,7 +60,7 @@ export const BasicsSchema = z
     location: text(),
     website: text(),
     linkedin: text(),
-    summary: text(4000),
+    summary: text(MAX_LONG_TEXT),
   })
   .strict();
 

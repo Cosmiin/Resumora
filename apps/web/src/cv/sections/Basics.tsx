@@ -1,4 +1,4 @@
-import type { CvContent } from "@resumora/shared";
+import { MAX_LONG_TEXT, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { TextField, set } from "../fields.tsx";
 
@@ -18,7 +18,7 @@ export function BasicsSection({ value, onChange }: { value: Basics; onChange(nex
         <TextField label={t("cv.website")} type="url" value={value.website} onChange={field("website")} />
         <TextField label={t("cv.linkedin")} type="url" value={value.linkedin} onChange={field("linkedin")} />
       </div>
-      <TextField label={t("cv.summary")} multiline value={value.summary} onChange={field("summary")} />
+      <TextField label={t("cv.summary")} multiline maxLength={MAX_LONG_TEXT} value={value.summary} onChange={field("summary")} />
     </section>
   );
 }

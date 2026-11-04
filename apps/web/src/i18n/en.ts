@@ -3,6 +3,7 @@ export const en = {
   "app.name": "Resumora",
   "app.loading": "Loading…",
   "app.signOut": "Sign out",
+  "app.signOutUnsaved": "You have unsaved changes. Sign out anyway?",
 
   "auth.signIn.title": "Sign in",
   "auth.signIn.submit": "Sign in",
@@ -36,6 +37,8 @@ export const en = {
   "cv.status.saving": "Saving…",
   "cv.status.error": "Couldn't save — retrying",
   "cv.status.conflict": "Not saved",
+  "cv.status.invalid": "Not saved",
+  "cv.invalid": "Your CV can't be saved yet — {problem}",
   "cv.conflict.title": "This CV was saved in another tab or device.",
   "cv.conflict.body": "Load the latest version, or keep your version and overwrite it.",
   "cv.conflict.loadLatest": "Load latest",

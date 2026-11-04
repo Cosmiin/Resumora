@@ -1,4 +1,4 @@
-import type { CvContent } from "@resumora/shared";
+import { MAX_LONG_TEXT, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { ItemList, TextField, set } from "../fields.tsx";
 
@@ -95,7 +95,7 @@ export function ProjectsSection({ items, onChange }: Props<"projects">) {
             <TextField label={t("cv.project")} value={p.name} onChange={(v) => update(set(p, "name", v))} />
             <TextField label={t("cv.url")} type="url" value={p.url} onChange={(v) => update(set(p, "url", v))} />
           </div>
-          <TextField label={t("cv.description")} multiline value={p.description} onChange={(v) => update(set(p, "description", v))} />
+          <TextField label={t("cv.description")} multiline maxLength={MAX_LONG_TEXT} value={p.description} onChange={(v) => update(set(p, "description", v))} />
         </>
       )}
     />

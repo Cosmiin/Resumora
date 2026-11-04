@@ -1,9 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
-import { CvContentSchema, HistoryItemSchema, emptyCv } from "@resumora/shared";
+import { CvContentSchema, HistoryItemSchema, emptyCv, type CvContent } from "@resumora/shared";
 import type { AuthUser, Env } from "../env.ts";
 import type { CvRepo, SaveResult } from "./repo.ts";
 
 type SaveRow = { version: number; updated_at: string; conflict: boolean };
+
+/** Parses a CV read from the database. A bad shape is a server problem (500), not the client's (400). */
+function storedCv(value: unknown): CvContent {
+  const parsed = CvContentSchema.safeParse(value);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new Error(`stored CV does not match the schema at ${issue?.path.join(".") ?? "?"}: ${issue?.message}`);
+  }
+  return parsed.data;
+}
 
 /** CvRepo backed by Supabase, querying as the signed-in user so RLS applies. */
 export function supabaseCvRepo(env: Env, user: AuthUser): CvRepo {
@@ -27,7 +37,7 @@ export function supabaseCvRepo(env: Env, user: AuthUser): CvRepo {
       if (error) throw new Error(`base_cvs select failed: ${error.message}`);
       if (!data) return { content: emptyCv(), version: 0, updatedAt: new Date(0).toISOString() };
       return {
-        content: CvContentSchema.parse(data.content),
+        content: storedCv(data.content),
         version: data.version,
         updatedAt: data.updated_at,
       };
@@ -61,7 +71,7 @@ export function supabaseCvRepo(env: Env, user: AuthUser): CvRepo {
         .eq("id", id)
         .maybeSingle();
       if (error) throw new Error(`base_cv_versions select failed: ${error.message}`);
-      return data ? { content: CvContentSchema.parse(data.content), createdAt: data.created_at } : null;
+      return data ? { content: storedCv(data.content), createdAt: data.created_at } : null;
     },
 
     async restore(id, expectedVersion) {

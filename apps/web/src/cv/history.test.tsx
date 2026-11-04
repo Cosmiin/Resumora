@@ -102,3 +102,29 @@ describe("version history", () => {
     expect(within(first!).getByRole("button", { name: "Restore" })).toBeDisabled();
   });
 });
+
+describe("version history blocks editing", () => {
+  it("the editor can't be edited while history is open", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await openHistory(user);
+    expect(screen.getByLabelText("Full name").closest("[inert]")).not.toBeNull();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByLabelText("Full name").closest("[inert]")).toBeNull();
+  });
+
+  it("offers Load latest when the restore worked but reloading failed", async () => {
+    const user = userEvent.setup();
+    api.restoreHistory.mockResolvedValue({ version: 3, updatedAt: "2026-11-04T10:30:00Z" });
+    renderPage();
+    const dialog = await openHistory(user);
+    const [, older] = await within(dialog).findAllByRole("listitem");
+    api.getCv.mockRejectedValueOnce(new ApiClientError(0, "network", "offline"));
+    await user.click(within(older!).getByRole("button", { name: "Restore" }));
+
+    expect(await screen.findByRole("button", { name: "Load latest" })).toBeInTheDocument();
+    api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });
+    await user.click(screen.getByRole("button", { name: "Load latest" }));
+    await waitFor(() => expect(screen.getByLabelText("Full name")).toHaveValue("Old Name"));
+  });
+});

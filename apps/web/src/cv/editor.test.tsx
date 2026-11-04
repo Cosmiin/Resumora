@@ -7,6 +7,10 @@ import { ApiClientError } from "../lib/api-error.ts";
 
 const api = vi.hoisted(() => ({ getCv: vi.fn(), saveCv: vi.fn() }));
 vi.mock("./cv-api.ts", () => api);
+const authState = vi.hoisted(() => ({ userId: "user-a" }));
+vi.mock("../auth/AuthProvider.tsx", () => ({
+  useAuth: () => ({ loading: false, session: { user: { id: authState.userId } } }),
+}));
 
 import { CvPage } from "./CvPage.tsx";
 
@@ -21,6 +25,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  authState.userId = "user-a";
   api.getCv.mockResolvedValue({ content: emptyCv(), version: 0, updatedAt: "2026-11-04T10:00:00Z" });
   api.saveCv.mockResolvedValue({ version: 1, updatedAt: "2026-11-04T10:01:00Z" });
 });
@@ -62,6 +67,47 @@ describe("CV editor", () => {
     await user.click(screen.getByRole("button", { name: "Load latest" }));
     await waitFor(() => expect(screen.getByLabelText("Full name")).toHaveValue("Server"));
     expect(screen.queryByText("This CV was saved in another tab or device.")).not.toBeInTheDocument();
+  });
+
+  it("a new sign-in loads that user's CV, not a cached one", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const page = () => (
+      <QueryClientProvider client={client}>
+        <CvPage />
+      </QueryClientProvider>
+    );
+    const cvOf = (fullName: string) => ({
+      content: { ...emptyCv(), basics: { ...emptyCv().basics, fullName } },
+      version: 1,
+      updatedAt: "2026-11-04T10:00:00Z",
+    });
+
+    api.getCv.mockResolvedValue(cvOf("User A"));
+    const first = render(page());
+    expect(await screen.findByDisplayValue("User A")).toBeInTheDocument();
+    first.unmount(); // sign-out navigates away from the editor
+    authState.userId = "user-b";
+
+    api.getCv.mockResolvedValue(cvOf("User B"));
+    render(page());
+    expect(await screen.findByDisplayValue("User B")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("User A")).not.toBeInTheDocument();
+  });
+
+  it("stops adding at the CV limits", async () => {
+    const bullets = Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, text: "x" }));
+    api.getCv.mockResolvedValue({
+      content: {
+        ...emptyCv(),
+        experience: [{ id: "e1", company: "Acme", title: "", location: "", startDate: "", endDate: "", current: false, bullets }],
+      },
+      version: 1,
+      updatedAt: "2026-11-04T10:00:00Z",
+    });
+    renderPage();
+    expect(await screen.findByRole("button", { name: "Add bullet" })).toBeDisabled();
+    expect(screen.getByLabelText("Summary")).toHaveAttribute("maxLength", "4000");
+    expect(screen.getByLabelText("Full name")).toHaveAttribute("maxLength", "2000");
   });
 
   it("shows a retry option when the CV cannot load", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { ZodError } from "zod";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { supabaseCvRepo } from "../src/cv/supabase-repo.ts";
 
@@ -40,6 +41,21 @@ describe.skipIf(!url)("supabaseCvRepo against local Supabase", () => {
     expect((await repo.getHistory(item!.id))?.content.basics.fullName).toBe("First");
     expect(await repo.restore(item!.id, 2)).toMatchObject({ ok: true, version: 3 });
     expect((await repo.get()).content.basics.fullName).toBe("First");
+  });
+
+  it("a CV with an unexpected shape fails as a server error, not a client error", async () => {
+    const user = await signedInUser();
+    const direct = createClient(url!, anonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${user.token}` } },
+    });
+    const inserted = await direct.from("base_cvs").insert({ user_id: user.id, content: { foo: 1 }, version: 1 });
+    expect(inserted.error).toBeNull();
+
+    const err = await supabaseCvRepo(env, user).get().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(ZodError); // ZodError would become a 400 "invalid_content"
+    expect(String(err)).toMatch(/stored CV/);
   });
 
   it("users cannot see each other's CV", async () => {

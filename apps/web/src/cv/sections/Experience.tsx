@@ -1,4 +1,4 @@
-import { newId, type Experience } from "@resumora/shared";
+import { MAX_BULLETS, newId, type Experience } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { ItemList, TextField, set } from "../fields.tsx";
 
@@ -59,7 +59,12 @@ export function ExperienceSection({ items, onChange }: { items: Experience[]; on
               </li>
             ))}
           </ol>
-          <button type="button" className="secondary" onClick={() => update(set(exp, "bullets", [...exp.bullets, { id: newId(), text: "" }]))}>
+          <button
+            type="button"
+            className="secondary"
+            disabled={exp.bullets.length >= MAX_BULLETS}
+            onClick={() => update(set(exp, "bullets", [...exp.bullets, { id: newId(), text: "" }]))}
+          >
             {t("cv.bullet.add")}
           </button>
         </>

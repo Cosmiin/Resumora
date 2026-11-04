@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { newId } from "@resumora/shared";
+import { MAX_ITEMS, MAX_TEXT, newId } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 
@@ -9,15 +9,17 @@ export function TextField(props: {
   onChange(value: string): void;
   multiline?: boolean;
   type?: "text" | "email" | "tel" | "url" | "month";
+  /** Defaults to the schema's normal text limit. */
+  maxLength?: number;
 }) {
-  const { label, value, onChange, multiline, type = "text" } = props;
+  const { label, value, onChange, multiline, type = "text", maxLength = MAX_TEXT } = props;
   return (
     <label>
       {label}
       {multiline ? (
-        <textarea rows={4} value={value} onChange={(e) => onChange(e.target.value)} />
+        <textarea rows={4} maxLength={maxLength} value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (
-        <input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+        <input type={type} maxLength={maxLength} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
     </label>
   );
@@ -64,7 +66,11 @@ export function ItemList<T extends { id: string }>(props: {
           </div>
         </fieldset>
       ))}
-      <button type="button" onClick={() => onChange([...items, { ...create(), id: newId() } as T])}>
+      <button
+        type="button"
+        disabled={items.length >= MAX_ITEMS}
+        onClick={() => onChange([...items, { ...create(), id: newId() } as T])}
+      >
         {t(addLabel)}
       </button>
     </section>

@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { ErrorBodySchema } from "@resumora/shared";
 import { supabase } from "./supabase.ts";
 import { ApiClientError } from "./api-error.ts";
@@ -24,7 +25,8 @@ async function send(path: string, init: ApiInit, token: string | undefined): Pro
 
 /**
  * Calls the Resumora API as the signed-in user and validates the response.
- * An expired token is refreshed once; a second 401 signs the user out.
+ * An expired token is refreshed once; a second 401 signs the user out. If the refresh
+ * itself can't reach Supabase, the user stays signed in and gets a network error.
  */
 export async function apiFetch<S extends z.ZodType<unknown>>(
   path: string,
@@ -35,6 +37,9 @@ export async function apiFetch<S extends z.ZodType<unknown>>(
 
   if (res.status === 401) {
     const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error && isAuthRetryableFetchError(refreshed.error)) {
+      throw new ApiClientError(0, "network", "Can't reach Resumora.");
+    }
     const token = refreshed.data.session?.access_token;
     if (token) res = await send(path, init, token);
     if (res.status === 401) await supabase.auth.signOut();

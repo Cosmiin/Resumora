@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { AuthRetryableFetchError } from "@supabase/supabase-js";
 
 const auth = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -51,6 +52,13 @@ describe("apiFetch", () => {
     await expect(apiFetch("/v1/cv", { schema: Ok })).rejects.toMatchObject({ status: 401, code: "unauthorized" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(auth.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the session when the refresh can't reach Supabase", async () => {
+    fetchMock.mockResolvedValue(json(401, { error: { code: "unauthorized", message: "", requestId: "r" } }));
+    auth.refreshSession.mockResolvedValue({ data: { session: null }, error: new AuthRetryableFetchError("fetch failed", 0) });
+    await expect(apiFetch("/v1/cv", { schema: Ok })).rejects.toMatchObject({ status: 0, code: "network" });
+    expect(auth.signOut).not.toHaveBeenCalled();
   });
 
   it("maps error body", async () => {

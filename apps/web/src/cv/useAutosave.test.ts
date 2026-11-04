@@ -112,6 +112,39 @@ describe("useAutosave", () => {
     expect(result.current.status).toBe("saved");
   });
 
+  it("shows content the server rejects once, without retrying", async () => {
+    const save = vi
+      .fn<Save>()
+      .mockRejectedValueOnce(new ApiClientError(413, "content_too_large", "This CV is too large to save (limit 256 KB)."))
+      .mockResolvedValue(saved(2));
+    const { result } = setup(save);
+
+    act(() => result.current.setContent(named("Huge")));
+    await advance(1000);
+    expect(result.current.status).toBe("invalid");
+    expect(result.current.problem).toBe("This CV is too large to save (limit 256 KB).");
+    await advance(30_000);
+    expect(save).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.setContent(named("Smaller"))); // the user fixes it
+    await advance(1000);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe("saved");
+    expect(result.current.problem).toBeNull();
+  });
+
+  it("checks content before sending it", async () => {
+    const save = vi.fn<Save>().mockResolvedValue(saved(2));
+    const { result } = setup(save);
+    const tooLong = { ...named("A"), basics: { ...named("A").basics, summary: "x".repeat(4001) } };
+
+    act(() => result.current.setContent(tooLong));
+    await advance(1000);
+    expect(save).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("invalid");
+    expect(result.current.problem).toContain("summary");
+  });
+
   it("warns before unload when dirty", async () => {
     const save = vi.fn<Save>().mockResolvedValue(saved(2));
     const { result } = setup(save);

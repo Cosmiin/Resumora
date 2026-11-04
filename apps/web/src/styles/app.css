@@ -250,3 +250,13 @@ label.checkbox input {
   gap: 0.75rem;
   align-items: center;
 }
+.editor-sections {
+  display: grid;
+  gap: 1.25rem;
+}
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: rgb(15 40 38 / 25%);
+}

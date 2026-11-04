@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { CvContent, CvResponse } from "@resumora/shared";
+import type { CvContent, CvResponse, SaveResponse } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
-import { isConflict, useAutosave, type SaveStatus } from "./useAutosave.ts";
+import { conflictFrom, isConflict, useAutosave, type SaveStatus } from "./useAutosave.ts";
 import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryDrawer } from "./HistoryDrawer.tsx";
 import { BasicsSection } from "./sections/Basics.tsx";
@@ -22,6 +22,7 @@ const statusLabel: Record<SaveStatus, MessageKey> = {
   saving: "cv.status.saving",
   error: "cv.status.error",
   conflict: "cv.status.conflict",
+  invalid: "cv.status.invalid",
 };
 
 export function Editor({ initial }: { initial: CvResponse }) {
@@ -32,12 +33,20 @@ export function Editor({ initial }: { initial: CvResponse }) {
 
   async function restore(id: string) {
     setRestoreFailed(false);
+    let restored: SaveResponse;
     try {
-      await restoreHistory(id, autosave.currentVersion());
-      autosave.reset(await getCv());
+      restored = await restoreHistory(id, autosave.currentVersion());
     } catch (err) {
-      if (isConflict(err)) autosave.reportConflict(err);
+      if (isConflict(err)) autosave.reportConflict(conflictFrom(err));
       else setRestoreFailed(true);
+      setHistoryOpen(false);
+      return;
+    }
+    try {
+      autosave.reset(await getCv());
+    } catch {
+      // The restore is saved, but our copy is now out of date: let the user load it.
+      autosave.reportConflict(restored);
     }
     setHistoryOpen(false);
   }
@@ -54,16 +63,27 @@ export function Editor({ initial }: { initial: CvResponse }) {
         </button>
       </div>
       {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
+      {autosave.problem && (
+        <p role="alert" className="form-error">
+          {t("cv.invalid", { problem: autosave.problem })}
+        </p>
+      )}
       {conflict && <ConflictBanner onLoadLatest={loadLatest} onKeepMine={keepMine} />}
-      <BasicsSection value={content.basics} onChange={update("basics")} />
-      <ExperienceSection items={content.experience} onChange={update("experience")} />
-      <EducationSection items={content.education} onChange={update("education")} />
-      <SkillsSection items={content.skills} onChange={update("skills")} />
-      <LanguagesSection items={content.languages} onChange={update("languages")} />
-      <CertificationsSection items={content.certifications} onChange={update("certifications")} />
-      <ProjectsSection items={content.projects} onChange={update("projects")} />
+      {/* While history is open the form can't be edited, so a restore can't race the user's typing. */}
+      <div className="editor-sections" inert={historyOpen}>
+        <BasicsSection value={content.basics} onChange={update("basics")} />
+        <ExperienceSection items={content.experience} onChange={update("experience")} />
+        <EducationSection items={content.education} onChange={update("education")} />
+        <SkillsSection items={content.skills} onChange={update("skills")} />
+        <LanguagesSection items={content.languages} onChange={update("languages")} />
+        <CertificationsSection items={content.certifications} onChange={update("certifications")} />
+        <ProjectsSection items={content.projects} onChange={update("projects")} />
+      </div>
       {historyOpen && (
-        <HistoryDrawer onClose={() => setHistoryOpen(false)} canRestore={status === "saved"} onRestore={restore} />
+        <>
+          <div className="drawer-backdrop" onClick={() => setHistoryOpen(false)} />
+          <HistoryDrawer onClose={() => setHistoryOpen(false)} canRestore={status === "saved"} onRestore={restore} />
+        </>
       )}
     </div>
   );
