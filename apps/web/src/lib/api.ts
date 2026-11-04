@@ -6,7 +6,8 @@ import { ApiClientError } from "./api-error.ts";
 
 export { ApiClientError };
 
-type ApiInit = Omit<RequestInit, "body"> & { schema: z.ZodType<unknown>; json?: unknown };
+/** `json` is sent as JSON; `form` as multipart (the browser sets the content type and boundary). */
+type ApiInit = Omit<RequestInit, "body"> & { schema: z.ZodType<unknown>; json?: unknown; form?: FormData };
 
 async function send(path: string, init: ApiInit, token: string | undefined): Promise<Response> {
   const headers = new Headers(init.headers);
@@ -16,7 +17,7 @@ async function send(path: string, init: ApiInit, token: string | undefined): Pro
     return await fetch(path, {
       ...init,
       headers,
-      body: init.json === undefined ? undefined : JSON.stringify(init.json),
+      body: init.form ?? (init.json === undefined ? undefined : JSON.stringify(init.json)),
     });
   } catch {
     throw new ApiClientError(0, "network", "Can't reach Resumora.");
