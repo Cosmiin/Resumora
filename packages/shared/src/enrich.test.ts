@@ -65,12 +65,14 @@ describe("bulletScore", () => {
 
 describe("isPlaceholder", () => {
   it("catches placeholders", () => {
-    for (const t of ["", "  ", "TODO", "tbd.", "Lorem ipsum dolor", "asdf", "test", "Exemplu", "De completat"]) {
+    for (const t of ["", "  ", "TODO", "tbd.", "Lorem ipsum dolor", "asdf", "test", "Exemplu!", "De completat...", "Nimic"]) {
       expect(isPlaceholder(t)).toBe(true);
     }
   });
   it("lets real text through", () => {
     expect(isPlaceholder("Tested payroll exports")).toBe(false);
+    expect(isPlaceholder("Testing API endpoints with Postman")).toBe(false);
+    expect(isPlaceholder("Test plans written for checkout")).toBe(false);
   });
 });
 
@@ -261,5 +263,17 @@ describe("band and clearCount", () => {
       "fp",
     );
     expect(clearCount(r)).toEqual({ clear: 1, total: 3 });
+  });
+});
+
+describe("blank tip and question", () => {
+  it("become null", () => {
+    const r = buildRoleResult(
+      role(["Did work"]),
+      model([mb("b1", { ...g("specific", "specific", "specific", "missing"), issue: "impact", tip: "  ", question: "" })]),
+      "fp",
+    );
+    expect(r.bullets[0]).toMatchObject({ tip: null, question: null });
+    expect(r.questions).toEqual([]);
   });
 });

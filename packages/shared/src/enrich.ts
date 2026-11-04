@@ -100,19 +100,13 @@ export function isAllowedOption(option: string): boolean {
   return !/\d/.test(rest);
 }
 
-const PLACEHOLDERS = [
-  "placeholder",
-  "test",
-  "testing",
-  "todo",
-  "tbd",
-  "asdf",
-  "lorem ipsum",
-  "nothing special",
-  "de completat",
-  "exemplu",
-  "nimic",
-];
+/** Whole-text matches only: these words start real bullets too ("Testing API endpoints"). */
+const PLACEHOLDER_WORDS = ["placeholder", "test", "testing", "todo", "tbd", "asdf", "exemplu", "nimic"];
+const PLACEHOLDER_PHRASES = ["lorem ipsum", "nothing special", "de completat"];
+
+function blankToNull(value: string | null): string | null {
+  return value === null || value.trim() === "" ? null : value;
+}
 
 function plain(text: string): string {
   return text
@@ -128,7 +122,7 @@ function plain(text: string): string {
 export function isPlaceholder(text: string): boolean {
   const t = plain(text);
   if (t === "") return true;
-  return PLACEHOLDERS.some((p) => t === p || t.startsWith(`${p} `));
+  return PLACEHOLDER_WORDS.includes(t) || PLACEHOLDER_PHRASES.some((p) => t === p || t.startsWith(`${p} `));
 }
 
 function repeatKey(text: string): string {
@@ -173,7 +167,7 @@ export function buildRoleResult(role: Experience, model: ModelScore, fingerprint
 
     const issue = normalizedIssue(m, unusable, duplicate);
     const keep = issue === m.issue;
-    const question = keep && issue !== "duplicate" ? m.question : null;
+    const question = keep && issue !== "duplicate" ? blankToNull(m.question) : null;
     if (question !== null) options.set(b.id, m.options.filter(isAllowedOption));
     return {
       id: b.id,
@@ -183,7 +177,7 @@ export function buildRoleResult(role: Experience, model: ModelScore, fingerprint
       specificity: m.specificity,
       impact: m.impact,
       issue,
-      tip: keep ? m.tip : null,
+      tip: keep ? blankToNull(m.tip) : null,
       question,
     };
   });
