@@ -14,6 +14,7 @@
 **Tech Stack:** Cloudflare Worker (Hono), Supabase (Postgres + RLS), zod 4, vitest, React 19, `callModel` (OpenRouter `google/gemini-3.1-flash-lite`, then OpenAI `gpt-5.4-mini`).
 
 **Spec:** `docs/superpowers/specs/2026-11-05-base-cv-enrichment-design.md` (binding). Scoring prompt source material: `docs/superpowers/specs/reference/codex-experience-scoring.md` (Appendix C).
+**Mockups:** https://claude.ai/artifact/RjBScDyPRxNtsmYMMAYF4y. Its look, copy and flow are binding for Tasks 8–11. Controllers save its HTML into the plan workspace and hand implementers the file path.
 **Depends on:** Plans A–C on `rebuild/perfect-cv`. It uses `cvReducer`, `SectionTools`, `EditablePage`, `useAutosave` (`status: "saved" | …`), `HistoryItem.reason` (already includes `"ai"`), `callModel`, `cv.locale: "en" | "ro"`, and `BulletSchema = { id, text }`.
 
 ## Global Constraints

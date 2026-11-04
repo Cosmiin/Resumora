@@ -1,6 +1,7 @@
 # Base CV enrichment: experience scores, questions and rewrites
 
 Status: draft for review · 2026-11-05 · builds on `rebuild/perfect-cv` (Plans A–C)
+Mockups: https://claude.ai/artifact/RjBScDyPRxNtsmYMMAYF4y (clickable; the source of truth for look and flow, using the same app frame as the Perfect CV mockups)
 Starting point for scoring: the Codex handoff "Resumora experience scoring" (policy experience-score/5), simplified and extended as described below.
 
 ## Why
