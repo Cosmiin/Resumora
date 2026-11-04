@@ -19,6 +19,42 @@ def suite(db):
   def state(self):return self.call('get_job_workflow',f"'{self.job['id']}'")
   def claim(self):return self.call('claim_job_workflow',f"'{secret}',false",role='anon')
   def finish(self,task,value=None):return self.call('finish_job_workflow',f"'{secret}','{task['lease']}',{lit(value) if value else 'NULL'}, {'NULL' if value else chr(39)+'PROVIDER_UNAVAILABLE'+chr(39)}",role='anon')
+  def test_extraction_pins_saved_french_job_document_with_english_and_removed_base(self):
+   from pathlib import Path
+   source=json.loads((Path(__file__).resolve().parents[2]/'packages/contracts/fixtures/job-editor-import.json').read_text());source['content']['language']='en'
+   base=self.call('save_base_draft',f"'{uid()}',0,{lit(source)},'checkpoint'")
+   payload=json.loads(db.sql(f"SELECT app.freeze_job_document('{{}}',{lit(source)})"));payload['content']['language']='fr';payload['content']['documentLocale']='fr'
+   document=self.call('save_current_job_document',f"'{uid()}','{self.job['id']}','fr',NULL,0,{lit(payload)},'{base['id']}',NULL,NULL")
+   db.sql(f"UPDATE app.job_workflow_operations SET state='cancelled' WHERE job_id='{self.job['id']}'")
+   for revision in [1,2]:
+    if revision==2:
+     state=self.call('load_base_state');self.call('remove_base_cv',f"'{uid()}',{state['revision']},{state['generation']}")
+    operation=self.call('request_job_workflow',f"'{uid()}','{self.job['id']}','extract',{revision},NULL,NULL")
+    self.assertEqual(operation['documentVersionId'],document['id']);self.assertEqual(operation['targetLocale'],'fr')
+    task=self.claim();self.assertEqual(task['document']['id'],document['id'])
+    if revision==2:self.assertIsNone(task['base'])
+    self.assertEqual(self.finish(task,{'schemaVersion':'vacancy-extraction/3'})['state'],'ready')
+   self.call('request_job_workflow',f"'{uid()}','{self.job['id']}','extract',3,NULL,NULL")
+   task=self.claim();payload['content']['summary']['text']='Accepted replacement in French'
+   self.call('save_current_job_document',f"'{uid()}','{self.job['id']}','fr','{document['documentId']}',1,{lit(payload)},NULL,NULL,NULL")
+   self.assertIn('VERSION_CONFLICT',self.raw('job_workflow_attempt',f"'{secret}','{task['lease']}',NULL,'missing','{{}}'",role='anon',error=True))
+   self.assertEqual(self.finish(task,{'schemaVersion':'vacancy-extraction/3'})['state'],'stale')
+  def test_interface_fallback_reaches_new_and_reextracted_jobs_without_a_cv(self):
+   created=self.call('save_target_job_with_locale',f"'{uid()}',NULL,NULL,{lit({'text':self.source})},'[]','en'")
+   operations=self.call('get_job_workflow',f"'{created['id']}'")['operations'];self.assertEqual(operations[0]['targetLocale'],'en')
+   intake=uid();self.call('save_workspace_draft',f"'{uid()}','intake','{intake}',0,{lit({'text':self.source,'sourceUrl':''})},NULL")
+   submitted=self.call('submit_workspace_intake_with_locale',f"'{uid()}','{intake}',1,'en'")
+   self.assertEqual(self.call('get_job_workflow',f"'{submitted['id']}'")['operations'][0]['targetLocale'],'en')
+   linked=self.call('save_target_url_with_locale',f"'{uid()}','https://jobs.ashbyhq.com/synthetic/fallback','en'")
+   db.sql("UPDATE app.job_workflow_operations SET state='cancelled' WHERE kind='extract'")
+   fetched=self.claim();self.assertEqual(fetched['jobId'],linked['id']);self.finish(fetched,{'text':self.source})
+   followup=self.claim();self.assertEqual(followup['operation']['kind'],'extract');self.assertEqual(followup['operation']['targetLocale'],'en');self.finish(followup,{'schemaVersion':'vacancy-extraction/3'})
+
+   db.sql(f"UPDATE app.job_workflow_operations SET state='cancelled' WHERE job_id='{created['id']}'")
+   key=uid();args=f"'{key}','{created['id']}','extract',1,NULL,NULL,'en'"
+   op=self.call('request_job_workflow_with_locale',args);self.assertEqual(op['targetLocale'],'en')
+   replay=self.call('request_job_workflow_with_locale',f"'{key}','{created['id']}','extract',1,NULL,NULL,'ro'");self.assertEqual(replay,op)
+   self.assertIn('INVALID_COMMAND_ENVELOPE',self.raw('save_target_job_with_locale',f"'{uid()}',NULL,NULL,{lit({'text':self.source})},'[]','fr'",error=True))
   def test_no_base_durable_retry_new_intent_owned_and_no_table_access(self):
    state=self.state();self.assertEqual(state['revision'],1);self.assertEqual(len(state['operations']),1)
    self.assertIsNone(self.job['snapshotId']);self.assertIn('SNAPSHOT_NOT_FOUND',self.raw('get_job_workflow',f"'{self.job['id']}'",user=self.b,error=True))

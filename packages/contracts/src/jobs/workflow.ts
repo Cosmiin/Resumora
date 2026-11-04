@@ -1,3 +1,5 @@
+import { skillInventoryPolicy } from '../intelligence/skill-keywords.ts';
+import type { ContentLocale } from "../editor/content-language.ts";
 import { isAccepted, type BaseDraft } from '../editor/model.ts';
 import { currentWording } from '../editor/wording.ts';
 import { jobEditorFacts } from './documents.ts';
@@ -14,18 +16,25 @@ export type ComponentMatch = { requirementId:string;componentId:string;scope:'pr
 export type MatchResult = {schemaVersion:'job-evidence-match/1';components:ComponentMatch[];suggestions?:JobSuggestion[]};
 export type TailorSection = {targetId:string;action:'retain'|'rewrite'|'reorder';text:string;skillIds:string[];evidenceIds:string[];requirementIds:string[];reason:string;warnings:string[]};
 export type TailorProposal = {schemaVersion:'job-tailor/1';sections:TailorSection[]};
-export type WorkflowOperation = {id:string;kind:'fetch'|'extract'|'match'|'tailor';state:'queued'|'processing'|'ready'|'failed'|'cancelled'|'stale'|'unknown';jobRevision:number;snapshotId:string|null;snapshotRevision:number|null;documentVersionId?:string|null;documentLocale?:'ro'|'en'|null;targetLocale?:'ro'|'en';targetDocumentVersionId?:string|null;result:Vacancy|MatchResult|TailorProposal|null;error:string|null;createdAt:string};
+export type WorkflowOperation = {languagePolicyVersion?:string|null;answersRevision?:number;id:string;kind:'fetch'|'extract'|'match'|'tailor';state:'queued'|'processing'|'ready'|'failed'|'cancelled'|'stale'|'unknown';jobRevision:number;snapshotId:string|null;snapshotRevision:number|null;documentVersionId?:string|null;documentLocale?:ContentLocale|null;targetLocale?:ContentLocale;targetDocumentVersionId?:string|null;result:Vacancy|MatchResult|TailorProposal|null;error:string|null;createdAt:string};
 export type JobWorkflow = {revision:number;extracted:Vacancy|null;reviewed:Vacancy|null;operations:WorkflowOperation[];sourceParentId:string|null;duplicates:{id:string;title:string;kind:'exact'|'updated'}[]};
 const object=(v:unknown):v is Record<string,any>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const text=(v:unknown,max=6000):v is string=>typeof v==='string'&&!!v.trim()&&v.length<=max&&!/[\u0000\uD800-\uDFFF]/u.test(v);
 const exact=(v:Record<string,unknown>,keys:string[])=>Object.keys(v).sort().join(',')===[...keys].sort().join(',');
 const unique=(v:string[])=>new Set(v).size===v.length;
 const strings=(v:unknown,max=200):v is string[]=>Array.isArray(v)&&v.length<=max&&v.every(x=>text(x,256))&&unique(v);
-function fail():never {throw new Error('INVALID_WORKFLOW_OUTPUT');}
+export class WorkflowOutputError extends Error {
+ readonly reason: 'STRUCTURE'|'SPAN_SHAPE'|'SPAN_SOURCE_MISMATCH';
+ constructor(reason: WorkflowOutputError['reason'] = 'STRUCTURE') { super('INVALID_WORKFLOW_OUTPUT'); this.reason = reason; }
+}
+function fail(reason?: WorkflowOutputError['reason']):never {throw new WorkflowOutputError(reason);}
 export async function fingerprint(v:unknown){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(v))))).map(n=>n.toString(16).padStart(2,'0')).join('');}
 export function validateSpans(v:unknown,source:string):Span[]{
- if(!Array.isArray(v)||v.length>30)fail();
- for(const s of v)if(!object(s)||!exact(s,['start','end','quote'])||!Number.isSafeInteger(s.start)||!Number.isSafeInteger(s.end)||s.start<0||s.end<=s.start||s.end>source.length||!text(s.quote,20000)||source.slice(s.start,s.end)!==s.quote)fail();
+ if(!Array.isArray(v)||v.length>30)fail('SPAN_SHAPE');
+ for(const s of v){
+  if(!object(s)||!exact(s,['start','end','quote'])||!Number.isSafeInteger(s.start)||!Number.isSafeInteger(s.end)||s.start<0||s.end<=s.start||s.end>source.length||!text(s.quote,20000))fail('SPAN_SHAPE');
+  if(source.slice(s.start,s.end)!==s.quote)fail('SPAN_SOURCE_MISMATCH');
+ }
  return v;
 }
 export function validateVacancy(value:unknown,source:string,manual=false):Vacancy {
@@ -74,6 +83,7 @@ export function validateMatch(value:unknown,vacancy:Vacancy,evidence:Evidence[])
  for(const c of value.components){if(!object(c)||!exact(c,['requirementId','componentId','scope','matchClass','evidence','reason'])||!expected.includes(`${c.requirementId}:${c.componentId}:${c.scope}`)||!['demonstrated','claimed_limited','transferable','not_evidenced','unknown','conflict'].includes(c.matchClass)||!text(c.reason,1500)||!Array.isArray(c.evidence)||c.evidence.length>20)fail();found.push(`${c.requirementId}:${c.componentId}:${c.scope}`);
   if(['demonstrated','claimed_limited','transferable','conflict'].includes(c.matchClass)&&!c.evidence.length)fail();
   for(const s of c.evidence){if(!object(s)||!exact(s,['id','quote'])||!text(s.quote)||!evidence.some(e=>e.id===s.id&&(c.scope!=='profile'||e.kind!=='cv')&&(c.scope==='profile'?e.text:(e.cvText??e.text)).includes(s.quote)&&(c.scope==='profile'||e.inCv)))fail();}
+  if(c.matchClass==='demonstrated'&&c.evidence.every((ref:{id:string})=>evidence.find(e=>e.id===ref.id)?.key==='skill'))fail();
   const r=vacancy.requirements.find(r=>r.id===c.requirementId)!;if(r.eligibility&&c.matchClass==='transferable')fail();
  }
  if(!unique(found))fail();
@@ -106,20 +116,29 @@ export function validateTailor(value:unknown,draft:BaseDraft,vacancy:Vacancy,evi
   const cited=s.evidenceIds.map((id:string)=>{const row=evidence.find(e=>e.id===id&&e.kind!=='cv');if(!row||(!['summary','professionalSkills','technicalSkills',...draft.titles.map(f=>f.fieldId)].includes(s.targetId)&&(row.targetId!==s.targetId||!['context','details','bullet','answer','qualification','field','title','proficiency'].includes(row.key))))fail();return row;});
   if(s.action==='reorder'&&!['professionalSkills','technicalSkills'].includes(s.targetId))fail();
   if(s.action!=='retain'&&!cited.length)fail();
-  if(['professionalSkills','technicalSkills'].includes(s.targetId)){if(s.text!==''||!s.skillIds.every((id:string)=>evidence.some(e=>e.kind!=='cv'&&e.id===id&&e.targetId===s.targetId&&e.key==='skill')))fail();}else if(s.skillIds.length)fail();
+  if(['professionalSkills','technicalSkills'].includes(s.targetId)){if(s.text!==''||s.skillIds.length>skillInventoryPolicy.activeCategoryLimit||!s.skillIds.every((id:string)=>cited.some((e:Evidence)=>e.id===id&&e.targetId===s.targetId&&e.key==='skill')))fail();}else {
+   if(s.skillIds.length)fail();
+   // A label can be selected for a skill list, but cannot attest work performed.
+   // Legacy labels without provenance remain selectable under the same rule.
+   if(s.action!=='retain'&&(!cited.some((e:Evidence)=>e.key!=='skill')||cited.some((e:Evidence)=>e.key==='skill')))fail();
+  }
   if(s.action==='rewrite'&&!s.text.trim()&&!s.skillIds.length)fail();
   const support=cited.map((e:Evidence)=>e.text).join('\n'),numbers=new Set(support.match(/\d+(?:[.,]\d+)*%?/g)??[]);for(const n of s.text.match(/\d+(?:[.,]\d+)*%?/g)??[])if(!numbers.has(n))fail();
  }
  if(!unique(value.sections.map((s:TailorSection)=>s.targetId)))fail();return structuredClone(value) as TailorProposal;
 }
-export function jobClarificationQuestion(requirement:string,target:string){return `What, if any, work in ${target.slice(0,200)} supports this employer requirement: “${requirement.slice(0,1200)}”? Describe only activities you personally performed. You may answer no, unknown, or skip.`;}
-export type JobSuggestion={id:string;type:'include'|'clarify'|'verify'|'gap';requirementIds:string[];evidenceIds:string[];targetId:string|null;state:string;priority:number;reason:string};
+export function jobClarificationQuestion(requirement:string,target:string,locale='en'){
+ const primary=locale.split('-')[0];
+ if(primary==='ro')return `Ce activități ai desfășurat în ${target.slice(0,200)} care susțin această cerință a angajatorului: „${requirement.slice(0,1200)}”? Descrie numai activități realizate personal. Poți răspunde nu, nu știu sau poți omite întrebarea.`;
+ if(primary!=='en')throw Error('CONTENT_LANGUAGE_REQUIRED');
+ return `What, if any, work in ${target.slice(0,200)} supports this employer requirement: “${requirement.slice(0,1200)}”? Describe only activities you personally performed. You may answer no, unknown, or skip.`;}
+export type JobSuggestion={question?:string|null;id:string;type:'include'|'clarify'|'verify'|'gap';requirementIds:string[];evidenceIds:string[];targetId:string|null;state:string;priority:number;reason:string};
 export type SuggestionResult={schemaVersion:'job-suggestions/1';suggestions:JobSuggestion[]};
 export async function validateSuggestions(value:unknown,vacancy:Vacancy,evidence:Evidence[]):Promise<SuggestionResult>{
  if(!object(value)||!exact(value,['schemaVersion','suggestions'])||value.schemaVersion!=='job-suggestions/1'||!Array.isArray(value.suggestions)||value.suggestions.length>40)fail();
  const suggestions:JobSuggestion[]=[];
  for(const s of value.suggestions){
-  if(!object(s)||!exact(s,['type','requirementIds','evidenceIds','targetId','priority','reason'])||!['include','clarify','verify','gap'].includes(s.type)||!strings(s.requirementIds,200)||!s.requirementIds.length||!s.requirementIds.every((id:string)=>vacancy.requirements.some(r=>r.id===id))||!strings(s.evidenceIds,500)||!s.evidenceIds.every((id:string)=>evidence.some(e=>e.id===id&&e.kind!=='cv'))||!(s.targetId===null||evidence.some(e=>e.targetId===s.targetId))||!Number.isInteger(s.priority)||s.priority<1||s.priority>100||!text(s.reason,1000))fail();
+  if(!object(s)||!exact(s,['type','requirementIds','evidenceIds','targetId','priority','reason',...(Object.hasOwn(s,'question')?['question']:[])])||!['include','clarify','verify','gap'].includes(s.type)||!strings(s.requirementIds,200)||!s.requirementIds.length||!s.requirementIds.every((id:string)=>vacancy.requirements.some(r=>r.id===id))||!strings(s.evidenceIds,500)||!s.evidenceIds.every((id:string)=>evidence.some(e=>e.id===id&&e.kind!=='cv'))||!(s.targetId===null||evidence.some(e=>e.targetId===s.targetId))||!Number.isInteger(s.priority)||s.priority<1||s.priority>100||!text(s.reason,1000)||(s.question!==undefined&&s.question!==null&&!text(s.question,2000)))fail();
   if(s.type==='include'&&(!s.evidenceIds.length||!s.targetId))fail();
   const id='suggestion_'+(await fingerprint({target:s.targetId,requirements:vacancy.requirements.filter(r=>s.requirementIds.includes(r.id)).map(r=>({text:r.text,priority:r.priority,components:r.components.map(c=>c.text)})).sort((a,b)=>a.text.localeCompare(b.text)),evidence:evidence.filter(e=>s.evidenceIds.includes(e.id)).map(e=>({id:e.id,text:e.text,target:e.targetId})).sort((a,b)=>a.id.localeCompare(b.id))})).slice(0,48);
   if(suggestions.some(s=>s.id===id))fail();suggestions.push({...s,id,state:'new'} as JobSuggestion);

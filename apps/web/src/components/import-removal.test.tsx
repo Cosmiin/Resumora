@@ -6,7 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { App } from "../App";
+import { App } from "../test-editor-harness";
 import { MemoryBaseCvAdapter } from "../base/adapter";
 import { patchFact, setContributions } from "../base/editing";
 import { ImportReview } from "./ImportReview";
@@ -138,7 +138,9 @@ it.each(removals)(
       target: { value: "en" },
     });
     fireEvent.click(
-      await screen.findByRole("button", { name: "Confirm and open editor" }),
+      await screen.findByRole("button", {
+        name: "Confirm and use this information",
+      }),
     );
     await waitFor(async () => expect((await adapter.load())!.revision).toBe(2));
     const before = (await adapter.load())!.draft;
@@ -172,13 +174,13 @@ it.each(removals)(
     expect(saved.importReview).toEqual(before.importReview);
     expect(saved.sources).toEqual(before.sources);
     for (const candidate of deleted) {
-      expect(() => confirmImported(saved, [candidate.id])).toThrow(
-        "INVALID_REVIEW_SELECTION",
-      );
+      const replay = confirmImported(saved, [candidate.id]);
+      expect(importedFact(replay, candidate)).toBeUndefined();
+      expect(replay.importReview).toEqual(saved.importReview);
       const name = review.extraction.candidates.find((c) => c.path === "name")!;
-      expect(() => confirmImported(saved, [name.id, candidate.id])).toThrow(
-        "INVALID_REVIEW_SELECTION",
-      );
+      const withName = confirmImported(saved, [name.id, candidate.id]);
+      expect(importedFact(withName, candidate)).toBeUndefined();
+      expect(withName.importReview).toEqual(saved.importReview);
     }
     expect(saved.importReview!.confirmedIds).toEqual(
       before.importReview!.confirmedIds,
@@ -242,12 +244,17 @@ it("keeps present unaccepted facts staged, including inactive dates and edited l
       />
     </LanguageContext>,
   );
+  fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
   expect(screen.getByDisplayValue("2022")).toBeTruthy();
   expect(screen.queryByDisplayValue("Kept records")).toBeNull();
   fireEvent.click(
-    screen.getByRole("button", { name: "Confirm and open editor" }),
+    screen.getByRole("button", { name: "Confirm and use this information" }),
   );
-  expect(confirm).toHaveBeenCalledWith(pending);
+  expect(confirm).toHaveBeenCalledWith(
+    review.extraction.candidates
+      .filter((c) => importedFact(removed, c))
+      .map((c) => c.id),
+  );
   const reviewed = confirmImported(removed, pending);
   expect(reviewed.importReview!.confirmedIds).not.toContain(bullet.id);
   expect(reviewed.roles[0].end.value.year).toBe("2022");
@@ -281,8 +288,16 @@ it("keeps present unaccepted facts staged, including inactive dates and edited l
       />
     </LanguageContext>,
   );
-  expect(screen.getByDisplayValue("Kept records")).toBeTruthy();
-  expect(screen.getByDisplayValue("2022")).toBeTruthy();
+  expect(
+    within(
+      document.querySelector(".import-information") as HTMLElement,
+    ).getByText("Kept records"),
+  ).toBeTruthy();
+  expect(
+    within(
+      document.querySelector(".import-information") as HTMLElement,
+    ).getByText("2022"),
+  ).toBeTruthy();
 });
 
 it("retains previous confirmations after deletion without granting a new absent confirmation", () => {

@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { App } from "./App";
+import { App } from "./test-editor-harness";
 import { MemoryBaseCvAdapter } from "./base/adapter";
 import { maraReviewDraft } from "./base/fixture";
 import {
@@ -294,16 +294,14 @@ it("keeps UI/CV language independent, preserves imported status and keeps genera
     "en",
   );
   expect(preview.querySelector("article")!.lang).toBe("en");
-  await user.selectOptions(
-    screen.getByRole("combobox", { name: "CV language" }),
-    "ro",
-  );
-  expect(preview.querySelector("article")!.lang).toBe("ro");
+  expect(screen.queryByRole("combobox", { name: "CV language" })).toBeNull();
+  expect(preview.querySelector("article")!.lang).toBe("en");
   await waitFor(
-    async () => expect((await adapter.load())?.draft.language).toBe("ro"),
+    async () => expect((await adapter.load())?.draft.language).toBe("en"),
     { timeout: 2000 },
   );
   const saved = (await adapter.load())!;
+  expect(saved.draft.documentLocale ?? saved.draft.language).toBe("en");
   expect(
     allFacts(saved.draft).find((f) => f.sourceClaimId === "claim_resp_a")
       ?.status,

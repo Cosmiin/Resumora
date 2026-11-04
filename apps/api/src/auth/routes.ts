@@ -1,4 +1,6 @@
 import { boundedJson } from '../ai/http.ts';
+import { isAuthApiError, isAuthSessionMissingError, isAuthWeakPasswordError } from '@supabase/auth-js';
+import type { AuthError } from '@supabase/auth-js';
 import { config, readCookie, writeCookie, clearCookie } from './cookies.ts';
 import { createAuth, authHeaders, authJson, authError, saveSession, verifySession, checkWrite, clearAuth } from './session.ts';
 import type { AuthConfig, SessionCookie, BrowserCookie, FlowCookie } from './session.ts';
@@ -11,6 +13,19 @@ export const authMethods: Readonly<Record<string, string>> = {
 const generic = { message: 'If an eligible account exists, check your email. Use this browser to open the link.' };
 // Serializes password completion in the supported local Worker isolate, without retaining passwords.
 const completions = new Set<string>();
+// SDK transport/protocol errors can have status 0 or a synthetic 400. Only
+// actual provider rejections should be interpreted as account/input failures.
+function providerFailure(error: AuthError | null, headers: Headers): Response | null {
+  if (!error) return null;
+  if (error.status === 429) {
+    headers.set('Retry-After', '60');
+    return authError('RATE_LIMITED', 429, headers);
+  }
+  if ((!isAuthApiError(error) && !isAuthSessionMissingError(error) && !isAuthWeakPasswordError(error)) || ![400, 401, 403, 422].includes(error.status ?? 0)) {
+    return authError('AUTH_UNAVAILABLE', 503, headers);
+  }
+  return null;
+}
 export async function authRoute(request: Request, env: AuthConfig, transport: typeof fetch = fetch): Promise<Response> {
   const headers = authHeaders();
   const url = new URL(request.url), path = url.pathname;
@@ -99,9 +114,18 @@ export async function authRoute(request: Request, env: AuthConfig, transport: ty
     if (path === '/v1/auth/login') {
       const auth = createAuth(env, {}, transport);
       const { data, error } = await auth.signInWithPassword({ email, password: body.password as string });
-      if (error || !data.session) return authError(error?.status === 429 ? 'RATE_LIMITED' : 'INVALID_CREDENTIALS', error?.status === 429 ? 429 : 401, headers);
+      const failure = providerFailure(error, headers);
+      if (failure) return failure;
+      if (error?.code === 'email_not_confirmed') return authError('EMAIL_NOT_CONFIRMED', 403, headers);
+      if (error) return error.code && error.code !== 'invalid_credentials'
+        ? authError('AUTH_UNAVAILABLE', 503, headers)
+        : authError('INVALID_CREDENTIALS', 401, headers);
+      if (!data.session || !data.user?.id) return authError('AUTH_UNAVAILABLE', 503, headers);
       const verified = await auth.getUser(data.session.access_token);
-      if (verified.error || verified.data.user?.id !== data.user?.id) return authError('INVALID_CREDENTIALS', 401, headers);
+      const verificationFailure = providerFailure(verified.error, headers);
+      if (verificationFailure) return verificationFailure;
+      if (verified.error) return authError('INVALID_CREDENTIALS', 401, headers);
+      if (verified.data.user?.id !== data.user.id) return authError('AUTH_UNAVAILABLE', 503, headers);
       const previous = await readCookie<SessionCookie>(request, env, 'session');
       if (previous) await revokeSessionConnections(env, previous.csrf, transport);
       await saveSession(headers, env, data.session, false);
@@ -115,9 +139,23 @@ export async function authRoute(request: Request, env: AuthConfig, transport: ty
     const result = purpose === 'confirm'
       ? await auth.signUp({ email, password: body.password as string, options: { emailRedirectTo: cfg.api + '/v1/auth/callback/confirm' } })
       : await auth.resetPasswordForEmail(email, { redirectTo: cfg.api + '/v1/auth/callback/recovery' });
-    if (result.error?.status === 429) { headers.set('Retry-After', '60'); return authError('RATE_LIMITED', 429, headers); }
+    const accountRejection = isAuthApiError(result.error)
+      && [400, 404, 422].includes(result.error.status)
+      && ['user_already_exists', 'email_exists', 'user_not_found'].includes(result.error.code ?? '');
+    const failure = accountRejection ? null : providerFailure(result.error, headers);
+    if (failure) return failure;
+    if (result.error && !accountRejection) {
+      if (purpose === 'confirm' && isAuthWeakPasswordError(result.error)) return authError('PASSWORD_TOO_WEAK', 422, headers);
+      if ([400, 422].includes(result.error.status ?? 0) && ['email_address_invalid', 'validation_failed'].includes(result.error.code ?? '')) return authError('INVALID_INPUT', 400, headers);
+      // These public email requests carry no user credentials. Unrecognized
+      // rejections (including API key/configuration failures) are not delivery.
+      return authError('AUTH_UNAVAILABLE', 503, headers);
+    }
+    if (purpose === 'confirm' && !result.error) {
+      const signedUp = 'user' in result.data ? result.data.user : null;
+      if (!signedUp || typeof signedUp !== 'object' || !('id' in signedUp) || typeof signedUp.id !== 'string' || !signedUp.id) return authError('AUTH_UNAVAILABLE', 503, headers);
+    }
     // Provider account-existence errors share the same response. Do not return provider diagnostics.
-    if (result.error && (result.error.status ?? 500) >= 500) return authError('AUTH_UNAVAILABLE', 503, headers);
     // Store only SDK PKCE verifier entries; never persist an unexpected signup session.
     const flowStorage = Object.fromEntries(Object.entries(storage).filter(([key]) => key.includes('code-verifier')));
     // Match ciphertext/cookie sizes even when the SDK removes a verifier after an existing-account rejection.

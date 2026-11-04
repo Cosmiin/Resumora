@@ -1,4 +1,6 @@
+import { skillInventoryPolicy } from '../intelligence/skill-keywords.ts';
 import { answerEvidenceText } from '../intelligence/model.ts';
+import { allInventorySkills } from '../intelligence/skills-improvement.ts';
 import { type BaseDraft, type Fact, type DocumentPresentation, summaryFact, writeSummary, isAccepted, coreSections } from '../editor/model.ts';
 import { decodeDraft, isBaseDraft, type EditorWireEnvelope } from '../editor/transport.ts';
 import { isPhoto } from '../editor/photo.ts';
@@ -74,7 +76,7 @@ export function jobEditorFacts(d: BaseDraft): { ref: JobFactRef; fact: Fact; key
   const summary=summaryFact(d);if(summary)add('summary','summary',summary);
   add(d.id, 'name', d.name); d.titles.forEach(f => add(d.id, 'title', f));
   d.contacts.forEach(c => add(c.id, 'contact', c.value));
-  for (const group of ['professionalSkills','technicalSkills'] as const) d[group].forEach(f => add(group, 'skill', f));
+  for (const group of ['professionalSkills','technicalSkills'] as const) allInventorySkills(d, group).forEach(f => add(group, 'skill', f));
   const entity = (e: { id: string }, fields: Record<string, unknown>) => {
     for (const [key, f] of Object.entries(fields)) {
       if (key === 'bullets') (f as Fact[]).forEach(b => add(e.id, 'bullet', b));
@@ -152,11 +154,18 @@ export function projectJobEditor(source: EditorWireEnvelope, payload: JobEditorP
     draft.sources.push({ id: 'job_local_manual', kind: 'manual', label: 'Job-only manual additions' });
   }
   for (const [group, selection] of [['professionalSkills', professionalSkillIds], ['technicalSkills', technicalSkillIds]] as const) {
-    if (selection !== undefined) draft[group] = selection.map(id => {
-      const matches = draft[group].filter(f => f.id === id);
-      if (matches.length !== 1) invalid();
-      return matches[0];
-    });
+    if (selection !== undefined) {
+      const inventory = allInventorySkills(draft, group);
+      // Historical active-only projections remain readable. A new selection
+      // that draws from reserves follows the current thirty-skill limit.
+      if (selection.length > skillInventoryPolicy.activeCategoryLimit && selection.some(id => draft.skillReserves?.[group].some(f => f.id === id))) invalid();
+      draft[group] = selection.map(id => {
+        const matches = inventory.filter(f => f.id === id);
+        if (matches.length !== 1 || !isAccepted(matches[0]) || !draft.sources.some(s => s.id === matches[0].sourceId)) invalid();
+        return matches[0];
+      });
+      if (draft.skillReserves) draft.skillReserves[group] = draft.skillReserves[group].filter(f => !selection.includes(f.id));
+    }
   }
   if (!isBaseDraft(draft)) invalid();
   return draft;

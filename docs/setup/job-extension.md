@@ -1,10 +1,12 @@
 # Resumora job capture extension
 
+The developer ZIP contains one top-level **Resumeify Extension** folder with all extension files inside. Extract the ZIP, then select that folder (containing `manifest.json`) in Chrome's **Load unpacked** dialog.
+
 Implementation boundary approved by Firstmate inbox 002/003: a persistent capture-only connection subordinate to existing account login. No Supabase access/refresh token, password, session cookie, CV or privileged key enters the extension.
 
 ## Threat boundary and contract
 
-- Existing web login authenticates `POST /v1/extension/authorize` with the existing exact APP_ORIGIN, encrypted session and CSRF check. The signed-in account explicitly approves an extension/device, S256 challenge and random state. Only the packaged public identity (or exact release-configured extension IDs) and their `https://ID.chromiumapp.org/capture` callback are accepted. Codes expire after 120 seconds and exchange atomically once.
+- The toolbar's **Connect account** action starts connection. The signed-in page verifies the pending extension/device, S256 challenge and random state through an external message before automatically authorizing; there is no second permission button. Only the configured app's `/extension/connect` page can ask the installed extension to verify that exact pending request, which expires after ten minutes and is cleared when connection ends. Other pages cannot start connections, capture jobs or read credentials through this bridge. Existing web login authenticates `POST /v1/extension/authorize` with the exact APP_ORIGIN, encrypted session and CSRF check. Only the packaged public identity (or exact release-configured extension IDs) and their `https://ID.chromiumapp.org/capture` callback are accepted. Codes expire after 120 seconds and exchange atomically once. Older extensions must be updated before automatic connection works.
 - The database binds the code to owner, workspace, login-session digest, extension ID and random device ID. It stores only SHA256 capability hashes. Exchange gives a capture-only connection (at most the remaining web-session lifetime, capped at seven days) and a ten-minute access credential. Renewal issues only another capture access credential, never a web session. This is a narrow capability bridge, not another account/password provider.
 - `POST /v1/jobs` with an extension bearer credential accepts only `{requestId, snapshot}`; no account, tenant, CV or existing job IDs. Exact extension Origin and configured ID/device headers are mandatory. The database determines owner/workspace and validates membership on every command. No general database/JWT proxy exists.
 - A bounded raw snapshot, new private draft and pending operation commit together before a receipt is returned (202). Same owner/request ID and body return the same job. Changed body with the same ID conflicts; a new intentional click gets a new ID even for the same URL. Latest saved Base is associated server-side if present; absent Base is null. No Base content is read by capture credentials.
@@ -27,7 +29,7 @@ Forward migration reserved: `20261028040000_p5_job_capture.sql`, after pending 1
 - [Security](https://developer.chrome.com/docs/extensions/develop/security-privacy/stay-secure), last updated 2018-03-06: minimum permissions, hostile content-script inputs, no credential transfer to pages.
 - [Storage](https://developer.chrome.com/docs/extensions/reference/api/storage) and [alarms](https://developer.chrome.com/docs/extensions/reference/api/alarms), last updated 2026-10-28. Storage uses local/session, restricted to trusted contexts. Alarms are re-established at worker start; scheduling can be delayed. Opportunistic immediate send plus durable local queue handles recovery without claiming a timing guarantee.
 
-## Operator readiness (not executed here)
+## Deployment checklist
 
 1. Review/apply the forward migration in order through the separately approved database process. Existing pending 10000/20000/30000 are not edited here. The test runner uses disposable local PG only.
 2. Provision a new random server-only CAPTURE_WORKER_SECRET (at least 32 characters) to the Worker and its SHA256 digest into the singleton `app.capture_worker_authorization`. Only an approved privileged database operator can insert the digest; never put the plaintext in migration history or the ZIP. This is distinct from AI_WORKER_SECRET and grants only the named capture RPC authority.
@@ -40,7 +42,13 @@ Forward migration reserved: `20261028040000_p5_job_capture.sql`, after pending 1
 
 Manual paste uses the existing authenticated `POST /v1/jobs` contract, with a null snapshot pair requesting server association to the latest saved Base or none. Retry identity is based on the submitted null pair, so a Base saved later does not mutate/reassign an earlier draft. Unreviewed extension metadata is displayed as data; classification not explicit in source remains unknown. Schema.org skills stay general skills rather than being silently classified as required/preferred.
 
-This source change does not publish a Store listing, deploy a site, apply a hosted migration, configure secrets or establish real installed-Chrome/provider assurance.
+This packaging implementation does not itself publish a Store listing, deploy a site or apply a hosted migration. Local activation and its verification are recorded separately below.
+
+### Local connection activation — 3 November 2026
+
+The active checkout now has a new server-only capture credential in its ignored API configuration; only its SHA256 digest was registered in the existing hosted `app.capture_worker_authorization` table. Existing tables/functions were already installed, so no schema migration, Profile write or provider/model change was needed. The managed environment was restarted through `dev:start`. Extension CORS preflight now succeeds, and a deliberately invalid connection receives the expected unauthorized response instead of an unavailable-service error.
+
+An isolated installed-Chromium check exercised the real external-message bridge, `launchWebAuthFlow`, automatic authorization and callback/token exchange with synthetic API responses. It verified one authorization, one exchange, pending-request cleanup, hidden disconnected controls and desktop/mobile layouts. This establishes the browser flow with test data; the owner's real account connection and live job-site capture still need verification. Existing unpacked installations must replace their files with the current developer ZIP and reload in `chrome://extensions` to enable the new connection bridge.
 
 ## Capture coverage and remaining evidence
 

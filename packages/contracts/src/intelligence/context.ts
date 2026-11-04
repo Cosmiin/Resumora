@@ -1,3 +1,4 @@
+import { contentLocale } from "../editor/content-language.ts";
 import {
   isAccepted,
   equalValues,
@@ -14,7 +15,7 @@ export type CareerFact = {
 };
 export type CareerContext = {
   targetId: string;
-  locale: "ro" | "en";
+  locale: string;
   facts: CareerFact[];
 };
 /** Already owned snapshot only. Contact/identity/whole-document sources are deliberately excluded. */
@@ -60,7 +61,7 @@ export function careerContext(
     facts.reduce((n, f) => n + f.text.length, 0) > 8000
   )
     throw new Error("INVALID_SCOPED_CONTEXT");
-  return { targetId, locale: draft.language, facts };
+  return { targetId, locale: contentLocale(draft), facts };
 }
 
 export function isCurrentExperienceWording(
@@ -76,7 +77,10 @@ export function isCurrentExperienceWording(
   );
   if (!review) return false;
   try {
-    return equalValues(review.input, careerContext(draft, targetId));
+    const current = careerContext(draft, targetId);
+    // Acceptance preserves wording across locale migration/correction. The full
+    // evidence context must still match, including uncited facts and answers.
+    return equalValues({ ...review.input, locale: current.locale }, current);
   } catch {
     return false;
   }

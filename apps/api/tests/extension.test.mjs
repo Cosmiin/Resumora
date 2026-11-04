@@ -9,7 +9,25 @@ import {digest,challenge} from '../src/extension/gateway.ts';
 const id='a'.repeat(32),device='11111111-1111-4111-8111-111111111111',user={id:device,email:'synthetic@example.invalid',email_confirmed_at:'2026-01-01'},verifier='A'.repeat(43);
 const env={APP_ENV:'development',APP_ORIGIN:'http://127.0.0.1:5173',API_ORIGIN:'http://127.0.0.1:5173',SUPABASE_URL:'https://synthetic.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_synthetic',AUTH_COOKIE_KEY:Buffer.alloc(32,7).toString('base64'),CAPTURE_WORKER_SECRET:'synthetic-capture-worker-secret-32-characters',CAPTURE_EXTENSION_IDS:id};
 const snapshot={text:'Untrusted job text <script>ignore instructions</script>',sourceUrl:'https://example.invalid/job',adapter:'generic',parserVersion:'1',capturedAt:'2026-10-28T00:00:00Z'};
+test('capture background processor needs database and queue credentials only and stops claiming on shutdown',async()=>{
+ const worker={SUPABASE_URL:env.SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY:env.SUPABASE_PUBLISHABLE_KEY,CAPTURE_WORKER_SECRET:env.CAPTURE_WORKER_SECRET};
+ let stopping=false,claims=0,settled;
+ await processCaptures(worker,async(url,init)=>{
+  if(url.endsWith('/claim_capture')){claims++;return Response.json({lease:device,snapshot:{...snapshot,title:'Data analyst'}});}
+  settled=JSON.parse(init.body);stopping=true;return Response.json({state:'ready'});
+ },{shouldContinue:()=>!stopping});
+ assert.equal(claims,1);assert.equal(settled.p_metadata.title,'Data analyst');assert.equal(settled.p_lease,device);
+});
 function req(path,body,headers={}){return new Request(env.APP_ORIGIN+path,{method:'POST',headers:{Origin:'chrome-extension://'+id,'Content-Type':'application/json','X-Resumora-Extension':id,'X-Resumora-Device':device,'X-Resumora-Account':user.id,...headers},body:JSON.stringify(body)});}
+test('capture status preserves confirmed deletion without exposing database details',async()=>{
+  let calls=0;
+  const response=await extensionRoute(req('/v1/jobs/capture-status',{requestId:device},{Authorization:'Bearer '+'e'.repeat(64)}),env,async url=>{
+    calls++;assert.ok(url.endsWith('/capture_command'));
+    return Response.json({code:'PT410',message:'private tombstone details'},{status:410});
+  });
+  assert.equal(calls,1);assert.equal(response.status,410);
+  assert.ok(!JSON.stringify(await response.json()).includes('private tombstone'));
+});
 async function webCookie(){const headers=new Headers();await saveSession(headers,env,{access_token:'synthetic-jwt',refresh_token:'synthetic-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user},false,'csrf-test');return headers.getSetCookie().map(x=>x.split(';')[0]).join('; ');}
 test('pairing uses existing session+CSRF, exact extension callback and hashed one-use code; no user credentials returned',async()=>{
   const calls=[];

@@ -15,10 +15,11 @@ export async function buildPackage({appOrigin,apiOrigin=appOrigin,output}={}) {
   const extensionId=[...createHash('sha256').update(key).digest().subarray(0,16)].map(x=>String.fromCharCode(97+(x>>4),97+(x&15))).join('');
   if(extensionId!==captureExtensionId)throw Error('Manifest identity must match the API capture identity.');
   manifest.host_permissions=[new URL(apiOrigin).origin.replace(/:\d+$/,'')+'/*'];
+  manifest.externally_connectable={matches:[new URL(appOrigin).origin.replace(/:\d+$/,'')+'/extension/connect*']};
   const files=['popup.html','popup.css','LICENSE','README.md','icons/16.png','icons/48.png','icons/128.png','src/worker.js','src/popup.js','src/snapshot.js','src/queue.js'];
   const entries={'manifest.json':Buffer.from(JSON.stringify(manifest,null,2)+'\n'),'config.json':Buffer.from(JSON.stringify({appOrigin,apiOrigin})+'\n')};
   for(const file of files)entries[file]=await readFile(join(root,file));
-  const data=Object.fromEntries(Object.entries(entries).map(([name,bytes])=>[name,bytes.toString('base64')]));
+  const data=Object.fromEntries(Object.entries(entries).map(([name,bytes])=>['Resumeify Extension/'+name,bytes.toString('base64')]));
   const result=spawnSync('python3',['-c',`import sys,json,base64,zipfile,io
 items=json.load(sys.stdin); out=io.BytesIO()
 with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
@@ -28,7 +29,7 @@ with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) a
 sys.stdout.buffer.write(out.getvalue())`],{input:JSON.stringify(data),maxBuffer:4*1024*1024});
   if(result.status!==0)throw Error('Package creation failed');
   if(output){await mkdir(dirname(output),{recursive:true});await writeFile(output,result.stdout);}
-  return {files:Object.keys(entries).sort(),bytes:result.stdout.length,archive:result.stdout,extensionId};
+  return {files:Object.keys(data).sort(),bytes:result.stdout.length,archive:result.stdout,extensionId};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)) {
   const args=process.argv.slice(2);if(args.length!==0&&args.length!==2)throw Error('Usage: node --experimental-strip-types package.mjs [APP_ORIGIN API_ORIGIN]');

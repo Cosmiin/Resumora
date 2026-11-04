@@ -2,7 +2,7 @@
 
 Date: 3 November 2026
 
-Status: proposed implementation design; product decisions confirmed, implementation approval pending.
+Status: implemented, independently reviewed and activated in the managed local app. See the implementation plan execution record for verification limits.
 
 ## Intent and confirmed behavior
 
@@ -47,7 +47,7 @@ Two alternatives were considered:
 1. Infer independently inside every prompt. This permits different workflows to choose different languages, makes low-confidence correction inconsistent, and can let an answer or vacancy change the language. It does not meet the user's consistency requirement.
 2. Remove selectors and adjust only existing Romanian/English prompts. This leaves multilingual storage, job flows, caches, speech, and export behavior incorrect. It does not meet the confirmed scope.
 
-The shared persisted decision is the recommended implementation. The user selected the product rules above; technical details below are implementation proposals rather than additional user preferences.
+The shared persisted decision is the approved implementation. The user approved the product rules and implementation design below.
 
 ## Language model and resolution
 

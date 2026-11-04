@@ -8,7 +8,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { App } from "../App";
+import { App } from "../test-editor-harness";
 import { MemoryBaseCvAdapter } from "../base/adapter";
 import {
   blankDraft,

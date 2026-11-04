@@ -6,7 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import { App } from "../App";
+import { App } from "../test-editor-harness";
 import {
   AdapterError,
   MemoryBaseCvAdapter,

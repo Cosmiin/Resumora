@@ -1,5 +1,7 @@
 # Resumora setup guide
 
+**For the running app, use the [current environment guide](docs/setup/environment.md).** This page preserves the original infrastructure research and historical verification states; it is not the everyday startup procedure.
+
 Initial research: **24 October 2026**. This guide is infrastructure preparation, not execution authorization. The [database guide](docs/database/README.md) owns database implementation and apply status; [authentication setup](docs/setup/authentication.md) owns the implemented auth flows, configuration and hosted acceptance dependencies.
 
 Earlier read-only dashboard inspection verified **Resumora**, project ref `aquvhqbkvrtzhbmezkci`, **West EU (Ireland)**, **Free Plan**, **Email enabled** and **Confirm email enabled**. Empty/development use remains owner-reported; RLS, storage, login and delivery are unverified. The dashboard's `PRODUCTION` label does not establish real production data. Reuse this project; no duplicate or upgrade. This branch adds credential-file ignore protection, pending merge. Owner chose initial email tests for **only the owner/project team**, with actual eligibility/delivery still to verify; no external testers or paid SMTP configuration now.

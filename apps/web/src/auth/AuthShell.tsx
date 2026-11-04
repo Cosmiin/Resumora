@@ -1,3 +1,10 @@
+import { WorkspaceProvider } from "../workspace/context";
+import {
+  authErrorMessage,
+  AuthResponseError,
+  readAuthResponse,
+  type AuthStatus,
+} from "./response";
 import {
   useCallback,
   useEffect,
@@ -12,12 +19,18 @@ export type AuthTransport = (
   path: string,
   init?: RequestInit,
 ) => Promise<Response>;
-type Status = { user: Account | null; csrfToken: string; recovery: boolean };
+type Status = AuthStatus;
 export function AuthShell({
   children,
   fetcher = fetch,
+  accountMenuInShell = false,
 }: {
-  children: (account: Account, transport: AuthTransport) => ReactNode;
+  children: (
+    account: Account,
+    transport: AuthTransport,
+    accountActions: ReactNode,
+  ) => ReactNode;
+  accountMenuInShell?: boolean;
   fetcher?: typeof fetch;
 }) {
   const [status, setStatus] = useState<Status | null>(null);
@@ -104,7 +117,9 @@ export function AuthShell({
         if (
           !(
             init.signal?.aborted &&
-            (error as { name?: string } | null)?.name === "AbortError"
+            ["AbortError", "TimeoutError"].includes(
+              (error as { name?: string } | null)?.name ?? "",
+            )
           ) &&
           !path.startsWith("/v1/auth/") &&
           startedGeneration === generation.current &&
@@ -161,12 +176,8 @@ export function AuthShell({
       const started = generation.current;
       try {
         const response = await transport("/v1/auth/session");
-        const body = await response.json();
+        const body = await readAuthResponse(response, "session");
         if (started !== generation.current) return;
-        if (!response.ok)
-          throw Error(
-            body.error?.message ?? "Autentificarea nu este disponibilă.",
-          );
         if (
           accountId.current !== (body.user?.id ?? null) ||
           csrf.current !== body.csrfToken
@@ -183,11 +194,7 @@ export function AuthShell({
       } catch (e) {
         if (started !== generation.current) return;
         verified.current = false;
-        setError(
-          e instanceof Error
-            ? e.message
-            : "Autentificarea nu este disponibilă.",
-        );
+        setError(authErrorMessage(e));
       } finally {
         setReady(true);
       }
@@ -265,13 +272,22 @@ export function AuthShell({
           "/v1/intelligence/imports",
           "/v1/intelligence/questions",
           "/v1/intelligence/rewrite",
+          "/v1/intelligence/experience",
         ].includes(path)
-      )
-        return afterRequests(async () => {
+      ) {
+        const preflight = async () => {
           assertCurrent();
           const next = await load();
           if (next?.recovery) throw new Error("SESSION_CHANGED");
-        }).then(() => ordered(send, "intelligence"));
+        };
+        // Experience requests have durable IDs and private responses never rotate cookies.
+        // Verify the session without waiting for an unrelated advisory score to finish.
+        return (
+          path === "/v1/intelligence/experience"
+            ? ordered(preflight, "verification")
+            : afterRequests(preflight)
+        ).then(() => ordered(send, "intelligence"));
+      }
       return ordered(
         send,
         path.startsWith("/v1/intelligence/") ? "intelligence" : "account",
@@ -287,11 +303,11 @@ export function AuthShell({
     load,
     verify,
   ]);
-  async function reloadAfterAction() {
+  async function reloadAfterAction(preserveForm = false) {
     generation.current++;
     verified.current = false;
     csrf.current = "";
-    setStatus(null);
+    if (!preserveForm) setStatus(null);
     return load(true);
   }
   useEffect(() => {
@@ -323,38 +339,47 @@ export function AuthShell({
           : { email: data.get("email"), password: data.get("password") };
     await ordered(async () => {
       try {
+        // A queued submit must wait for session verification and must not use a failed check.
+        if (!verified.current || !csrf.current)
+          throw new AuthResponseError(
+            "Sesiunea trebuie verificată din nou. Reîncearcă conexiunea.",
+          );
         const response = await transport("/v1/auth/" + mode, {
           method: "POST",
           body: JSON.stringify(body),
         });
-        const result = await response.json();
-        if (!response.ok)
-          throw Error(
-            result.error?.message ?? "Cererea nu a reușit. Încearcă din nou.",
-          );
-        form.reset();
+        await readAuthResponse(response, mode);
         if (mode === "login") {
           loggingOut.current = false;
           generation.current++;
-          await load();
+          const next = await load();
+          if (!next) return;
+          if (!next.user)
+            throw new AuthResponseError(
+              "Autentificarea nu a putut fi confirmată. Reîncearcă conexiunea.",
+            );
+          form.reset();
         } else if (mode === "password") {
+          form.reset();
           setMode("login");
           window.history.replaceState(null, "", "/");
           await reloadAfterAction();
           setNotice("Parolă schimbată. Autentifică-te cu parola nouă.");
-        } else
+        } else {
+          form.reset();
           setNotice(
             "Dacă există un cont eligibil, verifică emailul. Deschide linkul în acest browser.",
           );
+        }
       } catch (e) {
         if (mode === "password") {
-          const next = await reloadAfterAction();
+          const next = await reloadAfterAction(true);
           if (next && !next.recovery) {
             setMode("login");
             window.history.replaceState(null, "", "/");
           }
         }
-        setError(e instanceof Error ? e.message : "Cererea nu a reușit.");
+        setError(authErrorMessage(e));
       } finally {
         setBusy(false);
       }
@@ -362,6 +387,12 @@ export function AuthShell({
   }
   async function logout() {
     if (busy) return;
+    if (
+      !window.dispatchEvent(
+        new Event("resumora:before-signout", { cancelable: true }),
+      )
+    )
+      return;
     verified.current = false;
     loggingOut.current = true;
     setBusy(true);
@@ -381,13 +412,9 @@ export function AuthShell({
           throw Error("Deconectarea nu este confirmată. Reîncearcă.");
         loggingOut.current = false;
         await reloadAfterAction();
-      } catch (e) {
+      } catch {
         await reloadAfterAction();
-        setError(
-          e instanceof Error
-            ? e.message
-            : "Deconectarea nu este confirmată. Reîncearcă.",
-        );
+        setError("Deconectarea nu este confirmată. Reîncearcă.");
       } finally {
         setBusy(false);
       }
@@ -402,16 +429,18 @@ export function AuthShell({
   if (status?.user && !status.recovery)
     return (
       <>
-        <div className="auth-account">
-          <span>{status.user.email}</span>
-          <button
-            className="btn btn-ghost"
-            onClick={() => void logout()}
-            disabled={busy}
-          >
-            Deconectare
-          </button>
-        </div>
+        {!accountMenuInShell && (
+          <div className="auth-account">
+            <span>{status.user.email}</span>
+            <button
+              className="btn btn-ghost"
+              onClick={() => void logout()}
+              disabled={busy}
+            >
+              Deconectare
+            </button>
+          </div>
+        )}
         {error && (
           <div role="alert">
             <p>
@@ -423,9 +452,24 @@ export function AuthShell({
             </button>
           </div>
         )}
-        <Fragment key={`${status.user.id}:${status.csrfToken}`}>
-          {children(status.user, accountTransport)}
-        </Fragment>
+        <WorkspaceProvider key={status.user.id} transport={accountTransport}>
+          <Fragment key={`${status.user.id}:${status.csrfToken}`}>
+            {children(
+              status.user,
+              accountTransport,
+              <>
+                <span>{status.user.email}</span>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => void logout()}
+                  disabled={busy}
+                >
+                  Deconectare
+                </button>
+              </>,
+            )}
+          </Fragment>
+        </WorkspaceProvider>
       </>
     );
   const reset = mode === "password",
@@ -453,6 +497,7 @@ export function AuthShell({
             <label>
               Email
               <input
+                className="native"
                 name="email"
                 type="email"
                 autoComplete="email"
@@ -466,6 +511,7 @@ export function AuthShell({
             <label>
               {reset ? "Parolă nouă" : "Parolă"}
               <input
+                className="native"
                 name="password"
                 type="password"
                 autoComplete={
@@ -481,7 +527,7 @@ export function AuthShell({
           <button
             className="btn btn-primary"
             type="submit"
-            disabled={busy || !status}
+            disabled={busy || !status || !verified.current}
           >
             {busy
               ? "Se procesează…"
@@ -524,7 +570,7 @@ export function AuthShell({
           Anulează și deconectează
         </button>
       )}
-      {!status && (
+      {(!status || !verified.current || error) && (
         <button
           className="btn btn-ghost"
           onClick={() => {

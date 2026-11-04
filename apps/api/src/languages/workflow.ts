@@ -1,3 +1,5 @@
+import { contentLocale } from "@resumora/contracts/editor/content-language";
+import { documentLabels } from "@resumora/contracts/editor/document-labels";
 import { decodeDraft, encodeDraft } from "@resumora/contracts/editor/transport";
 import {
   allFacts,
@@ -51,7 +53,7 @@ export function languageWorkflow(
     validateDocumentLocale(locale);
     const row =
       pin.kind === "job"
-        ? await db.loadCurrentJobDocument(pin.jobId!, locale.split("-")[0])
+        ? await db.loadCurrentJobDocument(pin.jobId!, locale)
         : (await db.languageContext()).source;
     if (
       !row ||
@@ -94,6 +96,19 @@ export function languageWorkflow(
       glossaryVersion: await componentFingerprint(request.glossary),
       translationPreferences: { regionalTerminology: "" },
     };
+    const target =
+      request.source.kind === "job"
+        ? await db.loadCurrentJobDocument(request.source.jobId!, request.targetLocale)
+        : await db.loadBaseLanguage(request.variantId);
+    const existing =
+      target && target.revision === request.targetRevision
+        ? decodeDraft(target.payload)
+        : null;
+    const labels =
+      existing && contentLocale(existing) === request.targetLocale
+        ? documentLabels(existing)
+        : null;
+    if (labels) input.targetLabels = labels;
     return { draft, input };
   }
   function batches(input: TranslationInput) {
@@ -156,6 +171,7 @@ export function languageWorkflow(
       plan = batches(input),
       batch = plan[proposal.step];
     if (!batch) fail("invalidProposal", 422);
+    if (proposal.output?.documentLabels) batch.targetLabels = proposal.output.documentLabels;
     const operationId = await stageOperationId(id, `P09:${proposal.step}`);
     const reservation = (await db.languageCommand(
       "work",
@@ -174,6 +190,7 @@ export function languageWorkflow(
       const previous = proposal.output;
       const combined: TranslationOutput = {
         ...output,
+        ...(previous?.documentLabels ? { documentLabels: previous.documentLabels } : {}),
         completion:
           output.completion === "needs_review" ||
           previous?.completion === "needs_review"
@@ -279,7 +296,7 @@ export function languageWorkflow(
       proposal.request.source.kind === "job"
         ? await db.loadCurrentJobDocument(
             proposal.request.source.jobId!,
-            proposal.request.targetLocale.split("-")[0],
+            proposal.request.targetLocale,
           )
         : await db.loadBaseLanguage(proposal.request.variantId);
     if ((existing?.revision ?? 0) !== proposal.request.targetRevision)
@@ -311,6 +328,7 @@ export function languageWorkflow(
         ...input.items.map(({ text, protectedTerms, ...item }) => item),
       ],
     };
+    if (!documentLabels(target)) fail("TRANSLATION_LABELS_UNAVAILABLE", 422);
     target.translation = lineage;
     target.documentLocale = input.targetLocale;
     target.sourceLocale = input.sourceLocale;

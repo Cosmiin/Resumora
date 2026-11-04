@@ -6,7 +6,7 @@ Implementation tests use a synthetic provider and include a native workerd login
 
 ## Local configuration
 
-Use the existing **Resumora development Supabase project**, not a duplicate project. Keep the frontend at `http://127.0.0.1:5173` and Worker at `http://127.0.0.1:8787`; the existing Vite proxy preserves the browser Origin. `API_ORIGIN` is the browser-facing API origin through that proxy, **not** port 8787. Do not substitute `localhost` or expose these HTTP listeners to the LAN.
+Use the existing **Resumora development Supabase project**, not a duplicate project. Keep the frontend at the exact configured `APP_ORIGIN` (default `http://127.0.0.1:5173`, this checkout `http://127.0.0.1:15173`) and Worker at `http://127.0.0.1:8787`; the existing Vite proxy preserves the browser Origin. `API_ORIGIN` is the browser-facing API origin through that proxy, **not** port 8787. Do not substitute `localhost` or expose these HTTP listeners to the LAN.
 
 Check the intended secret path before creating it:
 
@@ -26,7 +26,22 @@ AUTH_COOKIE_KEY="<private-base64-encoded-32-random-bytes>"
 
 `APP_ENV=development` already lives in Wrangler's checked-in configuration. The URL, publishable key and origins are public configuration; the cookie key is a Worker-only secret. Obtain existing designated configuration through the approved private setup path. Generate/store the cookie key privately without printing it in chat, terminals, logs or source files. Do not use a Supabase signing key, service-role/secret key, database password or management token. Legacy JWT API keys and service-role/secret keys fail configuration validation. Never put secrets in a `VITE_*` value. Root ignores and Vite's Worker filesystem deny rules remain in force.
 
-Run `npm ci --ignore-scripts`, then `npm run dev`. Missing/invalid settings return actionable `503 AUTH_UNCONFIGURED`; the frontend stays locked. Frontend and browser-facing API must share one exact origin. This implementation deliberately has no permissive CORS or cross-site cookie mode. HTTPS uses Secure `__Host-` cookies; only explicit development on HTTP `127.0.0.1` uses the distinct `resumora-local-` cookie names. Ports share host cookies, so do not run unrelated apps using these names on the same hostname. Replacing `AUTH_COOKIE_KEY` invalidates existing cookies; no automatic key rotation or hosted settings write occurs.
+Run `npm ci --ignore-scripts`, then `npm run dev:start` on Linux/WSL with user systemd (or `npm run dev` for foreground development). Missing/invalid settings return `503 AUTH_UNCONFIGURED`; the frontend stays locked with a readable unavailable-service message. The startup helper supplies the setup diagnostics. Frontend and browser-facing API must share one exact origin. This implementation deliberately has no permissive CORS or cross-site cookie mode. HTTPS uses Secure `__Host-` cookies; only explicit development on HTTP `127.0.0.1` uses the distinct `resumora-local-` cookie names. Ports share host cookies, so do not run unrelated apps using these names on the same hostname. Replacing `AUTH_COOKIE_KEY` invalidates existing cookies; no automatic key rotation or hosted settings write occurs.
+
+## User journey and failure recovery
+
+1. **Sign in:** enter email and password, then choose **Intră în cont**. The app verifies the resulting session before opening private content.
+2. **Register:** choose **Creează cont**, enter email and a password of at least eight characters, and submit once. Open the confirmation email in the same browser that requested it. The confirmation callback verifies the account before entering the app.
+3. **Forgot password:** choose **Ai uitat parola?**, request the email, open its link in the same browser, and set a new password. Sign in with the new password afterward.
+4. **Sign out:** use **Deconectare**. Private content closes immediately; a failed sign-out remains visibly unconfirmed.
+
+Wrong credentials, unconfirmed email, weak signup passwords, invalid input, rate limits, temporary provider failure, and an unavailable local API have distinct readable messages. Explicit provider configuration failures never claim that an email was sent. Empty/HTML/malformed gateway responses never display JSON-parser exceptions. Session JSON is validated before the app treats it as verified. A failed session check blocks auth submissions until **Reîncearcă conexiunea** succeeds. This retry checks only the session; it never automatically resends a registration, reset email, password change, or login. Failed submissions preserve typed values where the flow remains valid. Registration/recovery success messages remain neutral about whether an account exists.
+
+### 2 November 2026 incident and verification
+
+The frontend remained up while its separately launched API process terminated (exit 143). Its proxy returned an empty text/plain 502, which the old UI parsed with `response.json()` and exposed as `Unexpected end of JSON input`. Earlier frontend-only health checks missed the authentication outage. A paired persistent service now owns both processes, and the browser validates responses and maps errors instead of exposing raw parser errors.
+
+A controlled API-process termination recovered the paired service and valid session endpoint in approximately six seconds. A read-only provider settings check returned 200 with email sign-in enabled and confirmation required. Synthetic browser checks exercised empty502 initial/session and login responses, input preservation, non-replayed POSTs, credentials errors, HTML signup errors, registration guidance, password-reset request, verified login, and logout. Provider-side failure regression tests use injected network/timeout/5xx/malformed responses; no real account signup, recovery email, password change, or hosted settings change was performed. Email delivery and real credentials must still be exercised by the account owner.
 
 ## External setup dependencies
 
@@ -81,3 +96,12 @@ npm run smoke
 ```
 
 These cover the SDK against synthetic provider responses, native Worker cookie/session execution, form transitions, generic enumeration responses, CSRF/origin/body boundaries, refresh rotation/failure, cookie tampering/expiry, recovery isolation/consumption and fixed redirects. No test sends real email, creates hosted users or proves hosted login. Mandatory no-mistakes and CI gates remain part of delivery.
+
+### Final regression results
+
+- Frontend: 66 files, 698 tests passed on the finished source.
+- API: 423 tests passed; 61 auth cases cover the expanded provider-failure matrix.
+- Local configuration/service lifecycle: 11 tests passed; actual systemd unit validated and automatic recovery exercised.
+- Web/API TypeScript checks passed. Browser auth journey checks used synthetic responses; live provider settings were read-only.
+
+During verification, an initial two-worker frontend run reported an unload-protection assertion and an enrichment timeout; both passed in a focused 51-test recheck. A subsequent serial run started before the final weak-password mapping landed and used its older cached transform for the newly added test. The final run above started after all source edits and passed every test. No production workaround or timeout increase was added for those test runs.

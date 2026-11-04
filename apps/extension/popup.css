@@ -1,1 +1,2 @@
 body{font:14px system-ui;background:#faf8f3;color:#233c36;width:340px;padding:18px;margin:0}h1{font:700 24px Georgia;margin:0}button,a{display:block;margin:12px 0;padding:10px;border-radius:8px;border:1px solid #236252;background:#fff;color:#174c40}button{cursor:pointer}button:disabled{opacity:.5}li{padding:8px 0;overflow-wrap:anywhere}small{line-height:1.5}#message{min-height:40px}
+[hidden]{display:none!important}

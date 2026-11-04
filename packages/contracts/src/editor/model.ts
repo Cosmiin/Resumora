@@ -1,3 +1,4 @@
+import type { ContentLocale, ContentLanguageDecision } from "./content-language.ts";
 import type { TranslationLineage } from "./languages.ts";
 import type { CvPhoto } from "./photo.ts";
 import type {
@@ -21,6 +22,9 @@ export type Fact<T extends FactValue = FactValue> = {
   acceptance?: "automatic";
   sourceClaimId?: string;
   sourceLineage?: { sourceId: string; sourceClaimId?: string }[];
+  /** @deprecated Read compatibility only; removed at the transport boundary. */
+  skillEvidence?: unknown;
+  skillOrigin?: unknown;
   evidenceClaimIds?: string[];
   previousFactId?: string;
   confirmedAt?: string;
@@ -89,6 +93,7 @@ export type OptionalSection = {
   heading?: Fact<string>;
 };
 export type Answer = {
+  origin?: { jobId: string; answerId: string; answerRevision: number };
   id: string;
   targetId: string;
   question:
@@ -142,9 +147,13 @@ export type DocumentPresentation = {
 export type BaseDraft = {
   id: string;
   importReview?: ImportReview;
+  /** Import-only user choices; immutable extraction evidence stays in importReview. */
+  importSkillChoices?: Record<string, "professionalSkills" | "technicalSkills" | "omit">;
   questionPlans?: QuestionPlan[];
   roleRewriteReviews?: RoleRewriteReview[];
-  language: Locale;
+  experienceEnrichment?: Record<string, import("../intelligence/experience.ts").ExperienceSession>;
+  language: ContentLocale;
+  contentLanguage?: ContentLanguageDecision;
   documentLocale?: string;
   sourceLocale?: string;
   translation?: TranslationLineage;
@@ -155,6 +164,10 @@ export type BaseDraft = {
   summary: Prose;
   professionalSkills: Fact<string>[];
   technicalSkills: Fact<string>[];
+  /** Canonical labels explicitly deleted by the user; discovery must respect them. */
+  skillExclusions?: string[];
+  skillReserves?: { technicalSkills: Fact<string>[]; professionalSkills: Fact<string>[] };
+  skillReview?: { operationId: string; fingerprint: string; snapshotId: string; revision: number };
   roles: Role[];
   education: Education[];
   optionalSections: OptionalSection[];

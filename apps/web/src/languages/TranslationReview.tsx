@@ -1,3 +1,4 @@
+import { useWorkspaceDraft, DraftStatus } from "../workspace/context";
 import { useEffect, useRef, useState } from "react";
 import { Button, useCopy } from "../components/ui";
 import { DocumentPreview } from "../components/DocumentPreview";
@@ -25,7 +26,10 @@ export function TranslationReview({
   save,
   cancel,
 }: {
-  client: Pick<LanguageClient, "review" | "accept" | "cancel" | "start" | "advance">;
+  client: Pick<
+    LanguageClient,
+    "review" | "accept" | "cancel" | "start" | "advance"
+  >;
   context: NonNullable<DocumentLanguageContext["source"]>;
   proposal: LanguageProposal;
   existing?: BaseDraft;
@@ -48,6 +52,28 @@ export function TranslationReview({
     [error, setError] = useState(""),
     [preview, setPreview] = useState<BaseDraft | null>(null),
     [previewError, setPreviewError] = useState(false);
+  const reviewDraft = useWorkspaceDraft("translation-review", initial.id, {
+    values,
+    confirmed,
+    step,
+    proposalId: initial.id,
+  });
+  const restored = useRef(false);
+  useEffect(() => {
+    if (reviewDraft.ready && !restored.current) {
+      restored.current = true;
+      if (reviewDraft.head) {
+        setValues(reviewDraft.value.values);
+        setConfirmed(reviewDraft.value.confirmed);
+        setStep(reviewDraft.value.step);
+      }
+      void reviewDraft.controller.persist();
+    }
+  }, [reviewDraft.ready]);
+  useEffect(() => {
+    if (restored.current && reviewDraft.ready)
+      reviewDraft.set({ values, confirmed, step, proposalId: initial.id });
+  }, [values, confirmed, step, reviewDraft.ready]);
   const active = useRef(true),
     abort = useRef<AbortController | null>(null);
   useEffect(
@@ -101,6 +127,7 @@ export function TranslationReview({
   });
   useEffect(() => {
     let current = true;
+    setPreview(null);
     void input()
       .then((i) => composeTranslation(context.draft, i, output(), existing))
       .then(
@@ -122,6 +149,7 @@ export function TranslationReview({
     setBusy(true);
     setError("");
     try {
+      if (!(await reviewDraft.flush())) throw Error("draftSaveFailed");
       const nextConfirmed = [...new Set([...confirmed, section])],
         next = await client.review(proposal.id, proposal.reviewRevision, {
           values: items.map((i) => ({
@@ -217,6 +245,7 @@ export function TranslationReview({
       aria-label={t("Revizuiește traducerea", "Review translation")}
     >
       <h2>{t("Revizuiește traducerea", "Review translation")}</h2>
+      <DraftStatus draft={reviewDraft} />
       <p>
         {proposal.request.sourceLocale} → {proposal.request.targetLocale}
       </p>
@@ -234,9 +263,10 @@ export function TranslationReview({
                     <strong>{proposal.request.sourceLocale}</strong>
                     <p>{item.text}</p>
                   </div>
-                  <label>
+                  <label className="field">
                     {proposal.request.targetLocale} · {index + 1}
                     <textarea
+                      className="native"
                       value={values[item.id] ?? item.text}
                       onChange={(e) => {
                         setValues((v) => ({ ...v, [item.id]: e.target.value }));
@@ -313,6 +343,7 @@ export function TranslationReview({
           <Button
             disabled={
               busy ||
+              !preview ||
               previewError ||
               sections.some((id) => !confirmed.includes(id))
             }

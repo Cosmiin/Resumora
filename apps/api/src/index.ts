@@ -1,3 +1,5 @@
+import { transcriptionRoute, voiceTypes } from "./intelligence/transcription.ts";
+import { drainCvImports } from "./intelligence/import-processor.ts";
 import { isLanguagePath, configuredLanguageRoute } from "./languages/routes.ts";
 import { exportRoute, type ExportConfig } from "./export/routes.ts";
 import { processJobWorkflow,drainJobWorkflows } from "./jobs/processor.ts";
@@ -22,6 +24,7 @@ import { authenticateRequest, checkWrite, authError } from "./auth/session.ts";
 import type { AuthConfig } from "./auth/session.ts";
 import { createDatabaseGateway } from "./db/supabase.ts";
 import { cvRoute } from "./cv/routes.ts";
+import { isWorkspacePath, workspaceRoute } from "./workspace/routes.ts";
 
 // Private endpoints use the authenticated user token; paid inference is OFF by default.
 interface Env
@@ -57,8 +60,7 @@ function json(
 
 export default {
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
-    await processCaptures(env);
-    await drainJobWorkflows(env);
+    await Promise.all([drainCvImports(env), processCaptures(env), drainJobWorkflows(env)]);
   },
   async fetch(request: Request, env: Env, context?: Pick<ExecutionContext,"waitUntil">): Promise<Response> {
     const path = new URL(request.url).pathname;
@@ -72,7 +74,9 @@ export default {
       return adminRoute(request, env);
     if (authMethods[path]) return authRoute(request, env);
     if (
+      path === "/v1/intelligence/transcriptions" ||
       isIntelligencePath(path) ||
+      isWorkspacePath(path) ||
       isLanguagePath(path) ||
       cvPaths.has(path) ||
       path === "/v1/exports/pdf" ||
@@ -90,7 +94,9 @@ export default {
         !(await checkWrite(
           request,
           env,
-          path === "/v1/photos"
+          path === "/v1/intelligence/transcriptions"
+            ? voiceTypes
+            : path === "/v1/photos"
             ? ["image/jpeg", "image/png", "image/webp"]
             : path === "/v1/intelligence/imports"
               ? ["application/octet-stream"]
@@ -101,7 +107,10 @@ export default {
       let response: Response;
       try {
         const gateway = createDatabaseGateway(env, identity);
-        response = isLanguagePath(path) ? await configuredLanguageRoute(request,env,gateway,identity.user.id) : path === "/v1/exports/pdf"
+        const transcription = path === "/v1/intelligence/transcriptions"
+          ? transcriptionRoute(request, env, gateway, identity.user.id) : undefined;
+        if (transcription) context?.waitUntil(transcription.then(() => undefined));
+        response = transcription ? await transcription : isWorkspacePath(path) ? await workspaceRoute(request,env,gateway,identity.user.id,{waitUntil:context?.waitUntil.bind(context)}) : isLanguagePath(path) ? await configuredLanguageRoute(request,env,gateway,identity.user.id) : path === "/v1/exports/pdf"
           ? await exportRoute(request,gateway,env)
           : isIntelligencePath(path)
           ? await configuredIntelligenceRoute(
@@ -109,6 +118,8 @@ export default {
               env,
               gateway,
               identity.user.id,
+              fetch,
+              {waitUntil:context?.waitUntil.bind(context)},
             )
           : path === "/v1/enhancement"
             ? await enhancementRoute(request, env, gateway, identity.user.id)
@@ -135,7 +146,7 @@ export default {
           { status: 503 },
         );
       }
-      if(response.ok && request.method==='POST' && ((path==='/v1/jobs'||path==='/v1/jobs/url') || /\/workflow\/(fetch|extract|match|tailor|prepare)$/.test(path)))context?.waitUntil(processJobWorkflow(env).catch(()=>undefined));
+      if(response.ok && request.method==='POST' && ((path==='/v1/jobs'||path==='/v1/jobs/url'||/^\/v1\/jobs\/intakes\/[^/]+\/submit$/.test(path)) || /\/workflow\/(fetch|extract|match|tailor|prepare)$/.test(path)))context?.waitUntil(processJobWorkflow(env).catch(()=>undefined));
       const headers = new Headers(response.headers);
       for (const [name, value] of identity.headers) headers.set(name, value);
       return new Response(response.body, {

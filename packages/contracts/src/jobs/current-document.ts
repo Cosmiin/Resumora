@@ -1,3 +1,4 @@
+import type { ContentLocale } from "../editor/content-language.ts";
 import { currentWording } from '../editor/wording.ts';
 import { isUuid } from './connected.ts';
 import { encodeDraft,decodeDraft,type EditorWireEnvelope } from '../editor/transport.ts';
@@ -5,7 +6,7 @@ import type { BaseDraft,Fact } from '../editor/model.ts';
 import { projectJobEditor,type JobEditorPayload } from './documents.ts';
 /** fingerprint hashes THIS current accepted payload (content + presentation).
  * provenance.sourceFingerprint instead identifies its historical source Base. */
-export type CurrentJobDocument={id:string;documentId:string;revision:number;fingerprint:string;locale:'ro'|'en';createdAt:string;provenance:Record<string,unknown>;payload:EditorWireEnvelope};
+export type CurrentJobDocument={id:string;documentId:string;revision:number;fingerprint:string;locale:ContentLocale;createdAt:string;provenance:Record<string,unknown>;payload:EditorWireEnvelope};
 export type CurrentJobSourcePin={documentId:string;currentId:string;fingerprint:string;revision:number};
 export type CurrentJobWrite={requestId:string;jobId:string;locale:string;documentId:string|null;expectedRevision:number;payload:EditorWireEnvelope;baseSnapshotId:string|null;operationId?:string;provenance?:Record<string,unknown>;sourceCurrent?:CurrentJobSourcePin};
 /** Shape only; authority/current equality must be checked under SQL row locks. */
@@ -26,7 +27,7 @@ export function selfContainedJobDraft(input:BaseDraft):BaseDraft{
    if(input.presentation.approvedWording?.[target.id]?.scope==='experience')target.bullets=[];
   }
  }
- delete d.nameParts;delete d.importReview;delete d.questionPlans;delete d.roleRewriteReviews;d.referenceProse=[];d.answers=[];
+ delete d.nameParts;delete d.importReview;delete d.importSkillChoices;delete d.questionPlans;delete d.roleRewriteReviews;delete d.experienceEnrichment;delete d.skillReserves;delete d.skillReview;delete d.skillExclusions;d.referenceProse=[];d.answers=[];
  delete d.presentation.approvedWording;delete d.presentation.contributionHtml;
  const clean=(v:unknown)=>{if(!v||typeof v!=='object')return;for(const value of Object.values(v)){if(Array.isArray(value))value.forEach(clean);else clean(value);}const f=v as Partial<Fact>;if(typeof f.fieldId==='string'&&typeof f.sourceId==='string'){f.sourceId='job_document';delete f.sourceClaimId;delete f.sourceLineage;}};
  clean(d);d.sources=[{id:'job_document',kind:'document',label:'Accepted job CV content'}];

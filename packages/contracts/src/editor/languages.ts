@@ -1,3 +1,5 @@
+import { documentLabels, builtInDocumentLabels } from "./document-labels.ts";
+import { canonicalContentLocale, contentLocale, contentLanguagePolicyVersion } from "./content-language.ts";
 import { allFacts, clone, type BaseDraft, type Fact } from "./model.ts";
 import { currentWording, isWordingFieldVisible } from "./wording.ts";
 import {
@@ -38,7 +40,7 @@ export type TranslationLineage = {
   >[];
 };
 export const defaultDocumentLocale = (draft: BaseDraft) =>
-  draft.language === "ro" ? "ro-RO" : "en-GB";
+  contentLocale(draft) === "ro" ? "ro-RO" : contentLocale(draft) === "en" ? "en-GB" : contentLocale(draft);
 export async function componentFingerprint(value: unknown): Promise<string> {
   return [
     ...new Uint8Array(
@@ -255,7 +257,15 @@ export async function materializeTranslation(
   const accepted = validateTranslationOutput(output, input),
     target = clone(source);
   validateDocumentLocale(input.targetLocale);
-  target.language = input.targetLocale.startsWith("ro-") ? "ro" : "en";
+  target.language = new Intl.Locale(input.targetLocale).language;
+  const labels = input.targetLabels ?? accepted.documentLabels ?? builtInDocumentLabels(input.targetLocale);
+  target.contentLanguage = {
+    locale: input.targetLocale,
+    confidence: "high",
+    source: "translation",
+    policyVersion: contentLanguagePolicyVersion,
+    ...(labels ? { labels } : {}),
+  };
   target.documentLocale = input.targetLocale;
   target.sourceLocale = input.sourceLocale;
   for (const role of [
@@ -297,12 +307,7 @@ export async function materializeTranslation(
 }
 
 export function isCanonicalDocumentLocale(value: unknown): value is string {
-  if (typeof value !== "string" || value.length > 35) return false;
-  try {
-    return Intl.getCanonicalLocales(value)[0] === value;
-  } catch {
-    return false;
-  }
+  return typeof value === "string" && canonicalContentLocale(value) === value;
 }
 export function isTranslationLineage(
   value: unknown,
@@ -407,7 +412,15 @@ export async function composeTranslation(
   output: TranslationOutput,
   existing?: BaseDraft,
 ): Promise<BaseDraft> {
-  const target = await materializeTranslation(source, input, output);
+  const existingLabels =
+    existing && contentLocale(existing) === input.targetLocale
+      ? documentLabels(existing)
+      : null;
+  const target = await materializeTranslation(
+    source,
+    existingLabels ? { ...input, targetLabels: existingLabels } : input,
+    output,
+  );
   if (!existing) return target;
   const sections = new Set(input.items.map((i) => i.sectionId));
   if (!sections.has("identity")) target.titles = clone(existing.titles);

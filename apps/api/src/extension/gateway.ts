@@ -13,11 +13,17 @@ export function extensionIds(env: CaptureConfig) {
 }
 // Fixed RPC allowlist; public publishable key, never a service role or arbitrary JWT.
 export async function captureRpc(env: CaptureConfig, name: 'authorize_capture' | 'revoke_my_capture_connections' | 'revoke_capture_session' | 'capture_command' | 'claim_capture' | 'finish_capture', args: Record<string, unknown>, transport: typeof fetch = fetch, userToken?: string): Promise<unknown> {
-  const cfg = config(env);
+  // Background claims authenticate with their queue capability, never session cookies.
+  let provider: string;
+  if(name === 'claim_capture' || name === 'finish_capture') {
+    const url = new URL(env.SUPABASE_URL ?? '');
+    if(url.protocol !== 'https:' || !/^[a-z0-9]+\.supabase\.co$/.test(url.hostname) || url.origin + '/' !== url.href || !/^sb_publishable_[A-Za-z0-9_-]+$/.test(env.SUPABASE_PUBLISHABLE_KEY ?? ''))throw Error('unconfigured');
+    provider = url.origin;
+  } else provider = config(env).provider;
   if (!env.CAPTURE_WORKER_SECRET || env.CAPTURE_WORKER_SECRET.length<32) throw Error('unconfigured');
   const authenticated = name === 'authorize_capture' || name === 'revoke_my_capture_connections';
   if (authenticated !== !!userToken) throw Error('invalid credential class');
-  const response = await transport(cfg.provider + '/rest/v1/rpc/' + name, {
+  const response = await transport(provider + '/rest/v1/rpc/' + name, {
     method:'POST', redirect:'manual', signal:AbortSignal.timeout(10000),
     headers:{ apikey:env.SUPABASE_PUBLISHABLE_KEY!, ...(userToken ? { Authorization:`Bearer ${userToken}` } : {}),
       'Content-Type':'application/json','Content-Profile':'app','Accept-Profile':'app' },
@@ -26,7 +32,7 @@ export async function captureRpc(env: CaptureConfig, name: 'authorize_capture' |
   const result = await boundedJson(response,300000);
   if (!response.ok) {
     const code = (result as {code?: string})?.code;
-    const status = code && /^PT(400|401|403|409|429)$/.test(code) ? Number(code.slice(2)) : 503;
+    const status = code && /^PT(400|401|403|409|410|429)$/.test(code) ? Number(code.slice(2)) : 503;
     throw Object.assign(Error('capture unavailable'),{status});
   }
   return result;

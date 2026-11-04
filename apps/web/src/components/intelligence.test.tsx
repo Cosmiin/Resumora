@@ -10,7 +10,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { Enrichment } from "./Enrichment";
 import { RoleRewrite } from "./RoleRewrite";
-import { App } from "../App";
+import { App } from "../test-editor-harness";
 import { LanguageContext } from "./ui";
 import {
   blankDraft,
@@ -289,6 +289,8 @@ describe("CV import and career intelligence integration", () => {
       },
       confirmedIds: [],
     };
+    initial.sources.find((s) => s.id === initial.name.sourceId)!.locator =
+      `import:${initial.importReview.id}:page:1`;
     const defaults = blankDraft();
     initial.contacts.push(
       {
@@ -322,7 +324,7 @@ describe("CV import and career intelligence integration", () => {
     render(<App adapter={adapter} />);
     await user.click(
       await screen.findByRole("button", {
-        name: "Confirmă și deschide editorul",
+        name: "Confirmă și folosește informațiile",
       }),
     );
     await waitFor(() =>

@@ -1,3 +1,4 @@
+import { openProfileDetails, openProfilePresentation } from "../test-profile";
 import {
   act,
   fireEvent,
@@ -8,7 +9,12 @@ import {
 } from "@testing-library/react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { PhotoEditor } from "./PhotoEditor";
-import { PhotoContext, PhotoClientError, createPhotoClient, type PhotoClient } from "./client";
+import {
+  PhotoContext,
+  PhotoClientError,
+  createPhotoClient,
+  type PhotoClient,
+} from "./client";
 import { LanguageContext } from "../components/ui";
 import { blankDraft } from "../base/model";
 import {
@@ -55,6 +61,45 @@ function file() {
     },
   });
   return f;
+}
+function photoFrame() {
+  return screen.getByRole("img", { name: /Photo framing|Decupare fotografie/ });
+}
+function readPosition() {
+  const values = screen
+    .getByLabelText(/Photo position|Poziția fotografiei/)
+    .textContent!.match(/\d+(?:\.\d+)?(?=%)/g)!
+    .map(Number);
+  return { x: values[0] / 100, y: values[1] / 100, zoom: values[2] / 100 };
+}
+function zoomTo(value: number) {
+  const canvas = photoFrame();
+  for (let n = 0; n < 30 && Math.abs(readPosition().zoom - value) > 0.01; n++)
+    fireEvent.keyDown(canvas, { key: readPosition().zoom < value ? "+" : "-" });
+}
+function frameAt(x: number, y: number, width = 400, height = 600) {
+  vi.stubGlobal("PointerEvent", MouseEvent);
+  const canvas = photoFrame(),
+    current = readPosition(),
+    rect = cropRectangle(width, height, {
+      version: 1,
+      centerX: current.x,
+      centerY: current.y,
+      zoom: current.zoom,
+    });
+  Object.defineProperty(canvas, "setPointerCapture", {
+    value: vi.fn(),
+    configurable: true,
+  });
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    width: 360,
+  } as DOMRect);
+  fireEvent.pointerDown(canvas, { clientX: 0, clientY: 0 });
+  fireEvent.pointerMove(canvas, {
+    clientX: (((current.x - x) * width) / rect.size) * 360,
+    clientY: (((current.y - y) * height) / rect.size) * 360,
+  });
+  fireEvent.pointerUp(canvas);
 }
 beforeEach(() => {
   vi.stubGlobal("Blob", NativeBlob);
@@ -118,6 +163,7 @@ it("uploads accepted canvas bytes from Chrome and saves a Base photo", async () 
       <App adapter={adapter} />
     </PhotoContext.Provider>,
   );
+  await openProfileDetails();
   fireEvent.change(await screen.findByLabelText("Alege o fotografie"), {
     target: { files: [selected] },
   });
@@ -137,7 +183,7 @@ it("uploads accepted canvas bytes from Chrome and saves a Base photo", async () 
   await screen.findByText("Fotografie salvată automat în CV.");
   expect((await adapter.load())?.draft.presentation.photo?.assetId).toBe(id);
 });
-it("automatically coalesces photo/crop changes; sliders serialize and closing before debounce sends nothing", async () => {
+it("automatically coalesces photo/crop changes; keyboard and direct framing serialize and closing before debounce sends nothing", async () => {
   const port = client(),
     commit = vi.fn(
       async (_photo: CvPhoto | null, _expected: CvPhoto | null) => true,
@@ -152,15 +198,10 @@ it("automatically coalesces photo/crop changes; sliders serialize and closing be
   fireEvent.change(screen.getByLabelText("Choose a photo"), {
     target: { files: [file()] },
   });
-  const zoom = await screen.findByRole("slider", { name: /Zoom/ });
+  await screen.findByRole("img", { name: /Photo framing/ });
   expect(port.upload).not.toHaveBeenCalled();
-  fireEvent.change(zoom, { target: { value: "2" } });
-  fireEvent.change(screen.getByLabelText(/Horizontal framing/), {
-    target: { value: ".6" },
-  });
-  fireEvent.change(screen.getByLabelText(/Vertical framing/), {
-    target: { value: ".4" },
-  });
+  zoomTo(2);
+  frameAt(0.6, 0.4);
   fireEvent.change(screen.getByLabelText("Shape"), {
     target: { value: "circle" },
   });
@@ -199,7 +240,7 @@ it("uncertain CV save retains uploaded asset for retry; component unmount discar
   await screen.findByLabelText("Shape");
 
   await screen.findByText(/Photo is not yet saved/);
-  fireEvent.click(screen.getByRole("button", {name:"Retry photo save"}));
+  fireEvent.click(screen.getByRole("button", { name: "Retry photo save" }));
 
   await waitFor(() => expect(commit).toHaveBeenCalledTimes(2));
   expect(port.upload).toHaveBeenCalledTimes(1);
@@ -320,6 +361,7 @@ it("actual App photo commit merges late text edits and preserves presentation ov
       <App adapter={adapter} />
     </PhotoContext.Provider>,
   );
+  await openProfileDetails();
   fireEvent.change(await screen.findByLabelText("Alege o fotografie"), {
     target: { files: [file()] },
   });
@@ -329,6 +371,7 @@ it("actual App photo commit merges late text edits and preserves presentation ov
   fireEvent.change(screen.getByRole("textbox", { name: /Prenume/ }), {
     target: { value: "Mara" },
   });
+  await openProfilePresentation();
   fireEvent.change(screen.getByRole("combobox", { name: "Șablon" }), {
     target: { value: "template_archive_2_1_0" },
   });
@@ -379,20 +422,14 @@ it.each(["replay", "expired"] as const)(
         <App adapter={adapter} />
       </PhotoContext.Provider>,
     );
+    await openProfileDetails();
     fireEvent.change(await screen.findByLabelText("Alege o fotografie"), {
       target: { files: [file()] },
     });
     await screen.findByLabelText("Formă");
     await screen.findByText(/Fotografia nu este încă salvată/);
-    fireEvent.change(screen.getByRole("slider", { name: /Zoom/ }), {
-      target: { value: "2" },
-    });
-    fireEvent.change(screen.getByLabelText(/Poziție orizontală/), {
-      target: { value: ".6" },
-    });
-    fireEvent.change(screen.getByLabelText(/Poziție verticală/), {
-      target: { value: ".4" },
-    });
+    zoomTo(2);
+    frameAt(0.6, 0.4);
     fireEvent.change(screen.getByLabelText("Formă"), {
       target: { value: "circle" },
     });
@@ -410,7 +447,9 @@ it.each(["replay", "expired"] as const)(
       ).toBe(false),
     );
     expect(save).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Reîncearcă" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reîncearcă aceeași salvare" }),
+    );
     if (recovery === "expired")
       fireEvent.click(
         await screen.findByRole("button", { name: "Verifică starea salvată" }),
@@ -441,13 +480,15 @@ it.each(["replay", "expired"] as const)(
     );
     // Undo has its own existing App autosave; settle that unrelated write first.
     await waitFor(() => expect(save).toHaveBeenCalledTimes(4));
-    const unrelatedPhoto = structuredClone((await adapter.load())?.draft.presentation.photo);
-    fireEvent.change(screen.getByRole("slider", { name: /Zoom/ }), {
-      target: { value: "3" },
-    });
+    const unrelatedPhoto = structuredClone(
+      (await adapter.load())?.draft.presentation.photo,
+    );
+    zoomTo(3);
     await screen.findByText(/Fotografia nu este încă salvată/);
     expect(save).toHaveBeenCalledTimes(4);
-    expect((await adapter.load())?.draft.presentation.photo).toEqual(unrelatedPhoto);
+    expect((await adapter.load())?.draft.presentation.photo).toEqual(
+      unrelatedPhoto,
+    );
   },
 );
 
@@ -479,40 +520,45 @@ it.each([
       target: { files: [file()] },
     });
     await screen.findByLabelText("Shape");
-    fireEvent.change(screen.getByRole("slider", { name: /Zoom/ }), {
-      target: { value: String(zoom) },
-    });
+    zoomTo(zoom);
     const canvas = screen.getByRole("img", { name: /Photo framing/ });
     Object.defineProperty(canvas, "setPointerCapture", { value: vi.fn() });
     vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
       width: 360,
     } as DOMRect);
-    const horizontal = screen.getByRole("slider", {
-      name: /Horizontal framing/,
-    }) as HTMLInputElement;
-    const vertical = screen.getByRole("slider", {
-      name: /Vertical framing/,
-    }) as HTMLInputElement;
+    const bounds = {
+      min: cropRectangle(width, height, {
+        version: 1,
+        centerX: 0,
+        centerY: 0,
+        zoom,
+      }).crop,
+      max: cropRectangle(width, height, {
+        version: 1,
+        centerX: 1,
+        centerY: 1,
+        zoom,
+      }).crop,
+    };
     fireEvent.pointerDown(canvas, { clientX: 0, clientY: 0 });
     for (const [clientX, clientY] of [
       [3600, 3600],
       [-3600, -3600],
     ]) {
       fireEvent.pointerMove(canvas, { clientX, clientY });
-      const x = Number(horizontal.value),
-        y = Number(vertical.value);
+      const { x, y } = readPosition();
       expect(x).toBeCloseTo(
-        clientX > 0 ? Number(horizontal.min) : Number(horizontal.max),
+        clientX > 0 ? bounds.min.centerX : bounds.max.centerX,
       );
       expect(y).toBeCloseTo(
-        clientY > 0 ? Number(vertical.min) : Number(vertical.max),
+        clientY > 0 ? bounds.min.centerY : bounds.max.centerY,
       );
     }
     fireEvent.pointerMove(canvas, { clientX: -3564, clientY: -3564 });
-    if (Number(horizontal.min) < Number(horizontal.max))
-      expect(Number(horizontal.value)).toBeLessThan(Number(horizontal.max));
-    if (Number(vertical.min) < Number(vertical.max))
-      expect(Number(vertical.value)).toBeLessThan(Number(vertical.max));
+    if (bounds.min.centerX < bounds.max.centerX)
+      expect(readPosition().x).toBeLessThan(bounds.max.centerX);
+    if (bounds.min.centerY < bounds.max.centerY)
+      expect(readPosition().y).toBeLessThan(bounds.max.centerY);
     fireEvent.pointerUp(canvas);
 
     await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
@@ -532,27 +578,71 @@ it.each([
 );
 
 it("opening a saved frame does not autosave and upload failure retains the prior asset without retry loop", async () => {
-  const port=client(),commit=vi.fn(async()=>true),value:CvPhoto={assetId:id,crop:{version:1,centerX:.5,centerY:.5,zoom:1},shape:"square",visible:true};
-  render(<PhotoContext.Provider value={port}><LanguageContext.Provider value="en"><PhotoEditor value={value} commit={commit}/></LanguageContext.Provider></PhotoContext.Provider>);
-  fireEvent.click(await screen.findByRole("button",{name:"Adjust photo"}));
+  const port = client(),
+    commit = vi.fn(async () => true),
+    value: CvPhoto = {
+      assetId: id,
+      crop: { version: 1, centerX: 0.5, centerY: 0.5, zoom: 1 },
+      shape: "square",
+      visible: true,
+    };
+  render(
+    <PhotoContext.Provider value={port}>
+      <LanguageContext.Provider value="en">
+        <PhotoEditor value={value} commit={commit} />
+      </LanguageContext.Provider>
+    </PhotoContext.Provider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Adjust photo" }));
   await screen.findByLabelText("Shape");
-  await act(async()=>{await new Promise(r=>setTimeout(r,750));});
-  expect(commit).not.toHaveBeenCalled();expect(port.upload).not.toHaveBeenCalled();
-  expect(screen.queryByRole("button",{name:"Zoom in"})).toBeNull();expect(screen.queryByRole("button",{name:"Center"})).toBeNull();expect(screen.queryByRole("button",{name:"Save photo"})).toBeNull();
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 750));
+  });
+  expect(commit).not.toHaveBeenCalled();
+  expect(port.upload).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Zoom in" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Center" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Save photo" })).toBeNull();
   vi.mocked(port.upload).mockRejectedValue(new Error("photoUnavailable"));
-  fireEvent.change(screen.getByLabelText("Choose a photo"),{target:{files:[file()]}});
+  fireEvent.change(screen.getByLabelText("Choose a photo"), {
+    target: { files: [file()] },
+  });
   await screen.findByText(/Photo upload failed/);
-  expect(commit).not.toHaveBeenCalled();expect(value.assetId).toBe(id);
-  await act(async()=>{await new Promise(r=>setTimeout(r,750));});expect(port.upload).toHaveBeenCalledTimes(1);
+  expect(commit).not.toHaveBeenCalled();
+  expect(value.assetId).toBe(id);
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 750));
+  });
+  expect(port.upload).toHaveBeenCalledTimes(1);
 });
-it("holding a drag never dispatches an upload; release coalesces one automatic save",async()=>{
-  vi.stubGlobal("PointerEvent",MouseEvent);const port=client(),commit=vi.fn(async()=>true);
-  render(<PhotoContext.Provider value={port}><LanguageContext.Provider value="en"><PhotoEditor value={null} commit={commit}/></LanguageContext.Provider></PhotoContext.Provider>);
-  fireEvent.change(screen.getByLabelText("Choose a photo"),{target:{files:[file()]}});const canvas=await screen.findByRole("img",{name:/Photo framing/});
-  Object.defineProperty(canvas,"setPointerCapture",{value:vi.fn()});vi.spyOn(canvas,"getBoundingClientRect").mockReturnValue({width:88} as DOMRect);
-  fireEvent.pointerDown(canvas,{clientX:0,clientY:0});fireEvent.pointerMove(canvas,{clientX:8,clientY:8});
-  await act(async()=>{await new Promise(r=>setTimeout(r,750));});expect(port.upload).not.toHaveBeenCalled();
-  fireEvent.pointerUp(canvas);await waitFor(()=>expect(commit).toHaveBeenCalledTimes(1));expect(port.upload).toHaveBeenCalledTimes(1);
+it("holding a drag never dispatches an upload; release coalesces one automatic save", async () => {
+  vi.stubGlobal("PointerEvent", MouseEvent);
+  const port = client(),
+    commit = vi.fn(async () => true);
+  render(
+    <PhotoContext.Provider value={port}>
+      <LanguageContext.Provider value="en">
+        <PhotoEditor value={null} commit={commit} />
+      </LanguageContext.Provider>
+    </PhotoContext.Provider>,
+  );
+  fireEvent.change(screen.getByLabelText("Choose a photo"), {
+    target: { files: [file()] },
+  });
+  const canvas = await screen.findByRole("img", { name: /Photo framing/ });
+  Object.defineProperty(canvas, "setPointerCapture", { value: vi.fn() });
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    width: 88,
+  } as DOMRect);
+  fireEvent.pointerDown(canvas, { clientX: 0, clientY: 0 });
+  fireEvent.pointerMove(canvas, { clientX: 8, clientY: 8 });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 750));
+  });
+  expect(port.upload).not.toHaveBeenCalled();
+  fireEvent.pointerUp(canvas);
+  await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
+  expect(port.upload).toHaveBeenCalledTimes(1);
 });
 
 it.each([
@@ -560,16 +650,105 @@ it.each([
   ["reserve", /prepare the photo save in your account/],
   ["storage_write", /save or verify the photo file/],
   ["finalize", /photo save could not be confirmed/],
-] as const)("typed photo failure %s preserves prior photo with a specific reason",async(phase,reason)=>{
-  const port=client(),commit=vi.fn(async()=>true),prior:CvPhoto={assetId:id,crop:{version:1,centerX:.5,centerY:.5,zoom:1},shape:"square",visible:true};
-  vi.mocked(port.upload).mockRejectedValue(new PhotoClientError("photoUnavailable",503,phase));
-  render(<PhotoContext.Provider value={port}><LanguageContext.Provider value="en"><PhotoEditor value={prior} commit={commit}/></LanguageContext.Provider></PhotoContext.Provider>);
-  fireEvent.change(screen.getByLabelText("Choose a photo"),{target:{files:[file()]}});
-  await screen.findByText(reason);expect(commit).not.toHaveBeenCalled();expect(prior.assetId).toBe(id);expect(screen.getByRole("button",{name:"Retry photo save"})).toBeTruthy();
+] as const)(
+  "typed photo failure %s preserves prior photo with a specific reason",
+  async (phase, reason) => {
+    const port = client(),
+      commit = vi.fn(async () => true),
+      prior: CvPhoto = {
+        assetId: id,
+        crop: { version: 1, centerX: 0.5, centerY: 0.5, zoom: 1 },
+        shape: "square",
+        visible: true,
+      };
+    vi.mocked(port.upload).mockRejectedValue(
+      new PhotoClientError("photoUnavailable", 503, phase),
+    );
+    render(
+      <PhotoContext.Provider value={port}>
+        <LanguageContext.Provider value="en">
+          <PhotoEditor value={prior} commit={commit} />
+        </LanguageContext.Provider>
+      </PhotoContext.Provider>,
+    );
+    fireEvent.change(screen.getByLabelText("Choose a photo"), {
+      target: { files: [file()] },
+    });
+    await screen.findByText(reason);
+    expect(commit).not.toHaveBeenCalled();
+    expect(prior.assetId).toBe(id);
+    expect(
+      screen.getByRole("button", { name: "Retry photo save" }),
+    ).toBeTruthy();
+  },
+);
+it("typed photo client accepts only known failure phases", async () => {
+  const port = createPhotoClient(async () =>
+    Response.json(
+      { error: { code: "photoUnavailable", phase: "storage_write" } },
+      { status: 503 },
+    ),
+  );
+  await expect(port.upload(new Blob(), id)).rejects.toMatchObject({
+    phase: "storage_write",
+    status: 503,
+    message: "photoUnavailable",
+  });
+  const unknown = createPhotoClient(async () =>
+    Response.json(
+      { error: { code: "photoUnavailable", phase: "PRIVATE_UNTRUSTED_PHASE" } },
+      { status: 503 },
+    ),
+  );
+  await expect(unknown.upload(new Blob(), id)).rejects.toMatchObject({
+    phase: undefined,
+    status: 503,
+  });
 });
-it("typed photo client accepts only known failure phases",async()=>{
-  const port=createPhotoClient(async()=>Response.json({error:{code:"photoUnavailable",phase:"storage_write"}},{status:503}));
-  await expect(port.upload(new Blob(),id)).rejects.toMatchObject({phase:"storage_write",status:503,message:"photoUnavailable"});
-  const unknown=createPhotoClient(async()=>Response.json({error:{code:"photoUnavailable",phase:"PRIVATE_UNTRUSTED_PHASE"}},{status:503}));
-  await expect(unknown.upload(new Blob(),id)).rejects.toMatchObject({phase:undefined,status:503});
+
+it("offers a larger direct frame without sliders, supports focused wheel/pinch zoom, and saves only after release", async () => {
+  class TouchPointer extends MouseEvent {
+    pointerId: number;
+    constructor(
+      type: string,
+      init: MouseEventInit & { pointerId?: number } = {},
+    ) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 1;
+    }
+  }
+  vi.stubGlobal("PointerEvent", TouchPointer);
+  const port = client(),
+    commit = vi.fn(async () => true);
+  render(
+    <PhotoContext value={port}>
+      <LanguageContext value="en">
+        <PhotoEditor value={null} commit={commit} />
+      </LanguageContext>
+    </PhotoContext>,
+  );
+  fireEvent.drop(screen.getByRole("region", { name: "Optional photo" }), {
+    dataTransfer: { files: [file()] },
+  });
+  const frame = await screen.findByRole("img", { name: /Photo framing/ });
+  Object.defineProperty(frame, "setPointerCapture", { value: vi.fn() });
+  expect(screen.queryByRole("slider")).toBeNull();
+  frame.focus();
+  fireEvent.wheel(frame, { deltaY: -90 });
+  expect(readPosition().zoom).toBeGreaterThan(1);
+  fireEvent.click(screen.getByRole("button", { name: "Reset framing" }));
+  expect(readPosition().zoom).toBe(1);
+  fireEvent.pointerDown(frame, { pointerId: 1, clientX: 50, clientY: 100 });
+  fireEvent.pointerDown(frame, { pointerId: 2, clientX: 150, clientY: 100 });
+  fireEvent.pointerMove(frame, { pointerId: 2, clientX: 250, clientY: 100 });
+  expect(readPosition().zoom).toBe(2);
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700));
+  });
+  expect(port.upload).not.toHaveBeenCalled();
+  fireEvent.pointerUp(frame, { pointerId: 1 });
+  expect(port.upload).not.toHaveBeenCalled();
+  fireEvent.pointerCancel(frame, { pointerId: 2 });
+  await waitFor(() => expect(commit).toHaveBeenCalledTimes(1));
+  expect(port.upload).toHaveBeenCalledTimes(1);
 });

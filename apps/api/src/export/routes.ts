@@ -1,3 +1,5 @@
+import { contentLocale } from '@resumora/contracts/editor/content-language';
+import { jobLocaleKey } from '../jobs/locale.ts';
 import type { DraftSnapshot } from "@resumora/contracts/editor/transport";
 import { decodeDraft } from "@resumora/contracts/editor/transport";
 import { validateDraft } from "@resumora/contracts/editor/validation";
@@ -40,7 +42,7 @@ export function exportFilename(draft: BaseDraft, employer = ""): string {
     draft.name.value,
     draft.titles[0].value,
     employer,
-    draft.language.toUpperCase(),
+    contentLocale(draft).toUpperCase(),
   ].filter(Boolean);
   const name = parts
     .join("_")
@@ -100,21 +102,21 @@ export async function exportRoute(
       if (
         !isUuid(input.jobId) ||
         !isUuid(input.documentId) ||
-        !["ro", "en"].includes(String(input.locale)) ||
+        !jobLocaleKey(input.locale) ||
         typeof input.fingerprint !== "string" ||
         !/^[a-f0-9]{64}$/.test(input.fingerprint)
       )
         return response("invalidRequest", 400);
       const row = await gateway.loadCurrentJobDocument(
         input.jobId,
-        String(input.locale),
+        jobLocaleKey(input.locale)!,
       );
       if (
         !row ||
         row.id !== input.versionId ||
         row.documentId !== input.documentId ||
         row.revision !== input.revision ||
-        row.locale !== input.locale ||
+        jobLocaleKey(row.locale) !== jobLocaleKey(input.locale) ||
         row.fingerprint !== input.fingerprint
       )
         return response("missing", 404);
@@ -172,7 +174,7 @@ export async function exportRoute(
       } else {
         const current = await gateway.loadCurrentJobDocument(
           input.jobId as string,
-          String(input.locale),
+          jobLocaleKey(input.locale)!,
         );
         if (
           !current ||

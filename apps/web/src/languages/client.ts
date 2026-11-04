@@ -1,3 +1,4 @@
+import { isBaseDraft } from "@resumora/contracts/editor/transport";
 import type { AuthTransport } from "../auth/AuthShell";
 import type {
   DocumentLanguageContext,
@@ -31,15 +32,50 @@ export function languageClient(transport: AuthTransport) {
     return value as T;
   }
   return {
-    context: (jobId?: string, sourceLocale?: string, signal?: AbortSignal) =>
-      json<DocumentLanguageContext>(
+    context: async (
+      jobId?: string,
+      sourceLocale?: string,
+      signal?: AbortSignal,
+    ) => {
+      const value = await json<DocumentLanguageContext>(
         "/v1/document-languages" +
           (jobId
             ? `?jobId=${encodeURIComponent(jobId)}${sourceLocale ? `&sourceLocale=${encodeURIComponent(sourceLocale)}` : ""}`
             : ""),
         undefined,
         signal,
-      ),
+      );
+      if (
+        !value ||
+        !Array.isArray(value.versions) ||
+        value.versions.some(
+          (v) =>
+            !v ||
+            typeof v.locale !== "string" ||
+            typeof v.id !== "string" ||
+            !Number.isSafeInteger(v.revision),
+        ) ||
+        !(
+          value.source === null ||
+          (value.source &&
+            typeof value.source === "object" &&
+            typeof value.source.locale === "string" &&
+            typeof value.source.accepted === "boolean" &&
+            Array.isArray(value.source.items) &&
+            value.source.items.every(
+              (i) =>
+                i &&
+                typeof i.id === "string" &&
+                typeof i.sectionId === "string",
+            ) &&
+            value.source.pin &&
+            typeof value.source.pin.currentId === "string" &&
+            isBaseDraft(value.source.draft))
+        )
+      )
+        throw Error("languageUnavailable");
+      return value;
+    },
     start: (
       input: {
         operationId: string;
@@ -99,7 +135,7 @@ export function languageClient(transport: AuthTransport) {
     ) =>
       json<{ draft: BaseDraft; revision: number; id: string }>(
         jobId
-          ? `/v1/jobs/${jobId}/cv?locale=${version.locale.split("-")[0]}`
+          ? `/v1/jobs/${jobId}/cv?locale=${encodeURIComponent(version.locale)}`
           : `/v1/base-cv/languages/${version.variantId}`,
         undefined,
         signal,

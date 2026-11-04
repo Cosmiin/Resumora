@@ -1,3 +1,5 @@
+import { isCompleteDocumentLabels, type DocumentLabels } from "../editor/document-labels.ts";
+import { canonicalContentLocale } from "../editor/content-language.ts";
 /** P09 transports professional representations, never a new candidate fact store. */
 export const documentLocales = [
   { code: "ro-RO", language: "ro", label: "Română", direction: "ltr" },
@@ -8,19 +10,13 @@ export const enabledDocumentLocales: readonly string[] = documentLocales.map(
 );
 export function validateDocumentLocale(
   value: unknown,
-  enabled: readonly string[] = enabledDocumentLocales,
+  enabled?: readonly string[],
 ): string {
-  if (typeof value !== "string" || value.length > 35)
-    throw new Error("TRANSLATION_LOCALE_INVALID");
-  let canonical: string;
-  try {
-    canonical = Intl.getCanonicalLocales(value)[0];
-  } catch {
-    throw new Error("TRANSLATION_LOCALE_INVALID");
-  }
-  if (canonical !== value || !enabled.includes(value))
+  const canonical = canonicalContentLocale(value);
+  if (!canonical) throw new Error("TRANSLATION_LOCALE_INVALID");
+  if (canonical !== value || (enabled && !enabled.includes(canonical)))
     throw new Error("TRANSLATION_LOCALE_DISABLED");
-  return value;
+  return canonical;
 }
 export type TranslationItem = {
   id: string;
@@ -42,6 +38,8 @@ export type GlossaryEntry = {
   approval: "user_approved";
 };
 export type TranslationInput = {
+  /** Compatible saved target resources; never a source-language fallback. */
+  targetLabels?: DocumentLabels;
   contentType: "cv";
   sourceLocale: string;
   targetLocale: string;
@@ -63,6 +61,8 @@ export type TranslationWarning = {
   message: string;
 };
 export type TranslationOutput = {
+  /** Exact target-locale rendering resources, persisted with the proposal. */
+  documentLabels?: DocumentLabels;
   schemaVersion: "cv-translation/1";
   sourceLocale: string;
   targetLocale: string;
@@ -84,8 +84,8 @@ export type TranslationOutput = {
 };
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
-const keys = (v: Record<string, unknown>, required: string[]) =>
-  Object.keys(v).length === required.length &&
+const keys = (v: Record<string, unknown>, required: string[], optional: string[] = []) =>
+  Object.keys(v).every(k => required.includes(k) || optional.includes(k)) &&
   required.every((k) => Object.hasOwn(v, k));
 const text = (v: unknown, max = 20000): v is string =>
   typeof v === "string" && !!v.trim() && v.length <= max;
@@ -102,7 +102,7 @@ function invalid(): never {
 const numbers = (value: string) => value.match(/\p{N}+(?:[.,]\p{N}+)*/gu) ?? [];
 export function validateTranslationInput(
   input: TranslationInput,
-  enabled: readonly string[] = enabledDocumentLocales,
+  enabled?: readonly string[],
 ): TranslationInput {
   if (
     !record(input) ||
@@ -117,7 +117,8 @@ export function validateTranslationInput(
       "glossaryVersion",
       "approvedGlossary",
       "translationPreferences",
-    ])
+    ], ["targetLabels"]) ||
+    (input.targetLabels !== undefined && !isCompleteDocumentLabels(input.targetLabels))
   )
     invalid();
   validateDocumentLocale(input.sourceLocale, enabled);
@@ -205,7 +206,8 @@ export function validateTranslationOutput(
       "warnings",
       "ambiguousTerms",
       "suggestedGlossary",
-    ]) ||
+    ], ["documentLabels"]) ||
+    (value.documentLabels !== undefined && !isCompleteDocumentLabels(value.documentLabels)) ||
     value.schemaVersion !== "cv-translation/1" ||
     value.sourceLocale !== input.sourceLocale ||
     value.targetLocale !== input.targetLocale ||

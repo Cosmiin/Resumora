@@ -8,12 +8,12 @@ import { chooseTemplate } from "../templates/registry";
 import { Button, useCopy } from "../components/ui";
 import { validatePdf } from "./pdf";
 export type ExportPin =
-  | { kind: "base"; versionId: string; revision: number;variantId?:string }
+  | { kind: "base"; versionId: string; revision: number; variantId?: string }
   | {
       kind: "job";
       jobId: string;
       documentId: string;
-      locale: "ro" | "en";
+      locale: string;
       fingerprint: string;
       versionId: string;
       revision: number;
@@ -63,7 +63,9 @@ export function AppearanceExport({
   transport,
   change,
   asOf,
+  ensurePin,
 }: {
+  ensurePin?: () => Promise<ExportPin>;
   draft: BaseDraft;
   snapshot: Snapshot | null;
   pin: ExportPin | null;
@@ -111,6 +113,18 @@ export function AppearanceExport({
   );
   async function prepare() {
     if (!ready || !pin || !transport || !preview.current) return;
+    let selectedPin = pin;
+    try {
+      if (ensurePin) {
+        selectedPin = await ensurePin();
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => resolve()),
+        );
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "validation");
+      return;
+    }
     const article =
       preview.current.querySelector<HTMLElement>("article.document");
     if (!article) return;
@@ -125,7 +139,7 @@ export function AppearanceExport({
       const result = await transport("/v1/exports/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pin),
+        body: JSON.stringify(selectedPin),
         signal: controller.signal,
       });
       if (!result.ok) {
@@ -135,8 +149,9 @@ export function AppearanceExport({
       if (
         result.headers.get("Content-Type")?.split(";")[0] !==
           "application/pdf" ||
-        result.headers.get("X-Document-Version") !== pin.versionId ||
-        result.headers.get("X-Document-Revision") !== String(pin.revision)
+        result.headers.get("X-Document-Version") !== selectedPin.versionId ||
+        result.headers.get("X-Document-Revision") !==
+          String(selectedPin.revision)
       )
         throw new Error("pdfValidationFailed");
       const bytes = await pdfBytes(result);
@@ -190,7 +205,7 @@ export function AppearanceExport({
             value={draft.presentation.templateVersionId}
             onChange={(id) => change(chooseTemplate(draft, id))}
           />
-          <label>
+          <label className="check">
             <input
               type="checkbox"
               checked={!!draft.presentation.photo?.visible}
@@ -217,9 +232,10 @@ export function AppearanceExport({
               "A4 · Template and photo settings are saved for this CV. No AI requests.",
             )}
           </p>
-          <label>
+          <label className="field">
             {t("Zoom", "Zoom")}{" "}
             <select
+              className="native"
               value={zoom}
               onChange={(e) => setZoom(Number(e.target.value))}
             >
@@ -288,9 +304,10 @@ export function AppearanceExport({
                 src={url}
                 className="export-pdf"
               />
-              <label>
+              <label className="field">
                 {t("Numele fișierului", "Filename")}
                 <input
+                  className="native"
                   value={filename}
                   maxLength={180}
                   onChange={(e) => setFilename(e.target.value)}

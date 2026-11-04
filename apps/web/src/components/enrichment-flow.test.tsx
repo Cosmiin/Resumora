@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "../App";
@@ -91,7 +92,9 @@ async function open(
       <App adapter={adapter} intelligence={ai} />
     </StrictMode>,
   );
-  await screen.findByRole("button", { name: "Îmbunătățește" });
+  await screen.findByRole("button", {
+    name: /^(Îmbunătățește|Începe întrebările)$/,
+  });
   fireEvent.change(screen.getByLabelText("Limba interfeței"), {
     target: { value: "en" },
   });
@@ -124,7 +127,9 @@ it("one Improve cycle persists context before one whole-role proposal, with no c
   expect(
     screen.queryByRole("button", { name: "Propose experience rewrite" }),
   ).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^(Improve|Start questions)$/ }),
+  );
   fireEvent.click(await screen.findByLabelText("Consolidated team reports"));
   fireEvent.change(screen.getByLabelText("How did you prepare reports?"), {
     target: { value: "I checked the inputs." },
@@ -132,17 +137,22 @@ it("one Improve cycle persists context before one whole-role proposal, with no c
   expect(ai.questions).toHaveBeenCalledTimes(1);
   expect(rewrite).not.toHaveBeenCalled();
   fireEvent.click(
-    screen.getByRole("button", { name: /Save and create description/ }),
+    screen.getByRole("button", {
+      name: /Save and create description|Confirm and create proposal|Use answer & suggest wording|Review description/,
+    }),
   );
   await screen.findByLabelText(
-    "Proposal — review before acceptance",
+    document.querySelector(".guided-enrichment, .experience-modal")
+      ? "Formatted proposal preview"
+      : "Proposal — review before acceptance",
     {},
     { timeout: 3000 },
   );
   expect(rewrite).toHaveBeenCalledTimes(1);
   expect(
-    screen.getByRole<HTMLButtonElement>("button", { name: "Accept rewrite" })
-      .disabled,
+    screen.getByRole<HTMLButtonElement>("button", {
+      name: /^(Accept changes|Use this description)$/,
+    }).disabled,
   ).toBe(false);
   await waitFor(
     async () => {
@@ -160,7 +170,9 @@ it("uncertain save holds automatic generation until the existing save retry reco
     adapter = new MemoryBaseCvAdapter(),
     ai = client(d);
   await open(adapter, ai, d);
-  fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^(Improve|Start questions)$/ }),
+  );
   fireEvent.click(await screen.findByLabelText("Consolidated team reports"));
   const save = adapter.save.bind(adapter);
   let uncertain = true;
@@ -176,11 +188,18 @@ it("uncertain save holds automatic generation until the existing save retry reco
     return result;
   });
   fireEvent.click(
-    screen.getByRole("button", { name: /Save and create description/ }),
+    screen.getByRole("button", {
+      name: /Save and create description|Confirm and create proposal|Use answer & suggest wording|Review description/,
+    }),
   );
-  await screen.findByRole("button", { name: "Retry" }, { timeout: 3000 });
+  const modal = within(screen.getByRole("dialog"));
+  await modal.findByRole(
+    "button",
+    { name: "Retry the same save" },
+    { timeout: 3000 },
+  );
   expect(ai.rewrite).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  fireEvent.click(modal.getByRole("button", { name: "Retry the same save" }));
   await waitFor(() => expect(ai.rewrite).toHaveBeenCalledTimes(1), {
     timeout: 3000,
   });
@@ -218,12 +237,16 @@ it("changing evidence while waiting cancels automatic generation; retries remain
   }
   ready = true;
   const view = render(<Surface />);
-  fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^(Improve|Start questions)$/ }),
+  );
   fireEvent.click(await screen.findByLabelText("Consolidated team reports"));
   ready = false;
   view.rerender(<Surface />);
   fireEvent.click(
-    screen.getByRole("button", { name: /Save and create description/ }),
+    screen.getByRole("button", {
+      name: /Save and create description|Confirm and create proposal|Use answer & suggest wording|Review description/,
+    }),
   );
   expect(ai.rewrite).not.toHaveBeenCalled();
   latest.roles[0].context = fact("Different evidence.");
@@ -267,22 +290,30 @@ it("failed questions and automatic rewrite retry only on a deliberate click and 
     );
   }
   render(<Surface />);
-  fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^(Improve|Start questions)$/ }),
+  );
   await screen.findByText(/We cannot confirm the question request/);
   expect(questions).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^(Improve|Start questions)$/ }),
+  );
   fireEvent.click(await screen.findByLabelText("Consolidated team reports"));
   fireEvent.click(
-    screen.getByRole("button", { name: /Save and create description/ }),
+    screen.getByRole("button", {
+      name: /Save and create description|Confirm and create proposal|Use answer & suggest wording|Review description/,
+    }),
   );
   await screen.findByText(/did not pass structure or evidence/);
   expect(rewrite).toHaveBeenCalledTimes(1);
   expect(latest.answers[0].status).toBe("confirmed");
   expect(latest.roles).toEqual(d.roles);
-  fireEvent.click(
-    screen.getByRole("button", { name: "Retry rewrite" }),
+  fireEvent.click(screen.getByRole("button", { name: "Retry rewrite" }));
+  await screen.findByLabelText(
+    document.querySelector(".guided-enrichment, .experience-modal")
+      ? "Formatted proposal preview"
+      : "Proposal — review before acceptance",
   );
-  await screen.findByLabelText("Proposal — review before acceptance");
   expect(rewrite).toHaveBeenCalledTimes(2);
   expect(questions).toHaveBeenCalledTimes(2);
   expect(latest.answers[0].status).toBe("confirmed");
@@ -408,7 +439,9 @@ it("allows a saved manual fallback answer to be rewritten after durable save", a
     };
   });
   await open(adapter, ai, d);
-  fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /^(Improve|Start questions)$/ }),
+  );
   fireEvent.click(
     await screen.findByRole("button", {
       name: "Continue with manual questions",
@@ -422,16 +455,32 @@ it("allows a saved manual fallback answer to be rewritten after durable save", a
       target: { value: "I checked source records each week." },
     },
   );
-  fireEvent.click(screen.getByRole("button", { name: /Save and next/ }));
-  const rewrite = screen.getByRole<HTMLButtonElement>("button", {
-    name: "Propose experience rewrite",
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: /Save and next|Confirm and continue|Save and continue/,
+    }),
+  );
+  fireEvent.click(
+    screen.getByText(/^(Generate from existing information|More options)$/, {
+      selector: "summary",
+    }),
+  );
+  const choose = screen.getByRole<HTMLButtonElement>("button", {
+    name: /^(Propose role wording|Create description from existing details)$/,
   });
-  expect(rewrite.disabled).toBe(true);
   expect(ai.rewrite).not.toHaveBeenCalled();
-  await waitFor(() => expect(rewrite.disabled).toBe(false), { timeout: 3000 });
+  await waitFor(() => expect(choose.disabled).toBe(false), { timeout: 3000 });
+  fireEvent.click(choose);
+  const rewrite = screen.getByRole<HTMLButtonElement>("button", {
+    name: "Create proposal",
+  });
   expect(ai.rewrite).not.toHaveBeenCalled();
   fireEvent.click(rewrite);
-  await screen.findByLabelText("Proposal — review before acceptance");
+  await screen.findByLabelText(
+    document.querySelector(".guided-enrichment, .experience-modal")
+      ? "Formatted proposal preview"
+      : "Proposal — review before acceptance",
+  );
   expect(ai.questions).toHaveBeenCalledTimes(1);
   expect(ai.rewrite).toHaveBeenCalledTimes(1);
 });
@@ -443,8 +492,16 @@ it.each(["Skip", "I don't know"])(
       adapter = new MemoryBaseCvAdapter(),
       ai = client(d);
     await open(adapter, ai, d);
-    fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^(Improve|Start questions)$/ }),
+    );
     await screen.findByLabelText("Consolidated team reports");
+    if (action === "I don't know")
+      fireEvent.click(
+        screen.getByText(/^(Other options|More options)$/, {
+          selector: "summary",
+        }),
+      );
     fireEvent.click(screen.getByRole("button", { name: new RegExp(action) }));
     expect(ai.rewrite).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
@@ -460,9 +517,17 @@ it.each(["Skip", "I don't know"])(
       screen.queryByRole("button", { name: "Propose experience rewrite" }),
     ).toBeNull();
     expect(ai.rewrite).not.toHaveBeenCalled();
+    if (action === "I don't know")
+      fireEvent.click(
+        screen.getByText(/^(Other options|More options)$/, {
+          selector: "summary",
+        }),
+      );
     fireEvent.click(screen.getByRole("button", { name: new RegExp(action) }));
     await screen.findByLabelText(
-      "Proposal — review before acceptance",
+      document.querySelector(".guided-enrichment, .experience-modal")
+        ? "Formatted proposal preview"
+        : "Proposal — review before acceptance",
       {},
       { timeout: 3000 },
     );
@@ -600,7 +665,9 @@ it.each([false, true])(
       </LanguageContext>
     );
     const view = render(surface(d));
-    fireEvent.click(screen.getByRole("button", { name: "Improve" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^(Improve|Start questions)$/ }),
+    );
     const next = clone(d);
     if (changed) next.roles[0].context.value = "Changed responsibilities";
     view.rerender(surface(next));

@@ -174,12 +174,18 @@ it.each([
     );
     expect(screen.getByText(operationId)).toBeTruthy();
     const retry = screen.getByRole<HTMLButtonElement>("button", {
-      name: locale === "en" ? "Retry rewrite" : "Reîncearcă rescrierea",
+      name: uncertain
+        ? locale === "en"
+          ? "Check earlier request"
+          : "Verifică cererea anterioară"
+        : locale === "en"
+          ? "Retry rewrite"
+          : "Reîncearcă rescrierea",
     });
-    expect(retry.disabled).toBe(uncertain);
+    expect(retry.disabled).toBe(false);
     fireEvent.click(retry);
     await act(async () => {});
-    expect(request).toHaveBeenCalledTimes(uncertain ? 1 : 2);
+    expect(request).toHaveBeenCalledTimes(2);
   },
 );
 it("unknown network outcome retains request identity across client recreation and never dispatches a duplicate", async () => {
@@ -199,7 +205,12 @@ it("unknown network outcome retains request identity across client recreation an
       operationId: crypto.randomUUID(),
     }),
   ).rejects.toMatchObject({ code: "AI_REQUEST_UNKNOWN", operationId });
-  expect(transport).toHaveBeenCalledTimes(1);
+  expect(
+    transport.mock.calls.filter(([, init]) => init.method === "POST"),
+  ).toHaveLength(1);
+  expect(transport.mock.calls.at(-1)?.[0]).toBe(
+    `/v1/intelligence/operations/${operationId}`,
+  );
   const stored = Object.keys(sessionStorage).map((k) =>
     sessionStorage.getItem(k),
   );
@@ -230,4 +241,39 @@ it("known truncated outcome permits one new explicit request without automatic c
   await client.rewrite({ ...context, operationId: crypto.randomUUID() });
   expect(transport).toHaveBeenCalledTimes(2);
   expect(sessionStorage.length).toBe(0);
+});
+
+it("a recovered definite failure permits a new explicit rewrite while unknown recovery uses reads", async () => {
+  const d = fixture(),
+    transport = vi
+      .fn()
+      .mockRejectedValueOnce(Error("Lost failure response"))
+      .mockResolvedValueOnce(
+        Response.json({
+          id: operationId,
+          kind: "rewrite",
+          state: "failed",
+          input: {},
+          result: null,
+        }),
+      )
+      .mockResolvedValueOnce(Response.json(proposal(d))),
+    context = {
+      snapshotId: operationId,
+      revision: 1,
+      targetId: d.roles[0].id,
+      operationId,
+    };
+  const client = httpIntelligence(transport);
+  await expect(client.rewrite(context)).rejects.toMatchObject({
+    code: "AI_REQUEST_UNKNOWN",
+  });
+  await expect(
+    client.rewrite({ ...context, operationId: crypto.randomUUID() }),
+  ).rejects.toMatchObject({ code: "AI_OUTPUT_INVALID" });
+  expect(transport.mock.calls[1][1].method).toBe("GET");
+  await client.rewrite({ ...context, operationId: crypto.randomUUID() });
+  expect(
+    transport.mock.calls.filter(([, init]) => init.method === "POST"),
+  ).toHaveLength(2);
 });

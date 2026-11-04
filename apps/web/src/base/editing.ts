@@ -17,7 +17,8 @@ export function patchFact<T extends FactValue>(
   const next = clone(draft);
   const current = allFacts(next, true).find((f) => f.fieldId === field.fieldId);
   if (current) {
-    replaceFact(next, current, editFact(current as Fact<T>, value));
+    const updated = editFact(current as Fact<T>, value);
+    replaceFact(next, current, updated);
   }
   return next;
 }
@@ -314,4 +315,15 @@ export function prepareDraft(draft: BaseDraft): BaseDraft {
     next.presentation.order.push("languages");
   }
   return next;
+}
+
+/** Initial editor and CV markup use the same list structure. Stored prose is left intact. */
+export function contributionMarkup(draft:BaseDraft,roleId:string):string {
+  const stored=draft.presentation.contributionHtml?.[roleId];
+  if(stored!==undefined)return stored;
+  const list=document.createElement("ul");
+  for(const f of draft.roles.find(r=>r.id===roleId)?.bullets ?? []) {
+    const li=document.createElement("li");li.dataset.contribution=f.fieldId;li.textContent=f.value.replace(/^\s*(?:[-*+•●▪◦‣]\s+|\d{1,3}[.)]\s+)/,"");list.append(li);
+  }
+  return list.outerHTML;
 }

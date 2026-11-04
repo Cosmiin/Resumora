@@ -29,3 +29,19 @@ test('photo gateway records only allowlisted DB/Storage metadata and retains exi
   assert.deepEqual(logs[1],['photo-storage-response',{operation:'write',httpStatus:403,code:'AccessDenied'}]);assert.ok(!JSON.stringify(logs).includes('PRIVATE_'));assert.ok(!JSON.stringify(logs).includes(secret));
  }finally{console.warn=original;}
 });
+test('photo verification preserves modern and legacy missing-object diagnostics without leaking response details',async()=>{
+ const logs=[],original=console.warn;console.warn=(...args)=>logs.push(args);
+ try{
+  for(const detail of [
+   {code:'NoSuchKey',message:'PRIVATE_OBJECT_PATH'},
+   {error:'not_found',message:'PRIVATE_OBJECT_PATH'},
+   {code:'PRIVATE_TOKEN',error:'PRIVATE_OBJECT_PATH',message:'PRIVATE_SQL_DETAIL'},
+  ]){
+   const gateway=createDatabaseGateway(env,identity,async()=>Response.json(detail,{status:400}));
+   await assert.rejects(gateway.getPhoto(`${id}/${id}.jpg`),error=>error.status===503&&error.code==='DATABASE_UNAVAILABLE');
+  }
+  assert.deepEqual(logs.map(([,meta])=>meta.code),['NoSuchKey','not_found','UNCLASSIFIED']);
+  assert.ok(logs.every(([event,meta])=>event==='photo-storage-response'&&meta.operation==='read'&&meta.httpStatus===400&&Object.keys(meta).sort().join(',')==='code,httpStatus,operation'));
+  assert.ok(!JSON.stringify(logs).includes('PRIVATE_'));
+ }finally{console.warn=original;}
+});

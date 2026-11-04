@@ -118,6 +118,7 @@ it.each([
         }}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(valueOf(screen.getByLabelText(/First name/))).toBe(first);
     expect(valueOf(screen.getByLabelText(/Last name/))).toBe(last);
     fireEvent.change(screen.getByLabelText(/First name/), {
@@ -126,7 +127,7 @@ it.each([
     expect(valueOf(screen.getByLabelText(/Last name/))).toBe(last);
     fireEvent.click(
       screen.getByRole("button", {
-        name: /Confirm and (continue|open editor)/,
+        name: /Confirm and use this information/,
       }),
     );
     expect(valueOf(screen.getByRole("textbox", { name: /First name/ }))).toBe(
@@ -167,7 +168,7 @@ it("legacy combined-name imports show the full name visibly and let the user com
     />,
   );
   fireEvent.click(
-    screen.getByRole("button", { name: /Confirm and (continue|open editor)/ }),
+    screen.getByRole("button", { name: /Confirm and use this information/ }),
   );
   const full = screen.getByRole("textbox", { name: "Full name from CV" });
   expect(valueOf(full)).toBe("Ana-Maria Șerban Ionescu");
@@ -207,7 +208,7 @@ it("an incomplete AI identity preserves the source name and the user-supplied co
     />,
   );
   fireEvent.click(
-    screen.getByRole("button", { name: /Confirm and (continue|open editor)/ }),
+    screen.getByRole("button", { name: /Confirm and use this information/ }),
   );
   expect(valueOf(screen.getByRole("textbox", { name: /First name/ }))).toBe(
     "Ana",

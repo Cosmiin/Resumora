@@ -140,10 +140,10 @@
 }
 .document.document-template .document-contact {
   display: inline-block;
-  margin-right: 5mm;
+  margin-inline-end: 5mm;
 }
 .document.document-template .document-contact:last-child {
-  margin-right: 0;
+  margin-inline-end: 0;
 }
 .document.document-template .document-section + .document-section {
   margin-top: 4.5mm;
@@ -153,10 +153,10 @@
 }
 .document.document-template .document-skill-line .document-skill {
   display: inline-block;
-  margin-right: 4mm;
+  margin-inline-end: 4mm;
 }
 .document.document-template .document-skill-line .document-skill:last-child {
-  margin-right: 0;
+  margin-inline-end: 0;
 }
 .document.document-template .document-entry + .document-entry {
   margin-top: 4mm;
@@ -175,14 +175,14 @@
 }
 .document.document-template .document-location {
   display: inline-block;
-  margin-left: 4mm;
+  margin-inline-start: 4mm;
 }
 .document.document-template .document-contributions {
-  padding-left: 4.5mm;
+  padding-inline-start: 4.5mm;
   margin-top: 2mm;
 }
 .document.document-template .document-contributions li {
-  padding-left: 0.4mm;
+  padding-inline-start: 0.4mm;
   margin-bottom: 1mm;
   orphans: 2;
   widows: 2;
@@ -222,9 +222,9 @@
 .document.document-template.template-folio
   .document-positioning-title
   + .document-positioning-title {
-  margin-left: 4mm;
-  padding-left: 4mm;
-  border-left: 1px solid #bdcec7;
+  margin-inline-start: 4mm;
+  padding-inline-start: 4mm;
+  border-inline-start: 1px solid #bdcec7;
 }
 .document.document-template.template-folio .document-contacts {
   margin-top: 4mm;
@@ -235,8 +235,8 @@
   font-weight: 700;
 }
 .document.document-template.template-folio .document-summary {
-  padding-left: 4mm;
-  border-left: 1px solid #bdcec7;
+  padding-inline-start: 4mm;
+  border-inline-start: 1px solid #bdcec7;
 }
 .document.document-template.template-folio .document-profile-copy {
   max-width: 161mm;
@@ -246,8 +246,8 @@
   .document-skill-line
   .document-skill
   + .document-skill {
-  border-left: 1px solid #bdcec7;
-  padding-left: 3mm;
+  border-inline-start: 1px solid #bdcec7;
+  padding-inline-start: 3mm;
 }
 .document.document-template.template-folio h4.document-primary {
   font-size: 12pt;
@@ -335,10 +335,10 @@
 }
 .document.document-template.template-meridian .document-contributions {
   list-style-type: square;
-  padding-left: 4mm;
+  padding-inline-start: 4mm;
 }
 .document.document-template.template-meridian .document-contributions li {
-  padding-left: 1mm;
+  padding-inline-start: 1mm;
   margin-bottom: 1.3mm;
 }
 .document.document-template.template-signal h2 {
@@ -354,10 +354,10 @@
 .document.document-template.template-signal
   .document-positioning-title
   + .document-positioning-title {
-  margin-left: 4mm;
+  margin-inline-start: 4mm;
 }
 .document.document-template.template-signal .document-contacts {
-  text-align: right;
+  text-align: end;
   padding-top: 2mm;
   border-top: 1px solid #bdcec7;
 }
@@ -370,8 +370,8 @@
   padding-bottom: 0;
 }
 .document.document-template.template-signal .document-summary {
-  padding-left: 5mm;
-  border-left: 3px solid #17695d;
+  padding-inline-start: 5mm;
+  border-inline-start: 3px solid #17695d;
 }
 .document.document-template.template-signal .document-summary h3 {
   font-size: 9pt;
@@ -394,8 +394,8 @@
   .document-skill {
   font-size: 11pt;
   font-weight: 550;
-  padding-right: 3mm;
-  border-right: 1px solid #bdcec7;
+  padding-inline-end: 3mm;
+  border-inline-end: 1px solid #bdcec7;
 }
 .document.document-template.template-signal
   .document-skill-line
@@ -410,17 +410,17 @@
 .document.document-template.template-signal h4 .document-secondary {
   font-size: 10.5pt;
   font-weight: 450;
-  margin-left: 3mm;
+  margin-inline-start: 3mm;
 }
 .document.document-template.template-signal .document-meta {
   margin-top: 1mm;
 }
 .document.document-template.template-signal .document-location {
   display: block;
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 .document.document-template.template-signal .document-contributions {
-  padding-left: 5mm;
+  padding-inline-start: 5mm;
   margin-top: 2mm;
 }
 .document.document-template.template-signal .document-entry + .document-entry {
@@ -511,15 +511,15 @@
   margin-top: 1mm;
 }
 .document.document-template.template-archive .document-location {
-  margin-left: 4mm;
+  margin-inline-start: 4mm;
 }
 .document.document-template.template-archive .document-contributions {
   list-style-type: square;
-  padding-left: 5mm;
+  padding-inline-start: 5mm;
   margin-top: 2mm;
 }
 .document.document-template.template-archive .document-contributions li {
-  padding-left: 0.8mm;
+  padding-inline-start: 0.8mm;
   margin-bottom: 1.2mm;
 }
 .document.document-template.template-archive .document-entry + .document-entry {
@@ -597,11 +597,11 @@
 }
 .document.document-template.template-monograph .document-contributions {
   list-style-type: square;
-  padding-left: 5mm;
+  padding-inline-start: 5mm;
   margin-top: 2mm;
 }
 .document.document-template.template-monograph .document-contributions li {
-  padding-left: 0.8mm;
+  padding-inline-start: 0.8mm;
   margin-bottom: 1.1mm;
 }
 .document.document-template.template-monograph
@@ -612,7 +612,7 @@
   margin-top: 4mm;
 }
 .document.document-template .document-contact {
-  margin-right: 0;
+  margin-inline-end: 0;
 }
 .document.document-template .document-contact-separator {
   margin: 0 2mm;
@@ -624,7 +624,7 @@
   margin: 0 1mm;
 }
 .document.document-template .document-location {
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 .document.document-template.template-signal .document-meta-separator,
 .document.document-template.template-monograph .document-meta-separator {
@@ -755,10 +755,10 @@
   border: 0;
 }
 .document.document-template div.document-contributions {
-  padding-left: 0;
+  padding-inline-start: 0;
 }
 .document.document-template div.document-contributions ul {
-  padding-left: 4.5mm;
+  padding-inline-start: 4.5mm;
   margin-top: 2mm;
 }
 .document.document-template .document-nameband h2 {
@@ -794,4 +794,60 @@
   .document.document-template .document-nameband {
     gap: 12px;
   }
+}
+
+/* Derived experience is shared content in every template, including print. */
+.document.document-template .document-experience-total {
+  margin: 0 0 3mm;
+  font-size: 10pt;
+  font-weight: 600;
+}
+.document.document-template.template-signal .document-role-duration,
+.document.document-template.template-monograph .document-role-duration {
+  display: block;
+}
+
+.document.document-template .document-role-wording p {
+  margin: 0.35em 0;
+}
+.document.document-template .document-role-wording ul,
+.document.document-template .document-role-wording ol,
+.document.document-template div.document-contributions ol {
+  padding-inline-start: 4.5mm;
+  margin: 2mm 0;
+}
+.document.document-template .document-role-wording li {
+  padding-inline-start: 0.4mm;
+  margin-bottom: 1mm;
+  break-inside: avoid;
+}
+
+/* Script-capable system fonts preserve multilingual and RTL document content. */
+.document {
+  font-family:
+    var(--font-document), "Noto Sans", "Noto Naskh Arabic", "Noto Sans CJK SC",
+    "DejaVu Sans", sans-serif;
+}
+.document[dir="rtl"] {
+  text-align: start;
+}
+.document[dir="rtl"] .document-entry-head,
+.document[dir="rtl"] .document-nameband {
+  direction: rtl;
+}
+.document[dir="rtl"] ul {
+  padding-inline-start: 1.3em;
+  padding-inline-end: 0;
+}
+
+.document {
+  --font-document:
+    "Source Serif 4 Variable", "Noto Naskh Arabic", "Noto Serif CJK SC",
+    "DejaVu Sans", Georgia, serif;
+  --font-sans:
+    "Figtree Variable", "Noto Sans", "Noto Naskh Arabic", "Noto Sans CJK SC",
+    "DejaVu Sans", sans-serif;
+  --font-display:
+    "Bricolage Grotesque Variable", "Noto Sans", "Noto Naskh Arabic",
+    "Noto Sans CJK SC", "DejaVu Sans", sans-serif;
 }

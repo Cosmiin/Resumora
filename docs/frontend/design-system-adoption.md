@@ -2,6 +2,12 @@
 
 The supplied CVizat export is the visual reference for Resumora's frontend. The subsequently authorized [Base CV application slice](base-cv.md) adopts update-2 for J05–J08; its guide owns current persistence behavior and acceptance limits. The intake assessments below retain their historical context; frontend implementation is now authorized within that bounded slice. The original intake preserved the reference package and prepared the handoff; it did not implement an application or authorize production work. The [PRD](../product/prd.md), [canonical CV/workspace contracts](../../schemas/cv/v1/README.md), [journeys A–F](../../research/ux/journeys.md) and [D-01–14 decision register](../../research/strategy/publication/docs/product/decisions.md) retain their product/data authority. The brand name is now Resumora; historical discovery evidence and the supplied export remain unchanged.
 
+## Application control conventions
+
+Text inputs, textareas and standard selectors use the shared `native` class, with `field` for a stacked label/control and `check` for a checkbox row. The shared styles own typography, borders, focus, placeholder and disabled states; checkboxes/radios use the pine action accent. Use `Button` and its secondary/primary/danger variants for ordinary actions, including photo retry/deletion actions. File pickers expose a localized design-system action while retaining the native file input for selection.
+
+Header selectors, skill chips, inline visibility/format actions and the compact month/year picker retain their dedicated token-based styles. Keep their keyboard, sizing and interaction behavior when auditing controls. Control styling does not change persistence, inference, confirmation, authorization or export behavior.
+
 ## Updated reference · 2026-10-25
 
 The [second export](../../references/design-system/cvizat/CVizat%20Design%20System%20%282%29.zip) is now the current design reference. Its [change summary](../../references/design-system/cvizat/update-2.md) and [member inventory](../../references/design-system/cvizat/update-2.manifest.json) record 23 added files, 8 changed files, 160 unchanged files and no removals. It adds onboarding, Base editing/history/review, enrichment, capture/requirements review, job editing/export, applications/LinkedIn comparison, account/payment, sign-in/recovery and system-state mock screens, plus a mobile board and journey registry A–I. These are supplied design examples, not implemented product capabilities or approved changes to scope.

@@ -142,3 +142,10 @@ test('whole-experience scope is optional, strict, and preserved in the projected
 });
 
 test('mounted current-only route refuses historical selectors before any storage read',async()=>{const id=uid();let reads=0;const gateway={loadCurrentJobDocument:async()=>{reads++;return null;}};for(const action of ['/history','/restore'])assert.equal((await jobDocumentsRoute(req(id,action),gateway)).status,410);assert.equal((await jobDocumentsRoute(req(id,'',undefined,'?versionId='+uid()),gateway)).status,400);assert.equal(reads,0);});
+
+test('current job save uses inferred full locale and canonicalizes route identity without losing region',async()=>{
+ const job=uid(),version=uid(),document=uid(),d=blankDraft();d.language='en';d.contentLanguage={locale:'fr-CA',confidence:'high',source:'import',policyVersion:'cv-language/1'};let write;
+ const gateway={saveCurrentJobDocument:async i=>{write=i;return {id:version,documentId:document,revision:1,locale:i.locale,payload:i.payload,fingerprint:'a'.repeat(64),provenance:{}};}};
+ const result=await jobDocumentsRoute(new Request(`https://app.invalid/v1/jobs/${job}/cv/save`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({requestId:uid(),documentId:null,baseSnapshotId:uid(),expectedRevision:0,locale:'FR-ca',draft:d})}),gateway);
+ assert.equal(result.status,200);assert.equal(write.locale,'fr-CA');assert.equal(write.payload.content.contentLanguage.locale,'fr-CA');
+});

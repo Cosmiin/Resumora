@@ -1,3 +1,5 @@
+import { processCvImport } from "../src/intelligence/import-processor.ts";
+import { cvImportLimits } from "@resumora/contracts/intelligence/import-limits";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { enhancementRoute } from "../src/ai/routes.ts";
@@ -44,7 +46,14 @@ function setup() {
     payload: encodeDraft(draft),
   };
   let uploads = 0;
+  const queue = [];
   const store = {
+    enqueue: async (op, bytes) => {
+      queue.push({ operationId: op, bytes });
+      const row = rows.get(op);
+      row.stage = "queued";
+      return structuredClone(row);
+    },
     begin: async (i) => {
       if (rows.has(i.operationId))
         return { created: false, record: rows.get(i.operationId) };
@@ -104,6 +113,54 @@ function setup() {
     },
   };
   return {
+    // Exercise intake acknowledgement and worker processing as separate executions.
+    processUpload: async (request, config, transport) => {
+      const response = await configuredIntelligenceRoute(
+        request,
+        config,
+        gateway,
+        user,
+        () => assert.fail("intake cannot dispatch a provider"),
+      );
+      if (response.status !== 200) return response;
+      const receipt = await response.clone().json();
+      if (receipt.state !== "uploaded") return response;
+      assert.equal(receipt.stage, "queued");
+      await processCvImport(config, {
+        transport,
+        store: {
+          claim: async () => {
+            const queued = queue.shift();
+            if (!queued) return null;
+            const row = rows.get(queued.operationId);
+            row.state = "processing";
+            return {
+              lease: row.operationId,
+              userId: user,
+              record: structuredClone(row),
+              base64: Buffer.from(queued.bytes).toString("base64"),
+            };
+          },
+          finish: (lease, state, review, error) =>
+            store.complete(lease, state, review, error),
+          reserve: (_lease, input) => gateway.reserveDocumentOperation(input),
+          ledger: () => ({
+            durability: "durable",
+            begin: (s) => ledger.begin(s),
+            finish: (id, r) => ledger.finish(id, r),
+          }),
+        },
+      });
+      return configuredIntelligenceRoute(
+        new Request(
+          `https://resumora.invalid/v1/intelligence/imports/${receipt.id}`,
+        ),
+        config,
+        gateway,
+        user,
+        transport,
+      );
+    },
     rows,
     reservations,
     ledger,
@@ -192,11 +249,9 @@ test("configured PDF import uses native file primary, admission before extractio
       false,
     );
   };
-  const first = await configuredIntelligenceRoute(
+  const first = await f.processUpload(
     upload("pdf", pdfFixture(), operationId),
     env,
-    f.gateway,
-    f.user,
     transport,
   );
   assert.equal(first.status, 200);
@@ -205,11 +260,9 @@ test("configured PDF import uses native file primary, admission before extractio
   assert.deepEqual(result.review.confirmedIds, []);
   assert.equal(result.review.pages, 1);
   assert.match(result.review.extraction.candidates[0].warning, /review/);
-  const repeated = await configuredIntelligenceRoute(
+  const repeated = await f.processUpload(
     upload("pdf", pdfFixture(), operationId),
     env,
-    f.gateway,
-    f.user,
     transport,
   );
   assert.equal((await repeated.json()).state, "ready");
@@ -244,7 +297,10 @@ test("DOC and DOCX native reading uses only documented OpenAI Responses, bounded
         file.file_data.split(";base64,")[1],
         Buffer.from(bytes).toString("base64"),
       );
-      assert.ok(b.max_output_tokens <= 8000);
+      assert.equal(
+        b.max_output_tokens,
+        b.model.endsWith("small") ? 300 : cvImportLimits.outputTokens,
+      );
       return reply(
         b,
         b.model.endsWith("small")
@@ -268,11 +324,9 @@ test("DOC and DOCX native reading uses only documented OpenAI Responses, bounded
         true,
       );
     };
-    const response = await configuredIntelligenceRoute(
+    const response = await f.processUpload(
         upload(format, bytes),
         env,
-        f.gateway,
-        f.user,
         transport,
       ),
       result = await response.json();
@@ -293,19 +347,18 @@ test("oversized DOCX CDATA fails preflight without admission or extraction attem
     }),
   ]) {
     const f = setup();
-    const response = await configuredIntelligenceRoute(
-      upload("docx", bytes),
-      env,
-      f.gateway,
-      f.user,
-      () => assert.fail("Oversized text must not reach a provider"),
+    const response = await f.processUpload(upload("docx", bytes), env, () =>
+      assert.fail("Oversized text must not reach a provider"),
     );
     const result = await response.json();
     assert.equal(response.status, 200);
     assert.equal(result.state, "failed");
     assert.equal(result.error, "DOCUMENT_TEXT_LIMIT");
     assert.equal(f.reservations.size, 0);
-    const report = await f.ledger.report({ from: "2000-01-01", to: "2099-01-01" });
+    const report = await f.ledger.report({
+      from: "2000-01-01",
+      to: "2099-01-01",
+    });
     assert.equal(report.totals.attempts, 0);
   }
 });
@@ -321,22 +374,15 @@ test("non-CV and invalid input never dispatch stronger extraction; ambient keys 
     );
   };
   const result = await (
-    await configuredIntelligenceRoute(
-      upload("pdf", pdfFixture()),
-      env,
-      f.gateway,
-      f.user,
-      transport,
-    )
+    await f.processUpload(upload("pdf", pdfFixture()), env, transport)
   ).json();
   assert.equal(result.state, "not_cv");
   assert.equal(calls, 1);
+  const deniedFixture = setup();
   const denied = await (
-    await configuredIntelligenceRoute(
+    await deniedFixture.processUpload(
       upload("pdf", pdfFixture(Array(11).fill(null))),
       env,
-      setup().gateway,
-      f.user,
       transport,
     )
   ).json();
@@ -499,7 +545,7 @@ test("owned saved context drives choices and semantic whole-role proposals; fore
         false,
       ),
   );
-  assert.equal(bad.status, 503);
+  assert.equal(bad.status, 502);
   assert.equal(f.draft.presentation.approvedWording, undefined);
 });
 
@@ -535,7 +581,7 @@ for (const effort of [undefined, "none", "low"]) {
         const admission = body.model.endsWith("small");
         assert.equal(
           body[word ? "max_output_tokens" : "max_completion_tokens"],
-          admission ? 300 : 8000,
+          admission ? 300 : cvImportLimits.outputTokens,
         );
         if (router) {
           assert.deepEqual(body.provider, {
@@ -581,13 +627,7 @@ for (const effort of [undefined, "none", "low"]) {
         bytes =
           format === "pdf" ? pdfFixture() : format === "docx" ? docx() : doc();
       const request = () => upload(format, bytes, operationId);
-      const response = await configuredIntelligenceRoute(
-        request(),
-        configured,
-        f.gateway,
-        f.user,
-        transport,
-      );
+      const response = await f.processUpload(request(), configured, transport);
       assert.equal(response.status, 200);
       assert.equal((await response.json()).state, "ready");
       assert.equal(calls.length, word ? 2 : 4);
@@ -599,9 +639,10 @@ for (const effort of [undefined, "none", "low"]) {
       assert.equal(report.totals.unknownCost, calls.length);
       for (const attempt of report.recent) {
         const fp = JSON.parse(attempt.requestFingerprint);
-        assert.equal(fp.length, effort === undefined ? 4 : 5);
+        assert.equal(fp.length, effort === undefined ? 5 : 6);
+        assert.equal(fp[3], "ro");
         if (effort !== undefined)
-          assert.deepEqual(fp[4], { reasoningEffort: effort });
+          assert.deepEqual(fp[5], { reasoningEffort: effort });
         assert.equal(
           attempt.requestFingerprint.includes("Mara Ionescu"),
           false,
@@ -681,7 +722,7 @@ test("invalid effort fails before storage, reservations or network; clients cann
 });
 
 for (const kind of ["questions", "rewrite"]) {
-  test(`career ${kind} uses configured low effort and the unchanged 1800-token cap`, async () => {
+  test(`career ${kind} uses configured low effort and the existing task-specific token cap`, async () => {
     const f = setup();
     const req = new Request(
       `https://resumora.invalid/v1/intelligence/${kind}`,
@@ -704,7 +745,10 @@ for (const kind of ["questions", "rewrite"]) {
       async (_url, init) => {
         const b = JSON.parse(init.body);
         assert.deepEqual(b.reasoning, { effort: "low" });
-        assert.equal(b.max_completion_tokens, 1800);
+        assert.equal(
+          b.max_completion_tokens,
+          kind === "questions" ? 16000 : 1800,
+        );
         const data =
           kind === "rewrite"
             ? {
@@ -793,4 +837,143 @@ test("existing enhancement endpoint validates server effort before reservation a
       );
     }
   }
+});
+
+test("point assistant reserves every provider stage against the owned snapshot and replays the parent receipt", async () => {
+  const f = setup(),
+    receipts = new Map(),
+    attempts = [],
+    calls = [];
+  const begin = f.gateway.beginAttempt;
+  f.gateway.beginAttempt = async (start) => {
+    assert.ok(
+      f.reservations.has(start.operationId),
+      "child stage must be reserved before provider ledger begin",
+    );
+    attempts.push(start);
+    return begin(start);
+  };
+  f.gateway.getWorkspaceOperation = async (id) => receipts.get(id);
+  f.gateway.beginWorkspaceOperation = async (id, kind, input) => {
+    receipts.set(id, { id, kind, input, state: "processing" });
+    return { created: true };
+  };
+  f.gateway.finishWorkspaceOperation = async (id, state, result) =>
+    receipts.set(id, { ...receipts.get(id), state, result });
+  const { experienceFingerprint, experiencePoints, experienceText } =
+    await import("@resumora/contracts/intelligence/experience");
+  const body = {
+    operationId: crypto.randomUUID(),
+    snapshotId: f.snapshot.id,
+    revision: 1,
+    targetId: f.role.id,
+    experience: {
+      intent: "point",
+      fingerprint: await experienceFingerprint(f.draft, f.role.id),
+      point: experiencePoints(experienceText(f.draft, f.role.id))[0],
+    },
+  };
+  const transport = async (url, init) => {
+    const b = JSON.parse(init.body);
+    calls.push(b);
+    const content = JSON.parse(b.messages[1].content);
+    const value = b.response_format.json_schema.schema.properties.dimensions
+      ? {
+          dimensions: ["contribution", "methods", "scope", "outcome"].map(
+            (dimension, i) => ({
+              dimension,
+              grade: i < 2 ? "specific" : "missing",
+              evidenceIds: i < 2 ? [content.passages[0].id] : [],
+            }),
+          ),
+        }
+      : {
+          text: "Prepare weekly Excel reports.",
+          explanation: "Keeps the method clear.",
+          factIds: [content.facts[0].id],
+        };
+    return reply(b, value, false);
+  };
+  const post = () =>
+    configuredIntelligenceRoute(
+      new Request("https://app.invalid/v1/intelligence/experience", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+      env,
+      f.gateway,
+      f.user,
+      transport,
+    );
+  const response = await post();
+  assert.equal(
+    response.status,
+    200,
+    JSON.stringify(await response.clone().json()),
+  );
+  const result = await response.json();
+  assert.equal(result.intent, "point");
+  assert.equal(result.assessment, undefined);
+  assert.equal(result.proposedAssessment, undefined);
+  assert.equal(calls.length, 1);
+  assert.equal(attempts.length, 1);
+  assert.equal(f.reservations.size, 2);
+  assert.equal((await post()).status, 200);
+  assert.equal(calls.length, 1);
+});
+
+function experienceFixture(){
+ const f=setup(),receipts=new Map();
+ f.gateway.getWorkspaceOperation=async id=>receipts.get(id);
+ f.gateway.beginWorkspaceOperation=async(id,kind,input)=>{if(receipts.has(id))return{created:false};receipts.set(id,{id,kind,input,state:'processing'});return{created:true};};
+ f.gateway.finishWorkspaceOperation=async(id,state,result)=>{const prev=receipts.get(id);if(prev.state==='ready')return prev;const row={...prev,state,result};receipts.set(id,row);return row;};
+ return{...f,receipts};
+}
+async function experienceBody(f,intent='point'){
+ const{experienceFingerprint,experiencePoints,experienceText}=await import('@resumora/contracts/intelligence/experience');
+ return{snapshotId:f.snapshot.id,revision:1,targetId:f.role.id,operationId:crypto.randomUUID(),experience:{intent,fingerprint:await experienceFingerprint(f.draft,f.role.id),...(intent==='point'?{point:experiencePoints(experienceText(f.draft,f.role.id))[0]}:{})}};
+}
+function experiencePost(f,body,transport,signal,execution){
+ return configuredIntelligenceRoute(new Request('https://app.invalid/v1/intelligence/experience',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal}),env,f.gateway,f.user,transport,execution);
+}
+function validExperiencePoint(b){const context=JSON.parse(b.messages[1].content);return{text:'Prepared weekly Excel reports.',explanation:'Makes your contribution clearer.',factIds:[context.facts[0].id]};}
+test('score uses source references through the configured provider and replays the grounded receipt without inference',async()=>{
+ const f=experienceFixture();f.role.context=fact('Am verificat fluxurile „end-to-end” pentru 5–6 echipe.\nAm folosit SQL și Excel.');f.snapshot.payload=encodeDraft(f.draft);let calls=0;
+ const body=await experienceBody(f,'score');
+ const transport=async(_url,init)=>{calls++;const b=JSON.parse(init.body),context=JSON.parse(b.messages[1].content);assert.equal(context.facts,undefined);assert.equal(context.text,undefined);const ids=context.points.map(p=>p.id);assert.deepEqual(b.response_format.json_schema.schema.properties.dimensions.items.properties.evidencePointIds.items.enum,ids);assert.equal(context.passages,undefined);assert.equal(context.points[0].start,undefined);return reply(b,{experience:null,dimensions:['contribution','methods','scope','outcome'].map((dimension,i)=>({dimension,grade:i<3?'specific':'missing',evidencePointIds:i<3?[ids[0]]:[]})),points:context.points.map(p=>({id:p.id,meaningful:true,contribution:'specific',clarity:'specific',specificity:'partial',issue:'scope',duplicateOf:null,strength:'Descrie activitatea și instrumentele folosite.',improvement:'Clarifică publicul activității.',suggestedQuestion:'Pentru cine pregăteai aceste verificări?'}))},false);};
+ const response=await experiencePost(f,body,transport);assert.equal(response.status,200,JSON.stringify(await response.clone().json()));const result=await response.json();assert.equal(result.assessment.score,85);assert.equal(result.assessment.dimensions[0].evidence[0],f.role.context.value);assert.equal(f.receipts.get(body.operationId).state,'ready');assert.equal(calls,1);assert.equal(f.ledger.attempts.size,1);
+ const replay=await experiencePost(f,body,transport);assert.equal(replay.status,200);assert.deepEqual(await replay.json(),result);assert.equal(calls,1);
+});
+test('reported regression: an invalid advisory score is a definite failure and cannot discard a successful point',async()=>{
+ const f=experienceFixture();let calls=0;
+ const transport=async(_url,init)=>{calls++;const b=JSON.parse(init.body);return reply(b,b.response_format.json_schema.schema.properties.dimensions?{dimensions:['contribution','methods','scope','outcome'].map(dimension=>({dimension,grade:'specific',evidenceIds:['foreign-passage']}))}:validExperiencePoint(b),false);};
+ const point=await experienceBody(f),response=await experiencePost(f,point,transport);assert.equal(response.status,200);assert.equal(calls,1);const valid=await response.json();assert.equal(valid.text,'Prepared weekly Excel reports.');
+ const score=await experienceBody(f,'score'),failed=await experiencePost(f,score,transport);assert.equal(failed.status,502);assert.equal((await failed.json()).error.code,'AI_OUTPUT_INVALID');assert.equal(f.receipts.get(score.operationId).state,'failed');assert.equal(f.receipts.get(point.operationId).state,'ready');assert.deepEqual(f.receipts.get(point.operationId).result,valid);assert.equal(calls,2);
+});
+test('a disconnected browser does not cancel paid completion or lose its recovery receipt',async()=>{
+ const f=experienceFixture(),body=await experienceBody(f),controller=new AbortController(),background=[];let calls=0;
+ const response=await experiencePost(f,body,async(_url,init)=>{calls++;controller.abort();return reply(JSON.parse(init.body),validExperiencePoint(JSON.parse(init.body)),false);},controller.signal,{waitUntil:p=>background.push(p)});
+ assert.equal(response.status,200);await Promise.all(background);assert.equal(f.receipts.get(body.operationId).state,'ready');assert.equal(calls,1);assert.ok(background.length);
+});
+test('lost receipt acknowledgement recovers the stored result without another AI request',async()=>{
+ const f=experienceFixture(),body=await experienceBody(f),finish=f.gateway.finishWorkspaceOperation;let writes=0,calls=0;
+ f.gateway.finishWorkspaceOperation=async(...args)=>{await finish(...args);if(++writes===1)throw Error('lost acknowledgement');};
+ const response=await experiencePost(f,body,async(_url,init)=>{calls++;const b=JSON.parse(init.body);return reply(b,validExperiencePoint(b),false);});
+ assert.equal(response.status,200);assert.equal(writes,1);assert.equal(calls,1);assert.equal(f.receipts.get(body.operationId).state,'ready');
+});
+test('a receipt storage outage still delivers an already validated point for draft saving',async()=>{
+ const f=experienceFixture(),body=await experienceBody(f);let calls=0;
+ f.gateway.finishWorkspaceOperation=async()=>{throw Error('temporary database outage');};
+ const response=await experiencePost(f,body,async(_url,init)=>{calls++;const b=JSON.parse(init.body);return reply(b,validExperiencePoint(b),false);});
+ assert.equal(response.status,200);assert.equal(response.headers.get('X-Result-Receipt'),'pending');assert.equal((await response.json()).text,'Prepared weekly Excel reports.');assert.equal(calls,1);
+});
+test('metadata-only autosaves do not reject unchanged owned input; changed role wording stays stale',async()=>{
+ const f=experienceFixture(),body=await experienceBody(f);f.gateway.loadDraft=async()=>({...f.snapshot,id:crypto.randomUUID(),revision:2});let calls=0;
+ const transport=async(_url,init)=>{calls++;const b=JSON.parse(init.body);return reply(b,validExperiencePoint(b),false);};
+ assert.equal((await experiencePost(f,body,transport)).status,200);assert.equal(calls,1);
+ const changed=structuredClone(f.snapshot);changed.id=crypto.randomUUID();changed.revision=3;changed.payload.content.roles[0].context.value='Different role';f.gateway.loadDraft=async()=>changed;
+ // Existing receipts are readable even after an edit; fresh inference is rejected against stale evidence.
+ assert.equal((await experiencePost(f,body,transport)).status,200);assert.equal(calls,1);
+ assert.equal((await experiencePost(f,{...body,operationId:crypto.randomUUID()},transport)).status,409);assert.equal(calls,1);
 });

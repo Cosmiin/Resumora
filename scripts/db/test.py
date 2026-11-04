@@ -91,13 +91,20 @@ class Database:
             lines = lines[1:]
         return '\n'.join(lines)
 
-    def migrate(self, through='P4'):
+    def migrate(self, through='P4', before_version=None):
         applied = 0
         for path in sorted((ROOT / 'supabase/migrations').glob('*.sql')):
+            if before_version and path.name.split('_')[0] >= before_version:
+                continue
             # These forward artifacts retain their owning lane name but depend
             # on later shared schema. Do not preload removal before P7/P8.
             phase = {'20261028050000_p6_templates.sql': 'P3',
-                     '20261030030000_p1_remove_base.sql': 'P8'}.get(path.name, path.name.split('_')[1].upper())
+                     '20261030030000_p1_remove_base.sql': 'P8',
+                     '20261031184256_cv_import_background_processing.sql': 'P8',
+                     '20261031194408_pending_cv_import_review.sql': 'P8',
+                     '20261101004420_experience_enrichment_metadata.sql': 'P8',
+                     '20261103004831_skills_inventory_metadata.sql': 'P8',
+                     '20261101110459_reliable_experience_receipts.sql': 'P8'}.get(path.name, path.name.split('_')[1].upper())
             if phase > through:
                 continue
             version = path.name.split('_')[0]
@@ -178,7 +185,7 @@ def main():
     parser.add_argument('--pg-share', default=os.environ.get('PG_SHAREDIR'))
     parser.add_argument('--pg-lib', default=os.environ.get('PG_LIBDIR'))
     parser.add_argument('--receipt', type=Path)
-    parser.add_argument('--suite', choices=['all', 'editor-drafts', 'connected', 'photos', 'imports', 'templates', 'job-documents', 'capture', 'workflow', 'legacy-preservation', 'languages', 'base-removal'], default='all', help='Focused editor SQL checks or mandatory full suite.')
+    parser.add_argument('--suite', choices=['job-deletion', 'import-upgrade', 'experience-enrichment', 'pending-import', 'import-background', 'workspaces', 'all', 'editor-drafts', 'connected', 'photos', 'photo-metadata', 'imports', 'templates', 'job-documents', 'capture', 'workflow', 'legacy-preservation', 'languages', 'base-removal'], default='all', help='Focused editor SQL checks or mandatory full suite.')
     args = parser.parse_args()
     binary = Path(args.pg_bin) if args.pg_bin else Path(shutil.which('initdb') or '').parent
     if not (binary / 'initdb').is_file():
@@ -191,7 +198,7 @@ def main():
         if args.suite == 'imports':
             # Exercise import restrictions against a permissive policy on the shared Storage fixture.
             db.sql("CREATE POLICY existing_permissive ON storage.objects FOR ALL TO authenticated,anon USING(true) WITH CHECK(true);")
-        through = 'P8' if args.suite in ('languages','base-removal','all') else 'P7' if args.suite in ('workflow','job-documents','legacy-preservation') else 'P4'
+        through = 'P8' if args.suite in ('job-deletion','import-upgrade','experience-enrichment','pending-import','import-background','workspaces','workflow','job-documents','languages','base-removal','photo-metadata','all') else 'P7' if args.suite in ('workflow','job-documents','legacy-preservation') else 'P4'
         if args.suite in ('job-documents','all'):
             db.migrate('P5')
             import importlib.util
@@ -199,7 +206,41 @@ def main():
             current=importlib.util.module_from_spec(spec);spec.loader.exec_module(current);current.prepare_upgrade(db)
             spec=importlib.util.spec_from_file_location('legacy_current_preservation',ROOT/'supabase/tests/legacy_current_preservation.py')
             legacy=importlib.util.module_from_spec(spec);spec.loader.exec_module(legacy);legacy.prepare_upgrade(db)
+        if args.suite in ('import-upgrade','all'):
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('import_upgrade',ROOT/'supabase/tests/import_upgrade.py')
+            import_upgrade=importlib.util.module_from_spec(spec);spec.loader.exec_module(import_upgrade)
+            db.migrate('P8',before_version='20261102234859')
+            import_upgrade.prepare_upgrade(db)
         count = db.migrate(through)
+        if args.suite in ('import-upgrade','all'):
+            result=unittest.TextTestRunner(verbosity=2).run(import_upgrade.suite(db))
+            if not result.wasSuccessful():return 1
+            if args.suite=='import-upgrade':return 0
+
+        if args.suite in ('job-deletion','all'):
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('job_deletion', ROOT/'supabase/tests/job_deletion.py')
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+            if not result.wasSuccessful(): return 1
+            if args.suite=='job-deletion': return 0
+        if args.suite in ('experience-enrichment','all'):
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('experience_enrichment', ROOT/'supabase/tests/experience_enrichment.py')
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+            if not result.wasSuccessful(): return 1
+            if args.suite=='experience-enrichment': return 0
+        if args.suite in ('pending-import','import-background','all'):
+            import importlib.util
+            modules=['pending_import'] if args.suite=='pending-import' else ['import_background','pending_import'] if args.suite=='all' else ['import_background']
+            for name in modules:
+                spec=importlib.util.spec_from_file_location(name,ROOT/f'supabase/tests/{name}.py')
+                module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+                result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+                if not result.wasSuccessful(): return 1
+            if args.suite in ('pending-import','import-background'): return 0
         if args.suite in ('legacy-preservation','job-documents','all'):
             import importlib.util
             spec=importlib.util.spec_from_file_location('legacy_current_preservation', ROOT/'supabase/tests/legacy_current_preservation.py')
@@ -214,6 +255,24 @@ def main():
         tests = ROOT / 'supabase/tests/behavior.py'
         cases = 2
         upgrade = None
+        if args.suite in ('workspaces', 'all'):
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('workspaces', ROOT/'supabase/tests/workspaces.py')
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+            if args.suite == 'workspaces': return 0 if result.wasSuccessful() else 1
+            cases += result.testsRun
+            if not result.wasSuccessful(): return 1
+        if args.suite in ('photo-metadata', 'all'):
+            import importlib.util
+            spec=importlib.util.spec_from_file_location('photo_metadata', ROOT/'supabase/tests/photo_metadata.py')
+            module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+            result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
+            if args.suite == 'photo-metadata':
+                if args.receipt: args.receipt.write_text(json.dumps({'suite':'photo-metadata','migrations_applied':count,'cases':result.testsRun,'success':result.wasSuccessful(),'hosted_access':False},indent=2)+'\n')
+                return 0 if result.wasSuccessful() else 1
+            cases += result.testsRun
+            if not result.wasSuccessful(): return 1
         if args.suite == 'base-removal':
             import importlib.util
             spec=importlib.util.spec_from_file_location('base_removal', ROOT/'supabase/tests/base_removal.py')
@@ -221,13 +280,15 @@ def main():
             result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
             if args.receipt: args.receipt.write_text(json.dumps({'suite':'base-removal','migrations_applied':count,'cases':result.testsRun,'success':result.wasSuccessful(),'hosted_access':False},indent=2)+'\n')
             return 0 if result.wasSuccessful() else 1
-        if args.suite == 'languages':
+        if args.suite in ('languages','all'):
             import importlib.util
             spec=importlib.util.spec_from_file_location('document_languages', ROOT/'supabase/tests/document_languages.py')
             module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
             result=unittest.TextTestRunner(verbosity=2).run(module.suite(db))
             if args.receipt: args.receipt.write_text(json.dumps({'suite':'languages','cases':result.testsRun,'success':result.wasSuccessful(),'hosted_access':False},indent=2)+'\n')
-            return 0 if result.wasSuccessful() else 1
+            if args.suite == 'languages': return 0 if result.wasSuccessful() else 1
+            if not result.wasSuccessful(): return 1
+            cases += result.testsRun
         if args.suite == 'workflow':
             import importlib.util
             spec=importlib.util.spec_from_file_location('job_workflow', ROOT/'supabase/tests/job_workflow.py')

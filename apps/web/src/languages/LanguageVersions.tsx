@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { WorkspaceContext } from "../workspace/context";
+import type { WorkspaceDraft } from "@resumora/contracts/editor/workspace";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Button, useCopy } from "../components/ui";
-import { documentLocales } from "@resumora/contracts/intelligence/translation";
+import { contentLanguageChoices } from "./catalog";
 import {
   staleTranslationComponents,
   isTranslationLineage,
@@ -22,7 +24,9 @@ export function LanguageVersions({
   ready,
   revisionKey,
   open,
+  ensureReady,
 }: {
+  ensureReady?: () => Promise<void>;
   transport: AuthTransport;
   jobId?: string;
   currentLocale: string;
@@ -30,6 +34,7 @@ export function LanguageVersions({
   revisionKey: string;
   open: (value: { locale: string; variantId?: string }) => void;
 }) {
+  const registry = useContext(WorkspaceContext);
   const t = useCopy(),
     client = useMemo(() => languageClient(transport), [transport]),
     [context, setContext] = useState<DocumentLanguageContext | null>(null),
@@ -43,7 +48,27 @@ export function LanguageVersions({
     [stale, setStale] = useState<Record<string, string[]>>({});
   const active = useRef(true),
     controller = useRef<AbortController | null>(null),
-    operation = useRef<string | null>(null);
+    operation = useRef<string | null>(null),
+    receiptKey = useRef<string | null>(null);
+  const receipt = (key: string, id: string | null) => {
+    try {
+      if (id) sessionStorage.setItem(key, id);
+      else sessionStorage.removeItem(key);
+    } catch {
+      /* Only operation identifiers are cached. */
+    }
+  };
+  const forget = () => {
+    if (receiptKey.current) receipt(receiptKey.current, null);
+    operation.current = null;
+  };
+  useEffect(
+    () => () => {
+      active.current = false;
+      controller.current?.abort();
+    },
+    [],
+  );
   useEffect(() => {
     active.current = true;
     const abort = new AbortController();
@@ -51,6 +76,37 @@ export function LanguageVersions({
       async (ctx) => {
         if (!active.current) return;
         setContext(ctx);
+        if (ctx.source) {
+          const key = `resumora:translation:${jobId ?? "profile"}:${ctx.source.pin.currentId}:${currentLocale}`;
+          receiptKey.current = key;
+          let saved: string | null = null;
+          try {
+            saved = sessionStorage.getItem(key);
+          } catch {}
+          if (saved) {
+            operation.current = saved;
+            void client.get(saved).then(
+              (result) => {
+                if (!active.current) return;
+                if (result.state === "ready" && result.output) {
+                  setTarget(result.request.targetLocale);
+                  setReviewContext(ctx.source);
+                  setProposal(result);
+                } else if (
+                  ["cancelled", "accepted", "failed", "stale"].includes(
+                    result.state,
+                  )
+                )
+                  forget();
+                else setError("translationInterrupted");
+              },
+              () => {
+                if (active.current) setError("translationInterrupted");
+              },
+            );
+          }
+        }
+
         const changed: Record<string, string[]> = {};
         if (ctx.source)
           for (const version of ctx.versions)
@@ -68,9 +124,38 @@ export function LanguageVersions({
     return () => {
       active.current = false;
       abort.abort();
-      controller.current?.abort();
     };
   }, [client, jobId, currentLocale, revisionKey]);
+  useEffect(() => {
+    let current = true;
+    if (!registry?.transport || !context?.source) return;
+    void registry
+      .json<WorkspaceDraft[]>("/v1/workspace-drafts")
+      .then(async (rows) => {
+        for (const row of rows.filter((r) => r.kind === "translation-review")) {
+          const saved = await client.get(row.id);
+          if (!current) return;
+          if (
+            saved.state === "ready" &&
+            saved.output &&
+            saved.request.source.kind === (jobId ? "job" : "base") &&
+            ("jobId" in saved.request.source
+              ? saved.request.source.jobId === jobId
+              : !jobId) &&
+            saved.request.source.currentId === context.source!.pin.currentId &&
+            saved.request.sourceLocale === currentLocale
+          ) {
+            setReviewContext(context.source);
+            setProposal(saved);
+            break;
+          }
+        }
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [registry, context?.source?.pin.currentId, jobId, currentLocale]);
   const version = context?.versions.find(
     (v) =>
       v.locale === target ||
@@ -78,9 +163,38 @@ export function LanguageVersions({
       (v.locale === "en" && target === "en-GB"),
   );
   const name = (locale: string) =>
-    documentLocales.find((l) => l.code === locale)?.label ?? locale;
+    contentLanguageChoices([locale]).find((l) => l.code === locale)?.label ??
+    locale;
+  async function resume() {
+    if (!operation.current || !context?.source) return;
+    setBusy(true);
+    try {
+      let result = await client.get(operation.current);
+      while (result.state === "pending")
+        result = await client.advance(result.id);
+      if (result.state === "ready" && result.output) {
+        setTarget(result.request.targetLocale);
+        setReviewContext(context.source);
+        setProposal(result);
+        setError("");
+      } else if (
+        ["cancelled", "accepted", "failed", "stale"].includes(result.state)
+      ) {
+        forget();
+        setError(result.state);
+      } else setError("translationInterrupted");
+    } catch {
+      setError("translationInterrupted");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function translate(sectionIds: string[] = []) {
-    if (!context?.source || !ready) return;
+    if (operation.current) {
+      await resume();
+      return;
+    }
+    if ((!context?.source && !ensureReady) || !ready) return;
     setBusy(true);
     setError("");
     const abort = new AbortController();
@@ -88,16 +202,24 @@ export function LanguageVersions({
     const id = crypto.randomUUID();
     operation.current = id;
     try {
+      if (ensureReady) await ensureReady();
+      const sourceContext = ensureReady
+        ? await client.context(jobId, currentLocale, abort.signal)
+        : context;
+      if (!sourceContext?.source?.accepted)
+        throw Error("acceptedVersionRequired");
       const acceptedTarget = version
         ? await client.read(version, jobId, abort.signal)
         : null;
       if (acceptedTarget && acceptedTarget.revision !== version?.revision)
         throw new Error("targetChanged");
+      receiptKey.current = `resumora:translation:${jobId ?? "profile"}:${sourceContext.source.pin.currentId}:${currentLocale}`;
+      receipt(receiptKey.current, id);
       let result = await client.start(
         {
           operationId: id,
-          source: context.source.pin,
-          sourceLocale: context.source.locale,
+          source: sourceContext.source.pin,
+          sourceLocale: sourceContext.source.locale,
           targetLocale: target,
           sectionIds,
           glossary: [],
@@ -116,10 +238,22 @@ export function LanguageVersions({
         );
       if (active.current) {
         setExisting(acceptedTarget?.draft);
-        setReviewContext(context.source);
+        setReviewContext(sourceContext.source);
         setProposal(result);
       }
     } catch (e) {
+      if (
+        e instanceof Error &&
+        [
+          "AI_DISABLED",
+          "AI_UNCONFIGURED",
+          "staleSource",
+          "acceptedVersionRequired",
+          "validation",
+          "invalidRequest",
+        ].includes(e.message)
+      )
+        forget();
       if (active.current && !abort.signal.aborted)
         setError(e instanceof Error ? e.message : "languageUnavailable");
     } finally {
@@ -141,7 +275,12 @@ export function LanguageVersions({
             .map((i) => i.sectionId),
         ),
       ];
-    if (!sections.length || sections.some(id=>!context.source!.items.some(i=>i.sectionId===id))) {
+    if (
+      !sections.length ||
+      sections.some(
+        (id) => !context.source!.items.some((i) => i.sectionId === id),
+      )
+    ) {
       setError("sourceStructureChanged");
       return;
     }
@@ -149,7 +288,7 @@ export function LanguageVersions({
   }
   function saved(value: LanguageAccepted) {
     setProposal(null);
-    operation.current = null;
+    forget();
     open({
       locale: target,
       ...(value.variantId ? { variantId: value.variantId } : {}),
@@ -158,16 +297,20 @@ export function LanguageVersions({
   return (
     <section
       className="language-versions"
-      aria-label={t("Limba CV-ului", "CV language")}
+      aria-label={t("Versiuni de limbă", "Language versions")}
     >
       <label>
-        {t("Limba CV-ului", "CV language")}
+        {t("Tradu CV-ul în", "Translate CV into")}
         <select
+          className="native"
           value={target}
           disabled={busy || !ready}
           onChange={(e) => setTarget(e.target.value)}
         >
-          {documentLocales.map((locale) => (
+          {contentLanguageChoices([
+            currentLocale,
+            ...(context?.versions.map((v) => v.locale) ?? []),
+          ]).map((locale) => (
             <option key={locale.code} value={locale.code}>
               {locale.label}
               {locale.code === currentLocale
@@ -200,14 +343,18 @@ export function LanguageVersions({
           </Button>
           {!!stale[version.locale]?.length && (
             <Button
-              disabled={!ready || busy || !context?.source?.accepted}
+              disabled={
+                !ready || busy || (!context?.source?.accepted && !ensureReady)
+              }
               onClick={() => void refresh()}
             >
               {t("Actualizează traducerea", "Update Translation")}
             </Button>
           )}
           <Button
-            disabled={!ready || busy || !context?.source?.accepted}
+            disabled={
+              !ready || busy || (!context?.source?.accepted && !ensureReady)
+            }
             onClick={() => void translate()}
           >
             {t("Propune o traducere nouă", "Propose new translation")}
@@ -216,7 +363,9 @@ export function LanguageVersions({
       ) : (
         target !== currentLocale && (
           <Button
-            disabled={!ready || busy || !context?.source?.accepted}
+            disabled={
+              !ready || busy || (!context?.source?.accepted && !ensureReady)
+            }
             onClick={() => void translate()}
           >
             {busy
@@ -225,16 +374,36 @@ export function LanguageVersions({
           </Button>
         )
       )}
-      {!context?.source?.accepted && target !== currentLocale && (
-        <p>
-          {t(
-            "Salvează mai întâi CV-ul sursă acceptat.",
-            "Save the accepted source CV first.",
-          )}
-        </p>
-      )}
-      {version && isTranslationLineage(version.translation) && version.translation.linguistic && <aside>{version.translation.linguistic.warnings.map((w,i)=><p key={'w'+i}>{w.code}: {w.message}</p>)}{version.translation.linguistic.ambiguousTerms.map((w,i)=><p key={'a'+i}>{w.term}</p>)}{version.translation.linguistic.suggestedGlossary.map((w,i)=><p key={'g'+i}>{w.originalTerm} → {w.preferredTranslation}</p>)}</aside>}
-      {!!stale[version?.locale??target]?.length && (
+      {!context?.source?.accepted &&
+        !ensureReady &&
+        target !== currentLocale && (
+          <p>
+            {t(
+              "Salvează mai întâi CV-ul sursă acceptat.",
+              "Save the accepted source CV first.",
+            )}
+          </p>
+        )}
+      {version &&
+        isTranslationLineage(version.translation) &&
+        version.translation.linguistic && (
+          <aside>
+            {version.translation.linguistic.warnings.map((w, i) => (
+              <p key={"w" + i}>
+                {w.code}: {w.message}
+              </p>
+            ))}
+            {version.translation.linguistic.ambiguousTerms.map((w, i) => (
+              <p key={"a" + i}>{w.term}</p>
+            ))}
+            {version.translation.linguistic.suggestedGlossary.map((w, i) => (
+              <p key={"g" + i}>
+                {w.originalTerm} → {w.preferredTranslation}
+              </p>
+            ))}
+          </aside>
+        )}
+      {!!stale[version?.locale ?? target]?.length && (
         <p role="status">
           {t(
             "Unele secțiuni din sursă s-au schimbat. Traducerea salvată rămâne disponibilă.",
@@ -260,12 +429,23 @@ export function LanguageVersions({
                 )}
         </p>
       )}
+      {!busy && operation.current && !proposal && (
+        <Button onClick={() => void resume()}>
+          {t("Reia traducerea salvată", "Resume saved translation")}
+        </Button>
+      )}
       {busy && (
         <Button
           onClick={() => {
             controller.current?.abort();
             if (operation.current)
-              void client.cancel(operation.current).catch(() => {});
+              void client.cancel(operation.current).then(
+                () => {
+                  forget();
+                  setError("");
+                },
+                () => setError("translationInterrupted"),
+              );
             setBusy(false);
           }}
         >
@@ -282,7 +462,7 @@ export function LanguageVersions({
           save={saved}
           cancel={() => {
             setProposal(null);
-            operation.current = null;
+            forget();
           }}
         />
       )}

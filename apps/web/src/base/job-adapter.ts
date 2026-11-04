@@ -7,7 +7,7 @@ type Current = {
   documentId: string;
   revision: number;
   createdAt: string;
-  locale: "ro" | "en";
+  locale: string;
   fingerprint?: string;
   draft: BaseDraft;
 };
@@ -24,7 +24,7 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
   constructor(
     transport: CvTransport,
     readonly jobId: string,
-    readonly locale?: "ro" | "en",
+    readonly locale?: string,
   ) {
     this.http = new HttpBaseCvAdapter(
       transport,
@@ -62,7 +62,15 @@ export class HttpJobCvAdapter implements BaseCvAdapter {
     }>("/context");
     this.baseSnapshotId = context.source.snapshotId;
     this.source = selfContainedJobDraft(context.draft);
-    if (this.locale) this.source.language = this.locale;
+    if (this.locale) {
+      this.source.language = this.locale;
+      this.source.documentLocale =
+        this.locale === "ro"
+          ? "ro-RO"
+          : this.locale === "en"
+            ? "en-GB"
+            : this.locale;
+    }
     this.documentId = null;
     return null;
   }

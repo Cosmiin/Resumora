@@ -120,6 +120,12 @@ Use a dedicated synthetic test tenant and a narrow window so these rows represen
 
 Inspect both primary and any fallback rows, even when the user action succeeded. `start_data` has requested provider/model/start time; `result_data` has resolved model, status, normalized token usage and any reported/estimated cost. A reserved attempt without a result, timeout, absent usage or absent cost is **unknown liability, not zero**. A failed or cancelled action can still cost money. Costs are alternatives: use `reportedCost.nanoUsd` when present, otherwise `estimatedNanoUsd`; **never add reported and estimated costs for the same attempt**. Nano-USD is one billionth of USD. Keep unknown rows separate rather than folding them into a reassuring total. Cross-check privately against the provider's own billing/usage, allowing for settlement delay; this app is not an authoritative accrued-spend monitor.
 
+## Timing during an already-authorized evaluation
+
+Use the [bounded import timing events](cv-import-timing.md) to separate upload/enqueue acknowledgement, preflight, reservations, provider round-trip/body completion, validation, settlement, durable review publication and browser observation. The independent local import worker must be running with the isolated instance's owner-provided bindings, as described in [background import setup](cv-import-background.md#worker-execution); upload intake never performs inline AI. Do not reuse another instance's private bindings or add request-triggered worker execution.
+
+Capture one already-authorized representative synthetic import first. Keep browser and server durations separate. Exact queue residence requires the existing authorized operator query linked from the timing guide, not new browser access. Missing events and unfinished attempts stay unknown. Synthetic transports prove boundaries only; no hosted speed improvement has been established. The six-minute processing, 240-second extraction attempt and 330-second extraction stage limits are ceilings, not expected latency.
+
 ## Record the outcome and remaining gaps
 
 Record commit, synthetic fixture labels, model/policy identifiers, observations, bounded attempt evidence, unknown costs, and verified OFF shutdown in a private owner evaluation sheet. Do not publish credential values, raw provider data, CVs or authentication artifacts. A failed case is useful evidence; it is not a reason to weaken admission, evidence, ownership or confirmation guards.

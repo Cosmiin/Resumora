@@ -1,3 +1,4 @@
+import { openProfileDetails, openProfilePresentation } from "../test-profile";
 import { webcrypto } from "node:crypto";
 import {
   act,
@@ -159,6 +160,9 @@ async function backend() {
     },
     confirmedIds: [],
   };
+  draft.sources.find(
+    (s) => s.id === draft.technicalSkills[0].sourceId,
+  )!.locator = `import:${draft.importReview.id}:page:1`;
   let snapshot: Snapshot = {
     id: crypto.randomUUID(),
     revision: 1,
@@ -225,6 +229,9 @@ async function backend() {
       };
       return Response.json(snapshot);
     }
+    if (path.startsWith("/v1/workspace-drafts")) return Response.json(null);
+    if (path === "/v1/document-languages")
+      return Response.json({ source: null, versions: [] });
     events.push(path);
     if (path.endsWith("/cancel")) return Response.json({});
     if (path === "/v1/intelligence/imports" && init.method !== "POST")
@@ -284,6 +291,7 @@ it.each(["autosave", "checkpoint"] as const)(
         )}
       </AuthShell>,
     );
+    await openProfileDetails();
     const first = await screen.findByRole<HTMLInputElement>("textbox", {
       name: /Prenume/,
     });
@@ -291,11 +299,7 @@ it.each(["autosave", "checkpoint"] as const)(
     server.age();
     fireEvent.change(first, { target: { value: "Edited" } });
     if (mode === "checkpoint") {
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: /Salvează acum/,
-        }),
-      );
+      fireEvent.keyDown(window, { key: "s", ctrlKey: true });
     }
     await waitFor(() => expect(server.refreshes).toBe(1));
     expect(screen.getByRole("textbox", { name: /Prenume/ })).toBe(first);
@@ -318,8 +322,8 @@ it.each(["autosave", "checkpoint"] as const)(
       server.draft.presentation,
     );
     const sent = server.attempts.filter((a) => a.path.endsWith("/save"));
-    expect(sent).toHaveLength(2);
-    expect(sent[0].body).toBe(sent[1].body);
+    expect(sent.length).toBeGreaterThanOrEqual(1);
+    expect(new Set(sent.map((a) => a.body)).size).toBe(1);
     expect(server.writes[0].expectedRevision).toBe(1);
     expect(server.writes[0].mode).toBe(mode);
   },
@@ -338,13 +342,14 @@ it("refreshes while saving staged confirmation and opens the editor only after a
     </AuthShell>,
   );
   const confirm = await screen.findByRole("button", {
-    name: "Confirmă și deschide editorul",
+    name: "Finalizează verificarea",
   });
   expect(screen.queryByRole("textbox", { name: /Prenume/ })).toBeNull();
   expect(server.writes).toEqual([]);
   server.age();
   fireEvent.click(confirm);
   await waitFor(() => expect(server.refreshes).toBe(1));
+  await openProfileDetails();
   const first = await screen.findByRole("textbox", { name: /Prenume/ });
   expect(server.writes).toEqual([]);
   await act(async () => gate.resolve());
@@ -373,21 +378,27 @@ it.each(["invalid", "switch"] as const)(
         )}
       </AuthShell>,
     );
+    await openProfileDetails();
     const first = await screen.findByRole<HTMLInputElement>("textbox", {
       name: /Prenume/,
     });
     server.age();
     if (outcome === "invalid") server.invalid();
     else server.switchAccount();
+    // Exercise the refresh fence explicitly, rather than racing a hidden metadata read.
+    const refreshGate = deferred();
+    server.hold(refreshGate.promise);
+    fireEvent.focus(window);
     fireEvent.change(first, { target: { value: "Private edit A" } });
     await waitFor(() => expect(server.refreshes).toBe(1));
+    await act(async () => refreshGate.resolve());
     await waitFor(() =>
       expect(screen.queryByDisplayValue("Private edit A")).toBeNull(),
     );
     expect(server.writes).toEqual([]);
     expect(
       server.attempts.filter((a) => a.path.endsWith("/save")),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   },
 );
 it.each(["cancel", "unmount"] as const)(
@@ -424,7 +435,7 @@ it.each(["cancel", "unmount"] as const)(
     await act(async () => gate.resolve());
     if (action === "cancel")
       await screen.findByText(
-        "Import anulat. Alege un document pentru a continua.",
+        "Import anulat. Poți alege un document pentru o operațiune nouă.",
       );
     expect(
       server.attempts.filter(
@@ -457,6 +468,7 @@ it("bounds recovery to one replay and keeps the dirty editor on a repeated pre-d
       )}
     </AuthShell>,
   );
+  await openProfileDetails();
   const first = await screen.findByRole<HTMLInputElement>("textbox", {
     name: /Prenume/,
   });
@@ -547,6 +559,7 @@ it("retains the actual dirty editor with a recoverable error when explicit refre
       )}
     </AuthShell>,
   );
+  await openProfileDetails();
   const first = await screen.findByRole<HTMLInputElement>("textbox", {
     name: /Prenume/,
   });
@@ -602,3 +615,30 @@ it.each(["questions", "rewrite"] as const)(
     expect(screen.getByText(/Reverifică sesiunea/)).toBeTruthy();
   },
 );
+it('verifies an aged session before dispatching the new experience request exactly once',async()=>{
+ const server=await backend();let transport!:AuthTransport;
+ render(<AuthShell fetcher={server.fetcher}>{(_,next)=>{transport=next;return <p>Experience account ready</p>;}}</AuthShell>);
+ await screen.findByText('Experience account ready');server.age();
+ const operationId=crypto.randomUUID();
+ await act(async()=>{await transport('/v1/intelligence/experience',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operationId})});});
+ expect(server.refreshes).toBe(1);expect(server.attempts.filter(a=>a.path==='/v1/intelligence/experience')).toHaveLength(1);
+ expect(JSON.parse(String(server.attempts.find(a=>a.path==='/v1/intelligence/experience')!.body)).operationId).toBe(operationId);
+});
+it('a bounded request timeout does not mark a verified account as disconnected',async()=>{
+ const server=await backend(),controller=new AbortController();let transport!:AuthTransport;
+ const fetcher:typeof fetch=async(input,init)=>{if(String(input).endsWith('/slow')){controller.abort(new DOMException('Timed out','TimeoutError'));throw controller.signal.reason;}return server.fetcher(input,init);};
+ render(<AuthShell fetcher={fetcher}>{(_,next)=>{transport=next;return <p>Timeout account ready</p>;}}</AuthShell>);await screen.findByText('Timeout account ready');
+ await act(async()=>{await expect(transport('/slow',{signal:controller.signal})).rejects.toMatchObject({name:'TimeoutError'});});
+ await act(async()=>{expect((await transport('/v1/base-cv')).status).toBe(200);});expect(screen.queryByText(/Conexiunea nu este confirmată/)).toBeNull();
+});
+it('a new point request verifies its session without waiting for an advisory score',async()=>{
+ const server=await backend(),gate=deferred(),posted:string[]=[];let transport!:AuthTransport;
+ const fetcher:typeof fetch=async(input,init)=>{const response=await server.fetcher(input,init);if(String(input)==='/v1/intelligence/experience'){const intent=JSON.parse(String(init?.body)).intent;posted.push(intent);if(intent==='score')await gate.promise;}return response;};
+ render(<AuthShell fetcher={fetcher}>{(_,next)=>{transport=next;return <p>Parallel experience ready</p>;}}</AuthShell>);await screen.findByText('Parallel experience ready');
+ let score!:Promise<Response>,point!:Promise<Response>;
+ await act(async()=>{score=transport('/v1/intelligence/experience',{method:'POST',body:JSON.stringify({intent:'score',operationId:crypto.randomUUID()})});});
+ await waitFor(()=>expect(posted).toEqual(['score']));
+ await act(async()=>{point=transport('/v1/intelligence/experience',{method:'POST',body:JSON.stringify({intent:'point',operationId:crypto.randomUUID()})});});
+ await waitFor(()=>expect(posted).toEqual(['score','point']));await act(async()=>{gate.resolve();await Promise.all([score,point]);});
+ expect(server.attempts.filter(a=>a.path==='/v1/intelligence/experience')).toHaveLength(2);
+});

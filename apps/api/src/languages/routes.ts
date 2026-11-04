@@ -93,7 +93,7 @@ export async function languageRoute(
       if (jobId && locale)
         row = (await db.loadCurrentJobDocument(
           jobId,
-          locale.split("-")[0],
+          locale,
         )) as typeof row;
       if (!row)
         return privateJson({ source: null, versions: context.versions });
@@ -101,7 +101,7 @@ export async function languageRoute(
       if (draft.translation && jobId) {
         row = (await db.loadCurrentJobDocument(
           jobId,
-          draft.translation.sourceLocale.split("-")[0],
+          draft.translation.sourceLocale,
         )) as typeof row;
         if (!row)
           return privateJson({ source: null, versions: context.versions });
@@ -244,7 +244,7 @@ export async function languageRoute(
         body.source.kind === "job"
           ? await db.loadCurrentJobDocument(
               body.source.jobId!,
-              targetLocale.split("-")[0],
+              targetLocale,
             )
           : await db.loadBaseLanguage(variantId);
       if (

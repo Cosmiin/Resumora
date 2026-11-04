@@ -109,3 +109,28 @@ test('network/schema/redirect/malformed upstream failures are sanitized and neve
   const gateway = createDatabaseGateway(env, identity, async () => Response.json({ code: 'PT422', message: 'private user data' }, { status: 422 }));
   await assert.rejects(gateway.loadDraft(), rejected(422, 'DATABASE_REQUEST_REJECTED'));
 });
+
+
+test('workspace draft lists accept typed arrays and missing owned resources remain null', async () => {
+ const row={id,kind:'intake',revision:1,value:{text:'Unfinished QA vacancy',sourceUrl:''},updatedAt:'2026-10-31T00:00:00Z',submittedJobId:null};
+ for(const value of [[],[row]]) {
+  const gateway=createDatabaseGateway(env,identity,async()=>Response.json(value));
+  assert.deepEqual(await gateway.listWorkspaceDrafts(),value);
+ }
+ for(const value of [{},Array(101).fill(row),[{...row,kind:'unrestricted'}],[{...row,value:{secret:'unsupported'}}],[{...row,revision:0}]]) {
+  const gateway=createDatabaseGateway(env,identity,async()=>Response.json(value));
+  await assert.rejects(gateway.listWorkspaceDrafts(),rejected(503,'DATABASE_UNAVAILABLE'));
+ }
+ const gateway=createDatabaseGateway(env,identity,async()=>Response.json(null));
+ assert.equal(await gateway.getWorkspaceDraft('intake',id),null);
+ assert.equal(await gateway.getWorkspaceOperation(id),null);
+});
+test('job intake transports retain explicit interface fallback at their authenticated RPC boundary',async()=>{
+ const calls=[],gateway=createDatabaseGateway(env,identity,async(url,init)=>{calls.push({name:url.split('/').at(-1),body:JSON.parse(init.body)});return Response.json({});});
+ await gateway.saveJob({requestId,intake:{text:'Synthetic employer description'},snapshotId:null,snapshotRevision:null,requirements:[],interfaceLocale:'en'});
+ await gateway.saveJobUrl(requestId,'https://jobs.ashbyhq.com/example/job','en');
+ await gateway.submitWorkspaceIntake({requestId,id,expectedRevision:1,interfaceLocale:'en'});
+ await gateway.requestJobWorkflow({requestId,jobId:id,kind:'extract',revision:1,interfaceLocale:'en'});
+ assert.deepEqual(calls.map(c=>c.name),['save_target_job_with_locale','save_target_url_with_locale','submit_workspace_intake_with_locale','request_job_workflow_with_locale']);
+ assert.ok(calls.every(c=>c.body.p_interface_locale==='en'));
+});

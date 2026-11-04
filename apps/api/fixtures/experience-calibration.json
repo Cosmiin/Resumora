@@ -1,0 +1,549 @@
+{
+  "status": "Reference expectations for review, not live-model validation or a hiring predictor. First six cases are the approved prompt anchors; remaining cases are draft cross-profession references.",
+  "cases": [
+    {
+      "id": "generic-admin",
+      "role": "Administrator",
+      "documentLocale": "en",
+      "points": [
+        "Responsible for various administrative tasks."
+      ],
+      "expected": [
+        {
+          "contribution": "partial",
+          "clarity": "specific",
+          "specificity": "missing",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "contracts",
+      "role": "HR Administrator",
+      "documentLocale": "en",
+      "points": [
+        "Prepared employment contracts for temporary workers."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "market-entry",
+      "role": "Global Market Developer",
+      "documentLocale": "en",
+      "points": [
+        "Supported Romanian market-entry planning through partner outreach."
+      ],
+      "expected": [
+        {
+          "contribution": "partial",
+          "clarity": "specific",
+          "specificity": "partial",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "onboarding",
+      "role": "HR Coordinator",
+      "documentLocale": "en",
+      "points": [
+        "Coordinated onboarding documentation between recruiters and payroll teams."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "empty-metric",
+      "role": "Operations Analyst",
+      "documentLocale": "en",
+      "points": [
+        "Increased efficiency by 75% using advanced solutions."
+      ],
+      "expected": [
+        {
+          "contribution": "missing",
+          "clarity": "partial",
+          "specificity": "missing",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "api-logs",
+      "role": "Software Engineer",
+      "documentLocale": "en",
+      "points": [
+        "Investigated failed API requests using application logs."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "nursing",
+      "role": "Nurse",
+      "documentLocale": "en",
+      "points": [
+        "Recorded patients’ blood pressure and temperature during morning rounds."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "retail",
+      "role": "Retail Assistant",
+      "documentLocale": "en",
+      "points": [
+        "Reconciled cash-register totals against receipts at the end of each shift."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "warehouse",
+      "role": "Warehouse Assistant",
+      "documentLocale": "en",
+      "points": [
+        "Checked delivery notes against incoming warehouse shipments."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "hospitality",
+      "role": "Housekeeper",
+      "documentLocale": "en",
+      "points": [
+        "Prepared guest rooms for check-in using the housekeeping checklist."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "invoices",
+      "role": "Accounts Assistant",
+      "documentLocale": "en",
+      "points": [
+        "Matched supplier invoices to purchase orders before payment approval."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "support",
+      "role": "Support Agent",
+      "documentLocale": "en",
+      "points": [
+        "Resolved account-access requests submitted through the support queue."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "maintenance",
+      "role": "Maintenance Technician",
+      "documentLocale": "en",
+      "points": [
+        "Replaced worn conveyor belts during scheduled maintenance."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "teaching",
+      "role": "Primary Teacher",
+      "documentLocale": "en",
+      "points": [
+        "Prepared reading exercises for first-year primary pupils."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "laboratory",
+      "role": "Laboratory Assistant",
+      "documentLocale": "en",
+      "points": [
+        "Labelled water samples and recorded collection locations in the laboratory register."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "service-desk",
+      "role": "Service Assistant",
+      "documentLocale": "en",
+      "points": [
+        "Answered product availability questions from customers at the service desk."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "pull-requests",
+      "role": "Software Engineer",
+      "documentLocale": "en",
+      "points": [
+        "Reviewed pull requests for the payments service."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "care",
+      "role": "Care Assistant",
+      "documentLocale": "en",
+      "points": [
+        "Assisted residents with dressing during the morning care routine."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "scheduling",
+      "role": "Receptionist",
+      "documentLocale": "en",
+      "points": [
+        "Scheduled follow-up appointments requested by patients at reception."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "translation",
+      "role": "Translator",
+      "documentLocale": "en",
+      "points": [
+        "Translated product installation instructions from German into Romanian."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "vague-hr",
+      "role": "HR Assistant",
+      "documentLocale": "en",
+      "points": [
+        "Helped with HR operations."
+      ],
+      "expected": [
+        {
+          "contribution": "partial",
+          "clarity": "specific",
+          "specificity": "missing",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "prestige-geography",
+      "role": "Business Analyst",
+      "documentLocale": "en",
+      "points": [
+        "Worked on important strategic initiatives in Europe."
+      ],
+      "expected": [
+        {
+          "contribution": "partial",
+          "clarity": "specific",
+          "specificity": "missing",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "tools-only",
+      "role": "Office Assistant",
+      "documentLocale": "en",
+      "points": [
+        "Used Excel and SAP for daily activities."
+      ],
+      "expected": [
+        {
+          "contribution": "missing",
+          "clarity": "specific",
+          "specificity": "missing",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "empty-value",
+      "role": "Consultant",
+      "documentLocale": "en",
+      "points": [
+        "Delivered outstanding results and improved business performance."
+      ],
+      "expected": [
+        {
+          "contribution": "missing",
+          "clarity": "partial",
+          "specificity": "missing",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "short-report",
+      "role": "Analyst",
+      "documentLocale": "en",
+      "points": [
+        "Prepared reports."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "partial",
+          "issue": "specificity",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "vague-onboarding",
+      "role": "Coordinator",
+      "documentLocale": "en",
+      "points": [
+        "Supported customer onboarding."
+      ],
+      "expected": [
+        {
+          "contribution": "partial",
+          "clarity": "specific",
+          "specificity": "partial",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "placeholder",
+      "role": "Analyst",
+      "documentLocale": "en",
+      "points": [
+        "TBD"
+      ],
+      "expected": [
+        {
+          "contribution": "missing",
+          "clarity": "missing",
+          "specificity": "missing",
+          "issue": "example",
+          "meaningful": false
+        }
+      ]
+    },
+    {
+      "id": "keywords",
+      "role": "Analyst",
+      "documentLocale": "en",
+      "points": [
+        "Excel, leadership, Germany, innovation."
+      ],
+      "expected": [
+        {
+          "contribution": "missing",
+          "clarity": "missing",
+          "specificity": "missing",
+          "issue": "example",
+          "meaningful": false
+        }
+      ]
+    },
+    {
+      "id": "nonsense",
+      "role": "Analyst",
+      "documentLocale": "en",
+      "points": [
+        "asdf"
+      ],
+      "expected": [
+        {
+          "contribution": "missing",
+          "clarity": "missing",
+          "specificity": "missing",
+          "issue": "example",
+          "meaningful": false
+        }
+      ]
+    },
+    {
+      "id": "ro-contracts",
+      "role": "Administrator resurse umane",
+      "documentLocale": "ro",
+      "points": [
+        "Am pregătit contracte de muncă pentru lucrători temporari."
+      ],
+      "expected": [
+        {
+          "contribution": "specific",
+          "clarity": "specific",
+          "specificity": "specific",
+          "issue": "none",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "ro-support",
+      "role": "Asistent resurse umane",
+      "documentLocale": "ro",
+      "points": [
+        "Am sprijinit procesul de integrare a noilor angajați."
+      ],
+      "expected": [
+        {
+          "contribution": "partial",
+          "clarity": "specific",
+          "specificity": "partial",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    },
+    {
+      "id": "ro-admin",
+      "role": "Administrator",
+      "documentLocale": "ro",
+      "points": [
+        "M-am ocupat de diverse sarcini administrative."
+      ],
+      "expected": [
+        {
+          "contribution": "partial",
+          "clarity": "specific",
+          "specificity": "missing",
+          "issue": "contribution",
+          "meaningful": true
+        }
+      ]
+    }
+  ]
+}

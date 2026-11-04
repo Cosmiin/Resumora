@@ -112,11 +112,11 @@ def suite(db):
    request=lambda kind,locale='NULL':self.call('request_job_workflow',f"'{uid()}','{self.job['id']}','{kind}',1,NULL,{locale}")
    claim=lambda:self.call('claim_job_workflow',f"'{secret}',false",role='anon')
    finish=lambda task:self.call('finish_job_workflow',f"'{secret}','{task['lease']}','{{}}',NULL",role='anon')
-   operation=request('match');self.assertEqual(operation['documentVersionId'],primary['id']);self.assertEqual(operation['targetLocale'],'en');self.assertEqual(operation['targetDocumentVersionId'],en['id'])
+   operation=request('match');self.assertEqual(operation['documentVersionId'],primary['id']);self.assertEqual(operation['targetLocale'],'ro');self.assertEqual(operation['targetDocumentVersionId'],primary['id'])
    task=claim();en=self.save(locale='en',document=en['documentId'],revision=2);self.assertEqual(finish(task)['state'],'ready')
-   # New generation has an independent EN target pin while matching source is primary RO.
-   operation=request('prepare');self.assertEqual(operation['documentVersionId'],primary['id']);self.assertEqual(operation['targetDocumentVersionId'],en['id'])
-   task=claim();en=self.save(locale='en',document=en['documentId'],revision=3);self.assertEqual(finish(task)['state'],'stale')
+   # Default generation belongs to the saved primary RO document, not the EN Base.
+   operation=request('prepare');self.assertEqual(operation['documentVersionId'],primary['id']);self.assertEqual(operation['targetDocumentVersionId'],primary['id'])
+   task=claim();en=self.save(locale='en',document=en['documentId'],revision=3);primary=self.save(locale='ro',payload=ro,document=primary['documentId'],revision=1);self.assertEqual(finish(task)['state'],'stale')
    operation=request('match',"'en'");self.assertEqual(operation['documentVersionId'],en['id']);task=claim();en=self.save(locale='en',document=en['documentId'],revision=4);self.assertEqual(finish(task)['state'],'stale')
    self.assertEqual(self.call('load_current_job_document',f"'{self.job['id']}',NULL")['id'],primary['id'])
   def test_current_photo_asset_is_owned_and_survives_base_detachment(self):

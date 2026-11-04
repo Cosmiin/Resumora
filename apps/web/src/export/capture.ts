@@ -92,7 +92,7 @@ export async function capturePrintDocument(
   css += `\n@page { size: ${paper}; margin: 15mm 17mm; }\nhtml, body { margin:0; padding:0; background:white; }`;
   if (css.includes("</style")) throw new Error("PRINT_STYLE_INVALID");
   return {
-    html: `<!doctype html><html lang="${escapeAttribute(article.lang)}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:"><style>${css}</style></head><body>${clone.outerHTML}</body></html>`,
+    html: `<!doctype html><html lang="${escapeAttribute(article.lang)}" dir="${article.dir === "rtl" ? "rtl" : "ltr"}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:"><style>${css}</style></head><body>${clone.outerHTML}</body></html>`,
     expected: { text: article.textContent ?? "", links, paper },
   };
 }

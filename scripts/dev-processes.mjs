@@ -1,17 +1,25 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { localProcessEnvironment } from './dev-config.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-export function startDevServers({ quiet = false } = {}) {
+export function startDevServers({ quiet = false, webPort = 5173, configuration, imports = false, jobs = false, spawnProcess = spawn } = {}) {
   const specs = [
     ['api', 'node_modules/wrangler/bin/wrangler.js', ['dev', '--local', '--ip', '127.0.0.1', '--port', '8787'], 'apps/api'],
-    ['web', 'node_modules/vite/bin/vite.js', [], 'apps/web'],
+    ['web', 'node_modules/vite/bin/vite.js', ['--port', String(webPort)], 'apps/web'],
   ];
+  if (imports) specs.push(['imports', 'scripts/import-worker.mjs', ['--watch'], '']);
+  if (jobs) specs.push(['jobs', 'scripts/job-worker.mjs', ['--watch'], '']);
   const children = specs.map(([name, entry, args, cwd]) => {
-    const child = spawn(process.execPath, [root + entry, ...args], {
+    const worker = name === 'imports' || name === 'jobs';
+    const env = localProcessEnvironment(process.env, worker ? configuration : undefined, name);
+    if (name === 'web') {
+      env.APP_ORIGIN = env.API_ORIGIN = `http://127.0.0.1:${webPort}`;
+    }
+    const child = spawnProcess(process.execPath, [...(worker ? ['--experimental-strip-types'] : []), root + entry, ...args], {
       cwd: root + cwd,
-      env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
+      env,
       stdio: quiet ? 'ignore' : 'inherit',
       detached: process.platform !== 'win32',
     });

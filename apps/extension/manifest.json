@@ -6,6 +6,7 @@
   "minimum_chrome_version": "120",
   "permissions": ["activeTab", "scripting", "storage", "identity", "alarms"],
   "host_permissions": ["http://127.0.0.1/*"],
+  "externally_connectable": {"matches":["http://127.0.0.1/extension/connect*"]},
   "background": {"service_worker":"src/worker.js","type":"module"},
   "action": {"default_popup":"popup.html","default_title":"Capture this job in Resumora"},
   "icons": {"16":"icons/16.png","48":"icons/48.png","128":"icons/128.png"},

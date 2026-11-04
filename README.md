@@ -1,10 +1,12 @@
-# Resumora — Discovery proposal
+# Resumora
 
-**Status: discovery proposal and local Base/job CV application slice.** This repository contains research, product/technical proposals, a local synthetic prototype, a [local frontend/Worker foundation](docs/setup/local-development.md), and the [approved database implementation](docs/database/README.md). It is not a production app; the local foundation does not authorize production launch, spending, real model calls, payments, or deployment. Remaining product policy decisions are tracked in [`research/strategy/publication/docs/product/decisions.md`](research/strategy/publication/docs/product/decisions.md).
+**Current development setup:** [one local Linux/WSL environment](docs/setup/environment.md), connected to hosted Supabase and OpenRouter/OpenAI. Start from that guide to run or troubleshoot the app. The research/prototype sections below are background material.
+
+**Status: local development application.** The working app includes login, saved profiles, CV enrichment and background import processing. This repository also retains the original research, proposals and synthetic prototype. A production website deployment is a separate step; product decisions remain in the [decision register](research/strategy/publication/docs/product/decisions.md).
 
 ## Start here
 
-For infrastructure preparation, use the [setup guide](SETUP_GUIDE.md): verified repository readiness, account inventory, secure configuration and feature-triggered service checklists. The [authentication setup](docs/setup/authentication.md) owns the implemented email/password flows, local configuration and hosted acceptance dependencies.
+For everyday use, follow the [environment guide](docs/setup/environment.md): `nvm use`, `npm run dev:start`, then `npm run dev:doctor`. The [setup guide](SETUP_GUIDE.md) is historical infrastructure preparation; the [authentication setup](docs/setup/authentication.md) describes email/password flows.
 
 1. Read the [customer-journey reference](docs/product/customer-journeys.md), [documentation index](docs/README.md), [integrated PRD](docs/product/prd.md) and [decision register](research/strategy/publication/docs/product/decisions.md).
 2. Preview the [interactive Romanian-first prototype](prototype/review.html). It uses synthetic Mara Ionescu / Northstar People data and keeps state in your browser. The interface defaults to Romanian; interface and CV language have separate controls. No real AI, server, payment, or PDF service is connected.
@@ -13,11 +15,13 @@ For infrastructure preparation, use the [setup guide](SETUP_GUIDE.md): verified 
 
 ## Frontend visual reference
 
-The [design-system adoption guide](docs/frontend/design-system-adoption.md) maps the supplied Resumora design to journeys A–F and lists the next frontend preparation tasks. The [CVizat reference package](references/design-system/cvizat/README.md) preserves the original ZIP and separate design source. This is reference preparation; production implementation remains unapproved. Current repository: [Cosmiin/Resumora](https://github.com/Cosmiin/Resumora).
+The [design-system adoption guide](docs/frontend/design-system-adoption.md) maps the supplied Resumora design to journeys A–F and lists the next frontend preparation tasks. The [CVizat reference package](references/design-system/cvizat/README.md) preserves the original ZIP and separate design source. These files preserve the original visual reference. Current repository: [Cosmiin/Resumora](https://github.com/Cosmiin/Resumora).
 
 ## Local application foundation
 
-For the runnable React Base CV journey, follow [Base CV review instructions](docs/frontend/base-cv.md). With the pinned Node/npm toolchain, run `npm ci --ignore-scripts` and `npm run dev`, then open `http://127.0.0.1:5173/` following the [browser verification requirements](docs/setup/authentication.md#external-setup-dependencies). Configure the existing cloud development Supabase project using [authentication setup](docs/setup/authentication.md) to create an account, confirm email, sign in, sign out or reset a password. Signed-in users can create/edit a Base CV and save content, enrichment answers and version history through the Worker. The unconfigured app stays locked; hosted authentication, save/reopen and account isolation still await controlled acceptance. No deployment is needed. See [local development](docs/setup/local-development.md) for toolchain details and `npm run check` for the [foundation checks](docs/setup/local-development.md#checks).
+For the active app, use the [environment guide](docs/setup/environment.md) and open `http://127.0.0.1:15173/#/profile`. One managed Linux/WSL service runs the frontend, API and enabled import processor from the chosen checkout. Authentication, saved data and storage use the existing hosted Supabase project. AI uses the configured OpenRouter/OpenAI accounts. All private runtime bindings come from `apps/api/.dev.vars`.
+
+For a new clean checkout, [local development](docs/setup/local-development.md) covers dependency installation and the unconfigured default port of 5173. A fresh checkout is not automatically the active app. For application details, see [authentication](docs/setup/authentication.md) and [Base CV persistence](docs/frontend/base-cv.md#persistence-component-handoff).
 
 For SQL migrations, database command contracts and native local verification, start with the [database guide](docs/database/README.md). The [gateway contract](docs/database/gateway.md) owns the Worker’s user-scoped persistence boundary.
 

@@ -1,3 +1,6 @@
+import { contentLocale } from "@resumora/contracts/editor/content-language";
+import { documentLabels } from "@resumora/contracts/editor/document-labels";
+import { currentMonth } from "@resumora/contracts/editor/dates";
 import { validateDocumentLocale } from "@resumora/contracts/intelligence/translation";
 import { renderToStaticMarkup } from "react-dom/server.browser";
 import { DocumentPreview } from "../components/DocumentContent";
@@ -10,8 +13,11 @@ export function renderPrintHtml(
   draft: BaseDraft,
   css: string,
   photo?: PrintPhoto,
+  asOf = currentMonth(),
 ): string {
-  validateDocumentLocale(draft.documentLocale ?? (draft.language==="ro"?"ro-RO":"en-GB"));
+  if (!documentLabels(draft))
+    throw new Error("CONTENT_LANGUAGE_LABELS_UNAVAILABLE");
+  validateDocumentLocale(contentLocale(draft));
   if (
     draft.presentation.templateVersionId &&
     !resolveTemplate(draft.presentation.templateVersionId)
@@ -29,7 +35,7 @@ export function renderPrintHtml(
   const html = renderToStaticMarkup(
     <DocumentPreview
       draft={draft}
-      asOf={{ year: "", month: "" }}
+      asOf={asOf}
       documentOnly
       renderPhoto={(settings) => {
         if (!settings?.visible) return null;
@@ -65,5 +71,5 @@ export function renderPrintHtml(
       }}
     />,
   );
-  return `<!doctype html><html lang="${draft.documentLocale ?? draft.language}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:"><style>${css}\nhtml,body{margin:0;padding:0;background:white}</style></head><body>${html}</body></html>`;
+  return `<!doctype html><html lang="${contentLocale(draft)}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:"><style>${css}\nhtml,body{margin:0;padding:0;background:white}</style></head><body>${html}</body></html>`;
 }

@@ -11,14 +11,17 @@ const root=fileURLToPath(new URL('.',import.meta.url));
 function inspect(archive){
   const inspected=spawnSync('python3',['-c',`import sys,zipfile,json,io
 with zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())) as z:
- print(json.dumps({'files':z.namelist(),'manifest':json.loads(z.read('manifest.json')),'config':json.loads(z.read('config.json')),'license':z.read('LICENSE').decode()}))`],{input:archive,maxBuffer:4*1024*1024});
-  assert.equal(inspected.status,0);return JSON.parse(inspected.stdout.toString());
+ names=z.namelist()
+ assert {name.split('/')[0] for name in names} == {'Resumeify Extension'}, 'ZIP must contain one Resumeify Extension folder'
+ print(json.dumps({'files':names,'manifest':json.loads(z.read('Resumeify Extension/manifest.json')),'config':json.loads(z.read('Resumeify Extension/config.json')),'license':z.read('Resumeify Extension/LICENSE').decode()}))`],{input:archive,maxBuffer:4*1024*1024});
+  assert.equal(inspected.status,0,inspected.stderr.toString());return JSON.parse(inspected.stdout.toString());
 }
 function checkArchive(bytes,origin){
   const archive=inspect(bytes);
-  assert.deepEqual(archive.files.slice().sort(),['LICENSE','README.md','config.json','icons/128.png','icons/16.png','icons/48.png','manifest.json','popup.css','popup.html','src/popup.js','src/queue.js','src/snapshot.js','src/worker.js'].sort());
+  assert.deepEqual(archive.files.slice().sort(),['LICENSE','README.md','config.json','icons/128.png','icons/16.png','icons/48.png','manifest.json','popup.css','popup.html','src/popup.js','src/queue.js','src/snapshot.js','src/worker.js'].map(name=>'Resumeify Extension/'+name).sort());
   assert.equal(archive.manifest.manifest_version,3);assert.deepEqual(archive.manifest.permissions,['activeTab','scripting','storage','identity','alarms']);
   assert.deepEqual(archive.manifest.host_permissions,[new URL(origin).origin.replace(/:\d+$/,'')+'/*']);
+  assert.deepEqual(archive.manifest.externally_connectable,{matches:[new URL(origin).origin.replace(/:\d+$/,'')+'/extension/connect*']});
   assert.deepEqual(archive.config,{appOrigin:origin,apiOrigin:origin});assert.ok(archive.license.startsWith('MIT License'));
   const key=Buffer.from(archive.manifest.key,'base64');
   assert.equal(createPublicKey({key,format:'der',type:'spki'}).asymmetricKeyType,'rsa');

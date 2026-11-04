@@ -3,7 +3,7 @@ import type { Totals, UsageReport } from '../ai/ledger.ts';
 
 const escape = (v: unknown) => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const number = (v: number) => new Intl.NumberFormat('ro-RO').format(v);
-const operation: Record<string, string> = { connection_check: 'Verificare conexiune', cv_parse: 'Citire CV', job_parse: 'Citire job', cv_tailor: 'Adaptare CV', cv_rewrite: 'Rescriere CV' };
+const operation: Record<string, string> = { connection_check: 'Verificare conexiune', cv_parse: 'Citire CV', job_parse: 'Citire job', cv_tailor: 'Adaptare CV', cv_rewrite: 'Rescriere CV', voice_transcription: 'Transcriere vocală' };
 const status: Record<string, string> = { completed: 'Finalizat', failed: 'Eșuat', unknown: 'Necunoscut', started: 'Început · rezultat necunoscut', incomplete: 'Incomplet' };
 
 // App-owned adaptation of supplied Resumora pine/sage/marigold tokens and card geometry.

@@ -4,9 +4,9 @@ import {createQueue} from '../src/queue.js';
 const identity={userId:'A',generation:'one'};
 const snapshot={text:'A synthetic job',sourceUrl:'https://example.invalid/job',parserVersion:'1'};
 const receipt=(body,state='received')=>({requestId:body.requestId,jobId:'job-'+body.requestId,state,createdAt:'2026-10-28T00:00:00Z'});
-function setup(send){
+function setup(send,status=async requestId=>receipt({requestId},'processing')){
   let disk=[],c={userId:'A',generation:'one'},clock=0,counter=0;
-  const port={read:async()=>structuredClone(disk),write:async rows=>{disk=structuredClone(rows);},connection:async()=>c,now:()=>clock,id:()=>String(++counter),send,status:async requestId=>receipt({requestId},'processing')};
+  const port={read:async()=>structuredClone(disk),write:async rows=>{disk=structuredClone(rows);},connection:async()=>c,now:()=>clock,id:()=>String(++counter),send,status};
   return {queue:createQueue(port),restart:()=>createQueue(port),set account(v){c=v;},tick:()=>clock+=300001,get disk(){return disk;}};
 }
 test('A accepted then popup close/worker restart/navigation and B while A processes retain independent durable receipts',async()=>{
@@ -27,12 +27,12 @@ test('slow A transport does not block enqueue or B transport; late A cannot repl
   assert.equal(f.disk.find(x=>x.requestId===b).receipt.jobId,'job-'+b);release();await sending;
   assert.equal(f.disk.find(x=>x.requestId===a).receipt.jobId,'job-'+a);assert.equal(f.disk.length,2);
 });
-test('ambiguous response retries same immutable ID across restart; new intent uses a different ID',async()=>{
+test('ambiguous response retries the same ID across restart; changed posting uses a different ID',async()=>{
   let first=true;const saved=new Map();
   const f=setup(async body=>{saved.set(body.requestId,receipt(body));if(first){first=false;throw Error('timeout');}return saved.get(body.requestId);});
   const id=await f.queue.enqueue(snapshot,identity);await f.queue.flush();assert.equal(f.disk[0].state,'queued');assert.ok(f.disk[0].payload);
   f.tick();await f.restart().flush();assert.equal(saved.size,1);assert.equal(f.disk[0].receipt.requestId,id);
-  const next=await f.queue.enqueue(snapshot,identity);assert.notEqual(next,id);await f.queue.flush();assert.equal(saved.size,2);
+  const next=await f.queue.enqueue({...snapshot,text:'Changed posting'},identity);assert.notEqual(next,id);await f.queue.flush();assert.equal(saved.size,2);
 });
 test('account switch/revocation never reassigns queued content; original account requires explicit retry',async()=>{
   const sent=[];const f=setup(async body=>{sent.push(body);return receipt(body);});
@@ -43,7 +43,7 @@ test('account switch/revocation never reassigns queued content; original account
 test('three bounded attempts, backpressure, discard and TTL; no false saved state',async()=>{
   let calls=0;const f=setup(async()=>{calls++;throw Error('offline');});
   const id=await f.queue.enqueue(snapshot,identity);for(let i=0;i<5;i++){await f.queue.flush();f.tick();}assert.equal(calls,3);assert.equal(f.disk[0].receipt,undefined);
-  for(let i=0;i<9;i++)await f.queue.enqueue(snapshot,identity);await assert.rejects(f.queue.enqueue(snapshot,identity),/Ten captures/);
+  for(let i=0;i<9;i++)await f.queue.enqueue({...snapshot,text:'Posting '+i},identity);await assert.rejects(f.queue.enqueue({...snapshot,text:'Posting ten'},identity),/Ten captures/);
   await f.queue.discard(id);assert.equal(f.disk.length,9);
   for(let i=0;i<300;i++)f.tick();assert.equal((await f.restart().list()).length,0);
 });
@@ -102,4 +102,59 @@ test('connection replacement and enqueue commit use the same transaction lock',a
   assert.equal(disk.length,1);assert.equal(disk[0].owner,'A');assert.equal(disk[0].generation,'one');
   await assert.rejects(q.enqueue(snapshot,identity),/Connection changed/);
   assert.equal(disk.length,1);
+});
+
+// Removing content-based reuse would create a second durable request on reopen.
+test('overlapping captures and reopening after acknowledgement reuse the persisted content receipt',async()=>{
+  const sent=[];const f=setup(async body=>{sent.push(body);return receipt(body);});
+  const [first,second]=await Promise.all([f.queue.enqueue({...snapshot,capturedAt:'2026-11-03T00:00:00Z'},identity),f.queue.enqueue({...snapshot,capturedAt:'2026-11-03T00:00:01Z'},identity)]);
+  assert.equal(second,first);assert.equal(f.disk.length,1);
+  await f.queue.flush();
+  const reopened=await f.restart().enqueue({...snapshot,capturedAt:'2026-11-03T00:00:02Z'},identity);
+  await f.restart().flush();assert.equal(reopened,first);assert.equal(sent.length,1);
+  const row=(await f.queue.list())[0];assert.equal(row.title,'A synthetic job');assert.equal(row.sourceUrl,snapshot.sourceUrl);assert.equal(row.payload,undefined);
+});
+test('content changes on the same URL and the same content on another URL remain separate captures',async()=>{
+  const f=setup(async body=>receipt(body));
+  const first=await f.queue.enqueue(snapshot,identity);
+  for(const patch of [{text:'Another selected LinkedIn posting'},{structured:'{"title":"Updated title"}'},{sourceUrl:'https://example.invalid/another-job'}])assert.notEqual(await f.queue.enqueue({...snapshot,...patch},identity),first);
+  assert.equal(f.disk.length,4);
+});
+test('content reuse never crosses account or generation boundaries and expires with its receipt',async()=>{
+  const f=setup(async body=>receipt(body));const first=await f.queue.enqueue(snapshot,identity);await f.queue.flush();
+  f.account={userId:'B',generation:'two'};const other=await f.queue.enqueue(snapshot,{userId:'B',generation:'two'});assert.notEqual(first,other);
+  f.account={userId:'A',generation:'three'};assert.notEqual(await f.queue.enqueue(snapshot,{userId:'A',generation:'three'}),first);
+  for(let i=0;i<300;i++)f.tick();f.account=identity;assert.notEqual(await f.restart().enqueue(snapshot,identity),first);
+});
+
+test('confirmed server deletion retires the local receipt and recaptures the unchanged posting under a new request',async()=>{
+  let deleted=false,statusCalls=0;const sent=[];
+  const f=setup(async body=>{sent.push(body);return receipt(body,'ready');},async requestId=>{statusCalls++;if(deleted)throw Object.assign(Error('gone'),{status:410});return receipt({requestId},'ready');});
+  const old=await f.queue.enqueue(snapshot,identity);await f.queue.flush();deleted=true;
+  const next=await f.restart().enqueue(snapshot,identity);
+  assert.notEqual(next,old);assert.equal(statusCalls,1);assert.equal(f.disk.length,1);assert.equal(f.disk[0].requestId,next);assert.equal(f.disk[0].receipt,undefined);
+  await f.queue.flush();assert.equal(sent.length,2);assert.equal(f.disk[0].receipt.jobId,'job-'+next);
+});
+test('unavailable or ambiguous receipt status fails clearly without a second capture or transport',async()=>{
+  for(const failure of [Error('offline'),Object.assign(Error('missing'),{status:404}),Object.assign(Error('unavailable'),{status:503}),null]){
+    let unavailable=false;const sent=[];
+    const f=setup(async body=>{sent.push(body);return receipt(body,'ready');},async requestId=>{if(unavailable){if(failure)throw failure;return null;}return receipt({requestId},'ready');});
+    const old=await f.queue.enqueue(snapshot,identity);await f.queue.flush();unavailable=true;
+    await assert.rejects(f.restart().enqueue(snapshot,identity),/Unable to verify the saved job/);
+    await f.queue.flush();assert.equal(sent.length,1);assert.equal(f.disk.length,1);assert.equal(f.disk[0].requestId,old);
+    unavailable=false;assert.equal(await f.queue.enqueue(snapshot,identity),old);
+  }
+});
+test('pending duplicate capture needs no receipt lookup; a slow accepted lookup does not block another posting',async()=>{
+  let started,release,calls=0;const waiting=new Promise(resolve=>started=resolve),gate=new Promise(resolve=>release=resolve);
+  const f=setup(async body=>receipt(body,'ready'),async requestId=>{calls++;started();await gate;return receipt({requestId},'ready');});
+  const old=await f.queue.enqueue(snapshot,identity);assert.equal(await f.queue.enqueue(snapshot,identity),old);assert.equal(calls,0);
+  await f.queue.flush();const recheck=f.queue.enqueue(snapshot,identity);await waiting;
+  const another=await f.queue.enqueue({...snapshot,text:'Another posting'},identity);assert.notEqual(another,old);release();assert.equal(await recheck,old);
+});
+test('connection changes during receipt verification reject capture without retiring the original receipt',async()=>{
+  let started,release;const waiting=new Promise(resolve=>started=resolve),gate=new Promise(resolve=>release=resolve);
+  const f=setup(async body=>receipt(body,'ready'),async()=>{started();await gate;throw Object.assign(Error('gone'),{status:410});});
+  const old=await f.queue.enqueue(snapshot,identity);await f.queue.flush();const recheck=f.queue.enqueue(snapshot,identity);await waiting;
+  f.account={userId:'B',generation:'two'};release();await assert.rejects(recheck,/Connection changed/);assert.equal(f.disk.length,1);assert.equal(f.disk[0].requestId,old);
 });

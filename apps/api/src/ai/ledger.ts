@@ -1,6 +1,6 @@
 import type { PriceSnapshot, Usage } from './accounting.ts';
 
-export type Operation = 'connection_check' | 'cv_parse' | 'job_parse' | 'cv_tailor' | 'cv_rewrite';
+export type Operation = 'connection_check' | 'cv_parse' | 'job_parse' | 'cv_tailor' | 'cv_rewrite' | 'voice_transcription';
 export type Outcome = 'started' | 'completed' | 'incomplete' | 'failed' | 'unknown';
 export type AttemptStart = {
   attemptId: string;

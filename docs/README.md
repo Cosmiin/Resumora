@@ -1,5 +1,7 @@
 # Resumora documentation
 
+For running or diagnosing the app, start with [the current development environment](setup/environment.md). It identifies the active local checkout, the hosted dependencies and the single startup procedure.
+
 Start with the [customer-journey reference](product/customer-journeys.md) for registration, password recovery/change, CV import/enrichment, job review/tailoring/export and account/application lifecycle. It distinguishes planned behavior and design examples from the local application; the [Base CV guide](frontend/base-cv.md) owns its current scope and review instructions.
 
 - [Product requirements](product/prd.md) and [open decisions](../research/strategy/publication/docs/product/decisions.md).

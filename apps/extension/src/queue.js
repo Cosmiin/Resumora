@@ -7,13 +7,45 @@ export function createQueue({read,write,send,status,connection,now=Date.now,id=(
   return {
     changeConnection:update=>locked(update),
     list:()=>locked(async()=> (await rows()).map(({payload,...row})=>row)),
-    enqueue:(payload,expected)=>locked(async()=> {
-      const q=await rows();if(q.filter(x=>x.payload).length>=10) throw Error('Ten captures are waiting. Retry or discard them before capturing more.');
-      const c=await connection();
-      if(!expected||!c||c.userId!==expected.userId||c.generation!==expected.generation)throw Error('Connection changed during capture. Capture again with the connected account.');
-      const requestId=id();q.push({requestId,payload,owner:expected.userId,generation:expected.generation,queuedAt:now(),attempts:0,nextAt:0,state:'queued'});
-      await write([...q.filter(x=>x.payload),...q.filter(x=>!x.payload).slice(-20)].sort((a,b)=>a.queuedAt-b.queuedAt));return requestId;
-    }),
+    enqueue:async(payload,expected)=> {
+      let fingerprint,reconciled;
+      for(;;) {
+        const result=await locked(async()=> {
+          const q=await rows(),c=await connection();
+          if(!expected||!c||c.userId!==expected.userId||c.generation!==expected.generation)throw Error('Connection changed during capture. Capture again with the connected account.');
+          // Selected postings can share a URL. Ignore only the extraction time.
+          if(!fingerprint){
+            const content=JSON.stringify([payload.sourceUrl,payload.text,payload.title??'',payload.structured??'',payload.parserVersion]);
+            fingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(content))),byte=>byte.toString(16).padStart(2,'0')).join('');
+          }
+          const existing=q.find(row=>row.owner===expected.userId&&row.generation===expected.generation&&row.fingerprint===fingerprint);
+          if(existing?.receipt&&!existing.payload){
+            if(reconciled?.requestId!==existing.requestId)return {candidate:existing.requestId,connection:c};
+            if(reconciled.deleted)q.splice(q.indexOf(existing),1); // Keep the server deletion fence; retire only this local receipt.
+            else {
+              existing.receipt=reconciled.receipt;existing.state=reconciled.receipt.state;delete existing.message;
+              await write(q);return {requestId:existing.requestId};
+            }
+          }else if(existing)return {requestId:existing.requestId};
+          if(q.filter(x=>x.payload).length>=10) throw Error('Ten captures are waiting. Retry or discard them before capturing more.');
+          const title=(payload.title?.trim()||payload.text?.split('\n').find(line=>line.trim())?.trim()||'Job posting').slice(0,160);
+          const requestId=id();q.push({requestId,payload,fingerprint,title,sourceUrl:payload.sourceUrl,owner:expected.userId,generation:expected.generation,queuedAt:now(),attempts:0,nextAt:0,state:'queued'});
+          await write([...q.filter(x=>x.payload),...q.filter(x=>!x.payload).slice(-20)].sort((a,b)=>a.queuedAt-b.queuedAt));return {requestId};
+        });
+        if(result.requestId)return result.requestId;
+        // Network reconciliation must not hold the storage/connection lock.
+        // Only the explicit deletion fence (410) permits a fresh request.
+        try {
+          const receipt=await status(result.candidate,result.connection);
+          if(receipt?.requestId!==result.candidate||typeof receipt.jobId!=='string'||!['received','processing','ready','failed'].includes(receipt.state))throw Error('Invalid receipt');
+          reconciled={requestId:result.candidate,receipt};
+        }catch(error){
+          if(error?.status!==410)throw Error('Unable to verify the saved job. Retry capture when connected; no duplicate was created.');
+          reconciled={requestId:result.candidate,deleted:true};
+        }
+        // Re-read the row and pinned identity before reusing or replacing it.
+      }
+    },
     retry:requestId=>locked(async()=>{
       const q=await rows(),c=await connection(),row=q.find(x=>x.requestId===requestId);
       if(!row||!c||row.owner!==c.userId) throw Error('Reconnect the original account to reconcile this request.');

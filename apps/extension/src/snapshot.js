@@ -108,7 +108,11 @@ export function capturePage() {
   if(text.length>120000)throw Error('Posting exceeds capture limits. Select relevant job text or paste it in Resumora; nothing was sent.');
   if(text.length<80)throw Error('No meaningful visible job text. Open the full posting, wait for it to load, or paste the advert in Resumora. Embedded cross-origin frames require opening the original job page.');
   const structured=metadata&&!selected?JSON.stringify(metadata):undefined;
-  const title=headingText.trim().slice(0,2000);
+  // Some boards (including BestJobs) render the posting title without an h1.
+  // A browser-title segment is a label only when the same text is visible in
+  // this advert; hidden page/account titles and selected excerpts stay out.
+  const fallbackTitle=!selected?(document.title??'').split(/\s+[|–—-]\s+/).map(part=>part.trim()).find(part=>part.length>=3&&text.includes(part)):undefined;
+  const title=(headingText.trim()||fallbackTitle||'').slice(0,2000);
   const snapshot={text,sourceUrl:location.href,...(title?{title}:{}),...(structured&&structured.length<=60000?{structured}:{}),adapter,capturedAt:new Date().toISOString(),parserVersion:'1'};
   if(new TextEncoder().encode(JSON.stringify(snapshot)).length>260000)throw Error('Posting is too large. Paste the relevant job section in Resumora.');
   return snapshot;

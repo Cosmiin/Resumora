@@ -1,3 +1,4 @@
+import { openProfileDetails, openProfilePresentation } from "../test-profile";
 import {
   act,
   fireEvent,
@@ -135,7 +136,7 @@ describe("AuthShell", () => {
     ).toBe(true);
     window.history.replaceState(null, "", "/");
   });
-  it("displays actionable unavailable configuration and does not open the editor", async () => {
+  it("displays a friendly unavailable message without configuration diagnostics or opening the editor", async () => {
     const fetcher = vi.fn(async () =>
       Response.json(
         { error: { message: "Configure Worker AUTH_COOKIE_KEY." } },
@@ -147,7 +148,7 @@ describe("AuthShell", () => {
     );
     await screen.findByRole("alert");
     expect(screen.getByRole("alert").textContent).toContain(
-      "Configure Worker AUTH_COOKIE_KEY",
+      "Autentificarea nu este disponibilă momentan.",
     );
     expect(screen.queryByText("Private editor")).toBeNull();
     expect(
@@ -275,6 +276,10 @@ it.each(["network", "provider"])(
         }
         return Response.json(session);
       }
+      if (String(input) === "/v1/document-languages")
+        return Response.json({ source: null, versions: [] });
+      if (String(input).startsWith("/v1/workspace-drafts"))
+        return Response.json(null);
       return Response.json(snapshot);
     });
     let cvTransport: AuthTransport = async () => Response.json(null);
@@ -286,6 +291,7 @@ it.each(["network", "provider"])(
         }}
       </AuthShell>,
     );
+    await openProfileDetails();
     const name = await screen.findByRole("textbox", { name: /Prenume/ });
     await waitFor(() => expect((name as HTMLInputElement).value).toBe("Ana"));
     fireEvent.change(name, { target: { value: "Unsaved" } });
@@ -721,6 +727,7 @@ it.each(["session", "anonymous-session", "cv", "intelligence"])(
           cookie = "account-b-session";
           cookieCsrf = "account-b-csrf";
           account = { id: "account-b", email: "b@example.invalid" };
+          return Response.json({ user: account });
         }
         return Response.json({});
       },

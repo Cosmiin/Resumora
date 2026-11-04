@@ -7,7 +7,7 @@ const env={SUPABASE_URL:'https://synthetic.supabase.co',SUPABASE_PUBLISHABLE_KEY
 for(const [name,status,expected] of [['definite refusal',403,'STORAGE_UPLOAD_REJECTED'],['unknown backend acknowledgement',500,'STORAGE_OUTCOME_UNKNOWN']])test(name+' stays before processor/provider and a replay retains the same result',async()=>{
  let row,puts=0,processed=0,providers=0;
  const g=createDatabaseGateway(env,identity,async()=>{puts++;return Response.json({code:'AccessDenied',message:'PRIVATE_DOCUMENT_NAME_OR_TOKEN_MUST_NOT_BE_LOGGED'},{status});});
- const store={begin:async input=>{if(row)return {created:false,record:row};row={id,operationId:input.operationId,state:'uploading',format:'pdf',objectKey:`${id}/${id}/original.pdf`,review:null,error:null};return {created:true,record:row};},get:async()=>row,complete:async(_id,state,review,error)=>(row={...row,state,review,error}),putObject:g.createImportStore('').putObject};
+ const store={enqueue:async()=>assert.fail("storage failure cannot enqueue"),begin:async input=>{if(row)return {created:false,record:row};row={id,operationId:input.operationId,state:'uploading',format:'pdf',objectKey:`${id}/${id}/original.pdf`,review:null,error:null};return {created:true,record:row};},get:async()=>row,complete:async(_id,state,review,error)=>(row={...row,state,review,error}),putObject:g.createImportStore('').putObject};
  const warnings=[],original=console.warn;console.warn=(...args)=>warnings.push(args);
  try{
   const w=importWorkflow({userId:id,store,aiEnabled:true,processor:async()=>{processed++;throw Error('Unexpected processor');},operations:{extract:async()=>{providers++;}}});

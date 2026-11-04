@@ -7,7 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { App } from "../App";
+import { App } from "../test-editor-harness";
 import { Editor } from "./Editor";
 import { DocumentPreview } from "./DocumentPreview";
 import { Review as DraftReview } from "./Review";
@@ -86,7 +86,7 @@ const review: Review = {
   },
   confirmedIds: [],
 };
-it("reviews one editable section at a time, confirms only visible facts and retains original provenance and categories across save/reload", () => {
+it("reviews the complete overview, edits cards and confirms the information shown while retaining provenance across reload", () => {
   let latest: BaseDraft = importedDraft(review);
   expect(allFacts(latest).filter((f) => f.sourceClaimId)).toHaveLength(
     paths.length,
@@ -115,49 +115,51 @@ it("reviews one editable section at a time, confirms only visible facts and reta
   expect(
     screen.getByRole("heading", { name: "Name and contact" }),
   ).toBeTruthy();
-  expect(screen.queryByDisplayValue("Engineer")).toBeNull();
-  expect(
-    screen.getByDisplayValue("Synthetic Owner").closest(".review-source-field")
-      ?.textContent,
-  ).toContain("Please check");
-  fireEvent.change(screen.getByLabelText(/Name ·/), {
+  expect(screen.getByRole("heading", { name: "Engineer" })).toBeTruthy();
+  expect(screen.queryByDisplayValue("Synthetic Owner")).toBeNull();
+  fireEvent.click(
+    within(screen.getByRole("region", { name: "Name and contact" })).getByRole(
+      "button",
+      { name: "Edit" },
+    ),
+  );
+  fireEvent.change(screen.getByLabelText("Name", { exact: true }), {
     target: { value: "Edited Owner" },
   });
   expect(latest.name.sourceLineage?.[0].sourceClaimId).toBe("c0");
-  fireEvent.click(screen.getByRole("button", { name: "Confirm and continue" }));
-  expect(latest.importReview!.confirmedIds).toEqual(["c0", "c1"]);
+  fireEvent.click(
+    within(screen.getByRole("region", { name: "Certifications" })).getByRole(
+      "button",
+      { name: "Edit" },
+    ),
+  );
+  fireEvent.change(screen.getByLabelText("Start", { exact: true }), {
+    target: { value: "13/2020" },
+  });
+  expect(
+    screen.getByRole("button", { name: "Confirm and use this information" }),
+  ).toHaveProperty("disabled", true);
+  expect(screen.getByRole("alert").textContent).toContain("Correct the dates");
+  fireEvent.change(screen.getByLabelText("Start", { exact: true }), {
+    target: { value: "02/2020" },
+  });
+  fireEvent.click(
+    within(screen.getByRole("region", { name: "Other categories" })).getByRole(
+      "button",
+      { name: "Edit" },
+    ),
+  );
+  fireEvent.change(screen.getByLabelText("Title", { exact: true }), {
+    target: { value: "Honors" },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Confirm and use this information" }),
+  );
+  expect(latest.importReview!.confirmedIds).toHaveLength(paths.length);
   expect(latest.name.value).toBe("Edited Owner");
   expect(latest.importReview!.extraction.candidates[0].value).toBe(
     "Synthetic Owner",
   );
-  expect(screen.getByRole("heading", { name: "Summary" })).toBeTruthy();
-  for (let i = 0; i < 3; i++)
-    fireEvent.click(
-      screen.getByRole("button", { name: "Confirm and continue" }),
-    );
-  fireEvent.change(screen.getByLabelText(/Start/), {
-    target: { value: "13/2020" },
-  });
-  expect(
-    (
-      screen.getByRole("button", {
-        name: "Confirm and continue",
-      }) as HTMLButtonElement
-    ).disabled,
-  ).toBe(true);
-  expect(screen.getByRole("alert").textContent).toContain("Correct the date");
-  fireEvent.change(screen.getByLabelText(/Start/), {
-    target: { value: "02/2020" },
-  });
-  fireEvent.click(screen.getByRole("button", { name: "Confirm and continue" }));
-  expect(screen.getByDisplayValue("Awards")).toBeTruthy();
-  fireEvent.change(screen.getByLabelText(/Title/), {
-    target: { value: "Honors" },
-  });
-  fireEvent.click(
-    screen.getByRole("button", { name: "Confirm and open editor" }),
-  );
-  expect(latest.importReview!.confirmedIds).toHaveLength(paths.length);
   const restored = decodeDraft(encodeDraft(clone(latest)));
   expect(
     restored.optionalSections.some(
@@ -294,7 +296,7 @@ it("saves, reloads and edits a single sourced summary without inventing an entry
   expect(validateDraft(latest)).toEqual([]);
 });
 
-it("omits high-confidence fields and confirms only uncertain or specifically warned fields", () => {
+it("shows confidently extracted fields too and records explicit confirmation only after the final action", () => {
   const input = clone(review);
   input.extraction.candidates = input.extraction.candidates.slice(0, 3);
   input.extraction.candidates[0].confidence = "high";
@@ -319,23 +321,25 @@ it("omits high-confidence fields and confirms only uncertain or specifically war
     );
   }
   render(<Surface />);
-  expect(screen.queryByDisplayValue("Synthetic Owner")).toBeNull();
-  expect(screen.getByDisplayValue("owner@example.invalid")).toBeTruthy();
+  expect(screen.getByText("Synthetic Owner")).toBeTruthy();
+  expect(
+    within(
+      document.querySelector(".import-information") as HTMLElement,
+    ).getByText("owner@example.invalid"),
+  ).toBeTruthy();
   expect(screen.getByText("Email unclear")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Confirm and continue" }));
-  expect(latest.importReview!.confirmedIds).toEqual(["c1"]);
-  fireEvent.click(
-    screen.getByRole("button", { name: "Confirm and open editor" }),
-  );
-  expect(latest.importReview!.confirmedIds).toEqual(["c1", "c2"]);
   expect(latest.name.status).toBe("extracted_unconfirmed");
-  expect(latest.name.acceptance).toBe("automatic");
   expect(latest.name.confirmedAt).toBeUndefined();
-  expect(latest.name.sourceClaimId).toBe("c0");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Confirm and use this information" }),
+  );
+  expect(latest.importReview!.confirmedIds).toEqual(["c0", "c1", "c2"]);
+  expect(latest.name.status).toBe("user_confirmed");
+  expect(latest.name.confirmedAt).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Review Base CV" })).toBeNull();
 });
 
-it("opens the editor for an entirely high-confidence import without false confirmation", async () => {
+it("keeps previously saved all-automatic imports compatible without inventing historical confirmation", async () => {
   const input = clone(review);
   input.extraction.candidates = input.extraction.candidates.slice(0, 1);
   input.extraction.candidates[0].confidence = "high";
@@ -413,6 +417,7 @@ it("retains edited end dates while ongoing is toggled and confirms inactive impo
     );
   }
   render(<Surface />);
+  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
   fireEvent.change(screen.getByLabelText(/End/), { target: { value: "2022" } });
   fireEvent.change(screen.getByLabelText(/Ongoing/), {
     target: { value: "true" },
@@ -429,7 +434,7 @@ it("retains edited end dates while ongoing is toggled and confirms inactive impo
     target: { value: "true" },
   });
   fireEvent.click(
-    screen.getByRole("button", { name: "Confirm and open editor" }),
+    screen.getByRole("button", { name: "Confirm and use this information" }),
   );
   latest = decodeDraft(encodeDraft(latest));
   expect(latest.roles[0].end.value.year).toBe("2023");
@@ -637,7 +642,12 @@ it("shares persisted automatic acceptance with enrichment, wording, duration and
       <DocumentPreview draft={draft} asOf={{ year: "2026", month: "10" }} />
     </LanguageContext>,
   );
-  expect(screen.getByText(/months/).textContent).not.toContain("unreviewed");
+  expect(view.container.querySelector(".duration-note p")?.textContent).toBe(
+    "1 year",
+  );
+  expect(
+    view.container.querySelector(".document-role-duration")?.textContent,
+  ).toBe("1 an");
   view.unmount();
   const historical = clone(draft);
   for (const field of allFacts(historical, true)) delete field.acceptance;
@@ -683,7 +693,11 @@ it("stages specific prefix-like warnings and retains historical high-confidence 
     </LanguageContext>,
   );
   expect(screen.getByText(candidate.warning)).toBeTruthy();
-  expect(screen.getByDisplayValue("Synthetic Owner")).toBeTruthy();
+  expect(
+    within(
+      document.querySelector(".import-information") as HTMLElement,
+    ).getByText("Synthetic Owner"),
+  ).toBeTruthy();
   view.unmount();
   delete candidate.warning;
   const historical = importedDraft(input);
@@ -693,7 +707,11 @@ it("stages specific prefix-like warnings and retains historical high-confidence 
       <ImportReview draft={historical} disabled={false} confirm={() => {}} />
     </LanguageContext>,
   );
-  expect(screen.getByDisplayValue("Synthetic Owner")).toBeTruthy();
+  expect(
+    within(
+      document.querySelector(".import-information") as HTMLElement,
+    ).getByText("Synthetic Owner"),
+  ).toBeTruthy();
 });
 
 it("keeps a details-only custom import in one editable category without inventing a title", () => {

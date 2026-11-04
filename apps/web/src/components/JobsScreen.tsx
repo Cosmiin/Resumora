@@ -1,11 +1,9 @@
 import { JobWorkflowPanel } from "./JobWorkflow";
-import { useEffect, useRef, useState } from "react";
-import type {
-  SavedJob,
-  JobSummary,
-} from "@resumora/contracts/jobs/connected";
+import { DeleteJobButton } from "./DeleteJobButton";
+import { useContext, useEffect, useRef, useState } from "react";
+import type { SavedJob, JobSummary } from "@resumora/contracts/jobs/connected";
 import type { AuthTransport } from "../auth/AuthShell";
-import { Button, useCopy } from "./ui";
+import { Button, LanguageContext, useCopy } from "./ui";
 export function JobsScreen({
   transport,
   snapshot,
@@ -15,9 +13,10 @@ export function JobsScreen({
   transport?: AuthTransport;
   snapshot: { id: string; revision: number } | null;
   ready: boolean;
-  openCv?: (job: { id: string; label: string;locale?:"ro"|"en" }) => void;
+  openCv?: (job: { id: string; label: string; locale?: string }) => void;
 }) {
-  const t = useCopy();
+  const t = useCopy(),
+    interfaceLocale = useContext(LanguageContext);
   const [jobs, setJobs] = useState<JobSummary[]>([]),
     [selected, setSelected] = useState<SavedJob | null>(null);
   const [text, setText] = useState(""),
@@ -137,6 +136,7 @@ export function JobsScreen({
           {t("Textul anunțului", "Advert text")}
         </label>
         <textarea
+          className="native"
           id="vacancy-text"
           ref={input}
           rows={9}
@@ -149,6 +149,7 @@ export function JobsScreen({
           {t("URL sursă (opțional)", "Source URL (optional)")}
         </label>
         <input
+          className="native"
           id="vacancy-url"
           type="url"
           value={sourceUrl}
@@ -167,6 +168,7 @@ export function JobsScreen({
           onClick={() =>
             void send("/v1/jobs", {
               requestId: crypto.randomUUID(),
+              interfaceLocale,
               intake: { text, ...(sourceUrl ? { sourceUrl } : {}) },
               snapshotId: null,
               snapshotRevision: null,
@@ -178,11 +180,26 @@ export function JobsScreen({
             ? t("Se salvează…", "Saving…")
             : t("Salvează ciorna jobului", "Save job draft")}
         </Button>
-        <Button disabled={!transport||!sourceUrl.trim()||busy||!!pending.current}
-          onClick={()=>void send('/v1/jobs/url',{requestId:crypto.randomUUID(),url:sourceUrl})}>
-          {t('Importă din URL public','Import from public URL')}
+        <Button
+          disabled={
+            !transport || !sourceUrl.trim() || busy || !!pending.current
+          }
+          onClick={() =>
+            void send("/v1/jobs/url", {
+              requestId: crypto.randomUUID(),
+              interfaceLocale,
+              url: sourceUrl,
+            })
+          }
+        >
+          {t("Importă din URL public", "Import from public URL")}
         </Button>
-        <p className="small">{t('Importul public acceptă momentan Greenhouse, Ashby, Lever și SmartRecruiters când oferă un JobPosting public. Pentru alte pagini, lipește textul sau folosește extensia.','Public URL import currently reads Greenhouse, Ashby, Lever and SmartRecruiters when a public JobPosting is provided. For other pages, paste text or use the extension.')}</p>
+        <p className="small">
+          {t(
+            "Importul public acceptă momentan Greenhouse, Ashby, Lever și SmartRecruiters când oferă un JobPosting public. Pentru alte pagini, lipește textul sau folosește extensia.",
+            "Public URL import currently reads Greenhouse, Ashby, Lever and SmartRecruiters when a public JobPosting is provided. For other pages, paste text or use the extension.",
+          )}
+        </p>
         {!snapshot && (
           <p>
             {t(
@@ -203,21 +220,55 @@ export function JobsScreen({
         <h3>{t("Joburi salvate", "Saved jobs")}</h3>
         {!jobs.length && <p>{t("Niciun job încă.", "No jobs yet.")}</p>}
         {jobs.map((j) => (
-          <article key={j.id}><Button
-            disabled={busy || !!pending.current}
-            onClick={() => void detail(j.id)}
-          >
-            {j.title || t("Ciornă de revizuit", "Draft to review")} ·{" "}
-            {j.state === "reviewed"
-              ? t("Revizuit", "Reviewed")
-              : t("Ciornă", "Draft")}
-          </Button><p className="small muted">{[j.company,j.location,j.workArrangement].filter(Boolean).join(' · ')} · {t('Salvat','Saved')} {new Date(j.createdAt).toLocaleDateString()} · {j.analysisState==='ready'?t('Pregătit pentru revizuire','Ready to review'):j.analysisState==='failed'?t('Analiza necesită atenție','Analysis needs attention'):j.analysisState?t('Analiză în așteptare','Analysis pending'):t('Salvat','Saved')}</p></article>
+          <article key={j.id}>
+            <Button
+              disabled={busy || !!pending.current}
+              onClick={() => void detail(j.id)}
+            >
+              {j.title || t("Ciornă de revizuit", "Draft to review")} ·{" "}
+              {j.state === "reviewed"
+                ? t("Revizuit", "Reviewed")
+                : t("Ciornă", "Draft")}
+            </Button>
+            <p className="small muted">
+              {[j.company, j.location, j.workArrangement]
+                .filter(Boolean)
+                .join(" · ")}{" "}
+              · {t("Salvat", "Saved")}{" "}
+              {new Date(j.createdAt).toLocaleDateString()} ·{" "}
+              {j.analysisState === "ready"
+                ? t("Pregătit pentru revizuire", "Ready to review")
+                : j.analysisState === "failed"
+                  ? t("Analiza necesită atenție", "Analysis needs attention")
+                  : j.analysisState
+                    ? t("Analiză în așteptare", "Analysis pending")
+                    : t("Salvat", "Saved")}
+            </p>
+            {transport&&<DeleteJobButton jobId={j.id} title={j.title||t('Job salvat','Saved job')} transport={transport} disabled={busy||!!pending.current} onDeleted={(id)=>{setJobs(old=>old.filter(job=>job.id!==id));setSelected(old=>old?.id===id?null:old);}} />}
+          </article>
         ))}
       </section>
       <section className="card stack">
         {selected && transport ? (
-          <JobWorkflowPanel key={selected.id} job={selected} transport={transport} ready={ready} onOpenJob={id=>void detail(id)}
-            openCv={openCv?(locale)=>openCv({id:selected.id,locale,label:selected.intake.title||t('Ciornă de job','Job draft')}):undefined}/>
+          <JobWorkflowPanel
+            key={selected.id}
+            job={selected}
+            transport={transport}
+            ready={ready}
+            onOpenJob={(id) => void detail(id)}
+            openCv={
+              openCv
+                ? (locale) =>
+                    openCv({
+                      id: selected.id,
+                      locale,
+                      label:
+                        selected.intake.title ||
+                        t("Ciornă de job", "Job draft"),
+                    })
+                : undefined
+            }
+          />
         ) : (
           <p>
             {t(

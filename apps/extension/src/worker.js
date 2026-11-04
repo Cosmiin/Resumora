@@ -50,6 +50,7 @@ async function connect() {
     const challenge=encode(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier))));
     const url=new URL(cfg.appOrigin+'/extension/connect');
     for(const [k,v] of Object.entries({extensionId:chrome.runtime.id,deviceId:device,challenge,state}))url.searchParams.set(k,v);
+    await chrome.storage.session.set({pairing:{extensionId:chrome.runtime.id,deviceId:device,challenge,state,until:Date.now()+10*60*1000}});
     const callback=await chrome.identity.launchWebAuthFlow({url:url.href,interactive:true});
     if(!callback)throw Error('Connection cancelled.');
     const result=new URL(callback);
@@ -60,8 +61,21 @@ async function connect() {
       await chrome.storage.local.set({connection:{secret:paired.connection,userId:paired.userId,expiresAt:paired.expiresAt,generation}});
       await chrome.storage.session.set({token:{value:paired.accessToken,until:Date.now()+paired.expiresIn*1000,generation}});
     });
-  }finally{connecting=false;}
+  }finally{await chrome.storage.session.remove('pairing');connecting=false;}
 }
+// Only the configured connection page can verify an in-progress toolbar click.
+// This exposes no credentials and cannot initiate capture or another connection.
+chrome.runtime.onMessageExternal.addListener((message,sender,respond)=>{
+  (async()=>{
+    await ready;
+    const page=new URL(sender.url??'');
+    if(page.origin!==cfg.appOrigin || page.pathname!=='/extension/connect' || sender.origin!==cfg.appOrigin || message?.type!=='verify-connection')return {ok:false};
+    const {pairing}=await chrome.storage.session.get('pairing');
+    return {ok:!!pairing && pairing.until>Date.now() && ['extensionId','deviceId','challenge','state'].every(key=>typeof message[key]==='string'&&message[key]===pairing[key])};
+  })().then(respond,()=>respond({ok:false}));
+  return true;
+});
+const capturing=new Map();
 async function handle(message) {
   await ready;
   if(message.type==='connect'){await connect();return {connected:true};}
@@ -74,6 +88,9 @@ async function handle(message) {
     const expected={userId:c.userId,generation:c.generation};
     const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
     if(!tab?.id||!/^https?:\/\//.test(tab.url??''))throw Error('Open a job posting in a normal web tab.');
+    const key=c.generation+':'+tab.id;
+    if(capturing.has(key))return capturing.get(key);
+    const pending=(async()=>{
     const results=await chrome.scripting.executeScript({target:{tabId:tab.id},func:capturePage});
     const payload=results[0]?.result;if(!payload)throw Error('Unable to read this posting. Paste it in Resumora.');
     const requestId=await queue.enqueue(payload,expected);
@@ -81,15 +98,44 @@ async function handle(message) {
     await chrome.alarms.create('capture-delivery',{when:Date.now()+100,periodInMinutes:1});
     void queue.flush().catch(()=>{}); // Opportunistic delivery; persisted queue + alarm own recovery.
     return {requestId};
+    })();
+    capturing.set(key,pending);
+    try{return await pending;}finally{if(capturing.get(key)===pending)capturing.delete(key);}
   }
   if(message.type==='retry'){await queue.retry(message.requestId);await chrome.alarms.create('capture-delivery',{when:Date.now()+100,periodInMinutes:1});void queue.flush().catch(()=>{});}
   if(message.type==='discard')await queue.discard(message.requestId);
   const c=await connection();return {connected:!!c,account:c?.userId,rows:await queue.list(),appOrigin:cfg.appOrigin};
 }
+// Page/platform failures can contain arbitrary text. Only our known actionable
+// messages cross back to the popup; never expose an unexpected error verbatim.
+const safeErrors=new Set([
+  'Connect your Resumora account to capture jobs.',
+  'Open a job posting in a normal web tab.',
+  'Unable to read this posting. Paste it in Resumora.',
+  'Connection already in progress.', 'Connection cancelled.', 'Invalid connection response.',
+  'Connection changed',
+  'Connection changed during capture. Capture again with the connected account.',
+  'Ten captures are waiting. Retry or discard them before capturing more.',
+  'Reconnect the original account to reconcile this request.',
+  'Unable to verify the saved job. Retry capture when connected; no duplicate was created.',
+  'Connection expired or revoked. Reconnect the same account to retry.',
+  'Server busy. Retry later.',
+  'Not acknowledged. Retry or open Resumora for manual paste.',
+  'Source link is too long. Use manual paste in Resumora.',
+  'Posting exceeds capture limits. Select the relevant job text or paste it in Resumora; nothing was sent.',
+  'Posting exceeds capture limits. Select relevant job text or paste it in Resumora; nothing was sent.',
+  'Profile or account content is ambiguous. Select only the advert or paste it in Resumora; nothing was sent.',
+  'Selection exceeds capture limits. Select less text or paste it in Resumora; nothing was sent.',
+  'Selection includes profile or account content. Select only the advert or paste it in Resumora; nothing was sent.',
+  'Multiple or ambiguous jobs are visible. Select one complete advert or paste it in Resumora; nothing was sent.',
+  'No meaningful visible job text. Open the full posting, wait for it to load, or paste the advert in Resumora. Embedded cross-origin frames require opening the original job page.',
+  'Posting is too large. Paste the relevant job section in Resumora.',
+]);
+const visibleError=error=>safeErrors.has(error?.message)?error.message:'Unable to capture or complete this action. Open the full posting and try again, or paste it in Resumora. Existing queued captures remain available.';
 // Only packaged extension UI may request capture; content pages have no message entry.
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(sender.id!==chrome.runtime.id||!sender.url?.startsWith(chrome.runtime.getURL('popup.html')))return;
-  handle(message).then(result=>respond({ok:true,...result}),()=>respond({ok:false,error:'Action failed. Reconnect or retry; queued captures remain available.'}));return true;
+  handle(message).then(result=>respond({ok:true,...result}),error=>respond({ok:false,error:visibleError(error)}));return true;
 });
 chrome.alarms.onAlarm.addListener(alarm=>{if(alarm.name==='capture-delivery')return ready.then(()=>queue.flush());});
 chrome.runtime.onStartup.addListener(()=>chrome.alarms.create('capture-delivery',{when:Date.now()+1000,periodInMinutes:1}));

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Account, AuthTransport } from "../auth/AuthShell";
 
 export function storeLink(value: unknown): string | null {
@@ -55,14 +55,14 @@ export function ExtensionPage({
         requires Chrome Developer mode and does not install by opening the ZIP.
       </p>
       <ol>
-        <li>Extract the ZIP into a folder.</li>
+        <li>Extract the ZIP to get the Resumeify Extension folder.</li>
         <li>
           Open chrome://extensions, enable Developer mode, choose Load unpacked
-          and select the folder.
+          and select Resumeify Extension, the folder containing manifest.json.
         </li>
         <li>
-          Connect your existing Resumora account and approve capture-only access.
-          Each installation uses the same public extension identity.
+          Click Connect account. If you are already signed in, connection is
+          automatic; otherwise sign in with your existing Resumora account.
         </li>
         <li>
           Open the full job posting and click the toolbar. Wait for a saved
@@ -109,7 +109,9 @@ export function ExtensionPage({
           <tr>
             <td>Other sites</td>
             <td>
-              Bounded visible page text or explicit visible selection; backend extraction follows your settings. Metadata is ancillary. Live sites unverified
+              Bounded visible page text or explicit visible selection; backend
+              extraction follows your settings. Metadata is ancillary. Live
+              sites unverified
             </td>
           </tr>
         </tbody>
@@ -121,12 +123,13 @@ export function ExtensionPage({
       </p>
       <h2>Your data</h2>
       <p>
-        Bounded visible page text (or your explicit visible selection), source URL
-        and ancillary job metadata are sent. Forms, hidden content, navigation
-        and recognized account/recommendation areas are excluded. Missing fields stay unknown. No browser history, cookies,
-        passwords or CV contents are collected. AI is off. Queued local
-        snapshots expire after 24 hours and are removed after acknowledgement or
-        discard. The extension can only capture jobs and check its receipts.
+        Bounded visible page text (or your explicit visible selection), source
+        URL and ancillary job metadata are sent. Forms, hidden content,
+        navigation and recognized account/recommendation areas are excluded.
+        Missing fields stay unknown. No browser history, cookies, passwords or
+        CV contents are collected. AI is off. Queued local snapshots expire
+        after 24 hours and are removed after acknowledgement or discard. The
+        extension can only capture jobs and check its receipts.
       </p>
       <p>
         Disconnect in the extension, sign out of the connected web login, or{" "}
@@ -138,6 +141,80 @@ export function ExtensionPage({
     </main>
   );
 }
+async function authorizeConnection(
+  body: Record<string, string | null>,
+  transport: AuthTransport,
+  isCurrent: () => boolean,
+) {
+  const runtime = (
+    globalThis as typeof globalThis & {
+      chrome?: {
+        runtime?: {
+          sendMessage: (
+            extensionId: string,
+            message: unknown,
+          ) => Promise<{ ok?: boolean }>;
+        };
+      };
+    }
+  ).chrome?.runtime;
+  const updateMessage =
+    "Update the extension, then click Connect account again.";
+  if (!runtime?.sendMessage) throw Error(updateMessage);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let proof: { ok?: boolean };
+  try {
+    proof = await Promise.race([
+      runtime.sendMessage(body.extensionId!, {
+        type: "verify-connection",
+        ...body,
+      }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(Error(updateMessage)), 10000);
+      }),
+    ]);
+  } catch {
+    throw Error(updateMessage);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (proof?.ok !== true)
+    throw Error("Open the extension and click Connect account again.");
+  if (!isCurrent()) throw Error("Connection cancelled.");
+  const response = await transport("/v1/extension/authorize", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!response.ok)
+    throw Error(
+      response.status === 503
+        ? "The connection service is temporarily unavailable. Try again in a moment."
+        : response.status === 401
+          ? "Sign in to Resumora, then click Connect account again."
+          : "We couldn't connect the extension. Try again.",
+    );
+  const result = await response.json(),
+    redirect = new URL(result.redirect);
+  if (
+    redirect.origin !== `https://${body.extensionId}.chromiumapp.org` ||
+    redirect.pathname !== "/capture" ||
+    redirect.username ||
+    redirect.password ||
+    redirect.hash ||
+    redirect.searchParams.getAll("state").length !== 1 ||
+    redirect.searchParams.get("state") !== body.state ||
+    redirect.searchParams.getAll("code").length !== 1 ||
+    !/^[a-f0-9]{64}$/.test(redirect.searchParams.get("code") ?? "") ||
+    [...redirect.searchParams.keys()].some(
+      (key) => !["state", "code"].includes(key),
+    )
+  )
+    throw Error(
+      "We couldn't verify the connection. Open the extension and connect again.",
+    );
+  return redirect.href;
+}
+
 export function ExtensionConnection({
   account,
   transport,
@@ -147,13 +224,23 @@ export function ExtensionConnection({
 }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const pending = useRef<{ key: string; request: Promise<string> } | null>(
+    null,
+  );
+  const currentRequest = useRef<string | null>(null);
   const managing = window.location.pathname === "/extension/manage";
-  const params = new URLSearchParams(window.location.search);
-  const body = Object.fromEntries(
-    ["extensionId", "deviceId", "challenge", "state"].map((key) => [
-      key,
-      params.get(key),
-    ]),
+  const search = window.location.search;
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const body = useMemo(
+    () =>
+      Object.fromEntries(
+        ["extensionId", "deviceId", "challenge", "state"].map((key) => [
+          key,
+          params.get(key),
+        ]),
+      ),
+    [params],
   );
   const valid =
     Object.keys(body).every((key) => params.getAll(key).length === 1) &&
@@ -161,72 +248,92 @@ export function ExtensionConnection({
     /^[0-9a-f-]{36}$/.test(body.deviceId ?? "") &&
     /^[A-Za-z0-9_-]{43}$/.test(body.challenge ?? "") &&
     /^[A-Za-z0-9_-]{43,128}$/.test(body.state ?? "");
-  async function approve() {
+  useEffect(() => {
+    if (managing || !valid) return;
+    let active = true;
+    const key = JSON.stringify([account.id, search, retry]);
+    currentRequest.current = key;
+    setMessage("");
+    setBusy(true);
+    if (pending.current?.key !== key)
+      pending.current = {
+        key,
+        request: authorizeConnection(
+          body,
+          transport,
+          () => currentRequest.current === key,
+        ),
+      };
+    pending.current.request
+      .then((redirect) => {
+        if (active) window.location.assign(redirect);
+      })
+      .catch((error) => {
+        if (active) {
+          setMessage(error.message);
+          setBusy(false);
+        }
+      });
+    return () => {
+      active = false;
+      currentRequest.current = null;
+    };
+  }, [account.id, body, managing, retry, search, transport, valid]);
+  async function revoke() {
     if (busy) return;
     setBusy(true);
     setMessage("");
     try {
-      const response = await transport(
-        "/v1/extension/" + (managing ? "revoke" : "authorize"),
-        { method: "POST", body: JSON.stringify(managing ? {} : body) },
-      );
+      const response = await transport("/v1/extension/revoke", {
+        method: "POST",
+        body: "{}",
+      });
       if (!response.ok) throw Error();
-      if (managing)
-        setMessage(
-          "All capture connections revoked. Already saved drafts remain in your account.",
-        );
-      else {
-        const result = await response.json(),
-          redirect = new URL(result.redirect);
-        if (
-          redirect.origin !== `https://${body.extensionId}.chromiumapp.org` ||
-          redirect.pathname !== "/capture" ||
-          redirect.searchParams.get("state") !== body.state
-        )
-          throw Error();
-        window.location.assign(redirect.href);
-      }
-    } catch {
       setMessage(
-        "Could not confirm the connection change. Retry, or cancel and reconnect from the extension.",
+        "All capture connections revoked. Already saved drafts remain in your account.",
       );
+    } catch {
+      setMessage("We couldn't disconnect the extension. Try again.");
     } finally {
       setBusy(false);
     }
   }
   return (
-    <main className="auth-panel stack">
-      <h1>{managing ? "Manage capture connections" : "Connect job capture"}</h1>
-      <p>Account: {account.email}</p>
+    <main className="auth-panel stack extension-connection">
+      <h1>
+        {managing ? "Manage connected extensions" : "Connect to Resumora"}
+      </h1>
+      <p>Signed in as {account.email}</p>
       <p>
         {managing
           ? "Revoke all extension connections for this account. New captures will require connecting again."
-          : "Allow this installation to save jobs and check capture receipts. It cannot read/edit your CV or administer your account. Saved jobs may be analyzed automatically if enabled in your Resumora settings."}
+          : "Save job postings directly to your Resumora account."}
       </p>
-      {!managing && valid && (
-        <p>
-          Extension {body.extensionId} · device {body.deviceId?.slice(0, 8)} ·
-          permission jobs:capture · expires within seven days/current login
-          lifetime.
-        </p>
-      )}
       {!managing && !valid ? (
         <p role="alert">
           Invalid pairing request. Start again from the extension.
         </p>
-      ) : (
+      ) : managing ? (
         <button
           className="btn btn-primary"
           disabled={busy}
-          onClick={() => void approve()}
+          onClick={() => void revoke()}
         >
-          {managing
-            ? "Revoke all capture connections"
-            : "Allow capture-only connection"}
+          Revoke all capture connections
+        </button>
+      ) : busy ? (
+        <p role="status">Connecting your account…</p>
+      ) : null}
+      {message && <p role={managing ? "status" : "alert"}>{message}</p>}
+      {!managing && valid && message && (
+        <button
+          className="btn btn-primary"
+          onClick={() => setRetry((value) => value + 1)}
+        >
+          Try again
         </button>
       )}
-      {message && <p role="status">{message}</p>}
-      <a href="/extension">Cancel / extension information</a>
+      <a href="/extension">{managing ? "Back" : "Cancel"}</a>
     </main>
   );
 }

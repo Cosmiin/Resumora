@@ -5,16 +5,22 @@ collection, application automation, login/CAPTCHA bypass or paid AI. Scripts
 are bundled, never remote.
 
 1. Download the ZIP from your Resumora site's Extension page and extract it.
+   All extension files are inside the **Resumeify Extension** folder.
 2. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**,
-   and select that folder. Only load source you trust. This developer workflow
+   and select **Resumeify Extension**, the folder containing `manifest.json`.
+   Only load source you trust. This developer workflow
    is not a normal one-click installation for Windows/macOS Chrome users.
-3. Click Connect account, sign into your existing account on the configured
-   site, and approve capture-only access. The packaged public manifest key
+3. Click Connect account. If you are already signed in, the extension connects
+   automatically; otherwise sign into your existing account on the site.
+   The packaged public manifest key
    fixes the extension ID across installation folders and users; there is no
    per-install operator registration.
 4. On a full job posting, click the toolbar. A snapshot queues locally; a Saved
    receipt appears only after server acknowledgement. You can then close the
-   popup/navigate and capture another job. Open Resumora Jobs to review drafts.
+   popup/navigate and capture another job. Each receipt shows the posting title
+   and site, with an **Open saved job** link to its draft. The toolbar click
+   saves immediately; the popup offers a capture button only if extraction
+   failed, so opening it and clicking again cannot queue two copies.
 
 Connection lasts at most seven days/current login lifetime; ten-minute access
 credentials renew through a revocable capture-only connection. Disconnect in
@@ -25,7 +31,19 @@ delivery attempts then explicit retry. Accepted receipts continue polling even
 when acknowledgement took three attempts. Account changes require explicit
 reconciliation under the original account, never silent reassignment. A capture pins its account and connection generation
 before tab lookup/extraction; a connection change rejects enqueue. Local
-queued text is removed after acknowledgement or discard. Stored credentials
+queued text is removed after acknowledgement or discard. Identical URL and
+source content reuse the same pending request or retained saved receipt,
+including after popup closure or worker restart. Local records expire after
+24 hours; at most the newest twenty acknowledged receipts are retained.
+Before reusing an acknowledged receipt, the extension verifies its server
+status. A confirmed permanent deletion retires the local receipt and allows
+a new capture; an unavailable or ambiguous status shows an error without
+creating a second request. Changed
+posting text or metadata at the same URL creates a separate capture. Reuse
+never crosses an account or connection generation. Dismissing/discarding the
+local record allows the posting to be captured again. A content fingerprint,
+posting title and source URL remain with the receipt until it expires; full
+source text does not. Stored credentials
 and pending text are limited to trusted extension contexts.
 
 ## Site package

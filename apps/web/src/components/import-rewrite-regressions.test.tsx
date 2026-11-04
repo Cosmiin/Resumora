@@ -81,7 +81,11 @@ for (const action of ["open", "check", "upload", "cancel"] as const) {
           importStatus: vi.fn((id) => {
             if (id === "b") return current.promise;
             if ((action === "check" || action === "cancel") && aCalls++ === 0)
-              return Promise.resolve(a);
+              return Promise.resolve({
+                ...a,
+                state: "unknown" as const,
+                error: "PROCESSING_OUTCOME_UNKNOWN",
+              });
             return stale.promise;
           }),
           importDocument: vi.fn(() => stale.promise),
@@ -121,7 +125,7 @@ for (const action of ["open", "check", "upload", "cancel"] as const) {
             );
           if (action === "cancel")
             fireEvent.click(
-              screen.getByRole("button", { name: "Cancel import" }),
+              screen.getByRole("button", { name: "Upload CV again" }),
             );
         }
         start.mockClear();
@@ -143,35 +147,31 @@ for (const action of ["open", "check", "upload", "cancel"] as const) {
             }).disabled,
           ).toBe(true);
           expect(screen.getByRole("status").textContent).toContain(
-            "Preparing your CV",
+            "Opening saved import",
           );
           expect(screen.queryByRole("alert")).toBeNull();
         }
         await act(async () => current.resolve(b));
         if (!staleFirst) await settleStale();
-        expect(screen.queryByRole("status")).toBeNull();
+        expect(document.querySelector(".import-loading")).toBeNull();
         expect(screen.queryByRole("alert")).toBeNull();
         expect(
-          screen.getByRole<HTMLButtonElement>("button", {
-            name: "Check operation",
-          }).disabled,
-        ).toBe(false);
-        expect(start.mock.calls[0][0].importReview.id).toBe("source-b");
+          within(
+            document.querySelector(".import-information") as HTMLElement,
+          ).getByText("source-b"),
+        ).toBeTruthy();
+        expect(start).not.toHaveBeenCalled();
         await act(async () =>
           fireEvent.click(
-            screen.getByRole("button", { name: "Cancel import" }),
+            screen.getByRole("button", {
+              name: "Finish review",
+            }),
           ),
         );
-        expect(client.cancelImport).toHaveBeenLastCalledWith(
-          "b",
-          expect.any(AbortSignal),
-        );
-        expect(screen.getByRole("status").textContent).toContain(
-          "Import cancelled",
-        );
+        expect(start.mock.calls[0][0].importReview.id).toBe("source-b");
         expect(
-          screen.queryByRole("button", { name: "Open unconfirmed facts" }),
-        ).toBeNull();
+          vi.mocked(client.cancelImport).mock.calls.every(([id]) => id !== "b"),
+        ).toBe(true);
       });
     }
   }
@@ -207,6 +207,15 @@ it("fences earlier generations when reopening the same import", async () => {
   );
   await act(async () =>
     old.resolve({ ...row, review: review("old-generation") }),
+  );
+  expect(start).not.toHaveBeenCalled();
+  expect(
+    within(
+      document.querySelector(".import-information") as HTMLElement,
+    ).getByText("current-generation"),
+  ).toBeTruthy();
+  await act(async () =>
+    fireEvent.click(screen.getByRole("button", { name: "Finish review" })),
   );
   expect(start.mock.calls[0][0].importReview.id).toBe("current-generation");
 });

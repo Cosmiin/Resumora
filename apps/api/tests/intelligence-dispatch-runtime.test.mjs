@@ -13,13 +13,20 @@ test("native fetch dispatches configured imports, questions and rewrites without
     stdin: {
       resolveDir: fileURLToPath(new URL("../", import.meta.url)),
       contents: `
+        import { processCvImport } from './src/intelligence/import-processor.ts';
         import { configuredIntelligenceRoute } from './src/intelligence/configured.ts';
         import { SyntheticLedger } from './fixtures/synthetic-ledger.ts';
         import { blankDraft, newRole, fact } from '@resumora/contracts/editor/model';
         import { encodeDraft } from '@resumora/contracts/editor/transport';
         const rows = new Map(), reservations = new Set(), ledger = new SyntheticLedger();
         let role, snapshot;
+        const queue = [];
         const store = {
+          async enqueue(operationId, bytes) {
+            queue.push({ operationId, base64: btoa(String.fromCharCode(...bytes)) });
+            rows.get(operationId).stage = 'queued';
+            return structuredClone(rows.get(operationId));
+          },
           async begin(input) {
             if (rows.has(input.operationId)) return { created: false, record: rows.get(input.operationId) };
             const record = { ...input, id: crypto.randomUUID(), state: 'uploading',
@@ -48,6 +55,16 @@ test("native fetch dispatches configured imports, questions and rewrites without
           loadSnapshot: async id => id === snapshot.id ? snapshot : null,
           loadDraft: async () => snapshot,
         };
+        const worker = {
+          async claim() {
+            const task = queue.shift(); if (!task) return null;
+            rows.get(task.operationId).state = 'processing';
+            return { lease: task.operationId, userId: 'synthetic-owner', record: structuredClone(rows.get(task.operationId)), base64: task.base64 };
+          },
+          finish: (lease, state, review, error) => store.complete(lease, state, review, error),
+          reserve: (_lease, input) => reserve(input),
+          ledger: () => ({ durability: 'durable', begin: s => ledger.begin(s), finish: (id, r) => ledger.finish(id, r) }),
+        };
         export default { async fetch(request, env) {
           if (!snapshot) {
             const draft = blankDraft();
@@ -57,6 +74,7 @@ test("native fetch dispatches configured imports, questions and rewrites without
             snapshot = { id: crypto.randomUUID(), revision: 1, payload: encodeDraft(draft) };
           }
           const path = new URL(request.url).pathname;
+          if (path === '/synthetic/tick') return Response.json(await processCvImport(env, { store: worker }));
           if (path === '/fixture') return Response.json({ snapshotId: snapshot.id,
             revision: 1, targetId: role.id, factId: role.context.id });
           if (path === '/attempts') return Response.json(await ledger.report({ from: '2000-01-01', to: '2099-01-01' }));
@@ -73,6 +91,7 @@ test("native fetch dispatches configured imports, questions and rewrites without
   const runtime = new Miniflare(convertV4MiniflareOptions({
     modules: [{ type: "ESModule", path: "entry.mjs", contents: bundle.outputFiles[0].text }, ...bundle.wasm],
     compatibilityDate: "2026-10-25",
+    compatibilityFlags: ["nodejs_compat"],
     host: "127.0.0.1",
     port: 0,
     unsafeRegisterWorker: false,
@@ -110,7 +129,7 @@ test("native fetch dispatches configured imports, questions and rewrites without
         assert.equal(body[word ? "max_output_tokens" : "max_completion_tokens"], 300);
         output = { kind: "cv", reason: "Synthetic CV", pages: word ? [] : [1] };
       } else if (body.model.endsWith("strong")) {
-        assert.equal(body[word ? "max_output_tokens" : "max_completion_tokens"], 8000);
+        assert.equal(body[word ? "max_output_tokens" : "max_completion_tokens"], 40000);
         output = {
           schemaVersion: "cv-extraction/1",
           candidates: [{ id: "name", path: "name", value: "Mara Ionescu", quote: "Mara Ionescu",
@@ -120,7 +139,7 @@ test("native fetch dispatches configured imports, questions and rewrites without
       } else {
         // Exercise direct Chat fallback as well as the primary Chat/Word paths.
         if (url.hostname === "openrouter.ai") return RuntimeResponse.json({}, { status: 503 });
-        assert.equal(body.max_completion_tokens, 1800);
+        assert.equal(body.max_completion_tokens, schema.properties.questions ? 16000 : 1800);
         output = schema.properties.questions ? {
           schemaVersion: "career-question-plan/1", targetId: payload.targetId,
           questions: [{ id: "q", dimension: "ownership", text: "Which part did you do?",
@@ -152,9 +171,14 @@ test("native fetch dispatches configured imports, questions and rewrites without
           "X-Operation-Id": operationId, "X-Expected-Revision": "0" },
         body: bytes,
       });
+      const beforeUpload = calls.length;
       const response = await upload();
-      const result = await response.json();
+      const receipt = await response.json();
       assert.equal(response.status, 200);
+      assert.equal(receipt.state, "uploaded");
+      assert.equal(calls.length, beforeUpload, "intake must not dispatch");
+      assert.deepEqual(await (await fetch(origin + "/synthetic/tick")).json(), { processed: 1 });
+      const result = await (await fetch(origin + "/v1/intelligence/imports/" + operationId)).json();
       assert.equal(result.state, "ready", JSON.stringify({ format, result, calls }));
       assert.deepEqual(result.review.confirmedIds, []);
       assert.equal(result.review.extraction.candidates[0].value, "Mara Ionescu");

@@ -4,7 +4,17 @@ test('actual worker handlers pair, persist capture after UI message, revoke, and
   const local={},session={},listeners={},network=[];
   const storage=object=>({get:async key=>({[key]:structuredClone(object[key])}),set:async value=>Object.assign(object,structuredClone(value)),remove:async key=>{delete object[key];},setAccessLevel:async options=>assert.equal(options.accessLevel,'TRUSTED_CONTEXTS')});
   const ext='a'.repeat(32),owner='11111111-1111-4111-8111-111111111111';let revoked=false,exchanges=0,pairedOwner=owner;
-  const chrome={runtime:{id:ext,getURL:path=>'chrome-extension://'+ext+'/'+path,onMessage:{addListener:fn=>listeners.message=fn},onStartup:{addListener:()=>{}},onInstalled:{addListener:()=>{}}},storage:{local:storage(local),session:storage(session)},identity:{getRedirectURL:()=>`https://${ext}.chromiumapp.org/`,launchWebAuthFlow:async({url})=>{const parsed=new URL(url);assert.equal(parsed.origin,'http://127.0.0.1:5173');assert.equal(parsed.searchParams.get('challenge').length,43);return `https://${ext}.chromiumapp.org/capture?code=${'c'.repeat(64)}&state=${parsed.searchParams.get('state')}`;}},tabs:{query:async()=>[{id:1,url:'https://example.invalid/job'}]},scripting:{executeScript:async()=>[{result:{text:'Synthetic job snapshot',sourceUrl:'https://example.invalid/job',adapter:'generic',parserVersion:'1',capturedAt:'2026-10-28T00:00:00Z'}}]},alarms:{create:async()=>{},onAlarm:{addListener:fn=>listeners.alarm=fn}}};
+  const external=(message,sender)=>new Promise(resolve=>{const accepted=listeners.external(message,sender,resolve);if(!accepted)resolve(undefined);});
+  const chrome={runtime:{id:ext,getURL:path=>'chrome-extension://'+ext+'/'+path,onMessage:{addListener:fn=>listeners.message=fn},onMessageExternal:{addListener:fn=>listeners.external=fn},onStartup:{addListener:()=>{}},onInstalled:{addListener:()=>{}}},storage:{local:storage(local),session:storage(session)},identity:{getRedirectURL:()=>`https://${ext}.chromiumapp.org/`,launchWebAuthFlow:async({url})=>{const parsed=new URL(url);assert.equal(parsed.origin,'http://127.0.0.1:5173');assert.equal(parsed.searchParams.get('challenge').length,43);
+    const body=Object.fromEntries(parsed.searchParams),message={type:'verify-connection',...body},sender={url:parsed.href,origin:parsed.origin};
+    assert.deepEqual(await external(message,sender),{ok:true});
+    assert.deepEqual(await external({...message,state:'B'.repeat(43)},sender),{ok:false});
+    assert.deepEqual(await external({...message,deviceId:owner},sender),{ok:false});
+    for(const url of ['https://evil.invalid/extension/connect','http://127.0.0.1:5174/extension/connect','http://127.0.0.1:5173/other'])assert.deepEqual(await external(message,{url,origin:new URL(url).origin}),{ok:false});
+    assert.deepEqual(await external({...message,type:'capture'},sender),{ok:false});
+    const until=session.pairing.until;session.pairing.until=Date.now()-1;
+    assert.deepEqual(await external(message,sender),{ok:false});session.pairing.until=until;
+    return `https://${ext}.chromiumapp.org/capture?code=${'c'.repeat(64)}&state=${parsed.searchParams.get('state')}`;}},tabs:{query:async()=>[{id:1,url:'https://example.invalid/job'}]},scripting:{executeScript:async()=>[{result:{text:'Synthetic job snapshot',sourceUrl:'https://example.invalid/job',adapter:'generic',parserVersion:'1',capturedAt:'2026-10-28T00:00:00Z'}}]},alarms:{create:async()=>{},onAlarm:{addListener:fn=>listeners.alarm=fn}}};
   chrome.alarms.get=async()=>undefined;
   const previousChrome=globalThis.chrome,previousFetch=globalThis.fetch;globalThis.chrome=chrome;
   globalThis.fetch=async(url,init)=>{
@@ -20,8 +30,24 @@ test('actual worker handlers pair, persist capture after UI message, revoke, and
   try{
     await import('../src/worker.js');
     const send=message=>new Promise(resolve=>listeners.message(message,{id:ext,url:`chrome-extension://${ext}/popup.html`},resolve));
-    assert.equal((await send({type:'connect'})).ok,true);assert.equal(local.connection.userId,owner);assert.match(local.connection.secret,/^[a-f0-9]{64}$/);
-    const queued=await send({type:'capture'});assert.ok(queued.requestId);assert.ok(local.queue.some(row=>row.requestId===queued.requestId));
+    assert.match((await send({type:'capture'})).error,/Connect your Resumora account/);
+    assert.equal((await send({type:'connect'})).ok,true);assert.equal(local.connection.userId,owner);assert.match(local.connection.secret,/^[a-f0-9]{64}$/);assert.equal(session.pairing,undefined);
+    assert.deepEqual(await external({type:'verify-connection'}, {url:'http://127.0.0.1:5173/extension/connect',origin:'http://127.0.0.1:5173'}),{ok:false});
+    // A rapid second toolbar/popup dispatch shares the same extraction and request.
+    const originalExtract=chrome.scripting.executeScript;let releaseCapture,extractions=0;
+    const captureGate=new Promise(resolve=>releaseCapture=resolve);
+    chrome.scripting.executeScript=async()=>{extractions++;await captureGate;return originalExtract();};
+    const firstCapture=send({type:'capture'}),secondCapture=send({type:'capture'});
+    for(let n=0;n<10;n++)await new Promise(resolve=>setImmediate(resolve));releaseCapture();
+    const [queued,overlapping]=await Promise.all([firstCapture,secondCapture]);
+    chrome.scripting.executeScript=originalExtract;
+    assert.ok(queued.requestId);assert.equal(overlapping.requestId,queued.requestId);assert.equal(extractions,1);assert.equal(local.queue.length,1);
+    const reopened=await send({type:'capture'});assert.equal(reopened.requestId,queued.requestId);assert.equal(local.queue.length,1);
+    chrome.scripting.executeScript=async()=>{throw Error('Multiple or ambiguous jobs are visible. Select one complete advert or paste it in Resumora; nothing was sent.');};
+    assert.match((await send({type:'capture'})).error,/Select one complete advert/);
+    chrome.scripting.executeScript=async()=>{throw Error('SECRET_UNTRUSTED_PLATFORM_ERROR');};
+    assert.doesNotMatch((await send({type:'capture'})).error,/SECRET_UNTRUSTED/);
+    chrome.scripting.executeScript=originalExtract;
     // Popup is gone; alarm/runtime processing still uses persisted queue.
     await listeners.alarm({name:'capture-delivery'});
     for(let i=0;i<20&&!local.queue[0].receipt;i++)await new Promise(resolve=>setImmediate(resolve));

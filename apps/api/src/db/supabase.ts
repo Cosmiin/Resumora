@@ -1,4 +1,7 @@
+import { jobLocaleKey } from '../jobs/locale.ts';
+import { draftKinds, validateWorkspaceValue } from '@resumora/contracts/editor/workspace';
 import { languageGateway } from "./languages.ts";
+import { workspaceGateway } from "./workspace.ts";
 import { decodeDraft } from "@resumora/contracts/editor/transport";
 import type { CurrentJobWrite,CurrentJobDocument } from "@resumora/contracts/jobs/current-document";
 import type { JobWorkflow,WorkflowOperation,Vacancy } from "@resumora/contracts/jobs/workflow";
@@ -17,6 +20,7 @@ import type {
   JobSave,
   SavedJob,
   JobSummary,
+  JobDeletion,
 } from "@resumora/contracts/jobs/connected";
 import type { AttemptStart, AttemptResult, Attempt } from "../ai/ledger.ts";
 import { boundedJson } from "../ai/http.ts";
@@ -208,8 +212,21 @@ export function createDatabaseGateway(
         throw new DatabaseError(response.status, "UNAUTHORIZED");
       throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
     }
-    const currentDocument=(v:unknown)=>{if(!record(v)||typeof v.id!=='string'||!uuid.test(v.id)||typeof v.documentId!=='string'||!uuid.test(v.documentId)||!positiveRevision(v.revision)||!['ro','en'].includes(String(v.locale))||typeof v.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(v.fingerprint)||!record(v.provenance)||!record(v.payload))return false;try{decodeDraft(v.payload as unknown as EditorWireEnvelope);return true;}catch{return false;}};
+    const currentDocument=(v:unknown)=>{if(!record(v)||typeof v.id!=='string'||!uuid.test(v.id)||typeof v.documentId!=='string'||!uuid.test(v.documentId)||!positiveRevision(v.revision)||!jobLocaleKey(v.locale)||typeof v.fingerprint!=='string'||!/^[a-f0-9]{64}$/.test(v.fingerprint)||!record(v.provenance)||!record(v.payload))return false;try{decodeDraft(v.payload as unknown as EditorWireEnvelope);return true;}catch{return false;}};
+    const workspaceDraft = (v: unknown) => {
+      if (!record(v) || typeof v.id !== 'string' || !uuid.test(v.id) ||
+          !draftKinds.includes(v.kind as typeof draftKinds[number]) || !positiveRevision(v.revision) ||
+          typeof v.updatedAt !== 'string' || !Number.isFinite(Date.parse(v.updatedAt)) ||
+          !(v.submittedJobId == null || (typeof v.submittedJobId === 'string' && uuid.test(v.submittedJobId)))) return false;
+      try { validateWorkspaceValue(v.kind as typeof draftKinds[number], v.value); return true; } catch { return false; }
+    };
     const valid =
+      name === 'delete_target_job' ? record(result) && result.jobId === args.p_job && result.deleted === true
+      : name === 'get_pending_cv_import' ? result === null || record(result)
+      : name === 'list_workspace_drafts' ? Array.isArray(result) && result.length <= 100 && result.every(workspaceDraft)
+      : name === 'get_workspace_draft' ? result === null || workspaceDraft(result)
+      : name === 'get_workspace_operation' ? result === null || record(result)
+      :
       name === "load_base_state" ? isBaseLifecycle(result) && "snapshot" in result && (result.snapshot === null || isSnapshot(result.snapshot))
       : name === "remove_base_cv" ? isBaseLifecycle(result) && "removed" in result && result.removed === true
       : name === "base_removal_objects" ? Array.isArray(result) && result.length <= 20 && result.every((v) => record(v) && ["cv-imports", "cv-photos"].includes(String(v.bucket)) && typeof v.objectKey === "string")
@@ -299,7 +316,7 @@ export function createDatabaseGateway(
     return response;
   }
   function photoStorageDiagnostic(response: Response, operation: "write" | "read", detail: unknown) {
-    const codes = new Set(["AccessDenied", "InvalidJWT", "InvalidSignature", "InvalidRequest", "NoSuchBucket", "EntityTooLarge", "DatabaseError", "InternalError", "InternalServerError", "InvalidMimeType", "KeyAlreadyExists", "ResourceAlreadyExists", "ResourceNotFound", "Duplicate"]);
+    const codes = new Set(["AccessDenied", "InvalidJWT", "InvalidSignature", "InvalidRequest", "NoSuchBucket", "NoSuchKey", "not_found", "EntityTooLarge", "DatabaseError", "InternalError", "InternalServerError", "InvalidMimeType", "KeyAlreadyExists", "ResourceAlreadyExists", "ResourceNotFound", "Duplicate"]);
     const candidate = record(detail) ? detail.code ?? detail.error : undefined;
     console.warn("photo-storage-response", { operation, httpStatus: response.status, code: typeof candidate === "string" && codes.has(candidate) ? candidate : "UNCLASSIFIED" });
   }
@@ -425,16 +442,18 @@ export function createDatabaseGateway(
       return bytes;
     }),
     ...languageGateway(rpc),
-    saveJobUrl:(requestId:string,url:string)=>rpc<SavedJob>('save_target_url',{p_key:key(requestId),p_url:url}),
+    ...workspaceGateway(rpc),
+    saveJobUrl:(requestId:string,url:string,interfaceLocale?:'ro'|'en')=>rpc<SavedJob>(interfaceLocale===undefined?'save_target_url':'save_target_url_with_locale',{p_key:key(requestId),p_url:url,...(interfaceLocale===undefined?{}:{p_interface_locale:interfaceLocale})}),
     linkJobSourceVersion:(i:{requestId:string;jobId:string;parentId:string;revision:number})=>rpc<JobWorkflow>('link_job_source_version',{p_key:key(i.requestId),p_job:key(i.jobId),p_parent:key(i.parentId),p_revision:revision(i.revision)}),
     getJobWorkflow:(jobId:string)=>rpc<JobWorkflow>('get_job_workflow',{p_job:key(jobId)}),
     reviewJobWorkflow:(i:{requestId:string;jobId:string;revision:number;value:Vacancy})=>rpc<JobWorkflow>('review_job_workflow',{p_key:key(i.requestId),p_job:key(i.jobId),p_revision:revision(i.revision),p_value:i.value}),
-    requestJobWorkflow:(i:{requestId:string;jobId:string;kind:string;revision:number;targetId?:string;locale?:'ro'|'en'})=>rpc<WorkflowOperation>('request_job_workflow',{p_key:key(i.requestId),p_job:key(i.jobId),p_kind:i.kind,p_revision:revision(i.revision),p_target:i.targetId??null,p_locale:i.locale??null}),
+    requestJobWorkflow:(i:{requestId:string;jobId:string;kind:string;revision:number;targetId?:string;locale?:string;interfaceLocale?:'ro'|'en'})=>rpc<WorkflowOperation>(i.interfaceLocale===undefined?'request_job_workflow':'request_job_workflow_with_locale',{...(i.interfaceLocale===undefined?{}:{p_interface_locale:i.interfaceLocale}),p_key:key(i.requestId),p_job:key(i.jobId),p_kind:i.kind,p_revision:revision(i.revision),p_target:i.targetId??null,p_locale:i.locale===undefined?null:jobLocaleKey(i.locale)}),
     cancelJobWorkflow:(jobId:string,operationId:string)=>rpc('cancel_job_workflow',{p_job:key(jobId),p_operation:key(operationId)}),
     jobWorkflowAction:(i:{requestId:string;jobId:string;revision:number;id:string;state:string})=>rpc<JobWorkflow>('job_workflow_action',{p_key:key(i.requestId),p_job:key(i.jobId),p_revision:revision(i.revision),p_id:i.id,p_state:i.state}),
     acceptJobTailor:(i:{requestId:string;jobId:string;operationId:string;documentId:string|null;expectedRevision:number;payload:JobEditorPayload})=>rpc<JobEditorVersion>('accept_job_tailor',{p_key:key(i.requestId),p_job:key(i.jobId),p_operation:key(i.operationId),p_document:i.documentId===null?null:key(i.documentId),p_expected_revision:revision(i.expectedRevision),p_payload:i.payload}),
     saveJob: (input: JobSave) =>
-      rpc<SavedJob>("save_target_job", {
+      rpc<SavedJob>(input.interfaceLocale===undefined?"save_target_job":"save_target_job_with_locale", {
+        ...(input.interfaceLocale===undefined?{}:{p_interface_locale:input.interfaceLocale}),
         p_key: key(input.requestId),
         p_snapshot: input.snapshotId === null ? null : key(input.snapshotId),
         p_revision: input.snapshotRevision === null ? null : revision(input.snapshotRevision),
@@ -455,6 +474,7 @@ export function createDatabaseGateway(
         p_company: input.company,
         p_requirements: input.requirements,
       }),
+    deleteJob: (input:{requestId:string;jobId:string}) => rpc<JobDeletion>('delete_target_job',{p_key:key(input.requestId),p_job:key(input.jobId).toLowerCase()}),
     listJobs: () => rpc<JobSummary[]>("list_target_jobs", {}),
     getJob: (id: string) =>
       rpc<SavedJob | null>("get_target_job", { p_job: key(id) }),
@@ -603,12 +623,12 @@ export function createDatabaseGateway(
       profileVersionId: string;
       jobVersionId: string;
       layout: Record<string, unknown>;
-      locale: "ro" | "en";
+      locale: string;
       tailored: boolean;
     }) => {
       if (
         typeof input.tailored !== "boolean" ||
-        !["ro", "en"].includes(input.locale)
+        !jobLocaleKey(input.locale)
       )
         throw new DatabaseError(400, "INVALID_REQUEST");
       return rpc<{
@@ -623,7 +643,7 @@ export function createDatabaseGateway(
         p_profile_version: key(input.profileVersionId),
         p_job_version: key(input.jobVersionId),
         p_layout: input.layout,
-        p_locale: input.locale,
+        p_locale: jobLocaleKey(input.locale),
         p_tailored: input.tailored,
       });
     },
@@ -637,8 +657,8 @@ export function createDatabaseGateway(
         "job_editor_context",
         { p_job: key(jobId) },
       ),
-    loadCurrentJobDocument:(jobId:string,locale?:string)=>rpc<CurrentJobDocument|null>('load_current_job_document',{p_job:key(jobId),p_locale:locale??null}),
-    saveCurrentJobDocument:(i:CurrentJobWrite)=>rpc<CurrentJobDocument>('save_current_job_document',{p_key:key(i.requestId),p_job:key(i.jobId),p_locale:i.locale,p_document:i.documentId===null?null:key(i.documentId),p_expected_revision:revision(i.expectedRevision),p_payload:i.payload,p_base_snapshot:i.baseSnapshotId,p_provenance:i.provenance??null,p_operation:i.operationId??null}),
+    loadCurrentJobDocument:(jobId:string,locale?:string)=>rpc<CurrentJobDocument|null>('load_current_job_document',{p_job:key(jobId),p_locale:locale===undefined?null:jobLocaleKey(locale)}),
+    saveCurrentJobDocument:(i:CurrentJobWrite)=>rpc<CurrentJobDocument>('save_current_job_document',{p_key:key(i.requestId),p_job:key(i.jobId),p_locale:jobLocaleKey(i.locale),p_document:i.documentId===null?null:key(i.documentId),p_expected_revision:revision(i.expectedRevision),p_payload:i.payload,p_base_snapshot:i.baseSnapshotId,p_provenance:i.provenance??null,p_operation:i.operationId??null}),
     loadJobEditor: (jobId: string, documentId?: string, versionId?: string) => {
       if ((documentId === undefined) !== (versionId === undefined))
         throw new DatabaseError(400, "INVALID_REQUEST");

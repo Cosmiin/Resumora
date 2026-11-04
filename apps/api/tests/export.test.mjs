@@ -42,3 +42,15 @@ test('actual PDF byte validator rejects missing text/Unicode, active content and
  doc.catalog.set(PDFName.of('OpenAction'),doc.context.obj({S:PDFName.of('JavaScript'),JS:PDFString.of('untrusted')}));
  await assert.rejects(inspectExportPdf(await doc.save()),/ACTIVE_CONTENT/);
 });
+test('French and default-locale aliases keep job export pins and reach the configured availability guard',async()=>{
+ for(const [inputLocale,storedLocale] of [['FR-ca','fr-CA'],['EN-gb','en']]){
+  const db=gateway();let requested;
+  db.loadCurrentJobDocument=async(_job,locale)=>{requested=locale;return {id,documentId:id,revision:1,locale:storedLocale,fingerprint:'a'.repeat(64),payload};};
+  const result=await exportRoute(request({kind:'job',jobId:id,documentId:id,versionId:id,revision:1,locale:inputLocale,fingerprint:'a'.repeat(64)}),db,{});
+  assert.equal(result.status,503);assert.equal((await result.json()).error.code,'pdfExportUnavailable');assert.equal(requested,storedLocale);
+ }
+});
+test('export filename follows the inferred or translated document locale',()=>{
+ const d=decodeDraft(payload);d.contentLanguage={locale:'fr-CA',confidence:'high',source:'import',policyVersion:'cv-language/1'};
+ assert.match(exportFilename(d),/FR-CA\.pdf$/);
+});

@@ -25,6 +25,23 @@ const response = (provider = 'openrouter', overrides = {}, status = 200) => Resp
 const options = overrides => ({ execution: 'synthetic', primary, fallback, evidence: [approval(primary), approval(fallback)],
   ledger: new SyntheticLedger(), transport: async () => response(), ...overrides });
 
+test('structured interactive wording streams on both primary and fallback without bypassing settlement', async () => {
+ for (const failPrimary of [false,true]) {
+  const seen=[],sent=[];
+  const task={operationId:'synthetic-operation',userId:'synthetic-owner',operation:'cv_rewrite',tier:'career',promptVersion:'experience-role/1',system:'Synthetic',input:{},schema:{},maxOutputTokens:1800,onDraft:text=>seen.push(text)};
+  const run=prepareEnhancement(options({structured:{request:task,validate:v=>v},transport:async(url,init)=>{
+   const body=JSON.parse(init.body);sent.push({url,body});assert.equal(body.stream,true);assert.equal(body.stream_options.include_usage,true);
+   if(failPrimary&&sent.length===1)return new Response('',{status:503});
+   const content=JSON.stringify({text:'Maintained reports.',factIds:['fact-1']});
+   const chunks=[{id:'stream-result',model:body.model,choices:[{index:0,delta:{content},finish_reason:'stop'}]},
+    {id:'stream-result',choices:[],usage}];
+   return new Response(chunks.map(c=>`data: ${JSON.stringify(c)}\n\n`).join('')+'data: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});
+  }}));
+  const result=await run.propose(input());assert.equal(result.output.text,'Maintained reports.');assert.equal(result.attempts.length,failPrimary?2:1);assert.equal(seen.at(-1),'Maintained reports.');assert.equal(seen.filter(x=>x==='').length,failPrimary?2:1);
+  assert.equal(result.attempts.at(-1).result.status,'completed');
+ }
+});
+
 test('fail closed for absent/expired/incomplete/non-EU/model-mismatched route evidence before transport', async () => {
   for (const evidence of [[], [approval(primary)], [{ ...approval(primary), countries: ['CH'] }, approval(fallback)],
     [{ ...approval(primary), countries: ['GB'] }, approval(fallback)], [{ ...approval(primary), countries: ['NO'] }, approval(fallback)],
@@ -298,8 +315,9 @@ test('optional reasoning effort is snapshotted for ordinary Chat attempts and op
     assert.equal(calls.length, 2); assert.ok(result.proposal);
     for (const attempt of result.attempts) {
       const fingerprint = JSON.parse(attempt.requestFingerprint);
-      assert.equal(fingerprint.length, effort === undefined ? 4 : 5);
-      if (effort !== undefined) assert.deepEqual(fingerprint[4], { reasoningEffort: effort });
+      assert.equal(fingerprint.length, effort === undefined ? 5 : 6);
+      assert.equal(fingerprint[3], "ro");
+      if (effort !== undefined) assert.deepEqual(fingerprint[5], { reasoningEffort: effort });
       assert.equal(attempt.requestFingerprint.includes(context.facts[0].text), false);
     }
     assert.equal((await runner.propose(input())).attempts.length, 1);
@@ -309,4 +327,24 @@ test('optional reasoning effort is snapshotted for ordinary Chat attempts and op
 test('invalid effort fails runner preparation before ledger or transport access', () => {
   for (const effort of [null, false, '', 'None', ' low', 'ultra', {}])
     assert.throws(() => prepareEnhancement(options({ reasoningEffort: effort, ledger: {}, transport: () => assert.fail('No transport') })), /INVALID_REASONING_EFFORT/);
+});
+test('an exhausted total deadline cannot open another paid fallback even with a coarse clock',async(t)=>{
+ const fixed=Date.now();t.mock.method(Date,'now',()=>fixed);let calls=0;
+ const result=await prepareEnhancement(options({attemptTimeoutMs:50,totalTimeoutMs:5,transport:async()=>{calls++;return new Promise(()=>{});}})).propose(input());
+ assert.equal(calls,1);assert.equal(result.attempts.length,1);assert.equal(result.attempts[0].result.errorCode,'TIMEOUT');
+});
+
+test('40K output is permitted only for CV extraction and reaches the provider unchanged',async()=>{
+ for(const [operation,tier,maxOutputTokens,allowed] of [['cv_parse','extraction',40000,true],['cv_parse','extraction',40001,false],['cv_parse','admission',40000,false],['cv_rewrite','career',40000,false]]){
+  const i=input();let calls=0;
+  const task={operationId:i.operationId,userId:i.userId,operation,tier,promptVersion:'cv.extract.synthetic',system:'Synthetic request',input:{},schema:{type:'object'},maxOutputTokens};
+  const runner=prepareEnhancement(options({structured:{request:task,validate:v=>v},transport:async(_url,init)=>{calls++;assert.equal(JSON.parse(init.body).max_completion_tokens,40000);return response();}}));
+  if(allowed){assert.ok((await runner.propose(i)).output);assert.equal(calls,1);}else{await assert.rejects(runner.propose(i),/INVALID_CONTEXT/);assert.equal(calls,0);}
+ }
+});
+test('CV extraction accepts a complete response beyond the old 256 KiB reader limit',async()=>{
+ const i=input(),payload={blob:'€'.repeat(100000)},body=JSON.stringify({id:'large-response',model:primary.model,usage,choices:[{finish_reason:'stop',message:{content:JSON.stringify(payload)}}]});assert.ok(Buffer.byteLength(body)>262144);
+ const task={operationId:i.operationId,userId:i.userId,operation:'cv_parse',tier:'extraction',promptVersion:'cv.extract.synthetic',system:'Synthetic request',input:{},schema:{type:'object'},maxOutputTokens:40000};
+ const runner=prepareEnhancement(options({structured:{request:task,validate:v=>v},transport:async()=>new Response(body,{headers:{'Content-Type':'application/json'}})}));
+ assert.deepEqual((await runner.propose(i)).output,payload);
 });

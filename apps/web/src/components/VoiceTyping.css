@@ -1,0 +1,31 @@
+.voice-typing {
+  display: grid;
+  gap: 0.4rem;
+}
+.voice-typing-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.voice-typing-controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.voice-typing small,
+.voice-typing [role="status"] {
+  font-size: 0.8rem;
+  color: var(--muted, #536b69);
+}
+.voice-typing p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.voice-typing[data-recording="true"] .voice-typing-controls { border-left: 3px solid var(--rose-700, #a54444); padding-left: 8px; }
+.voice-typing[data-recording="true"] .voice-typing-controls [role="status"]::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--rose-700, #a54444); animation: voice-pulse 1s ease-in-out infinite; }
+.voice-live-preview { padding: 8px 12px; border-radius: 6px; background: var(--sage-50, #eef5f2); color: var(--sage-900, #193b39); overflow-wrap: anywhere; }
+.voice-typing-overflow textarea { width: 100%; }
+@keyframes voice-pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .voice-typing[data-recording="true"] .voice-typing-controls [role="status"]::before { animation: none; } }

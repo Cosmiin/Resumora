@@ -1,3 +1,10 @@
+import {
+  ProfileEditorContext,
+  ProfileRole,
+  ExperienceJourney,
+  profileSectionStates,
+} from "./ProfileOverview";
+import { experienceDuration, formatExperienceDuration } from "../base/dates";
 import { answerEvidenceText } from "@resumora/contracts/intelligence/model";
 import { jobEditorFacts } from "@resumora/contracts/jobs/documents";
 import {
@@ -7,7 +14,23 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { Info, Plus, X } from "lucide-react";
+import {
+  Info,
+  Plus,
+  X,
+  UserRound,
+  FileText,
+  BriefcaseBusiness,
+  UsersRound,
+  Wrench,
+  GraduationCap,
+  Languages,
+  Award,
+  FolderKanban,
+  HeartHandshake,
+  LayoutList,
+  type LucideIcon,
+} from "lucide-react";
 import {
   isAccepted,
   clone,
@@ -26,6 +49,7 @@ import {
 } from "../base/model";
 import {
   patchFact,
+  contributionMarkup,
   moveItem,
   focusField,
   focusFirstField,
@@ -40,6 +64,39 @@ import { Button, Field, LanguageContext, issueText, useCopy } from "./ui";
 import { ChipInput, Sortable, Visibility } from "./InlineControls";
 import { Contributions } from "./Contributions";
 import { MonthYearField } from "./MonthYearField";
+
+const profileIcons: Record<string, LucideIcon> = {
+  identity: UserRound,
+  summary: FileText,
+  experience: BriefcaseBusiness,
+  professionalSkills: UsersRound,
+  technicalSkills: Wrench,
+  education: GraduationCap,
+  languages: Languages,
+  certifications: Award,
+  projects: FolderKanban,
+  volunteering: HeartHandshake,
+  custom: LayoutList,
+};
+function ProfileCategoryIcon({
+  section,
+  draft,
+}: {
+  section: string;
+  draft: BaseDraft;
+}) {
+  const kind =
+    draft.optionalSections.find((s) => s.id === section)?.kind ?? section;
+  const Icon = profileIcons[kind] ?? LayoutList;
+  return (
+    <Icon
+      className="profile-category-icon"
+      size={20}
+      aria-hidden="true"
+      focusable="false"
+    />
+  );
+}
 
 type Props = {
   jobMode?: boolean;
@@ -57,9 +114,36 @@ export function Editor({
 }: Props) {
   const t = useCopy(),
     locale = useContext(LanguageContext);
-  const [opened, setOpened] = useState<string | null>("identity");
+  const profile = useContext(ProfileEditorContext);
+  const [opened, setOpened] = useState<string | null>(
+    profile ? null : "identity",
+  );
+  const states = profile ? profileSectionStates(d, profile.asOf) : {};
+  const sectionOrder = profile
+    ? [
+        ...new Set([
+          "identity",
+          "summary",
+          "experience",
+          "professionalSkills",
+          "technicalSkills",
+          "education",
+          ...d.presentation.order,
+        ]),
+      ]
+    : d.presentation.order;
+  useEffect(() => {
+    if (!profile?.enrichTarget) return;
+    const section = d.roles.some((r) => r.id === profile.enrichTarget)
+      ? "experience"
+      : d.optionalSections.find((s) =>
+          s.entries.some((e) => e.id === profile.enrichTarget),
+        )?.id;
+    if (section) setOpened(section);
+  }, [profile?.enrichTarget]);
   const [entryOpen, setEntryOpen] = useState<string | null>(null);
   useEffect(() => {
+    if (profile) return;
     const frame = requestAnimationFrame(() => {
       if (document.activeElement?.closest("[data-editor]")) return;
       const fields = Array.from(
@@ -204,7 +288,7 @@ export function Editor({
   }
   function open(section: string) {
     setOpened(opened === section ? null : section);
-    if (opened !== section) focusFirstField(`section-${section}`);
+    if (!profile && opened !== section) focusFirstField(`section-${section}`);
   }
   function metadata(section: string) {
     return (
@@ -419,14 +503,7 @@ export function Editor({
   }
   const [secondTitle, setSecondTitle] = useState(false);
   function contributions(role: BaseDraft["roles"][number]) {
-    const node = document.createElement("div");
-    for (const b of role.bullets) {
-      const p = document.createElement("p");
-      p.dataset.contribution = b.fieldId;
-      p.textContent = b.value;
-      node.append(p);
-    }
-    const html = d.presentation.contributionHtml?.[role.id] ?? node.innerHTML;
+    const html = contributionMarkup(d, role.id);
     return box(
       `${role.id}-contributions`,
       t("Contribuții", "Contributions"),
@@ -471,70 +548,85 @@ export function Editor({
               })
             }
           >
-            <details
-              id={`entry-${r.id}`}
-              className="inline-entry"
-              open={entryOpen === r.id || d.roles.length === 1}
-              onToggle={(e) => {
-                if (e.currentTarget.open) {
-                  setEntryOpen(r.id);
-                  if (
-                    document.activeElement ===
-                    e.currentTarget.querySelector("summary")
-                  )
-                    focusFirstField(`entry-${r.id}`);
-                }
-              }}
-            >
-              <summary>
-                {r.title.value || t("Experiență nouă", "New experience")} ·{" "}
-                {r.company.value}
-              </summary>
-              <div className="field-grid">
-                {field(r.title, t("Rol", "Role"), { required: true })}
-                {field(r.company, t("Companie", "Company"), { required: true })}
-                {date(r.start, t("Când ai început?", "Start date"))}
-                <div>
-                  {!r.ongoing.value &&
-                    date(r.end, t("Când s-a terminat?", "End date"))}
-                  <label className="current-job">
-                    <input
-                      id={r.ongoing.fieldId}
-                      type="checkbox"
-                      checked={r.ongoing.value}
-                      onChange={(e) => patch(r.ongoing, e.target.checked)}
-                    />
-                    {t("Prezent / În curs", "Present / Ongoing")}
-                  </label>
-                </div>
-                {field(r.location, t("Localitate", "City"))}
-                {field(
-                  r.context,
-                  t("Context și responsabilități", "Role summary"),
-                  {
+            <div className={profile ? "profile-role-container" : undefined}>
+              {profile && (
+                <ProfileRole
+                  role={r}
+                  edit={() => {
+                    setEntryOpen(r.id);
+                    focusField(r.title.fieldId);
+                  }}
+                />
+              )}
+              <details
+                id={`entry-${r.id}`}
+                className="inline-entry"
+                open={entryOpen === r.id || (!profile && d.roles.length === 1)}
+                onToggle={(e) => {
+                  if (e.currentTarget.open) {
+                    setEntryOpen(r.id);
+                    if (
+                      document.activeElement ===
+                      e.currentTarget.querySelector("summary")
+                    )
+                      focusFirstField(`entry-${r.id}`);
+                  }
+                }}
+              >
+                <summary>
+                  {profile ? (
+                    t("Editează informațiile rolului", "Edit role information")
+                  ) : (
+                    <>
+                      {r.title.value || t("Experiență nouă", "New experience")}{" "}
+                      · {r.company.value}
+                    </>
+                  )}
+                </summary>
+                <div className="field-grid">
+                  {field(r.title, t("Rol", "Role"), { required: true })}
+                  {field(r.company, t("Companie", "Company"), {
+                    required: true,
+                  })}
+                  {date(r.start, t("Când ai început?", "Start date"))}
+                  <div>
+                    {!r.ongoing.value &&
+                      date(r.end, t("Când s-a terminat?", "End date"))}
+                    <label className="current-job">
+                      <input
+                        id={r.ongoing.fieldId}
+                        type="checkbox"
+                        checked={r.ongoing.value}
+                        onChange={(e) => patch(r.ongoing, e.target.checked)}
+                      />
+                      {t("Prezent / În curs", "Present / Ongoing")}
+                    </label>
+                  </div>
+                  {field(r.location, t("Localitate", "City"))}
+                  {field(r.context, t("Rezumatul rolului", "Role summary"), {
                     hint: t(
                       "Echipa, activitatea și responsabilitatea ta.",
                       "Your team, work and responsibility.",
                     ),
-                  },
-                )}
-                <div className="span-all">{contributions(r)}</div>
-              </div>
-              <button
-                type="button"
-                className="text-remove"
-                onClick={() =>
-                  update((n) => {
-                    n.roles.splice(i, 1);
-                    for (const a of n.answers)
-                      if (a.targetId === r.id) delete a.cvFieldId;
-                    delete n.presentation.contributionHtml?.[r.id];
-                  })
-                }
-              >
-                {t("Elimină experiența", "Remove experience")}
-              </button>
-            </details>
+                  })}
+                  <div className="span-all">{contributions(r)}</div>
+                </div>
+                <button
+                  type="button"
+                  className="text-remove"
+                  onClick={() =>
+                    update((n) => {
+                      n.roles.splice(i, 1);
+                      for (const a of n.answers)
+                        if (a.targetId === r.id) delete a.cvFieldId;
+                      delete n.presentation.contributionHtml?.[r.id];
+                    })
+                  }
+                >
+                  {t("Elimină experiența", "Remove experience")}
+                </button>
+              </details>
+            </div>
           </Sortable>
         ))}
       </>
@@ -712,6 +804,7 @@ export function Editor({
                         {t("Nivel autoevaluat", "Self-assessed level")}
                       </label>
                       <select
+                        className="native"
                         id={e.proficiency?.fieldId ?? `${e.id}-level`}
                         value={e.proficiency?.value ?? ""}
                         aria-required="true"
@@ -1030,13 +1123,36 @@ export function Editor({
           }
         />
       );
-    if (section === "experience") return roleEntries();
+    if (section === "experience")
+      return (
+        <>
+          {profile && <ExperienceJourney />}
+          {profile && (
+            <p className="profile-experience-total">
+              {t("Experiență totală", "Total experience")}:{" "}
+              <strong>
+                {t(
+                  formatExperienceDuration(
+                    experienceDuration(d.roles, profile.asOf),
+                    "ro",
+                  ),
+                  formatExperienceDuration(
+                    experienceDuration(d.roles, profile.asOf),
+                    "en",
+                  ),
+                )}
+              </strong>
+            </p>
+          )}
+          {roleEntries()}
+        </>
+      );
     if (section === "education") return educationEntries();
     return optional(section);
   }
   return (
     <div className="inline-editor" data-editor onKeyDown={keyboard}>
-      {d.presentation.order.map((section) => (
+      {sectionOrder.map((section) => (
         <details
           key={section}
           id={`section-${section}`}
@@ -1052,16 +1168,77 @@ export function Editor({
               open(section);
             }}
           >
-            {sectionName(section, locale, d)}
+            {profile ? (
+              <>
+                <ProfileCategoryIcon section={section} draft={d} />
+                <span className="profile-section-heading">
+                  <strong>{sectionName(section, locale, d)}</strong>
+                  <span className="small muted profile-section-preview">
+                    {section === "experience"
+                      ? t(`${d.roles.length} roluri`, `${d.roles.length} roles`)
+                      : states[section]?.preview ||
+                        t(
+                          "Adaugă informații când ești pregătit",
+                          "Add information when you are ready",
+                        )}
+                  </span>
+                </span>
+                <span
+                  className={`profile-section-badge profile-section-${states[section]?.state ?? "optional"}`}
+                >
+                  {states[section]?.state === "missing"
+                    ? t("De completat", "To complete")
+                    : states[section]?.state === "check"
+                      ? t("De verificat", "To check")
+                      : states[section]?.state === "filled"
+                        ? t("Completat", "Filled in")
+                        : t("Opțional", "Optional")}
+                </span>
+              </>
+            ) : (
+              sectionName(section, locale, d)
+            )}
           </summary>
           <div className="section-body">
             {metadata(section)}
             {content(section)}
+            {profile &&
+              d.optionalSections
+                .find((s) => s.id === section && s.kind !== "languages")
+                ?.entries.map((e) => (
+                  <div className="profile-optional-enrichment" key={e.id}>
+                    <Button onClick={() => profile.openEnrichment(e.id)}>
+                      {t(
+                        "Îmbunătățește această experiență",
+                        "Improve this experience",
+                      )}
+                      : {e.title.value || sectionName(section, locale, d)}
+                    </Button>
+                    {profile.enrichTarget === e.id && (
+                      <>
+                        <Button onClick={profile.closeEnrichment}>
+                          {t("Închide întrebările", "Close questions")}
+                        </Button>
+                        {profile.enrich(e.id)}
+                      </>
+                    )}
+                  </div>
+                ))}
           </div>
         </details>
       ))}
       <details className="structure-panel">
-        <summary>{t("Structura CV-ului", "CV structure")}</summary>
+        <summary>
+          {profile && (
+            <LayoutList
+              className="profile-category-icon"
+              size={20}
+              aria-hidden="true"
+              focusable="false"
+            />
+          )}
+          {t("Structura CV-ului", "CV structure")}
+        </summary>
         {d.presentation.order.map((section, i) => (
           <Sortable
             key={section}
@@ -1094,7 +1271,22 @@ export function Editor({
       </details>
       {!jobMode && (
         <details className="add-section">
-          <summary>{t("Adaugă secțiune", "Add section")}</summary>
+          <summary>
+            {profile && (
+              <Award
+                className="profile-category-icon"
+                size={20}
+                aria-hidden="true"
+                focusable="false"
+              />
+            )}
+            {profile
+              ? t(
+                  "Certificări și alte secțiuni · Opțional",
+                  "Certifications and other sections · Optional",
+                )
+              : t("Adaugă secțiune", "Add section")}
+          </summary>
           <div className="optional-contacts">
             {(
               [

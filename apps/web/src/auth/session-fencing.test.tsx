@@ -1,3 +1,4 @@
+import { openProfileDetails, openProfilePresentation } from "../test-profile";
 import {
   act,
   fireEvent,
@@ -79,6 +80,12 @@ for (const check of ["focus", "interval"] as const) {
               return upload.promise;
             }
             privateCalls.push(path);
+            if (path === "/v1/intelligence/imports/pending")
+              return Response.json(null);
+            if (path === "/v1/document-languages")
+              return Response.json({ source: null, versions: [] });
+            if (path.startsWith("/v1/workspace-drafts"))
+              return Response.json(null);
             if (path === "/v1/base-cv") {
               const draft = blankDraft(),
                 first = browser === a ? "Alpha" : "Beta";
@@ -106,6 +113,7 @@ for (const check of ["focus", "interval"] as const) {
             }}
           </AuthShell>,
         );
+        await openProfileDetails();
         await screen.findByDisplayValue("Alpha");
         const retired = accountTransport;
         const uploadOutcome = Promise.allSettled([
@@ -123,6 +131,7 @@ for (const check of ["focus", "interval"] as const) {
           "/v1/base-cv/history",
           "/v1/intelligence/imports",
           "/v1/intelligence/imports/synthetic",
+          "/v1/intelligence/imports/pending",
           "/v1/base-cv/save",
         ];
         const outcomes = Promise.allSettled(
@@ -138,9 +147,14 @@ for (const check of ["focus", "interval"] as const) {
           await waitFor(() => expect(probeStarted).toBe(true));
           expect(screen.getByDisplayValue("Alpha")).toBeTruthy();
           expect(screen.queryByDisplayValue("Beta")).toBeNull();
-          expect(privateCalls).toEqual(["/v1/base-cv"]);
+          expect(privateCalls).toEqual([
+            "/v1/base-cv",
+            "/v1/intelligence/imports/pending",
+            "/v1/document-languages",
+          ]);
           expect(delivered).toEqual([]);
           await act(async () => probe.resolve());
+          await openProfileDetails();
           await screen.findByDisplayValue("Beta");
           expect(screen.queryByDisplayValue("Alpha")).toBeNull();
           for (const outcome of await outcomes)
@@ -149,7 +163,14 @@ for (const check of ["focus", "interval"] as const) {
               reason: { message: "SESSION_CHANGED" },
             });
           expect(delivered).toEqual([]);
-          expect(privateCalls).toEqual(["/v1/base-cv", "/v1/base-cv"]);
+          expect(
+            privateCalls.filter((p) => p !== "/v1/document-languages"),
+          ).toEqual([
+            "/v1/base-cv",
+            "/v1/intelligence/imports/pending",
+            "/v1/base-cv",
+            "/v1/intelligence/imports/pending",
+          ]);
           await expect(
             retired("/v1/intelligence/imports/synthetic/cancel", {
               method: "POST",

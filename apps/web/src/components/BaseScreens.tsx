@@ -20,16 +20,68 @@ export function StartChooser({
   start,
   intelligence,
   revision = 0,
+  profile,
+  updatesDisabled,
+  applyUpdate,
+  openImportId,
+  onOpenImport,
 }: {
+  openImportId?: string;
+  onOpenImport?: (id: string) => void;
   start: (draft: BaseDraft) => void;
   intelligence?: IntelligenceClient;
   revision?: number;
+  profile?: BaseDraft | null;
+  updatesDisabled?: boolean;
+  applyUpdate?: (next: BaseDraft, original: BaseDraft) => boolean;
 }) {
   const t = useCopy(),
     locale = useContext(LanguageContext);
   const picker = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<FileSelection>({ state: "empty" }),
-    [mode, setMode] = useState<"choose" | "file">("choose");
+    [mode, setMode] = useState<"choose" | "file">(
+      intelligence ? "file" : "choose",
+    );
+  const manualDraft = () => ({
+    ...blankDraft(),
+    language: locale,
+    documentLocale: locale === "ro" ? "ro-RO" : "en-GB",
+  });
+  if (profile)
+    return (
+      <div className="start-layout">
+        <section className="card">
+          <p role="status">
+            {t(
+              "Șterge CV-ul de bază actual înainte de a încărca altul. CV-urile adaptate pentru joburi se păstrează.",
+              "Delete your current Base CV before uploading another. Your tailored job CVs are retained.",
+            )}
+          </p>
+        </section>
+      </div>
+    );
+  if (intelligence)
+    return (
+      <div className="profile-start-document">
+        <ImportDocument
+          instantUpload
+          openImportId={openImportId}
+          onOpenImport={onOpenImport}
+          client={intelligence}
+          revision={revision}
+          start={start}
+          profile={profile}
+          updatesDisabled={updatesDisabled}
+          applyUpdate={applyUpdate}
+        />
+        <Button
+          className="btn btn-ghost profile-start-manual"
+          onClick={() => start(manualDraft())}
+        >
+          {t("Începe fără CV", "Start without a CV")}
+        </Button>
+      </div>
+    );
   return (
     <div className="start-layout">
       <section className="card start-card">
@@ -43,7 +95,7 @@ export function StartChooser({
             "Add the facts you know. Dates and optional sections can wait until later.",
           )}
         </p>
-        <Button variant="primary" onClick={() => start(blankDraft())}>
+        <Button variant="primary" onClick={() => start(manualDraft())}>
           {t("Completează manual", "Enter manually")}
           <ArrowRight size={16} />
         </Button>
@@ -65,9 +117,15 @@ export function StartChooser({
       </section>
       {mode === "file" && intelligence && (
         <ImportDocument
+          instantUpload
+          openImportId={openImportId}
+          onOpenImport={onOpenImport}
           client={intelligence}
           revision={revision}
           start={start}
+          profile={profile}
+          updatesDisabled={updatesDisabled}
+          applyUpdate={applyUpdate}
         />
       )}
       {mode === "file" && !intelligence && (
@@ -148,7 +206,7 @@ export function StartChooser({
             )}
           </div>
           <div className="actions">
-            <Button variant="primary" onClick={() => start(blankDraft())}>
+            <Button variant="primary" onClick={() => start(manualDraft())}>
               {t("Continuă manual", "Continue manually")}
             </Button>
             <Button

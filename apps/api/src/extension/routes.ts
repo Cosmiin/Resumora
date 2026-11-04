@@ -79,8 +79,8 @@ export async function extensionRoute(request: Request, env: CaptureConfig, trans
     return authJson(result,result===null?404:action==='save'?202:200,headers);
   } catch(error) {
     const e = error as {status?:number;message?:string};
-    const status = e.message==='invalidRequest'||error instanceof SyntaxError||error instanceof TypeError ?400:[400,401,403,409,429].includes(e.status??0)?e.status!:503;
+    const status = e.message==='invalidRequest'||error instanceof SyntaxError||error instanceof TypeError ?400:[400,401,403,409,410,429].includes(e.status??0)?e.status!:503;
     if(status===429) headers.set('Retry-After','60');
-    return authError(status===401?'UNAUTHORIZED':status===429?'RATE_LIMITED':status===503?'CAPTURE_UNAVAILABLE':'INVALID_INPUT',status,headers);
+    return authError(status===401?'UNAUTHORIZED':status===410?'RESOURCE_DELETED':status===429?'RATE_LIMITED':status===503?'CAPTURE_UNAVAILABLE':'INVALID_INPUT',status,headers);
   }
 }

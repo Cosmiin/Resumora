@@ -13,6 +13,7 @@ import {
 } from "@testing-library/react";
 import { it, expect, vi } from "vitest";
 import { JobsScreen } from "./JobsScreen";
+import { JobWorkflowPanel } from "./JobWorkflow";
 import { AiSuggestions } from "./AiSuggestions";
 import {
   blankDraft,
@@ -26,54 +27,198 @@ import { encodeDraft, decodeDraft } from "@resumora/contracts/editor/transport";
 import { cvRoute } from "../../../api/src/cv/routes";
 import { acceptWording, currentWording } from "../base/wording";
 import { LanguageContext } from "./ui";
-const emptyWorkflow = () => ({revision:1,extracted:null,reviewed:null,operations:[],duplicates:[],sourceParentId:null,aiEnabled:false});
+const emptyWorkflow = () => ({
+  revision: 1,
+  extracted: null,
+  reviewed: null,
+  operations: [],
+  duplicates: [],
+  sourceParentId: null,
+  aiEnabled: false,
+});
 it("manual fallback saves without Base and renders captured script text as data", async () => {
- const text="A job <script>globalThis.compromised=true</script>",writes:Record<string,unknown>[]=[];
- const transport=async (path:string,init?:RequestInit)=>{
-  if(path.endsWith('/workflow'))return Response.json(emptyWorkflow());
-  if(!init?.body)return Response.json([]);
-  const body=JSON.parse(String(init.body));writes.push(body);
-  return Response.json({id:crypto.randomUUID(),versionId:null,state:'draft',createdAt:new Date().toISOString(),snapshotId:null,snapshotRevision:null,intake:body.intake,requirements:[]});
- };
- render(<LanguageContext value="en"><JobsScreen transport={transport} snapshot={null} ready={false}/></LanguageContext>);
- fireEvent.change(screen.getByLabelText('Advert text'),{target:{value:text}});
- fireEvent.click(screen.getByRole('button',{name:'Save job draft'}));
- await screen.findByText(/Advert saved to your account/);
- expect(writes[0].snapshotId).toBeNull();expect(writes[0].snapshotRevision).toBeNull();
- expect(screen.getByText(/Saved without a source link/)).toBeTruthy();
- expect(document.querySelector('pre')?.textContent).toBe(text);expect(document.querySelector('pre script')).toBeNull();
+  const text = "A job <script>globalThis.compromised=true</script>",
+    writes: Record<string, unknown>[] = [];
+  const transport = async (path: string, init?: RequestInit) => {
+    if (path.endsWith("/workflow")) return Response.json(emptyWorkflow());
+    if (!init?.body) return Response.json([]);
+    const body = JSON.parse(String(init.body));
+    writes.push(body);
+    return Response.json({
+      id: crypto.randomUUID(),
+      versionId: null,
+      state: "draft",
+      createdAt: new Date().toISOString(),
+      snapshotId: null,
+      snapshotRevision: null,
+      intake: body.intake,
+      requirements: [],
+    });
+  };
+  render(
+    <LanguageContext value="en">
+      <JobsScreen transport={transport} snapshot={null} ready={false} />
+    </LanguageContext>,
+  );
+  fireEvent.change(screen.getByLabelText("Advert text"), {
+    target: { value: text },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save job draft" }));
+  await screen.findByText(/Advert saved to your account/);
+  expect(writes[0].snapshotId).toBeNull();
+  expect(writes[0].snapshotRevision).toBeNull();
+  expect(screen.getByText(/Saved without a source link/)).toBeTruthy();
+  expect(document.querySelector("pre")?.textContent).toBe(text);
+  expect(document.querySelector("pre script")).toBeNull();
 });
-it.each(['none','capture','review'])('%s retry preserves unrelated intake during workflow review',async failure=>{
- const calls:{path:string;body:any}[]=[],job={id:crypto.randomUUID(),state:'draft',versionId:null,createdAt:'2026-10-30T00:00:00Z',snapshotId:null,snapshotRevision:null,intake:{text:'Required SQL.',sourceUrl:'https://example.invalid/a'},requirements:[]};
- let failed=false,w=emptyWorkflow();
- const transport=vi.fn(async(path:string,init?:RequestInit)=>{
-  if(!init?.body)return Response.json(path.endsWith('/workflow')?w:[]);
-  const body=JSON.parse(String(init.body));calls.push({path,body});
-  if(!failed&&(failure==='capture'?path==='/v1/jobs':failure==='review'&&path.endsWith('/review'))){failed=true;throw new TypeError('Synthetic connection failure');}
-  if(path.endsWith('/review')){w={...w,revision:2,reviewed:body.value};return Response.json(w);}
-  return Response.json(job);
- });
- render(<LanguageContext value="en"><JobsScreen transport={transport} snapshot={null} ready/></LanguageContext>);
- fireEvent.change(screen.getByLabelText('Advert text'),{target:{value:job.intake.text}});fireEvent.change(screen.getByLabelText('Source URL (optional)'),{target:{value:job.intake.sourceUrl}});
- fireEvent.click(screen.getByRole('button',{name:'Save job draft'}));
- if(failure==='capture')fireEvent.click(await screen.findByRole('button',{name:'Retry same request'}));
- await screen.findByLabelText('Title');expect(calls[0].body.intake).toEqual(job.intake);
- await waitFor(()=>expect((screen.getByLabelText('Advert text') as HTMLTextAreaElement).value).toBe(''));
- fireEvent.change(screen.getByLabelText('Advert text'),{target:{value:'Unsubmitted advert B'}});fireEvent.change(screen.getByLabelText('Source URL (optional)'),{target:{value:'https://example.invalid/b'}});
- fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Synthetic role'}});fireEvent.change(screen.getByLabelText('Company'),{target:{value:'Synthetic company'}});
- fireEvent.click(screen.getByRole('button',{name:'Save corrections'}));
- if(failure==='review')fireEvent.click(await screen.findByRole('button',{name:'Retry same request'}));
- await screen.findByText('Corrections saved without AI.');
- expect(calls).toHaveLength(failure==='none'?2:3);expect(calls.at(-1)!.path).toMatch(/workflow\/review$/);
- if(failure!=='none'){const repeated=calls.filter(c=>failure==='capture'?c.path==='/v1/jobs':c.path.endsWith('/review'));expect(repeated[0]).toEqual(repeated[1]);}
- expect((screen.getByLabelText('Advert text') as HTMLTextAreaElement).value).toBe('Unsubmitted advert B');expect((screen.getByLabelText('Source URL (optional)') as HTMLInputElement).value).toBe('https://example.invalid/b');
-});
-it('opens full original from compact job list without triggering analysis',async()=>{
- const job={id:crypto.randomUUID(),state:'draft',versionId:null,createdAt:'2026-10-30T00:00:00Z',snapshotId:null,snapshotRevision:null,intake:{text:'a'.repeat(200000),title:'Full saved title',sourceUrl:'https://example.invalid/job'},requirements:[]};
- const transport=vi.fn(async(path:string)=>Response.json(path==='/v1/jobs'?[{id:job.id,title:'Saved title',state:'draft',createdAt:job.createdAt}]:path.endsWith('/workflow')?emptyWorkflow():job));
- const view=render(<LanguageContext value="en"><JobsScreen transport={transport} snapshot={null} ready/></LanguageContext>);
- fireEvent.click(await screen.findByRole('button',{name:'Saved title · Draft'}));await screen.findByRole('heading',{name:'Full saved title'});
- expect(view.container.querySelector('pre')!.textContent).toBe(job.intake.text);expect(screen.getByRole('link',{name:'Open source'}).getAttribute('href')).toBe(job.intake.sourceUrl);expect(transport.mock.calls.every(c=>c.length===1)).toBe(true);
+it.each(["none", "capture", "review"])(
+  "%s retry preserves unrelated intake during workflow review",
+  async (failure) => {
+    const calls: { path: string; body: any }[] = [],
+      job = {
+        id: crypto.randomUUID(),
+        state: "draft",
+        versionId: null,
+        createdAt: "2026-10-30T00:00:00Z",
+        snapshotId: null,
+        snapshotRevision: null,
+        intake: {
+          text: "Required SQL.",
+          sourceUrl: "https://example.invalid/a",
+        },
+        requirements: [],
+      };
+    let failed = false,
+      w = emptyWorkflow();
+    const transport = vi.fn(async (path: string, init?: RequestInit) => {
+      if (!init?.body)
+        return Response.json(path.endsWith("/workflow") ? w : []);
+      const body = JSON.parse(String(init.body));
+      calls.push({ path, body });
+      if (
+        !failed &&
+        (failure === "capture"
+          ? path === "/v1/jobs"
+          : failure === "review" && path.endsWith("/review"))
+      ) {
+        failed = true;
+        throw new TypeError("Synthetic connection failure");
+      }
+      if (path.endsWith("/review")) {
+        w = { ...w, revision: 2, reviewed: body.value };
+        return Response.json(w);
+      }
+      return Response.json(job);
+    });
+    render(
+      <LanguageContext value="en">
+        <JobsScreen transport={transport} snapshot={null} ready />
+      </LanguageContext>,
+    );
+    fireEvent.change(screen.getByLabelText("Advert text"), {
+      target: { value: job.intake.text },
+    });
+    fireEvent.change(screen.getByLabelText("Source URL (optional)"), {
+      target: { value: job.intake.sourceUrl },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save job draft" }));
+    if (failure === "capture")
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Retry same request" }),
+      );
+    await screen.findByLabelText("Title");
+    expect(calls[0].body.intake).toEqual(job.intake);
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText("Advert text") as HTMLTextAreaElement).value,
+      ).toBe(""),
+    );
+    fireEvent.change(screen.getByLabelText("Advert text"), {
+      target: { value: "Unsubmitted advert B" },
+    });
+    fireEvent.change(screen.getByLabelText("Source URL (optional)"), {
+      target: { value: "https://example.invalid/b" },
+    });
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Synthetic role" },
+    });
+    fireEvent.change(screen.getByLabelText("Company"), {
+      target: { value: "Synthetic company" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm job details" }),
+    );
+    if (failure === "review")
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Retry same request" }),
+      );
+    await screen.findByText("Corrections saved without AI.");
+    expect(calls).toHaveLength(failure === "none" ? 2 : 3);
+    expect(calls.at(-1)!.path).toMatch(/workflow\/review$/);
+    if (failure !== "none") {
+      const repeated = calls.filter((c) =>
+        failure === "capture"
+          ? c.path === "/v1/jobs"
+          : c.path.endsWith("/review"),
+      );
+      expect(repeated[0]).toEqual(repeated[1]);
+    }
+    expect(
+      (screen.getByLabelText("Advert text") as HTMLTextAreaElement).value,
+    ).toBe("Unsubmitted advert B");
+    expect(
+      (screen.getByLabelText("Source URL (optional)") as HTMLInputElement)
+        .value,
+    ).toBe("https://example.invalid/b");
+  },
+);
+it("opens full original from compact job list without triggering analysis", async () => {
+  const job = {
+    id: crypto.randomUUID(),
+    state: "draft",
+    versionId: null,
+    createdAt: "2026-10-30T00:00:00Z",
+    snapshotId: null,
+    snapshotRevision: null,
+    intake: {
+      text: "a".repeat(200000),
+      title: "Full saved title",
+      sourceUrl: "https://example.invalid/job",
+    },
+    requirements: [],
+  };
+  const transport = vi.fn(async (path: string) =>
+    Response.json(
+      path === "/v1/jobs"
+        ? [
+            {
+              id: job.id,
+              title: "Saved title",
+              state: "draft",
+              createdAt: job.createdAt,
+            },
+          ]
+        : path.endsWith("/workflow")
+          ? emptyWorkflow()
+          : job,
+    ),
+  );
+  const view = render(
+    <LanguageContext value="en">
+      <JobsScreen transport={transport} snapshot={null} ready />
+    </LanguageContext>,
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Saved title · Draft" }),
+  );
+  await screen.findByRole("heading", { name: "Full saved title" });
+  expect(view.container.querySelector("pre")!.textContent).toBe(
+    job.intake.text,
+  );
+  expect(
+    screen.getByRole("link", { name: "Open source" }).getAttribute("href"),
+  ).toBe(job.intake.sourceUrl);
+  expect(transport.mock.calls.every((c) => c.length === 1)).toBe(true);
 });
 it("proposal changes presentation only after acceptance; answers and career facts survive version serialization", async () => {
   const draft = blankDraft();
@@ -501,4 +646,48 @@ it("I0 integration renders selected-option-supported job wording and retained Ba
     base.presentation.approvedWording!["other-role"],
   );
   expect(encodeDraft(base)).toEqual(source);
+});
+
+it("failed AI extraction explains recovery without discarding the saved advert or retrying automatically", async () => {
+  const job = {
+    id: crypto.randomUUID(),
+    state: "draft" as const,
+    versionId: null,
+    createdAt: new Date().toISOString(),
+    snapshotId: null,
+    snapshotRevision: null,
+    intake: { text: "Required SQL." },
+    requirements: [],
+  };
+  const transport = vi.fn(async (_path: string, _init?: RequestInit) =>
+    Response.json({
+      ...emptyWorkflow(),
+      aiEnabled: true,
+      operations: [
+        {
+          id: crypto.randomUUID(),
+          kind: "extract",
+          state: "failed",
+          error: "OUTPUT_INVALID",
+        },
+      ],
+    }),
+  );
+  render(
+    <LanguageContext value="en">
+      <JobWorkflowPanel job={job} transport={transport} ready />
+    </LanguageContext>,
+  );
+  expect(
+    (await screen.findByText(/AI returned a result we could not verify/))
+      .textContent,
+  ).toContain("Advert saved to your account.");
+  expect(
+    (
+      screen.getByRole("button", {
+        name: "Retry extraction",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(false);
+  expect(transport.mock.calls.every((call) => !call[1]?.body)).toBe(true);
 });

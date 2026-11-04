@@ -1,3 +1,13 @@
+import { contentDirection } from "../languages/direction";
+import { contentLocale } from "@resumora/contracts/editor/content-language";
+import {
+  builtInDocumentLabels,
+  documentLabels,
+  type DocumentLabels,
+} from "@resumora/contracts/editor/document-labels";
+import { RichContributions } from "./RichContributions";
+import { RoleText } from "./RoleText";
+import { stripListMarker } from "@resumora/contracts/editor/content";
 import { currentWording } from "../base/wording";
 import { PhotoPreview } from "../photo/PhotoPreview";
 import {
@@ -7,8 +17,12 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { formatDate, durationBounds } from "../base/dates";
-import { hasValue, isAccepted, type BaseDraft, type Fact } from "../base/model";
+import {
+  formatDate,
+  experienceDuration,
+  formatExperienceDuration,
+} from "../base/dates";
+import { hasValue, type BaseDraft, type Fact } from "../base/model";
 import { richText, safeRichHtml } from "../base/editing";
 import { sectionName } from "../base/sections";
 import { LanguageContext, useCopy } from "./ui";
@@ -65,7 +79,8 @@ export function DocumentPreview({
 }) {
   const t = useCopy(),
     uiLocale = useContext(LanguageContext),
-    cv = (ro: string, en: string) => (d.language === "ro" ? ro : en);
+    labels = documentLabels(d),
+    documentLocale = contentLocale(d);
   const template = resolveTemplate(d.presentation.templateVersionId);
   const live = livePreview ?? (!!onEdit || !!onTextEdit),
     hidden = (f: Fact) => d.presentation.hiddenFields?.includes(f.fieldId);
@@ -84,25 +99,41 @@ export function DocumentPreview({
       value
     );
   }
-  function editable(f: Fact<string>, id = f.fieldId): ReactNode {
+  function editable(
+    f: Fact<string>,
+    id = f.fieldId,
+    listItem = false,
+  ): ReactNode {
     if (hidden(f) || (!text(f) && !onTextEdit)) return null;
     if (onTextEdit)
       return (
         <PreviewText
           key={f.fieldId}
-          value={f.value}
+          value={listItem ? stripListMarker(f.value) : f.value}
           label={t("Text din previzualizare", "Preview text")}
           change={(value) => onTextEdit(f.fieldId, value)}
         />
       );
-    return block(text(f), id);
+    return block(listItem ? stripListMarker(text(f)) : text(f), id);
   }
   function wording(target: string, field: Fact<string>): ReactNode {
     const value = currentWording(d, target);
-    if (!value) return (text(field) || onTextEdit) && <p>{editable(field)}</p>;
+    if (!value)
+      return (
+        (text(field) || onTextEdit) &&
+        (onTextEdit ? (
+          <p>{editable(field)}</p>
+        ) : (
+          <div className="document-role-wording">
+            {block(<RoleText text={text(field)} />, field.fieldId)}
+          </div>
+        ))
+      );
     return (
       <>
-        <p>{block(value, field.fieldId)}</p>
+        <div className="document-role-wording">
+          {block(<RoleText text={value} />, field.fieldId)}
+        </div>
         {onTextEdit && (
           <details>
             <summary>
@@ -117,20 +148,19 @@ export function DocumentPreview({
   const hasExperienceWording = (target: string) =>
     d.presentation.approvedWording?.[target]?.scope === "experience" &&
     !!currentWording(d, target);
+  const duration = (bounds: ReturnType<typeof experienceDuration>) =>
+    bounds.known
+      ? formatExperienceDuration(bounds, documentLocale) ||
+        labels!.durationUnavailable
+      : labels!.durationUnavailable;
   const date = (f: BaseDraft["roles"][number]["start"]) =>
     hidden(f)
       ? ""
       : hasValue(f.value)
-        ? formatDate(f.value, d.language)
-        : cv("Dată necunoscută", "Date unknown");
-  const eligible = d.roles.filter(
-    (r) =>
-      isAccepted(r.start) &&
-      isAccepted(r.ongoing) &&
-      (r.ongoing.value || isAccepted(r.end)),
-  );
-  const bounds = durationBounds(eligible, asOf),
-    unknown = bounds.unknown + d.roles.length - eligible.length;
+        ? formatDate(f.value, documentLocale)
+        : labels!.unknownDate;
+  const bounds = experienceDuration(d.roles, asOf, d.presentation.hiddenFields),
+    unknown = bounds.unknown;
   function entryHeading(primary: ReactNode, secondary: ReactNode) {
     return template?.entry === "stacked" ? (
       <>
@@ -157,7 +187,11 @@ export function DocumentPreview({
       </h4>
     );
   }
-  function contactLink(kind: string, value: string): ReactNode {
+  function contactLink(
+    kind: string,
+    value: string,
+    platform?: string,
+  ): ReactNode {
     if (onEdit || onTextEdit) return value;
     const href =
       kind === "email" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
@@ -166,7 +200,11 @@ export function DocumentPreview({
           ? `tel:${value.replace(/[ ()-]/g, "")}`
           : kind === "social" && /^https?:\/\/[^\s]+$/i.test(value)
             ? value
-            : null;
+            : kind === "social" &&
+                platform === "website" &&
+                /^(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/?#][^\s]*)?$/i.test(value)
+              ? `https://${value}`
+              : null;
     return href ? (
       <a href={href} rel="noreferrer">
         {value}
@@ -186,7 +224,7 @@ export function DocumentPreview({
               <h2>
                 {block(
                   <>
-                    {text(d.name) || cv("Numele tău", "Your name")}
+                    {text(d.name) || labels!.yourName}
                     {template ? "\u00a0" : ""}
                   </>,
                   "first-name",
@@ -228,19 +266,22 @@ export function DocumentPreview({
                   <span className="document-contact">
                     {!!template && (
                       <>
-                        {
-                          {
-                            email: cv("E-mail", "Email"),
-                            phone: cv("Telefon", "Phone"),
-                            location: cv("Localitate", "Location"),
-                            address: cv("Adresă", "Address"),
-                            social: cv("Link", "Link"),
-                          }[c.kind]
-                        }
+                        {c.platform === "website"
+                          ? labels!.link
+                          : {
+                              email: labels!.email,
+                              phone: labels!.phone,
+                              location: labels!.location,
+                              address: labels!.address,
+                              social: labels!.link,
+                            }[c.kind]}
                         :{" "}
                       </>
                     )}
-                    {block(contactLink(c.kind, text(c.value)), c.value.fieldId)}
+                    {block(
+                      contactLink(c.kind, text(c.value), c.platform),
+                      c.value.fieldId,
+                    )}
                   </span>
                 </Fragment>
               ))}
@@ -258,7 +299,7 @@ export function DocumentPreview({
       return d[id].some((f) => text(f)) ? (
         <p className="document-skill-line">
           {block(
-            d[id].map(text).filter(Boolean).join(", "),
+            d[id].map(text).filter(Boolean).join(" | "),
             `chip-${sectionName(id, uiLocale)}`,
             sectionName(id, uiLocale),
           )}
@@ -270,19 +311,25 @@ export function DocumentPreview({
             <div key={r.id} className="document-entry">
               <div className="document-entry-head">
                 {entryHeading(
-                  block(text(r.title) || cv("Rol", "Role"), r.title.fieldId),
-                  block(
-                    text(r.company) || cv("Companie", "Company"),
-                    r.company.fieldId,
-                  ),
+                  block(text(r.title) || labels!.role, r.title.fieldId),
+                  block(text(r.company) || labels!.company, r.company.fieldId),
                 )}
                 <p className="document-meta">
                   <span className="document-date-range">
                     {block(date(r.start), r.start.fieldId)} —{" "}
                     {r.ongoing.value
-                      ? block(cv("Prezent", "Present"), r.ongoing.fieldId)
+                      ? block(labels!.present, r.ongoing.fieldId)
                       : block(date(r.end), r.end.fieldId)}
                   </span>
+                  {!hidden(r.start) &&
+                    !(r.ongoing.value ? hidden(r.ongoing) : hidden(r.end)) && (
+                      <>
+                        <span className="document-meta-separator">{" · "}</span>
+                        <span className="document-role-duration">
+                          {duration(experienceDuration([r], asOf))}
+                        </span>
+                      </>
+                    )}
                   {text(r.location) && (
                     <>
                       <span className="document-meta-separator">{" · "}</span>
@@ -301,7 +348,16 @@ export function DocumentPreview({
                 ) &&
                 (d.presentation.contributionHtml?.[r.id] &&
                 !r.bullets.some(hidden) &&
-                !onTextEdit ? (
+                onTextEdit ? (
+                  <div className="document-contributions">
+                    <RichContributions
+                      html={d.presentation.contributionHtml[r.id]}
+                      fields={r.bullets}
+                      change={onTextEdit}
+                    />
+                  </div>
+                ) : d.presentation.contributionHtml?.[r.id] &&
+                  !r.bullets.some(hidden) ? (
                   <div className="document-contributions">
                     {block(
                       <div
@@ -320,7 +376,7 @@ export function DocumentPreview({
                       .filter((b) => !hidden(b) && (text(b) || onTextEdit))
                       .map((b) => (
                         <li key={b.fieldId}>
-                          {editable(b, `${r.id}-contributions`)}
+                          {editable(b, `${r.id}-contributions`, true)}
                         </li>
                       ))}
                   </ul>
@@ -345,7 +401,7 @@ export function DocumentPreview({
                         ))}
                     </>,
                     block(
-                      text(e.institution) || cv("Instituție", "Institution"),
+                      text(e.institution) || labels!.institution,
                       e.institution.fieldId,
                     ),
                   )
@@ -353,7 +409,7 @@ export function DocumentPreview({
                   <>
                     <h4>
                       {block(
-                        text(e.institution) || cv("Instituție", "Institution"),
+                        text(e.institution) || labels!.institution,
                         e.institution.fieldId,
                       )}
                     </h4>
@@ -372,7 +428,7 @@ export function DocumentPreview({
                   <span className="document-date-range">
                     {block(date(e.start), e.start.fieldId)} —{" "}
                     {e.ongoing?.value
-                      ? block(cv("În curs", "Ongoing"), e.ongoing.fieldId)
+                      ? block(labels!.ongoing, e.ongoing.fieldId)
                       : block(date(e.end), e.end.fieldId)}
                   </span>
                   {!!template && text(e.location) && (
@@ -406,7 +462,7 @@ export function DocumentPreview({
                       ·{" "}
                       {block(
                         e.proficiency.value === "Native"
-                          ? cv("Nativ", "Native")
+                          ? labels!.native
                           : e.proficiency.value,
                         e.proficiency.fieldId,
                       )}
@@ -433,7 +489,7 @@ export function DocumentPreview({
                 <p className="document-meta">
                   {block(date(e.start), e.start.fieldId)} —{" "}
                   {e.ongoing?.value
-                    ? block(cv("În curs", "Ongoing"), e.ongoing.fieldId)
+                    ? block(labels!.ongoing, e.ongoing.fieldId)
                     : block(date(e.end), e.end.fieldId)}
                 </p>
               )}
@@ -441,27 +497,57 @@ export function DocumentPreview({
         ))
       : null;
   }
+  if (!labels)
+    return (
+      <p role="status">
+        {t(
+          "Etichetele CV-ului în această limbă nu sunt disponibile. Reîncearcă detectarea limbii.",
+          "Document labels for this language are unavailable. Retry language detection.",
+        )}
+      </p>
+    );
   const document = (
     <article
       className={`document${template ? ` document-template ${template.className}` : ""}`}
-      lang={d.documentLocale ?? d.language}
+      lang={documentLocale}
+      dir={contentDirection(documentLocale)}
       data-template-version={d.presentation.templateVersionId}
     >
       {d.presentation.order
         .filter((id) => !d.presentation.hidden.includes(id))
         .map((id) => {
           const body = content(id);
-          const categoryTitle = d.optionalSections.find(
+          const optional = d.optionalSections.find(
             (section) => section.id === id,
-          )?.heading;
+          );
+          const categoryTitle = optional?.heading;
+          const authoredLabel =
+            optional?.label &&
+            ![
+              builtInDocumentLabels("ro")?.[optional.kind],
+              builtInDocumentLabels("en")?.[optional.kind],
+            ].includes(optional.label)
+              ? optional.label
+              : undefined;
           return body ? (
             <section key={id} className={`document-section document-${id}`}>
               {id !== "identity" && (
                 <h3>
                   {categoryTitle
                     ? block(text(categoryTitle), categoryTitle.fieldId)
-                    : sectionName(id, d.language, d)}
+                    : (authoredLabel ??
+                      labels![(optional?.kind ?? id) as keyof DocumentLabels])}
                 </h3>
+              )}
+              {id === "experience" && (
+                <p className="document-experience-total">
+                  {labels!.totalExperience}: {duration(bounds)}
+                  {unknown > 0 && (
+                    <small className="document-experience-incomplete">
+                      {labels!.incompleteDates}
+                    </small>
+                  )}
+                </p>
               )}
               {body}
             </section>
@@ -496,7 +582,7 @@ export function DocumentPreview({
             : t("Versiune salvată", "Saved version")}
         </span>
         <small>
-          {d.language.toUpperCase()}
+          {documentLocale.toUpperCase()}
           {template ? ` · ${template.name}` : ""}
         </small>
       </div>
@@ -506,7 +592,7 @@ export function DocumentPreview({
         <summary>{t("Durată cumulată", "Combined duration")}</summary>
         <p>
           {bounds.known
-            ? `${bounds.min}–${bounds.max} ${t("luni", "months")}`
+            ? formatExperienceDuration(bounds, uiLocale)
             : t("Nedeterminată", "Unknown")}
           {unknown
             ? ` · ${unknown} ${t("roluri cu date incomplete sau neverificate", "roles with incomplete or unreviewed dates")}`

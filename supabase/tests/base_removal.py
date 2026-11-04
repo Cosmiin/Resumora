@@ -12,7 +12,9 @@ def suite(db):
  class Removal(unittest.TestCase):
   def setUp(self):
    self.w=b.Workspace();self.w.setUp()
+   self.initial_operation=uid();self.initial_admission=self.call('begin_cv_import',f"'{self.initial_operation}','pdf','{'a'*64}',100,0")
    self.source=json.loads((ROOT/'packages/contracts/fixtures/job-editor-import.json').read_text())
+   self.source['content']['importReview']['id']=self.initial_admission['record']['id']
    self.base=self.call('save_base_draft',f"'{uid()}',0,{lit(self.source)},'checkpoint'")
   def raw(self,name,args='',error=False,user=None,role='authenticated'):
    return db.sql(f'SELECT app.{name}({args})',user=user or self.w.a,role=role,expect_error=error)
@@ -51,7 +53,7 @@ def suite(db):
    self.assertEqual(self.call('base_removal_objects',user=self.w.b),[])
    self.assertEqual(self.call('load_base_draft'),before)
   def test_private_cleanup_outbox_and_deleted_import_replay_fence(self):
-   op=uid();admission=self.call('begin_cv_import',f"'{op}','pdf','{'a'*64}',100,1");source=admission['record']['id'];key=admission['record']['objectKey']
+   op=self.initial_operation;admission=self.initial_admission;source=admission['record']['id'];key=admission['record']['objectKey']
    db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{key}')",user=self.w.a,role='authenticated')
    result=json.loads(self.remove());self.assertTrue(result['cleanupPending']);self.assertEqual(self.count('source_documents'),'0')
    self.assertTrue(self.call('can_delete_cv_import_object',f"'{key}'"));self.assertFalse(self.call('can_access_cv_import_object',f"'{key}',false"));self.assertFalse(self.call('can_access_cv_import_object',f"'{key}',true"))
@@ -61,13 +63,13 @@ def suite(db):
    self.assertIn('RESOURCE_FORBIDDEN',db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{key}')",user=self.w.a,expect_error=True))
    db.sql(f"DELETE FROM storage.objects WHERE bucket_id='cv-imports' AND name='{key}'",user=self.w.a,role='authenticated')
    self.call('ack_base_removal_object',f"'cv-imports','{key}'");self.assertFalse(self.call('load_base_state')['cleanupPending'])
-   self.assertIn('REQUEST_EXPIRED',self.raw('begin_cv_import',f"'{op}','pdf','{'a'*64}',100,1",error=True))
+   self.assertIn('REQUEST_EXPIRED',self.raw('begin_cv_import',f"'{op}','pdf','{'a'*64}',100,0",error=True))
    self.assertIn('VERSION_CONFLICT',self.raw('begin_cv_import',f"'{uid()}','pdf','{'a'*64}',100,0",error=True))
   def test_upload_and_remove_serialize_in_both_orders_without_source_resurrection(self):
    for index,upload_first in enumerate([True,False]):
     with self.subTest(upload_first=upload_first):
      if index:self.setUp()
-     admission=self.call('begin_cv_import',f"'{uid()}','pdf','{'a'*64}',100,1")
+     admission=self.initial_admission
      key=admission['record']['objectKey'];tenant=self.w.wa;user=self.w.a
      held=subprocess.Popen(db.command(),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=db.env)
      def send(sql):held.stdin.write(sql+'\n');held.stdin.flush()
@@ -111,7 +113,7 @@ def suite(db):
    # Model Storage's caller permission probe followed by service-role metadata
    # completion. Roles/owner column below exist only in this isolated fixture.
    db.sql("ALTER TABLE storage.objects ADD COLUMN IF NOT EXISTS owner_id text;DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN BYPASSRLS;END IF;IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='supabase_storage_admin') THEN CREATE ROLE supabase_storage_admin NOLOGIN;END IF;END $$;GRANT service_role TO supabase_storage_admin;GRANT USAGE ON SCHEMA storage TO service_role;GRANT INSERT ON storage.objects TO service_role;")
-   upload=self.call('begin_cv_import',f"'{uid()}','pdf','{'a'*64}',100,1")
+   upload=self.initial_admission
    key=upload['record']['objectKey'];owner=self.w.a
    insert=lambda path,actor:f"INSERT INTO storage.objects(bucket_id,name,owner_id) VALUES('cv-imports','{path}','{actor}')"
    db.sql('BEGIN;'+insert(key,owner)+';ROLLBACK;',user=owner,role='authenticated')
@@ -178,5 +180,5 @@ def suite(db):
     current=self.call('load_current_job_document',f"'{job['id']}','{locale}'")
     self.assertEqual(current['payload'],payload);self.assertEqual(current['payload']['content']['presentation']['photo'],photo)
    self.assertEqual(self.count('job_editor_versions'),'2');self.assertEqual(self.count('photo_assets'),'1')
-   self.assertEqual(self.call('base_removal_objects'),[{'bucket':'cv-photos','objectKey':f'{self.w.wa}/{unused}.jpg'}])
+   self.assertEqual(self.call('base_removal_objects'),[{'bucket':'cv-imports','objectKey':self.initial_admission['record']['objectKey']},{'bucket':'cv-photos','objectKey':f'{self.w.wa}/{unused}.jpg'}])
  return unittest.defaultTestLoader.loadTestsFromTestCase(Removal)

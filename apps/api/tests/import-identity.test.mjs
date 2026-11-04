@@ -181,3 +181,95 @@ test("actual extraction operation validates separately identified names and maps
   assert.deepEqual(stages, ["admit", "extract"]);
   assert.deepEqual(d.nameParts, { first: "Ana-Maria", last: "Șerban Ionescu" });
 });
+
+test("personal website remains a reviewed contact with source evidence alongside distinct skill groups", () => {
+  const rows = [
+    ["contacts.linkedin", "https://linkedin.com/in/qa-person"],
+    ["contacts.website", "portfolio.example.com"],
+    ["professionalSkills.0", "Team leadership"],
+    ["professionalSkills.1", "Self-driven"],
+    ["technicalSkills.0", "SQL"],
+    ["technicalSkills.1", "Airtable"],
+  ];
+  const r = review(extraction(rows)),
+    draft = importedDraft(r);
+  const website = draft.contacts.find((c) => c.platform === "website");
+  assert.equal(website.kind, "social");
+  assert.equal(website.value.value, "portfolio.example.com");
+  assert.equal(website.value.status, "extracted_unconfirmed");
+  assert.equal(website.value.sourceClaimId, "c1");
+  assert.equal(draft.roles.length, 0);
+  assert.equal(
+    draft.optionalSections.some((s) => s.kind === "custom"),
+    false,
+  );
+  assert.deepEqual(
+    draft.professionalSkills.map((f) => f.value),
+    ["Team leadership", "Self-driven"],
+  );
+  assert.deepEqual(
+    draft.technicalSkills.map((f) => f.value),
+    ["SQL", "Airtable"],
+  );
+  const confirmed = decodeDraft(encodeDraft(confirmImported(draft, ["c1"])));
+  assert.equal(
+    confirmed.contacts.find((c) => c.platform === "website").value.status,
+    "user_confirmed",
+  );
+  assert.equal(
+    confirmed.contacts.find((c) => c.platform === "linkedin").value.value,
+    rows[0][1],
+  );
+});
+test("website extraction rejects URLs invented beyond the quoted source", () => {
+  assert.throws(
+    () =>
+      review(
+        extraction([
+          [
+            "contacts.website",
+            "https://invented.example.com",
+            "portfolio.example.com",
+          ],
+        ]),
+      ),
+    /EXTRACTION_OUTPUT/,
+  );
+});
+test("the actual import operation supplies website, professional/domain and technical extraction guidance", async () => {
+  const e = extraction([
+    ["contacts.website", "portfolio.example.com"],
+    ["professionalSkills.0", "Collaboration"],
+    ["technicalSkills.0", "JavaScript"],
+  ]);
+  let prompt;
+  const ops = intelligenceOperations(async (task) => {
+    if (task.stage === "extract") prompt = task;
+    const output =
+      task.stage === "admit" ? { kind: "cv", reason: "CV", pages: [1] } : e;
+    task.validateOutput(output);
+    return output;
+  });
+  const result = await ops.extract({
+    operationId: crypto.randomUUID(),
+    userId: crypto.randomUUID(),
+    document: {
+      schemaVersion: "document-pages/1",
+      format: "pdf",
+      sha256: "a".repeat(64),
+      parserVersion: "synthetic",
+      pages: [page],
+      fileBase64: "c3ludGhldGlj",
+    },
+  });
+  assert.match(prompt.system, /contacts.website/);
+  assert.match(prompt.system, /personal website, portfolio/i);
+  assert.match(prompt.system, /domain expertise and interpersonal or self-management/);
+  assert.match(prompt.system, /tools, software, programming languages/);
+  assert.equal(prompt.promptVersion, "cv.extract.v6-content-language");
+  const d = importedDraft({ ...review(e), ...result });
+  assert.equal(
+    d.contacts.find((c) => c.platform === "website").value.value,
+    "portfolio.example.com",
+  );
+});

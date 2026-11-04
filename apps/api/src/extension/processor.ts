@@ -31,9 +31,10 @@ export function normalizeCapture(snapshot: CaptureSnapshot): Record<string, unkn
     applicationUrl:typeof post.url==='string' && /^https?:\/\//i.test(post.url) && !new URL(post.url).username && !new URL(post.url).password?post.url.slice(0,2048):null,
   };
 }
-export async function processCaptures(env: CaptureConfig, transport: typeof fetch = fetch) {
+export async function processCaptures(env: CaptureConfig, transport: typeof fetch = fetch, options: { shouldContinue?: () => boolean } = {}) {
   if(!env.CAPTURE_WORKER_SECRET) return;
   for(let n=0;n<10;n++) {
+    if(options.shouldContinue && !options.shouldContinue())return;
     const work = await captureRpc(env,'claim_capture',{},transport) as {lease:string;snapshot:CaptureSnapshot}|null;
     if(!work) return;
     let metadata: Record<string,unknown>|null;

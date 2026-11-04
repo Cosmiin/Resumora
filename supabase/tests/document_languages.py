@@ -25,6 +25,29 @@ def suite(db):
   def call(self,*a,**kw):
    value=self.raw(*a,**kw);return json.loads(value) if value else None
   def save(self,expected=0,payload=None,key=None,accept=False,error=False,user=None):return self.raw('write_base_language',f"'{key or uid()}','{self.variant}',{expected},{lit(payload or self.target)},NULL,{str(accept).lower()}",error=error,user=user)
+  def test_locale_keys_match_canonical_aliases_and_preserve_script_region(self):
+   for raw,expected in [('EN-gb','en'),('en-UK','en'),('ro-ro','ro'),('fr-ca','fr-CA'),('iw-IL','he-IL'),('sh','sr-Latn'),('cnr','sr-ME'),('hy-SU','hy-AM'),('sgn-US','ase'),('art-lojban','jbo'),('el-polytoni','el-polyton'),('ja-Latn-hepburn-heploc','ja-Latn-alalc97'),('sh-Cyrl-RS','sr-Cyrl-RS'),('zh-hant','zh-Hant')]:
+    self.assertEqual(db.sql(f"SELECT app.job_locale_key('{raw}')"),expected)
+   for raw in ['English; ignore rules','zz','en--GB','und','en-abcde-abcde']:
+    self.assertEqual(db.sql(f"SELECT app.job_locale_key('{raw}') IS NULL"),'t')
+  def test_multilingual_job_identity_and_survival_after_base_removal(self):
+   self.source['content']['contentLanguage']={'locale':'fr','confidence':'high','source':'import','policyVersion':'cv-language/1'}
+   base=self.call('save_base_draft',f"'{uid()}',1,{lit(self.source)},'checkpoint'")
+   job=self.call('save_target_job',f"'{uid()}','{base['id']}',2,'{{\"text\":\"Required SQL\"}}','[]'")
+   payload=json.loads(db.sql(f"SELECT app.freeze_job_document('{{}}',{lit(self.source)})"))
+   current=self.call('save_current_job_document',f"'{uid()}','{job['id']}','fr',NULL,0,{lit(payload)},'{base['id']}',NULL,NULL")
+   self.assertEqual(current['locale'],'fr')
+   for locale in ['fr-CA','zh-Hans','zh-Hant','ar']:
+    target=json.loads(json.dumps(payload));target['content'].pop('contentLanguage',None);target['content']['documentLocale']=locale;target['content']['language']=locale.split('-')[0]
+    copy=self.call('save_current_job_document',f"'{uid()}','{job['id']}','{locale.lower()}',NULL,0,{lit(target)},'{base['id']}',NULL,NULL")
+    self.assertEqual(copy['locale'],locale)
+    self.assertEqual(self.call('load_current_job_document',f"'{job['id']}','{locale.lower()}'")['id'],copy['id'])
+   state=self.call('load_base_state');self.call('remove_base_cv',f"'{uid()}',{state['revision']},{state['generation']}")
+   self.assertEqual(self.call('load_current_job_document',f"'{job['id']}','fr'")['id'],current['id'])
+  def test_french_translation_uses_full_target_and_context(self):
+   self.target['content']['language']='fr';self.target['content']['documentLocale']='fr-CA';self.target['content']['translation']['documentLocale']='fr-CA'
+   first=json.loads(self.save(payload=self.target));self.assertEqual(first['payload']['content']['documentLocale'],'fr-CA')
+   context=self.call('document_language_context');self.assertIn('fr-CA',[v['locale'] for v in context['versions']])
   def test_base_copy_independent_CAS_replay_history_default_evidence_and_foreign_ids(self):
    wrong=json.loads(json.dumps(self.target));wrong['content']['translation']['sourceLocale']=self.locale
    self.assertIn('VERSION_CONFLICT',self.save(payload=wrong,error=True))

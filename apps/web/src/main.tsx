@@ -10,9 +10,13 @@ createRoot(document.getElementById("root")!).render(
     {window.location.pathname === "/extension" ? (
       <ExtensionPage />
     ) : (
-      <AuthShell>
-        {(account, transport) => (
-          <ConnectedApp account={account} transport={transport} />
+      <AuthShell accountMenuInShell>
+        {(account, transport, accountActions) => (
+          <ConnectedApp
+            account={account}
+            transport={transport}
+            accountActions={accountActions}
+          />
         )}
       </AuthShell>
     )}

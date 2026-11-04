@@ -1,3 +1,19 @@
+import { useContentLanguage } from "./components/useContentLanguage";
+import { ContentLanguageControl } from "./components/ContentLanguageControl";
+import { contentLocale } from "@resumora/contracts/editor/content-language";
+import { ExperienceWorkspace } from "./components/GuidedExperience";
+import { ImproveSkills } from './components/ImproveSkills';
+import { experienceTarget } from "@resumora/contracts/intelligence/experience";
+import {
+  ExperienceScoresContext,
+  useProfileExperienceScores,
+} from "./components/useProfileExperienceScores";
+import { mergeExperienceScoreState } from "./base/experience";
+import { WorkspaceAppShell } from "./workspace/AppShell";
+import { WorkspaceContext } from "./workspace/context";
+import { DocumentController } from "./workspace/document-controller";
+import { ProfileOverview } from "./components/ProfileOverview";
+import { ProfileStructure } from "./components/ProfileStructure";
 import { LanguageVersions } from "./languages/LanguageVersions";
 import { HttpLanguageCvAdapter } from "./languages/adapter";
 import { AppearanceExport } from "./export/AppearanceExport";
@@ -10,8 +26,9 @@ import { ImportReview } from "./components/ImportReview";
 import type { IntelligenceClient } from "./base/intelligence";
 import type { CvPhoto } from "@resumora/contracts/editor/photo";
 import { PhotoEditor } from "./photo/PhotoEditor";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
+  MoreHorizontal,
   FileText,
   History,
   Home,
@@ -65,80 +82,23 @@ export function App({
   adapter = sessionAdapter,
   intelligence,
   transport,
+  accountActions,
 }: {
+  accountActions?: import("react").ReactNode;
   adapter?: BaseCvAdapter;
   intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
-  const [uiLocale, setUiLocale] = useState<Locale>("ro");
-  const [language, setLanguage] = useState<HttpLanguageCvAdapter | null>(null);
-  const [job, setJob] = useState<{
-    id: string;
-    label: string;
-    adapter: HttpJobCvAdapter;
-  } | null>(null);
-  const active = job?.adapter ?? language ?? adapter;
-  if (!adapterKeys.has(active)) adapterKeys.set(active, ++nextAdapterKey);
-  if (!adapterKeys.has(adapter)) adapterKeys.set(adapter, ++nextAdapterKey);
   return (
-    <CvEditor
-      key={adapterKeys.get(active)}
-      adapter={active}
-      uiLocale={uiLocale}
-      onUiLocaleChange={setUiLocale}
-      switchLanguage={
-        transport
-          ? (value) => {
-              if (job) {
-                setJob({
-                  ...job,
-                  adapter: new HttpJobCvAdapter(
-                    transport,
-                    job.id,
-                    value.locale.split("-")[0] as Locale,
-                  ),
-                });
-              } else
-                setLanguage(
-                  value.variantId
-                    ? new HttpLanguageCvAdapter(
-                        transport,
-                        value.variantId,
-                        value.locale,
-                      )
-                    : null,
-                );
-              window.location.hash = "base";
-            }
-          : undefined
-      }
-      jobLabel={job?.label}
-      switchDocument={
-        transport
-          ? (selected) => {
-              setLanguage(null);
-              setJob(
-                selected
-                  ? {
-                      ...selected,
-                      adapter: new HttpJobCvAdapter(
-                        transport,
-                        selected.id,
-                        selected.locale,
-                      ),
-                    }
-                  : null,
-              );
-              window.location.hash = "base";
-            }
-          : undefined
-      }
+    <WorkspaceAppShell
+      adapter={adapter}
+      intelligence={intelligence}
       transport={transport}
-      intelligence={job || language ? undefined : intelligence}
+      accountActions={accountActions}
     />
   );
 }
-function CvEditor({
+export function CvEditor({
   uiLocale,
   onUiLocaleChange,
   switchLanguage,
@@ -147,18 +107,58 @@ function CvEditor({
   adapter,
   intelligence,
   transport,
+  embedded = false,
+  active = true,
+  resourceKey = "profile",
+  routeOverride,
+  navigate,
+  enrichTarget,
+  onState,
+  refreshKey,
+  appearanceOnly = false,
+  importId,
+  onOpenImport,
 }: {
+  embedded?: boolean;
+  active?: boolean;
+  resourceKey?: string;
+  routeOverride?: Route;
+  navigate?: (route: Route, targetId?: string) => void;
+  enrichTarget?: string;
+  onState?: (state: {
+    draft: BaseDraft | null;
+    head: Snapshot | null | undefined;
+    ready: boolean;
+    dirty: boolean;
+    error: string | null;
+  }) => void;
+  refreshKey?: string;
+  appearanceOnly?: boolean;
+  importId?: string;
+  onOpenImport?: (id: string) => void;
   adapter: BaseCvAdapter;
   uiLocale: Locale;
   onUiLocaleChange: (locale: Locale) => void;
   switchLanguage?: (value: { locale: string; variantId?: string }) => void;
   jobLabel?: string;
   switchDocument?: (
-    job: { id: string; label: string; locale?: "ro" | "en" } | null,
+    job: { id: string; label: string; locale?: string } | null,
   ) => void;
   intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
+  const registry = useContext(WorkspaceContext);
+  const localController = useRef<DocumentController | null>(null);
+  if (!localController.current)
+    localController.current = new DocumentController();
+  let controller = registry?.documents.get(resourceKey);
+  if (!controller) {
+    controller = localController.current;
+    registry?.documents.set(resourceKey, controller);
+    controller.subscribe(() => registry?.notify());
+  }
+  const documentController = controller;
+  documentController.adapter = adapter;
   const jobMode = adapter instanceof HttpJobCvAdapter;
   const languageMode = adapter instanceof HttpLanguageCvAdapter;
   const representationMode = jobMode || languageMode;
@@ -166,22 +166,29 @@ function CvEditor({
   const locale = uiLocale,
     setLocale = onUiLocaleChange,
     t = (ro: string, en: string) => (locale === "ro" ? ro : en);
-  const [route, setRoute] = useState<Route>(() =>
-      representationMode ? "base" : currentRoute(),
+  const [route, setRoute] = useState<Route>(
+      () => routeOverride ?? (representationMode ? "base" : currentRoute()),
     ),
-    [draft, setDraft] = useState<BaseDraft | null>(null),
-    [head, setHead] = useState<Snapshot | null | undefined>(undefined);
+    [draft, setDraft] = useState<BaseDraft | null>(
+      documentController.latest.current,
+    ),
+    [head, setHead] = useState<Snapshot | null | undefined>(
+      documentController.head.current,
+    );
   const [past, setPast] = useState<BaseDraft[]>([]),
     [undoFrom, setUndoFrom] = useState<BaseDraft | null>(null),
     [versions, setVersions] = useState<Snapshot[]>([]),
     [inspected, setInspected] = useState<Snapshot | null>(null);
+  const [skillsImproving, setSkillsImproving] = useState(() => documentController.profileChangesBlocked());
+  const [skillsStartRequested, setSkillsStartRequested] = useState(false);
+  const profileBlocked = skillsImproving || documentController.profileChangesBlocked();
   const [issues, setIssues] = useState<Issue[]>([]),
-    [busy, setBusy] = useState(false),
+    [busy, setBusy] = useState(documentController.lock.current),
     [loading, setLoading] = useState(true),
     [loadAttempt, setLoadAttempt] = useState(0),
     [historyAttempt, setHistoryAttempt] = useState(0),
     [historyError, setHistoryError] = useState(false),
-    [error, setError] = useState<string | null>(null),
+    [error, setError] = useState<string | null>(documentController.error),
     [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState<
     | { kind: "replace"; next: BaseDraft }
@@ -210,13 +217,13 @@ function CvEditor({
       documentEpoch.current++;
     };
   }, []);
-  const generation = useRef(0),
-    lock = useRef(false),
-    latest = useRef(draft),
-    headRef = useRef(head),
+  const generation = documentController.generation,
+    lock = documentController.lock,
+    latest = documentController.latest,
+    headRef = documentController.head,
     saveRef = useRef<() => void>(() => {}),
     main = useRef<HTMLElement>(null);
-  const pendingWrite = useRef<PendingWrite | null>(null);
+  const pendingWrite = documentController.pending;
   latest.current = draft;
   headRef.current = head;
   const [asOf] = useState(() => {
@@ -239,13 +246,105 @@ function CvEditor({
   const warnOnUnload = durable
     ? dirty || uncertainDraft || error === "conflict"
     : !!(draft || head);
+  const profileWorkspace = embedded && !representationMode;
+  const automaticScoresEnabled = !!(
+    !profileBlocked &&
+    active &&
+    profileWorkspace &&
+    draft &&
+    intelligence?.experience &&
+    !loading &&
+    !removal &&
+    !pendingImportedCandidates(draft).length &&
+    ["base", "enrich"].includes(route)
+  );
+  const languageResolution = useContentLanguage({
+    draft,
+    saved: head,
+    enabled: !!(
+      active &&
+      !loading &&
+      !removal &&
+      !dirty &&
+      !busy &&
+      !pendingWrite.current &&
+      !error
+    ),
+    scope: documentController,
+    change,
+    request: intelligence?.detectLanguage,
+  });
+  const experienceScores = useProfileExperienceScores({
+    draft,
+    enabled: automaticScoresEnabled && languageResolution.ready,
+    feedbackLocale: draft ? contentLocale(draft) : undefined,
+    ready: !dirty && !busy && !error && !pendingWrite.current,
+    priority: enrichTarget,
+    change: (scored, roleId, kind) => {
+      const current = latest.current;
+      if (!current || removalBlocked || documentController.profileChangesBlocked()) return;
+      const next = mergeExperienceScoreState(current, scored, roleId, kind);
+      if (equalValues(next, current)) return;
+      generation.current++;
+      latest.current = next;
+      setDraft(next);
+    },
+    request: intelligence?.experience
+      ? async (context, recoverOnly) => {
+          const saved = headRef.current;
+          if (
+            !saved ||
+            (!recoverOnly && !equalValues(latest.current, saved.draft))
+          )
+            throw new Error("SAVE_REQUIRED");
+          return intelligence.experience!(
+            { ...context, snapshotId: saved.id, revision: saved.revision },
+            recoverOnly,
+          );
+        }
+      : undefined,
+  });
+  const PresentationSurface = profileWorkspace ? "details" : "div";
   const editing =
     !!draft && !removalBlocked && ["base", "enrich", "review"].includes(route);
-  const go = useCallback((next: Route) => {
-    window.location.hash = next;
-    setRoute(next);
-  }, []);
+  const go = useCallback(
+    (next: Route) => {
+      if (navigate) {
+        navigate(next);
+        return;
+      }
+      window.location.hash = next;
+      setRoute(next);
+    },
+    [navigate],
+  );
   useEffect(() => {
+    if (routeOverride) setRoute(routeOverride);
+  }, [routeOverride]);
+  useEffect(
+    () =>
+      documentController.subscribe(() => {
+        setDraft(documentController.latest.current);
+        setHead(documentController.head.current);
+        setBusy(documentController.lock.current);
+        setSkillsImproving(documentController.profileChangesBlocked());
+        setError(documentController.error);
+      }),
+    [documentController],
+  );
+  documentController.error = error;
+  documentController.unsaved = dirty || !!pendingWrite.current;
+  useEffect(() => {
+    onState?.({
+      draft,
+      head,
+      ready: !profileBlocked && !dirty && !busy && !error && !loading && !pendingWrite.current,
+      dirty,
+      error,
+    });
+  }, [draft, head, dirty, busy, error, loading, profileBlocked]);
+  useEffect(() => {
+    if (embedded) return;
     const change = () => {
       const next = currentRoute();
       setRoute(
@@ -263,7 +362,8 @@ function CvEditor({
   }, [route]);
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.title = `Resumora · ${jobLabel ?? t("CV de bază", "Base CV")}`;
+    if (!embedded)
+      document.title = `Resumora · ${jobLabel ?? t("CV de bază", "Base CV")}`;
   }, [locale]);
   useEffect(() => {
     let cancelled = false;
@@ -273,7 +373,12 @@ function CvEditor({
       .then((s) => {
         if (!cancelled) {
           setHead(s);
-          if (s && !latest.current)
+          const cleanPrevious =
+            !!latest.current &&
+            !!headRef.current &&
+            !pendingWrite.current &&
+            matchesSavedDraft(headRef.current.draft, latest.current);
+          if (s && (!latest.current || cleanPrevious))
             setDraft(
               representationMode ? clone(s.draft) : prepareDraft(s.draft),
             );
@@ -281,7 +386,10 @@ function CvEditor({
             setDraft(adapter.initialDraft());
           setLoading(false);
           setError(
-            s && latest.current && !matchesSavedDraft(s.draft, latest.current)
+            s &&
+              latest.current &&
+              !cleanPrevious &&
+              !matchesSavedDraft(s.draft, latest.current)
               ? "conflict"
               : null,
           );
@@ -296,7 +404,7 @@ function CvEditor({
     return () => {
       cancelled = true;
     };
-  }, [adapter, loadAttempt]);
+  }, [adapter, loadAttempt, refreshKey]);
   useEffect(() => {
     if (!warnOnUnload) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -324,8 +432,8 @@ function CvEditor({
       cancelled = true;
     };
   }, [route, head?.id, adapter, historyAttempt]);
-  function change(next: BaseDraft) {
-    if (removalBlocked) return;
+  function change(next: BaseDraft, skillsReceipt = false) {
+    if (removalBlocked || (!skillsReceipt && documentController.profileChangesBlocked())) return;
     const current = latest.current;
     if (equalValues(next, current)) return;
     generation.current++;
@@ -342,6 +450,7 @@ function CvEditor({
       setError(null);
   }
   async function commitPhoto(photo: CvPhoto | null, expected: CvPhoto | null) {
+    if (documentController.profileChangesBlocked()) return false;
     // Merge against the latest text/presentation, not a closure captured before upload.
     // An unresolved save must be reconciled by the existing coordinator first.
     const current = latest.current;
@@ -366,7 +475,7 @@ function CvEditor({
     );
   }
   function openDraft(next: BaseDraft) {
-    if (removalBlocked) return;
+    if (removalBlocked || documentController.profileChangesBlocked()) return;
     generation.current++;
     const ready = representationMode ? clone(next) : prepareDraft(next);
     latest.current = ready;
@@ -378,6 +487,7 @@ function CvEditor({
     go("base");
   }
   function start(next: BaseDraft) {
+    if (documentController.profileChangesBlocked()) return;
     if (draft && dirty) setDialog({ kind: "replace", next });
     else openDraft(next);
   }
@@ -420,74 +530,22 @@ function CvEditor({
     await submitPendingWrite();
   }
   async function submitPendingWrite() {
-    const operation = pendingWrite.current;
-    if (!operation || operation.expired || lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    const epoch = documentEpoch.current;
-    try {
-      const saved =
-        operation.kind === "save"
-          ? await adapter.save(clone(operation.input))
-          : await adapter.restore(clone(operation.input));
-      if (!alive.current || epoch !== documentEpoch.current) return;
-      pendingWrite.current = null;
-      headRef.current = saved;
-      setHead(saved);
-      setError(null);
-      if (operation.kind === "restore") {
-        if (operation.generation === generation.current) {
-          openDraft(saved.draft);
-          setNotice(
-            t(
-              `Restaurat ca v${saved.revision}; istoricul este păstrat.`,
-              `Restored as v${saved.revision}; history retained.`,
-            ),
-          );
-        } else
-          setNotice(
-            t(
-              "Versiune restaurată; editările mai noi rămân în ciornă.",
-              "Version restored; newer edits remain in your draft.",
-            ),
-          );
+    const result = await documentController.submit(adapter);
+    if (!alive.current || !result) return;
+    const { operation, saved } = result;
+    if (saved) {
+      if (
+        operation.kind === "restore" &&
+        operation.generation === generation.current
+      ) {
+        openDraft(saved.draft);
         setInspected(null);
-      } else if (operation.generation === generation.current)
-        setNotice(
-          operation.input.mode === "autosave"
-            ? ""
-            : durable
-              ? t("Salvat în cont.", "Saved to your account.")
-              : t("Salvat în sesiune.", "Saved in session."),
-        );
-    } catch (e) {
-      if (!alive.current || epoch !== documentEpoch.current) return;
-      if (e instanceof AdapterError) {
-        if (e.code === "expired") operation.expired = true;
-        else if (
-          !operation.uncertain ||
-          !["unauthenticated", "forbidden", "missing"].includes(e.code)
-        )
-          pendingWrite.current = null;
-      } else operation.uncertain = true;
-      const supersededRejection =
-        !pendingWrite.current &&
-        e instanceof AdapterError &&
-        (e.code === "rejected" || e.code === "validation") &&
-        operation.generation !== generation.current;
-      setError(
-        supersededRejection
-          ? null
-          : e instanceof AdapterError
-            ? e.code
-            : "save",
-      );
-    } finally {
-      if (alive.current && epoch === documentEpoch.current) {
-        lock.current = false;
-        setBusy(false);
-        if (operation.kind === "restore") setDialog(null);
-      }
+        setDialog(null);
+      } else if (
+        operation.kind === "save" &&
+        operation.input.mode !== "autosave"
+      )
+        setNotice(t("Salvat în cont.", "Saved to your account."));
     }
   }
   async function reconcilePendingWrite() {
@@ -505,12 +563,12 @@ function CvEditor({
         (operation.kind === "save"
           ? matchesSavedDraft(saved.draft, operation.input.draft)
           : saved.restoredFrom === operation.input.snapshotId);
-      pendingWrite.current = null;
       if (!unchanged && !applied) {
+        pendingWrite.current = null;
         setError("conflict");
         return;
       }
-      headRef.current = saved;
+      if (!documentController.acceptReconciledWrite(operation, saved, applied)) return;
       setHead(saved);
       if (
         applied &&
@@ -538,14 +596,14 @@ function CvEditor({
   };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      if (active && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         saveRef.current();
       }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, []);
+  }, [active]);
   useEffect(() => {
     if (
       !dirty ||
@@ -563,6 +621,7 @@ function CvEditor({
     return () => clearTimeout(timer);
   }, [draft, dirty, busy, loading, error, removalBlocked]);
   function discardRemovedDraft(saved: Snapshot | null = null) {
+    registry?.clearProfile();
     documentEpoch.current++;
     generation.current++;
     pendingWrite.current = null;
@@ -582,6 +641,7 @@ function CvEditor({
     go("base");
   }
   async function removeBase(input?: RemovalInput) {
+    if (documentController.profileChangesBlocked()) return;
     if (!adapter.remove || lock.current || pendingWrite.current || jobMode)
       return;
     const state = adapter.lifecycle?.();
@@ -710,6 +770,7 @@ function CvEditor({
     };
   }, [adapter, jobMode]);
   async function reopen() {
+    if (documentController.profileChangesBlocked()) return;
     if (lock.current || pendingWrite.current) return;
     lock.current = true;
     setBusy(true);
@@ -746,6 +807,7 @@ function CvEditor({
     }
   }
   async function restore(snapshot: Snapshot) {
+    if (documentController.profileChangesBlocked()) return;
     if (headRef.current === undefined || lock.current || pendingWrite.current)
       return;
     pendingWrite.current = {
@@ -759,6 +821,202 @@ function CvEditor({
     };
     await submitPendingWrite();
   }
+  async function ensureCheckpoint() {
+    if (pendingWrite.current) await submitPendingWrite();
+    if (pendingWrite.current || documentController.error)
+      throw Error("unresolvedSave");
+    if (!latest.current) throw Error("missingDocument");
+    if (
+      !headRef.current ||
+      !matchesSavedDraft(headRef.current.draft, latest.current)
+    )
+      await save("autosave");
+    if (pendingWrite.current || documentController.error || !headRef.current)
+      throw Error("unresolvedSave");
+    if (!jobMode) {
+      const found = validateDraft(latest.current!);
+      if (found.length) {
+        setIssues(found);
+        go("base");
+        focusField(found[0].field);
+        throw Error("validation");
+      }
+      if (headRef.current.reason === "autosave") await save("checkpoint");
+    }
+    if (pendingWrite.current || documentController.error || !headRef.current)
+      throw Error("unresolvedSave");
+    return headRef.current;
+  }
+  async function exportPin(): Promise<
+    import("./export/AppearanceExport").ExportPin
+  > {
+    const saved = await ensureCheckpoint();
+    if (jobMode) {
+      const id = adapter.exportDocumentId();
+      if (!id) throw Error("missingDocument");
+      return {
+        kind: "job",
+        jobId: adapter.jobId,
+        documentId: id,
+        locale: contentLocale(saved.draft),
+        fingerprint: adapter.exportFingerprint(),
+        versionId: saved.id,
+        revision: saved.revision,
+      };
+    }
+    return {
+      kind: "base",
+      ...(languageMode ? { variantId: adapter.variantId } : {}),
+      versionId: saved.id,
+      revision: saved.revision,
+    };
+  }
+  const renderEnrichment = (targetId: string) =>
+    draft ? (
+      profileWorkspace && targetId === '__improve_skills' ? (
+        <ImproveSkills draft={draft} change={(next) => change(next, true)} onActivityChange={documentController.setSkillsImproving}
+          startRequested={skillsStartRequested} onStartConsumed={() => setSkillsStartRequested(false)}
+          ready={languageResolution.ready && !dirty && !busy && !error && !pendingWrite.current}
+          saveFailed={!!error} snapshot={head ?? undefined}
+          request={async (context, recoverOnly) => {
+            if (!intelligence?.improveSkills) throw Error('AI_DISABLED');
+            return intelligence.improveSkills(context, recoverOnly);
+          }}
+          commit={(identity, inventory) => documentController.commitSkillInventory(adapter, identity, inventory, {retryTransient:true})}
+          undo={() => documentController.undoSkillInventory(adapter, {retryTransient:true})}
+          canUndo={documentController.canUndoSkillInventory()}
+          retrySaveAutomatically={error === 'save' && !busy && !!pendingWrite.current}
+          retrySave={pendingWrite.current ? () => { if (pendingWrite.current?.expired) void reconcilePendingWrite(); else void submitPendingWrite(); } : undefined}
+        />
+      ) :
+      profileWorkspace &&
+      (targetId === "__skills" ||
+        (intelligence?.experience && experienceTarget(draft, targetId))) ? (
+        <ExperienceWorkspace
+          key={targetId}
+          draft={draft}
+          targetId={targetId}
+          change={change}
+          ready={
+            languageResolution.ready &&
+            !dirty &&
+            !busy &&
+            !error &&
+            !pendingWrite.current
+          }
+          saveFailed={!!error}
+          retrySave={
+            pendingWrite.current
+              ? () => {
+                  if (pendingWrite.current?.expired)
+                    void reconcilePendingWrite();
+                  else void submitPendingWrite();
+                }
+              : undefined
+          }
+          transcribe={
+            intelligence?.transcribe
+              ? async (audio, signal) => {
+                  const saved = headRef.current;
+                  if (!saved) throw new Error("SAVE_REQUIRED");
+                  return intelligence.transcribe!(
+                    {
+                      snapshotId: saved.id,
+                      revision: saved.revision,
+                      targetId,
+                      operationId: crypto.randomUUID(),
+                    },
+                    audio,
+                    signal,
+                  );
+                }
+              : undefined
+          }
+          request={async (context, recoverOnly, onDraft) => {
+            if (!intelligence?.experience) throw new Error("AI_DISABLED");
+            const saved = headRef.current;
+            if (
+              !saved ||
+              (!recoverOnly && !equalValues(latest.current, saved.draft))
+            )
+              throw new Error("SAVE_REQUIRED");
+            return intelligence.experience!(
+              { ...context, snapshotId: saved.id, revision: saved.revision },
+              recoverOnly,
+              onDraft,
+            );
+          }}
+        />
+      ) : (
+        <Enrichment
+          autoStart={profileWorkspace}
+          embedded={embedded}
+          selectedTargetId={embedded ? targetId : undefined}
+          transport={transport}
+          snapshot={head ?? null}
+          ready={
+            languageResolution.ready &&
+            !dirty &&
+            !busy &&
+            !error &&
+            !pendingWrite.current
+          }
+          durable={durable}
+          saveFailed={!!error}
+          retrySave={
+            pendingWrite.current
+              ? () => {
+                  if (pendingWrite.current?.expired)
+                    void reconcilePendingWrite();
+                  else void submitPendingWrite();
+                }
+              : undefined
+          }
+          rewriteRole={
+            intelligence
+              ? async (targetId, purpose) => {
+                  const saved = headRef.current;
+                  if (!saved || !equalValues(latest.current, saved.draft))
+                    throw new Error("SAVE_REQUIRED");
+                  const started = generation.current;
+                  const result = await intelligence.rewrite({
+                    snapshotId: saved.id,
+                    revision: saved.revision,
+                    targetId,
+                    ...(purpose ? { purpose } : {}),
+                    operationId: crypto.randomUUID(),
+                  });
+                  if (started !== generation.current) throw new Error("STALE");
+                  return result;
+                }
+              : undefined
+          }
+          prepareQuestions={
+            intelligence
+              ? async (targetId) => {
+                  const saved = headRef.current;
+                  if (!saved || !equalValues(latest.current, saved.draft))
+                    throw new Error("SAVE_REQUIRED");
+                  const started = generation.current;
+                  const result = await intelligence.questions({
+                    snapshotId: saved.id,
+                    revision: saved.revision,
+                    targetId,
+                    operationId: crypto.randomUUID(),
+                  });
+                  if (started !== generation.current) throw new Error("STALE");
+                  return result;
+                }
+              : undefined
+          }
+          draft={draft}
+          undoFrom={undoFrom}
+          change={change}
+          goEdit={() => go("base")}
+          asOf={asOf}
+        />
+      )
+    ) : null;
   const nav = [
     { route: "home", label: t("Acasă", "Home"), Icon: Home },
     {
@@ -781,685 +1039,856 @@ function CvEditor({
     : route === "enrich"
       ? t("Mai mult context, pas cu pas", "More context, one step at a time")
       : t("CV-ul tău de bază", "Your Base CV");
+  const MainSurface = embedded ? "section" : "main";
+  if (!active) return null;
   return (
     <LanguageContext value={locale}>
-      <a
-        className="skip-link"
-        href="#main"
-        onClick={(e) => {
-          e.preventDefault();
-          main.current?.focus();
-        }}
+      <ExperienceScoresContext
+        value={automaticScoresEnabled ? experienceScores : null}
       >
-        {t("Mergi la conținut", "Skip to content")}
-      </a>
-      <header className="topbar">
-        <a className="brand" href="#home" aria-label="Resumora">
-          <img
-            src="/resumora-logo.svg"
-            alt="Resumora"
-            width="142"
-            height="34"
-          />
-        </a>
-        <div className="header-tools">
-          <label>
-            {t("Interfață", "Interface")}
-            <select
-              aria-label={t("Limba interfeței", "Interface language")}
-              value={locale}
-              onChange={(e) => setLocale(e.target.value as Locale)}
-            >
-              <option value="ro">RO</option>
-              <option value="en">EN</option>
-            </select>
-          </label>
-          {draft && (
-            <label>
-              {t("CV", "CV")}
-              <select
-                aria-label={t("Limba CV-ului", "CV language")}
-                disabled={representationMode}
-                value={draft.language}
-                onChange={(e) =>
-                  change({
-                    ...clone(draft),
-                    language: e.target.value as Locale,
-                  })
-                }
-              >
-                <option value="ro">RO</option>
-                <option value="en">EN</option>
-              </select>
-            </label>
-          )}
-        </div>
-      </header>
-      <div className="app-layout">
-        <aside className="sidebar">
-          <nav aria-label={t("Navigare principală", "Main navigation")}>
-            <a href="/extension">{t("Extensie Chrome", "Chrome extension")}</a>
-            {nav
-              .filter(
-                (n) =>
-                  !representationMode ||
-                  n.route === "base" ||
-                  (languageMode && n.route === "history"),
-              )
-              .map((n) => (
-                <a
-                  key={n.route}
-                  href={`#${n.route}`}
-                  aria-current={route === n.route ? "page" : undefined}
+        {!embedded && (
+          <a
+            className="skip-link"
+            href="#main"
+            onClick={(e) => {
+              e.preventDefault();
+              main.current?.focus();
+            }}
+          >
+            {t("Mergi la conținut", "Skip to content")}
+          </a>
+        )}
+        {!embedded && (
+          <header className="topbar">
+            <a className="brand" href="#home" aria-label="Resumora">
+              <img
+                src="/resumora-logo.svg"
+                alt="Resumora"
+                width="142"
+                height="34"
+              />
+            </a>
+            <div className="header-tools">
+              <label>
+                {t("Interfață", "Interface")}
+                <select
+                  aria-label={t("Limba interfeței", "Interface language")}
+                  value={locale}
+                  onChange={(e) => setLocale(e.target.value as Locale)}
                 >
-                  <n.Icon size={19} />
-                  <span>{n.label}</span>
-                </a>
-              ))}
-          </nav>
-        </aside>
-        <main
-          id="main"
-          ref={main}
-          tabIndex={-1}
-          className={editing ? "editing-page" : ""}
+                  <option value="ro">RO</option>
+                  <option value="en">EN</option>
+                </select>
+              </label>
+            </div>
+          </header>
+        )}
+        <div
+          className={`app-layout ${embedded ? "document-controller-layout" : ""}`}
         >
-          {languageMode && (
-            <section className="notice">
-              <p>
-                {t(
-                  "Versiune de limbă independentă. CV-ul de bază sursă rămâne neschimbat.",
-                  "Independent language copy. The source Base CV remains unchanged.",
-                )}
-              </p>
-              <Button
-                disabled={dirty || busy || !!pendingWrite.current}
-                onClick={() => switchLanguage?.({ locale: "" })}
-              >
-                {t("Înapoi la CV-ul de bază", "Return to Base CV")}
-              </Button>
-            </section>
+          {!embedded && (
+            <aside className="sidebar">
+              <nav aria-label={t("Navigare principală", "Main navigation")}>
+                <a href="/extension">
+                  {t("Extensie Chrome", "Chrome extension")}
+                </a>
+                {nav
+                  .filter(
+                    (n) =>
+                      !representationMode ||
+                      n.route === "base" ||
+                      (languageMode && n.route === "history"),
+                  )
+                  .map((n) => (
+                    <a
+                      key={n.route}
+                      href={`#${n.route}`}
+                      aria-current={route === n.route ? "page" : undefined}
+                    >
+                      <n.Icon size={19} />
+                      <span>{n.label}</span>
+                    </a>
+                  ))}
+              </nav>
+            </aside>
           )}
-          {jobMode && (
-            <section className="notice" aria-label="Job CV context">
-              <strong>
-                {t("CV pentru job", "Job CV")} · {jobLabel}
-              </strong>
-              <p>
-                {t(
-                  "Salvarea înlocuiește CV-ul curent pentru acest job și această limbă. CV-urile adaptate nu au istoric. CV-ul de bază rămâne independent.",
-                  "Saving replaces the current CV for this job and language. Tailored CVs have no history. Base CV remains independent.",
-                )}
-              </p>
-              <Button
-                disabled={
-                  dirty ||
-                  busy ||
-                  loading ||
-                  !!pendingWrite.current ||
-                  (!!draft && !!error)
-                }
-                onClick={() => switchDocument?.(null)}
-              >
-                {t("Înapoi la CV-ul de bază", "Return to Base CV")}
-              </Button>
-              {(dirty || pendingWrite.current || (draft && error)) && (
+          <MainSurface
+            id="main"
+            ref={main}
+            tabIndex={embedded ? undefined : -1}
+            className={editing ? "editing-page" : ""}
+          >
+            {languageMode && (
+              <section className="notice">
                 <p>
                   {t(
-                    "Salvează sau rezolvă salvarea înainte de schimbarea CV-ului.",
-                    "Save or resolve the write before switching CVs.",
+                    "Versiune de limbă independentă. CV-ul de bază sursă rămâne neschimbat.",
+                    "Independent language copy. The source Base CV remains unchanged.",
                   )}
                 </p>
-              )}
-            </section>
-          )}
-          <div className="page-heading">
-            <h1>
-              {editing
-                ? editingTitle
-                : route === "history"
-                  ? durable
-                    ? t("Istoric", "History")
-                    : t("Istoric în sesiune", "Session history")
-                  : "Resumora"}
-            </h1>
-            {editing && (
-              <div className="actions">
-                {!representationMode && route === "base" && adapter.remove && (
-                  <Button
-                    disabled={busy || loading || !!pendingWrite.current}
-                    onClick={() => setDialog({ kind: "remove" })}
-                  >
-                    {t("Elimină CV-ul de bază", "Remove Base CV")}
-                  </Button>
-                )}
-                {!jobMode && (
-                  <Button onClick={() => go("history")}>
-                    <History size={16} />
-                    {t("Istoric", "History")}
-                  </Button>
-                )}
-                {!representationMode && (
-                  <Button
-                    onClick={() => go(route === "enrich" ? "base" : "enrich")}
-                  >
-                    {route === "enrich"
-                      ? t("Editor", "Editor")
-                      : t("Întrebări", "Questions")}
-                  </Button>
-                )}
-              </div>
+                <Button
+                  disabled={dirty || busy || !!pendingWrite.current}
+                  onClick={() => switchLanguage?.({ locale: "" })}
+                >
+                  {t("Înapoi la CV-ul de bază", "Return to Base CV")}
+                </Button>
+              </section>
             )}
-          </div>
-          {error && (
-            <div role="alert" className="notice notice-error">
-              {pendingWrite.current?.expired
-                ? t(
-                    "Rezultatul salvării nu mai poate fi reluat. Verifică starea salvată; editările tale vor fi păstrate.",
-                    "This save can no longer be replayed. Check saved state; your edits will be retained.",
-                  )
-                : error === "conflict"
-                  ? jobMode
-                    ? t(
-                        "CV-ul curent s-a schimbat. Redeschide-l pentru a continua; ciorna ta este păstrată.",
-                        "Current CV changed. Reopen it to continue; your draft is retained.",
-                      )
-                    : t(
-                        "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
-                        "Session changed. Your draft is retained; inspect history before reopening.",
-                      )
-                  : t(
-                      "Acțiunea a eșuat; ciorna este păstrată.",
-                      "The action failed; your draft is retained.",
-                    )}
-              {(pendingWrite.current ||
-                error === "conflict" ||
-                error === "load") && (
+            {jobMode && (
+              <section className="notice" aria-label="Job CV context">
+                <strong>
+                  {t("CV pentru job", "Job CV")} · {jobLabel}
+                </strong>
+                <p>
+                  {t(
+                    "Salvarea înlocuiește CV-ul curent pentru acest job și această limbă. CV-urile adaptate nu au istoric. CV-ul de bază rămâne independent.",
+                    "Saving replaces the current CV for this job and language. Tailored CVs have no history. Base CV remains independent.",
+                  )}
+                </p>
                 <Button
-                  disabled={busy}
-                  onClick={() =>
-                    pendingWrite.current
-                      ? pendingWrite.current.expired
-                        ? void reconcilePendingWrite()
-                        : void submitPendingWrite()
-                      : error === "conflict"
-                        ? jobMode
-                          ? setDialog({ kind: "reopen" })
-                          : go("history")
-                        : head === undefined || !draft
-                          ? setLoadAttempt((n) => n + 1)
-                          : dirty
-                            ? setDialog({ kind: "reopen" })
-                            : void reopen()
+                  disabled={
+                    dirty ||
+                    busy ||
+                    loading ||
+                    !!pendingWrite.current ||
+                    (!!draft && !!error)
                   }
+                  onClick={() => switchDocument?.(null)}
                 >
-                  {pendingWrite.current?.expired
-                    ? t("Verifică starea salvată", "Check saved state")
-                    : !pendingWrite.current && error === "conflict"
-                      ? jobMode
-                        ? t("Redeschide CV-ul curent", "Reopen current CV")
-                        : t("Istoric", "History")
-                      : t("Reîncearcă", "Retry")}
+                  {t("Înapoi la CV-ul de bază", "Return to Base CV")}
                 </Button>
-              )}
-              {jobMode && error === "conflict" && (
-                <Button
-                  disabled={busy || loading || !!pendingWrite.current}
-                  onClick={() => setDialog({ kind: "reopen" })}
-                >
-                  {t("Redeschide CV-ul curent", "Reopen current CV")}
-                </Button>
-              )}
-            </div>
-          )}
-          {route === "history" && historyError && (
-            <div role="alert" className="notice notice-error">
-              {t(
-                "Istoricul nu a putut fi încărcat.",
-                "History could not be loaded.",
-              )}
-              <Button onClick={() => setHistoryAttempt((n) => n + 1)}>
-                {t("Reîncearcă istoricul", "Retry history")}
-              </Button>
-            </div>
-          )}
-          {removalBlocked ? (
-            <section className="card" role="alert">
-              <h2>
-                {t("Eliminarea nu este confirmată", "Removal is not confirmed")}
-              </h2>
-              <p>
-                {t(
-                  "Păstrăm ciorna fără a o salva din nou. Reîncearcă aceeași operațiune pentru a verifica rezultatul.",
-                  "Your draft is retained without saving it again. Retry the same operation to check its outcome.",
+                {(dirty || pendingWrite.current || (draft && error)) && (
+                  <p>
+                    {t(
+                      "Salvează sau rezolvă salvarea înainte de schimbarea CV-ului.",
+                      "Save or resolve the write before switching CVs.",
+                    )}
+                  </p>
+                )}
+              </section>
+            )}
+            {draft && !representationMode && (
+              <ContentLanguageControl
+                draft={draft}
+                change={change}
+                disabled={profileBlocked || busy || !!removal || !!pendingWrite.current}
+              />
+            )}
+            {languageResolution.error && (
+              <p role="status">
+                {languageResolution.error === "CONTENT_LANGUAGE_INSUFFICIENT"
+                  ? t(
+                      "Adaugă sau clarifică descrierea activităților tale, apoi salvează. Vom verifica din nou limba înainte de recomandări AI.",
+                      "Add or clarify the description of your work, then save. We will check the language again before AI guidance.",
+                    )
+                  : t(
+                      "Limba conținutului nu a putut fi verificată.",
+                      "The content language could not be verified.",
+                    )}{" "}
+                {languageResolution.error !==
+                  "CONTENT_LANGUAGE_INSUFFICIENT" && (
+                  <Button
+                    disabled={
+                      !languageResolution.canRetry || languageResolution.working
+                    }
+                    onClick={languageResolution.retry}
+                  >
+                    {t(
+                      "Reîncearcă verificarea limbii",
+                      "Retry language detection",
+                    )}
+                  </Button>
                 )}
               </p>
-              <Button
-                disabled={busy}
-                onClick={() => void removeBase(removal.input)}
-              >
-                {t("Verifică eliminarea", "Check removal")}
-              </Button>
-            </section>
-          ) : loading ? (
-            <p role="status">{t("Deschidem sesiunea…", "Opening session…")}</p>
-          ) : (
-            <>
-              {route === "home" && (
-                <HomeScreen
-                  durable={durable}
-                  draft={!!draft}
-                  head={head ?? null}
-                  go={go}
-                  reopen={() =>
-                    dirty ? setDialog({ kind: "reopen" }) : void reopen()
+            )}
+            <div className="page-heading">
+              <h1 hidden={embedded && ["base", "start"].includes(route)}>
+                {editing
+                  ? editingTitle
+                  : route === "history"
+                    ? durable
+                      ? t("Istoric", "History")
+                      : t("Istoric în sesiune", "Session history")
+                    : route === "start" && draft
+                      ? t("Actualizează profilul", "Update your profile")
+                      : "Resumora"}
+              </h1>
+              {editing && (
+                <details
+                  className={
+                    profileWorkspace
+                      ? "profile-tools-menu"
+                      : "editor-tools-menu"
                   }
-                />
+                >
+                  <summary aria-label={t("Opțiuni profil", "Profile options")}>
+                    <MoreHorizontal size={22} />
+                    <span className="sr-only">
+                      {t("Opțiuni profil", "Profile options")}
+                    </span>
+                  </summary>
+                  <div className="actions">
+                    {!representationMode &&
+                      route === "base" &&
+                      adapter.remove && (
+                        <Button
+                          disabled={profileBlocked || busy || loading || !!pendingWrite.current}
+                          onClick={() => setDialog({ kind: "remove" })}
+                        >
+                          {t("Elimină CV-ul de bază", "Remove Base CV")}
+                        </Button>
+                      )}
+                    {!jobMode && (
+                      <Button disabled={profileBlocked} onClick={() => go("history")}>
+                        <History size={16} />
+                        {t("Istoric", "History")}
+                      </Button>
+                    )}
+                    {!representationMode && !embedded && (
+                      <Button
+                        onClick={() =>
+                          go(route === "enrich" ? "base" : "enrich")
+                        }
+                      >
+                        {route === "enrich"
+                          ? t("Editor", "Editor")
+                          : t("Întrebări", "Questions")}
+                      </Button>
+                    )}
+                  </div>
+                </details>
               )}
-              {!jobMode &&
-                (route === "start" ||
-                  (["base", "review", "enrich"].includes(route) && !draft)) && (
-                  <StartChooser
-                    start={start}
-                    intelligence={intelligence}
-                    revision={
-                      head?.revision ?? adapter.lifecycle?.().revision ?? 0
+              {!representationMode && route === "start" && draft && (
+                <Button onClick={() => go("base")}>
+                  {t("Înapoi la CV-ul de bază", "Return to Base CV")}
+                </Button>
+              )}
+            </div>
+            {error &&
+              !(
+                profileWorkspace &&
+                registry &&
+                pendingWrite.current &&
+                !pendingWrite.current.expired &&
+                error !== "conflict"
+              ) && (
+                <div role="alert" className="notice notice-error">
+                  {pendingWrite.current?.expired
+                    ? t(
+                        "Rezultatul salvării nu mai poate fi reluat. Verifică starea salvată; editările tale vor fi păstrate.",
+                        "This save can no longer be replayed. Check saved state; your edits will be retained.",
+                      )
+                    : error === "conflict"
+                      ? jobMode
+                        ? t(
+                            "CV-ul curent s-a schimbat. Redeschide-l pentru a continua; ciorna ta este păstrată.",
+                            "Current CV changed. Reopen it to continue; your draft is retained.",
+                          )
+                        : t(
+                            "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
+                            "Session changed. Your draft is retained; inspect history before reopening.",
+                          )
+                      : t(
+                          "Acțiunea a eșuat; ciorna este păstrată.",
+                          "The action failed; your draft is retained.",
+                        )}
+                  {(pendingWrite.current ||
+                    error === "conflict" ||
+                    error === "load") && (
+                    <Button
+                      disabled={busy}
+                      onClick={() =>
+                        pendingWrite.current
+                          ? pendingWrite.current.expired
+                            ? void reconcilePendingWrite()
+                            : void submitPendingWrite()
+                          : error === "conflict"
+                            ? jobMode
+                              ? setDialog({ kind: "reopen" })
+                              : go("history")
+                            : head === undefined || !draft
+                              ? setLoadAttempt((n) => n + 1)
+                              : dirty
+                                ? setDialog({ kind: "reopen" })
+                                : void reopen()
+                      }
+                    >
+                      {pendingWrite.current?.expired
+                        ? t("Verifică starea salvată", "Check saved state")
+                        : !pendingWrite.current && error === "conflict"
+                          ? jobMode
+                            ? t("Redeschide CV-ul curent", "Reopen current CV")
+                            : t("Istoric", "History")
+                          : t("Reîncearcă", "Retry")}
+                    </Button>
+                  )}
+                  {jobMode && error === "conflict" && (
+                    <Button
+                      disabled={profileBlocked || busy || loading || !!pendingWrite.current}
+                      onClick={() => setDialog({ kind: "reopen" })}
+                    >
+                      {t("Redeschide CV-ul curent", "Reopen current CV")}
+                    </Button>
+                  )}
+                </div>
+              )}
+            {route === "history" && historyError && (
+              <div role="alert" className="notice notice-error">
+                {t(
+                  "Istoricul nu a putut fi încărcat.",
+                  "History could not be loaded.",
+                )}
+                <Button onClick={() => setHistoryAttempt((n) => n + 1)}>
+                  {t("Reîncearcă istoricul", "Retry history")}
+                </Button>
+              </div>
+            )}
+            {removalBlocked ? (
+              <section className="card" role="alert">
+                <h2>
+                  {t(
+                    "Eliminarea nu este confirmată",
+                    "Removal is not confirmed",
+                  )}
+                </h2>
+                <p>
+                  {t(
+                    "Păstrăm ciorna fără a o salva din nou. Reîncearcă aceeași operațiune pentru a verifica rezultatul.",
+                    "Your draft is retained without saving it again. Retry the same operation to check its outcome.",
+                  )}
+                </p>
+                <Button
+                  disabled={busy}
+                  onClick={() => void removeBase(removal.input)}
+                >
+                  {t("Verifică eliminarea", "Check removal")}
+                </Button>
+              </section>
+            ) : loading ? (
+              <p role="status">
+                {t("Deschidem sesiunea…", "Opening session…")}
+              </p>
+            ) : (
+              <>
+                {route === "home" && (
+                  <HomeScreen
+                    durable={durable}
+                    draft={!!draft}
+                    head={head ?? null}
+                    go={go}
+                    reopen={() =>
+                      dirty ? setDialog({ kind: "reopen" }) : void reopen()
                     }
                   />
                 )}
-              {draft && ["base", "review"].includes(route) && (
-                <>
-                  {!!issues.length && (
-                    <p role="alert" className="notice notice-error">
-                      {issueText(issues[0].code, t)}
-                    </p>
-                  )}
-                  {!representationMode && draft.importReview && (
-                    <ImportReview
-                      key={draft.importReview.id}
-                      draft={draft}
-                      client={intelligence}
-                      change={change}
-                      disabled={
-                        busy || !!pendingWrite.current || head === undefined
+                {!jobMode &&
+                  (route === "start" ||
+                    (["base", "review", "enrich"].includes(route) &&
+                      !draft)) && (
+                    <StartChooser
+                      openImportId={importId}
+                      onOpenImport={onOpenImport}
+                      start={start}
+                      intelligence={intelligence}
+                      profile={draft}
+                      updatesDisabled={
+                        busy || dirty || !!error || !!pendingWrite.current
                       }
-                      confirm={(ids) => {
-                        const next = confirmImported(latest.current!, ids);
-                        change(next);
-                        void save("autosave");
+                      applyUpdate={(next, original) => {
+                        if (
+                          removalBlocked ||
+                          lock.current ||
+                          pendingWrite.current ||
+                          error ||
+                          headRef.current === undefined ||
+                          !equalValues(latest.current, original)
+                        )
+                          return false;
+                        change(prepareDraft(next));
+                        go("base");
+                        return true;
                       }}
+                      revision={
+                        head?.revision ?? adapter.lifecycle?.().revision ?? 0
+                      }
                     />
                   )}
-                  {(representationMode ||
-                    !draft.importReview ||
-                    !pendingImportedCandidates(draft).length) && (
-                    <div className="editor-layout">
-                      <div>
-                        {route === "base" ? (
-                          <Editor
-                            jobMode={jobMode}
-                            draft={draft}
-                            issues={issues}
-                            change={change}
-                            photoEditor={
-                              <PhotoEditor
-                                value={draft.presentation.photo}
-                                commit={commitPhoto}
-                              />
-                            }
-                          />
-                        ) : (
-                          <Review
-                            draft={draft}
-                            edit={() => go("base")}
-                            enrich={() => go("enrich")}
-                          />
-                        )}
-                      </div>
-                      <div>
-                        {transport && switchLanguage && head && (
-                          <LanguageVersions
-                            transport={transport}
-                            jobId={jobMode ? adapter.jobId : undefined}
-                            currentLocale={
-                              draft.documentLocale ??
-                              (draft.language === "ro" ? "ro-RO" : "en-GB")
-                            }
-                            ready={
-                              !dirty && !busy && !error && !pendingWrite.current
-                            }
-                            revisionKey={`${head.id}:${head.revision}`}
-                            open={switchLanguage}
-                          />
-                        )}
-                        <AppearanceExport
-                          draft={draft}
-                          snapshot={head ?? null}
-                          ready={
-                            !dirty && !busy && !error && !pendingWrite.current
-                          }
-                          transport={transport}
-                          change={change}
-                          asOf={asOf}
-                          pin={
-                            head
-                              ? jobMode
-                                ? adapter.exportDocumentId()
-                                  ? {
-                                      kind: "job",
-                                      jobId: adapter.jobId,
-                                      documentId: adapter.exportDocumentId()!,
-                                      locale: head.draft.language,
-                                      fingerprint: adapter.exportFingerprint(),
-                                      versionId: head.id,
-                                      revision: head.revision,
-                                    }
-                                  : null
-                                : {
-                                    kind: "base",
-                                    ...(languageMode
-                                      ? { variantId: adapter.variantId }
-                                      : {}),
-                                    versionId: head.id,
-                                    revision: head.revision,
-                                  }
-                              : null
-                          }
-                        />
-                        <DocumentPreview
-                          livePreview
-                          draft={draft}
-                          asOf={asOf}
-                          onTemplateChange={(versionId) =>
-                            change(chooseTemplate(draft, versionId))
-                          }
-                          onEdit={
-                            jobMode
-                              ? undefined
-                              : (id) => {
-                                  go("base");
-                                  focusField(id);
-                                }
-                          }
-                        />
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-              {draft && !representationMode && route === "enrich" && (
-                <Enrichment
-                  transport={transport}
-                  snapshot={head ?? null}
-                  ready={!dirty && !busy && !error && !pendingWrite.current}
-                  durable={durable}
-                  rewriteRole={
-                    intelligence
-                      ? async (targetId) => {
-                          const saved = headRef.current;
-                          if (
-                            !saved ||
-                            !equalValues(latest.current, saved.draft)
-                          )
-                            throw new Error("SAVE_REQUIRED");
-                          const started = generation.current;
-                          const result = await intelligence.rewrite({
-                            snapshotId: saved.id,
-                            revision: saved.revision,
-                            targetId,
-                            operationId: crypto.randomUUID(),
-                          });
-                          if (started !== generation.current)
-                            throw new Error("STALE");
-                          return result;
-                        }
-                      : undefined
-                  }
-                  prepareQuestions={
-                    intelligence
-                      ? async (targetId) => {
-                          const saved = headRef.current;
-                          if (
-                            !saved ||
-                            !equalValues(latest.current, saved.draft)
-                          )
-                            throw new Error("SAVE_REQUIRED");
-                          const started = generation.current;
-                          const result = await intelligence.questions({
-                            snapshotId: saved.id,
-                            revision: saved.revision,
-                            targetId,
-                            operationId: crypto.randomUUID(),
-                          });
-                          if (started !== generation.current)
-                            throw new Error("STALE");
-                          return result;
-                        }
-                      : undefined
-                  }
-                  draft={draft}
-                  undoFrom={undoFrom}
-                  change={change}
-                  goEdit={() => go("base")}
-                  asOf={asOf}
-                />
-              )}
-              {!jobMode && route === "history" && (
-                <HistoryScreen
-                  durable={durable}
-                  draft={!!draft}
-                  versions={versions}
-                  head={head ?? null}
-                  inspected={inspected}
-                  setInspected={setInspected}
-                  restore={(snapshot) =>
-                    setDialog({ kind: "restore", snapshot })
-                  }
-                  go={go}
-                  asOf={asOf}
-                />
-              )}
-              {!representationMode && route === "jobs" && (
-                <JobsScreen
-                  transport={transport}
-                  snapshot={head ?? null}
-                  ready={!dirty && !busy && !error && !pendingWrite.current}
-                  openCv={switchDocument}
-                />
-              )}
-              {["account", "missing"].includes(route) && (
-                <section className="card empty">
-                  <h2>{t("În pregătire", "In preparation")}</h2>
-                  <p>
-                    {t(
-                      durable
-                        ? "CV-ul și istoricul sunt salvate în contul tău."
-                        : "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
-                      durable
-                        ? "Your CV and history are saved in your account."
-                        : "Account and online saving are not connected. You can use the local editor without an account.",
+                {draft && ["base", "review"].includes(route) && (
+                  <>
+                    {!!issues.length && (
+                      <p role="alert" className="notice notice-error">
+                        {issueText(issues[0].code, t)}
+                      </p>
                     )}
-                  </p>
-                  <Button onClick={() => go(draft ? "base" : "start")}>
-                    {t("CV de bază", "Base CV")}
-                  </Button>
-                </section>
-              )}
-            </>
-          )}
-          {editing && (
-            <footer className="save-bar">
-              <div>
-                <p role="status">
-                  {busy
-                    ? t("Se salvează…", "Saving…")
-                    : error
-                      ? t(
-                          "Ciornă păstrată · salvarea a eșuat",
-                          "Draft retained · save failed",
-                        )
-                      : dirty
-                        ? t("Modificări în ciornă…", "Draft changes…")
-                        : durable
-                          ? t(
-                              "Ciornă salvată în cont",
-                              "Draft saved to your account",
-                            )
-                          : t(
-                              "Ciornă salvată în sesiune",
-                              "Draft saved in session",
+                    {!representationMode && draft.importReview && (
+                      <ImportReview
+                        key={draft.importReview.id}
+                        forceOverview={
+                          profileWorkspace &&
+                          !!pendingImportedCandidates(draft).length
+                        }
+                        draft={draft}
+                        client={intelligence}
+                        change={change}
+                        disabled={
+                          profileBlocked || busy || !!pendingWrite.current || head === undefined
+                        }
+                        confirm={(ids) => {
+                          const next = confirmImported(latest.current!, ids);
+                          change(next);
+                          void save("autosave");
+                        }}
+                      />
+                    )}
+                    {(representationMode ||
+                      !draft.importReview ||
+                      !pendingImportedCandidates(draft).length) && (
+                      <div
+                        className={`editor-layout ${profileWorkspace ? "profile-document-layout" : ""} ${appearanceOnly ? "appearance-only" : ""}`}
+                      >
+                        <div className="document-edit-pane">
+                          {route === "base" ? (
+                            <ProfileOverviewWrapper
+                              enabled={embedded && !representationMode}
+                              draft={draft}
+                              change={change}
+                              asOf={asOf}
+                              enrichTarget={enrichTarget}
+                              skillsImproving={profileBlocked}
+                              aiReady={
+                                languageResolution.ready &&
+                                !dirty &&
+                                !busy &&
+                                !error &&
+                                !pendingWrite.current
+                              }
+                              summarize={
+                                intelligence
+                                  ? async (targetId) => {
+                                      const saved = headRef.current;
+                                      if (
+                                        !saved ||
+                                        !equalValues(
+                                          latest.current,
+                                          saved.draft,
+                                        )
+                                      )
+                                        throw new Error("SAVE_REQUIRED");
+                                      return intelligence.rewrite({
+                                        snapshotId: saved.id,
+                                        revision: saved.revision,
+                                        targetId,
+                                        purpose: "summary",
+                                        operationId: crypto.randomUUID(),
+                                      });
+                                    }
+                                  : undefined
+                              }
+                              enrich={renderEnrichment}
+                              openEnrichment={(id) => {
+                                if (documentController.profileChangesBlocked()) return;
+                                if (id === "__improve_skills") {
+                                  if (!languageResolution.ready || dirty || busy || error || pendingWrite.current) return;
+                                  documentController.setSkillsImproving(true);
+                                  setSkillsStartRequested(true);
+                                }
+                                navigate?.("enrich", id);
+                              }}
+                              closeEnrichment={() => navigate?.("base")}
+                            >
+                              <Editor
+                                jobMode={jobMode}
+                                draft={draft}
+                                issues={issues}
+                                change={change}
+                                photoEditor={
+                                  <PhotoEditor
+                                    value={draft.presentation.photo}
+                                    commit={commitPhoto}
+                                  />
+                                }
+                              />
+                            </ProfileOverviewWrapper>
+                          ) : (
+                            <Review
+                              draft={draft}
+                              edit={() => go("base")}
+                              enrich={() => go("enrich")}
+                            />
+                          )}
+                        </div>
+                        <PresentationSurface
+                          className={
+                            profileWorkspace
+                              ? "profile-presentation-options"
+                              : "document-preview-pane"
+                          }
+                        >
+                          {profileWorkspace && (
+                            <summary>
+                              {t(
+                                "Aspect, limbă și export",
+                                "Appearance, language & export",
+                              )}
+                            </summary>
+                          )}
+                          <fieldset disabled={profileBlocked} className="profile-edit-lock">
+                            {profileWorkspace && (
+                              <>
+                                <PhotoEditor
+                                  value={draft.presentation.photo}
+                                  commit={commitPhoto}
+                                />
+                                <ProfileStructure
+                                  draft={draft}
+                                  change={change}
+                                />
+                              </>
                             )}
-                  {head && !jobMode ? ` · v${head.revision}` : ""}
-                </p>
-                <small>
-                  {durable
-                    ? t(
-                        "Salvare online în contul tău",
-                        "Saved online to your account",
-                      )
-                    : t(
-                        "Doar memoria paginii · reîncărcarea șterge datele",
-                        "Page memory only · reloading clears data",
-                      )}
-                </small>
-              </div>
-              <div className="actions">
-                <Button
-                  aria-label={t(
-                    "Anulează ultima modificare",
-                    "Undo last change",
-                  )}
-                  disabled={!past.length}
-                  onClick={() => {
-                    const previous = clone(past.at(-1)!);
-                    generation.current++;
-                    setUndoFrom(latest.current);
-                    latest.current = previous;
-                    setDraft(previous);
-                    setPast((p) => p.slice(0, -1));
-                    setIssues([]);
-                    if (
-                      headRef.current !== undefined &&
-                      error !== "conflict" &&
-                      !pendingWrite.current
-                    )
-                      setError(null);
-                  }}
-                >
-                  <Undo2 size={17} />
-                </Button>
-                <Button
-                  variant="primary"
-                  disabled={
-                    busy || head === undefined || !!pendingWrite.current
-                  }
-                  onClick={() => void save()}
-                >
-                  <Save size={16} />
-                  {t("Salvează acum", "Save now")}
-                  <kbd>⌘/Ctrl S</kbd>
-                </Button>
-              </div>
-            </footer>
-          )}
-          {!editing && (
-            <p className="session-footnote">
-              {durable
-                ? t(
-                    "Ciornele salvate se păstrează în contul tău.",
-                    "Saved drafts stay in your account.",
-                  )
-                : t(
-                    "Sesiune locală: reîncărcarea șterge datele. Fără salvare online.",
-                    "Local session: reloading clears data. No online saving.",
-                  )}
-            </p>
-          )}
-          {!!notice && (
-            <p role="status" className="notice">
-              {notice}
-            </p>
-          )}
-          {(removal?.phase === "cleanup" ||
-            adapter.lifecycle?.().cleanupPending) &&
-            adapter.cleanup && (
-              <Button
-                disabled={busy}
-                onClick={() => void retryRemovedSourceCleanup()}
-              >
-                {t(
-                  "Reîncearcă ștergerea fișierelor sursă",
-                  "Retry source file deletion",
+                            <div
+                              className="document-appearance-controls"
+                              hidden={
+                                embedded &&
+                                !appearanceOnly &&
+                                representationMode
+                              }
+                            >
+                              {transport && switchLanguage && head && (
+                                <LanguageVersions
+                                  transport={transport}
+                                  jobId={jobMode ? adapter.jobId : undefined}
+                                  currentLocale={contentLocale(draft)}
+                                  ready={
+                                    !dirty &&
+                                    !busy &&
+                                    !error &&
+                                    !pendingWrite.current
+                                  }
+                                  revisionKey={`${head.id}:${head.revision}`}
+                                  open={switchLanguage}
+                                />
+                              )}
+                              <AppearanceExport
+                                ensurePin={exportPin}
+                                draft={draft}
+                                snapshot={head ?? null}
+                                ready={
+                                  !dirty &&
+                                  !busy &&
+                                  !error &&
+                                  !pendingWrite.current
+                                }
+                                transport={transport}
+                                change={change}
+                                asOf={asOf}
+                                pin={
+                                  head
+                                    ? jobMode
+                                      ? adapter.exportDocumentId()
+                                        ? {
+                                            kind: "job",
+                                            jobId: adapter.jobId,
+                                            documentId:
+                                              adapter.exportDocumentId()!,
+                                            locale: contentLocale(head.draft),
+                                            fingerprint:
+                                              adapter.exportFingerprint(),
+                                            versionId: head.id,
+                                            revision: head.revision,
+                                          }
+                                        : null
+                                      : {
+                                          kind: "base",
+                                          ...(languageMode
+                                            ? { variantId: adapter.variantId }
+                                            : {}),
+                                          versionId: head.id,
+                                          revision: head.revision,
+                                        }
+                                    : null
+                                }
+                              />
+                            </div>
+                            <DocumentPreview
+                              livePreview
+                              draft={draft}
+                              asOf={asOf}
+                              onTemplateChange={(versionId) =>
+                                change(chooseTemplate(draft, versionId))
+                              }
+                              onEdit={
+                                jobMode
+                                  ? undefined
+                                  : (id) => {
+                                      go("base");
+                                      focusField(id);
+                                    }
+                              }
+                            />
+                          </fieldset>
+                        </PresentationSurface>
+                      </div>
+                    )}
+                  </>
                 )}
-              </Button>
+                {draft &&
+                  !representationMode &&
+                  route === "enrich" &&
+                  renderEnrichment(enrichTarget ?? draft.roles[0]?.id ?? "")}
+                {!jobMode && route === "history" && draft && (
+                  <Button
+                    disabled={profileBlocked || busy || !!pendingWrite.current}
+                    onClick={() => void save("checkpoint")}
+                  >
+                    {t("Creează un punct de restaurare", "Create a checkpoint")}
+                  </Button>
+                )}
+                {!jobMode && route === "history" && (
+                  <HistoryScreen
+                    durable={durable}
+                    draft={!!draft}
+                    versions={versions}
+                    head={head ?? null}
+                    inspected={inspected}
+                    setInspected={setInspected}
+                    restore={(snapshot) => {
+                      if (!documentController.profileChangesBlocked()) setDialog({ kind: "restore", snapshot });
+                    }}
+                    go={go}
+                    asOf={asOf}
+                  />
+                )}
+                {!representationMode && route === "jobs" && (
+                  <JobsScreen
+                    transport={transport}
+                    snapshot={head ?? null}
+                    ready={
+                      languageResolution.ready &&
+                      !dirty &&
+                      !busy &&
+                      !error &&
+                      !pendingWrite.current
+                    }
+                    openCv={switchDocument}
+                  />
+                )}
+                {["account", "missing"].includes(route) && (
+                  <section className="card empty">
+                    <h2>{t("În pregătire", "In preparation")}</h2>
+                    <p>
+                      {t(
+                        durable
+                          ? "CV-ul și istoricul sunt salvate în contul tău."
+                          : "Contul și salvarea online nu sunt conectate. Poți folosi editorul local fără cont.",
+                        durable
+                          ? "Your CV and history are saved in your account."
+                          : "Account and online saving are not connected. You can use the local editor without an account.",
+                      )}
+                    </p>
+                    <Button onClick={() => go(draft ? "base" : "start")}>
+                      {t("CV de bază", "Base CV")}
+                    </Button>
+                  </section>
+                )}
+              </>
             )}
-        </main>
-      </div>
-      {dialog && (
-        <Dialog
-          title={
-            dialog.kind === "remove"
-              ? t(
-                  "Elimini definitiv CV-ul de bază?",
-                  "Permanently remove Base CV?",
-                )
-              : dialog.kind === "restore"
-                ? t(
-                    `Restaurezi v${dialog.snapshot.revision}?`,
-                    `Restore v${dialog.snapshot.revision}?`,
-                  )
-                : t("Înlocuiești ciorna?", "Replace draft?")
-          }
-          onClose={() => !busy && setDialog(null)}
-        >
-          <p>
-            {dialog.kind === "remove"
-              ? t(
-                  "CV-ul de bază, versiunile, contextul, răspunsurile, variantele de limbă și documentele încărcate vor fi șterse. Rămân doar CV-urile adaptate curente pentru fiecare job și limbă. Această acțiune nu poate fi anulată.",
-                  "Your Base CV, versions, context, answers, language copies and uploaded documents will be deleted. Current tailored CVs for each job and language remain. This cannot be undone.",
-                )
-              : durable
-                ? t(
-                    "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric.",
-                    "Your current draft will be replaced. Previous versions stay in history.",
-                  )
-                : t(
-                    "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric până la reîncărcare.",
-                    "The current draft will be replaced. Prior versions remain in history until reload.",
+            {editing && (
+              <footer
+                className={`save-bar ${profileWorkspace ? "profile-save-status" : ""}`}
+              >
+                <div>
+                  <p role="status">
+                    {busy
+                      ? t("Se salvează…", "Saving…")
+                      : error
+                        ? t(
+                            "Ciornă păstrată · salvarea a eșuat",
+                            "Draft retained · save failed",
+                          )
+                        : dirty
+                          ? t("Modificări în ciornă…", "Draft changes…")
+                          : durable
+                            ? t(
+                                "Ciornă salvată în cont",
+                                "Draft saved to your account",
+                              )
+                            : t(
+                                "Ciornă salvată în sesiune",
+                                "Draft saved in session",
+                              )}
+                    {head && !jobMode && !profileWorkspace
+                      ? ` · v${head.revision}`
+                      : ""}
+                  </p>
+                  <small>
+                    {durable
+                      ? error || dirty || busy
+                        ? t(
+                            "Modificările nesalvate sunt păstrate în această pagină.",
+                            "Unsaved changes remain in this tab.",
+                          )
+                        : t(
+                            "Salvare online în contul tău",
+                            "Saved online to your account",
+                          )
+                      : t(
+                          "Doar memoria paginii · reîncărcarea șterge datele",
+                          "Page memory only · reloading clears data",
+                        )}
+                  </small>
+                </div>
+                <div className="actions">
+                  <Button
+                    aria-label={t(
+                      "Anulează ultima modificare",
+                      "Undo last change",
+                    )}
+                    disabled={profileBlocked || !past.length}
+                    onClick={() => {
+                      if (documentController.profileChangesBlocked()) return;
+                      const previous = clone(past.at(-1)!);
+                      generation.current++;
+                      setUndoFrom(latest.current);
+                      latest.current = previous;
+                      setDraft(previous);
+                      setPast((p) => p.slice(0, -1));
+                      setIssues([]);
+                      if (
+                        headRef.current !== undefined &&
+                        error !== "conflict" &&
+                        !pendingWrite.current
+                      )
+                        setError(null);
+                    }}
+                  >
+                    <Undo2 size={17} />
+                  </Button>
+                  {!embedded && (
+                    <Button
+                      variant="primary"
+                      disabled={profileBlocked || busy}
+                      onClick={() => void save()}
+                    >
+                      {t("Salvează acum", "Save now")}
+                    </Button>
                   )}
-          </p>
-          <div className="actions">
-            <Button onClick={() => setDialog(null)} disabled={busy}>
-              {t("Păstrează ciorna", "Keep draft")}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={
-                busy ||
-                !!pendingWrite.current ||
-                (dialog.kind === "restore" && head === undefined)
-              }
-              onClick={() => {
-                if (dialog.kind === "replace") {
-                  openDraft(dialog.next);
-                  setDialog(null);
-                } else if (dialog.kind === "remove") void removeBase();
-                else if (dialog.kind === "reopen") void reopen();
-                else void restore(dialog.snapshot);
-              }}
-            >
-              {dialog.kind === "remove"
+                </div>
+              </footer>
+            )}
+            {!editing && (
+              <p className="session-footnote">
+                {durable
+                  ? t(
+                      "Ciornele salvate se păstrează în contul tău.",
+                      "Saved drafts stay in your account.",
+                    )
+                  : t(
+                      "Sesiune locală: reîncărcarea șterge datele. Fără salvare online.",
+                      "Local session: reloading clears data. No online saving.",
+                    )}
+              </p>
+            )}
+            {!!notice && (
+              <p role="status" className="notice">
+                {notice}
+              </p>
+            )}
+            {(removal?.phase === "cleanup" ||
+              adapter.lifecycle?.().cleanupPending) &&
+              adapter.cleanup && (
+                <Button
+                  disabled={busy}
+                  onClick={() => void retryRemovedSourceCleanup()}
+                >
+                  {t(
+                    "Reîncearcă ștergerea fișierelor sursă",
+                    "Retry source file deletion",
+                  )}
+                </Button>
+              )}
+          </MainSurface>
+        </div>
+        {dialog && (
+          <Dialog
+            title={
+              dialog.kind === "remove"
                 ? t(
-                    "Elimină definitiv CV-ul de bază",
-                    "Permanently remove Base CV",
+                    "Elimini definitiv CV-ul de bază?",
+                    "Permanently remove Base CV?",
                   )
                 : dialog.kind === "restore"
-                  ? t("Restaurează versiunea", "Restore version")
-                  : t("Înlocuiește ciorna", "Replace draft")}
-            </Button>
-          </div>
-        </Dialog>
-      )}
+                  ? t(
+                      `Restaurezi v${dialog.snapshot.revision}?`,
+                      `Restore v${dialog.snapshot.revision}?`,
+                    )
+                  : t("Înlocuiești ciorna?", "Replace draft?")
+            }
+            onClose={() => !busy && setDialog(null)}
+          >
+            <p>
+              {dialog.kind === "remove"
+                ? t(
+                    "CV-ul de bază, versiunile, contextul, răspunsurile, variantele de limbă, documentele încărcate, ciornele legate de profil și răspunsurile pentru joburi vor fi șterse. Rămân doar CV-urile adaptate curente pentru fiecare job și limbă. Această acțiune nu poate fi anulată.",
+                    "Your Base CV, versions, context, answers, language copies, uploaded documents, profile-linked drafts and job answers will be deleted. Current tailored CVs for each job and language remain. This cannot be undone.",
+                  )
+                : durable
+                  ? t(
+                      "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric.",
+                      "Your current draft will be replaced. Previous versions stay in history.",
+                    )
+                  : t(
+                      "Ciorna curentă va fi înlocuită. Versiunile anterioare rămân în istoric până la reîncărcare.",
+                      "The current draft will be replaced. Prior versions remain in history until reload.",
+                    )}
+            </p>
+            <div className="actions">
+              <Button onClick={() => setDialog(null)} disabled={busy}>
+                {t("Păstrează ciorna", "Keep draft")}
+              </Button>
+              <Button
+                variant="primary"
+                disabled={
+                  busy ||
+                  !!pendingWrite.current ||
+                  (dialog.kind === "restore" && head === undefined)
+                }
+                onClick={() => {
+                  if (dialog.kind === "replace") {
+                    openDraft(dialog.next);
+                    setDialog(null);
+                  } else if (dialog.kind === "remove") void removeBase();
+                  else if (dialog.kind === "reopen") void reopen();
+                  else void restore(dialog.snapshot);
+                }}
+              >
+                {dialog.kind === "remove"
+                  ? t(
+                      "Elimină definitiv CV-ul de bază",
+                      "Permanently remove Base CV",
+                    )
+                  : dialog.kind === "restore"
+                    ? t("Restaurează versiunea", "Restore version")
+                    : t("Înlocuiește ciorna", "Replace draft")}
+              </Button>
+            </div>
+          </Dialog>
+        )}
+      </ExperienceScoresContext>
     </LanguageContext>
+  );
+}
+
+function ProfileOverviewWrapper({
+  enabled,
+  children,
+  ...props
+}: { enabled: boolean; children: import("react").ReactNode } & Omit<
+  Parameters<typeof ProfileOverview>[0],
+  "editor"
+>) {
+  return enabled ? (
+    <ProfileOverview {...props} editor={children} />
+  ) : (
+    <>{children}</>
   );
 }
