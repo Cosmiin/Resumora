@@ -36,7 +36,7 @@ export function EditablePage({ cv, dispatch, opened, onOpen }: Props) {
   const flags = new Map(missingCategories(cv).filter((f) => f.key !== "header").map((f) => [f.key, f.level]));
 
   return (
-    <div className="cv-page cv-page-edit" ref={root}>
+    <div className="cv-page cv-page-edit" ref={root} tabIndex={-1}>
       <HeaderEdit basics={cv.basics} dispatch={dispatch} />
       {layout.order.map((key) => {
         const Body = sectionRenderers[key];
