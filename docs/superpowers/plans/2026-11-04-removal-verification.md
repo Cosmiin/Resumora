@@ -22,7 +22,7 @@ Fresh reviewer found two P1 defects: direct retained RPCs could restore retired 
 
 SHA-256: `61e3c850002794f1854d3cde2cc54271bc06810eeddbfa335dff22345391d8ea`
 
-Drops 30 feature tables and91 routines, replaces shared routines and narrows shared stores. All38 applied predecessor migration files remain unchanged. One unapplied migration affecting only the removed materializer is deleted. Predecessor columns/constraints/policy hashes match hosted; shared-routine hashes are checked inside SQL.
+Drops 30 feature tables and 91 routines, replaces shared routines and narrows shared stores. All 38 applied predecessor migration files remain unchanged. One unapplied migration affecting only the removed materializer is deleted. Predecessor columns/constraints/policy hashes match hosted; shared-routine hashes are checked inside SQL.
 
 ## Preservation decisions
 
@@ -39,4 +39,23 @@ Apply only the candidate source delta after checking every original blob again. 
 
 ## Hosted result
 
-Hosted migration `20261104105519` applied successfully. All43 retained-store fingerprints match the frozen baseline exactly, including all39 editor snapshots, authentication records, imports, CV accounting and both Storage objects. Every postflight residual count is zero. Thirty tables and91 routines are gone; nine job parsing attempts, seven retired operations, seven job audit events and attributable request receipts were removed. Three capture connections and their authorization/fences are removed with their tables. Local source installation/startup verification is in progress.
+Hosted migration `20261104105519` applied successfully. All 43 retained-store fingerprints match the frozen baseline exactly, including all 39 editor snapshots, authentication records, imports, CV accounting and both Storage objects. Every postflight residual count is zero. Thirty tables and 91 routines are gone; nine job parsing attempts, seven retired operations, seven job audit events and attributable request receipts were removed. Three capture connections and their authorization/fences are removed with their tables. The exact candidate delta is installed in the active checkout; all original source blobs matched the isolation baseline before replacement. Locked dependency installation and the active web/Worker dry-run build succeeded. The managed service is active at `http://127.0.0.1:15173/#/profile`, with one CV import processor and no job processor. Doctor/status, read-only smoke, retired-endpoint 404, 22 runtime checks and 1 secret-boundary check pass. Authenticated read-only hosted Profile and language-context RPCs succeed. The optional admin authorization remains unconfigured and explicitly fails closed; no configuration was added. Live paid generation was not exercised.
+
+## Scope and limits
+
+Source changes remain uncommitted in the original checkout, alongside the preserved unfinished work; no push or PR was made. A local source-only recovery ref preserves the isolated candidate and its baseline in Git history. Other worktrees are unchanged. Temporary candidate source/data, browser preview and synthetic database are removed after verification.
+
+An unreferenced photo was preserved because no evidence attributes it to the removed product. Storage object counts and hashes remain unchanged. Applied migration history, Git history, the forward removal migration and bounded transition tests necessarily record the transition. Offline installations/downloads, managed backups, provider records and shared system logs were not erased. The separate audit of unfinished CV/enrichment/language work remains deferred.
+
+## Execution rulings
+
+- Capture all unfinished source in isolation before editing; reconcile against it before integration. This prevents overwriting concurrent work.
+- Run native suites in separate disposable databases; shared test worker secrets caused fixture contamination in the older aggregate runner. Authorization checks remain strict.
+- Retire obsolete multiproduct demos/research while retaining current Base work, audits and the duration reference required by tests.
+- Refuse attributed or ambiguous Base provenance instead of guessing how to rewrite personal content; frozen hosted checks were zero.
+- Preserve the unattributed photo and omit an unused deletion utility because the proven Storage deletion set is empty.
+- Delete the unapplied, exclusively retired-feature migration; preserve every applied predecessor.
+- Use installed Playwright for synthetic UI checks because the Browser plugin is unavailable.
+- Accept the existing optional admin route's exact unconfigured error in the smoke check; continue requiring anonymous rejection on Base routes.
+
+Each decision avoids expanding deletion or changing retained behavior without evidence. No reviewer minor findings were deferred.

@@ -40,11 +40,13 @@ assert.match(session.headers.get("cache-control"), /no-store/);
 const identity = await session.json();
 assert.equal(identity.user, null);
 assert.equal(typeof identity.csrfToken, "string");
-for (const path of ["/v1/base-cv", "/v1/admin/ai/usage"]) {
-  const denied = await get(path);
-  assert.equal(denied.status, 401);
-  assert.match(denied.headers.get("cache-control"), /no-store/);
-}
+const denied = await get("/v1/base-cv");
+assert.equal(denied.status, 401);
+assert.match(denied.headers.get("cache-control"), /no-store/);
+const admin = await get("/v1/admin/ai/usage");
+const adminBody = await admin.json();
+assert.ok(admin.status === 401 || (admin.status === 503 && adminBody.error?.code === "AUTH_UNCONFIGURED"), "Anonymous admin access must be denied or explicitly unconfigured");
+assert.match(admin.headers.get("cache-control"), /no-store/);
 const missing = await get("/v1/does-not-exist");
 assert.equal(missing.status, 404);
 console.log(
