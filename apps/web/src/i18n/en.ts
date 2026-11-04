@@ -146,6 +146,7 @@ export const en = {
   "panel.overview.addSection": "Add section",
   "panel.overview.fine": "Click a heading on the page to rename it. Hidden sections stay saved but are left out of the PDF, and are never flagged.",
   "panel.label": "Helper panel",
+  "panel.sheetGrip": "Panel size",
   "panel.back": "Back",
   "panel.tools.back": "← All sections",
   "panel.tools.hide": "Hide section",

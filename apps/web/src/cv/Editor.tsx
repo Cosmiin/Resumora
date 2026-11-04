@@ -17,6 +17,8 @@ import { useFocusAfterRender } from "./edit/useFocusAfterRender.ts";
 import { useFocusSection } from "./edit/useFocusSection.ts";
 import { useOpenedSections } from "./edit/useOpenedSections.ts";
 import { HelperPanel } from "./panel/HelperPanel.tsx";
+import { BottomSheet, type SheetState } from "./panel/BottomSheet.tsx";
+import { useMediaQuery } from "../hooks/useMediaQuery.ts";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
   saved: "cv.status.saved",
@@ -45,6 +47,8 @@ export function Editor({ initial }: { initial: CvResponse }) {
   // One stable dispatch: rows on the page skip re-rendering unless their own data changed.
   const dispatch = useCallback((a: CvAction) => setContent((c) => cvReducer(c, a)), [setContent]);
   const focusPage = useCallback(() => pageRef.current?.focus(), []);
+  const phone = useMediaQuery("(max-width: 899px)");
+  const [sheet, setSheet] = useState<SheetState>("peek");
 
   // When the import screen closes (cancel, applied or conflict), focus goes back to Import CV.
   // This runs after render, once the top bar is no longer inert and can take focus.
@@ -109,13 +113,26 @@ export function Editor({ initial }: { initial: CvResponse }) {
     </>
   );
 
+  const panel = (
+    <HelperPanel
+      cv={content}
+      dispatch={dispatch}
+      focus={sectionFocus}
+      onBack={clearFocus}
+      onFocusField={focusField}
+      onFocusPage={focusPage}
+      opened={opened}
+      onOpen={onOpen}
+    />
+  );
+
   return (
     <AppShell actions={actions} inert={importId !== null}>
       <main className="editor">
       {/* While an import is open the whole workspace is inert. While history is open only the page is,
           so a restore can't race the user's typing; the history panel stays usable. */}
       <div className="editor-workspace" inert={importId !== null}>
-        <div className="stage" ref={pageRef} tabIndex={-1}>
+        <div className="stage" ref={pageRef} tabIndex={-1} onFocus={() => setSheet("peek")}>
           {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
           {notices}
           {historyOpen && preview && (
@@ -138,17 +155,12 @@ export function Editor({ initial }: { initial: CvResponse }) {
             onPreview={(c, createdAt) => setPreview(c && createdAt ? { content: c, createdAt } : null)}
             onRestore={restore}
           />
+        ) : phone ? (
+          <BottomSheet state={sheet} onStateChange={setSheet}>
+            {panel}
+          </BottomSheet>
         ) : (
-          <HelperPanel
-            cv={content}
-            dispatch={dispatch}
-            focus={sectionFocus}
-            onBack={clearFocus}
-            onFocusField={focusField}
-            onFocusPage={focusPage}
-            opened={opened}
-            onOpen={onOpen}
-          />
+          panel
         )}
       </div>
       {importId && (
