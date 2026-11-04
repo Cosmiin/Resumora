@@ -63,6 +63,17 @@ describe("extractText", () => {
     expect(result).toMatchObject({ pages: 2, isScan: true });
   });
 
+  it("exactly 8 pages is accepted", async () => {
+    expect(await extractText(await makeImagePdf(8), "pdf")).toMatchObject({ pages: 8, isScan: true });
+  });
+
+  it("a pdf with few words but lots of line breaks is a scan", async () => {
+    const lines = Array.from({ length: 120 }, () => "a"); // 120 letters, text longer than 200 characters
+    const result = await extractText(makePdf(lines), "pdf");
+    expect(result.text.length).toBeGreaterThan(200);
+    expect(result.isScan).toBe(true);
+  });
+
   it("an empty docx still fails with no_text", async () => {
     expect(await failureCode(extractText(await makeDocx([]), "docx"))).toBe("no_text");
   });

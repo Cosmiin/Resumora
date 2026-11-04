@@ -76,7 +76,7 @@ export async function extractText(
   }
   if (raw.pages > MAX_PAGES) throw new ImportFailure("too_many_pages");
   const text = normalize(raw.text);
-  if (text.replace(/s/g, "").length < MIN_TEXT_CHARS) {
+  if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS) {
     if (format === "pdf") return { text, pages: raw.pages, isScan: true };
     throw new ImportFailure("no_text");
   }
