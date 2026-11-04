@@ -29,7 +29,7 @@ export function CvPage() {
   if (cv.isError) {
     return (
       <AppShell>
-        <main className="cv-page">
+        <main className="page-error">
           <p role="alert">{t("cv.loadError")}</p>
           <button type="button" onClick={() => cv.refetch()}>{t("cv.retry")}</button>
         </main>

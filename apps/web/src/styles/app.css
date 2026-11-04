@@ -150,6 +150,8 @@ label {
   color: var(--text-muted);
 }
 .auth-form input {
+  box-sizing: border-box;
+  min-height: 44px;
   padding: 12px 14px;
   border: 1px solid var(--border-field);
   border-radius: 8px;
@@ -473,8 +475,8 @@ label.checkbox input {
 
 /* Above 900px the panel always sits beside the page; the page area shrinks instead of wrapping. */
 @media (min-width: 901px) {
-  .editor-workspace, .import-body { flex-wrap: nowrap; }
-  .editor-page-area, .import-page-area { flex: 999 1 0; }
+  .editor-workspace { flex-wrap: nowrap; }
+  .editor-page-area { flex: 999 1 0; }
 }
 
 @media (max-width: 900px) {
@@ -528,6 +530,12 @@ label.checkbox input {
 .import-chips li { padding: 2px 10px; background: var(--white); border: 1px solid var(--status-warn-border); border-radius: var(--radius-pill); }
 .import-summary-kept { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
 .import-apply { width: 100%; }
+@media (min-width: 901px) {
+  .import-body { flex-wrap: nowrap; }
+  .import-page-area { flex: 999 1 0; }
+}
 @media (max-width: 900px) {
   .import-side { position: static; max-width: none; flex-basis: 100%; border-inline-start: 0; border-top: 1px solid var(--border-subtle); }
 }
+
+.page-error { display: grid; gap: 12px; justify-items: start; padding: 2rem; }
