@@ -44,7 +44,7 @@ describe("section tools", () => {
     expect(screen.getByRole("heading", { name: "Experience" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "I work here now" })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Remove role" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /move/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^move/i })).toBeNull();
   });
 
   it("moving into another section switches the panel", async () => {
