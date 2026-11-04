@@ -154,11 +154,6 @@
 .cv-role-desc.is-empty { opacity: 0; }
 .cv-role:hover .cv-role-desc.is-empty, .cv-role:focus-within .cv-role-desc.is-empty { opacity: 1; }
 
-@media (hover: none) {
-  .adder, .remover, .drag-grip { opacity: 0.55; }
-  .cv-role-desc.is-empty { opacity: 0.55; }
-}
-
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .drag-row { position: relative; }
 .drag-row.is-dragging { z-index: 2; opacity: 0.9; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); background: var(--surface-card); }
@@ -166,3 +161,9 @@
 .drag-row:hover > .drag-grip, .drag-row:focus-within > .drag-grip, .drag-grip:focus-visible { opacity: 1; }
 .drag-grip[aria-pressed="true"] { opacity: 1; background: var(--sage-100); color: var(--pine-600); cursor: grabbing; }
 .drag-grip:focus-visible { outline: 2px solid var(--pine-600); }
+
+@media (hover: none) {
+  .adder, .remover, .drag-grip { opacity: 0.55; }
+  .cv-role-desc.is-empty { opacity: 0.55; }
+}
+
