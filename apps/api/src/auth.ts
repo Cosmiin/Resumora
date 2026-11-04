@@ -1,6 +1,6 @@
 import { createClient, isAuthRetryableFetchError, type AuthError } from "@supabase/supabase-js";
 import type { AppDeps } from "./app.ts";
-import type { Env } from "./env.ts";
+import type { SupabaseEnv } from "./env.ts";
 
 /**
  * Verifies a Supabase access token.
@@ -8,7 +8,7 @@ import type { Env } from "./env.ts";
  * - Supabase unreachable or failing (network error, 5xx) → throws, so the API answers a
  *   logged 500 and the browser keeps the user signed in instead of logging everyone out.
  */
-export function supabaseVerifier(env: Env): AppDeps["verifyToken"] {
+export function supabaseVerifier(env: SupabaseEnv): AppDeps["verifyToken"] {
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

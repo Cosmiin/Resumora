@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { CvContentSchema, HistoryItemSchema, emptyCv, type CvContent } from "@resumora/shared";
-import type { AuthUser, Env } from "../env.ts";
+import type { AuthUser, SupabaseEnv } from "../env.ts";
 import type { CvRepo, SaveResult } from "./repo.ts";
 
 type SaveRow = { version: number; updated_at: string; conflict: boolean };
@@ -16,7 +16,7 @@ function storedCv(value: unknown): CvContent {
 }
 
 /** CvRepo backed by Supabase, querying as the signed-in user so RLS applies. */
-export function supabaseCvRepo(env: Env, user: AuthUser): CvRepo {
+export function supabaseCvRepo(env: SupabaseEnv, user: AuthUser): CvRepo {
   const db = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${user.token}` } },

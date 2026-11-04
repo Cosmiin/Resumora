@@ -1,4 +1,12 @@
-# Copy to .dev.vars (ignored). Values from `supabase status`.
+# Copy to .dev.vars (ignored). Supabase values from `supabase status`.
 SUPABASE_URL=http://127.0.0.1:54321
 SUPABASE_ANON_KEY=<anon key from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<service role key from supabase status>
 APP_ORIGIN=http://127.0.0.1:5173
+
+# AI for CV import. OpenRouter is tried first, OpenAI if it fails. Leave a key empty to skip that provider.
+# Use models that support structured output (json_schema).
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=
+OPENAI_API_KEY=
+OPENAI_MODEL=
