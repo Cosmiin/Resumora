@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
-import type { CvContent } from "@resumora/shared";
+import { Fragment, type ReactNode } from "react";
+import { CATEGORY, normalizeLayout, type CvContent, type SectionKey } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
+import { newSectionBody } from "./NewSections.tsx";
 import { blockKey, formatRange, type BlockRef } from "./blocks.ts";
 
 type Props = {
@@ -60,33 +61,28 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
     ...(showUnsorted ? [{ key: "sort", label: t("cv.page.toSort"), items: cv.unclearSkills, sort: true }] : []),
   ].filter((row) => row.items.length > 0);
 
-  const section = (label: string, show: boolean, children: ReactNode) =>
+  const layout = normalizeLayout(cv.layout);
+  const heading = (key: SectionKey) => layout.titles[key]?.trim() || CATEGORY[key].label[cv.locale];
+  const section = (key: SectionKey, show: boolean, children: ReactNode) =>
     show ? (
       <section className="cv-section">
-        <h2 className="cv-section-label">{label}</h2>
+        <h2 className="cv-section-label">{heading(key)}</h2>
         {children}
       </section>
     ) : null;
 
-  return (
-    <article className="cv-page" aria-label={t("cv.page.label")}>
-      {(hasBasics || editable) && (
-        <header className="cv-header">
-          <Block {...ctx}
-            gref={{ section: "basics" }}
-            label={b.fullName ? t("cv.page.editDetails") : t("cv.page.addName")}
-          >
-            <span className={b.fullName ? "cv-name" : "cv-name cv-placeholder"}>
-              {b.fullName || t("cv.page.addName")}
-            </span>
-            {titles && <span className="cv-titles">{titles}</span>}
-            {contact && <span className="cv-contact">{contact}</span>}
-          </Block>
-        </header>
-      )}
 
-      {section(
-        t("cv.summary"),
+  // Sections added in format v2 are read-only for now.
+  const roleRange = (start: string, end: string, current: boolean) => formatRange(start, end, current, cv.locale);
+  const newSection = (key: SectionKey) => {
+    const { show, body } = newSectionBody(key, cv, roleRange);
+    return section(key, show, body);
+  };
+
+  const sections: Record<SectionKey, ReactNode> = {
+    achievements: newSection("achievements"),
+    summary: section(
+        "summary",
         !!b.summary || editable,
         <Block {...ctx}
           gref={{ section: "summary" }}
@@ -96,10 +92,10 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
             {b.summary || t("cv.page.addSummary")}
           </span>
         </Block>,
-      )}
+    ),
 
-      {section(
-        t("cv.experience"),
+    experience: section(
+        "experience",
         cv.experience.length > 0,
         cv.experience.map((job) => {
           const name = job.title || job.company;
@@ -124,10 +120,10 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
             </Block>
           );
         }),
-      )}
+    ),
 
-      {section(
-        t("cv.education"),
+    education: section(
+        "education",
         cv.education.length > 0,
         cv.education.map((edu) => {
           const range = formatRange(edu.startDate, edu.endDate, false, cv.locale);
@@ -146,10 +142,10 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
             </Block>
           );
         }),
-      )}
+    ),
 
-      {section(
-        t("cv.skills"),
+    skills: section(
+        "skills",
         skillRows.length > 0,
         <Block {...ctx} gref={{ section: "skills" }} label={t("cv.page.editSkills")}>
           {skillRows.map((row) => (
@@ -165,10 +161,10 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
             </span>
           ))}
         </Block>,
-      )}
+    ),
 
-      {section(
-        t("cv.languages"),
+    languages: section(
+        "languages",
         cv.languages.length > 0,
         <div className="cv-inline-items">
           {cv.languages.map((lang) => (
@@ -182,10 +178,10 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
             </Block>
           ))}
         </div>,
-      )}
+    ),
 
-      {section(
-        t("cv.certifications"),
+    certifications: section(
+        "certifications",
         cv.certifications.length > 0,
         cv.certifications.map((c) => {
           const date = formatRange(c.date, "", false, cv.locale);
@@ -203,10 +199,10 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
             </Block>
           );
         }),
-      )}
+    ),
 
-      {section(
-        t("cv.projects"),
+    projects: section(
+        "projects",
         cv.projects.length > 0,
         cv.projects.map((p) => (
           <Block {...ctx} key={p.id} gref={{ section: "projects", itemId: p.id }} label={editLabel(p.name)}>
@@ -215,8 +211,15 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
             {p.description && <span className="cv-text">{p.description}</span>}
           </Block>
         )),
-      )}
+    ),
 
+    volunteering: newSection("volunteering"),
+    awards: newSection("awards"),
+    courses: newSection("courses"),
+    publications: newSection("publications"),
+    interests: newSection("interests"),
+    other: cv.custom.length > 0 && (
+      <>
       {cv.custom.map((c) => (
         <section key={c.id} className="cv-section">
           <Block {...ctx} gref={{ section: "custom", itemId: c.id }} label={editLabel(c.title)}>
@@ -224,6 +227,30 @@ export function CvDocument({ content: cv, selected, onSelect, showUnsorted }: Pr
             {c.details && <span className="cv-text">{c.details}</span>}
           </Block>
         </section>
+      ))}
+      </>
+    ),
+  };
+
+  return (
+    <article className="cv-page" aria-label={t("cv.page.label")}>
+      {(hasBasics || editable) && (
+        <header className="cv-header">
+          <Block {...ctx}
+            gref={{ section: "basics" }}
+            label={b.fullName ? t("cv.page.editDetails") : t("cv.page.addName")}
+          >
+            <span className={b.fullName ? "cv-name" : "cv-name cv-placeholder"}>
+              {b.fullName || t("cv.page.addName")}
+            </span>
+            {titles && <span className="cv-titles">{titles}</span>}
+            {contact && <span className="cv-contact">{contact}</span>}
+          </Block>
+        </header>
+      )}
+
+      {layout.order.filter((key) => !layout.hidden.includes(key)).map((key) => (
+        <Fragment key={key}>{sections[key]}</Fragment>
       ))}
     </article>
   );

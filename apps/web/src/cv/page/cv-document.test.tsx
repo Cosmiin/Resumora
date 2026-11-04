@@ -80,4 +80,49 @@ describe("CvDocument", () => {
     expect(screen.getByText(/mar\. 2021 – prezent/)).toBeInTheDocument();
     expect(screen.getByText(title)).toBeInTheDocument();
   });
+
+  it("sections follow layout order", () => {
+    const base = sampleCv();
+    const layout = { ...base.layout, order: ["education" as const, ...base.layout.order.filter((k) => k !== "education")] };
+    render(<CvDocument content={sampleCv({ layout })} />);
+    const edu = screen.getByRole("heading", { name: "Education" });
+    const exp = screen.getByRole("heading", { name: "Experience" });
+    expect(edu.compareDocumentPosition(exp) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("hidden sections are not rendered", () => {
+    const base = sampleCv();
+    render(<CvDocument content={sampleCv({ layout: { ...base.layout, hidden: ["education"] } })} />);
+    expect(screen.queryByRole("heading", { name: "Education" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Experience" })).toBeInTheDocument();
+  });
+
+  it("an own heading replaces the standard one", () => {
+    const base = sampleCv();
+    render(<CvDocument content={sampleCv({ layout: { ...base.layout, titles: { experience: "Work history" } } })} />);
+    expect(screen.getByRole("heading", { name: "Work history" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Experience" })).not.toBeInTheDocument();
+  });
+
+  it("a Romanian CV uses Romanian headings", () => {
+    render(<CvDocument content={sampleCv({ locale: "ro" })} />);
+    expect(screen.getByRole("heading", { name: "Experiență profesională" })).toBeInTheDocument();
+  });
+
+  it("key achievements and interests render", () => {
+    render(
+      <CvDocument
+        content={sampleCv({
+          achievements: [{ id: "a1", text: "Doubled revenue in a year." }],
+          interests: [{ id: "i1", name: "Chess" }],
+          awards: [{ id: "w1", name: "Best Newcomer", issuer: "Contoso", date: "2019-06", description: "" }],
+        })}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Key achievements" })).toBeInTheDocument();
+    expect(screen.getByText("Doubled revenue in a year.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Interests" })).toBeInTheDocument();
+    expect(screen.getByText("Chess")).toBeInTheDocument();
+    expect(screen.getByText("Best Newcomer")).toBeInTheDocument();
+  });
 });
