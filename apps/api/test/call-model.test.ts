@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AiUnavailableError, callModel, providersFromEnv, type AiCallLog, type ModelDeps } from "../src/ai/call-model.ts";
+import { AiOutputTooLongError, AiUnavailableError, callModel, providersFromEnv, type AiCallLog, type ModelDeps } from "../src/ai/call-model.ts";
 
 const Answer = z.object({ answer: z.string() }).strict();
 
@@ -139,6 +139,24 @@ describe("callModel", () => {
     const { fetch } = fakeFetch(ok({ answer: "yes" }));
     const { d } = deps(fetch, { logCall: async () => Promise.reject(new Error("db down")) });
     await expect(callModel(d, request)).resolves.toEqual({ answer: "yes" });
+  });
+});
+
+describe("callModel limits", () => {
+  it("a cut-off answer is not retried", async () => {
+    const cut = new Response(JSON.stringify({ choices: [{ finish_reason: "length", message: { content: "{\"answer\": \"trunc" } }] }), { status: 200 });
+    const { fetch, calls } = fakeFetch(cut);
+    const { d, logs } = deps(fetch);
+    await expect(callModel(d, request)).rejects.toBeInstanceOf(AiOutputTooLongError);
+    expect(calls).toHaveLength(1);
+    expect(logs[0]).toMatchObject({ status: "error", error: expect.stringMatching(/length/) });
+  });
+
+  it("a per-request timeout overrides the default", async () => {
+    const slow = () => new Promise<Response>((resolve) => setTimeout(() => resolve(ok({ answer: "slow but fine" })), 60));
+    const { fetch } = fakeFetch(slow);
+    const { d } = deps(fetch, { timeoutMs: 20 });
+    await expect(callModel(d, { ...request, timeoutMs: 500 })).resolves.toEqual({ answer: "slow but fine" });
   });
 });
 

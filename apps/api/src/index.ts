@@ -2,7 +2,7 @@ import { createApp, type AppDeps } from "./app.ts";
 import { supabaseVerifier } from "./auth.ts";
 import { providersFromEnv } from "./ai/call-model.ts";
 import { supabaseCvRepo } from "./cv/supabase-repo.ts";
-import { handleImportMessage } from "./imports/consumer.ts";
+import { handleImportMessage, sweepStaleImports } from "./imports/consumer.ts";
 import type { ImportMessage } from "./imports/repo.ts";
 import { supabaseImportAdmin, supabaseImportRepo } from "./imports/supabase-repo.ts";
 import type { Env } from "./env.ts";
@@ -26,6 +26,11 @@ export default {
   },
 
   /** Import processing. Batches have one message (see wrangler.jsonc). */
+  /** Every 5 minutes (wrangler.jsonc): fail imports that never finished and delete their files. */
+  async scheduled(_controller, env) {
+    await sweepStaleImports({ admin: supabaseImportAdmin(env), now: () => new Date(), log });
+  },
+
   async queue(batch, env) {
     const admin = supabaseImportAdmin(env);
     const model = { providers: providersFromEnv(env), fetch: (...args: Parameters<typeof fetch>) => fetch(...args), logCall: admin.logCall };

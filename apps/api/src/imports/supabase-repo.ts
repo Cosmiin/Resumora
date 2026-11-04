@@ -4,7 +4,8 @@ import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { SaveResult } from "../cv/repo.ts";
 import { IMPORT_FAILURES, type ImportFailureCode } from "./extract-text.ts";
 import { toResponse } from "./memory-repo.ts";
-import { storagePath, type ImportAdmin, type ImportRepo } from "./repo.ts";
+import { ApiError } from "../errors.ts";
+import { IMPORTS_PER_DAY, storagePath, type ImportAdmin, type ImportRepo } from "./repo.ts";
 
 const BUCKET = "cv-imports";
 const CONTENT_TYPES = {
@@ -45,15 +46,19 @@ export function supabaseImportRepo(env: SupabaseEnv, user: AuthUser): ImportRepo
 
   return {
     async create({ id, fileName, format, bytes }) {
+      // Row first, so a file never exists without a row (the sweeper finds files through rows).
       const path = storagePath(user.id, id, format);
-      const uploaded = await db.storage.from(BUCKET).upload(path, bytes, { contentType: CONTENT_TYPES[format] });
-      if (uploaded.error) throw new Error(`import upload failed: ${uploaded.error.message}`);
       const { data, error } = await db
         .from("cv_imports")
         .insert({ id, file_name: fileName, storage_path: path })
         .select(COLUMNS)
         .single();
+      if (error?.message === "import_limit") {
+        throw new ApiError(429, "import_limit", `You can import up to ${IMPORTS_PER_DAY} CVs per day.`);
+      }
       if (error) throw new Error(`cv_imports insert failed: ${error.message}`);
+      const uploaded = await db.storage.from(BUCKET).upload(path, bytes, { contentType: CONTENT_TYPES[format] });
+      if (uploaded.error) throw new Error(`import upload failed: ${uploaded.error.message}`);
       return rowToResponse(data as Row);
     },
 
@@ -110,6 +115,16 @@ export function supabaseImportAdmin(env: Pick<Env, "SUPABASE_URL" | "SUPABASE_SE
     async deleteFile(job) {
       const { error } = await db.storage.from(BUCKET).remove([job.storagePath]);
       if (error) throw new Error(`import file delete failed: ${error.message}`);
+    },
+    async expireStale(iso) {
+      const { data, error } = await db
+        .from("cv_imports")
+        .update({ status: "failed", error: "internal", result: null, updated_at: new Date().toISOString() })
+        .in("status", ["queued", "processing"])
+        .lt("created_at", iso)
+        .select("id, user_id, storage_path");
+      if (error) throw new Error(`cv_imports expire failed: ${error.message}`);
+      return (data ?? []).map((r) => ({ id: r.id as string, userId: r.user_id as string, storagePath: r.storage_path as string }));
     },
     async logCall(e) {
       const { error } = await db.from("ai_calls").insert({

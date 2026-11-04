@@ -24,7 +24,8 @@ export class ImportFailure extends Error {
 /** Fewer non-space characters than this means there's no real text (usually a scan). */
 export const MIN_TEXT_CHARS = 200;
 /** More characters than this is not a CV we can process in one go. */
-export const MAX_TEXT_CHARS = 60_000;
+// In line with the extraction output budget (16k tokens), since the CV is copied out word for word.
+export const MAX_TEXT_CHARS = 30_000;
 
 /** Identifies the file by its first bytes, not its name. */
 export function sniffFormat(bytes: Uint8Array): FileFormat | null {

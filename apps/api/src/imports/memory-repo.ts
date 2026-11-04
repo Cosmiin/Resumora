@@ -86,6 +86,11 @@ export function memoryImports(opts: { now?: () => Date; cvRepo(userId: string): 
       files.delete(job.storagePath);
     },
     async logCall() {},
+    async expireStale(iso) {
+      const stale = [...rows.values()].filter((r) => (r.status === "queued" || r.status === "processing") && r.createdAt < iso);
+      for (const r of stale) Object.assign(r, { status: "failed", error: "internal", result: null });
+      return stale.map((r) => ({ id: r.id, userId: r.userId, storagePath: r.storagePath }));
+    },
   };
 
   return { repoFor, admin, files, rows };

@@ -167,12 +167,14 @@ describe("CV import", () => {
     expect(screen.queryByRole("dialog", { name: "Import CV" })).not.toBeInTheDocument();
   });
 
-  it("stops waiting after 3 minutes", async () => {
+  it("keeps waiting for a slow import, then stops after 20 minutes", async () => {
     importsApi.getImport.mockResolvedValue(imp("processing"));
     renderPage();
     await chooseFile(pdf());
     const dialog = await screen.findByRole("dialog", { name: "Import CV" });
-    await advance(3 * 60_000);
+    await advance(5 * 60_000);
+    expect(within(dialog).getByText("Reading your CV…")).toBeInTheDocument();
+    await advance(15 * 60_000);
     expect(await within(dialog).findByText("This is taking longer than expected. Try again.")).toBeInTheDocument();
     const calls = importsApi.getImport.mock.calls.length;
     await advance(10_000);

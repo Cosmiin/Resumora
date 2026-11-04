@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(19);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -91,6 +91,17 @@ select results_eq(
   $$ select reason, content->>'n' from public.base_cv_versions $$,
   $$ values ('import'::text, 'imported'::text) $$,
   'the previous CV is kept as an import snapshot');
+
+-- ── Daily limit, enforced in the database so parallel uploads can't get past it ──
+set local request.jwt.claims to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select lives_ok(
+  $$ insert into public.cv_imports (file_name, storage_path)
+     select 'f.pdf', '22222222-2222-2222-2222-222222222222/' || g || '.pdf' from generate_series(1, 10) g $$,
+  'ten imports within 24 hours are allowed');
+select throws_ok(
+  $$ insert into public.cv_imports (file_name, storage_path) values ('f.pdf', '22222222-2222-2222-2222-222222222222/x.pdf') $$,
+  'P0001', 'import_limit',
+  'an 11th import within 24 hours is refused');
 
 select * from finish();
 rollback;

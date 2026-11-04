@@ -6,7 +6,7 @@ import { admitPrompt, extractPrompt } from "../src/imports/prompts.ts";
 import { processImport } from "../src/imports/process.ts";
 import { CV_LINES, makeDocx } from "./fixtures.ts";
 
-type Answers = { cv_admit?: Admit; cv_extract?: ImportDraft; down?: boolean };
+type Answers = { cv_admit?: Admit; cv_extract?: ImportDraft; down?: boolean; cutExtract?: boolean };
 
 /** A fake model that answers per task (the json_schema name) and records what it was sent. */
 function fakeModel(answers: Answers) {
@@ -19,6 +19,9 @@ function fakeModel(answers: Answers) {
     };
     const task = body.response_format.json_schema.name;
     sent.push({ task, system: body.messages[0]!.content, user: body.messages[1]!.content });
+    if (answers.cutExtract && task === "cv_extract") {
+      return new Response(JSON.stringify({ choices: [{ finish_reason: "length", message: { content: "{" } }] }), { status: 200 });
+    }
     return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(answers[task]) } }] }), { status: 200 });
   }) as typeof globalThis.fetch;
   const model: ModelDeps = {
@@ -64,6 +67,12 @@ describe("processImport", () => {
     const { model } = fakeModel({ cv_admit: { kind: "uncertain", reason: "Short" }, cv_extract: organized });
     const result = await processImport({ model }, await input());
     expect(result.warnings[0]).toBe("This may not be a CV. Check the result carefully.");
+  });
+
+  it("an answer cut off for length is too_long, not AI busy", async () => {
+    const { model, sent } = fakeModel({ cv_admit: { kind: "cv", reason: "" }, cutExtract: true });
+    expect(await failureCode(processImport({ model }, await input()))).toBe("too_long");
+    expect(sent.map((s) => s.task)).toEqual(["cv_admit", "cv_extract"]);
   });
 
   it("ai down", async () => {

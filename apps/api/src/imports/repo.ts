@@ -41,4 +41,6 @@ export interface ImportAdmin {
   fail(id: string, code: ImportFailureCode): Promise<void>;
   deleteFile(job: ImportJob): Promise<void>;
   logCall(entry: AiCallLog): Promise<void>;
+  /** Marks imports still queued or processing since before `iso` as failed ("internal") and returns them. */
+  expireStale(iso: string): Promise<ImportJob[]>;
 }

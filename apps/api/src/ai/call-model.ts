@@ -34,6 +34,8 @@ export type ModelRequest<S extends z.ZodType> = {
   system: string;
   user: string;
   maxOutputTokens: number;
+  /** Overrides ModelDeps.timeoutMs for slow tasks such as a full CV extraction. */
+  timeoutMs?: number;
 };
 
 /** Every provider failed (after retries). */
@@ -46,9 +48,16 @@ export class AiUnavailableError extends Error {
 const DEFAULT_TIMEOUT_MS = 45_000;
 const ATTEMPTS_PER_PROVIDER = 2;
 
+/** The answer hit the output limit. Retrying (or another provider) would be cut off the same way. */
+export class AiOutputTooLongError extends Error {
+  constructor() {
+    super("The answer was cut off at the output limit.");
+  }
+}
+
 /** A failed attempt. `retry` says whether the same provider is worth trying again. */
 class AttemptError extends Error {
-  constructor(message: string, readonly retry: boolean) {
+  constructor(message: string, readonly retry: boolean, readonly tooLong = false) {
     super(message);
   }
 }
@@ -99,12 +108,13 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
           .logCall({ userId: req.userId, task: req.task, provider: provider.name, model: provider.model, durationMs: Date.now() - started, ...entry })
           .catch((err: unknown) => console.error(JSON.stringify({ msg: "ai_calls log failed", error: String(err) })));
       try {
-        const { output, usage } = await attemptOnce(deps, provider, body(provider.model), req.schema);
+        const { output, usage } = await attemptOnce(deps, provider, body(provider.model), req.schema, req.timeoutMs);
         await log({ status: "ok", inputTokens: usage?.prompt_tokens, outputTokens: usage?.completion_tokens });
         return output;
       } catch (err) {
         const failure = err instanceof AttemptError ? err : new AttemptError("request failed", true);
         await log({ status: "error", error: failure.message });
+        if (failure.tooLong) throw new AiOutputTooLongError();
         if (!failure.retry) break;
       }
     }
@@ -114,7 +124,9 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
 
 type Usage = { prompt_tokens?: number; completion_tokens?: number };
 const CompletionSchema = z.object({
-  choices: z.array(z.object({ message: z.object({ content: z.string().nullable() }) })).min(1),
+  choices: z
+    .array(z.object({ finish_reason: z.string().nullish(), message: z.object({ content: z.string().nullable() }) }))
+    .min(1),
   usage: z.object({ prompt_tokens: z.number().optional(), completion_tokens: z.number().optional() }).optional(),
 });
 
@@ -123,8 +135,9 @@ async function attemptOnce<S extends z.ZodType>(
   provider: Provider,
   body: string,
   schema: S,
+  requestTimeoutMs?: number,
 ): Promise<{ output: z.infer<S>; usage?: Usage }> {
-  const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = requestTimeoutMs ?? deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let timer: ReturnType<typeof setTimeout> | undefined;
   // Race as well as abort, so a fetch that ignores the signal is still given up on.
   const timeout = new Promise<never>((_, reject) => {
@@ -145,7 +158,9 @@ async function attemptOnce<S extends z.ZodType>(
 
     const completion = CompletionSchema.safeParse(await Promise.race([res.json().catch(() => null), timeout]));
     if (!completion.success) throw new AttemptError("unexpected response shape", true);
-    const content = completion.data.choices[0]!.message.content ?? "";
+    const choice = completion.data.choices[0]!;
+    if (choice.finish_reason === "length") throw new AttemptError("output cut off at the length limit", false, true);
+    const content = choice.message.content ?? "";
 
     let json: unknown;
     try {

@@ -5,7 +5,7 @@ import { memoryCvRepo } from "../src/cv/memory-repo.ts";
 import type { CvRepo } from "../src/cv/repo.ts";
 import type { ModelDeps } from "../src/ai/call-model.ts";
 import { memoryImports, type MemoryImports } from "../src/imports/memory-repo.ts";
-import { handleImportMessage, type QueueMessage } from "../src/imports/consumer.ts";
+import { handleImportMessage, sweepStaleImports, type QueueMessage } from "../src/imports/consumer.ts";
 import type { ImportMessage } from "../src/imports/repo.ts";
 import { CV_LINES, makeDocx, makePdf } from "./fixtures.ts";
 
@@ -221,5 +221,20 @@ describe("import consumer", () => {
     await handleImportMessage({ admin: store.admin, model: fakeModel({ cv_admit: { kind: "not_cv", reason: "" } }), log: vi.fn() }, msg);
     expect(msg.ack).toHaveBeenCalled();
     expect((await json(await get(id))).status).toBe("ready");
+  });
+});
+
+describe("stuck import sweeper", () => {
+  it("fails imports stuck for too long and deletes their files", async () => {
+    const { id: stuck } = await json(await upload(makePdf(CV_LINES)));
+    await store.admin.start(stuck); // "processing", then the worker died
+    clock = new Date(clock.getTime() + 16 * 60_000);
+    const { id: fresh } = await json(await upload(makePdf(CV_LINES)));
+
+    await sweepStaleImports({ admin: store.admin, now: () => clock, log: vi.fn() });
+
+    expect((await json(await get(stuck))).error.code).toBe("internal");
+    expect((await json(await get(fresh))).status).toBe("queued");
+    expect([...store.files.keys()]).toEqual([`user-a/${fresh}.pdf`]);
   });
 });

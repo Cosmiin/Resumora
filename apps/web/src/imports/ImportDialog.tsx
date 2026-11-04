@@ -7,8 +7,11 @@ import { applyImport, getImport } from "./imports-api.ts";
 import { ImportReview } from "./ImportReview.tsx";
 
 export const POLL_MS = 2000;
-/** After this long without a result, stop checking and tell the user. */
-export const GIVE_UP_MS = 3 * 60_000;
+/**
+ * After this long without a result, stop checking and tell the user. Longer than the server's own
+ * worst case: the sweeper marks any import still unfinished after 15 minutes as failed.
+ */
+export const GIVE_UP_MS = 20 * 60_000;
 
 export function ImportDialog(props: {
   importId: string;

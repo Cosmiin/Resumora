@@ -42,6 +42,20 @@ export async function handleImportMessage(
   }
 }
 
+/** An import not finished after this long is given up on (longer than the worst case of retries). */
+export const STALE_AFTER_MS = 15 * 60_000;
+
+/**
+ * Runs on a schedule. Catches imports whose worker crashed or was never reached (a lost queue
+ * message, a misconfigured Worker): marks them failed so the user sees it, and deletes their files.
+ */
+export async function sweepStaleImports(deps: { admin: ImportAdmin; now(): Date; log: LogFn }): Promise<void> {
+  const before = new Date(deps.now().getTime() - STALE_AFTER_MS).toISOString();
+  const stale = await deps.admin.expireStale(before);
+  for (const job of stale) await cleanUp(deps, job);
+  if (stale.length) deps.log({ msg: "stale imports failed", count: stale.length });
+}
+
 /** A file that can't be deleted is logged, not retried: the import itself is already settled. */
 async function cleanUp(deps: { admin: ImportAdmin; log: LogFn }, job: ImportJob) {
   await deps.admin.deleteFile(job).catch((err: unknown) =>

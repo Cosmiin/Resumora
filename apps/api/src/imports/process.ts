@@ -1,10 +1,12 @@
 import { AdmitSchema, ImportDraftSchema, MAX_CV_BYTES, toCvContent, type ImportResult } from "@resumora/shared";
-import { AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
+import { AiOutputTooLongError, AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ImportFailure, extractText, type FileFormat } from "./extract-text.ts";
 import { admitPrompt, extractPrompt } from "./prompts.ts";
 
 /** The admit step only needs the start of the document. */
 const ADMIT_CHARS = 8_000;
+/** Copying a whole CV out word for word is slow; allow more than the default per attempt. */
+const EXTRACT_TIMEOUT_MS = 150_000;
 
 /**
  * Reads an uploaded CV and organizes it: text → "is this a CV?" → extraction → valid CV content.
@@ -37,6 +39,7 @@ export async function processImport(
       system: extractPrompt,
       user: doc(text),
       maxOutputTokens: 16_000,
+      timeoutMs: EXTRACT_TIMEOUT_MS,
     });
     const result = toCvContent(draft);
     if (admit.kind === "uncertain") result.warnings.unshift("This may not be a CV. Check the result carefully.");
@@ -45,6 +48,7 @@ export async function processImport(
     }
     return result;
   } catch (err) {
+    if (err instanceof AiOutputTooLongError) throw new ImportFailure("too_long");
     if (err instanceof AiUnavailableError) {
       throw new ImportFailure("ai_unavailable");
     }
