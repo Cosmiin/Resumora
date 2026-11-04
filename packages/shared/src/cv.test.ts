@@ -23,7 +23,7 @@ function withExperience(items: CvContent["experience"]): CvContent {
 describe("CvContentSchema", () => {
   it("emptyCv parses", () => {
     expect(() => CvContentSchema.parse(emptyCv())).not.toThrow();
-    expect(emptyCv().schemaVersion).toBe(1);
+    expect(emptyCv().schemaVersion).toBe(2);
     expect(emptyCv().locale).toBe("en");
     expect(emptyCv("ro").locale).toBe("ro");
   });
@@ -105,5 +105,16 @@ describe("CV format v2", () => {
 describe("newId", () => {
   it("is unique", () => {
     expect(new Set(Array.from({ length: 100 }, newId)).size).toBe(100);
+  });
+
+  it("rejects the v1 format", () => {
+    const v1 = { ...emptyCv(), schemaVersion: 1 };
+    expect(CvContentSchema.safeParse(v1).success).toBe(false);
+  });
+
+  it("achievements is limited to 10", () => {
+    const bullets = (n: number) => Array.from({ length: n }, (_, i) => ({ id: "b" + i, text: "x" }));
+    expect(CvContentSchema.safeParse({ ...emptyCv(), achievements: bullets(10) }).success).toBe(true);
+    expect(CvContentSchema.safeParse({ ...emptyCv(), achievements: bullets(11) }).success).toBe(false);
   });
 });

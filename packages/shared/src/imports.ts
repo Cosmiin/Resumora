@@ -8,6 +8,7 @@ import {
   MAX_TITLES,
   SKILL_GROUPS,
   YearMonthSchema,
+  defaultLayout,
   emptyCv,
   newId,
   type CvContent,
@@ -147,7 +148,7 @@ export function toCvContent(draft: ImportDraft): ImportResult {
   }
 
   const content: CvContent = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     locale: draft.detectedLocale === "ro" ? "ro" : "en",
     basics,
     experience,
@@ -179,6 +180,13 @@ export function toCvContent(draft: ImportDraft): ImportResult {
       title: clip(c.title, "other sections"),
       details: clip(c.details, "other sections", MAX_LONG_TEXT),
     })),
+    achievements: [],
+    volunteering: [],
+    awards: [],
+    courses: [],
+    publications: [],
+    interests: [],
+    layout: defaultLayout(),
   };
 
   return { content: CvContentSchema.parse(content), warnings: warnings.slice(0, 50) };
