@@ -1,5 +1,5 @@
 import { Fragment, memo, useCallback, useRef } from "react";
-import { newId, type Locale } from "@resumora/shared";
+import { MAX_LONG_TEXT, newId, type Locale } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { MessageKey } from "../../../i18n/en.ts";
 import type { CvAction } from "../cvReducer.ts";
@@ -89,6 +89,7 @@ const ListRow = memo(function ListRow({
       field={spec.field}
       className={className}
       multiline={multiline}
+      maxLength={multiline ? MAX_LONG_TEXT : undefined}
       value={text(spec.field)}
       label={t(spec.label)}
       placeholder={t(spec.placeholder ?? spec.label)}

@@ -1,4 +1,5 @@
 import { memo, useCallback, useLayoutEffect, useRef, type ChangeEvent, type KeyboardEvent, type Ref } from "react";
+import { MAX_TEXT } from "@resumora/shared";
 
 type Props = {
   value: string;
@@ -6,6 +7,8 @@ type Props = {
   label: string;
   placeholder?: string;
   multiline?: boolean;
+  /** The CV's limit for this field (the shared schema); MAX_TEXT unless the field is long text. */
+  maxLength?: number;
   className?: string;
   fieldKey: string;
   onKeyDown?(e: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>): void;
@@ -36,6 +39,7 @@ export const PageField = memo(function PageField({
   label,
   placeholder,
   multiline,
+  maxLength = MAX_TEXT,
   className,
   fieldKey,
   onKeyDown,
@@ -68,6 +72,7 @@ export const PageField = memo(function PageField({
     className,
     value,
     placeholder,
+    maxLength,
     "aria-label": label,
     "data-field": fieldKey,
     onKeyDown,

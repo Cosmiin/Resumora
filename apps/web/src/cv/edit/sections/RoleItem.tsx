@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useRef } from "react";
-import { newId, type Experience, type Locale } from "@resumora/shared";
+import { MAX_LONG_TEXT, newId, type Experience, type Locale } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { MessageKey } from "../../../i18n/en.ts";
 import { PRESENT } from "../../page/blocks.ts";
@@ -63,6 +63,7 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch }:
       placeholder={t(placeholder)}
       className={className}
       multiline={multiline}
+      maxLength={multiline ? MAX_LONG_TEXT : undefined}
       dispatch={dispatch}
     />
   );

@@ -28,6 +28,14 @@ describe("PageField", () => {
     expect(field).toHaveValue("Hello you");
   });
 
+  it("stops typing at the CV's limit for the field", () => {
+    const { unmount } = render(<Harness />);
+    expect(screen.getByRole("textbox", { name: "Summary" })).toHaveAttribute("maxlength", "2000");
+    unmount();
+    render(<PageField value="" onChange={() => {}} label="Long" fieldKey="long" multiline maxLength={4000} />);
+    expect(screen.getByRole("textbox", { name: "Long" })).toHaveAttribute("maxlength", "4000");
+  });
+
   it("has the accessible name from label", () => {
     render(<Harness />);
     expect(screen.getByLabelText("Summary")).toHaveAttribute("data-field", "summary");

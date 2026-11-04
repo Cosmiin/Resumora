@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { MAX_LONG_TEXT } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import { PageField } from "../PageField.tsx";
 import type { SectionProps } from "./types.ts";
@@ -8,6 +9,7 @@ export function SummaryEdit({ cv, dispatch }: SectionProps) {
   return (
     <PageField
       multiline
+      maxLength={MAX_LONG_TEXT}
       fieldKey="summary"
       value={cv.basics.summary}
       label={t("edit.summary")}

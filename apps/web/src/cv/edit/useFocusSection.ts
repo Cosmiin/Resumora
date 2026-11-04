@@ -25,6 +25,8 @@ export function useFocusSection(root: RefObject<HTMLElement | null>): [SectionFo
       setFocus((prev) => (prev?.key === section && prev.itemId === itemId ? prev : { key: section as CategoryKey, itemId }));
     };
     const onKeyDown = (e: KeyboardEvent) => {
+      // Esc on a picked-up drag grip cancels the move (DragList); it does not leave the page.
+      if ((e.target as HTMLElement).closest('[data-grip][aria-pressed="true"]')) return;
       if (e.key === "Escape") leave();
     };
     const onMouseDown = (e: MouseEvent) => {

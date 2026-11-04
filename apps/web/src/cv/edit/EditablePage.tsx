@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { missingCategories, newId, normalizeLayout, type CvContent, type SectionKey } from "@resumora/shared";
 import { sectionsOnCv, type CvAction } from "./cvReducer.ts";
 import { MissingBox } from "./MissingBox.tsx";
@@ -33,6 +33,10 @@ export function EditablePage({ cv, dispatch, opened, onOpen }: Props) {
 
   const layout = normalizeLayout(cv.layout);
   const onPage = new Set(sectionsOnCv(cv));
+  // A section that was on the page stays while it is edited, even if its text is cleared.
+  useEffect(() => {
+    for (const key of onPage) onOpen(key);
+  });
   const flags = new Map(missingCategories(cv).filter((f) => f.key !== "header").map((f) => [f.key, f.level]));
 
   return (

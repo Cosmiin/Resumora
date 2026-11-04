@@ -7,13 +7,14 @@ type Props = {
   gripId: string;
   pressed: boolean;
   onKeyDown(e: React.KeyboardEvent<HTMLButtonElement>): void;
+  onBlur?(): void;
   /** Pointer and touch listeners from dnd-kit. */
   pointer?: HTMLAttributes<HTMLButtonElement>;
 };
 
 /** The handle for reordering: drag it, or use the keyboard (Space, arrows, Space, Escape). */
 export const DragGrip = forwardRef<HTMLButtonElement, Props>(function DragGrip(
-  { name, hintId, gripId, pressed, onKeyDown, pointer },
+  { name, hintId, gripId, pressed, onKeyDown, onBlur, pointer },
   ref,
 ) {
   return (
@@ -27,6 +28,7 @@ export const DragGrip = forwardRef<HTMLButtonElement, Props>(function DragGrip(
       aria-describedby={hintId}
       aria-pressed={pressed}
       onKeyDown={onKeyDown}
+      onBlur={onBlur}
     >
       ⠿
     </button>

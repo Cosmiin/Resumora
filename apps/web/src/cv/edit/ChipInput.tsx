@@ -15,15 +15,17 @@ type Props = {
 export function ChipInput({ items, onAdd, onRemove, label, tone, fieldKey }: Props) {
   const [text, setText] = useState("");
 
+  const commit = useCallback(() => {
+    const name = text.trim();
+    if (name) onAdd(name);
+    setText("");
+  }, [text, onAdd]);
+
   const onKey = useCallback((e: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
-      const name = text.trim();
-      if (name) {
-        onAdd(name);
-        setText("");
-      }
+      commit();
     } else if (e.key === "Backspace" && text === "") {
       const last = items[items.length - 1];
       if (!last) return;
@@ -31,7 +33,7 @@ export function ChipInput({ items, onAdd, onRemove, label, tone, fieldKey }: Pro
       onRemove(last.id);
       setText(last.name);
     }
-  }, [text, items, onAdd, onRemove]);
+  }, [text, items, commit, onRemove]);
 
   return (
     <span className="cv-chips">
@@ -51,6 +53,7 @@ export function ChipInput({ items, onAdd, onRemove, label, tone, fieldKey }: Pro
         value={text}
         onChange={setText}
         onKeyDown={onKey}
+        onBlur={commit}
       />
     </span>
   );

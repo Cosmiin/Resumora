@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef } from "react";
-import { newId, type CvContent } from "@resumora/shared";
+import { MAX_LONG_TEXT, newId, type CvContent } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { CvAction } from "../cvReducer.ts";
 import { DragList } from "../DragList.tsx";
@@ -32,6 +32,7 @@ const CustomBlock = memo(function CustomBlock({ item, dispatch }: { item: Custom
       <RemoveButton name={name} onClick={remove} />
       <ItemField
         multiline
+        maxLength={MAX_LONG_TEXT}
         list="custom"
         itemId={item.id}
         field="details"

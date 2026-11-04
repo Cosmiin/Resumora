@@ -32,11 +32,12 @@ type RowProps = {
   hintId: string;
   pressed: boolean;
   onKey(e: KeyboardEvent<HTMLButtonElement>, id: string, index: number): void;
+  onBlur(id: string): void;
   className: string;
   children: ReactNode;
 };
 
-function Row({ id, name, index, hintId, pressed, onKey, className, children }: RowProps) {
+function Row({ id, name, index, hintId, pressed, onKey, onBlur, className, children }: RowProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
   void attributes; // dnd-kit's button attributes would clash with the grip's own labels
   return (
@@ -53,6 +54,7 @@ function Row({ id, name, index, hintId, pressed, onKey, className, children }: R
         pressed={pressed}
         pointer={listeners}
         onKeyDown={(e) => onKey(e, id, index)}
+        onBlur={() => onBlur(id)}
       />
       {children}
     </div>
@@ -129,6 +131,13 @@ export function DragList<T extends { id: string }>({ items, onMove, label, child
     [picked, total, onMove, items, label],
   );
 
+  // Leaving a picked-up grip drops it where it is.
+  // (A move re-renders the row in a new place, which can blur it; focus is put back right after.)
+  const onGripBlur = useCallback((id: string) => {
+    if (refocus.current === id) return;
+    setPicked((p) => (p?.id === id ? null : p));
+  }, []);
+
   const onDragEnd = (e: DragEndEvent) => {
     if (!e.over || e.active.id === e.over.id) return;
     const from = items.findIndex((i) => i.id === e.active.id);
@@ -154,6 +163,7 @@ export function DragList<T extends { id: string }>({ items, onMove, label, child
             hintId={hintId}
             pressed={picked?.id === item.id}
             onKey={onKey}
+            onBlur={onGripBlur}
             className={rowClassName}
           >
             {children(item)}

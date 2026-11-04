@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import type { Skill, SkillGroup } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { MessageKey } from "../../../i18n/en.ts";
@@ -45,6 +45,12 @@ const SkillRow = memo(function SkillRow({
 
 /** Technical, Professional, and To sort (only while it has skills). Never merged. */
 export function SkillsEdit({ cv, dispatch }: SectionProps) {
+  // Once shown, the To sort row stays while the page is open, so a chip pulled back by Backspace keeps its input.
+  const [showSort, setShowSort] = useState(false);
+  const hasSort = cv.unclearSkills.length > 0;
+  useEffect(() => {
+    if (hasSort) setShowSort(true);
+  }, [hasSort]);
   return (
     <>
       <SkillRow
@@ -61,7 +67,7 @@ export function SkillsEdit({ cv, dispatch }: SectionProps) {
         addLabel="edit.skills.professional"
         dispatch={dispatch}
       />
-      {cv.unclearSkills.length > 0 && (
+      {(hasSort || showSort) && (
         <SkillRow
           group="unclearSkills"
           items={cv.unclearSkills}
