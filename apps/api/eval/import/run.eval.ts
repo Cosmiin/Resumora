@@ -18,7 +18,7 @@ const PRICES: Record<string, { input: number; output: number }> = {
 const MAX_SECONDS = 30;
 const MAX_COST = 0.01;
 const MIN_ACCURACY = 0.95;
-/** The scan has no text layer; its words come from the same CV as a normal file. */
+/** The scan has no text layer: 10-scan relies on being the same CV as 04 (generate.ts renders case04 as a picture). */
 const SCAN_SOURCE_CASE = "04-colour-sidebar";
 
 type Row = { id: string; seconds: number; cost: number; score?: CaseScore; error?: string; pass: boolean };
@@ -58,30 +58,36 @@ async function runCase(folder: string): Promise<Row> {
   }
   const seconds = (Date.now() - started) / 1000;
   // Counts every call that reported tokens; a provider without a price here counts as $0.
+  const unpriced = calls.find((c) => !PRICES[`${c.provider}:${c.model}`]);
   const cost = calls.reduce((sum, c) => {
     const price = PRICES[`${c.provider}:${c.model}`];
     return sum + (price ? (c.inputTokens ?? 0) * price.input + (c.outputTokens ?? 0) * price.output : 0);
   }, 0);
+  if (unpriced) error = `no price for ${unpriced.provider}:${unpriced.model}`;
   if (!result) return { id: folder, seconds, cost, error, pass: false };
   const score = scoreCase(expected, result, await sourceText(folder));
   const pass =
     score.sectionsOk && score.fieldAccuracy >= MIN_ACCURACY && score.invented.length === 0 &&
-    score.diacriticsOk && score.flagsOk && seconds < MAX_SECONDS && cost < MAX_COST;
-  return { id: folder, seconds, cost, score, pass };
+    score.diacriticsOk && score.flagsOk && seconds < MAX_SECONDS && cost < MAX_COST && !error;
+  return { id: folder, seconds, cost, score, error, pass };
 }
 
 function printTable(rows: Row[]): void {
-  const head = pad("case", 24) + pad("sections", 10) + pad("fields", 8) + pad("invented", 10) + pad("accents", 9) + pad("flags", 7) + pad("secs", 7) + pad("cost", 9) + "result";
+  const head = pad("case", 24) + pad("sections", 10) + pad("fields", 8) + pad("invented", 10) + pad("extra", 7) + pad("accents", 9) + pad("flags", 7) + pad("secs", 7) + pad("cost", 9) + "result";
   const out = [head];
   for (const r of rows) {
     const s = r.score;
     const mark = (ok: boolean | undefined) => (ok === undefined ? "-" : ok ? "ok" : "FAIL");
     out.push(
       pad(r.id, 24) + pad(mark(s?.sectionsOk), 10) + pad(s ? `${(s.fieldAccuracy * 100).toFixed(1)}%` : "-", 8) +
-        pad(s ? s.invented.length : "-", 10) + pad(mark(s?.diacriticsOk), 9) + pad(mark(s?.flagsOk), 7) +
+        pad(s ? s.invented.length : "-", 10) + pad(s ? s.extra.length : "-", 7) + pad(mark(s?.diacriticsOk), 9) + pad(mark(s?.flagsOk), 7) +
         pad(r.seconds.toFixed(1), 7) + pad(usd(r.cost), 9) + (r.pass ? "PASS" : r.error ? `FAIL (${r.error})` : "FAIL"),
     );
-    for (const line of s?.invented ?? []) out.push(`    invented: ${line}`);
+    const detail = (label: string, lines: string[] = []) => lines.forEach((l) => out.push(`    ${label}: ${l}`));
+    detail("invented", s?.invented);
+    detail("section", s?.sectionProblems);
+    detail("accents", s?.brokenAccents);
+    detail("extra item", s?.extra);
   }
   const scored = rows.filter((r) => r.score);
   const all = scored.length === rows.length;

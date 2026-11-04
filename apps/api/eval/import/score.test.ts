@@ -76,4 +76,40 @@ describe("scoreCase", () => {
     expect(score.sectionsOk).toBe(false);
     expect(score.invented).toContain("Premiu inventat de model");
   });
+
+  it("an extra item lowers accuracy and is listed", () => {
+    const c = clone(content);
+    c.experience.push({ company: "Gamma SRL", title: "Manager", description: "", bullets: [{ text: "Echipa mare." }] });
+    const score = scoreCase(expected, actualFrom(c));
+    expect(score.fieldAccuracy).toBeLessThan(1);
+    expect(score.extra).toEqual(["experience: Gamma SRL Manager"]);
+  });
+
+  it("a changed boolean and a filled field that should be empty both count", () => {
+    const e = clone(expected);
+    (e.content.experience as Record<string, unknown>[])[0]!.current = true;
+    const c = clone(content) as Record<string, unknown>;
+    (c.experience as Record<string, unknown>[])[0]!.current = false;
+    expect(scoreCase(e, actualFrom(c)).fieldAccuracy).toBeLessThan(1);
+    const filled = clone(content);
+    filled.experience[0]!.description = "Invented text";
+    expect(scoreCase(expected, actualFrom(filled)).fieldAccuracy).toBeLessThan(1);
+  });
+
+  it("a heading in the wrong category fails sectionsOk and says so", () => {
+    const wrong = [expected.headings[0]!, { heading: "Aptitudini", category: "other" as const }];
+    const score = scoreCase(expected, actualFrom(content, wrong));
+    expect(score.sectionsOk).toBe(false);
+    expect(score.sectionProblems).toEqual(['"Aptitudini" -> got other, expected skills']);
+  });
+
+  it("flags match in any order", () => {
+    const flags = [{ key: "summary", level: "missing" }, { key: "languages", level: "tip" }];
+    const e: Expected = { ...expected, flags: [...flags].reverse() };
+    const c = clone(content) as Record<string, unknown>;
+    c.basics = { ...(c.basics as object), summary: "" };
+    c.languages = [];
+    expect(scoreCase(e, actualFrom(c)).flagsOk).toBe(true);
+    expect(scoreCase({ ...e, flags: [flags[0]!] }, actualFrom(c)).flagsOk).toBe(false);
+  });
 });
