@@ -175,6 +175,8 @@ describe("processImport with a PDF", () => {
     const result = await processImport({ model }, pdfInput(makePdf([])));
     expect(result.isScan).toBe(true);
     expect(result.warnings).toHaveLength(50);
+    expect(result.warnings).toContain("This file is a scan. Check every line.");
+    expect(result.warnings[0]).toBe("This may not be a CV. Check the result carefully.");
     expect(ImportResultSchema.safeParse(result).success).toBe(true);
   });
 

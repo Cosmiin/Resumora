@@ -83,16 +83,17 @@ export async function processImport(
     }
 
     const result = toCvContent(draft);
-    result.warnings.push(...warnings.filter((w) => !result.warnings.includes(w)));
-    if (admit.kind === "uncertain") result.warnings.unshift("This may not be a CV. Check the result carefully.");
+    // Our own warnings are always kept; the extraction's warnings are cut so the total stays within the limit.
+    const first = admit.kind === "uncertain" ? ["This may not be a CV. Check the result carefully."] : [];
+    const last = [...warnings, ...(isScan ? [SCAN_WARNING] : [])];
+    const ours = new Set([...first, ...last]);
+    const room = MAX_WARNINGS - ours.size;
+    result.warnings = [...first, ...result.warnings.filter((w) => !ours.has(w)).slice(0, room), ...new Set(last)];
     if (isScan) {
-      result.warnings.push(SCAN_WARNING);
       result.isScan = true;
     } else {
       result.unsourcedLines = findUnsourcedLines(result.content, text);
     }
-    // The warnings added above can pass the limit toCvContent kept to.
-    result.warnings = result.warnings.slice(0, MAX_WARNINGS);
     if (new TextEncoder().encode(JSON.stringify(result.content)).length > MAX_CV_BYTES) {
       throw new ImportFailure("too_long");
     }
