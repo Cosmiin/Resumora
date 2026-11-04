@@ -271,3 +271,66 @@ describe("CV import", () => {
     expect(importsApi.applyImport).not.toHaveBeenCalled();
   });
 });
+
+describe("import review: where each heading went", () => {
+  const withResult = (content: CvContent, extra: Partial<NonNullable<ImportResponse["result"]>> = {}) =>
+    imp("ready", { result: { content, warnings: [], sourceHeadings: [], unsourcedLines: [], isScan: false, ...extra } });
+  const open = async () => {
+    renderPage();
+    await chooseFile(pdf());
+    return screen.findByRole("dialog", { name: "Import review" });
+  };
+
+  it("the review lists each original heading with its category", async () => {
+    importsApi.getImport.mockResolvedValue(
+      withResult(imported, { sourceHeadings: [{ heading: "EXPERIENȚĂ PROFESIONALĂ", category: "experience" }, { heading: "Volunteering", category: "other" }] }),
+    );
+    const dialog = await open();
+    const table = await within(dialog).findByRole("table");
+    expect(within(table).getByText("In your file")).toBeInTheDocument();
+    expect(within(table).getByText("Placed in")).toBeInTheDocument();
+    const row = within(table).getByText("EXPERIENȚĂ PROFESIONALĂ").closest("tr")!;
+    expect(row).toHaveTextContent("Experience");
+    expect(row).toHaveTextContent("1");
+    expect(within(table).getByText("Volunteering").closest("tr")).toHaveTextContent("Other");
+  });
+
+  it("Move to moves an Other section and Apply sends the moved content", async () => {
+    importsApi.getImport.mockResolvedValue(
+      withResult({ ...imported, custom: [{ id: "c1", title: "Hobby-uri", details: "• Chess\n• Hiking" }] }, { sourceHeadings: [{ heading: "Hobby-uri", category: "other" }] }),
+    );
+    importsApi.applyImport.mockResolvedValue({ version: 4, updatedAt: "2026-11-04T10:05:00Z" });
+    cvApi.saveCv.mockResolvedValue({ version: 5, updatedAt: "2026-11-04T10:06:00Z" });
+    const dialog = await open();
+    await user.selectOptions(await within(dialog).findByRole("combobox", { name: "Move Hobby-uri to" }), "interests");
+    expect(within(dialog).getByText("Hobby-uri").closest("tr")).toHaveTextContent("Interests");
+    await user.click(await useThisCv(dialog));
+    await waitFor(() => expect(cvApi.saveCv).toHaveBeenCalled());
+    const [content, version] = cvApi.saveCv.mock.calls.at(-1)!;
+    expect(version).toBe(4);
+    expect(content.interests.map((i: { name: string }) => i.name)).toEqual(["Chess", "Hiking"]);
+    expect(content.custom).toEqual([]);
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
+  });
+
+  it("unsourced lines are listed", async () => {
+    importsApi.getImport.mockResolvedValue(withResult(imported, { unsourcedLines: ["Invented line"] }));
+    const dialog = await open();
+    expect(await within(dialog).findByText("We couldn't find these lines in your file:")).toBeInTheDocument();
+    expect(within(dialog).getByText("Invented line", { selector: "li" })).toBeInTheDocument();
+  });
+
+  it("a scan shows the scan warning once", async () => {
+    const scan = "This file is a scan. Check every line.";
+    importsApi.getImport.mockResolvedValue(withResult(imported, { isScan: true, warnings: [scan] }));
+    const dialog = await open();
+    await within(dialog).findByText("Ana Popescu");
+    expect(within(dialog).getAllByText(scan)).toHaveLength(1);
+  });
+
+  it("missing sections are flagged under the table", async () => {
+    importsApi.getImport.mockResolvedValue(withResult(imported));
+    const dialog = await open();
+    expect(await within(dialog).findByText("Recruiters read this first. Two to four sentences is enough.")).toBeInTheDocument();
+  });
+});

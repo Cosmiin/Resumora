@@ -5,3 +5,4 @@ export * from "./categories.ts";
 export * from "./upgrade.ts";
 export * from "./flags.ts";
 export * from "./dates.ts";
+export * from "./move-other.ts";
