@@ -149,6 +149,18 @@ export const en = {
   "cv.item.moveUp": "Move up",
   "cv.item.moveDown": "Move down",
   "cv.item.remove": "Remove",
+
+  "cv.page.label": "CV page",
+  "cv.page.editing": "Editing",
+  "cv.page.edit": "Edit {name}",
+  "cv.page.editDetails": "Edit your details",
+  "cv.page.editSummary": "Edit summary",
+  "cv.page.editSkills": "Edit skills",
+  "cv.page.addName": "Add your name",
+  "cv.page.addSummary": "Add a short summary",
+  "cv.page.technical": "Technical",
+  "cv.page.professional": "Professional",
+  "cv.page.toSort": "To sort",
 } as const;
 
 export type MessageKey = keyof typeof en;
