@@ -406,3 +406,5 @@ label.checkbox input {
 .cv-inline-items .cv-block { margin: 0; }
 .cv-inline-items .cv-block-button { width: auto; }
 @media (max-width: 720px) { .cv-page { padding: 32px 24px; } }
+.cv-block-button { min-height: 44px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
+.cv-inline-items .cv-block-button { justify-content: center; }
