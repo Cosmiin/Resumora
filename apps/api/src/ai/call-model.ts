@@ -26,13 +26,16 @@ export type ModelDeps = {
   timeoutMs?: number;
 };
 
+/** One piece of the user message. A PDF is sent to the model as a file, not as extracted text. */
+export type UserPart = { type: "text"; text: string } | { type: "pdf"; filename: string; base64: string };
+
 export type ModelRequest<S extends z.ZodType> = {
   userId: string;
   /** Short snake_case name, used as the JSON schema name and in logs. */
   task: string;
   schema: S;
   system: string;
-  user: string;
+  user: string | UserPart[];
   maxOutputTokens: number;
   /** Overrides ModelDeps.timeoutMs for slow tasks such as a full CV extraction. */
   timeoutMs?: number;
@@ -42,6 +45,13 @@ export type ModelRequest<S extends z.ZodType> = {
 export class AiUnavailableError extends Error {
   constructor() {
     super("The AI service is unavailable right now.");
+  }
+}
+
+/** Every provider refused the file (wrong type, not readable, not supported). Retrying will not help. */
+export class AiInputRejectedError extends Error {
+  constructor() {
+    super("The AI service could not read the file.");
   }
 }
 
@@ -57,7 +67,7 @@ export class AiOutputTooLongError extends Error {
 
 /** A failed attempt. `retry` says whether the same provider is worth trying again. */
 class AttemptError extends Error {
-  constructor(message: string, readonly retry: boolean, readonly tooLong = false) {
+  constructor(message: string, readonly retry: boolean, readonly tooLong = false, readonly inputRejected = false) {
     super(message);
   }
 }
@@ -71,6 +81,20 @@ export function providersFromEnv(
   ];
   return all.filter((p) => p.apiKey && p.model);
 }
+
+/** The chat-completions content for the user message; both providers take the same file part. */
+function userContent(user: string | UserPart[]): string | unknown[] {
+  if (typeof user === "string") return user;
+  return user.map((part) =>
+    part.type === "text"
+      ? { type: "text", text: part.text }
+      : { type: "file", file: { filename: part.filename, file_data: `data:application/pdf;base64,${part.base64}` } },
+  );
+}
+
+/** Statuses and wording that mean "I cannot read this file", as opposed to a bad key or a bad request. */
+const REJECTED_STATUSES = new Set([400, 415, 422]);
+const REJECTED_WORDS = /file|pdf|content type|unsupported/i;
 
 /** JSON schema for structured output. Providers reject the `$schema` key. */
 function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
@@ -100,7 +124,7 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
           }),
       messages: [
         { role: "system", content: req.system },
-        { role: "user", content: req.user },
+        { role: "user", content: userContent(req.user) },
       ],
       response_format: {
         type: "json_schema",
@@ -108,6 +132,7 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
       },
     });
 
+  let rejectedBy = 0;
   for (const provider of deps.providers) {
     for (let attempt = 1; attempt <= ATTEMPTS_PER_PROVIDER; attempt++) {
       const started = Date.now();
@@ -123,10 +148,12 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
         const failure = err instanceof AttemptError ? err : new AttemptError("request failed", true);
         await log({ status: "error", error: failure.message });
         if (failure.tooLong) throw new AiOutputTooLongError();
+        if (failure.inputRejected) rejectedBy++;
         if (!failure.retry) break;
       }
     }
   }
+  if (deps.providers.length > 0 && rejectedBy === deps.providers.length) throw new AiInputRejectedError();
   throw new AiUnavailableError();
 }
 
@@ -162,7 +189,11 @@ async function attemptOnce<S extends z.ZodType>(
       timeout,
     ]);
     // Only the status goes into errors: provider bodies may echo the prompt.
-    if (!res.ok) throw new AttemptError(`HTTP ${res.status}`, res.status === 429 || res.status >= 500);
+    if (!res.ok) {
+      // The body is only read to tell a refused file from other errors; it is never logged.
+      const text = REJECTED_STATUSES.has(res.status) ? await Promise.race([res.text().catch(() => ""), timeout]) : "";
+      throw new AttemptError(`HTTP ${res.status}`, res.status === 429 || res.status >= 500, false, REJECTED_WORDS.test(text));
+    }
 
     const completion = CompletionSchema.safeParse(await Promise.race([res.json().catch(() => null), timeout]));
     if (!completion.success) throw new AttemptError("unexpected response shape", true);
