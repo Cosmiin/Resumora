@@ -10,6 +10,7 @@ function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
     startDate: "2024-01",
     endDate: "",
     current: true,
+    description: "",
     bullets: [],
     ...overrides,
   };
@@ -63,6 +64,41 @@ describe("CvContentSchema", () => {
 
   it("rejects unknown fields", () => {
     expect(CvContentSchema.safeParse({ ...emptyCv(), photo: "x" }).success).toBe(false);
+  });
+});
+
+describe("CV format v2", () => {
+  const basics = (b: Partial<CvContent["basics"]>) => ({ ...emptyCv(), basics: { ...emptyCv().basics, ...b } });
+
+  it("accepts year-only dates", () => {
+    const parses = (startDate: string) =>
+      CvContentSchema.safeParse(withExperience([experience({ startDate })])).success;
+    expect(parses("2019")).toBe(true);
+    expect(parses("2019-04")).toBe(true);
+    expect(parses("2019-4")).toBe(false);
+    expect(parses("04/2019")).toBe(false);
+  });
+
+  it("allows at most two titles", () => {
+    expect(CvContentSchema.safeParse(basics({ titles: ["PM", "Analyst"] })).success).toBe(true);
+    const result = CvContentSchema.safeParse(basics({ titles: ["a", "b", "c"] }));
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path.slice(0, 2)).toEqual(["basics", "titles"]);
+  });
+
+  it("has three skill groups", () => {
+    const cv = { ...emptyCv(), technicalSkills: [{ id: "a", name: "SQL" }] };
+    expect(CvContentSchema.safeParse(cv).success).toBe(true);
+    expect(emptyCv().professionalSkills).toEqual([]);
+    expect(emptyCv().unclearSkills).toEqual([]);
+    expect(CvContentSchema.safeParse({ ...cv, skills: [] }).success).toBe(false);
+  });
+
+  it("keeps custom sections", () => {
+    const withCustom = (details: string) =>
+      CvContentSchema.safeParse({ ...emptyCv(), custom: [{ id: "c", title: "Volunteering", details }] }).success;
+    expect(withCustom("Red Cross, 2018")).toBe(true);
+    expect(withCustom("a".repeat(4001))).toBe(false);
   });
 });
 
