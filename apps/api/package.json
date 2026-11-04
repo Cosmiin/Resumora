@@ -12,10 +12,13 @@
     "@resumora/shared": "*",
     "@supabase/supabase-js": "2.119.0",
     "hono": "4.13.16",
+    "mammoth": "1.13.0",
+    "unpdf": "2.1.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261104.1",
+    "jszip": "3.10.2",
     "wrangler": "4.157.0"
   }
 }
