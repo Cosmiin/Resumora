@@ -16,7 +16,7 @@ export async function processImport(
   deps: { model: ModelDeps },
   input: { userId: string; bytes: Uint8Array; format: FileFormat },
 ): Promise<ImportResult> {
-  const text = await extractText(input.bytes, input.format);
+  const { text } = await extractText(input.bytes, input.format);
   const doc = (t: string) => `<document>\n${t}\n</document>`;
 
   try {
