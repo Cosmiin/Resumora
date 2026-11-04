@@ -148,3 +148,11 @@
 @media (hover: none) {
   .adder, .remover { opacity: 0.55; }
 }
+
+.cv-role-dates { display: flex; align-items: baseline; gap: 2px; flex: none; }
+.cv-role-dates input { width: 8ch; text-align: center; }
+.cv-present { font: inherit; color: inherit; background: none; border: 0; padding: 1px 4px; border-radius: 4px; cursor: pointer; }
+.cv-present:hover, .cv-present:focus-visible { background: var(--sage-100); }
+.cv-role + .cv-role { margin-block-start: 6px; }
+.cv-role-desc.is-empty { opacity: 0; }
+.cv-role:hover .cv-role-desc.is-empty, .cv-role:focus-within .cv-role-desc.is-empty { opacity: 1; }
