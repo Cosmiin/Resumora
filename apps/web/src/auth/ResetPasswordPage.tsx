@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase.ts";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 import { authErrorKey } from "./authErrors.ts";
+import { AuthLayout } from "./AuthLayout.tsx";
 
 /** Opened from the reset email; Supabase has already signed the user in for recovery. */
 export function ResetPasswordPage() {
@@ -23,9 +24,9 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <main className="auth-page">
-      <form className="auth-card" onSubmit={submit}>
-        <h1>{t("auth.reset.title")}</h1>
+    <AuthLayout>
+      <form className="auth-form" onSubmit={submit}>
+        <h2>{t("auth.reset.title")}</h2>
         {done ? (
           <p role="status">
             {t("auth.reset.done")} <Link to="/cv">{t("app.name")}</Link>
@@ -41,6 +42,6 @@ export function ResetPasswordPage() {
           </>
         )}
       </form>
-    </main>
+    </AuthLayout>
   );
 }

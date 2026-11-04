@@ -41,8 +41,17 @@ beforeEach(() => {
 describe("authentication", () => {
   it("redirects to login when signed out", async () => {
     const router = renderAt("/cv");
-    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/login");
+  });
+
+  it("login page shows the product promise", async () => {
+    renderAt("/login");
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Your CV, organized and ready for every application." }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
+    expect(screen.getByText("Sign in to continue with your CV.")).toBeInTheDocument();
   });
 
   it("shows readable error on wrong password", async () => {

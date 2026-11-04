@@ -8,7 +8,10 @@ export const en = {
   "app.signOut": "Sign out",
   "app.signOutUnsaved": "You have unsaved changes. Sign out anyway?",
 
-  "auth.signIn.title": "Sign in",
+  "auth.signIn.title": "Welcome back",
+  "auth.signIn.subtitle": "Sign in to continue with your CV.",
+  "auth.promise.title": "Your CV, organized and ready for every application.",
+  "auth.promise.text": "Import the CV you already have. Resumora sorts it into clear sections, keeps your own words, and helps you tailor it to each job.",
   "auth.signIn.submit": "Sign in",
   "auth.signUp.title": "Create your account",
   "auth.signUp.submit": "Create account",
