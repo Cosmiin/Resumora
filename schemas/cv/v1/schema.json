@@ -251,8 +251,7 @@
         },
         "photoMode": {
           "enum": [
-            "base",
-            "override"
+            "base"
           ]
         }
       },
@@ -265,51 +264,15 @@
     },
     "context": {
       "type": "object",
-      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
       "properties": {
         "kind": {
-          "enum": [
-            "base",
-            "tailored"
-          ]
-        },
-        "baseSnapshotId": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/id"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "jobSnapshotId": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/id"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "previousTailoredSnapshotId": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/id"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "const": "base"
         }
       },
-      "required": [
-        "kind",
-        "baseSnapshotId",
-        "jobSnapshotId",
-        "previousTailoredSnapshotId"
-      ]
+      "additionalProperties": false
     }
   },
   "required": [
@@ -429,8 +392,7 @@
             "upload",
             "manual",
             "interview",
-            "external_document",
-            "job_capture"
+            "external_document"
           ]
         },
         "sha256": {

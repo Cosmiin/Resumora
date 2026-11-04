@@ -82,9 +82,14 @@ export function validateDraft(d: BaseDraft): Issue[] {
     if (!e.ongoing?.value && reversedDates(e.start.value, e.end.value))
       issues.push({ field: e.end.fieldId, code: "chronology" });
   }
-  for (const s of d.optionalSections)
+  for (const s of d.optionalSections) {
+    if (s.heading && !s.heading.value.trim())
+      issues.push({ field: s.heading.fieldId, code: "required" });
     for (const e of s.entries) {
-      if (!e.title.value.trim())
+      if (
+        !(s.heading && e.id === s.id) &&
+        !e.title.value.trim()
+      )
         issues.push({ field: e.title.fieldId, code: "required" });
       for (const b of e.bullets ?? [])
         if (!b.value.trim())
@@ -92,6 +97,7 @@ export function validateDraft(d: BaseDraft): Issue[] {
       if (!e.ongoing?.value && reversedDates(e.start.value, e.end.value))
         issues.push({ field: e.end.fieldId, code: "chronology" });
     }
+  }
   for (const f of allFacts(d)) {
     if (typeof f.value === "object" && dateError(f.value))
       issues.push({ field: f.fieldId, code: "date" });

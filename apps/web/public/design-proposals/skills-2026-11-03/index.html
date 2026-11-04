@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resumora · Compact skills proposals</title>
+<style>
+:root{color-scheme:light;--ink:#163d37;--muted:#60746d;--line:#d6e0da;--accent:#126956}
+*{box-sizing:border-box}body{margin:0;background:#f6f7f3;color:var(--ink);font:15px/1.55 system-ui,sans-serif}header,main{max-width:1250px;margin:auto;padding:28px 32px}header{padding-bottom:18px}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}h1{font:600 32px/1.2 Georgia,serif;margin:9px 0 12px}p{margin:0;color:var(--muted)}nav{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 14px}button{font:inherit;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:7px;padding:10px 16px}button[aria-pressed=true]{background:var(--ink);color:white;border-color:var(--ink)}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #198d72;outline-offset:3px}.note{font-size:13px}.selected-note{background:#edf1e9;padding:12px 16px;border-left:3px solid var(--accent);margin-top:16px}main{padding-top:0}.panel{margin-bottom:24px}.panel[hidden]{display:none}.caption{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 0}.caption h2{font-size:17px;margin:0 0 4px}.caption p{font-size:14px;max-width:800px}a{color:var(--accent);white-space:nowrap;text-underline-offset:3px}img{display:block;width:100%;height:auto;background:white;border:1px solid var(--line)}details{margin-top:28px;border-top:1px solid var(--line);padding-top:16px}summary{cursor:pointer;font-weight:600;margin-bottom:14px}.current{max-width:979px}.compare .panel{border-top:1px solid var(--line);padding-top:8px}@media(max-width:600px){header,main{padding:20px 16px}h1{font-size:27px}.caption{align-items:flex-start;flex-direction:column}button{padding:9px 12px}}
+</style>
+</head>
+<body>
+<header>
+<div class="eyebrow">Resumora / Design exploration</div>
+<h1>A calmer, more compact skills section</h1>
+<p>Three visual proposals using your current CV style. Switch between them or compare all three below.</p>
+<nav aria-label="Proposal views">
+<button type="button" data-view="1" aria-pressed="true">1 · Editorial list</button>
+<button type="button" data-view="2" aria-pressed="false">2 · Collapsible categories</button>
+<button type="button" data-view="3" aria-pressed="false">3 · Preview + side panel</button>
+<button type="button" data-view="all" aria-pressed="false">Compare all</button>
+</nav>
+<p class="note">These are visual concepts. Editing, disclosure and side-panel interactions will be implemented after you choose.</p>
+<p class="selected-note">To select a proposal, reply <strong>1, 2 or 3 in the chat</strong>. You can also request changes or combine ideas.</p>
+</header>
+<main id="proposals">
+<section class="panel" data-option="1" aria-labelledby="heading-1">
+<div class="caption"><div><h2 id="heading-1">1 · Editorial list</h2><p>Keep every skill visible in two compact text groups. Move add, rename and remove controls behind Edit. Best for scanning the complete inventory.</p></div><a href="option-1.png" target="_blank" rel="noopener">Open full size</a></div>
+<img src="option-1.png" alt="Proposal 1: professional and technical skills shown as readable, dot-separated text with Edit and Improve actions in the heading." width="1510" height="1042">
+</section>
+<section class="panel" data-option="2" aria-labelledby="heading-2" hidden>
+<div class="caption"><div><h2 id="heading-2">2 · Collapsible categories</h2><p>Two quiet rows show category counts and short previews. Expand a category to see the full list; Edit reveals its controls. Best for keeping the document short.</p></div><a href="option-2.png" target="_blank" rel="noopener">Open full size</a></div>
+<img src="option-2.png" alt="Proposal 2: two collapsed category rows with counts, a preview of skills and Edit actions; the professional summary sits directly below." width="1510" height="1042">
+</section>
+<section class="panel" data-option="3" aria-labelledby="heading-3" hidden>
+<div class="caption"><div><h2 id="heading-3">3 · Preview + side panel</h2><p>Show four skills in each category, with an overflow count. Manage and overflow links open the complete inventory in a side panel. Best for a compact, recognizable tag view.</p></div><a href="option-3.png" target="_blank" rel="noopener">Open full size</a></div>
+<img src="option-3.png" alt="Proposal 3: two rows of pale sage skill tags with overflow counts and a Manage action. The full editing panel is closed in this preview." width="1510" height="1042">
+</section>
+<details><summary>Your current layout</summary><img class="current" src="current.png" alt="Original skills section: long wrapping skill lists with individual removal controls and add links under both categories." width="979" height="676"></details>
+</main>
+<script>
+const buttons=[...document.querySelectorAll('[data-view]')];
+const panels=[...document.querySelectorAll('[data-option]')];
+function show(view){
+ if(!['1','2','3','all'].includes(view))view='1';
+ buttons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===view)));
+ panels.forEach(panel=>panel.hidden=view!=='all'&&panel.dataset.option!==view);
+ document.querySelector('main').classList.toggle('compare',view==='all');
+ history.replaceState(null,'','#'+view);
+}
+buttons.forEach(button=>button.addEventListener('click',()=>show(button.dataset.view)));
+show(location.hash.slice(1)||'1');
+</script>
+</body>
+</html>

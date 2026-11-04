@@ -140,4 +140,37 @@ def suite(db):
             self.assertIn('INVALID_COMMAND_ENVELOPE', self.save({**large, 'content': {'context': 'x' * 1048576}}, 3, error=True))
             self.assertEqual(json.loads(self.call('load_base_draft'))['revision'], 3)
 
+        def test_base_lifecycle_floor_and_owned_transaction_guard(self):
+            key = uid()
+            first = self.save(key=key)
+            second = self.save(revision=1)
+            tenant = db.sql(f"SELECT id FROM app.tenants WHERE owner_user_id='{self.a}'")
+            self.assertIn('permission denied', self.call('require_base_cv_purge', f"'{tenant}'", error=True))
+            self.assertIn('IMMUTABLE_RECORD', db.sql(f"DELETE FROM app.editor_draft_snapshots WHERE tenant_id='{tenant}'", expect_error=True))
+            # Privileged synthetic fixture exercises the exact guard/floor seam;
+            # this is not the pending end-to-end destructive command.
+            db.sql(f"BEGIN; UPDATE app.base_cv_lifecycle SET generation=generation+1,revision_floor=3,purge_transaction=pg_current_xact_id() WHERE tenant_id='{tenant}'; SELECT app.require_base_cv_purge('{tenant}'); DELETE FROM app.editor_draft_snapshots WHERE tenant_id='{tenant}'; UPDATE app.base_cv_lifecycle SET purge_transaction=NULL WHERE tenant_id='{tenant}'; COMMIT;", user=self.a)
+            state = json.loads(self.call('load_base_state'))
+            self.assertEqual((state['generation'],state['revision'],state['snapshot']), (1,3,None))
+            self.assertEqual(db.sql(f"SELECT state FROM app.tenants WHERE id='{tenant}'"), 'active')
+            self.assertEqual(json.loads(self.call('base_draft_history')), [])
+            self.assertIn('VERSION_CONFLICT', self.save(revision=0,error=True))
+            self.assertIn('REQUEST_EXPIRED', self.save(key=key,error=True))
+            self.assertIn('SNAPSHOT_NOT_FOUND', self.call('restore_base_draft', f"'{uid()}',3,'{first['id']}'", error=True))
+            fresh = self.save({'schemaVersion':'resumora-editor-draft/1','content':{},'answers':[]},revision=3)
+            self.assertEqual(fresh['revision'],4)
+            self.assertIsNone(fresh['parentId'])
+            self.assertEqual(fresh['payload']['answers'],[])
+            self.assertEqual(json.loads(self.call('load_base_draft'))['id'],fresh['id'])
+
+        def test_base_purge_marker_cannot_authorize_a_later_transaction_or_audit_delete(self):
+            self.save()
+            tenant = db.sql(f"SELECT id FROM app.tenants WHERE owner_user_id='{self.a}'")
+            db.sql(f"UPDATE app.base_cv_lifecycle SET purge_transaction=pg_current_xact_id() WHERE tenant_id='{tenant}'")
+            self.assertIn('RESOURCE_FORBIDDEN', db.sql(f"SELECT app.require_base_cv_purge('{tenant}')",user=self.a,expect_error=True))
+            self.assertIn('IMMUTABLE_RECORD', db.sql(f"DELETE FROM app.editor_draft_snapshots WHERE tenant_id='{tenant}'",expect_error=True))
+            self.assertIn('IMMUTABLE_RECORD', db.sql(f"BEGIN;UPDATE app.base_cv_lifecycle SET purge_transaction=pg_current_xact_id() WHERE tenant_id='{tenant}';DELETE FROM app.audit_events WHERE tenant_id='{tenant}';COMMIT;",expect_error=True))
+            db.sql(f"UPDATE app.base_cv_lifecycle SET purge_transaction=NULL WHERE tenant_id='{tenant}'")
+            self.assertEqual(db.sql(f"SELECT state FROM app.tenants WHERE id='{tenant}'"),'active')
+
     return unittest.defaultTestLoader.loadTestsFromTestCase(EditorDrafts)

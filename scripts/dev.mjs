@@ -1,6 +1,26 @@
-import { startDevServers } from './dev-processes.mjs';
+import { startDevServers } from "./dev-processes.mjs";
+import {
+  readDevOrigin,
+  readDevAiSummary,
+  readDevConfiguration,
+  importWorkerEnabled,
+} from "./dev-config.mjs";
+import { fileURLToPath } from "node:url";
 
-const { children, stop } = startDevServers();
+const root = fileURLToPath(new URL("../", import.meta.url));
+const origin = readDevOrigin(root);
+const configuration = readDevConfiguration(root);
+const imports = importWorkerEnabled(configuration);
+const { children, stop } = startDevServers({
+  webPort: Number(new URL(origin).port),
+  configuration,
+  imports,
+});
+console.log(`Resumora: ${origin}/#/profile`);
+console.log(readDevAiSummary(root));
+console.log(
+  `CV import worker: ${imports ? "managed with the frontend and API" : "disabled with AI"}.`,
+);
 let stopping = false;
 function finish(code) {
   if (stopping) return;
@@ -9,16 +29,16 @@ function finish(code) {
   process.exitCode = code;
 }
 for (const { name, child } of children) {
-  child.on('error', () => {
+  child.on("error", () => {
     console.error(`Could not start ${name}. Run npm ci first.`);
     finish(1);
   });
-  child.on('exit', (code) => {
+  child.on("exit", (code) => {
     if (!stopping) {
-      console.error(`${name} exited; stopping the local development pair.`);
-      finish(code ?? 1);
+      console.error(`${name} exited; stopping the local development services.`);
+      finish(code === 0 ? 1 : (code ?? 1));
     }
   });
 }
-process.on('SIGINT', () => finish(0));
-process.on('SIGTERM', () => finish(0));
+process.on("SIGINT", () => finish(0));
+process.on("SIGTERM", () => finish(0));

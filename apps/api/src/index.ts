@@ -1,11 +1,16 @@
-import { jobDocumentsRoute } from "./jobs/documents.ts";
+import {
+  transcriptionRoute,
+  voiceTypes,
+} from "./intelligence/transcription.ts";
+import { drainCvImports } from "./intelligence/import-processor.ts";
+import { isLanguagePath, configuredLanguageRoute } from "./languages/routes.ts";
+import { exportRoute, type ExportConfig } from "./export/routes.ts";
 import { photoRoute } from "./photos/routes.ts";
 import {
   configuredIntelligenceRoute,
   type IntelligenceConfig,
 } from "./intelligence/configured.ts";
 import { isIntelligencePath } from "./intelligence/routes.ts";
-import { jobsRoute } from "./jobs/routes.ts";
 import { enhancementRoute, type EnhancementConfig } from "./ai/routes.ts";
 import type { ApiError, HealthResponse } from "@resumora/contracts";
 import { adminRoute } from "./admin/routes.ts";
@@ -15,10 +20,16 @@ import { authenticateRequest, checkWrite, authError } from "./auth/session.ts";
 import type { AuthConfig } from "./auth/session.ts";
 import { createDatabaseGateway } from "./db/supabase.ts";
 import { cvRoute } from "./cv/routes.ts";
+import { isWorkspacePath, workspaceRoute } from "./workspace/routes.ts";
 
 // Private endpoints use the authenticated user token; paid inference is OFF by default.
 interface Env
-  extends AdminAuthConfig, AuthConfig, EnhancementConfig, IntelligenceConfig {
+  extends
+    AdminAuthConfig,
+    AuthConfig,
+    EnhancementConfig,
+    IntelligenceConfig,
+    ExportConfig {
   APP_ENV: "development";
   PHOTO_WORKER_SECRET?: string;
 }
@@ -28,6 +39,8 @@ const cvPaths = new Set([
   "/v1/base-cv/history",
   "/v1/base-cv/save",
   "/v1/base-cv/restore",
+  "/v1/base-cv/remove",
+  "/v1/base-cv/removal-cleanup",
 ]);
 
 function json(
@@ -47,16 +60,25 @@ function json(
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+    await drainCvImports(env);
+  },
+  async fetch(
+    request: Request,
+    env: Env,
+    context?: Pick<ExecutionContext, "waitUntil">,
+  ): Promise<Response> {
     const path = new URL(request.url).pathname;
     if (path === "/admin/ai" || path === "/v1/admin/ai/usage")
       return adminRoute(request, env);
     if (authMethods[path]) return authRoute(request, env);
     if (
+      path === "/v1/intelligence/transcriptions" ||
       isIntelligencePath(path) ||
+      isWorkspacePath(path) ||
+      isLanguagePath(path) ||
       cvPaths.has(path) ||
-      path === "/v1/jobs" ||
-      path.startsWith("/v1/jobs/") ||
+      path === "/v1/exports/pdf" ||
       path === "/v1/enhancement" ||
       path === "/v1/photos" ||
       path.startsWith("/v1/photos/")
@@ -69,41 +91,67 @@ export default {
         !(await checkWrite(
           request,
           env,
-          path === "/v1/photos"
-            ? ["image/jpeg", "image/png", "image/webp"]
-            : path === "/v1/intelligence/imports"
-              ? ["application/octet-stream"]
-              : ["application/json"],
+          path === "/v1/intelligence/transcriptions"
+            ? voiceTypes
+            : path === "/v1/photos"
+              ? ["image/jpeg", "image/png", "image/webp"]
+              : path === "/v1/intelligence/imports"
+                ? ["application/octet-stream"]
+                : ["application/json"],
         ))
       )
         return authError("FORBIDDEN", 403, identity.headers);
       let response: Response;
       try {
         const gateway = createDatabaseGateway(env, identity);
-        response = isIntelligencePath(path)
-          ? await configuredIntelligenceRoute(
-              request,
-              env,
-              gateway,
-              identity.user.id,
-            )
-          : path === "/v1/enhancement"
-            ? await enhancementRoute(request, env, gateway, identity.user.id)
-            : /^\/v1\/jobs\/[^/]+\/cv(?:\/|$)/.test(path)
-              ? await jobDocumentsRoute(request, gateway)
-              : path.startsWith("/v1/jobs")
-                ? await jobsRoute(request, gateway)
-                : path.startsWith("/v1/photos")
-                  ? await photoRoute(
+        const transcription =
+          path === "/v1/intelligence/transcriptions"
+            ? transcriptionRoute(request, env, gateway, identity.user.id)
+            : undefined;
+        if (transcription)
+          context?.waitUntil(transcription.then(() => undefined));
+        response = transcription
+          ? await transcription
+          : isWorkspacePath(path)
+            ? await workspaceRoute(request, env, gateway, identity.user.id, {
+                waitUntil: context?.waitUntil.bind(context),
+              })
+            : isLanguagePath(path)
+              ? await configuredLanguageRoute(
+                  request,
+                  env,
+                  gateway,
+                  identity.user.id,
+                )
+              : path === "/v1/exports/pdf"
+                ? await exportRoute(request, gateway, env)
+                : isIntelligencePath(path)
+                  ? await configuredIntelligenceRoute(
                       request,
+                      env,
                       gateway,
-                      env.PHOTO_WORKER_SECRET,
-                      (bytes) =>
-                        import("./photos/normalize.ts").then((module) =>
-                          module.normalizePhoto(bytes),
-                        ),
+                      identity.user.id,
+                      fetch,
+                      { waitUntil: context?.waitUntil.bind(context) },
                     )
-                  : await cvRoute(request, gateway);
+                  : path === "/v1/enhancement"
+                    ? await enhancementRoute(
+                        request,
+                        env,
+                        gateway,
+                        identity.user.id,
+                      )
+                    : path.startsWith("/v1/photos")
+                      ? await photoRoute(
+                          request,
+                          gateway,
+                          env.PHOTO_WORKER_SECRET,
+                          (bytes) =>
+                            import("./photos/normalize.ts").then((module) =>
+                              module.normalizePhoto(bytes),
+                            ),
+                        )
+                      : await cvRoute(request, gateway);
       } catch {
         response = Response.json(
           { error: { code: "unavailable" } },

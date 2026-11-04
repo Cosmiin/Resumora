@@ -22,7 +22,7 @@ class CookieJar {
   header() { return [...this.values].map(([k, v]) => `${k}=${v}`).join('; '); }
 }
 
-test('mounted Worker private responses cannot replace newer cookies after refresh-threshold and delayed-response interleavings', { timeout: 30000 }, async () => {
+test('mounted Worker private responses cannot replace newer cookies after refresh-threshold and delayed-response interleavings', { timeout: 45000 }, async () => {
   const env = {
     APP_ENV: 'development', APP_ORIGIN: 'http://127.0.0.1:5173', API_ORIGIN: 'http://127.0.0.1:5173',
     SUPABASE_URL: 'https://synthetic.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic',
@@ -59,9 +59,9 @@ test('mounted Worker private responses cannot replace newer cookies after refres
       const current = sessions.get(request.headers.get('authorization')?.replace('Bearer ', ''));
       assert.ok(current, 'Verified synthetic access token required');
       if (url.pathname === '/auth/v1/user') return RuntimeResponse.json(current.user);
-      assert.equal(url.pathname, '/rest/v1/rpc/load_base_draft');
+      assert.equal(url.pathname, '/rest/v1/rpc/load_base_state');
       if (holdReads) await new Promise(resolve => waiting.push(resolve));
-      return RuntimeResponse.json(null);
+      return RuntimeResponse.json({generation:0,revision:0,cleanupPending:false,snapshot:null});
     },
   }));
   const same = new CookieJar(), switched = new CookieJar();
@@ -107,7 +107,7 @@ test('mounted Worker private responses cannot replace newer cookies after refres
     const started = Date.now();
     const aResponse = privateCall(same), switchedResponse = privateCall(switched);
     while (waiting.length < 2) await delay(5);
-    await delay(Math.max(0, 10500 - (Date.now() - started)));
+    await delay(Math.max(0, 12000 - (Date.now() - started)));
     const sameRefresh = await call(same, '/v1/auth/session');
     same.accept(sameRefresh);
     assert.equal((await sameRefresh.json()).user.id, users[0].id);

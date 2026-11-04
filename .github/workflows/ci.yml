@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 15
     env:
       WRANGLER_SEND_METRICS: 'false'
+      APP_ORIGIN: 'https://resumora-build.invalid'
+      API_ORIGIN: 'https://resumora-build.invalid'
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,6 +32,6 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
       - name: Check types, build and local HTTP behavior
-        run: npm run check
+        run: npm run typecheck && npm run test:web && npm run build && npm run test:dev-secrets && npm run test:dev-config
       - name: Check synthetic OpenAI accounting and protected admin routes
         run: npm test --workspace @resumora/api

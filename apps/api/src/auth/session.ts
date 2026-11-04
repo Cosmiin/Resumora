@@ -46,9 +46,13 @@ export function authError(
           ? "Verify your session again. Your draft is retained."
           : code === "INVALID_CREDENTIALS"
             ? "Email or password is incorrect."
-            : code === "RATE_LIMITED"
-              ? "Please wait before trying again."
-              : "Unable to complete this request. Please try again.";
+            : code === "EMAIL_NOT_CONFIRMED"
+              ? "Confirm your email using the link in your inbox before signing in."
+              : code === "PASSWORD_TOO_WEAK"
+                ? "Choose a stronger password and try again."
+                : code === "RATE_LIMITED"
+                  ? "Please wait before trying again."
+                  : "Unable to complete this request. Please try again.";
   return authJson(
     { error: { code, message }, requestId: crypto.randomUUID() },
     status,

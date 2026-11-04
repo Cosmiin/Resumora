@@ -1,79 +1,51 @@
-# Local frontend and Worker foundation
+# Local development
 
-This workspace includes a runnable [**local Base CV slice**](../frontend/base-cv.md), plus the local Worker foundation. It uses React + Vite + TypeScript for the frontend and Wrangler's local Workers runtime for the API. See [authentication setup](authentication.md) for the implemented auth boundary, private local configuration and hosted test dependencies, and the [Base CV guide](../frontend/base-cv.md#persistence-component-handoff) for the connected editor. Without auth configuration the app stays locked and does not call Supabase or send email. A configured admin verifier can fetch public Supabase signing keys. Paid inference defaults OFF; its configuration is owned by [connected vacancies and wording](connected-jobs-ai.md). No Cloudflare account, API token or environment file is needed to start the locked shell.
+Read the [environment guide](environment.md) first. The active application is a Linux/WSL checkout with a managed frontend, API and CV import processor. Supabase and AI providers are hosted dependencies.
 
-## Start from a clean checkout
+## Toolchain and startup
 
-Use the Node version pinned in [`.nvmrc`](../../.nvmrc) and the npm version in the root [`packageManager` field](../../package.json). Direct dependencies are exact versions; the [root lockfile](../../package-lock.json) pins transitive dependencies. From the repository root:
+Use Node from `.nvmrc` and the existing npm workspaces. For a new checkout, install locked dependencies with `npm ci --ignore-scripts`. Runtime bindings belong in that checkout's ignored `apps/api/.dev.vars`. Do not copy private settings into source or frontend variables.
 
 ```sh
-npm ci --ignore-scripts
-npm run dev
+nvm use
+npm run dev:doctor
+npm run dev:start
+npm run dev:status
 ```
 
-Open **http://127.0.0.1:5173/** following the [browser verification requirements](authentication.md#external-setup-dependencies). The page opens the authentication shell, which stays locked until configured. See the [Base CV guide](../frontend/base-cv.md#run-and-review) for persistence behavior. Both servers bind to loopback; this does not expose a development server to the LAN. Stop the launcher with Ctrl+C; it stops only its own process trees.
-
-For separate terminals, use `npm run dev:api` and `npm run dev:web`. The Worker is **http://127.0.0.1:8787/**. Vite proxies relative `/v1/...` requests to that Worker; the composed Base CV adapter uses those authenticated routes. The browser sees one origin (`http://127.0.0.1:5173`); no permissive CORS configuration or browser API key is needed.
-
-The proxy preserves the incoming host/origin context rather than claiming all requests came from the API origin. Session code checks the actual `Origin` header and CSRF token; the proxy alone is not an authorization control. Keep the `127.0.0.1` hostname consistent: substituting `localhost` changes the origin and can affect future cookies. No HTTPS or cookie security behavior has been proven by this HTTP foundation.
-
-`npm ci --ignore-scripts` was used for this initial toolchain: the lockfile's platform packages supply the local executables without dependency lifecycle scripts. Other operating systems must verify their native tool binaries before development; do not disable antivirus if one is blocked.
+The usual active browser origin is `http://127.0.0.1:15173`; use the configuration reported by `dev:doctor`. An unconfigured checkout defaults to 5173 and a locked authentication shell. `dev:start` manages one `resumora-dev.service`; avoid launching another frontend, API or import worker alongside it. `dev:stop` stops the managed environment.
 
 ## Workspace map
 
-| Path | Purpose |
+| Path | Responsibility |
 | --- | --- |
-| `apps/web/` | Romanian-first Base CV app, interaction tests, Vite config and frontend build; adapters described in the [Base CV guide](../frontend/base-cv.md#code-and-replacement-boundary) |
-| `apps/api/` | Worker entry point; [authentication](authentication.md#session-and-request-contract), [database gateway](../database/gateway.md), CV routes described in the [persistence handoff](../frontend/base-cv.md#persistence-component-handoff), [connected jobs/wording](connected-jobs-ai.md) and protected admin preparation |
-| `packages/contracts/` | Shared health/error response types, [editor modules](../frontend/base-cv.md#code-and-replacement-boundary) and [vacancy contracts](../product/target-vacancy-groundwork.md); no server bindings or secret values |
-| `scripts/dev.mjs` | Start/stop the local pair together |
-| `scripts/smoke.mjs` | Start a fresh local pair, verify HTTP/proxy behavior, then stop it |
-
-The discovery prototype remains under `prototype/` with its existing independent commands. It is not bundled into this app. The app adopts the supplied Resumora pine/sage tokens and locally bundled fonts/icons, without external CDN requests or the reference's simulated login behavior.
-
-## Current routes and auth boundary
-
-`GET /v1/health` reports process health only, with authentication `implemented_unverified` and database `implemented_unverified`; it is not proof of hosted connectivity. Unknown routes return 404, wrong methods 405. Auth routes use the Worker-only PKCE/cookie boundary documented in [authentication setup](authentication.md#session-and-request-contract). Unconfigured auth returns `503 AUTH_UNCONFIGURED`, never simulated success. Admin routes retain their separate existing owner-verifier/durable-ledger requirements.
+| `apps/web/src` | React editor, authenticated shell, import review, enrichment and document preview |
+| `apps/api/src` | Worker API, authentication, persistence gateways and provider operations |
+| `packages/contracts/src` | Shared CV, transport and intelligence contracts |
+| `supabase/migrations` | Ordered database migration history |
+| `scripts/dev*.mjs` | Managed local configuration, processes and diagnostics |
+| `scripts/import-worker.mjs` | Background CV import processor |
+| `scripts/db` | Native database verification |
 
 ## Configuration and secrets
 
-The [OpenAI/admin preparation guide](openai-admin.md) documents the isolated synthetic preview, Worker-only secret paths, narrow owner verifier and exact durable-ledger/session integration still required. For the separate enhancement endpoint and its default-OFF configuration, use [connected vacancies and wording](connected-jobs-ai.md).
+The frontend proxies `/v1` to the API on port 8787. The configured frontend origin, API origin and browser hostname must agree. Origin/CSRF and session checks are enforced by the API.
 
-The checked-in [Worker configuration](../../apps/api/wrangler.jsonc) contains public `APP_ENV=development` and `AI_PAID_INFERENCE=off`, a proposed development Worker name and a compatibility date. No `account_id`, hosted routes, remote resource bindings or provider key is configured. The build script uses `wrangler deploy --dry-run` to bundle locally without uploading. `workers_dev` and preview URLs are disabled as additional publishing defaults; they do not prevent somebody manually invoking a deployment command. This task did not deploy.
+Checked-in paid inference defaults off. The active checkout's private configuration controls enabled providers and the background import worker. `dev:doctor` reports configuration and process state without invoking models. It does not establish end-to-end provider availability.
 
-No frontend environment variables are needed. If future web configuration is introduced, Vite's client-prefixed values are public build output and must never contain secrets. Worker auth configuration (`SUPABASE_URL`, publishable key and exact same-origin proxy addresses) stays separate from the private cookie-protection key. Ordinary user-auth flows do not require a service-role key or database password.
-
-The root ignore rules cover `.env*` and `.dev.vars*` at every depth. Local Worker secrets belong in `apps/api/.dev.vars`, only when the feature needs them. No real credential files or example exceptions were added. Verify a proposed path using `git check-ignore` before writing values. Never print credential-file contents to validate setup.
-
-Vite's development filesystem access is limited to `apps/web/`, `packages/contracts/` and `node_modules/`, retaining the pinned Vite version's default denied-file rules. The Worker workspace is explicitly denied through both `apps/api/` and npm's `node_modules/@resumora/api/` symlink. Worker files, including `.dev.vars` and its environment variants, cannot be served through the frontend's `/@fs/` endpoint using either path.
-
-Wrangler telemetry is disabled in this local configuration/launcher. The root [`undici` override](../../package.json) replaces Wrangler/Miniflare's vulnerable dependency; the [lockfile](../../package-lock.json) records the resolved version. Recheck the override when upgrading Wrangler; it is not permission to use `npm audit fix --force` or downgrade tooling blindly. [Maintainer advisory](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c)
+Vite denies API workspace files and private configuration through both normal and workspace-symlink paths. Keys remain server-side. The API build is a Wrangler dry run; it does not deploy.
 
 ## Checks
 
-Stop any running local dev pair first, then run:
-
 ```sh
 npm run check
+npm test --workspace @resumora/api
+npm run dev:doctor
+npm run smoke
 ```
 
-This runs frontend/API type checks, the browser-free frontend suite described in the [Base CV guide](../frontend/base-cv.md#verification-and-limits), the frontend production build, the Worker's **dry-run** bundle (no upload), and an HTTP smoke check of the real local Worker through Vite. The smoke check verifies health metadata, no session cookie, method handling, unconfigured auth denial or configured Origin/CSRF and missing-flow denial, unconfigured admin denial and unknown-route handling. It does not sign in or access external resources. It refuses occupied ports rather than stopping another service.
+`check` runs workspace typechecks, frontend tests, frontend/API builds, secret-boundary tests and development-configuration tests. `smoke` reads the already-running managed app; it does not start another pair or send model requests. Neither command requires stopping the managed service.
 
-To check frontend formatting separately, run `npm run format:check --workspace @resumora/web`. It checks `apps/web/src/` and `apps/web/vitest.config.ts` with Prettier; it is not included in `npm run check`.
+For a bounded frontend worker count use `npm run test --workspace @resumora/web -- --maxWorkers=2`. Formatting can be checked separately with `npm run format:check --workspace @resumora/web`.
 
-To run only the local integration check: `npm run smoke`. Generated `node_modules/`, `dist/` and `.wrangler/` directories are ignored. Native Windows runtime, browser rendering/accessibility and hosted Cloudflare behavior need their own later verification; this foundation was checked in the current WSL/Linux environment.
-
-To run only the development secret-boundary regression: `npm run test:dev-secrets`. It starts Vite on an available loopback port, checks that synthetic Worker secrets, other private Worker files and Vite's default protected files return 403 for direct and `?raw` requests through canonical and npm workspace-symlink paths, verifies frontend/shared/dependency files remain accessible, then removes its fixtures and stops the server. It also runs as part of `npm run check`.
-
-The [GitHub Actions workflow](../../.github/workflows/ci.yml) runs these foundation checks for pull requests and pushes to `main`, using the pinned Node/npm toolchain and locked dependencies with lifecycle scripts disabled. It does not deploy the application or verify browser rendering, hosted services or working authentication. The discovery prototype and schema/research checks remain separate from this workflow.
-
-Run `npm test --workspace @resumora/api` for injected OpenAI/accounting/owner-verification tests, synthetic admin HTTP checks, database gateway checks, CV route/editor transport checks and the [photo API/runtime checks](../frontend/profile-photo.md#setup-and-remaining-acceptance); CI runs this separately from `npm run check`. It requires no provider credentials, hosted database access or remote inference.
-
-## Next milestones
-
-1. Follow the [database guide](../database/README.md) for the approved SQL implementation, verification and development apply boundary; the Worker now composes the user-scoped database gateway and CV routes.
-2. Configure the implemented Worker auth boundary and coordinate real confirmation/recovery tests using authorized project-team recipients.
-3. Complete controlled hosted signup/login/reset and account-isolation acceptance. Owner-reported hosted URL/schema configuration is separate from observed user-flow evidence.
-4. Separately authorize hosted deployment. Do not reuse CVTailor resources or deploy the discovery repository root.
-
-Official tool references checked 25 October 2026: [Vite](https://vite.dev/guide/), [Wrangler installation](https://developers.cloudflare.com/workers/wrangler/install-and-update/), [local Workers development](https://developers.cloudflare.com/workers/local-development/), [Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/).
+Native database and canonical-schema checks are described in the [database guide](../database/README.md). The [CI workflow](../../.github/workflows/ci.yml) runs application checks and API tests; native database checks are separate. Automated synthetic results establish code behavior within their tested boundaries, not live provider quality or latency.

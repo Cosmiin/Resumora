@@ -23,7 +23,7 @@ function provider() {
     if (url.pathname.endsWith('/user') && init.method === 'GET') return failUser || revoked ? Response.json({ message: 'invalid token' }, { status: 401 }) : Response.json(user);
     if (url.pathname.endsWith('/user') && init.method === 'PUT') return Response.json(user);
     if (url.pathname.endsWith('/logout')) { revoked = true; return new Response('{}'); }
-    if (url.pathname.endsWith('/signup') || url.pathname.endsWith('/recover')) return accountError ? Response.json({ msg: 'account exists', code: 'user_already_exists' }, { status: 422 }) : Response.json(url.pathname.endsWith('/signup') ? { user, session: null } : {});
+    if (url.pathname.endsWith('/signup') || url.pathname.endsWith('/recover')) return accountError ? Response.json({ msg: 'account exists', code: 'user_already_exists' }, { status: 422, headers: { 'X-Supabase-Api-Version': '2024-01-01' } }) : Response.json(url.pathname.endsWith('/signup') ? { user, session: null } : {});
     if (url.pathname.endsWith('/token')) {
       if (exchangeError && url.searchParams.get('grant_type') === 'pkce') return Response.json({ error: 'invalid_grant' }, { status: 400 });
       if (url.searchParams.get('grant_type') === 'refresh_token') { refreshCount++; if (revoked || rejectRefresh) return Response.json({ error: 'invalid_grant' }, { status: 400 }); }
@@ -79,6 +79,121 @@ test('wrong/unknown credentials share safe error; provider diagnostics never ret
   const second = await (await b.call('/login', { email: 'unknown@example.invalid', password: 'wrong-password' })).json();
   assert.deepEqual(first.error, second.error); assert.equal(first.error.code, 'INVALID_CREDENTIALS');
 });
+
+const unavailableResponses = {
+  network: () => { throw new TypeError('private provider network diagnostic'); },
+  timeout: () => { throw new DOMException('private provider timeout diagnostic', 'TimeoutError'); },
+  server: () => Response.json({ message: 'private provider server diagnostic' }, { status: 503 }),
+  malformed: () => new Response('private provider invalid JSON', { status: 400 }),
+  malformedSuccess: () => new Response('private provider invalid JSON'),
+};
+for (const endpoint of ['/token', '/user']) {
+  for (const [failure, respond] of Object.entries({ ...unavailableResponses, missingIdentity: () => Response.json({}) })) {
+    test(`login reports ${failure} at ${endpoint} as unavailable without replacing existing cookies`, async () => {
+      const p = provider(), b = new Browser(p); await b.login();
+      const originalCookie = b.cookie(), original = p.transport;
+      p.transport = (input, init) => new URL(String(input)).pathname.endsWith(endpoint) ? respond() : original(input, init);
+      const response = await b.call('/login', { email: user.email, password: 'synthetic-password' });
+      assert.equal(response.status, 503);
+      assert.equal((await response.json()).error.code, 'AUTH_UNAVAILABLE');
+      assert.equal(response.headers.getSetCookie().length, 0);
+      assert.equal(b.cookie(), originalCookie);
+    });
+  }
+}
+for (const path of ['/signup', '/recovery']) {
+  for (const [failure, respond] of Object.entries(unavailableResponses)) {
+    test(`${path} reports ${failure} as unavailable without creating a pending email flow`, async () => {
+      const p = provider(), b = new Browser(p); await b.status();
+      const original = p.transport;
+      p.transport = async () => respond();
+      const response = await b.call(path, { email: user.email, password: 'synthetic-password' });
+      assert.equal(response.status, 503);
+      assert.equal((await response.json()).error.code, 'AUTH_UNAVAILABLE');
+      assert.equal(await readCookie(b.request('/'), env, 'flow'), null);
+      p.transport = original;
+      assert.equal((await b.call(path, { email: user.email, password: 'synthetic-password' })).status, 200);
+    });
+  }
+}
+for (const endpoint of ['/token', '/user']) {
+  test(`login preserves rate limiting from ${endpoint}`, async () => {
+    const p = provider(), b = new Browser(p); await b.status();
+    p.failure = { path: endpoint, method: endpoint === '/token' ? 'POST' : 'GET', status: 429 };
+    const response = await b.call('/login', { email: user.email, password: 'synthetic-password' });
+    assert.equal(response.status, 429);
+    assert.equal(response.headers.get('retry-after'), '60');
+    assert.equal((await response.json()).error.code, 'RATE_LIMITED');
+    assert.equal(await readCookie(b.request('/'), env, 'session'), null);
+  });
+}
+test('login distinguishes invalid credentials and an email awaiting confirmation', async () => {
+  for (const [code, status, expected] of [['invalid_credentials', 401, 'INVALID_CREDENTIALS'], ['email_not_confirmed', 403, 'EMAIL_NOT_CONFIRMED']]) {
+    const p = provider(), b = new Browser(p); await b.status();
+    p.failure = { path: '/token', method: 'POST', status: 400, code };
+    const response = await b.call('/login', { email: user.email, password: 'synthetic-password' });
+    assert.equal(response.status, status);
+    const body = await response.json();
+    assert.equal(body.error.code, expected);
+    assert.equal(JSON.stringify(body).includes('synthetic unavailable'), false);
+    assert.equal(await readCookie(b.request('/'), env, 'session'), null);
+  }
+});
+test('signup rejects a successful provider response missing its user instead of claiming email delivery', async () => {
+  const p = provider(), b = new Browser(p); await b.status();
+  p.transport = async () => Response.json({});
+  const response = await b.call('/signup', { email: user.email, password: 'synthetic-password' });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, 'AUTH_UNAVAILABLE');
+  assert.equal(await readCookie(b.request('/'), env, 'flow'), null);
+});
+for (const [code, status, expected] of [
+  ['weak_password', 422, 'PASSWORD_TOO_WEAK'],
+  ['email_address_invalid', 400, 'INVALID_INPUT'],
+  ['validation_failed', 400, 'INVALID_INPUT'],
+  ['signup_disabled', 503, 'AUTH_UNAVAILABLE'],
+  ['email_provider_disabled', 503, 'AUTH_UNAVAILABLE'],
+  ['email_address_not_authorized', 503, 'AUTH_UNAVAILABLE'],
+  ['unexpected_configuration_error', 503, 'AUTH_UNAVAILABLE'],
+]) {
+  test(`signup reports ${code} without claiming email delivery or blocking a corrected attempt`, async () => {
+    const p = provider(), b = new Browser(p); await b.status();
+    p.failure = { path: '/signup', method: 'POST', status: 422, code };
+    const response = await b.call('/signup', { email: user.email, password: 'synthetic-password' });
+    assert.equal(response.status, status);
+    const body = await response.json();
+    assert.equal(body.error.code, expected);
+    assert.equal(JSON.stringify(body).includes('synthetic unavailable'), false);
+    assert.equal(await readCookie(b.request('/'), env, 'flow'), null);
+    p.failure = null;
+    assert.equal((await b.call('/signup', { email: user.email, password: 'corrected-password' })).status, 200);
+  });
+}
+for (const path of ['/signup', '/recovery']) {
+  for (const status of [400, 401, 403, 422]) {
+    test(`${path} reports provider ${status} as a service failure without creating an email flow`, async () => {
+      const p = provider(), b = new Browser(p); await b.status();
+      p.failure = { path: path === '/signup' ? '/signup' : '/recover', method: 'POST', status };
+      const response = await b.call(path, { email: user.email, password: 'synthetic-password' });
+      assert.equal(response.status, 503);
+      assert.equal((await response.json()).error.code, 'AUTH_UNAVAILABLE');
+      assert.equal(await readCookie(b.request('/'), env, 'flow'), null);
+    });
+  }
+  test(`${path} keeps explicit account-existence rejections neutral`, async () => {
+    const fresh = new Browser(provider()); await fresh.status();
+    const accepted = await fresh.call(path, { email: user.email, password: 'synthetic-password' });
+    const expected = await accepted.json();
+    for (const [code, status] of [['user_already_exists', 422], ['email_exists', 422], ['user_not_found', 404]]) {
+      const p = provider(), b = new Browser(p); await b.status();
+      p.failure = { path: path === '/signup' ? '/signup' : '/recover', method: 'POST', status, code };
+      const response = await b.call(path, { email: user.email, password: 'synthetic-password' });
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), expected);
+      assert.deepEqual(response.headers.getSetCookie().map(value => value.length), accepted.headers.getSetCookie().map(value => value.length));
+    }
+  });
+}
 test('writes reject absent/foreign origin, absent/wrong csrf, non-json and oversized bodies without egress', async () => {
   const p = provider(), b = new Browser(p); await b.status();
   for (const headers of [{ Origin: '' }, { Origin: 'https://evil.invalid' }, { 'X-CSRF-Token': '' }, { 'X-CSRF-Token': 'wrong' }, { 'Content-Type': 'text/plain' }]) {
@@ -127,7 +242,7 @@ test('revoked refresh fails closed; provider redirects are not followed', async 
   const headers = authHeaders(); await saveSession(headers, env, { ...p.session(), refresh_token: 'different-revoked-refresh', expires_at: 1 }, false); b.accept(new Response(null, { headers }));
   assert.equal((await authenticateRequest(b.request('/'), env, p.transport)).response.status, 409);
   await b.status(); p.redirect = true;
-  assert.equal((await b.call('/login', { email: user.email, password: 'synthetic-password' })).status, 401);
+  assert.equal((await b.call('/login', { email: user.email, password: 'synthetic-password' })).status, 503);
   assert.equal(p.calls.at(-1).path, '/auth/v1/token');
 });
 test('recovery requires browser-bound recovery PKCE; fixed clean redirects defeat return URL/token leakage; successful update consumes session', async () => {

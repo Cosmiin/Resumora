@@ -1,24 +1,21 @@
+const positiveRevision = (v: unknown): v is number =>
+  Number.isSafeInteger(v) && Number(v) > 0;
 import {
-  isJobEditorPayload,
-  isJobPin,
-  positiveRevision,
-  type JobEditorVersion,
-  type JobEditorSave,
-  type JobEditorPayload,
-  type JobPin,
-} from "@resumora/contracts/jobs/documents";
+  draftKinds,
+  validateWorkspaceValue,
+} from "@resumora/contracts/editor/workspace";
+import { languageGateway } from "./languages.ts";
+import { workspaceGateway } from "./workspace.ts";
+import { decodeDraft } from "@resumora/contracts/editor/transport";
 import type { PhotoAsset } from "../photos/routes.ts";
 import { importGateway } from "./imports.ts";
-import type {
-  JobSave,
-  SavedJob,
-  JobSummary,
-} from "@resumora/contracts/jobs/connected";
 import type { AttemptStart, AttemptResult, Attempt } from "../ai/ledger.ts";
 import { boundedJson } from "../ai/http.ts";
 import type {
   DraftSnapshot,
   EditorWireEnvelope,
+  BaseLifecycle,
+  BaseRemoval,
 } from "@resumora/contracts/editor/transport";
 
 /** Worker bindings only. Never use a service-role/secret key at this boundary. */
@@ -58,6 +55,13 @@ const safeCodes = new Set([
 ]);
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
+const isBaseLifecycle = (value: unknown): value is BaseLifecycle =>
+  record(value) &&
+  Number.isSafeInteger(value.generation) &&
+  Number(value.generation) >= 0 &&
+  Number.isSafeInteger(value.revision) &&
+  Number(value.revision) >= 0 &&
+  typeof value.cleanupPending === "boolean";
 function isSnapshot(value: unknown): boolean {
   return (
     record(value) &&
@@ -77,16 +81,6 @@ function isSnapshot(value: unknown): boolean {
     value.payload.schemaVersion === "resumora-editor-draft/1" &&
     record(value.payload.content) &&
     Array.isArray(value.payload.answers)
-  );
-}
-function isJobEditorVersion(value: unknown): boolean {
-  return (
-    record(value) &&
-    isSnapshot({ ...value, payload: value.sourcePayload }) &&
-    typeof value.documentId === "string" &&
-    uuid.test(value.documentId) &&
-    ["save", "restore"].includes(value.reason as string) &&
-    isJobEditorPayload(value.payload)
   );
 }
 function key(value: string) {
@@ -175,6 +169,63 @@ export function createDatabaseGateway(
     }
     if (!response.ok) {
       if (
+        [
+          "reserve_photo",
+          "finish_photo",
+          "read_photo",
+          "delete_photo",
+          "expire_photo_uploads",
+        ].includes(name)
+      ) {
+        const codes = new Set([
+          "PT400",
+          "PT401",
+          "PT403",
+          "PT404",
+          "PT409",
+          "PT410",
+          "PT413",
+          "PT422",
+          "42501",
+          "23502",
+          "23503",
+          "23505",
+          "23514",
+          "40001",
+          "40P01",
+          "55P03",
+          "42883",
+          "PGRST202",
+          "PGRST301",
+        ]);
+        const reasons = new Set([
+          "AUTHENTICATION_REQUIRED",
+          "RESOURCE_FORBIDDEN",
+          "ACTIVE_WORKSPACE_REQUIRED",
+          "PHOTO_NOT_FOUND",
+          "PHOTO_NOT_AVAILABLE",
+          "IDEMPOTENCY_BODY_MISMATCH",
+          "INVALID_COMMAND_ENVELOPE",
+          "VERSION_CONFLICT",
+        ]);
+        console.warn("photo-database", {
+          operation: name,
+          httpStatus: response.status,
+          code:
+            record(result) &&
+            typeof result.code === "string" &&
+            codes.has(result.code)
+              ? result.code
+              : "UNCLASSIFIED",
+          reason:
+            record(result) &&
+            typeof result.message === "string" &&
+            reasons.has(result.message)
+              ? result.message
+              : "UNCLASSIFIED",
+        });
+      }
+      if (
         record(result) &&
         typeof result.code === "string" &&
         /^PT(400|401|403|404|409|410|413|422)$/.test(result.code)
@@ -190,58 +241,73 @@ export function createDatabaseGateway(
         throw new DatabaseError(response.status, "UNAUTHORIZED");
       throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
     }
+    const workspaceDraft = (v: unknown) => {
+      if (
+        !record(v) ||
+        typeof v.id !== "string" ||
+        !uuid.test(v.id) ||
+        !draftKinds.includes(v.kind as (typeof draftKinds)[number]) ||
+        !positiveRevision(v.revision) ||
+        typeof v.updatedAt !== "string" ||
+        !Number.isFinite(Date.parse(v.updatedAt))
+      )
+        return false;
+      try {
+        validateWorkspaceValue(v.kind as (typeof draftKinds)[number], v.value);
+        return true;
+      } catch {
+        return false;
+      }
+    };
     const valid =
-      name === "job_editor_context"
-        ? record(result) &&
-          isJobPin(result.job) &&
-          record(result.source) &&
-          typeof result.source.snapshotId === "string" &&
-          uuid.test(result.source.snapshotId) &&
-          positiveRevision(result.source.revision)
-        : name === "load_job_editor"
-          ? result === null || isJobEditorVersion(result)
-          : name === "job_editor_history"
+      name === "load_editor_snapshot"
+        ? result === null || record(result)
+        : name === "get_pending_cv_import"
+          ? result === null || record(result)
+          : name === "list_workspace_drafts"
             ? Array.isArray(result) &&
-              result.length <= (args.p_limit as number) &&
-              result.every(isJobEditorVersion)
-            : name === "save_job_editor" || name === "restore_job_editor"
-              ? isJobEditorVersion(result)
-              : name === "delete_job_editor"
-                ? record(result) &&
-                  result.documentId === args.p_document &&
-                  result.deleted === true
-                : name === "load_base_draft"
-                  ? result === null || isSnapshot(result)
-                  : name === "base_draft_history"
-                    ? Array.isArray(result) &&
-                      result.length <= (args.p_limit as number) &&
-                      result.every(isSnapshot)
-                    : name === "save_base_draft" ||
-                        name === "restore_base_draft"
-                      ? isSnapshot(result)
-                      : name === "list_cv_imports" ||
-                          name === "expired_cv_import_objects"
-                        ? Array.isArray(result) && result.length <= 5
-                        : name === "list_target_jobs"
-                          ? Array.isArray(result) && result.length <= 50
-                          : name === "get_target_job" ||
-                              name === "load_editor_snapshot"
-                            ? result === null || record(result)
-                            : name === "save_job_cv_checkpoint"
-                              ? record(result) &&
-                                typeof result.documentId === "string" &&
-                                uuid.test(result.documentId) &&
-                                typeof result.cvVersionId === "string" &&
-                                uuid.test(result.cvVersionId) &&
-                                result.revision ===
-                                  (args.p_expected_revision as number) + 1 &&
-                                result.tailoringState ===
-                                  (args.p_tailored
-                                    ? "tailored"
-                                    : "not_tailored")
-                              : name === "expire_photo_uploads"
-                                ? Array.isArray(result) && result.length <= 10
-                                : record(result);
+              result.length <= 100 &&
+              result.every(workspaceDraft)
+            : name === "get_workspace_draft"
+              ? result === null || workspaceDraft(result)
+              : name === "get_workspace_operation"
+                ? result === null || record(result)
+                : name === "load_base_state"
+                  ? isBaseLifecycle(result) &&
+                    "snapshot" in result &&
+                    (result.snapshot === null || isSnapshot(result.snapshot))
+                  : name === "remove_base_cv"
+                    ? isBaseLifecycle(result) &&
+                      "removed" in result &&
+                      result.removed === true
+                    : name === "base_removal_objects"
+                      ? Array.isArray(result) &&
+                        result.length <= 20 &&
+                        result.every(
+                          (v) =>
+                            record(v) &&
+                            ["cv-imports", "cv-photos"].includes(
+                              String(v.bucket),
+                            ) &&
+                            typeof v.objectKey === "string",
+                        )
+                      : name === "ack_base_removal_object"
+                        ? record(result) && result.acknowledged === true
+                        : name === "load_base_draft"
+                          ? result === null || isSnapshot(result)
+                          : name === "base_draft_history"
+                            ? Array.isArray(result) &&
+                              result.length <= (args.p_limit as number) &&
+                              result.every(isSnapshot)
+                            : name === "save_base_draft" ||
+                                name === "restore_base_draft"
+                              ? isSnapshot(result)
+                              : name === "list_cv_imports" ||
+                                  name === "expired_cv_import_objects"
+                                ? Array.isArray(result) && result.length <= 5
+                                : name === "expire_photo_uploads"
+                                  ? Array.isArray(result) && result.length <= 10
+                                  : record(result);
 
     if (!valid) throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
     return result as T;
@@ -272,6 +338,41 @@ export function createDatabaseGateway(
     }
     return response;
   }
+  function photoStorageDiagnostic(
+    response: Response,
+    operation: "write" | "read",
+    detail: unknown,
+  ) {
+    const codes = new Set([
+      "AccessDenied",
+      "InvalidJWT",
+      "InvalidSignature",
+      "InvalidRequest",
+      "NoSuchBucket",
+      "NoSuchKey",
+      "not_found",
+      "EntityTooLarge",
+      "DatabaseError",
+      "InternalError",
+      "InternalServerError",
+      "InvalidMimeType",
+      "KeyAlreadyExists",
+      "ResourceAlreadyExists",
+      "ResourceNotFound",
+      "Duplicate",
+    ]);
+    const candidate = record(detail)
+      ? (detail.code ?? detail.error)
+      : undefined;
+    console.warn("photo-storage-response", {
+      operation,
+      httpStatus: response.status,
+      code:
+        typeof candidate === "string" && codes.has(candidate)
+          ? candidate
+          : "UNCLASSIFIED",
+    });
+  }
   async function storage(objectKey: string, bytes?: Uint8Array) {
     if (
       !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/original\.(pdf|docx|doc)$/.test(
@@ -284,63 +385,212 @@ export function createDatabaseGateway(
       : objectKey.endsWith(".doc")
         ? "application/msword"
         : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-    const response = await transport(
-      bytes
-        ? `${origin}/storage/v1/object/cv-imports/${objectKey}`
-        : `${origin}/storage/v1/object/cv-imports`,
-      {
-        method: bytes ? "POST" : "DELETE",
-        redirect: "manual",
-        signal: AbortSignal.timeout(15000),
-        headers: {
-          apikey: apiKey,
-          Authorization: `Bearer ${token}`,
-          "Content-Type": bytes ? contentType : "application/json",
-          "x-upsert": "false",
+    let response: Response;
+    try {
+      response = await transport(
+        bytes
+          ? `${origin}/storage/v1/object/cv-imports/${objectKey}`
+          : `${origin}/storage/v1/object/cv-imports`,
+        {
+          method: bytes ? "POST" : "DELETE",
+          redirect: "manual",
+          signal: AbortSignal.timeout(15000),
+          headers: {
+            apikey: apiKey,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": bytes ? contentType : "application/json",
+            "x-upsert": "false",
+          },
+          body: bytes
+            ? (bytes as Uint8Array<ArrayBuffer>)
+            : JSON.stringify({ prefixes: [objectKey] }),
         },
-        body: bytes
-          ? (bytes as Uint8Array<ArrayBuffer>)
-          : JSON.stringify({ prefixes: [objectKey] }),
-      },
-    );
+      );
+    } catch {
+      if (bytes)
+        console.warn("import-storage", {
+          phase: "upload",
+          httpStatus: null,
+          code: "STORAGE_OUTCOME_UNKNOWN",
+        });
+      throw new DatabaseError(
+        503,
+        bytes ? "STORAGE_OUTCOME_UNKNOWN" : "STORAGE_UNAVAILABLE",
+      );
+    }
     if (!bytes && response.status === 404) {
       await response.body?.cancel();
       return;
     }
-    await boundedJson(response, 65536);
+    if (bytes && !response.ok) {
+      const value = await boundedJson(response, 65536).catch(() => null);
+      const diagnosticCodes = new Set([
+        "AccessDenied",
+        "InvalidJWT",
+        "InvalidSignature",
+        "InvalidRequest",
+        "NoSuchBucket",
+        "EntityTooLarge",
+        "DatabaseError",
+        "InternalError",
+        "InternalServerError",
+        "InvalidMimeType",
+        "KeyAlreadyExists",
+        "ResourceNotFound",
+      ]);
+      const diagnostic =
+        record(value) &&
+        typeof value.code === "string" &&
+        diagnosticCodes.has(value.code)
+          ? value.code
+          : "UNCLASSIFIED_STORAGE_ERROR";
+      const knownReasons = [
+        "AUTHENTICATION_REQUIRED",
+        "RESOURCE_FORBIDDEN",
+        "VERSION_CONFLICT",
+        "permission denied",
+        "row-level security",
+        "lock timeout",
+        "deadlock detected",
+      ];
+      const description = record(value)
+        ? [value.message, value.error]
+            .filter((v) => typeof v === "string")
+            .join(" ")
+        : "";
+      const reason =
+        knownReasons.find((code) => description.includes(code)) ??
+        "UNCLASSIFIED";
+      console.warn("import-storage", {
+        phase: "upload",
+        httpStatus: response.status,
+        code: diagnostic,
+        reason,
+      });
+      const definite = response.status >= 400 && response.status < 500;
+      throw new DatabaseError(
+        definite ? response.status : 503,
+        definite ? "STORAGE_UPLOAD_REJECTED" : "STORAGE_OUTCOME_UNKNOWN",
+      );
+    }
+    try {
+      await boundedJson(response, 65536);
+    } catch {
+      if (bytes)
+        console.warn("import-storage", {
+          phase: "upload",
+          httpStatus: response.status,
+          code: "STORAGE_ACK_UNKNOWN",
+        });
+      throw new DatabaseError(
+        503,
+        bytes ? "STORAGE_OUTCOME_UNKNOWN" : "STORAGE_UNAVAILABLE",
+      );
+    }
     if (!response.ok)
       throw new DatabaseError(
         response.status === 403 ? 403 : 503,
         "STORAGE_UNAVAILABLE",
       );
   }
+  const loadBaseState = () =>
+    rpc<BaseLifecycle & { snapshot: DraftSnapshot | null }>(
+      "load_base_state",
+      {},
+    );
+  const cleanupBaseSources = async (): Promise<BaseLifecycle> => {
+    const rows = await rpc<
+      { bucket: "cv-imports" | "cv-photos"; objectKey: string }[]
+    >("base_removal_objects", {});
+    for (const row of rows) {
+      try {
+        if (row.bucket === "cv-imports") await storage(row.objectKey);
+        else {
+          if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(row.objectKey))
+            throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
+          const response = await photoStorage("object/cv-photos", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prefixes: [row.objectKey] }),
+          });
+          if (!response.ok && response.status !== 404) {
+            await response.body?.cancel();
+            throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
+          }
+          await response.body?.cancel();
+        }
+        await rpc("ack_base_removal_object", {
+          p_bucket: row.bucket,
+          p_object_key: row.objectKey,
+        });
+      } catch {
+        /* Keep the owned manifest for an explicit bounded retry. */
+      }
+    }
+    const { snapshot: _snapshot, ...state } = await loadBaseState();
+    return state;
+  };
   return {
-    ...importGateway(rpc, storage),
-    saveJob: (input: JobSave) =>
-      rpc<SavedJob>("save_target_job", {
-        p_key: key(input.requestId),
-        p_snapshot: key(input.snapshotId),
-        p_revision: revision(input.snapshotRevision),
-        p_intake: input.intake,
-        p_requirements: input.requirements,
-      }),
-    reviewJob: (input: {
+    loadBaseState,
+    retryBaseCleanup: cleanupBaseSources,
+    removeBase: async (input: {
       requestId: string;
-      jobId: string;
-      title: string;
-      company: string;
-      requirements: unknown[];
-    }) =>
-      rpc<SavedJob>("review_target_job", {
+      expectedRevision: number;
+      expectedGeneration: number;
+    }): Promise<BaseRemoval> => {
+      const result = await rpc<BaseRemoval>("remove_base_cv", {
         p_key: key(input.requestId),
-        p_job: key(input.jobId),
-        p_title: input.title,
-        p_company: input.company,
-        p_requirements: input.requirements,
-      }),
-    listJobs: () => rpc<JobSummary[]>("list_target_jobs", {}),
-    getJob: (id: string) =>
-      rpc<SavedJob | null>("get_target_job", { p_job: key(id) }),
+        p_expected_revision: revision(input.expectedRevision),
+        p_expected_generation: revision(input.expectedGeneration),
+      });
+      try {
+        return { ...result, ...(await cleanupBaseSources()) };
+      } catch {
+        return { ...result, cleanupPending: true };
+      }
+    },
+    ...importGateway(rpc, storage, async (objectKey) => {
+      if (
+        !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/original\.(pdf|docx|doc)$/.test(
+          objectKey,
+        )
+      )
+        throw new DatabaseError(400, "INVALID_REQUEST");
+      const response = await photoStorage(
+        `object/authenticated/cv-imports/${objectKey}`,
+        { method: "GET" },
+      );
+      if (!response.ok || !response.body) {
+        await response.body?.cancel();
+        throw new DatabaseError(404, "SOURCE_UNAVAILABLE");
+      }
+      const reader = response.body.getReader(),
+        chunks: Uint8Array[] = [];
+      let size = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > 10_000_000)
+            throw new DatabaseError(503, "SOURCE_UNAVAILABLE");
+          chunks.push(value);
+        }
+      } finally {
+        await reader.cancel();
+        reader.releaseLock();
+      }
+      const bytes = new Uint8Array(size);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return bytes;
+    }),
+    ...languageGateway(rpc),
+    ...workspaceGateway(rpc),
+
     loadSnapshot: (id: string) =>
       rpc<DraftSnapshot | null>("load_editor_snapshot", {
         p_snapshot: key(id),
@@ -355,7 +605,7 @@ export function createDatabaseGateway(
     }) =>
       rpc<{ created: boolean }>("reserve_enhancement", {
         p_operation: key(input.operationId),
-        p_snapshot: key(input.snapshotId),
+        p_snapshot: input.snapshotId === null ? null : key(input.snapshotId),
         p_revision: revision(input.revision),
         p_target: input.targetId,
         p_policy: input.policy,
@@ -419,9 +669,10 @@ export function createDatabaseGateway(
       );
       // 409 is only a possible replay; caller always checks existing bytes/hash.
       if (!response.ok) {
+        const error = await boundedJson(response, 4096).catch(() => null);
+        photoStorageDiagnostic(response, "write", error);
         let duplicate = response.status === 409;
         if (response.status === 400) {
-          const error = await boundedJson(response, 4096).catch(() => null);
           duplicate =
             record(error) &&
             (error.code === "ResourceAlreadyExists" ||
@@ -439,11 +690,17 @@ export function createDatabaseGateway(
         `object/authenticated/cv-photos/${objectPath(objectKey)}`,
         { method: "GET" },
       );
-      if (!response.ok)
+      if (!response.ok) {
+        photoStorageDiagnostic(
+          response,
+          "read",
+          await boundedJson(response, 4096).catch(() => null),
+        );
         throw new DatabaseError(
           response.status === 404 ? 404 : 503,
           "DATABASE_UNAVAILABLE",
         );
+      }
       const reader = response.body?.getReader();
       if (!reader) throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
       const chunks: Uint8Array[] = [];
@@ -476,121 +733,12 @@ export function createDatabaseGateway(
         throw new DatabaseError(503, "DATABASE_UNAVAILABLE");
       await response.body?.cancel();
     },
-    saveJobCvCheckpoint: (input: {
-      requestId: string;
-      documentId: string | null;
-      expectedRevision: number;
-      profileVersionId: string;
-      jobVersionId: string;
-      layout: Record<string, unknown>;
-      locale: "ro" | "en";
-      tailored: boolean;
-    }) => {
-      if (
-        typeof input.tailored !== "boolean" ||
-        !["ro", "en"].includes(input.locale)
-      )
-        throw new DatabaseError(400, "INVALID_REQUEST");
-      return rpc<{
-        documentId: string;
-        cvVersionId: string;
-        revision: number;
-        tailoringState: "tailored" | "not_tailored";
-      }>("save_job_cv_checkpoint", {
-        p_key: key(input.requestId),
-        p_document: input.documentId === null ? null : key(input.documentId),
-        p_expected_revision: revision(input.expectedRevision),
-        p_profile_version: key(input.profileVersionId),
-        p_job_version: key(input.jobVersionId),
-        p_layout: input.layout,
-        p_locale: input.locale,
-        p_tailored: input.tailored,
-      });
-    },
+
     provisionWorkspace: (requestId: string) =>
       rpc<{ tenantId: string; userId: string }>("provision_workspace", {
         request_key: key(requestId),
       }),
-    jobEditorContext: (jobId: string) =>
-      rpc<{ job: JobPin; source: JobEditorPayload["source"] }>(
-        "job_editor_context",
-        { p_job: key(jobId) },
-      ),
-    loadJobEditor: (jobId: string, documentId?: string, versionId?: string) => {
-      if ((documentId === undefined) !== (versionId === undefined))
-        throw new DatabaseError(400, "INVALID_REQUEST");
-      return rpc<JobEditorVersion | null>("load_job_editor", {
-        p_job: key(jobId),
-        p_document: documentId === undefined ? null : key(documentId),
-        p_version: versionId === undefined ? null : key(versionId),
-      });
-    },
-    jobEditorHistory: (
-      jobId: string,
-      documentId: string,
-      page: { beforeRevision?: number; limit?: number } = {},
-    ) => {
-      const limit = page.limit ?? 20;
-      if (
-        !Number.isSafeInteger(limit) ||
-        limit < 1 ||
-        limit > 20 ||
-        (page.beforeRevision !== undefined &&
-          !positiveRevision(page.beforeRevision))
-      )
-        throw new DatabaseError(400, "INVALID_REQUEST");
-      return rpc<JobEditorVersion[]>(
-        "job_editor_history",
-        {
-          p_job: key(jobId),
-          p_document: key(documentId),
-          p_before_revision: page.beforeRevision ?? null,
-          p_limit: limit,
-        },
-        32 * 1048576,
-      );
-    },
-    saveJobEditor: (jobId: string, input: JobEditorSave) => {
-      if (!isJobEditorPayload(input.payload) || input.payload.job.id !== jobId)
-        throw new DatabaseError(400, "INVALID_REQUEST");
-      return rpc<JobEditorVersion>("save_job_editor", {
-        p_key: key(input.requestId),
-        p_job: key(jobId),
-        p_document: input.documentId === null ? null : key(input.documentId),
-        p_expected_revision: revision(input.expectedRevision),
-        p_payload: input.payload,
-      });
-    },
-    restoreJobEditor: (
-      jobId: string,
-      input: {
-        requestId: string;
-        documentId: string;
-        expectedRevision: number;
-        versionId: string;
-      },
-    ) =>
-      rpc<JobEditorVersion>("restore_job_editor", {
-        p_key: key(input.requestId),
-        p_job: key(jobId),
-        p_document: key(input.documentId),
-        p_expected_revision: revision(input.expectedRevision),
-        p_version: key(input.versionId),
-      }),
-    deleteJobEditor: (
-      jobId: string,
-      input: {
-        requestId: string;
-        documentId: string;
-        expectedRevision: number;
-      },
-    ) =>
-      rpc<{ documentId: string; deleted: true }>("delete_job_editor", {
-        p_key: key(input.requestId),
-        p_job: key(jobId),
-        p_document: key(input.documentId),
-        p_expected_revision: revision(input.expectedRevision),
-      }),
+
     loadDraft: () => rpc<DraftSnapshot | null>("load_base_draft", {}),
     draftHistory: (page: { beforeRevision?: number; limit?: number } = {}) => {
       const limit = page.limit ?? 20;
@@ -631,7 +779,7 @@ export function createDatabaseGateway(
       rpc<DraftSnapshot>("restore_base_draft", {
         p_key: key(input.requestId),
         p_expected_revision: revision(input.expectedRevision),
-        p_snapshot: key(input.snapshotId),
+        p_snapshot: input.snapshotId === null ? null : key(input.snapshotId),
       }),
   };
 }

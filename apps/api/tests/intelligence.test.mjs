@@ -320,13 +320,13 @@ test("question plan schema has no preselected facts; whole-role rewrite supports
 test("import workflow stores once, resumes without a paid rerun and fences cancellation before cleanup", async () => {
   let row = null,
     uploads = 0,
-    processed = 0,
-    extracts = 0;
+    queued = 0;
   const bytes = new TextEncoder().encode("%PDF-1.7 synthetic");
   const sourceHash = Buffer.from(
     await crypto.subtle.digest("SHA-256", bytes),
   ).toString("hex");
   const store = {
+    enqueue: async () => { queued++; return (row = { ...row, stage: "queued" }); },
     expired: async () => [],
     ackPurge: async () => {},
     list: async () => (row ? [row] : []),
@@ -365,29 +365,7 @@ test("import workflow stores once, resumes without a paid rerun and fences cance
       assert.equal(row.state, "cancelled");
     },
   };
-  const workflow = importWorkflow({
-    userId: "synthetic",
-    store,
-    aiEnabled: true,
-    processor: async () => {
-      processed++;
-      return {
-        schemaVersion: "document-pages/1",
-        format: "pdf",
-        sha256: sourceHash,
-        parserVersion: "fixture",
-        pages: [page],
-        fileBase64: "JVBERi0=",
-        warnings: [],
-      };
-    },
-    operations: {
-      extract: async () => {
-        extracts++;
-        return { admission: review.admission, extraction };
-      },
-    },
-  });
+  const workflow = importWorkflow({ store });
   const input = {
     operationId: "op",
     format: "pdf",
@@ -395,9 +373,9 @@ test("import workflow stores once, resumes without a paid rerun and fences cance
     expectedRevision: 0,
     signal: new AbortController().signal,
   };
-  assert.equal((await workflow.start(input)).state, "ready");
-  assert.equal((await workflow.start(input)).state, "ready");
-  assert.deepEqual([uploads, processed, extracts], [1, 1, 1]);
+  assert.equal((await workflow.start(input)).state, "uploaded");
+  assert.equal((await workflow.start(input)).state, "uploaded");
+  assert.deepEqual([uploads, queued], [1, 1]);
   await workflow.cancel("op");
   assert.equal((await workflow.status("op")).state, "cancelled");
 });
@@ -676,4 +654,112 @@ test("role-guided questions and rewrite receive only selected eligible career ev
     targetId: role.id,
   });
   assert.equal(calls[2].input.roleTitle, null);
+});
+
+test("question framing uses accepted role, category-heading and entry titles after import", async () => {
+  const draft = importedDraft({
+    ...review,
+    extraction: {
+      ...extraction,
+      candidates: [
+        ["roles.0.title", "Coordinator"],
+        ["roles.0.context", "Prepared weekly reports."],
+        ["custom.0.title", "Awards"],
+        ["custom.0.details", "Recognised for mentoring."],
+        ["certifications.0.title", "Safety training"],
+        ["certifications.0.details", "Completed safety training."],
+      ].map(([path, value]) => ({
+        ...candidate,
+        id: path.replaceAll(".", "_"),
+        path,
+        value,
+      })),
+    },
+  });
+  const custom = draft.optionalSections.find((s) => s.heading);
+  const certification = draft.optionalSections.find(
+    (s) => s.kind === "certifications",
+  );
+  const inputs = [];
+  const operations = intelligenceOperations(async ({ input }) => {
+    inputs.push(input);
+    return {
+      schemaVersion: "career-question-plan/1",
+      targetId: input.targetId,
+      questions: [
+        {
+          id: "q",
+          dimension: "ownership",
+          text: "What was your contribution?",
+          why: "Clarify individual responsibility.",
+          selectionMode: "multiple",
+          options: [],
+        },
+      ],
+    };
+  });
+  for (const [targetId, title] of [
+    [draft.roles[0].id, draft.roles[0].title],
+    [custom.entries[0].id, custom.heading],
+    [certification.entries[0].id, certification.entries[0].title],
+  ]) {
+    for (const status of [
+      "extracted_unconfirmed",
+      "user_confirmed",
+      "user_authored",
+      "draft",
+    ]) {
+      title.status = status;
+      for (const acceptance of ["automatic", undefined]) {
+        if (acceptance) title.acceptance = acceptance;
+        else delete title.acceptance;
+        await operations.questions({
+          operationId: "framing",
+          userId: "tenant-one",
+          draft,
+          targetId,
+        });
+        const input = inputs.at(-1);
+        const accepted =
+          status === "user_confirmed" ||
+          status === "user_authored" ||
+          (status === "extracted_unconfirmed" && acceptance === "automatic");
+        assert.equal(input.roleTitle, accepted ? title.value : null);
+        assert.equal(input.facts.some((f) => f.id === title.id), false);
+      }
+    }
+  }
+});
+
+test("future extraction proposes separate skill categories and retains unclear items for explicit category review", async () => {
+  const calls=[];
+  const output={...extraction,candidates:[candidate,{...candidate,id:"technical",path:"technicalSkills.0",value:"Salesforce",quote:"Core skills: Salesforce, Collaboration, Management"},{...candidate,id:"professional",path:"professionalSkills.0",value:"Collaboration",quote:"Core skills: Salesforce, Collaboration, Management"},{...candidate,id:"unclear",path:"unclearSkills.0",value:"Management",quote:"Core skills: Salesforce, Collaboration, Management",warning:"Category unclear without context"}]};
+  const ops=intelligenceOperations(async input=>{calls.push(input);return input.stage==="admit"?{kind:"cv",reason:"CV",pages:[1]}:output;});
+  const result=await ops.extract({operationId:crypto.randomUUID(),userId:"synthetic",document:{schemaVersion:"document-pages/1",format:"pdf",sha256:hash,parserVersion:"fixture",pages:[page],fileBase64:Buffer.from("%PDF-1.7 synthetic").toString("base64"),warnings:[]}});
+  const extract=calls.find(c=>c.stage==="extract");assert.equal(extract.promptVersion,"cv.extract.v6-content-language");
+  assert.match(extract.system,/Do not also emit the same skill list as custom/);
+  const draft=importedDraft({...review,extraction:result.extraction});
+  assert.deepEqual(draft.technicalSkills.map(f=>f.value),["Salesforce"]);
+  assert.deepEqual(draft.professionalSkills.map(f=>f.value),["Collaboration"]);
+  assert.ok(draft.sources.some(s=>s.text?.includes("Management")));
+  assert.deepEqual(draft.importReview.extraction,result.extraction);
+});
+
+test('dense CV extraction retains values and quotes beyond the old 40K character cap',async()=>{
+ const{validateExtraction}=await import('@resumora/contracts/intelligence/model');
+ const candidate=i=>({id:`b${i}`,path:`roles.0.bullets.${i}`,value:'a'.repeat(1000),quote:'a'.repeat(1000),page:1,confidence:'medium'});
+ const value={schemaVersion:'cv-extraction/1',candidates:Array.from({length:40},(_,i)=>candidate(i)),warnings:[],omittedPages:[]};
+ assert.equal(validateExtraction(value,[{number:1,warnings:[]}]).candidates.length,40);
+ value.candidates=Array.from({length:81},(_,i)=>candidate(i));assert.throws(()=>validateExtraction(value,[{number:1,warnings:[]}]),/DOCUMENT_TEXT_LIMIT/);
+});
+
+test('source-preserving extraction requests retain domain competencies and original descriptions through confirmation',async()=>{
+ const domains=['GDPR & cross-border compliance','contractor classification','workforce management','compensation benchmarking','commission structure design','forecasting','talent acquisition strategy','employer branding','organisational design'];
+ const wording='Supported—not led—the rollout for 5–6 teams; did not own payroll. Kept the 12.5% estimate unchanged.\nAm păstrat formularea și diacriticele originale.';
+ const candidates=[{...candidate,id:'name',path:'name',value:'Alex Example',quote:'Alex Example'},...domains.map((value,i)=>({...candidate,id:`domain${i}`,path:`professionalSkills.${i}`,value,quote:value})),{...candidate,id:'context',path:'roles.0.context',value:wording,quote:wording},{...candidate,id:'achievement',path:'roles.0.bullets.0',value:'Checked 17 records; no measured revenue improvement was reported.',quote:'Checked 17 records; no measured revenue improvement was reported.'}];
+ const output={...extraction,candidates};let calls=0;
+ const ops=intelligenceOperations(async task=>{calls++;if(task.stage==='admit')return{kind:'cv',reason:'CV',pages:[1]};assert.equal(task.promptVersion,'cv.extract.v6-content-language');assert.equal(task.maxOutputTokens,40000);for(const term of domains)assert.ok(task.system.includes(term.replace(" & "," and ")),term);assert.match(task.system,/Copy the original summary, role descriptions, responsibilities, achievements.*verbatim/);assert.match(task.system,/Do not summarise, polish, translate, rewrite, merge distinct contributions/);assert.match(task.system,/report the omission explicitly in warnings/);task.validateOutput(output);return output;});
+ const result=await ops.extract({operationId:crypto.randomUUID(),userId:'synthetic',document:{schemaVersion:'document-pages/1',format:'pdf',sha256:hash,parserVersion:'synthetic',pages:[page],fileBase64:Buffer.from('%PDF synthetic').toString('base64'),warnings:[]}});assert.equal(calls,2);
+ const incoming=importedDraft({...review,extraction:result.extraction});assert.deepEqual(incoming.professionalSkills.map(f=>f.value),domains);assert.equal(incoming.roles[0].context.value,wording);
+ const confirmed=confirmImported(incoming,candidates.map(c=>c.id)),saved=decodeDraft(encodeDraft(confirmed));assert.equal(saved.roles[0].context.value,wording);assert.equal(saved.roles[0].bullets[0].value,candidates.at(-1).value);assert.deepEqual(saved.professionalSkills.map(f=>f.value),domains);assert.equal(saved.importReview.extraction.candidates.find(c=>c.id==='context').quote,wording);assert.equal(saved.summary.text,'');
 });

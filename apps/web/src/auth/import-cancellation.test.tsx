@@ -1,3 +1,4 @@
+import { processCvImport } from "../../../api/src/intelligence/import-processor";
 import { webcrypto } from "node:crypto";
 import {
   act,
@@ -65,7 +66,14 @@ it.each(["none", "focus", "interval"] as const)(
       id: crypto.randomUUID(),
       email: "synthetic@example.invalid",
     };
+    let queued: { operationId: string; bytes: Uint8Array } | null = null;
+    let worker: Promise<unknown> | undefined;
     const store: ImportStore & { list(): Promise<ImportRecord[]> } = {
+      enqueue: async (operationId, bytes) => {
+        queued = { operationId, bytes };
+        rows.get(operationId)!.stage = "queued";
+        return copy(operationId);
+      },
       begin: async (input) => {
         const row: ImportRecord = {
           id: crypto.randomUUID(),
@@ -207,7 +215,39 @@ it.each(["none", "focus", "interval"] as const)(
           user.id,
           provider,
         );
-        if (uploading) events.push("upload completed");
+        if (uploading) {
+          events.push("upload completed");
+          // Synthetic worker execution is controlled by this test, outside intake.
+          worker = processCvImport(env, {
+            transport: provider,
+            store: {
+              claim: async () => {
+                if (!queued) return null;
+                const task = queued;
+                queued = null;
+                rows.get(task.operationId)!.state = "processing";
+                return {
+                  lease: task.operationId,
+                  userId: user.id,
+                  record: copy(task.operationId),
+                  base64: Buffer.from(task.bytes).toString("base64"),
+                };
+              },
+              finish: (lease, state, review, error) =>
+                store.complete(lease, state, review, error),
+              reserve: (_lease, input) =>
+                gateway.reserveDocumentOperation(input),
+              ledger: () => ({
+                durability: "durable",
+                begin: ledger.begin.bind(ledger),
+                finish: ledger.finish.bind(ledger),
+                report: ledger.report.bind(ledger),
+              }),
+            },
+          }).catch((error) => {
+            expect(error.message).toBe("VERSION_CONFLICT");
+          });
+        }
         return response;
       },
     );
@@ -220,16 +260,10 @@ it.each(["none", "focus", "interval"] as const)(
         }}
       </AuthShell>,
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Alege un document" }),
-    );
     const file = await screen.findByLabelText("Document CV");
     fireEvent.change(file, {
       target: { files: [new File([bytes], "synthetic.pdf")] },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Încarcă și analizează" }),
-    );
     let pendingSave: Promise<Response> | undefined,
       pendingPrecheck: Promise<Response> | undefined;
     try {
@@ -268,7 +302,9 @@ it.each(["none", "focus", "interval"] as const)(
       );
       await waitFor(() => expect(events).toContain("cancel fenced"));
       expect(events).not.toContain("admission completed");
-      await screen.findByText("cancelled");
+      await screen.findByText(
+        "Import anulat. Poți alege un document pentru o operațiune nouă.",
+      );
     } finally {
       await act(async () => {
         finishAdmission();
@@ -279,6 +315,7 @@ it.each(["none", "focus", "interval"] as const)(
     await pendingPrecheck;
     expect(events).toContain("precheck dispatched");
     await waitFor(() => expect(events).toContain("upload completed"));
+    await worker;
     expect(provider).toHaveBeenCalledTimes(1);
     expect(events).not.toContain("synthetic-extraction");
     expect([...rows.values()][0].state).toBe("cancelled");

@@ -1,4 +1,8 @@
 import { AdapterError, type BaseCvAdapter, type Snapshot } from "./adapter";
+import type {
+  BaseLifecycle,
+  BaseRemoval,
+} from "@resumora/contracts/editor/transport";
 
 export type CvTransport = (
   path: string,
@@ -9,6 +13,14 @@ export type CvTransport = (
 // retained here; remount the shell's App on account/session changes.
 export class HttpBaseCvAdapter implements BaseCvAdapter {
   readonly capability = "durable" as const;
+  private state: BaseLifecycle = {
+    generation: 0,
+    revision: 0,
+    cleanupPending: false,
+  };
+  lifecycle() {
+    return { ...this.state };
+  }
   constructor(
     private readonly transport: CvTransport = (path, init) =>
       fetch(path, { ...init, credentials: "same-origin", cache: "no-store" }),
@@ -47,10 +59,73 @@ export class HttpBaseCvAdapter implements BaseCvAdapter {
         throw new AdapterError("rejected");
       throw new Error("cvRequestFailed");
     }
+    if (path === "" && this.prefix === "/v1/base-cv") {
+      const generation = response.headers.get("X-Base-Generation"),
+        revision = response.headers.get("X-Base-Revision");
+      if (generation !== null || revision !== null) {
+        if (
+          generation === null ||
+          revision === null ||
+          !/^\d+$/.test(generation) ||
+          !/^\d+$/.test(revision) ||
+          !Number.isSafeInteger(Number(generation)) ||
+          !Number.isSafeInteger(Number(revision))
+        )
+          throw new Error("invalidBaseLifecycle");
+        if (
+          Number(generation) < this.state.generation ||
+          Number(revision) < this.state.revision
+        )
+          throw new AdapterError("expired");
+        this.state = {
+          generation: Number(generation),
+          revision: Number(revision),
+          cleanupPending:
+            response.headers.get("X-Base-Cleanup-Pending") === "true",
+        };
+      }
+    }
     return (await response.json()) as T;
   }
-  load() {
-    return this.request<Snapshot | null>("");
+  async load() {
+    const snapshot = await this.request<Snapshot | null>("");
+    if (snapshot) this.state.revision = snapshot.revision;
+    return snapshot;
+  }
+  async remove(input: {
+    requestId: string;
+    expectedRevision: number;
+    expectedGeneration: number;
+  }): Promise<BaseRemoval> {
+    const result = await this.request<BaseRemoval>("/remove", input);
+    if (
+      result.removed !== true ||
+      !Number.isSafeInteger(result.generation) ||
+      result.generation < 1 ||
+      !Number.isSafeInteger(result.revision) ||
+      result.revision < 1 ||
+      typeof result.cleanupPending !== "boolean"
+    )
+      throw new Error("invalidBaseRemoval");
+    this.state = {
+      generation: result.generation,
+      revision: result.revision,
+      cleanupPending: result.cleanupPending,
+    };
+    return result;
+  }
+  async cleanup(): Promise<BaseLifecycle> {
+    const result = await this.request<BaseLifecycle>("/removal-cleanup", {});
+    if (
+      !Number.isSafeInteger(result.generation) ||
+      result.generation < this.state.generation ||
+      !Number.isSafeInteger(result.revision) ||
+      result.revision < this.state.revision ||
+      typeof result.cleanupPending !== "boolean"
+    )
+      throw new Error("invalidBaseLifecycle");
+    this.state = result;
+    return { ...result };
   }
   async history(): Promise<Snapshot[]> {
     const rows: Snapshot[] = [];

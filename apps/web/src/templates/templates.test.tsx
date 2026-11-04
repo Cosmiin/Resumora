@@ -1,3 +1,4 @@
+import { openProfileDetails, openProfilePresentation } from "../test-profile";
 import {
   fireEvent,
   render,
@@ -48,7 +49,7 @@ it.each(cvTemplates)(
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
     expect(
-      within(paper as HTMLElement).getByText("SQL, Power Automate"),
+      within(paper as HTMLElement).getByText("SQL | Power Automate"),
     ).toBeTruthy();
     for (const [index, entry] of [
       ...paper.querySelectorAll(".document-experience .document-entry"),
@@ -173,6 +174,7 @@ it("autosaves the native chooser through App, reopens it and restores versioned 
   });
   window.location.hash = "#base";
   const view = render(<App adapter={adapter} />);
+  await openProfilePresentation();
   const select = await screen.findByRole("combobox", { name: "Șablon" });
   fireEvent.change(select, { target: { value: cvTemplates[3].versionId } });
   await waitFor(
@@ -188,6 +190,7 @@ it("autosaves the native chooser through App, reopens it and restores versioned 
   expect(saved.draft.contacts).toEqual(original.contacts);
   view.unmount();
   render(<App adapter={adapter} />);
+  await openProfilePresentation();
   expect(
     (
       (await screen.findByRole("combobox", {
@@ -246,7 +249,7 @@ it("uses the same executing renderer and envelope for independent tailored conte
   const paper = container.querySelector("article.document")!;
   expect(paper.textContent).toContain(selected.summary.text);
   expect(paper.textContent).toContain("Approved tailored experience wording.");
-  expect(paper.textContent).toContain("SQL, Power Automate");
+  expect(paper.textContent).toContain("SQL | Power Automate");
   expect(paper.textContent).toContain(selected.professionalSkills[0].value);
 });
 

@@ -16,12 +16,39 @@ type Rpc = <T>(
 export function importGateway(
   rpc: Rpc,
   storage: (key: string, bytes?: Uint8Array) => Promise<void>,
+  readOriginal: (key: string) => Promise<Uint8Array>,
 ) {
   return {
     createImportStore(
       secret: string,
     ): ImportStore & { list(): Promise<ImportRecord[]> } {
       return {
+        pending: () => rpc<ImportRecord | null>("get_pending_cv_import", {}),
+        enqueue: (operationId, bytes) =>
+          rpc<ImportRecord>("queue_cv_import", {
+            p_operation: operationId,
+            p_base64: encodeDocumentBytes(bytes),
+          }),
+        source: async (importId) => {
+          const row = await rpc<ImportRecord>("get_cv_import_source", {
+            p_source: importId,
+          });
+          const bytes = await readOriginal(row.objectKey);
+          // Storage is nontransactional. Recheck the owned live source after the
+          // asynchronous read so removal/revocation cannot serve a late original.
+          const current = await rpc<ImportRecord>("get_cv_import_source", {
+            p_source: importId,
+          });
+          if (
+            current.id !== row.id ||
+            current.operationId !== row.operationId ||
+            current.objectKey !== row.objectKey ||
+            current.format !== row.format ||
+            current.sourceHash !== row.sourceHash
+          )
+            throw new Error("SOURCE_MISMATCH");
+          return { bytes, format: row.format, sourceHash: row.sourceHash };
+        },
         begin: (input) =>
           rpc("begin_cv_import", {
             p_operation: input.operationId,
@@ -90,4 +117,13 @@ export function importGateway(
         p_selected: input.selected,
       }),
   };
+}
+
+function encodeDocumentBytes(bytes: Uint8Array): string {
+  const native = bytes as Uint8Array & { toBase64?: () => string };
+  if (native.toBase64) return native.toBase64();
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 8192)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(binary);
 }

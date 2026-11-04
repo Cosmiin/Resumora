@@ -1,3 +1,8 @@
+import type {
+  ContentLocale,
+  ContentLanguageDecision,
+} from "./content-language.ts";
+import type { TranslationLineage } from "./languages.ts";
 import type { CvPhoto } from "./photo.ts";
 import type {
   ImportReview,
@@ -17,8 +22,12 @@ export type Fact<T extends FactValue = FactValue> = {
   status:
     "draft" | "extracted_unconfirmed" | "user_confirmed" | "user_authored";
   sourceId: string;
+  acceptance?: "automatic";
   sourceClaimId?: string;
   sourceLineage?: { sourceId: string; sourceClaimId?: string }[];
+  /** @deprecated Read compatibility only; removed at the transport boundary. */
+  skillEvidence?: unknown;
+  skillOrigin?: unknown;
   evidenceClaimIds?: string[];
   previousFactId?: string;
   confirmedAt?: string;
@@ -33,7 +42,8 @@ export type Source = {
 export type Prose = {
   id: string;
   text: string;
-  origin: "user_authored";
+  origin: "user_authored" | "extracted" | "ai_generated";
+  provenance?: Omit<Fact<string>, "value">;
   approval: "pending" | "approved";
   claimIds: string[];
 };
@@ -83,6 +93,7 @@ export type OptionalSection = {
   kind: OptionalKind;
   label: string;
   entries: OptionalEntry[];
+  heading?: Fact<string>;
 };
 export type Answer = {
   id: string;
@@ -106,7 +117,7 @@ export type Answer = {
   sourceId?: string;
   cvFieldId?: string;
 };
-// Shared by the existing editor content projection and any independent tailored
+// Shared by the existing editor content projection and independent translated
 // document using that projection. Choice belongs to this document/revision; it
 // is never read from a global preference or the latest Base draft.
 export type DocumentPresentation = {
@@ -138,9 +149,22 @@ export type DocumentPresentation = {
 export type BaseDraft = {
   id: string;
   importReview?: ImportReview;
+  /** Import-only user choices; immutable extraction evidence stays in importReview. */
+  importSkillChoices?: Record<
+    string,
+    "professionalSkills" | "technicalSkills" | "omit"
+  >;
   questionPlans?: QuestionPlan[];
   roleRewriteReviews?: RoleRewriteReview[];
-  language: Locale;
+  experienceEnrichment?: Record<
+    string,
+    import("../intelligence/experience.ts").ExperienceSession
+  >;
+  language: ContentLocale;
+  contentLanguage?: ContentLanguageDecision;
+  documentLocale?: string;
+  sourceLocale?: string;
+  translation?: TranslationLineage;
   name: Fact<string>;
   nameParts?: { first: string; last: string };
   titles: [Fact<string>, Fact<string>];
@@ -148,6 +172,20 @@ export type BaseDraft = {
   summary: Prose;
   professionalSkills: Fact<string>[];
   technicalSkills: Fact<string>[];
+  /** Canonical labels explicitly deleted by the user; discovery must respect them. */
+  skillExclusions?: string[];
+  skillReserves?: {
+    technicalSkills: Fact<string>[];
+    professionalSkills: Fact<string>[];
+  };
+  skillReview?: {
+    operationId: string;
+    fingerprint: string;
+    snapshotId: string;
+    revision: number;
+    /** Absolute deadline; reopening the profile must not renew an attempt. */
+    expiresAt?: number;
+  };
   roles: Role[];
   education: Education[];
   optionalSections: OptionalSection[];
@@ -231,6 +269,7 @@ export function editFact<T extends FactValue>(
   }
   return {
     ...fact(value),
+    ...(current.acceptance ? { acceptance: current.acceptance } : {}),
     fieldId: current.fieldId,
     previousFactId:
       current.status === "user_confirmed"
@@ -307,7 +346,15 @@ export function blankDraft(): BaseDraft {
     presentation: { order: [...coreSections, "languages"], hidden: [] },
   };
 }
-export function sectionFacts(d: BaseDraft, section: string): Fact[] {
+export function sectionFacts(
+  d: BaseDraft,
+  section: string,
+  includeInactive = false,
+): Fact[] {
+  if (section === "summary") {
+    const f = summaryFact(d);
+    return f ? [f] : [];
+  }
   if (section === "identity")
     return [d.name, ...d.titles, ...d.contacts.map((c) => c.value)];
   if (section === "professionalSkills" || section === "technicalSkills")
@@ -319,7 +366,7 @@ export function sectionFacts(d: BaseDraft, section: string): Fact[] {
       r.location,
       r.start,
       r.ongoing,
-      ...(!r.ongoing.value ? [r.end] : []),
+      ...(includeInactive || !r.ongoing.value ? [r.end] : []),
       r.context,
       ...r.bullets,
     ]);
@@ -330,28 +377,65 @@ export function sectionFacts(d: BaseDraft, section: string): Fact[] {
       e.field,
       e.location,
       e.start,
-      ...(!e.ongoing?.value ? [e.end] : []),
+      ...(includeInactive || !e.ongoing?.value ? [e.end] : []),
       e.details,
       ...(e.ongoing ? [e.ongoing] : []),
     ]);
-  return (
-    d.optionalSections
-      .find((s) => s.id === section)
-      ?.entries.flatMap((e) => [
+  return d.optionalSections
+    .filter((s) => s.id === section)
+    .flatMap((s) => [
+      ...(s.heading ? [s.heading] : []),
+      ...s.entries.flatMap((e) => [
         e.title,
         e.details,
         ...(e.bullets ?? []),
         e.start,
-        ...(!e.ongoing?.value ? [e.end] : []),
+        ...(includeInactive || !e.ongoing?.value ? [e.end] : []),
         ...(e.ongoing ? [e.ongoing] : []),
         ...(e.proficiency ? [e.proficiency] : []),
-      ]) ?? []
-  );
+      ]),
+    ]);
 }
-export function allFacts(d: BaseDraft): Fact[] {
+export function writeSummary(
+  d: BaseDraft,
+  text: string,
+  origin: Prose["origin"] = "user_authored",
+) {
+  if (text === d.summary.text && origin === "user_authored") return;
+  const source = summaryFact(d);
+  if (origin === "user_authored" && source) {
+    const { value, ...provenance } = editFact(source, text);
+    d.summary.provenance = provenance;
+  } else delete d.summary.provenance;
+  d.summary.text = text;
+  d.summary.origin = origin;
+  d.summary.approval = "approved";
+}
+export function summaryFact(d: BaseDraft): Fact<string> | null {
+  if (!d.summary.provenance) return null;
+  const result = {} as Fact<string>;
+  for (const key of new Set([...Object.keys(d.summary.provenance), "value"]))
+    Object.defineProperty(result, key, {
+      enumerable: true,
+      configurable: true,
+      get: () =>
+        key === "value"
+          ? d.summary.text
+          : (d.summary.provenance as unknown as Record<string, unknown>)[key],
+      set: (v) => {
+        if (key === "value") d.summary.text = v;
+        else
+          (d.summary.provenance as unknown as Record<string, unknown>)[key] = v;
+      },
+    });
+  return result;
+}
+export function allFacts(d: BaseDraft, includeInactive = false): Fact[] {
   return [...coreSections, ...d.optionalSections.map((s) => s.id)].flatMap(
-    (s) => sectionFacts(d, s),
+    (s) => sectionFacts(d, s, includeInactive),
   );
 }
-export const isAuthored = (f: Fact) =>
-  f.status === "user_confirmed" || f.status === "user_authored";
+export const isAccepted = (f: Fact) =>
+  f.status === "user_confirmed" ||
+  f.status === "user_authored" ||
+  (f.status === "extracted_unconfirmed" && f.acceptance === "automatic");

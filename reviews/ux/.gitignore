@@ -1,5 +1,0 @@
-# Local browser evidence; the portable proposal excludes screenshot binaries.
-screenshots/*.png
-
-# Machine-specific Chrome wrapper contains local runtime paths.
-browser-runner.py

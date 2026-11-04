@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import { cropRectangle, type CvPhoto } from "@resumora/contracts/editor/photo";
 import { usePhotoUrl } from "./client";
-import { useCopy } from "../components/ui";
+import { Button, useCopy } from "../components/ui";
 export function PhotoPreview({ photo }: { photo: CvPhoto | null | undefined }) {
   const t = useCopy(),
     source = usePhotoUrl(photo?.visible ? photo.assetId : undefined),
     canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
+    if (canvas.current) delete canvas.current.dataset.photoReady;
     if (!source.url || !photo) return;
     let active = true;
     const image = new Image();
@@ -30,6 +31,7 @@ export function PhotoPreview({ photo }: { photo: CvPhoto | null | undefined }) {
         320,
         320,
       );
+      if (ctx) canvas.current.dataset.photoReady = "true";
     };
     image.src = source.url;
     return () => {
@@ -47,9 +49,9 @@ export function PhotoPreview({ photo }: { photo: CvPhoto | null | undefined }) {
             "Photo unavailable. Replace it or remove it from this CV.",
           )}
         </p>
-        <button type="button" onClick={source.retry}>
+        <Button type="button" onClick={source.retry}>
           {t("Reîncarcă fotografia din previzualizare", "Retry preview photo")}
-        </button>
+        </Button>
       </div>
     );
   if (!source.url)

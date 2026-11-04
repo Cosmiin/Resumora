@@ -1,3 +1,5 @@
+import { canonicalContentLocale, isDocumentLabels, type ContentLocale } from "../editor/content-language.ts";
+import { cvImportLimits } from "./import-limits.ts";
 /** Provisional operation schemas; prompt quality/tone remains an owner workshop. */
 export const documentLimits = Object.freeze({
   bytes: 10_000_000,
@@ -6,6 +8,12 @@ export const documentLimits = Object.freeze({
   candidates: 250,
 });
 export type DocumentFormat = "pdf" | "docx" | "doc";
+export type WordSourceText = {
+  importId: string;
+  sourceHash: string;
+  format: "doc" | "docx";
+  text: string;
+};
 export type DocumentPage = {
   number: number;
   warnings: string[];
@@ -35,6 +43,9 @@ export type Candidate = {
 };
 export type Extraction = {
   schemaVersion: "cv-extraction/1";
+  detectedLanguage?: ContentLocale | null;
+  languageConfidence?: "low" | "medium" | "high";
+  documentLabels?: Record<string, string>;
   candidates: Candidate[];
   warnings: string[];
   omittedPages: number[];
@@ -175,14 +186,26 @@ export function validateAdmission(v: unknown, pages: number): Admission {
   return structuredClone(v) as unknown as Admission;
 }
 export const candidatePath =
-  /^(name|titles\.[01]|contacts\.(email|phone|location|linkedin)|professionalSkills\.(0|[1-9][0-9]?)|technicalSkills\.(0|[1-9][0-9]?)|roles\.\d\.(title|company|location|start|end|ongoing|context|bullets\.(0|[1-9][0-9]?))|education\.\d\.(institution|qualification|field|location|start|end|details)|languages\.\d\.(title|proficiency))$/;
+  /^(name|nameParts\.(first|last)|summary|certifications\.\d\.(title|details|start|end)|custom\.\d\.(title|details)|titles\.[01]|contacts\.(email|phone|location|linkedin|website)|professionalSkills\.(0|[1-9][0-9]?)|technicalSkills\.(0|[1-9][0-9]?)|unclearSkills\.(0|[1-9][0-9]?)|roles\.\d\.(title|company|location|start|end|ongoing|context|bullets\.(0|[1-9][0-9]?))|education\.\d\.(institution|qualification|field|location|start|end|details)|languages\.\d\.(title|proficiency))$/;
+export const pdfExtractionNotice =
+  "Native PDF transcription requires review against the original page.";
+export const wordExtractionNotice =
+  "Native Word excerpt requires review; original pagination is unknown.";
+export const hasSpecificImportWarning = (candidate: Candidate): boolean =>
+  !!candidate.warning &&
+  candidate.warning !== pdfExtractionNotice &&
+  candidate.warning !== wordExtractionNotice;
+
 export function validateExtraction(
   v: unknown,
   pages: DocumentPage[],
 ): Extraction {
   if (
     !object(v) ||
-    !exact(v, ["schemaVersion", "candidates", "warnings", "omittedPages"]) ||
+    !exact(v, ["schemaVersion", "candidates", "warnings", "omittedPages"], ["detectedLanguage", "languageConfidence", "documentLabels"]) ||
+    (v.detectedLanguage !== undefined && v.detectedLanguage !== null && canonicalContentLocale(v.detectedLanguage) !== v.detectedLanguage) ||
+    (v.languageConfidence !== undefined && (typeof v.languageConfidence !== "string" || !["low", "medium", "high"].includes(v.languageConfidence))) ||
+    (v.documentLabels !== undefined && !isDocumentLabels(v.documentLabels)) ||
     v.schemaVersion !== "cv-extraction/1" ||
     !Array.isArray(v.candidates) ||
     !v.candidates.length ||
@@ -224,10 +247,14 @@ export function validateExtraction(
       (c.warning !== undefined && !text(c.warning, 500))
     )
       throw new IntelligenceError("EXTRACTION_OUTPUT");
+    if (c.path.startsWith("nameParts.") || c.path === "contacts.website") {
+      const normalized = (value: string) =>
+        value.normalize("NFC").replace(/\s+/g, " ").trim();
+      if (!normalized(c.quote).includes(normalized(c.value)))
+        throw new IntelligenceError("EXTRACTION_OUTPUT");
+    }
     if (!c.warning)
-      c.warning = pages.length
-        ? "Native PDF transcription requires review against the original page."
-        : "Native Word excerpt requires review; original pagination is unknown.";
+      c.warning = pages.length ? pdfExtractionNotice : wordExtractionNotice;
     if (
       /\.(start|end)$/.test(c.path) &&
       !/^(\d{4}|(0[1-9]|1[0-2])\/\d{4})$/.test(c.value)
@@ -242,7 +269,7 @@ export function validateExtraction(
     (v.candidates as Candidate[]).reduce(
       (n, c) => n + c.value.length + c.quote.length,
       0,
-    ) > documentLimits.characters
+    ) > cvImportLimits.extractedCharacters
   )
     throw new IntelligenceError("DOCUMENT_TEXT_LIMIT");
   return structuredClone(v) as unknown as Extraction;
@@ -332,10 +359,46 @@ export function validateRewrite(
     .map((f) => f.text)
     .join("\n");
   const supportedNumbers = new Set(support.match(/\d+(?:[.,]\d+)*%?/g) ?? []);
-  for (const n of (v.text as string).match(/\d+(?:[.,]\d+)*%?/g) ?? [])
+  for (const n of (v.text as string)
+    .replace(/^\s*\d{1,3}[.)]\s+/gm, "")
+    .match(/\d+(?:[.,]\d+)*%?/g) ?? [])
     if (!supportedNumbers.has(n))
       throw new IntelligenceError("UNSUPPORTED_METRIC");
   return structuredClone(v) as unknown as RoleRewrite;
+}
+/** A brief role introduction, not the overall professional summary. */
+export function validateRoleSummary(
+  v: unknown,
+  targetId: string,
+  facts: { id: string; text: string }[],
+): RoleRewrite {
+  const p = validateRewrite(v, targetId, facts);
+  if (
+    p.text.trim().length > 1200 ||
+    Array.from(new Intl.Segmenter(undefined, { granularity: "sentence" }).segment(p.text.trim())).length > 5 ||
+    /[\r\n]/.test(p.text.trim()) ||
+    /^\s*(?:[-*•]\s|\d+[.)]\s)/.test(p.text)
+  )
+    throw new IntelligenceError("REWRITE_OUTPUT");
+  return p;
+}
+/** New scope/context generation only; persisted reviews retain the legacy summary limits. */
+export function validateRoleScopeSummary(
+  v: unknown,
+  targetId: string,
+  facts: { id: string; text: string }[],
+): RoleRewrite {
+  const p = validateRoleSummary(v, targetId, facts);
+  if (
+    p.text.trim().length > 400 ||
+    Array.from(
+      new Intl.Segmenter(undefined, { granularity: "sentence" }).segment(
+        p.text.trim(),
+      ),
+    ).length > 2
+  )
+    throw new IntelligenceError("REWRITE_OUTPUT");
+  return p;
 }
 export function isImportReview(v: unknown): v is ImportReview {
   if (
@@ -406,6 +469,7 @@ export function answerEvidenceText(answer: {
 }
 export type RoleRewriteReview = {
   id: string;
+  purpose?: "summary";
   proposal: RoleRewrite;
   input: import("./context.ts").CareerContext;
   status: "pending" | "accepted" | "rejected";
@@ -413,12 +477,13 @@ export type RoleRewriteReview = {
 export function isRoleRewriteReview(v: unknown): v is RoleRewriteReview {
   if (
     !object(v) ||
-    !exact(v, ["id", "proposal", "input", "status"]) ||
+    !exact(v, ["id", "proposal", "input", "status"], ["purpose"]) ||
+    (v.purpose !== undefined && v.purpose !== "summary") ||
     !text(v.id, 100) ||
     !["pending", "accepted", "rejected"].includes(v.status as string) ||
     !object(v.input) ||
     !text(v.input.targetId, 100) ||
-    !["ro", "en"].includes(v.input.locale as string) ||
+    (typeof v.input.locale !== "string" || canonicalContentLocale(v.input.locale) !== v.input.locale) ||
     !Array.isArray(v.input.facts) ||
     v.input.facts.length > 24 ||
     !v.input.facts.every(
@@ -451,7 +516,7 @@ export function isRoleRewriteReview(v: unknown): v is RoleRewriteReview {
   // Incomplete/edited pending wording can autosave; only accepted proposals must pass the acceptance guard.
   if (v.status !== "accepted") return true;
   try {
-    validateRewrite(
+    (v.purpose === "summary" ? validateRoleSummary : validateRewrite)(
       p,
       v.input.targetId,
       v.input.facts as { id: string; text: string }[],

@@ -1,3 +1,4 @@
+import { openProfileDetails, openProfilePresentation } from "../test-profile";
 import { render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { ConnectedApp } from "./ConnectedApp";
@@ -7,6 +8,9 @@ it("uses durable HTTP loading, keeps the adapter stable, and resets the real edi
   window.location.hash = "#base";
   let name = "Ana Alpha";
   const transport = vi.fn(async (path: string) => {
+    if (path === "/v1/document-languages")
+      return Response.json({ source: null, versions: [] });
+    if (path.startsWith("/v1/workspace-drafts")) return Response.json(null);
     expect(path).toBe("/v1/base-cv");
     const draft = blankDraft();
     draft.name.value = name;
@@ -23,6 +27,7 @@ it("uses durable HTTP loading, keeps the adapter stable, and resets the real edi
   });
   const a = { id: "account-a", email: "a@example.invalid" };
   const view = render(<ConnectedApp account={a} transport={transport} />);
+  await openProfileDetails();
   await waitFor(() =>
     expect(
       (screen.getByRole("textbox", { name: /Prenume/ }) as HTMLInputElement)
@@ -30,7 +35,9 @@ it("uses durable HTTP loading, keeps the adapter stable, and resets the real edi
     ).toBe("Ana"),
   );
   view.rerender(<ConnectedApp account={{ ...a }} transport={transport} />);
-  expect(transport).toHaveBeenCalledTimes(1);
+  expect(
+    transport.mock.calls.filter(([path]) => path === "/v1/base-cv"),
+  ).toHaveLength(1);
   name = "Bela Beta";
   view.rerender(
     <ConnectedApp
@@ -38,6 +45,7 @@ it("uses durable HTTP loading, keeps the adapter stable, and resets the real edi
       transport={transport}
     />,
   );
+  await openProfileDetails();
   await waitFor(() =>
     expect(
       (screen.getByRole("textbox", { name: /Prenume/ }) as HTMLInputElement)
@@ -45,6 +53,8 @@ it("uses durable HTTP loading, keeps the adapter stable, and resets the real edi
     ).toBe("Bela"),
   );
   expect(screen.queryByDisplayValue("Ana")).toBeNull();
-  expect(transport).toHaveBeenCalledTimes(2);
+  expect(
+    transport.mock.calls.filter(([path]) => path === "/v1/base-cv"),
+  ).toHaveLength(2);
   window.location.hash = "";
 });

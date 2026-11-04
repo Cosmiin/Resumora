@@ -1,4 +1,4 @@
-import { allFacts, hasValue, isAuthored, type BaseDraft } from "../base/model";
+import { allFacts, hasValue, isAccepted, type BaseDraft } from "../base/model";
 import { validateDraft } from "../base/validation";
 import { Button, Pill, useCopy } from "./ui";
 export function Review({
@@ -12,24 +12,34 @@ export function Review({
 }) {
   const t = useCopy(),
     pending = allFacts(draft).filter(
-      (f) => hasValue(f.value) && !isAuthored(f),
+      (f) => hasValue(f.value) && !isAccepted(f),
     ).length;
   const incomplete = validateDraft(draft).length;
+  const imported = allFacts(draft).some(
+    (f) => f.acceptance === "automatic" && isAccepted(f),
+  );
   const checks = [
     {
       title: t("Conținut", "Content"),
       state:
         pending || incomplete
           ? t("Necesită atenție", "Needs action")
-          : t("Informații auto-declarate", "Self-reported facts"),
+          : imported
+            ? t("Informații importate", "Imported facts")
+            : t("Informații auto-declarate", "Self-reported facts"),
       text: pending
         ? `${pending} ${t("informații necesită verificare.", "facts need review.")}`
         : incomplete
           ? `${incomplete} ${t("câmpuri necesită completare.", "fields need completion.")}`
-          : t(
-              "Informațiile introduse sunt auto-declarate. Secțiunile opționale pot rămâne goale.",
-              "Entered facts are self-reported. Optional sections may remain empty.",
-            ),
+          : imported
+            ? t(
+                "Informațiile cu încredere ridicată sunt acceptate automat. Proveniența extrasă rămâne păstrată în editor.",
+                "High-confidence facts are accepted automatically. Extracted provenance is retained in the editor.",
+              )
+            : t(
+                "Informațiile introduse sunt auto-declarate. Secțiunile opționale pot rămâne goale.",
+                "Entered facts are self-reported. Optional sections may remain empty.",
+              ),
       action: edit,
     },
     {
@@ -42,14 +52,6 @@ export function Review({
       action: edit,
     },
     {
-      title: t("Optimizare pentru job", "Job optimization"),
-      state: t("Nu se aplică", "Not applicable"),
-      text: t(
-        "Nu este selectat un job. Adaptarea și scorurile de compatibilitate nu sunt disponibile.",
-        "No job is selected. Tailoring and compatibility scores are unavailable.",
-      ),
-    },
-    {
       title: t("Calitatea redactării", "Writing quality"),
       state: t("De revizuit", "Needs review"),
       text: t(
@@ -57,14 +59,6 @@ export function Review({
         "Review your wording. Questions can help add context; AI generation is unavailable.",
       ),
       action: enrich,
-    },
-    {
-      title: t("Pregătire pentru aplicare", "Application readiness"),
-      state: t("În așteptare", "Pending"),
-      text: t(
-        "Acest CV de bază nu are un export verificat sau o candidatură asociată.",
-        "This Base CV has no verified export or associated application.",
-      ),
     },
   ];
   return (

@@ -1,6 +1,0 @@
-*,*::before,*::after{box-sizing:border-box}
-body{margin:0;background:var(--surface-page);color:var(--text-body);font-family:var(--font-sans);font-size:16px;-webkit-font-smoothing:antialiased}
-button,input,textarea,select{font:inherit}
-a{color:var(--text-accent);text-underline-offset:2px}a:hover{color:var(--action-primary-hover)}
-:focus-visible{outline:var(--focus-outline);outline-offset:var(--focus-offset)}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

@@ -10,7 +10,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { Enrichment } from "./Enrichment";
 import { RoleRewrite } from "./RoleRewrite";
-import { App } from "../App";
+import { App } from "../test-editor-harness";
 import { LanguageContext } from "./ui";
 import {
   blankDraft,
@@ -260,7 +260,7 @@ describe("CV import and career intelligence integration", () => {
     expect(currentWording(latest, target)).toBeNull();
     expect(latest.answers[0].text).toBe("I consolidated three files.");
   });
-  it("one Confirm and save reviewed CV click persists selected confirmation and checkpoint without a second completion action", async () => {
+  it("one section confirmation persists visible data without a second completion action", async () => {
     const user = userEvent.setup(),
       initial = maraReviewDraft();
     initial.name.status = "extracted_unconfirmed";
@@ -281,7 +281,7 @@ describe("CV import and career intelligence integration", () => {
             value: initial.name.value,
             page: 1,
             quote: initial.name.value,
-            confidence: "high",
+            confidence: "low",
           },
         ],
         warnings: [],
@@ -289,6 +289,8 @@ describe("CV import and career intelligence integration", () => {
       },
       confirmedIds: [],
     };
+    initial.sources.find((s) => s.id === initial.name.sourceId)!.locator =
+      `import:${initial.importReview.id}:page:1`;
     const defaults = blankDraft();
     initial.contacts.push(
       {
@@ -322,17 +324,16 @@ describe("CV import and career intelligence integration", () => {
     render(<App adapter={adapter} />);
     await user.click(
       await screen.findByRole("button", {
-        name: "Selectează informațiile fără avertismente",
-      }),
-    );
-    await user.click(
-      screen.getByRole("button", {
-        name: "Confirmă și salvează CV-ul verificat",
+        name: "Confirmă și folosește informațiile",
       }),
     );
     await waitFor(() =>
       expect(
-        save.mock.calls.filter(([v]) => v.mode === "checkpoint"),
+        save.mock.calls.filter(
+          ([v]) =>
+            v.mode === "autosave" &&
+            v.draft.importReview?.confirmedIds.includes("name"),
+        ),
       ).toHaveLength(1),
     );
     const saved = await adapter.load();

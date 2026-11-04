@@ -13,7 +13,7 @@ export type EnhancementProposal = {
   text: string;
   sources: ScopedFact[];
 };
-/** Conservative groundwork truth boundary: only exact quotations of verified evidence.
+/** Conservative grounding boundary: only exact quotations of eligible saved evidence.
  * Paraphrasing/semantic entailment is deliberately deferred. IDs alone do not prove truth.
  */
 export function validateProposal(
@@ -48,13 +48,15 @@ export function validateProposal(
  * No novel words, titles, metrics or qualifications are permitted. */
 export function composeGrounded(
   facts: readonly ScopedFact[],
-  locale: "en" | "ro",
+  locale: string,
 ): string {
   return (
     facts
       .map((f) => {
         let text = f.text.trim().replace(/[.;]+$/u, "");
-        text = text.replace(locale === "ro" ? /^Eu\s+/u : /^I\s+/u, "");
+        const primary = new Intl.Locale(locale).language;
+        if (primary === "ro") text = text.replace(/^Eu\s+/u, "");
+        if (primary === "en") text = text.replace(/^I\s+/u, "");
         return text ? text[0].toLocaleUpperCase(locale) + text.slice(1) : "";
       })
       .join("; ") + "."

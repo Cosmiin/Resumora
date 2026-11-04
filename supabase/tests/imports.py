@@ -23,6 +23,35 @@ def suite(db):
                     'admission':{'kind':'cv','reason':'synthetic CV','pages':[1]},'extraction':{'schemaVersion':'cv-extraction/1',
                     'candidates':[{'id':'name','path':'name','value':'Mara Ionescu','page':1,'quote':'Mara Ionescu','confidence':'high'}],
                     'warnings':[],'omittedPages':[]},'confirmedIds':[]}
+        def test_original_source_requires_owner_ready_unexpired_and_not_cancelled(self):
+            args=f"'{self.row['id']}'"
+            self.assertIn('SNAPSHOT_NOT_FOUND',self.call('get_cv_import_source',args,error=True))
+            self.complete('uploaded');self.complete('processing');self.complete('ready',self.review())
+            self.assertEqual(json.loads(self.call('get_cv_import_source',args))['objectKey'],self.row['objectKey'])
+            self.assertIn('SNAPSHOT_NOT_FOUND',self.call('get_cv_import_source',args,user=self.b,error=True))
+            self.assertIn('permission denied',self.call('get_cv_import_source',args,role='anon',error=True))
+            db.sql(f"UPDATE app.cv_import_sessions SET expires_at=transaction_timestamp()-interval '1 second' WHERE source_id='{self.row['id']}'")
+            self.assertIn('SNAPSHOT_NOT_FOUND',self.call('get_cv_import_source',args,error=True))
+            db.sql(f"UPDATE app.cv_import_sessions SET expires_at=transaction_timestamp()+interval '1 day' WHERE source_id='{self.row['id']}'")
+            self.call('cancel_cv_import',f"'{self.op}'")
+            self.assertIn('SNAPSHOT_NOT_FOUND',self.call('get_cv_import_source',args,error=True))
+        def test_word_source_has_the_same_owner_expiry_and_cancellation_fences(self):
+            self.call('cancel_cv_import', f"'{self.op}'")
+            for fmt in ('doc', 'docx'):
+                self.op = uid()
+                self.row = json.loads(self.call('begin_cv_import', f"'{self.op}','{fmt}','{'a'*64}',1024,0"))['record']
+                review = self.review(); review['format'] = fmt; review['pages'] = None; review['admission']['pages'] = []
+                review['extraction']['candidates'][0]['page'] = None
+                self.complete('uploaded'); self.complete('processing'); self.complete('ready', review)
+                args = f"'{self.row['id']}'"
+                self.assertEqual(json.loads(self.call('get_cv_import_source', args))['sourceHash'], 'a'*64)
+                self.assertIn('SNAPSHOT_NOT_FOUND', self.call('get_cv_import_source', args, user=self.b, error=True))
+                db.sql(f"UPDATE app.cv_import_sessions SET expires_at=now()-interval '1 second' WHERE source_id='{self.row['id']}'")
+                self.assertIn('SNAPSHOT_NOT_FOUND', self.call('get_cv_import_source', args, error=True))
+                db.sql(f"UPDATE app.cv_import_sessions SET expires_at=now()+interval '1 day' WHERE source_id='{self.row['id']}'")
+                self.call('cancel_cv_import', f"'{self.op}'")
+                self.assertIn('SNAPSHOT_NOT_FOUND', self.call('get_cv_import_source', args, error=True))
+
         def test_owned_manifest_replay_mismatch_and_foreign_direct_write_denial(self):
             again=json.loads(self.call('begin_cv_import',f"'{self.op}','pdf','{'a'*64}',1024,0"));self.assertFalse(again['created']);self.assertEqual(again['record']['id'],self.row['id'])
             self.assertIn('IDEMPOTENCY_BODY_MISMATCH',self.call('begin_cv_import',f"'{self.op}','pdf','{'b'*64}',1024,0",error=True))
@@ -40,7 +69,7 @@ def suite(db):
             object_filter=f"bucket_id='cv-imports' AND name='{name}'"
             db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.a,role='authenticated')
             self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE {object_filter}",user=self.b,role='authenticated'),'0')
-            self.assertIn('row-level security',db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.b,role='authenticated',expect_error=True))
+            self.assertIn('RESOURCE_FORBIDDEN',db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.b,role='authenticated',expect_error=True))
             try:
                 self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE {object_filter}",role='anon'),'0')
             except AssertionError as error:
@@ -102,6 +131,7 @@ def suite(db):
             for fmt in ('pdf','docx','doc'):
                 with self.subTest(format=fmt):
                     if fmt!='pdf':
+                        self.call('cancel_cv_import',f"'{self.op}'")
                         self.op=uid();self.row=json.loads(self.call('begin_cv_import',f"'{self.op}','{fmt}','{'a'*64}',1024,0"))['record']
                     self.complete('uploaded');self.complete('processing')
                     review=self.review();review['format']=fmt;review['pages']=1 if fmt=='pdf' else None
@@ -168,5 +198,5 @@ def suite(db):
             db.sql(f"UPDATE app.cv_import_sessions SET created_at=now()-interval '100 seconds' WHERE source_id='{self.row['id']}'")
             self.assertEqual(json.loads(self.call('get_cv_import',f"'{self.op}'"))['state'],'unknown')
             payload={'schemaVersion':'resumora-editor-draft/1','content':{},'answers':[]};self.call('save_base_draft',f"'{uid()}',0,{literal(payload)},'autosave'")
-            self.assertIn('VERSION_CONFLICT',self.call('begin_cv_import',f"'{uid()}','pdf','{'c'*64}',100,0",error=True))
+            self.assertIn('BASE_CV_EXISTS',self.call('begin_cv_import',f"'{uid()}','pdf','{'c'*64}',100,0",error=True))
     return unittest.defaultTestLoader.loadTestsFromTestCase(Imports)

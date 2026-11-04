@@ -8,10 +8,13 @@
     "dev:admin-demo": "node --experimental-strip-types scripts/admin-demo.mjs",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
-    "build": "wrangler deploy --dry-run --outdir dist"
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "prebuild": "node ../../scripts/build-print.mjs",
+    "pretest": "node ../../scripts/build-print.mjs"
   },
   "dependencies": {
     "@cantoo/pdf-lib": "2.11.1",
+    "@cloudflare/puppeteer": "1.4.0",
     "@jsquash/jpeg": "1.6.0",
     "@jsquash/png": "3.1.1",
     "@jsquash/webp": "1.5.0",
@@ -22,6 +25,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261025.1",
-    "wrangler": "4.152.0"
+    "wrangler": "4.152.0",
+    "pdfjs-dist": "5.4.624",
+    "@napi-rs/canvas": "0.1.100"
   }
 }
