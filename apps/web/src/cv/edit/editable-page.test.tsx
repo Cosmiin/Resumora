@@ -96,7 +96,6 @@ describe("EditablePage", () => {
     render(<Harness initial={cv} />);
     const level = screen.getByRole("textbox", { name: "Language level" });
     await userEvent.click(level);
-    await userEvent.tab(); // remove button
     await userEvent.tab();
     const add = screen.getByRole("button", { name: "+ Add item" });
     expect(add).toHaveFocus();
@@ -111,6 +110,49 @@ describe("EditablePage", () => {
     expect(state().languages[0]?.level).toBe("B2+");
     await userEvent.click(screen.getByRole("button", { name: "Remove French" }));
     expect(state().languages).toHaveLength(0);
+  });
+
+  it("every text field of every list item is visible and editable", async () => {
+    const cv: CvContent = {
+      ...emptyCv(),
+      certifications: [{ id: "c1", name: "AWS", issuer: "Amazon", date: "2021-03" }],
+      projects: [{ id: "p1", name: "Site", description: "Built it", url: "site.dev" }],
+      awards: [{ id: "a1", name: "Prize", issuer: "Org", date: "2020-05", description: "For work" }],
+      courses: [{ id: "k1", name: "Course", provider: "School", date: "2019-01" }],
+      publications: [{ id: "u1", title: "Paper", publisher: "Journal", date: "2018-02", url: "paper.org" }],
+    };
+    render(<Harness initial={cv} />);
+    const checks: [string, string, (c: CvContent) => string, string][] = [
+      ["Certification", "AWS", (c) => c.certifications[0]!.name, "!"],
+      ["Certification issuer", "Amazon", (c) => c.certifications[0]!.issuer, "!"],
+      ["Project", "Site", (c) => c.projects[0]!.name, "!"],
+      ["Project description", "Built it", (c) => c.projects[0]!.description, "!"],
+      ["Project link", "site.dev", (c) => c.projects[0]!.url, "!"],
+      ["Award", "Prize", (c) => c.awards[0]!.name, "!"],
+      ["Award issuer", "Org", (c) => c.awards[0]!.issuer, "!"],
+      ["Award description", "For work", (c) => c.awards[0]!.description, "!"],
+      ["Course", "Course", (c) => c.courses[0]!.name, "!"],
+      ["Course provider", "School", (c) => c.courses[0]!.provider, "!"],
+      ["Publication", "Paper", (c) => c.publications[0]!.title, "!"],
+      ["Publisher", "Journal", (c) => c.publications[0]!.publisher, "!"],
+      ["Publication link", "paper.org", (c) => c.publications[0]!.url, "!"],
+    ];
+    for (const [label, shown, read, add] of checks) {
+      const box = screen.getByRole("textbox", { name: label });
+      expect(box).toHaveValue(shown);
+      await userEvent.type(box, add);
+      expect(read(state())).toBe(shown + add);
+    }
+    for (const label of ["Certification date", "Award date", "Course date", "Publication date"]) {
+      expect(screen.getByRole("textbox", { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it('a typed date "03/2021" is saved as 2021-03', async () => {
+    const cv: CvContent = { ...emptyCv(), certifications: [{ id: "c1", name: "AWS", issuer: "", date: "" }] };
+    render(<Harness initial={cv} />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Certification date" }), "03/2021");
+    expect(state().certifications[0]?.date).toBe("2021-03");
   });
 
   it("a custom section keeps its own heading", async () => {

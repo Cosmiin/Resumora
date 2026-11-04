@@ -7,13 +7,14 @@ type Props = {
   value: string;
   locale: Locale;
   label: string;
+  placeholder?: string;
   onCommit(value: string): void;
   onPresent?(): void;
   fieldKey: string;
 };
 
 /** A date typed in free form: valid text is saved at once, anything else waits with a hint. */
-export function DateField({ value, locale, label, onCommit, onPresent, fieldKey }: Props) {
+export function DateField({ value, locale, label, placeholder, onCommit, onPresent, fieldKey }: Props) {
   const shown = formatYearMonth(value, locale);
   const [text, setText] = useState(shown);
   const [invalid, setInvalid] = useState(false);
@@ -53,6 +54,7 @@ export function DateField({ value, locale, label, onCommit, onPresent, fieldKey 
       <PageField
         fieldKey={fieldKey}
         label={label}
+        placeholder={placeholder}
         value={text}
         onChange={change}
         onFocus={onFocus}

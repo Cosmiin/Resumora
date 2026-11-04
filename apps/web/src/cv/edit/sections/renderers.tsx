@@ -8,7 +8,7 @@ import type { SectionRenderer } from "./types.ts";
 
 const simple = (list: SimpleList): SectionRenderer =>
   function Simple({ cv, dispatch }) {
-    return <SimpleListEdit list={list} items={cv[list]} dispatch={dispatch} />;
+    return <SimpleListEdit list={list} items={cv[list]} locale={cv.locale} dispatch={dispatch} />;
   };
 
 /** Section bodies by key. Sections without an entry (roles, education, skills) are added later. */
