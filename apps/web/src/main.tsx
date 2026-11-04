@@ -9,6 +9,7 @@ import { routes } from "./router.tsx";
 import "./styles/tokens.css";
 import "./styles/app.css";
 import "./styles/cv-page.css";
+import "./styles/panel.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
