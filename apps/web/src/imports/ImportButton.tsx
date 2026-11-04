@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type Ref } from "react";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api-error.ts";
 import { startImport } from "./imports-api.ts";
@@ -8,7 +8,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPTED = /\.(pdf|docx)$/i;
 
 /** Picks a CV file, uploads it and reports the new import's id. */
-export function ImportButton({ onStarted }: { onStarted(importId: string): void }) {
+export function ImportButton({ onStarted, ref }: { onStarted(importId: string): void; ref?: Ref<HTMLButtonElement> }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function ImportButton({ onStarted }: { onStarted(importId: string): void 
         accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         onChange={(e) => void choose(e.target.files?.[0])}
       />
-      <button type="button" className="secondary" disabled={busy} onClick={() => input.current?.click()}>
+      <button ref={ref} type="button" className="secondary" disabled={busy} onClick={() => input.current?.click()}>
         {busy ? t("import.uploading") : t("import.button")}
       </button>
       {problem && <p role="alert" className="form-error">{problem}</p>}

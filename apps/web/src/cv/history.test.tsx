@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
@@ -71,6 +71,24 @@ describe("version history", () => {
     expect(within(cvPage()).queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("a slow preview never leaves another version on the page", async () => {
+    const user = userEvent.setup();
+    let finishB!: (v: { content: CvContent; createdAt: string }) => void;
+    renderPage();
+    const panel = await openHistory(user);
+    const [newer, older] = await within(panel).findAllByRole("listitem");
+    await user.click(within(older!).getByRole("button"));
+    await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
+    api.getHistoryItem.mockReturnValue(new Promise((resolve) => (finishB = resolve)));
+    await user.click(within(newer!).getByRole("button"));
+    expect(cvPage()).not.toHaveTextContent("Old Name");
+    const restoreButton = within(panel).getByRole("button", { name: "Restore this version" });
+    expect(restoreButton).toBeDisabled();
+    await act(async () => finishB({ content: named("Newer Name"), createdAt: "2026-11-04T10:15:00Z" }));
+    expect(cvPage()).toHaveTextContent("Newer Name");
+    expect(restoreButton).toBeEnabled();
+  });
+
   it("closing history shows the current CV again", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -112,6 +130,8 @@ describe("version history", () => {
       expect(within(panel).getByText("2 November")).toBeInTheDocument();
       expect(within(panel).getByText("Before import")).toBeInTheDocument();
       expect(within(panel).getByText("Before AI change")).toBeInTheDocument();
+      await user.click(within(panel).getByRole("button", { name: /Before import/ }));
+      expect(await screen.findByText(/Previewing the version from today, [0-9]{2}:[0-9]{2}/)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -125,7 +145,9 @@ describe("version history", () => {
     const [, older] = await within(panel).findAllByRole("listitem");
     api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });
     await user.click(within(older!).getByRole("button"));
-    await user.click(within(panel).getByRole("button", { name: "Restore this version" }));
+    const restoreButton = within(panel).getByRole("button", { name: "Restore this version" });
+    await waitFor(() => expect(restoreButton).toBeEnabled());
+    await user.click(restoreButton);
 
     expect(api.restoreHistory).toHaveBeenCalledWith("h1", 2);
     await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
@@ -144,7 +166,9 @@ describe("version history", () => {
     const panel = await openHistory(user);
     const [, older] = await within(panel).findAllByRole("listitem");
     await user.click(within(older!).getByRole("button"));
-    await user.click(within(panel).getByRole("button", { name: "Restore this version" }));
+    const restoreButton = within(panel).getByRole("button", { name: "Restore this version" });
+    await waitFor(() => expect(restoreButton).toBeEnabled());
+    await user.click(restoreButton);
     expect(await screen.findByText("This CV was saved in another tab or device.")).toBeInTheDocument();
   });
 
@@ -180,7 +204,9 @@ describe("version history blocks editing", () => {
     const [, older] = await within(panel).findAllByRole("listitem");
     api.getCv.mockRejectedValueOnce(new ApiClientError(0, "network", "offline"));
     await user.click(within(older!).getByRole("button"));
-    await user.click(within(panel).getByRole("button", { name: "Restore this version" }));
+    const restoreButton = within(panel).getByRole("button", { name: "Restore this version" });
+    await waitFor(() => expect(restoreButton).toBeEnabled());
+    await user.click(restoreButton);
 
     expect(await screen.findByRole("button", { name: "Load latest" })).toBeInTheDocument();
     api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });

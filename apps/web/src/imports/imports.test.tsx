@@ -136,6 +136,37 @@ describe("CV import", () => {
     expect(summaryOf(dialog).getByText("Roles").nextElementSibling).toHaveTextContent("3");
   });
 
+  it("counts every filled section of the imported page", async () => {
+    const content: CvContent = {
+      ...named("Ana Popescu"),
+      basics: { ...named("Ana Popescu").basics, summary: "Product manager." },
+      experience: imported.experience,
+      languages: [{ id: "l1", name: "English", level: "C1" }],
+      certifications: [{ id: "k1", name: "PSM I", issuer: "Scrum.org", date: "2022" }],
+      projects: [{ id: "p1", name: "Billing", url: "", description: "" }],
+      custom: [{ id: "c1", title: "Volunteering", details: "" }, { id: "c2", title: "", details: "" }],
+    };
+    importsApi.getImport.mockResolvedValue(imp("ready", { result: { content, warnings: [] } }));
+    renderPage();
+    await chooseFile(pdf());
+    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    await within(dialog).findByText("PSM I");
+    expect(summaryOf(dialog).getByText("Sections").nextElementSibling).toHaveTextContent("6");
+  });
+
+  it("keeps the top bar out of reach and returns focus to Import CV", async () => {
+    importsApi.getImport.mockResolvedValue(ready);
+    renderPage();
+    const header = (await screen.findByRole("button", { name: "Import CV" })).closest("header")!;
+    expect(header.closest("[inert]")).toBeNull();
+    await chooseFile(pdf());
+    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    expect(header.closest("[inert]")).not.toBeNull();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(header.closest("[inert]")).toBeNull();
+    expect(screen.getByRole("button", { name: "Import CV" })).toHaveFocus();
+  });
+
   it("moves focus into the import screen when it opens", async () => {
     importsApi.getImport.mockResolvedValue(imp("queued"));
     renderPage();

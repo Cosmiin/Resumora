@@ -494,6 +494,36 @@ label.checkbox input {
   .side-panel-header { flex-direction: row-reverse; justify-content: flex-end; }
 }
 
+/* Save warnings inside the open panel stay pinned to its top while the fields scroll under them. */
+.side-panel-notices {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: grid;
+  gap: 8px;
+  padding-block: 4px;
+  background: var(--white);
+}
+
+/* Below 900px history is a bottom sheet: the previewed page stays visible above it, the list
+   scrolls inside the sheet and Restore stays in view at its foot. */
+@media (max-width: 900px) {
+  .side-panel.history-panel {
+    inset: auto 0 0 0;
+    max-height: 55vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--shadow-page);
+  }
+  .history-panel > * { flex-shrink: 0; }
+  .history-panel > .side-panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  /* Room to scroll the end of the page above the sheet. */
+  .editor-workspace:has(.history-panel) .editor-page-area { padding-bottom: 55vh; }
+}
+
 .history-intro, .history-hint { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
 .history-group { display: grid; gap: 8px; }
 .history-day { margin: 0; font: 600 11px/1.4 var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--pine-600); }

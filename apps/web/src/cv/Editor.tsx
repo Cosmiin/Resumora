@@ -6,7 +6,7 @@ import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
 import { conflictFrom, isConflict, useAutosave, type SaveStatus } from "./useAutosave.ts";
 import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryPanel } from "./HistoryPanel.tsx";
-import { dayLabel, timeLabel } from "./historyFormat.ts";
+import { whenLabel } from "./historyFormat.ts";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ImportButton } from "../imports/ImportButton.tsx";
 import { ImportScreen } from "../imports/ImportScreen.tsx";
@@ -33,6 +33,8 @@ export function Editor({ initial }: { initial: CvResponse }) {
   const dialogOpen = historyOpen || importId !== null;
   const [preview, setPreview] = useState<{ content: CvContent; createdAt: string } | null>(null);
   const historyButton = useRef<HTMLButtonElement>(null);
+  const importButton = useRef<HTMLButtonElement>(null);
+  const importWasOpen = useRef(false);
   const [selected, setSelected] = useState<BlockRef | null>(null);
   const position = selected && findItem(content, selected);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -56,6 +58,13 @@ export function Editor({ initial }: { initial: CvResponse }) {
     );
     (block ?? pageRef.current)?.focus();
   }, [selected]);
+
+  // When the import screen closes (cancel, applied or conflict), focus goes back to Import CV.
+  // This runs after render, once the top bar is no longer inert and can take focus.
+  useEffect(() => {
+    if (importWasOpen.current && importId === null) importButton.current?.focus();
+    importWasOpen.current = importId !== null;
+  }, [importId]);
 
   function openHistory() {
     setSelected(null);
@@ -89,12 +98,26 @@ export function Editor({ initial }: { initial: CvResponse }) {
     closeHistory();
   }
 
+  // Save warnings sit in the open side panel (which covers the page on phones and stays in view on
+  // desktop), otherwise above the page. Only one copy is ever rendered.
+  const notices = (autosave.problem || conflict) && (
+    <>
+      {autosave.problem && (
+        <p role="alert" className="form-error">
+          {t("cv.invalid", { problem: autosave.problem })}
+        </p>
+      )}
+      {conflict && <ConflictBanner onLoadLatest={loadLatest} onKeepMine={keepMine} />}
+    </>
+  );
+  const panelOpen = !historyOpen && !!selected && !!position;
+
   const actions = (
     <>
       <span className={`save-status save-status-${status}`} aria-live="polite">
         {t(statusLabel[status])}
       </span>
-      <ImportButton onStarted={setImportId} />
+      <ImportButton ref={importButton} onStarted={setImportId} />
       <button ref={historyButton} type="button" className="secondary" onClick={openHistory}>
         {t("history.open")}
       </button>
@@ -102,15 +125,10 @@ export function Editor({ initial }: { initial: CvResponse }) {
   );
 
   return (
-    <AppShell actions={actions}>
+    <AppShell actions={actions} inert={importId !== null}>
       <main className="editor">
       {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
-      {autosave.problem && (
-        <p role="alert" className="form-error">
-          {t("cv.invalid", { problem: autosave.problem })}
-        </p>
-      )}
-      {conflict && <ConflictBanner onLoadLatest={loadLatest} onKeepMine={keepMine} />}
+      {!panelOpen && notices}
       {/* While an import is open the whole workspace is inert. While history is open only the page is,
           so a restore can't race the user's typing; the history panel stays usable. */}
       <div className="editor-workspace" inert={importId !== null}>
@@ -118,7 +136,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
           {historyOpen ? (
             preview && (
               <p className="history-notice" role="status">
-                {t("history.previewing", { when: `${dayLabel(preview.createdAt)}, ${timeLabel(preview.createdAt)}` })}
+                {t("history.previewing", { when: whenLabel(preview.createdAt) })}
               </p>
             )
           ) : (
@@ -141,8 +159,9 @@ export function Editor({ initial }: { initial: CvResponse }) {
             onRestore={restore}
           />
         ) : (
-          selected &&
-          position && <SidePanel cv={content} selected={selected} onChange={setContent} onSelect={setSelected} />
+          panelOpen && selected && (
+            <SidePanel cv={content} selected={selected} onChange={setContent} onSelect={setSelected} notices={notices} />
+          )
         )}
       </div>
       {importId && (

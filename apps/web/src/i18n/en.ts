@@ -115,6 +115,8 @@ export const en = {
   "history.intro": "We keep a copy while you edit, and always before an import or a restore. The newest 50 are kept.",
   "history.previewError": "Couldn't load that version. Please try again.",
   "history.restoreNote": "Restoring keeps your current CV in History too.",
+  "history.today": "Today",
+  "history.todayInline": "today",
   "history.previewing": "Previewing the version from {when} — your current CV isn't changed",
   "history.close": "Close",
   "history.empty": "No earlier versions yet. Resumora keeps a version every 10 minutes while you edit.",

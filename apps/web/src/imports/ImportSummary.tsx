@@ -6,13 +6,18 @@ export function ImportSummary(props: { result: ImportResult; canApply: boolean; 
   const { result, canApply, applying, onApply } = props;
   const { content: cv, warnings } = result;
   const unsorted = cv.unclearSkills;
-  const sections = [
-    cv.experience.length,
-    cv.education.length,
-    cv.technicalSkills.length + cv.professionalSkills.length + cv.unclearSkills.length,
-    ...cv.custom.map((c) => (c.title || c.details ? 1 : 0)),
-  ].filter((n) => n > 0).length;
   const skills = cv.technicalSkills.length + cv.professionalSkills.length + unsorted.length;
+  // Every section that shows on the page; each filled custom entry is its own section.
+  const sections = [
+    !!cv.basics.summary.trim(),
+    cv.experience.length > 0,
+    cv.education.length > 0,
+    skills > 0,
+    cv.languages.length > 0,
+    cv.certifications.length > 0,
+    cv.projects.length > 0,
+    ...cv.custom.map((c) => !!(c.title || c.details)),
+  ].filter(Boolean).length;
 
   return (
     <aside className="import-summary" aria-label={t("import.summary.title")}>

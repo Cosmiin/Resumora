@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { CvContent } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { blockKey, findItem, type BlockRef } from "./page/blocks.ts";
@@ -10,10 +10,12 @@ type Props = {
   selected: BlockRef;
   onChange(next: CvContent): void;
   onSelect(ref: BlockRef | null): void;
+  /** Save warnings (conflict, can't be saved) shown at the top so they stay in view while editing. */
+  notices?: ReactNode;
 };
 
 /** The fields of the block selected on the page. Escape or the close button closes it. */
-export function SidePanel({ cv, selected, onChange, onSelect }: Props) {
+export function SidePanel({ cv, selected, onChange, onSelect, notices }: Props) {
   const { section } = selected;
   const position = findItem(cv, selected) ?? { index: 0, count: 1 };
   const label = isListSection(section)
@@ -59,6 +61,7 @@ export function SidePanel({ cv, selected, onChange, onSelect }: Props) {
           <span className="side-panel-back" aria-hidden="true">← {t("panel.back")}</span>
         </button>
       </header>
+      {notices && <div className="side-panel-notices">{notices}</div>}
       <div className="side-panel-body" ref={bodyRef}>
         <PanelBody cv={cv} selected={selected} onChange={onChange} />
       </div>

@@ -37,6 +37,7 @@ function groupByDay(items: HistoryItem[]) {
 export function HistoryPanel({ canRestore, onClose, onPreview, onRestore }: Props) {
   const history = useQuery({ queryKey: ["cv-history"], queryFn: listHistory, staleTime: 0, gcTime: 0 });
   const [chosen, setChosen] = useState<string | null>(null);
+  const [previewed, setPreviewed] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -54,13 +55,19 @@ export function HistoryPanel({ canRestore, onClose, onPreview, onRestore }: Prop
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // The page and Restore must always agree: until the chosen version has loaded, the page shows the
+  // current CV and Restore stays disabled.
   async function choose(item: HistoryItem) {
     latest.current = item.id;
     setChosen(item.id);
+    setPreviewed(null);
     setLoadFailed(false);
+    onPreview(null);
     try {
       const { content } = await getHistoryItem(item.id);
-      if (latest.current === item.id) onPreview(content, item.createdAt);
+      if (latest.current !== item.id) return;
+      onPreview(content, item.createdAt);
+      setPreviewed(item.id);
     } catch {
       if (latest.current !== item.id) return;
       setLoadFailed(true);
@@ -80,7 +87,7 @@ export function HistoryPanel({ canRestore, onClose, onPreview, onRestore }: Prop
 
   return (
     <aside
-      className="side-panel"
+      className="side-panel history-panel"
       aria-label={t("history.open")}
     >
       <header className="side-panel-header">
@@ -122,7 +129,7 @@ export function HistoryPanel({ canRestore, onClose, onPreview, onRestore }: Prop
           ))}
       </div>
       <footer className="side-panel-footer">
-        <button type="button" disabled={!canRestore || !chosen || busy} onClick={() => chosen && restore(chosen)}>
+        <button type="button" disabled={!canRestore || !chosen || previewed !== chosen || busy} onClick={() => chosen && restore(chosen)}>
           {t("history.restore")}
         </button>
         <p className="history-hint">{canRestore ? t("history.restoreNote") : t("history.waitForSave")}</p>

@@ -6,7 +6,13 @@ import { useAuth } from "../auth/AuthProvider.tsx";
 import { hasUnsavedChanges } from "../cv/unsaved.ts";
 
 /** Top bar (brand, navigation, page actions, account menu) around a signed-in page. */
-export function AppShell({ actions, children }: { actions?: ReactNode; children: ReactNode }) {
+export function AppShell(props: {
+  actions?: ReactNode;
+  /** True while a full-window screen (the import review) covers the page: the top bar is out of reach. */
+  inert?: boolean;
+  children: ReactNode;
+}) {
+  const { actions, inert, children } = props;
   const email = useAuth().session?.user.email ?? "";
   const [menuOpen, setMenuOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -32,7 +38,7 @@ export function AppShell({ actions, children }: { actions?: ReactNode; children:
 
   return (
     <div className="app-shell">
-      <header className="app-header">
+      <header className="app-header" inert={inert}>
         <strong className="app-brand">{t("app.name")}</strong>
         <nav aria-label={t("nav.main")} className="app-nav">
           <NavLink to="/cv">{t("nav.myCv")}</NavLink>

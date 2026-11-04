@@ -120,4 +120,58 @@ describe("side panel", () => {
     await user.click(screen.getByRole("button", { name: "Experience" }));
     expect(within(panel(/experience/i)).getByLabelText("Job title")).toHaveValue("");
   });
+
+  it("shows the conflict banner inside the open panel", async () => {
+    const user = userEvent.setup();
+    api.saveCv.mockRejectedValue(
+      new ApiClientError(409, "version_conflict", "Saved elsewhere", {
+        current: { version: 4, updatedAt: "2026-11-04T10:05:00Z" },
+      }),
+    );
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit Senior Product Manager" }));
+    await user.type(screen.getByLabelText("Company"), "!");
+    const open = panel(/experience/i);
+    expect(
+      await within(open).findByText("This CV was saved in another tab or device.", {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
+    expect(within(open).getByRole("button", { name: "Load latest" })).toBeInTheDocument();
+    expect(within(open).getByRole("button", { name: "Keep my version" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Load latest" })).toHaveLength(1);
+  });
+
+  it("shows why the CV can't be saved inside the open panel", async () => {
+    const user = userEvent.setup();
+    api.saveCv.mockRejectedValue(new ApiClientError(400, "invalid_cv", "a field is too long."));
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit Senior Product Manager" }));
+    await user.type(screen.getByLabelText("Company"), "!");
+    expect(
+      await within(panel(/experience/i)).findByText(/can't be saved yet — a field is too long/, {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
+  });
+
+  it("Move up keeps focus on a move button", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit Product Analyst" }));
+    expect(panel(/experience/i)).toHaveTextContent("role 2 of 3");
+    await user.click(screen.getByRole("button", { name: "Move up" }));
+    expect(panel(/experience/i)).toHaveTextContent("role 1 of 3");
+    expect(screen.getByRole("button", { name: "Move up" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move down" })).toHaveFocus();
+  });
+
+  it("a new blank role has a name on the page and reopens", async () => {
+    const user = userEvent.setup();
+    api.getCv.mockResolvedValue({ content: emptyCv(), version: 0, updatedAt: "2026-11-04T10:00:00Z" });
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "+ Add a section" }));
+    await user.click(screen.getByRole("button", { name: "Experience" }));
+    await user.keyboard("{Escape}");
+    const block = within(page()).getByRole("button", { name: "Edit New entry" });
+    expect(block).toHaveTextContent("New entry");
+    await user.click(block);
+    expect(within(panel(/experience/i)).getByLabelText("Job title")).toHaveValue("");
+  });
 });

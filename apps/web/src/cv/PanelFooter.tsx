@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { MAX_ITEMS, newId, type CvContent } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { BlockRef } from "./page/blocks.ts";
@@ -22,6 +23,28 @@ export function PanelFooter({ cv, section, itemId, onChange, onNavigate, onAdd }
   const index = items.findIndex((x) => x.id === itemId);
   const ref = (id: string): BlockRef => ({ section, itemId: id });
   const save = (next: ListItem[]) => onChange(withListItems(cv, section, next));
+  const upRef = useRef<HTMLButtonElement>(null);
+  const downRef = useRef<HTMLButtonElement>(null);
+  const moved = useRef(false);
+
+  // After Move up/down the pressed button can become disabled (first or last place), which drops
+  // focus. Then focus the other move button, or the first field if that one is disabled too.
+  useEffect(() => {
+    if (!moved.current) return;
+    moved.current = false;
+    const active = document.activeElement;
+    if (active !== document.body && !(active instanceof HTMLButtonElement && active.disabled)) return;
+    const other = [upRef.current, downRef.current].find((b) => b && !b.disabled);
+    const firstField = upRef.current
+      ?.closest(".side-panel")
+      ?.querySelector<HTMLElement>(".side-panel-body :is(input, textarea, select, button)");
+    (other ?? firstField)?.focus();
+  });
+
+  function moveTo(to: number) {
+    moved.current = true;
+    save(move(items, index, to));
+  }
 
   function remove() {
     const next = items.filter((x) => x.id !== itemId);
@@ -45,10 +68,10 @@ export function PanelFooter({ cv, section, itemId, onChange, onNavigate, onAdd }
         <button type="button" className="secondary" onClick={remove}>
           {t("cv.item.remove")}
         </button>
-        <button type="button" className="secondary" disabled={index <= 0} onClick={() => save(move(items, index, index - 1))}>
+        <button ref={upRef} type="button" className="secondary" disabled={index <= 0} onClick={() => moveTo(index - 1)}>
           {t("cv.item.moveUp")}
         </button>
-        <button type="button" className="secondary" disabled={index >= last} onClick={() => save(move(items, index, index + 1))}>
+        <button ref={downRef} type="button" className="secondary" disabled={index >= last} onClick={() => moveTo(index + 1)}>
           {t("cv.item.moveDown")}
         </button>
       </div>
