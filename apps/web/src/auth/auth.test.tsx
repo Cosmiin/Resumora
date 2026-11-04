@@ -84,14 +84,30 @@ describe("authentication", () => {
       error: null,
     });
     renderAt("/");
-    expect(await screen.findByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Account: ana@example.com" })).toBeInTheDocument();
+  });
+});
+
+const signedIn = { data: { session: { access_token: "t", user: { id: "u1", email: "ana@example.com" } } }, error: null };
+
+async function openAccountMenu() {
+  await userEvent.click(await screen.findByRole("button", { name: "Account: ana@example.com" }));
+}
+
+describe("top bar", () => {
+  it("shows My CV and the account menu signs out", async () => {
+    auth.getSession.mockResolvedValue(signedIn);
+    auth.signOut.mockResolvedValue({ error: null });
+    renderAt("/cv");
+    expect(await screen.findByRole("link", { name: "My CV" })).toHaveAttribute("aria-current", "page");
+    await openAccountMenu();
     expect(screen.getByText("ana@example.com")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(auth.signOut).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("sign out", () => {
-  const signedIn = { data: { session: { access_token: "t", user: { id: "u1", email: "ana@example.com" } } }, error: null };
-
   it("asks first when there are unsaved changes", async () => {
     auth.getSession.mockResolvedValue(signedIn);
     auth.signOut.mockResolvedValue({ error: null });
@@ -99,7 +115,8 @@ describe("sign out", () => {
     renderAt("/cv");
     setUnsavedChanges(true);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    await openAccountMenu();
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(confirm).toHaveBeenCalledWith("You have unsaved changes. Sign out anyway?");
     expect(auth.signOut).not.toHaveBeenCalled();
 
@@ -114,7 +131,8 @@ describe("sign out", () => {
     auth.signOut.mockResolvedValue({ error: null });
     const confirm = vi.spyOn(window, "confirm");
     renderAt("/cv");
-    await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    await openAccountMenu();
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(confirm).not.toHaveBeenCalled();
     expect(auth.signOut).toHaveBeenCalledTimes(1);
     confirm.mockRestore();

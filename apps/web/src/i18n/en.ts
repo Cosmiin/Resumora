@@ -2,6 +2,9 @@
 export const en = {
   "app.name": "Resumora",
   "app.loading": "Loading…",
+  "nav.main": "Main",
+  "nav.myCv": "My CV",
+  "nav.account": "Account: {email}",
   "app.signOut": "Sign out",
   "app.signOutUnsaved": "You have unsaved changes. Sign out anyway?",
 

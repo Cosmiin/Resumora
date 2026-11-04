@@ -6,6 +6,7 @@ import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
 import { conflictFrom, isConflict, useAutosave, type SaveStatus } from "./useAutosave.ts";
 import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryDrawer } from "./HistoryDrawer.tsx";
+import { AppShell } from "../layout/AppShell.tsx";
 import { ImportButton } from "../imports/ImportButton.tsx";
 import { ImportDialog } from "../imports/ImportDialog.tsx";
 import { BasicsSection } from "./sections/Basics.tsx";
@@ -57,17 +58,22 @@ export function Editor({ initial }: { initial: CvResponse }) {
   }
   const update = <K extends keyof CvContent>(key: K) => (value: CvContent[K]) => setContent({ ...content, [key]: value });
 
+  const actions = (
+    <>
+      <span className={`save-status save-status-${status}`} aria-live="polite">
+        {t(statusLabel[status])}
+      </span>
+      <ImportButton onStarted={setImportId} />
+      <button type="button" className="secondary" onClick={() => setHistoryOpen(true)}>
+        {t("history.open")}
+      </button>
+    </>
+  );
+
   return (
-    <div className="editor">
-      <div className="editor-toolbar">
-        <span className={`save-status save-status-${status}`} aria-live="polite">
-          {t(statusLabel[status])}
-        </span>
-        <ImportButton onStarted={setImportId} />
-        <button type="button" className="secondary" onClick={() => setHistoryOpen(true)}>
-          {t("history.open")}
-        </button>
-      </div>
+    <AppShell actions={actions}>
+      <main className="cv-page">
+        <div className="editor">
       {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
       {autosave.problem && (
         <p role="alert" className="form-error">
@@ -111,6 +117,8 @@ export function Editor({ initial }: { initial: CvResponse }) {
           <HistoryDrawer onClose={() => setHistoryOpen(false)} canRestore={status === "saved"} onRestore={restore} />
         </>
       )}
-    </div>
+        </div>
+      </main>
+    </AppShell>
   );
 }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { ApiClientError } from "../lib/api-error.ts";
 
@@ -22,7 +23,9 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <CvPage />
+      <MemoryRouter>
+        <CvPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
