@@ -10,6 +10,9 @@ type Props = {
   dispatch(a: CvAction): void;
   /** Ask the page to put the cursor in a field (once it has rendered). */
   onFocusField(fieldKey: string): void;
+  /** Sections added this visit that count as present while still empty. */
+  opened: ReadonlySet<SectionKey>;
+  onOpen(key: SectionKey): void;
 };
 
 const CUSTOM = "custom";
@@ -24,18 +27,27 @@ function Eye({ on }: { on: boolean }) {
 }
 
 /** The panel's home view: what is missing, the sections on the CV (order, hide) and a way to add more. */
-export function Overview({ cv, dispatch, onFocusField }: Props) {
+export function Overview({ cv, dispatch, onFocusField, opened, onOpen }: Props) {
   const layout = normalizeLayout(cv.layout);
   const nameOf = (key: SectionKey) => layout.titles[key] || CATEGORY[key].label[cv.locale];
-  const present = sectionsOnCv(cv);
+  const saved = sectionsOnCv(cv);
+  const present = layout.order.filter((k) => saved.includes(k) || opened.has(k));
   const addable = SECTION_KEYS.filter((k) => k !== "other" && !present.includes(k));
-  const flags = missingCategories(cv);
+  const flags = missingCategories(cv).filter((f) => f.key === "header" || !opened.has(f.key));
   const [choice, setChoice] = useState<string>(CUSTOM);
   const chosen = choice === CUSTOM || addable.some((k) => k === choice) ? choice : (addable[0] ?? CUSTOM);
+
+  // The reducer orders saved sections only; a section opened but still empty stays where it is.
+  const move = (from: number, to: number) => {
+    const a = saved.indexOf(present[from] as SectionKey);
+    const b = saved.indexOf(present[to] as SectionKey);
+    if (a >= 0 && b >= 0) dispatch({ type: "moveSection", from: a, to: b });
+  };
 
   const addSection = (key: SectionKey) => {
     const id = newId();
     dispatch({ type: "addSection", key, id });
+    onOpen(key);
     const field = firstFieldKey(key, id);
     if (field) onFocusField(field);
   };
@@ -87,7 +99,7 @@ export function Overview({ cv, dispatch, onFocusField }: Props) {
         <div className="sec-list">
           <DragList
             items={present.map((key) => ({ id: key }))}
-            onMove={(from, to) => dispatch({ type: "moveSection", from, to })}
+            onMove={move}
             label={(item) => nameOf(item.id as SectionKey)}
             rowClassName="sec-row"
           >

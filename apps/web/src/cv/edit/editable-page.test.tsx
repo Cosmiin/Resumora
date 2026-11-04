@@ -4,13 +4,15 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { EditablePage } from "./EditablePage.tsx";
+import { useOpenedSections } from "./useOpenedSections.ts";
 import { cvReducer } from "./cvReducer.ts";
 
 function Harness({ initial }: { initial: CvContent }) {
   const [cv, dispatch] = useReducer(cvReducer, initial);
+  const [opened, onOpen] = useOpenedSections();
   return (
     <>
-      <EditablePage cv={cv} dispatch={dispatch} />
+      <EditablePage cv={cv} dispatch={dispatch} opened={opened} onOpen={onOpen} />
       <output data-testid="json">{JSON.stringify(cv)}</output>
     </>
   );

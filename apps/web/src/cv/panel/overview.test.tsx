@@ -1,4 +1,4 @@
-import { useReducer, useRef, useState } from "react";
+import { useReducer, useRef } from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -6,24 +6,20 @@ import { emptyCv, newId, type CvContent, type Experience } from "@resumora/share
 import { EditablePage } from "../edit/EditablePage.tsx";
 import { cvReducer } from "../edit/cvReducer.ts";
 import { useFocusAfterRender } from "../edit/useFocusAfterRender.ts";
+import { useOpenedSections } from "../edit/useOpenedSections.ts";
 import { HelperPanel } from "./HelperPanel.tsx";
 
 function Harness({ initial }: { initial: CvContent }) {
   const [cv, dispatch] = useReducer(cvReducer, initial);
   const page = useRef<HTMLDivElement>(null);
+  const [opened, onOpen] = useOpenedSections();
   const focusLater = useFocusAfterRender(page);
-  const [, rerender] = useState(0);
-  // Focus waits for the next render; a bump makes sure there is one even when nothing else changed.
-  const focusField = (key: string) => {
-    focusLater(key);
-    rerender((n) => n + 1);
-  };
   return (
     <>
       <div ref={page}>
-        <EditablePage cv={cv} dispatch={dispatch} />
+        <EditablePage cv={cv} dispatch={dispatch} opened={opened} onOpen={onOpen} />
       </div>
-      <HelperPanel cv={cv} dispatch={dispatch} focus={null} onBack={() => {}} onFocusField={focusField} />
+      <HelperPanel cv={cv} dispatch={dispatch} focus={null} onBack={() => {}} onFocusField={focusLater} opened={opened} onOpen={onOpen} />
       <output data-testid="json">{JSON.stringify(cv)}</output>
     </>
   );
@@ -91,5 +87,15 @@ describe("helper panel overview", () => {
     await userEvent.keyboard(" {ArrowDown} ");
     expect(order()).toEqual(["Experience", "Summary", "Other"]);
     expect(state().layout.order.indexOf("experience")).toBeLessThan(state().layout.order.indexOf("summary"));
+  });
+
+  it("Add Summary in the panel opens the empty summary on the page, focused, and drops its flag", async () => {
+    render(<Harness initial={{ ...filled(), basics: { ...filled().basics, summary: "" } }} />);
+    expect(document.querySelector('[data-field="summary"]')).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Add Summary" }));
+    expect(document.activeElement).toBe(document.querySelector('[data-field="summary"]'));
+    expect(screen.queryByRole("button", { name: "Add Summary" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Reorder Summary" })).toBeInTheDocument();
+    expect(state().basics.summary).toBe("");
   });
 });

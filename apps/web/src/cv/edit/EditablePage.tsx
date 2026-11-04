@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { missingCategories, newId, normalizeLayout, type CvContent, type SectionKey } from "@resumora/shared";
 import { sectionsOnCv, type CvAction } from "./cvReducer.ts";
 import { MissingBox } from "./MissingBox.tsx";
@@ -7,24 +7,28 @@ import { useFocusAfterRender } from "./useFocusAfterRender.ts";
 import { HeaderEdit } from "./sections/HeaderEdit.tsx";
 import { firstFieldKey, sectionRenderers } from "./sections/renderers.tsx";
 
-type Props = { cv: CvContent; dispatch(a: CvAction): void };
+type Props = {
+  cv: CvContent;
+  dispatch(a: CvAction): void;
+  /** Sections added this visit that stay on the page while empty (see useOpenedSections). */
+  opened: ReadonlySet<SectionKey>;
+  onOpen(key: SectionKey): void;
+};
 
 /** The CV page where every piece of text is typed in place. */
-export function EditablePage({ cv, dispatch }: Props) {
+export function EditablePage({ cv, dispatch, opened, onOpen }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
-  // Sections added this visit stay on the page even while they are still empty (a blank summary).
-  const [opened, setOpened] = useState<ReadonlySet<SectionKey>>(new Set());
 
   const addSection = useCallback(
     (key: SectionKey) => {
       const id = newId();
       dispatch({ type: "addSection", key, id });
-      setOpened((prev) => new Set(prev).add(key));
+      onOpen(key);
       const field = firstFieldKey(key, id);
       if (field) focusLater(field);
     },
-    [dispatch, focusLater],
+    [dispatch, focusLater, onOpen],
   );
 
   const layout = normalizeLayout(cv.layout);
