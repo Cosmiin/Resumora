@@ -33,7 +33,6 @@ const pdf = () => new File(["%PDF-1.4 test"], "cv.pdf", { type: "application/pdf
 
 const summaryOf = (dialog: HTMLElement) => within(within(dialog).getByRole("complementary", { name: "We organized your CV" }));
 const useThisCv = (dialog: HTMLElement) => within(dialog).findAllByRole("button", { name: "Use this CV" }).then((all) => all[0]!);
-const cvPage = () => screen.getByRole("article", { name: "CV page" });
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -175,14 +174,16 @@ describe("CV import", () => {
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
 
-  it("makes the open side panel inert behind the import screen", async () => {
+  it("makes the page and its panel inert behind the import screen", async () => {
     importsApi.getImport.mockResolvedValue(imp("queued"));
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "Edit your details" }));
-    const panel = document.querySelector(".side-panel")!;
+    const field = await screen.findByRole("textbox", { name: "Full name" });
+    const panel = screen.getByRole("complementary", { name: "Helper panel" });
+    expect(field.closest("[inert]")).toBeNull();
     expect(panel.closest("[inert]")).toBeNull();
     await chooseFile(pdf());
     await screen.findByRole("dialog", { name: "Import review" });
+    expect(field.closest("[inert]")).not.toBeNull();
     expect(panel.closest("[inert]")).not.toBeNull();
   });
 
@@ -207,8 +208,8 @@ describe("CV import", () => {
 
     expect(importsApi.applyImport).toHaveBeenCalledWith("imp-1", 3);
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
-    expect(cvPage()).toHaveTextContent("Ana Popescu");
-    expect(cvPage()).toHaveTextContent("Senior Product Manager");
+    expect(screen.getByRole("textbox", { name: "Full name" })).toHaveValue("Ana Popescu");
+    expect(screen.getByRole("textbox", { name: "Title 1" })).toHaveValue("Senior Product Manager");
     expect(screen.getByText("Saved")).toBeInTheDocument();
   });
 
@@ -218,8 +219,7 @@ describe("CV import", () => {
     importsApi.getImport.mockResolvedValue(ready);
     importsApi.applyImport.mockResolvedValue({ version: 5, updatedAt: "2026-11-04T10:05:00Z" });
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "Edit your details" }));
-    await user.type(screen.getByLabelText("Full name"), "!");
+    await user.type(await screen.findByRole("textbox", { name: "Full name" }), "!");
     await chooseFile(pdf());
     const dialog = await screen.findByRole("dialog", { name: "Import review" });
     const useIt = await useThisCv(dialog);
@@ -267,7 +267,7 @@ describe("CV import", () => {
     await within(dialog).findByText("Ana Popescu");
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument();
-    expect(cvPage()).toHaveTextContent("Current");
+    expect(screen.getByRole("textbox", { name: "Full name" })).toHaveValue("Current");
     expect(importsApi.applyImport).not.toHaveBeenCalled();
   });
 });

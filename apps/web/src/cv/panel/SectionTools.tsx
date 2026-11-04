@@ -10,6 +10,8 @@ type Props = {
   dispatch(a: CvAction): void;
   focus: NonNullable<PanelFocus>;
   onBack(): void;
+  /** Move the cursor to the page itself (used when what had it is gone). */
+  onFocusPage(): void;
 };
 
 function Eye() {
@@ -22,7 +24,7 @@ function Eye() {
 }
 
 /** Role tools: "I work here now" and Remove role. */
-function RoleBox({ cv, dispatch, list, itemId, onBack }: Pick<Props, "cv" | "dispatch" | "onBack"> & { list: "experience" | "volunteering"; itemId: string }) {
+function RoleBox({ cv, dispatch, list, itemId, onFocusPage }: Pick<Props, "cv" | "dispatch" | "onFocusPage"> & { list: "experience" | "volunteering"; itemId: string }) {
   const item = cv[list].find((r) => r.id === itemId);
   if (!item) return null;
   const title = item.title || item.company ? roleName(item, list) : t("panel.tools.thisRole");
@@ -43,8 +45,9 @@ function RoleBox({ cv, dispatch, list, itemId, onBack }: Pick<Props, "cv" | "dis
           type="button"
           className="btn danger"
           onClick={() => {
+            // The panel stays on this section; the role and its tools are gone.
             dispatch({ type: "removeItem", list, itemId });
-            onBack();
+            onFocusPage();
           }}
         >
           {t("panel.tools.removeRole")}
@@ -76,7 +79,7 @@ function ToSortBox({ cv, dispatch }: Pick<Props, "cv" | "dispatch">) {
 }
 
 /** The tools for the part of the CV the cursor is in. */
-export function SectionTools({ cv, dispatch, focus, onBack }: Props) {
+export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage }: Props) {
   const { key, itemId } = focus;
   const layout = normalizeLayout(cv.layout);
   const standard = CATEGORY[key].label[cv.locale];
@@ -100,7 +103,7 @@ export function SectionTools({ cv, dispatch, focus, onBack }: Props) {
             onClick={() => {
               dispatch({ type: "toggleHidden", key: sectionKey });
               onBack();
-              document.querySelector<HTMLElement>(".cv-page-edit")?.focus();
+              onFocusPage();
             }}
           >
             <Eye />
@@ -116,7 +119,7 @@ export function SectionTools({ cv, dispatch, focus, onBack }: Props) {
         </p>
       )}
       {(key === "experience" || key === "volunteering") && itemId && (
-        <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onBack={onBack} />
+        <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onFocusPage={onFocusPage} />
       )}
       {key === "skills" && <ToSortBox cv={cv} dispatch={dispatch} />}
       <div>

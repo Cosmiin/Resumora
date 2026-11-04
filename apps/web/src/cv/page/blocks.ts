@@ -1,29 +1,4 @@
-import type { CvContent, Locale } from "@resumora/shared";
-
-export type SectionKey =
-  | "basics"
-  | "summary"
-  | "experience"
-  | "education"
-  | "skills"
-  | "languages"
-  | "certifications"
-  | "projects"
-  | "custom";
-
-/** `itemId` is only set for list sections (experience, education, languages, certifications, projects, custom). */
-export type BlockRef = { section: SectionKey; itemId?: string };
-
-type ListSection = "experience" | "education" | "languages" | "certifications" | "projects" | "custom";
-const LIST_SECTIONS: readonly string[] = ["experience", "education", "languages", "certifications", "projects", "custom"];
-
-/** Where a block sits in its list; null when a list item no longer exists. */
-export function findItem(cv: CvContent, ref: BlockRef): { index: number; count: number } | null {
-  if (!LIST_SECTIONS.includes(ref.section)) return { index: 0, count: 1 };
-  const list: readonly { id: string }[] = cv[ref.section as ListSection];
-  const index = list.findIndex((item) => item.id === ref.itemId);
-  return index < 0 ? null : { index, count: list.length };
-}
+import type { Locale } from "@resumora/shared";
 
 /** "Present" follows the CV's language, not the interface language. */
 export const PRESENT: Record<Locale, string> = { en: "Present", ro: "prezent" };
@@ -40,7 +15,3 @@ export function formatRange(start: string, end: string, current: boolean, locale
   return [formatDate(start, locale), to].filter(Boolean).join(" – ");
 }
 
-/** Value for the `data-block` attribute, used to return focus to a block. */
-export function blockKey(ref: BlockRef): string {
-  return `${ref.section}:${ref.itemId ?? ""}`;
-}

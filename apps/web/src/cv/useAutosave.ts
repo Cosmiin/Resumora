@@ -90,8 +90,11 @@ export function useAutosave({ initial, save, load, delayMs = 1000 }: Options) {
     }
   }, [reportConflict]);
 
+  /** Takes the new content, or a function from the current content to the new one (it sees every earlier change). */
   const setContent = useCallback(
-    (next: CvContent) => {
+    (change: CvContent | ((current: CvContent) => CvContent)) => {
+      const next = typeof change === "function" ? change(latest.current) : change;
+      if (next === latest.current) return;
       latest.current = next;
       setContentState(next);
       if (paused.current) return;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CvContent, CvResponse, SaveResponse } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
@@ -11,9 +11,12 @@ import { AppShell } from "../layout/AppShell.tsx";
 import { ImportButton } from "../imports/ImportButton.tsx";
 import { ImportScreen } from "../imports/ImportScreen.tsx";
 import { CvDocument } from "./page/CvDocument.tsx";
-import { blockKey, findItem, type BlockRef } from "./page/blocks.ts";
-import { SidePanel } from "./SidePanel.tsx";
-import { AddSection } from "./AddSection.tsx";
+import { EditablePage } from "./edit/EditablePage.tsx";
+import { cvReducer, type CvAction } from "./edit/cvReducer.ts";
+import { useFocusAfterRender } from "./edit/useFocusAfterRender.ts";
+import { useFocusSection } from "./edit/useFocusSection.ts";
+import { useOpenedSections } from "./edit/useOpenedSections.ts";
+import { HelperPanel } from "./panel/HelperPanel.tsx";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
   saved: "cv.status.saved",
@@ -35,29 +38,13 @@ export function Editor({ initial }: { initial: CvResponse }) {
   const historyButton = useRef<HTMLButtonElement>(null);
   const importButton = useRef<HTMLButtonElement>(null);
   const importWasOpen = useRef(false);
-  const [selected, setSelected] = useState<BlockRef | null>(null);
-  const position = selected && findItem(content, selected);
   const pageRef = useRef<HTMLDivElement>(null);
-  const lastSelected = useRef<BlockRef | null>(null);
-
-  // The open block can disappear (removed, or replaced by Load latest / restore / import).
-  useEffect(() => {
-    if (selected && !position) setSelected(null);
-  }, [selected, position]);
-
-  // When the panel closes and focus was inside it, return focus to that block (or the page).
-  useEffect(() => {
-    const previous = lastSelected.current;
-    lastSelected.current = selected;
-    if (selected || !previous) return;
-    const active = document.activeElement;
-    if (active && active !== document.body && active.isConnected) return;
-    const key = blockKey(previous);
-    const block = Array.from(pageRef.current?.querySelectorAll<HTMLElement>("[data-block]") ?? []).find(
-      (el) => el.dataset.block === key,
-    );
-    (block ?? pageRef.current)?.focus();
-  }, [selected]);
+  const [opened, onOpen] = useOpenedSections();
+  const focusField = useFocusAfterRender(pageRef);
+  const [sectionFocus, clearFocus] = useFocusSection(pageRef);
+  // One stable dispatch: rows on the page skip re-rendering unless their own data changed.
+  const dispatch = useCallback((a: CvAction) => setContent((c) => cvReducer(c, a)), [setContent]);
+  const focusPage = useCallback(() => pageRef.current?.focus(), []);
 
   // When the import screen closes (cancel, applied or conflict), focus goes back to Import CV.
   // This runs after render, once the top bar is no longer inert and can take focus.
@@ -67,7 +54,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
   }, [importId]);
 
   function openHistory() {
-    setSelected(null);
+    clearFocus();
     setPreview(null);
     setHistoryOpen(true);
   }
@@ -98,8 +85,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
     closeHistory();
   }
 
-  // Save warnings sit in the open side panel (which covers the page on phones and stays in view on
-  // desktop), otherwise above the page. Only one copy is ever rendered.
+  // Save warnings sit above the page. Only one copy is ever rendered.
   const notices = (autosave.problem || conflict) && (
     <>
       {autosave.problem && (
@@ -110,7 +96,6 @@ export function Editor({ initial }: { initial: CvResponse }) {
       {conflict && <ConflictBanner onLoadLatest={loadLatest} onKeepMine={keepMine} />}
     </>
   );
-  const panelOpen = !historyOpen && !!selected && !!position;
 
   const actions = (
     <>
@@ -127,28 +112,23 @@ export function Editor({ initial }: { initial: CvResponse }) {
   return (
     <AppShell actions={actions} inert={importId !== null}>
       <main className="editor">
-      {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
-      {!panelOpen && notices}
       {/* While an import is open the whole workspace is inert. While history is open only the page is,
           so a restore can't race the user's typing; the history panel stays usable. */}
       <div className="editor-workspace" inert={importId !== null}>
-        <div className="editor-page-area" ref={pageRef} tabIndex={-1}>
-          {historyOpen ? (
-            preview && (
-              <p className="history-notice" role="status">
-                {t("history.previewing", { when: whenLabel(preview.createdAt) })}
-              </p>
-            )
-          ) : (
-            <p className="editor-hint">{t("cv.page.hint")}</p>
+        <div className="stage" ref={pageRef} tabIndex={-1}>
+          {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
+          {notices}
+          {historyOpen && preview && (
+            <p className="history-notice" role="status">
+              {t("history.previewing", { when: whenLabel(preview.createdAt) })}
+            </p>
           )}
           <div className="editor-page" inert={dialogOpen}>
-          {historyOpen ? (
-            <CvDocument content={preview?.content ?? content} showUnsorted />
-          ) : (
-            <CvDocument content={content} selected={selected} onSelect={setSelected} showUnsorted />
-          )}
-          {!historyOpen && <AddSection cv={content} onChange={setContent} onAdd={setSelected} />}
+            {historyOpen ? (
+              <CvDocument content={preview?.content ?? content} showUnsorted />
+            ) : (
+              <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} />
+            )}
           </div>
         </div>
         {historyOpen ? (
@@ -159,9 +139,16 @@ export function Editor({ initial }: { initial: CvResponse }) {
             onRestore={restore}
           />
         ) : (
-          panelOpen && selected && (
-            <SidePanel cv={content} selected={selected} onChange={setContent} onSelect={setSelected} notices={notices} />
-          )
+          <HelperPanel
+            cv={content}
+            dispatch={dispatch}
+            focus={sectionFocus}
+            onBack={clearFocus}
+            onFocusField={focusField}
+            onFocusPage={focusPage}
+            opened={opened}
+            onOpen={onOpen}
+          />
         )}
       </div>
       {importId && (

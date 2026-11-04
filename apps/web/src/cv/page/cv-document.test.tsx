@@ -1,10 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { sampleCv } from "../../test/sample-cv.ts";
 import { CvDocument } from "./CvDocument.tsx";
-import type { BlockRef } from "./blocks.ts";
 
 describe("CvDocument", () => {
   it("draws every filled section", () => {
@@ -32,26 +30,6 @@ describe("CvDocument", () => {
     render(<CvDocument content={cv} />);
     expect(screen.queryAllByRole("button")).toEqual([]);
     expect(screen.queryByRole("heading", { name: "Experience" })).not.toBeInTheDocument();
-  });
-
-  it("clicking a role selects it", async () => {
-    const cv = sampleCv();
-    const onSelect = vi.fn();
-    const { rerender } = render(<CvDocument content={cv} onSelect={onSelect} />);
-    await userEvent.click(screen.getByRole("button", { name: "Edit Senior Product Manager" }));
-    const ref: BlockRef = { section: "experience", itemId: cv.experience[0]!.id };
-    expect(onSelect).toHaveBeenCalledWith(ref);
-    rerender(<CvDocument content={cv} onSelect={onSelect} selected={ref} />);
-    expect(screen.getByRole("button", { name: "Edit Senior Product Manager" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("an empty CV offers places to start", async () => {
-    const onSelect = vi.fn();
-    render(<CvDocument content={emptyCv()} onSelect={onSelect} />);
-    await userEvent.click(screen.getByRole("button", { name: "Add your name" }));
-    expect(onSelect).toHaveBeenLastCalledWith({ section: "basics" });
-    await userEvent.click(screen.getByRole("button", { name: "Add a short summary" }));
-    expect(onSelect).toHaveBeenLastCalledWith({ section: "summary" });
   });
 
   it("skills to sort only show when asked", () => {

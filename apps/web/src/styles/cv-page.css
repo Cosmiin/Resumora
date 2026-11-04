@@ -16,35 +16,10 @@
 }
 .cv-block { display: block; position: relative; margin: 0 -10px; padding: 6px 10px; }
 .cv-block > span { display: block; }
-.cv-block-button {
-  width: calc(100% + 20px);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.cv-block-button:hover { background: var(--surface-selected-block); }
-.cv-block-button[aria-pressed="true"] { outline: var(--outline-selected); background: var(--surface-selected-block); }
-.cv-block-button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.cv-editing-tag {
-  position: absolute;
-  inset-block-start: -9px;
-  inset-inline-end: 8px;
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--pine-600);
-  color: var(--text-on-primary);
-  font-size: 10px;
-  font-weight: 600;
-}
 .cv-header { margin-block-end: 18px; }
 .cv-name { font-family: var(--font-display); font-size: 34px; line-height: 1.1; font-weight: 500; color: var(--pine-800); }
 .cv-titles { margin-block-start: 4px; font-size: 14px; color: var(--pine-600); }
 .cv-contact { margin-block-start: 6px; font-size: 12px; color: var(--text-muted); }
-.cv-placeholder { color: var(--text-muted); font-style: italic; }
 .cv-section { margin-block-start: 18px; }
 .cv-section-label {
   margin: 0 0 4px;
@@ -67,10 +42,7 @@
 .cv-chip-sort { background: var(--marigold-100); color: var(--marigold-800); outline: 1px dashed var(--marigold-600); }
 .cv-inline-items { display: flex; flex-wrap: wrap; gap: 0 8px; }
 .cv-inline-items .cv-block { margin: 0; }
-.cv-inline-items .cv-block-button { width: auto; }
 @media (max-width: 720px) { .cv-page { padding: 32px 24px; } }
-.cv-block-button { min-height: 44px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
-.cv-inline-items .cv-block-button { justify-content: center; }
 
 /* Text typed straight on the page: fields that look like the CV text and grow with it */
 .cv-page :is(input, textarea) {

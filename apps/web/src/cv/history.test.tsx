@@ -20,6 +20,7 @@ import { CvPage } from "./CvPage.tsx";
 const named = (fullName: string): CvContent => ({ ...emptyCv(), basics: { ...emptyCv().basics, fullName } });
 
 const cvPage = () => screen.getByRole("article", { name: "CV page" });
+const nameField = () => screen.getByRole("textbox", { name: "Full name" });
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -97,8 +98,7 @@ describe("version history", () => {
     await user.click(within(older!).getByRole("button"));
     await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
     await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(cvPage()).toHaveTextContent("Current");
-    expect(cvPage()).not.toHaveTextContent("Old Name");
+    expect(nameField()).toHaveValue("Current");
     expect(screen.queryByText(/Previewing the version from/)).not.toBeInTheDocument();
   });
 
@@ -113,7 +113,7 @@ describe("version history", () => {
     expect(document.activeElement).toBe(document.body);
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("complementary", { name: "History" })).not.toBeInTheDocument();
-    expect(cvPage()).toHaveTextContent("Current");
+    expect(nameField()).toHaveValue("Current");
   });
 
   it("groups versions by day with the time", async () => {
@@ -150,7 +150,7 @@ describe("version history", () => {
     await user.click(restoreButton);
 
     expect(api.restoreHistory).toHaveBeenCalledWith("h1", 2);
-    await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
+    await waitFor(() => expect(nameField()).toHaveValue("Old Name"));
     expect(screen.getByText("Saved")).toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "History" })).not.toBeInTheDocument();
   });
@@ -176,8 +176,7 @@ describe("version history", () => {
     const user = userEvent.setup();
     api.saveCv.mockReturnValue(new Promise(() => {})); // save never finishes
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "Edit your details" }));
-    await user.type(screen.getByLabelText("Full name"), "!");
+    await user.type(await screen.findByRole("textbox", { name: "Full name" }), "!");
     const panel = await openHistory(user);
     const [first] = await within(panel).findAllByRole("listitem");
     await user.click(within(first!).getByRole("button"));
@@ -189,11 +188,13 @@ describe("version history blocks editing", () => {
   it("the editor can't be edited while history is open", async () => {
     const user = userEvent.setup();
     renderPage();
+    const field = await screen.findByRole("textbox", { name: "Full name" });
     const panel = await openHistory(user);
     expect(panel.closest("[inert]")).toBeNull();
     expect(cvPage().closest("[inert]")).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(cvPage().closest("[inert]")).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Full name" }).closest("[inert]")).toBeNull();
+    expect(field).toBeDefined();
   });
 
   it("offers Load latest when the restore worked but reloading failed", async () => {
@@ -211,6 +212,6 @@ describe("version history blocks editing", () => {
     expect(await screen.findByRole("button", { name: "Load latest" })).toBeInTheDocument();
     api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });
     await user.click(screen.getByRole("button", { name: "Load latest" }));
-    await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
+    await waitFor(() => expect(nameField()).toHaveValue("Old Name"));
   });
 });

@@ -18,10 +18,10 @@ function Harness({ initial }: { initial: CvContent }) {
   const [focus, clear] = useFocusSection(page);
   return (
     <>
-      <div ref={page}>
+      <div ref={page} tabIndex={-1} data-testid="page">
         <EditablePage cv={cv} dispatch={dispatch} opened={opened} onOpen={onOpen} />
       </div>
-      <HelperPanel cv={cv} dispatch={dispatch} focus={focus} onBack={clear} onFocusField={focusLater} opened={opened} onOpen={onOpen} />
+      <HelperPanel cv={cv} dispatch={dispatch} focus={focus} onBack={clear} onFocusField={focusLater} onFocusPage={() => page.current?.focus()} opened={opened} onOpen={onOpen} />
     </>
   );
 }
@@ -44,7 +44,7 @@ describe("section tools", () => {
     expect(screen.getByRole("heading", { name: "Experience" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "I work here now" })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Remove role" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /bmoveb/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /move/i })).toBeNull();
   });
 
   it("moving into another section switches the panel", async () => {
@@ -80,7 +80,18 @@ describe("section tools", () => {
     await userEvent.click(screen.getByRole("button", { name: "Hide Experience" }));
     expect(screen.getByText("Click any text on the page to edit it.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show Experience" })).toBeInTheDocument();
-    expect(document.activeElement).toBe(document.querySelector(".cv-page-edit"));
+    expect(document.activeElement).toBe(screen.getByTestId("page"));
+  });
+
+  it("Remove role keeps the panel on the section", async () => {
+    render(<Harness initial={filled()} />);
+    await userEvent.click(roleTitle());
+    await userEvent.click(screen.getByRole("button", { name: "Remove role" }));
+    expect(screen.queryByRole("textbox", { name: "Role title" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Experience" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "← All sections" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove role" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByTestId("page"));
   });
 
   it("AI buttons are visible, marked Coming next and do nothing", async () => {

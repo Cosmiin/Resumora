@@ -16,10 +16,10 @@ function Harness({ initial }: { initial: CvContent }) {
   const focusLater = useFocusAfterRender(page);
   return (
     <>
-      <div ref={page}>
+      <div ref={page} tabIndex={-1}>
         <EditablePage cv={cv} dispatch={dispatch} opened={opened} onOpen={onOpen} />
       </div>
-      <HelperPanel cv={cv} dispatch={dispatch} focus={null} onBack={() => {}} onFocusField={focusLater} opened={opened} onOpen={onOpen} />
+      <HelperPanel cv={cv} dispatch={dispatch} focus={null} onBack={() => {}} onFocusField={focusLater} onFocusPage={() => page.current?.focus()} opened={opened} onOpen={onOpen} />
       <output data-testid="json">{JSON.stringify(cv)}</output>
     </>
   );
