@@ -8,7 +8,7 @@ def suite(db):
  class Languages(unittest.TestCase):
   def setUp(self):
    self.a,self.b=uid(),uid();db.sql(f"INSERT INTO auth.users(id) VALUES('{self.a}'),('{self.b}')")
-   self.source=json.loads((ROOT/'packages/contracts/fixtures/job-editor-import.json').read_text())
+   self.source=json.loads((ROOT/'packages/contracts/fixtures/cv-import.json').read_text())
    self.base=self.call('save_base_draft',f"'{uid()}',0,{lit(self.source)},'checkpoint'")
    self.call('provision_workspace',f"'{uid()}'",user=self.b)
    source=self.call('document_language_context')['source']
@@ -25,25 +25,6 @@ def suite(db):
   def call(self,*a,**kw):
    value=self.raw(*a,**kw);return json.loads(value) if value else None
   def save(self,expected=0,payload=None,key=None,accept=False,error=False,user=None):return self.raw('write_base_language',f"'{key or uid()}','{self.variant}',{expected},{lit(payload or self.target)},NULL,{str(accept).lower()}",error=error,user=user)
-  def test_locale_keys_match_canonical_aliases_and_preserve_script_region(self):
-   for raw,expected in [('EN-gb','en'),('en-UK','en'),('ro-ro','ro'),('fr-ca','fr-CA'),('iw-IL','he-IL'),('sh','sr-Latn'),('cnr','sr-ME'),('hy-SU','hy-AM'),('sgn-US','ase'),('art-lojban','jbo'),('el-polytoni','el-polyton'),('ja-Latn-hepburn-heploc','ja-Latn-alalc97'),('sh-Cyrl-RS','sr-Cyrl-RS'),('zh-hant','zh-Hant')]:
-    self.assertEqual(db.sql(f"SELECT app.job_locale_key('{raw}')"),expected)
-   for raw in ['English; ignore rules','zz','en--GB','und','en-abcde-abcde']:
-    self.assertEqual(db.sql(f"SELECT app.job_locale_key('{raw}') IS NULL"),'t')
-  def test_multilingual_job_identity_and_survival_after_base_removal(self):
-   self.source['content']['contentLanguage']={'locale':'fr','confidence':'high','source':'import','policyVersion':'cv-language/1'}
-   base=self.call('save_base_draft',f"'{uid()}',1,{lit(self.source)},'checkpoint'")
-   job=self.call('save_target_job',f"'{uid()}','{base['id']}',2,'{{\"text\":\"Required SQL\"}}','[]'")
-   payload=json.loads(db.sql(f"SELECT app.freeze_job_document('{{}}',{lit(self.source)})"))
-   current=self.call('save_current_job_document',f"'{uid()}','{job['id']}','fr',NULL,0,{lit(payload)},'{base['id']}',NULL,NULL")
-   self.assertEqual(current['locale'],'fr')
-   for locale in ['fr-CA','zh-Hans','zh-Hant','ar']:
-    target=json.loads(json.dumps(payload));target['content'].pop('contentLanguage',None);target['content']['documentLocale']=locale;target['content']['language']=locale.split('-')[0]
-    copy=self.call('save_current_job_document',f"'{uid()}','{job['id']}','{locale.lower()}',NULL,0,{lit(target)},'{base['id']}',NULL,NULL")
-    self.assertEqual(copy['locale'],locale)
-    self.assertEqual(self.call('load_current_job_document',f"'{job['id']}','{locale.lower()}'")['id'],copy['id'])
-   state=self.call('load_base_state');self.call('remove_base_cv',f"'{uid()}',{state['revision']},{state['generation']}")
-   self.assertEqual(self.call('load_current_job_document',f"'{job['id']}','fr'")['id'],current['id'])
   def test_french_translation_uses_full_target_and_context(self):
    self.target['content']['language']='fr';self.target['content']['documentLocale']='fr-CA';self.target['content']['translation']['documentLocale']='fr-CA'
    first=json.loads(self.save(payload=self.target));self.assertEqual(first['payload']['content']['documentLocale'],'fr-CA')
@@ -76,44 +57,4 @@ def suite(db):
    changed=json.loads(json.dumps(self.source));changed['content']['summary']['text']='Changed source'
    self.call('save_base_draft',f"'{uid()}',1,{lit(changed)},'checkpoint'")
    stale=self.call('language_proposal_command',f"'get','{op}'");self.assertEqual(stale['state'],'stale');self.assertIsNone(stale['output']);self.assertEqual(self.call('load_base_language',f"'{self.variant}'")['payload'],self.target)
-  def job_source(self):
-   job=self.call('save_target_job',f"'{uid()}','{self.base['id']}',1,'{{\"text\":\"Required SQL\"}}','[]'")
-   payload=json.loads(db.sql(f"SELECT app.freeze_job_document('{{}}',{lit(self.source)})"))
-   locale=payload['content']['language']
-   current=self.call('save_current_job_document',f"'{uid()}','{job['id']}','{locale}',NULL,0,{lit(payload)},'{self.base['id']}',NULL,NULL")
-   pin={'kind':'job','jobId':job['id'],'documentId':current['documentId'],'currentId':current['id'],'revision':current['revision'],'fingerprint':current['fingerprint']}
-   return job,current,pin
-  def job_translation(self,current,pin):
-   target=json.loads(json.dumps(current['payload']));target['content']['language']=self.locale.split('-')[0];target['content']['documentLocale']=self.locale;target['content']['sourceLocale']=self.source_locale
-   target['content']['translation']=json.loads(json.dumps(self.target['content']['translation']));target['content']['translation']['source']=pin;target['content']['summary']['text']='Accepted target wording'
-   metadata={'sourceDocumentId':pin['documentId'],'sourceCurrentId':pin['currentId'],'sourceDocumentFingerprint':pin['fingerprint'],'sourceDocumentRevision':pin['revision']}
-   return target,metadata
-  def test_job_source_creates_locale_after_Base_removal_and_stale_or_foreign_source_is_refused(self):
-   job,current,pin=self.job_source();target,metadata=self.job_translation(current,pin)
-   tenant=db.sql(f"SELECT id FROM app.tenants WHERE owner_user_id='{self.a}' AND kind='personal'")
-   self.assertIn('permission denied',self.raw('prepare_job_documents_for_base_removal',f"'{tenant}'",error=True))
-   state=self.call('load_base_state')
-   removed=self.call('remove_base_cv',f"'{uid()}',{state['revision']},{state['generation']}")
-   self.assertTrue(removed['removed']);self.assertIsNone(self.call('load_base_draft'))
-   self.assertEqual(db.sql(f"SELECT count(*) FROM app.editor_draft_snapshots WHERE tenant_id='{tenant}'"),'0')
-   accepted=self.call('save_current_job_document',f"'{uid()}','{job['id']}','{self.locale.split('-')[0]}',NULL,0,{lit(target)},NULL,{lit(metadata)},NULL")
-   self.assertEqual(accepted['payload'],target);self.assertEqual(self.call('load_current_job_document',f"'{job['id']}','{current['locale']}'")['id'],current['id'])
-   newer=json.loads(json.dumps(current['payload']));newer['content']['summary']['text']='Updated source'
-   self.call('save_current_job_document',f"'{uid()}','{job['id']}','{current['locale']}','{current['documentId']}',1,{lit(newer)},NULL,NULL,NULL")
-   self.assertIn('VERSION_CONFLICT',self.raw('save_current_job_document',f"'{uid()}','{job['id']}','{self.locale.split('-')[0]}','{accepted['documentId']}',1,{lit(target)},NULL,{lit(metadata)},NULL",error=True))
-   self.assertEqual(self.call('load_current_job_document',f"'{job['id']}','{accepted['locale']}'")['id'],accepted['id'])
-   self.assertTrue(self.raw('save_current_job_document',f"'{uid()}','{job['id']}','{accepted['locale']}',NULL,0,{lit(target)},NULL,{lit(metadata)},NULL",user=self.b,error=True))
-  def test_job_proposal_acceptance_clears_private_result_and_replay_keeps_one_current_copy(self):
-   job,current,pin=self.job_source();target,metadata=self.job_translation(current,pin);op,work=uid(),uid()
-   request={'source':pin,'sourceLocale':self.source_locale,'targetLocale':self.locale,'targetRevision':0,'targetDocumentId':None,'variantId':self.variant,'sectionIds':[],'glossary':[]}
-   self.call('language_proposal_command',f"'start','{op}',{lit(request)},'{self.secret}'")
-   claimed=self.call('language_proposal_command',f"'work','{op}',{lit({'operationId':work,'expectedStep':0})},'{self.secret}'");self.assertTrue(claimed['created'])
-   duplicate=self.call('language_proposal_command',f"'work','{op}',{lit({'operationId':work,'expectedStep':0})},'{self.secret}'");self.assertFalse(duplicate['created'])
-   self.call('language_proposal_command',f"'settle','{op}',{lit({'operationId':work,'complete':True,'output':{'items':[{'text':'SYNTHETIC_PENDING_PRIVATE'}]}})},'{self.secret}'")
-   self.call('language_proposal_command',f"'review','{op}',{lit({'expectedRevision':0,'review':{'values':[],'confirmed':[]}})}")
-   result=self.call('accept_language_proposal',f"'{op}','{uid()}',1,{lit(target)},NULL")
-   again=self.call('accept_language_proposal',f"'{op}','{uid()}',1,{lit(target)},NULL");self.assertEqual(result,again)
-   status=self.call('language_proposal_command',f"'get','{op}'");self.assertEqual(status['state'],'accepted');self.assertIsNone(status['output']);self.assertIsNone(status['review'])
-   self.assertEqual(db.sql(f"SELECT count(*) FROM app.job_editor_versions WHERE document_id='{result['documentId']}'"),'1')
-   self.assertEqual(self.call('load_current_job_document',f"'{job['id']}','{current['locale']}'")['id'],current['id'])
  return unittest.defaultTestLoader.loadTestsFromTestCase(Languages)

@@ -2,7 +2,7 @@ import { useContentLanguage } from "./components/useContentLanguage";
 import { ContentLanguageControl } from "./components/ContentLanguageControl";
 import { contentLocale } from "@resumora/contracts/editor/content-language";
 import { ExperienceWorkspace } from "./components/GuidedExperience";
-import { ImproveSkills } from './components/ImproveSkills';
+import { ImproveSkills } from "./components/ImproveSkills";
 import { experienceTarget } from "@resumora/contracts/intelligence/experience";
 import {
   ExperienceScoresContext,
@@ -17,7 +17,6 @@ import { ProfileStructure } from "./components/ProfileStructure";
 import { LanguageVersions } from "./languages/LanguageVersions";
 import { HttpLanguageCvAdapter } from "./languages/adapter";
 import { AppearanceExport } from "./export/AppearanceExport";
-import { HttpJobCvAdapter } from "./base/job-adapter";
 import {
   confirmImported,
   pendingImportedCandidates,
@@ -50,7 +49,6 @@ import { validateDraft, type Issue } from "./base/validation";
 import { DocumentPreview } from "./components/DocumentPreview";
 import { chooseTemplate } from "./templates/registry";
 import { Editor } from "./components/Editor";
-import { JobsScreen } from "./components/JobsScreen";
 import type { AuthTransport } from "./auth/AuthShell";
 import { Enrichment } from "./components/Enrichment";
 import { Review } from "./components/Review";
@@ -102,7 +100,6 @@ export function CvEditor({
   uiLocale,
   onUiLocaleChange,
   switchLanguage,
-  jobLabel,
   switchDocument,
   adapter,
   intelligence,
@@ -140,10 +137,7 @@ export function CvEditor({
   uiLocale: Locale;
   onUiLocaleChange: (locale: Locale) => void;
   switchLanguage?: (value: { locale: string; variantId?: string }) => void;
-  jobLabel?: string;
-  switchDocument?: (
-    job: { id: string; label: string; locale?: string } | null,
-  ) => void;
+  switchDocument?: () => void;
   intelligence?: IntelligenceClient;
   transport?: AuthTransport;
 }) {
@@ -159,9 +153,9 @@ export function CvEditor({
   }
   const documentController = controller;
   documentController.adapter = adapter;
-  const jobMode = adapter instanceof HttpJobCvAdapter;
+
   const languageMode = adapter instanceof HttpLanguageCvAdapter;
-  const representationMode = jobMode || languageMode;
+  const representationMode = languageMode;
   const durable = adapter.capability === "durable";
   const locale = uiLocale,
     setLocale = onUiLocaleChange,
@@ -179,9 +173,12 @@ export function CvEditor({
     [undoFrom, setUndoFrom] = useState<BaseDraft | null>(null),
     [versions, setVersions] = useState<Snapshot[]>([]),
     [inspected, setInspected] = useState<Snapshot | null>(null);
-  const [skillsImproving, setSkillsImproving] = useState(() => documentController.profileChangesBlocked());
+  const [skillsImproving, setSkillsImproving] = useState(() =>
+    documentController.profileChangesBlocked(),
+  );
   const [skillsStartRequested, setSkillsStartRequested] = useState(false);
-  const profileBlocked = skillsImproving || documentController.profileChangesBlocked();
+  const profileBlocked =
+    skillsImproving || documentController.profileChangesBlocked();
   const [issues, setIssues] = useState<Issue[]>([]),
     [busy, setBusy] = useState(documentController.lock.current),
     [loading, setLoading] = useState(true),
@@ -234,9 +231,7 @@ export function CvEditor({
     };
   });
   function matchesSavedDraft(saved: BaseDraft, current: BaseDraft) {
-    return jobMode
-      ? adapter.matchesDraft(saved, current)
-      : equalValues(saved, current);
+    return equalValues(saved, current);
   }
   const dirty = !!draft && (!head || !matchesSavedDraft(head.draft, draft));
   const pending = pendingWrite.current;
@@ -282,7 +277,12 @@ export function CvEditor({
     priority: enrichTarget,
     change: (scored, roleId, kind) => {
       const current = latest.current;
-      if (!current || removalBlocked || documentController.profileChangesBlocked()) return;
+      if (
+        !current ||
+        removalBlocked ||
+        documentController.profileChangesBlocked()
+      )
+        return;
       const next = mergeExperienceScoreState(current, scored, roleId, kind);
       if (equalValues(next, current)) return;
       generation.current++;
@@ -338,7 +338,13 @@ export function CvEditor({
     onState?.({
       draft,
       head,
-      ready: !profileBlocked && !dirty && !busy && !error && !loading && !pendingWrite.current,
+      ready:
+        !profileBlocked &&
+        !dirty &&
+        !busy &&
+        !error &&
+        !loading &&
+        !pendingWrite.current,
       dirty,
       error,
     });
@@ -348,10 +354,7 @@ export function CvEditor({
     const change = () => {
       const next = currentRoute();
       setRoute(
-        (jobMode && next !== "base") ||
-          (languageMode && !["base", "history"].includes(next))
-          ? "base"
-          : next,
+        languageMode && !["base", "history"].includes(next) ? "base" : next,
       );
     };
     window.addEventListener("hashchange", change);
@@ -362,8 +365,7 @@ export function CvEditor({
   }, [route]);
   useEffect(() => {
     document.documentElement.lang = locale;
-    if (!embedded)
-      document.title = `Resumora · ${jobLabel ?? t("CV de bază", "Base CV")}`;
+    if (!embedded) document.title = `Resumora · ${t("CV de bază", "Base CV")}`;
   }, [locale]);
   useEffect(() => {
     let cancelled = false;
@@ -382,8 +384,7 @@ export function CvEditor({
             setDraft(
               representationMode ? clone(s.draft) : prepareDraft(s.draft),
             );
-          if (!s && jobMode && !latest.current)
-            setDraft(adapter.initialDraft());
+
           setLoading(false);
           setError(
             s &&
@@ -433,7 +434,11 @@ export function CvEditor({
     };
   }, [route, head?.id, adapter, historyAttempt]);
   function change(next: BaseDraft, skillsReceipt = false) {
-    if (removalBlocked || (!skillsReceipt && documentController.profileChangesBlocked())) return;
+    if (
+      removalBlocked ||
+      (!skillsReceipt && documentController.profileChangesBlocked())
+    )
+      return;
     const current = latest.current;
     if (equalValues(next, current)) return;
     generation.current++;
@@ -568,7 +573,8 @@ export function CvEditor({
         setError("conflict");
         return;
       }
-      if (!documentController.acceptReconciledWrite(operation, saved, applied)) return;
+      if (!documentController.acceptReconciledWrite(operation, saved, applied))
+        return;
       setHead(saved);
       if (
         applied &&
@@ -642,8 +648,7 @@ export function CvEditor({
   }
   async function removeBase(input?: RemovalInput) {
     if (documentController.profileChangesBlocked()) return;
-    if (!adapter.remove || lock.current || pendingWrite.current || jobMode)
-      return;
+    if (!adapter.remove || lock.current || pendingWrite.current) return;
     const state = adapter.lifecycle?.();
     const operation = input ?? {
       requestId: crypto.randomUUID(),
@@ -679,15 +684,10 @@ export function CvEditor({
       if (e instanceof AdapterError) {
         setRemoval(null);
         setNotice(
-          e.code === "preservationRequired"
-            ? t(
-                "Eliminarea nu a fost efectuată. Un CV adaptat mai vechi necesită reconciliere pentru a-i păstra conținutul.",
-                "Nothing was removed. An older tailored CV needs reconciliation to preserve its current content.",
-              )
-            : t(
-                "Eliminarea nu a fost efectuată. Redeschide starea salvată înainte de a reîncerca.",
-                "Nothing was removed. Reopen saved state before trying again.",
-              ),
+          t(
+            "Eliminarea nu a fost efectuată. Redeschide starea salvată înainte de a reîncerca.",
+            "Nothing was removed. Reopen saved state before trying again.",
+          ),
         );
       } else setRemoval({ input: operation, phase: "unknown" });
     } finally {
@@ -729,7 +729,7 @@ export function CvEditor({
     }
   }
   useEffect(() => {
-    if (jobMode || !adapter.lifecycle) return;
+    if (!adapter.lifecycle) return;
     let disposed = false;
     const inspect = async () => {
       const before = adapter.lifecycle!().generation;
@@ -768,7 +768,7 @@ export function CvEditor({
       removalChannel.current?.close();
       removalChannel.current = null;
     };
-  }, [adapter, jobMode]);
+  }, [adapter, false]);
   async function reopen() {
     if (documentController.profileChangesBlocked()) return;
     if (lock.current || pendingWrite.current) return;
@@ -833,7 +833,7 @@ export function CvEditor({
       await save("autosave");
     if (pendingWrite.current || documentController.error || !headRef.current)
       throw Error("unresolvedSave");
-    if (!jobMode) {
+    {
       const found = validateDraft(latest.current!);
       if (found.length) {
         setIssues(found);
@@ -851,19 +851,7 @@ export function CvEditor({
     import("./export/AppearanceExport").ExportPin
   > {
     const saved = await ensureCheckpoint();
-    if (jobMode) {
-      const id = adapter.exportDocumentId();
-      if (!id) throw Error("missingDocument");
-      return {
-        kind: "job",
-        jobId: adapter.jobId,
-        documentId: id,
-        locale: contentLocale(saved.draft),
-        fingerprint: adapter.exportFingerprint(),
-        versionId: saved.id,
-        revision: saved.revision,
-      };
-    }
+
     return {
       kind: "base",
       ...(languageMode ? { variantId: adapter.variantId } : {}),
@@ -873,25 +861,56 @@ export function CvEditor({
   }
   const renderEnrichment = (targetId: string) =>
     draft ? (
-      profileWorkspace && targetId === '__improve_skills' ? (
-        <ImproveSkills draft={draft} change={(next) => change(next, true)} onActivityChange={documentController.setSkillsImproving}
-          startRequested={skillsStartRequested} onStartConsumed={() => setSkillsStartRequested(false)}
-          ready={languageResolution.ready && !dirty && !busy && !error && !pendingWrite.current}
-          saveFailed={!!error} snapshot={head ?? undefined}
+      profileWorkspace && targetId === "__improve_skills" ? (
+        <ImproveSkills
+          draft={draft}
+          change={(next) => change(next, true)}
+          onActivityChange={documentController.setSkillsImproving}
+          startRequested={skillsStartRequested}
+          onStartConsumed={() => setSkillsStartRequested(false)}
+          ready={
+            languageResolution.ready &&
+            !dirty &&
+            !busy &&
+            !error &&
+            !pendingWrite.current
+          }
+          saveFailed={!!error}
+          snapshot={head ?? undefined}
           request={async (context, recoverOnly) => {
-            if (!intelligence?.improveSkills) throw Error('AI_DISABLED');
+            if (!intelligence?.improveSkills) throw Error("AI_DISABLED");
             return intelligence.improveSkills(context, recoverOnly);
           }}
-          commit={(identity, inventory) => documentController.commitSkillInventory(adapter, identity, inventory, {retryTransient:true})}
-          undo={() => documentController.undoSkillInventory(adapter, {retryTransient:true})}
+          commit={(identity, inventory) =>
+            documentController.commitSkillInventory(
+              adapter,
+              identity,
+              inventory,
+              { retryTransient: true },
+            )
+          }
+          undo={() =>
+            documentController.undoSkillInventory(adapter, {
+              retryTransient: true,
+            })
+          }
           canUndo={documentController.canUndoSkillInventory()}
-          retrySaveAutomatically={error === 'save' && !busy && !!pendingWrite.current}
-          retrySave={pendingWrite.current ? () => { if (pendingWrite.current?.expired) void reconcilePendingWrite(); else void submitPendingWrite(); } : undefined}
+          retrySaveAutomatically={
+            error === "save" && !busy && !!pendingWrite.current
+          }
+          retrySave={
+            pendingWrite.current
+              ? () => {
+                  if (pendingWrite.current?.expired)
+                    void reconcilePendingWrite();
+                  else void submitPendingWrite();
+                }
+              : undefined
+          }
         />
-      ) :
-      profileWorkspace &&
-      (targetId === "__skills" ||
-        (intelligence?.experience && experienceTarget(draft, targetId))) ? (
+      ) : profileWorkspace &&
+        (targetId === "__skills" ||
+          (intelligence?.experience && experienceTarget(draft, targetId))) ? (
         <ExperienceWorkspace
           key={targetId}
           draft={draft}
@@ -1021,9 +1040,7 @@ export function CvEditor({
     { route: "home", label: t("Acasă", "Home"), Icon: Home },
     {
       route: "base",
-      label: jobMode
-        ? t("CV pentru job", "Job CV")
-        : t("CV de bază", "Base CV"),
+      label: t("CV de bază", "Base CV"),
       Icon: FileText,
     },
     {
@@ -1031,12 +1048,10 @@ export function CvEditor({
       label: t("Îmbunătățește", "Improve"),
       Icon: MessageSquare,
     },
-    { route: "jobs", label: t("Joburi", "Jobs"), Icon: BriefcaseBusiness },
     { route: "account", label: t("Cont", "Account"), Icon: UserRound },
   ];
-  const editingTitle = jobMode
-    ? `${t("CV pentru job", "Job CV")} · ${jobLabel}`
-    : route === "enrich"
+  const editingTitle =
+    route === "enrich"
       ? t("Mai mult context, pas cu pas", "More context, one step at a time")
       : t("CV-ul tău de bază", "Your Base CV");
   const MainSurface = embedded ? "section" : "main";
@@ -1089,9 +1104,6 @@ export function CvEditor({
           {!embedded && (
             <aside className="sidebar">
               <nav aria-label={t("Navigare principală", "Main navigation")}>
-                <a href="/extension">
-                  {t("Extensie Chrome", "Chrome extension")}
-                </a>
                 {nav
                   .filter(
                     (n) =>
@@ -1134,44 +1146,14 @@ export function CvEditor({
                 </Button>
               </section>
             )}
-            {jobMode && (
-              <section className="notice" aria-label="Job CV context">
-                <strong>
-                  {t("CV pentru job", "Job CV")} · {jobLabel}
-                </strong>
-                <p>
-                  {t(
-                    "Salvarea înlocuiește CV-ul curent pentru acest job și această limbă. CV-urile adaptate nu au istoric. CV-ul de bază rămâne independent.",
-                    "Saving replaces the current CV for this job and language. Tailored CVs have no history. Base CV remains independent.",
-                  )}
-                </p>
-                <Button
-                  disabled={
-                    dirty ||
-                    busy ||
-                    loading ||
-                    !!pendingWrite.current ||
-                    (!!draft && !!error)
-                  }
-                  onClick={() => switchDocument?.(null)}
-                >
-                  {t("Înapoi la CV-ul de bază", "Return to Base CV")}
-                </Button>
-                {(dirty || pendingWrite.current || (draft && error)) && (
-                  <p>
-                    {t(
-                      "Salvează sau rezolvă salvarea înainte de schimbarea CV-ului.",
-                      "Save or resolve the write before switching CVs.",
-                    )}
-                  </p>
-                )}
-              </section>
-            )}
+            {false}
             {draft && !representationMode && (
               <ContentLanguageControl
                 draft={draft}
                 change={change}
-                disabled={profileBlocked || busy || !!removal || !!pendingWrite.current}
+                disabled={
+                  profileBlocked || busy || !!removal || !!pendingWrite.current
+                }
               />
             )}
             {languageResolution.error && (
@@ -1232,18 +1214,26 @@ export function CvEditor({
                       route === "base" &&
                       adapter.remove && (
                         <Button
-                          disabled={profileBlocked || busy || loading || !!pendingWrite.current}
+                          disabled={
+                            profileBlocked ||
+                            busy ||
+                            loading ||
+                            !!pendingWrite.current
+                          }
                           onClick={() => setDialog({ kind: "remove" })}
                         >
                           {t("Elimină CV-ul de bază", "Remove Base CV")}
                         </Button>
                       )}
-                    {!jobMode && (
-                      <Button disabled={profileBlocked} onClick={() => go("history")}>
+                    {
+                      <Button
+                        disabled={profileBlocked}
+                        onClick={() => go("history")}
+                      >
                         <History size={16} />
                         {t("Istoric", "History")}
                       </Button>
-                    )}
+                    }
                     {!representationMode && !embedded && (
                       <Button
                         onClick={() =>
@@ -1279,15 +1269,10 @@ export function CvEditor({
                         "This save can no longer be replayed. Check saved state; your edits will be retained.",
                       )
                     : error === "conflict"
-                      ? jobMode
-                        ? t(
-                            "CV-ul curent s-a schimbat. Redeschide-l pentru a continua; ciorna ta este păstrată.",
-                            "Current CV changed. Reopen it to continue; your draft is retained.",
-                          )
-                        : t(
-                            "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
-                            "Session changed. Your draft is retained; inspect history before reopening.",
-                          )
+                      ? t(
+                          "Sesiunea s-a schimbat. Ciorna ta este păstrată; inspectează istoricul înainte de redeschidere.",
+                          "Session changed. Your draft is retained; inspect history before reopening.",
+                        )
                       : t(
                           "Acțiunea a eșuat; ciorna este păstrată.",
                           "The action failed; your draft is retained.",
@@ -1303,9 +1288,7 @@ export function CvEditor({
                             ? void reconcilePendingWrite()
                             : void submitPendingWrite()
                           : error === "conflict"
-                            ? jobMode
-                              ? setDialog({ kind: "reopen" })
-                              : go("history")
+                            ? go("history")
                             : head === undefined || !draft
                               ? setLoadAttempt((n) => n + 1)
                               : dirty
@@ -1316,20 +1299,11 @@ export function CvEditor({
                       {pendingWrite.current?.expired
                         ? t("Verifică starea salvată", "Check saved state")
                         : !pendingWrite.current && error === "conflict"
-                          ? jobMode
-                            ? t("Redeschide CV-ul curent", "Reopen current CV")
-                            : t("Istoric", "History")
+                          ? t("Istoric", "History")
                           : t("Reîncearcă", "Retry")}
                     </Button>
                   )}
-                  {jobMode && error === "conflict" && (
-                    <Button
-                      disabled={profileBlocked || busy || loading || !!pendingWrite.current}
-                      onClick={() => setDialog({ kind: "reopen" })}
-                    >
-                      {t("Redeschide CV-ul curent", "Reopen current CV")}
-                    </Button>
-                  )}
+                  {false}
                 </div>
               )}
             {route === "history" && historyError && (
@@ -1343,6 +1317,7 @@ export function CvEditor({
                 </Button>
               </div>
             )}
+
             {removalBlocked ? (
               <section className="card" role="alert">
                 <h2>
@@ -1381,38 +1356,36 @@ export function CvEditor({
                     }
                   />
                 )}
-                {!jobMode &&
-                  (route === "start" ||
-                    (["base", "review", "enrich"].includes(route) &&
-                      !draft)) && (
-                    <StartChooser
-                      openImportId={importId}
-                      onOpenImport={onOpenImport}
-                      start={start}
-                      intelligence={intelligence}
-                      profile={draft}
-                      updatesDisabled={
-                        busy || dirty || !!error || !!pendingWrite.current
-                      }
-                      applyUpdate={(next, original) => {
-                        if (
-                          removalBlocked ||
-                          lock.current ||
-                          pendingWrite.current ||
-                          error ||
-                          headRef.current === undefined ||
-                          !equalValues(latest.current, original)
-                        )
-                          return false;
-                        change(prepareDraft(next));
-                        go("base");
-                        return true;
-                      }}
-                      revision={
-                        head?.revision ?? adapter.lifecycle?.().revision ?? 0
-                      }
-                    />
-                  )}
+                {(route === "start" ||
+                  (["base", "review", "enrich"].includes(route) && !draft)) && (
+                  <StartChooser
+                    openImportId={importId}
+                    onOpenImport={onOpenImport}
+                    start={start}
+                    intelligence={intelligence}
+                    profile={draft}
+                    updatesDisabled={
+                      busy || dirty || !!error || !!pendingWrite.current
+                    }
+                    applyUpdate={(next, original) => {
+                      if (
+                        removalBlocked ||
+                        lock.current ||
+                        pendingWrite.current ||
+                        error ||
+                        headRef.current === undefined ||
+                        !equalValues(latest.current, original)
+                      )
+                        return false;
+                      change(prepareDraft(next));
+                      go("base");
+                      return true;
+                    }}
+                    revision={
+                      head?.revision ?? adapter.lifecycle?.().revision ?? 0
+                    }
+                  />
+                )}
                 {draft && ["base", "review"].includes(route) && (
                   <>
                     {!!issues.length && (
@@ -1431,7 +1404,10 @@ export function CvEditor({
                         client={intelligence}
                         change={change}
                         disabled={
-                          profileBlocked || busy || !!pendingWrite.current || head === undefined
+                          profileBlocked ||
+                          busy ||
+                          !!pendingWrite.current ||
+                          head === undefined
                         }
                         confirm={(ids) => {
                           const next = confirmImported(latest.current!, ids);
@@ -1486,9 +1462,17 @@ export function CvEditor({
                               }
                               enrich={renderEnrichment}
                               openEnrichment={(id) => {
-                                if (documentController.profileChangesBlocked()) return;
+                                if (documentController.profileChangesBlocked())
+                                  return;
                                 if (id === "__improve_skills") {
-                                  if (!languageResolution.ready || dirty || busy || error || pendingWrite.current) return;
+                                  if (
+                                    !languageResolution.ready ||
+                                    dirty ||
+                                    busy ||
+                                    error ||
+                                    pendingWrite.current
+                                  )
+                                    return;
                                   documentController.setSkillsImproving(true);
                                   setSkillsStartRequested(true);
                                 }
@@ -1497,7 +1481,6 @@ export function CvEditor({
                               closeEnrichment={() => navigate?.("base")}
                             >
                               <Editor
-                                jobMode={jobMode}
                                 draft={draft}
                                 issues={issues}
                                 change={change}
@@ -1532,7 +1515,10 @@ export function CvEditor({
                               )}
                             </summary>
                           )}
-                          <fieldset disabled={profileBlocked} className="profile-edit-lock">
+                          <fieldset
+                            disabled={profileBlocked}
+                            className="profile-edit-lock"
+                          >
                             {profileWorkspace && (
                               <>
                                 <PhotoEditor
@@ -1556,7 +1542,7 @@ export function CvEditor({
                               {transport && switchLanguage && head && (
                                 <LanguageVersions
                                   transport={transport}
-                                  jobId={jobMode ? adapter.jobId : undefined}
+
                                   currentLocale={contentLocale(draft)}
                                   ready={
                                     !dirty &&
@@ -1583,28 +1569,14 @@ export function CvEditor({
                                 asOf={asOf}
                                 pin={
                                   head
-                                    ? jobMode
-                                      ? adapter.exportDocumentId()
-                                        ? {
-                                            kind: "job",
-                                            jobId: adapter.jobId,
-                                            documentId:
-                                              adapter.exportDocumentId()!,
-                                            locale: contentLocale(head.draft),
-                                            fingerprint:
-                                              adapter.exportFingerprint(),
-                                            versionId: head.id,
-                                            revision: head.revision,
-                                          }
-                                        : null
-                                      : {
-                                          kind: "base",
-                                          ...(languageMode
-                                            ? { variantId: adapter.variantId }
-                                            : {}),
-                                          versionId: head.id,
-                                          revision: head.revision,
-                                        }
+                                    ? {
+                                        kind: "base",
+                                        ...(languageMode
+                                          ? { variantId: adapter.variantId }
+                                          : {}),
+                                        versionId: head.id,
+                                        revision: head.revision,
+                                      }
                                     : null
                                 }
                               />
@@ -1616,14 +1588,10 @@ export function CvEditor({
                               onTemplateChange={(versionId) =>
                                 change(chooseTemplate(draft, versionId))
                               }
-                              onEdit={
-                                jobMode
-                                  ? undefined
-                                  : (id) => {
-                                      go("base");
-                                      focusField(id);
-                                    }
-                              }
+                              onEdit={(id) => {
+                                go("base");
+                                focusField(id);
+                              }}
                             />
                           </fieldset>
                         </PresentationSurface>
@@ -1635,7 +1603,7 @@ export function CvEditor({
                   !representationMode &&
                   route === "enrich" &&
                   renderEnrichment(enrichTarget ?? draft.roles[0]?.id ?? "")}
-                {!jobMode && route === "history" && draft && (
+                {route === "history" && draft && (
                   <Button
                     disabled={profileBlocked || busy || !!pendingWrite.current}
                     onClick={() => void save("checkpoint")}
@@ -1643,7 +1611,7 @@ export function CvEditor({
                     {t("Creează un punct de restaurare", "Create a checkpoint")}
                   </Button>
                 )}
-                {!jobMode && route === "history" && (
+                {route === "history" && (
                   <HistoryScreen
                     durable={durable}
                     draft={!!draft}
@@ -1652,26 +1620,14 @@ export function CvEditor({
                     inspected={inspected}
                     setInspected={setInspected}
                     restore={(snapshot) => {
-                      if (!documentController.profileChangesBlocked()) setDialog({ kind: "restore", snapshot });
+                      if (!documentController.profileChangesBlocked())
+                        setDialog({ kind: "restore", snapshot });
                     }}
                     go={go}
                     asOf={asOf}
                   />
                 )}
-                {!representationMode && route === "jobs" && (
-                  <JobsScreen
-                    transport={transport}
-                    snapshot={head ?? null}
-                    ready={
-                      languageResolution.ready &&
-                      !dirty &&
-                      !busy &&
-                      !error &&
-                      !pendingWrite.current
-                    }
-                    openCv={switchDocument}
-                  />
-                )}
+
                 {["account", "missing"].includes(route) && (
                   <section className="card empty">
                     <h2>{t("În pregătire", "In preparation")}</h2>
@@ -1716,9 +1672,7 @@ export function CvEditor({
                                 "Ciornă salvată în sesiune",
                                 "Draft saved in session",
                               )}
-                    {head && !jobMode && !profileWorkspace
-                      ? ` · v${head.revision}`
-                      : ""}
+                    {head && !profileWorkspace ? ` · v${head.revision}` : ""}
                   </p>
                   <small>
                     {durable
@@ -1828,8 +1782,8 @@ export function CvEditor({
             <p>
               {dialog.kind === "remove"
                 ? t(
-                    "CV-ul de bază, versiunile, contextul, răspunsurile, variantele de limbă, documentele încărcate, ciornele legate de profil și răspunsurile pentru joburi vor fi șterse. Rămân doar CV-urile adaptate curente pentru fiecare job și limbă. Această acțiune nu poate fi anulată.",
-                    "Your Base CV, versions, context, answers, language copies, uploaded documents, profile-linked drafts and job answers will be deleted. Current tailored CVs for each job and language remain. This cannot be undone.",
+                    "CV-ul de bază, versiunile, contextul, răspunsurile, variantele de limbă, documentele încărcate, ciornele legate de profil vor fi șterse. Această acțiune nu poate fi anulată.",
+                    "Your Base CV, versions, context, answers, language copies, uploaded documents, profile-linked drafts will be deleted. This cannot be undone.",
                   )
                 : durable
                   ? t(

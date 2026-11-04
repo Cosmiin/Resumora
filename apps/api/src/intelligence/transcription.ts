@@ -1,4 +1,4 @@
-import { isUuid } from "@resumora/contracts/jobs/connected";
+import { isUuid } from "@resumora/contracts/editor/identity";
 import { decodeDraft } from "@resumora/contracts/editor/transport";
 import { experienceTarget } from "@resumora/contracts/intelligence/experience";
 import { normalizeUsage, object } from "../ai/accounting.ts";
@@ -9,7 +9,7 @@ import {
   type EnhancementConfig,
   type EnhancementGateway,
 } from "../ai/routes.ts";
-import { privateJson } from "../jobs/routes.ts";
+import { privateJson } from "../http/responses.ts";
 
 export const maxVoiceBytes = 4 * 1024 * 1024;
 export const voiceTypes = [

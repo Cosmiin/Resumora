@@ -764,7 +764,7 @@ export function PhotoEditor({
               <p>
                 {t(
                   "Ștergi această fotografie de peste tot? Va fi eliminată și din CV-urile adaptate existente și nu va mai fi disponibilă în versiunile anterioare. Copiile deja descărcate nu pot fi retrase.",
-                  "Delete this stored photo everywhere? It will also be removed from your existing tailored CVs and will no longer be available in historical versions. Downloaded copies cannot be recalled.",
+                  "Delete this stored photo everywhere? It will no longer be available in your CV or its historical versions. Downloaded copies cannot be recalled.",
                 )}
               </p>
               <Button

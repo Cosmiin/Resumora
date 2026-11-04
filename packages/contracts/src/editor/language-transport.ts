@@ -20,11 +20,10 @@ export type LanguageReview = {
   confirmed: string[];
 };
 export type LanguageAccepted = {
-  kind: "base" | "job";
+  kind: "base";
   id: string;
   revision: number;
   variantId?: string;
-  jobId?: string;
   documentId?: string;
   locale?: string;
 };

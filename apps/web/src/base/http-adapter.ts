@@ -43,8 +43,6 @@ export class HttpBaseCvAdapter implements BaseCvAdapter {
         error?: { code?: string; issues?: AdapterError["issues"] };
       } | null;
       const code = body?.error?.code;
-      if (response.status === 409 && code === "preservationRequired")
-        throw new AdapterError("preservationRequired");
       if (response.status === 410) throw new AdapterError("expired");
       if (
         (response.status === 422 && code === "validation") ||

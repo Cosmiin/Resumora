@@ -33,7 +33,7 @@ reserving a durable operation. It requires `AI_PAID_INFERENCE=on`, `OPENAI_API_K
 turns on paid inference. No new secret, external configuration, or database migration is
 introduced.
 
-Audio uses the existing [configured global processing policy](connected-jobs-ai.md#owner-configuration-paid-mode-remains-off)
+Audio uses the existing [configured global processing policy](cv-import-enrichment.md#owner-configuration-paid-mode-remains-off)
 and the fixed `https://api.openai.com/v1/audio/transcriptions` endpoint. The policy value is
 an opaque owner reference, as in the other configured live routes; it is not a geographic
 allowlist or proof of EU-only processing. This route makes no EU processing or provider

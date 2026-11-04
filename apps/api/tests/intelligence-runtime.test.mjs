@@ -62,7 +62,14 @@ test("mounted native Worker keeps auth/CSRF on raw import and rejects paid-off b
   const calls = [];
   const runtime = new Miniflare(
     convertV4MiniflareOptions({
-      modules: [{ type: "ESModule", path: "entry.mjs", contents: bundle.outputFiles[0].text }, ...bundle.wasm],
+      modules: [
+        {
+          type: "ESModule",
+          path: "entry.mjs",
+          contents: bundle.outputFiles[0].text,
+        },
+        ...bundle.wasm,
+      ],
       compatibilityDate: "2026-10-25",
       host: "127.0.0.1",
       port: 0,
@@ -101,7 +108,15 @@ test("mounted native Worker keeps auth/CSRF on raw import and rejects paid-off b
       "/v1/intelligence/rewrite",
     ])
       assert.equal((await post(path, {}, false)).status, 401);
-    assert.equal((await fetch(origin + "/v1/intelligence/imports/11111111-1111-4111-8111-111111111111/source")).status,401);
+    assert.equal(
+      (
+        await fetch(
+          origin +
+            "/v1/intelligence/imports/11111111-1111-4111-8111-111111111111/source",
+        )
+      ).status,
+      401,
+    );
     assert.equal(calls.length, 0);
     assert.equal((await post("/v1/intelligence/imports")).status, 403);
     assert.equal(
@@ -125,7 +140,6 @@ test("mounted native Worker keeps auth/CSRF on raw import and rejects paid-off b
     );
     for (const path of [
       "/v1/base-cv/history",
-      "/v1/jobs",
       "/v1/intelligence/imports",
       "/v1/intelligence/imports/11111111-1111-4111-8111-111111111111",
       "/v1/intelligence/imports/11111111-1111-4111-8111-111111111111/source",

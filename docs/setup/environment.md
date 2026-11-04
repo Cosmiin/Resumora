@@ -11,7 +11,6 @@ This is the current entry point for running Resumora, updated 2 November 2026. O
 | Frontend | Local Vite process, port 15173 |
 | API | Local Wrangler process, port 8787, reached through the frontend proxy |
 | CV import processor | Local Node process, managed with the frontend and API when AI is enabled |
-| Job capture/workflow processor | Separate local Node process, managed with the frontend and API when queue credentials are configured |
 | Login, saved data and file storage | Existing hosted Supabase project **Resumora**, `aquvhqbkvrtzhbmezkci` |
 | AI generation | Existing OpenRouter configuration, with OpenAI fallback |
 
@@ -27,16 +26,15 @@ npm run dev:start
 npm run dev:doctor
 ```
 
-`dev:start` manages **one** user service, `resumora-dev.service`, containing the frontend, API and configured background processors. It validates queue credentials and enabled AI configuration before restarting, checks the login endpoint, and restarts the group after an unexpected child exit. It refuses a service belonging to a different checkout or ports held by unrelated processes.
+`dev:start` manages **one** user service, `resumora-dev.service`, containing the frontend, API and configured background processors. It validates enabled AI configuration before restarting, checks the login endpoint, and restarts the group after an unexpected child exit. It refuses a service belonging to a different checkout or ports held by unrelated processes.
 
-When stopping or restarting during an import, the processor is allowed up to 450 seconds to finish its current bounded job. It stops claiming new jobs after the stop signal. A restart can therefore take longer while an import is active.
+When stopping or restarting during an import, the processor is allowed up to 450 seconds to finish its current bounded import. It stops claiming new imports after the stop signal. A restart can therefore take longer while an import is active.
 
-The separate job processor continuously normalizes accepted extension captures and handles queued URL retrieval and job extraction without relying on browser navigation or local Wrangler cron delivery. Capture normalization uses `CAPTURE_WORKER_SECRET`; URL retrieval and extraction use `AI_WORKER_SECRET`. Neither processor needs the login cookie key. Capture normalization and public URL retrieval work with paid AI off; extraction runs only with `AI_PAID_INFERENCE=on`. The job processor settles an active lease on shutdown and stops claiming new work.
 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev:start` | Start/restart the complete local environment, including after configuration changes |
-| `npm run dev:doctor` | Show code location, Node version, configuration path, local/hosted boundaries, service ownership, session reachability and separate import/job-worker process counts |
+| `npm run dev:doctor` | Show code location, Node version, configuration path, local/hosted boundaries, service ownership, session reachability and import-worker process count |
 | `npm run dev:status` | Short service and login-readiness check |
 | `npm run dev:stop` | Stop the services and disable automatic startup |
 | `journalctl --user -u resumora-dev.service -n 80` | Inspect recent operational logs |
@@ -47,7 +45,7 @@ The diagnostic check performs no generation, account creation, database mutation
 
 The active checkout's `apps/api/.dev.vars` is the runtime source for auth, Supabase, AI providers, models, worker authorization and matching browser origins. It is ignored by Git and readable only by its owner. Keep `APP_ORIGIN` and `API_ORIGIN` equal to `http://127.0.0.1:15173` here. Keep keys server-side; never put them in frontend `VITE_*` variables.
 
-The launcher passes public origins to Vite and server bindings only to the processes that need them. The capture worker secret is available only to the job processor and API, never Vite or the CV import processor. Ambient provider/authentication variables are stripped so an old exported key cannot select another account. `AI_PAID_INFERENCE=on` explicitly enables the configured local AI services and import worker; `off` leaves manual editing, saved-data access and configured deterministic job processing available. Incomplete enabled AI or partially configured queue credentials stop startup with the missing binding names, without exposing their values or stopping an already healthy service.
+The launcher passes public origins to Vite and server bindings only to the processes that need them. Ambient provider/authentication variables are stripped so an old exported key cannot select another account. `AI_PAID_INFERENCE=on` explicitly enables the configured local AI services and import worker; `off` leaves manual editing, saved-data access available. Incomplete enabled AI stop startup with the missing binding names, without exposing their values or stopping an already healthy service.
 
 Earlier launches assembled several private files from previous checkouts and activation folders. The recovered settings are now in this checkout's single file. Those older files and `.dev.vars.before-ai-restore` are recovery material, not startup inputs. Updating an old file does not update this runtime.
 

@@ -270,7 +270,7 @@ it("uncertain CV save retains uploaded asset for retry; component unmount discar
   await act(async () => resolve({ id }));
   expect(commit).not.toHaveBeenCalled();
 });
-it("deletion confirmation explicitly names existing tailored CVs and client uses owned authenticated route", async () => {
+it("deletion confirmation explains CV/history unavailability and client uses owned authenticated route", async () => {
   const transport = vi.fn(async (_path: string, _init?: RequestInit) =>
       Response.json({ deleted: true }),
     ),
@@ -296,7 +296,7 @@ it("deletion confirmation explicitly names existing tailored CVs and client uses
     screen.getByRole("button", { name: "Delete photo everywhere" }),
   );
   const group = screen.getByRole("group", { name: "Confirm photo deletion" });
-  expect(group.textContent).toContain("existing tailored CVs");
+  expect(group.textContent).toContain("your CV or its historical versions");
   expect(
     transport.mock.calls.filter((c) => c[1]?.method === "DELETE"),
   ).toHaveLength(0);

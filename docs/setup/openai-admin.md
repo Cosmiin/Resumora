@@ -1,6 +1,6 @@
 # OpenAI connection and owner usage dashboard preparation
 
-This is working preparation code with **synthetic verification only**, not a connected spend monitor. No inference, hosted migration, deployment, customer read or account configuration was performed. The Worker never constructs this fixed-prompt connection-check adapter; the separate enhancement endpoint is owned by [connected setup](connected-jobs-ai.md). Merely supplying a key cannot enable paid calls.
+This is working preparation code with **synthetic verification only**, not a connected spend monitor. No inference, hosted migration, deployment, customer read or account configuration was performed. The Worker never constructs this fixed-prompt connection-check adapter; the separate enhancement endpoint is owned by [connected setup](cv-import-enrichment.md). Merely supplying a key cannot enable paid calls.
 
 **Approved milestone: finish preparation; integrate later.** Real accrued-cost monitoring is deferred until separately approved durable-ledger and full auth/session integration. The admin reporting port and browser-session integration remain unconnected; enhancement accounting is a separate boundary in the connected setup guide. Every dashboard state carries this preparation notice, including empty and error states; the preview's token and cost examples remain explicitly synthetic.
 
@@ -9,7 +9,7 @@ This is working preparation code with **synthetic verification only**, not a con
 | `GET /admin/ai` on Worker port 8787 | Romanian server-rendered owner dashboard; locked until auth configured, then unavailable until durable ledger wired |
 | `GET /v1/admin/ai/usage` | Owner check on every request; fails closed with no real totals because no durable ledger is wired, no CORS access |
 | Internal `prepareConnection().check()` | Fixed `connection_check` using Responses; disabled by default, injected synthetic transport tested; no public connection-check route |
-| Admin ledger | Typed `UsageLedger` report port remains unbound; separate enhancement accounting is documented in [connected setup](connected-jobs-ai.md#durable-operationattempt-accounting) |
+| Admin ledger | Typed `UsageLedger` report port remains unbound; separate enhancement accounting is documented in [connected setup](cv-import-enrichment.md#durable-operationattempt-accounting) |
 | Login/session | [Authentication setup](authentication.md#session-and-request-contract) owns application login/session flows; this admin boundary still uses separate bearer JWT verification |
 | Organization Costs API | Unimplemented; no organization admin key required |
 
@@ -50,7 +50,7 @@ Config alone still does not connect data or execute inference. Future browser ac
 
 ## Required integration before real usage
 
-The [connected accounting extension](connected-jobs-ai.md#durable-operationattempt-accounting) reserves enhancement operations/attempts but deliberately leaves `report` unimplemented. The [database plan P4](../database/plan-v2.0.0.md#8-migration-order-dependencies-and-approval-scopes) remains the broader roadmap, not an existing admin aggregation adapter. Reuse the existing accounting boundary rather than create a competing billing schema; no hosted migration is implied.
+The [connected accounting extension](cv-import-enrichment.md#durable-operationattempt-accounting) reserves enhancement operations/attempts but deliberately leaves `report` unimplemented. The [database runbook](../database/runbook.md#8-migration-order-dependencies-and-approval-scopes) remains the broader roadmap, not an existing admin aggregation adapter. Reuse the existing accounting boundary rather than create a competing billing schema; no hosted migration is implied.
 
 Implement the missing **server-only durable reporting adapter** and inject the appropriate ledger at `adminRoute` and the fixed connection-check adapter. Required semantics are documented in [`ledger.ts`](../../apps/api/src/ai/ledger.ts):
 
@@ -62,7 +62,7 @@ Implement the missing **server-only durable reporting adapter** and inject the a
 
 The fixture class is test/preview memory only; production routes reject it. No claim of durable accrued spend or end-to-end live readiness follows from a test double implementing this interface.
 
-After storage and approved auth/session integration, a separately approved **single fixed owner smoke check** could explicitly construct `prepareConnection` with `execution: 'live'`, a durable ledger and Worker-only secret. There is no runtime switch or public route for this diagnostic. The separate enhancement endpoint follows [connected setup](connected-jobs-ai.md); live smoke, queues, streaming, reconciliation jobs and budget enforcement remain outside this diagnostic preparation.
+After storage and approved auth/session integration, a separately approved **single fixed owner smoke check** could explicitly construct `prepareConnection` with `execution: 'live'`, a durable ledger and Worker-only secret. There is no runtime switch or public route for this diagnostic. The separate enhancement endpoint follows [connected setup](cv-import-enrichment.md); live smoke, queues, streaming, reconciliation jobs and budget enforcement remain outside this diagnostic preparation.
 
 ## API and estimate rules
 
@@ -74,7 +74,7 @@ Both JWKS and provider fetches use `redirect: 'manual'`, the Worker-supported no
 
 Prices are a versioned **26 October 2026 observed standard text snapshot**; the effective date is this application's snapshot boundary, not a claimed vendor price-change date. No model is selected by default. The demo prices `gpt-5.4-nano` (input/cached/output $0.20/$0.02/$1.25 per million tokens) and `gpt-5.4-mini` ($0.75/$0.075/$4.50), including exact documented `2026-03-17` snapshots. These fixture models are not a recommendation; review availability/deprecation/quality before future live use. Unknown models/tiers, pre-snapshot dates, unsupported nonzero cache-write usage or missing/invalid counters have unknown cost. New prices require a new version; do not replace stored historical rates. [Official pricing](https://developers.openai.com/api/docs/pricing), [nano model](https://developers.openai.com/api/docs/models/gpt-5.4-nano), [mini model](https://developers.openai.com/api/docs/models/gpt-5.4-mini)
 
-`(input − cached input) × input rate + cached input × cache rate + output × output rate` uses integer nano-USD. Cached input is a subset of input, reasoning is a subset of output; neither is added again. Missing reasoning detail remains null. Money rounds half up only for display (six decimals); persisted sums retain full integer precision. Connection-check attempts with missing usage/prices are excluded from the **known subtotal**, with separate unknown counters; an unknown subtotal is labeled unknown, never free. Enhancement reported-charge accounting follows the [connected accounting contract](connected-jobs-ai.md#durable-operationattempt-accounting). Provider usage is allowlisted to documented numeric token fields, not arbitrary response JSON. Estimates cover only this application's recorded attempts and are **not an OpenAI invoice**. [Reasoning and output limits](https://developers.openai.com/api/docs/guides/reasoning)
+`(input − cached input) × input rate + cached input × cache rate + output × output rate` uses integer nano-USD. Cached input is a subset of input, reasoning is a subset of output; neither is added again. Missing reasoning detail remains null. Money rounds half up only for display (six decimals); persisted sums retain full integer precision. Connection-check attempts with missing usage/prices are excluded from the **known subtotal**, with separate unknown counters; an unknown subtotal is labeled unknown, never free. Enhancement reported-charge accounting follows the [connected accounting contract](cv-import-enrichment.md#durable-operationattempt-accounting). Provider usage is allowlisted to documented numeric token fields, not arbitrary response JSON. Estimates cover only this application's recorded attempts and are **not an OpenAI invoice**. [Reasoning and output limits](https://developers.openai.com/api/docs/guides/reasoning)
 
 ## Verification
 

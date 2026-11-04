@@ -29,6 +29,6 @@ This is a one-person profile flow, not support for managing multiple people. The
 
 ## Verification
 
-Focused synthetic coverage: 15 new upload/update checks, 37 existing import/review/removal checks, 43 editor/enrichment/Base-removal checks, and 7 API import-identity checks passed. Frontend and API TypeScript checks passed. The web production build passed using explicit public APP_ORIGIN/API_ORIGIN values as required by the existing extension packager; an invocation without them fails configuration validation.
+Focused synthetic coverage: 15 new upload/update checks, 37 existing import/review/removal checks, 43 editor/enrichment/Base-removal checks, and 7 API import-identity checks passed. Frontend and API TypeScript checks passed. The web production build passed using explicit public APP_ORIGIN/API_ORIGIN values during the recorded check.
 
 Fresh-profile headless Chrome checks at desktop and a constrained 390 px layout confirmed ownership/selection/role-destination gates, preservation of the existing name, role ID and Q&A, two retained/added contributions, styled selects and no control overflow. These checks used only synthetic data and do not claim a walkthrough of the owner's signed-in browser or provider extraction quality.

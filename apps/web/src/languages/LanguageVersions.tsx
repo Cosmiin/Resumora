@@ -19,7 +19,6 @@ import { languageClient } from "./client";
 import { TranslationReview } from "./TranslationReview";
 export function LanguageVersions({
   transport,
-  jobId,
   currentLocale,
   ready,
   revisionKey,
@@ -28,7 +27,6 @@ export function LanguageVersions({
 }: {
   ensureReady?: () => Promise<void>;
   transport: AuthTransport;
-  jobId?: string;
   currentLocale: string;
   ready: boolean;
   revisionKey: string;
@@ -72,12 +70,12 @@ export function LanguageVersions({
   useEffect(() => {
     active.current = true;
     const abort = new AbortController();
-    void client.context(jobId, currentLocale, abort.signal).then(
+    void client.context(abort.signal).then(
       async (ctx) => {
         if (!active.current) return;
         setContext(ctx);
         if (ctx.source) {
-          const key = `resumora:translation:${jobId ?? "profile"}:${ctx.source.pin.currentId}:${currentLocale}`;
+          const key = `resumora:translation:profile:${ctx.source.pin.currentId}:${currentLocale}`;
           receiptKey.current = key;
           let saved: string | null = null;
           try {
@@ -125,7 +123,7 @@ export function LanguageVersions({
       active.current = false;
       abort.abort();
     };
-  }, [client, jobId, currentLocale, revisionKey]);
+  }, [client, currentLocale, revisionKey]);
   useEffect(() => {
     let current = true;
     if (!registry?.transport || !context?.source) return;
@@ -138,10 +136,7 @@ export function LanguageVersions({
           if (
             saved.state === "ready" &&
             saved.output &&
-            saved.request.source.kind === (jobId ? "job" : "base") &&
-            ("jobId" in saved.request.source
-              ? saved.request.source.jobId === jobId
-              : !jobId) &&
+            saved.request.source.kind === "base" &&
             saved.request.source.currentId === context.source!.pin.currentId &&
             saved.request.sourceLocale === currentLocale
           ) {
@@ -155,7 +150,7 @@ export function LanguageVersions({
     return () => {
       current = false;
     };
-  }, [registry, context?.source?.pin.currentId, jobId, currentLocale]);
+  }, [registry, context?.source?.pin.currentId, currentLocale]);
   const version = context?.versions.find(
     (v) =>
       v.locale === target ||
@@ -204,16 +199,16 @@ export function LanguageVersions({
     try {
       if (ensureReady) await ensureReady();
       const sourceContext = ensureReady
-        ? await client.context(jobId, currentLocale, abort.signal)
+        ? await client.context(abort.signal)
         : context;
       if (!sourceContext?.source?.accepted)
         throw Error("acceptedVersionRequired");
       const acceptedTarget = version
-        ? await client.read(version, jobId, abort.signal)
+        ? await client.read(version, abort.signal)
         : null;
       if (acceptedTarget && acceptedTarget.revision !== version?.revision)
         throw new Error("targetChanged");
-      receiptKey.current = `resumora:translation:${jobId ?? "profile"}:${sourceContext.source.pin.currentId}:${currentLocale}`;
+      receiptKey.current = `resumora:translation:profile:${sourceContext.source.pin.currentId}:${currentLocale}`;
       receipt(receiptKey.current, id);
       let result = await client.start(
         {
@@ -324,7 +319,7 @@ export function LanguageVersions({
       </label>
       {target !== currentLocale &&
       context?.source?.locale === target &&
-      !jobId ? (
+      true ? (
         <Button
           disabled={!ready || busy}
           onClick={() => open({ locale: target })}

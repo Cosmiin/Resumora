@@ -1,5 +1,9 @@
 import { documentLabels, builtInDocumentLabels } from "./document-labels.ts";
-import { canonicalContentLocale, contentLocale, contentLanguagePolicyVersion } from "./content-language.ts";
+import {
+  canonicalContentLocale,
+  contentLocale,
+  contentLanguagePolicyVersion,
+} from "./content-language.ts";
 import { allFacts, clone, type BaseDraft, type Fact } from "./model.ts";
 import { currentWording, isWordingFieldVisible } from "./wording.ts";
 import {
@@ -10,8 +14,7 @@ import {
   type TranslationOutput,
 } from "../intelligence/translation.ts";
 export type TranslationSource = {
-  kind: "base" | "job";
-  jobId?: string;
+  kind: "base";
   documentId: string;
   currentId: string;
   revision: number;
@@ -25,9 +28,9 @@ export type TranslationLineage = {
   glossaryVersion: string;
   linguistic?: {
     promptVersion: string;
-    warnings: TranslationOutput['warnings'];
-    ambiguousTerms: TranslationOutput['ambiguousTerms'];
-    suggestedGlossary: TranslationOutput['suggestedGlossary'];
+    warnings: TranslationOutput["warnings"];
+    ambiguousTerms: TranslationOutput["ambiguousTerms"];
+    suggestedGlossary: TranslationOutput["suggestedGlossary"];
   };
   components: Pick<
     TranslationItem,
@@ -40,7 +43,11 @@ export type TranslationLineage = {
   >[];
 };
 export const defaultDocumentLocale = (draft: BaseDraft) =>
-  contentLocale(draft) === "ro" ? "ro-RO" : contentLocale(draft) === "en" ? "en-GB" : contentLocale(draft);
+  contentLocale(draft) === "ro"
+    ? "ro-RO"
+    : contentLocale(draft) === "en"
+      ? "en-GB"
+      : contentLocale(draft);
 export async function componentFingerprint(value: unknown): Promise<string> {
   return [
     ...new Uint8Array(
@@ -225,10 +232,20 @@ export async function staleTranslationComponents(
   currentSource: BaseDraft,
 ): Promise<string[]> {
   const items = await translationItems(currentSource);
-  return [...new Set([
-    ...lineage.components.filter(c => items.find(i => i.id === c.id)?.sourceFingerprint !== c.sourceFingerprint).map(c => c.id),
-    ...items.filter(i => !lineage.components.some(c => c.id === i.id)).map(i => i.id),
-  ])];
+  return [
+    ...new Set([
+      ...lineage.components
+        .filter(
+          (c) =>
+            items.find((i) => i.id === c.id)?.sourceFingerprint !==
+            c.sourceFingerprint,
+        )
+        .map((c) => c.id),
+      ...items
+        .filter((i) => !lineage.components.some((c) => c.id === i.id))
+        .map((i) => i.id),
+    ]),
+  ];
 }
 /** Materialized document representation, never a write-back or new career fact.
  * The CURRENT target holds only its own accepted wording plus opaque lineage;
@@ -258,7 +275,10 @@ export async function materializeTranslation(
     target = clone(source);
   validateDocumentLocale(input.targetLocale);
   target.language = new Intl.Locale(input.targetLocale).language;
-  const labels = input.targetLabels ?? accepted.documentLabels ?? builtInDocumentLabels(input.targetLocale);
+  const labels =
+    input.targetLabels ??
+    accepted.documentLabels ??
+    builtInDocumentLabels(input.targetLocale);
   target.contentLanguage = {
     locale: input.targetLocale,
     confidence: "high",
@@ -332,14 +352,18 @@ export function isTranslationLineage(
     typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
   if (
     !object(value) ||
-    !keys(value, [
-      "schemaVersion",
-      "documentLocale",
-      "sourceLocale",
-      "source",
-      "glossaryVersion",
-      "components",
-    ], ["linguistic"]) ||
+    !keys(
+      value,
+      [
+        "schemaVersion",
+        "documentLocale",
+        "sourceLocale",
+        "source",
+        "glossaryVersion",
+        "components",
+      ],
+      ["linguistic"],
+    ) ||
     value.schemaVersion !== "cv-language/1" ||
     !isCanonicalDocumentLocale(value.documentLocale) ||
     !isCanonicalDocumentLocale(value.sourceLocale) ||
@@ -348,28 +372,82 @@ export function isTranslationLineage(
     !keys(
       value.source,
       ["kind", "documentId", "currentId", "revision", "fingerprint"],
-      ["jobId"],
+      [],
     )
   )
     return false;
   if (value.linguistic !== undefined) {
-    const m=value.linguistic;
-    if(!object(m)||!keys(m,['promptVersion','warnings','ambiguousTerms','suggestedGlossary'])||!handle(m.promptVersion)||JSON.stringify(m).length>16000||!Array.isArray(m.warnings)||!Array.isArray(m.ambiguousTerms)||!Array.isArray(m.suggestedGlossary))return false;
-    if(m.warnings.some(w=>!object(w)||!keys(w,['itemId','code','message'])||!handle(w.itemId)||!['qualification_equivalence','title_uncertain','term_preserved','untranslated'].includes(String(w.code))||typeof w.message!=='string'||w.message.length>2000))return false;
-    if(m.ambiguousTerms.some(w=>!object(w)||!keys(w,['itemId','term'])||!handle(w.itemId)||!handle(w.term)))return false;
-    if(m.suggestedGlossary.some(w=>!object(w)||!keys(w,['originalTerm','preferredTranslation','context'])||!handle(w.originalTerm)||!handle(w.preferredTranslation)||typeof w.context!=='string'||w.context.length>2000))return false;
+    const m = value.linguistic;
+    if (
+      !object(m) ||
+      !keys(m, [
+        "promptVersion",
+        "warnings",
+        "ambiguousTerms",
+        "suggestedGlossary",
+      ]) ||
+      !handle(m.promptVersion) ||
+      JSON.stringify(m).length > 16000 ||
+      !Array.isArray(m.warnings) ||
+      !Array.isArray(m.ambiguousTerms) ||
+      !Array.isArray(m.suggestedGlossary)
+    )
+      return false;
+    if (
+      m.warnings.some(
+        (w) =>
+          !object(w) ||
+          !keys(w, ["itemId", "code", "message"]) ||
+          !handle(w.itemId) ||
+          ![
+            "qualification_equivalence",
+            "title_uncertain",
+            "term_preserved",
+            "untranslated",
+          ].includes(String(w.code)) ||
+          typeof w.message !== "string" ||
+          w.message.length > 2000,
+      )
+    )
+      return false;
+    if (
+      m.ambiguousTerms.some(
+        (w) =>
+          !object(w) ||
+          !keys(w, ["itemId", "term"]) ||
+          !handle(w.itemId) ||
+          !handle(w.term),
+      )
+    )
+      return false;
+    if (
+      m.suggestedGlossary.some(
+        (w) =>
+          !object(w) ||
+          !keys(w, ["originalTerm", "preferredTranslation", "context"]) ||
+          !handle(w.originalTerm) ||
+          !handle(w.preferredTranslation) ||
+          typeof w.context !== "string" ||
+          w.context.length > 2000,
+      )
+    )
+      return false;
   }
   const source = value.source;
   if (
-    !["base", "job"].includes(String(source.kind)) ||
+    source.kind !== "base" ||
     !handle(source.documentId) ||
     !handle(source.currentId) ||
     !Number.isSafeInteger(source.revision) ||
     Number(source.revision) < 1 ||
     !hash(source.fingerprint) ||
-    (source.kind === "job"
-      ? !handle(source.jobId)
-      : Object.hasOwn(source, "jobId"))
+    !keys(source, [
+      "kind",
+      "documentId",
+      "currentId",
+      "revision",
+      "fingerprint",
+    ])
   )
     return false;
   if (

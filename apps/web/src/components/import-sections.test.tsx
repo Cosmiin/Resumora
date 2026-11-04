@@ -31,11 +31,6 @@ import {
 } from "../base/model";
 import { encodeDraft, decodeDraft } from "@resumora/contracts/editor/transport";
 import { careerContext } from "@resumora/contracts/intelligence/context";
-import {
-  jobEditorFacts,
-  projectJobEditor,
-  type JobEditorPayload,
-} from "@resumora/contracts/jobs/documents";
 import { isAccepted } from "../base/model";
 import { enrichmentTarget } from "../base/enrichment";
 import { acceptWording, currentWording } from "../base/wording";
@@ -581,7 +576,7 @@ it.each(["education", "certifications"] as const)(
   },
 );
 
-it("shares persisted automatic acceptance with enrichment, wording, duration and job projection", () => {
+it("shares persisted automatic acceptance with enrichment, wording, duration ", () => {
   const input = clone(review);
   input.extraction.candidates = [
     ["roles.0.context", "Maintained records"],
@@ -614,29 +609,6 @@ it("shares persisted automatic acceptance with enrichment, wording, duration and
   expect(currentWording(wording, role.id)).toBe(
     "Maintained records and reduced delays",
   );
-  const payload: JobEditorPayload = {
-    schemaVersion: "resumora-job-editor/1",
-    acceptance: "accepted",
-    source: { snapshotId: crypto.randomUUID(), revision: 1 },
-    job: {
-      id: crypto.randomUUID(),
-      versionId: null,
-      fingerprint: "a".repeat(64),
-    },
-    selectedFacts: jobEditorFacts(draft)
-      .filter((f) => isAccepted(f.fact))
-      .map((f) => f.ref),
-    selectedAnswerIds: [],
-    wording: [],
-    presentation: {},
-    localAdditions: [],
-  };
-  const projected = projectJobEditor(encodeDraft(draft), payload);
-  expect(projected.presentation.hiddenFields ?? []).not.toContain(
-    role.context.fieldId,
-  );
-  expect(projected.roles[0].context.acceptance).toBe("automatic");
-  expect(projected.roles[0].context.status).toBe("extracted_unconfirmed");
   const view = render(
     <LanguageContext value="en">
       <DocumentPreview draft={draft} asOf={{ year: "2026", month: "10" }} />
@@ -654,9 +626,6 @@ it("shares persisted automatic acceptance with enrichment, wording, duration and
   expect(pendingImportedCandidates(historical)).toHaveLength(5);
   expect(() => careerContext(historical, role.id)).toThrow(
     "INVALID_SCOPED_CONTEXT",
-  );
-  expect(() => projectJobEditor(encodeDraft(historical), payload)).toThrow(
-    "invalidJobEditor",
   );
   for (const field of allFacts(historical, true))
     if (field.sourceClaimId) {

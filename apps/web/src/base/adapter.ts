@@ -23,8 +23,7 @@ export class AdapterError extends Error {
       | "rejected"
       | "unauthenticated"
       | "forbidden"
-      | "expired"
-      | "preservationRequired",
+      | "expired",
     public issues: Issue[] = [],
   ) {
     super(code);

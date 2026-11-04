@@ -26,48 +26,30 @@ def suite(db):
                 error=error)
             return value if error else json.loads(value)
 
-        def save_job(self, layout, job, tailored, error=False, key=None):
-            value = self.call('save_job_cv_checkpoint',
-                f"'{key or uid()}',NULL,0,'{self.profile['profileVersionId']}','{job['jobVersionId']}',{literal(layout)},'ro'," + ('true' if tailored else 'false'),
-                error=error)
-            return value if error else json.loads(value)
-
         def document(self, version):
             return json.loads(db.sql(f"SELECT canonical_json->'document' FROM app.cv_versions WHERE id='{version}'"))
 
         def test_registered_and_legacy_versions_publish_and_restore_exact_layout(self):
-            job = self.job()
-            for revision, version in enumerate(VERSIONS, 1):
+            for version in VERSIONS:
                 with self.subTest(version=version):
-                    cv = copy.deepcopy(self.cv)
-                    cv['document']['templateVersionId'] = version
-                    db.sql(f'SELECT app.validate_canonical({literal(cv)})')
-                    published = self.publish(cv, profile=self.profile['profileId'], revision=revision, base_revision=2 * revision - 1)
-                    self.profile = published
-                    self.assertEqual(self.document(published['baseCvVersionId']), cv['document'])
-                    base = self.save_base(cv['document'], 2 * revision)
-                    self.assertEqual(self.document(base['cvVersionId']), cv['document'])
-                    for tailored in (True, False):
-                        key = uid()
-                        branch = self.save_job(cv['document'], job, tailored, key=key)
-                        saved = self.document(branch['cvVersionId'])
-                        self.assertEqual(saved['templateVersionId'], version)
-                        self.assertEqual(saved['sections'], cv['document']['sections'])
-                        self.assertEqual(self.save_job(cv['document'], job, tailored, key=key), branch)
-                        changed = dict(cv['document'], templateVersionId=VERSIONS[(revision + 1) % 5])
-                        newer = json.loads(self.call('save_job_cv_checkpoint',
-                            f"'{uid()}','{branch['documentId']}',1,'{self.profile['profileVersionId']}','{job['jobVersionId']}',{literal(changed)},'en'," + ('true' if tailored else 'false')))
-                        restored = json.loads(self.call('restore_cv_version',
-                            f"'{uid()}','{branch['documentId']}',2,'{branch['cvVersionId']}'"))
-                        self.assertEqual(self.document(restored['cvVersionId']), saved)
-                        self.assertEqual(self.document(branch['cvVersionId']), saved)
-                        self.assertEqual(self.document(newer['cvVersionId'])['templateVersionId'], changed['templateVersionId'])
-                        self.assertEqual(db.sql(f"SELECT content_hash=app.hash_json(canonical_json-'snapshotId'-'baseCvId'-'version'-'parentSnapshotId'-'createdAt') FROM app.cv_versions WHERE id='{restored['cvVersionId']}'"), 't')
-                        self.assertEqual(db.sql(f"SELECT count(*) FROM app.cv_versions WHERE id='{branch['cvVersionId']}'", user=self.b, role='authenticated'), '0')
-                    self.assertEqual(db.sql(f"SELECT head_version_id FROM app.cv_documents WHERE id='{self.profile['baseDocumentId']}'"), base['cvVersionId'])
+                    self.setUp()
+                    cv=copy.deepcopy(self.cv);cv['document']['templateVersionId']=version
+                    published=self.publish(cv,profile=self.profile['profileId'],revision=1,base_revision=1)
+                    self.profile=published
+                    self.assertEqual(self.document(published['baseCvVersionId']),cv['document'])
+                    base=self.save_base(cv['document'],2)
+                    self.assertEqual(self.document(base['cvVersionId']),cv['document'])
+                    changed=dict(cv['document'],templateVersionId=VERSIONS[1] if version!=VERSIONS[1] else VERSIONS[0])
+                    newer=self.save_base(changed,3)
+                    key=uid();args=f"'{key}','{base['documentId']}',4,'{base['cvVersionId']}'"
+                    restored=json.loads(self.call('restore_cv_version',args))
+                    self.assertEqual(json.loads(self.call('restore_cv_version',args)),restored)
+                    self.assertEqual(self.document(restored['cvVersionId']),cv['document'])
+                    self.assertEqual(self.document(newer['cvVersionId']),changed)
+                    self.assertEqual(db.sql(f"SELECT content_hash=app.hash_json(canonical_json-'snapshotId'-'baseCvId'-'version'-'parentSnapshotId'-'createdAt') FROM app.cv_versions WHERE id='{restored['cvVersionId']}'"),'t')
+                    self.assertEqual(db.sql(f"SELECT count(*) FROM app.cv_versions WHERE id='{base['cvVersionId']}'",user=self.b,role='authenticated'),'0')
 
         def test_invalid_and_unregistered_versions_fail_without_publishing(self):
-            job = self.job()
             for version, message in [
                 ('template_future_9_0_0', 'UNREGISTERED_TEMPLATE_VERSION'),
                 ('template_folio_2_1_1', 'UNREGISTERED_TEMPLATE_VERSION'),
@@ -81,8 +63,6 @@ def suite(db):
                     self.assertIn(message, db.sql(f'SELECT app.validate_canonical({literal(cv)})', expect_error=True))
                     self.assertIn(message, self.publish(cv, profile=self.profile['profileId'], revision=1, base_revision=1, error=True))
                     self.assertIn(message, self.save_base(cv['document'], 1, error=True))
-                    for tailored in (True, False):
-                        self.assertIn(message, self.save_job(cv['document'], job, tailored, error=True))
             self.assertEqual(db.sql(f"SELECT count(*) FROM app.cv_versions WHERE tenant_id='{self.wa}'"), '1')
             self.assertEqual(db.sql(f"SELECT head_version_id FROM app.cv_documents WHERE id='{self.profile['baseDocumentId']}'"), self.profile['baseCvVersionId'])
 
@@ -106,10 +86,6 @@ def suite(db):
             'test_claim_and_published_versions_are_immutable',
             'test_revoked_support_blocks_new_cv_but_not_historical_read',
             'test_invalid_dates_titles_contacts_and_unsupported_prose_rejected',
-        )),
-        (behavior.Workspace, (
-            'test_section_prose_references_are_rejected_by_all_publication_commands',
-            'test_same_tenant_wrong_job_document_or_version_is_rejected',
         )),
     ):
         checks.addTests(cls(name) for name in names)

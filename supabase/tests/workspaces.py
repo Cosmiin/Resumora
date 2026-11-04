@@ -1,4 +1,4 @@
-"""Synthetic native PostgreSQL checks for the two-destination persistence boundary."""
+"""Synthetic native PostgreSQL checks for the Profile persistence boundary."""
 import json,unittest,uuid
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
@@ -9,57 +9,24 @@ def suite(db):
   def setUp(self):
    self.a,self.b=uid(),uid();db.sql(f"INSERT INTO auth.users(id) VALUES('{self.a}'),('{self.b}')")
    self.call('provision_workspace',f"'{uid()}'");self.call('provision_workspace',f"'{uid()}'",user=self.b)
-   self.payload=json.loads((ROOT/'packages/contracts/fixtures/job-editor-import.json').read_text())
+   self.payload=json.loads((ROOT/'packages/contracts/fixtures/cv-import.json').read_text())
    self.base=self.call('save_base_draft',f"'{uid()}',0,{lit(self.payload)},'autosave'")
-   self.job=self.call('save_target_job',f"'{uid()}',NULL,NULL,{lit({'text':'Required SQL reporting.'})},'[]'")
    self.role=self.payload['content']['roles'][0]['id']
-   db.sql(f"UPDATE app.job_workflow_operations SET state='cancelled';UPDATE app.job_workflows SET reviewed='{{\"requirements\":[{{\"id\":\"req\"}}]}}' WHERE job_id='{self.job['id']}'")
    self.secret='synthetic-workspace-worker-secret-at-least-32'
    db.sql(f"INSERT INTO app.ai_worker_authorization VALUES(true,sha256(convert_to('{self.secret}','UTF8'))) ON CONFLICT(singleton) DO UPDATE SET secret_hash=EXCLUDED.secret_hash")
   def raw(self,name,args='',user=None,role='authenticated',error=False):
-   if name=='save_workspace_draft' and any("'"+k+"'" in args for k in ['job-answer','import-review','tailor-review','translation-review']):args+=',0'
+   if name=='save_workspace_draft' and any("'"+k+"'" in args for k in ['import-review','translation-review']):args+=',0'
    return db.sql(f'SELECT app.{name}({args})',role=role,user=user or self.a,expect_error=error)
   def call(self,*args,**kwargs):
    s=self.raw(*args,**kwargs);return json.loads(s) if s else None
-  def answer(self):return dict(id=uid(),requirementId='req',targetId=self.role,questionText='What reporting did you personally do?',text='Prepared a weekly report.',status='confirmed')
   def test_drafts_are_owned_revisioned_replayable_and_do_not_enqueue_processing(self):
-   id,key=uid(),uid();value={'text':'Unfinished advert','sourceUrl':''};count=db.sql('SELECT count(*) FROM app.job_workflow_operations')
-   args=f"'{key}','intake','{id}',0,{lit(value)}"
+   id,key='00000000-0000-4000-8000-000000000001',uid();value={'route':'#/profile/history'}
+   args=f"'{key}','resume','{id}',0,{lit(value)}"
    first=self.call('save_workspace_draft',args);self.assertEqual(first,self.call('save_workspace_draft',args));self.assertEqual(first['revision'],1)
-   self.assertIsNone(self.call('get_workspace_draft',f"'intake','{id}'",user=self.b))
-   self.assertIn('permission denied',self.raw('get_workspace_draft',f"'intake','{id}'",role='anon',error=True))
-   self.assertIn('VERSION_CONFLICT',self.raw('save_workspace_draft',f"'{uid()}','intake','{id}',0,{lit(value)}",error=True))
-   self.assertEqual(db.sql('SELECT count(*) FROM app.job_workflow_operations'),count)
-   self.assertIn('SNAPSHOT_NOT_FOUND',self.raw('save_workspace_draft',f"'{uid()}','job-review','{self.job['id']}',0,'{{}}'",user=self.b,error=True))
+   self.assertIsNone(self.call('get_workspace_draft',f"'resume','{id}'",user=self.b))
+   self.assertIn('permission denied',self.raw('get_workspace_draft',f"'resume','{id}'",role='anon',error=True))
+   self.assertIn('VERSION_CONFLICT',self.raw('save_workspace_draft',f"'{uid()}','resume','{id}',0,{lit(value)}",error=True))
    self.assertIn('permission denied',db.sql('SELECT * FROM app.workspace_drafts',role='authenticated',user=self.a,expect_error=True))
-  def test_intake_publication_is_once_and_cannot_lose_the_saved_source(self):
-   id=uid();self.call('save_workspace_draft',f"'{uid()}','intake','{id}',0,{lit({'text':'Required reporting.','sourceUrl':''})}")
-   args=f"'{uid()}','{id}',1";job=self.call('submit_workspace_intake',args)
-   self.assertEqual(job['id'],self.call('submit_workspace_intake',f"'{uid()}','{id}',1")['id'])
-   self.assertEqual(job['intake']['text'],'Required reporting.')
-   self.assertEqual(db.sql(f"SELECT count(*) FROM app.job_workflow_operations WHERE job_id='{job['id']}'"),'1')
-   self.assertIn('VERSION_CONFLICT',self.raw('save_workspace_draft',f"'{uid()}','intake','{id}',1,'{{}}'",error=True))
-  def test_job_answers_leave_base_unchanged_and_stale_an_inflight_model_result(self):
-   op=self.call('request_job_workflow',f"'{uid()}','{self.job['id']}','prepare',1,NULL,'ro'")
-   task=self.call('claim_job_workflow',f"'{self.secret}',false",role='anon')
-   answer=self.answer();answer_key=uid();args=f"'{answer_key}','{self.job['id']}',0,{lit(answer)}";saved=self.call('save_job_answer',args)
-   self.assertEqual(saved,self.call('save_job_answer',args))
-   self.assertEqual(saved['revision'],1);self.assertEqual(saved['answers'][0]['questionText'],answer['questionText'])
-   self.assertEqual(self.call('load_base_draft')['id'],self.base['id'])
-   result=self.call('finish_job_workflow',f"'{self.secret}','{task['lease']}','{{}}',NULL",role='anon')
-   self.assertEqual(result['state'],'stale')
-   self.assertIn('SNAPSHOT_NOT_FOUND',self.raw('get_job_answers',f"'{self.job['id']}'",user=self.b,error=True))
-  def test_integration_acceptance_is_atomic_owned_and_exactly_once(self):
-   answer=self.answer();self.call('save_job_answer',f"'{uid()}','{self.job['id']}',0,{lit(answer)}")
-   op=uid();input=dict(jobId=self.job['id'],snapshotId=self.base['id'],revision=1,targetId=self.role,answerIds=[answer['id']],answersRevision=1)
-   self.call('begin_workspace_operation',f"'{op}','integration',{lit(input)}")
-   self.assertIn('RESOURCE_FORBIDDEN',self.raw('finish_workspace_operation',f"'{op}','ready','{{}}','wrong'",error=True))
-   payload=json.loads(json.dumps(self.payload));payload['answers'].append(dict(id='copied-answer',targetId=self.role,question='context',questionText=answer['questionText'],text=answer['text'],status='confirmed'))
-   self.call('finish_workspace_operation',f"'{op}','ready',{lit({'draft':payload,'proposal':{}})},'{self.secret}'")
-   self.assertIsNone(self.call('get_workspace_operation',f"'{op}'",user=self.b))
-   saved=self.call('accept_profile_integration',f"'{uid()}','{op}'")
-   self.assertEqual(saved['revision'],2);self.assertEqual(saved['payload']['answers'][-1]['questionText'],answer['questionText'])
-   self.assertEqual(saved['id'],self.call('accept_profile_integration',f"'{uid()}','{op}'")['id'])
   def test_receipt_acknowledgements_are_idempotent_and_success_is_never_downgraded(self):
    op=uid();input=dict(snapshotId=self.base['id'],revision=1,targetId=self.role)
    self.call('begin_workspace_operation',f"'{op}','rewrite',{lit(input)}")
@@ -106,13 +73,8 @@ def suite(db):
   def test_profile_removal_purges_new_career_context_and_rejects_late_results(self):
    op=uid();input=dict(snapshotId=self.base['id'],revision=1,targetId=self.role)
    self.call('begin_workspace_operation',f"'{op}','rewrite',{lit(input)}")
-   self.call('save_job_answer',f"'{uid()}','{self.job['id']}',0,{lit(self.answer())}")
-   self.call('save_workspace_draft',f"'{uid()}','job-answer','{self.job['id']}',0,'{{\"entries\":{{}}}}'")
    self.call('remove_base_cv',f"'{uid()}',1,0")
-   self.assertEqual(self.call('get_job_answers',f"'{self.job['id']}'")['answers'],[])
    self.assertIsNone(self.call('get_workspace_operation',f"'{op}'"))
-   self.assertIsNone(self.call('get_workspace_draft',f"'job-answer','{self.job['id']}'"))
    self.call('save_base_draft',f"'{uid()}',2,{lit(self.payload)},'autosave'")
-   self.assertIn('BASE_GENERATION_CONFLICT',self.raw('save_workspace_draft',f"'{uid()}','job-answer','{self.job['id']}',0,'{{\"entries\":{{}}}}'",error=True))
    self.assertIn('SNAPSHOT_NOT_FOUND',self.raw('finish_workspace_operation',f"'{op}','ready','{{}}','{self.secret}'",error=True))
  return unittest.defaultTestLoader.loadTestsFromTestCase(Workspaces)

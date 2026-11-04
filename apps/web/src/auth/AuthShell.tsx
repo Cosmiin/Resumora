@@ -477,7 +477,6 @@ export function AuthShell({
   return (
     <main className="auth-panel">
       <img src="/resumora-logo.svg" alt="Resumora" width="142" height="34" />
-      <a href="/extension">Extensie Chrome · Capture a job</a>
       <h1>
         {reset
           ? "Parolă nouă"

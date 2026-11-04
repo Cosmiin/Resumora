@@ -21,7 +21,7 @@
     "build": "npm run build --workspace @resumora/web && npm run build --workspace @resumora/api",
     "smoke": "node scripts/smoke.mjs",
     "test:dev-secrets": "node --test scripts/dev-secret-boundary.test.mjs",
-    "check": "npm run typecheck && npm run test:web && npm run build && npm run smoke && npm run test:dev-secrets && npm run test:dev-config",
+    "check": "npm run typecheck && npm run test:web && npm run build && npm run test:dev-secrets && npm run test:dev-config",
     "test:web": "npm run test --workspace @resumora/web",
     "dev:start": "node scripts/dev-service.mjs start",
     "dev:stop": "node scripts/dev-service.mjs stop",

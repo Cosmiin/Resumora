@@ -79,7 +79,8 @@ it("a checkpoint/context refresh does not cancel the explicit translation it pre
   f.context.source!.accepted = false;
   const transport = vi.fn(async (path: string, init?: RequestInit) => {
     calls.push({ path, aborted: init?.signal?.aborted });
-    if (path === "/v1/document-languages") return Response.json(f.context);
+    if (path.split("?")[0] === "/v1/document-languages")
+      return Response.json(f.context);
     if (path === "/v1/document-languages/proposals")
       return Response.json(f.proposal);
     return Response.json(f.proposal);
@@ -125,7 +126,9 @@ it("refresh recovers the owned translation receipt with reads and never starts a
     f.proposal.id,
   );
   const transport = vi.fn(async (path: string) =>
-    Response.json(path === "/v1/document-languages" ? f.context : f.proposal),
+    Response.json(
+      path.split("?")[0] === "/v1/document-languages" ? f.context : f.proposal,
+    ),
   );
   render(
     <LanguageVersions

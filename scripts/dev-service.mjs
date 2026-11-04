@@ -4,7 +4,13 @@ import { homedir } from "node:os";
 import { createServer } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readDevOrigin, readDevAiSummary, readDevConfiguration, importWorkerEnabled, jobWorkerEnabled, serviceUnit } from "./dev-config.mjs";
+import {
+  readDevOrigin,
+  readDevAiSummary,
+  readDevConfiguration,
+  importWorkerEnabled,
+  serviceUnit,
+} from "./dev-config.mjs";
 
 const workspaceRoot = fileURLToPath(new URL("../", import.meta.url)).replace(
   /\/$/,
@@ -106,7 +112,6 @@ export async function runService(
     // Validate before stopping a healthy instance; a partial config must not replace it.
     const configuration = readDevConfiguration(root);
     importWorkerEnabled(configuration);
-    jobWorkerEnabled(configuration);
     mkdirSync(directory, { recursive: true });
     const contents = serviceUnit(root, node);
     const changed =

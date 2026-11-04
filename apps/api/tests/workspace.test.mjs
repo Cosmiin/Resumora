@@ -1,20 +1,48 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { workspaceRoute,isWorkspacePath } from '../src/workspace/routes.ts';
-import { blankDraft,newRole } from '../../../packages/contracts/src/editor/model.ts';
-import { encodeDraft,decodeDraft } from '../../../packages/contracts/src/editor/transport.ts';
-import { currentWording } from '../../../packages/contracts/src/editor/wording.ts';
-const uuid=()=>crypto.randomUUID();
-const request=(path,body)=>new Request('https://app.example'+path,{method:body===undefined?'GET':'POST',...(body===undefined?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})});
-function setup(){const d=blankDraft(),role=newRole();role.title.value='Analyst';role.company.value='Synthetic company';role.context.value='Prepared weekly reports.';d.roles.push(role);const jobId=uuid(),snapshot={id:uuid(),revision:1,parentId:null,createdAt:new Date().toISOString(),reason:'autosave',payload:encodeDraft(d)},answer={id:uuid(),targetId:role.id,requirementId:'reporting',questionText:'How did you improve reporting?',text:'Reduced preparation by 2 days.',status:'confirmed',revision:1};const operations=new Map();let baseWrites=0,runs=0;const gateway={getJob:async id=>id===jobId?{id}:null,loadDraft:async()=>snapshot,getJobAnswers:async()=>({revision:1,answers:[answer]}),getWorkspaceOperation:async id=>operations.get(id)??null,beginWorkspaceOperation:async(id,kind,input)=>{const operation={id,kind,input,state:'processing',result:null};operations.set(id,operation);return{created:true,operation};},reserveEnhancement:async()=>({created:true}),finishWorkspaceOperation:async(id,state,result)=>{const op={...operations.get(id),state,result};operations.set(id,op);return op;},saveDraft:async()=>{baseWrites++;throw Error('Forbidden implicit profile write');},saveJobAnswer:async i=>({revision:2,answers:[{...i.answer,revision:2}]}),acceptProfileIntegration:async(_key,id)=>({...snapshot,revision:2,payload:operations.get(id).result.draft})};const env={AI_PAID_INFERENCE:'on',AI_WORKER_SECRET:'synthetic-worker-secret-with-at-least-32-characters',AI_PROCESSING_POLICY:'synthetic-policy'};const run=async()=>{runs++;return{schemaVersion:'career-role-rewrite/1',targetId:role.id,text:'Prepared weekly reports and reduced preparation by 2 days.',factIds:[role.context.id,'job_'+answer.id],warnings:[]};};return{gateway,env,run,d,role,jobId,snapshot,answer,operations,counts:()=>({runs,baseWrites})};}
-test('workspace paths are handled by the private boundary, including operation reads',()=>{assert.ok(isWorkspacePath('/v1/workspace-drafts/intake/'+uuid()));assert.ok(isWorkspacePath('/v1/intelligence/operations/'+uuid()));assert.ok(isWorkspacePath('/v1/jobs/'+uuid()+'/answers'));assert.equal(isWorkspacePath('/other'),false);});
-test('draft saving rejects open JSON shapes and never invokes the AI runner',async()=>{const s=setup();let saved; s.gateway.saveWorkspaceDraft=async i=>(saved=i,{id:i.id,kind:i.kind,revision:1,value:i.value});const id=uuid();let r=await workspaceRoute(request('/v1/workspace-drafts/intake/'+id,{requestId:uuid(),expectedRevision:0,value:{text:'Partial advert',sourceUrl:''}}),s.env,s.gateway,'user',{run:s.run});assert.equal(r.status,200);assert.equal(saved.value.text,'Partial advert');assert.equal(s.counts().runs,0);r=await workspaceRoute(request('/v1/workspace-drafts/intake/'+id,{requestId:uuid(),expectedRevision:0,value:{text:'x',sourceUrl:'',execute:'untrusted instructions'}}),s.env,s.gateway,'user',{run:s.run});assert.equal(r.status,400);});
-test('job answers are confirmed without publishing any Base change',async()=>{const s=setup();const {revision,...answer}=s.answer;const r=await workspaceRoute(request(`/v1/jobs/${s.jobId}/answers`,{requestId:uuid(),expectedRevision:1,answer}),s.env,s.gateway,'user');assert.equal(r.status,200);assert.deepEqual(s.counts(),{runs:0,baseWrites:0});assert.equal((await r.json()).answers[0].questionText,s.answer.questionText);});
-test('integration proposes a complete grounded role, retains exact Q&A and never writes the profile before acceptance',async()=>{const s=setup(),id=uuid(),body={operationId:id,snapshotId:s.snapshot.id,revision:1,targetId:s.role.id,answerIds:[s.answer.id],answersRevision:1};const path=`/v1/jobs/${s.jobId}/profile-integrations`;const r=await workspaceRoute(request(path,body),s.env,s.gateway,'user',{run:s.run});assert.equal(r.status,200);const op=await r.json();const draft=decodeDraft(op.result.draft);assert.equal(draft.answers[0].questionText,s.answer.questionText);assert.equal(draft.answers[0].text,s.answer.text);assert.equal(draft.answers[0].origin.jobId,s.jobId);assert.equal(draft.roles[0].id,s.role.id);assert.equal(currentWording(draft,s.role.id),op.result.proposal.text);assert.deepEqual(s.counts(),{runs:1,baseWrites:0});const again=await workspaceRoute(request(path,body),s.env,s.gateway,'user',{run:s.run});assert.equal(again.status,200);assert.deepEqual(s.counts(),{runs:1,baseWrites:0});const accepted=await workspaceRoute(request(path+'/'+id+'/accept',{requestId:uuid()}),s.env,s.gateway,'user');assert.equal(accepted.status,200);assert.equal((await accepted.json()).draft.answers[0].questionText,s.answer.questionText);});
-test('stale inputs and disabled inference fail before reserving or invoking a provider',async()=>{const s=setup(),body={operationId:uuid(),snapshotId:s.snapshot.id,revision:1,targetId:s.role.id,answerIds:[s.answer.id],answersRevision:2};let r=await workspaceRoute(request(`/v1/jobs/${s.jobId}/profile-integrations`,body),s.env,s.gateway,'user',{run:s.run});assert.equal(r.status,409);r=await workspaceRoute(request(`/v1/jobs/${s.jobId}/profile-integrations`,{...body,answersRevision:1}),{...s.env,AI_PAID_INFERENCE:'off'},s.gateway,'user',{run:s.run});assert.equal(r.status,503);assert.equal(s.operations.size,0);assert.equal(s.counts().runs,0);});
-
-test('a definitively invalid integration is recoverable as failed rather than an unknown provider outcome',async()=>{const s=setup(),id=uuid(),body={operationId:id,snapshotId:s.snapshot.id,revision:1,targetId:s.role.id,answerIds:[s.answer.id],answersRevision:1};await workspaceRoute(request(`/v1/jobs/${s.jobId}/profile-integrations`,body),s.env,s.gateway,'user',{run:async()=>{throw Error('AI_OUTPUT_INVALID');}});assert.equal(s.operations.get(id).state,'failed');assert.equal(s.counts().baseWrites,0);});
-test('intake submit forwards actual interface fallback for no-CV extraction',async()=>{
- const s=setup();let submitted;s.gateway.getWorkspaceDraft=async()=>({value:{text:'A sufficiently detailed synthetic job advert for testing language fallback.',sourceUrl:''}});s.gateway.submitWorkspaceIntake=async i=>{submitted=i;return {id:uuid()};};
- const r=await workspaceRoute(request('/v1/jobs/intakes/'+uuid()+'/submit',{requestId:uuid(),expectedRevision:1,interfaceLocale:'en'}),s.env,s.gateway,'user');assert.equal(r.status,201);assert.equal(submitted.interfaceLocale,'en');
+import test from "node:test";
+import assert from "node:assert/strict";
+import { isWorkspacePath, workspaceRoute } from "../src/workspace/routes.ts";
+const id = "11111111-1111-4111-8111-111111111111";
+test("private workspace dispatch retains operation reads and draft recovery", () => {
+  assert.ok(isWorkspacePath("/v1/workspace-drafts/resume/" + id));
+  assert.ok(isWorkspacePath("/v1/intelligence/operations/" + id));
+  assert.equal(isWorkspacePath("/other"), false);
+});
+test("draft saving rejects open shapes and retains the profile-generation fence", async () => {
+  let saved;
+  const gateway = {
+    saveWorkspaceDraft: async (i) => (
+      (saved = i),
+      { id: i.id, kind: i.kind, revision: 1, value: i.value }
+    ),
+  };
+  const request = (value, extra = {}) =>
+    new Request("https://app.invalid/v1/workspace-drafts/resume/" + id, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        requestId: id,
+        expectedRevision: 0,
+        value,
+        ...extra,
+      }),
+    });
+  const response = await workspaceRoute(
+    request({ route: "#/profile" }),
+    {},
+    gateway,
+    "owner",
+  );
+  assert.equal(response.status, 200);
+  assert.equal(saved.value.route, "#/profile");
+  assert.equal(
+    (
+      await workspaceRoute(
+        request({ route: "#/profile", execute: "untrusted" }),
+        {},
+        gateway,
+        "owner",
+      )
+    ).status,
+    400,
+  );
 });

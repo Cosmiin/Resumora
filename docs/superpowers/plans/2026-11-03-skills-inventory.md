@@ -14,7 +14,7 @@
 
 Current input consists of visible accepted role/project/volunteering text and confirmed, non-superseded answers, split into 2,000-character facts and 24-fact/8,000-character chunks. Titles alone do not become evidence. Each chunk currently permits eight results, and each experience permits 30 combined results. The profile has no category cap; immediate per-role insertion lets processing order decide which skills appear first. Deduplication is principally case/whitespace matching. Prompts allow only explicitly named technical methods, omit durable inference classification, and localize skill labels. The 3,000 output-token budget is shared by small and rich inputs.
 
-Existing skills are supplied as deduplication context. Accepted additions become ordinary Facts and preserve source lineage. Detailed quotes live only in replaceable experience receipts; self-contained job CVs intentionally drop those receipts. Tailoring selects existing skill IDs and does not create new skills.
+Existing skills are supplied as deduplication context. Accepted additions become ordinary Facts and preserve source lineage. Detailed quotes live in replaceable experience receipts.
 
 Chosen approach: improve the existing extraction and consolidation path. A prompt-only change cannot enforce inventory limits or preserve inference evidence. A new whole-profile model pipeline would introduce unnecessary operations and recovery architecture. Keep bounded calls, expand their capacity, and rank globally in the existing client consolidation step.
 
@@ -29,7 +29,7 @@ Inference metadata distinguishes explicit evidence from strongly demonstrated in
 - Preserve existing manual/imported skills and identities; a legacy list already above 30 is not silently truncated. Automated additions respect remaining capacity.
 - Canonical international skill labels (typically English) are the explicit exception requested by this brief; generated rationale follows the resolved document locale, and quotations stay original. Do not implement a second language detector or override parallel language metadata.
 - Preserve source evidence on the accepted Fact so save/reload and job copies retain traceability.
-- Keep verification focused on skills, persistence, request transport and tailoring compatibility. No unrelated full-suite sweep.
+- Keep verification focused on skills, persistence, request transport. No unrelated full-suite sweep.
 - Work in the existing non-main feature checkout; preserve all unrelated unfinished work. No broad staging or commits of pre-existing work.
 
 ## Review focus
@@ -37,7 +37,7 @@ Inference metadata distinguishes explicit evidence from strongly demonstrated in
 1. Late roles with stronger skills must compete before the category capacity is consumed.
 2. Existing translated synonyms and user exclusions must prevent reintroduction.
 3. Cache refresh and partial failure must preserve accepted content and recoverable operation IDs.
-4. Inference metadata must survive serialization and self-contained tailored copies.
+4. Inference metadata must survive serialization.
 5. Shared language files may change concurrently: use narrow edits, re-read before editing, and validate the final integrated files.
 
 ## Tasks

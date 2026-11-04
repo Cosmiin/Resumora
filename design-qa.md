@@ -15,7 +15,7 @@ Initial result: blocked.
 - P2: the initial import wrapper constrained the reading surface to the old 850px upload container and enlarged document headings through an overly broad upload-heading rule. Fixed by releasing the review container width and scoping heading styles.
 - P2: the initial review ribbon, explanatory text and separate source toolbar pushed the document approximately 100px below the intended composition. Fixed by bringing source access into the compact ribbon and associating the approval explanation with the primary button for assistive technology.
 - P2: additional add-entry rows pushed Skills below the desktop viewport. Fixed by placing the desktop add controls beside their section headings on hover/focus; mobile retains visible touch controls.
-- P2: the prior responsive preview selector hid nested answer history. Fixed by targeting named outer panes and forcing the normal Profile into its reading/edit pane when returning from a job preview.
+- P2: the prior responsive preview selector hid nested answer history. Fixed by targeting named outer panes and forcing the normal Profile into its reading/edit pane when returning from preview.
 - P2: completion controls previously concealed accepted wording. Fixed by closing the contextual assistant after the user's explicit proposal decision and focusing the selected experience with scroll positioning. The final mobile capture shows the accepted text immediately below that experience heading.
 - P2: the profile options control overlapped the recovery banner after a failed save. Fixed by anchoring the control to its heading; the final failure capture keeps both actions separate and shows the correct unsaved status color.
 

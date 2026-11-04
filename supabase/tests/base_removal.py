@@ -5,15 +5,13 @@ ROOT=Path(__file__).resolve().parents[2]
 uid=lambda:str(uuid.uuid4())
 lit=lambda v:"'"+json.dumps(v).replace("'","''")+"'::jsonb"
 def suite(db):
- legacy_spec=importlib.util.spec_from_file_location('removal_legacy_fixture',ROOT/'supabase/tests/legacy_current_preservation.py')
- legacy=importlib.util.module_from_spec(legacy_spec);legacy_spec.loader.exec_module(legacy);legacy.install_legacy_fixture(db)
  spec=importlib.util.spec_from_file_location('removal_canonical',ROOT/'supabase/tests/behavior.py')
  b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b);b.DB=db
  class Removal(unittest.TestCase):
   def setUp(self):
    self.w=b.Workspace();self.w.setUp()
    self.initial_operation=uid();self.initial_admission=self.call('begin_cv_import',f"'{self.initial_operation}','pdf','{'a'*64}',100,0")
-   self.source=json.loads((ROOT/'packages/contracts/fixtures/job-editor-import.json').read_text())
+   self.source=json.loads((ROOT/'packages/contracts/fixtures/cv-import.json').read_text())
    self.source['content']['importReview']['id']=self.initial_admission['record']['id']
    self.base=self.call('save_base_draft',f"'{uid()}',0,{lit(self.source)},'checkpoint'")
   def raw(self,name,args='',error=False,user=None,role='authenticated'):
@@ -22,17 +20,10 @@ def suite(db):
    s=self.raw(*a,**kw);return s=='t' if s in ('t','f') else json.loads(s) if s else None
   def remove(self,key=None,revision=1,generation=0,error=False):return self.raw('remove_base_cv',f"'{key or uid()}',{revision},{generation}",error=error)
   def count(self,t):return db.sql(f"SELECT count(*) FROM app.{t} WHERE tenant_id='{self.w.wa}'")
-  def test_full_canonical_closure_current_job_and_application_metadata_survive(self):
-   job=self.w.job()
-   cv=json.loads(db.sql(f"SELECT test_support.legacy_job_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)",user=self.w.a))
-   application=self.w.application(job,cv);self.w.mark(application,1,cv)
-   events=db.sql(f"SELECT row_to_json(e) FROM app.application_events e WHERE tenant_id='{self.w.wa}'")
-   result=json.loads(self.remove());self.assertEqual(events,db.sql(f"SELECT row_to_json(e) FROM app.application_events e WHERE tenant_id='{self.w.wa}'"));self.assertTrue(result['removed']);self.assertEqual((result['generation'],result['revision']),(1,2))
-   for t in ['editor_draft_snapshots','career_profiles','profile_versions','claims','cv_versions','cv_documents','analysis_runs','cv_import_sessions','editor_photo_references']:
-    self.assertEqual(self.count(t),'0',t)
-   current=self.call('load_current_job_document',f"'{job['jobId']}',NULL")
-   self.assertEqual(current['payload']['content']['name']['value'],'Ana Exemplu');self.assertEqual(current['payload']['answers'],[])
-   self.assertEqual(self.count('jobs'),'1');self.assertEqual(self.count('job_editor_versions'),'1')
+  def test_full_canonical_closure_leaves_auth_and_account_intact(self):
+   result=json.loads(self.remove());self.assertTrue(result['removed']);self.assertEqual((result['generation'],result['revision']),(1,2))
+   for table in ['editor_draft_snapshots','career_profiles','profile_versions','claims','cv_versions','cv_documents','cv_import_sessions','editor_photo_references']:
+    self.assertEqual(self.count(table),'0',table)
    self.assertIsNone(self.call('load_base_draft'));self.assertEqual(self.call('base_draft_history'),[])
    self.assertEqual(db.sql(f"SELECT state FROM app.tenants WHERE id='{self.w.wa}'"),'active')
   def test_replay_expiration_and_monotonic_no_resurrection(self):
@@ -155,30 +146,4 @@ def suite(db):
    attempt={'operationId':op,'attemptId':op+'-primary','provider':'openrouter','userId':self.w.a}
    self.assertIn('VERSION_CONFLICT',self.raw('begin_ai_attempt',f"{lit(attempt)},'{secret}'",error=True))
    self.assertEqual(db.sql(f"SELECT base_removed AND snapshot_id IS NULL AND import_id IS NULL FROM app.ai_enhancement_operations WHERE id='{op}'"),'t')
-  def test_preservation_collision_rolls_back_every_removal_effect(self):
-   job=self.w.job();cv=json.loads(db.sql(f"SELECT test_support.legacy_job_checkpoint('{uid()}',NULL,0,'{self.w.profile['profileVersionId']}','{job['jobVersionId']}',{lit(self.w.cv['document'])},'ro',true)",user=self.w.a))
-   # Two independently accepted representations with differing visible text.
-   db.sql(f"BEGIN;UPDATE app.base_cv_lifecycle SET purge_transaction=pg_current_xact_id() WHERE tenant_id='{self.w.wa}';SELECT app.prepare_job_documents_for_base_removal('{self.w.wa}');UPDATE app.base_cv_lifecycle SET purge_transaction=NULL WHERE tenant_id='{self.w.wa}';COMMIT;",user=self.w.a)
-   db.sql(f"UPDATE app.job_editor_versions SET payload=jsonb_set(payload,'{{content,name,value}}','\"Different accepted name\"') WHERE tenant_id='{self.w.wa}'")
-   self.assertIn('LEGACY_JOB_DOCUMENT_COLLISION',self.remove(error=True))
-   self.assertEqual(self.call('load_base_draft')['id'],self.base['id']);self.assertEqual(self.call('load_base_state')['generation'],0);self.assertEqual(self.call('base_removal_objects'),[])
-   self.assertNotEqual(self.count('claims'),'0');self.assertNotEqual(self.count('cv_versions'),'0')
-  def test_current_ro_en_documents_and_owned_photo_survive_without_history(self):
-   job=self.call('save_target_job',f"'{uid()}','{self.base['id']}',1,'{{\"text\":\"Required SQL reporting\"}}','[]'")
-   asset,unused=uid(),uid()
-   for ident in [asset,unused]:
-    db.sql(f"INSERT INTO app.photo_assets(id,tenant_id,object_key,state,byte_size,width,height,sha256) VALUES('{ident}','{self.w.wa}','{self.w.wa}/{ident}.jpg','ready',100,800,800,repeat('a',64))")
-   photo={'assetId':asset,'crop':{'version':1,'centerX':.4,'centerY':.6,'zoom':1.5},'shape':'square','visible':False}
-   snapshots={}
-   for locale in ['ro','en']:
-    source=json.loads(json.dumps(self.source));source['content']['language']=locale;source['content']['presentation']['photo']=photo
-    payload=self.call('freeze_job_document',f"'{{}}',{lit(source)}",role=None)
-    current=self.call('save_current_job_document',f"'{uid()}','{job['id']}','{locale}',NULL,0,{lit(payload)},'{self.base['id']}',NULL,NULL")
-    snapshots[locale]=current['payload']
-   self.remove()
-   for locale,payload in snapshots.items():
-    current=self.call('load_current_job_document',f"'{job['id']}','{locale}'")
-    self.assertEqual(current['payload'],payload);self.assertEqual(current['payload']['content']['presentation']['photo'],photo)
-   self.assertEqual(self.count('job_editor_versions'),'2');self.assertEqual(self.count('photo_assets'),'1')
-   self.assertEqual(self.call('base_removal_objects'),[{'bucket':'cv-imports','objectKey':self.initial_admission['record']['objectKey']},{'bucket':'cv-photos','objectKey':f'{self.w.wa}/{unused}.jpg'}])
  return unittest.defaultTestLoader.loadTestsFromTestCase(Removal)

@@ -12,7 +12,7 @@ The interface reports actual queued, document-checking and extraction states, wi
 
 ## Worker execution
 
-The existing scheduled Worker drains up to two queued imports sequentially, independently of capture/job processing. This per-drain bound is not an aggregate concurrency limit. The checked-in schedule uses a minute cron; it does not establish hosted queue congestion or execution lifetime. Queue waiting is separate from the processing window. This change has not deployed a hosted Worker.
+The existing scheduled Worker drains up to two queued imports sequentially. This per-drain bound is not an aggregate concurrency limit. The checked-in schedule uses a minute cron; it does not establish hosted queue congestion or execution lifetime. Queue waiting is separate from the processing window. This change has not deployed a hosted Worker.
 
 Wrangler local development does not automatically run the production cron. The [managed local environment](environment.md) therefore starts `scripts/import-worker.mjs --watch` alongside the API and frontend, using the same private configuration. Use `npm run dev:start` and `npm run dev:doctor`; do not start a second manual worker while the service is running.
 
@@ -39,7 +39,7 @@ Supabase's static advisor reports the deliberately closed queue table as RLS-wit
 - Both TypeScript checks, the production web build and Worker dry-run build passed. The existing web bundle-size warning remains.
 - Desktop 1136 × 884 and mobile 390 × 844 browser checks use synthetic clients and block actual `/v1` requests. Upload → queue → check → read → close page → reopen → review passed without a second upload or horizontal overflow and with no console exceptions.
 
-The broader SQL suite still has the same 12 legacy job-document failures in an isolated pre-change baseline and after this migration. The old P4 storage-denial assertion also expects an RLS error when run at P8, whose stronger upload fence returns `RESOURCE_FORBIDDEN`; its original test is preserved. No live model acceptance test or real CV was submitted by the agent.
+Use the current native SQL suites for retained-product regression checks.
 
 Failure at upload, recognition, extraction, fallback or saved-import recovery shows **Upload CV again** (**Încarcă CV-ul din nou**) above a fresh-start action. Selecting this action fences an uncertain previous operation before clearing the old file and import URL. A missing record can be cleared directly. No upload or paid request starts until the user selects a file again. Known terminal failures can reset immediately. If cancellation cannot be confirmed, its bounded request ends with a connection message and another explicit retry action.
 

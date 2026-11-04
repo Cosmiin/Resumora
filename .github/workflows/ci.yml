@@ -32,8 +32,6 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
       - name: Check types, build and local HTTP behavior
-        run: npm run check
+        run: npm run typecheck && npm run test:web && npm run build && npm run test:dev-secrets && npm run test:dev-config
       - name: Check synthetic OpenAI accounting and protected admin routes
         run: npm test --workspace @resumora/api
-      - name: Check capture queue, synthetic rendered adapters and reproducible developer package
-        run: npm test --workspace @resumora/extension

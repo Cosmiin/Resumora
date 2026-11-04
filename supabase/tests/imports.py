@@ -69,7 +69,7 @@ def suite(db):
             object_filter=f"bucket_id='cv-imports' AND name='{name}'"
             db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.a,role='authenticated')
             self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE {object_filter}",user=self.b,role='authenticated'),'0')
-            self.assertIn('row-level security',db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.b,role='authenticated',expect_error=True))
+            self.assertIn('RESOURCE_FORBIDDEN',db.sql(f"INSERT INTO storage.objects(bucket_id,name) VALUES('cv-imports','{name}')",user=self.b,role='authenticated',expect_error=True))
             try:
                 self.assertEqual(db.sql(f"SELECT count(*) FROM storage.objects WHERE {object_filter}",role='anon'),'0')
             except AssertionError as error:
@@ -131,6 +131,7 @@ def suite(db):
             for fmt in ('pdf','docx','doc'):
                 with self.subTest(format=fmt):
                     if fmt!='pdf':
+                        self.call('cancel_cv_import',f"'{self.op}'")
                         self.op=uid();self.row=json.loads(self.call('begin_cv_import',f"'{self.op}','{fmt}','{'a'*64}',1024,0"))['record']
                     self.complete('uploaded');self.complete('processing')
                     review=self.review();review['format']=fmt;review['pages']=1 if fmt=='pdf' else None
@@ -197,5 +198,5 @@ def suite(db):
             db.sql(f"UPDATE app.cv_import_sessions SET created_at=now()-interval '100 seconds' WHERE source_id='{self.row['id']}'")
             self.assertEqual(json.loads(self.call('get_cv_import',f"'{self.op}'"))['state'],'unknown')
             payload={'schemaVersion':'resumora-editor-draft/1','content':{},'answers':[]};self.call('save_base_draft',f"'{uid()}',0,{literal(payload)},'autosave'")
-            self.assertIn('VERSION_CONFLICT',self.call('begin_cv_import',f"'{uid()}','pdf','{'c'*64}',100,0",error=True))
+            self.assertIn('BASE_CV_EXISTS',self.call('begin_cv_import',f"'{uid()}','pdf','{'c'*64}',100,0",error=True))
     return unittest.defaultTestLoader.loadTestsFromTestCase(Imports)

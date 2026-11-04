@@ -209,10 +209,13 @@ it("late discovery cannot pull the user away from the page they selected", async
   );
   window.location.hash = "#/profile";
   render(app(f));
-  fireEvent.click(screen.getByRole("link", { name: "Joburile mele" }));
+  await act(async () => {
+    window.location.hash = "#/profile/history";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
   await act(async () => {
     finish({ id: operation, state: "ready" });
   });
-  expect(window.location.hash).toBe("#/jobs");
+  expect(window.location.hash).toBe("#/profile/history");
   expect(f.intelligence.importDocument).not.toHaveBeenCalled();
 });

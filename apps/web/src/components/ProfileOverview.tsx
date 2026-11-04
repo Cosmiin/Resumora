@@ -1,4 +1,4 @@
-import {experienceTargets} from '@resumora/contracts/intelligence/experience';
+import { experienceTargets } from "@resumora/contracts/intelligence/experience";
 import { RoleText } from "./RoleText";
 import { ProfileDocument } from "./ProfileDocument";
 import { stripListMarker } from "@resumora/contracts/editor/content";
@@ -80,16 +80,24 @@ export function ProfileOverview({
   }
   function nextRole(id: string, skip: boolean) {
     const targets = experienceTargets(draft);
-    const accepted = new Set(targets.filter(r => !!currentWording(draft, r.id)).map(r => r.id));
+    const accepted = new Set(
+      targets.filter((r) => !!currentWording(draft, r.id)).map((r) => r.id),
+    );
     const skipped = new Set([...skippedRoles, ...(skip ? [id] : [])]);
     if (skip) setSkippedRoles([...skipped]);
-    const candidates = targets.filter(r => r.id !== id && !accepted.has(r.id) && !skipped.has(r.id));
-    const index = targets.findIndex(r => r.id === id);
-    const next = candidates.find(r => targets.findIndex(t => t.id === r.id) > index) ?? candidates[0];
+    const candidates = targets.filter(
+      (r) => r.id !== id && !accepted.has(r.id) && !skipped.has(r.id),
+    );
+    const index = targets.findIndex((r) => r.id === id);
+    const next =
+      candidates.find((r) => targets.findIndex((t) => t.id === r.id) > index) ??
+      candidates[0];
     if (next) openEnrichment(next.id);
     else {
       closeEnrichment();
-      document.getElementById("profile-skills")?.scrollIntoView?.({ block: "nearest" });
+      document
+        .getElementById("profile-skills")
+        ?.scrollIntoView?.({ block: "nearest" });
     }
   }
   const sections = profileSectionStates(draft, asOf);
@@ -126,7 +134,11 @@ export function ProfileOverview({
             change={change}
             disabled={busy || skillsImproving}
             skillsImproving={skillsImproving}
-            enrichTarget={enrichTarget === "__skills" || enrichTarget === "__improve_skills" ? enrichTarget : undefined}
+            enrichTarget={
+              enrichTarget === "__skills" || enrichTarget === "__improve_skills"
+                ? enrichTarget
+                : undefined
+            }
             enrich={enrich}
             openEnrichment={(id) => {
               setQuestionIntent(id);
@@ -134,15 +146,18 @@ export function ProfileOverview({
             }}
             closeEnrichment={closeDocumentEnrichment}
           />
-          {enrichTarget && enrichTarget !== "__skills" && enrichTarget !== "__improve_skills" && enrich(enrichTarget)}
+          {enrichTarget &&
+            enrichTarget !== "__skills" &&
+            enrichTarget !== "__improve_skills" &&
+            enrich(enrichTarget)}
         </>
       ) : (
         <div className="stack profile-overview">
           <div className="profile-completeness" role="status">
             <p>
               {t(
-                "Profilul meu este CV-ul tău de bază: informațiile și răspunsurile reutilizabile despre cariera ta. Din el creezi CV-uri adaptate fiecărui job; acele copii nu schimbă automat profilul.",
-                "My Profile is your Base CV: reusable career information and confirmed answers. Use it to create job-specific CVs; those copies do not automatically change your Profile.",
+                "Profilul meu este CV-ul tău de bază: informațiile și răspunsurile reutilizabile despre cariera ta.",
+                "My Profile is your Base CV: reusable career information and confirmed answers.",
               )}
             </p>
             <strong>
@@ -158,8 +173,8 @@ export function ProfileOverview({
             </strong>
             <p className="small muted">
               {t(
-                "Poți adapta CV-ul acum și completa informațiile mai târziu. Întrebările și secțiunile suplimentare sunt opționale.",
-                "You can tailor your CV now and fill in details later. Questions and additional sections are optional.",
+                "Poți edita CV-ul acum și completa informațiile mai târziu. Întrebările și secțiunile suplimentare sunt opționale.",
+                "You can edit your CV now and fill in details later. Questions and additional sections are optional.",
               )}
             </p>
           </div>

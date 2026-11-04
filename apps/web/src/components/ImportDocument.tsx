@@ -20,8 +20,8 @@ export function ImportDocument(
       <section className="card">
         <p role="status">
           {t(
-            "Șterge CV-ul de bază actual înainte de a încărca altul. CV-urile adaptate pentru joburi se păstrează.",
-            "Delete your current Base CV before uploading another. Your tailored job CVs are retained.",
+            "Șterge CV-ul de bază actual înainte de a încărca altul.",
+            "Delete your current Base CV before uploading another.",
           )}
         </p>
       </section>

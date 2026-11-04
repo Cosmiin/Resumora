@@ -977,9 +977,6 @@
     ]
   },
   "context": {
-    "kind": "base",
-    "baseSnapshotId": null,
-    "jobSnapshotId": null,
-    "previousTailoredSnapshotId": null
+    "kind": "base"
   }
 }

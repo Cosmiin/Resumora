@@ -32,16 +32,9 @@ export function languageClient(transport: AuthTransport) {
     return value as T;
   }
   return {
-    context: async (
-      jobId?: string,
-      sourceLocale?: string,
-      signal?: AbortSignal,
-    ) => {
+    context: async (signal?: AbortSignal) => {
       const value = await json<DocumentLanguageContext>(
-        "/v1/document-languages" +
-          (jobId
-            ? `?jobId=${encodeURIComponent(jobId)}${sourceLocale ? `&sourceLocale=${encodeURIComponent(sourceLocale)}` : ""}`
-            : ""),
+        "/v1/document-languages",
         undefined,
         signal,
       );
@@ -128,15 +121,9 @@ export function languageClient(transport: AuthTransport) {
         `/v1/document-languages/proposals/${id}/cancel`,
         {},
       ),
-    read: (
-      version: LanguageVersionInfo,
-      jobId?: string,
-      signal?: AbortSignal,
-    ) =>
+    read: (version: LanguageVersionInfo, signal?: AbortSignal) =>
       json<{ draft: BaseDraft; revision: number; id: string }>(
-        jobId
-          ? `/v1/jobs/${jobId}/cv?locale=${encodeURIComponent(version.locale)}`
-          : `/v1/base-cv/languages/${version.variantId}`,
+        `/v1/base-cv/languages/${version.variantId}`,
         undefined,
         signal,
       ),

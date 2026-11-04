@@ -1,4 +1,7 @@
-import type { ContentLocale, ContentLanguageDecision } from "./content-language.ts";
+import type {
+  ContentLocale,
+  ContentLanguageDecision,
+} from "./content-language.ts";
 import type { TranslationLineage } from "./languages.ts";
 import type { CvPhoto } from "./photo.ts";
 import type {
@@ -93,7 +96,6 @@ export type OptionalSection = {
   heading?: Fact<string>;
 };
 export type Answer = {
-  origin?: { jobId: string; answerId: string; answerRevision: number };
   id: string;
   targetId: string;
   question:
@@ -115,7 +117,7 @@ export type Answer = {
   sourceId?: string;
   cvFieldId?: string;
 };
-// Shared by the existing editor content projection and any independent tailored
+// Shared by the existing editor content projection and independent translated
 // document using that projection. Choice belongs to this document/revision; it
 // is never read from a global preference or the latest Base draft.
 export type DocumentPresentation = {
@@ -148,10 +150,16 @@ export type BaseDraft = {
   id: string;
   importReview?: ImportReview;
   /** Import-only user choices; immutable extraction evidence stays in importReview. */
-  importSkillChoices?: Record<string, "professionalSkills" | "technicalSkills" | "omit">;
+  importSkillChoices?: Record<
+    string,
+    "professionalSkills" | "technicalSkills" | "omit"
+  >;
   questionPlans?: QuestionPlan[];
   roleRewriteReviews?: RoleRewriteReview[];
-  experienceEnrichment?: Record<string, import("../intelligence/experience.ts").ExperienceSession>;
+  experienceEnrichment?: Record<
+    string,
+    import("../intelligence/experience.ts").ExperienceSession
+  >;
   language: ContentLocale;
   contentLanguage?: ContentLanguageDecision;
   documentLocale?: string;
@@ -166,8 +174,16 @@ export type BaseDraft = {
   technicalSkills: Fact<string>[];
   /** Canonical labels explicitly deleted by the user; discovery must respect them. */
   skillExclusions?: string[];
-  skillReserves?: { technicalSkills: Fact<string>[]; professionalSkills: Fact<string>[] };
-  skillReview?: { operationId: string; fingerprint: string; snapshotId: string; revision: number };
+  skillReserves?: {
+    technicalSkills: Fact<string>[];
+    professionalSkills: Fact<string>[];
+  };
+  skillReview?: {
+    operationId: string;
+    fingerprint: string;
+    snapshotId: string;
+    revision: number;
+  };
   roles: Role[];
   education: Education[];
   optionalSections: OptionalSection[];
@@ -333,7 +349,10 @@ export function sectionFacts(
   section: string,
   includeInactive = false,
 ): Fact[] {
-  if (section === "summary") {const f=summaryFact(d);return f?[f]:[];}
+  if (section === "summary") {
+    const f = summaryFact(d);
+    return f ? [f] : [];
+  }
   if (section === "identity")
     return [d.name, ...d.titles, ...d.contacts.map((c) => c.value)];
   if (section === "professionalSkills" || section === "technicalSkills")
@@ -375,17 +394,38 @@ export function sectionFacts(
       ]),
     ]);
 }
-export function writeSummary(d:BaseDraft,text:string,origin:Prose['origin']='user_authored'){
-  if(text===d.summary.text&&origin==='user_authored')return;
-  const source=summaryFact(d);
-  if(origin==='user_authored'&&source){const {value,...provenance}=editFact(source,text);d.summary.provenance=provenance;}
-  else delete d.summary.provenance;
-  d.summary.text=text;d.summary.origin=origin;d.summary.approval='approved';
+export function writeSummary(
+  d: BaseDraft,
+  text: string,
+  origin: Prose["origin"] = "user_authored",
+) {
+  if (text === d.summary.text && origin === "user_authored") return;
+  const source = summaryFact(d);
+  if (origin === "user_authored" && source) {
+    const { value, ...provenance } = editFact(source, text);
+    d.summary.provenance = provenance;
+  } else delete d.summary.provenance;
+  d.summary.text = text;
+  d.summary.origin = origin;
+  d.summary.approval = "approved";
 }
 export function summaryFact(d: BaseDraft): Fact<string> | null {
-  if(!d.summary.provenance)return null;
-  const result={} as Fact<string>;
-  for(const key of new Set([...Object.keys(d.summary.provenance),'value']))Object.defineProperty(result,key,{enumerable:true,configurable:true,get:()=>key==='value'?d.summary.text:(d.summary.provenance as unknown as Record<string,unknown>)[key],set:(v)=>{if(key==='value')d.summary.text=v;else (d.summary.provenance as unknown as Record<string,unknown>)[key]=v;}});
+  if (!d.summary.provenance) return null;
+  const result = {} as Fact<string>;
+  for (const key of new Set([...Object.keys(d.summary.provenance), "value"]))
+    Object.defineProperty(result, key, {
+      enumerable: true,
+      configurable: true,
+      get: () =>
+        key === "value"
+          ? d.summary.text
+          : (d.summary.provenance as unknown as Record<string, unknown>)[key],
+      set: (v) => {
+        if (key === "value") d.summary.text = v;
+        else
+          (d.summary.provenance as unknown as Record<string, unknown>)[key] = v;
+      },
+    });
   return result;
 }
 export function allFacts(d: BaseDraft, includeInactive = false): Fact[] {

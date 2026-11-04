@@ -9,12 +9,12 @@ import {
 import { translationItems } from "@resumora/contracts/editor/languages";
 import { languageWorkflow } from "../../../api/src/languages/workflow";
 import { intelligenceOperations } from "../../../api/src/intelligence/operations";
-import { jobLocaleKey } from "../../../api/src/jobs/locale";
+import { documentLocaleKey } from "../base/routes";
 import { DocumentPreview } from "../components/DocumentContent";
 import { renderPrintHtml } from "../export/render";
 
 // The in-memory gateway retains only the saved current representation, like a reopened account.
-function harness(kind: "base" | "job", targetLocale = "fr-CA", long = false) {
+function harness(targetLocale = "fr-CA", long = false) {
   const draft = blankDraft();
   draft.language = "en";
   draft.documentLocale = "en-GB";
@@ -49,16 +49,10 @@ function harness(kind: "base" | "job", targetLocale = "fr-CA", long = false) {
   const inputs: any[] = [];
   const db: any = {
     languageContext: async () => ({
-      source: kind === "base" ? source : null,
+      source,
       versions: [],
     }),
     loadBaseLanguage: async () => target,
-    loadCurrentJobDocument: async (_job: string, locale: string) =>
-      jobLocaleKey(locale) === "en"
-        ? source
-        : jobLocaleKey(locale) === targetLocale
-          ? target
-          : null,
     languageCommand: async (action: string, id: string, input: any) => {
       if (action === "get") return structuredClone(proposal);
       if (action === "start") {
@@ -104,7 +98,11 @@ function harness(kind: "base" | "job", targetLocale = "fr-CA", long = false) {
         payload: input.payload,
       };
       proposal.state = "accepted";
-      proposal.accepted = { kind, id: target.id, revision: target.revision };
+      proposal.accepted = {
+        kind: "base",
+        id: target.id,
+        revision: target.revision,
+      };
       return proposal.accepted;
     },
   };
@@ -139,9 +137,8 @@ function harness(kind: "base" | "job", targetLocale = "fr-CA", long = false) {
   const flow = languageWorkflow(db, operations, "owner", "secret");
   const request: any = {
     source: {
-      kind,
-      ...(kind === "job" ? { jobId: "job" } : {}),
-      documentId: kind === "job" ? source.documentId : draft.id,
+      kind: "base",
+      documentId: draft.id,
       currentId: source.id,
       revision: 1,
       fingerprint: source.fingerprint,
@@ -195,17 +192,12 @@ function harness(kind: "base" | "job", targetLocale = "fr-CA", long = false) {
   };
 }
 
-it.each([
-  ["base", "fr-CA"],
-  ["job", "fr-CA"],
-  ["job", "ar"],
-] as const)(
-  "accepted %s %s translation reopens and exports with its exact persisted labels",
-  async (kind, locale) => {
-    const h = harness(kind, locale);
+it.each(["fr-CA", "ar"])(
+  "accepted %s translation reopens and exports with its exact persisted labels",
+  async (locale) => {
+    const h = harness(locale);
     await h.translate();
     const paid = h.calls;
-    if (kind === "job") h.removeBase();
     const reopened = decodeDraft(h.target.payload);
     expect(reopened.contentLanguage?.locale).toBe(locale);
     expect(documentLabels(reopened)).toEqual(h.labels);
@@ -225,7 +217,7 @@ it.each([
     await h.flow.accept("proposal", "save", 1);
     expect(h.calls).toBe(paid);
     expect(h.writes).toBe(1);
-    // Scoped refresh reuses exact target resources, including when the Base no longer exists.
+    // Scoped refresh reuses exact target resources, without another localization request.
     h.request.targetRevision = h.target.revision;
     h.request.sectionIds = [(await translationItems(h.draft))[0].sectionId];
     await h.translate();
@@ -235,7 +227,7 @@ it.each([
   },
 );
 it("localizes only the first P09 batch and keeps the same catalog through a long CV acceptance", async () => {
-  const h = harness("job", "zh-Hant", true);
+  const h = harness("zh-Hant", true);
   await h.translate();
   expect(h.calls).toBeGreaterThan(1);
   expect(h.localizationRequests).toBe(1);

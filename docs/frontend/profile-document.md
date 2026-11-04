@@ -36,11 +36,11 @@ The skills section offers **Improve skills**, which extracts candidates and impr
 
 The header shows Saving, Saved, Not saved, or session-only state. Failed document saves retain one actionable recovery control per failed resource. The secondary status no longer claims an unsuccessful write was saved online. Controllers continue to own writes across in-app navigation; existing browser-close and account/sign-out protections remain.
 
-Mobile displays the same flowing document and opens contextual enrichment in a focused, scrollable dialog. Edit/preview visibility selectors target named top-level panes, so nested answer history is not hidden. Returning from a job preview cannot strand Profile in a hidden mobile pane.
+Mobile displays the same flowing document and opens contextual enrichment in a focused, scrollable dialog. Edit/preview visibility selectors target named top-level panes, so nested answer history is not hidden.
 
 ## Verification boundary
 
-Verification uses synthetic identities, source documents, proposals and transport adapters. It includes import staging and refresh, original-source navigation, field lineage, partial-date precision, accepted wording versus original facts, one explicit question request, mobile answer history, failed-save retry and pending edits across navigation. Existing account/session isolation, photo, template and independent-job tests are retained with updated public UI entry steps.
+Verification uses synthetic identities, source documents, proposals and transport adapters. It includes import staging and refresh, original-source navigation, field lineage, partial-date precision, accepted wording versus original facts, one explicit question request, mobile answer history, failed-save retry and pending edits across navigation. Existing account/session isolation, photo and template tests are retained with updated public UI entry steps.
 
 No real CV, hosted database write, live model request, migration, service restart, push or deployment is part of this UI verification. The live connected application remains on the existing local origin, `http://127.0.0.1:15173/`.
 
@@ -48,7 +48,7 @@ No real CV, hosted database write, live model request, migration, service restar
 
 The empty-section regression verifies that viewing the CV does not create facts, adding a language/proficiency and certification changes the existing model, and remounting retains both the entries and empty configured sections. Browser verification follows upload → review → confirmation → inline completion → refresh, checks skill/language/certification persistence and export visibility, and confirms no duplicate editor or horizontal overflow at 390px. Photo and authentication regression checks use the local name and presentation disclosures. The enrichment audit is recorded in `../ux-experience-enrichment-audit.md`; its recommended redesign is separate from this section-completion implementation.
 
-Validation result: 543 frontend tests across 49 files passed. The final targeted document regression also passed (6 tests). Web typecheck, changed TypeScript formatting, diff whitespace checks and the production web build passed. The build uses explicit local APP_ORIGIN/API_ORIGIN values for extension packaging and retains the existing large-chunk warning.
+Validation result: 543 frontend tests across 49 files passed. The final targeted document regression also passed (6 tests). Web typecheck, changed TypeScript formatting, diff whitespace checks and the production web build passed. The build retains the existing large-chunk warning.
 
 ## Experience modal — 1 November 2026
 

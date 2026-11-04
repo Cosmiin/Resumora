@@ -2,7 +2,7 @@
 
 The [product registry](../../apps/web/src/templates/registry.ts) owns the selected designs and immutable version IDs. The native **Șablon / Template** control changes the existing document preview immediately and uses normal autosave/history. Classic is a display fallback for legacy documents and unavailable versions, not a selectable design. An unavailable version displays an explicit fallback notice while retaining the saved reference and every content field.
 
-The [job editor guide](../setup/job-editor-documents.md) owns current job-document persistence. Appearance uses the same accepted structured document and shared renderer for editor preview and searchable PDF output. No template change requests inference. Production PDF activation remains configuration-gated pending Browser Run resource, binding, privacy and budget approval; local synthetic proof does not authorize activation.
+Appearance uses the same accepted structured document and shared renderer for editor preview and searchable PDF output. No template change requests inference. Production PDF activation remains configuration-gated pending Browser Run resource, binding, privacy and budget approval; local synthetic proof does not authorize activation.
 
 ## Files and boundaries
 
@@ -75,9 +75,9 @@ Use `PhotoPreview` before the name for `photoPlacement: "above"`, or after the n
 
 ## Current document and export boundary
 
-Template selection belongs to the current accepted Base or job/language document. Reuse `chooseTemplate`, the existing editor save path and `DocumentPresentation`; do not mutate the Base adapter from a job editor. Jobs retain one current document per job/language with CAS metadata, without historical content or restore. Base language copies retain the existing Base editor/history mechanism independently of the factual default Base.
+Template selection belongs to the accepted Base CV or its language version. Reuse `chooseTemplate`, the editor save path and `DocumentPresentation`. Language copies retain independent history and presentation.
 
-`AppearanceExport` offers the existing five choices, photo visibility and zoom. Appearance changes first save through the editor; preparing PDF requires a settled accepted checkpoint. `POST /v1/exports/pdf` accepts only an owned source pin (Base snapshot/revision/optional language variant, or current job/document/locale/id/revision/fingerprint). It does not accept client HTML, remote resource URLs or another copy of CV content. It reloads accepted content and photo bytes, renders `DocumentContent` with the same template CSS/local fonts, and rechecks the source after asynchronous work. Contacts retain safe hyperlinks. All essential content remains native text.
+`AppearanceExport` offers the existing five choices, photo visibility and zoom. Appearance changes first save through the editor; preparing PDF requires a settled accepted checkpoint. `POST /v1/exports/pdf` accepts only an owned source pin (Base snapshot/revision/optional language variant). It does not accept client HTML, remote resource URLs or another copy of CV content. It reloads accepted content and photo bytes, renders `DocumentContent` with the same template CSS/local fonts, and rechecks the source after asynchronous work. Contacts retain safe hyperlinks. All essential content remains native text.
 
 `build-print.mjs` produces the ignored Worker renderer/parser assets; it is an API prebuild/pretest step. The configured Browser Run session denies external resource requests, waits for fonts/photo, checks overflow and prints A4. Actual PDF bytes are checked for parseability, embedded fonts/ToUnicode (including vector Type3 fonts), page geometry, text completeness/order/diacritics, bounds and links. The client validates the returned bytes and echoed source pin before presenting the same Blob in its PDF preview and named download. Validation failure retains the saved CV and consumes no AI credit. The HTML preview is continuous; prepared PDF preview supplies actual pages and browser PDF navigation. Font/density/accent/paper-size controls beyond current template defaults are not exposed.
 
@@ -101,7 +101,7 @@ Before accepting a new layout, inspect its actual product-rendered document and 
 Acceptance checklist:
 
 - Stable version ID/class; exactly selected product registry entries; legacy and unknown references preserve all content.
-- Save/load/history/restore retain per-document choice; changing Base cannot overwrite a tailored choice.
+- Save/load/history/restore retain per-document choice; language copies keep their own presentation.
 - Current facts, ordering, hidden fields, accepted wording, safe rich contributions and modular sections survive.
 - Independent RO/EN CV language; both skill categories remain comma-separated inline text.
 - Actual saved photo visibility/shape/crop are honored; no-photo releases space.
@@ -109,4 +109,4 @@ Acceptance checklist:
 - Actual renderer/export text, fonts, safe bounds, dates and multipage flow checked; no fabricated metrics or ATS score.
 - Distinguish implemented local byte validation from pending production Browser Run activation; no paid inference for changing a template.
 
-Canonical SQL verification uses `python3 scripts/db/test.py --suite templates` with PostgreSQL 16+ on PATH (or an explicitly supplied tool path). It executes the actual validator/profile/Base/job save and restore interfaces for all five choices, legacy null and invalid/unregistered references, plus focused existing permission/ownership/integrity checks. Migration inclusion in the disposable P0–P3 harness is explicit despite the reserved `p6_templates` filename. SQL acceptance/publication is unproven until that command passes; no hosted apply is implied.
+Canonical SQL verification uses `python3 scripts/db/test.py --suite templates` with PostgreSQL 16+ on PATH (or an explicitly supplied tool path). It executes the actual validator/profile/Base save and restore interfaces for all five choices, legacy null and invalid/unregistered references, plus focused existing permission/ownership/integrity checks. Migration inclusion in the disposable P0–P3 harness is explicit despite the reserved `p6_templates` filename. SQL acceptance/publication is unproven until that command passes; no hosted apply is implied.

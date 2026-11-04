@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { FileText, BriefcaseBusiness, UserRound } from "lucide-react";
+import { FileText, UserRound } from "lucide-react";
 import { CvEditor } from "../App";
 import type { BaseCvAdapter, Snapshot } from "../base/adapter";
 import type { BaseDraft, Locale } from "../base/model";
@@ -20,11 +20,9 @@ import {
   workspaceLocation,
   type Route,
 } from "../base/routes";
-import { HttpJobCvAdapter } from "../base/job-adapter";
 import { HttpLanguageCvAdapter } from "../languages/adapter";
 import { languageClient } from "../languages/client";
 import { Button, LanguageContext } from "../components/ui";
-import { JobsWorkspace } from "../components/JobsWorkspace";
 import {
   WorkspaceContext,
   WorkspaceProvider,
@@ -90,21 +88,19 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
     [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
   const t = (ro: string, en: string) => (uiLocale === "ro" ? ro : en);
   useEffect(() => {
-    if (location.view === "job") return;
     const label =
-      location.view === "intake"
-        ? t("Adaugă un job", "Add a job")
-        : location.destination === "jobs"
-          ? t("Joburile mele", "My Jobs")
-          : location.view === "history"
-            ? t("Istoricul profilului", "Profile history")
-            : location.view === "import"
-              ? t("Importă un CV", "Import a CV")
-              : t("Profilul meu", "My Profile");
+      location.view === "history"
+        ? t("Istoricul profilului", "Profile history")
+        : location.view === "import"
+          ? t("Importă un CV", "Import a CV")
+          : t("Profilul meu", "My Profile");
     document.title = `${label} · Resumora`;
   }, [location.canonical, uiLocale]);
   useEffect(() => {
-    if (profile.draft?.skillReview && location.canonical !== "#/profile/enrich/__improve_skills") {
+    if (
+      profile.draft?.skillReview &&
+      location.canonical !== "#/profile/enrich/__improve_skills"
+    ) {
       window.location.hash = "#/profile/enrich/__improve_skills";
       setLocation(workspaceLocation("#/profile/enrich/__improve_skills"));
     }
@@ -112,8 +108,11 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
   const initialHash = useRef(window.location.hash);
   const navigationVersion = useRef(0);
   const navigate = useCallback((route: string) => {
-    if (registry.documents.get("profile")?.profileChangesBlocked() &&
-      route !== "#/profile/enrich/__improve_skills") return;
+    if (
+      registry.documents.get("profile")?.profileChangesBlocked() &&
+      route !== "#/profile/enrich/__improve_skills"
+    )
+      return;
     navigationVersion.current++;
     window.location.hash = route.replace(/^#/, "");
     setLocation(workspaceLocation(route));
@@ -121,8 +120,12 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
   useEffect(() => {
     const change = () => {
       navigationVersion.current++;
-      const blocked = registry.documents.get("profile")?.profileChangesBlocked();
-      const next = workspaceLocation(blocked ? "#/profile/enrich/__improve_skills" : window.location.hash);
+      const blocked = registry.documents
+        .get("profile")
+        ?.profileChangesBlocked();
+      const next = workspaceLocation(
+        blocked ? "#/profile/enrich/__improve_skills" : window.location.hash,
+      );
       setLocation(next);
       if (window.location.hash !== next.canonical)
         window.history.replaceState(null, "", next.canonical);
@@ -243,43 +246,6 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
     (state: typeof profile) => setProfile(state),
     [],
   );
-  const openJobDocument = useCallback(
-    (jobId: string, label: string, locale: string, refreshKey: string) => {
-      if(registry.deletedJobs.has(jobId))return;
-      const key = `job:${jobId}:${documentLocaleKey(locale)}`;
-      setPanes((old) => {
-        const existing = old.find((p) => p.key === key);
-        if (existing?.refreshKey === refreshKey) return old;
-        if (existing)
-          return old.map((p) => (p.key === key ? { ...p, refreshKey } : p));
-        return [
-          ...old,
-          {
-            key,
-            label,
-            adapter: new HttpJobCvAdapter(transport!, jobId, locale),
-            refreshKey,
-          },
-        ];
-      });
-    },
-    [transport],
-  );
-  const acceptedProfile = useCallback(
-    (saved: Snapshot) => {
-      const controller = registry.documents.get("profile");
-      if (!controller) throw Error("staleIntegration");
-      controller.acceptIntegration(saved);
-      setProfile({
-        draft: saved.draft,
-        head: saved,
-        ready: true,
-        dirty: false,
-        error: null,
-      });
-    },
-    [registry],
-  );
   const canonicalLocale = profile.draft
     ? documentLocaleKey(contentLocale(profile.draft))
     : "ro";
@@ -350,7 +316,6 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
   }, [transport, location.canonical, canonicalLocale, profile.head?.id]);
   const profileNavigate = useCallback(
     (route: Route, target?: string) => {
-      if (route === "jobs") return navigate("#/jobs");
       if (route === "start") return navigate("#/profile/import");
       if (route === "history") return navigate("#/profile/history");
       if (route === "enrich") {
@@ -397,9 +362,6 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
     )
       navigate("#/profile");
   }, [location.canonical, profile.head, navigate]);
-  const activeJobKey = location.jobId
-    ? `job:${location.jobId}:${documentLocaleKey(location.locale ?? canonicalLocale)}`
-    : "";
   const baseActive =
     location.destination === "profile" &&
     (location.view !== "profile-cv" ||
@@ -457,12 +419,6 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
                 <option value="en">English</option>
               </select>
             </label>
-            <a href="/extension">
-              {t("Extensie pentru browser", "Browser extension")}
-            </a>
-            <a href="/extension/manage">
-              {t("Gestionează extensia", "Manage extension")}
-            </a>
           </div>
         </details>
       </header>
@@ -477,15 +433,6 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
             >
               <FileText size={19} />
               {t("Profilul meu", "My Profile")}
-            </a>
-            <a
-              href="#/jobs"
-              aria-current={
-                location.destination === "jobs" ? "page" : undefined
-              }
-            >
-              <BriefcaseBusiness size={19} />
-              {t("Joburile mele", "My Jobs")}
             </a>
           </nav>
         </aside>
@@ -521,8 +468,7 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
               )}
             </div>
           )}
-          {((location.destination === "jobs" && location.panel === "cv") ||
-            location.view === "profile-cv") && (
+          {location.view === "profile-cv" && (
             <div className="mobile-view-switch">
               <Button
                 aria-pressed={mobileView === "edit"}
@@ -545,18 +491,6 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
                 "This page does not exist. Your profile is available below.",
               )}
             </p>
-          )}
-          {location.destination === "jobs" && (
-            <JobsWorkspace
-              location={location}
-              profile={profile.draft}
-              snapshot={profile.head ?? null}
-              ready={profile.ready && !!profile.draft && !!profile.head}
-              navigate={navigate}
-              onDocument={openJobDocument}
-              onProfileAccepted={acceptedProfile}
-              onJobDeleted={(id)=>setPanes(old=>old.filter(p=>!p.key.startsWith(`job:${id}:`)))}
-            />
           )}
           {!resumeReady && location.view === "profile" && (
             <p role="status">
@@ -604,14 +538,12 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
             }
           />
           {panes.map((pane) => {
-            const active = pane.language
-              ? location.view === "profile-cv" &&
-                documentLocaleKey(location.locale ?? "") ===
-                  documentLocaleKey(
-                    (pane.adapter as HttpLanguageCvAdapter).documentLocale,
-                  )
-              : pane.key === activeJobKey &&
-                ["cv", "appearance"].includes(location.panel ?? "details");
+            const active =
+              location.view === "profile-cv" &&
+              documentLocaleKey(location.locale ?? "") ===
+                documentLocaleKey(
+                  (pane.adapter as HttpLanguageCvAdapter).documentLocale,
+                );
             return (
               <CvEditor
                 key={pane.key}
@@ -623,19 +555,12 @@ function Shell({ adapter, intelligence, transport, accountActions }: Props) {
                 transport={transport}
                 uiLocale={uiLocale}
                 onUiLocaleChange={setUiLocale}
-                jobLabel={pane.label}
                 refreshKey={pane.refreshKey}
-                appearanceOnly={
-                  location.panel === "appearance" || !!pane.language
-                }
+                appearanceOnly={true}
                 navigate={profileNavigate}
                 switchDocument={() => navigate("#/profile")}
                 switchLanguage={(value) =>
-                  navigate(
-                    pane.language
-                      ? `#/profile/cv/${encodeURIComponent(value.locale)}`
-                      : `#/jobs/${location.jobId}/cv/${encodeURIComponent(value.locale)}?panel=appearance`,
-                  )
+                  navigate(`#/profile/cv/${encodeURIComponent(value.locale)}`)
                 }
               />
             );

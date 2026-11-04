@@ -58,7 +58,7 @@ it("starts every Profile section collapsed without duplicate role cards or autof
   expect(
     screen.getAllByRole("heading", { name: "Analyst", hidden: true }),
   ).toHaveLength(1);
-  expect(screen.getByText(/You can tailor your CV now/)).toBeTruthy();
+  expect(screen.getByText(/You can edit your CV now/)).toBeTruthy();
 });
 it("marks missing structure without inventing content or treating optional sections as errors", () => {
   const d = fixture(),

@@ -104,16 +104,11 @@ it("restores revisioned saved draft data without publishing or starting AI", asy
   expect(c.state.dirty).toBe(false);
   expect(save).not.toHaveBeenCalled();
 });
-it("parses explicit job/language identity and redirects old links without confusing resources", () => {
-  const id = "11111111-1111-4111-8111-111111111111";
-  expect(
-    workspaceLocation(`#/jobs/${id}/cv/en?panel=appearance`),
-  ).toMatchObject({
-    destination: "jobs",
-    view: "job",
-    jobId: id,
-    locale: "en",
-    panel: "appearance",
+it("parses Profile language identity and redirects old links without confusing resources", () => {
+  expect(workspaceLocation("#/profile/cv/fr-CA")).toMatchObject({
+    destination: "profile",
+    view: "profile-cv",
+    locale: "fr-CA",
   });
   expect(workspaceLocation("#base")).toMatchObject({
     view: "profile",

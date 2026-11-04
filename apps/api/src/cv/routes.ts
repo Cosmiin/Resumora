@@ -138,9 +138,24 @@ export async function cvRoute(
     if (!uuid(body.requestId) || !revision(body.expectedRevision))
       return failure("invalidRequest", 400);
     if (path === "/v1/base-cv/remove") {
-      if (Object.keys(body).some((key) => !["requestId", "expectedRevision", "expectedGeneration"].includes(key)) || !revision(body.expectedGeneration)) return failure("invalidRequest", 400);
+      if (
+        Object.keys(body).some(
+          (key) =>
+            !["requestId", "expectedRevision", "expectedGeneration"].includes(
+              key,
+            ),
+        ) ||
+        !revision(body.expectedGeneration)
+      )
+        return failure("invalidRequest", 400);
       if (!gateway.removeBase) return failure("unavailable", 503);
-      return json(await gateway.removeBase({ requestId: body.requestId, expectedRevision: body.expectedRevision, expectedGeneration: body.expectedGeneration }));
+      return json(
+        await gateway.removeBase({
+          requestId: body.requestId,
+          expectedRevision: body.expectedRevision,
+          expectedGeneration: body.expectedGeneration,
+        }),
+      );
     }
     if (path === "/v1/base-cv/save") {
       if (
@@ -202,7 +217,6 @@ export async function cvRoute(
     );
   } catch (error) {
     const e = error as { status?: number; code?: string } | null;
-    if (e?.code === "LEGACY_JOB_DOCUMENT_CONVERSION_REQUIRED" || e?.code === "LEGACY_JOB_DOCUMENT_COLLISION") return failure("preservationRequired", 409);
     if (e?.code === "IDEMPOTENCY_BODY_MISMATCH")
       return failure("requestMismatch", 409);
     if (e?.code === "VERSION_CONFLICT" || e?.code === "BASE_VERSION_CONFLICT")

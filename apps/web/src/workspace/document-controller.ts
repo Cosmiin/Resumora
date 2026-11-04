@@ -313,21 +313,6 @@ export class DocumentController {
     }
     return { operation, saved };
   }
-  acceptIntegration(saved: Snapshot) {
-    if (
-      this.profileChangesBlocked() ||
-      this.unsaved ||
-      !this.head.current ||
-      (this.head.current.id !== saved.parentId &&
-        this.head.current.id !== saved.id)
-    )
-      throw Error("staleIntegration");
-    this.latest.current = clone(saved.draft);
-    this.head.current = clone(saved);
-    this.generation.current++;
-    this.error = null;
-    this.notify();
-  }
   dispose() {
     this.alive = false;
     this.skillUndo = undefined;

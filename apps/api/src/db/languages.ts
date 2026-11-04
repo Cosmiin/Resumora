@@ -16,8 +16,7 @@ export function languageGateway(
   | "acceptLanguage"
 > {
   return {
-    languageContext: (jobId) =>
-      rpc("document_language_context", { p_job: jobId ?? null }),
+    languageContext: () => rpc("document_language_context", {}),
     loadBaseLanguage: (variantId, snapshotId) =>
       rpc("load_base_language", {
         p_variant: variantId,

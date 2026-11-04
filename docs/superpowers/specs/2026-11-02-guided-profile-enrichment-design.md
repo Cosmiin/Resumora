@@ -9,7 +9,7 @@ Help users express their experience so a recruiter can quickly understand their 
 
 The user selected a focused role workspace: contextual questions one at a time, followed by one editable whole-role proposal, with the original available on demand. The unit of improvement is the whole role, including a short introduction and responsibilities/achievements. Individual sentences remain the basis for diagnostic feedback. The same experience must cover projects and volunteering.
 
-The user approved priorities 1–5: whole-role improvement; contextual discovery; trustworthy scoring and encouragement; evidence-backed competence consolidation; projects and volunteering. Preserve the current scoring rubric initially. Job-description tailoring and its separate match assessment are a later project.
+The user approved priorities 1–5: whole-role improvement; contextual discovery; trustworthy scoring and encouragement; evidence-backed competence consolidation; projects and volunteering. Preserve the current scoring rubric initially.
 
 Additional user requirement: AI interactions must feel fast, ideally completing in 5–10 seconds and within 15 seconds at most, with a live typewriter effect. Include real streaming for both the OpenRouter primary and direct OpenAI fallback. These are required performance targets, not claims about currently measured behavior or unconditional provider guarantees.
 
@@ -177,7 +177,7 @@ Each increment should be reviewable and verified before the next. Update relevan
 
 ## Deferred
 
-Job-specific tailoring, job-match scoring, universal ATS guarantees, new skill scoring, rubric reweighting, import redesign, unrelated editor refactors, provider/model tuning and speculative infrastructure/performance work are outside this design.
+Universal ATS guarantees, new skill scoring, rubric reweighting, import redesign, unrelated editor refactors, provider/model tuning and speculative infrastructure/performance work are outside this design.
 
 ## Design review
 

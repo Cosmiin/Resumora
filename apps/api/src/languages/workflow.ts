@@ -6,7 +6,7 @@ import {
   clone,
   type BaseDraft,
 } from "@resumora/contracts/editor/model";
-import { selfContainedJobDraft } from "@resumora/contracts/jobs/current-document";
+import { selfContainedDocumentDraft } from "@resumora/contracts/editor/document";
 import {
   translationItems,
   defaultDocumentLocale,
@@ -51,10 +51,7 @@ export function languageWorkflow(
 ) {
   async function source(pin: TranslationSource, locale: string) {
     validateDocumentLocale(locale);
-    const row =
-      pin.kind === "job"
-        ? await db.loadCurrentJobDocument(pin.jobId!, locale)
-        : (await db.languageContext()).source;
+    const row = (await db.languageContext()).source;
     if (
       !row ||
       row.id !== pin.currentId ||
@@ -64,7 +61,7 @@ export function languageWorkflow(
       fail("staleSource");
     const draft = decodeDraft(row.payload);
     if (
-      (pin.kind === "base" ? draft.id : row.documentId) !== pin.documentId ||
+      draft.id !== pin.documentId ||
       draft.translation ||
       (draft.documentLocale ?? defaultDocumentLocale(draft)) !== locale
     )
@@ -96,10 +93,7 @@ export function languageWorkflow(
       glossaryVersion: await componentFingerprint(request.glossary),
       translationPreferences: { regionalTerminology: "" },
     };
-    const target =
-      request.source.kind === "job"
-        ? await db.loadCurrentJobDocument(request.source.jobId!, request.targetLocale)
-        : await db.loadBaseLanguage(request.variantId);
+    const target = await db.loadBaseLanguage(request.variantId);
     const existing =
       target && target.revision === request.targetRevision
         ? decodeDraft(target.payload)
@@ -171,7 +165,8 @@ export function languageWorkflow(
       plan = batches(input),
       batch = plan[proposal.step];
     if (!batch) fail("invalidProposal", 422);
-    if (proposal.output?.documentLabels) batch.targetLabels = proposal.output.documentLabels;
+    if (proposal.output?.documentLabels)
+      batch.targetLabels = proposal.output.documentLabels;
     const operationId = await stageOperationId(id, `P09:${proposal.step}`);
     const reservation = (await db.languageCommand(
       "work",
@@ -190,7 +185,9 @@ export function languageWorkflow(
       const previous = proposal.output;
       const combined: TranslationOutput = {
         ...output,
-        ...(previous?.documentLabels ? { documentLabels: previous.documentLabels } : {}),
+        ...(previous?.documentLabels
+          ? { documentLabels: previous.documentLabels }
+          : {}),
         completion:
           output.completion === "needs_review" ||
           previous?.completion === "needs_review"
@@ -292,13 +289,7 @@ export function languageWorkflow(
       input.items.some((i) => !proposal.review!.confirmed.includes(i.sectionId))
     )
       fail("reviewIncomplete", 422);
-    const existing =
-      proposal.request.source.kind === "job"
-        ? await db.loadCurrentJobDocument(
-            proposal.request.source.jobId!,
-            proposal.request.targetLocale,
-          )
-        : await db.loadBaseLanguage(proposal.request.variantId);
+    const existing = await db.loadBaseLanguage(proposal.request.variantId);
     if ((existing?.revision ?? 0) !== proposal.request.targetRevision)
       fail("targetChanged");
     let target = await composeTranslation(
@@ -318,10 +309,40 @@ export function languageWorkflow(
       source: proposal.request.source,
       glossaryVersion: input.glossaryVersion,
       linguistic: {
-        promptVersion: 'P09.cv-translation.v1',
-        warnings: [...(existing ? decodeDraft(existing.payload).translation?.linguistic?.warnings.filter(w=>!translatedIds.has(w.itemId))??[] : []), ...output.warnings],
-        ambiguousTerms: [...(existing ? decodeDraft(existing.payload).translation?.linguistic?.ambiguousTerms.filter(w=>!translatedIds.has(w.itemId))??[] : []), ...output.ambiguousTerms],
-        suggestedGlossary: [...(existing?decodeDraft(existing.payload).translation?.linguistic?.suggestedGlossary.filter(g=>!output.suggestedGlossary.some(n=>n.originalTerm===g.originalTerm))??[]:[]),...output.suggestedGlossary],
+        promptVersion: "P09.cv-translation.v1",
+        warnings: [
+          ...(existing
+            ? (decodeDraft(
+                existing.payload,
+              ).translation?.linguistic?.warnings.filter(
+                (w) => !translatedIds.has(w.itemId),
+              ) ?? [])
+            : []),
+          ...output.warnings,
+        ],
+        ambiguousTerms: [
+          ...(existing
+            ? (decodeDraft(
+                existing.payload,
+              ).translation?.linguistic?.ambiguousTerms.filter(
+                (w) => !translatedIds.has(w.itemId),
+              ) ?? [])
+            : []),
+          ...output.ambiguousTerms,
+        ],
+        suggestedGlossary: [
+          ...(existing
+            ? (decodeDraft(
+                existing.payload,
+              ).translation?.linguistic?.suggestedGlossary.filter(
+                (g) =>
+                  !output.suggestedGlossary.some(
+                    (n) => n.originalTerm === g.originalTerm,
+                  ),
+              ) ?? [])
+            : []),
+          ...output.suggestedGlossary,
+        ],
       },
       components: [
         ...previous.filter((i) => !translatedIds.has(i.id)),
@@ -332,7 +353,7 @@ export function languageWorkflow(
     target.translation = lineage;
     target.documentLocale = input.targetLocale;
     target.sourceLocale = input.sourceLocale;
-    target = selfContainedJobDraft(target);
+    target = selfContainedDocumentDraft(target);
     await source(proposal.request.source, proposal.request.sourceLocale);
     return db.acceptLanguage({
       operationId: id,

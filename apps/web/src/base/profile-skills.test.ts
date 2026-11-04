@@ -2,7 +2,6 @@ import { it, expect } from "vitest";
 import { blankDraft, newRole, fact } from "./model";
 import * as skills from "./profile-skills";
 import { patchFact } from "./editing";
-import { eligibleEvidence } from "@resumora/contracts/jobs/workflow";
 import {
   experienceIdentity,
   type SkillSuggestion,
@@ -60,9 +59,6 @@ it("normal inline skill edits remain self-declared and discard obsolete skill ev
     const edited = next.technicalSkills[0];
     expect(edited.skillOrigin).toBeUndefined();
     expect(edited.skillEvidence).toBeUndefined();
-    expect(
-      eligibleEvidence(next).find((f) => f.id === edited.id)?.key,
-    ).toBe("skill");
   }
 });
 it("consolidates duplicate skills across roles while retaining suggestion IDs without evidence defaults", () => {
@@ -84,7 +80,8 @@ it("one confirmation preserves existing skills and applies selected rows without
   expect(next.technicalSkills.map((f) => f.value)).toEqual(["SQL"]);
   expect(next.technicalSkills[0].skillEvidence).toBeUndefined();
   expect(next.professionalSkills.map((f) => f.value)).toEqual([
-    "Communication", "Financial reporting",
+    "Communication",
+    "Financial reporting",
   ]);
   expect(d).toEqual(before);
   expect(
@@ -132,9 +129,7 @@ it("deduplicates when the user renames two selected suggestions to the same skil
     .map((r) => ({ ...r, label: "SQL", selected: true }));
   const next = skills.acceptProfileSkills(d, rows);
   expect([...next.technicalSkills, ...next.professionalSkills]).toHaveLength(1);
-  expect(
-    next.technicalSkills[0].skillEvidence,
-  ).toBeUndefined();
+  expect(next.technicalSkills[0].skillEvidence).toBeUndefined();
 });
 
 it("adds short supported keywords directly, retains existing skills and explicit exclusions, and never repeats removed keywords", () => {
@@ -168,7 +163,9 @@ it("accepts structurally valid labels without a second semantic filter", () => {
       "Preparing recurring financial reports for the team";
   const next = skills.addProfileSkillKeywords(d);
   expect(next.technicalSkills.map((f) => f.value)).toEqual(["SQL"]);
-  expect(next.professionalSkills.map(f => f.value)).toEqual(["Preparing recurring financial reports for the team"]);
+  expect(next.professionalSkills.map((f) => f.value)).toEqual([
+    "Preparing recurring financial reports for the team",
+  ]);
   expect(next.roles).toEqual(d.roles);
 });
 it("keeps a removed keyword excluded when a different experience suggests it later", () => {

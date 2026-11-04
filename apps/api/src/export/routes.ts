@@ -1,10 +1,8 @@
-import { contentLocale } from '@resumora/contracts/editor/content-language';
-import { jobLocaleKey } from '../jobs/locale.ts';
+import { contentLocale } from "@resumora/contracts/editor/content-language";
 import type { DraftSnapshot } from "@resumora/contracts/editor/transport";
 import { decodeDraft } from "@resumora/contracts/editor/transport";
 import { validateDraft } from "@resumora/contracts/editor/validation";
-import type { CurrentJobDocument } from "@resumora/contracts/jobs/current-document";
-import { isUuid } from "@resumora/contracts/jobs/connected";
+import { isUuid } from "@resumora/contracts/editor/identity";
 import type { BaseDraft } from "@resumora/contracts/editor/model";
 import type { PhotoGateway } from "../photos/routes.ts";
 import { digestPhoto } from "../photos/routes.ts";
@@ -16,11 +14,10 @@ export interface ExportGateway extends Pick<
   "readPhoto" | "getPhoto"
 > {
   loadSnapshot(id: string): Promise<DraftSnapshot | null>;
-  loadBaseLanguage?(variantId:string,snapshotId?:string):Promise<DraftSnapshot|null>;
-  loadCurrentJobDocument(
-    jobId: string,
-    locale?: string,
-  ): Promise<CurrentJobDocument | null>;
+  loadBaseLanguage?(
+    variantId: string,
+    snapshotId?: string,
+  ): Promise<DraftSnapshot | null>;
 }
 export type ExportConfig = {
   PDF_EXPORT_ENABLED?: string;
@@ -55,7 +52,7 @@ export function exportFilename(draft: BaseDraft, employer = ""): string {
   return `${name || "CV"}.pdf`;
 }
 /** Shared authenticated/Origin/CSRF boundary mounts this route. Client supplies
- * only an owned accepted pin (a current-only CAS pin for jobs); no HTML, contact bytes, URLs, template overrides or
+ * only an owned accepted pin; no HTML, contact bytes, URLs, template overrides or
  * arbitrary browser navigation crosses the export request boundary.
  */
 export async function exportRoute(
@@ -68,7 +65,7 @@ export async function exportRoute(
   const input = await readBody(request);
   if (input instanceof Response) return input;
   if (
-    !["base", "job"].includes(String(input.kind)) ||
+    input.kind !== "base" ||
     !isUuid(input.versionId) ||
     !Number.isSafeInteger(input.revision) ||
     Number(input.revision) < 1 ||
@@ -78,10 +75,7 @@ export async function exportRoute(
           "kind",
           "versionId",
           "revision",
-          ...(input.kind==="base"?["variantId"]:[]),
-          ...(input.kind === "job"
-            ? ["jobId", "documentId", "locale", "fingerprint"]
-            : []),
+          ...(input.kind === "base" ? ["variantId"] : []),
         ].includes(k),
     )
   )
@@ -89,8 +83,13 @@ export async function exportRoute(
   let draft: BaseDraft,
     employer = "";
   try {
-    if (input.kind === "base") {
-      const row = input.variantId ? typeof input.variantId==="string"&&/^lang_[a-f0-9]{64}$/.test(input.variantId) ? await gateway.loadBaseLanguage?.(input.variantId,input.versionId) : null : await gateway.loadSnapshot(input.versionId);
+    {
+      const row = input.variantId
+        ? typeof input.variantId === "string" &&
+          /^lang_[a-f0-9]{64}$/.test(input.variantId)
+          ? await gateway.loadBaseLanguage?.(input.variantId, input.versionId)
+          : null
+        : await gateway.loadSnapshot(input.versionId);
       if (!row || row.revision !== input.revision)
         return response("missing", 404);
       if (row.reason === "autosave")
@@ -98,29 +97,6 @@ export async function exportRoute(
       draft = decodeDraft(row.payload);
       if (!input.variantId && validateDraft(draft).length)
         return response("acceptedVersionRequired", 409);
-    } else {
-      if (
-        !isUuid(input.jobId) ||
-        !isUuid(input.documentId) ||
-        !jobLocaleKey(input.locale) ||
-        typeof input.fingerprint !== "string" ||
-        !/^[a-f0-9]{64}$/.test(input.fingerprint)
-      )
-        return response("invalidRequest", 400);
-      const row = await gateway.loadCurrentJobDocument(
-        input.jobId,
-        jobLocaleKey(input.locale)!,
-      );
-      if (
-        !row ||
-        row.id !== input.versionId ||
-        row.documentId !== input.documentId ||
-        row.revision !== input.revision ||
-        jobLocaleKey(row.locale) !== jobLocaleKey(input.locale) ||
-        row.fingerprint !== input.fingerprint
-      )
-        return response("missing", 404);
-      draft = decodeDraft(row.payload);
     }
     // Never launch a hosted resource merely because a binding happens to exist.
     if (config.PDF_EXPORT_ENABLED !== "on" || (!config.PDF_BROWSER && !launch))
@@ -166,23 +142,15 @@ export async function exportRoute(
         timeout,
       ]);
       // A deletion/revocation during rendering must not resurrect an old Base
-      // or a deleted job through a late download response.
-      if (input.kind === "base") {
-        const current = input.variantId ? await gateway.loadBaseLanguage?.(String(input.variantId),input.versionId as string) : await gateway.loadSnapshot(input.versionId as string);
+      // through a late download response.
+      {
+        const current = input.variantId
+          ? await gateway.loadBaseLanguage?.(
+              String(input.variantId),
+              input.versionId as string,
+            )
+          : await gateway.loadSnapshot(input.versionId as string);
         if (!current || current.revision !== input.revision)
-          return response("missing", 404);
-      } else {
-        const current = await gateway.loadCurrentJobDocument(
-          input.jobId as string,
-          jobLocaleKey(input.locale)!,
-        );
-        if (
-          !current ||
-          current.id !== input.versionId ||
-          current.revision !== input.revision ||
-          current.documentId !== input.documentId ||
-          current.fingerprint !== input.fingerprint
-        )
           return response("missing", 404);
       }
       if (settings?.visible) {

@@ -1,6 +1,13 @@
-import { documentLabelKeys, builtInDocumentLabels, isCompleteDocumentLabels } from '@resumora/contracts/editor/document-labels';
-import { contentLocale, languageInstruction } from '@resumora/contracts/editor/content-language';
-import { languageOperations } from './language-operations.ts';
+import {
+  documentLabelKeys,
+  builtInDocumentLabels,
+  isCompleteDocumentLabels,
+} from "@resumora/contracts/editor/document-labels";
+import {
+  contentLocale,
+  languageInstruction,
+} from "@resumora/contracts/editor/content-language";
+import { languageOperations } from "./language-operations.ts";
 import { cvImportLimits } from "@resumora/contracts/intelligence/import-limits";
 import { experienceOperations } from "./experience-operations.ts";
 import { skillsImprovementOperation } from "./skills-improvement.ts";
@@ -58,7 +65,7 @@ export type StructuredOperation = {
   };
   operationId: string;
   userId: string;
-  operation: "cv_parse" | "cv_rewrite" | "job_parse" | "cv_tailor";
+  operation: "cv_parse" | "cv_rewrite";
   promptVersion: string;
   attemptPhase?: "verify" | "suggest";
   tier: "admission" | "extraction" | "career";
@@ -138,9 +145,19 @@ export const operationSchemas = {
     schemaVersion: { type: "string", enum: ["cv-extraction/1"] },
     detectedLanguage: { anyOf: [{ type: "string" }, { type: "null" }] },
     languageConfidence: { type: "string", enum: ["low", "medium", "high"] },
-    documentLabels: { anyOf: [{ type: "object", additionalProperties: false,
-      required: [...documentLabelKeys], properties: Object.fromEntries(documentLabelKeys.map(key => [key, str])) },
-      { type: "object", additionalProperties: false, properties: {} }] },
+    documentLabels: {
+      anyOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: [...documentLabelKeys],
+          properties: Object.fromEntries(
+            documentLabelKeys.map((key) => [key, str]),
+          ),
+        },
+        { type: "object", additionalProperties: false, properties: {} },
+      ],
+    },
     candidates: {
       type: "array",
       items: schema({
@@ -218,11 +235,19 @@ function validateExtractedOutput(
     languageConfidence?: string;
     documentLabels?: Record<string, string>;
   };
-  if (!v || typeof v !== 'object' || Array.isArray(v)) throw Error('AI_OUTPUT_INVALID');
-  if (v.detectedLanguage === null && v.languageConfidence !== undefined && v.languageConfidence !== 'low') throw Error('AI_OUTPUT_INVALID');
+  if (!v || typeof v !== "object" || Array.isArray(v))
+    throw Error("AI_OUTPUT_INVALID");
+  if (
+    v.detectedLanguage === null &&
+    v.languageConfidence !== undefined &&
+    v.languageConfidence !== "low"
+  )
+    throw Error("AI_OUTPUT_INVALID");
   if (v.detectedLanguage && v.languageConfidence !== undefined) {
-    const labels = builtInDocumentLabels(v.detectedLanguage) ?? (isCompleteDocumentLabels(v.documentLabels) ? v.documentLabels : null);
-    if (!labels) throw Error('AI_OUTPUT_INVALID');
+    const labels =
+      builtInDocumentLabels(v.detectedLanguage) ??
+      (isCompleteDocumentLabels(v.documentLabels) ? v.documentLabels : null);
+    if (!labels) throw Error("AI_OUTPUT_INVALID");
     v.documentLabels = labels;
   }
   if (Array.isArray(v?.candidates))
@@ -240,15 +265,22 @@ export function intelligenceOperations(run: StructuredRunner) {
       input: TranslationInput;
     }) {
       const input = validateTranslationInput(request.input);
-      const labels = input.targetLabels ?? builtInDocumentLabels(input.targetLocale);
+      const labels =
+        input.targetLabels ?? builtInDocumentLabels(input.targetLocale);
       const labelSchema = schema(
-        Object.fromEntries(documentLabelKeys.map(key =>
-          [key, { type: "string", minLength: 1, maxLength: 500 }],
-        )),
+        Object.fromEntries(
+          documentLabelKeys.map((key) => [
+            key,
+            { type: "string", minLength: 1, maxLength: 500 },
+          ]),
+        ),
       );
       const translationSchema = labels
         ? operationSchemas.translation
-        : schema({ ...operationSchemas.translation.properties, documentLabels: labelSchema });
+        : schema({
+            ...operationSchemas.translation.properties,
+            documentLabels: labelSchema,
+          });
       const validate = (value: unknown) => {
         const output = validateTranslationOutput(value, input);
         if (!labels && !isCompleteDocumentLabels(output.documentLabels))
@@ -262,11 +294,14 @@ export function intelligenceOperations(run: StructuredRunner) {
         operation: "cv_rewrite",
         promptVersion: "P09.cv-translation.v1",
         tier: "career",
-        system: translationPrompt + " " + languageInstruction(input.targetLocale)
-          + (labels
+        system:
+          translationPrompt +
+          " " +
+          languageInstruction(input.targetLocale) +
+          (labels
             ? " Target rendering labels are already available; translate items only."
-            : " Also return documentLabels: concise natural translations of every required label key in the exact targetLocale. Never substitute source-language labels. Label meanings: "
-              + JSON.stringify(builtInDocumentLabels("en"))),
+            : " Also return documentLabels: concise natural translations of every required label key in the exact targetLocale. Never substitute source-language labels. Label meanings: " +
+              JSON.stringify(builtInDocumentLabels("en"))),
         contentLocale: input.targetLocale,
         input,
         schema: translationSchema,
@@ -326,7 +361,11 @@ export function intelligenceOperations(run: StructuredRunner) {
           (pages.length
             ? ""
             : " Word pagination is unknown: every candidate page must be null and omittedPages must be empty. Do not invent page numbers."),
-        input: { format: input.document.format, pages, documentLabelMeanings: builtInDocumentLabels("en") },
+        input: {
+          format: input.document.format,
+          pages,
+          documentLabelMeanings: builtInDocumentLabels("en"),
+        },
         fileBase64: input.document.fileBase64,
         fileFormat: input.document.format,
         schema: operationSchemas.extraction,
@@ -359,7 +398,9 @@ export function intelligenceOperations(run: StructuredRunner) {
         tier: "career",
         validateOutput: (v) => validateQuestionPlan(v, input.targetId),
         system:
-          common + " " + languageInstruction(context.locale) +
+          common +
+          " " +
+          languageInstruction(context.locale) +
           " Return 1–3 concise questions targeting the most useful missing details in the selected role's existing description, bullets and saved answers. Use roleTitle only to frame questions, never as evidence of responsibilities or achievements. Refer to concrete work already mentioned rather than repeating a generic career questionnaire. Ask about personal contribution, workflow, audience, tools or observed outcomes only where unclear. Each question should resolve a different gap; explain that specific gap in why. For choices, offer 2–6 distinct plausible activities or contexts relevant to that work, phrased as possibilities for the user to confirm, not assertions. Avoid generic yes/no, proficiency ratings, vague teamwork/communication lists and invented tools, numbers or accomplishments. Use zero options when a free-text question is more honest than speculative choices. Use multiple selection for activities that may coexist and single selection only for mutually exclusive contexts. Users may always choose none and write text. Do not preselect anything, repeat prior answered/skipped/unknown questions, or require numerical achievements. Choices are prompts, not facts until explicitly confirmed. Use the requested locale. Return complete valid JSON with all useful questions and options for this batch. Be concise without sacrificing coverage. Do not repeat the evidence or saved answers in the output.",
         input: {
           ...context,
@@ -397,7 +438,9 @@ export function intelligenceOperations(run: StructuredRunner) {
       purpose?: "summary";
     }) {
       const validate =
-        input.purpose === "summary" ? validateRoleScopeSummary : validateRewrite;
+        input.purpose === "summary"
+          ? validateRoleScopeSummary
+          : validateRewrite;
       const context = projectEnhancementContext(input.draft, input.targetId);
       const approved =
         input.draft.presentation.approvedWording?.[input.targetId];
@@ -430,7 +473,9 @@ export function intelligenceOperations(run: StructuredRunner) {
         tier: "career",
         validateOutput: (v) => validate(v, input.targetId, context.facts),
         system:
-          common + " " + languageInstruction(context.locale) +
+          common +
+          " " +
+          languageInstruction(context.locale) +
           (input.purpose === "summary"
             ? " Write ONLY a brief statement of this selected role's scope and context. Help the reader understand the environment in which the person worked: the business area, teams, stakeholders, customers, geographical coverage or level of ownership, but only where supported by eligible evidence. Lead with the most distinctive supported context and select only the details that add useful perspective. Synthesize context from the evidence without listing or paraphrasing individual contribution bullets, tasks or achievements. Use one or two concise sentences, normally 25–45 words, never more than two sentences or 400 characters, in a single paragraph without bullets or line breaks. Use fewer words when evidence is limited; never pad the statement to reach a target length. If useful scope details are missing, write a minimal neutral statement grounded in the available work and explain the missing context in warnings. Never infer leadership, authority, scale, seniority, cross-functional work or international coverage. Avoid generic praise and promotional claims. This is a role introduction, not the overall professional summary. Cite the used fact IDs. Return a proposal for explicit review, never an automatic edit. Questions are context only, not evidence. Use relevant professional terminology only when supported by the cited facts. Never invent achievements, responsibilities, tools, metrics or outcomes. Use the requested locale."
             : " Rewrite the WHOLE selected experience description and contribution bullets into clear, concise professional wording using all relevant current eligible evidence and saved answers, not just the last answer. Begin with a brief role introduction (one or two sentences), then use short paragraphs or actual newline-separated bullet lines prefixed with '- ' when listing distinct contributions helps readability. Preserve prose when it reads better; never force every sentence into a bullet. Never return HTML, code fences, Markdown headings or bold asterisks. Use only line-leading list markers for formatting; never a single paragraph containing inline bullet markers. Use consistent list structure. Saved questions explain the answers; they are not factual evidence. Keep responsibilities distinct from accomplishments and never turn an activity or selected possibility into a measured result. Preserve individual attribution and all supported factual precision. Do not alter employer/title/dates. Cite every used fact ID; output stays pending until the user accepts. Questions and original answers remain saved. Prior approved wording is style context only; support factual assertions solely with cited evidence. Return warnings for unsupported detail; never fill it in. Use the requested locale."),

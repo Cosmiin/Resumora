@@ -1,4 +1,4 @@
-import { selfContainedJobDraft } from "@resumora/contracts/jobs/current-document";
+import { selfContainedDocumentDraft } from "@resumora/contracts/editor/document";
 import { useState } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
@@ -155,7 +155,9 @@ it("keeps unclear skills visible and allows category correction without applying
   }
   render(<Harness />);
   expect(screen.queryByText("1 excluded · Review")).toBeNull();
-  expect(screen.getByRole("region", {name:"Choose a category"})).toBeTruthy();
+  expect(
+    screen.getByRole("region", { name: "Choose a category" }),
+  ).toBeTruthy();
   fireEvent.click(
     screen.getByRole("button", { name: "Professional skills: Management" }),
   );
@@ -174,7 +176,7 @@ it("removes import-only classification choices from independent accepted job CVs
     "c1",
     "professionalSkills",
   );
-  const current = selfContainedJobDraft(d);
+  const current = selfContainedDocumentDraft(d);
   expect(current.importReview).toBeUndefined();
   expect(current.importSkillChoices).toBeUndefined();
   expect(current.professionalSkills.map((f) => f.value)).toContain(
@@ -228,18 +230,68 @@ it("moves, removes and undoes a tag without reverting another choice or changing
   expect(latest.importReview?.confirmedIds).toEqual([]);
 });
 
-it("requires an explicit decision for unclassified skills while keeping the original candidates and source quotes",()=>{
- const d=importedDraft(review()),c=d.importReview!.extraction.candidates[3],before=clone(d.importReview);
- expect(importSkillChoice(d,c)).toBe('review');expect(pendingImportSkills(d).map(c=>c.id)).toEqual(['c3']);
- expect(()=>confirmImported(d,['c0','c1','c2'])).toThrow('UNCLASSIFIED_IMPORT_SKILLS');
- const omitted=chooseImportSkill(d,'c3','omit');expect(pendingImportSkills(omitted)).toHaveLength(0);expect(confirmImported(omitted,['c0','c1','c2']).importReview!.confirmedIds).toHaveLength(3);
- const reopened=chooseImportSkill(omitted,'c3','review');expect(pendingImportSkills(reopened)).toHaveLength(1);expect(decodeDraft(encodeDraft(reopened))).toEqual(reopened);expect(reopened.importReview).toEqual(before);
+it("requires an explicit decision for unclassified skills while keeping the original candidates and source quotes", () => {
+  const d = importedDraft(review()),
+    c = d.importReview!.extraction.candidates[3],
+    before = clone(d.importReview);
+  expect(importSkillChoice(d, c)).toBe("review");
+  expect(pendingImportSkills(d).map((c) => c.id)).toEqual(["c3"]);
+  expect(() => confirmImported(d, ["c0", "c1", "c2"])).toThrow(
+    "UNCLASSIFIED_IMPORT_SKILLS",
+  );
+  const omitted = chooseImportSkill(d, "c3", "omit");
+  expect(pendingImportSkills(omitted)).toHaveLength(0);
+  expect(
+    confirmImported(omitted, ["c0", "c1", "c2"]).importReview!.confirmedIds,
+  ).toHaveLength(3);
+  const reopened = chooseImportSkill(omitted, "c3", "review");
+  expect(pendingImportSkills(reopened)).toHaveLength(1);
+  expect(decodeDraft(encodeDraft(reopened))).toEqual(reopened);
+  expect(reopened.importReview).toEqual(before);
 });
-it("batch classification keeps retained domain skills, respects earlier removals, and undo restores an unresolved item",()=>{
- const r=review();r.extraction.candidates.push({id:'domain',path:'unclearSkills.1',value:'GDPR & cross-border compliance',quote:'GDPR & cross-border compliance',page:null,confidence:'medium',warning:'Category needs review'});
- let latest=chooseImportSkill(importedDraft(r),'c1','omit');
- function Harness(){const[d,set]=useState(latest);return <LanguageContext value="en"><ImportSkills draft={d} disabled={false} change={n=>{latest=n;set(n)}} /></LanguageContext>}
- render(<Harness/>);fireEvent.click(screen.getByRole('button',{name:'Remove: Management'}));expect(pendingImportSkills(latest).map(c=>c.id)).toEqual(['domain']);
- fireEvent.click(screen.getByRole('button',{name:'Undo removal'}));expect(pendingImportSkills(latest)).toHaveLength(2);
- fireEvent.click(screen.getByRole('button',{name:'Keep all as professional skills'}));expect(pendingImportSkills(latest)).toHaveLength(0);expect(latest.professionalSkills.map(f=>f.value)).toEqual(['Collaboration','Management','GDPR & cross-border compliance']);expect(latest.technicalSkills).toHaveLength(0);expect(latest.importSkillChoices?.c1).toBe('omit');expect(latest.importReview!.confirmedIds).toEqual([]);expect(latest.importReview!.extraction).toEqual(r.extraction);
+it("batch classification keeps retained domain skills, respects earlier removals, and undo restores an unresolved item", () => {
+  const r = review();
+  r.extraction.candidates.push({
+    id: "domain",
+    path: "unclearSkills.1",
+    value: "GDPR & cross-border compliance",
+    quote: "GDPR & cross-border compliance",
+    page: null,
+    confidence: "medium",
+    warning: "Category needs review",
+  });
+  let latest = chooseImportSkill(importedDraft(r), "c1", "omit");
+  function Harness() {
+    const [d, set] = useState(latest);
+    return (
+      <LanguageContext value="en">
+        <ImportSkills
+          draft={d}
+          disabled={false}
+          change={(n) => {
+            latest = n;
+            set(n);
+          }}
+        />
+      </LanguageContext>
+    );
+  }
+  render(<Harness />);
+  fireEvent.click(screen.getByRole("button", { name: "Remove: Management" }));
+  expect(pendingImportSkills(latest).map((c) => c.id)).toEqual(["domain"]);
+  fireEvent.click(screen.getByRole("button", { name: "Undo removal" }));
+  expect(pendingImportSkills(latest)).toHaveLength(2);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Keep all as professional skills" }),
+  );
+  expect(pendingImportSkills(latest)).toHaveLength(0);
+  expect(latest.professionalSkills.map((f) => f.value)).toEqual([
+    "Collaboration",
+    "Management",
+    "GDPR & cross-border compliance",
+  ]);
+  expect(latest.technicalSkills).toHaveLength(0);
+  expect(latest.importSkillChoices?.c1).toBe("omit");
+  expect(latest.importReview!.confirmedIds).toEqual([]);
+  expect(latest.importReview!.extraction).toEqual(r.extraction);
 });

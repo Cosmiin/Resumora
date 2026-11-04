@@ -14,7 +14,7 @@ import {
 import { careerContext } from "@resumora/contracts/intelligence/context";
 import { validateRoleSummary } from "@resumora/contracts/intelligence/model";
 import { decodeDraft, encodeDraft } from "@resumora/contracts/editor/transport";
-import { selfContainedJobDraft } from "@resumora/contracts/jobs/current-document";
+import { selfContainedDocumentDraft } from "@resumora/contracts/editor/document";
 import { blankDraft, newRole, fact, type BaseDraft } from "../base/model";
 import { acceptWording, currentWording } from "../base/wording";
 import { contributionMarkup, patchFact } from "../base/editing";
@@ -86,7 +86,7 @@ it.each([undefined, ...cvTemplates.map((t) => t.versionId)])(
       scope: "experience",
       origin: "ai_generated",
     });
-    for (const draft of [d, selfContainedJobDraft(d)]) {
+    for (const draft of [d, selfContainedDocumentDraft(d)]) {
       const { container, unmount } = render(
         <DocumentPreview draft={draft} asOf={asOf} documentOnly />,
       );

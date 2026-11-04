@@ -16,40 +16,6 @@ import { SaveController } from "./controller";
 import { DocumentController } from "./document-controller";
 import { Button, useCopy } from "../components/ui";
 export class WorkspaceRegistry {
-  deletedJobs = new Set<string>();
-  private jobDrafts = new Map<string, Set<string>>();
-  trackJobDraft(jobId: string, key: string) {
-    let keys = this.jobDrafts.get(jobId);
-    if (!keys) {
-      keys = new Set();
-      this.jobDrafts.set(jobId, keys);
-    }
-    keys.add(key);
-  }
-  forgetJob(jobId: string) {
-    this.deletedJobs.add(jobId);
-    const keys = new Set([
-      `job-review:${jobId}`,
-      `job-answer:${jobId}`,
-      ...(this.jobDrafts.get(jobId) ?? []),
-    ]);
-    for (const key of keys) {
-      this.controllers.get(key)?.dispose();
-      this.controllers.delete(key);
-    }
-    this.jobDrafts.delete(jobId);
-    for (const [key, controller] of this.documents) {
-      if (key.startsWith(`job:${jobId}:`)) {
-        controller.dispose();
-        this.documents.delete(key);
-      }
-    }
-    this.commands.delete(`job-command:${jobId}`);
-    this.commands.delete(`job-answer-command:${jobId}`);
-    if (this.openedRoute.startsWith(`#/jobs/${jobId}`))
-      this.openedRoute = "#/jobs";
-    this.notify();
-  }
   openedRoute = "";
   opened(route: string) {
     if (this.openedRoute !== route) {
@@ -165,7 +131,7 @@ export class WorkspaceRegistry {
   }
   clearProfile() {
     for (const [key, c] of this.controllers) {
-      if (!["intake", "resume", "job-review"].includes(key.split(":")[0])) {
+      if (!["resume"].includes(key.split(":")[0])) {
         c.dispose();
         this.controllers.delete(key);
       }
@@ -188,8 +154,6 @@ export class WorkspaceRegistry {
     for (const d of this.documents.values()) d.dispose();
     this.documents.clear();
     this.commands.clear();
-    this.jobDrafts.clear();
-    this.deletedJobs.clear();
   }
 }
 export const WorkspaceContext = createContext<WorkspaceRegistry | null>(null);
@@ -361,11 +325,7 @@ export function WorkspaceRecovery() {
       ))}
       {failedDocuments.map(([key, d]) => (
         <div key={key}>
-          <span>
-            {key.startsWith("job:")
-              ? t("CV pentru job", "Job CV")
-              : t("Profilul meu", "My Profile")}
-          </span>
+          <span>{t("Profilul meu", "My Profile")}</span>
           <Button
             disabled={d.lock.current || !d.pending.current}
             onClick={() => {

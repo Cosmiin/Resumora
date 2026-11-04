@@ -1,15 +1,17 @@
-import { canonicalContentLocale } from '@resumora/contracts/editor/content-language';
-import { createImportTiming, type ImportTiming } from "@resumora/contracts/intelligence/import-timing";
+import { canonicalContentLocale } from "@resumora/contracts/editor/content-language";
+import {
+  createImportTiming,
+  type ImportTiming,
+} from "@resumora/contracts/intelligence/import-timing";
 import { cvImportLimits } from "@resumora/contracts/intelligence/import-limits";
 import { skillInventoryPolicy } from "@resumora/contracts/intelligence/skill-keywords";
-import { WorkflowOutputError } from "@resumora/contracts/jobs/workflow";
 import {
   prepareEnhancement,
   validateReasoningEffort,
   type ReasoningEffort,
 } from "../ai/enhancement.ts";
 import { configId, type EnhancementConfig } from "../ai/routes.ts";
-import { privateJson } from "../jobs/routes.ts";
+import { privateJson } from "../http/responses.ts";
 import type { UsageLedger } from "../ai/ledger.ts";
 import type { createDatabaseGateway } from "../db/supabase.ts";
 import { intelligenceOperations, type StructuredRunner } from "./operations.ts";
@@ -62,13 +64,16 @@ export async function configuredIntelligenceRoute(
     new URL(request.url).pathname === "/v1/intelligence/experience";
   const skillsImprovement = path === "/v1/intelligence/skills";
   // Retain completion/receipt after a browser disconnect; never extend paid work beyond its deadline.
-  const signal = experience || skillsImprovement
-    ? AbortSignal.timeout(skillsImprovement ? 180000 : 25000)
-    : AbortSignal.any([
-        request.signal,
-        AbortSignal.timeout(cvImportLimits.processingMs),
-      ]);
-  const skillsSignal = experience ? AbortSignal.timeout(skillInventoryPolicy.totalMs) : signal;
+  const signal =
+    experience || skillsImprovement
+      ? AbortSignal.timeout(skillsImprovement ? 180000 : 25000)
+      : AbortSignal.any([
+          request.signal,
+          AbortSignal.timeout(cvImportLimits.processingMs),
+        ]);
+  const skillsSignal = experience
+    ? AbortSignal.timeout(skillInventoryPolicy.totalMs)
+    : signal;
   const secret = env.AI_WORKER_SECRET ?? "",
     policy = env.AI_PROCESSING_POLICY ?? "";
   const ledger: UsageLedger = {
@@ -83,15 +88,19 @@ export async function configuredIntelligenceRoute(
     ? async () => {
         throw new Error("READ_ONLY_OPERATION");
       }
-    : task => configuredStructuredRunner(
-        env,
-        userId,
-        ledger,
-        experience && task.promptVersion === skillInventoryPolicy.promptVersion ? skillsSignal : signal,
-        transport,
-        gateway.reserveDocumentOperation,
-        gateway.reserveEnhancement,
-      )(task);
+    : (task) =>
+        configuredStructuredRunner(
+          env,
+          userId,
+          ledger,
+          experience &&
+            task.promptVersion === skillInventoryPolicy.promptVersion
+            ? skillsSignal
+            : signal,
+          transport,
+          gateway.reserveDocumentOperation,
+          gateway.reserveEnhancement,
+        )(task);
   const operations = intelligenceOperations(run),
     store = gateway.createImportStore(secret);
   const workflow = importWorkflow({ store });
@@ -106,7 +115,8 @@ export async function configuredIntelligenceRoute(
       getWorkspaceOperation: gateway.getWorkspaceOperation,
       beginWorkspaceOperation: gateway.beginWorkspaceOperation,
       finishWorkspaceOperation: gateway.finishWorkspaceOperation
-        ? (id, state, result) => gateway.finishWorkspaceOperation(id, state, result, secret)
+        ? (id, state, result) =>
+            gateway.finishWorkspaceOperation(id, state, result, secret)
         : undefined,
       loadSnapshot: gateway.loadSnapshot,
       loadDraft: gateway.loadDraft,
@@ -123,11 +133,12 @@ export async function configuredIntelligenceRoute(
         ).created,
     },
   });
-  if (experience || skillsImprovement) execution.waitUntil?.(response.then(() => undefined));
+  if (experience || skillsImprovement)
+    execution.waitUntil?.(response.then(() => undefined));
   return response;
 }
 
-/** Shared bounded provider/usage runner used by CV import and queued job operations. */
+/** Shared bounded provider/usage runner used by CV import and enrichment operations. */
 export function configuredStructuredRunner(
   env: IntelligenceConfig,
   userId: string,
@@ -147,10 +158,22 @@ export function configuredStructuredRunner(
     policy = env.AI_PROCESSING_POLICY ?? "";
   const reasoningEffort = validateReasoningEffort(env.AI_REASONING_EFFORT);
   const run: StructuredRunner = async (task) => {
-    const skillInventory = [skillInventoryPolicy.promptVersion, "skills-improvement/3"].includes(task.promptVersion) &&
-      task.operation === "cv_rewrite" && task.tier === "career";
-    const operationTiming = task.promptVersion.startsWith('experience-')
-      ? createImportTiming('server', task.parentOperationId ?? task.operationId, { emit: event => { console.debug('experience-timing', event); } })
+    const skillInventory =
+      [skillInventoryPolicy.promptVersion, "skills-improvement/3"].includes(
+        task.promptVersion,
+      ) &&
+      task.operation === "cv_rewrite" &&
+      task.tier === "career";
+    const operationTiming = task.promptVersion.startsWith("experience-")
+      ? createImportTiming(
+          "server",
+          task.parentOperationId ?? task.operationId,
+          {
+            emit: (event) => {
+              console.debug("experience-timing", event);
+            },
+          },
+        )
       : timing;
     if (!enabled) throw new Error("AI_DISABLED");
     const word = task.fileFormat === "doc" || task.fileFormat === "docx";
@@ -199,7 +222,9 @@ export function configuredStructuredRunner(
     }
     if (task.careerSnapshot) {
       if (!reserveCareer) throw new Error("AI_UNCONFIGURED");
-      const reservationDone = operationTiming?.span('stage_reservation', { stageOperationId: task.operationId });
+      const reservationDone = operationTiming?.span("stage_reservation", {
+        stageOperationId: task.operationId,
+      });
       const reserved = await reserveCareer({
         operationId: task.operationId,
         snapshotId: task.careerSnapshot.snapshotId,
@@ -236,7 +261,11 @@ export function configuredStructuredRunner(
         };
     let validationReason = "NOT_REACHED";
     const runner = prepareEnhancement({
-      timing: task.operation === "cv_parse" || task.promptVersion.startsWith('experience-') ? operationTiming : undefined,
+      timing:
+        task.operation === "cv_parse" ||
+        task.promptVersion.startsWith("experience-")
+          ? operationTiming
+          : undefined,
       execution: "configured",
       processingPolicy: policy,
       reasoningEffort,
@@ -250,13 +279,17 @@ export function configuredStructuredRunner(
       totalTimeoutMs:
         task.operation === "cv_parse" && task.tier === "extraction"
           ? cvImportLimits.extractionTotalMs
-          : skillInventory ? skillInventoryPolicy.totalMs : 30000,
+          : skillInventory
+            ? skillInventoryPolicy.totalMs
+            : 30000,
       attemptTimeoutMs:
         task.tier === "admission"
           ? 8000
           : task.operation === "cv_parse" && task.tier === "extraction"
             ? cvImportLimits.extractionAttemptMs
-            : skillInventory ? skillInventoryPolicy.attemptMs : 25000,
+            : skillInventory
+              ? skillInventoryPolicy.attemptMs
+              : 25000,
       structured: {
         request: {
           ...task,
@@ -273,11 +306,17 @@ export function configuredStructuredRunner(
             return result;
           } catch (error) {
             const code = error instanceof Error ? error.message : "";
-            const skillReason = (error as { validationReason?: unknown })?.validationReason;
+            const skillReason = (error as { validationReason?: unknown })
+              ?.validationReason;
             validationReason =
-              error instanceof WorkflowOutputError
-                ? error.reason
-                : task.promptVersion === "skills-improvement/3" && typeof skillReason === "string" && ["SKILLS_RESPONSE_SHAPE", "SKILLS_ROW_SHAPE", "SKILLS_LABEL_INVALID", "SKILLS_REMOVAL_INVALID"].includes(skillReason)
+              task.promptVersion === "skills-improvement/3" &&
+              typeof skillReason === "string" &&
+              [
+                "SKILLS_RESPONSE_SHAPE",
+                "SKILLS_ROW_SHAPE",
+                "SKILLS_LABEL_INVALID",
+                "SKILLS_REMOVAL_INVALID",
+              ].includes(skillReason)
                 ? skillReason
                 : [
                       "QUESTION_OUTPUT",
@@ -302,7 +341,16 @@ export function configuredStructuredRunner(
       userId,
       context: {
         targetId: task.operationId,
-        locale: canonicalContentLocale(task.contentLocale) ?? canonicalContentLocale((task.input as { locale?: unknown; targetLocale?: unknown })?.locale) ?? canonicalContentLocale((task.input as { targetLocale?: unknown })?.targetLocale) ?? "ro",
+        locale:
+          canonicalContentLocale(task.contentLocale) ??
+          canonicalContentLocale(
+            (task.input as { locale?: unknown; targetLocale?: unknown })
+              ?.locale,
+          ) ??
+          canonicalContentLocale(
+            (task.input as { targetLocale?: unknown })?.targetLocale,
+          ) ??
+          "ro",
         facts: [
           {
             id: task.operationId,
@@ -321,8 +369,10 @@ export function configuredStructuredRunner(
         last?.errorCode === "OUTPUT_INVALID" ||
         last?.errorCode === "OUTPUT_UNSUPPORTED";
       const importing = task.operation === "cv_parse";
-      const job = task.promptVersion.startsWith("AIW.");
-      const experience = task.promptVersion.startsWith("experience-") || task.promptVersion === "cv-language/1" || task.promptVersion === "skills-improvement/3";
+      const experience =
+        task.promptVersion.startsWith("experience-") ||
+        task.promptVersion === "cv-language/1" ||
+        task.promptVersion === "skills-improvement/3";
       const questions = task.promptVersion.startsWith("career.questions.");
       const rewrite = task.promptVersion.startsWith("career.role-rewrite.");
       const uncertain = result.attempts.some(
@@ -337,15 +387,13 @@ export function configuredStructuredRunner(
         (a) => a.result?.errorCode === "TIMEOUT",
       );
       const code =
-        (importing || questions || rewrite || job || experience) && uncertain
+        (importing || questions || rewrite || experience) && uncertain
           ? timedOut
             ? "AI_TIMEOUT_UNKNOWN"
             : "AI_REQUEST_UNKNOWN"
-          : (importing || questions || rewrite || job || experience) &&
-              truncated
+          : (importing || questions || rewrite || experience) && truncated
             ? "AI_OUTPUT_TRUNCATED"
-            : (importing || questions || rewrite || job || experience) &&
-                invalid
+            : (importing || questions || rewrite || experience) && invalid
               ? "AI_OUTPUT_INVALID"
               : (rewrite || experience) &&
                   last?.errorCode === "PROVIDER_REJECTED"
@@ -355,13 +403,9 @@ export function configuredStructuredRunner(
                   : rewrite || experience
                     ? "AI_REQUEST_UNKNOWN"
                     : "PROVIDER_OUTPUT_UNAVAILABLE";
-      if (questions || job || experience)
+      if (questions || experience)
         console.warn(
-          experience
-            ? "ai-experience-outcome"
-            : job
-              ? "ai-job-outcome"
-              : "ai-questions-outcome",
+          experience ? "ai-experience-outcome" : "ai-questions-outcome",
           {
             stage: task.promptVersion,
             code,

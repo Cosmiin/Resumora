@@ -1,20 +1,16 @@
-import { transcriptionRoute, voiceTypes } from "./intelligence/transcription.ts";
+import {
+  transcriptionRoute,
+  voiceTypes,
+} from "./intelligence/transcription.ts";
 import { drainCvImports } from "./intelligence/import-processor.ts";
 import { isLanguagePath, configuredLanguageRoute } from "./languages/routes.ts";
 import { exportRoute, type ExportConfig } from "./export/routes.ts";
-import { processJobWorkflow,drainJobWorkflows } from "./jobs/processor.ts";
-import { jobWorkflowRoute } from "./jobs/workflow.ts";
-import { extensionRoute } from "./extension/routes.ts";
-import { processCaptures } from "./extension/processor.ts";
-import type { CaptureConfig } from "./extension/gateway.ts";
-import { currentJobDocumentsRoute } from "./jobs/current-documents.ts";
 import { photoRoute } from "./photos/routes.ts";
 import {
   configuredIntelligenceRoute,
   type IntelligenceConfig,
 } from "./intelligence/configured.ts";
 import { isIntelligencePath } from "./intelligence/routes.ts";
-import { jobsRoute } from "./jobs/routes.ts";
 import { enhancementRoute, type EnhancementConfig } from "./ai/routes.ts";
 import type { ApiError, HealthResponse } from "@resumora/contracts";
 import { adminRoute } from "./admin/routes.ts";
@@ -28,7 +24,12 @@ import { isWorkspacePath, workspaceRoute } from "./workspace/routes.ts";
 
 // Private endpoints use the authenticated user token; paid inference is OFF by default.
 interface Env
-  extends AdminAuthConfig, AuthConfig, EnhancementConfig, IntelligenceConfig, CaptureConfig, ExportConfig {
+  extends
+    AdminAuthConfig,
+    AuthConfig,
+    EnhancementConfig,
+    IntelligenceConfig,
+    ExportConfig {
   APP_ENV: "development";
   PHOTO_WORKER_SECRET?: string;
 }
@@ -60,16 +61,14 @@ function json(
 
 export default {
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
-    await Promise.all([drainCvImports(env), processCaptures(env), drainJobWorkflows(env)]);
+    await drainCvImports(env);
   },
-  async fetch(request: Request, env: Env, context?: Pick<ExecutionContext,"waitUntil">): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    context?: Pick<ExecutionContext, "waitUntil">,
+  ): Promise<Response> {
     const path = new URL(request.url).pathname;
-    if (path.startsWith('/v1/extension/') || path === '/v1/jobs/capture-status' ||
-      (path === '/v1/jobs' && (request.headers.has('Authorization') || request.method === 'OPTIONS' || request.headers.get('Origin')?.startsWith('chrome-extension://'))))
-      { const response=await extensionRoute(request, env);
-        if(response.ok && path==='/v1/jobs')context?.waitUntil(processJobWorkflow(env).catch(()=>undefined));
-        return response;
-      }
     if (path === "/admin/ai" || path === "/v1/admin/ai/usage")
       return adminRoute(request, env);
     if (authMethods[path]) return authRoute(request, env);
@@ -80,8 +79,6 @@ export default {
       isLanguagePath(path) ||
       cvPaths.has(path) ||
       path === "/v1/exports/pdf" ||
-      path === "/v1/jobs" ||
-      path.startsWith("/v1/jobs/") ||
       path === "/v1/enhancement" ||
       path === "/v1/photos" ||
       path.startsWith("/v1/photos/")
@@ -97,56 +94,70 @@ export default {
           path === "/v1/intelligence/transcriptions"
             ? voiceTypes
             : path === "/v1/photos"
-            ? ["image/jpeg", "image/png", "image/webp"]
-            : path === "/v1/intelligence/imports"
-              ? ["application/octet-stream"]
-              : ["application/json"],
+              ? ["image/jpeg", "image/png", "image/webp"]
+              : path === "/v1/intelligence/imports"
+                ? ["application/octet-stream"]
+                : ["application/json"],
         ))
       )
         return authError("FORBIDDEN", 403, identity.headers);
       let response: Response;
       try {
         const gateway = createDatabaseGateway(env, identity);
-        const transcription = path === "/v1/intelligence/transcriptions"
-          ? transcriptionRoute(request, env, gateway, identity.user.id) : undefined;
-        if (transcription) context?.waitUntil(transcription.then(() => undefined));
-        response = transcription ? await transcription : isWorkspacePath(path) ? await workspaceRoute(request,env,gateway,identity.user.id,{waitUntil:context?.waitUntil.bind(context)}) : isLanguagePath(path) ? await configuredLanguageRoute(request,env,gateway,identity.user.id) : path === "/v1/exports/pdf"
-          ? await exportRoute(request,gateway,env)
-          : isIntelligencePath(path)
-          ? await configuredIntelligenceRoute(
-              request,
-              env,
-              gateway,
-              identity.user.id,
-              fetch,
-              {waitUntil:context?.waitUntil.bind(context)},
-            )
-          : path === "/v1/enhancement"
-            ? await enhancementRoute(request, env, gateway, identity.user.id)
-            : /^\/v1\/jobs\/[^/]+\/cv(?:\/|$)/.test(path)
-              ? await currentJobDocumentsRoute(request, gateway)
-              : /^\/v1\/jobs\/[^/]+\/workflow(?:\/|$)/.test(path)
-                ? await jobWorkflowRoute(request,gateway,env.AI_PAID_INFERENCE==='on')
-                : path.startsWith("/v1/jobs")
-                ? await jobsRoute(request, gateway)
-                : path.startsWith("/v1/photos")
-                  ? await photoRoute(
+        const transcription =
+          path === "/v1/intelligence/transcriptions"
+            ? transcriptionRoute(request, env, gateway, identity.user.id)
+            : undefined;
+        if (transcription)
+          context?.waitUntil(transcription.then(() => undefined));
+        response = transcription
+          ? await transcription
+          : isWorkspacePath(path)
+            ? await workspaceRoute(request, env, gateway, identity.user.id, {
+                waitUntil: context?.waitUntil.bind(context),
+              })
+            : isLanguagePath(path)
+              ? await configuredLanguageRoute(
+                  request,
+                  env,
+                  gateway,
+                  identity.user.id,
+                )
+              : path === "/v1/exports/pdf"
+                ? await exportRoute(request, gateway, env)
+                : isIntelligencePath(path)
+                  ? await configuredIntelligenceRoute(
                       request,
+                      env,
                       gateway,
-                      env.PHOTO_WORKER_SECRET,
-                      (bytes) =>
-                        import("./photos/normalize.ts").then((module) =>
-                          module.normalizePhoto(bytes),
-                        ),
+                      identity.user.id,
+                      fetch,
+                      { waitUntil: context?.waitUntil.bind(context) },
                     )
-                  : await cvRoute(request, gateway);
+                  : path === "/v1/enhancement"
+                    ? await enhancementRoute(
+                        request,
+                        env,
+                        gateway,
+                        identity.user.id,
+                      )
+                    : path.startsWith("/v1/photos")
+                      ? await photoRoute(
+                          request,
+                          gateway,
+                          env.PHOTO_WORKER_SECRET,
+                          (bytes) =>
+                            import("./photos/normalize.ts").then((module) =>
+                              module.normalizePhoto(bytes),
+                            ),
+                        )
+                      : await cvRoute(request, gateway);
       } catch {
         response = Response.json(
           { error: { code: "unavailable" } },
           { status: 503 },
         );
       }
-      if(response.ok && request.method==='POST' && ((path==='/v1/jobs'||path==='/v1/jobs/url'||/^\/v1\/jobs\/intakes\/[^/]+\/submit$/.test(path)) || /\/workflow\/(fetch|extract|match|tailor|prepare)$/.test(path)))context?.waitUntil(processJobWorkflow(env).catch(()=>undefined));
       const headers = new Headers(response.headers);
       for (const [name, value] of identity.headers) headers.set(name, value);
       return new Response(response.body, {

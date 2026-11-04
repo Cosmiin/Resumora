@@ -8,13 +8,13 @@ Extraction returns `label`, `category` and `importance`. Cleanup returns those f
 
 Validation checks object shape, field types, string/list limits, categories, importance and valid inventory IDs. Removed IDs cannot also be retained. There is no quotation matching, cited-fact lookup, named-tool support check, numeric-claim check, keyword grammar rejection or semantic merge/deletion gate. The prompts remain responsible for relevant extraction, concise naming, classification, meaningful retention and sensible removals. Inputs omitted by cleanup are carried forward unchanged.
 
-Both categories show at most 20 skills. Overflow stays in reserves for future tailoring. Ranking uses core/supporting importance followed by canonical alphabetical ordering. Synonym deduplication and explicit user exclusions remain.
+Both categories show at most 20 skills. Overflow stays in the saved skills inventory. Ranking uses core/supporting importance followed by canonical alphabetical ordering. Synonym deduplication and explicit user exclusions remain.
 
 ## References removed
 
 Skills have no source icon, source tooltip, imported-skill “View source” action, quotes, supporting experience links, inferred/explicit flag or origin label. Historical `skillEvidence` and `skillOrigin` fields are accepted only for compatibility and discarded during encode/decode; historical suggestion references are discarded too. Shared CV import provenance remains because other editor features use it.
 
-Job matching and tailoring use skill names and IDs without origin metadata. A skill name alone does not demonstrate work experience, and career prose must use actual experience evidence.
+A skill name alone does not demonstrate work experience; career prose uses actual experience evidence.
 
 ## Editing lock, saving and recovery
 

@@ -12,7 +12,7 @@ Date: 3 November 2026. Scope: the master profile's “Add skills from experience
 - Category boundaries were inconsistent: the new brief includes technical implementation methods, whereas the old guidance emphasized explicitly named tools and technologies.
 - Deduplication mainly folded case and whitespace. Cross-language labels and synonyms could repeat a competency.
 - A valid short cached result never refreshed for a new extraction policy.
-- Accepted skills retained source lineage, but detailed evidence stayed in replaceable experience receipts. Self-contained job copies drop those receipts.
+- Accepted skills retained source lineage, but detailed evidence stayed in replaceable experience receipts.
 - The 3,000-token output limit was accompanied by a 25-second outer request deadline, a 30-second provider ceiling and a 45-second browser deadline. Raising tokens alone would leave extraction cut short.
 
 ## Implementation
@@ -27,7 +27,7 @@ Labels normally use 1–2 words. Established names may use up to eight words / 1
 
 The profile waits for the batch, including deferred experiences, to settle before choosing additions. Core skills rank before supporting skills, followed by breadth of support across experiences, explicit evidence, and a stable label tie-break. Automatic additions respect the remaining capacity in each category. Existing content, identities and user exclusions remain authoritative. Prior saved/imported/manual lists above 30 are preserved rather than silently pruned; automatic extraction adds no further skills to a full category.
 
-Optional evidence metadata is stored on each accepted skill Fact, independently of generation receipts. It retains original-language quotations and inference details through serialization and self-contained job copies. Existing readers continue to accept older Facts and receipts. Tailoring continues to select/reorder existing skill IDs. Editing a skill through the existing editor creates a new authored Fact and does not falsely carry forward an old skill's inference metadata. Changed/removed source evidence can still trigger support warnings.
+Optional evidence metadata is stored on each accepted skill Fact, independently of generation receipts. It retains original-language quotations and inference details through serialization. Existing readers continue to accept older Facts and receipts. Editing a skill through the existing editor creates a new authored Fact and does not falsely carry forward an old skill's inference metadata. Changed/removed source evidence can still trigger support warnings.
 
 The skills-specific output ceiling is 12,000 tokens: up to 60 small structured records, bounded quotes/rationales and room for provider reasoning. It is a maximum, not a requested output length. Provider attempts have 60 seconds within a 90-second skills request budget, and the browser waits up to 95 seconds. Other operation budgets remain unchanged. Truncated/invalid output is not accepted as a complete inventory. These limits have transport tests but are not a live latency/cost benchmark.
 
@@ -54,10 +54,10 @@ These are hand-reviewed expected outputs from fictional fixtures passed through 
 Regression tests were first observed failing for the missing capacity, metadata, alias handling, source persistence, policy refresh, language resolution and deadline behaviors, then implemented. Tests exercise real parsers, request builders, serialization, UI components and consolidation; only network/model responses are mocked.
 
 - API coverage: multilingual fixtures, empty/unsupported evidence, hidden/draft/superseded facts, inferred versus explicit metadata, category boundaries, aliases, 60 candidates, official names, unknown citations/numbers/tools, existing-skill deduplication, primary/fallback request serialization, outer deadlines and receipt settlement.
-- Frontend coverage: one-click insertion without dialogs, full/deferred batch ranking, 30-per-category capacity, preservation of older/manual data and exclusions, stale cache refresh, concurrent edits, save gating, uncertain-operation recovery, partial failures, evidence round-trips, job copies and browser deadlines.
-- Existing experience, guided-experience, import-skills, skill-tag and job-workflow tests are included as focused compatibility checks.
+- Frontend coverage: one-click insertion without dialogs, full/deferred batch ranking, 30-per-category capacity, preservation of older/manual data and exclusions, stale cache refresh, concurrent edits, save gating, uncertain-operation recovery, partial failures, evidence round-trips and browser deadlines.
+- Existing experience, guided-experience, import-skills, and skill-tag tests are included as focused compatibility checks.
 - No live provider calls or production-data mutations were made. Fictional expected outputs do not establish live precision/recall or latency.
-- Workspace-wide `npm run typecheck` is not green during concurrent language development: generalized content-locale strings still reach consumers typed as `ro | en`. The last check reported sites in API `enhancement-context.ts:85`, `experience-operations.ts:276,408`, and web `App.tsx:244,810,1437`, `DocumentContent.tsx:512`, `ExperienceEnrichment.tsx:1314`, `GuidedExperience.tsx:378,432`, `JobWorkflow.tsx:497`, `JobsWorkspace.tsx:394,485`, `useExperienceScore.ts:35`. These are the parallel locale propagation work; they were not narrowed back to Romanian/English to make this task's typecheck pass.
+- Workspace-wide `npm run typecheck` is not green during concurrent language development: generalized content-locale strings still reach consumers typed as `ro | en`. The last check reported sites in API `enhancement-context.ts:85`, `experience-operations.ts:276,408`, and web `App.tsx:244,810,1437`, `DocumentContent.tsx:512`, `ExperienceEnrichment.tsx:1314`, `GuidedExperience.tsx:378,432`, `useExperienceScore.ts:35`. These are the parallel locale propagation work; they were not narrowed back to Romanian/English to make this task's typecheck pass.
 
 One focused review found three lifecycle defects and all three received failing-then-passing regressions: deferred roles now participate before selection; insertion is armed only for an active discovery batch, so a later manual deletion cannot silently refill capacity; automatic insertion requires the current extraction policy, so failed refreshes cannot apply legacy classifications. Historical receipts remain readable.
 
@@ -66,7 +66,7 @@ Final results: **99 API tests passed; 69 frontend tests passed; `git diff --chec
 Commands used for the final focused verification:
 
 ```sh
-node --experimental-strip-types --test apps/api/tests/skills-inventory.test.mjs apps/api/tests/skills-transport.test.mjs apps/api/tests/experience-assistant.test.mjs apps/api/tests/enhancement.test.mjs apps/api/tests/guided-experience.test.mjs apps/api/tests/job-workflow.test.mjs
+node --experimental-strip-types --test apps/api/tests/skills-inventory.test.mjs apps/api/tests/skills-transport.test.mjs apps/api/tests/experience-assistant.test.mjs apps/api/tests/enhancement.test.mjs apps/api/tests/guided-experience.test.mjs
 npm run test --workspace @resumora/web -- src/base/profile-skills.test.ts src/components/profile-skills.test.tsx src/components/experience-assistant.test.tsx src/base/intelligence-stream.test.ts src/components/import-skills.test.tsx src/components/skill-tag-rows.test.tsx
 npm run typecheck
 git diff --check

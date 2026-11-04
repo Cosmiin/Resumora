@@ -7,9 +7,9 @@ import {
   type TranslationSource,
 } from "@resumora/contracts/editor/languages";
 import { validateDocumentLocale } from "@resumora/contracts/intelligence/translation";
-import { isUuid } from "@resumora/contracts/jobs/connected";
+import { isUuid } from "@resumora/contracts/editor/identity";
 import { readBody } from "../cv/routes.ts";
-import { privateJson, routeError } from "../jobs/routes.ts";
+import { privateJson, routeError } from "../http/responses.ts";
 import { languageWorkflow, LanguageError } from "./workflow.ts";
 import { intelligenceOperations } from "../intelligence/operations.ts";
 import {
@@ -29,15 +29,8 @@ const keys = (v: Record<string, unknown>, allowed: string[]) =>
 function pin(v: unknown): v is TranslationSource {
   return (
     object(v) &&
-    keys(v, [
-      "kind",
-      "jobId",
-      "documentId",
-      "currentId",
-      "revision",
-      "fingerprint",
-    ]) &&
-    ["base", "job"].includes(String(v.kind)) &&
+    keys(v, ["kind", "documentId", "currentId", "revision", "fingerprint"]) &&
+    v.kind === "base" &&
     isUuid(v.currentId) &&
     typeof v.documentId === "string" &&
     v.documentId.length > 0 &&
@@ -45,10 +38,7 @@ function pin(v: unknown): v is TranslationSource {
     Number.isSafeInteger(v.revision) &&
     Number(v.revision) > 0 &&
     typeof v.fingerprint === "string" &&
-    /^[a-f0-9]{64}$/.test(v.fingerprint) &&
-    (v.kind === "base"
-      ? !Object.hasOwn(v, "jobId")
-      : isUuid(v.jobId) && isUuid(v.documentId))
+    /^[a-f0-9]{64}$/.test(v.fingerprint)
   );
 }
 export const isLanguagePath = (path: string) =>
@@ -78,41 +68,21 @@ export async function languageRoute(
       if (request.method !== "GET")
         return privateJson({ error: { code: "method" } }, 405);
       if (
-        [...url.searchParams.keys()].some(
-          (k) => !["jobId", "sourceLocale"].includes(k),
-        )
+        [...url.searchParams.keys()].some((k) => !["sourceLocale"].includes(k))
       )
         throw new LanguageError("invalidRequest", 400);
-      const jobId = url.searchParams.get("jobId") ?? undefined,
-        locale = url.searchParams.get("sourceLocale");
-      if (jobId && !isUuid(jobId))
-        throw new LanguageError("invalidRequest", 400);
+      const locale = url.searchParams.get("sourceLocale");
       if (locale) validateDocumentLocale(locale);
-      const context = await db.languageContext(jobId);
-      let row = context.source;
-      if (jobId && locale)
-        row = (await db.loadCurrentJobDocument(
-          jobId,
-          locale,
-        )) as typeof row;
+      const context = await db.languageContext();
+      const row = context.source;
       if (!row)
         return privateJson({ source: null, versions: context.versions });
-      let draft = decodeDraft(row.payload);
-      if (draft.translation && jobId) {
-        row = (await db.loadCurrentJobDocument(
-          jobId,
-          draft.translation.sourceLocale,
-        )) as typeof row;
-        if (!row)
-          return privateJson({ source: null, versions: context.versions });
-        draft = decodeDraft(row.payload);
-      }
+      const draft = decodeDraft(row.payload);
       if (draft.translation)
         throw new LanguageError("authoritativeSourceRequired");
       const source: TranslationSource = {
-        kind: jobId ? "job" : "base",
-        ...(jobId ? { jobId } : {}),
-        documentId: jobId ? row.documentId! : draft.id,
+        kind: "base",
+        documentId: draft.id,
         currentId: row.id,
         revision: row.revision,
         fingerprint: row.fingerprint,
@@ -240,13 +210,7 @@ export async function languageRoute(
       const variantId =
         "lang_" +
         (await componentFingerprint([body.source.documentId, targetLocale]));
-      const target =
-        body.source.kind === "job"
-          ? await db.loadCurrentJobDocument(
-              body.source.jobId!,
-              targetLocale,
-            )
-          : await db.loadBaseLanguage(variantId);
+      const target = await db.loadBaseLanguage(variantId);
       if (
         !Number.isSafeInteger(body.expectedTargetRevision) ||
         Number(body.expectedTargetRevision) !== (target?.revision ?? 0)
@@ -257,8 +221,7 @@ export async function languageRoute(
         sourceLocale,
         targetLocale,
         targetRevision: target?.revision ?? 0,
-        targetDocumentId:
-          target && "documentId" in target ? target.documentId : null,
+        targetDocumentId: null,
         variantId,
         sectionIds: body.sectionIds as string[],
         glossary: body.glossary as LanguageRequest["glossary"],

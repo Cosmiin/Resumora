@@ -49,9 +49,7 @@ async function open(adapter: BaseCvAdapter) {
 async function confirmRemoval() {
   fireEvent.click(screen.getByRole("button", { name: "Remove Base CV" }));
   const dialog = await screen.findByRole("dialog");
-  expect(dialog.textContent).toContain(
-    "Current tailored CVs for each job and language remain",
-  );
+  expect(dialog.textContent).toContain("This cannot be undone");
   fireEvent.click(
     within(dialog).getByRole("button", { name: "Permanently remove Base CV" }),
   );
@@ -149,18 +147,6 @@ it("retains an unknown removal operation and prevents autosave while retrying th
   await screen.findByRole("button", { name: "Enter manually" });
   expect(seen).toHaveLength(2);
   expect(seen[0]).toBe(seen[1]);
-});
-
-it("keeps the Base and explains a canonical-current preservation refusal", async () => {
-  const { adapter, snapshot } = await seeded();
-  vi.spyOn(adapter, "remove").mockRejectedValue(
-    new AdapterError("preservationRequired"),
-  );
-  await open(adapter);
-  await confirmRemoval();
-  await screen.findByText(/Nothing was removed. An older tailored CV/);
-  expect((await adapter.load())!.id).toBe(snapshot.id);
-  expect(await adapter.history()).toHaveLength(1);
 });
 
 it("rechecks its own authenticated lifecycle on a cross-tab signal and discards old context", async () => {

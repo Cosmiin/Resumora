@@ -77,8 +77,7 @@ def validate(cv):
     assert set(cv['document']['contactIds'])<=contacts.keys(),'dangling contact'
     assert all(contacts[c]['visibility']=='export' for c in cv['document']['contactIds']),'private contact selected for export'
     ctx=cv['context']
-    assert (ctx['kind']=='tailored')==(ctx['baseSnapshotId'] is not None and ctx['jobSnapshotId'] is not None),'tailored lineage required'
-    if ctx['kind']=='base':assert not any(ctx[k] for k in ['baseSnapshotId','jobSnapshotId','previousTailoredSnapshotId']),'base has tailored context'
+    assert ctx=={'kind':'base'},'invalid context'
     return True
 
 def export_projection(cv):
@@ -91,8 +90,6 @@ def export_projection(cv):
 def main():
     Draft202012Validator.check_schema(SCHEMA)
     for p in sorted((HERE/'fixtures').glob('*.json')):
-        if 'workspace' in p.stem:
-            continue  # Companion workspace fixtures have a separate versioned contract.
         validate(json.loads(p.read_text()));print('PASS',p.name)
     full=json.loads((HERE/'fixtures/full-ro.json').read_text())
     cases=[]
@@ -111,7 +108,7 @@ def main():
     bad('impossible dates',lambda c:next(x for x in c['claims'] if x['id']=='claim_start_a').update(value={'year':2025}))
     bad('missing source',lambda c:c.update(sources=[]))
     bad('three title slots',lambda c:c['facts']['positioningTitleClaimIds'].append(None))
-    bad('tailored lineage',lambda c:c['context'].update(kind='tailored'))
+    bad('invalid context',lambda c:c['context'].update(kind='unsupported'))
     bad('unknown invented property',lambda c:c.update(inventedExperience=10))
     for name,c in cases:
         try:validate(c)
@@ -121,8 +118,6 @@ def main():
     assert 'Strada Sintetică' not in json.dumps(exported,ensure_ascii=False)
     assert len(exported['prose'])==1
     assert full['facts']['employment'][1]['ongoing']
-    tail=json.loads((HERE/'fixtures/tailored-en.json').read_text())
-    assert tail['document']['sectionOrder'][1]=='section_projects'
-    print('PASS privacy projection, pending prose exclusion, concurrent/partial/ongoing dates, bilingual independent ordering')
+    print('PASS privacy projection, pending prose exclusion, concurrent/partial/ongoing dates')
     print('RESULT: canonical CV fixtures passed; 15 negative cases rejected; schema and relational checks passed')
 if __name__=='__main__':main()

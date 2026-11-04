@@ -1,5 +1,5 @@
 import { canonicalContentLocale } from "@resumora/contracts/editor/content-language";
-/** Established base/job aliases retain their historical identity. */
+/** Established Base aliases retain their historical identity. */
 export function documentLocaleKey(locale: string) {
   const canonical = canonicalContentLocale(locale) ?? locale;
   return canonical === "ro-RO"
@@ -15,29 +15,16 @@ export const routes = [
   "review",
   "enrich",
   "history",
-  "jobs",
   "account",
 ] as const;
 export type Route = (typeof routes)[number] | "missing";
 
 export type WorkspaceLocation = {
-  destination: "profile" | "jobs";
-  view:
-    | "profile"
-    | "enrich"
-    | "import"
-    | "history"
-    | "profile-cv"
-    | "jobs"
-    | "intake"
-    | "job"
-    | "missing";
-  jobId?: string;
+  destination: "profile";
+  view: "profile" | "enrich" | "import" | "history" | "profile-cv" | "missing";
   targetId?: string;
   importId?: string;
-  draftId?: string;
   locale?: string;
-  panel?: "details" | "cv" | "answers" | "appearance";
   canonical: string;
 };
 const resource =
@@ -50,7 +37,6 @@ export function workspaceLocation(hash: string): WorkspaceLocation {
     review: "/profile",
     enrich: "/profile/enrich",
     history: "/profile/history",
-    jobs: "/jobs",
     account: "/profile",
   };
   const raw = hash.replace(/^#/, "");
@@ -58,12 +44,7 @@ export function workspaceLocation(hash: string): WorkspaceLocation {
   try {
     const url = new URL(path, "http://local"),
       parts = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
-    const panel = url.searchParams.get("panel");
-    const mode =
-      panel && ["details", "cv", "answers", "appearance"].includes(panel)
-        ? (panel as WorkspaceLocation["panel"])
-        : undefined;
-    const canonical = "#" + url.pathname + (mode ? "?panel=" + mode : "");
+    const canonical = "#" + url.pathname;
     if (parts[0] === "profile") {
       if (parts.length === 1)
         return { destination: "profile", view: "profile", canonical };
@@ -96,32 +77,6 @@ export function workspaceLocation(hash: string): WorkspaceLocation {
           destination: "profile",
           view: "profile-cv",
           locale: canonicalContentLocale(parts[2])!,
-          canonical,
-        };
-    }
-    if (parts[0] === "jobs") {
-      if (parts.length === 1)
-        return { destination: "jobs", view: "jobs", canonical };
-      if (parts[1] === "new" && parts.length === 3 && resource.test(parts[2]))
-        return {
-          destination: "jobs",
-          view: "intake",
-          draftId: parts[2],
-          canonical,
-        };
-      if (
-        resource.test(parts[1] ?? "") &&
-        (parts.length === 2 ||
-          (parts.length === 4 &&
-            parts[2] === "cv" &&
-            !!canonicalContentLocale(parts[3])))
-      )
-        return {
-          destination: "jobs",
-          view: "job",
-          jobId: parts[1],
-          locale: parts[3] ? canonicalContentLocale(parts[3])! : undefined,
-          panel: mode ?? (parts[2] === "cv" ? "cv" : "details"),
           canonical,
         };
     }

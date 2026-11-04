@@ -7,7 +7,6 @@ import type {
   DraftSnapshot,
   EditorWireEnvelope,
 } from "@resumora/contracts/editor/transport";
-import type { CurrentJobDocument } from "@resumora/contracts/jobs/current-document";
 export type {
   LanguageRequest,
   LanguageReview,
@@ -38,7 +37,7 @@ export type LanguageContext = {
   }[];
 };
 export interface LanguageGateway {
-  languageContext(jobId?: string): Promise<LanguageContext>;
+  languageContext(): Promise<LanguageContext>;
   loadDraft(): Promise<DraftSnapshot | null>;
   loadBaseLanguage(
     variantId: string,
@@ -55,10 +54,6 @@ export interface LanguageGateway {
     payload: EditorWireEnvelope | null;
     restore?: string;
   }): Promise<DraftSnapshot>;
-  loadCurrentJobDocument(
-    jobId: string,
-    locale?: string,
-  ): Promise<CurrentJobDocument | null>;
   languageCommand(
     action: string,
     id: string,

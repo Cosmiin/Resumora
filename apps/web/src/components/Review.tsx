@@ -52,14 +52,6 @@ export function Review({
       action: edit,
     },
     {
-      title: t("Optimizare pentru job", "Job optimization"),
-      state: t("Nu se aplică", "Not applicable"),
-      text: t(
-        "Nu este selectat un job. Adaptarea și scorurile de compatibilitate nu sunt disponibile.",
-        "No job is selected. Tailoring and compatibility scores are unavailable.",
-      ),
-    },
-    {
       title: t("Calitatea redactării", "Writing quality"),
       state: t("De revizuit", "Needs review"),
       text: t(
@@ -67,14 +59,6 @@ export function Review({
         "Review your wording. Questions can help add context; AI generation is unavailable.",
       ),
       action: enrich,
-    },
-    {
-      title: t("Pregătire pentru aplicare", "Application readiness"),
-      state: t("În așteptare", "Pending"),
-      text: t(
-        "Acest CV de bază nu are un export verificat sau o candidatură asociată.",
-        "This Base CV has no verified export or associated application.",
-      ),
     },
   ];
   return (

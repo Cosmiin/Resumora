@@ -1,4 +1,7 @@
-import { canonicalContentLocale, isContentLanguageDecision } from "./content-language.ts";
+import {
+  canonicalContentLocale,
+  isContentLanguageDecision,
+} from "./content-language.ts";
 import { isExperienceSessions } from "../intelligence/experience.ts";
 import {
   isCanonicalDocumentLocale,
@@ -74,15 +77,24 @@ export interface CvDraftGateway {
 /** Drop retired per-skill references while preserving shared CV import provenance. */
 function retireSkillReferences(draft: BaseDraft): BaseDraft {
   for (const category of ["technicalSkills", "professionalSkills"] as const) {
-    for (const skill of [...draft[category], ...(draft.skillReserves?.[category] ?? [])]) {
+    for (const skill of [
+      ...draft[category],
+      ...(draft.skillReserves?.[category] ?? []),
+    ]) {
       delete skill.skillEvidence;
       delete skill.skillOrigin;
     }
   }
   for (const session of Object.values(draft.experienceEnrichment ?? {})) {
-    if (session.skills) session.skills.skills = session.skills.skills.map(({id, label, category, importance}) => ({
-      id, label, category, ...(importance ? {importance} : {}),
-    }));
+    if (session.skills)
+      session.skills.skills = session.skills.skills.map(
+        ({ id, label, category, importance }) => ({
+          id,
+          label,
+          category,
+          ...(importance ? { importance } : {}),
+        }),
+      );
   }
   return draft;
 }
@@ -95,14 +107,41 @@ export function decodeDraft(payload: EditorWireEnvelope): BaseDraft {
     throw new Error("unsupportedEditorVersion");
   const draft = { ...payload.content, answers: payload.answers };
   if (!isBaseDraft(draft)) throw new Error("invalidEditorDraft");
-  const result=retireSkillReferences(structuredClone(draft));
-  const legacy=result.optionalSections.find(s=>s.id==='import-summary');
-  if(legacy){
-    const f=legacy.entries[0]?.details;
-    if(f&&!result.summary.text){const {value,...provenance}=f;result.summary={...result.summary,id:f.fieldId,text:value,origin:'extracted',approval:f.status==='user_confirmed'||f.acceptance==='automatic'?'approved':'pending',provenance};}
-    result.optionalSections=result.optionalSections.filter(s=>s!==legacy);
-    result.presentation.order=[...new Set(result.presentation.order.map(id=>id==='import-summary'?'summary':id))];
-    result.presentation.hidden=[...new Set(result.presentation.hidden.map(id=>id==='import-summary'?'summary':id))];
+  const result = retireSkillReferences(structuredClone(draft));
+  const legacy = result.optionalSections.find((s) => s.id === "import-summary");
+  if (legacy) {
+    const f = legacy.entries[0]?.details;
+    if (f && !result.summary.text) {
+      const { value, ...provenance } = f;
+      result.summary = {
+        ...result.summary,
+        id: f.fieldId,
+        text: value,
+        origin: "extracted",
+        approval:
+          f.status === "user_confirmed" || f.acceptance === "automatic"
+            ? "approved"
+            : "pending",
+        provenance,
+      };
+    }
+    result.optionalSections = result.optionalSections.filter(
+      (s) => s !== legacy,
+    );
+    result.presentation.order = [
+      ...new Set(
+        result.presentation.order.map((id) =>
+          id === "import-summary" ? "summary" : id,
+        ),
+      ),
+    ];
+    result.presentation.hidden = [
+      ...new Set(
+        result.presentation.hidden.map((id) =>
+          id === "import-summary" ? "summary" : id,
+        ),
+      ),
+    ];
   }
   return result;
 }
@@ -170,14 +209,24 @@ const fact = (value: Check): Check =>
 const text = fact(str),
   partial = fact(date),
   flag = fact(bool);
-export const isTextFact = (value: unknown): value is Fact<string> => text(value);
-const prose = obj({
-  id: str,
-  text: str,
-  origin: one("user_authored", "extracted", "ai_generated"),
-  approval: one("pending", "approved"),
-  claimIds: list(str),
-}, {provenance: v=>!!v&&typeof v==='object'&&!Object.hasOwn(v,'value')&&text({...v,value:''})});
+export const isTextFact = (value: unknown): value is Fact<string> =>
+  text(value);
+const prose = obj(
+  {
+    id: str,
+    text: str,
+    origin: one("user_authored", "extracted", "ai_generated"),
+    approval: one("pending", "approved"),
+    claimIds: list(str),
+  },
+  {
+    provenance: (v) =>
+      !!v &&
+      typeof v === "object" &&
+      !Object.hasOwn(v, "value") &&
+      text({ ...v, value: "" }),
+  },
+);
 const answer = obj(
   {
     id: str,
@@ -196,7 +245,6 @@ const answer = obj(
     questionText: str,
   },
   {
-    origin: obj({ jobId: str, answerId: str, answerRevision: (v) => Number.isSafeInteger(v) && Number(v) > 0 }),
     targetLabel: str,
     sourceId: str,
     cvFieldId: str,
@@ -333,11 +381,29 @@ const draftShape = obj(
     translation: isTranslationLineage,
     nameParts: obj({ first: str, last: str }),
     importReview: isImportReview,
-    importSkillChoices: (v) => !!v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).length <= 250 && Object.values(v).every(one("professionalSkills","technicalSkills","omit")),
+    importSkillChoices: (v) =>
+      !!v &&
+      typeof v === "object" &&
+      !Array.isArray(v) &&
+      Object.keys(v).length <= 250 &&
+      Object.values(v).every(
+        one("professionalSkills", "technicalSkills", "omit"),
+      ),
     experienceEnrichment: isExperienceSessions,
-    skillExclusions: v => Array.isArray(v) && v.length <= 4000 && v.every(x => typeof x === "string" && x.length <= 2000),
-    skillReserves: obj({ technicalSkills: list(text), professionalSkills: list(text) }),
-    skillReview: obj({ operationId: str, fingerprint: str, snapshotId: str, revision: v => Number.isSafeInteger(v) && Number(v) > 0 }),
+    skillExclusions: (v) =>
+      Array.isArray(v) &&
+      v.length <= 4000 &&
+      v.every((x) => typeof x === "string" && x.length <= 2000),
+    skillReserves: obj({
+      technicalSkills: list(text),
+      professionalSkills: list(text),
+    }),
+    skillReview: obj({
+      operationId: str,
+      fingerprint: str,
+      snapshotId: str,
+      revision: (v) => Number.isSafeInteger(v) && Number(v) > 0,
+    }),
     roleRewriteReviews: list(isRoleRewriteReview),
     questionPlans: list((v) => {
       try {
@@ -356,7 +422,21 @@ export function isBaseDraft(value: unknown): value is BaseDraft {
   if (!draftShape(value)) return false;
   try {
     const d = value as BaseDraft;
-    if(d.importSkillChoices && (!d.importReview || Object.keys(d.importSkillChoices).some(id=>!d.importReview!.extraction.candidates.some(c=>c.id===id && /^(professionalSkills|technicalSkills|unclearSkills)\.\d+$/.test(c.path))))) return false;
+    if (
+      d.importSkillChoices &&
+      (!d.importReview ||
+        Object.keys(d.importSkillChoices).some(
+          (id) =>
+            !d.importReview!.extraction.candidates.some(
+              (c) =>
+                c.id === id &&
+                /^(professionalSkills|technicalSkills|unclearSkills)\.\d+$/.test(
+                  c.path,
+                ),
+            ),
+        ))
+    )
+      return false;
     return (value as BaseDraft).answers.every((a) => {
       const evidence = answerEvidenceText(a);
       return a.status !== "confirmed" || !!evidence.trim();

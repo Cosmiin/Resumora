@@ -1,12 +1,9 @@
 import type {
   DraftKind,
   WorkspaceDraft,
-  JobAnswers,
-  JobAnswer,
   CareerOperation,
 } from "@resumora/contracts/editor/workspace";
 import type { DraftSnapshot } from "@resumora/contracts/editor/transport";
-import type { SavedJob } from "@resumora/contracts/jobs/connected";
 type Rpc = <T>(name: string, args: Record<string, unknown>) => Promise<T>;
 export function workspaceGateway(rpc: Rpc) {
   return {
@@ -38,34 +35,7 @@ export function workspaceGateway(rpc: Rpc) {
         p_value: i.value,
         p_generation: i.profileGeneration ?? null,
       }),
-    submitWorkspaceIntake: (i: {
-      interfaceLocale?: "ro"|"en";
-      requestId: string;
-      id: string;
-      expectedRevision: number;
-    }) =>
-      rpc<SavedJob>(i.interfaceLocale === undefined ? "submit_workspace_intake" : "submit_workspace_intake_with_locale", {
-        ...(i.interfaceLocale === undefined ? {} : {p_interface_locale:i.interfaceLocale}),
-        p_key: i.requestId,
-        p_id: i.id,
-        p_revision: i.expectedRevision,
-      }),
-    getJobAnswers: (jobId: string) =>
-      rpc<JobAnswers>("get_job_answers", { p_job: jobId }),
-    saveJobAnswer: (i: {
-      requestId: string;
-      jobId: string;
-      expectedRevision: number;
-      answer: Omit<JobAnswer, "revision">;
-    }) =>
-      rpc<JobAnswers>("save_job_answer", {
-        p_key: i.requestId,
-        p_job: i.jobId,
-        p_revision: i.expectedRevision,
-        p_answer: i.answer,
-      }),
-    rejectWorkspaceOperation: (id: string) =>
-      rpc<CareerOperation>("reject_workspace_operation", { p_id: id }),
+
     getWorkspaceOperation: (id: string) =>
       rpc<CareerOperation | null>("get_workspace_operation", { p_id: id }),
     beginWorkspaceOperation: (
@@ -88,11 +58,6 @@ export function workspaceGateway(rpc: Rpc) {
         p_state: state,
         p_result: result,
         p_secret: secret,
-      }),
-    acceptProfileIntegration: (requestId: string, id: string) =>
-      rpc<DraftSnapshot>("accept_profile_integration", {
-        p_key: requestId,
-        p_operation: id,
       }),
   };
 }
