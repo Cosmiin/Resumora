@@ -7,3 +7,4 @@ export * from "./flags.ts";
 export * from "./dates.ts";
 export * from "./move-other.ts";
 export * from "./enrich.ts";
+export * from "./enrich-checks.ts";
