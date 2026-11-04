@@ -28,7 +28,7 @@ const imported: CvContent = {
 const imp = (status: ImportResponse["status"], extra: Partial<ImportResponse> = {}): ImportResponse => ({
   id: "imp-1", status, fileName: "cv.pdf", error: null, result: null, createdAt: "2026-11-04T10:00:00Z", ...extra,
 });
-const ready = imp("ready", { result: { content: imported, warnings: ["Check the dates of Acme SRL."] } });
+const ready = imp("ready", { result: { content: imported, warnings: ["Check the dates of Acme SRL."], sourceHeadings: [], unsourcedLines: [], isScan: false } });
 const pdf = () => new File(["%PDF-1.4 test"], "cv.pdf", { type: "application/pdf" });
 
 const summaryOf = (dialog: HTMLElement) => within(within(dialog).getByRole("complementary", { name: "We organized your CV" }));
@@ -127,7 +127,7 @@ describe("CV import", () => {
       experience: [role, { ...role, id: "e2" }, { ...role, id: "e3" }],
       unclearSkills: [{ id: "s3", name: "Management" }, { id: "s4", name: "Budgeting" }],
     };
-    importsApi.getImport.mockResolvedValue(imp("ready", { result: { content, warnings: ["A", "B"] } }));
+    importsApi.getImport.mockResolvedValue(imp("ready", { result: { content, warnings: ["A", "B"], sourceHeadings: [], unsourcedLines: [], isScan: false } }));
     renderPage();
     await chooseFile(pdf());
     const dialog = await screen.findByRole("dialog", { name: "Import review" });
@@ -146,7 +146,7 @@ describe("CV import", () => {
       projects: [{ id: "p1", name: "Billing", url: "", description: "" }],
       custom: [{ id: "c1", title: "Volunteering", details: "" }, { id: "c2", title: "", details: "" }],
     };
-    importsApi.getImport.mockResolvedValue(imp("ready", { result: { content, warnings: [] } }));
+    importsApi.getImport.mockResolvedValue(imp("ready", { result: { content, warnings: [], sourceHeadings: [], unsourcedLines: [], isScan: false } }));
     renderPage();
     await chooseFile(pdf());
     const dialog = await screen.findByRole("dialog", { name: "Import review" });

@@ -70,6 +70,40 @@ describe("toCvContent", () => {
     expect(warnings.some((w) => /title/i.test(w))).toBe(true);
   });
 
+  it("maps achievements, volunteering, awards, courses, publications and interests", () => {
+    const { content, warnings } = toCvContent(
+      draftWith({
+        achievements: ["Doubled sales", ...Array.from({ length: 11 }, () => "x")],
+        volunteering: [job("Red Cross", ["Helped"])],
+        awards: [{ name: "Best PM", issuer: "Acme", date: "2021-05", description: "Top of 40" }],
+        courses: [{ name: "Scrum", provider: "Udemy", date: "bad" }],
+        publications: [{ title: "On CVs", publisher: "Journal", date: "2019", url: "https://x.ro" }],
+        interests: ["Chess"],
+      }),
+    );
+    expect(content.achievements).toHaveLength(10);
+    expect(content.achievements[0]).toEqual({ id: expect.any(String), text: "Doubled sales" });
+    expect(content.volunteering[0]).toMatchObject({ company: "Red Cross", bullets: [{ id: expect.any(String), text: "Helped" }] });
+    expect(content.awards[0]).toMatchObject({ id: expect.any(String), name: "Best PM", issuer: "Acme", date: "2021-05", description: "Top of 40" });
+    expect(content.courses[0]).toMatchObject({ name: "Scrum", provider: "Udemy", date: "" });
+    expect(content.publications[0]).toMatchObject({ title: "On CVs", publisher: "Journal", date: "2019", url: "https://x.ro" });
+    expect(content.interests).toEqual([{ id: expect.any(String), name: "Chess" }]);
+    expect(warnings.some((w) => /achievements/i.test(w) && w.includes("10"))).toBe(true);
+    expect(warnings.some((w) => /date/i.test(w))).toBe(true);
+    expect(CvContentSchema.safeParse(content).success).toBe(true);
+  });
+
+  it("maps sourceHeadings and turns an unknown category into other with a warning", () => {
+    const result = toCvContent(
+      draftWith({ sourceHeadings: [{ heading: "Work history", category: "experience" }, { heading: "Hobbies & stuff", category: "banana" }] }),
+    );
+    expect(result.sourceHeadings).toEqual([
+      { heading: "Work history", category: "experience" },
+      { heading: "Hobbies & stuff", category: "other" },
+    ]);
+    expect(result.warnings.some((w) => w.includes("Hobbies & stuff"))).toBe(true);
+  });
+
   it("the draft schema accepts what the editor never would, so it can be trimmed instead of retried", () => {
     expect(ImportDraftSchema.safeParse(draftWith({ technicalSkills: Array.from({ length: 60 }, (_, i) => `S${i}`) })).success).toBe(true);
   });
@@ -84,5 +118,12 @@ describe("ImportResultSchema", () => {
     expect(parsed.content.layout).toEqual(defaultLayout());
     expect(parsed.content.achievements).toEqual([]);
     expect(parsed.warnings).toEqual(["check dates"]);
+  });
+
+  it("accepts an old result without sourceHeadings", () => {
+    const parsed = ImportResultSchema.parse({ content: emptyCv(), warnings: [] });
+    expect(parsed.sourceHeadings).toEqual([]);
+    expect(parsed.unsourcedLines).toEqual([]);
+    expect(parsed.isScan).toBe(false);
   });
 });
