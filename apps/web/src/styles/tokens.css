@@ -1,0 +1,204 @@
+/* Design tokens ported from main:apps/web/src/design/*.css */
+:root {
+  /* Pine — primary. 600 is the prototype accent #17695d, 800 its ink #173b39 */
+  --pine-50: #f1f8f4;
+  --pine-100: #e4efe7;
+  --pine-200: #c5dfd1;
+  --pine-300: #9cc8b3;
+  --pine-400: #5fa48d;
+  --pine-500: #2a8270;
+  --pine-600: #17695d;
+  --pine-700: #105649;
+  --pine-800: #173b39;
+  --pine-900: #0f2826;
+  /* Sage neutrals */
+  --white: #ffffff;
+  --sage-25: #f9fbf9;
+  --sage-50: #f4f7f4;
+  --sage-100: #eaf0eb;
+  --sage-150: #e7eeea;
+  --sage-200: #d8e3df;
+  --sage-300: #bdcec7;
+  --sage-400: #a5bcb0;
+  --sage-500: #7d948f;
+  --sage-600: #536b69;
+  /* Marigold — warmth, attention, celebration, focus */
+  --marigold-50: #fffaf0;
+  --marigold-100: #fff5e6;
+  --marigold-200: #ebd5b1;
+  --marigold-300: #f6cf7a;
+  --marigold-500: #e9a23b;
+  --marigold-600: #b87a24;
+  --marigold-800: #83511b;
+  /* Rose — confirmed gaps, destructive */
+  --rose-50: #fff0f0;
+  --rose-200: #ecc9c9;
+  --rose-400: #c9686c;
+  --rose-600: #9a4145;
+  --rose-700: #7f3236;
+  /* Sky — information, "you have this elsewhere" */
+  --sky-50: #e9f0fa;
+  --sky-200: #cddbed;
+  --sky-600: #355d8c;
+
+  /* Semantic — surfaces */
+  --surface-page: var(--sage-50);
+  --surface-card: var(--white);
+  --surface-sunken: var(--sage-100);
+  --surface-hero: var(--pine-100);
+  --surface-selected: var(--pine-100);
+  --surface-hover: var(--sage-50);
+  --surface-inverse: var(--pine-800);
+  --surface-document: var(--white);
+  /* Text */
+  --text-strong: var(--pine-800);
+  --text-body: var(--pine-800);
+  --text-muted: var(--sage-600);
+  --text-accent: var(--pine-600);
+  --text-on-primary: var(--white);
+  --text-on-inverse: var(--white);
+  --text-document: #172b29;
+  /* Borders */
+  --border-subtle: var(--sage-200);
+  --border-field: var(--sage-300);
+  --border-strong: var(--sage-400);
+  --border-selected: var(--pine-600);
+  /* Actions */
+  --action-primary: var(--pine-600);
+  --action-primary-hover: var(--pine-700);
+  --action-primary-press: var(--pine-800);
+  --action-secondary-hover: #f1f5f1;
+  --action-danger: var(--rose-600);
+  --focus-ring: var(--marigold-600);
+  /* Status — text always paired with colour */
+  --status-good-bg: var(--pine-100);
+  --status-good-fg: #155c46;
+  --status-good-border: #bdd8c9;
+  --status-warn-bg: var(--marigold-100);
+  --status-warn-fg: var(--marigold-800);
+  --status-warn-border: var(--marigold-200);
+  --status-bad-bg: var(--rose-50);
+  --status-bad-fg: var(--rose-600);
+  --status-bad-border: var(--rose-200);
+  --status-info-bg: var(--sky-50);
+  --status-info-fg: var(--sky-600);
+  --status-info-border: var(--sky-200);
+  --status-neutral-bg: #f6f8f5;
+  --status-neutral-fg: var(--sage-600);
+  --status-neutral-border: var(--sage-200);
+  /* Match / keyword states (PRD §7) */
+  --match-included: var(--status-good-fg);
+  --match-equivalent: var(--status-good-fg);
+  --match-omitted: var(--status-info-fg);
+  --match-confirm: var(--status-warn-fg);
+  --match-gap: var(--status-neutral-fg);
+  /* Score ring */
+  --score-track: var(--pine-200);
+  --score-fill: var(--pine-600);
+}
+
+:root {
+  /* Spacing — prototype values preserved (7, 9, 11, 15, 25 occur in source) */
+  --space-1: 4px;
+  --space-2: 7px;
+  --space-3: 9px;
+  --space-4: 12px;
+  --space-5: 15px;
+  --space-6: 18px;
+  --space-7: 20px;
+  --space-8: 25px;
+  --space-9: 30px;
+  --space-10: 38px;
+  --space-11: 46px;
+  --space-12: 60px;
+  --pad-card: 25px;
+  --pad-hero: 38px;
+  --pad-page-x: 44px;
+  --pad-page-y: 36px;
+  --gap-grid: 24px;
+  --gap-stack: 18px;
+  --sidebar-width: 218px;
+  --content-max: 1440px;
+  --reading-max: 760px;
+  --control-height: 41px;
+  --control-height-sm: 34px;
+  --control-height-touch: 44px;
+  --field-height: 43px;
+  /* Radii */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-field: 7px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-card: 14px;
+  --radius-dialog: 15px;
+  --radius-hero: 18px;
+  --radius-pill: 999px;
+  --bp-tablet: 1100px;
+  --bp-mobile: 760px;
+}
+
+:root {
+  --font-display:
+    "Bricolage Grotesque", "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-document: "Source Serif 4", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 650;
+  --weight-bold: 700;
+  --weight-heavy: 750;
+  /* Scale (px at 16px root) — derived from prototype rem values */
+  --text-display: 3.2rem;
+  --text-h1: 2.65rem;
+  --text-h2: 1.24rem;
+  --text-h3: 1rem;
+  --text-lg: 1.05rem;
+  --text-body: 0.92rem;
+  --text-sm: 0.83rem;
+  --text-xs: 0.78rem;
+  --text-2xs: 0.7rem;
+  --text-eyebrow: 0.73rem;
+  --text-stat: 2.4rem;
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-body: 1.6;
+  --leading-document: 1.55;
+  --tracking-display: -0.045em;
+  --tracking-heading: -0.02em;
+  --tracking-stat: -0.05em;
+  --tracking-eyebrow: 0.14em;
+  --tracking-nav-group: 0.12em;
+  /* Semantic */
+  --type-page-title: var(--weight-bold)
+    clamp(1.8rem, 3vw, var(--text-h1))/var(--leading-tight) var(--font-display);
+  --type-section-title: var(--weight-semibold)
+    var(--text-h2)/var(--leading-snug) var(--font-display);
+  --type-body: var(--weight-regular) var(--text-body)/var(--leading-body)
+    var(--font-sans);
+  --type-label: var(--weight-semibold) 0.79rem/1.4 var(--font-sans);
+}
+
+:root {
+  --shadow-none: none;
+  --shadow-card: 0 1px 2px rgba(23, 59, 57, 0.04);
+  --shadow-raised: 0 4px 16px rgba(23, 59, 57, 0.08);
+  --shadow-document: 0 9px 24px rgba(23, 59, 57, 0.035);
+  --shadow-paper: 0 14px 40px rgba(23, 59, 57, 0.08);
+  --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.13);
+  --shadow-press: 0 2px 0 var(--pine-800);
+  --shadow-press-secondary: 0 2px 0 var(--sage-300);
+  --backdrop: rgba(23, 59, 57, 0.33);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); /* @kind other */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* @kind other */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur-base: 200ms; /* @kind other */
+  --dur-slow: 360ms; /* @kind other */
+  --dur-celebrate: 700ms; /* @kind other */
+  --focus-outline: 3px solid var(--focus-ring);
+  --focus-offset: 3px;
+}
+
