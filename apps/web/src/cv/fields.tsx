@@ -36,7 +36,7 @@ export function set<T, K extends keyof T>(obj: T, key: K, value: T[K]): T {
   return { ...obj, [key]: value };
 }
 
-function move<T>(items: T[], from: number, to: number): T[] {
+export function move<T>(items: T[], from: number, to: number): T[] {
   const next = [...items];
   const [item] = next.splice(from, 1);
   next.splice(to, 0, item!);

@@ -43,6 +43,17 @@ export function sampleCv(overrides: Partial<CvContent> = {}): CvContent {
         description: "",
         bullets: [{ id: "b-3", text: "Built the first usage dashboard for the sales team." }],
       },
+      {
+        id: "exp-3",
+        company: "Contoso Labs",
+        title: "Support Specialist",
+        location: "Bucharest",
+        startDate: "2017-01",
+        endDate: "2018-08",
+        current: false,
+        description: "",
+        bullets: [],
+      },
     ],
     education: [
       {

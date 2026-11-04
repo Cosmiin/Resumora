@@ -19,6 +19,8 @@ import { CvPage } from "./CvPage.tsx";
 
 const named = (fullName: string): CvContent => ({ ...emptyCv(), basics: { ...emptyCv().basics, fullName } });
 
+const cvPage = () => screen.getByRole("article", { name: "CV page" });
+
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -76,7 +78,7 @@ describe("version history", () => {
     await user.click(within(older!).getByRole("button", { name: "Restore" }));
 
     expect(api.restoreHistory).toHaveBeenCalledWith("h1", 2);
-    await waitFor(() => expect(screen.getByLabelText("Full name")).toHaveValue("Old Name"));
+    await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
     expect(screen.getByText("Saved")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -99,7 +101,8 @@ describe("version history", () => {
     const user = userEvent.setup();
     api.saveCv.mockReturnValue(new Promise(() => {})); // save never finishes
     renderPage();
-    await user.type(await screen.findByLabelText("Full name"), "!");
+    await user.click(await screen.findByRole("button", { name: "Edit your details" }));
+    await user.type(screen.getByLabelText("Full name"), "!");
     const dialog = await openHistory(user);
     const [first] = await within(dialog).findAllByRole("listitem");
     expect(within(first!).getByRole("button", { name: "Restore" })).toBeDisabled();
@@ -111,9 +114,9 @@ describe("version history blocks editing", () => {
     const user = userEvent.setup();
     renderPage();
     await openHistory(user);
-    expect(screen.getByLabelText("Full name").closest("[inert]")).not.toBeNull();
+    expect(cvPage().closest("[inert]")).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(screen.getByLabelText("Full name").closest("[inert]")).toBeNull();
+    expect(cvPage().closest("[inert]")).toBeNull();
   });
 
   it("offers Load latest when the restore worked but reloading failed", async () => {
@@ -128,6 +131,6 @@ describe("version history blocks editing", () => {
     expect(await screen.findByRole("button", { name: "Load latest" })).toBeInTheDocument();
     api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });
     await user.click(screen.getByRole("button", { name: "Load latest" }));
-    await waitFor(() => expect(screen.getByLabelText("Full name")).toHaveValue("Old Name"));
+    await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
   });
 });

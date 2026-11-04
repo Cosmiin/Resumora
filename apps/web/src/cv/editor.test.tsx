@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
-import { emptyCv } from "@resumora/shared";
+import { MAX_ITEMS, emptyCv } from "@resumora/shared";
 import { ApiClientError } from "../lib/api-error.ts";
 
 const api = vi.hoisted(() => ({ getCv: vi.fn(), saveCv: vi.fn() }));
@@ -26,6 +26,11 @@ function renderPage() {
   );
 }
 
+async function addSection(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(await screen.findByRole("button", { name: "+ Add a section" }));
+  await user.click(screen.getByRole("button", { name }));
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
   authState.userId = "user-a";
@@ -37,7 +42,7 @@ describe("CV editor", () => {
   it("adds an experience and a bullet", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "Add experience" }));
+    await addSection(user, "Experience");
     await user.type(screen.getByLabelText("Company"), "Acme");
     await user.click(screen.getByRole("button", { name: "Add bullet" }));
     await user.type(screen.getByLabelText("Bullet 1"), "Led a team of 5");
@@ -57,7 +62,8 @@ describe("CV editor", () => {
       }),
     );
     renderPage();
-    await user.type(await screen.findByLabelText("Full name"), "Mine");
+    await user.click(await screen.findByRole("button", { name: "Add your name" }));
+    await user.type(screen.getByLabelText("Full name"), "Mine");
     expect(
       await screen.findByText("This CV was saved in another tab or device.", {}, { timeout: 3000 }),
     ).toBeInTheDocument();
@@ -89,29 +95,32 @@ describe("CV editor", () => {
 
     api.getCv.mockResolvedValue(cvOf("User A"));
     const first = render(page());
-    expect(await screen.findByDisplayValue("User A")).toBeInTheDocument();
+    expect(await screen.findByText("User A")).toBeInTheDocument();
     first.unmount(); // sign-out navigates away from the editor
     authState.userId = "user-b";
 
     api.getCv.mockResolvedValue(cvOf("User B"));
     render(page());
-    expect(await screen.findByDisplayValue("User B")).toBeInTheDocument();
-    expect(screen.queryByDisplayValue("User A")).not.toBeInTheDocument();
+    expect(await screen.findByText("User B")).toBeInTheDocument();
+    expect(screen.queryByText("User A")).not.toBeInTheDocument();
   });
 
   it("stops adding at the CV limits", async () => {
+    const user = userEvent.setup();
     const bullets = Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, text: "x" }));
+    const role = (i: number) => ({ id: `e${i}`, company: `Acme ${i}`, title: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets: i === 0 ? bullets : [] });
     api.getCv.mockResolvedValue({
-      content: {
-        ...emptyCv(),
-        experience: [{ id: "e1", company: "Acme", title: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets }],
-      },
+      content: { ...emptyCv(), experience: Array.from({ length: MAX_ITEMS }, (_, i) => role(i)) },
       version: 1,
       updatedAt: "2026-11-04T10:00:00Z",
     });
     renderPage();
-    expect(await screen.findByRole("button", { name: "Add bullet" })).toBeDisabled();
+    await user.click(await screen.findByRole("button", { name: "Edit Acme 0" }));
+    expect(screen.getByRole("button", { name: "Add bullet" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add another" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Add a short summary" }));
     expect(screen.getByLabelText("Summary")).toHaveAttribute("maxLength", "4000");
+    await user.click(screen.getByRole("button", { name: "Add your name" }));
     expect(screen.getByLabelText("Full name")).toHaveAttribute("maxLength", "2000");
   });
 
@@ -120,7 +129,7 @@ describe("CV editor", () => {
     renderPage();
     const retry = await screen.findByRole("button", { name: "Try again" });
     await userEvent.click(retry);
-    expect(await screen.findByLabelText("Full name")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Add your name" })).toBeInTheDocument();
   });
 });
 
@@ -129,8 +138,11 @@ describe("CV format v2 in the editor", () => {
     api.getCv.mockResolvedValue({ content: { ...emptyCv(), ...overrides }, version: 1, updatedAt: "2026-11-04T10:00:00Z" });
 
   it("edits two titles", async () => {
+    const user = userEvent.setup();
+    withCv({ basics: { ...emptyCv().basics, fullName: "Ana" } });
     renderPage();
-    expect(await screen.findByLabelText("Title 1")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Edit your details" }));
+    expect(screen.getByLabelText("Title 1")).toBeInTheDocument();
     expect(screen.getByLabelText("Title 2")).toBeInTheDocument();
     expect(screen.queryByLabelText("Title 3")).not.toBeInTheDocument();
   });
@@ -139,7 +151,8 @@ describe("CV format v2 in the editor", () => {
     const user = userEvent.setup();
     withCv({ unclearSkills: [{ id: "s1", name: "Management" }] });
     renderPage();
-    expect(await screen.findByRole("heading", { name: "Skills to sort" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Edit skills" }));
+    expect(screen.getByRole("heading", { name: "Skills to sort" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Move Management to technical" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Move Management to professional" }));
 
@@ -151,8 +164,10 @@ describe("CV format v2 in the editor", () => {
   });
 
   it("unclear group is hidden when empty", async () => {
+    const user = userEvent.setup();
     renderPage();
-    expect(await screen.findByRole("heading", { name: "Technical skills" })).toBeInTheDocument();
+    await addSection(user, "Skills");
+    expect(screen.getByRole("heading", { name: "Technical skills" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Professional skills" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Skills to sort" })).not.toBeInTheDocument();
   });
@@ -160,7 +175,7 @@ describe("CV format v2 in the editor", () => {
   it("adds a custom section", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "Add section" }));
+    await addSection(user, "Other section");
     await user.type(screen.getByLabelText("Section title"), "Volunteering");
     await user.type(screen.getByLabelText("Details"), "Red Cross");
     await waitFor(() => expect(api.saveCv).toHaveBeenCalled(), { timeout: 3000 });
@@ -171,7 +186,7 @@ describe("CV format v2 in the editor", () => {
   it("date fields accept a year", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("button", { name: "Add experience" }));
+    await addSection(user, "Experience");
     const start = screen.getByLabelText("Start");
     expect(start).toHaveAttribute("placeholder", "YYYY-MM");
     await user.type(start, "2019");

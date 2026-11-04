@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { CvContent, CvResponse, SaveResponse } from "@resumora/shared";
+import { useEffect, useRef, useState } from "react";
+import type { CvResponse, SaveResponse } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
@@ -9,16 +9,10 @@ import { HistoryDrawer } from "./HistoryDrawer.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ImportButton } from "../imports/ImportButton.tsx";
 import { ImportDialog } from "../imports/ImportDialog.tsx";
-import { BasicsSection } from "./sections/Basics.tsx";
-import { ExperienceSection } from "./sections/Experience.tsx";
-import { SkillsSection } from "./sections/Skills.tsx";
-import { CustomSection } from "./sections/Custom.tsx";
-import {
-  CertificationsSection,
-  EducationSection,
-  LanguagesSection,
-  ProjectsSection,
-} from "./sections/Lists.tsx";
+import { CvDocument } from "./page/CvDocument.tsx";
+import { blockKey, findItem, type BlockRef } from "./page/blocks.ts";
+import { SidePanel } from "./SidePanel.tsx";
+import { AddSection } from "./AddSection.tsx";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
   saved: "cv.status.saved",
@@ -36,6 +30,29 @@ export function Editor({ initial }: { initial: CvResponse }) {
   const [restoreFailed, setRestoreFailed] = useState(false);
   const [importId, setImportId] = useState<string | null>(null);
   const dialogOpen = historyOpen || importId !== null;
+  const [selected, setSelected] = useState<BlockRef | null>(null);
+  const position = selected && findItem(content, selected);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const lastSelected = useRef<BlockRef | null>(null);
+
+  // The open block can disappear (removed, or replaced by Load latest / restore / import).
+  useEffect(() => {
+    if (selected && !position) setSelected(null);
+  }, [selected, position]);
+
+  // When the panel closes and focus was inside it, return focus to that block (or the page).
+  useEffect(() => {
+    const previous = lastSelected.current;
+    lastSelected.current = selected;
+    if (selected || !previous) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    const key = blockKey(previous);
+    const block = Array.from(pageRef.current?.querySelectorAll<HTMLElement>("[data-block]") ?? []).find(
+      (el) => el.dataset.block === key,
+    );
+    (block ?? pageRef.current)?.focus();
+  }, [selected]);
 
   async function restore(id: string) {
     setRestoreFailed(false);
@@ -56,7 +73,6 @@ export function Editor({ initial }: { initial: CvResponse }) {
     }
     setHistoryOpen(false);
   }
-  const update = <K extends keyof CvContent>(key: K) => (value: CvContent[K]) => setContent({ ...content, [key]: value });
 
   const actions = (
     <>
@@ -72,8 +88,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
 
   return (
     <AppShell actions={actions}>
-      <main className="cv-page">
-        <div className="editor">
+      <main className="editor">
       {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
       {autosave.problem && (
         <p role="alert" className="form-error">
@@ -81,16 +96,16 @@ export function Editor({ initial }: { initial: CvResponse }) {
         </p>
       )}
       {conflict && <ConflictBanner onLoadLatest={loadLatest} onKeepMine={keepMine} />}
-      {/* While history is open the form can't be edited, so a restore can't race the user's typing. */}
-      <div className="editor-sections" inert={dialogOpen}>
-        <BasicsSection value={content.basics} onChange={update("basics")} />
-        <ExperienceSection items={content.experience} onChange={update("experience")} />
-        <EducationSection items={content.education} onChange={update("education")} />
-        <SkillsSection cv={content} onChange={(skills) => setContent({ ...content, ...skills })} />
-        <LanguagesSection items={content.languages} onChange={update("languages")} />
-        <CertificationsSection items={content.certifications} onChange={update("certifications")} />
-        <ProjectsSection items={content.projects} onChange={update("projects")} />
-        <CustomSection items={content.custom} onChange={update("custom")} />
+      {/* While history is open the CV can't be edited, so a restore can't race the user's typing. */}
+      <div className="editor-workspace" inert={dialogOpen}>
+        <div className="editor-page-area" ref={pageRef} tabIndex={-1}>
+          <p className="editor-hint">{t("cv.page.hint")}</p>
+          <CvDocument content={content} selected={selected} onSelect={setSelected} showUnsorted />
+          <AddSection cv={content} onChange={setContent} onAdd={setSelected} />
+        </div>
+        {selected && position && (
+          <SidePanel cv={content} selected={selected} onChange={setContent} onSelect={setSelected} />
+        )}
       </div>
       {importId && (
         <>
@@ -117,7 +132,6 @@ export function Editor({ initial }: { initial: CvResponse }) {
           <HistoryDrawer onClose={() => setHistoryOpen(false)} canRestore={status === "saved"} onRestore={restore} />
         </>
       )}
-        </div>
       </main>
     </AppShell>
   );

@@ -161,6 +161,22 @@ export const en = {
   "cv.page.technical": "Technical",
   "cv.page.professional": "Professional",
   "cv.page.toSort": "To sort",
+  "cv.page.hint": "Click any part of your CV to edit it.",
+
+  "panel.close": "Close panel",
+  "panel.back": "Back",
+  "panel.position": "{section} · {n} of {count}",
+  "panel.rolePosition": "{section} · role {n} of {count}",
+  "panel.title.basics": "Your details",
+  "panel.title.summary": "Short summary",
+  "panel.title.untitled": "New entry",
+  "panel.previous": "Previous",
+  "panel.next": "Next",
+  "panel.addAnother": "Add another",
+
+  "addSection.open": "+ Add a section",
+  "addSection.label": "Sections you can add",
+  "addSection.custom": "Other section",
 } as const;
 
 export type MessageKey = keyof typeof en;
