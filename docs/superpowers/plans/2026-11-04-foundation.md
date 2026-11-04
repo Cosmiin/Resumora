@@ -18,7 +18,7 @@
 ## Global Constraints
 - Branch `rebuild/foundation`; `main` is never modified. Old code is read with `git show main:<path>`.
 - Install exact versions (`.npmrc`: `save-exact=true`; no `engine-strict`). `.nvmrc`: `24`.
-- Ports: web `http://127.0.0.1:5173`, API `http://127.0.0.1:8787`, Vite proxies `/v1` and `/health` to the API.
+- Ports: web `http://127.0.0.1:5173`, API `http://127.0.0.1:8788`, Vite proxies `/v1` and `/health` to the API.
 - Secrets only in `apps/api/.dev.vars` (ignored) and `apps/web/.env.local` (ignored, public values only: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`). Both have committed `*.example` files.
 - Error body shape everywhere: `{ "error": { "code": string, "message": string, "requestId": string } }`.
 - CV limits: strings ≤ 2,000 chars, `basics.summary` and `projects[].description` ≤ 4,000, lists ≤ 40 items, bullets ≤ 20 per experience, serialized body ≤ 256 KB (`413 content_too_large`).
@@ -136,8 +136,8 @@ apps/web/         index.html, vite.config.ts, .env.example, src/main.tsx, src/ro
   - `invalid token is rejected`: `verifyToken` returns null → 401.
   - `unexpected errors are logged`: a test-only route throwing `new Error("boom")` → 500 `code === "internal"`, `log` called once with `level: "error"` and the same `requestId` as the body.
 - [ ] **Step 2:** `npm test -w apps/api`. Expected: FAIL.
-- [ ] **Step 3:** Implement per Interfaces. `npm run dev -w apps/api` = `wrangler dev --port 8787`.
-- [ ] **Step 4:** `npm test -w apps/api`. Expected: PASS. Then with `.dev.vars` filled: `npm run dev -w apps/api` and `curl http://127.0.0.1:8787/health` → `{"ok":true}`.
+- [ ] **Step 3:** Implement per Interfaces. `npm run dev -w apps/api` = `wrangler dev --port 8788`.
+- [ ] **Step 4:** `npm test -w apps/api`. Expected: PASS. Then with `.dev.vars` filled: `npm run dev -w apps/api` and `curl http://127.0.0.1:8788/health` → `{"ok":true}`.
 - [ ] **Step 5:** Commit `feat(api): add worker skeleton with auth and error handling`.
 
 ### Task 4: My CV and history endpoints
@@ -193,7 +193,7 @@ apps/web/         index.html, vite.config.ts, .env.example, src/main.tsx, src/ro
   - `api.test.ts` (mock `fetch` and the supabase module): `adds bearer token`; `retries once after refresh` (401 then 200 → resolves, `refreshSession` called once); `signs out after second 401`; `maps error body` (409 body → `ApiClientError` with `code "version_conflict"`).
   - `auth.test.tsx`: `redirects to login when signed out` (render `/cv` → login heading visible); `shows readable error on wrong password` (signIn rejects with `Invalid login credentials` → text from `t("auth.wrongCredentials")`); `signed-in user sees the app`.
 - [ ] **Step 2:** `npm test -w apps/web`. Expected: FAIL.
-- [ ] **Step 3:** Implement per Interfaces. Vite proxy `/v1` and `/health` → `http://127.0.0.1:8787`, `server.host = "127.0.0.1"`, `port 5173`. Add `eslint.config.js` rules `react-hooks/rules-of-hooks: error`, `react-hooks/exhaustive-deps: error`.
+- [ ] **Step 3:** Implement per Interfaces. Vite proxy `/v1` and `/health` → `http://127.0.0.1:8788`, `server.host = "127.0.0.1"`, `port 5173`. Add `eslint.config.js` rules `react-hooks/rules-of-hooks: error`, `react-hooks/exhaustive-deps: error`.
 - [ ] **Step 4:** `npm test -w apps/web && npm run lint`. Expected: PASS. Manual: `npm run db:start && npm run dev`, sign up at `http://127.0.0.1:5173/login`, land on `/cv`.
 - [ ] **Step 5:** Commit `feat(web): add app shell with Supabase sign-in`.
 

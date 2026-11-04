@@ -11,7 +11,7 @@ Build one strong CV, then tailor it to every job you apply for.
 
 ## Quick start
 
-Prerequisites: Node 24, Docker Desktop, Supabase CLI.
+Prerequisites: Node 26 LTS, Docker Desktop, Supabase CLI.
 
 ```sh
 npm install
@@ -19,7 +19,7 @@ npm run db:start          # local Supabase (prints URL + keys)
 cp apps/api/.dev.vars.example apps/api/.dev.vars
 cp apps/web/.env.example apps/web/.env.local
 # fill both with the values from `supabase status`
-npm run dev               # API on :8787, web on :5173
+npm run dev               # API on :8788, web on :5173
 ```
 
 Open http://127.0.0.1:5173.

@@ -5,13 +5,13 @@ Design: `docs/superpowers/specs/2026-11-04-rebuild-design.md`. Current plan: `do
 
 ## Stack
 - `packages/shared` — zod schemas + types shared by web, API and extension (`CvContentSchema`, API responses)
-- `apps/api` — Cloudflare Worker (Hono), run locally with `wrangler dev` on :8787
+- `apps/api` — Cloudflare Worker (Hono), run locally with `wrangler dev` on :8788
 - `apps/web` — React 19 + Vite SPA on :5173 (React Router, TanStack Query); proxies `/v1` to the API
 - `supabase/` — Postgres migrations, RLS, pgTAP tests; Supabase Auth + Storage
 - Auth: browser signs in with supabase-js and sends `Authorization: Bearer <jwt>`; the API queries Supabase as that user (RLS)
 
 ## Run
-- Prereqs: Node 24 (`.nvmrc`), Docker Desktop, Supabase CLI
+- Prereqs: Node 26 LTS (`.nvmrc`), Docker Desktop, Supabase CLI
 - `npm install` · `npm run db:start` · copy `apps/api/.dev.vars.example` → `.dev.vars` and `apps/web/.env.example` → `.env.local` with values from `supabase status`
 - `npm run dev` (API + web) · open http://127.0.0.1:5173
 
