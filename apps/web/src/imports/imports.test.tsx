@@ -330,6 +330,41 @@ describe("import review: where each heading went", () => {
     expect(cvApi.saveCv.mock.calls.at(-1)![1]).toBe(4);
   });
 
+  it("Move to moves the section with that heading, not the one in the same position", async () => {
+    importsApi.getImport.mockResolvedValue(
+      withResult(
+        { ...imported, custom: [{ id: "c1", title: "Hobbies", details: "Chess" }, { id: "c2", title: "Certificates", details: "AWS" }] },
+        { sourceHeadings: [{ heading: "Certificates", category: "other" }, { heading: "Hobbies", category: "other" }] },
+      ),
+    );
+    importsApi.applyImport.mockResolvedValue({ version: 4, updatedAt: "2026-11-04T10:05:00Z" });
+    cvApi.saveCv.mockResolvedValue({ version: 5, updatedAt: "2026-11-04T10:06:00Z" });
+    const dialog = await open();
+    await user.selectOptions(await within(dialog).findByRole("combobox", { name: "Move Certificates to" }), "certifications");
+    await user.click(await useThisCv(dialog));
+    await waitFor(() => expect(cvApi.saveCv).toHaveBeenCalled());
+    const [content] = cvApi.saveCv.mock.calls.at(-1)!;
+    expect(content.certifications.map((c: { name: string }) => c.name)).toEqual(["AWS"]);
+    expect(content.custom.map((c: { title: string }) => c.title)).toEqual(["Hobbies"]);
+  });
+
+  it("cancelling after the moves failed to save still tells the editor the import was applied", async () => {
+    importsApi.getImport.mockResolvedValue(
+      withResult({ ...imported, custom: [{ id: "c1", title: "Hobby-uri", details: "Chess" }] }, { sourceHeadings: [{ heading: "Hobby-uri", category: "other" }] }),
+    );
+    importsApi.applyImport.mockResolvedValue({ version: 4, updatedAt: "2026-11-04T10:05:00Z" });
+    cvApi.saveCv.mockRejectedValue(new Error("boom"));
+    const dialog = await open();
+    await user.selectOptions(await within(dialog).findByRole("combobox", { name: "Move Hobby-uri to" }), "interests");
+    await user.click(await useThisCv(dialog));
+    await within(dialog).findByText("Imported, but your moves weren't saved. Try again.");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
+    // The editor now holds the imported CV at the version the server applied it with.
+    expect(await screen.findByRole("textbox", { name: "Full name" })).toHaveValue("Ana Popescu");
+    expect(cvApi.saveCv).toHaveBeenCalledTimes(1);
+  });
+
   it("duplicate Other headings move one row at a time", async () => {
     importsApi.getImport.mockResolvedValue(
       withResult(

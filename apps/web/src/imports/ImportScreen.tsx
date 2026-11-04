@@ -72,6 +72,12 @@ export function ImportScreen(props: {
     });
   }
 
+  /** If the import was already applied (a retry of the moves is pending), the editor must hear about it. */
+  function close() {
+    if (appliedRef.current && imp?.result) onApplied({ content: imp.result.content, ...appliedRef.current });
+    else onClose();
+  }
+
   async function apply() {
     if (!imp?.result || !result) return;
     setApplying(true);
@@ -105,13 +111,13 @@ export function ImportScreen(props: {
       className="import-screen"
       ref={screenRef}
       tabIndex={-1}
-      onKeyDown={(e) => e.key === "Escape" && onClose()}
+      onKeyDown={(e) => e.key === "Escape" && close()}
     >
       <header className="import-bar">
         <strong className="app-brand">{t("app.name")}</strong>
         <p className="import-bar-title">{t("import.bar", { file: imp?.fileName ?? "" })}</p>
         <div className="import-bar-actions">
-          <button type="button" className="secondary" onClick={onClose}>{t("import.cancel")}</button>
+          <button type="button" className="secondary" onClick={close}>{t("import.cancel")}</button>
           {result && (
             <button type="button" disabled={!canApply || applying} onClick={() => void apply()}>{t("import.apply")}</button>
           )}

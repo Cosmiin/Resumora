@@ -104,6 +104,12 @@ describe("toCvContent", () => {
     expect(result.warnings.some((w) => w.includes("Hobbies & stuff"))).toBe(true);
   });
 
+  it("maps the category custom to other without a warning", () => {
+    const result = toCvContent(draftWith({ sourceHeadings: [{ heading: "Extras", category: "custom" }] }));
+    expect(result.sourceHeadings).toEqual([{ heading: "Extras", category: "other" }]);
+    expect(result.warnings).toEqual([]);
+  });
+
   it("does not keep the field of study twice when the degree line also names it", () => {
     const edu = (degree: string, field: string) => ({ school: "Uni", degree, field, startDate: "", endDate: "", notes: "" });
     const result = toCvContent(

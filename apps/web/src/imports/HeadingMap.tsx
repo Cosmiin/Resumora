@@ -26,8 +26,19 @@ export function HeadingMap(props: {
   const { headings, content, onMove } = props;
   if (headings.length === 0) return null;
   const locale = content.locale;
-  // The i-th Other heading is the i-th custom section; a row with no section left has no choice.
-  let others = 0;
+  // An Other heading owns the custom section with the same title. A heading with no title match
+  // takes the next section that no heading names; a row with none left has no choice.
+  const norm = (s: string) => s.trim().toLowerCase();
+  const named = new Set(headings.filter((h) => h.category === "other").map((h) => norm(h.heading)));
+  const spare = content.custom.filter((c) => !named.has(norm(c.title)));
+  const taken = new Set<string>();
+  let spareAt = 0;
+  const entryFor = (heading: string) => {
+    const match = content.custom.find((c) => !taken.has(c.id) && norm(c.title) === norm(heading));
+    const entry = match ?? spare[spareAt++];
+    if (entry) taken.add(entry.id);
+    return entry;
+  };
   return (
     <section className="map-wrap" aria-label={t("import.map.title")}>
       <h3 className="map-title">{t("import.map.title")}</h3>
@@ -41,7 +52,7 @@ export function HeadingMap(props: {
         </thead>
         <tbody>
           {headings.map((h, i) => {
-            const entry = h.category === "other" ? content.custom[others++] : undefined;
+            const entry = h.category === "other" ? entryFor(h.heading) : undefined;
             return (
               <tr key={`${h.heading}-${i}`} className={h.category === "other" ? "other" : undefined}>
                 <td className="orig">{h.heading}</td>

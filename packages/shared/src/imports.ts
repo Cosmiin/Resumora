@@ -244,6 +244,7 @@ export function toCvContent(draft: ImportDraft): ImportResult {
   const sourceHeadings: SourceHeading[] = draft.sourceHeadings.map((h) => {
     // A field path ("basics.summary") means its last part; a skill group's name means the skills section.
     const key = h.category.split(".").pop()!.trim();
+    if (key === "custom") return { heading: h.heading, category: "other" };
     if (known.has(key)) return { heading: h.heading, category: key as SectionKey };
     if ((SKILL_GROUPS as readonly string[]).includes(key)) return { heading: h.heading, category: "skills" };
     warn(`The heading "${h.heading.slice(0, 100)}" didn't match a known section, so it was filed under other.`);

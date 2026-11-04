@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyCv, MAX_ITEMS, moveOtherTo } from "./index.ts";
+import { CvContentSchema, emptyCv, MAX_ITEMS, MAX_TEXT, moveOtherTo } from "./index.ts";
 
 const withCustom = (details: string) => ({
   ...emptyCv(),
@@ -24,6 +24,12 @@ describe("moveOtherTo", () => {
   it("leaves the CV alone when the entry does not exist", () => {
     const cv = withCustom("x");
     expect(moveOtherTo(cv, "nope", "interests")).toEqual(cv);
+  });
+
+  it("shortens a line longer than a name field so the CV stays valid", () => {
+    const out = moveOtherTo(withCustom("x".repeat(MAX_TEXT + 1)), "c1", "projects");
+    expect(out.projects[0]!.name).toHaveLength(MAX_TEXT);
+    expect(CvContentSchema.safeParse(out).success).toBe(true);
   });
 
   it("keeps the lines that do not fit in the section", () => {

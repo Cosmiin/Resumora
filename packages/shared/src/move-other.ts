@@ -1,4 +1,4 @@
-import { newId, MAX_ITEMS, type CvContent } from "./cv.ts";
+import { newId, MAX_ITEMS, MAX_TEXT, type CvContent } from "./cv.ts";
 
 export const MOVE_TARGETS = ["certifications", "courses", "awards", "interests", "languages", "projects"] as const;
 export type MoveTarget = (typeof MOVE_TARGETS)[number];
@@ -14,7 +14,8 @@ export function moveOtherTo(cv: CvContent, customId: string, target: MoveTarget)
     .map((l) => l.replace(BULLET, "").trim())
     .filter((l) => l !== "");
   const room = Math.max(0, MAX_ITEMS - cv[target].length);
-  const names = lines.slice(0, room);
+  // A line can be longer than a name field allows (a section holds up to MAX_LONG_TEXT).
+  const names = lines.slice(0, room).map((l) => l.slice(0, MAX_TEXT));
   // Lines that do not fit stay in the section, so no text is lost.
   const left = lines.slice(room);
   const next: CvContent = {

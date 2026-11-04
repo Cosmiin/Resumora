@@ -16,6 +16,8 @@ const ADMIT_CHARS = 8_000;
 /** Copying a whole CV out word for word is slow; allow more than the default per attempt. */
 const EXTRACT_TIMEOUT_MS = 150_000;
 const BASE64_CHUNK = 0x8000;
+/** The most warnings an import result may hold (ImportResultSchema). */
+const MAX_WARNINGS = 50;
 
 const TEXT_FALLBACK_WARNING = "We read this file as plain text, so text from different columns may be mixed. Check the result.";
 
@@ -89,6 +91,8 @@ export async function processImport(
     } else {
       result.unsourcedLines = findUnsourcedLines(result.content, text);
     }
+    // The warnings added above can pass the limit toCvContent kept to.
+    result.warnings = result.warnings.slice(0, MAX_WARNINGS);
     if (new TextEncoder().encode(JSON.stringify(result.content)).length > MAX_CV_BYTES) {
       throw new ImportFailure("too_long");
     }

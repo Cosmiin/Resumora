@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyDraft, type Admit, type ImportDraft } from "@resumora/shared";
+import { emptyDraft, ImportResultSchema, type Admit, type ImportDraft } from "@resumora/shared";
 import type { ModelDeps } from "../src/ai/call-model.ts";
 import { ImportFailure } from "../src/imports/extract-text.ts";
 import { admitPrompt, extractPrompt } from "../src/imports/prompts.ts";
@@ -167,6 +167,15 @@ describe("processImport with a PDF", () => {
     expect(result.isScan).toBe(true);
     expect(result.warnings).toContain("This file is a scan. Check every line.");
     expect(result.unsourcedLines).toEqual([]);
+  });
+
+  it("a scan with 50 extraction warnings still gives a valid result", async () => {
+    const warned = { ...organized, warnings: Array.from({ length: 50 }, (_, i) => `warning ${i}`) };
+    const { model } = fakeModel({ cv_admit: { kind: "uncertain", reason: "Short" }, cv_extract: warned });
+    const result = await processImport({ model }, pdfInput(makePdf([])));
+    expect(result.isScan).toBe(true);
+    expect(result.warnings).toHaveLength(50);
+    expect(ImportResultSchema.safeParse(result).success).toBe(true);
   });
 
   it("a scan whose file the model rejects is ai_unavailable", async () => {
