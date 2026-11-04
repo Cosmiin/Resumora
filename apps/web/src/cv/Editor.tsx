@@ -8,7 +8,7 @@ import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryDrawer } from "./HistoryDrawer.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ImportButton } from "../imports/ImportButton.tsx";
-import { ImportDialog } from "../imports/ImportDialog.tsx";
+import { ImportScreen } from "../imports/ImportScreen.tsx";
 import { CvDocument } from "./page/CvDocument.tsx";
 import { blockKey, findItem, type BlockRef } from "./page/blocks.ts";
 import { SidePanel } from "./SidePanel.tsx";
@@ -108,23 +108,20 @@ export function Editor({ initial }: { initial: CvResponse }) {
         )}
       </div>
       {importId && (
-        <>
-          <div className="drawer-backdrop" onClick={() => setImportId(null)} />
-          <ImportDialog
-            importId={importId}
-            canApply={status === "saved"}
-            currentVersion={autosave.currentVersion}
-            onClose={() => setImportId(null)}
-            onApplied={(cv) => {
-              autosave.reset(cv);
-              setImportId(null);
-            }}
-            onConflict={(c) => {
-              autosave.reportConflict(c);
-              setImportId(null);
-            }}
-          />
-        </>
+        <ImportScreen
+          importId={importId}
+          canApply={status === "saved"}
+          currentVersion={autosave.currentVersion}
+          onClose={() => setImportId(null)}
+          onApplied={(cv) => {
+            autosave.reset(cv);
+            setImportId(null);
+          }}
+          onConflict={(c) => {
+            autosave.reportConflict(c);
+            setImportId(null);
+          }}
+        />
       )}
       {historyOpen && (
         <>
