@@ -116,7 +116,7 @@ Errors are always `{ error: { code, message, requestId } }`, and every 5xx is lo
 
 ## Roadmap
 1. **Foundation**: workspace, shared schema, DB baseline, API with auth + My CV + history, web app with auth, editor, autosave, conflict warning, history.
-2. **Import**: upload to Storage → Queue → text extraction (unpdf / mammoth) → admit + extract (organized into skill groups) → review → apply; adds `callModel`.
+2. **Import** (done, plan `2026-11-04-import.md`): upload to Storage → Queue → text extraction (unpdf / mammoth) → admit + extract (organized into skill groups) → review → apply; adds `callModel`.
 3. **AI + output**: Improve with AI per experience, skills suggestions, templates, PDF export.
 4. **Jobs + tailoring**: job entity, requirement extraction, score, tailored CV as diff to accept.
 5. **Extension**: Chrome extension capturing job pages, signs in with the same Supabase session flow.

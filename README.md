@@ -24,6 +24,15 @@ npm run dev               # API on :8788, web on :5173
 
 Open http://127.0.0.1:5173.
 
+### CV import (AI)
+
+Import reads the uploaded PDF or Word file and uses AI to organize it. Add to `apps/api/.dev.vars`:
+
+- `SUPABASE_SERVICE_ROLE_KEY`: the service role key from `supabase status` (used only by the import worker).
+- `OPENROUTER_API_KEY` + `OPENROUTER_MODEL`, and/or `OPENAI_API_KEY` + `OPENAI_MODEL`. OpenRouter is tried first and OpenAI if it fails. Pick models that support structured output (JSON schema).
+
+After pulling a change to the CV format, run `npm run db:reset` (local data is test data until launch).
+
 ## Checks
 
 ```sh
