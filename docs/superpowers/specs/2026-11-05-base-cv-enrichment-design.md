@@ -250,6 +250,7 @@ Scoring is **not** streamed. It runs in the background and nobody watches it bei
   - a result whose fingerprint no longer matches the role is ignored;
   - on failure the last score stays, marked "previous", with "Try again".
 - **`ScorePill`:** in each role's margin on the page (editor-only, like the missing-section boxes). Shows the number and band colour, or "…" while scoring, "previous", or "Add bullets to get a score". Click → focus the role's title, so the panel opens the role's tools.
+- **"Your roles" in the panel overview**, under "Needs attention": one row per experience, with its score pill, title and band label, in CV order. Clicking a row focuses that role, so the weakest role is one click away even when it is off screen. The rows use the same `RoleScoreState` as the pills, so they cost no extra requests. One line of fine print goes under the list: "Scores show how clearly each role tells a recruiter what you did. They update a moment after you stop typing."
 - **`ScoreCard`** at the top of the role's tools in `SectionTools`:
   - the score, band and "N of M bullets clear";
   - up to 2 tips: the model's `nextStep` tip first, then the first ATS tip;

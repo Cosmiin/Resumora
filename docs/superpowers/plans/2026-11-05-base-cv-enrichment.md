@@ -412,7 +412,7 @@ Also covered by the tests (from the spec): the model grading a bullet id that wa
 
 **Files:**
 - Create: `apps/web/src/cv/enrich/ScoreCard.tsx`, `apps/web/src/cv/enrich/score-card.test.tsx`
-- Modify: `apps/web/src/cv/panel/SectionTools.tsx` (render `ScoreCard` at the top of a role's tools), `apps/web/src/cv/panel/HelperPanel.tsx` (pass `scores`, `retry`), the role component (weak-bullet markers while the card is shown), `en.ts`
+- Modify: `apps/web/src/cv/panel/SectionTools.tsx` (render `ScoreCard` at the top of a role's tools), `apps/web/src/cv/panel/Overview.tsx` (the "Your roles" list under "Needs attention"; create `apps/web/src/cv/enrich/RoleScoreList.tsx` for it), `apps/web/src/cv/panel/HelperPanel.tsx` (pass `scores`, `retry`), the role component (weak-bullet markers while the card is shown), `en.ts`
 
 **Interfaces:**
 - Consumes: Task 2 (`atsChecks`) and Task 10 (`RoleScoreState`).
@@ -424,7 +424,8 @@ Also covered by the tests (from the spec): the model grading a bullet id that wa
   - "Answer questions" is hidden when `questions` is empty;
   - "Rewrite bullets" is always shown when the role has bullets;
   - `unavailable` shows "Score unavailable" and "Try again" → `onRetry`;
-  - markers appear only on bullets below 75, and only while the role's tools are open.
+  - markers appear only on bullets below 75, and only while the role's tools are open;
+  - the overview's "Your roles" list shows one row per experience in CV order, with pill, title and band label; it shows "…" while scoring and "Add bullets to get a score" for an empty role; clicking a row focuses that role's title, and the panel switches to its tools.
 - [ ] **Step 2: Run** `npm test -w apps/web -- score-card`. Expected: FAIL.
 - [ ] **Step 3: Implement.** Generic tips per issue, and the ATS tip texts, go in `en.ts` under `enrich.tips.*`. The "Improve with AI · Coming next" button for Experience is replaced by this card.
 - [ ] **Step 4: Run** the full check. Expected: green.
