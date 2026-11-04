@@ -1,8 +1,57 @@
 import { MAX_LONG_TEXT, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { DateField, ItemList, TextField, set } from "../fields.tsx";
+import { blankItem } from "./blank.ts";
 
 type Props<K extends keyof CvContent> = { items: CvContent[K]; onChange(next: CvContent[K]): void };
+type FieldsProps<K extends "education" | "languages" | "certifications" | "projects"> = {
+  value: CvContent[K][number];
+  onChange(next: CvContent[K][number]): void;
+};
+
+export function EducationFields({ value: e, onChange }: FieldsProps<"education">) {
+  return (
+    <div className="cv-grid">
+      <TextField label={t("cv.school")} value={e.school} onChange={(v) => onChange(set(e, "school", v))} />
+      <TextField label={t("cv.degree")} value={e.degree} onChange={(v) => onChange(set(e, "degree", v))} />
+      <TextField label={t("cv.field")} value={e.field} onChange={(v) => onChange(set(e, "field", v))} />
+      <DateField label={t("cv.startDate")} value={e.startDate} onChange={(v) => onChange(set(e, "startDate", v))} />
+      <DateField label={t("cv.endDate")} value={e.endDate} onChange={(v) => onChange(set(e, "endDate", v))} />
+      <TextField label={t("cv.notes")} value={e.notes} onChange={(v) => onChange(set(e, "notes", v))} />
+    </div>
+  );
+}
+
+export function LanguageFields({ value: l, onChange }: FieldsProps<"languages">) {
+  return (
+    <div className="cv-grid">
+      <TextField label={t("cv.language")} value={l.name} onChange={(v) => onChange(set(l, "name", v))} />
+      <TextField label={t("cv.level")} value={l.level} onChange={(v) => onChange(set(l, "level", v))} />
+    </div>
+  );
+}
+
+export function CertificationFields({ value: c, onChange }: FieldsProps<"certifications">) {
+  return (
+    <div className="cv-grid">
+      <TextField label={t("cv.certification")} value={c.name} onChange={(v) => onChange(set(c, "name", v))} />
+      <TextField label={t("cv.issuer")} value={c.issuer} onChange={(v) => onChange(set(c, "issuer", v))} />
+      <DateField label={t("cv.date")} value={c.date} onChange={(v) => onChange(set(c, "date", v))} />
+    </div>
+  );
+}
+
+export function ProjectFields({ value: p, onChange }: FieldsProps<"projects">) {
+  return (
+    <>
+      <div className="cv-grid">
+        <TextField label={t("cv.project")} value={p.name} onChange={(v) => onChange(set(p, "name", v))} />
+        <TextField label={t("cv.url")} type="url" value={p.url} onChange={(v) => onChange(set(p, "url", v))} />
+      </div>
+      <TextField label={t("cv.description")} multiline maxLength={MAX_LONG_TEXT} value={p.description} onChange={(v) => onChange(set(p, "description", v))} />
+    </>
+  );
+}
 
 export function EducationSection({ items, onChange }: Props<"education">) {
   return (
@@ -11,17 +60,8 @@ export function EducationSection({ items, onChange }: Props<"education">) {
       addLabel="cv.education.add"
       items={items}
       onChange={onChange}
-      create={() => ({ school: "", degree: "", field: "", startDate: "", endDate: "", notes: "" })}
-      renderItem={(e, update) => (
-        <div className="cv-grid">
-          <TextField label={t("cv.school")} value={e.school} onChange={(v) => update(set(e, "school", v))} />
-          <TextField label={t("cv.degree")} value={e.degree} onChange={(v) => update(set(e, "degree", v))} />
-          <TextField label={t("cv.field")} value={e.field} onChange={(v) => update(set(e, "field", v))} />
-          <DateField label={t("cv.startDate")} value={e.startDate} onChange={(v) => update(set(e, "startDate", v))} />
-          <DateField label={t("cv.endDate")} value={e.endDate} onChange={(v) => update(set(e, "endDate", v))} />
-          <TextField label={t("cv.notes")} value={e.notes} onChange={(v) => update(set(e, "notes", v))} />
-        </div>
-      )}
+      create={blankItem.education}
+      renderItem={(e, update) => <EducationFields value={e} onChange={update} />}
     />
   );
 }
@@ -33,13 +73,8 @@ export function LanguagesSection({ items, onChange }: Props<"languages">) {
       addLabel="cv.languages.add"
       items={items}
       onChange={onChange}
-      create={() => ({ name: "", level: "" })}
-      renderItem={(l, update) => (
-        <div className="cv-grid">
-          <TextField label={t("cv.language")} value={l.name} onChange={(v) => update(set(l, "name", v))} />
-          <TextField label={t("cv.level")} value={l.level} onChange={(v) => update(set(l, "level", v))} />
-        </div>
-      )}
+      create={blankItem.languages}
+      renderItem={(l, update) => <LanguageFields value={l} onChange={update} />}
     />
   );
 }
@@ -51,14 +86,8 @@ export function CertificationsSection({ items, onChange }: Props<"certifications
       addLabel="cv.certifications.add"
       items={items}
       onChange={onChange}
-      create={() => ({ name: "", issuer: "", date: "" })}
-      renderItem={(c, update) => (
-        <div className="cv-grid">
-          <TextField label={t("cv.certification")} value={c.name} onChange={(v) => update(set(c, "name", v))} />
-          <TextField label={t("cv.issuer")} value={c.issuer} onChange={(v) => update(set(c, "issuer", v))} />
-          <DateField label={t("cv.date")} value={c.date} onChange={(v) => update(set(c, "date", v))} />
-        </div>
-      )}
+      create={blankItem.certifications}
+      renderItem={(c, update) => <CertificationFields value={c} onChange={update} />}
     />
   );
 }
@@ -70,16 +99,8 @@ export function ProjectsSection({ items, onChange }: Props<"projects">) {
       addLabel="cv.projects.add"
       items={items}
       onChange={onChange}
-      create={() => ({ name: "", description: "", url: "" })}
-      renderItem={(p, update) => (
-        <>
-          <div className="cv-grid">
-            <TextField label={t("cv.project")} value={p.name} onChange={(v) => update(set(p, "name", v))} />
-            <TextField label={t("cv.url")} type="url" value={p.url} onChange={(v) => update(set(p, "url", v))} />
-          </div>
-          <TextField label={t("cv.description")} multiline maxLength={MAX_LONG_TEXT} value={p.description} onChange={(v) => update(set(p, "description", v))} />
-        </>
-      )}
+      create={blankItem.projects}
+      renderItem={(p, update) => <ProjectFields value={p} onChange={update} />}
     />
   );
 }
