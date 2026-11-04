@@ -50,20 +50,29 @@ apps/extension   (later: reads job page, POST /v1/jobs)
 
 ## CV content (`packages/shared/src/cv.ts`)
 ```ts
-type YearMonth = string;               // "YYYY-MM" or ""
+type YearMonth = string;               // "YYYY-MM", "YYYY" or ""
 type CvContent = {
   schemaVersion: 1;
   locale: "en" | "ro";
-  basics: { fullName; headline; email; phone; location; website; linkedin; summary };   // strings
+  basics: { fullName; firstName; lastName; titles: string[] /* max 2 */;
+            email; phone; location; website; linkedin; summary };                    // strings
   experience: { id; company; title; location; startDate: YearMonth; endDate: YearMonth;
-                current: boolean; bullets: { id; text }[] }[];
+                current: boolean; description; bullets: { id; text }[] }[];
   education: { id; school; degree; field; startDate: YearMonth; endDate: YearMonth; notes }[];
-  skills: { id; name; category }[];
+  technicalSkills:    { id; name }[];  // tools, software, languages, platforms, technologies
+  professionalSkills: { id; name }[];  // work capabilities, domain expertise, interpersonal, self-management
+  unclearSkills:      { id; name }[];  // too vague to classify: kept and shown for the user to sort
   languages: { id; name; level }[];
   certifications: { id; name; issuer; date: YearMonth }[];
   projects: { id; name; description; url }[];
+  custom: { id; title; details }[];    // sections that fit nowhere else, original heading kept
 };
 ```
+**Import rules** (owner's structure, changed in Plan 2):
+- Skills are classified by meaning, not by the CV's heading. A skill is never in two groups. Labels are short recruiter terms.
+- Text is copied word for word in the source language. Improving the wording is a separate step (Plan 3).
+- Name parts are filled only when clear. Dates are kept only when stated.
+- Anything left out is reported as a warning.
 Every list item has a stable `id` (`crypto.randomUUID()`), so tailored CVs and AI proposals can be diffed per item.
 Limits: strings ≤ 2,000 chars (summary/description ≤ 4,000), ≤ 40 items per list, ≤ 20 bullets per experience,
 serialized content ≤ 256 KB.
@@ -75,7 +84,7 @@ base_cv_versions(id uuid pk, user_id, content jsonb, reason text, created_at)   
 cv_imports      (id, user_id, storage_path, file_name, status text, error text, result jsonb,
                  attempts int, created_at, updated_at)                                                 -- plan 2
 ai_calls        (id, user_id, task text, provider text, model text, status text, error text,
-                 duration_ms int, input_tokens int, output_tokens int, created_at)                     -- plan 1 (table), plan 3 (writes)
+                 duration_ms int, input_tokens int, output_tokens int, created_at)                     -- plan 1 (table), plan 2 (writes)
 jobs            (id, user_id, url, title, company, description text, requirements jsonb, created_at)   -- plan 4
 tailored_cvs    (id, user_id, job_id, base_version int, content jsonb, score jsonb, version int, ...)  -- plan 4
 ```
@@ -107,8 +116,8 @@ Errors are always `{ error: { code, message, requestId } }`, and every 5xx is lo
 
 ## Roadmap
 1. **Foundation**: workspace, shared schema, DB baseline, API with auth + My CV + history, web app with auth, editor, autosave, conflict warning, history.
-2. **Import**: upload to Storage → Queue → text extraction (unpdf / mammoth) → admit + extract → review → apply.
-3. **AI + output**: `callModel`, Improve with AI per experience, skills suggestions, templates, PDF export.
+2. **Import**: upload to Storage → Queue → text extraction (unpdf / mammoth) → admit + extract (organized into skill groups) → review → apply; adds `callModel`.
+3. **AI + output**: Improve with AI per experience, skills suggestions, templates, PDF export.
 4. **Jobs + tailoring**: job entity, requirement extraction, score, tailored CV as diff to accept.
 5. **Extension**: Chrome extension capturing job pages, signs in with the same Supabase session flow.
 6. **Ship**: Cloudflare deploy (Workers + Pages), hosted Supabase migration, Stripe subscriptions.
