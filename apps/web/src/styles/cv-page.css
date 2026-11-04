@@ -2,6 +2,7 @@
 .cv-page {
   box-sizing: border-box;
   width: 100%;
+  min-width: 0;
   max-width: 680px;
   margin-inline: auto;
   aspect-ratio: 210 / 297; /* A4 proportions; grows with content */
@@ -46,6 +47,7 @@
 
 /* Text typed straight on the page: fields that look like the CV text and grow with it */
 .cv-page :is(input, textarea) {
+  max-width: 100%; /* long values scroll inside their own field */
   width: auto; /* app.css makes every input 100% wide; on the page fields sit inline */
   font: inherit;
   color: inherit;

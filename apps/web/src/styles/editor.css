@@ -45,9 +45,9 @@
 /* Editor: the page on the left, the helper panel (or History) on the right */
 .editor { padding: 0; }
 .editor-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: start; min-height: 760px; }
-.stage { padding: 28px 24px 40px; min-width: 0; display: grid; gap: 16px; align-content: start; }
+.stage { padding: 28px 24px 40px; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
 .stage:focus { outline: none; }
-.editor-page { display: grid; gap: 16px; justify-items: stretch; min-width: 0; }
+.editor-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; justify-items: stretch; min-width: 0; }
 .panel {
   position: sticky;
   top: 0;
