@@ -1,5 +1,7 @@
 # Skills inventory implementation plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 > **For agentic workers:** Use superpowers:executing-plans for focused inline implementation. The user explicitly authorized independent design, implementation, and proportionate validation.
 
 **Goal:** Build a selective, reusable master-CV inventory, with up to 30 technical and 30 professional skills, traceable high-confidence inference, and concise standard terminology.

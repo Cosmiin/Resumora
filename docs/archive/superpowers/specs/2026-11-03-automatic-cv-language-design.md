@@ -1,5 +1,7 @@
 # Automatic CV content language
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 Date: 3 November 2026
 
 Status: implemented, independently reviewed and activated in the managed local app. See the implementation plan execution record for verification limits.

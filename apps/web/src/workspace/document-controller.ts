@@ -19,6 +19,7 @@ type StagedSkillInventory = {
   review: BaseDraft["skillReview"];
   undo: boolean;
   applied?: boolean;
+  discarded?: boolean;
 };
 export type PendingWrite = {
   generation: number;
@@ -43,6 +44,45 @@ export class DocumentController {
   error: string | null = null;
   unsaved = false;
   private skillsImproving = false;
+  skillTimeoutId?: string;
+  private skillTimer?: ReturnType<typeof setTimeout>;
+  /** The deadline belongs to the document, even when the skills view is closed. */
+  watchSkillReview = () => {
+    clearTimeout(this.skillTimer);
+    const review = this.latest.current?.skillReview;
+    if (!this.alive || !review) return;
+    const remaining = (review.expiresAt ?? 0) - Date.now();
+    if (remaining <= 0) this.discardSkillReview(review.operationId);
+    else
+      this.skillTimer = setTimeout(
+        () => this.discardSkillReview(review.operationId),
+        remaining,
+      );
+  };
+  discardSkillReview = (operationId: string) => {
+    const current = this.latest.current;
+    if (!this.alive || current?.skillReview?.operationId !== operationId)
+      return;
+    clearTimeout(this.skillTimer);
+    const pending = this.pending.current;
+    if (
+      pending?.kind === "save" &&
+      pending.skillInventory?.review?.operationId === operationId
+    )
+      pending.skillInventory.discarded = true;
+    // Keep an uncertain database write's identity for reconciliation. Its late
+    // acknowledgement may advance the saved revision, but must never publish
+    // the discarded inventory over the retained draft or subsequent edits.
+    const next = clone(current);
+    delete next.skillReview;
+    this.latest.current = next;
+    this.generation.current++;
+    this.skillsImproving = false;
+    this.skillTimeoutId = operationId;
+    this.skillUndo = undefined;
+    this.refreshUnsaved();
+    this.notify();
+  };
   setSkillsImproving = (active: boolean) => {
     if (this.skillsImproving === active) return;
     this.skillsImproving = active;
@@ -54,7 +94,8 @@ export class DocumentController {
       !!this.latest.current?.skillReview ||
       !!(
         this.pending.current?.kind === "save" &&
-        this.pending.current.skillInventory
+        this.pending.current.skillInventory &&
+        !this.pending.current.skillInventory.discarded
       )
     );
   }
@@ -142,6 +183,9 @@ export class DocumentController {
       this.lock.current ||
       this.pending.current ||
       this.error === "conflict" ||
+      (!undo &&
+        current.skillReview?.expiresAt !== undefined &&
+        current.skillReview.expiresAt <= Date.now()) ||
       (undo
         ? skillInventoryIdentity(current)
         : skillReviewIdentity(current)) !== expectedIdentity
@@ -173,6 +217,7 @@ export class DocumentController {
     await this.submit(adapter);
     const retryable = () =>
       this.alive &&
+      !staged.discarded &&
       this.pending.current === operation &&
       operation.uncertain &&
       !operation.expired &&
@@ -196,6 +241,7 @@ export class DocumentController {
     const current = this.latest.current;
     if (
       !current ||
+      staged.discarded ||
       current.id !== staged.documentId ||
       (staged.undo
         ? skillInventoryIdentity(current)
@@ -228,6 +274,13 @@ export class DocumentController {
   ): boolean {
     if (!this.alive || this.pending.current !== operation) return false;
     const staged = operation.kind === "save" && operation.skillInventory;
+    if (
+      staged &&
+      !staged.undo &&
+      staged.review?.expiresAt !== undefined &&
+      staged.review.expiresAt <= Date.now()
+    )
+      this.discardSkillReview(staged.review.operationId);
     if (
       staged &&
       (this.latest.current?.id !== staged.documentId ||
@@ -314,6 +367,7 @@ export class DocumentController {
     return { operation, saved };
   }
   dispose() {
+    clearTimeout(this.skillTimer);
     this.alive = false;
     this.skillUndo = undefined;
     this.listeners.clear();

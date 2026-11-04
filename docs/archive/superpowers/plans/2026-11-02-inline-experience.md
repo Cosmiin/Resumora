@@ -1,5 +1,7 @@
 # Inline experience improvement implementation plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 User selected comparison option 1 (exec-8d9701a1-29db-4fb2-a9a8-04836d0aca2c.png), adding small contextual hints and examples. Implement in the existing worktree, preserving unrelated edits.
 
 1. Add regression coverage for an inline question under the selected point, stable right-side guidance, preserved answers on switching points, and optional examples that never populate answers.

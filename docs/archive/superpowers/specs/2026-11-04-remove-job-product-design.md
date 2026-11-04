@@ -1,5 +1,7 @@
 # Resumora: remove the job product, preserve Base CV
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 Date: 4 November 2026
 Status: approved by the user on 4 November 2026. Proceed to the implementation plan; execution and hosted mutation are not started by design approval alone.
 

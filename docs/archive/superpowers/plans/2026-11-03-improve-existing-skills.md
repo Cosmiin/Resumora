@@ -1,5 +1,7 @@
 # Improve existing skills implementation plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 ## Clarification revision (3 November)
 
 The latest explicit answers supersede reserve editing and the 30-skill active cap below. Keep **20 technical + 20 professional** active, preserve overflow privately for the saved inventory, and remove reserve controls from the profile. Natural labels follow the CV locale; prefer familiar established acronyms without inventing abbreviations or changing meaning. Improve continues to clean existing skills and discover new skills together. Experience editing must not apply skills implicitly; stale-result protection stays in place.

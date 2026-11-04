@@ -1,5 +1,7 @@
 # Removal verification and cutover receipt
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 Target: existing hosted Resumora project `aquvhqbkvrtzhbmezkci` and active Linux checkout. Private source baseline includes all unfinished CV, enrichment and language changes. Initial whole-source reconciliation: zero differences. No original-tree reset, stash, branch change, or other-worktree deletion.
 
 ## Candidate checks

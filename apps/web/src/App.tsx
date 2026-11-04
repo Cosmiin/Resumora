@@ -223,6 +223,9 @@ export function CvEditor({
   const pendingWrite = documentController.pending;
   latest.current = draft;
   headRef.current = head;
+  useEffect(() => {
+    documentController.watchSkillReview();
+  }, [documentController, draft?.skillReview?.operationId, draft?.skillReview?.expiresAt]);
   const [asOf] = useState(() => {
     const n = new Date();
     return {
@@ -866,6 +869,8 @@ export function CvEditor({
           draft={draft}
           change={(next) => change(next, true)}
           onActivityChange={documentController.setSkillsImproving}
+          onTimeout={documentController.discardSkillReview}
+          timedOutOperationId={documentController.skillTimeoutId}
           startRequested={skillsStartRequested}
           onStartConsumed={() => setSkillsStartRequested(false)}
           ready={
@@ -877,9 +882,9 @@ export function CvEditor({
           }
           saveFailed={!!error}
           snapshot={head ?? undefined}
-          request={async (context, recoverOnly) => {
+          request={async (context, recoverOnly, signal) => {
             if (!intelligence?.improveSkills) throw Error("AI_DISABLED");
-            return intelligence.improveSkills(context, recoverOnly);
+            return intelligence.improveSkills(context, recoverOnly, signal);
           }}
           commit={(identity, inventory) =>
             documentController.commitSkillInventory(

@@ -36,13 +36,13 @@ An HTTP replay only reads the existing operation. A lost queue acknowledgement r
 
 `useImportSession` owns the browser operation, upload/poll/read deadlines, Strict Mode recovery, cancellation and stale-response fencing. `ImportDocument` owns presentation and connects the existing review components. The shared public status validator permits metadata-only ready receipts for recent/pending discovery; opening a ready review requires the existing validated review body. No worker/storage fields are accepted in this contract.
 
-Review choices and additive merging remain in the existing review/workspace controllers. Review autosave does not publish a Profile. Only a successful atomic Profile save records confirmation; failed saves retain the recoverable review and additive imports preserve unrelated data and presentation.
+Review choices remain in the review/workspace controllers. Review autosave does not publish a Profile. Only a successful atomic Profile save records confirmation; failed saves retain the recoverable review.
 
-## Evidence and next measurement
+## Timing evidence
 
 Synthetic transport tests hold the response body and persistence acknowledgements independently. A fake clock deliberately assigns stage reservation 5 ms, attempt reservation 7 ms, provider/body 24 ms, validation 3 ms and attempt settlement 17 ms; the reported spans match those boundaries. These numbers are **test inputs, not measured production latency or a speedup**. Tests also cover absent completion, null publication, failed settlement, rejected/hanging telemetry sinks, HTTP replay, uncertain enqueue, hash mismatch, cancellation, refresh deadlines and stale responses.
 
-The smallest useful owner run is one already-authorized representative synthetic PDF import with an open browser: retain only its operation ID, phase events and ready observation, and compare the output with the fixture's expected content. Follow the existing [owner evaluation procedure](owner-ai-evaluation.md); do not make an additional paid run merely to obtain timing without authorization. If the first import is inconclusive, report unknown boundaries instead of automatically retrying it.
+The smallest useful owner run is one already-authorized representative synthetic PDF import with an open browser: retain only its operation ID, phase events and ready observation, and compare the output with the fixture's expected content. Use synthetic content and explicitly authorized provider calls; timing collection is not permission to initiate an additional paid run. If the first import is inconclusive, report unknown boundaries instead of automatically retrying it.
 
 For exact queue residence, an already-authorized database operator can inspect only the recorded operation and synthetic tenant through their existing private SQL interface. Do not grant a new browser endpoint or read queue payloads, leases or secret tables:
 
@@ -63,7 +63,7 @@ One sample can identify where to investigate; it cannot establish percentiles, c
 ## Local verification for this change (2 November 2026)
 
 - Final focused API run: **113 passed**, including native workerd dispatch, immutable upload replay/lost acknowledgements, worker hash checks, null publication and provider timing/settlement failures.
-- Final focused browser/workspace run: **95 passed** across 12 files, including Strict Mode, hanging reads, client/account fencing, pending-review recovery, failed saves and additive updates.
+- Final focused browser/workspace run: **95 passed** across 12 files, including Strict Mode, hanging reads, client/account fencing, pending-review recovery and failed saves.
 - A single broad frontend run passed 615 of 616 tests and exposed a same-session refresh regression. It was fixed; the final focused run includes all 17 session-recovery tests. Independent review then identified a related deferred-poll race; its added regression test failed before the fix and passed afterward. The broad suite was not repeated.
 - API/web type checks, local smoke, secret-boundary test and `git diff --check` passed. Web build and Worker dry-run build passed with command-local `APP_ORIGIN=http://127.0.0.1:5173 API_ORIGIN=http://127.0.0.1:5173`. No configuration file was changed. The existing large-bundle warning remains.
 - Native PostgreSQL queue/pending-review tests could not run because PostgreSQL binaries are unavailable. No hosted database substitute was used. Existing SQL ownership, expiry and atomic-save contracts were not changed; this session adds no fresh native SQL evidence.

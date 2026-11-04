@@ -5,6 +5,7 @@ import {
   isSkillsImprovementResult,
   skillReviewFingerprint,
   skillReviewIdentity,
+  skillsImprovementTimeoutMs,
   type SkillInventory,
   type SkillsImprovementResult,
 } from "@resumora/contracts/intelligence/skills-improvement";
@@ -24,6 +25,7 @@ type Props = {
   request: (
     context: IntelligenceContext & { fingerprint: string },
     recoverOnly?: boolean,
+    signal?: AbortSignal,
   ) => Promise<SkillsImprovementResult>;
   commit: (identity: string, inventory: SkillInventory) => Promise<boolean>;
   undo: () => Promise<boolean>;
@@ -33,6 +35,8 @@ type Props = {
   retrySave?: () => void;
   retrySaveAutomatically?: boolean;
   onActivityChange?: (active: boolean) => void;
+  onTimeout?: (operationId: string) => void;
+  timedOutOperationId?: string;
 };
 /** A saved pending identity fences remounts; only the controller publishes a confirmed inventory. */
 export function ImproveSkills(props: Props) {
@@ -42,6 +46,12 @@ export function ImproveSkills(props: Props) {
     busyRef = useRef(false);
   live.current = props;
   const armed = useRef(new Set<string>()),
+    requestAbort = useRef<AbortController | null>(null),
+    preparationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+      undefined,
+    ),
+    attempt = useRef(0),
+    startConsumed = useRef(false),
     attempted = useRef(new Set<string>()),
     metadataRetries = useRef(new Map<string, number>());
   const [busy, setBusy] = useState(false),
@@ -53,12 +63,64 @@ export function ImproveSkills(props: Props) {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      requestAbort.current?.abort();
+      clearTimeout(preparationTimer.current);
+      if (busyRef.current && !live.current.draft.skillReview) {
+        attempt.current++;
+        busyRef.current = false;
+        live.current.onActivityChange?.(false);
+      }
     };
   }, []);
   const publish = (d: BaseDraft) => {
     live.current = { ...live.current, draft: d };
     live.current.change(d);
   };
+  function releaseTimedOutAttempt() {
+    attempt.current++;
+    requestAbort.current?.abort();
+    requestAbort.current = null;
+    busyRef.current = false;
+    setBusy(false);
+    setDone(false);
+    setRemoved([]);
+    setError("SKILLS_TIMEOUT");
+    live.current.onActivityChange?.(false);
+  }
+  function expire(operationId: string) {
+    if (live.current.draft.skillReview?.operationId !== operationId) return;
+    releaseTimedOutAttempt();
+    // Update the local identity first so even an immediately resolved promise
+    // cannot publish this attempt after its deadline.
+    const next = clone(live.current.draft);
+    delete next.skillReview;
+    live.current.onTimeout?.(operationId);
+    publish(next);
+    live.current.onActivityChange?.(false);
+  }
+  useEffect(() => {
+    if (props.timedOutOperationId && !live.current.draft.skillReview)
+      releaseTimedOutAttempt();
+  }, [props.timedOutOperationId]);
+  const expiry = useRef(expire);
+  expiry.current = expire;
+  useEffect(() => {
+    const review = props.draft.skillReview;
+    if (!review) return;
+    const remaining = (review.expiresAt ?? 0) - Date.now();
+    if (remaining <= 0) {
+      expiry.current(review.operationId);
+      return;
+    }
+    const timer = setTimeout(
+      () => expiry.current(review.operationId),
+      remaining,
+    );
+    return () => clearTimeout(timer);
+  }, [
+    props.draft.skillReview?.operationId,
+    props.draft.skillReview?.expiresAt,
+  ]);
   async function prepare() {
     const p = live.current;
     if (busyRef.current || p.draft.skillReview || !p.ready || !p.snapshot)
@@ -68,11 +130,19 @@ export function ImproveSkills(props: Props) {
     setBusy(true);
     setError("");
     setDone(false);
+    setRemoved([]);
+    const expiresAt = Date.now() + skillsImprovementTimeoutMs;
+    const preparation = ++attempt.current;
+    preparationTimer.current = setTimeout(() => {
+      if (mounted.current && attempt.current === preparation)
+        releaseTimedOutAttempt();
+    }, skillsImprovementTimeoutMs);
     const identity = skillReviewIdentity(p.draft);
     try {
       const fingerprint = await skillReviewFingerprint(p.draft);
       if (
         !mounted.current ||
+        attempt.current !== preparation ||
         identity !== skillReviewIdentity(live.current.draft)
       )
         return;
@@ -83,21 +153,33 @@ export function ImproveSkills(props: Props) {
         fingerprint,
         snapshotId: p.snapshot.id,
         revision: p.snapshot.revision,
+        expiresAt,
       };
       armed.current.add(operationId);
       publish(next);
     } finally {
-      busyRef.current = false;
-      if (mounted.current) setBusy(false);
+      if (attempt.current === preparation) {
+        clearTimeout(preparationTimer.current);
+        busyRef.current = false;
+        if (mounted.current) setBusy(false);
+      }
     }
   }
   async function execute(recover: boolean) {
     const p = live.current.draft.skillReview;
     if (!p || busyRef.current || !live.current.ready) return;
+    if ((p.expiresAt ?? 0) <= Date.now()) {
+      expire(p.operationId);
+      return;
+    }
+    const execution = ++attempt.current;
+    const abort = new AbortController();
+    requestAbort.current = abort;
     const profileId = live.current.draft.id,
       identity = skillReviewIdentity(live.current.draft);
     const valid = () =>
       mounted.current &&
+      attempt.current === execution &&
       live.current.draft.id === profileId &&
       live.current.draft.skillReview?.operationId === p.operationId;
     busyRef.current = true;
@@ -107,11 +189,18 @@ export function ImproveSkills(props: Props) {
     try {
       if ((await skillReviewFingerprint(live.current.draft)) !== p.fingerprint)
         throw Error("STALE_INPUT");
+      if (!valid()) return;
+      const { expiresAt: _deadline, ...context } = p;
       const result = await live.current.request(
-        { ...p, targetId: profileId },
+        { ...context, targetId: profileId },
         recover,
+        abort.signal,
       );
       if (!valid()) return;
+      if (Date.now() >= p.expiresAt!) {
+        expire(p.operationId);
+        return;
+      }
       if (
         !isSkillsImprovementResult(result) ||
         result.fingerprint !== p.fingerprint
@@ -121,7 +210,7 @@ export function ImproveSkills(props: Props) {
         throw Error("STALE_INPUT");
       setRemoved(result.removed);
       const applied = await live.current.commit(identity, result.inventory);
-      if (!mounted.current) return;
+      if (!mounted.current || attempt.current !== execution) return;
       if (applied) setDone(true);
       else if (
         identity !== skillReviewIdentity(live.current.draft) &&
@@ -140,17 +229,28 @@ export function ImproveSkills(props: Props) {
         publish(next);
       }
     } finally {
-      busyRef.current = false;
-      if (mounted.current) setBusy(false);
+      if (attempt.current === execution) {
+        busyRef.current = false;
+        if (mounted.current) setBusy(false);
+      }
     }
   }
   useEffect(() => {
     // Only a click in this page session may create a new operation. A route
     // restored by refresh/history can recover an existing operation below.
-    if (props.startRequested && props.ready && props.snapshot) {
-      props.onStartConsumed?.();
-      if (!props.draft.skillReview) void prepare();
-    }
+    if (!props.startRequested) startConsumed.current = false;
+    if (props.startRequested && props.ready && props.snapshot)
+      queueMicrotask(() => {
+        if (
+          !mounted.current ||
+          !live.current.startRequested ||
+          startConsumed.current
+        )
+          return;
+        startConsumed.current = true;
+        live.current.onStartConsumed?.();
+        if (!live.current.draft.skillReview) void prepare();
+      });
     const p = props.draft.skillReview;
     if (
       p &&
@@ -158,7 +258,17 @@ export function ImproveSkills(props: Props) {
       !attempted.current.has(p.operationId) &&
       props.ready
     )
-      void execute(!armed.current.has(p.operationId));
+      // StrictMode replays mount effects. Start after that replay so its cleanup
+      // cannot abort the one permitted receipt recovery before dispatch.
+      queueMicrotask(() => {
+        if (
+          mounted.current &&
+          !busyRef.current &&
+          live.current.draft.skillReview?.operationId === p.operationId &&
+          !attempted.current.has(p.operationId)
+        )
+          void execute(!armed.current.has(p.operationId));
+      });
   }, [props.ready, props.draft, props.startRequested, busy]);
   useEffect(() => {
     if (
@@ -218,7 +328,9 @@ export function ImproveSkills(props: Props) {
 
   const pending = props.draft.skillReview;
   const active =
-    busy || !!pending || (!!props.startRequested && props.ready);
+    busy ||
+    !!pending ||
+    (!!props.startRequested && props.ready && !startConsumed.current);
   useEffect(() => {
     props.onActivityChange?.(active);
   }, [active, props.onActivityChange]);
@@ -269,25 +381,30 @@ export function ImproveSkills(props: Props) {
       </div>
       {error && (
         <p role="alert">
-          {error === "STALE_INPUT"
+          {error === "SKILLS_TIMEOUT"
             ? t(
-                "Ai modificat profilul. Am păstrat editările și am omis rezultatul vechi. Poți reîncerca.",
-                "Your profile changed. Your edits are preserved and the outdated result was skipped. You can retry.",
+                "Au trecut 90 de secunde. Încercarea a fost eliminată; competențele anterioare sunt păstrate. Poți începe din nou.",
+                "90 seconds elapsed. This attempt was discarded; your previous skills are kept. You can start again.",
               )
-            : error === "SAVE_REQUIRED" || props.saveFailed
+            : error === "STALE_INPUT"
               ? t(
-                  "Salvarea nu este confirmată. Lista anterioară rămâne afișată. Reîncearcă salvarea.",
-                  "Saving is not confirmed. Your previous list is still shown. Retry saving.",
+                  "Ai modificat profilul. Am păstrat editările și am omis rezultatul vechi. Poți reîncerca.",
+                  "Your profile changed. Your edits are preserved and the outdated result was skipped. You can retry.",
                 )
-              : pending
+              : error === "SAVE_REQUIRED" || props.saveFailed
                 ? t(
-                    "Rezultatul nu este încă disponibil. Verifică aceeași cerere.",
-                    "The result is not available yet. Check the same request.",
+                    "Salvarea nu este confirmată. Lista anterioară rămâne afișată. Reîncearcă salvarea.",
+                    "Saving is not confirmed. Your previous list is still shown. Retry saving.",
                   )
-                : t(
-                    "Nu am putut finaliza îmbunătățirea. Competențele tale sunt păstrate.",
-                    "We could not complete the improvement. Your skills are preserved.",
-                  )}
+                : pending
+                  ? t(
+                      "Rezultatul nu este încă disponibil. Verifică aceeași cerere.",
+                      "The result is not available yet. Check the same request.",
+                    )
+                  : t(
+                      "Nu am putut finaliza îmbunătățirea. Competențele tale sunt păstrate.",
+                      "We could not complete the improvement. Your skills are preserved.",
+                    )}
         </p>
       )}
       {props.saveFailed && props.retrySave && (

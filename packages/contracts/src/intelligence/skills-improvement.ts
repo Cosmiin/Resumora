@@ -8,6 +8,8 @@ import {
   type SkillCategory,
 } from "./skill-keywords.ts";
 
+export const skillsImprovementTimeoutMs = 90_000;
+
 export type SkillInventory = {
   technicalSkills: Fact<string>[];
   professionalSkills: Fact<string>[];

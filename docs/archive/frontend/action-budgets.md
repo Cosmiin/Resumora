@@ -1,5 +1,7 @@
 # Base CV · before/after action evidence
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../HANDOFF.md).
+
 The old **ce98260c** production bundle and the replacement production bundle were executed through public DOM events in jsdom. This is observed interaction evidence, not a native browser or viewport pass. Native scroll counts and fit at **1366×768** and **390×844** remain unverified because the required Chrome profile could not be positively bound.
 
 The table records the previously captured bundles named by the hashes below; it is not a new production-bundle run of the current review head. The optional month/year picker checks described below execute the current React components in jsdom.
@@ -50,7 +52,7 @@ Typing content is excluded. Each Tab/Enter/chord is listed separately. Mouse foc
 - Native layout, actual scrolling, required-reading effort, focus/Tab, IME, formatting shortcuts, drag/touch and the file picker remain manual checks. The baseline has two mandatory approval/declaration checkbox interactions in the full flow; the replacement has none. Reading time is not invented.
 - Mobile/200% zoom and long content may scroll vertically to preserve readable controls. Save stays in a fixed bar; there is no clipped form, tiny-text shortcut or mobile preview toggle.
 - Destructive restore/draft replacement retains its cancellation dialog. Ordinary editing has no modals or per-section confirmations. Source/status details are optional disclosures.
-- The captured bundles used page-memory autosave; those traces establish no durable save or account behavior. See the [Base CV guide](base-cv.md#run-and-review) for current persistence. No AI, parsing or export claim is made.
+- The captured bundles used page-memory autosave; those traces establish no durable save or account behavior. See the [Base CV guide](../../frontend/base-cv.md#run-and-review) for current persistence. No AI, parsing or export claim is made.
 
 ## Optional month/year picker · current component evidence
 
@@ -72,6 +74,6 @@ The owner-approved enrichment behavior also separates career context from CV tex
 
 ## Reproduce and manually finish acceptance
 
-Run the app as described in [base-cv.md](base-cv.md). In the verified owner profile, set 1366×768 and then 390×844, exercise all ten rows, record actual scrolls/keyboard focus/required reading, then repeat at 200% zoom. Test typing with an IME, touch deletion/reorder, native chooser cancel, preserved bold/italic/lists, month/year picker placement and keyboard behavior, and native destructive-dialog Escape/focus return. Use synthetic data.
+Run the app as described in [base-cv.md](../../frontend/base-cv.md). In the verified owner profile, set 1366×768 and then 390×844, exercise all ten rows, record actual scrolls/keyboard focus/required reading, then repeat at 200% zoom. Test typing with an IME, touch deletion/reorder, native chooser cancel, preserved bold/italic/lists, month/year picker placement and keyboard behavior, and native destructive-dialog Escape/focus return. Use synthetic data.
 
 Private evidence: `action-budget-production-traces.json` contains every click/key/focus/reveal event and production-bundle SHA256; `action-budget-drive.cjs` is the executable harness. The exact old bundle SHA256 is `06a656e66b00f138abcf74cfd05eb8bb72a86d87954dc2e0fad4ff3b8c1434e8`. The new bundle SHA256 is `9eed0686eb34247fe68991198f7bb4440e0900d678bb8122ca2694be993d4c65`. No source strings or static snapshots stand in for behavior.

@@ -183,6 +183,8 @@ export type BaseDraft = {
     fingerprint: string;
     snapshotId: string;
     revision: number;
+    /** Absolute deadline; reopening the profile must not renew an attempt. */
+    expiresAt?: number;
   };
   roles: Role[];
   education: Education[];

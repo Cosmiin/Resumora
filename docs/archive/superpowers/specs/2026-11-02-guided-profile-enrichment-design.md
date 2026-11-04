@@ -1,5 +1,7 @@
 # Guided Profile enrichment
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 Date: 2026-11-02
 Status: Approved and implemented locally. Synthetic verification completed; live provider latency and hosted stream buffering remain unmeasured.
 

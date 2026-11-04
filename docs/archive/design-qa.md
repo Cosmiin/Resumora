@@ -1,5 +1,7 @@
 # Option 1 implementation QA
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../HANDOFF.md).
+
 Date: 31 October 2026.
 
 Source visual truth: `/mnt/c/Users/mcosm/.codex/generated_images/01a192cc-d1b1-7ea2-818e-8c8c6f6de34b/exec-50de27f9-018a-4149-b359-e605d3505984.png`.

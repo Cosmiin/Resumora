@@ -1,5 +1,7 @@
 # Remove the Job Product Implementation Plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove every active job-related feature and all attributable data across the existing hosted Resumora project, retaining authentication and the complete Base CV product.

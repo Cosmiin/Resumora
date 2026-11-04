@@ -51,7 +51,7 @@ Earlier launches assembled several private files from previous checkouts and act
 
 ## Checkouts and historical previews
 
-Other Git worktrees are development history, not additional running environments. They may contain unfinished work and are retained. The current service's ownership marker and `dev:doctor` identify the active checkout. The old option-gallery preview on 15174 is retired; its design files remain available.
+Other Git worktrees are development history, not additional running environments. They retain other development changes and are preserved. The current service's ownership marker and `dev:doctor` identify the active checkout. The old option-gallery preview on 15174 is retired; its design files remain available.
 
 For a future code-folder move, transfer the complete working tree and private configuration deliberately, reinstall the service from the chosen checkout, and verify its owner, origin, session endpoint and worker before retiring the old location. Do not switch to `main` or reconstruct credentials from old launch commands as a way of starting the app.
 

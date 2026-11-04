@@ -1,5 +1,7 @@
 # Guided Profile Enrichment Implementation Plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Deliver the approved focused whole-entry improvement experience, live provider streaming, honest score previews and consolidated skills.

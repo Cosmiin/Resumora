@@ -6,4 +6,4 @@ Run `npm run check`, `npm test --workspace @resumora/api`, the native PostgreSQL
 
 Use synthetic transports for rendered desktop/mobile checks of import review, contextual questions, accepted wording, skills, language versions, photos, templates, PDF controls and history. Synthetic results do not establish hosted provider quality or authorize processing an owner's CV.
 
-Current CV audits and their bounded evidence are documented in [the frontend guides](docs/README.md), [skills audit](docs/skills-extraction-audit.md) and [design QA](design-qa.md). Their historical counts apply to their recorded checkpoints; rerun affected checks for the current source.
+Current behavior and the latest bounded verification evidence are recorded in the [handoff](docs/HANDOFF.md). Dated records under `docs/archive/` apply only to their recorded checkpoints and do not define the active task list.

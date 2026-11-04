@@ -1,6 +1,8 @@
 # Skills extraction audit and implementation
 
-Follow-up: [Improve existing skills](frontend/improve-skills.md) appends explicit cleanup, reserve inventory, atomic saving and session Undo to this implementation. That document records current language policy and verification; the results below describe the earlier extraction-only stage.
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../HANDOFF.md).
+
+Follow-up: [Improve existing skills](../frontend/improve-skills.md) appends explicit cleanup, reserve inventory, atomic saving and session Undo to this implementation. That document records current language policy and verification; the results below describe the earlier extraction-only stage.
 
 Date: 3 November 2026. Scope: the master profile's “Add skills from experience” action and its legacy experience-level acceptance helper. No provider credentials, models, database migrations, deployment or language-detection behavior were changed.
 

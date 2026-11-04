@@ -1,5 +1,7 @@
 # Removal inventory — execution in progress
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 Active checkout remains /home/cosmin/.treehouse/AI-CV-Maker-V2-180668/13/AI-CV-Maker-V2. Candidate: /home/cosmin/.cache/resumora-removal-20261104.
 
 Source preservation fingerprints, raw schema definitions and test logs are private execution artifacts in the candidate's .superpowers/sdd/2026-11-04-remove-job-product directory. No runtime secrets were copied.

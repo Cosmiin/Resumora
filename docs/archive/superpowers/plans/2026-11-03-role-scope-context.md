@@ -1,5 +1,7 @@
 # Role scope and context implementation plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 > Execute inline using superpowers:executing-plans, with test-first validation and final review.
 
 **Goal:** Implement the user's selected proposal 2: a short statement of the role's scope and context.

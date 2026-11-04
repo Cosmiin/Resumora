@@ -1,6 +1,8 @@
 # Updating a profile from another CV
 
-Implemented 30 October 2026 as the first upload-safety slice of the [UX proposal](../ux-simplification-proposal.md). The broader two-destination navigation and durable intermediate-draft roadmap are still proposals.
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../HANDOFF.md).
+
+Implemented 30 October 2026 as the first upload-safety slice of the [UX proposal](../../ux-simplification-proposal.md). The broader two-destination navigation and durable intermediate-draft roadmap are still proposals.
 
 ## User flow
 
@@ -23,7 +25,7 @@ This is a one-person profile flow, not support for managing multiple people. The
 - The save coordinator retains its conflict, exact-replay, account/session and deletion-generation protections. Applying checks that the reviewed profile still matches the current draft and that no write is unresolved.
 - Candidate IDs are scoped to the import's source locators. Separate extractions may reuse an ID; imported-fact lookup and confirmation cannot attest an unrelated old fact with the same candidate ID.
 - The current payload still carries one active import-review envelope. An earlier pending factual review must finish before another import can be applied. Previous extraction/source provenance remains in sources and snapshots.
-- Comparison selections now autosave as owner-scoped import-review drafts. Acknowledged selections, destination choices and ownership confirmation return for the same profile checkpoint; changing that checkpoint requires fresh selection. Draft saving does not apply changes or invoke AI. See [two-destination workspaces](two-destination-workspaces.md).
+- Comparison selections now autosave as owner-scoped import-review drafts. Acknowledged selections, destination choices and ownership confirmation return for the same profile checkpoint; changing that checkpoint requires fresh selection. Draft saving does not apply changes or invoke AI. See [two-destination workspaces](../../frontend/two-destination-workspaces.md).
 - First-profile imports still use the existing staged review and existing automatic-acceptance policy for eligible high-confidence facts. This slice protects reimports; it does not retroactively undo earlier imported drafts.
 - No schema, provider configuration, service restart, live account mutation or paid model call was needed to validate this slice.
 

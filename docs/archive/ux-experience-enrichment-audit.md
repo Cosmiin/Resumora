@@ -1,5 +1,7 @@
 # Experience enrichment UX audit
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../HANDOFF.md).
+
 31 October 2026 · Resumora local application · Screenshot-led inspection
 
 ## Verdict

@@ -1,5 +1,7 @@
 # Automatic CV Language Implementation Plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Infer the base CV language and apply it consistently to every generated content surface without routine language selection.

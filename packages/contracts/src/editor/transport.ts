@@ -398,12 +398,15 @@ const draftShape = obj(
       technicalSkills: list(text),
       professionalSkills: list(text),
     }),
-    skillReview: obj({
-      operationId: str,
-      fingerprint: str,
-      snapshotId: str,
-      revision: (v) => Number.isSafeInteger(v) && Number(v) > 0,
-    }),
+    skillReview: obj(
+      {
+        operationId: str,
+        fingerprint: str,
+        snapshotId: str,
+        revision: (v) => Number.isSafeInteger(v) && Number(v) > 0,
+      },
+      { expiresAt: (v) => Number.isSafeInteger(v) && Number(v) > 0 },
+    ),
     roleRewriteReviews: list(isRoleRewriteReview),
     questionPlans: list((v) => {
       try {

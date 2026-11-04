@@ -33,6 +33,70 @@ function gate() {
   const wait = new Promise<void>((resolve) => (release = resolve));
   return { wait, release };
 }
+it("rejects a save after the wall-clock deadline even when browser timers have not fired", async () => {
+  const { controller, adapter, inventory, identity, saved } = await fixture();
+  vi.useFakeTimers();
+  try {
+    controller.latest.current!.skillReview!.expiresAt = Date.now() + 90000;
+    controller.watchSkillReview();
+    const pause = gate();
+    adapter.nextSave = { wait: pause.wait };
+    const saving = controller.commitSkillInventory(
+      adapter,
+      identity,
+      inventory,
+    );
+    vi.setSystemTime(Date.now() + 90001);
+    pause.release();
+    expect(await saving).toBe(false);
+    expect(controller.profileChangesBlocked()).toBe(false);
+    expect(controller.latest.current!.skillReview).toBeUndefined();
+    expect(getSkillInventory(controller.latest.current!)).toEqual(
+      getSkillInventory(saved.draft),
+    );
+    controller.dispose();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it("expires the Profile lock outside the skills view and fences a late inventory save", async () => {
+  const { controller, adapter, inventory, identity, saved } = await fixture();
+  vi.useFakeTimers();
+  try {
+    controller.latest.current!.skillReview!.expiresAt = Date.now() + 90000;
+    controller.watchSkillReview();
+    const pause = gate();
+    adapter.nextSave = { wait: pause.wait };
+    const saving = controller.commitSkillInventory(
+      adapter,
+      identity,
+      inventory,
+    );
+    await vi.advanceTimersByTimeAsync(89999);
+    expect(controller.profileChangesBlocked()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(controller.profileChangesBlocked()).toBe(false);
+    expect(controller.latest.current!.skillReview).toBeUndefined();
+    expect(getSkillInventory(controller.latest.current!)).toEqual(
+      getSkillInventory(saved.draft),
+    );
+    edit(controller, (d) => {
+      d.name.value = "Edited after timeout";
+    });
+    pause.release();
+    expect(await saving).toBe(false);
+    expect(getSkillInventory(controller.latest.current!)).toEqual(
+      getSkillInventory(saved.draft),
+    );
+    expect(controller.latest.current!.name.value).toBe("Edited after timeout");
+    expect(controller.canUndoSkillInventory()).toBe(false);
+    await saveOrdinary(controller, adapter);
+    expect((await adapter.load())!.draft).toEqual(controller.latest.current);
+    controller.dispose();
+  } finally {
+    vi.useRealTimers();
+  }
+});
 it("automatically retries a transient inventory save with the same write identity", async () => {
   const { controller, adapter, identity, inventory } = await fixture();
   vi.useFakeTimers();
@@ -505,10 +569,11 @@ it("rejects an expired reconciliation after disposal", async () => {
   expect(controller.head.current).toBeUndefined();
 });
 
-
 it("refuses a previous improvement's undo during another improvement and while its receipt is pending", async () => {
-  const {controller, adapter, identity, inventory} = await fixture();
-  expect(await controller.commitSkillInventory(adapter, identity, inventory)).toBe(true);
+  const { controller, adapter, identity, inventory } = await fixture();
+  expect(
+    await controller.commitSkillInventory(adapter, identity, inventory),
+  ).toBe(true);
   expect(controller.canUndoSkillInventory()).toBe(true);
   const before = clone(controller.latest.current);
   const writes = adapter.writes.length;
@@ -518,7 +583,12 @@ it("refuses a previous improvement's undo during another improvement and while i
   expect(controller.latest.current).toEqual(before);
   expect(adapter.writes.length).toBe(writes);
   controller.setSkillsImproving(false);
-  controller.latest.current!.skillReview = {operationId:"pending",fingerprint:"a".repeat(64),snapshotId:"saved",revision:1};
+  controller.latest.current!.skillReview = {
+    operationId: "pending",
+    fingerprint: "a".repeat(64),
+    snapshotId: "saved",
+    revision: 1,
+  };
   expect(controller.profileChangesBlocked()).toBe(true);
   expect(await controller.undoSkillInventory(adapter)).toBe(false);
   delete controller.latest.current!.skillReview;

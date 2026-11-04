@@ -28,7 +28,7 @@ export type IntelligenceContext = {
   operationId: string;
 };
 export interface IntelligenceClient {
-  improveSkills?(context: IntelligenceContext & { fingerprint:string }, recoverOnly?:boolean): Promise<SkillsImprovementResult>;
+  improveSkills?(context: IntelligenceContext & { fingerprint:string }, recoverOnly?:boolean, signal?: AbortSignal): Promise<SkillsImprovementResult>;
   detectLanguage?(context: IntelligenceContext, recoverOnly?: boolean): Promise<ContentLanguageDecision>;
   transcribe?(context: IntelligenceContext, audio: Blob, signal: AbortSignal): Promise<string>;
   /** Stable, opaque lifetime of the authenticated transport; contains no account data. */
@@ -150,7 +150,11 @@ export function httpIntelligence(transport: CvTransport): IntelligenceClient {
     canonicalContentLocale(operation.input.contentLocale) === operation.input.contentLocale;
   return {
     sessionIdentity: transport,
-    improveSkills: async (context, recoverOnly = false) => {
+    improveSkills: async (context, recoverOnly = false, signal) => {
+      const lifetime = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(90000)]);
+      const checkActive = () => {
+        if (lifetime.aborted) throw new IntelligenceRequestError('SKILLS_TIMEOUT', context.operationId);
+      };
       const validate = (value:unknown) => {
         if (!isSkillsImprovementResult(value) || value.fingerprint !== context.fingerprint)
           throw new IntelligenceRequestError('AI_OUTPUT_INVALID', context.operationId);
@@ -158,7 +162,7 @@ export function httpIntelligence(transport: CvTransport): IntelligenceClient {
       };
       const readReceipt = async () => {
         const operation = await request<import('@resumora/contracts/editor/workspace').CareerOperation>(
-          `/operations/${encodeURIComponent(context.operationId)}`, {method:'GET',signal:AbortSignal.timeout(10000)});
+          `/operations/${encodeURIComponent(context.operationId)}`, {method:'GET',signal:AbortSignal.any([lifetime, AbortSignal.timeout(10000)])});
         if (operation.kind !== 'rewrite' || operation.input.skillsImprovement !== true || operation.input.targetId !== context.targetId || operation.input.fingerprint !== context.fingerprint)
           throw new IntelligenceRequestError('IDEMPOTENCY_BODY_MISMATCH', context.operationId);
         if (operation.state === 'ready') return validate(operation.result);
@@ -168,20 +172,29 @@ export function httpIntelligence(transport: CvTransport): IntelligenceClient {
       const recoverable = new Set(['MISSING','ALREADY_REQUESTED','AI_REQUEST_PENDING','AI_RESULT_UNAVAILABLE','AI_REQUEST_UNKNOWN','AI_TIMEOUT_UNKNOWN','INTELLIGENCE_UNAVAILABLE','UNAVAILABLE']);
       let resumeMissing = false, resumed = false;
       for (let attempt = 0; ; attempt++) {
+        checkActive();
         try {
           if ((!recoverOnly && attempt === 0) || resumeMissing) {
             if (resumeMissing) { resumed = true; resumeMissing = false; }
-            return validate(await command('/skills',context,AbortSignal.timeout(185000)));
+            const value = await command('/skills',context,lifetime);
+            checkActive();
+            return validate(value);
           }
           return await readReceipt();
         } catch (error) {
+          checkActive();
           const code = error instanceof IntelligenceRequestError ? error.code : 'AI_REQUEST_UNKNOWN';
           if (!recoverable.has(code) || attempt >= delays.length)
             throw new IntelligenceRequestError(code, context.operationId);
           // Missing receipts may resume the SAME saved request. Unknown/processing
           // receipts only poll, so a transport retry cannot duplicate paid inference.
           resumeMissing = code === 'MISSING' && !resumed && (recoverOnly || attempt > 0);
-          await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+          await new Promise<void>(resolve => {
+            const finish = () => { clearTimeout(timer); lifetime.removeEventListener('abort', finish); resolve(); };
+            const timer = setTimeout(finish, delays[attempt]);
+            lifetime.addEventListener('abort', finish, {once:true});
+            if (lifetime.aborted) finish();
+          });
         }
       }
     },

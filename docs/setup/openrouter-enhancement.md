@@ -15,8 +15,8 @@ connection check and synthetic dashboard are documented in [OpenAI/admin prepara
 
 ## Bounded provider flow and accounting
 
-See the current [enhancement behavior](cv-import-enrichment.md#enhancement-behavior) and
-[durable accounting contract](cv-import-enrichment.md#durable-operationattempt-accounting).
+See the current [enhancement behavior](cv-import-enrichment.md#provider-seam-and-operation-contracts) and
+[durable accounting contract](cv-import-enrichment.md#provider-seam-and-operation-contracts).
 The [OpenAI/admin guide](openai-admin.md#api-and-estimate-rules) owns versioned price snapshots
 and estimate arithmetic. Provider-reported request charges exclude credit-purchase fees and
 separately invoiced BYOK charges; they are not invoice reconciliation.
@@ -35,13 +35,13 @@ All linked official pages were fetched publicly on **2026-10-28**, without accou
 | OpenRouter logging/privacy | Regional input/output logging is skipped; provider retention remains provider-specific. [EU routing business page](https://openrouter.ai/business/eu) | Evidence that content-bearing security/abuse logs, downstream caches and observability never leave the EU; selected provider's contractual retention/access terms. A no-training or ZDR label alone is insufficient. | Unverified. |
 | Direct OpenAI fallback | Europe processing region is EEA + Switzerland. Non-US residency requires abuse-monitoring approval and a Modified Retention amendment; eligible endpoint/model required. TLS uses regional handling. [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data) | Owner key/project eligibility, applicable contracts/retention, EU-member-only restriction, supported pinned snapshot and subprocessor path. Ordinary personal key or `store:false` is insufficient. | Broader published geography; strict EU not proven. |
 
-**Historical conclusion:** neither generic regional hostname establishes a strict EU-member-only path; EEA/Europe must not be described as EU-member-only. GDPR/SCCs, retention controls and geographic guarantees answer different questions. The [current processing policy](cv-import-enrichment.md#owner-configuration-paid-mode-remains-off) supersedes strict EU as an activation requirement; this matrix remains evidence of the limits of any geographic claim.
+**Historical conclusion:** neither generic regional hostname establishes a strict EU-member-only path; EEA/Europe must not be described as EU-member-only. GDPR/SCCs, retention controls and geographic guarantees answer different questions. The [current processing policy](cv-import-enrichment.md#setup-and-activation-boundary) supersedes strict EU as an activation requirement; this matrix remains evidence of the limits of any geographic claim.
 
 ## Cost candidates, conditional only
 
 No currently reviewed candidate is approved for **strict EU-only** operation. The following are inexpensive candidates for later eligibility/quality evaluation, not selected models or approval to call them:
 
-| Route / candidate | Public observation (USD per 1M input/output tokens) | Remaining gate |
+| Route / candidate | Public observation (USD per 1M input/output tokens) | Verification boundary |
 | --- | --- | --- |
 | OpenRouter `openai/gpt-5-nano` | Regional metadata lists $0.055 / $0.44 and structured outputs / `max_completion_tokens`. [Public EU model metadata](https://eu.openrouter.ai/api/v1/models) | Conditional schema-compatible candidate; exact endpoint, EU-member geography, retention and Romanian/English factual quality remain unverified. |
 | OpenRouter Amazon Nova Micro 1.0 | Regional catalog lists $0.035 / $0.14. [Official EU catalog](https://openrouter.ai/business/eu) | Public metadata omits structured outputs: excluded from the current strict-schema request seam. Geography/retention also unapproved. |
@@ -56,7 +56,7 @@ Use small scoped prompts, bounded output and one proposal at a time. Do not auto
 
 ## Activation checklist and owner inputs
 
-Use [current owner configuration](cv-import-enrichment.md#owner-configuration-paid-mode-remains-off).
+Use [current owner configuration](cv-import-enrichment.md#setup-and-activation-boundary).
 The strict-EU synthetic checklist in [`region.ts`](../../apps/api/src/ai/region.ts) remains a
 rehearsal only. Its invented evidence cannot authorize execution or certify residency. Any future
 strict-EU variant would require externally verified route/account, retention, subprocessor and
@@ -66,5 +66,5 @@ application-path evidence, not an environment flag or browser attestation.
 
 The [enhancement checks](../../apps/api/tests/enhancement.test.mjs) exercise the historical
 synthetic evidence gate. Current connected checks and their limits are owned by the
-[connected setup guide](cv-import-enrichment.md#offline-checks). No live model quality, account
+[connected setup guide](cv-import-enrichment.md#verification). No live model quality, account
 entitlement or geographic guarantee follows from injected transports.

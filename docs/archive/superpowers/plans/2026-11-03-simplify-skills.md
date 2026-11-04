@@ -1,5 +1,7 @@
 # Simplify skills implementation plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 **Goal:** Remove skills reference functionality and block all profile changes during improvement and saving.
 **Architecture:** Skills responses contain labels, categories, importance and cleanup input IDs. DocumentController owns the mutation lock across views; the skills operation alone may update its receipt and commit inventory.
 **Tech stack:** TypeScript, React, Node test runner, Vitest.

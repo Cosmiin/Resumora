@@ -1,5 +1,7 @@
 # Resumora reliability and UX implementation plan
 
+> Historical record. This is not the current specification or an active task list. Start with [the current handoff](../../../HANDOFF.md).
+
 > Execute inline with the Superpowers executing-plans and verification workflows. The user's request explicitly authorizes proceeding through validated phases without approval gates.
 
 **Goal:** Recoverable AI operations, CV-language content, faster enrichment and clearer editing without losing existing data.

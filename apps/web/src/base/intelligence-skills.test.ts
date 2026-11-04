@@ -2,6 +2,37 @@ import { expect, it, vi } from "vitest";
 import { httpIntelligence } from "./intelligence";
 import { blankDraft, fact } from "./model";
 import { getSkillInventory } from "@resumora/contracts/intelligence/skills-improvement";
+it("stops receipt polling when the skills attempt is aborted", async () => {
+  vi.useFakeTimers();
+  try {
+    const abort = new AbortController();
+    const transport = vi.fn(async (_path: string, _init?: RequestInit) => {
+      throw Error("offline");
+    });
+    const client = httpIntelligence(transport);
+    const pending = expect(
+      client.improveSkills!(
+        {
+          snapshotId: "saved",
+          revision: 1,
+          targetId: "profile",
+          operationId: "old",
+          fingerprint: "a".repeat(64),
+        },
+        false,
+        abort.signal,
+      ),
+    ).rejects.toThrow("SKILLS_TIMEOUT");
+    await vi.advanceTimersByTimeAsync(1);
+    abort.abort();
+    await vi.advanceTimersByTimeAsync(10000);
+    await pending;
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(transport.mock.calls[0][1]?.signal?.aborted).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});
 it("recovers the same improvement via GET and rejects unrelated receipts and malformed inventories", async () => {
   const context = {
     snapshotId: crypto.randomUUID(),
