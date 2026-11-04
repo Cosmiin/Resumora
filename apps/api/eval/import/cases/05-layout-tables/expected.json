@@ -1,0 +1,134 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "Hannah",
+      "lastName": "Brooks",
+      "titles": [
+        "Operations Manager"
+      ],
+      "phone": "+40 700 000 055",
+      "location": "Brașov, Romania",
+      "website": "",
+      "linkedin": "",
+      "summary": "Operations manager with a background in logistics. I keep warehouses, drivers and customers moving on time.",
+      "fullName": "Hannah Brooks",
+      "email": "hannah.brooks@example.com"
+    },
+    "experience": [
+      {
+        "company": "Carpathia Logistics",
+        "title": "Operations Manager",
+        "location": "Brașov, Romania",
+        "startDate": "2019-04",
+        "endDate": "",
+        "current": true,
+        "description": "Run daily operations for a 120-person distribution centre.",
+        "bullets": [
+          {
+            "text": "Reduced late deliveries from 9% to 3% by redesigning the dispatch schedule."
+          },
+          {
+            "text": "Introduced a weekly safety review that cut reported incidents by half."
+          }
+        ]
+      },
+      {
+        "company": "TransAlp Cargo",
+        "title": "Shift Supervisor",
+        "location": "Brașov, Romania",
+        "startDate": "2014-08",
+        "endDate": "2019-03",
+        "current": false,
+        "description": "Supervised a team of 25 loaders and drivers.",
+        "bullets": [
+          {
+            "text": "Trained 14 new team members on the warehouse management system."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "Transilvania University of Brașov",
+        "degree": "Bachelor's degree",
+        "field": "Logistics Management",
+        "startDate": "2010",
+        "endDate": "2014",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "English",
+        "level": "Fluent"
+      },
+      {
+        "name": "German",
+        "level": "Intermediate"
+      }
+    ],
+    "certifications": [],
+    "projects": [],
+    "custom": [],
+    "achievements": [],
+    "volunteering": [],
+    "awards": [],
+    "courses": [],
+    "publications": [],
+    "interests": [],
+    "technicalSkills": [
+      {
+        "name": "SAP"
+      },
+      {
+        "name": "Excel"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "Route planning"
+      },
+      {
+        "name": "Inventory control"
+      },
+      {
+        "name": "Team leadership"
+      }
+    ],
+    "unclearSkills": [
+      {
+        "name": "Management"
+      }
+    ]
+  },
+  "headings": [
+    {
+      "heading": "Profile",
+      "category": "summary"
+    },
+    {
+      "heading": "Experience",
+      "category": "experience"
+    },
+    {
+      "heading": "Skills",
+      "category": "skills"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    }
+  ]
+}

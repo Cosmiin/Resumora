@@ -1,0 +1,143 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "Project Coordinator"
+      ],
+      "phone": "+40 700 000 099",
+      "location": "Cluj-Napoca, Romania",
+      "website": "",
+      "linkedin": "",
+      "summary": "Project coordinator for construction and renovation work. I make sure the right people are on site on the right day.",
+      "fullName": "Rachel Tan",
+      "email": "rachel.tan@example.com"
+    },
+    "experience": [
+      {
+        "company": "Habitat Build",
+        "title": "Project Coordinator",
+        "location": "Cluj-Napoca, Romania",
+        "startDate": "2019-07",
+        "endDate": "",
+        "current": true,
+        "description": "Coordinate renovation projects for apartment buildings.",
+        "bullets": [
+          {
+            "text": "Delivered 22 renovation projects on schedule over five years."
+          },
+          {
+            "text": "Kept a shared plan that contractors and owners could both read."
+          }
+        ]
+      },
+      {
+        "company": "Dacia Construct",
+        "title": "Site Assistant",
+        "location": "Cluj-Napoca, Romania",
+        "startDate": "2016-09",
+        "endDate": "2019-06",
+        "current": false,
+        "description": "Supported the site manager on residential projects.",
+        "bullets": [
+          {
+            "text": "Prepared weekly progress reports for three sites."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "Technical University of Cluj-Napoca",
+        "degree": "Bachelor of Engineering",
+        "field": "Civil Engineering",
+        "startDate": "2012",
+        "endDate": "2016",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "English",
+        "level": "Fluent"
+      },
+      {
+        "name": "Romanian",
+        "level": "Native"
+      }
+    ],
+    "certifications": [],
+    "projects": [],
+    "custom": [],
+    "achievements": [],
+    "volunteering": [
+      {
+        "company": "Habitat for Humanity",
+        "title": "Volunteer Builder",
+        "location": "Cluj-Napoca, Romania",
+        "startDate": "2017-04",
+        "endDate": "2022-09",
+        "current": false,
+        "description": "Weekend builds for families in need.",
+        "bullets": [
+          {
+            "text": "Helped finish nine houses over five years."
+          }
+        ]
+      }
+    ],
+    "awards": [
+      {
+        "name": "Employee of the Year",
+        "issuer": "Habitat Build",
+        "date": "2022-12",
+        "description": "Awarded for delivering all projects on schedule."
+      }
+    ],
+    "courses": [],
+    "publications": [],
+    "interests": [],
+    "technicalSkills": [],
+    "professionalSkills": [],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "Profile",
+      "category": "summary"
+    },
+    {
+      "heading": "Experience",
+      "category": "experience"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    },
+    {
+      "heading": "Volunteer Work",
+      "category": "volunteering"
+    },
+    {
+      "heading": "Awards",
+      "category": "awards"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    },
+    {
+      "key": "skills",
+      "level": "missing"
+    }
+  ]
+}

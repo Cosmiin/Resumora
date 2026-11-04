@@ -1,0 +1,134 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "Sales Lead"
+      ],
+      "phone": "+40 700 000 066",
+      "location": "Constanța, Romania",
+      "website": "",
+      "linkedin": "linkedin.com/in/omar-haddad-example",
+      "summary": "Sales lead for industrial equipment. I build long relationships with customers who buy once a decade.",
+      "fullName": "Omar Haddad",
+      "email": "omar.haddad@example.com"
+    },
+    "experience": [
+      {
+        "company": "Marea Neagră Machinery",
+        "title": "Sales Lead",
+        "location": "Constanța, Romania",
+        "startDate": "2018-02",
+        "endDate": "",
+        "current": true,
+        "description": "Responsible for port and shipyard customers.",
+        "bullets": [
+          {
+            "text": "Closed the largest contract in the company's history, worth 2.4 million euro."
+          },
+          {
+            "text": "Grew the customer list from 35 to 61 active accounts."
+          }
+        ]
+      },
+      {
+        "company": "PortTech",
+        "title": "Sales Representative",
+        "location": "Constanța, Romania",
+        "startDate": "2014-05",
+        "endDate": "2018-01",
+        "current": false,
+        "description": "Sold cranes and spare parts.",
+        "bullets": [
+          {
+            "text": "Exceeded the yearly target in four of the last four years."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "Ovidius University of Constanța",
+        "degree": "Bachelor's degree",
+        "field": "Economics",
+        "startDate": "2010",
+        "endDate": "2014",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "Arabic",
+        "level": "Native"
+      },
+      {
+        "name": "English",
+        "level": "Fluent"
+      },
+      {
+        "name": "French",
+        "level": "Conversational"
+      }
+    ],
+    "certifications": [],
+    "projects": [],
+    "custom": [],
+    "achievements": [],
+    "volunteering": [],
+    "awards": [],
+    "courses": [],
+    "publications": [],
+    "interests": [],
+    "technicalSkills": [
+      {
+        "name": "Salesforce"
+      },
+      {
+        "name": "SAP"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "Negotiation"
+      },
+      {
+        "name": "Account management"
+      },
+      {
+        "name": "Contract drafting"
+      }
+    ],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "Profile",
+      "category": "summary"
+    },
+    {
+      "heading": "Work History",
+      "category": "experience"
+    },
+    {
+      "heading": "Key Skills",
+      "category": "skills"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    }
+  ]
+}

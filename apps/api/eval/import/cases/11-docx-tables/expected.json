@@ -1,0 +1,143 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "Financial Accountant"
+      ],
+      "phone": "+40 700 000 111",
+      "location": "Ploiești, Romania",
+      "website": "",
+      "linkedin": "",
+      "summary": "Accountant with nine years in manufacturing and retail. I close the month early and explain the numbers clearly.",
+      "fullName": "Victor Alden",
+      "email": "victor.alden@example.com"
+    },
+    "experience": [
+      {
+        "company": "Prahova Metalworks",
+        "title": "Financial Accountant",
+        "location": "Ploiești, Romania",
+        "startDate": "2018-05",
+        "endDate": "",
+        "current": true,
+        "description": "Responsible for the general ledger and monthly closing of a manufacturing company.",
+        "bullets": [
+          {
+            "text": "Shortened the monthly close from eight working days to five."
+          },
+          {
+            "text": "Prepared audited accounts with no material findings for four years in a row."
+          }
+        ]
+      },
+      {
+        "company": "Retail Plus",
+        "title": "Junior Accountant",
+        "location": "Ploiești, Romania",
+        "startDate": "2015-10",
+        "endDate": "2018-04",
+        "current": false,
+        "description": "Handled accounts payable for 30 stores.",
+        "bullets": [
+          {
+            "text": "Cut supplier payment errors by two thirds with a new approval checklist."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "Petroleum-Gas University of Ploiești",
+        "degree": "Bachelor's degree",
+        "field": "Accounting and Management Information Systems",
+        "startDate": "2011",
+        "endDate": "2015",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "Romanian",
+        "level": "Native"
+      },
+      {
+        "name": "English",
+        "level": "Upper intermediate"
+      }
+    ],
+    "certifications": [
+      {
+        "name": "ACCA Diploma in Financial and Management Accounting",
+        "issuer": "ACCA",
+        "date": "2020-03"
+      }
+    ],
+    "projects": [],
+    "custom": [],
+    "achievements": [],
+    "volunteering": [],
+    "awards": [],
+    "courses": [],
+    "publications": [],
+    "interests": [],
+    "technicalSkills": [
+      {
+        "name": "SAP"
+      },
+      {
+        "name": "Excel"
+      },
+      {
+        "name": "SAGA"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "Financial reporting"
+      },
+      {
+        "name": "Month-end closing"
+      },
+      {
+        "name": "VAT compliance"
+      }
+    ],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "Skills",
+      "category": "skills"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    },
+    {
+      "heading": "Profile",
+      "category": "summary"
+    },
+    {
+      "heading": "Experience",
+      "category": "experience"
+    },
+    {
+      "heading": "Certifications",
+      "category": "certifications"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    }
+  ]
+}

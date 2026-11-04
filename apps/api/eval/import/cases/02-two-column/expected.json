@@ -1,0 +1,171 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "Marketing Manager",
+        "Brand Strategist"
+      ],
+      "phone": "+40 700 000 022",
+      "location": "Bucharest, Romania",
+      "website": "priyanandakumar.example.com",
+      "linkedin": "",
+      "summary": "Marketing manager who turns research into campaigns. Ten years across consumer brands and B2B software, with a focus on measurable growth.",
+      "fullName": "Priya Nandakumar",
+      "email": "priya.nandakumar@example.com"
+    },
+    "experience": [
+      {
+        "company": "Lumen Software",
+        "title": "Marketing Manager",
+        "location": "Bucharest, Romania",
+        "startDate": "2020-01",
+        "endDate": "",
+        "current": true,
+        "description": "Lead a team of five covering content, events and paid media.",
+        "bullets": [
+          {
+            "text": "Raised qualified leads by 62% in two years through a rebuilt content programme."
+          },
+          {
+            "text": "Ran the company's first user conference with 450 attendees."
+          },
+          {
+            "text": "Set up Salesforce and HubSpot reporting shared by sales and marketing."
+          }
+        ]
+      },
+      {
+        "company": "Casa Verde Foods",
+        "title": "Brand Manager",
+        "location": "Bucharest, Romania",
+        "startDate": "2015-06",
+        "endDate": "2019-12",
+        "current": false,
+        "description": "Managed three snack brands sold in 900 stores.",
+        "bullets": [
+          {
+            "text": "Relaunched the oat bar range, growing sales by 28% in the first year."
+          },
+          {
+            "text": "Negotiated media packages worth 1.2 million lei per year."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "Bucharest University of Economic Studies",
+        "degree": "Master's degree",
+        "field": "Marketing",
+        "startDate": "2012",
+        "endDate": "2014",
+        "notes": ""
+      },
+      {
+        "school": "University of Bucharest",
+        "degree": "Bachelor's degree",
+        "field": "Communication",
+        "startDate": "2009",
+        "endDate": "2012",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "English",
+        "level": "Fluent"
+      },
+      {
+        "name": "Hindi",
+        "level": "Native"
+      },
+      {
+        "name": "Romanian",
+        "level": "Professional"
+      }
+    ],
+    "certifications": [],
+    "projects": [],
+    "custom": [
+      {
+        "title": "Driving licence",
+        "details": "Category B"
+      }
+    ],
+    "achievements": [],
+    "volunteering": [],
+    "awards": [],
+    "courses": [
+      {
+        "name": "Marketing Analytics",
+        "provider": "Google Digital Academy",
+        "date": "2021-04"
+      }
+    ],
+    "publications": [],
+    "interests": [],
+    "technicalSkills": [
+      {
+        "name": "HubSpot"
+      },
+      {
+        "name": "Salesforce"
+      },
+      {
+        "name": "Google Analytics"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "Brand strategy"
+      },
+      {
+        "name": "Campaign planning"
+      },
+      {
+        "name": "Team leadership"
+      }
+    ],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "Profile",
+      "category": "summary"
+    },
+    {
+      "heading": "Experience",
+      "category": "experience"
+    },
+    {
+      "heading": "Skills",
+      "category": "skills"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    },
+    {
+      "heading": "Training",
+      "category": "courses"
+    },
+    {
+      "heading": "Driving licence",
+      "category": "other"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    }
+  ]
+}

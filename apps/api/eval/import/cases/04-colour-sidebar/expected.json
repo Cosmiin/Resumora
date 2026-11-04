@@ -1,0 +1,143 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "UX Designer"
+      ],
+      "phone": "+40 700 000 044",
+      "location": "Iași, Romania",
+      "website": "sofialindqvist.example.com",
+      "linkedin": "",
+      "summary": "UX designer who works from user research to shipped interfaces. Comfortable with both quick prototypes and detailed design systems.",
+      "fullName": "Sofia Lindqvist",
+      "email": "sofia.lindqvist@example.com"
+    },
+    "experience": [
+      {
+        "company": "Fieldnote",
+        "title": "Senior UX Designer",
+        "location": "Iași, Romania",
+        "startDate": "2020-06",
+        "endDate": "",
+        "current": true,
+        "description": "Design lead for a note-taking app with 200,000 users.",
+        "bullets": [
+          {
+            "text": "Redesigned onboarding, lifting day-seven retention from 31% to 44%."
+          },
+          {
+            "text": "Built a design system used by four product teams."
+          }
+        ]
+      },
+      {
+        "company": "Studio Pixel",
+        "title": "UX Designer",
+        "location": "Iași, Romania",
+        "startDate": "2017-02",
+        "endDate": "2020-05",
+        "current": false,
+        "description": "Designed websites and apps for small businesses.",
+        "bullets": [
+          {
+            "text": "Ran 40 usability tests across 12 client projects."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "Gheorghe Asachi Technical University",
+        "degree": "Bachelor's degree",
+        "field": "Industrial Design",
+        "startDate": "2013",
+        "endDate": "2017",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "Swedish",
+        "level": "Native"
+      },
+      {
+        "name": "English",
+        "level": "Fluent"
+      }
+    ],
+    "certifications": [
+      {
+        "name": "Certified Usability Analyst",
+        "issuer": "Human Factors International",
+        "date": "2019-11"
+      }
+    ],
+    "projects": [],
+    "custom": [],
+    "achievements": [],
+    "volunteering": [],
+    "awards": [],
+    "courses": [],
+    "publications": [],
+    "interests": [],
+    "technicalSkills": [
+      {
+        "name": "Figma"
+      },
+      {
+        "name": "Miro"
+      },
+      {
+        "name": "HTML and CSS"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "User research"
+      },
+      {
+        "name": "Prototyping"
+      },
+      {
+        "name": "Workshop facilitation"
+      }
+    ],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "Skills",
+      "category": "skills"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    },
+    {
+      "heading": "Certifications",
+      "category": "certifications"
+    },
+    {
+      "heading": "About me",
+      "category": "summary"
+    },
+    {
+      "heading": "Experience",
+      "category": "experience"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    }
+  ]
+}
