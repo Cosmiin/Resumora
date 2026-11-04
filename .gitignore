@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.wrangler/
+coverage/
+.superpowers/
+*.log
+.env
+.env.local
+.dev.vars
+supabase/.temp/
+supabase/.branches/
