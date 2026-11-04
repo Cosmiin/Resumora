@@ -1,7 +1,0 @@
-/extension*
-  X-Frame-Options: DENY
-  Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'
-  Referrer-Policy: no-referrer
-
-/downloads/*
-  X-Content-Type-Options: nosniff
