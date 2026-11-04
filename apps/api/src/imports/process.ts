@@ -2,6 +2,7 @@ import { AdmitSchema, ImportDraftSchema, MAX_CV_BYTES, toCvContent, type ImportR
 import { AiOutputTooLongError, AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ImportFailure, extractText, type FileFormat } from "./extract-text.ts";
 import { admitPrompt, extractPrompt } from "./prompts.ts";
+import { findUnsourcedLines } from "./source-check.ts";
 
 /** The admit step only needs the start of the document. */
 const ADMIT_CHARS = 8_000;
@@ -16,7 +17,7 @@ export async function processImport(
   deps: { model: ModelDeps },
   input: { userId: string; bytes: Uint8Array; format: FileFormat },
 ): Promise<ImportResult> {
-  const { text } = await extractText(input.bytes, input.format);
+  const { text, isScan } = await extractText(input.bytes, input.format);
   const doc = (t: string) => `<document>\n${t}\n</document>`;
 
   try {
@@ -42,6 +43,7 @@ export async function processImport(
       timeoutMs: EXTRACT_TIMEOUT_MS,
     });
     const result = toCvContent(draft);
+    result.unsourcedLines = isScan ? [] : findUnsourcedLines(result.content, text);
     if (admit.kind === "uncertain") result.warnings.unshift("This may not be a CV. Check the result carefully.");
     if (new TextEncoder().encode(JSON.stringify(result.content)).length > MAX_CV_BYTES) {
       throw new ImportFailure("too_long");
