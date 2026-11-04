@@ -106,6 +106,12 @@
 .cv-line { margin-block-end: 4px; }
 .cv-line .cv-item-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .cv-line .cv-item-head > input:first-child { flex: 1; min-width: 0; }
+@media (max-width: 560px) {
+  /* Dates drop under the title instead of squeezing both; the title needs a real basis to wrap. */
+  .cv-line .cv-item-head { flex-wrap: wrap; }
+  .cv-line .cv-item-head > input:first-child { flex: 1 1 14ch; }
+  .cv-line .cv-item-dates { flex: none; }
+}
 .cv-item-details { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
 .cv-item-details .sep { color: var(--sage-300); }
 .cv-custom { margin-block-end: 8px; }
