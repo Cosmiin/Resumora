@@ -1,13 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
-import { CvContentSchema, HistoryItemSchema, emptyCv, type CvContent } from "@resumora/shared";
+import { HistoryItemSchema, StoredCvSchema, emptyCv, type CvContent } from "@resumora/shared";
 import type { AuthUser, SupabaseEnv } from "../env.ts";
 import type { CvRepo, SaveResult } from "./repo.ts";
 
 type SaveRow = { version: number; updated_at: string; conflict: boolean };
 
-/** Parses a CV read from the database. A bad shape is a server problem (500), not the client's (400). */
-function storedCv(value: unknown): CvContent {
-  const parsed = CvContentSchema.safeParse(value);
+/** Parses a CV read from the database (v1 or v2, always returned as v2). A bad shape is a server problem (500), not the client's (400). */
+export function storedCv(value: unknown): CvContent {
+  const parsed = StoredCvSchema.safeParse(value);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     throw new Error(`stored CV does not match the schema at ${issue?.path.join(".") ?? "?"}: ${issue?.message}`);

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CvResponseSchema, ErrorBodySchema, emptyCv, newId, type CvContent } from "@resumora/shared";
 import { createApp } from "../src/app.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
+import { storedCv } from "../src/cv/supabase-repo.ts";
 import type { CvRepo } from "../src/cv/repo.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -146,5 +147,74 @@ describe("history", () => {
     const res = await get(`/v1/cv/history/${newId()}`);
     expect(res.status).toBe(404);
     expect(ErrorBodySchema.parse(await json(res)).error.code).toBe("not_found");
+  });
+});
+
+/** A v1 CV as an old database row holds it: no new lists, no layout. */
+function storedV1(fullName: string): Record<string, unknown> {
+  const v1: Record<string, unknown> = { ...cvNamed(fullName), schemaVersion: 1 };
+  for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests"]) delete v1[key];
+  v1.experience = [
+    { id: newId(), company: "Acme", title: "PM", location: "", startDate: "2020-01", endDate: "", current: true, description: "", bullets: [{ id: newId(), text: "Shipped it" }] },
+  ];
+  return v1;
+}
+
+describe("old v1 CVs", () => {
+  /** Mimics supabaseCvRepo: raw rows read through storedCv; restore copies the stored value as SQL does. */
+  function rawRepo(row: unknown, versions: Record<string, unknown>): CvRepo {
+    return {
+      async get() {
+        return { content: storedCv(row), version: 1, updatedAt: "2026-11-04T10:00:00Z" };
+      },
+      async save() {
+        throw new Error("not used");
+      },
+      async listHistory() {
+        return [];
+      },
+      async getHistory(id) {
+        return id in versions ? { content: storedCv(versions[id]), createdAt: "2026-11-04T09:00:00Z" } : null;
+      },
+      async restore(id) {
+        if (!(id in versions)) return null;
+        row = versions[id];
+        return { ok: true, version: 2, updatedAt: "2026-11-04T10:01:00Z" };
+      },
+    };
+  }
+
+  it("GET /v1/cv returns a stored v1 CV as v2", async () => {
+    repo = rawRepo(storedV1("Ana"), {});
+    const body = CvResponseSchema.parse(await json(await get("/v1/cv")));
+    expect(body.content.schemaVersion).toBe(2);
+    expect(body.content.basics.fullName).toBe("Ana");
+    expect(body.content.experience[0]!.bullets[0]!.text).toBe("Shipped it");
+    expect(body.content.achievements).toEqual([]);
+  });
+
+  it("history detail of a v1 version comes back as v2", async () => {
+    const id = newId();
+    repo = rawRepo(storedV1("Now"), { [id]: storedV1("Before") });
+    const res = await get(`/v1/cv/history/${id}`);
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.content.schemaVersion).toBe(2);
+    expect(body.content.basics.fullName).toBe("Before");
+  });
+
+  it("restoring a v1 history version saves v2", async () => {
+    const id = newId();
+    repo = rawRepo(storedV1("Now"), { [id]: storedV1("Before") });
+    expect((await send("POST", `/v1/cv/history/${id}/restore`, { version: 1 })).status).toBe(200);
+    const body = CvResponseSchema.parse(await json(await get("/v1/cv")));
+    expect(body.content.schemaVersion).toBe(2);
+    expect(body.content.basics.fullName).toBe("Before");
+  });
+
+  it("PUT /v1/cv rejects a v1 body with 400", async () => {
+    const res = await send("PUT", "/v1/cv", { content: storedV1("Old"), version: 0 });
+    expect(res.status).toBe(400);
+    expect(ErrorBodySchema.parse(await json(res)).error.code).toBe("invalid_content");
   });
 });
