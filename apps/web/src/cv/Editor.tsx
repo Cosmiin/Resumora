@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { CvResponse, SaveResponse } from "@resumora/shared";
+import type { CvContent, CvResponse, SaveResponse } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
 import { conflictFrom, isConflict, useAutosave, type SaveStatus } from "./useAutosave.ts";
 import { ConflictBanner } from "./ConflictBanner.tsx";
-import { HistoryDrawer } from "./HistoryDrawer.tsx";
+import { HistoryPanel } from "./HistoryPanel.tsx";
+import { dayLabel, timeLabel } from "./historyFormat.ts";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ImportButton } from "../imports/ImportButton.tsx";
 import { ImportScreen } from "../imports/ImportScreen.tsx";
@@ -30,6 +31,8 @@ export function Editor({ initial }: { initial: CvResponse }) {
   const [restoreFailed, setRestoreFailed] = useState(false);
   const [importId, setImportId] = useState<string | null>(null);
   const dialogOpen = historyOpen || importId !== null;
+  const [preview, setPreview] = useState<{ content: CvContent; createdAt: string } | null>(null);
+  const historyButton = useRef<HTMLButtonElement>(null);
   const [selected, setSelected] = useState<BlockRef | null>(null);
   const position = selected && findItem(content, selected);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -54,6 +57,18 @@ export function Editor({ initial }: { initial: CvResponse }) {
     (block ?? pageRef.current)?.focus();
   }, [selected]);
 
+  function openHistory() {
+    setSelected(null);
+    setPreview(null);
+    setHistoryOpen(true);
+  }
+
+  function closeHistory() {
+    setHistoryOpen(false);
+    setPreview(null);
+    historyButton.current?.focus();
+  }
+
   async function restore(id: string) {
     setRestoreFailed(false);
     let restored: SaveResponse;
@@ -62,7 +77,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
     } catch (err) {
       if (isConflict(err)) autosave.reportConflict(conflictFrom(err));
       else setRestoreFailed(true);
-      setHistoryOpen(false);
+      closeHistory();
       return;
     }
     try {
@@ -71,7 +86,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
       // The restore is saved, but our copy is now out of date: let the user load it.
       autosave.reportConflict(restored);
     }
-    setHistoryOpen(false);
+    closeHistory();
   }
 
   const actions = (
@@ -80,7 +95,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
         {t(statusLabel[status])}
       </span>
       <ImportButton onStarted={setImportId} />
-      <button type="button" className="secondary" onClick={() => setHistoryOpen(true)}>
+      <button ref={historyButton} type="button" className="secondary" onClick={openHistory}>
         {t("history.open")}
       </button>
     </>
@@ -96,15 +111,38 @@ export function Editor({ initial }: { initial: CvResponse }) {
         </p>
       )}
       {conflict && <ConflictBanner onLoadLatest={loadLatest} onKeepMine={keepMine} />}
-      {/* While history is open the CV can't be edited, so a restore can't race the user's typing. */}
-      <div className="editor-workspace" inert={dialogOpen}>
+      {/* While history or an import is open the CV can't be edited, so a restore can't race the user's typing.
+          The history panel sits outside the inert page area so it stays usable. */}
+      <div className="editor-workspace">
         <div className="editor-page-area" ref={pageRef} tabIndex={-1}>
-          <p className="editor-hint">{t("cv.page.hint")}</p>
-          <CvDocument content={content} selected={selected} onSelect={setSelected} showUnsorted />
-          <AddSection cv={content} onChange={setContent} onAdd={setSelected} />
+          {historyOpen ? (
+            preview && (
+              <p className="history-notice" role="status">
+                {t("history.previewing", { when: `${dayLabel(preview.createdAt)}, ${timeLabel(preview.createdAt)}` })}
+              </p>
+            )
+          ) : (
+            <p className="editor-hint">{t("cv.page.hint")}</p>
+          )}
+          <div className="editor-page" inert={dialogOpen}>
+          {historyOpen ? (
+            <CvDocument content={preview?.content ?? content} showUnsorted />
+          ) : (
+            <CvDocument content={content} selected={selected} onSelect={setSelected} showUnsorted />
+          )}
+          {!historyOpen && <AddSection cv={content} onChange={setContent} onAdd={setSelected} />}
+          </div>
         </div>
-        {selected && position && (
-          <SidePanel cv={content} selected={selected} onChange={setContent} onSelect={setSelected} />
+        {historyOpen ? (
+          <HistoryPanel
+            canRestore={status === "saved"}
+            onClose={closeHistory}
+            onPreview={(c, createdAt) => setPreview(c && createdAt ? { content: c, createdAt } : null)}
+            onRestore={restore}
+          />
+        ) : (
+          selected &&
+          position && <SidePanel cv={content} selected={selected} onChange={setContent} onSelect={setSelected} />
         )}
       </div>
       {importId && (
@@ -122,12 +160,6 @@ export function Editor({ initial }: { initial: CvResponse }) {
             setImportId(null);
           }}
         />
-      )}
-      {historyOpen && (
-        <>
-          <div className="drawer-backdrop" onClick={() => setHistoryOpen(false)} />
-          <HistoryDrawer onClose={() => setHistoryOpen(false)} canRestore={status === "saved"} onRestore={restore} />
-        </>
       )}
       </main>
     </AppShell>

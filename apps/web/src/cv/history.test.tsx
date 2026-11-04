@@ -44,43 +44,79 @@ beforeEach(() => {
 
 async function openHistory(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: "History" }));
-  return screen.findByRole("dialog", { name: "Version history" });
+  return screen.findByRole("complementary", { name: "History" });
 }
 
 describe("version history", () => {
   it("lists versions newest first", async () => {
     const user = userEvent.setup();
     renderPage();
-    const dialog = await openHistory(user);
-    const items = await within(dialog).findAllByRole("listitem");
+    const panel = await openHistory(user);
+    const items = await within(panel).findAllByRole("listitem");
     expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent("Before a restore");
-    expect(items[1]).toHaveTextContent("Saved automatically");
+    expect(items[0]).toHaveTextContent("Before restore");
+    expect(items[1]).toHaveTextContent("While editing");
   });
 
-  it("previews a version", async () => {
+  it("previews a version on the page", async () => {
     const user = userEvent.setup();
     renderPage();
-    const dialog = await openHistory(user);
-    const [, older] = await within(dialog).findAllByRole("listitem");
-    await user.click(within(older!).getByRole("button", { name: "Preview" }));
-    expect(await within(dialog).findByText("Old Name")).toBeInTheDocument();
+    const panel = await openHistory(user);
+    const [, older] = await within(panel).findAllByRole("listitem");
+    await user.click(within(older!).getByRole("button"));
+    await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
+    expect(screen.getByText(/Previewing the version from/)).toBeInTheDocument();
+    expect(within(older!).getByRole("button", { pressed: true })).toBeInTheDocument();
     expect(api.getHistoryItem).toHaveBeenCalledWith("h1");
+    expect(within(cvPage()).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("closing history shows the current CV again", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const panel = await openHistory(user);
+    const [, older] = await within(panel).findAllByRole("listitem");
+    await user.click(within(older!).getByRole("button"));
+    await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(cvPage()).toHaveTextContent("Current");
+    expect(cvPage()).not.toHaveTextContent("Old Name");
+    expect(screen.queryByText(/Previewing the version from/)).not.toBeInTheDocument();
+  });
+
+  it("groups versions by day with the time", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-04T12:00:00Z") });
+    try {
+      api.listHistory.mockResolvedValue([
+        { id: "h2", reason: "import", createdAt: "2026-11-04T10:15:00Z" },
+        { id: "h1", reason: "ai", createdAt: "2026-11-02T10:00:00Z" },
+      ]);
+      const user = userEvent.setup();
+      renderPage();
+      const panel = await openHistory(user);
+      expect(await within(panel).findByText("Today")).toBeInTheDocument();
+      expect(within(panel).getByText("2 November")).toBeInTheDocument();
+      expect(within(panel).getByText("Before import")).toBeInTheDocument();
+      expect(within(panel).getByText("Before AI change")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("restore replaces the editor content", async () => {
     const user = userEvent.setup();
     api.restoreHistory.mockResolvedValue({ version: 3, updatedAt: "2026-11-04T10:30:00Z" });
     renderPage();
-    const dialog = await openHistory(user);
-    const [, older] = await within(dialog).findAllByRole("listitem");
+    const panel = await openHistory(user);
+    const [, older] = await within(panel).findAllByRole("listitem");
     api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });
-    await user.click(within(older!).getByRole("button", { name: "Restore" }));
+    await user.click(within(older!).getByRole("button"));
+    await user.click(within(panel).getByRole("button", { name: "Restore this version" }));
 
     expect(api.restoreHistory).toHaveBeenCalledWith("h1", 2);
     await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
     expect(screen.getByText("Saved")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "History" })).not.toBeInTheDocument();
   });
 
   it("restore conflict shows banner", async () => {
@@ -91,9 +127,10 @@ describe("version history", () => {
       }),
     );
     renderPage();
-    const dialog = await openHistory(user);
-    const [, older] = await within(dialog).findAllByRole("listitem");
-    await user.click(within(older!).getByRole("button", { name: "Restore" }));
+    const panel = await openHistory(user);
+    const [, older] = await within(panel).findAllByRole("listitem");
+    await user.click(within(older!).getByRole("button"));
+    await user.click(within(panel).getByRole("button", { name: "Restore this version" }));
     expect(await screen.findByText("This CV was saved in another tab or device.")).toBeInTheDocument();
   });
 
@@ -103,9 +140,10 @@ describe("version history", () => {
     renderPage();
     await user.click(await screen.findByRole("button", { name: "Edit your details" }));
     await user.type(screen.getByLabelText("Full name"), "!");
-    const dialog = await openHistory(user);
-    const [first] = await within(dialog).findAllByRole("listitem");
-    expect(within(first!).getByRole("button", { name: "Restore" })).toBeDisabled();
+    const panel = await openHistory(user);
+    const [first] = await within(panel).findAllByRole("listitem");
+    await user.click(within(first!).getByRole("button"));
+    expect(within(panel).getByRole("button", { name: "Restore this version" })).toBeDisabled();
   });
 });
 
@@ -123,10 +161,11 @@ describe("version history blocks editing", () => {
     const user = userEvent.setup();
     api.restoreHistory.mockResolvedValue({ version: 3, updatedAt: "2026-11-04T10:30:00Z" });
     renderPage();
-    const dialog = await openHistory(user);
-    const [, older] = await within(dialog).findAllByRole("listitem");
+    const panel = await openHistory(user);
+    const [, older] = await within(panel).findAllByRole("listitem");
     api.getCv.mockRejectedValueOnce(new ApiClientError(0, "network", "offline"));
-    await user.click(within(older!).getByRole("button", { name: "Restore" }));
+    await user.click(within(older!).getByRole("button"));
+    await user.click(within(panel).getByRole("button", { name: "Restore this version" }));
 
     expect(await screen.findByRole("button", { name: "Load latest" })).toBeInTheDocument();
     api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });
