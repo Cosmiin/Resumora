@@ -14,6 +14,7 @@ import {
   type CvContent,
   type Skill,
 } from "./cv.ts";
+import { StoredCvSchema } from "./upgrade.ts";
 
 /** "Is this a CV?" — the first, cheap AI step of an import. */
 export const AdmitSchema = z.object({ kind: z.enum(["cv", "not_cv", "uncertain"]), reason: z.string() }).strict();
@@ -67,7 +68,7 @@ export function emptyDraft(): ImportDraft {
 
 /** What a finished import holds, ready for review. */
 export const ImportResultSchema = z.object({
-  content: CvContentSchema,
+  content: StoredCvSchema,
   warnings: z.array(z.string().max(500)).max(50),
 });
 export type ImportResult = z.infer<typeof ImportResultSchema>;

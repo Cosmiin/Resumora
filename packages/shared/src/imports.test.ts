@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, MAX_BULLETS, MAX_ITEMS } from "./cv.ts";
-import { ImportDraftSchema, emptyDraft, toCvContent, type ImportDraft } from "./imports.ts";
+import { CvContentSchema, MAX_BULLETS, MAX_ITEMS, defaultLayout, emptyCv } from "./cv.ts";
+import { ImportDraftSchema, ImportResultSchema, emptyDraft, toCvContent, type ImportDraft } from "./imports.ts";
 
 const draftWith = (overrides: Partial<ImportDraft>): ImportDraft => ({ ...emptyDraft(), ...overrides });
 const job = (company: string, bullets: string[] = []) => ({
@@ -8,6 +8,15 @@ const job = (company: string, bullets: string[] = []) => ({
 });
 
 describe("toCvContent", () => {
+  it("returns v2 with the default layout", () => {
+    const { content } = toCvContent(draftWith({ experience: [job("Acme")] }));
+    expect(content.schemaVersion).toBe(2);
+    expect(content.layout).toEqual(defaultLayout());
+    for (const list of [content.achievements, content.volunteering, content.awards, content.courses, content.publications, content.interests]) {
+      expect(list).toEqual([]);
+    }
+  });
+
   it("assigns ids", () => {
     const { content } = toCvContent(
       draftWith({ experience: [job("Acme", ["Did a thing"])], technicalSkills: ["SQL"], custom: [{ title: "Awards", details: "Best PM 2021" }] }),
@@ -63,5 +72,17 @@ describe("toCvContent", () => {
 
   it("the draft schema accepts what the editor never would, so it can be trimmed instead of retried", () => {
     expect(ImportDraftSchema.safeParse(draftWith({ technicalSkills: Array.from({ length: 60 }, (_, i) => `S${i}`) })).success).toBe(true);
+  });
+});
+
+describe("ImportResultSchema", () => {
+  it("upgrades a stored v1 result", () => {
+    const v1: Record<string, unknown> = { ...emptyCv(), schemaVersion: 1 };
+    for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests"]) delete v1[key];
+    const parsed = ImportResultSchema.parse({ content: v1, warnings: ["check dates"] });
+    expect(parsed.content.schemaVersion).toBe(2);
+    expect(parsed.content.layout).toEqual(defaultLayout());
+    expect(parsed.content.achievements).toEqual([]);
+    expect(parsed.warnings).toEqual(["check dates"]);
   });
 });
