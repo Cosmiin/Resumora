@@ -90,3 +90,28 @@
 .cv-page :is(input, textarea):hover { background: var(--pine-50); }
 .cv-page :is(input, textarea):focus { background: var(--pine-50); box-shadow: inset 0 -1.5px 0 var(--pine-600); }
 .cv-page ::placeholder { color: var(--sage-500); font-style: italic; opacity: 1; }
+
+/* Bullets, chips and dates typed on the page */
+.cv-bullets li::marker { color: var(--sage-500); }
+.cv-bullets li { padding-inline-start: 2px; }
+.cv-chips { align-items: center; min-width: 0; }
+.cv-chip { display: inline-flex; align-items: center; gap: 2px; padding-inline-end: 4px; }
+.cv-chip button { font: inherit; border: 0; background: none; color: var(--sage-500); cursor: pointer; padding: 0 3px; line-height: 1; visibility: hidden; }
+.cv-section:focus-within .cv-chip button, .cv-chip:hover button { visibility: visible; }
+.cv-chips .cv-chip-input { font-size: 12px; min-width: 9ch; }
+.cv-date-field { position: relative; }
+.date-hint {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-end: 0;
+  z-index: 3;
+  width: 210px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: var(--marigold-100);
+  color: var(--marigold-800);
+  border: 1px solid var(--marigold-200);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+}

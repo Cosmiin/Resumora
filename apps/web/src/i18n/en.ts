@@ -197,6 +197,11 @@ export const en = {
   "addSection.open": "+ Add a section",
   "addSection.label": "Sections you can add",
   "addSection.custom": "Other section",
+  "edit.bullet": "Bullet {n} of {of}",
+  "edit.bulletPlaceholder": "Describe a result…",
+  "edit.dateHint": "Not saved yet. Try \"Mar 2021\", \"03/2021\" or \"2021\".",
+  "edit.removeChip": "Remove {name}",
+  "edit.addChip": "Add…",
 } as const;
 
 export type MessageKey = keyof typeof en;

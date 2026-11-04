@@ -9,6 +9,8 @@ type Props = {
   className?: string;
   fieldKey: string;
   onKeyDown?(e: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>): void;
+  onFocus?(): void;
+  onBlur?(): void;
   ref?: Ref<HTMLTextAreaElement | HTMLInputElement>;
 };
 
@@ -37,6 +39,8 @@ export const PageField = memo(function PageField({
   className,
   fieldKey,
   onKeyDown,
+  onFocus,
+  onBlur,
   ref,
 }: Props) {
   const own = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
@@ -59,6 +63,8 @@ export const PageField = memo(function PageField({
     "aria-label": label,
     "data-field": fieldKey,
     onKeyDown,
+    onFocus,
+    onBlur,
   };
   return multiline ? (
     <textarea
