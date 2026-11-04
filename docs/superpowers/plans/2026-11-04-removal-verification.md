@@ -18,7 +18,7 @@ Fresh reviewer found two P1 defects: direct retained RPCs could restore retired 
 
 ## Tested migration
 
-`20261104101028_remove_job_product.sql`
+`20261104105519_remove_job_product.sql`
 
 SHA-256: `61e3c850002794f1854d3cde2cc54271bc06810eeddbfa335dff22345391d8ea`
 
@@ -39,4 +39,4 @@ Apply only the candidate source delta after checking every original blob again. 
 
 ## Hosted result
 
-Pending maintenance execution.
+Hosted migration `20261104105519` applied successfully. All43 retained-store fingerprints match the frozen baseline exactly, including all39 editor snapshots, authentication records, imports, CV accounting and both Storage objects. Every postflight residual count is zero. Thirty tables and91 routines are gone; nine job parsing attempts, seven retired operations, seven job audit events and attributable request receipts were removed. Three capture connections and their authorization/fences are removed with their tables. Local source installation/startup verification is in progress.
