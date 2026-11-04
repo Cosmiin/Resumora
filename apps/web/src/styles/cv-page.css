@@ -107,9 +107,9 @@
 .cv-line .cv-item-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .cv-line .cv-item-head > input:first-child { flex: 1; min-width: 0; }
 @media (max-width: 560px) {
-  /* Dates drop under the title instead of squeezing both; the title needs a real basis to wrap. */
+  /* Dates drop under the title instead of squeezing both; the title basis is its content, so the row wraps before it shrinks. */
   .cv-line .cv-item-head { flex-wrap: wrap; }
-  .cv-line .cv-item-head > input:first-child { flex: 1 1 14ch; }
+  .cv-line .cv-item-head > input:first-child { flex: 1 1 auto; }
   .cv-line .cv-item-dates { flex: none; }
 }
 .cv-item-details { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
@@ -129,7 +129,7 @@
 .ghost .btn { font-size: 12px; padding: 2px 10px; }
 
 .cv-role-dates { display: flex; align-items: baseline; gap: 2px; flex: none; }
-.cv-role-dates input { width: 8ch; text-align: center; }
+.cv-role-dates input { width: 9ch; text-align: center; }
 .cv-role-dates .cv-date-field.is-wide input { width: 19ch; }
 .cv-present { font: inherit; color: inherit; background: none; border: 0; padding: 1px 4px; border-radius: 4px; cursor: pointer; }
 .cv-present:hover, .cv-present:focus-visible { background: var(--sage-100); }
