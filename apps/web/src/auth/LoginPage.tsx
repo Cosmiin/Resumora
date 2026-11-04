@@ -46,9 +46,11 @@ export function LoginPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) setError(authErrorKey(error.message));
       } else if (mode === "signUp") {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) setError(authErrorKey(error.message));
-        else setNotice("auth.signUp.done");
+        // With a session the user is already signed in and AuthProvider moves on to the app;
+        // without one, Supabase has emailed a confirmation link.
+        else if (!data.session) setNotice("auth.signUp.done");
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
@@ -85,7 +87,7 @@ export function LoginPage() {
           </label>
         )}
         {error && <p role="alert" className="form-error">{t(error)}</p>}
-        {notice && <p role="status" className="form-notice">{t(notice)}</p>}
+        {notice && <p role="status" className="form-notice">{t(notice, { email })}</p>}
         <button type="submit" disabled={busy}>{t(submits[mode])}</button>
         <div className="auth-links">
           {mode !== "signIn" && <button type="button" className="link" onClick={() => switchTo("signIn")}>{t("auth.toSignIn")}</button>}

@@ -9,7 +9,7 @@ export const en = {
   "auth.signIn.submit": "Sign in",
   "auth.signUp.title": "Create your account",
   "auth.signUp.submit": "Create account",
-  "auth.signUp.done": "Account created. Check your email if confirmation is required, then sign in.",
+  "auth.signUp.done": "Almost done: we sent a confirmation link to {email}. Open it, then sign in.",
   "auth.forgot.title": "Reset your password",
   "auth.forgot.submit": "Send reset link",
   "auth.forgot.done": "If an account exists for that email, a reset link is on its way.",
