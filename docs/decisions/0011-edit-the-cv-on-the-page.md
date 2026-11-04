@@ -26,4 +26,4 @@ Editing feels instant, and the page looks like the result while it is being edit
 ## What it means in practice
 Page fields need careful CSS. The touch overrides must load after the base rules, or they are ignored. Drag adds a dependency, @dnd-kit.
 
-The reducer is in `apps/web/src/cv/edit/cvReducer.ts`. The page editor is in `apps/web/src/cv/Editor.tsx`. The helper panel is in `apps/web/src/cv/panel/HelperPanel.tsx`.
+The reducer is in `apps/web/src/cv/edit/cvReducer.ts`. The page editor is in `apps/web/src/cv/edit/EditablePage.tsx`, hosted by `apps/web/src/cv/Editor.tsx`. The helper panel is in `apps/web/src/cv/panel/HelperPanel.tsx`.
