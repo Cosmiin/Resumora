@@ -54,7 +54,7 @@ SKILLS: three groups, classified by the meaning of each item, never by the CV's 
 OTHER SECTIONS
 - languages: spoken languages with their level as written. certifications: name, issuer, date. projects: name, description, url.
 - Preserve all certifications and optional categories.
-- custom: any section that fits nowhere else (volunteering, awards, publications, driving licence, interests…), with its original heading as title and its complete content as details.
+- custom: any section that fits nowhere else (driving licence, references, availability…), with its original heading as title and its complete content as details.
 
 LANGUAGE
 - detectedLocale: the language of the CV's main connected narrative. Experience prose is the main evidence, then the summary. English technical or business terms, product and company names, addresses, isolated titles and the listed spoken languages must not decide it. "ro" if mainly Romanian, "en" if mainly English, "other" otherwise.
@@ -67,15 +67,16 @@ ${common}`;
 
 const categoryRules = [
   "Place content by meaning, not by heading. Headings not in the list go to the category whose content fits; if none fits, put the section in `custom` with its heading copied exactly.",
-  "List every heading in the file, exactly as written, in `sourceHeadings` with the category its content went to.",
+  "List every heading in the file, exactly as written, in `sourceHeadings` with the category its content went to. Content placed in `custom` gets the category `other` in `sourceHeadings`. Do not list headings for the name and contact block (for example \"Contact\", \"Date personale\").",
   "Fill the matching lists for achievements, volunteering (same shape as experience), awards, courses, publications and interests; skills still go to the three skill groups.",
 ].join("\n- ");
 
 /** The owner's v2 rules plus the category list generated from `CATEGORIES`. */
 export function buildExtractPrompt(): string {
   const lines = CATEGORIES.filter((c) => c.key !== "header").map((c) => {
-    const also = [...c.synonyms.en, ...c.synonyms.ro].join(", ");
-    return `- ${c.key}: ${c.label.en} / ${c.label.ro} (also: ${also})`;
+    const words = [...c.synonyms.en, ...c.synonyms.ro];
+    const also = words.length ? ` (also: ${words.join(", ")})` : "";
+    return `- ${c.key}: ${c.label.en} / ${c.label.ro}${also}`;
   });
   return `${extractRules}\n\nCATEGORIES\n- ${categoryRules}\n${lines.join("\n")}`;
 }

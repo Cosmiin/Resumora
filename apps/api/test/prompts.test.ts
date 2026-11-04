@@ -27,3 +27,14 @@ describe("buildExtractPrompt", () => {
     expect(extractPrompt).toBe(prompt);
   });
 });
+
+describe("buildExtractPrompt category rules", () => {
+  it("maps custom to other, skips the contact block, and omits an empty synonym list", () => {
+    const prompt = buildExtractPrompt();
+    expect(prompt).toContain("Content placed in `custom` gets the category `other` in `sourceHeadings`.");
+    expect(prompt).toContain("Do not list headings for the name and contact block");
+    expect(prompt).not.toContain("(also: )");
+    expect(prompt).toContain("(driving licence, references, availability…)");
+    expect(prompt).not.toContain("(volunteering, awards, publications");
+  });
+});
