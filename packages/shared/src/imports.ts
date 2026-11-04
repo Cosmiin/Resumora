@@ -95,6 +95,15 @@ export const ImportResultSchema = z.object({
 });
 export type ImportResult = z.infer<typeof ImportResultSchema>;
 
+/** "Master of Arts, History" with field "History" is degree "Master of Arts": the field is not kept twice. */
+function withoutField(degree: string, field: string): string {
+  const d = degree.trim();
+  const f = field.trim();
+  if (!f || !d.endsWith(f)) return degree;
+  const rest = d.slice(0, -f.length).replace(/\s*[,–-]\s*$/, "");
+  return rest && rest.length < d.length - f.length ? rest : degree;
+}
+
 /**
  * Turns the model's draft into valid CV content: adds ids, keeps lists and texts within the CV
  * limits, removes duplicate skills, clears dates that aren't YYYY-MM or YYYY. Everything left out
@@ -180,7 +189,7 @@ export function toCvContent(draft: ImportDraft): ImportResult {
     education: list(draft.education, "education entries").map((e) => ({
       id: newId(),
       school: clip(e.school, "education"),
-      degree: clip(e.degree, "education"),
+      degree: clip(withoutField(e.degree, e.field), "education"),
       field: clip(e.field, "education"),
       startDate: date(e.startDate, "education"),
       endDate: date(e.endDate, "education"),
@@ -233,7 +242,10 @@ export function toCvContent(draft: ImportDraft): ImportResult {
 
   const known = new Set<string>(SECTION_KEYS);
   const sourceHeadings: SourceHeading[] = draft.sourceHeadings.map((h) => {
-    if (known.has(h.category)) return { heading: h.heading, category: h.category as SectionKey };
+    // A field path ("basics.summary") means its last part; a skill group's name means the skills section.
+    const key = h.category.split(".").pop()!.trim();
+    if (known.has(key)) return { heading: h.heading, category: key as SectionKey };
+    if ((SKILL_GROUPS as readonly string[]).includes(key)) return { heading: h.heading, category: "skills" };
     warn(`The heading "${h.heading.slice(0, 100)}" didn't match a known section, so it was filed under other.`);
     return { heading: h.heading, category: "other" };
   });

@@ -104,6 +104,32 @@ describe("toCvContent", () => {
     expect(result.warnings.some((w) => w.includes("Hobbies & stuff"))).toBe(true);
   });
 
+  it("does not keep the field of study twice when the degree line also names it", () => {
+    const edu = (degree: string, field: string) => ({ school: "Uni", degree, field, startDate: "", endDate: "", notes: "" });
+    const result = toCvContent(
+      draftWith({ education: [edu("Master of Arts, History", "History"), edu("BA History", "History"), edu("History", "History"), edu("MSc – Data", "")] }),
+    );
+    expect(result.content.education.map((e) => e.degree)).toEqual(["Master of Arts", "BA History", "History", "MSc – Data"]);
+  });
+
+  it("files a heading named after a skill group under skills, and a field path under its last part", () => {
+    const result = toCvContent(
+      draftWith({
+        sourceHeadings: [
+          { heading: "Skills", category: "technicalSkills" },
+          { heading: "Strengths", category: "professionalSkills" },
+          { heading: "Profile", category: "basics.summary" },
+        ],
+      }),
+    );
+    expect(result.sourceHeadings).toEqual([
+      { heading: "Skills", category: "skills" },
+      { heading: "Strengths", category: "skills" },
+      { heading: "Profile", category: "summary" },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
   it("the draft schema accepts what the editor never would, so it can be trimmed instead of retried", () => {
     expect(ImportDraftSchema.safeParse(draftWith({ technicalSkills: Array.from({ length: 60 }, (_, i) => `S${i}`) })).success).toBe(true);
   });
