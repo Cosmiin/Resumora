@@ -40,6 +40,14 @@ export function useAutosave({ initial, save, load, delayMs = 1000 }: Options) {
     loadRef.current = load;
   });
 
+  /** Stop autosaving and show the conflict choice (from our own save or a restore). */
+  const reportConflict = useCallback((err: ApiClientError) => {
+    clearTimeout(timer.current);
+    paused.current = true;
+    setConflict(readConflict(err.body));
+    setStatus("conflict");
+  }, []);
+
   const flush = useCallback(async function flush(): Promise<void> {
     clearTimeout(timer.current);
     if (saving.current || paused.current) return;
@@ -59,16 +67,14 @@ export function useAutosave({ initial, save, load, delayMs = 1000 }: Options) {
       setStatus("saved");
     } catch (err) {
       saving.current = false;
-      if (err instanceof ApiClientError && err.code === "version_conflict") {
-        paused.current = true;
-        setConflict(readConflict(err.body));
-        setStatus("conflict");
+      if (isConflict(err)) {
+        reportConflict(err);
       } else {
         setStatus("error");
         timer.current = setTimeout(flush, RETRY_MS);
       }
     }
-  }, []);
+  }, [reportConflict]);
 
   const setContent = useCallback(
     (next: CvContent) => {
@@ -82,8 +88,9 @@ export function useAutosave({ initial, save, load, delayMs = 1000 }: Options) {
     [delayMs, flush],
   );
 
-  const loadLatest = useCallback(async () => {
-    const fresh = await loadRef.current();
+  /** Replace local state with a CV the server just gave us (load latest, after restore). */
+  const reset = useCallback((fresh: CvResponse) => {
+    clearTimeout(timer.current);
     latest.current = lastSaved.current = fresh.content;
     version.current = fresh.version;
     paused.current = false;
@@ -91,6 +98,8 @@ export function useAutosave({ initial, save, load, delayMs = 1000 }: Options) {
     setConflict(null);
     setStatus("saved");
   }, []);
+
+  const loadLatest = useCallback(async () => reset(await loadRef.current()), [reset]);
 
   const keepMine = useCallback(async () => {
     if (conflict) version.current = conflict.version;
@@ -112,7 +121,13 @@ export function useAutosave({ initial, save, load, delayMs = 1000 }: Options) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [status]);
 
-  return { content, setContent, status, conflict, loadLatest, keepMine };
+  const currentVersion = useCallback(() => version.current, []);
+
+  return { content, setContent, status, conflict, loadLatest, keepMine, reset, reportConflict, currentVersion };
+}
+
+export function isConflict(err: unknown): err is ApiClientError {
+  return err instanceof ApiClientError && err.code === "version_conflict";
 }
 
 function readConflict(body: unknown): Conflict {
