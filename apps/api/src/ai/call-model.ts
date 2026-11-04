@@ -132,6 +132,7 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
       },
     });
 
+  const hasFile = Array.isArray(req.user) && req.user.some((p) => p.type === "pdf");
   let rejectedBy = 0;
   for (const provider of deps.providers) {
     for (let attempt = 1; attempt <= ATTEMPTS_PER_PROVIDER; attempt++) {
@@ -141,7 +142,7 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
           .logCall({ userId: req.userId, task: req.task, provider: provider.name, model: provider.model, durationMs: Date.now() - started, ...entry })
           .catch((err: unknown) => console.error(JSON.stringify({ msg: "ai_calls log failed", error: String(err) })));
       try {
-        const { output, usage } = await attemptOnce(deps, provider, body(provider), req.schema, req.timeoutMs);
+        const { output, usage } = await attemptOnce(deps, provider, body(provider), req.schema, req.timeoutMs, hasFile);
         await log({ status: "ok", inputTokens: usage?.prompt_tokens, outputTokens: usage?.completion_tokens });
         return output;
       } catch (err) {
@@ -171,6 +172,7 @@ async function attemptOnce<S extends z.ZodType>(
   body: string,
   schema: S,
   requestTimeoutMs?: number,
+  hasFile = false,
 ): Promise<{ output: z.infer<S>; usage?: Usage }> {
   const timeoutMs = requestTimeoutMs ?? deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -191,7 +193,7 @@ async function attemptOnce<S extends z.ZodType>(
     // Only the status goes into errors: provider bodies may echo the prompt.
     if (!res.ok) {
       // The body is only read to tell a refused file from other errors; it is never logged.
-      const text = REJECTED_STATUSES.has(res.status) ? await Promise.race([res.text().catch(() => ""), timeout]) : "";
+      const text = hasFile && REJECTED_STATUSES.has(res.status) ? await Promise.race([res.text().catch(() => ""), timeout]) : "";
       throw new AttemptError(`HTTP ${res.status}`, res.status === 429 || res.status >= 500, false, REJECTED_WORDS.test(text));
     }
 

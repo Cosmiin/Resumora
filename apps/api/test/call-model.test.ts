@@ -218,6 +218,12 @@ describe("callModel file parts", () => {
     expect(calls[1]!.url).toBe("https://openai.test/v1/chat/completions");
   });
 
+  it("a plain text request is never an input rejection, even with an 'unsupported' body", async () => {
+    const unsupported = () => new Response(JSON.stringify({ error: { message: "unsupported parameter in profile" } }), { status: 400 });
+    const { fetch } = fakeFetch(unsupported(), unsupported());
+    await expect(callModel(deps(fetch).d, request)).rejects.toBeInstanceOf(AiUnavailableError);
+  });
+
   it("a rejection on one provider and an outage on the other is not an input rejection", async () => {
     const { fetch } = fakeFetch(rejected(), status(500), status(500));
     await expect(callModel(deps(fetch).d, pdfRequest)).rejects.toBeInstanceOf(AiUnavailableError);
