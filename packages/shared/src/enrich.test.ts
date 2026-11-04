@@ -65,7 +65,7 @@ describe("bulletScore", () => {
 
 describe("isPlaceholder", () => {
   it("catches placeholders", () => {
-    for (const t of ["", "  ", "TODO", "tbd.", "Lorem ipsum dolor", "asdf", "test", "Exemplu!", "De completat...", "Nimic"]) {
+    for (const t of ["", "  ", "TODO", "tbd.", "Lorem ipsum dolor", "asdf", "test", "Exemplu!", "De completat...", "Nimic", "Nimič", "Lórem ípsum dolor", "Éxemplu"]) {
       expect(isPlaceholder(t)).toBe(true);
     }
   });
