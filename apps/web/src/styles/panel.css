@@ -1,9 +1,9 @@
 /* Helper panel (right-hand side). Width and the bottom sheet are set by the editor layout. */
-.panel-overview { display: grid; gap: 18px; }
+.panel-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 .p-h { font-family: var(--font-display); font-size: 20px; font-weight: 500; margin: 0; color: var(--pine-800); }
 .p-sub { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage-600); margin: 0 0 8px; }
 .health { display: grid; gap: 8px; }
-.flag { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rose-200); background: var(--rose-50); }
+.flag { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rose-200); background: var(--rose-50); }
 .flag.tip { border-color: var(--sky-200); background: var(--sky-50); }
 .pill { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: var(--rose-600); color: var(--white); }
 .flag.tip .pill { background: var(--sky-600); }
@@ -37,7 +37,7 @@
 .btn:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
 
 /* Section tools: the panel while the cursor is in a section */
-.panel-tools { display: grid; gap: 14px; }
+.panel-tools { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .panel-tools .link { justify-self: start; font: inherit; font-size: 13px; border: 0; background: none; padding: 0; color: var(--pine-600); text-decoration: underline; cursor: pointer; }
 .fine .link { display: inline; }
 .ctx-head { display: flex; align-items: center; gap: 4px; }

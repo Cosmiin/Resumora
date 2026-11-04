@@ -58,6 +58,7 @@
   border-left: 1px solid var(--sage-200);
   padding: 20px 18px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr); /* a long option or word must not widen the column */
   align-content: start;
   gap: 22px;
   min-width: 0;

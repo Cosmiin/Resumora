@@ -46,6 +46,7 @@
 
 /* Text typed straight on the page: fields that look like the CV text and grow with it */
 .cv-page :is(input, textarea) {
+  width: auto; /* app.css makes every input 100% wide; on the page fields sit inline */
   font: inherit;
   color: inherit;
   background: transparent;
