@@ -67,8 +67,8 @@ describe("extractText", () => {
     expect(await extractText(await makeImagePdf(8), "pdf")).toMatchObject({ pages: 8, isScan: true });
   });
 
-  it("a pdf with few words but lots of line breaks is a scan", async () => {
-    const lines = Array.from({ length: 120 }, () => "a"); // 120 letters, text longer than 200 characters
+  it("a pdf with few letters spread over lots of spaces is a scan", async () => {
+    const lines = Array.from({ length: 15 }, () => "a a a a a a a a a a"); // 150 letters, text longer than 200 characters
     const result = await extractText(makePdf(lines), "pdf");
     expect(result.text.length).toBeGreaterThan(200);
     expect(result.isScan).toBe(true);
