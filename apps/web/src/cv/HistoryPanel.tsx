@@ -44,6 +44,16 @@ export function HistoryPanel({ canRestore, onClose, onPreview, onRestore }: Prop
 
   useEffect(() => closeRef.current?.focus(), []);
 
+  // Escape closes history wherever focus is (clicking the read-only page moves it to the body),
+  // unless the import screen is open on top and handles its own Escape.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.querySelector(".import-screen")) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   async function choose(item: HistoryItem) {
     latest.current = item.id;
     setChosen(item.id);
@@ -72,11 +82,6 @@ export function HistoryPanel({ canRestore, onClose, onPreview, onRestore }: Prop
     <aside
       className="side-panel"
       aria-label={t("history.open")}
-      onKeyDown={(e) => {
-        if (e.key !== "Escape") return;
-        e.stopPropagation();
-        onClose();
-      }}
     >
       <header className="side-panel-header">
         <div>

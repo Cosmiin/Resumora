@@ -144,6 +144,17 @@ describe("CV import", () => {
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
 
+  it("makes the open side panel inert behind the import screen", async () => {
+    importsApi.getImport.mockResolvedValue(imp("queued"));
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit your details" }));
+    const panel = document.querySelector(".side-panel")!;
+    expect(panel.closest("[inert]")).toBeNull();
+    await chooseFile(pdf());
+    await screen.findByRole("dialog", { name: "Import review" });
+    expect(panel.closest("[inert]")).not.toBeNull();
+  });
+
   it("shows the not-a-CV message", async () => {
     importsApi.getImport.mockResolvedValue(
       imp("failed", { error: { code: "not_a_cv", message: "This doesn't look like a CV. Upload your CV as PDF or Word." } }),

@@ -111,9 +111,9 @@ export function Editor({ initial }: { initial: CvResponse }) {
         </p>
       )}
       {conflict && <ConflictBanner onLoadLatest={loadLatest} onKeepMine={keepMine} />}
-      {/* While history or an import is open the CV can't be edited, so a restore can't race the user's typing.
-          The history panel sits outside the inert page area so it stays usable. */}
-      <div className="editor-workspace">
+      {/* While an import is open the whole workspace is inert. While history is open only the page is,
+          so a restore can't race the user's typing; the history panel stays usable. */}
+      <div className="editor-workspace" inert={importId !== null}>
         <div className="editor-page-area" ref={pageRef} tabIndex={-1}>
           {historyOpen ? (
             preview && (

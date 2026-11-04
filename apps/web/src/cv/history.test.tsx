@@ -84,6 +84,20 @@ describe("version history", () => {
     expect(screen.queryByText(/Previewing the version from/)).not.toBeInTheDocument();
   });
 
+  it("Escape closes history even when focus is on the page", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const panel = await openHistory(user);
+    const [, older] = await within(panel).findAllByRole("listitem");
+    await user.click(within(older!).getByRole("button"));
+    await waitFor(() => expect(cvPage()).toHaveTextContent("Old Name"));
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("complementary", { name: "History" })).not.toBeInTheDocument();
+    expect(cvPage()).toHaveTextContent("Current");
+  });
+
   it("groups versions by day with the time", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-04T12:00:00Z") });
     try {
@@ -151,7 +165,8 @@ describe("version history blocks editing", () => {
   it("the editor can't be edited while history is open", async () => {
     const user = userEvent.setup();
     renderPage();
-    await openHistory(user);
+    const panel = await openHistory(user);
+    expect(panel.closest("[inert]")).toBeNull();
     expect(cvPage().closest("[inert]")).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(cvPage().closest("[inert]")).toBeNull();
