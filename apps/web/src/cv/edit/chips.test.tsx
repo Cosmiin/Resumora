@@ -8,6 +8,7 @@ function Harness() {
   const [items, setItems] = useState([{ id: "1", name: "SQL" }]);
   return (
     <ChipInput
+      fieldKey="skills"
       label="Add skill"
       items={items}
       onAdd={(name) => setItems((all) => [...all, { id: name, name }])}

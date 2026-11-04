@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatYearMonth, parseTypedDate, type Locale } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { PageField } from "./PageField.tsx";
@@ -9,7 +9,7 @@ type Props = {
   label: string;
   onCommit(value: string): void;
   onPresent?(): void;
-  fieldKey?: string;
+  fieldKey: string;
 };
 
 /** A date typed in free form: valid text is saved at once, anything else waits with a hint. */
@@ -27,7 +27,7 @@ export function DateField({ value, locale, label, onCommit, onPresent, fieldKey 
     }
   }, [shown]);
 
-  const change = (next: string) => {
+  const change = useCallback((next: string) => {
     setText(next);
     const parsed = parseTypedDate(next);
     if (!parsed.ok) {
@@ -37,23 +37,26 @@ export function DateField({ value, locale, label, onCommit, onPresent, fieldKey 
     setInvalid(false);
     if (parsed.present) onPresent?.();
     else onCommit(parsed.value);
-  };
+  }, [onCommit, onPresent]);
+
+  const onFocus = useCallback(() => {
+    focused.current = true;
+  }, []);
+  const onBlur = useCallback(() => {
+    focused.current = false;
+    setText(shown);
+    setInvalid(false);
+  }, [shown]);
 
   return (
     <span className="cv-date-field">
       <PageField
-        fieldKey={fieldKey ?? `date-${label}`}
+        fieldKey={fieldKey}
         label={label}
         value={text}
         onChange={change}
-        onFocus={() => {
-          focused.current = true;
-        }}
-        onBlur={() => {
-          focused.current = false;
-          setText(shown);
-          setInvalid(false);
-        }}
+        onFocus={onFocus}
+        onBlur={onBlur}
       />
       {invalid ? (
         <span className="date-hint" role="status">

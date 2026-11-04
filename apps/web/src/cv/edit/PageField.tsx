@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef, type KeyboardEvent, type Ref } from "react";
+import { memo, useCallback, useLayoutEffect, useRef, type ChangeEvent, type KeyboardEvent, type Ref } from "react";
 
 type Props = {
   value: string;
@@ -49,11 +49,19 @@ export const PageField = memo(function PageField({
     if (own.current) grow(own.current);
   }, [value, multiline]);
 
-  const setRef = (el: HTMLTextAreaElement | HTMLInputElement | null) => {
-    own.current = el;
-    if (typeof ref === "function") ref(el);
-    else if (ref) ref.current = el;
-  };
+  const setRef = useCallback(
+    (el: HTMLTextAreaElement | HTMLInputElement | null) => {
+      own.current = el;
+      if (typeof ref === "function") ref(el);
+      else if (ref) ref.current = el;
+    },
+    [ref],
+  );
+
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => onChange(e.target.value),
+    [onChange],
+  );
 
   const common = {
     ref: setRef,
@@ -70,9 +78,9 @@ export const PageField = memo(function PageField({
     <textarea
       {...common}
       rows={1}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={handleChange}
     />
   ) : (
-    <input {...common} type="text" onChange={(e) => onChange(e.target.value)} />
+    <input {...common} type="text" onChange={handleChange} />
   );
 });

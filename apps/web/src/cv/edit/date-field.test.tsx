@@ -6,7 +6,7 @@ import { DateField } from "./DateField.tsx";
 function setup(value = "2020-05") {
   const onCommit = vi.fn();
   const onPresent = vi.fn();
-  render(<DateField value={value} locale="en" label="Start date" onCommit={onCommit} onPresent={onPresent} />);
+  render(<DateField fieldKey="start" value={value} locale="en" label="Start date" onCommit={onCommit} onPresent={onPresent} />);
   return { onCommit, onPresent, box: screen.getByRole("textbox", { name: "Start date" }) };
 }
 

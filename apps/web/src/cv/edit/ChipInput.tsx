@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useCallback, useState, type KeyboardEvent } from "react";
 import { t } from "../../i18n/t.ts";
 import { PageField } from "./PageField.tsx";
 
@@ -8,14 +8,15 @@ type Props = {
   onRemove(id: string): void;
   label: string;
   tone?: "sort";
-  fieldKey?: string;
+  fieldKey: string;
 };
 
 /** Chips: Enter or comma adds one; Backspace in an empty box pulls the last one back to edit. */
 export function ChipInput({ items, onAdd, onRemove, label, tone, fieldKey }: Props) {
   const [text, setText] = useState("");
 
-  const onKey = (e: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+  const onKey = useCallback((e: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       const name = text.trim();
@@ -30,7 +31,7 @@ export function ChipInput({ items, onAdd, onRemove, label, tone, fieldKey }: Pro
       onRemove(last.id);
       setText(last.name);
     }
-  };
+  }, [text, items, onAdd, onRemove]);
 
   return (
     <span className="cv-chips">
@@ -44,7 +45,7 @@ export function ChipInput({ items, onAdd, onRemove, label, tone, fieldKey }: Pro
       ))}
       <PageField
         className="cv-chip-input"
-        fieldKey={fieldKey ?? `chips-${label}`}
+        fieldKey={fieldKey}
         label={label}
         placeholder={t("edit.addChip")}
         value={text}

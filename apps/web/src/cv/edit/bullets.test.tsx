@@ -1,9 +1,20 @@
 import { useReducer } from "react";
-import { describe, expect, it } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv } from "@resumora/shared";
 import { BulletList } from "./BulletList.tsx";
+
+const fieldRenders = vi.hoisted(() => new Map<string, number>());
+vi.mock("./PageField.tsx", async () => {
+  const actual = await vi.importActual<typeof import("./PageField.tsx")>("./PageField.tsx");
+  return {
+    PageField: (props: React.ComponentProps<typeof actual.PageField>) => {
+      fieldRenders.set(props.fieldKey, (fieldRenders.get(props.fieldKey) ?? 0) + 1);
+      return <actual.PageField {...props} />;
+    },
+  };
+});
 import { cvReducer } from "./cvReducer.ts";
 
 function Harness({ texts }: { texts: string[] }) {
@@ -72,5 +83,33 @@ describe("BulletList", () => {
     await userEvent.paste("first line\nsecond line");
     expect(screen.getByTestId("count")).toHaveTextContent("1");
     expect(screen.getByRole("textbox", { name: "Bullet 1 of Achievements" })).toHaveValue("first line\nsecond line");
+  });
+});
+
+describe("BulletList typing and composing", () => {
+  it("a key pressed during IME composition does nothing", () => {
+    render(<Harness texts={["Shipped"]} />);
+    const first = screen.getByRole("textbox", { name: "Bullet 1 of Achievements" });
+    fireEvent.keyDown(first, { key: "Enter", isComposing: true });
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+  });
+
+  it("Enter over a selection deletes it before splitting", async () => {
+    render(<Harness texts={["Shipped the launch"]} />);
+    const first = screen.getByRole("textbox", { name: "Bullet 1 of Achievements" }) as HTMLTextAreaElement;
+    await userEvent.click(first);
+    first.setSelectionRange(7, 11);
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("textbox", { name: "Bullet 1 of Achievements" })).toHaveValue("Shipped");
+    expect(await screen.findByRole("textbox", { name: "Bullet 2 of Achievements" })).toHaveValue(" launch");
+  });
+
+  it("typing in bullet 1 does not re-render bullet 2", async () => {
+    render(<Harness texts={["One", "Two"]} />);
+    await userEvent.click(screen.getByRole("textbox", { name: "Bullet 1 of Achievements" }));
+    fieldRenders.clear();
+    await userEvent.keyboard("xyz");
+    expect(fieldRenders.get("bullet-b1")).toBeGreaterThan(0);
+    expect(fieldRenders.get("bullet-b2")).toBeUndefined();
   });
 });
