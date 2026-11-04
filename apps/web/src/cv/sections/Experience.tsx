@@ -1,7 +1,6 @@
 import { MAX_BULLETS, MAX_LONG_TEXT, newId, type Experience } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
-import { DateField, ItemList, TextField, set } from "../fields.tsx";
-import { blankItem } from "./blank.ts";
+import { DateField, TextField, set } from "../fields.tsx";
 
 export function ExperienceFields({ value: exp, onChange: update }: { value: Experience; onChange(next: Experience): void }) {
   return (
@@ -59,18 +58,5 @@ export function ExperienceFields({ value: exp, onChange: update }: { value: Expe
         {t("cv.bullet.add")}
       </button>
     </>
-  );
-}
-
-export function ExperienceSection({ items, onChange }: { items: Experience[]; onChange(next: Experience[]): void }) {
-  return (
-    <ItemList
-      title="cv.experience"
-      addLabel="cv.experience.add"
-      items={items}
-      onChange={onChange}
-      create={blankItem.experience}
-      renderItem={(exp, update) => <ExperienceFields value={exp} onChange={update} />}
-    />
   );
 }

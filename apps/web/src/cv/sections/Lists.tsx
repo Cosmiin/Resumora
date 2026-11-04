@@ -1,9 +1,7 @@
 import { MAX_LONG_TEXT, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
-import { DateField, ItemList, TextField, set } from "../fields.tsx";
-import { blankItem } from "./blank.ts";
+import { DateField, TextField, set } from "../fields.tsx";
 
-type Props<K extends keyof CvContent> = { items: CvContent[K]; onChange(next: CvContent[K]): void };
 type FieldsProps<K extends "education" | "languages" | "certifications" | "projects"> = {
   value: CvContent[K][number];
   onChange(next: CvContent[K][number]): void;
@@ -50,57 +48,5 @@ export function ProjectFields({ value: p, onChange }: FieldsProps<"projects">) {
       </div>
       <TextField label={t("cv.description")} multiline maxLength={MAX_LONG_TEXT} value={p.description} onChange={(v) => onChange(set(p, "description", v))} />
     </>
-  );
-}
-
-export function EducationSection({ items, onChange }: Props<"education">) {
-  return (
-    <ItemList
-      title="cv.education"
-      addLabel="cv.education.add"
-      items={items}
-      onChange={onChange}
-      create={blankItem.education}
-      renderItem={(e, update) => <EducationFields value={e} onChange={update} />}
-    />
-  );
-}
-
-export function LanguagesSection({ items, onChange }: Props<"languages">) {
-  return (
-    <ItemList
-      title="cv.languages"
-      addLabel="cv.languages.add"
-      items={items}
-      onChange={onChange}
-      create={blankItem.languages}
-      renderItem={(l, update) => <LanguageFields value={l} onChange={update} />}
-    />
-  );
-}
-
-export function CertificationsSection({ items, onChange }: Props<"certifications">) {
-  return (
-    <ItemList
-      title="cv.certifications"
-      addLabel="cv.certifications.add"
-      items={items}
-      onChange={onChange}
-      create={blankItem.certifications}
-      renderItem={(c, update) => <CertificationFields value={c} onChange={update} />}
-    />
-  );
-}
-
-export function ProjectsSection({ items, onChange }: Props<"projects">) {
-  return (
-    <ItemList
-      title="cv.projects"
-      addLabel="cv.projects.add"
-      items={items}
-      onChange={onChange}
-      create={blankItem.projects}
-      renderItem={(p, update) => <ProjectFields value={p} onChange={update} />}
-    />
   );
 }

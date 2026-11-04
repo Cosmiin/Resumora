@@ -14,10 +14,9 @@ const groups: { key: SkillGroup; title: MessageKey; add: MessageKey }[] = [
 /**
  * The three skill groups. "Skills to sort" only appears when it has items, and each of its
  * skills can be moved to technical or professional (keeping its id) or removed.
- * `readOnly` renders plain lists, used by the import review.
  */
-export function SkillsSection({ cv, onChange, readOnly }: { cv: Skills; onChange?(next: Skills): void; readOnly?: boolean }) {
-  const change = (next: Partial<Skills>) => onChange?.({ ...cv, ...next });
+export function SkillsSection({ cv, onChange }: { cv: Skills; onChange(next: Skills): void }) {
+  const change = (next: Partial<Skills>) => onChange({ ...cv, ...next });
   const moveTo = (skill: Skill, to: SkillGroup) =>
     change({ unclearSkills: cv.unclearSkills.filter((s) => s.id !== skill.id), [to]: [...cv[to], skill] });
 
@@ -32,40 +31,32 @@ export function SkillsSection({ cv, onChange, readOnly }: { cv: Skills; onChange
           <div key={key} className={unclear ? "skill-group skill-group-unclear" : "skill-group"}>
             <h3>{t(title)}</h3>
             {unclear && <p className="hint">{t("cv.skills.unclearHint")}</p>}
-            {readOnly ? (
-              <ul className="skill-list">
-                {items.map((s) => <li key={s.id}>{s.name}</li>)}
-              </ul>
-            ) : (
-              <>
-                {items.map((skill, i) => (
-                  <div key={skill.id} className="skill-row">
-                    <TextField
-                      label={t("cv.skill.n", { n: i + 1 })}
-                      value={skill.name}
-                      onChange={(name) => change({ [key]: items.map((s) => (s.id === skill.id ? { ...s, name } : s)) })}
-                    />
-                    {unclear && (
-                      <>
-                        <button type="button" className="secondary" aria-label={t("cv.skills.toTechnicalNamed", { name: skill.name })} onClick={() => moveTo(skill, "technicalSkills")}>
-                          {t("cv.skills.toTechnical")}
-                        </button>
-                        <button type="button" className="secondary" aria-label={t("cv.skills.toProfessionalNamed", { name: skill.name })} onClick={() => moveTo(skill, "professionalSkills")}>
-                          {t("cv.skills.toProfessional")}
-                        </button>
-                      </>
-                    )}
-                    <button type="button" className="link" onClick={() => change({ [key]: items.filter((s) => s.id !== skill.id) })}>
-                      {t("cv.item.remove")}
+            {items.map((skill, i) => (
+              <div key={skill.id} className="skill-row">
+                <TextField
+                  label={t("cv.skill.n", { n: i + 1 })}
+                  value={skill.name}
+                  onChange={(name) => change({ [key]: items.map((s) => (s.id === skill.id ? { ...s, name } : s)) })}
+                />
+                {unclear && (
+                  <>
+                    <button type="button" className="secondary" aria-label={t("cv.skills.toTechnicalNamed", { name: skill.name })} onClick={() => moveTo(skill, "technicalSkills")}>
+                      {t("cv.skills.toTechnical")}
                     </button>
-                  </div>
-                ))}
-                {!unclear && (
-                  <button type="button" disabled={items.length >= MAX_ITEMS} onClick={() => change({ [key]: [...items, { id: newId(), name: "" }] })}>
-                    {t(add)}
-                  </button>
+                    <button type="button" className="secondary" aria-label={t("cv.skills.toProfessionalNamed", { name: skill.name })} onClick={() => moveTo(skill, "professionalSkills")}>
+                      {t("cv.skills.toProfessional")}
+                    </button>
+                  </>
                 )}
-              </>
+                <button type="button" className="link" onClick={() => change({ [key]: items.filter((s) => s.id !== skill.id) })}>
+                  {t("cv.item.remove")}
+                </button>
+              </div>
+            ))}
+            {!unclear && (
+              <button type="button" disabled={items.length >= MAX_ITEMS} onClick={() => change({ [key]: [...items, { id: newId(), name: "" }] })}>
+                {t(add)}
+              </button>
             )}
           </div>
         );

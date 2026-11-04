@@ -63,7 +63,6 @@ export const en = {
   "cv.summary": "Summary",
 
   "cv.experience": "Experience",
-  "cv.experience.add": "Add experience",
   "cv.company": "Company",
   "cv.title": "Job title",
   "cv.startDate": "Start",
@@ -75,7 +74,6 @@ export const en = {
   "cv.bullet.remove": "Remove bullet {n}",
 
   "cv.education": "Education",
-  "cv.education.add": "Add education",
   "cv.school": "School",
   "cv.degree": "Degree",
   "cv.field": "Field of study",
@@ -95,24 +93,20 @@ export const en = {
   "cv.skill.n": "Skill {n}",
 
   "cv.languages": "Languages",
-  "cv.languages.add": "Add language",
   "cv.language": "Language",
   "cv.level": "Level",
 
   "cv.certifications": "Certifications",
-  "cv.certifications.add": "Add certification",
   "cv.certification": "Certification",
   "cv.issuer": "Issuer",
   "cv.date": "Date",
 
   "cv.projects": "Projects",
-  "cv.projects.add": "Add project",
   "cv.project": "Project",
   "cv.description": "Description",
   "cv.url": "Link",
 
   "cv.custom": "Other sections",
-  "cv.custom.add": "Add section",
   "cv.custom.title": "Section title",
   "cv.custom.details": "Details",
 

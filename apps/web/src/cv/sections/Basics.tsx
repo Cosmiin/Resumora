@@ -32,13 +32,3 @@ export function BasicsFields({ value, onChange }: { value: Basics; onChange(next
 export function SummaryField({ value, onChange }: { value: string; onChange(next: string): void }) {
   return <TextField label={t("cv.summary")} multiline maxLength={MAX_LONG_TEXT} value={value} onChange={onChange} />;
 }
-
-export function BasicsSection({ value, onChange }: { value: Basics; onChange(next: Basics): void }) {
-  return (
-    <section className="cv-section">
-      <h2>{t("cv.basics")}</h2>
-      <BasicsFields value={value} onChange={onChange} />
-      <SummaryField value={value.summary} onChange={(summary) => onChange(set(value, "summary", summary))} />
-    </section>
-  );
-}

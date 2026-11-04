@@ -271,24 +271,6 @@ label {
   padding: 2rem;
 }
 
-.cv-page {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 4rem;
-}
-.editor {
-  display: grid;
-  gap: 1.25rem;
-}
-.editor-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.5rem 0;
-  background: var(--sage-50, #f4f7f4);
-}
 .save-status {
   font-size: 0.9rem;
   color: var(--sage-600, #536b69);
@@ -297,43 +279,15 @@ label {
 .save-status-conflict {
   color: #a33a2b;
 }
-.cv-section {
-  display: grid;
-  gap: 0.9rem;
-  padding: 1.25rem;
-  background: var(--white, #fff);
-  border: 1px solid var(--sage-200, #d8e3df);
-  border-radius: 12px;
-}
-.cv-section h2 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-.cv-section > button {
-  justify-self: start;
-}
 .cv-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.75rem;
 }
-.cv-item {
-  display: grid;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 1rem;
-  border: 1px solid var(--sage-200, #d8e3df);
-  border-radius: 10px;
-}
-.cv-item-actions,
 .conflict-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-}
-.cv-item-actions button {
-  padding: 0.3rem 0.7rem;
-  font-size: 0.85rem;
 }
 .cv-bullets {
   display: grid;
@@ -362,26 +316,12 @@ label.checkbox input {
   margin: 0.35rem 0 0.75rem;
 }
 
-.editor-toolbar {
-  gap: 0.75rem;
-  align-items: center;
-}
-.editor-sections {
-  display: grid;
-  gap: 1.25rem;
-}
-
 /* Skill groups */
 .skill-group { margin-block: var(--space-3, 12px); }
 .skill-group h3 { font-size: 1rem; margin-block-end: 4px; }
 .skill-group-unclear { border-inline-start: 3px solid var(--color-warning, #b7791f); padding-inline-start: 12px; }
 .skill-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
-.skill-list { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-inline-start: 18px; }
 .hint { color: var(--color-text-muted, #666); font-size: 0.9rem; }
-
-/* Import */
-.preserve-lines { white-space: pre-line; }
-.dialog-actions { display: flex; gap: 8px; margin-block-start: 16px; }
 
 /* CV page */
 .cv-page {
@@ -524,10 +464,18 @@ label.checkbox input {
 }
 .side-panel-back { display: none; font-size: 0.95rem; }
 .side-panel-body { display: grid; gap: 12px; }
-.side-panel-body .cv-section { padding: 0; border: 0; margin: 0; }
+.side-panel-body .cv-section { display: grid; gap: 0.9rem; margin: 0; }
+.side-panel-body .cv-section h2 { margin: 0; font-size: 1.1rem; }
+.side-panel-body .cv-section > button { justify-self: start; }
 .side-panel-footer { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
 .side-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .side-panel-actions button { min-height: 44px; }
+
+/* Above 900px the panel always sits beside the page; the page area shrinks instead of wrapping. */
+@media (min-width: 901px) {
+  .editor-workspace, .import-body { flex-wrap: nowrap; }
+  .editor-page-area, .import-page-area { flex: 999 1 0; }
+}
 
 @media (max-width: 900px) {
   .side-panel {
