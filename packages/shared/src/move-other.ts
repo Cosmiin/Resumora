@@ -15,7 +15,14 @@ export function moveOtherTo(cv: CvContent, customId: string, target: MoveTarget)
     .filter((l) => l !== "");
   const room = Math.max(0, MAX_ITEMS - cv[target].length);
   const names = lines.slice(0, room);
-  const next: CvContent = { ...cv, custom: cv.custom.filter((c) => c.id !== customId) };
+  // Lines that do not fit stay in the section, so no text is lost.
+  const left = lines.slice(room);
+  const next: CvContent = {
+    ...cv,
+    custom: left.length === 0
+      ? cv.custom.filter((c) => c.id !== customId)
+      : cv.custom.map((c) => (c.id === customId ? { ...c, details: left.join("\n") } : c)),
+  };
   switch (target) {
     case "certifications":
       next.certifications = [...cv.certifications, ...names.map((name) => ({ id: newId(), name, issuer: "", date: "" }))];

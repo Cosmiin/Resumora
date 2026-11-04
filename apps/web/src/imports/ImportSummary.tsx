@@ -1,9 +1,6 @@
-import { CATEGORY, missingCategories, type ImportResult, type MoveTarget } from "@resumora/shared";
+import { CATEGORY, missingCategories, SCAN_WARNING, type ImportResult, type MoveTarget } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { HeadingMap } from "./HeadingMap.tsx";
-
-/** The API adds this to `warnings` for a scan; the review shows it once, from `isScan`. */
-const SCAN_WARNING = "This file is a scan. Check every line.";
 
 /** The right-hand panel of the import review: what was found, what needs a look, and the "use it" button. */
 export function ImportSummary(props: {
@@ -11,7 +8,7 @@ export function ImportSummary(props: {
   canApply: boolean;
   applying: boolean;
   onApply(): void;
-  onMove(customId: string, target: MoveTarget): void;
+  onMove(customId: string, target: MoveTarget, headingIndex: number): void;
 }) {
   const { result, canApply, applying, onApply, onMove } = props;
   const { content: cv, sourceHeadings, unsourcedLines, isScan } = result;

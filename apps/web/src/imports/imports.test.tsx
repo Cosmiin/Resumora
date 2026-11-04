@@ -313,6 +313,39 @@ describe("import review: where each heading went", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
   });
 
+  it("a failed save of the moves keeps the review open, and retry saves only the moves", async () => {
+    importsApi.getImport.mockResolvedValue(
+      withResult({ ...imported, custom: [{ id: "c1", title: "Hobby-uri", details: "Chess" }] }, { sourceHeadings: [{ heading: "Hobby-uri", category: "other" }] }),
+    );
+    importsApi.applyImport.mockResolvedValue({ version: 4, updatedAt: "2026-11-04T10:05:00Z" });
+    cvApi.saveCv.mockRejectedValueOnce(new Error("boom")).mockResolvedValue({ version: 5, updatedAt: "2026-11-04T10:06:00Z" });
+    const dialog = await open();
+    await user.selectOptions(await within(dialog).findByRole("combobox", { name: "Move Hobby-uri to" }), "interests");
+    await user.click(await useThisCv(dialog));
+    expect(await within(dialog).findByText("Imported, but your moves weren't saved. Try again.")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Import review" })).toBeInTheDocument();
+    await user.click(await useThisCv(dialog));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
+    expect(importsApi.applyImport).toHaveBeenCalledTimes(1);
+    expect(cvApi.saveCv.mock.calls.at(-1)![1]).toBe(4);
+  });
+
+  it("duplicate Other headings move one row at a time", async () => {
+    importsApi.getImport.mockResolvedValue(
+      withResult(
+        { ...imported, custom: [{ id: "c1", title: "Extra", details: "A" }, { id: "c2", title: "Extra", details: "B" }] },
+        { sourceHeadings: [{ heading: "Extra", category: "other" }, { heading: "Extra", category: "other" }] },
+      ),
+    );
+    const dialog = await open();
+    const [first] = await within(dialog).findAllByRole("combobox", { name: "Move Extra to" });
+    await user.selectOptions(first!, "interests");
+    const rows = within(within(dialog).getByRole("table")).getAllByText("Extra").map((e) => e.closest("tr")!);
+    expect(rows[0]).toHaveTextContent("Interests");
+    expect(rows[1]).toHaveTextContent("Other");
+    expect(within(rows[1]!).getByRole("combobox")).toBeInTheDocument();
+  });
+
   it("unsourced lines are listed", async () => {
     importsApi.getImport.mockResolvedValue(withResult(imported, { unsourcedLines: ["Invented line"] }));
     const dialog = await open();

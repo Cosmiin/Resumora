@@ -1,4 +1,4 @@
-import { AdmitSchema, ImportDraftSchema, MAX_CV_BYTES, toCvContent, type ImportResult } from "@resumora/shared";
+import { AdmitSchema, ImportDraftSchema, MAX_CV_BYTES, SCAN_WARNING, toCvContent, type ImportResult } from "@resumora/shared";
 import {
   AiInputRejectedError,
   AiOutputTooLongError,
@@ -18,7 +18,6 @@ const EXTRACT_TIMEOUT_MS = 150_000;
 const BASE64_CHUNK = 0x8000;
 
 const TEXT_FALLBACK_WARNING = "We read this file as plain text, so text from different columns may be mixed. Check the result.";
-const SCAN_WARNING = "This file is a scan. Check every line.";
 
 /** Base64 of the bytes in chunks (Workers have no Buffer, and one big spread overflows the stack). */
 function toBase64(bytes: Uint8Array): string {

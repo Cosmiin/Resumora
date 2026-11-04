@@ -76,6 +76,9 @@ export function emptyDraft(): ImportDraft {
   };
 }
 
+/** The warning the API adds for a scanned file; the review shows it from `isScan` instead. */
+export const SCAN_WARNING = "This file is a scan. Check every line.";
+
 /** What a finished import holds, ready for review. */
 export type SourceHeading = { heading: string; category: SectionKey };
 const SourceHeadingSchema = z.object({

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { moveOtherTo, type CvResponse, type ImportResult, type MoveTarget } from "@resumora/shared";
+import { moveOtherTo, type CvResponse, type SaveResponse, type ImportResult, type MoveTarget } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { conflictFrom, isConflict, type Conflict } from "../cv/useAutosave.ts";
 import { CvDocument } from "../cv/page/CvDocument.tsx";
@@ -29,6 +29,9 @@ export function ImportScreen(props: {
   const [slow, setSlow] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyFailed, setApplyFailed] = useState(false);
+  const [movesFailed, setMovesFailed] = useState(false);
+  /** Set once the server applied the import, so a retry only saves the moves again. */
+  const appliedRef = useRef<SaveResponse | null>(null);
   /** The result after any "Move to"; null until the user moves something. */
   const [edited, setEdited] = useState<ImportResult | null>(null);
   const screenRef = useRef<HTMLDivElement>(null);
@@ -56,16 +59,16 @@ export function ImportScreen(props: {
 
   const result = edited ?? (imp?.status === "ready" ? imp.result : null);
 
-  function move(customId: string, target: MoveTarget) {
+  function move(customId: string, target: MoveTarget, headingIndex: number) {
     const base = edited ?? imp?.result;
     if (!base) return;
-    const heading = base.content.custom.find((c) => c.id === customId)?.title.trim().toLowerCase();
+    const content = moveOtherTo(base.content, customId, target);
+    const allMoved = !content.custom.some((c) => c.id === customId);
     setEdited({
       ...base,
-      content: moveOtherTo(base.content, customId, target),
-      sourceHeadings: base.sourceHeadings.map((h) =>
-        h.category === "other" && h.heading.trim().toLowerCase() === heading ? { ...h, category: target } : h,
-      ),
+      content,
+      // Lines that did not fit stay in Other, so the row stays in Other too.
+      sourceHeadings: base.sourceHeadings.map((h, i) => (i === headingIndex && allMoved ? { ...h, category: target } : h)),
     });
   }
 
@@ -73,8 +76,10 @@ export function ImportScreen(props: {
     if (!imp?.result || !result) return;
     setApplying(true);
     setApplyFailed(false);
+    setMovesFailed(false);
     try {
-      const saved = await applyImport(importId, currentVersion());
+      const saved = appliedRef.current ?? (await applyImport(importId, currentVersion()));
+      appliedRef.current = saved;
       if (!edited) return onApplied({ content: imp.result.content, ...saved });
       // The server applies the import as it found it; save the moved version on top of that.
       try {
@@ -82,7 +87,7 @@ export function ImportScreen(props: {
         onApplied({ content: edited.content, ...final });
       } catch (err) {
         if (isConflict(err)) return onConflict(conflictFrom(err));
-        onApplied({ content: imp.result.content, ...saved });
+        setMovesFailed(true);
       }
     } catch (err) {
       if (isConflict(err)) return onConflict(conflictFrom(err));
@@ -124,6 +129,7 @@ export function ImportScreen(props: {
         {result && (
           <div className="import-side">
             {applyFailed && <p role="alert" className="form-error">{t("import.applyError")}</p>}
+            {movesFailed && <p role="alert" className="form-error">{t("import.movesError")}</p>}
             {!canApply && <p aria-live="polite">{t("import.waitingSave")}</p>}
             <ImportSummary result={result} canApply={canApply} applying={applying} onApply={() => void apply()} onMove={move} />
           </div>

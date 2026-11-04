@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyCv, moveOtherTo } from "./index.ts";
+import { emptyCv, MAX_ITEMS, moveOtherTo } from "./index.ts";
 
 const withCustom = (details: string) => ({
   ...emptyCv(),
@@ -24,5 +24,13 @@ describe("moveOtherTo", () => {
   it("leaves the CV alone when the entry does not exist", () => {
     const cv = withCustom("x");
     expect(moveOtherTo(cv, "nope", "interests")).toEqual(cv);
+  });
+
+  it("keeps the lines that do not fit in the section", () => {
+    const full = { ...withCustom("one\ntwo\nthree"), interests: Array.from({ length: MAX_ITEMS - 1 }, (_, i) => ({ id: "i" + i, name: "x" + i })) };
+    const out = moveOtherTo(full, "c1", "interests");
+    expect(out.interests).toHaveLength(MAX_ITEMS);
+    expect(out.interests.at(-1)!.name).toBe("one");
+    expect(out.custom.find((c) => c.id === "c1")!.details).toBe("two\nthree");
   });
 });

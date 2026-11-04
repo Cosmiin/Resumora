@@ -161,6 +161,7 @@ export const en = {
   "import.missing.title": "Not in your file yet",
   "import.unsourced.title": "We couldn't find these lines in your file:",
   "import.waitingSave": "Saving your changes first…",
+  "import.movesError": "Imported, but your moves weren't saved. Try again.",
   "import.apply": "Use this CV",
   "import.applyError": "Couldn't use this import. Please try again.",
   "import.cancel": "Cancel",
