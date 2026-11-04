@@ -134,7 +134,7 @@ For default selection, distinguish **explicitly named** competences from **infer
 
 Use one explicit **Add selected skills** confirmation. Users may select, deselect, rename or dismiss within the same review without opening successive dialogs. User edits to labels become user-authored input, not silently AI-verified evidence. Existing accepted skills are not automatically removed, renamed or reclassified. Merge exact normalized duplicates; consolidate semantic equivalents conservatively while retaining all source references. A normalization/label edit must not erase a meaningful distinction.
 
-Use concrete counts/statuses such as **4 new skills to review** and **6 supported skills added**. Do not introduce a numeric skills quality or ATS score without a job-specific rubric. If evidence later changes, retain confirmed skills and flag affected support for review rather than silently deleting user content.
+Use concrete counts/statuses such as **4 new skills to review** and **6 supported skills added**. Do not introduce a numeric skills quality or ATS score without a defined rubric. If evidence later changes, retain confirmed skills and flag affected support for review rather than silently deleting user content.
 
 ## Projects and volunteering
 
@@ -146,7 +146,7 @@ Use one bounded target resolver for the three supported entry kinds, shared by e
 
 - Extract feature-specific orchestration from the large enrichment component as the first slice needs it. Own view state in a focused hook/controller; retain canonical document and save ownership in the existing controllers. Keep changes in `App.tsx` to wiring.
 - Extend strict request/result/session validation for whole-entry proposals and candidate assessment. Read existing version-1 saved sessions without losing drafts, pending requests, answers or undo. Do not reinterpret a pending point request as a new whole-role request.
-- Persist proposal, edited candidate and recovery metadata under the existing `experienceEnrichment` container, already excluded from frozen job documents. Avoid adding a new top-level private field requiring database projection changes. Keep bounded metadata and stable source identities; prune obsolete transient candidate scores without deleting accepted evidence.
+- Persist proposal, edited candidate and recovery metadata under the existing `experienceEnrichment` container. Avoid adding a new top-level private field requiring database projection changes. Keep bounded metadata and stable source identities; prune obsolete transient candidate scores without deleting accepted evidence.
 - Skills review state can remain per-entry under this same container and aggregate into one view. Confirmation applies selected new skill facts together through the existing Profile save path, preserving unrelated changes and provenance.
 - Keep generation and assessment separate within existing request lifetimes and provider stage accounting. Do not increase deadlines, alter models, dispatch all entries in parallel, or introduce request-triggered workers without measured evidence and separate authorization.
 - Preserve operation replay, account fencing, revision conflict handling, cancellation and stale response checks. Definite failure and uncertain completion need distinct recovery. A transient request retry must not become duplicate inference.

@@ -59,6 +59,10 @@ def prepare_upgrade(db):
  assert 'BASE_PROVENANCE_REQUIRES_RECONCILIATION' in known,known
  assert preserved(db)==UPGRADE['before']
  UPGRADE['knownRefused']=True
+ legacy=db.sql("BEGIN; ALTER TABLE app.editor_draft_snapshots DISABLE TRIGGER USER; UPDATE app.editor_draft_snapshots SET payload=jsonb_set(payload,'{content,sources}','[{\"id\":\"job_local_manual\",\"kind\":\"manual\",\"label\":\"Private additions\"}]') WHERE id='"+snapshot+"'; "+migration+' COMMIT;',expect_error=True)
+ assert 'BASE_PROVENANCE_REQUIRES_RECONCILIATION' in legacy,legacy
+ assert preserved(db)==UPGRADE['before']
+
 
 def suite(db):
  class BaseOnly(unittest.TestCase):
@@ -97,6 +101,16 @@ def suite(db):
   def test_old_worker_and_rpc_cannot_publish(self):
    for fn in ['claim_job_workflow(text,boolean)','capture_command(text,text,text,uuid,text,jsonb)','document_language_context(uuid)']:
     self.assertEqual(db.sql(f"SELECT to_regprocedure('app.{fn}') IS NULL"),'t')
+  def test_stale_direct_rpc_cannot_reintroduce_retired_provenance(self):
+   user=uid();db.sql(f"INSERT INTO auth.users(id) VALUES('{user}')")
+   variants=[{'answers':[{'origin':{'jobId':uid(),'answerId':uid(),'answerRevision':1}}]},
+     {'content':{'sources':[{'id':'job_local_manual','kind':'manual','label':'Private additions'}]}},
+     {'content':{'sources':[{'id':'job_source_legacy','kind':'answer','label':'Old answer'}]}}]
+   for delta in variants:
+    payload={'schemaVersion':'resumora-editor-draft/1','content':{},'answers':[],**delta}
+    result=db.sql(f"SELECT app.save_base_draft('{uid()}',0,{literal(payload)},'autosave')",user=user,role='authenticated',expect_error=True)
+    self.assertIn('editor_snapshot_supported_provenance',result)
+   self.assertEqual(db.sql(f"SELECT count(*) FROM app.editor_draft_snapshots s JOIN app.tenants t ON t.id=s.tenant_id WHERE t.owner_user_id='{user}'"),'0')
   def test_base_remove_and_restore_keep_ownership_guards(self):
    a,b=uid(),uid();db.sql(f"INSERT INTO auth.users(id) VALUES ('{a}'),('{b}')")
    payload={'schemaVersion':'resumora-editor-draft/1','content':{},'answers':[]}

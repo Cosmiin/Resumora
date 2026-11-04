@@ -28,7 +28,7 @@ Inference metadata distinguishes explicit evidence from strongly demonstrated in
 - Add no dependencies, migrations, provider/model changes, or live paid test calls.
 - Preserve existing manual/imported skills and identities; a legacy list already above 30 is not silently truncated. Automated additions respect remaining capacity.
 - Canonical international skill labels (typically English) are the explicit exception requested by this brief; generated rationale follows the resolved document locale, and quotations stay original. Do not implement a second language detector or override parallel language metadata.
-- Preserve source evidence on the accepted Fact so save/reload and job copies retain traceability.
+- Preserve source evidence on the accepted Fact so save/reload retain traceability.
 - Keep verification focused on skills, persistence, request transport. No unrelated full-suite sweep.
 - Work in the existing non-main feature checkout; preserve all unrelated unfinished work. No broad staging or commits of pre-existing work.
 

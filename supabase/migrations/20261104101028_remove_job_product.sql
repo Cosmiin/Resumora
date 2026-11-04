@@ -32,10 +32,10 @@ BEGIN
  -- A mixed source cannot be removed without deciding which user-authored facts to keep.
  IF EXISTS(SELECT 1 FROM app.source_documents WHERE (job_id IS NOT NULL OR source_kind='job') AND profile_id IS NOT NULL)
  OR EXISTS(SELECT 1 FROM app.editor_draft_snapshots s WHERE
-   jsonb_path_exists(s.payload,'$.answers[*].origin') OR s.payload::text ~ '("jobId"|"job_capture"|job_source_|job:[0-9a-f-]+:answer:)' OR
+   jsonb_path_exists(s.payload,'$.answers[*].origin') OR s.payload::text ~ '("jobId"|"job_capture"|job_source_|job_local_|job:[0-9a-f-]+:answer:)' OR
    s.payload#>>'{content,translation,source,kind}'='job' OR
    jsonb_path_exists(s.payload,'$.content.sources[*] ? (@.kind == "job_capture" || @.kind == "job")'))
- OR EXISTS(SELECT 1 FROM app.profile_versions p WHERE p.canonical_json::text ~ '("jobId"|"job_capture"|job_source_|job:[0-9a-f-]+:answer:)')
+ OR EXISTS(SELECT 1 FROM app.profile_versions p WHERE p.canonical_json::text ~ '("jobId"|"job_capture"|job_source_|job_local_|job:[0-9a-f-]+:answer:)')
  OR EXISTS(SELECT 1 FROM app.claim_provenance p JOIN app.source_spans sp ON sp.tenant_id=p.tenant_id AND sp.id=p.source_span_id JOIN app.source_documents s ON s.tenant_id=sp.tenant_id AND s.id=sp.source_document_id WHERE s.job_id IS NOT NULL OR s.source_kind='job')
  THEN RAISE EXCEPTION 'BASE_PROVENANCE_REQUIRES_RECONCILIATION'; END IF;
 END $guard$;
@@ -500,157 +500,6 @@ ALTER TABLE app.workspace_drafts DROP CONSTRAINT workspace_drafts_kind_check;
 
 ALTER TABLE app.career_operation_results DROP CONSTRAINT career_operation_results_kind_check;
 
-CREATE OR REPLACE FUNCTION app.validate_canonical(cv jsonb)
- RETURNS void
- LANGUAGE plpgsql
- IMMUTABLE
- SET search_path TO ''
-AS $function$
-DECLARE ids uuid[]; ref record; record jsonb; item jsonb; linked jsonb; start_value jsonb; end_value jsonb; expected text; entity_ids text[];
-BEGIN
- IF cv IS NULL OR pg_catalog.octet_length(cv::text)>1048576 OR NOT app.matches_schema(cv,app.canonical_cv_schema(),app.canonical_cv_schema()) THEN
-   RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='CANONICAL_SCHEMA_INVALID';
- END IF;
- IF cv#>>'{document,templateVersionId}' IS NOT NULL AND cv#>>'{document,templateVersionId}' NOT IN (
-   'template_folio_2_1_0', 'template_meridian_2_1_0', 'template_signal_2_1_0',
-   'template_archive_2_1_0', 'template_monograph_2_1_0'
- ) THEN
-   RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='UNREGISTERED_TEMPLATE_VERSION';
- END IF;
- ids:=app.collect_ids(cv);
- IF pg_catalog.cardinality(ids)<>(SELECT count(DISTINCT i) FROM pg_catalog.unnest(ids)i) THEN
-   RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='DUPLICATE_CANONICAL_ID';
- END IF;
- IF pg_catalog.jsonb_array_length(cv->'generatedProse')>0 OR pg_catalog.jsonb_array_length(cv->'generations')>0 OR pg_catalog.jsonb_array_length(cv->'interviews')>0 OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{document,sections}')s WHERE pg_catalog.jsonb_array_length(s->'proseIds')>0) THEN
-   RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='DEFERRED_FEATURE_NOT_IN_P0_P3';
- END IF;
- FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'provenance') LOOP
-   IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv->'sources')s WHERE s->>'id'=record->>'sourceId') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_SOURCE'; END IF;
- END LOOP;
- FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'claims') LOOP
-   FOR item IN SELECT * FROM pg_catalog.jsonb_array_elements(record->'provenanceIds') LOOP
-     IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv->'provenance')p WHERE p->>'id'=item#>>'{}') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_PROVENANCE'; END IF;
-   END LOOP;
- END LOOP;
- FOR ref IN SELECT * FROM app.claim_refs(cv) LOOP
-   SELECT c INTO linked FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE app.canonical_id(c->>'id')=ref.claim_id;
-   IF linked IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_CLAIM'; END IF;
-   expected:=CASE WHEN ref.field_role IN ('nameClaimId','positioningTitleClaimIds','labelClaimId','titleClaimId','companyClaimId','institutionClaimId','qualificationClaimId','fieldClaimId') THEN 'text' WHEN ref.field_role IN ('startClaimId','endClaimId') THEN 'date' WHEN ref.field_role='locationClaimId' THEN 'location' WHEN ref.field_role='metricClaimIds' THEN 'metric' ELSE NULL END;
-   IF expected IS NOT NULL AND linked->>'kind'<>expected THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='WRONG_CLAIM_KIND'; END IF;
- END LOOP;
- FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv#>'{facts,contacts}') LOOP
-   SELECT c INTO linked FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE c->>'id'=record->>'valueClaimId';
-   IF linked->>'kind'<>(CASE WHEN record->>'kind'='location' THEN 'location' ELSE 'text' END) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='WRONG_CONTACT_CLAIM_KIND'; END IF;
- END LOOP;
- FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements((cv#>'{facts,employment}')||(cv#>'{facts,education}')||(cv#>'{facts,optionalEntries}')) LOOP
-   SELECT c->'value' INTO start_value FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE c->>'id'=record->>'startClaimId';
-   SELECT c->'value' INTO end_value FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE c->>'id'=record->>'endClaimId';
-   IF start_value IS NOT NULL AND end_value IS NOT NULL AND ((start_value->>'year')::integer,COALESCE((start_value->>'month')::integer,1))>((end_value->>'year')::integer,COALESCE((end_value->>'month')::integer,12)) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='IMPOSSIBLE_DATE_CHRONOLOGY'; END IF;
-   FOR item IN SELECT * FROM pg_catalog.jsonb_array_elements(COALESCE(record->'skillIds','[]')) LOOP
-     IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{facts,skills}')s WHERE s->>'id'=item#>>'{}') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_SKILL'; END IF;
-   END LOOP;
- END LOOP;
- SELECT pg_catalog.array_agg(e->>'id') INTO entity_ids FROM pg_catalog.jsonb_array_elements((cv#>'{facts,contacts}')||(cv#>'{facts,skills}')||(cv#>'{facts,employment}')||(cv#>'{facts,education}')||(cv#>'{facts,optionalEntries}'))e;
- FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'enrichment') LOOP
-   IF NOT COALESCE(record->>'targetEntityId'=ANY(entity_ids),false) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_ENRICHMENT_TARGET'; END IF;
- END LOOP;
- FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'claimLinks') LOOP
-   IF record->>'relation'='metric_of' AND NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE c->>'id'=record->>'fromClaimId' AND c->>'kind'='metric') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='METRIC_LINK_REQUIRES_METRIC'; END IF;
- END LOOP;
- IF pg_catalog.jsonb_array_length(cv#>'{document,sectionOrder}')<>pg_catalog.jsonb_array_length(cv#>'{document,sections}') OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements_text(cv#>'{document,sectionOrder}')i WHERE NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{document,sections}')s WHERE s->>'id'=i)) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='SECTION_ORDER_NOT_PERMUTATION'; END IF;
- FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv#>'{document,sections}') LOOP
-   FOR item IN SELECT * FROM pg_catalog.jsonb_array_elements(record->'entryIds') LOOP
-     expected:=record->>'kind';
-     IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements((cv#>'{facts,skills}')||(cv#>'{facts,employment}')||(cv#>'{facts,education}')||(cv#>'{facts,optionalEntries}'))e WHERE e->>'id'=item#>>'{}' AND (CASE WHEN e ? 'class' THEN e->>'class'||'_skills' WHEN e ? 'companyClaimId' THEN 'experience' WHEN e ? 'institutionClaimId' THEN 'education' ELSE e->>'kind' END)=expected) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='WRONG_SECTION_ENTRY_KIND'; END IF;
-   END LOOP;
- END LOOP;
- FOR item IN SELECT * FROM pg_catalog.jsonb_array_elements(cv#>'{document,contactIds}') LOOP
-   IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{facts,contacts}')c WHERE c->>'id'=item#>>'{}' AND c->>'visibility'='export') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='PRIVATE_OR_DANGLING_CONTACT'; END IF;
- END LOOP;
- IF cv#>>'{context,kind}' IS DISTINCT FROM 'base' THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_CV_CONTEXT'; END IF;
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.begin_workspace_operation(p_id uuid, p_kind text, p_input jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid:=app.tenant_for_user(); o app.career_operation_results;created boolean;
-BEGIN
- PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;
- IF p_kind NOT IN ('questions','rewrite') OR octet_length(p_input::text)>16384 OR NOT EXISTS(SELECT 1 FROM app.editor_draft_snapshots WHERE tenant_id=w AND id=(p_input->>'snapshotId')::uuid AND revision=(p_input->>'revision')::bigint) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
- INSERT INTO app.career_operation_results(tenant_id,id,kind,state,input) VALUES(w,p_id,p_kind,'processing',p_input) ON CONFLICT(id) DO NOTHING;created:=FOUND;
- SELECT * INTO o FROM app.career_operation_results WHERE tenant_id=w AND id=p_id;
- IF o.id IS NULL OR o.input IS DISTINCT FROM p_input OR o.kind<>p_kind THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='IDEMPOTENCY_BODY_MISMATCH';END IF;
- RETURN jsonb_build_object('created',created,'operation',app.workspace_operation_json(o));
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.save_workspace_draft_before_generation(p_key uuid, p_kind text, p_id uuid, p_revision bigint, p_value jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid; d app.workspace_drafts;r record;
-BEGIN
- PERFORM app.provision_workspace(p_key);w:=app.tenant_for_user();
- PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;PERFORM app.assert_workspace_resource(p_kind,p_id);
- IF p_revision IS NULL OR p_revision<0 OR jsonb_typeof(p_value) IS DISTINCT FROM 'object' OR octet_length(p_value::text)>1000000 THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
- IF EXISTS(SELECT 1 FROM jsonb_object_keys(p_value) k WHERE NOT k=ANY(CASE p_kind WHEN 'resume' THEN ARRAY['route'] WHEN 'import-review' THEN ARRAY['draft','selected','targets','ownerConfirmed','profileId','profileFingerprint'] WHEN 'translation-review' THEN ARRAY['values','confirmed','step','proposalId'] END)) THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
- IF p_kind='resume' AND (p_value->>'route' IS NULL OR p_value->>'route' !~ '^#/profile($|/)') THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE'; END IF;
- SELECT * INTO r FROM app.begin_request(w,'save_workspace_draft',p_key,jsonb_build_object('kind',p_kind,'id',p_id,'revision',p_revision,'value',p_value));
- IF r.cached IS NOT NULL THEN RETURN r.cached;END IF;
- SELECT * INTO d FROM app.workspace_drafts WHERE tenant_id=w AND kind=p_kind AND id=p_id FOR UPDATE;
- IF coalesce(d.revision,0)<>p_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
- INSERT INTO app.workspace_drafts(tenant_id,kind,id,revision,value) VALUES(w,p_kind,p_id,p_revision+1,p_value)
- ON CONFLICT(tenant_id,kind,id) DO UPDATE SET revision=p_revision+1,value=p_value,updated_at=now() RETURNING * INTO d;
- RETURN app.finish_request(w,r.request_id,app.workspace_draft_json(d));
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.assert_workspace_resource(p_kind text, p_id uuid)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid:=app.tenant_for_user(); valid boolean:=false;
-BEGIN
- CASE p_kind
- WHEN 'resume' THEN valid:=p_id='00000000-0000-4000-8000-000000000001'::uuid;
- WHEN 'import-review' THEN valid:=EXISTS(SELECT 1 FROM app.cv_import_sessions WHERE tenant_id=w AND source_id=p_id AND state='ready' AND expires_at>now());
- WHEN 'translation-review' THEN valid:=EXISTS(SELECT 1 FROM app.document_language_proposals WHERE tenant_id=w AND id=p_id);
- ELSE valid:=false;
- END CASE;
- IF NOT valid THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.list_workspace_drafts()
- RETURNS jsonb
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
- SELECT coalesce(jsonb_agg(app.workspace_draft_json(d)),'[]') FROM (SELECT * FROM app.workspace_drafts WHERE tenant_id=app.tenant_for_user() AND kind IN ('resume','translation-review') ORDER BY updated_at DESC LIMIT 100) d
-$function$;
-
-CREATE OR REPLACE FUNCTION app.canonical_for_cv(workspace uuid, version_id uuid, document_id uuid, new_version_id uuid, sequence_no bigint, parent uuid, locale text, layout jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE facts jsonb;
-BEGIN
- PERFORM app.assert_profile_usable(workspace,version_id);
- SELECT v.canonical_json INTO facts FROM app.profile_versions v WHERE v.tenant_id=workspace AND v.id=version_id;
- RETURN pg_catalog.jsonb_build_object('schemaVersion','1.0.0','snapshotId',app.portable_id(new_version_id),'baseCvId',app.portable_id(document_id),
-   'version',sequence_no,'parentSnapshotId',app.portable_id(parent),'createdAt',pg_catalog.transaction_timestamp(),'locale',locale,
-   'sources',facts->'sources','provenance',facts->'provenance','claims',facts->'claims','facts',facts->'facts',
-   'claimLinks',facts->'claimLinks','enrichment',facts->'enrichment','interviews','[]'::jsonb,'generatedProse','[]'::jsonb,'generations','[]'::jsonb,
-   'document',layout,'context',pg_catalog.jsonb_build_object('kind','base'));
-END $function$;
-
 CREATE OR REPLACE FUNCTION app.language_proposal_command(p_action text, p_id uuid, p_input jsonb DEFAULT '{}'::jsonb, p_secret text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -697,187 +546,6 @@ BEGIN
  RETURN app.language_proposal_json(p);
 END $function$;
 
-CREATE OR REPLACE FUNCTION app.remove_base_cv_before_workspace(p_key uuid, p_expected_revision bigint, p_expected_generation bigint)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid:=app.tenant_for_user(); l app.base_cv_lifecycle;r record;t text;
-BEGIN
- PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;PERFORM app.assert_tenant(w);
- INSERT INTO app.base_cv_lifecycle(tenant_id) VALUES(w) ON CONFLICT DO NOTHING;
- SELECT * INTO l FROM app.base_cv_lifecycle WHERE tenant_id=w FOR UPDATE;
- SELECT * INTO r FROM app.begin_request(w,'remove_base_cv',p_key,jsonb_build_object('revision',p_expected_revision,'generation',p_expected_generation));
- IF r.cached IS NOT NULL THEN
-  IF (r.cached->>'generation')::bigint<>l.generation OR (r.cached->>'revision')::bigint<>l.revision_floor OR EXISTS(SELECT 1 FROM app.editor_draft_snapshots WHERE tenant_id=w) THEN
-   RAISE EXCEPTION USING ERRCODE='PT410',MESSAGE='REQUEST_EXPIRED_RECOVER_EXISTING_RESOURCE';END IF;
-  RETURN (app.load_base_state()-'snapshot')||jsonb_build_object('removed',true);
- END IF;
- IF p_expected_revision IS NULL OR p_expected_generation IS NULL OR p_expected_generation<>l.generation OR p_expected_revision<>greatest(l.revision_floor,coalesce((app.current_base_snapshot(w)).revision,0)) THEN
-  RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
- UPDATE app.base_cv_lifecycle SET purge_transaction=pg_current_xact_id() WHERE tenant_id=w;
- INSERT INTO app.base_removal_objects(tenant_id,bucket,object_key)
- SELECT w,bucket,object_key FROM app.source_documents WHERE tenant_id=w AND profile_id IS NOT NULL AND bucket='cv-imports' AND object_key IS NOT NULL ON CONFLICT DO NOTHING;
- INSERT INTO app.base_removal_objects(tenant_id,bucket,object_key)
- SELECT w,'cv-photos',p.object_key FROM app.photo_assets p WHERE p.tenant_id=w ON CONFLICT DO NOTHING;
- DELETE FROM app.document_language_proposals WHERE tenant_id=w AND request#>>'{source,kind}'='base';
- UPDATE app.ai_enhancement_operations SET base_removed=true,snapshot_id=NULL,revision=NULL,import_id=NULL WHERE tenant_id=w;
- -- Result refs can contain whole historical draft payloads. Keep only the
- -- non-content idempotency identity/hash and expire these command families.
- UPDATE app.idempotency_requests SET result_refs='{}'::jsonb,expires_at=transaction_timestamp() WHERE tenant_id=w AND command_kind IN (
- 'save_base_draft','restore_base_draft','begin_cv_import','save_import_review_draft','save_base_language','restore_base_language','publish_profile','save_profile_checkpoint','save_cv_checkpoint','write_base_language','save_base_cv_checkpoint','restore_cv_version');
- DELETE FROM app.cv_import_sessions WHERE tenant_id=w;
- DELETE FROM app.editor_photo_references WHERE tenant_id=w;
- DELETE FROM app.editor_draft_snapshots WHERE tenant_id=w;
- -- Ordered Base canonical closure.
- FOREACH t IN ARRAY ARRAY['cv_photo_references','cv_items','cv_sections'] LOOP
-  EXECUTE format('DELETE FROM app.%I WHERE tenant_id=$1',t) USING w;
- END LOOP;
- UPDATE app.cv_documents SET head_version_id=NULL WHERE tenant_id=w;
- DELETE FROM app.cv_versions WHERE tenant_id=w;
- DELETE FROM app.cv_documents WHERE tenant_id=w;
- UPDATE app.career_profiles SET head_version_id=NULL WHERE tenant_id=w;
- FOREACH t IN ARRAY ARRAY['profile_version_relations','profile_version_claims','profile_version_entities','profile_versions','entity_revision_entities','entity_revision_claims','entity_revisions','career_entities','claim_relations','claim_provenance','confirmation_events','claims'] LOOP
-  EXECUTE format('DELETE FROM app.%I WHERE tenant_id=$1',t) USING w;
- END LOOP;
- DELETE FROM app.source_spans WHERE tenant_id=w AND profile_id IS NOT NULL;
- DELETE FROM app.source_documents WHERE tenant_id=w AND profile_id IS NOT NULL;
- DELETE FROM app.career_profiles WHERE tenant_id=w;
- DELETE FROM app.photo_assets p WHERE tenant_id=w;
- UPDATE app.base_cv_lifecycle SET generation=generation+1,revision_floor=greatest(revision_floor,p_expected_revision)+1,purge_transaction=NULL WHERE tenant_id=w;
- PERFORM app.audit(w,'editor.remove','tenant',w);
- RETURN app.finish_request(w,r.request_id,(app.load_base_state()-'snapshot')||jsonb_build_object('removed',true));
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.remove_base_cv(p_key uuid, p_expected_revision bigint, p_expected_generation bigint)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid:=app.tenant_for_user();v jsonb;previous_generation bigint;
-BEGIN
- PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;
- previous_generation:=(app.load_base_state()->>'generation')::bigint;
- v:=app.remove_base_cv_before_workspace(p_key,p_expected_revision,p_expected_generation);
- IF (v->>'generation')::bigint=previous_generation THEN RETURN v;END IF; UPDATE app.base_cv_lifecycle SET initial_import_id=NULL WHERE tenant_id=w;
- DELETE FROM app.workspace_drafts WHERE tenant_id=w AND kind NOT IN ('resume');
- DELETE FROM app.career_operation_results WHERE tenant_id=w;
-
- UPDATE app.idempotency_requests SET result_refs='{}',expires_at=now() WHERE tenant_id=w AND command_kind IN ('save_workspace_draft');
- RETURN v;
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.canonical_cv_schema() RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path='' AS $function$ SELECT $schema${"$id":"https://schemas.example.invalid/cv/v1/schema.json","type":"object","$defs":{"id":{"type":"string","pattern":"^[a-z][a-z0-9_-]{1,79}$"},"claim":{"type":"object","allOf":[{"if":{"properties":{"kind":{"const":"text"}}},"then":{"properties":{"value":{"type":"string","maxLength":20000,"minLength":1}}}},{"if":{"properties":{"kind":{"const":"date"}}},"then":{"properties":{"value":{"$ref":"#/$defs/partialDate"}}}},{"if":{"properties":{"kind":{"const":"location"}}},"then":{"properties":{"value":{"$ref":"#/$defs/location"}}}},{"if":{"properties":{"kind":{"const":"metric"}}},"then":{"properties":{"value":{"$ref":"#/$defs/metric"}}}},{"if":{"properties":{"status":{"enum":["user_confirmed","externally_verified"]}}},"then":{"required":["confirmedAt","confirmationActor"]}},{"if":{"properties":{"status":{"const":"externally_verified"}}},"then":{"required":["verificationMethod"]}}],"required":["id","kind","value","status","provenanceIds"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["text","date","location","metric"]},"value":{},"status":{"enum":["extracted_unconfirmed","user_confirmed","externally_verified","suggested","rejected"]},"confirmedAt":{"type":"string","format":"date-time"},"provenanceIds":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"uniqueItems":true},"confirmationActor":{"$ref":"#/$defs/id"},"verificationMethod":{"type":"string","maxLength":20000,"minLength":1}},"additionalProperties":false},"prose":{"type":"object","required":["id","kind","text","claimIds","origin","approval","locale","generationId"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["summary","bullet","scope","other"]},"text":{"type":"string","maxLength":20000,"minLength":1},"locale":{"enum":["ro","en"]},"origin":{"enum":["ai_generated","user_authored"]},"approval":{"enum":["pending","approved","rejected"]},"claimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"uniqueItems":true},"generationId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"additionalProperties":false},"skill":{"type":"object","required":["id","class","labelClaimId","evidenceClaimIds"],"properties":{"id":{"$ref":"#/$defs/id"},"class":{"enum":["professional","technical"]},"conceptId":{"type":"string","maxLength":20000,"minLength":1},"labelClaimId":{"$ref":"#/$defs/id"},"evidenceClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false},"metric":{"type":"object","required":["value","unit","qualifier"],"properties":{"unit":{"type":"string","maxLength":20000,"minLength":1},"value":{"type":"number"},"period":{"type":"string","maxLength":20000,"minLength":1},"baseline":{"type":"number"},"qualifier":{"enum":["exact","approximate","range"]},"upperValue":{"type":"number"}},"additionalProperties":false},"source":{"type":"object","required":["id","kind","label","capturedAt"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["upload","manual","interview","external_document"]},"label":{"type":"string","maxLength":20000,"minLength":1},"sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},"capturedAt":{"type":"string","format":"date-time"},"extractorVersion":{"type":"string","maxLength":20000,"minLength":1}},"additionalProperties":false},"contact":{"type":"object","required":["id","kind","valueClaimId","visibility"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["email","phone","location","address","linkedin","github","portfolio","other"]},"label":{"type":"string","maxLength":20000,"minLength":1},"visibility":{"enum":["private","export"]},"valueClaimId":{"$ref":"#/$defs/id"}},"additionalProperties":false},"section":{"type":"object","required":["id","kind","label","entryIds","proseIds","visible"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["identity","summary","professional_skills","technical_skills","experience","education","certifications","projects","achievements","portfolio","languages","leadership","publications","volunteering","custom"]},"label":{"type":"string","maxLength":20000,"minLength":1},"visible":{"type":"boolean"},"entryIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"proseIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false},"location":{"type":"object","required":[],"properties":{"city":{"type":"string","maxLength":20000,"minLength":1},"address":{"type":"string","maxLength":20000,"minLength":1},"countryCode":{"type":"string","pattern":"^[A-Z]{2}$"}},"additionalProperties":false},"claimLink":{"type":"object","required":["id","fromClaimId","toClaimId","relation"],"properties":{"id":{"$ref":"#/$defs/id"},"relation":{"enum":["metric_of","supports","contribution_to","scope_of"]},"toClaimId":{"$ref":"#/$defs/id"},"fromClaimId":{"$ref":"#/$defs/id"}},"additionalProperties":false},"education":{"type":"object","required":["id","institutionClaimId","qualificationClaimId","fieldClaimId","locationClaimId","startClaimId","endClaimId","detailClaimIds"],"properties":{"id":{"$ref":"#/$defs/id"},"endClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"fieldClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"startClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"detailClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"locationClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"institutionClaimId":{"$ref":"#/$defs/id"},"qualificationClaimId":{"$ref":"#/$defs/id"}},"additionalProperties":false},"interview":{"type":"object","required":["id","question","answerClaimIds","targetClaimIds","state"],"properties":{"id":{"$ref":"#/$defs/id"},"state":{"enum":["asked","answered_unconfirmed","confirmed","dismissed"]},"question":{"type":"string","maxLength":20000,"minLength":1},"answerClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"targetClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false},"employment":{"type":"object","allOf":[{"if":{"properties":{"ongoing":{"const":true}}},"then":{"properties":{"endClaimId":{"type":"null"}}}}],"required":["id","titleClaimId","companyClaimId","locationClaimId","startClaimId","endClaimId","ongoing","scopeClaimIds","responsibilityClaimIds","accomplishmentClaimIds","metricClaimIds","skillIds"],"properties":{"id":{"$ref":"#/$defs/id"},"ongoing":{"type":"boolean"},"skillIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"endClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"startClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"titleClaimId":{"$ref":"#/$defs/id"},"scopeClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"companyClaimId":{"$ref":"#/$defs/id"},"metricClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"locationClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"accomplishmentClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"responsibilityClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false},"enrichment":{"type":"object","required":["id","targetEntityId","attribute","claimIds"],"properties":{"id":{"$ref":"#/$defs/id"},"claimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"uniqueItems":true},"attribute":{"enum":["systems","technology","individual_contribution","impact_time","impact_cost","impact_accuracy","impact_revenue","impact_productivity","scale","stakeholders","budget","team","project"]},"targetEntityId":{"$ref":"#/$defs/id"}},"additionalProperties":false},"generation":{"type":"object","required":["id","provider","modelRequested","modelResolved","promptVersion","inputHash","createdAt"],"properties":{"id":{"$ref":"#/$defs/id"},"provider":{"type":"string","maxLength":20000,"minLength":1},"createdAt":{"type":"string","format":"date-time"},"inputHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"modelResolved":{"type":"string","maxLength":20000,"minLength":1},"promptVersion":{"type":"string","maxLength":20000,"minLength":1},"modelRequested":{"type":"string","maxLength":20000,"minLength":1}},"additionalProperties":false},"provenance":{"type":"object","required":["id","sourceId","locator"],"properties":{"id":{"$ref":"#/$defs/id"},"excerpt":{"type":"string","maxLength":20000,"minLength":1},"locator":{"type":"string","maxLength":20000,"minLength":1},"sourceId":{"$ref":"#/$defs/id"},"extractionConfidence":{"type":"number","maximum":1,"minimum":0}},"additionalProperties":false},"partialDate":{"type":"object","required":["year"],"properties":{"year":{"type":"integer","maximum":2200,"minimum":1900},"month":{"type":"integer","maximum":12,"minimum":1}},"additionalProperties":false},"optionalEntry":{"type":"object","required":["id","kind","labelClaimId","detailClaimIds","startClaimId","endClaimId","linkClaimIds","metricClaimIds"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["certifications","projects","achievements","portfolio","languages","leadership","publications","volunteering","custom"]},"endClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"labelClaimId":{"$ref":"#/$defs/id"},"linkClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"startClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"detailClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"metricClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false}},"title":"CV Maker canonical snapshot v1 \u2014 discovery proposal","$schema":"https://json-schema.org/draft/2020-12/schema","required":["schemaVersion","snapshotId","baseCvId","version","parentSnapshotId","createdAt","locale","sources","provenance","claims","facts","claimLinks","enrichment","interviews","generatedProse","generations","document","context"],"properties":{"facts":{"type":"object","required":["nameClaimId","positioningTitleClaimIds","contacts","skills","employment","education","optionalEntries"],"properties":{"skills":{"type":"array","items":{"$ref":"#/$defs/skill"}},"contacts":{"type":"array","items":{"$ref":"#/$defs/contact"}},"education":{"type":"array","items":{"$ref":"#/$defs/education"}},"employment":{"type":"array","items":{"$ref":"#/$defs/employment"}},"nameClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"optionalEntries":{"type":"array","items":{"$ref":"#/$defs/optionalEntry"}},"positioningTitleClaimIds":{"type":"array","items":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"maxItems":2,"minItems":2}},"additionalProperties":false},"claims":{"type":"array","items":{"$ref":"#/$defs/claim"}},"locale":{"enum":["ro","en"]},"context":{"type":"object","required":["kind"],"properties":{"kind":{"const":"base"}},"additionalProperties":false},"sources":{"type":"array","items":{"$ref":"#/$defs/source"}},"version":{"type":"integer","minimum":1},"baseCvId":{"$ref":"#/$defs/id"},"document":{"type":"object","required":["sectionOrder","sections","templateVersionId","contactIds"],"properties":{"photo":{"oneOf":[{"type":"null"},{"type":"object","required":["assetId","crop","shape","visible"],"properties":{"crop":{"type":"object","required":["version","centerX","centerY","zoom"],"properties":{"zoom":{"type":"number","maximum":3,"minimum":1},"centerX":{"type":"number","maximum":1,"minimum":0},"centerY":{"type":"number","maximum":1,"minimum":0},"version":{"const":1}},"additionalProperties":false},"shape":{"enum":["circle","square"]},"assetId":{"type":"string","pattern":"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"},"visible":{"type":"boolean"}},"additionalProperties":false}]},"sections":{"type":"array","items":{"$ref":"#/$defs/section"}},"photoMode":{"enum":["base"]},"contactIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"sectionOrder":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"templateVersionId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"additionalProperties":false},"createdAt":{"type":"string","format":"date-time"},"claimLinks":{"type":"array","items":{"$ref":"#/$defs/claimLink"}},"enrichment":{"type":"array","items":{"$ref":"#/$defs/enrichment"}},"interviews":{"type":"array","items":{"$ref":"#/$defs/interview"}},"provenance":{"type":"array","items":{"$ref":"#/$defs/provenance"}},"snapshotId":{"$ref":"#/$defs/id"},"generations":{"type":"array","items":{"$ref":"#/$defs/generation"}},"schemaVersion":{"const":"1.0.0"},"generatedProse":{"type":"array","items":{"$ref":"#/$defs/prose"}},"parentSnapshotId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"additionalProperties":false}$schema$::jsonb $function$;
-
-CREATE OR REPLACE FUNCTION app.begin_request(workspace uuid, command text, request_key uuid, body jsonb, allow_deleting boolean DEFAULT false)
- RETURNS TABLE(request_id uuid, cached jsonb)
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE actor uuid; principal text; fingerprint bytea; existing app.idempotency_requests;
-BEGIN
-  actor := app.assert_tenant(workspace,allow_deleting);
-  IF request_key IS NULL OR request_key='00000000-0000-0000-0000-000000000000'::uuid
-     OR body IS NULL OR pg_catalog.octet_length(body::text)>1048576 THEN
-    RAISE EXCEPTION USING ERRCODE='PT400', MESSAGE='INVALID_COMMAND_ENVELOPE';
-  END IF;
-  principal := 'user:'||actor::text;
-  fingerprint := app.hash_json(pg_catalog.jsonb_build_object('schemaVersion','1',
-    'command',command,'tenant',workspace,'principal',principal,'body',body));
-  INSERT INTO app.idempotency_requests
-    (tenant_id,principal_key,command_kind,key_digest,request_hash,state,result_refs,
-     expires_at,request_schema_version)
-  VALUES (workspace,principal,command,pg_catalog.sha256(pg_catalog.uuid_send(request_key)),
-    fingerprint,'in_progress','{}',pg_catalog.transaction_timestamp()+interval '7 days','1')
-  ON CONFLICT (tenant_id,principal_key,command_kind,key_digest) DO NOTHING
-  RETURNING id INTO request_id;
-  IF request_id IS NOT NULL THEN
-    cached := NULL;
- RETURN NEXT;
-    RETURN;
-  END IF;
-  SELECT r.* INTO STRICT existing FROM app.idempotency_requests r
-    WHERE r.tenant_id=workspace AND r.principal_key=principal AND r.command_kind=command
-      AND r.key_digest=pg_catalog.sha256(pg_catalog.uuid_send(request_key)) FOR UPDATE;
-  IF existing.request_hash<>fingerprint THEN
-    RAISE EXCEPTION USING ERRCODE='PT409', MESSAGE='IDEMPOTENCY_BODY_MISMATCH';
-  END IF;
-  IF existing.expires_at<=pg_catalog.transaction_timestamp() THEN
-    RAISE EXCEPTION USING ERRCODE='PT410', MESSAGE='REQUEST_EXPIRED_RECOVER_EXISTING_RESOURCE';
-  END IF;
-  IF existing.state NOT IN ('completed','accepted') THEN
-    RAISE EXCEPTION USING ERRCODE='PT409', MESSAGE='COMMAND_IN_PROGRESS';
-  END IF;
-  request_id := existing.id;
-  cached := existing.result_refs;
- RETURN NEXT;
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.restore_cv_version(p_key uuid, p_document uuid, p_expected_revision bigint, p_historical_version uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid:=app.tenant_for_user();r record;old_version app.cv_versions;document app.cv_documents;version uuid;
-BEGIN
- SELECT * INTO document FROM app.cv_documents WHERE tenant_id=w AND id=p_document FOR UPDATE;
- SELECT * INTO r FROM app.begin_request(w,'restore_cv_version',p_key,jsonb_build_object('document',p_document,'expectedRevision',p_expected_revision,'historicalVersion',p_historical_version));
- IF r.cached IS NOT NULL THEN RETURN r.cached;END IF;
- SELECT * INTO old_version FROM app.cv_versions WHERE tenant_id=w AND id=p_historical_version AND document_id=p_document;
- IF old_version.id IS NULL OR document.id IS NULL OR document.document_kind<>'base' THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='RESTORE_LINEAGE_FORBIDDEN';END IF;
- PERFORM app.assert_profile_usable(w,old_version.profile_version_id);
- IF document.draft_revision IS DISTINCT FROM p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
- version:=app.insert_cv_version(w,p_document,old_version.profile_version_id,r.request_id,old_version.canonical_json->'document',old_version.locale);
- PERFORM app.audit(w,'cv.restore','cv_version',version);
- RETURN app.finish_request(w,r.request_id,jsonb_build_object('cvVersionId',version,'documentId',p_document,'revision',document.draft_revision+1,'restoredFrom',p_historical_version));
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.protect_immutable()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO ''
-AS $function$
-BEGIN
- IF TG_OP='DELETE' AND pg_catalog.has_table_privilege(current_user,TG_RELID,'DELETE') THEN
-  -- Preserve the separate existing account-removal contract.
-  IF EXISTS(SELECT 1 FROM app.tenants WHERE id=OLD.tenant_id AND state='deleting') THEN RETURN OLD; END IF;
-  IF TG_TABLE_SCHEMA='app' AND TG_TABLE_NAME=ANY(ARRAY[
-   'source_spans','claims','claim_provenance','confirmation_events',
-   'entity_revisions','entity_revision_claims','entity_revision_entities',
-   'profile_versions','profile_version_entities','profile_version_claims','profile_version_relations',
-   'claim_relations','cv_versions','cv_sections','cv_items','cv_photo_references',
-   'editor_draft_snapshots',
-   'recommendations'
-  ]) AND EXISTS(SELECT 1 FROM app.base_cv_lifecycle l
-   WHERE l.tenant_id=OLD.tenant_id AND l.purge_transaction=pg_catalog.pg_current_xact_id()) THEN RETURN OLD; END IF;
- END IF;
- RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='IMMUTABLE_RECORD';
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.accept_language_proposal(p_id uuid, p_key uuid, p_review_revision bigint, p_payload jsonb, p_variant text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid:=app.tenant_for_user();p app.document_language_proposals;result jsonb;source jsonb;provenance jsonb;current jsonb;
-BEGIN
- PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;PERFORM app.assert_tenant(w);
- SELECT * INTO p FROM app.document_language_proposals WHERE tenant_id=w AND id=p_id FOR UPDATE;
- IF p.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
- IF p.state='accepted' THEN RETURN p.accepted;END IF;
- IF p.state<>'ready' OR p.review_revision<>p_review_revision OR NOT app.translation_source_current(w,p.request->'source',p.request->>'sourceLocale') OR p_payload#>'{content,translation,source}' IS DISTINCT FROM p.request->'source' OR p_payload#>>'{content,documentLocale}' IS DISTINCT FROM p.request->>'targetLocale' THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
- source:=p.request->'source';
-  result:=app.write_base_language(p_key,p_variant,(p.request->>'targetRevision')::bigint,p_payload,NULL,true);
-  result:=jsonb_build_object('kind','base','variantId',p_variant,'id',result->>'id','revision',result->'revision');
- UPDATE app.document_language_proposals SET state='accepted',accepted=result,output=NULL,review=NULL WHERE id=p.id;
- RETURN result;
-END $function$;
-
 CREATE OR REPLACE FUNCTION app.translation_source_current(w uuid, s jsonb, source_locale text)
  RETURNS boolean
  LANGUAGE plpgsql
@@ -892,71 +560,7 @@ BEGIN
  RETURN coalesce(result,false);
 END $function$;
 
-CREATE OR REPLACE FUNCTION app.workspace_draft_json(d app.workspace_drafts)
- RETURNS jsonb
- LANGUAGE sql
- STABLE
- SET search_path TO ''
-AS $function$
- SELECT jsonb_build_object('id',d.id,'kind',d.kind,'revision',d.revision,'value',d.value,'updatedAt',d.updated_at)
-$function$;
-
-CREATE OR REPLACE FUNCTION app.document_language_context()
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid:=app.tenant_for_user();source jsonb;versions jsonb;v app.editor_draft_snapshots;
-BEGIN
-  SELECT * INTO v FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id='default' ORDER BY revision DESC LIMIT 1;
-  IF v.id IS NOT NULL THEN source:=app.editor_snapshot_json(v)||jsonb_build_object('documentId',v.payload#>>'{content,id}','fingerprint',encode(app.hash_json(v.payload),'hex'),'locale',app.document_content_locale(v.payload));END IF;
-  SELECT coalesce(jsonb_agg(jsonb_build_object('variantId',s.variant_id,'id',s.id,'revision',s.revision,'locale',s.payload#>>'{content,documentLocale}','translation',s.payload#>'{content,translation}')),'[]') INTO versions FROM (SELECT DISTINCT ON(variant_id) * FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id<>'default' ORDER BY variant_id,revision DESC) s WHERE s.payload#>>'{content,translation,source,documentId}'=v.payload#>>'{content,id}';
- RETURN jsonb_build_object('source',source,'versions',versions);
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.expire_photo_uploads(p_worker_secret text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE workspace uuid:=app.tenant_for_user(); row app.photo_assets; result jsonb:='[]'::jsonb;
-BEGIN
- PERFORM app.require_photo_worker(p_worker_secret);
- FOR row IN SELECT p.* FROM app.photo_assets p WHERE p.tenant_id=workspace AND
-  (p.state='purge_pending' OR (p.state IN ('reserved','ready') AND p.created_at<transaction_timestamp()-interval '24 hours'
-   AND NOT EXISTS(SELECT 1 FROM app.editor_photo_references r WHERE r.tenant_id=p.tenant_id AND r.asset_id=p.id)
-   AND NOT EXISTS(SELECT 1 FROM app.cv_photo_references r WHERE r.tenant_id=p.tenant_id AND r.asset_id=p.id)))
-  ORDER BY p.created_at LIMIT 10 FOR UPDATE SKIP LOCKED
- LOOP
-  IF row.state<>'purge_pending' AND
-   (EXISTS(SELECT 1 FROM app.editor_photo_references r WHERE r.tenant_id=row.tenant_id AND r.asset_id=row.id)
-    OR EXISTS(SELECT 1 FROM app.cv_photo_references r WHERE r.tenant_id=row.tenant_id AND r.asset_id=row.id)) THEN
-   CONTINUE;
-  END IF;
-  UPDATE app.photo_assets SET state='purge_pending',deleted_at=coalesce(deleted_at,transaction_timestamp()) WHERE id=row.id;
-  result:=result||jsonb_build_array(app.photo_manifest(row));
- END LOOP;
- RETURN result;
-END $function$;
-
-CREATE OR REPLACE FUNCTION app.save_workspace_draft(p_key uuid, p_kind text, p_id uuid, p_revision bigint, p_value jsonb, p_generation bigint DEFAULT NULL::bigint)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE w uuid;
-BEGIN
- PERFORM app.provision_workspace(p_key);w:=app.tenant_for_user();
- PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;
- PERFORM app.assert_workspace_resource(p_kind,p_id);
- IF p_kind NOT IN ('resume') AND
-    (p_generation IS NULL OR p_generation IS DISTINCT FROM (app.load_base_state()->>'generation')::bigint)
- THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='BASE_GENERATION_CONFLICT'; END IF;
- RETURN app.save_workspace_draft_before_generation(p_key,p_kind,p_id,p_revision,p_value);
-END $function$;
+CREATE OR REPLACE FUNCTION app.canonical_cv_schema() RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path='' AS $function$ SELECT $schema${"$id":"https://schemas.example.invalid/cv/v1/schema.json","type":"object","$defs":{"id":{"type":"string","pattern":"^[a-z][a-z0-9_-]{1,79}$"},"claim":{"type":"object","allOf":[{"if":{"properties":{"kind":{"const":"text"}}},"then":{"properties":{"value":{"type":"string","maxLength":20000,"minLength":1}}}},{"if":{"properties":{"kind":{"const":"date"}}},"then":{"properties":{"value":{"$ref":"#/$defs/partialDate"}}}},{"if":{"properties":{"kind":{"const":"location"}}},"then":{"properties":{"value":{"$ref":"#/$defs/location"}}}},{"if":{"properties":{"kind":{"const":"metric"}}},"then":{"properties":{"value":{"$ref":"#/$defs/metric"}}}},{"if":{"properties":{"status":{"enum":["user_confirmed","externally_verified"]}}},"then":{"required":["confirmedAt","confirmationActor"]}},{"if":{"properties":{"status":{"const":"externally_verified"}}},"then":{"required":["verificationMethod"]}}],"required":["id","kind","value","status","provenanceIds"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["text","date","location","metric"]},"value":{},"status":{"enum":["extracted_unconfirmed","user_confirmed","externally_verified","suggested","rejected"]},"confirmedAt":{"type":"string","format":"date-time"},"provenanceIds":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"uniqueItems":true},"confirmationActor":{"$ref":"#/$defs/id"},"verificationMethod":{"type":"string","maxLength":20000,"minLength":1}},"additionalProperties":false},"prose":{"type":"object","required":["id","kind","text","claimIds","origin","approval","locale","generationId"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["summary","bullet","scope","other"]},"text":{"type":"string","maxLength":20000,"minLength":1},"locale":{"enum":["ro","en"]},"origin":{"enum":["ai_generated","user_authored"]},"approval":{"enum":["pending","approved","rejected"]},"claimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"uniqueItems":true},"generationId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"additionalProperties":false},"skill":{"type":"object","required":["id","class","labelClaimId","evidenceClaimIds"],"properties":{"id":{"$ref":"#/$defs/id"},"class":{"enum":["professional","technical"]},"conceptId":{"type":"string","maxLength":20000,"minLength":1},"labelClaimId":{"$ref":"#/$defs/id"},"evidenceClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false},"metric":{"type":"object","required":["value","unit","qualifier"],"properties":{"unit":{"type":"string","maxLength":20000,"minLength":1},"value":{"type":"number"},"period":{"type":"string","maxLength":20000,"minLength":1},"baseline":{"type":"number"},"qualifier":{"enum":["exact","approximate","range"]},"upperValue":{"type":"number"}},"additionalProperties":false},"source":{"type":"object","required":["id","kind","label","capturedAt"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["upload","manual","interview","external_document"]},"label":{"type":"string","maxLength":20000,"minLength":1},"sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},"capturedAt":{"type":"string","format":"date-time"},"extractorVersion":{"type":"string","maxLength":20000,"minLength":1}},"additionalProperties":false},"contact":{"type":"object","required":["id","kind","valueClaimId","visibility"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["email","phone","location","address","linkedin","github","portfolio","other"]},"label":{"type":"string","maxLength":20000,"minLength":1},"visibility":{"enum":["private","export"]},"valueClaimId":{"$ref":"#/$defs/id"}},"additionalProperties":false},"section":{"type":"object","required":["id","kind","label","entryIds","proseIds","visible"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["identity","summary","professional_skills","technical_skills","experience","education","certifications","projects","achievements","portfolio","languages","leadership","publications","volunteering","custom"]},"label":{"type":"string","maxLength":20000,"minLength":1},"visible":{"type":"boolean"},"entryIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"proseIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false},"location":{"type":"object","required":[],"properties":{"city":{"type":"string","maxLength":20000,"minLength":1},"address":{"type":"string","maxLength":20000,"minLength":1},"countryCode":{"type":"string","pattern":"^[A-Z]{2}$"}},"additionalProperties":false},"claimLink":{"type":"object","required":["id","fromClaimId","toClaimId","relation"],"properties":{"id":{"$ref":"#/$defs/id"},"relation":{"enum":["metric_of","supports","contribution_to","scope_of"]},"toClaimId":{"$ref":"#/$defs/id"},"fromClaimId":{"$ref":"#/$defs/id"}},"additionalProperties":false},"education":{"type":"object","required":["id","institutionClaimId","qualificationClaimId","fieldClaimId","locationClaimId","startClaimId","endClaimId","detailClaimIds"],"properties":{"id":{"$ref":"#/$defs/id"},"endClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"fieldClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"startClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"detailClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"locationClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"institutionClaimId":{"$ref":"#/$defs/id"},"qualificationClaimId":{"$ref":"#/$defs/id"}},"additionalProperties":false},"interview":{"type":"object","required":["id","question","answerClaimIds","targetClaimIds","state"],"properties":{"id":{"$ref":"#/$defs/id"},"state":{"enum":["asked","answered_unconfirmed","confirmed","dismissed"]},"question":{"type":"string","maxLength":20000,"minLength":1},"answerClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"targetClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false},"employment":{"type":"object","allOf":[{"if":{"properties":{"ongoing":{"const":true}}},"then":{"properties":{"endClaimId":{"type":"null"}}}}],"required":["id","titleClaimId","companyClaimId","locationClaimId","startClaimId","endClaimId","ongoing","scopeClaimIds","responsibilityClaimIds","accomplishmentClaimIds","metricClaimIds","skillIds"],"properties":{"id":{"$ref":"#/$defs/id"},"ongoing":{"type":"boolean"},"skillIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"endClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"startClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"titleClaimId":{"$ref":"#/$defs/id"},"scopeClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"companyClaimId":{"$ref":"#/$defs/id"},"metricClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"locationClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"accomplishmentClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"responsibilityClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false},"enrichment":{"type":"object","required":["id","targetEntityId","attribute","claimIds"],"properties":{"id":{"$ref":"#/$defs/id"},"claimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"minItems":1,"uniqueItems":true},"attribute":{"enum":["systems","technology","individual_contribution","impact_time","impact_cost","impact_accuracy","impact_revenue","impact_productivity","scale","stakeholders","budget","team","project"]},"targetEntityId":{"$ref":"#/$defs/id"}},"additionalProperties":false},"generation":{"type":"object","required":["id","provider","modelRequested","modelResolved","promptVersion","inputHash","createdAt"],"properties":{"id":{"$ref":"#/$defs/id"},"provider":{"type":"string","maxLength":20000,"minLength":1},"createdAt":{"type":"string","format":"date-time"},"inputHash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"modelResolved":{"type":"string","maxLength":20000,"minLength":1},"promptVersion":{"type":"string","maxLength":20000,"minLength":1},"modelRequested":{"type":"string","maxLength":20000,"minLength":1}},"additionalProperties":false},"provenance":{"type":"object","required":["id","sourceId","locator"],"properties":{"id":{"$ref":"#/$defs/id"},"excerpt":{"type":"string","maxLength":20000,"minLength":1},"locator":{"type":"string","maxLength":20000,"minLength":1},"sourceId":{"$ref":"#/$defs/id"},"extractionConfidence":{"type":"number","maximum":1,"minimum":0}},"additionalProperties":false},"partialDate":{"type":"object","required":["year"],"properties":{"year":{"type":"integer","maximum":2200,"minimum":1900},"month":{"type":"integer","maximum":12,"minimum":1}},"additionalProperties":false},"optionalEntry":{"type":"object","required":["id","kind","labelClaimId","detailClaimIds","startClaimId","endClaimId","linkClaimIds","metricClaimIds"],"properties":{"id":{"$ref":"#/$defs/id"},"kind":{"enum":["certifications","projects","achievements","portfolio","languages","leadership","publications","volunteering","custom"]},"endClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"labelClaimId":{"$ref":"#/$defs/id"},"linkClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"startClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"detailClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"metricClaimIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true}},"additionalProperties":false}},"title":"CV Maker canonical snapshot v1 \u2014 discovery proposal","$schema":"https://json-schema.org/draft/2020-12/schema","required":["schemaVersion","snapshotId","baseCvId","version","parentSnapshotId","createdAt","locale","sources","provenance","claims","facts","claimLinks","enrichment","interviews","generatedProse","generations","document","context"],"properties":{"facts":{"type":"object","required":["nameClaimId","positioningTitleClaimIds","contacts","skills","employment","education","optionalEntries"],"properties":{"skills":{"type":"array","items":{"$ref":"#/$defs/skill"}},"contacts":{"type":"array","items":{"$ref":"#/$defs/contact"}},"education":{"type":"array","items":{"$ref":"#/$defs/education"}},"employment":{"type":"array","items":{"$ref":"#/$defs/employment"}},"nameClaimId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"optionalEntries":{"type":"array","items":{"$ref":"#/$defs/optionalEntry"}},"positioningTitleClaimIds":{"type":"array","items":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]},"maxItems":2,"minItems":2}},"additionalProperties":false},"claims":{"type":"array","items":{"$ref":"#/$defs/claim"}},"locale":{"enum":["ro","en"]},"context":{"type":"object","required":["kind"],"properties":{"kind":{"const":"base"}},"additionalProperties":false},"sources":{"type":"array","items":{"$ref":"#/$defs/source"}},"version":{"type":"integer","minimum":1},"baseCvId":{"$ref":"#/$defs/id"},"document":{"type":"object","required":["sectionOrder","sections","templateVersionId","contactIds"],"properties":{"photo":{"oneOf":[{"type":"null"},{"type":"object","required":["assetId","crop","shape","visible"],"properties":{"crop":{"type":"object","required":["version","centerX","centerY","zoom"],"properties":{"zoom":{"type":"number","maximum":3,"minimum":1},"centerX":{"type":"number","maximum":1,"minimum":0},"centerY":{"type":"number","maximum":1,"minimum":0},"version":{"const":1}},"additionalProperties":false},"shape":{"enum":["circle","square"]},"assetId":{"type":"string","pattern":"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"},"visible":{"type":"boolean"}},"additionalProperties":false}]},"sections":{"type":"array","items":{"$ref":"#/$defs/section"}},"photoMode":{"enum":["base"]},"contactIds":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"sectionOrder":{"type":"array","items":{"$ref":"#/$defs/id"},"uniqueItems":true},"templateVersionId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"additionalProperties":false},"createdAt":{"type":"string","format":"date-time"},"claimLinks":{"type":"array","items":{"$ref":"#/$defs/claimLink"}},"enrichment":{"type":"array","items":{"$ref":"#/$defs/enrichment"}},"interviews":{"type":"array","items":{"$ref":"#/$defs/interview"}},"provenance":{"type":"array","items":{"$ref":"#/$defs/provenance"}},"snapshotId":{"$ref":"#/$defs/id"},"generations":{"type":"array","items":{"$ref":"#/$defs/generation"}},"schemaVersion":{"const":"1.0.0"},"generatedProse":{"type":"array","items":{"$ref":"#/$defs/prose"}},"parentSnapshotId":{"oneOf":[{"$ref":"#/$defs/id"},{"type":"null"}]}},"additionalProperties":false}$schema$::jsonb $function$;
 
 CREATE OR REPLACE FUNCTION app.save_profile_checkpoint_before_base_removal(p_key uuid, p_profile uuid, p_expected_revision bigint, p_expected_base_revision bigint, p_cv jsonb, p_confirm_claim_ids uuid[], p_as_of date)
  RETURNS jsonb
@@ -1067,6 +671,32 @@ EXCEPTION WHEN check_violation OR foreign_key_violation OR invalid_text_represen
  WHEN unique_violation THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='PROFILE_IDENTITY_CONFLICT';
 END $function$;
 
+CREATE OR REPLACE FUNCTION app.expire_photo_uploads(p_worker_secret text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE workspace uuid:=app.tenant_for_user(); row app.photo_assets; result jsonb:='[]'::jsonb;
+BEGIN
+ PERFORM app.require_photo_worker(p_worker_secret);
+ FOR row IN SELECT p.* FROM app.photo_assets p WHERE p.tenant_id=workspace AND
+  (p.state='purge_pending' OR (p.state IN ('reserved','ready') AND p.created_at<transaction_timestamp()-interval '24 hours'
+   AND NOT EXISTS(SELECT 1 FROM app.editor_photo_references r WHERE r.tenant_id=p.tenant_id AND r.asset_id=p.id)
+   AND NOT EXISTS(SELECT 1 FROM app.cv_photo_references r WHERE r.tenant_id=p.tenant_id AND r.asset_id=p.id)))
+  ORDER BY p.created_at LIMIT 10 FOR UPDATE SKIP LOCKED
+ LOOP
+  IF row.state<>'purge_pending' AND
+   (EXISTS(SELECT 1 FROM app.editor_photo_references r WHERE r.tenant_id=row.tenant_id AND r.asset_id=row.id)
+    OR EXISTS(SELECT 1 FROM app.cv_photo_references r WHERE r.tenant_id=row.tenant_id AND r.asset_id=row.id)) THEN
+   CONTINUE;
+  END IF;
+  UPDATE app.photo_assets SET state='purge_pending',deleted_at=coalesce(deleted_at,transaction_timestamp()) WHERE id=row.id;
+  result:=result||jsonb_build_array(app.photo_manifest(row));
+ END LOOP;
+ RETURN result;
+END $function$;
+
 CREATE OR REPLACE FUNCTION app.insert_cv_version(workspace uuid, document_id uuid, profile_version uuid, request_id uuid, layout jsonb, locale text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -1101,6 +731,211 @@ BEGIN
  RETURN snapshot;
 END $function$;
 
+CREATE OR REPLACE FUNCTION app.restore_cv_version(p_key uuid, p_document uuid, p_expected_revision bigint, p_historical_version uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid:=app.tenant_for_user();r record;old_version app.cv_versions;document app.cv_documents;version uuid;
+BEGIN
+ SELECT * INTO document FROM app.cv_documents WHERE tenant_id=w AND id=p_document FOR UPDATE;
+ SELECT * INTO r FROM app.begin_request(w,'restore_cv_version',p_key,jsonb_build_object('document',p_document,'expectedRevision',p_expected_revision,'historicalVersion',p_historical_version));
+ IF r.cached IS NOT NULL THEN RETURN r.cached;END IF;
+ SELECT * INTO old_version FROM app.cv_versions WHERE tenant_id=w AND id=p_historical_version AND document_id=p_document;
+ IF old_version.id IS NULL OR document.id IS NULL OR document.document_kind<>'base' THEN RAISE EXCEPTION USING ERRCODE='PT403',MESSAGE='RESTORE_LINEAGE_FORBIDDEN';END IF;
+ PERFORM app.assert_profile_usable(w,old_version.profile_version_id);
+ IF document.draft_revision IS DISTINCT FROM p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+ version:=app.insert_cv_version(w,p_document,old_version.profile_version_id,r.request_id,old_version.canonical_json->'document',old_version.locale);
+ PERFORM app.audit(w,'cv.restore','cv_version',version);
+ RETURN app.finish_request(w,r.request_id,jsonb_build_object('cvVersionId',version,'documentId',p_document,'revision',document.draft_revision+1,'restoredFrom',p_historical_version));
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.protect_immutable()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+BEGIN
+ IF TG_OP='DELETE' AND pg_catalog.has_table_privilege(current_user,TG_RELID,'DELETE') THEN
+  -- Preserve the separate existing account-removal contract.
+  IF EXISTS(SELECT 1 FROM app.tenants WHERE id=OLD.tenant_id AND state='deleting') THEN RETURN OLD; END IF;
+  IF TG_TABLE_SCHEMA='app' AND TG_TABLE_NAME=ANY(ARRAY[
+   'source_spans','claims','claim_provenance','confirmation_events',
+   'entity_revisions','entity_revision_claims','entity_revision_entities',
+   'profile_versions','profile_version_entities','profile_version_claims','profile_version_relations',
+   'claim_relations','cv_versions','cv_sections','cv_items','cv_photo_references',
+   'editor_draft_snapshots',
+   'recommendation_requirements'
+  ]) AND EXISTS(SELECT 1 FROM app.base_cv_lifecycle l
+   WHERE l.tenant_id=OLD.tenant_id AND l.purge_transaction=pg_catalog.pg_current_xact_id()) THEN RETURN OLD; END IF;
+ END IF;
+ RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='IMMUTABLE_RECORD';
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.workspace_draft_json(d app.workspace_drafts)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO ''
+AS $function$
+ SELECT jsonb_build_object('id',d.id,'kind',d.kind,'revision',d.revision,'value',d.value,'updatedAt',d.updated_at)
+$function$;
+
+CREATE OR REPLACE FUNCTION app.document_language_context()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid:=app.tenant_for_user();source jsonb;versions jsonb;v app.editor_draft_snapshots;
+BEGIN
+  SELECT * INTO v FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id='default' ORDER BY revision DESC LIMIT 1;
+  IF v.id IS NOT NULL THEN source:=app.editor_snapshot_json(v)||jsonb_build_object('documentId',v.payload#>>'{content,id}','fingerprint',encode(app.hash_json(v.payload),'hex'),'locale',app.document_content_locale(v.payload));END IF;
+  SELECT coalesce(jsonb_agg(jsonb_build_object('variantId',s.variant_id,'id',s.id,'revision',s.revision,'locale',s.payload#>>'{content,documentLocale}','translation',s.payload#>'{content,translation}')),'[]') INTO versions FROM (SELECT DISTINCT ON(variant_id) * FROM app.editor_draft_snapshots WHERE tenant_id=w AND variant_id<>'default' ORDER BY variant_id,revision DESC) s WHERE s.payload#>>'{content,translation,source,documentId}'=v.payload#>>'{content,id}';
+ RETURN jsonb_build_object('source',source,'versions',versions);
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.assert_workspace_resource(p_kind text, p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid:=app.tenant_for_user(); valid boolean:=false;
+BEGIN
+ CASE p_kind
+ WHEN 'resume' THEN valid:=p_id='00000000-0000-4000-8000-000000000001'::uuid;
+ WHEN 'import-review' THEN valid:=EXISTS(SELECT 1 FROM app.cv_import_sessions WHERE tenant_id=w AND source_id=p_id AND state='ready' AND expires_at>now());
+ WHEN 'translation-review' THEN valid:=EXISTS(SELECT 1 FROM app.document_language_proposals WHERE tenant_id=w AND id=p_id);
+ ELSE valid:=false;
+ END CASE;
+ IF NOT valid THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND'; END IF;
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.validate_canonical(cv jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ IMMUTABLE
+ SET search_path TO ''
+AS $function$
+DECLARE ids uuid[]; ref record; record jsonb; item jsonb; linked jsonb; start_value jsonb; end_value jsonb; expected text; entity_ids text[];
+BEGIN
+ IF cv IS NULL OR pg_catalog.octet_length(cv::text)>1048576 OR NOT app.matches_schema(cv,app.canonical_cv_schema(),app.canonical_cv_schema()) THEN
+   RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='CANONICAL_SCHEMA_INVALID';
+ END IF;
+ IF cv#>>'{document,templateVersionId}' IS NOT NULL AND cv#>>'{document,templateVersionId}' NOT IN (
+   'template_folio_2_1_0', 'template_meridian_2_1_0', 'template_signal_2_1_0',
+   'template_archive_2_1_0', 'template_monograph_2_1_0'
+ ) THEN
+   RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='UNREGISTERED_TEMPLATE_VERSION';
+ END IF;
+ ids:=app.collect_ids(cv);
+ IF pg_catalog.cardinality(ids)<>(SELECT count(DISTINCT i) FROM pg_catalog.unnest(ids)i) THEN
+   RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='DUPLICATE_CANONICAL_ID';
+ END IF;
+ IF pg_catalog.jsonb_array_length(cv->'generatedProse')>0 OR pg_catalog.jsonb_array_length(cv->'generations')>0 OR pg_catalog.jsonb_array_length(cv->'interviews')>0 OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{document,sections}')s WHERE pg_catalog.jsonb_array_length(s->'proseIds')>0) THEN
+   RAISE EXCEPTION USING ERRCODE='PT422', MESSAGE='DEFERRED_FEATURE_NOT_IN_P0_P3';
+ END IF;
+ FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'provenance') LOOP
+   IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv->'sources')s WHERE s->>'id'=record->>'sourceId') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_SOURCE'; END IF;
+ END LOOP;
+ FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'claims') LOOP
+   FOR item IN SELECT * FROM pg_catalog.jsonb_array_elements(record->'provenanceIds') LOOP
+     IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv->'provenance')p WHERE p->>'id'=item#>>'{}') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_PROVENANCE'; END IF;
+   END LOOP;
+ END LOOP;
+ FOR ref IN SELECT * FROM app.claim_refs(cv) LOOP
+   SELECT c INTO linked FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE app.canonical_id(c->>'id')=ref.claim_id;
+   IF linked IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_CLAIM'; END IF;
+   expected:=CASE WHEN ref.field_role IN ('nameClaimId','positioningTitleClaimIds','labelClaimId','titleClaimId','companyClaimId','institutionClaimId','qualificationClaimId','fieldClaimId') THEN 'text' WHEN ref.field_role IN ('startClaimId','endClaimId') THEN 'date' WHEN ref.field_role='locationClaimId' THEN 'location' WHEN ref.field_role='metricClaimIds' THEN 'metric' ELSE NULL END;
+   IF expected IS NOT NULL AND linked->>'kind'<>expected THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='WRONG_CLAIM_KIND'; END IF;
+ END LOOP;
+ FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv#>'{facts,contacts}') LOOP
+   SELECT c INTO linked FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE c->>'id'=record->>'valueClaimId';
+   IF linked->>'kind'<>(CASE WHEN record->>'kind'='location' THEN 'location' ELSE 'text' END) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='WRONG_CONTACT_CLAIM_KIND'; END IF;
+ END LOOP;
+ FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements((cv#>'{facts,employment}')||(cv#>'{facts,education}')||(cv#>'{facts,optionalEntries}')) LOOP
+   SELECT c->'value' INTO start_value FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE c->>'id'=record->>'startClaimId';
+   SELECT c->'value' INTO end_value FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE c->>'id'=record->>'endClaimId';
+   IF start_value IS NOT NULL AND end_value IS NOT NULL AND ((start_value->>'year')::integer,COALESCE((start_value->>'month')::integer,1))>((end_value->>'year')::integer,COALESCE((end_value->>'month')::integer,12)) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='IMPOSSIBLE_DATE_CHRONOLOGY'; END IF;
+   FOR item IN SELECT * FROM pg_catalog.jsonb_array_elements(COALESCE(record->'skillIds','[]')) LOOP
+     IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{facts,skills}')s WHERE s->>'id'=item#>>'{}') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_SKILL'; END IF;
+   END LOOP;
+ END LOOP;
+ SELECT pg_catalog.array_agg(e->>'id') INTO entity_ids FROM pg_catalog.jsonb_array_elements((cv#>'{facts,contacts}')||(cv#>'{facts,skills}')||(cv#>'{facts,employment}')||(cv#>'{facts,education}')||(cv#>'{facts,optionalEntries}'))e;
+ FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'enrichment') LOOP
+   IF NOT COALESCE(record->>'targetEntityId'=ANY(entity_ids),false) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='DANGLING_ENRICHMENT_TARGET'; END IF;
+ END LOOP;
+ FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv->'claimLinks') LOOP
+   IF record->>'relation'='metric_of' AND NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv->'claims')c WHERE c->>'id'=record->>'fromClaimId' AND c->>'kind'='metric') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='METRIC_LINK_REQUIRES_METRIC'; END IF;
+ END LOOP;
+ IF pg_catalog.jsonb_array_length(cv#>'{document,sectionOrder}')<>pg_catalog.jsonb_array_length(cv#>'{document,sections}') OR EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements_text(cv#>'{document,sectionOrder}')i WHERE NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{document,sections}')s WHERE s->>'id'=i)) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='SECTION_ORDER_NOT_PERMUTATION'; END IF;
+ FOR record IN SELECT * FROM pg_catalog.jsonb_array_elements(cv#>'{document,sections}') LOOP
+   FOR item IN SELECT * FROM pg_catalog.jsonb_array_elements(record->'entryIds') LOOP
+     expected:=record->>'kind';
+     IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements((cv#>'{facts,skills}')||(cv#>'{facts,employment}')||(cv#>'{facts,education}')||(cv#>'{facts,optionalEntries}'))e WHERE e->>'id'=item#>>'{}' AND (CASE WHEN e ? 'class' THEN e->>'class'||'_skills' WHEN e ? 'companyClaimId' THEN 'experience' WHEN e ? 'institutionClaimId' THEN 'education' ELSE e->>'kind' END)=expected) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='WRONG_SECTION_ENTRY_KIND'; END IF;
+   END LOOP;
+ END LOOP;
+ FOR item IN SELECT * FROM pg_catalog.jsonb_array_elements(cv#>'{document,contactIds}') LOOP
+   IF NOT EXISTS(SELECT 1 FROM pg_catalog.jsonb_array_elements(cv#>'{facts,contacts}')c WHERE c->>'id'=item#>>'{}' AND c->>'visibility'='export') THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='PRIVATE_OR_DANGLING_CONTACT'; END IF;
+ END LOOP;
+ IF cv#>>'{context,kind}' IS DISTINCT FROM 'base' THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_CV_CONTEXT'; END IF;
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.accept_language_proposal(p_id uuid, p_key uuid, p_review_revision bigint, p_payload jsonb, p_variant text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid:=app.tenant_for_user();p app.document_language_proposals;result jsonb;source jsonb;provenance jsonb;current jsonb;
+BEGIN
+ PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;PERFORM app.assert_tenant(w);
+ SELECT * INTO p FROM app.document_language_proposals WHERE tenant_id=w AND id=p_id FOR UPDATE;
+ IF p.id IS NULL THEN RAISE EXCEPTION USING ERRCODE='PT404',MESSAGE='SNAPSHOT_NOT_FOUND';END IF;
+ IF p.state='accepted' THEN RETURN p.accepted;END IF;
+ IF p.state<>'ready' OR p.review_revision<>p_review_revision OR NOT app.translation_source_current(w,p.request->'source',p.request->>'sourceLocale') OR p_payload#>'{content,translation,source}' IS DISTINCT FROM p.request->'source' OR p_payload#>>'{content,documentLocale}' IS DISTINCT FROM p.request->>'targetLocale' THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+ source:=p.request->'source';
+  result:=app.write_base_language(p_key,p_variant,(p.request->>'targetRevision')::bigint,p_payload,NULL,true);
+  result:=jsonb_build_object('kind','base','variantId',p_variant,'id',result->>'id','revision',result->'revision');
+ UPDATE app.document_language_proposals SET state='accepted',accepted=result,output=NULL,review=NULL WHERE id=p.id;
+ RETURN result;
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.begin_workspace_operation(p_id uuid, p_kind text, p_input jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid:=app.tenant_for_user(); o app.career_operation_results;created boolean;
+BEGIN
+ PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;
+ IF p_kind NOT IN ('questions','rewrite') OR octet_length(p_input::text)>16384 OR NOT EXISTS(SELECT 1 FROM app.editor_draft_snapshots WHERE tenant_id=w AND id=(p_input->>'snapshotId')::uuid AND revision=(p_input->>'revision')::bigint) THEN RAISE EXCEPTION USING ERRCODE='PT422',MESSAGE='INVALID_EDITOR_PAYLOAD';END IF;
+ INSERT INTO app.career_operation_results(tenant_id,id,kind,state,input) VALUES(w,p_id,p_kind,'processing',p_input) ON CONFLICT(id) DO NOTHING;created:=FOUND;
+ SELECT * INTO o FROM app.career_operation_results WHERE tenant_id=w AND id=p_id;
+ IF o.id IS NULL OR o.input IS DISTINCT FROM p_input OR o.kind<>p_kind THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='IDEMPOTENCY_BODY_MISMATCH';END IF;
+ RETURN jsonb_build_object('created',created,'operation',app.workspace_operation_json(o));
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.canonical_for_cv(workspace uuid, version_id uuid, document_id uuid, new_version_id uuid, sequence_no bigint, parent uuid, locale text, layout jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE facts jsonb;
+BEGIN
+ PERFORM app.assert_profile_usable(workspace,version_id);
+ SELECT v.canonical_json INTO facts FROM app.profile_versions v WHERE v.tenant_id=workspace AND v.id=version_id;
+ RETURN pg_catalog.jsonb_build_object('schemaVersion','1.0.0','snapshotId',app.portable_id(new_version_id),'baseCvId',app.portable_id(document_id),
+   'version',sequence_no,'parentSnapshotId',app.portable_id(parent),'createdAt',pg_catalog.transaction_timestamp(),'locale',locale,
+   'sources',facts->'sources','provenance',facts->'provenance','claims',facts->'claims','facts',facts->'facts',
+   'claimLinks',facts->'claimLinks','enrichment',facts->'enrichment','interviews','[]'::jsonb,'generatedProse','[]'::jsonb,'generations','[]'::jsonb,
+   'document',layout,'context',pg_catalog.jsonb_build_object('kind','base'));
+END $function$;
+
 CREATE OR REPLACE FUNCTION app.pin_cv_photo()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1128,6 +963,171 @@ BEGIN
  PERFORM app.validate_canonical(NEW.canonical_json);
  NEW.content_hash:=app.hash_json(NEW.canonical_json-'snapshotId'-'baseCvId'-'version'-'parentSnapshotId'-'createdAt');
  RETURN NEW;
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.list_workspace_drafts()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+ SELECT coalesce(jsonb_agg(app.workspace_draft_json(d)),'[]') FROM (SELECT * FROM app.workspace_drafts WHERE tenant_id=app.tenant_for_user() AND kind IN ('resume','translation-review') ORDER BY updated_at DESC LIMIT 100) d
+$function$;
+
+CREATE OR REPLACE FUNCTION app.save_workspace_draft_before_generation(p_key uuid, p_kind text, p_id uuid, p_revision bigint, p_value jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid; d app.workspace_drafts;r record;
+BEGIN
+ PERFORM app.provision_workspace(p_key);w:=app.tenant_for_user();
+ PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;PERFORM app.assert_workspace_resource(p_kind,p_id);
+ IF p_revision IS NULL OR p_revision<0 OR jsonb_typeof(p_value) IS DISTINCT FROM 'object' OR octet_length(p_value::text)>1000000 THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
+ IF EXISTS(SELECT 1 FROM jsonb_object_keys(p_value) k WHERE NOT k=ANY(CASE p_kind WHEN 'resume' THEN ARRAY['route'] WHEN 'import-review' THEN ARRAY['draft','selected','targets','ownerConfirmed','profileId','profileFingerprint'] WHEN 'translation-review' THEN ARRAY['values','confirmed','step','proposalId'] END)) THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE';END IF;
+ IF p_kind='resume' AND (p_value->>'route' IS NULL OR p_value->>'route' !~ '^#/profile($|/)') THEN RAISE EXCEPTION USING ERRCODE='PT400',MESSAGE='INVALID_COMMAND_ENVELOPE'; END IF;
+ SELECT * INTO r FROM app.begin_request(w,'save_workspace_draft',p_key,jsonb_build_object('kind',p_kind,'id',p_id,'revision',p_revision,'value',p_value));
+ IF r.cached IS NOT NULL THEN RETURN r.cached;END IF;
+ SELECT * INTO d FROM app.workspace_drafts WHERE tenant_id=w AND kind=p_kind AND id=p_id FOR UPDATE;
+ IF coalesce(d.revision,0)<>p_revision THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+ INSERT INTO app.workspace_drafts(tenant_id,kind,id,revision,value) VALUES(w,p_kind,p_id,p_revision+1,p_value)
+ ON CONFLICT(tenant_id,kind,id) DO UPDATE SET revision=p_revision+1,value=p_value,updated_at=now() RETURNING * INTO d;
+ RETURN app.finish_request(w,r.request_id,app.workspace_draft_json(d));
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.save_workspace_draft(p_key uuid, p_kind text, p_id uuid, p_revision bigint, p_value jsonb, p_generation bigint DEFAULT NULL::bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid;
+BEGIN
+ PERFORM app.provision_workspace(p_key);w:=app.tenant_for_user();
+ PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;
+ PERFORM app.assert_workspace_resource(p_kind,p_id);
+ IF p_kind NOT IN ('resume') AND
+    (p_generation IS NULL OR p_generation IS DISTINCT FROM (app.load_base_state()->>'generation')::bigint)
+ THEN RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='BASE_GENERATION_CONFLICT'; END IF;
+ RETURN app.save_workspace_draft_before_generation(p_key,p_kind,p_id,p_revision,p_value);
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.remove_base_cv_before_workspace(p_key uuid, p_expected_revision bigint, p_expected_generation bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid:=app.tenant_for_user(); l app.base_cv_lifecycle;r record;t text;
+BEGIN
+ PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;PERFORM app.assert_tenant(w);
+ INSERT INTO app.base_cv_lifecycle(tenant_id) VALUES(w) ON CONFLICT DO NOTHING;
+ SELECT * INTO l FROM app.base_cv_lifecycle WHERE tenant_id=w FOR UPDATE;
+ SELECT * INTO r FROM app.begin_request(w,'remove_base_cv',p_key,jsonb_build_object('revision',p_expected_revision,'generation',p_expected_generation));
+ IF r.cached IS NOT NULL THEN
+  IF (r.cached->>'generation')::bigint<>l.generation OR (r.cached->>'revision')::bigint<>l.revision_floor OR EXISTS(SELECT 1 FROM app.editor_draft_snapshots WHERE tenant_id=w) THEN
+   RAISE EXCEPTION USING ERRCODE='PT410',MESSAGE='REQUEST_EXPIRED_RECOVER_EXISTING_RESOURCE';END IF;
+  RETURN (app.load_base_state()-'snapshot')||jsonb_build_object('removed',true);
+ END IF;
+ IF p_expected_revision IS NULL OR p_expected_generation IS NULL OR p_expected_generation<>l.generation OR p_expected_revision<>greatest(l.revision_floor,coalesce((app.current_base_snapshot(w)).revision,0)) THEN
+  RAISE EXCEPTION USING ERRCODE='PT409',MESSAGE='VERSION_CONFLICT';END IF;
+ UPDATE app.base_cv_lifecycle SET purge_transaction=pg_current_xact_id() WHERE tenant_id=w;
+ INSERT INTO app.base_removal_objects(tenant_id,bucket,object_key)
+ SELECT w,bucket,object_key FROM app.source_documents WHERE tenant_id=w AND profile_id IS NOT NULL AND bucket='cv-imports' AND object_key IS NOT NULL ON CONFLICT DO NOTHING;
+ INSERT INTO app.base_removal_objects(tenant_id,bucket,object_key)
+ SELECT w,'cv-photos',p.object_key FROM app.photo_assets p WHERE p.tenant_id=w ON CONFLICT DO NOTHING;
+ DELETE FROM app.document_language_proposals WHERE tenant_id=w AND request#>>'{source,kind}'='base';
+ UPDATE app.ai_enhancement_operations SET base_removed=true,snapshot_id=NULL,revision=NULL,import_id=NULL WHERE tenant_id=w;
+ -- Result refs can contain whole historical draft payloads. Keep only the
+ -- non-content idempotency identity/hash and expire these command families.
+ UPDATE app.idempotency_requests SET result_refs='{}'::jsonb,expires_at=transaction_timestamp() WHERE tenant_id=w AND command_kind IN (
+ 'save_base_draft','restore_base_draft','begin_cv_import','save_import_review_draft','save_base_language','restore_base_language','publish_profile','save_profile_checkpoint','save_cv_checkpoint','write_base_language','save_base_cv_checkpoint','restore_cv_version');
+ DELETE FROM app.cv_import_sessions WHERE tenant_id=w;
+ DELETE FROM app.editor_photo_references WHERE tenant_id=w;
+ DELETE FROM app.editor_draft_snapshots WHERE tenant_id=w;
+ -- Ordered Base canonical closure.
+ FOREACH t IN ARRAY ARRAY['cv_photo_references','cv_items','cv_sections'] LOOP
+  EXECUTE format('DELETE FROM app.%I WHERE tenant_id=$1',t) USING w;
+ END LOOP;
+ UPDATE app.cv_documents SET head_version_id=NULL WHERE tenant_id=w;
+ DELETE FROM app.cv_versions WHERE tenant_id=w;
+ DELETE FROM app.cv_documents WHERE tenant_id=w;
+ UPDATE app.career_profiles SET head_version_id=NULL WHERE tenant_id=w;
+ FOREACH t IN ARRAY ARRAY['profile_version_relations','profile_version_claims','profile_version_entities','profile_versions','entity_revision_entities','entity_revision_claims','entity_revisions','career_entities','claim_relations','claim_provenance','confirmation_events','claims'] LOOP
+  EXECUTE format('DELETE FROM app.%I WHERE tenant_id=$1',t) USING w;
+ END LOOP;
+ DELETE FROM app.source_spans WHERE tenant_id=w AND profile_id IS NOT NULL;
+ DELETE FROM app.source_documents WHERE tenant_id=w AND profile_id IS NOT NULL;
+ DELETE FROM app.career_profiles WHERE tenant_id=w;
+ DELETE FROM app.photo_assets p WHERE tenant_id=w;
+ UPDATE app.base_cv_lifecycle SET generation=generation+1,revision_floor=greatest(revision_floor,p_expected_revision)+1,purge_transaction=NULL WHERE tenant_id=w;
+ PERFORM app.audit(w,'editor.remove','tenant',w);
+ RETURN app.finish_request(w,r.request_id,(app.load_base_state()-'snapshot')||jsonb_build_object('removed',true));
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.begin_request(workspace uuid, command text, request_key uuid, body jsonb, allow_deleting boolean DEFAULT false)
+ RETURNS TABLE(request_id uuid, cached jsonb)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE actor uuid; principal text; fingerprint bytea; existing app.idempotency_requests;
+BEGIN
+  actor := app.assert_tenant(workspace,allow_deleting);
+  IF request_key IS NULL OR request_key='00000000-0000-0000-0000-000000000000'::uuid
+     OR body IS NULL OR pg_catalog.octet_length(body::text)>1048576 THEN
+    RAISE EXCEPTION USING ERRCODE='PT400', MESSAGE='INVALID_COMMAND_ENVELOPE';
+  END IF;
+  principal := 'user:'||actor::text;
+  fingerprint := app.hash_json(pg_catalog.jsonb_build_object('schemaVersion','1',
+    'command',command,'tenant',workspace,'principal',principal,'body',body));
+  INSERT INTO app.idempotency_requests
+    (tenant_id,principal_key,command_kind,key_digest,request_hash,state,result_refs,
+     expires_at,request_schema_version)
+  VALUES (workspace,principal,command,pg_catalog.sha256(pg_catalog.uuid_send(request_key)),
+    fingerprint,'in_progress','{}',pg_catalog.transaction_timestamp()+interval '7 days','1')
+  ON CONFLICT (tenant_id,principal_key,command_kind,key_digest) DO NOTHING
+  RETURNING id INTO request_id;
+  IF request_id IS NOT NULL THEN
+    cached := NULL;
+ RETURN NEXT;
+    RETURN;
+  END IF;
+  SELECT r.* INTO STRICT existing FROM app.idempotency_requests r
+    WHERE r.tenant_id=workspace AND r.principal_key=principal AND r.command_kind=command
+      AND r.key_digest=pg_catalog.sha256(pg_catalog.uuid_send(request_key)) FOR UPDATE;
+  IF existing.request_hash<>fingerprint THEN
+    RAISE EXCEPTION USING ERRCODE='PT409', MESSAGE='IDEMPOTENCY_BODY_MISMATCH';
+  END IF;
+  IF existing.expires_at<=pg_catalog.transaction_timestamp() THEN
+    RAISE EXCEPTION USING ERRCODE='PT410', MESSAGE='REQUEST_EXPIRED_RECOVER_EXISTING_RESOURCE';
+  END IF;
+  IF existing.state NOT IN ('completed','accepted') THEN
+    RAISE EXCEPTION USING ERRCODE='PT409', MESSAGE='COMMAND_IN_PROGRESS';
+  END IF;
+  request_id := existing.id;
+  cached := existing.result_refs;
+ RETURN NEXT;
+END $function$;
+
+CREATE OR REPLACE FUNCTION app.remove_base_cv(p_key uuid, p_expected_revision bigint, p_expected_generation bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE w uuid:=app.tenant_for_user();v jsonb;previous_generation bigint;
+BEGIN
+ PERFORM 1 FROM app.tenants WHERE id=w FOR UPDATE;
+ previous_generation:=(app.load_base_state()->>'generation')::bigint;
+ v:=app.remove_base_cv_before_workspace(p_key,p_expected_revision,p_expected_generation);
+ IF (v->>'generation')::bigint=previous_generation THEN RETURN v;END IF; UPDATE app.base_cv_lifecycle SET initial_import_id=NULL WHERE tenant_id=w;
+ DELETE FROM app.workspace_drafts WHERE tenant_id=w AND kind NOT IN ('resume');
+ DELETE FROM app.career_operation_results WHERE tenant_id=w;
+
+ UPDATE app.idempotency_requests SET result_refs='{}',expires_at=now() WHERE tenant_id=w AND command_kind IN ('save_workspace_draft');
+ RETURN v;
 END $function$;
 
 DROP FUNCTION app.document_language_context(uuid);
@@ -1278,6 +1278,15 @@ ALTER TABLE app.source_documents ADD CONSTRAINT source_documents_kind CHECK (sou
 ALTER TABLE app.source_documents ADD CONSTRAINT source_documents_profile CHECK (profile_id IS NOT NULL);
 ALTER TABLE app.workspace_drafts ADD CONSTRAINT workspace_drafts_kind CHECK (kind IN ('resume','import-review','translation-review'));
 ALTER TABLE app.career_operation_results ADD CONSTRAINT career_operation_results_kind CHECK (kind IN ('questions','rewrite'));
+-- Applies to every snapshot insertion path, including direct authenticated RPCs.
+ALTER TABLE app.editor_draft_snapshots ADD CONSTRAINT editor_snapshot_supported_provenance CHECK (
+ NOT jsonb_path_exists(payload,'$.answers[*].origin')
+ AND coalesce(payload#>>'{content,translation,source,kind}','base')='base'
+ AND NOT jsonb_path_exists(payload,'$.**.jobId')
+ AND NOT jsonb_path_exists(payload,'$.content.sources[*] ? (@.kind != "manual" && @.kind != "fixture" && @.kind != "answer" && @.kind != "document")')
+ AND NOT jsonb_path_exists(payload,'$.**.id ? (@ like_regex "^job_(source|local)_")')
+ AND NOT jsonb_path_exists(payload,'$.**.sourceId ? (@ like_regex "^job_(source|local)_")')
+ AND NOT jsonb_path_exists(payload,'$.**.locator ? (@ like_regex "^job:")'));
 ALTER TABLE app.document_language_proposals ADD CONSTRAINT document_language_proposals_source CHECK (request#>>'{source,kind}'='base');
 -- Normalize only obsolete, null canonical context metadata; never editor content/history.
 UPDATE app.cv_versions SET canonical_json=jsonb_set(canonical_json,'{context}','{"kind":"base"}'),content_hash=app.hash_json(jsonb_set(canonical_json,'{context}','{"kind":"base"}')-'snapshotId'-'baseCvId'-'version'-'parentSnapshotId'-'createdAt') WHERE canonical_json->'context' IS DISTINCT FROM '{"kind":"base"}'::jsonb;

@@ -6,7 +6,7 @@ Status: implemented, independently reviewed and activated in the managed local a
 
 ## Intent and confirmed behavior
 
-Resumora has one base CV. Users should not have to select its language. Detect the dominant narrative language and consistently use it for generated questions, hints, explanations, feedback, skills, summaries, rewrites, and tailored CV content.
+Resumora has one base CV. Users should not have to select its language. Detect the dominant narrative language and consistently use it for generated questions, hints, explanations, feedback, skills, summaries, rewrites, and CV content.
 
 The user confirmed:
 
@@ -19,7 +19,7 @@ The user confirmed:
 - Following a language correction, refresh old questions and feedback when next needed. Preserve accepted CV wording.
 - Offer correction only for low- or medium-confidence detection. There is no routine language selector for a confidently detected base.
 - Remove **Update from a CV**. Uploading another CV requires deleting the existing base first.
-- Preserve current deletion behavior: delete base data and answers, including base language copies, while retaining current tailored job CVs and saved jobs. Do not delete user data as part of implementing this change.
+- Preserve current deletion behavior: delete base data and answers, including base language copies. Do not delete user data as part of implementing this change.
 
 ## Existing behavior and affected areas
 
@@ -33,7 +33,6 @@ Relevant boundaries:
 - `packages/contracts/src/intelligence/{model,context,experience,experience-policy,experience-assessment-prompt,translation}.ts`
 - `packages/contracts/src/jobs/` locale contracts, validation, and document identity
 - `apps/api/src/intelligence/` extraction, coaching, scores, skills, rewrites, summaries, and transcription
-- `apps/api/src/jobs/` extraction commentary, matching, suggestions, tailoring, and verification
 - `apps/api/src/languages/`, `apps/api/src/db/`, and Supabase locale validation/storage routines
 - `apps/web/src/App.tsx`, profile/import components, coaching components/hooks, and language versions
 - `apps/web/src/components/{DocumentContent,VoiceTyping,LiveDictation}.tsx`, templates and exports
@@ -57,7 +56,7 @@ Persist content-language metadata containing the canonical locale, confidence (`
 
 Resolution order:
 
-1. Explicit target locale for a saved translated representation or existing job document.
+1. Explicit target locale for a saved translated representation.
 2. A confirmed correction or persisted inferred base/content locale.
 3. A historical saved locale while its actual narrative awaits lazy detection.
 4. The interface language for an empty/manual draft awaiting narrative.
@@ -83,7 +82,6 @@ Cover:
 - Import explanations and warnings, once the narrative language is available.
 - Career and guided-experience questions, hints, answer examples, diagnostic feedback, assessments, and previews.
 - Skills discovery and suggestions, role introductions, role rewrites, and summaries.
-- Job matching explanations, clarification prompts, recommendations, tailoring reasons/warnings, and generated document wording.
 - Translation review commentary and generated wording associated with the translated version.
 - Any human-facing validation/verification explanations returned by model operations.
 
@@ -119,15 +117,15 @@ The existing local Romanian/English OCR assets serve source-quote geometry. Do n
 
 Remove the update action and the UI route into the comparison/merge flow while a base exists. Enforce the same rule at the API/import start and acceptance boundaries so direct navigation, replay, old pending imports, and concurrent tabs cannot apply a second upload to an existing base. Preserve initial staged-import review and same-operation recovery; identify it by its import ID and lifecycle generation, not merely by whether a draft now exists.
 
-Keep deletion semantics as currently confirmed. Delete language metadata, cached base feedback, base language copies, and pending base import work with the base; preserve tailored job CVs with their own locale and necessary rendering resources. Old responses must not recreate a deleted base. The next new base starts detection afresh.
+Keep deletion semantics as currently confirmed. Delete language metadata, cached base feedback, base language copies, and pending base import work with the base. Old responses must not recreate a deleted base. The next new base starts detection afresh.
 
 Remove the product entry point and prevent updates; whether now-unreachable comparison code is deleted is an implementation cleanup choice. Do not broadly remove unrelated import review or provenance behavior.
 
 ## Storage and rollout
 
-Generalize relevant API/contracts and database constraints currently restricted to `ro`/`en`, including job document locale keys, workflow locale fields, source/target locale validation, and translation context routines. Keep interface locale storage unchanged. Canonicalization must be consistent so aliases/case differences cannot create duplicate document identities.
+Generalize relevant API/contracts and database constraints currently restricted to `ro`/`en`, including source/target locale validation, and translation context routines. Keep interface locale storage unchanged. Canonicalization must be consistent so aliases/case differences cannot create duplicate document identities.
 
-Use additive, compatibility-preserving changes. Decode existing snapshots, operation receipts, and translation lineage. Existing data is inferred lazily; no bulk prose rewrite. Preserve revision/idempotency checks, generation fences, ownership checks, and current job-document uniqueness.
+Use additive, compatibility-preserving changes. Decode existing snapshots, operation receipts, and translation lineage. Existing data is inferred lazily; no bulk prose rewrite. Preserve revision/idempotency checks, generation fences, ownership checks.
 
 Prepare migrations and verify them locally before any hosted application. Implementation alone must not be reported as end-to-end operational until the required schema is present in the configured environment. Follow the repository's environment guide and keep secrets out of output. Preserve existing unfinished changes in this checkout.
 
@@ -136,7 +134,7 @@ Prepare migrations and verify them locally before any hosted application. Implem
 Required behavior checks:
 
 1. Romanian narrative containing English business/technical terms stays Romanian with an English interface.
-2. English, French/Spanish, and representative non-Latin/RTL narratives retain their actual language through save/reopen, coaching, job tailoring, and preview/export.
+2. English, French/Spanish, and representative non-Latin/RTL narratives retain their actual language through save/reopen, coaching and preview/export.
 3. Empty manual profiles use the interface fallback; substantial prose triggers bounded inference without repeated calls on UI changes.
 4. Low/medium detection allows correction; high detection hides it. Correction persists and invalidates only language-dependent results.
 5. Answers and dictated transcripts in another language produce grounded output in the CV language and preserve original evidence.
