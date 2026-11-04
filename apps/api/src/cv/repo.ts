@@ -1,5 +1,10 @@
 import type { CvContent, CvResponse, HistoryItem } from "@resumora/shared";
 
+/** Keep at most this many history snapshots per user. */
+export const HISTORY_LIMIT = 50;
+/** During normal saves, take a snapshot at most this often. */
+export const SNAPSHOT_INTERVAL_MS = 10 * 60_000;
+
 /** `ok: false` means the expected version was stale; version/updatedAt are the current ones. */
 export type SaveResult = { ok: boolean; version: number; updatedAt: string };
 
@@ -11,5 +16,6 @@ export interface CvRepo {
   /** Newest first. */
   listHistory(): Promise<HistoryItem[]>;
   getHistory(id: string): Promise<{ content: CvContent; createdAt: string } | null>;
-  restore(id: string, expectedVersion: number): Promise<SaveResult>;
+  /** null when the history id does not exist (for this user). */
+  restore(id: string, expectedVersion: number): Promise<SaveResult | null>;
 }

@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import type { AuthUser } from "./env.ts";
 import type { CvRepo } from "./cv/repo.ts";
 import { ApiError, errorBody, toErrorResponse, type LogFn } from "./errors.ts";
+import { cvRoutes } from "./cv/routes.ts";
 
 export type AppDeps = {
   /** The only browser origin allowed to call the API cross-origin. */
@@ -45,6 +46,8 @@ export function createApp(deps: AppDeps) {
     c.set("user", user);
     await next();
   });
+
+  app.route("/v1/cv", cvRoutes((c) => deps.cvRepo(c.get("user"))));
 
   app.notFound((c) => c.json(errorBody("not_found", "Not found.", c.get("requestId")), 404));
 
