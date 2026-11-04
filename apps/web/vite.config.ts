@@ -15,6 +15,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["src/test/setup.ts"],
+    // Tests never talk to Supabase; placeholders keep them independent of a local .env.local.
+    env: { VITE_SUPABASE_URL: "http://127.0.0.1:54321", VITE_SUPABASE_ANON_KEY: "test-anon-key" },
     pool: "threads",
   },
 });
