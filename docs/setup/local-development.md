@@ -48,4 +48,4 @@ npm run smoke
 
 For a bounded frontend worker count use `npm run test --workspace @resumora/web -- --maxWorkers=2`. Formatting can be checked separately with `npm run format:check --workspace @resumora/web`.
 
-Native database and canonical-schema checks are described in the [database guide](../database/README.md). The [CI workflow](../../.github/workflows/ci.yml) runs application checks and API tests; native database checks are separate. Automated synthetic results establish code behavior within their tested boundaries, not live provider quality or latency.
+Native database and canonical-schema checks are described in the [database guide](../database/README.md). The [application CI workflow](../../.github/workflows/ci.yml) runs application checks and API tests. The [database CI workflow](../../.github/workflows/database.yml) separately runs preflight credential checks and synthetic PostgreSQL migrations, isolation, races and populated upgrades. Automated synthetic results establish code behavior within their tested boundaries, not live provider quality or latency.
