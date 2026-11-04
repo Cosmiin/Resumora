@@ -85,11 +85,19 @@ function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
  * move straight to the next provider. Every attempt is logged.
  */
 export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: ModelRequest<S>): Promise<z.infer<S>> {
-  const body = (model: string) =>
+  const body = (provider: Provider) =>
     JSON.stringify({
-      model,
+      model: provider.model,
       temperature: 0,
-      max_tokens: req.maxOutputTokens,
+      ...(provider.name === "openai"
+        ? // GPT-5 models reject `max_tokens`; `store: false` keeps CVs out of OpenAI's stored completions.
+          { max_completion_tokens: req.maxOutputTokens, store: false }
+        : {
+            max_tokens: req.maxOutputTokens,
+            // CVs are personal data: only endpoints that neither keep nor train on it, and that
+            // support every parameter we send (structured output), may serve the request.
+            provider: { data_collection: "deny", zdr: true, require_parameters: true },
+          }),
       messages: [
         { role: "system", content: req.system },
         { role: "user", content: req.user },
@@ -108,7 +116,7 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
           .logCall({ userId: req.userId, task: req.task, provider: provider.name, model: provider.model, durationMs: Date.now() - started, ...entry })
           .catch((err: unknown) => console.error(JSON.stringify({ msg: "ai_calls log failed", error: String(err) })));
       try {
-        const { output, usage } = await attemptOnce(deps, provider, body(provider.model), req.schema, req.timeoutMs);
+        const { output, usage } = await attemptOnce(deps, provider, body(provider), req.schema, req.timeoutMs);
         await log({ status: "ok", inputTokens: usage?.prompt_tokens, outputTokens: usage?.completion_tokens });
         return output;
       } catch (err) {

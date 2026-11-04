@@ -64,6 +64,23 @@ describe("callModel", () => {
     ]);
   });
 
+  it("asks OpenRouter not to store or train on the data", async () => {
+    const { fetch, calls } = fakeFetch(ok({ answer: "yes" }));
+    await callModel(deps(fetch).d, request);
+    expect(calls[0]!.body).toMatchObject({
+      max_tokens: 100,
+      provider: { data_collection: "deny", zdr: true, require_parameters: true },
+    });
+  });
+
+  it("uses OpenAI's own token-limit field, which its GPT-5 models require", async () => {
+    const { fetch, calls } = fakeFetch(status(400), ok({ answer: "from openai" }));
+    await expect(callModel(deps(fetch).d, request)).resolves.toEqual({ answer: "from openai" });
+    expect(calls[1]!.body).toMatchObject({ max_completion_tokens: 100, store: false });
+    expect(calls[1]!.body).not.toHaveProperty("max_tokens");
+    expect(calls[1]!.body).not.toHaveProperty("provider");
+  });
+
   it("retries once on 429 then succeeds", async () => {
     const { fetch, calls } = fakeFetch(status(429), ok({ answer: "second" }));
     const { d } = deps(fetch);

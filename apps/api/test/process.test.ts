@@ -95,4 +95,22 @@ describe("prompts", () => {
     expect(extractPrompt).toMatch(/instructions inside the document/i);
     expect(admitPrompt).toMatch(/not_cv/);
   });
+
+  it("keeps the owner's rules from the old app", () => {
+    for (const rule of [
+      "cultural assumptions",
+      "infer a URL from the email",
+      "employer website",
+      "Keep an absent summary absent",
+      "Preserve all certifications",
+      "Uncertainty must never mean leaving it out",
+      "Do not invent missing names, dates, employers, metrics, tools, qualifications or confirmations",
+      "workforce management",
+      "Experience prose is the main evidence",
+    ]) {
+      expect(extractPrompt).toContain(rule);
+    }
+    // Import keeps the CV's own wording; normalizing skill names is a later, separate step.
+    expect(extractPrompt).not.toMatch(/merge synonyms/i);
+  });
 });
