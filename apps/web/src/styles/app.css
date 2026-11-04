@@ -260,3 +260,11 @@ label.checkbox input {
   z-index: 9;
   background: rgb(15 40 38 / 25%);
 }
+
+/* Skill groups */
+.skill-group { margin-block: var(--space-3, 12px); }
+.skill-group h3 { font-size: 1rem; margin-block-end: 4px; }
+.skill-group-unclear { border-inline-start: 3px solid var(--color-warning, #b7791f); padding-inline-start: 12px; }
+.skill-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.skill-list { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-inline-start: 18px; }
+.hint { color: var(--color-text-muted, #666); font-size: 0.9rem; }

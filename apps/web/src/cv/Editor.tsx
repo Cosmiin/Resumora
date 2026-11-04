@@ -8,12 +8,13 @@ import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryDrawer } from "./HistoryDrawer.tsx";
 import { BasicsSection } from "./sections/Basics.tsx";
 import { ExperienceSection } from "./sections/Experience.tsx";
+import { SkillsSection } from "./sections/Skills.tsx";
+import { CustomSection } from "./sections/Custom.tsx";
 import {
   CertificationsSection,
   EducationSection,
   LanguagesSection,
   ProjectsSection,
-  SkillsSection,
 } from "./sections/Lists.tsx";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
@@ -74,10 +75,11 @@ export function Editor({ initial }: { initial: CvResponse }) {
         <BasicsSection value={content.basics} onChange={update("basics")} />
         <ExperienceSection items={content.experience} onChange={update("experience")} />
         <EducationSection items={content.education} onChange={update("education")} />
-        <SkillsSection items={content.skills} onChange={update("skills")} />
+        <SkillsSection cv={content} onChange={(skills) => setContent({ ...content, ...skills })} />
         <LanguagesSection items={content.languages} onChange={update("languages")} />
         <CertificationsSection items={content.certifications} onChange={update("certifications")} />
         <ProjectsSection items={content.projects} onChange={update("projects")} />
+        <CustomSection items={content.custom} onChange={update("custom")} />
       </div>
       {historyOpen && (
         <>

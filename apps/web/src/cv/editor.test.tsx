@@ -99,7 +99,7 @@ describe("CV editor", () => {
     api.getCv.mockResolvedValue({
       content: {
         ...emptyCv(),
-        experience: [{ id: "e1", company: "Acme", title: "", location: "", startDate: "", endDate: "", current: false, bullets }],
+        experience: [{ id: "e1", company: "Acme", title: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets }],
       },
       version: 1,
       updatedAt: "2026-11-04T10:00:00Z",
@@ -116,5 +116,62 @@ describe("CV editor", () => {
     const retry = await screen.findByRole("button", { name: "Try again" });
     await userEvent.click(retry);
     expect(await screen.findByLabelText("Full name")).toBeInTheDocument();
+  });
+});
+
+describe("CV format v2 in the editor", () => {
+  const withCv = (overrides: Partial<ReturnType<typeof emptyCv>>) =>
+    api.getCv.mockResolvedValue({ content: { ...emptyCv(), ...overrides }, version: 1, updatedAt: "2026-11-04T10:00:00Z" });
+
+  it("edits two titles", async () => {
+    renderPage();
+    expect(await screen.findByLabelText("Title 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Title 2")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Title 3")).not.toBeInTheDocument();
+  });
+
+  it("sorts an unclear skill", async () => {
+    const user = userEvent.setup();
+    withCv({ unclearSkills: [{ id: "s1", name: "Management" }] });
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Skills to sort" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move Management to technical" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Move Management to professional" }));
+
+    await waitFor(() => expect(api.saveCv).toHaveBeenCalled(), { timeout: 3000 });
+    const [content] = api.saveCv.mock.lastCall!;
+    expect(content.professionalSkills).toEqual([{ id: "s1", name: "Management" }]);
+    expect(content.unclearSkills).toEqual([]);
+    expect(screen.queryByRole("heading", { name: "Skills to sort" })).not.toBeInTheDocument();
+  });
+
+  it("unclear group is hidden when empty", async () => {
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Technical skills" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Professional skills" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Skills to sort" })).not.toBeInTheDocument();
+  });
+
+  it("adds a custom section", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Add section" }));
+    await user.type(screen.getByLabelText("Section title"), "Volunteering");
+    await user.type(screen.getByLabelText("Details"), "Red Cross");
+    await waitFor(() => expect(api.saveCv).toHaveBeenCalled(), { timeout: 3000 });
+    const [content] = api.saveCv.mock.lastCall!;
+    expect(content.custom).toEqual([{ id: expect.any(String), title: "Volunteering", details: "Red Cross" }]);
+  });
+
+  it("date fields accept a year", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Add experience" }));
+    const start = screen.getByLabelText("Start");
+    expect(start).toHaveAttribute("placeholder", "YYYY-MM");
+    await user.type(start, "2019");
+    await waitFor(() => expect(screen.getByText("Saved")).toBeInTheDocument(), { timeout: 3000 });
+    expect(api.saveCv.mock.lastCall![0].experience[0].startDate).toBe("2019");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

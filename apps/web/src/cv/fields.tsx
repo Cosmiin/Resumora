@@ -8,21 +8,27 @@ export function TextField(props: {
   value: string;
   onChange(value: string): void;
   multiline?: boolean;
-  type?: "text" | "email" | "tel" | "url" | "month";
+  type?: "text" | "email" | "tel" | "url";
+  placeholder?: string;
   /** Defaults to the schema's normal text limit. */
   maxLength?: number;
 }) {
-  const { label, value, onChange, multiline, type = "text", maxLength = MAX_TEXT } = props;
+  const { label, value, onChange, multiline, type = "text", placeholder, maxLength = MAX_TEXT } = props;
   return (
     <label>
       {label}
       {multiline ? (
         <textarea rows={4} maxLength={maxLength} value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (
-        <input type={type} maxLength={maxLength} value={value} onChange={(e) => onChange(e.target.value)} />
+        <input type={type} placeholder={placeholder} maxLength={maxLength} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
     </label>
   );
+}
+
+/** A YYYY-MM or YYYY date, typed as text so a year on its own is allowed. */
+export function DateField(props: { label: string; value: string; onChange(value: string): void }) {
+  return <TextField {...props} placeholder="YYYY-MM" maxLength={7} />;
 }
 
 /** Returns a copy of `obj` with `key` set — used to update one field of a list item. */
