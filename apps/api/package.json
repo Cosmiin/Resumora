@@ -19,6 +19,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261104.1",
     "jszip": "3.10.2",
+    "pdf-lib": "1.17.1",
     "wrangler": "4.157.0"
   }
 }

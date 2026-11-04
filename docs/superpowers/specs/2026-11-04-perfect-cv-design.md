@@ -214,3 +214,5 @@ Three plans. **A comes first. B and C both depend on A, but not on each other**,
 2. Approved: Move to offers the six list-shaped categories only.
 3. Added: sections can be renamed, and custom sections can be added with your own name.
 4. Changed: reorder by dragging, with no arrows (see "Reordering by dragging").
+
+5. Checked 2026-11-04: both providers accept a PDF file part with privacy routing on (OpenRouter `google/gemini-3.1-flash-lite` with zdr and no data collection, OpenAI `gpt-5.4-mini`); each returned the right email from a test PDF. No fallback needed.
