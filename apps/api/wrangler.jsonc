@@ -11,6 +11,9 @@
       { "binding": "IMPORTS", "queue": "resumora-imports" },
       { "binding": "JOBS", "queue": "resumora-jobs" }
     ],
-    "consumers": [{ "queue": "resumora-imports", "max_batch_size": 1, "max_retries": 3 }]
+    "consumers": [
+      { "queue": "resumora-imports", "max_batch_size": 1, "max_retries": 3 },
+      { "queue": "resumora-jobs", "max_batch_size": 1, "max_retries": 2 }
+    ]
   }
 }
