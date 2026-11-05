@@ -15,7 +15,7 @@ Both runs passed every check.
   fair point, and we left our expectation as it was rather than change it after the fact.
 - **Empty and repeated bullets get zero.** "TBD", "de completat" and a bullet copied word for word
   scored 0 every time. The 2 reworded repeats also scored 0 in both runs (reported, not part of the bar).
-- **The AI did not invent numbers.** Across 12 rewrite runs the check found 0 figures (in all 12) that were not that was not in
+- **The AI did not invent numbers.** In 12 rewrite runs, 0 proposals had a figure that was not in
   the person's own text or answers. In the example where the person gave a figure ("about 60 calls a day"), the rewrite used it (seen when reading the output; the eval prints this as usedNumber). A
   range they picked ("10–50 a week") stayed a range. The code check that would have caught an
   invented number had nothing to catch, so the AI itself is behaving, not just the safety net.
