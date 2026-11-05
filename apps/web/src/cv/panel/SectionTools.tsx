@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { CATEGORY, normalizeLayout, type CvContent, type Question } from "@resumora/shared";
+import { CATEGORY, normalizeLayout, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
-import { QuestionFlow } from "../enrich/QuestionFlow.tsx";
-import { RewriteReview } from "../enrich/RewriteReview.tsx";
-import { ScoreCard, openQuestions } from "../enrich/ScoreCard.tsx";
+import { useOpenFocus } from "../enrich/focus-context.ts";
+import { ScoreCard } from "../enrich/ScoreCard.tsx";
 import { SkillsTools } from "../enrich/SkillsTools.tsx";
 import { SummaryTools } from "../enrich/SummaryTools.tsx";
 import type { RoleScoreState } from "../enrich/useRoleScores.ts";
@@ -70,87 +68,19 @@ function RoleBox({ cv, dispatch, list, itemId, onFocusPage }: Pick<Props, "cv" |
 
 const savedNow = () => Promise.resolve();
 
-type RoleView = { kind: "card" } | { kind: "questions"; questions: Question[] } | { kind: "drafting" } | { kind: "review" };
-
-/** The role's score card, or in its place the questions or the rewrite review. */
-function RoleEnrich({ cv, dispatch, roleId, scores, onRetry, waitForSave }: Pick<Props, "cv" | "dispatch" | "scores" | "onRetry"> & { roleId: string; waitForSave(): Promise<void> }) {
-  const [view, setView] = useState<RoleView>({ kind: "card" });
-  const [saveFailed, setSaveFailed] = useState(false);
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
+/** The role's score card; its button opens focus mode, which the editor renders over the page. */
+function RoleEnrich({ cv, roleId, scores, onRetry }: Pick<Props, "cv" | "scores" | "onRetry"> & { roleId: string }) {
+  const open = useOpenFocus();
   const role = cv.experience.find((r) => r.id === roleId);
   const score = scores?.get(roleId);
-  if (!role) return null;
-  const back = () => setView({ kind: "card" });
-
-  if (view.kind === "card") {
-    if (!score) return null;
-    // Questions already answered in a note are not asked again.
-    const questions = score.state === "ready" && score.result ? openQuestions(role, score.result.questions) : [];
-    const rewrite = async () => {
-      setSaveFailed(false);
-      setView({ kind: "drafting" });
-      try {
-        await waitForSave();
-      } catch {
-        // The rewrite reads the saved CV, so it would work on older text: back to the card.
-        if (alive.current) {
-          setSaveFailed(true);
-          setView((v) => (v.kind === "drafting" ? { kind: "card" } : v));
-        }
-        return;
-      }
-      if (alive.current) setView((v) => (v.kind === "drafting" ? { kind: "review" } : v));
-    };
-    return (
-      <>
-        {saveFailed && (
-          <p className="review-note" role="alert">
-            {t("enrich.summary.saveFailed")}
-          </p>
-        )}
-        <ScoreCard
-          role={role}
-          score={score}
-          onAnswer={() => questions.length > 0 && setView({ kind: "questions", questions })}
-          onRewrite={() => void rewrite()}
-          onRetry={() => onRetry?.(roleId)}
-        />
-      </>
-    );
-  }
-
-  // The review has its own "Back to score" link, next to its Done button.
-  if (view.kind === "review") return <RewriteReview role={role} dispatch={dispatch} onClose={back} />;
-
+  if (!role || !score) return null;
   return (
-    <>
-      <button type="button" className="link" onClick={back}>
-        {t("enrich.backToScore")}
-      </button>
-      {view.kind === "questions" && (
-        <QuestionFlow
-          role={role}
-          questions={view.questions}
-          dispatch={dispatch}
-          waitForSave={waitForSave}
-          onDraft={() => setView({ kind: "review" })}
-          locale={cv.locale}
-        />
-      )}
-      {view.kind === "drafting" && (
-        <div className="box">
-          <p className="working" role="status">
-            {t("enrich.review.drafting")}
-          </p>
-        </div>
-      )}
-    </>
+    <ScoreCard
+      role={role}
+      score={score}
+      onImprove={(mode) => open?.({ roleId, mode })}
+      onRetry={() => onRetry?.(roleId)}
+    />
   );
 }
 
@@ -216,7 +146,7 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores,
         </p>
       )}
       {key === "experience" && itemId && (
-        <RoleEnrich key={itemId} cv={cv} dispatch={dispatch} roleId={itemId} scores={scores} onRetry={onRetry} waitForSave={waitForSave} />
+        <RoleEnrich key={itemId} cv={cv} roleId={itemId} scores={scores} onRetry={onRetry} />
       )}
       {(key === "experience" || key === "volunteering") && itemId && (
         <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onFocusPage={onFocusPage} />

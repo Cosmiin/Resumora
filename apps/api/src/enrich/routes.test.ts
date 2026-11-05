@@ -44,6 +44,13 @@ describe("/v1/enrich", () => {
     expect((await app.request("/v1/enrich/scores")).status).toBe(401);
   });
 
+  it("POST /rewrite-role returns 404", async () => {
+    const res = await app.request("/v1/enrich/rewrite-role", {
+      method: "POST", headers: auth, body: JSON.stringify({ roleId: role.id }),
+    });
+    expect(res.status).toBe(404);
+  });
+
   it("POST /score returns a result and GET /scores lists it", async () => {
     const res = await score({ roleId: role.id, fingerprint: fp });
     expect(res.status).toBe(200);
@@ -119,7 +126,7 @@ describe("/v1/enrich", () => {
     });
     expect(declared.status).toBe(413);
     expect(await code(declared)).toBe("content_too_large");
-    const streamed = await app.request("/v1/enrich/rewrite-role", { method: "POST", headers: auth, body: big });
+    const streamed = await app.request("/v1/enrich/rewrite-summary", { method: "POST", headers: auth, body: big });
     expect(streamed.status).toBe(413);
     expect(model.requests).toHaveLength(0);
     expect(store.size).toBe(0);

@@ -6,7 +6,7 @@ import { startCapture } from "./mic.ts";
 import { openTranscription, type TranscriptEvent, type Transport } from "./realtime.ts";
 
 /** `denied`, `unavailable` (no microphone support) and `limit` hide the mic; everything else can record again. */
-export type VoiceState = "idle" | "asking" | "recording" | "stopping" | "denied" | "unavailable" | "limit";
+export type VoiceState = "idle" | "asking" | "countdown" | "recording" | "stopping" | "denied" | "unavailable" | "limit";
 
 /** After stop, how long to wait for the last words before closing. */
 const STOP_WAIT_MS = 1500;
@@ -17,6 +17,8 @@ type Live = {
   stopCapture?: () => void;
   transport?: Transport;
   tick?: ReturnType<typeof setInterval>;
+  countdown?: ReturnType<typeof setInterval>;
+  recording?: boolean;
   wait?: ReturnType<typeof setTimeout>;
   seconds: number;
   stopping: boolean;
@@ -34,6 +36,7 @@ const supported = () => typeof navigator !== "undefined" && !!navigator.mediaDev
 
 function stopMic(l: Live) {
   clearInterval(l.tick);
+  clearInterval(l.countdown);
   l.stopCapture?.();
   l.stopCapture = undefined;
   l.stream?.getTracks().forEach((track) => track.stop());
@@ -67,8 +70,10 @@ function drain(l: Live, emit: (text: string) => void, all = false) {
  * in the order they were spoken. `interrupted`: the last recording broke off; the mic can be tried again.
  * The language comes from the saved CV on the server; `locale` is the same CV's language.
  */
-export function useVoice(_opts: { locale: Locale }) {
+export function useVoice({ maxSeconds = VOICE.maxSeconds }: { locale: Locale; maxSeconds?: number }) {
   const [state, setState] = useState<VoiceState>(() => (supported() ? "idle" : "unavailable"));
+  const [count, setCount] = useState<3 | 2 | 1 | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const [partial, setPartial] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [interrupted, setInterrupted] = useState(false);
@@ -85,6 +90,8 @@ export function useVoice(_opts: { locale: Locale }) {
         drain(l, emit, true);
         closeAll(l);
       }
+      setCount(null);
+      setConnecting(false);
       setPartial("");
       setInterrupted(broke);
       setState(next);
@@ -95,7 +102,7 @@ export function useVoice(_opts: { locale: Locale }) {
   const stop = useCallback(() => {
     const l = live.current;
     if (!l || l.stopping) return;
-    if (!l.transport || !l.stopCapture) return end("idle"); // still asking
+    if (!l.recording || !l.transport) return end("idle"); // still asking or counting down
     l.stopping = true;
     l.awaitingCommit = true;
     stopMic(l); // sends the last audio before the commit
@@ -147,13 +154,6 @@ export function useVoice(_opts: { locale: Locale }) {
     setInterrupted(false);
     setPartial("");
     setSeconds(0);
-    try {
-      l.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      if (live.current === l) end("denied");
-      return;
-    }
-    if (live.current !== l) return closeAll(l);
     let secret: string;
     try {
       secret = (await createVoiceSession()).clientSecret;
@@ -162,23 +162,59 @@ export function useVoice(_opts: { locale: Locale }) {
       return e instanceof ApiClientError && e.status === 429 ? end("limit") : end("idle", true);
     }
     if (live.current !== l) return closeAll(l);
-    l.transport = openTranscription(secret, (e) => onEvent(l, e));
+    // Check the daily limit before showing any countdown.
+    setState("countdown");
+    setCount(3);
+    setConnecting(true);
+    let remaining: 3 | 2 | 1 = 3;
+    let countdownDone = false;
+    let transportOpened = false;
+    const beginRecording = () => {
+      if (live.current !== l || !countdownDone || !transportOpened || !l.stopCapture || l.recording) return;
+      l.recording = true;
+      setCount(null);
+      setState("recording");
+      l.tick = setInterval(() => {
+        l.seconds += 1;
+        setSeconds(l.seconds);
+        if (l.seconds >= maxSeconds) stop();
+      }, 1000);
+    };
+    l.countdown = setInterval(() => {
+      if (remaining === 1) {
+        clearInterval(l.countdown);
+        countdownDone = true;
+        beginRecording();
+      } else {
+        remaining = remaining === 3 ? 2 : 1;
+        setCount(remaining);
+      }
+    }, 1000);
     try {
-      const transport = l.transport;
-      const stopCapture = await startCapture(l.stream, (audio) => transport.sendAudio(audio));
-      if (live.current !== l) return stopCapture();
-      l.stopCapture = stopCapture;
+      l.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      if (live.current !== l) return closeAll(l);
+      if (live.current === l) end("denied");
+      return;
+    }
+    if (live.current !== l) return closeAll(l);
+    try {
+      const transport = l.transport = openTranscription(secret, (e) => onEvent(l, e));
+      const capture = startCapture(l.stream, (audio) => {
+        if (live.current === l && l.recording) transport.sendAudio(audio);
+      }).then((stopCapture) => {
+        if (live.current !== l) return stopCapture();
+        l.stopCapture = stopCapture;
+      });
+      await Promise.all([transport.opened, capture]);
+      if (live.current !== l) return;
+      transportOpened = true;
+      setConnecting(false);
+      beginRecording();
+    } catch {
+      if (live.current !== l) return;
       return end("idle", true);
     }
-    setState("recording");
-    l.tick = setInterval(() => {
-      l.seconds += 1;
-      setSeconds(l.seconds);
-      if (l.seconds >= VOICE.maxSeconds) stop();
-    }, 1000);
-  }, [end, onEvent, stop]);
+  }, [end, maxSeconds, onEvent, stop]);
 
   useEffect(
     () => () => {
@@ -195,6 +231,8 @@ export function useVoice(_opts: { locale: Locale }) {
 
   return {
     state,
+    count,
+    connecting,
     partial,
     seconds,
     interrupted,

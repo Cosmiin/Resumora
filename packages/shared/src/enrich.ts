@@ -2,11 +2,11 @@ import { z } from "zod";
 import type { Experience, Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/1";
+export const SCORE_POLICY = "score/2";
 
 export const WEIGHTS = { contribution: 35, clarity: 25, specificity: 20, impact: 20 } as const;
 
-export const MAX_QUESTIONS = 3;
+export const MAX_QUESTIONS = 20;
 
 export const GradeSchema = z.enum(["missing", "partial", "specific"]);
 export type Grade = z.infer<typeof GradeSchema>;
@@ -41,8 +41,17 @@ export const ModelScoreSchema = z
   .strict();
 export type ModelScore = z.infer<typeof ModelScoreSchema>;
 
+const QuestionKindSchema = z.enum(["detail", "result"]);
+export type QuestionKind = z.infer<typeof QuestionKindSchema>;
+
+export function questionKind(b: { contribution: Grade; clarity: Grade; specificity: Grade; impact: Grade }): QuestionKind {
+  return b.contribution === "specific" && b.clarity === "specific" && b.specificity === "specific" && b.impact !== "specific"
+    ? "result"
+    : "detail";
+}
+
 export const QuestionSchema = z
-  .object({ bulletId: id, text: z.string(), options: z.array(z.string()) })
+  .object({ bulletId: id, text: z.string(), options: z.array(z.string()), kind: QuestionKindSchema })
   .strict();
 export type Question = z.infer<typeof QuestionSchema>;
 
@@ -126,7 +135,7 @@ export function isPlaceholder(text: string): boolean {
   return PLACEHOLDER_WORDS.includes(t) || PLACEHOLDER_PHRASES.some((p) => t === p || t.startsWith(`${p} `));
 }
 
-function repeatKey(text: string): string {
+export function repeatKey(text: string): string {
   return text.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
@@ -190,7 +199,7 @@ export function buildRoleResult(role: Experience, model: ModelScore, fingerprint
     .filter((b) => b.question !== null)
     .sort(byUrgency)
     .slice(0, MAX_QUESTIONS)
-    .map((b) => ({ bulletId: b.id, text: b.question as string, options: options.get(b.id) ?? [] }));
+    .map((b) => ({ bulletId: b.id, text: b.question as string, options: options.get(b.id) ?? [], kind: questionKind(b) }));
 
   const open = bullets.filter((b) => b.issue !== "none");
   let nextStep: RoleResult["nextStep"] = null;
@@ -219,6 +228,10 @@ function cyrb53(str: string): number {
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+
+export function hashText(text: string): string {
+  return cyrb53(text).toString(36);
 }
 
 /**

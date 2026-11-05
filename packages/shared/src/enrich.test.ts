@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   EnrichParseError,
+  MAX_QUESTIONS,
+  RoleResultSchema,
   SCORE_POLICY,
   band,
   buildRoleResult,
@@ -9,6 +11,9 @@ import {
   fingerprint,
   isAllowedOption,
   isPlaceholder,
+  hashText,
+  questionKind,
+  repeatKey,
   type Grade,
   type ModelBullet,
   type ModelScore,
@@ -55,6 +60,17 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId });
 
 describe("bulletScore", () => {
+  it("uses policy score/2", () => {
+    expect(SCORE_POLICY).toBe("score/2");
+  });
+
+  it("asks for a result only when impact is the remaining gap", () => {
+    expect(questionKind(g("specific", "specific", "specific", "missing"))).toBe("result");
+    expect(questionKind(g("specific", "specific", "specific", "partial"))).toBe("result");
+    expect(questionKind(g("partial", "specific", "specific", "missing"))).toBe("detail");
+    expect(questionKind(g("specific", "specific", "specific", "specific"))).toBe("detail");
+  });
+
   it("applies the weights", () => {
     expect(bulletScore(g("specific", "specific", "specific", "specific"))).toBe(100);
     expect(bulletScore(g("specific", "specific", "specific", "missing"))).toBe(80);
@@ -153,7 +169,7 @@ describe("buildRoleResult", () => {
     expect(r).toMatchObject({ score: null, questions: [], nextStep: null, bullets: [] });
   });
 
-  it("orders questions by issue priority then lower score, max 3, non-null only", () => {
+  it("keeps all five questions by issue priority then lower score, non-null only", () => {
     const r = buildRoleResult(
       role(["a1", "a2", "a3", "a4", "a5", "a6"]),
       model([
@@ -166,7 +182,8 @@ describe("buildRoleResult", () => {
       ]),
       "fp",
     );
-    expect(r.questions.map((q) => q.bulletId)).toEqual(["b4", "b3", "b2"]);
+    expect(r.questions.map((q) => q.bulletId)).toEqual(["b4", "b3", "b2", "b6", "b1"]);
+    expect(r.questions.map((q) => q.kind)).toEqual(["detail", "detail", "detail", "detail", "result"]);
   });
 
   it("duplicates never ask", () => {
@@ -177,6 +194,18 @@ describe("buildRoleResult", () => {
     );
     expect(r.questions).toEqual([]);
     expect(r.bullets[1]?.question).toBeNull();
+  });
+
+  it.each([5, 20])("keeps every question for a role with %i bullets", (count) => {
+    const r = role(Array.from({ length: count }, (_, i) => `Handled task ${i}`));
+    const bullets = r.bullets.map(({ id }) => mb(id, {
+      ...g("specific", "specific", "specific", "missing"), issue: "impact", question: "How often?",
+    }));
+    const result = buildRoleResult(r, model(bullets), "fp");
+    expect(MAX_QUESTIONS).toBe(20);
+    expect(result.questions).toHaveLength(count);
+    expect(result.questions.every((q) => q.kind === "result")).toBe(true);
+    expect(RoleResultSchema.safeParse(result).success).toBe(true);
   });
 
   it("filters question options", () => {
@@ -195,6 +224,7 @@ describe("buildRoleResult", () => {
     expect(r.questions[0]).toEqual({
       bulletId: "b1",
       text: "How many?",
+      kind: "result",
       options: ["10–50 a week", "Under 10", "50+", "Peste 50", "Customs papers"],
     });
   });
@@ -255,6 +285,21 @@ describe("fingerprint", () => {
     expect(
       fingerprint(role(["one", "two"], { company: "Z", startDate: "2000", endDate: "", current: true }), "en"),
     ).toBe(fp);
+  });
+  it("ignores hidden notes and facts", () => {
+    expect(fingerprint({
+      ...base,
+      notes: [{ id: "n1", question: "Q", answer: "A", via: ["type"], askedAt: "2026-11-05T00:00:00Z" }],
+      facts: { items: ["Used SQL"], fromNotes: "hash", updatedAt: "2026-11-05T00:00:00Z" },
+    }, "en")).toBe(fp);
+  });
+});
+
+describe("text keys", () => {
+  it("normalizes repeats and returns stable base-36 hashes", () => {
+    expect(repeatKey("  Prepared   contracts ")).toBe(repeatKey("prepared contracts"));
+    expect(hashText("hello")).toBe("19jqrdkps12");
+    expect(hashText("hello!")).not.toBe(hashText("hello"));
   });
 });
 

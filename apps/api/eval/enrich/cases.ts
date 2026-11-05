@@ -1,6 +1,6 @@
 // Fictional people only. Score cases carry the grades a careful reviewer expects, in the order
 // contribution / clarity / specificity / impact. Bullets marked `zero` are checked another way (see run.eval.ts).
-import type { Experience, Grade, Locale } from "@resumora/shared";
+import type { Experience, Grade, Locale, Note } from "@resumora/shared";
 
 type G = Grade;
 const M: G = "missing";
@@ -11,6 +11,66 @@ export type Expected = { grades: [G, G, G, G] } | { zero: "placeholder" | "exact
 export type ScoreCase = { id: string; locale: Locale; title: string; bullets: { text: string; expected: Expected }[] };
 
 const g = (c: G, cl: G, s: G, i: G): Expected => ({ grades: [c, cl, s, i] });
+
+export type ImproveCase = {
+  id: string; locale: Locale; role: Experience; bulletId: string; notes: Note[];
+  expectNumber?: string; forbidNumber?: string;
+};
+export type DumpCase = { id: string; locale: Locale; role: Experience; ramble: string };
+
+const ROLE: Experience = {
+  id: "role", company: "Fictional Co", title: "Customer Support Assistant", location: "",
+  startDate: "2021-01", endDate: "2023-06", current: false, description: "", bullets: [], notes: [],
+};
+const ASKED_AT = "2026-11-05T10:00:00.000Z";
+
+export const IMPROVE_CASES: ImproveCase[] = [
+  {
+    id: "focus-en-vague-answer", locale: "en", bulletId: "b1", expectNumber: "60",
+    role: { ...ROLE, bullets: [{ id: "b1", text: "Helped customers." }] },
+    notes: [{ id: "n1", question: "What did you handle?", answer: "About 60 customer calls a day, mostly booking questions, using Zendesk.", via: ["type"], askedAt: ASKED_AT }],
+  },
+  {
+    id: "focus-en-rangeOnly", locale: "en", bulletId: "b1", expectNumber: "10–50",
+    role: { ...ROLE, title: "Trainer", bullets: [{ id: "b1", text: "Trained new staff." }] },
+    notes: [{ id: "n1", question: "How many new staff did you train?", answer: "10–50 a week", via: ["pick"], askedAt: ASKED_AT }],
+  },
+  {
+    id: "focus-en-80-result", locale: "en", bulletId: "b1",
+    role: { ...ROLE, title: "Support Engineer", bullets: [{ id: "b1", text: "Investigated failed API requests using application logs." }] },
+    notes: [{ id: "n1", question: "What was the result?", answer: "Found expired API keys and restored customers' access by rotating those keys.", via: ["type"], askedAt: ASKED_AT }],
+  },
+  {
+    id: "focus-ro-role", locale: "ro", bulletId: "b1",
+    role: { ...ROLE, title: "Lucrător depozit", bullets: [{ id: "b1", text: "Ajutat la pregătirea comenzilor." }] },
+    notes: [{ id: "n1", question: "Ce ai făcut concret?", answer: "Am scanat codurile de bare în SAP și am împachetat coletele pentru curier.", via: ["type"], askedAt: ASKED_AT }],
+  },
+  {
+    id: "focus-en-duplicate-trap", locale: "en", bulletId: "b1",
+    role: { ...ROLE, title: "Payroll Assistant", bullets: [
+      { id: "b1", text: "Helped with payroll." }, { id: "b2", text: "Prepared payroll files in Sage." },
+    ] },
+    notes: [{ id: "n1", question: "What did you do for payroll?", answer: "Prepared payroll files in Sage and checked overtime entries so staff were paid correctly.", via: ["type"], askedAt: ASKED_AT }],
+  },
+  {
+    id: "focus-en-forbid-number", locale: "en", bulletId: "b1", forbidNumber: "30%",
+    role: { ...ROLE, title: "Accounts Assistant", bullets: [{ id: "b1", text: "Helped with invoices." }] },
+    notes: [{ id: "n1", question: "What changed?", answer: "Checked supplier invoices in Excel and caught duplicate charges. A percentage reduction would sound better, but I never measured it.", via: ["type"], askedAt: ASKED_AT }],
+  },
+];
+
+export const DUMP_CASES: DumpCase[] = [
+  {
+    id: "focus-en-brain-dump", locale: "en",
+    role: { ...ROLE, title: "Payroll Assistant" },
+    ramble: "I prepared payroll for 75 staff using Sage. I checked overtime entries against timesheets and fixed missing bank details before the payroll run.",
+  },
+  {
+    id: "focus-ro-brain-dump", locale: "ro",
+    role: { ...ROLE, title: "Lucrător depozit" },
+    ramble: "Scanam codurile de bare în SAP și împachetam coletele pentru curier. Verificam adresele de livrare și corectam etichetele greșite înainte de expediere.",
+  },
+];
 
 export const SCORE_CASES: ScoreCase[] = [
   {
@@ -130,50 +190,5 @@ export const SCORE_CASES: ScoreCase[] = [
       { text: "Răspuns clienților prin e-mail cu privire la livrări întârziate.", expected: { zero: "paraphrasedDuplicate" } },
       { text: "Actualizat zilnic tabelul de urmărire a comenzilor.", expected: g(S, S, S, M) },
     ],
-  },
-];
-
-export type RewriteCase = { id: string; trap: string; locale: Locale; role: Experience; usesNumber?: string; rangeOnly?: string };
-
-const role = (id: string, title: string, bullets: string[], notes: [string, string, "pick" | "type"][] = []): Experience => ({
-  id, company: "Fictional Co", title, location: "", startDate: "2021-01", endDate: "2023-06", current: false, description: "",
-  bullets: bullets.map((text, i) => ({ id: `b${i + 1}`, text })),
-  notes: notes.map(([question, answer, via], i) => ({ id: `n${i + 1}`, question, answer, via: [via], askedAt: "2026-11-05T09:00:00.000Z" })),
-});
-
-export const REWRITE_CASES: RewriteCase[] = [
-  {
-    id: "vague-number", trap: "A bullet already holds a vague number (40%); the note explains the work but adds no figures.", locale: "en",
-    role: role("r1", "Support Team Lead", ["Improved response times by 40% across the support desk.", "Handled escalations."], [
-      ["What did you do to improve response times?", "I set up a shared inbox with saved replies and a rota for who answers first.", "type"],
-    ]),
-  },
-  {
-    id: "answer-adds-number", trap: "The note gives a real figure (about 60 calls a day); the rewrite may use it.", locale: "en", usesNumber: "60",
-    role: role("r2", "Receptionist", ["Answered customer calls.", "Kept the visitor log."], [
-      ["About how many calls did you take a day?", "About 60 calls a day, mostly booking questions.", "type"],
-    ]),
-  },
-  {
-    id: "no-answers", trap: "No notes at all: the rewrite must not add any number.", locale: "en",
-    role: role("r3", "Dispatcher", ["Did various admin tasks.", "Prepared delivery schedules for drivers."]),
-  },
-  {
-    id: "duplicate-pair", trap: "Two bullets say the same thing; one note belongs to both.", locale: "en",
-    role: role("r4", "Store Assistant", ["Helped customers find products.", "Assisted shoppers in finding items.", "Restocked shelves in the morning."], [
-      ["What kind of products did customers ask about most?", "Mostly garden tools and paint.", "type"],
-    ]),
-  },
-  {
-    id: "romanian-role", trap: "A Romanian role: the rewrite must stay in Romanian.", locale: "ro",
-    role: role("r5", "Asistent de depozit", ["Ajutat la pregătirea comenzilor.", "Răspuns de diverse activități în depozit."], [
-      ["Ce ai făcut concret la pregătirea comenzilor?", "Am scanat codurile de bare și am împachetat coletele pentru curier.", "type"],
-    ]),
-  },
-  {
-    id: "range-only", trap: "The note is only a picked range (10–50 a week); the rewrite may use the range, never an exact number.", locale: "en", rangeOnly: "10–50",
-    role: role("r6", "Training Assistant", ["Trained new staff.", "Prepared welcome packs."], [
-      ["How many new people did you train?", "10–50 a week", "pick"],
-    ]),
   },
 ];

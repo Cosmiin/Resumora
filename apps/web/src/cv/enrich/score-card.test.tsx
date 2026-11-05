@@ -1,6 +1,6 @@
 import { useReducer, useRef } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import { EditablePage } from "../edit/EditablePage.tsx";
@@ -38,7 +38,7 @@ function result(over: Partial<RoleResult> = {}): RoleResult {
   const scores = [30, 80, 90, 76, 40];
   return {
     roleId: "r1",
-    policy: "score/1",
+    policy: "score/2",
     fingerprint: "x",
     score: 62,
     bullets: scores.map((score, i) => ({
@@ -53,14 +53,14 @@ function result(over: Partial<RoleResult> = {}): RoleResult {
       question: null,
     })),
     nextStep: { bulletId: "b1", issue: "specificity", tip: "Name the tasks you did." },
-    questions: [{ bulletId: "b1", text: "Which tasks?", options: ["Rota", "Orders"] }],
+    questions: [{ bulletId: "b1", text: "Which tasks?", options: ["Rota", "Orders"], kind: "detail" }],
     ...over,
   };
 }
 const ready = (r = result()): RoleScoreState => ({ state: "ready", result: r });
 
 function card(score: RoleScoreState, r: Experience = role()) {
-  const fns = { onAnswer: vi.fn(), onRewrite: vi.fn(), onRetry: vi.fn() };
+  const fns = { onImprove: vi.fn(), onRetry: vi.fn() };
   render(<ScoreCard role={r} score={score} {...fns} />);
   return fns;
 }
@@ -87,23 +87,30 @@ describe("score card", () => {
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("Add the result: what changed, by how much, or why it mattered.");
   });
 
-  it("hides the Answer button when there are none, and always offers Rewrite bullets", async () => {
-    const fns = card(ready(result({ questions: [] })));
-    expect(screen.queryByRole("button", { name: /^Answer/ })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Rewrite bullets" }));
-    expect(fns.onRewrite).toHaveBeenCalled();
-  });
-
-  it("counts the questions on the Answer button", async () => {
+  it("offers one button, Improve this role, that opens focus mode", async () => {
     const fns = card(ready());
-    await userEvent.click(screen.getByRole("button", { name: "Answer 1 question" }));
-    expect(fns.onAnswer).toHaveBeenCalled();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "Improve this role" }));
+    expect(fns.onImprove).toHaveBeenCalledWith("improve");
   });
 
-  it("uses the plural for several questions", () => {
-    const q = { bulletId: "b1", text: "Which tasks?", options: [] };
-    card(ready(result({ questions: [q, q, q] })));
-    expect(screen.getByRole("button", { name: "Answer 3 questions" })).toBeInTheDocument();
+  it("at 80 or more with a result missing, says so and offers Make it stand out", async () => {
+    const fns = card(ready(result({ score: 84 })));
+    expect(screen.getByText("Clear! Add results to stand out.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Make it stand out" }));
+    expect(fns.onImprove).toHaveBeenCalledWith("standOut");
+  });
+
+  it("at 80 or more with every result given, keeps Improve this role", () => {
+    const r = result({ score: 84 });
+    card(ready({ ...r, bullets: r.bullets.map((b) => ({ ...b, impact: "specific" as const })) }));
+    expect(screen.queryByText("Clear! Add results to stand out.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Improve this role" })).toBeInTheDocument();
+  });
+
+  it("at 100 offers nothing to improve", () => {
+    card(ready(result({ score: 100 })));
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("says the score is unavailable and offers Try again", async () => {
@@ -128,20 +135,11 @@ describe("score card", () => {
     expect(fns.onRetry).toHaveBeenCalled();
   });
 
-  it("does not count questions already answered in a note", () => {
-    const q = (text: string) => ({ bulletId: "b1", text, options: [] });
-    const note = { id: "n1", question: "Which tasks?", answer: "Rota", via: ["type" as const], askedAt: "2026-11-05T10:00:00Z" };
-    card(ready(result({ questions: [q("Which tasks?"), q("How many people?")] })), role({ notes: [note] }));
-    expect(screen.getByRole("button", { name: "Answer 1 question" })).toBeInTheDocument();
-    cleanup();
-    card(ready(result({ questions: [q("Which tasks?")] })), role({ notes: [note] }));
-    expect(screen.queryByRole("button", { name: /^Answer/ })).toBeNull();
-  });
-
-  it("asks for bullets when the role has none", () => {
-    card({ state: "none" }, role({ bullets: [] }));
+  it("asks for bullets when the role has none, and still offers focus mode (the brain dump)", async () => {
+    const fns = card({ state: "none" }, role({ bullets: [] }));
     expect(screen.getByText("Add bullets to get a score")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Rewrite bullets" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Improve this role" }));
+    expect(fns.onImprove).toHaveBeenCalledWith("improve");
   });
 });
 
