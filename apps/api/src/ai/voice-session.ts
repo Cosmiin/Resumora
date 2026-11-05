@@ -46,14 +46,15 @@ export class VoiceUnavailableError extends Error {
   }
 }
 
+/**
+ * Asks OpenAI for a temporary key. The caller reserves the session first (that reservation is the
+ * success log); a failure here logs an extra error row and the reserved session stays used.
+ */
 export async function createVoiceSession(
   deps: VoiceDeps,
   { userId, locale }: { userId: string; locale: "en" | "ro" },
 ): Promise<VoiceSession> {
   const started = Date.now();
-  const log = (status: "ok" | "error", error?: string) =>
-    deps.logCall({ userId, task: VOICE_TASK, provider: "openai", model: VOICE.model, status, error, durationMs: Date.now() - started });
-  let session: VoiceSession;
   try {
     const res = await deps.fetch(ENDPOINT, {
       method: "POST",
@@ -74,17 +75,12 @@ export async function createVoiceSession(
     if (!res.ok) throw new Error(`OpenAI answered ${res.status}`);
     const body = (await res.json()) as { value?: unknown; expires_at?: unknown };
     if (typeof body.value !== "string" || typeof body.expires_at !== "number") throw new Error("OpenAI answer had no key");
-    session = { clientSecret: body.value, expiresAt: new Date(body.expires_at * 1000).toISOString(), model: VOICE.model };
+    return { clientSecret: body.value, expiresAt: new Date(body.expires_at * 1000).toISOString(), model: VOICE.model };
   } catch (e) {
     // A failed log here must not hide the real failure.
-    await log("error", e instanceof Error ? e.message : "unknown error").catch(() => {});
+    await deps
+      .logCall({ userId, task: VOICE_TASK, provider: "openai", model: VOICE.model, status: "error", error: e instanceof Error ? e.message : "unknown error", durationMs: Date.now() - started })
+      .catch(() => {});
     throw new VoiceUnavailableError();
   }
-  // An unlogged session would not count toward the daily limit, so the key is not handed out.
-  try {
-    await log("ok");
-  } catch {
-    throw new VoiceUnavailableError();
-  }
-  return session;
 }

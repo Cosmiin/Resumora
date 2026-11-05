@@ -69,7 +69,7 @@ export function createApp(deps: AppDeps) {
     importRoutes({ repoFor: (c) => deps.importRepo(c.get("user")), cvRepoFor: (c) => deps.cvRepo(c.get("user")), queue: deps.queue, now: deps.now ?? (() => new Date()) }),
   );
 
-  app.route("/v1/enrich", enrichRoutes({ cvRepo: deps.cvRepo, insightsRepo: deps.insightsRepo, model: deps.model, voice: deps.voice, now: deps.now }));
+  app.route("/v1/enrich", enrichRoutes({ cvRepo: deps.cvRepo, insightsRepo: deps.insightsRepo, model: deps.model, voice: deps.voice }));
 
   app.notFound((c) => c.json(errorBody("not_found", "Not found.", c.get("requestId")), 404));
 

@@ -8,7 +8,7 @@ import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import type { AuthUser } from "../env.ts";
 import { ApiError } from "../errors.ts";
-import { createVoiceSession, VoiceUnavailableError, VOICE_TASK, type VoiceDeps } from "../ai/voice-session.ts";
+import { createVoiceSession, VoiceUnavailableError, type VoiceDeps } from "../ai/voice-session.ts";
 import type { InsightsRepo } from "./repo.ts";
 import { scoreRole } from "./score.ts";
 import { suggestSkills } from "./skills.ts";
@@ -30,7 +30,6 @@ export function enrichRoutes(deps: {
   model(user: AuthUser): ModelDeps;
   /** Not set in tests that never use voice. */
   voice?(user: AuthUser): VoiceDeps;
-  now?: () => Date;
 }) {
   const app = new Hono<AppEnv>();
   app.use(
@@ -109,11 +108,11 @@ export function enrichRoutes(deps: {
   app.post("/voice-session", async (c) => {
     const user = c.get("user");
     if (!deps.voice) throw new ApiError(503, "ai_unavailable", "Voice answers aren't available right now.");
-    const since = new Date((deps.now?.() ?? new Date()).getTime() - 24 * 3600_000).toISOString();
-    if ((await deps.insightsRepo(user).countAiCallsSince(VOICE_TASK, since)) >= VOICE.perDay) {
+    const locale: Locale = (await deps.cvRepo(user).get()).content.locale;
+    // Counts and records the session in one step; a failed OpenAI call below still uses it up.
+    if (!(await deps.insightsRepo(user).reserveVoiceSession(VOICE.model, VOICE.perDay))) {
       throw new ApiError(429, "voice_limit", "You've used today's voice answers. You can still type or pick.");
     }
-    const locale: Locale = (await deps.cvRepo(user).get()).content.locale;
     try {
       return c.json(await createVoiceSession(deps.voice(user), { userId: user.id, locale }));
     } catch (e) {

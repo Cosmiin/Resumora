@@ -55,15 +55,10 @@ export function supabaseInsightsRepo(env: SupabaseEnv, user: AuthUser): Insights
       if (error) throw new Error(`cv_insights delete failed: ${error.message}`);
     },
 
-    async countAiCallsSince(task, sinceIso) {
-      const { count, error } = await db
-        .from("ai_calls")
-        .select("id", { count: "exact", head: true })
-        .eq("task", task)
-        .eq("status", "ok")
-        .gte("created_at", sinceIso);
-      if (error) throw new Error(`ai_calls count failed: ${error.message}`);
-      return count ?? 0;
+    async reserveVoiceSession(model, limit) {
+      const { data, error } = await db.rpc("reserve_voice_session", { p_model: model, p_limit: limit });
+      if (error) throw new Error(`reserve_voice_session failed: ${error.message}`);
+      return data === true;
     },
   };
 }

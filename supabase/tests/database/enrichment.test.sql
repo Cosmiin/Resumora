@@ -1,8 +1,8 @@
--- Enrichment: cv_insights privacy, snapshot_base_cv and log_ai_call.
+-- Enrichment: cv_insights privacy, snapshot_base_cv, log_ai_call and reserve_voice_session.
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(21);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -83,6 +83,25 @@ select throws_ok(
   $$ select public.log_ai_call('not_a_task', 'p', 'm', 'ok', null, 1, 1, 1) $$,
   '22023', null,
   'an unknown task is rejected');
+
+-- ── Voice sessions: 20 a day per user ───────────────────────────────────────
+select is(
+  (select count(*)::int from (select public.reserve_voice_session('m', 20) as ok from generate_series(1, 20)) s where s.ok),
+  20, 'twenty voice sessions are reserved in a day');
+select is(public.reserve_voice_session('m', 20), false, 'the 21st voice session is refused');
+select is(
+  (select count(*)::int from public.ai_calls where task = 'enrich_voice'),
+  20, 'a refused reservation writes no row');
+
+set local request.jwt.claims to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select is(public.reserve_voice_session('m', 20), true, 'another user''s sessions do not count');
+
+set local role anon;
+set local request.jwt.claims to '{"role":"anon"}';
+select throws_ok(
+  $$ select public.reserve_voice_session('m', 20) $$,
+  '42501', null,
+  'a signed-out visitor cannot reserve a voice session');
 
 select * from finish();
 rollback;

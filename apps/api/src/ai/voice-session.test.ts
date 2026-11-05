@@ -47,11 +47,10 @@ describe("createVoiceSession", () => {
     expect(JSON.stringify(out)).not.toContain(KEY);
   });
 
-  it("logs one ok row for openai", async () => {
+  it("logs nothing on success: the route's reservation is the success log", async () => {
     const { d, calls } = deps();
     await createVoiceSession(d, { userId: "u1", locale: "en" });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({ userId: "u1", task: "enrich_voice", provider: "openai", model: "gpt-4o-mini-transcribe", status: "ok" });
+    expect(calls).toHaveLength(0);
   });
 
   it("an OpenAI 500 throws and logs an error row", async () => {
@@ -62,10 +61,7 @@ describe("createVoiceSession", () => {
     expect(JSON.stringify(calls[0])).not.toContain(KEY);
   });
 
-  it("a failed log on an ok answer throws and returns no secret; a failed log on an error answer still throws unavailable", async () => {
-    const ok = deps();
-    ok.d.logCall = async () => { throw new Error("db down"); };
-    await expect(createVoiceSession(ok.d, { userId: "u1", locale: "en" })).rejects.toThrow(/unavailable/);
+  it("a failed log on an error answer still throws unavailable", async () => {
     const bad = deps(() => new Response("x", { status: 500 }));
     bad.d.logCall = async () => { throw new Error("db down"); };
     await expect(createVoiceSession(bad.d, { userId: "u1", locale: "en" })).rejects.toThrow(/unavailable/);
@@ -80,7 +76,7 @@ describe("createVoiceSession", () => {
 
 describe("POST /v1/enrich/voice-session", () => {
   const auth = { authorization: "Bearer good" };
-  function setup(opts: { locale?: "en" | "ro"; answer?: () => Response; recent?: number; failLog?: boolean } = {}) {
+  function setup(opts: { locale?: "en" | "ro"; answer?: () => Response; recent?: number } = {}) {
     const { d, requests, calls } = deps(opts.answer);
     const aiCalls: MemoryAiCalls = [];
     for (let i = 0; i < (opts.recent ?? 0); i++) {
@@ -102,7 +98,6 @@ describe("POST /v1/enrich/voice-session", () => {
       voice: () => ({
         ...d,
         logCall: async (e) => {
-          if (opts.failLog) throw new Error("db down");
           await d.logCall(e);
           aiCalls.push({ userId: e.userId, task: e.task, status: e.status, createdAt: new Date().toISOString() });
         },
@@ -114,7 +109,7 @@ describe("POST /v1/enrich/voice-session", () => {
       await ready;
       return app.request("/v1/enrich/voice-session", { method: "POST", headers: auth });
     };
-    return { post, requests, calls, app };
+    return { post, requests, calls, app, aiCalls };
   }
   const code = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
 
@@ -142,35 +137,33 @@ describe("POST /v1/enrich/voice-session", () => {
     expect(nineteen.requests).toHaveLength(1);
   });
 
-  it("does not count rows older than 24 hours, or other users' rows", async () => {
+  it("lets only one of many parallel requests at 19 through", async () => {
+    const s = setup({ recent: 19 });
+    const all = await Promise.all(Array.from({ length: 5 }, () => s.post()));
+    expect(all.map((r) => r.status).sort()).toEqual([200, 429, 429, 429, 429]);
+    expect(s.requests).toHaveLength(1);
+    expect(s.aiCalls.filter((c) => c.status === "ok")).toHaveLength(20);
+  });
+
+  it("does not count rows older than 24 hours, other users' rows, or error rows", async () => {
     const old = new Date(Date.now() - 25 * 3600_000).toISOString();
+    const now = new Date().toISOString();
     const rows: MemoryAiCalls = [
       ...Array.from({ length: 25 }, () => ({ userId: "u", task: "enrich_voice", status: "ok" as const, createdAt: old })),
-      ...Array.from({ length: 25 }, () => ({ userId: "other", task: "enrich_voice", status: "ok" as const, createdAt: new Date().toISOString() })),
+      ...Array.from({ length: 25 }, () => ({ userId: "other", task: "enrich_voice", status: "ok" as const, createdAt: now })),
+      ...Array.from({ length: 25 }, () => ({ userId: "u", task: "enrich_voice", status: "error" as const, createdAt: now })),
     ];
-    const since = new Date(Date.now() - 24 * 3600_000).toISOString();
-    expect(await memoryInsightsRepo("u", new Map(), rows).countAiCallsSince("enrich_voice", since)).toBe(0);
+    const repo = memoryInsightsRepo("u", new Map(), rows);
+    for (let i = 0; i < 20; i++) expect(await repo.reserveVoiceSession("m", 20)).toBe(true);
+    expect(await repo.reserveVoiceSession("m", 20)).toBe(false);
   });
 
-  it("does not count error rows toward the limit", async () => {
-    const rows: MemoryAiCalls = Array.from({ length: 30 }, () => ({ userId: "u", task: "enrich_voice", status: "error" as const, createdAt: new Date().toISOString() }));
-    const since = new Date(Date.now() - 24 * 3600_000).toISOString();
-    expect(await memoryInsightsRepo("u", new Map(), rows).countAiCallsSince("enrich_voice", since)).toBe(0);
-  });
-
-  it("503 with no secret when logging the ok row fails", async () => {
-    const s = setup({ failLog: true });
-    const res = await s.post();
-    expect(res.status).toBe(503);
-    expect(await code(res)).toBe("ai_unavailable");
-    expect(s.requests).toHaveLength(1);
-  });
-
-  it("503 ai_unavailable when OpenAI fails, and an error row is logged", async () => {
+  it("503 ai_unavailable when OpenAI fails; an error row is logged and the session stays used", async () => {
     const s = setup({ answer: () => new Response("x", { status: 500 }) });
     const res = await s.post();
     expect(res.status).toBe(503);
     expect(await code(res)).toBe("ai_unavailable");
     expect(s.calls[0]).toMatchObject({ task: "enrich_voice", status: "error" });
+    expect(s.aiCalls.filter((c) => c.status === "ok")).toHaveLength(1);
   });
 });
