@@ -152,6 +152,7 @@ describe("summary tools", () => {
     stream.emit({ event: "start", data: { index: 0, replaces: "summary" } });
     stream.emit({ event: "dropped", data: { index: 0, reason: "number" } });
     stream.emit({ event: "done", data: {} });
+    expect(screen.getByText("Left out: it added a number you didn't give us")).toBeInTheDocument();
     expect(screen.getByText("Couldn't improve this without adding facts. Try answering a question first.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Use this" })).toBeNull();
   });

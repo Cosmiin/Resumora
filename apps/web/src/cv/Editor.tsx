@@ -20,6 +20,8 @@ import { HelperPanel } from "./panel/HelperPanel.tsx";
 import { BottomSheet, type SheetState } from "./panel/BottomSheet.tsx";
 import { useMediaQuery } from "../hooks/useMediaQuery.ts";
 import { useRoleScores } from "./enrich/useRoleScores.ts";
+import { FocusOpenProvider, type FocusTarget } from "./enrich/focus-context.ts";
+import { FocusMode } from "./enrich/FocusMode.tsx";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
   saved: "cv.status.saved",
@@ -60,6 +62,15 @@ export function Editor({ initial }: { initial: CvResponse }) {
   const { scores, retry } = useRoleScores({ cv: content, status });
   const phone = useMediaQuery("(max-width: 899px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
+  const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
+  // Focus mode hands focus back to its opener; if the opener is gone by then (the score card's
+  // button disappears at 100), the page takes it, so keyboard focus is never left on <body>.
+  const closeFocus = useCallback(() => {
+    setFocusTarget(null);
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body) focusPage();
+    });
+  }, [focusPage]);
 
   // When the import screen closes (cancel, applied or conflict), focus goes back to Import CV.
   // This runs after render, once the top bar is no longer inert and can take focus.
@@ -141,11 +152,12 @@ export function Editor({ initial }: { initial: CvResponse }) {
   );
 
   return (
-    <AppShell actions={actions} inert={importId !== null}>
+    <AppShell actions={actions} inert={importId !== null || focusTarget !== null}>
       <main className="editor">
       {/* While an import is open the whole workspace is inert. While history is open only the page is,
           so a restore can't race the user's typing; the history panel stays usable. */}
-      <div className="editor-workspace" inert={importId !== null}>
+      <FocusOpenProvider value={setFocusTarget}>
+      <div className="editor-workspace" inert={importId !== null || focusTarget !== null}>
         <div className="stage" ref={pageRef} tabIndex={-1} onFocus={() => setSheet("peek")}>
           {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
           {notices}
@@ -177,6 +189,18 @@ export function Editor({ initial }: { initial: CvResponse }) {
           panel
         )}
       </div>
+      </FocusOpenProvider>
+      {focusTarget && !historyOpen && (
+        <FocusMode
+          key={`${focusTarget.roleId}:${focusTarget.bulletId ?? ""}:${focusTarget.mode}`}
+          target={focusTarget}
+          cv={content}
+          dispatch={dispatch}
+          scores={scores}
+          waitForSave={waitForSave}
+          onClose={closeFocus}
+        />
+      )}
       {importId && (
         <ImportScreen
           importId={importId}

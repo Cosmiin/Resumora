@@ -5,7 +5,7 @@ import type { MessageKey } from "../../i18n/en.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { Checklist } from "./Checklist.tsx";
 import { streamRewrite } from "./enrich-api.ts";
-import { onEvent, type Proposal } from "./RewriteReview.tsx";
+import { onEvent, type Proposal } from "./stream-events.ts";
 
 type Props = {
   cv: CvContent;

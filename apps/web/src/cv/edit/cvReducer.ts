@@ -8,8 +8,10 @@ import {
   isSectionEmpty,
   newId,
   normalizeLayout,
+  notesHash,
   type CvContent,
   type Note,
+  type RoleFacts,
   type SectionKey,
   type SkillGroup,
 } from "@resumora/shared";
@@ -50,8 +52,10 @@ export type CvAction =
   | { type: "moveSection"; from: number; to: number }
   | { type: "addSection"; key: SectionKey; id: string }
   | { type: "addCustomSection"; id: string; title: string }
+  | { type: "replaceBullet"; roleId: string; bulletId: string; text: string }
+  | { type: "addBullets"; roleId: string; texts: string[] }
+  | { type: "setFacts"; roleId: string; facts: RoleFacts | null }
   | { type: "setNote"; roleId: string; note: Note }
-  | { type: "applyProposals"; roleId: string; accepted: { replaces: string | null; text: string }[] }
   | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean };
 
 /**
@@ -171,31 +175,6 @@ function bulletAction(cv: CvContent, action: Extract<CvAction, { owner: BulletOw
   }
 }
 
-/**
- * Accepted AI proposals for one role, as one change (one undo step). A proposal whose bullet
- * is gone is skipped; new bullets are appended while there is room.
- */
-function applyProposals(cv: CvContent, action: Extract<CvAction, { type: "applyProposals" }>): CvContent {
-  const owner = { list: "experience", itemId: action.roleId } as const;
-  const bullets = getBullets(cv, owner);
-  if (!bullets) return cv;
-  const replace = new Map<string, string>();
-  for (const p of action.accepted) if (p.replaces !== null) replace.set(p.replaces, p.text);
-  let changed = false;
-  const next = bullets.map((b) => {
-    const text = replace.get(b.id);
-    if (text === undefined || text === b.text) return b;
-    changed = true;
-    return { ...b, text };
-  });
-  for (const p of action.accepted) {
-    if (p.replaces !== null || next.length >= MAX_BULLETS) continue;
-    next.push({ id: newId(), text: p.text });
-    changed = true;
-  }
-  return changed ? withBullets(cv, owner, next) : cv;
-}
-
 /** Every CV edit as one small action. Pure; returns the same object when nothing changes. */
 export function cvReducer(cv: CvContent, action: CvAction): CvContent {
   switch (action.type) {
@@ -272,6 +251,25 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const custom = next.custom.map((c) => (c.id === action.id ? { ...c, title: action.title } : c));
       return unhide({ ...next, custom }, "other");
     }
+    case "replaceBullet":
+      return bulletAction(cv, { type: "setBullet", owner: { list: "experience", itemId: action.roleId }, bulletId: action.bulletId, text: action.text });
+    case "addBullets": {
+      const owner = { list: "experience", itemId: action.roleId } as const;
+      const bullets = getBullets(cv, owner);
+      if (!bullets || !action.texts.length || bullets.length >= MAX_BULLETS) return cv;
+      const added = action.texts.slice(0, MAX_BULLETS - bullets.length).map((text) => ({ id: newId(), text }));
+      return withBullets(cv, owner, [...bullets, ...added]);
+    }
+    case "setFacts": {
+      const role = cv.experience.find((r) => r.id === action.roleId);
+      if (!role) return cv;
+      const before = role.facts ?? null;
+      const facts = action.facts;
+      if (facts && notesHash(role.notes) !== facts.fromNotes) return cv;
+      if (before === facts || (before && facts && before.fromNotes === facts.fromNotes && before.updatedAt === facts.updatedAt
+        && before.items.length === facts.items.length && before.items.every((item, i) => item === facts.items[i]))) return cv;
+      return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, facts } : r)) };
+    }
     case "setNote": {
       const role = cv.experience.find((r) => r.id === action.roleId);
       if (!role) return cv;
@@ -286,8 +284,6 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const notes = exists ? kept.map((n) => (n.id === action.note.id ? action.note : n)) : [...kept, action.note];
       return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, notes } : r)) };
     }
-    case "applyProposals":
-      return applyProposals(cv, action);
     case "setCurrent": {
       const items = cv[action.list];
       const item = items.find((r) => r.id === action.itemId);

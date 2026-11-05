@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { newId, type Bullet } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
+import { ImproveButton } from "../enrich/ImproveButton.tsx";
 import type { BulletOwner, CvAction } from "./cvReducer.ts";
 import { focusField } from "./focus.ts";
 import { PageField } from "./PageField.tsx";
@@ -106,6 +107,7 @@ const BulletItem = memo(function BulletItem({
         onChange={onChange}
         onKeyDown={onKeyDown}
       />
+      {ownerList === "experience" && ownerItemId && bullet.text.trim() !== "" && <ImproveButton roleId={ownerItemId} bulletId={id} />}
     </li>
   );
 });

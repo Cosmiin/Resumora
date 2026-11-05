@@ -1,0 +1,103 @@
+<h2>Brain dump + the "start speaking" cue</h2>
+<p class="subtitle">Focus mode, opened on a role with only one bullet. Top: what you see first. Below: two ways to cue the moment you can start talking (the mic needs ~1 s to connect). Pick the cue you like.</p>
+
+<style>
+  .rz { --pine-50:#f1f8f4; --pine-100:#e4efe7; --pine-200:#c5dfd1; --pine-400:#5fa48d; --pine-600:#17695d; --pine-800:#173b39; --sage-50:#f4f7f4; --sage-100:#eaf0eb; --sage-200:#d8e3df; --sage-500:#7d948f; --sage-600:#536b69; --mari-100:#fff5e6; --mari-500:#e9a23b; --rose-400:#c9686c;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--pine-800); }
+  .rz .card-body h3 { color:#e9efec; }
+  .rz .serif { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+  .fm { width:100%; border-radius:14px; overflow:hidden; background: radial-gradient(1200px 500px at 30% 0%, #fff 0%, var(--sage-50) 60%); display:grid; grid-template-columns: 0.8fr 1.4fr; min-height: 380px; position:relative; }
+  .left { padding:24px 20px; border-right:1px solid var(--sage-200); }
+  .right { padding:24px 28px; }
+  .eyebrow { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--sage-600); }
+  .bl { font-size:12.5px; padding:7px 9px; border-radius:8px; margin:4px 0; background:#fff; box-shadow:0 4px 14px rgba(15,40,38,.08); }
+  .ghostbl { font-size:12px; padding:7px 9px; border-radius:8px; margin:4px 0; border:1.5px dashed var(--sage-200); color:var(--sage-500); }
+  .q { font-size:22px; line-height:1.25; margin:6px 0 6px; }
+  .hint { font-size:13px; color:var(--sage-600); margin:0 0 12px; line-height:1.45; }
+  .prompts { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .prompts span { font-size:12px; padding:5px 10px; border-radius:999px; background:var(--sage-100); color:var(--sage-600); }
+  .area { border:1px solid var(--sage-200); border-radius:14px; background:#fff; padding:14px; min-height:110px; font-size:13.5px; color:var(--sage-500); line-height:1.5; }
+  .row { display:flex; align-items:center; gap:12px; margin-top:14px; }
+  .bigmic { width:52px; height:52px; border-radius:50%; background:var(--pine-600); color:#fff; display:grid; place-items:center; font-size:20px; box-shadow:0 6px 18px rgba(23,105,93,.35); flex:none; position:relative; }
+  .btn { margin-left:auto; background:var(--pine-600); color:#fff; border-radius:10px; padding:9px 15px; font-weight:600; font-size:13px; }
+  .btn.dis { background:var(--sage-200); color:var(--sage-600); }
+  .close { position:absolute; right:14px; top:12px; font-size:12px; color:var(--sage-600); }
+
+  /* recording visuals */
+  .rec { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:14px; background:var(--pine-800); color:#fff; }
+  .wave { display:flex; align-items:center; gap:3px; height:28px; flex:1; }
+  .wave i { width:3px; border-radius:2px; background:var(--pine-200); animation: w 1s ease-in-out infinite; }
+  @keyframes w { 0%,100%{height:6px} 50%{height:26px} }
+  .timer { font-variant-numeric: tabular-nums; font-size:13px; opacity:.85; }
+  .stop { width:34px; height:34px; border-radius:50%; background:#fff; display:grid; place-items:center; flex:none; }
+  .stop b { width:11px; height:11px; border-radius:2px; background:var(--rose-400); display:block; }
+  .live { margin-top:10px; font-size:13.5px; line-height:1.5; }
+  .live .prov { color:var(--sage-500); }
+  .ring { position:absolute; inset:-8px; border-radius:50%; border:3px solid var(--pine-400); animation: p 1.4s ease-out infinite; }
+  @keyframes p { 0%{transform:scale(.85);opacity:1} 100%{transform:scale(1.35);opacity:0} }
+  .count { font-size:44px; line-height:1; }
+  .cue { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:14px; padding:8px 14px; border-radius:999px; background:#e3f6ea; color:#155c46; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#22a06b; animation: blink 1s infinite; }
+  @keyframes blink { 50%{opacity:.3} }
+  .mini { border-radius:14px; background:#fff; padding:16px; min-height:190px; display:flex; flex-direction:column; gap:12px; }
+  .stepl { font-size:11px; color:var(--sage-500); text-transform:uppercase; letter-spacing:.06em; }
+</style>
+
+<div class="rz">
+  <div class="section">
+  <div class="fm">
+    <span class="close">✕ Close</span>
+    <div class="left">
+      <div class="eyebrow">Your role</div>
+      <div class="serif" style="font-size:17px;margin:4px 0 2px">Office Manager</div>
+      <div style="font-size:12px;color:var(--sage-600);margin-bottom:10px">Brightway Clinic · 2021 – now</div>
+      <div class="bl">Managed the office.</div>
+      <div class="ghostbl">+ new bullets will appear here</div>
+      <div class="ghostbl">+</div>
+    </div>
+    <div class="right">
+      <div class="eyebrow">Tell us more · no wrong answers</div>
+      <p class="q serif">What did a normal week here look like?</p>
+      <p class="hint">Just talk, or type, like you're explaining it to a friend. Messy is fine: half sentences, lists, whatever comes to mind. We'll turn it into clear bullets and you pick the ones you like.</p>
+      <div class="prompts"><span>What did you handle every day?</span><span>Who relied on you?</span><span>Anything you fixed or set up?</span><span>Tools you used?</span></div>
+      <div class="area">e.g. "I ran the front desk, booked patients for 4 doctors, did the supply orders every Friday, set up the new booking software when we switched…"</div>
+      <div class="row">
+        <div class="bigmic">🎙</div>
+        <div style="font-size:13px;color:var(--sage-600)">Tap to talk<br><span style="font-size:12px">up to 2 minutes</span></div>
+        <span class="btn dis">Turn this into bullets →</span>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <h3 style="color:#e9efec;margin-top:8px">Which "you can talk now" cue?</h3>
+  <div class="cards">
+    <div class="card" data-choice="countdown" onclick="toggleSelect(this)">
+      <div class="card-image" style="padding:14px;width:100%;box-sizing:border-box">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px;width:100%">
+          <div class="mini"><span class="stepl">1 · tap</span><div style="display:grid;place-items:center;flex:1"><div class="count serif" style="color:var(--pine-600)">3</div><span style="font-size:12px;color:var(--sage-600)">Get ready…</span></div></div>
+          <div class="mini"><span class="stepl">2 · go</span><div style="display:grid;place-items:center;flex:1"><span class="cue"><span class="dot"></span>Start talking</span></div></div>
+          <div class="mini"><span class="stepl">3 · talking</span>
+            <div class="rec"><span class="stop"><b></b></span><div class="wave"><i style="animation-delay:0s"></i><i style="animation-delay:.1s"></i><i style="animation-delay:.25s"></i><i style="animation-delay:.05s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.15s"></i><i style="animation-delay:.4s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.35s"></i><i style="animation-delay:.1s"></i></div><span class="timer">0:14</span></div>
+            <div class="live">I ran the front desk, booked patients for four doctors <span class="prov">and did the supply</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body"><h3>A · 3-2-1 countdown</h3><p>A short countdown while the mic connects, then a green "Start talking". Very clear, but adds about 2 seconds each time.</p></div>
+    </div>
+
+    <div class="card" data-choice="ring" onclick="toggleSelect(this)">
+      <div class="card-image" style="padding:14px;width:100%;box-sizing:border-box">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px;width:100%">
+          <div class="mini"><span class="stepl">1 · connecting</span><div style="display:grid;place-items:center;flex:1;gap:8px"><div class="bigmic" style="background:var(--sage-500);box-shadow:none">🎙</div><span style="font-size:12px;color:var(--sage-600)">Getting the mic ready…</span></div></div>
+          <div class="mini"><span class="stepl">2 · listening</span><div style="display:grid;place-items:center;flex:1;gap:10px"><div class="bigmic"><span class="ring"></span>🎙</div><span class="cue"><span class="dot"></span>Listening, go ahead</span></div></div>
+          <div class="mini"><span class="stepl">3 · talking</span>
+            <div class="rec"><span class="stop"><b></b></span><div class="wave"><i style="animation-delay:0s"></i><i style="animation-delay:.1s"></i><i style="animation-delay:.25s"></i><i style="animation-delay:.05s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.15s"></i><i style="animation-delay:.4s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.35s"></i><i style="animation-delay:.1s"></i></div><span class="timer">0:14</span></div>
+            <div class="live">I ran the front desk, booked patients for four doctors <span class="prov">and did the supply</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body"><h3>B · Pulsing "Listening" (no countdown)</h3><p>The mic is grey while it connects, then it pulses green with "Listening, go ahead" the moment it's ready. Starts as fast as possible.</p></div>
+    </div>
+  </div>
+</div>

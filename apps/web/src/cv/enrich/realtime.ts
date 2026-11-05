@@ -18,6 +18,8 @@ export type TranscriptEvent =
   | { type: "closed" };
 
 export type Transport = {
+  /** Resolves when the connection opens; rejects if it closes first. */
+  opened: Promise<void>;
   /** Base64 PCM16 mono 24 kHz. Held until the connection opens. */
   sendAudio(audio: string): void;
   /** Ask for the audio so far to be transcribed now. */
@@ -47,6 +49,9 @@ function toEvent(raw: unknown): TranscriptEvent | null {
 
 export function openTranscription(clientSecret: string, onEvent: (e: TranscriptEvent) => void): Transport {
   const ws = new WebSocket(URL_TRANSCRIBE, ["realtime", `openai-insecure-api-key.${clientSecret}`]);
+  let markOpen!: () => void;
+  let failOpen!: (error: Error) => void;
+  const opened = new Promise<void>((resolve, reject) => { markOpen = resolve; failOpen = reject; });
   const queue: string[] = [];
   let closedByUs = false;
   const send = (msg: object) => {
@@ -56,6 +61,7 @@ export function openTranscription(clientSecret: string, onEvent: (e: TranscriptE
   };
   ws.onopen = () => {
     for (const data of queue.splice(0)) ws.send(data);
+    markOpen();
   };
   ws.onmessage = (e: MessageEvent) => {
     let parsed: unknown;
@@ -68,9 +74,11 @@ export function openTranscription(clientSecret: string, onEvent: (e: TranscriptE
     if (event) onEvent(event);
   };
   ws.onclose = () => {
+    failOpen(new Error("Voice connection closed before opening"));
     if (!closedByUs) onEvent({ type: "closed" });
   };
   return {
+    opened,
     sendAudio: (audio) => send({ type: "input_audio_buffer.append", audio }),
     commit: () => send({ type: "input_audio_buffer.commit" }),
     close: () => {

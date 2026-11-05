@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { emptyCv, fingerprint, newId, type CvContent, type Experience, type RewriteEvent, type RoleResult } from "@resumora/shared";
+import { emptyCv, newId, type CvContent, type Experience, type RewriteEvent } from "@resumora/shared";
 import { createApp } from "../app.ts";
 import { AiUnavailableError, type ModelDeps } from "../ai/call-model.ts";
 import { AiStreamBrokenError } from "../ai/stream-model.ts";
@@ -49,9 +49,6 @@ describe("checkProposal", () => {
     expect(checkSummary(cv, "summary", "x".repeat(600))).toBe("ok");
     expect(checkSummary(cv, "summary", "x".repeat(601))).toBe("length");
   });
-  it("drops a proposal for a keep-as-is bullet", () => {
-    expect(checkProposal(role, b2!.id, "Handled calls.", new Set([b2!.id]))).toBe("unchanged");
-  });
 });
 
 describe("rewriteEvents", () => {
@@ -100,7 +97,7 @@ const enc = new TextEncoder();
 const sseBody = (text: string) =>
   [`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`, `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`, "data: [DONE]\n\n"].join("");
 
-function setup(opts: { cv: CvContent; answer: string; scores?: RoleResult; status?: number }) {
+function setup(opts: { cv: CvContent; answer: string }) {
   const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = [];
   const order: string[] = [];
   const inner = memoryCvRepo();
@@ -117,7 +114,6 @@ function setup(opts: { cv: CvContent; answer: string; scores?: RoleResult; statu
     fetch: (async (_u: string, init: RequestInit) => {
       order.push("model");
       bodies.push(JSON.parse(String(init.body)));
-      if (opts.status) return new Response("{}", { status: opts.status });
       return new Response(enc.encode(sseBody(opts.answer)), { status: 200 });
     }) as typeof fetch,
     logCall: async () => {},
@@ -140,7 +136,6 @@ function setup(opts: { cv: CvContent; answer: string; scores?: RoleResult; statu
   });
   const ready = (async () => {
     await inner.save(opts.cv, 0);
-    if (opts.scores) await memoryInsightsRepo("user-1", store).put(opts.scores.roleId, opts.scores);
   })();
   const post = async (path: string, body?: unknown) => {
     await ready;
@@ -165,46 +160,6 @@ const cvWith = (roles: Experience[], summary = "Payroll specialist."): CvContent
   const cv = emptyCv("en");
   return { ...cv, basics: { ...cv.basics, summary }, experience: roles };
 };
-
-describe("POST /v1/enrich/rewrite-role", () => {
-  const role = roleWith(["Prepared contracts for 40 workers.", "Answered phones.", "Closed the books monthly."], { notes: [note("10–50 a week", "How many calls?")] });
-  const [b1, b2] = role.bullets;
-
-  it("snapshots once before the model, streams events, and puts notes and keep-as-is marks in the message", async () => {
-    const scores = {
-      roleId: role.id, policy: "x", fingerprint: fingerprint(role, "en"), score: 80,
-      bullets: [{ id: b2!.id, score: 100 }, { id: b1!.id, score: 50 }],
-    } as unknown as RoleResult;
-    const answer = `### ${b1!.id}\nDrafted contracts for 40 workers.\n### ${b2!.id}\nHandled the phones.\n### new\nAnswered 10–50 calls a week.\n### end\n`;
-    const { post, bodies, order } = setup({ cv: cvWith([role]), answer, scores });
-    const res = await post("rewrite-role", { roleId: role.id });
-    expect(res.headers.get("content-type")).toContain("text/event-stream");
-    const events = await readEvents(res);
-    expect(order).toEqual(["snapshot", "model"]);
-    expect(events.filter((e) => e.event === "ready").map((e) => e.data.index)).toEqual([0, 2]);
-    expect(events.find((e) => e.event === "dropped")!.data).toEqual({ index: 1, reason: "unchanged" });
-    expect(events.at(-1)).toEqual({ event: "done", data: {} });
-    const user = bodies[0]!.messages[1]!.content;
-    expect(user).toContain('Q: "How many calls?"\nA: "10–50 a week"');
-    expect(user).toMatch(new RegExp(`${b2!.id}.*keep as is`));
-    expect(user).not.toMatch(new RegExp(`${b1!.id}.*keep as is`));
-  });
-
-  it("409 not_saved for a missing role, with no snapshot and no model call", async () => {
-    const { post, order } = setup({ cv: cvWith([role]), answer: "" });
-    const res = await post("rewrite-role", { roleId: "gone" });
-    expect(res.status).toBe(409);
-    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("not_saved");
-    expect(order).toEqual([]);
-  });
-
-  it("an unavailable provider gives an ai_unavailable error event, then done", async () => {
-    const { post } = setup({ cv: cvWith([role]), answer: "", status: 500 });
-    const events = await readEvents(await post("rewrite-role", { roleId: role.id }));
-    expect(events.map((e) => e.event)).toEqual(["error", "done"]);
-    expect(events[0]!.data).toMatchObject({ code: "ai_unavailable" });
-  });
-});
 
 describe("POST /v1/enrich/rewrite-summary", () => {
   const r1 = roleWith(["Prepared contracts for 40 workers."], { company: "Acme Payroll", title: "Payroll Specialist", notes: [note("Under 10 a day", "How many?")] });

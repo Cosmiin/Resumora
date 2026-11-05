@@ -188,6 +188,9 @@ Do not provide a rewritten bullet. Do not invent a tip or question to
 fill a field. Keep each tip and question to one sentence, preferably no
 more than 20 words. Address the user naturally and respectfully.
 
+When a bullet's only gap is impact, ask for a result: how many, how often,
+for whom, or what changed. Its answer options must be ranges.
+
 For unusable text, ask about a real task.
 For duplicates, recommend consolidation; do not invent a need for
 another responsibility.
@@ -207,6 +210,7 @@ OUTPUT
 
 Return only JSON matching the supplied response schema.
 Return every supplied bullet id exactly once, and no other id.
+If specific ids are selected for grading, return only those ids; the rest are context.
 Return grades, not numbers. The application calculates all scores.`;
 
 export function scoreSystemPrompt(locale: Locale): string {
@@ -214,7 +218,7 @@ export function scoreSystemPrompt(locale: Locale): string {
 }
 
 /** The role as the model sees it: context for the title and description, bullets to grade. No company, no dates. */
-export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets">): string {
+export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets">, gradeOnly?: readonly string[]): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));
   return [
     "<experience>",
@@ -223,5 +227,6 @@ export function scoreUserMessage(role: Pick<Experience, "title" | "description" 
     "Bullets to grade (JSON, each { id, text }):",
     JSON.stringify(bullets),
     "</experience>",
+    ...(gradeOnly ? [`Grade only these bullets: ${gradeOnly.join(", ")}. Return entries for those ids only; the other bullets are context.`] : []),
   ].join("\n");
 }

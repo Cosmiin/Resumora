@@ -11,15 +11,18 @@ import { ApiError } from "../errors.ts";
 import { createVoiceSession, VoiceUnavailableError, type VoiceDeps } from "../ai/voice-session.ts";
 import type { InsightsRepo } from "./repo.ts";
 import { scoreRole } from "./score.ts";
+import { improveBullet } from "./improve.ts";
+import { brainDump } from "./brain-dump.ts";
+import { roleFacts } from "./role-facts.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
-import { checkProposal, checkSummary, keepAsIsIds, rewriteEvents } from "./rewrite.ts";
-import { rewriteRoleSystemPrompt, rewriteRoleUserMessage, rewriteSummarySystemPrompt, rewriteSummaryUserMessage } from "./rewrite-prompts.ts";
+import { checkSummary, rewriteEvents } from "./rewrite.ts";
+import { rewriteSummarySystemPrompt, rewriteSummaryUserMessage } from "./rewrite-prompts.ts";
 
 const RoleBody = z.object({ roleId: z.string().min(1).max(64) });
-const notSaved = () => new ApiError(409, "not_saved", "Your latest changes aren't saved yet. Try again in a moment.");
 
 const ScoreBody = z.object({ roleId: z.string().min(1).max(64), fingerprint: z.string().min(1).max(64) });
+const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */
 const MAX_BODY_BYTES = 16 * 1024;
@@ -54,6 +57,58 @@ export function enrichRoutes(deps: {
     return c.json(result);
   });
 
+  app.post("/improve-bullet", async (c) => {
+    const body = ImproveBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId, bulletId and a fingerprint.");
+    const user = c.get("user");
+    try {
+      const result = await improveBullet(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        body.data,
+      );
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "improve bullet failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/brain-dump", async (c) => {
+    const body = ScoreBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
+    const user = c.get("user");
+    try {
+      return c.json(await brainDump(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "brain dump failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/role-facts", async (c) => {
+    const body = RoleBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId.");
+    const user = c.get("user");
+    try {
+      return c.json(await roleFacts(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "role facts failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
   /** Streams rewrite events. Everything that can still fail with plain JSON happens before this is called. */
   const sendEvents = (c: Context<AppEnv>, events: AsyncIterable<RewriteEvent>) =>
     streamSSE(c, async (stream) => {
@@ -62,27 +117,6 @@ export function enrichRoutes(deps: {
         await stream.writeSSE({ event: e.event, data: JSON.stringify(RewriteEventSchemas[e.event].parse(e.data)) });
       }
     });
-
-  app.post("/rewrite-role", async (c) => {
-    const body = RoleBody.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId.");
-    const user = c.get("user");
-    const cv = deps.cvRepo(user);
-    const { content } = await cv.get();
-    const role = content.experience.find((r) => r.id === body.data.roleId);
-    if (!role) throw notSaved();
-    const keep = await keepAsIsIds(role, content.locale, deps.insightsRepo(user));
-    await cv.snapshot("ai");
-    const chunks = streamModel(deps.model(user), {
-      userId: user.id,
-      task: "enrich_rewrite_role",
-      system: rewriteRoleSystemPrompt(content.locale),
-      user: rewriteRoleUserMessage(role, keep),
-      maxOutputTokens: 2500,
-      signal: c.req.raw.signal,
-    });
-    return sendEvents(c, rewriteEvents(chunks, (key, text) => checkProposal(role, key, text, keep)));
-  });
 
   app.post("/rewrite-summary", async (c) => {
     const user = c.get("user");

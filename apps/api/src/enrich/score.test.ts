@@ -13,11 +13,11 @@ vi.mock("../ai/call-model.ts", async (importOriginal) => {
     },
   };
 });
-import { SCORE_POLICY, emptyCv, fingerprint, type CvContent, type Experience } from "@resumora/shared";
+import { SCORE_POLICY, buildRoleResult, emptyCv, fingerprint, type CvContent, type Experience } from "@resumora/shared";
 import { ApiError } from "../errors.ts";
 import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { memoryInsightsRepo } from "./memory-repo.ts";
-import { scoreRole } from "./score.ts";
+import { gradeBullets, scoreRole } from "./score.ts";
 import { scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
 import { allSpecific, fakeModel, roleWith } from "./fake-model.ts";
 
@@ -62,6 +62,42 @@ describe("scoreRole", () => {
     });
     expect((await run(second, role)).policy).toBe(SCORE_POLICY);
     expect(second.requests).toHaveLength(0);
+  });
+
+  it("promotes a matching pending result without a model call", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    const predicted = buildRoleResult(role, allSpecific(role), fp(role));
+    await insights.put(role.id, { ...predicted, fingerprint: "old" });
+    await insights.putPending(role.id, predicted);
+    const model = fakeModel(() => ({}));
+    expect(await run(model, role)).toEqual(predicted);
+    expect(model.requests).toHaveLength(0);
+    expect(model.logged).toHaveLength(0);
+    expect(await insights.get(role.id)).toEqual(predicted);
+  });
+
+  it("the matching main result wins over pending", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    const main = buildRoleResult(role, allSpecific(role), fp(role));
+    await insights.put(role.id, main);
+    await insights.putPending(role.id, { ...main, score: 80 });
+    const model = fakeModel(() => ({}));
+    expect(await run(model, role)).toEqual(main);
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it("ignores pending results from score/1 or a different fingerprint", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    const predicted = buildRoleResult(role, allSpecific(role), fp(role));
+    await insights.put(role.id, { ...predicted, fingerprint: "old" });
+    await insights.putPending(role.id, { ...predicted, policy: "score/1" });
+    await insights.putPending(role.id, { ...predicted, fingerprint: "other" });
+    const model = fakeModel(() => allSpecific(role));
+    expect((await run(model, role)).policy).toBe(SCORE_POLICY);
+    expect(model.requests).toHaveLength(1);
   });
 
   it("asks again when the cached row is from another policy", async () => {
@@ -139,6 +175,61 @@ describe("scoreRole", () => {
     await save(kept);
     await run(fakeModel(() => allSpecific(kept)), kept);
     expect((await insights.list()).map((r) => r.roleId)).toEqual([kept.id]);
+  });
+});
+
+describe("gradeBullets", () => {
+  const role = roleWith([], { bullets: [{ id: "b1", text: "Prepared payroll files." }, { id: "b2", text: "Checked staff records." }] });
+  const grade = (model: ReturnType<typeof fakeModel>, ids: readonly string[] = ["b2"]) =>
+    gradeBullets({ cv, insights, model: model.deps, userId: "user-1" }, role, "ro", ids);
+
+  it("grades only the requested bullet with context and logs enrich_score", async () => {
+    const answer = { ...allSpecific(role), bullets: [allSpecific(role).bullets[1]!] };
+    const model = fakeModel(() => answer);
+    expect(await grade(model)).toEqual(answer.bullets);
+    expect(model.requests).toHaveLength(1);
+    expect(model.requests[0]).toMatchObject({
+      max_completion_tokens: 780,
+      messages: [
+        { role: "system", content: scoreSystemPrompt("ro") },
+        { role: "user", content: expect.stringContaining("Grade only these bullets: b2. Return entries for those ids only; the other bullets are context.") },
+      ],
+    });
+    expect(JSON.stringify(model.requests[0]?.messages)).toContain("Prepared payroll files.");
+    expect(model.logged).toMatchObject([{ task: "enrich_score", userId: "user-1", status: "ok" }]);
+  });
+
+  it.each(["extra", "missing", "duplicate", "wrong"])("maps %s bullet ids to 502 ai_bad_answer without retries", async (kind) => {
+    const answer = allSpecific(role);
+    const b2 = answer.bullets[1]!;
+    answer.bullets = kind === "extra" ? answer.bullets : kind === "missing" ? [] : kind === "duplicate" ? [b2, b2] : [answer.bullets[0]!];
+    const model = fakeModel(() => answer);
+    await expect(grade(model)).rejects.toMatchObject({ status: 502, code: "ai_bad_answer" });
+    expect(model.requests).toHaveLength(1);
+    expect(model.logged).toMatchObject([{ task: "enrich_score", status: "ok" }]);
+  });
+
+  it("accepts a corrected schema-invalid answer on retry", async () => {
+    let calls = 0;
+    const model = fakeModel(() => {
+      if (calls++ === 0) return {};
+      const answer = allSpecific(role);
+      return { ...answer, bullets: [answer.bullets[1]!] };
+    });
+    expect(await grade(model)).toHaveLength(1);
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it("grades several ids in any order using the proportional token limit", async () => {
+    const answer = allSpecific(role);
+    const model = fakeModel(() => answer);
+    expect(await grade(model, ["b2", "b1"])).toEqual(answer.bullets);
+    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 960 });
+    expect(JSON.stringify(model.requests[0]?.messages)).toContain("Grade only these bullets: b2, b1.");
+  });
+
+  it("keeps provider failures as 503 ai_unavailable", async () => {
+    await expect(grade(fakeModel(() => ({}), 500))).rejects.toMatchObject({ status: 503, code: "ai_unavailable" });
   });
 });
 

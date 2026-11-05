@@ -1,0 +1,94 @@
+<style>
+  .rz { --pine-50:#f1f8f4; --pine-100:#e4efe7; --pine-200:#c5dfd1; --pine-600:#17695d; --pine-800:#173b39; --sage-50:#f4f7f4; --sage-100:#eaf0eb; --sage-200:#d8e3df; --sage-600:#536b69; --mari-100:#fff5e6; --mari-300:#f6cf7a; --mari-500:#e9a23b; --rose-400:#c9686c;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--pine-800); }
+  .rz .card-body h3 { color: #e9efec; }
+  .rz .serif { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+  .stage { position: relative; width: 100%; height: 470px; border-radius: 14px; overflow: hidden; background: var(--sage-50); }
+  .cvbg { position:absolute; inset:18px 160px 18px 18px; background:#fff; border-radius:8px; padding:22px; filter: blur(1.5px); opacity:.55; }
+  .cvbg .l { height:8px; background:var(--sage-200); border-radius:4px; margin:9px 0; }
+  .scrim { position:absolute; inset:0; background: rgba(15,40,38,.38); backdrop-filter: blur(2px); }
+  .dialog { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width: 400px; background:#fff; border-radius:20px; box-shadow: 0 24px 60px rgba(15,40,38,.28); padding:22px 24px; }
+  .steps { display:flex; gap:5px; margin-bottom:14px; } .steps i { flex:1; height:4px; border-radius:2px; background:var(--sage-200);} .steps i.on{background:var(--pine-600);}
+  .eyebrow { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--sage-600); }
+  .bullet { margin:8px 0 14px; padding:10px 12px; background:var(--sage-50); border-left:3px solid var(--mari-500); border-radius:8px; font-size:13px; display:flex; justify-content:space-between; gap:8px;}
+  .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; background:var(--mari-100); color:#83511b; white-space:nowrap; height:fit-content;}
+  .q { font-size:19px; line-height:1.3; margin:0 0 12px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .chip { font-size:12px; padding:6px 11px; border-radius:999px; border:1px solid var(--sage-200); background:#fff; }
+  .chip.sel { background:var(--pine-100); border-color:var(--pine-600); color:var(--pine-600); }
+  .box { border:1px solid var(--sage-200); border-radius:12px; padding:10px 12px; font-size:13px; color:var(--sage-600); min-height:44px; display:flex; justify-content:space-between; align-items:flex-end; }
+  .mic { width:34px; height:34px; border-radius:50%; background:var(--pine-600); display:grid; place-items:center; color:#fff; font-size:15px; flex:none; }
+  .foot { display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:13px; }
+  .btn { background:var(--pine-600); color:#fff; border-radius:10px; padding:8px 14px; font-weight:600; }
+  .ghost { color:var(--sage-600); }
+  /* B: focus mode */
+  .fm { position:absolute; inset:0; background: radial-gradient(1200px 500px at 30% 0%, #fff 0%, var(--sage-50) 60%); display:grid; grid-template-columns: 1fr 1.15fr; }
+  .fm .left { padding:26px 22px; border-right:1px solid var(--sage-200); }
+  .fm .right { padding:26px 26px; }
+  .role { font-size:12px; color:var(--sage-600); margin-bottom:10px; }
+  .bl { font-size:12.5px; padding:7px 9px; border-radius:8px; margin:4px 0; color:var(--sage-600); }
+  .bl.cur { background:#fff; color:var(--pine-800); box-shadow:0 4px 14px rgba(15,40,38,.10); border-left:3px solid var(--mari-500); }
+  .close { position:absolute; right:14px; top:12px; font-size:12px; color:var(--sage-600); }
+  .bigscore { display:flex; align-items:baseline; gap:6px; margin-top:16px; }
+  .bigscore b { font-size:28px; }
+</style>
+
+<h2>Where should the focused question view live?</h2>
+<p class="subtitle">Both show the bullet the question is about, the question, quick-pick chips, a text box and a mic. The difference is how much of the screen it takes.</p>
+<div class="rz">
+
+<div class="cards">
+  <div class="card" data-choice="dialog" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="stage">
+        <div class="cvbg"><div class="l" style="width:40%"></div><div class="l"></div><div class="l" style="width:80%"></div><div class="l"></div><div class="l" style="width:70%"></div><div class="l"></div><div class="l" style="width:60%"></div></div>
+        <div class="scrim"></div>
+        <div class="dialog">
+          <div class="steps"><i class="on"></i><i></i><i></i></div>
+          <div class="eyebrow">Question 1 of 3 · Dispatcher, TransLog</div>
+          <div class="bullet"><span>Responsible for planning routes for drivers.</span><span class="pill">43</span></div>
+          <p class="q serif">Roughly how many drivers or routes did you plan for each day?</p>
+          <div class="chips"><span class="chip">Under 10</span><span class="chip sel">10–50</span><span class="chip">50+</span><span class="chip">Something else</span></div>
+          <div class="box"><span>10–50 drivers, mostly regional…</span><span class="mic">🎙</span></div>
+          <div class="foot"><span class="ghost">Skip</span><span class="btn">Improve this bullet →</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Centered dialog</h3>
+      <p>A card floats over the dimmed CV. Compact and familiar; the CV stays faintly visible behind it.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="focus-mode" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="stage">
+        <div class="fm">
+          <div class="left">
+            <div class="eyebrow">Your role</div>
+            <div class="serif" style="font-size:17px;margin:4px 0 2px">Dispatcher</div>
+            <div class="role">TransLog · 2019 – 2023</div>
+            <div class="bl cur">Responsible for planning routes for drivers.</div>
+            <div class="bl">Handled calls from customers.</div>
+            <div class="bl">Worked with the warehouse team.</div>
+            <div class="bigscore"><b class="serif">52</b><span class="eyebrow">role score</span></div>
+          </div>
+          <div class="right">
+            <span class="close">✕ Close</span>
+            <div class="steps"><i class="on"></i><i></i><i></i></div>
+            <div class="eyebrow">Question 1 of 3</div>
+            <p class="q serif" style="margin-top:8px">Roughly how many drivers or routes did you plan for each day?</p>
+            <div class="chips"><span class="chip">Under 10</span><span class="chip sel">10–50</span><span class="chip">50+</span><span class="chip">Something else</span></div>
+            <div class="box"><span>10–50 drivers, mostly regional…</span><span class="mic">🎙</span></div>
+            <div class="foot"><span class="ghost">Skip</span><span class="btn">Improve this bullet →</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Full-screen focus mode</h3>
+      <p>Takes over the editor. The whole role stays on the left with the current bullet lifted out, and the role score is visible, so you can watch it climb as you go.</p>
+    </div>
+  </div>
+</div>
+</div>

@@ -5,7 +5,7 @@ import { HISTORY_LIMIT } from "../cv/repo.ts";
 import { memoryInsightsRepo, type MemoryInsightsStore } from "./memory-repo.ts";
 
 const result = (fingerprint: string, roleId = "r1"): RoleResult =>
-  RoleResultSchema.parse({ roleId, policy: "score/1", fingerprint, score: null, bullets: [], nextStep: null, questions: [] });
+  RoleResultSchema.parse({ roleId, policy: "score/2", fingerprint, score: null, bullets: [], nextStep: null, questions: [] });
 
 describe("memoryInsightsRepo", () => {
   it("put then get round-trips, and get is null for an unknown role", async () => {
@@ -42,6 +42,62 @@ describe("memoryInsightsRepo", () => {
     await repo.remove(["r1", "r3"]);
     expect(await repo.list()).toEqual([result("b", "r2")]);
     expect(await memoryInsightsRepo("u2", store).get("r1")).toEqual(result("other"));
+  });
+});
+
+
+describe("pending role results", () => {
+  it("putPending on a missing row stores nothing", async () => {
+    const repo = memoryInsightsRepo("u1");
+    await repo.putPending("r1", result("future"));
+    expect(await repo.pending("r1")).toEqual([]);
+    expect(await repo.get("r1")).toBeNull();
+    expect(await repo.list()).toEqual([]);
+  });
+
+  it("a sixth entry drops the oldest by at, regardless of array order", async () => {
+    const store: MemoryInsightsStore = new Map();
+    const repo = memoryInsightsRepo("u1", store);
+    await repo.put("r1", result("saved"));
+    store.get("u1/r1")!.pending = [3, 1, 5, 2, 4].map((day) => ({
+      fingerprint: "p" + day, result: result("p" + day), at: "2020-01-0" + day + "T00:00:00.000Z",
+    }));
+    await repo.putPending("r1", result("p6"));
+    const pending = await repo.pending("r1");
+    expect(pending).toHaveLength(5);
+    expect(pending.map((p) => p.fingerprint).sort()).toEqual(["p2", "p3", "p4", "p5", "p6"]);
+    expect(pending.find((p) => p.fingerprint === "p6")?.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("the same fingerprint replaces its entry", async () => {
+    const repo = memoryInsightsRepo("u1");
+    await repo.put("r1", result("saved"));
+    await repo.putPending("r1", result("future"));
+    const replacement = { ...result("future"), policy: "score/1" };
+    await repo.putPending("r1", replacement);
+    expect(await repo.pending("r1")).toEqual([{ fingerprint: "future", result: replacement, at: expect.any(String) }]);
+  });
+
+  it("put keeps pending intact, isolated from other users and returned values", async () => {
+    const store: MemoryInsightsStore = new Map();
+    const repo = memoryInsightsRepo("u1", store);
+    await repo.put("r1", result("saved"));
+    await repo.putPending("r1", result("future"));
+    const pending = await repo.pending("r1");
+    await repo.put("r1", result("new-main"));
+    expect(await repo.pending("r1")).toEqual(pending);
+    pending[0]!.result.fingerprint = "changed";
+    expect((await repo.pending("r1"))[0]?.result.fingerprint).toBe("future");
+    expect(await memoryInsightsRepo("u2", store).pending("r1")).toEqual([]);
+  });
+
+  it("drops pending entries with invalid role results when adding another", async () => {
+    const store: MemoryInsightsStore = new Map();
+    const repo = memoryInsightsRepo("u1", store);
+    await repo.put("r1", result("saved"));
+    store.get("u1/r1")!.pending = [{ fingerprint: "bad", result: { ...result("bad"), score: 101 }, at: "2020-01-01T00:00:00.000Z" }];
+    await repo.putPending("r1", result("future"));
+    expect((await repo.pending("r1")).map((p) => p.fingerprint)).toEqual(["future"]);
   });
 });
 

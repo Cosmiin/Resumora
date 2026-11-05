@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_BULLETS, MAX_NOTES, emptyCv, type CvContent, type Experience } from "@resumora/shared";
+import { MAX_BULLETS, MAX_NOTES, emptyCv, notesHash, type CvContent, type Experience } from "@resumora/shared";
 import { cvReducer, sectionsOnCv } from "./cvReducer.ts";
 
 function role(id: string, bullets: string[], extra: Partial<Experience> = {}): Experience {
@@ -267,7 +267,7 @@ describe("setNote", () => {
     const at = (day: number) => `2026-01-${String(day).padStart(2, "0")}T00:00:00.000Z`;
     // Not in date order, so "oldest" means by askedAt, not by position.
     const full = Array.from({ length: MAX_NOTES }, (_, i) => ({
-      id: `n${i}`, question: "Q", answer: `a${i}`, via: ["type" as const], askedAt: at(i === 3 ? 1 : i + 10),
+      id: `n${i}`, question: "Q", answer: `a${i}`, via: ["type" as const], askedAt: at(i === 3 ? 1 : i + 2),
     }));
     const cv = withRole(["x"], { notes: full });
     const fresh = { id: "new", question: "Q", answer: "latest", via: ["voice" as const], askedAt: at(28) };
@@ -288,45 +288,72 @@ describe("setNote", () => {
   });
 });
 
-describe("applyProposals", () => {
-  const apply = (cv: CvContent, accepted: { replaces: string | null; text: string }[]) =>
-    cvReducer(cv, { type: "applyProposals", roleId: "e1", accepted });
+describe("focus actions", () => {
+  const facts = { items: ["Built APIs"], fromNotes: notesHash([]), updatedAt: "2026-11-05T10:00:00.000Z" };
 
-  it("replaces bullets by id and appends new ones, in one step", () => {
-    const next = apply(withRole(["a", "b"]), [
-      { replaces: "e1-b2", text: "B" },
-      { replaces: null, text: "C" },
-    ]);
-    expect(texts(next)).toEqual(["a", "B", "C"]);
-    expect(next.experience[0]!.bullets[0]!.id).toBe("e1-b1");
-    expect(next.experience[0]!.bullets[1]!.id).toBe("e1-b2");
-    expect(next.experience[0]!.bullets[2]!.id).not.toMatch(/^e1-b/);
+  it("replaceBullet changes only the selected text and keeps its id", () => {
+    const cv = { ...withRole(["First", "Second"]), experience: [role("e1", ["First", "Second"]), role("e2", ["Other"])] };
+    const next = cvReducer(cv, { type: "replaceBullet", roleId: "e1", bulletId: "e1-b2", text: "Improved" });
+    expect(next.experience[0]).toEqual({ ...cv.experience[0], bullets: [{ id: "e1-b1", text: "First" }, { id: "e1-b2", text: "Improved" }] });
+    expect(next.experience[0]!.bullets[0]).toBe(cv.experience[0]!.bullets[0]);
+    expect(next.experience[1]).toBe(cv.experience[1]);
+    expect(cv.experience[0]!.bullets[1]!.text).toBe("Second");
   });
 
-  it("skips a proposal whose bullet was deleted and applies the others", () => {
-    const cv = withRole(["a", "b"]);
-    const next = apply(cv, [
-      { replaces: "e1-b9", text: "gone" },
-      { replaces: "e1-b1", text: "A" },
-    ]);
-    expect(texts(next)).toEqual(["A", "b"]);
+  it("replaceBullet returns the same CV for unchanged text or missing targets", () => {
+    const cv = withRole(["First"]);
+    expect(cvReducer(cv, { type: "replaceBullet", roleId: "e1", bulletId: "e1-b1", text: "First" })).toBe(cv);
+    expect(cvReducer(cv, { type: "replaceBullet", roleId: "e1", bulletId: "missing", text: "New" })).toBe(cv);
+    expect(cvReducer(cv, { type: "replaceBullet", roleId: "missing", bulletId: "e1-b1", text: "New" })).toBe(cv);
   });
 
-  it("changes nothing when every bullet it replaces is gone", () => {
-    const cv = withRole(["a"]);
-    expect(apply(cv, [{ replaces: "e1-b9", text: "gone" }])).toBe(cv);
-    expect(cvReducer(cv, { type: "applyProposals", roleId: "nope", accepted: [{ replaces: null, text: "x" }] })).toBe(cv);
+  it("addBullets appends only two of three texts to an 18-bullet role with new ids", () => {
+    const cv = withRole(Array.from({ length: 18 }, (_, i) => "Bullet " + i));
+    const next = cvReducer(cv, { type: "addBullets", roleId: "e1", texts: ["One", "Two", "Three"] });
+    const bullets = next.experience[0]!.bullets;
+    expect(bullets).toHaveLength(20);
+    expect(bullets.slice(0, 18)).toEqual(cv.experience[0]!.bullets);
+    expect(bullets.slice(18).map((b) => b.text)).toEqual(["One", "Two"]);
+    expect(bullets.slice(18).every((b) => b.id.length > 0)).toBe(true);
+    expect(new Set(bullets.map((b) => b.id)).size).toBe(20);
+    expect(cv.experience[0]!.bullets).toHaveLength(18);
   });
 
-  it("stops appending at MAX_BULLETS", () => {
-    const cv = withRole(Array.from({ length: MAX_BULLETS - 1 }, (_, i) => `b${i}`));
-    const next = apply(cv, [
-      { replaces: null, text: "one" },
-      { replaces: null, text: "two" },
-      { replaces: "e1-b1", text: "first" },
-    ]);
-    expect(texts(next)).toHaveLength(MAX_BULLETS);
-    expect(texts(next).at(-1)).toBe("one");
-    expect(texts(next)[0]).toBe("first");
+  it("addBullets returns the same CV for no texts, a full role or a missing role", () => {
+    const cv = withRole(["First"]);
+    const full = withRole(Array.from({ length: MAX_BULLETS }, () => "Bullet"));
+    expect(cvReducer(cv, { type: "addBullets", roleId: "e1", texts: [] })).toBe(cv);
+    expect(cvReducer(full, { type: "addBullets", roleId: "e1", texts: ["New"] })).toBe(full);
+    expect(cvReducer(cv, { type: "addBullets", roleId: "missing", texts: ["New"] })).toBe(cv);
+  });
+
+  it("setFacts sets and clears a role's facts without changing its other content", () => {
+    const cv = withRole(["First"]);
+    const next = cvReducer(cv, { type: "setFacts", roleId: "e1", facts });
+    expect(next.experience[0]).toEqual({ ...cv.experience[0], facts });
+    const cleared = cvReducer(next, { type: "setFacts", roleId: "e1", facts: null });
+    expect(cleared.experience[0]).toEqual({ ...cv.experience[0], facts: null });
+    expect(cv.experience[0]!.facts).toBeUndefined();
+  });
+
+  it("setFacts ignores facts from notes changed by a restore", () => {
+    const cv = withRole(["First"], { notes: [{
+      id: "n1", question: "What did you build?", answer: "Built APIs", via: ["type"],
+      askedAt: "2026-11-05T10:00:00.000Z",
+    }] });
+    const returnedFacts = { ...facts, fromNotes: notesHash(cv.experience[0]!.notes) };
+    expect(cvReducer(cv, { type: "setFacts", roleId: "e1", facts: returnedFacts }).experience[0]!.facts).toEqual(returnedFacts);
+    const restored = withRole(["First"]);
+    expect(cvReducer(restored, { type: "setFacts", roleId: "e1", facts: returnedFacts })).toBe(restored);
+  });
+
+  it("setFacts returns the same CV for equal facts, no facts or a missing role", () => {
+    const cv = withRole(["First"], { facts });
+    expect(cvReducer(cv, { type: "setFacts", roleId: "e1", facts: { ...facts, items: [...facts.items] } })).toBe(cv);
+    expect(cvReducer(cv, { type: "setFacts", roleId: "missing", facts })).toBe(cv);
+    const absent = withRole(["First"]);
+    expect(cvReducer(absent, { type: "setFacts", roleId: "e1", facts: null })).toBe(absent);
+    const cleared = withRole(["First"], { facts: null });
+    expect(cvReducer(cleared, { type: "setFacts", roleId: "e1", facts: null })).toBe(cleared);
   });
 });

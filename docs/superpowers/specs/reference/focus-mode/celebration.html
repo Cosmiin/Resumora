@@ -1,0 +1,114 @@
+<h2>When the score goes up</h2>
+<p class="subtitle">You accepted an improved bullet and the role went from 52 to 71. Two levels of celebration. Press <b>Replay</b> to see the animation again.</p>
+
+<style>
+  .rz { --pine-100:#e4efe7; --pine-200:#c5dfd1; --pine-400:#5fa48d; --pine-600:#17695d; --pine-800:#173b39; --sage-50:#f4f7f4; --sage-100:#eaf0eb; --sage-200:#d8e3df; --sage-500:#7d948f; --sage-600:#536b69; --mari-100:#fff5e6; --mari-300:#f6cf7a; --mari-500:#e9a23b; --mari-800:#83511b;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--pine-800); }
+  .rz .card-body h3 { color:#e9efec; }
+  .rz .serif { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
+  .fm { width:100%; height:400px; border-radius:14px; overflow:hidden; background: radial-gradient(1200px 500px at 30% 0%, #fff 0%, var(--sage-50) 60%); display:grid; grid-template-columns: 1fr 1.2fr; position:relative; }
+  .left { padding:20px 18px; border-right:1px solid var(--sage-200); }
+  .right { padding:20px 22px; position:relative; }
+  .eyebrow { font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--sage-600); }
+  .bl { font-size:12px; padding:7px 9px; border-radius:8px; margin:4px 0; color:var(--sage-600); display:flex; justify-content:space-between; gap:6px; }
+  .bl.new { background:#fff; color:var(--pine-800); box-shadow:0 4px 14px rgba(15,40,38,.10); border-left:3px solid var(--pine-400); }
+  .tag { font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:999px; height:fit-content; white-space:nowrap; }
+  .tag.g { background:#e3f6ea; color:#155c46; } .tag.y { background:var(--mari-100); color:var(--mari-800); }
+  /* score ring */
+  .ringwrap { position:relative; width:92px; height:92px; margin:14px 0 4px; }
+  .ringwrap svg { transform: rotate(-90deg); }
+  .ringwrap .num { position:absolute; inset:0; display:grid; place-items:center; font-size:30px; }
+  .arc { stroke-dasharray: 251; stroke-dashoffset: calc(251 - 251*0.52); transition: none; }
+  .play .arc { animation: fill 1.4s cubic-bezier(.2,.8,.2,1) .3s forwards; }
+  @keyframes fill { to { stroke-dashoffset: calc(251 - 251*0.71); } }
+  .delta { font-size:12px; font-weight:700; color:#155c46; opacity:0; }
+  .play .delta { animation: up .6s ease-out 1.5s forwards; }
+  @keyframes up { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
+  /* A: toast */
+  .toast { position:absolute; left:22px; right:22px; bottom:20px; background:var(--pine-800); color:#fff; border-radius:14px; padding:14px 16px; opacity:0; transform:translateY(12px); }
+  .play .toast { animation: up .5s ease-out 1.7s forwards; }
+  .toast b { font-size:15px; } .toast p { margin:4px 0 10px; font-size:12.5px; opacity:.85; }
+  .tbtn { display:inline-block; background:#fff; color:var(--pine-800); font-weight:600; font-size:12px; padding:6px 12px; border-radius:8px; margin-right:6px; }
+  .tlink { font-size:12px; opacity:.8; }
+  /* B: moment */
+  .moment { position:absolute; inset:0; background:rgba(255,255,255,.92); display:grid; place-items:center; text-align:center; opacity:0; }
+  .play .moment { animation: up .4s ease-out .1s forwards; }
+  .moment .big { font-size:54px; line-height:1; }
+  .moment h4 { margin:10px 0 2px; font-size:20px; }
+  .moment p { margin:0 0 14px; font-size:13px; color:var(--sage-600); }
+  .pbtn { background:var(--pine-600); color:#fff; font-weight:600; font-size:13px; padding:9px 16px; border-radius:10px; display:inline-block; }
+  .conf { position:absolute; width:7px; height:11px; border-radius:2px; top:40%; left:50%; opacity:0; }
+  .play .conf { animation: burst 1.3s ease-out .5s forwards; }
+  @keyframes burst { 0%{opacity:1; transform:translate(0,0) rotate(0)} 100%{opacity:0; transform:translate(var(--x),var(--y)) rotate(400deg)} }
+  .replay { margin: 0 0 12px; background:#2c3a37; color:#e9efec; border:1px solid #46544f; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:13px; }
+</style>
+
+<button class="replay" onclick="document.querySelectorAll('.anim').forEach(e=>{e.classList.remove('play'); void e.offsetWidth; e.classList.add('play');});">↻ Replay</button>
+
+<div class="rz">
+<div class="cards">
+  <div class="card" data-choice="subtle" onclick="toggleSelect(this)">
+    <div class="card-image" style="width:100%">
+      <div class="fm anim play">
+        <div class="left">
+          <div class="eyebrow">Dispatcher · TransLog</div>
+          <div class="ringwrap"><svg width="92" height="92"><circle cx="46" cy="46" r="40" fill="none" stroke="#d8e3df" stroke-width="8"/><circle class="arc" cx="46" cy="46" r="40" fill="none" stroke="#17695d" stroke-width="8" stroke-linecap="round"/></svg><span class="num serif" data-from="52" data-to="71">52</span></div>
+          <div class="delta">▲ +19 · A good start → almost Clear</div>
+          <div class="bl new"><span>Planned daily routes for 10–50 regional drivers.</span><span class="tag g">80</span></div>
+          <div class="bl"><span>Handled calls from customers.</span><span class="tag y">43</span></div>
+          <div class="bl"><span>Worked with the warehouse team.</span><span class="tag y">48</span></div>
+        </div>
+        <div class="right">
+          <div class="eyebrow">Question 1 of 3 · done</div>
+          <p class="serif" style="font-size:17px;margin:8px 0;color:var(--sage-600)">Roughly how many drivers did you plan for each day?</p>
+          <div class="toast">
+            <b>Nice, 52 → 71! 🎉</b>
+            <p>That bullet is now clear. Next up: "Handled calls from customers" is the weakest one left.</p>
+            <span class="tbtn">Next question →</span><span class="tlink">I'm done for now</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>A · Score climbs + a toast with what's next</h3><p>The ring fills and the number counts up, "+19" pops in, the new bullet glows, and a small card congratulates you and names the next weakest bullet. Rewarding, but it never blocks you.</p></div>
+  </div>
+
+  <div class="card" data-choice="moment" onclick="toggleSelect(this)">
+    <div class="card-image" style="width:100%">
+      <div class="fm anim play">
+        <div class="left">
+          <div class="eyebrow">Dispatcher · TransLog</div>
+          <div class="bl new"><span>Planned daily routes for 10–50 regional drivers.</span><span class="tag g">80</span></div>
+          <div class="bl"><span>Handled calls from customers.</span><span class="tag y">43</span></div>
+          <div class="bl"><span>Worked with the warehouse team.</span><span class="tag y">48</span></div>
+        </div>
+        <div class="right"></div>
+        <div class="moment">
+          <div>
+            <div class="big serif"><span data-from="52" data-to="71" class="num">52</span></div>
+            <h4 class="serif">Up from 52. Nice work! 🎉</h4>
+            <p>Your Dispatcher role is almost in the Clear band.<br>One more answer could get it there.</p>
+            <span class="pbtn">Keep going →</span>
+          </div>
+          <span class="conf" style="background:#e9a23b;--x:-140px;--y:-120px"></span><span class="conf" style="background:#17695d;--x:150px;--y:-110px"></span><span class="conf" style="background:#5fa48d;--x:-90px;--y:110px"></span><span class="conf" style="background:#f6cf7a;--x:120px;--y:100px"></span><span class="conf" style="background:#c9686c;--x:-170px;--y:10px"></span><span class="conf" style="background:#17695d;--x:180px;--y:30px"></span><span class="conf" style="background:#e9a23b;--x:20px;--y:-150px"></span><span class="conf" style="background:#5fa48d;--x:-30px;--y:140px"></span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>B · A short "moment" with confetti</h3><p>A brief full-panel moment: the big number counts up, a little confetti burst, one line of praise and "Keep going". More of a celebration, but it's one extra click every time.</p></div>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+  function count(){
+    document.querySelectorAll('.num[data-to]').forEach(function(el){
+      var a=+el.dataset.from, b=+el.dataset.to, t0=null, d=1400, delay=300;
+      el.textContent=a;
+      function step(t){ if(!t0) t0=t; var p=Math.min(1,Math.max(0,(t-t0-delay)/d)); p=1-Math.pow(1-p,3); el.textContent=Math.round(a+(b-a)*p); if(p<1) requestAnimationFrame(step); }
+      requestAnimationFrame(step);
+    });
+  }
+  count();
+  document.querySelector('.replay').addEventListener('click', count);
+})();
+</script>
