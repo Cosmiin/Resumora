@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyCv, type CvContent, type Experience } from "@resumora/shared";
+import { MAX_BULLETS, emptyCv, type CvContent, type Experience } from "@resumora/shared";
 import { cvReducer, sectionsOnCv } from "./cvReducer.ts";
 
 function role(id: string, bullets: string[], extra: Partial<Experience> = {}): Experience {
@@ -245,5 +245,48 @@ describe("setNote", () => {
   it("new roles start with no notes", () => {
     const cv = cvReducer(emptyCv(), { type: "addItem", list: "experience", id: "e9" });
     expect(cv.experience[0]!.notes).toEqual([]);
+  });
+});
+
+describe("applyProposals", () => {
+  const apply = (cv: CvContent, accepted: { replaces: string | null; text: string }[]) =>
+    cvReducer(cv, { type: "applyProposals", roleId: "e1", accepted });
+
+  it("replaces bullets by id and appends new ones, in one step", () => {
+    const next = apply(withRole(["a", "b"]), [
+      { replaces: "e1-b2", text: "B" },
+      { replaces: null, text: "C" },
+    ]);
+    expect(texts(next)).toEqual(["a", "B", "C"]);
+    expect(next.experience[0]!.bullets[0]!.id).toBe("e1-b1");
+    expect(next.experience[0]!.bullets[1]!.id).toBe("e1-b2");
+    expect(next.experience[0]!.bullets[2]!.id).not.toMatch(/^e1-b/);
+  });
+
+  it("skips a proposal whose bullet was deleted and applies the others", () => {
+    const cv = withRole(["a", "b"]);
+    const next = apply(cv, [
+      { replaces: "e1-b9", text: "gone" },
+      { replaces: "e1-b1", text: "A" },
+    ]);
+    expect(texts(next)).toEqual(["A", "b"]);
+  });
+
+  it("changes nothing when every bullet it replaces is gone", () => {
+    const cv = withRole(["a"]);
+    expect(apply(cv, [{ replaces: "e1-b9", text: "gone" }])).toBe(cv);
+    expect(cvReducer(cv, { type: "applyProposals", roleId: "nope", accepted: [{ replaces: null, text: "x" }] })).toBe(cv);
+  });
+
+  it("stops appending at MAX_BULLETS", () => {
+    const cv = withRole(Array.from({ length: MAX_BULLETS - 1 }, (_, i) => `b${i}`));
+    const next = apply(cv, [
+      { replaces: null, text: "one" },
+      { replaces: null, text: "two" },
+      { replaces: "e1-b1", text: "first" },
+    ]);
+    expect(texts(next)).toHaveLength(MAX_BULLETS);
+    expect(texts(next).at(-1)).toBe("one");
+    expect(texts(next)[0]).toBe("first");
   });
 });

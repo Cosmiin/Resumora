@@ -1,8 +1,11 @@
-import { CATEGORY, normalizeLayout, type CvContent } from "@resumora/shared";
+import { useEffect, useRef, useState } from "react";
+import { CATEGORY, normalizeLayout, type CvContent, type Question } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
+import { QuestionFlow } from "../enrich/QuestionFlow.tsx";
+import { RewriteReview } from "../enrich/RewriteReview.tsx";
 import { ScoreCard } from "../enrich/ScoreCard.tsx";
 import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 import type { PanelFocus } from "./HelperPanel.tsx";
@@ -16,9 +19,9 @@ type Props = {
   onFocusPage(): void;
   scores?: ReadonlyMap<string, RoleScoreState>;
   onRetry?(roleId: string): void;
+  /** Resolves once autosave has saved the latest edits (the rewrite reads the saved CV). */
+  waitForSave?(): Promise<void>;
 };
-
-const noop = () => undefined;
 
 function Eye() {
   return (
@@ -63,12 +66,71 @@ function RoleBox({ cv, dispatch, list, itemId, onFocusPage }: Pick<Props, "cv" |
   );
 }
 
-/** The score card for one role. Answering and rewriting are wired in a later task. */
-function RoleScoreCard({ cv, roleId, scores, onRetry }: Pick<Props, "cv" | "scores" | "onRetry"> & { roleId: string }) {
+const savedNow = () => Promise.resolve();
+
+type RoleView = { kind: "card" } | { kind: "questions"; questions: Question[] } | { kind: "drafting" } | { kind: "review" };
+
+/** The role's score card, or in its place the questions or the rewrite review. */
+function RoleEnrich({ cv, dispatch, roleId, scores, onRetry, waitForSave }: Pick<Props, "cv" | "dispatch" | "scores" | "onRetry"> & { roleId: string; waitForSave(): Promise<void> }) {
+  const [view, setView] = useState<RoleView>({ kind: "card" });
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const role = cv.experience.find((r) => r.id === roleId);
   const score = scores?.get(roleId);
-  if (!role || !score) return null;
-  return <ScoreCard role={role} score={score} onAnswer={noop} onRewrite={noop} onRetry={() => onRetry?.(roleId)} />;
+  if (!role) return null;
+  const back = () => setView({ kind: "card" });
+
+  if (view.kind === "card") {
+    if (!score) return null;
+    const questions = score.state === "ready" ? (score.result?.questions ?? []) : [];
+    const rewrite = async () => {
+      setView({ kind: "drafting" });
+      await waitForSave();
+      if (alive.current) setView((v) => (v.kind === "drafting" ? { kind: "review" } : v));
+    };
+    return (
+      <ScoreCard
+        role={role}
+        score={score}
+        onAnswer={() => questions.length > 0 && setView({ kind: "questions", questions })}
+        onRewrite={() => void rewrite()}
+        onRetry={() => onRetry?.(roleId)}
+      />
+    );
+  }
+
+  // The review has its own way back, which keeps the proposals already chosen.
+  if (view.kind === "review") return <RewriteReview role={role} dispatch={dispatch} onClose={back} />;
+
+  return (
+    <>
+      <button type="button" className="link" onClick={back}>
+        {t("enrich.backToScore")}
+      </button>
+      {view.kind === "questions" && (
+        <QuestionFlow
+          role={role}
+          questions={view.questions}
+          dispatch={dispatch}
+          waitForSave={waitForSave}
+          onDraft={() => setView({ kind: "review" })}
+          locale={cv.locale}
+        />
+      )}
+      {view.kind === "drafting" && (
+        <div className="box">
+          <p className="working" role="status">
+            {t("enrich.review.drafting")}
+          </p>
+        </div>
+      )}
+    </>
+  );
 }
 
 /** Skills the importer could not place: send each one to a group. */
@@ -93,7 +155,7 @@ function ToSortBox({ cv, dispatch }: Pick<Props, "cv" | "dispatch">) {
 }
 
 /** The tools for the part of the CV the cursor is in. */
-export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores, onRetry }: Props) {
+export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores, onRetry, waitForSave = savedNow }: Props) {
   const { key, itemId } = focus;
   const layout = normalizeLayout(cv.layout);
   const standard = CATEGORY[key].label[cv.locale];
@@ -132,7 +194,9 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores,
           </button>
         </p>
       )}
-      {key === "experience" && itemId && <RoleScoreCard cv={cv} roleId={itemId} scores={scores} onRetry={onRetry} />}
+      {key === "experience" && itemId && (
+        <RoleEnrich key={itemId} cv={cv} dispatch={dispatch} roleId={itemId} scores={scores} onRetry={onRetry} waitForSave={waitForSave} />
+      )}
       {(key === "experience" || key === "volunteering") && itemId && (
         <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onFocusPage={onFocusPage} />
       )}

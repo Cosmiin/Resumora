@@ -70,6 +70,36 @@
 .answer-partial { font-size: 13px; color: var(--sage-500); font-style: italic; }
 .answer-voice-msg { font-size: 12px; color: var(--sage-600); margin: 0; }
 .voice-note { font-size: 11.5px; color: var(--sky-600); background: var(--sky-50); border: 1px solid var(--sky-200); border-radius: 7px; padding: 6px 9px; margin: 0; }
+
+/* Questions and the rewrite review, in place of the score card */
+.question-flow, .rewrite-review { display: grid; gap: 10px; justify-items: stretch; }
+.question-flow > .link, .rewrite-review > .link { justify-self: start; }
+.qbox { display: grid; gap: 8px; }
+.qcount { font-size: 12px; color: var(--sage-500); }
+.qtext { font-size: 14px; font-weight: 600; margin: 0; line-height: 1.4; }
+.qfor { font-size: 12px; color: var(--sage-600); font-style: italic; margin: 0; }
+.saved-note { font-size: 12px; color: var(--pine-600); margin: 0; }
+.working { font-size: 13px; color: var(--sage-600); display: flex; align-items: center; gap: 8px; margin: 0; }
+.working::before { content: ""; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid var(--sage-200); border-top-color: var(--pine-600); animation: working-spin 0.8s linear infinite; }
+@keyframes working-spin { to { transform: rotate(360deg); } }
+.rewrite-review .p-sub { margin: 0; }
+.prop { border: 1px solid var(--sage-200); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
+.prop-old { font-size: 12.5px; color: var(--sage-500); text-decoration: line-through; text-decoration-color: var(--sage-300); }
+.prop-label { font-size: 12px; font-weight: 600; color: var(--sage-600); }
+.prop-new { font-size: 13px; color: var(--pine-800); }
+.prop-hint { font-size: 11.5px; color: var(--sage-500); }
+.prop-why { font-size: 12px; color: var(--rose-600); }
+.prop-state { font-size: 12px; font-weight: 600; color: var(--pine-700); }
+.prop.streaming .prop-new, .prop.stopped .prop-new { color: var(--sage-500); }
+.prop.streaming .prop-new::after { content: ""; display: inline-block; width: 1px; height: 13px; margin-inline-start: 2px; vertical-align: -2px; background: var(--pine-600); animation: caret-blink 1s steps(1) infinite; }
+@keyframes caret-blink { 50% { opacity: 0; } }
+.prop.dropped { border-style: dashed; opacity: 0.7; }
+.prop.dropped .prop-new { text-decoration: line-through; text-decoration-color: var(--rose-200); color: var(--sage-500); }
+.prop.used { background: var(--pine-50); border-color: var(--pine-200); }
+.prop.kept { opacity: 0.55; }
+.review-note { font-size: 12px; color: var(--sage-600); background: var(--sage-50); border-radius: 8px; padding: 8px 10px; margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   .mic[aria-pressed="true"] { animation: none; box-shadow: 0 0 0 3px rgb(154 65 69 / 0.25); }
+  .prop.streaming .prop-new::after { animation: none; }
+  .working::before { animation: none; }
 }

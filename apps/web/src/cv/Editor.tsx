@@ -3,7 +3,7 @@ import type { CvContent, CvResponse, SaveResponse } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
-import { conflictFrom, isConflict, useAutosave, type SaveStatus } from "./useAutosave.ts";
+import { conflictFrom, isConflict, useAutosave, useWaitForSave, type SaveStatus } from "./useAutosave.ts";
 import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryPanel } from "./HistoryPanel.tsx";
 import { whenLabel } from "./historyFormat.ts";
@@ -46,7 +46,16 @@ export function Editor({ initial }: { initial: CvResponse }) {
   const focusField = useFocusAfterRender(pageRef);
   const [sectionFocus, clearFocus] = useFocusSection(pageRef);
   // One stable dispatch: rows on the page skip re-rendering unless their own data changed.
-  const dispatch = useCallback((a: CvAction) => setContent((c) => cvReducer(c, a)), [setContent]);
+  const { waitForSave, markEdited } = useWaitForSave(status);
+  const dispatch = useCallback(
+    (a: CvAction) =>
+      setContent((c) => {
+        const next = cvReducer(c, a);
+        if (next !== c) markEdited();
+        return next;
+      }),
+    [setContent, markEdited],
+  );
   const focusPage = useCallback(() => pageRef.current?.focus(), []);
   const { scores, retry } = useRoleScores({ cv: content, status });
   const phone = useMediaQuery("(max-width: 899px)");
@@ -127,6 +136,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
       onOpen={onOpen}
       scores={scores}
       onRetry={retry}
+      waitForSave={waitForSave}
     />
   );
 

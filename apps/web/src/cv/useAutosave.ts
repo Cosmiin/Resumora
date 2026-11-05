@@ -171,3 +171,45 @@ export function conflictFrom(err: ApiClientError): Conflict {
     updatedAt: typeof current?.updatedAt === "string" ? current.updatedAt : "",
   };
 }
+
+/** How long a rewrite waits for a save before going ahead anyway; the server answers 409 if it isn't saved. */
+export const SAVE_WAIT_MS = 15_000;
+
+/**
+ * `waitForSave()` resolves when autosave next reports "saved", or at once when nothing is waiting
+ * to be saved. `markEdited()` tells it about an edit that the status doesn't show yet.
+ * It never waits longer than `SAVE_WAIT_MS`.
+ */
+export function useWaitForSave(status: SaveStatus): { waitForSave(): Promise<void>; markEdited(): void } {
+  const current = useRef(status);
+  const edited = useRef(false);
+  const waiters = useRef(new Set<() => void>());
+
+  useEffect(() => {
+    current.current = status;
+    if (status !== "saved") return;
+    edited.current = false;
+    const done = [...waiters.current];
+    waiters.current.clear();
+    done.forEach((resolve) => resolve());
+  }, [status]);
+
+  const markEdited = useCallback(() => {
+    edited.current = true;
+  }, []);
+
+  const waitForSave = useCallback(() => {
+    if (current.current === "saved" && !edited.current) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        waiters.current.delete(finish);
+        resolve();
+      };
+      const timer = setTimeout(finish, SAVE_WAIT_MS);
+      waiters.current.add(finish);
+    });
+  }, []);
+
+  return { waitForSave, markEdited };
+}

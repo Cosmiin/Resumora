@@ -50,6 +50,7 @@ export type CvAction =
   | { type: "addSection"; key: SectionKey; id: string }
   | { type: "addCustomSection"; id: string; title: string }
   | { type: "setNote"; roleId: string; note: Note }
+  | { type: "applyProposals"; roleId: string; accepted: { replaces: string | null; text: string }[] }
   | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean };
 
 /**
@@ -169,6 +170,31 @@ function bulletAction(cv: CvContent, action: Extract<CvAction, { owner: BulletOw
   }
 }
 
+/**
+ * Accepted AI proposals for one role, as one change (one undo step). A proposal whose bullet
+ * is gone is skipped; new bullets are appended while there is room.
+ */
+function applyProposals(cv: CvContent, action: Extract<CvAction, { type: "applyProposals" }>): CvContent {
+  const owner = { list: "experience", itemId: action.roleId } as const;
+  const bullets = getBullets(cv, owner);
+  if (!bullets) return cv;
+  const replace = new Map<string, string>();
+  for (const p of action.accepted) if (p.replaces !== null) replace.set(p.replaces, p.text);
+  let changed = false;
+  const next = bullets.map((b) => {
+    const text = replace.get(b.id);
+    if (text === undefined || text === b.text) return b;
+    changed = true;
+    return { ...b, text };
+  });
+  for (const p of action.accepted) {
+    if (p.replaces !== null || next.length >= MAX_BULLETS) continue;
+    next.push({ id: newId(), text: p.text });
+    changed = true;
+  }
+  return changed ? withBullets(cv, owner, next) : cv;
+}
+
 /** Every CV edit as one small action. Pure; returns the same object when nothing changes. */
 export function cvReducer(cv: CvContent, action: CvAction): CvContent {
   switch (action.type) {
@@ -251,6 +277,8 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const notes = exists ? role.notes.map((n) => (n.id === action.note.id ? action.note : n)) : [...role.notes, action.note];
       return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, notes } : r)) };
     }
+    case "applyProposals":
+      return applyProposals(cv, action);
     case "setCurrent": {
       const items = cv[action.list];
       const item = items.find((r) => r.id === action.itemId);

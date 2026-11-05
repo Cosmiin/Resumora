@@ -19,14 +19,15 @@ type Props = {
   /** Role scores for the score card and the "Your roles" list. */
   scores?: ReadonlyMap<string, RoleScoreState>;
   onRetry?(roleId: string): void;
+  waitForSave?(): Promise<void>;
 };
 
 /** The right-hand panel: the overview, or the tools for the section being edited. */
-export function HelperPanel({ cv, dispatch, focus, onBack, onFocusField, onFocusPage, opened, onOpen, scores, onRetry }: Props) {
+export function HelperPanel({ cv, dispatch, focus, onBack, onFocusField, onFocusPage, opened, onOpen, scores, onRetry, waitForSave }: Props) {
   return (
     <aside className="panel" aria-label={t("panel.label")}>
       {focus ? (
-        <SectionTools cv={cv} dispatch={dispatch} focus={focus} onBack={onBack} onFocusPage={onFocusPage} scores={scores} onRetry={onRetry} />
+        <SectionTools cv={cv} dispatch={dispatch} focus={focus} onBack={onBack} onFocusPage={onFocusPage} scores={scores} onRetry={onRetry} waitForSave={waitForSave} />
       ) : (
         <Overview cv={cv} dispatch={dispatch} onFocusField={onFocusField} opened={opened} onOpen={onOpen} scores={scores} />
       )}
