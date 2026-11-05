@@ -120,6 +120,7 @@ export const jobsEn = {
   "edit.job.benefits": "Benefits",
   "edit.job.onePerLine": "One per line.",
   "edit.job.titleRequired": "Give the job a title.",
+  "edit.job.lineTooLong": "Each line can be up to 500 characters. Shorten the long ones and save again.",
   "edit.job.reload": "Reload",
   "edit.job.save": "Save",
   "edit.job.saving": "Saving…",

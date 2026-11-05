@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
-import type { JobListPage } from "@resumora/shared";
+import type { Job, JobListPage } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ApiClientError } from "../lib/api.ts";
@@ -9,6 +9,7 @@ import { t } from "../i18n/t.ts";
 import { deleteJob, getJob } from "./jobs-api.ts";
 import { JobAd } from "./JobAd.tsx";
 import { JobSummary } from "./JobSummary.tsx";
+import { JobEditForm } from "./JobEditForm.tsx";
 
 export function JobPage() {
   const userId = useAuth().session?.user.id ?? "anonymous";
@@ -22,6 +23,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const [pollUntil] = useState(() => Date.now() + 120_000);
   const [pollStopped, setPollStopped] = useState(false);
   const [tab, setTab] = useState<"ad" | "summary">("ad");
+  const [editing, setEditing] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -51,6 +53,17 @@ function JobView({ id, userId }: { id: string; userId: string }) {
       setDeleting(false);
     }
   }
+  async function saved(updated: Job) {
+    await queryClient.cancelQueries({ queryKey: ["jobs", userId], exact: true });
+    await queryClient.cancelQueries({ queryKey: ["job", userId, id], exact: true });
+    queryClient.setQueryData(["job", userId, id], updated);
+    queryClient.setQueryData<InfiniteData<JobListPage>>(["jobs", userId], (data) => data && ({
+      ...data, pages: data.pages.map((page) => ({ ...page, items: page.items.map((row) => row.id === id
+        ? { ...row, title: updated.title, company: updated.company, location: updated.location } : row) })),
+    }));
+    setEditing(false);
+    setTab("summary");
+  }
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
@@ -78,7 +91,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   return <AppShell>
     <main className="jobs-page job-page">
       <Link className="crumb" to="/jobs">{t("job.back")}</Link>
-      {query.isPending ? <p>{t("app.loading")}</p> : query.isError ? (
+      {query.isPending ? <p>{t("app.loading")}</p> : query.isError && query.data === undefined ? (
         query.error instanceof ApiClientError && query.error.status === 404 ? <p>{t("job.notFound")}</p> :
           <div className="jobs-state"><p role="alert">{t("jobs.loadError")}</p>
             <button type="button" onClick={() => void query.refetch()}>{t("jobs.retry")}</button></div>
@@ -93,10 +106,15 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         <h1 className="vtitle">{t(job.errorCode === "not_a_job" ? "jobs.error.not_a_job" : "jobs.error.ai_failed")}</h1>
         <p className="jobs-note">{t(job.errorCode === "not_a_job" ? "job.failed.notAJob" : "job.failed.other")}</p>
         {original}{deletion}
-      </div> : extracted ? <>
+      </div> : extracted && editing ? <JobEditForm id={id} version={job.version} extracted={extracted}
+        onSaved={saved} onCancel={() => setEditing(false)} onReload={async () => {
+          const result = await query.refetch();
+          if (result.isError) throw result.error;
+          setEditing(false);
+        }} /> : extracted ? <>
         <div className="view-head">
           <div><h1 className="vtitle">{job.title}</h1><div className="vsub">{[job.company, job.location].filter(Boolean).join(" · ")}</div></div>
-          <div className="job-actions"><button type="button" className="secondary">{t("job.edit")}</button>{deletion}</div>
+          <div className="job-actions"><button type="button" className="secondary" onClick={() => setEditing(true)}>{t("job.edit")}</button>{deletion}</div>
         </div>
         <div className="facts">
           {extracted.workMode !== "unknown" && <span className="fact">{t(`job.workMode.${extracted.workMode}`)}</span>}
