@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -32,6 +32,8 @@ const enrichApi = vi.hoisted(() => ({
 vi.mock("./enrich/enrich-api.ts", () => enrichApi);
 
 import { CvPage } from "./CvPage.tsx";
+import * as roleScores from "./enrich/useRoleScores.ts";
+import * as helperPanel from "./panel/HelperPanel.tsx";
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -57,6 +59,40 @@ beforeEach(() => {
 });
 
 describe("CV editor", () => {
+  describe.each(["real", "mocked"])("rapid section typing with %s role scores and panel", (components) => {
+    beforeEach(() => {
+      if (components === "mocked") {
+        vi.spyOn(roleScores, "useRoleScores").mockReturnValue({ scores: new Map(), retry: vi.fn() });
+        vi.spyOn(helperPanel, "HelperPanel").mockReturnValue(<></>);
+      }
+    });
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it.each(["Summary", "Bullet 1 of Dev", "Degree"])("keeps every character typed into %s without an update loop", async (label) => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const user = userEvent.setup({ delay: 0 });
+      const typed = "Built reliable services for growing teams. ".repeat(4);
+      withCv({
+        basics,
+        experience: [
+          { id: "r1", company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: true, description: "", bullets: [{ id: "b1", text: "" }], notes: [] },
+        ],
+        education: [
+          { id: "e1", school: "University", degree: "", field: "", startDate: "2016", endDate: "2020", notes: "" },
+        ],
+      });
+      renderPage();
+
+      const field = await screen.findByRole("textbox", { name: label });
+      await user.clear(field);
+      await user.type(field, typed);
+
+      expect(screen.getByRole("textbox", { name: label })).toHaveValue(typed);
+      expect(consoleError.mock.calls.flat().map(String).join("\n")).not.toContain("Maximum update depth");
+    });
+  });
+
   it("typing on the page autosaves", async () => {
     const user = userEvent.setup();
     withCv({ basics });
