@@ -1,4 +1,5 @@
 import { enrichSectionsEn } from "./en-enrich.ts";
+import { jobsEn } from "./en-jobs.ts";
 
 /** All UI copy. Romanian gets its own file with the same keys later. */
 export const en = {
@@ -6,6 +7,7 @@ export const en = {
   "app.loading": "Loading…",
   "nav.main": "Main",
   "nav.myCv": "My CV",
+  "nav.jobs": "Jobs",
   "nav.account": "Account: {email}",
   "app.signOut": "Sign out",
   "app.signOutUnsaved": "You have unsaved changes. Sign out anyway?",
@@ -346,6 +348,7 @@ export const en = {
   "edit.skills.professional": "Add professional skill",
   "edit.skills.sort": "Add skill to sort",
   ...enrichSectionsEn,
+  ...jobsEn,
 } as const;
 
 export type MessageKey = keyof typeof en;
