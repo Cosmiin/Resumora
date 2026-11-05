@@ -223,6 +223,7 @@ size: 300
 - `slots = min(4, MAX_BULLETS − role.bullets.length)`. `slots === 0` → `{ proposals: [], roleBefore, roleAfterAll: roleBefore }` with no call.
 - `before = role.bullets.length ? await scoreRole(...) : null`.
 - `callModel` task `enrich_brain_dump`, schema `{ bullets: string[] }` with at most 4. Prompt: up to `slots` new bullets using only what the ramble says, not repeating existing bullets, plus the writing rules.
+- Normalise each text with `squash` (exported from `rewrite.ts` in Task 3) before any check, and return the squashed text, so the 220-character check measures what is returned.
 - Keep the first `slots` texts that pass `checkProposal(role, "new", text)` (the saved role already holds the ramble as a note, so its numbers count as sources), and the repeat check against existing bullets and earlier kept ones. Temporary ids are `new1`…`new4`.
 - No survivors → `{ proposals: [], roleBefore: before?.score ?? null, roleAfterAll: before?.score ?? null }` with no grading call.
 - One `gradeBullets` call on the role with all survivors appended, ids = the temporary ids. `merged = mergeGrades(...)`. Keep proposals with a score ≥ 40.

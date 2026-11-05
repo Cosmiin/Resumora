@@ -6,7 +6,7 @@ import type { InsightsRepo } from "./repo.ts";
 
 /** Longest summary we accept. */
 const SUMMARY_MAX = 600;
-const squash = (s: string) => s.trim().replace(/\s+/g, " ");
+export const squash = (s: string) => s.trim().replace(/\s+/g, " ");
 
 /** Texts whose numbers a proposal may repeat: the role's own words and the person's answers. */
 export function roleSources(role: Experience): string[] {
