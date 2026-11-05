@@ -165,6 +165,24 @@ describe("skills", () => {
     expect(cv.technicalSkills).toEqual([{ id, name: "Docker" }]);
   });
 
+  it("moveSkills moves several skills in one action and skips ones it cannot move", () => {
+    let cv = cvReducer(emptyCv(), { type: "addSkill", group: "unclearSkills", name: "Docker" });
+    cv = cvReducer(cv, { type: "addSkill", group: "unclearSkills", name: "Teamwork" });
+    const [a, b] = cv.unclearSkills;
+    const next = cvReducer(cv, {
+      type: "moveSkills",
+      moves: [
+        { skillId: a!.id, group: "technicalSkills" },
+        { skillId: "gone", group: "technicalSkills" },
+        { skillId: b!.id, group: "professionalSkills" },
+      ],
+    });
+    expect(next.unclearSkills).toEqual([]);
+    expect(next.technicalSkills).toEqual([a]);
+    expect(next.professionalSkills).toEqual([b]);
+    expect(cvReducer(cv, { type: "moveSkills", moves: [] })).toBe(cv);
+  });
+
   it("removeSkill removes", () => {
     let cv = cvReducer(emptyCv(), { type: "addSkill", group: "technicalSkills", name: "Go" });
     cv = cvReducer(cv, { type: "removeSkill", group: "technicalSkills", skillId: cv.technicalSkills[0]!.id });

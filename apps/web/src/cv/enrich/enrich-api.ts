@@ -100,3 +100,18 @@ export function streamRewrite(path: string, body: unknown, onEvent: (e: RewriteE
   void readRewrite(path, body, emit, signal);
   return controller;
 }
+
+const SkillGroupSchema = z.enum(["technicalSkills", "professionalSkills"]);
+const SkillsAnswerSchema = z.object({
+  suggestions: z.array(z.object({ name: z.string(), group: SkillGroupSchema, evidence: z.string() })),
+  sort: z.array(z.object({ skillId: z.string(), group: SkillGroupSchema })),
+});
+export type SkillsAnswer = z.infer<typeof SkillsAnswerSchema>;
+
+/**
+ * Skills the saved roles show (each with the line it came from), and a group for each skill still to sort.
+ * 503 `ai_unavailable`: the AI is down. 502 `ai_bad_answer`: its answer couldn't be used.
+ */
+export function getSkillSuggestions(): Promise<SkillsAnswer> {
+  return apiFetch("/v1/enrich/skills", { method: "POST", json: {}, schema: SkillsAnswerSchema });
+}

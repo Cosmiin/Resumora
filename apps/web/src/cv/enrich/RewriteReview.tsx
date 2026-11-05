@@ -30,7 +30,7 @@ function update(list: Proposal[], key: string, change: (p: Proposal) => Proposal
 }
 
 /** How the proposals change with one event of stream `run`. Only streaming proposals take new text. */
-function onEvent(list: Proposal[], run: number, e: RewriteEvent): Proposal[] {
+export function onEvent(list: Proposal[], run: number, e: RewriteEvent): Proposal[] {
   if (e.event === "error" || e.event === "done") return list;
   const key = `${run}:${e.data.index}`;
   const streaming = (change: (p: Proposal) => Proposal) => update(list, key, (p) => (p.state === "streaming" ? change(p) : p));

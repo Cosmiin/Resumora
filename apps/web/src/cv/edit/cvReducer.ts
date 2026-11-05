@@ -41,6 +41,7 @@ export type CvAction =
   | { type: "addSkill"; group: SkillGroup; name: string }
   | { type: "removeSkill"; group: SkillGroup; skillId: string }
   | { type: "moveSkill"; skillId: string; to: SkillGroup }
+  | { type: "moveSkills"; moves: { skillId: string; group: SkillGroup }[] }
   | { type: "addInterest"; name: string }
   | { type: "removeInterest"; itemId: string }
   | { type: "setSummary"; value: string }
@@ -237,6 +238,8 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       return { ...cv, [action.group]: cv[action.group].filter((s) => s.id !== action.skillId) };
     case "moveSkill":
       return moveSkill(cv, action.skillId, action.to);
+    case "moveSkills":
+      return action.moves.reduce((next, m) => moveSkill(next, m.skillId, m.group), cv);
     case "addInterest": {
       const name = action.name.trim();
       if (name === "" || cv.interests.some((i) => i.name.trim().toLowerCase() === name.toLowerCase())) return cv;

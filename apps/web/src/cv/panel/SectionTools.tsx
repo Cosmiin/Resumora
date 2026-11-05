@@ -7,6 +7,8 @@ import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
 import { QuestionFlow } from "../enrich/QuestionFlow.tsx";
 import { RewriteReview } from "../enrich/RewriteReview.tsx";
 import { ScoreCard } from "../enrich/ScoreCard.tsx";
+import { SkillsTools } from "../enrich/SkillsTools.tsx";
+import { SummaryTools } from "../enrich/SummaryTools.tsx";
 import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 import type { PanelFocus } from "./HelperPanel.tsx";
 
@@ -200,6 +202,8 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores,
       {(key === "experience" || key === "volunteering") && itemId && (
         <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onFocusPage={onFocusPage} />
       )}
+      {key === "summary" && <SummaryTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
+      {key === "skills" && <SkillsTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
       {key === "skills" && <ToSortBox cv={cv} dispatch={dispatch} />}
       <div>
         <p className="p-sub">{t("panel.tools.tips")}</p>

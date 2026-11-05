@@ -1,3 +1,5 @@
+import { enrichSectionsEn } from "./en-enrich.ts";
+
 /** All UI copy. Romanian gets its own file with the same keys later. */
 export const en = {
   "app.name": "Resumora",
@@ -175,11 +177,7 @@ export const en = {
   "panel.tip.skills.2": "Move each \"to sort\" skill into a group.",
   "panel.tip.education.1": "Newest first. Grades only if they help.",
   "panel.tip.list.1": "One item per line. Press Enter for the next one.",
-  "panel.ai.summary.rewrite": "Rewrite my summary",
-  "panel.ai.summary.tailor": "Tailor to a job ad",
   "panel.ai.achievements.pull": "Pull achievements from my roles",
-  "panel.ai.skills.suggest": "Suggest skills from my experience",
-  "panel.ai.skills.sort": "Sort skills for me",
 
   "edit.bullet": "Bullet {n} of {of}",
   "edit.bulletPlaceholder": "Describe a result…",
@@ -347,6 +345,7 @@ export const en = {
   "edit.skills.technical": "Add technical skill",
   "edit.skills.professional": "Add professional skill",
   "edit.skills.sort": "Add skill to sort",
+  ...enrichSectionsEn,
 } as const;
 
 export type MessageKey = keyof typeof en;

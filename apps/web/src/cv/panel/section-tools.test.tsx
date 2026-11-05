@@ -95,9 +95,9 @@ describe("section tools", () => {
   });
 
   it("AI buttons are visible, marked Coming next and do nothing", async () => {
-    render(<Harness initial={filled()} />);
-    await userEvent.click(screen.getByRole("textbox", { name: "Summary" }));
-    const btn = screen.getByRole("button", { name: /Rewrite my summary/ });
+    render(<Harness initial={{ ...filled(), achievements: [{ id: "a1", text: "Won an award" }] }} />);
+    await userEvent.click(screen.getByDisplayValue("Won an award"));
+    const btn = screen.getByRole("button", { name: /Pull achievements from my roles/ });
     expect(btn).toHaveAttribute("aria-disabled", "true");
     expect(btn).toHaveAttribute("title", "Arrives in the next project");
     expect(btn).toHaveTextContent("Coming next");
