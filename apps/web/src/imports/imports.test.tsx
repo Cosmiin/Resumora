@@ -11,6 +11,16 @@ vi.mock("../cv/cv-api.ts", () => cvApi);
 const importsApi = vi.hoisted(() => ({ startImport: vi.fn(), getImport: vi.fn(), applyImport: vi.fn() }));
 vi.mock("./imports-api.ts", () => importsApi);
 
+// Scores ask the API in the background; keep them quiet and off the network.
+const enrichApi = vi.hoisted(() => ({
+  getScores: vi.fn(async () => []),
+  scoreRole: vi.fn(() => new Promise(() => {})),
+  createVoiceSession: vi.fn(),
+  streamRewrite: vi.fn(),
+  getSkillSuggestions: vi.fn(),
+}));
+vi.mock("../cv/enrich/enrich-api.ts", () => enrichApi);
+
 import { CvPage } from "../cv/CvPage.tsx";
 
 const named = (fullName: string): CvContent => ({ ...emptyCv(), basics: { ...emptyCv().basics, fullName } });
@@ -18,7 +28,7 @@ const imported: CvContent = {
   ...named("Ana Popescu"),
   basics: { ...named("Ana Popescu").basics, titles: ["Senior Product Manager"] },
   experience: [
-    { id: "e1", company: "Acme SRL", title: "Product Manager", location: "", startDate: "2019", endDate: "2024-03", current: false, description: "Owned onboarding.", bullets: [{ id: "b1", text: "Led the redesign." }] },
+    { id: "e1", company: "Acme SRL", title: "Product Manager", location: "", startDate: "2019", endDate: "2024-03", current: false, description: "Owned onboarding.", bullets: [{ id: "b1", text: "Led the redesign." }], notes: [] },
   ],
   technicalSkills: [{ id: "s1", name: "SQL" }],
   professionalSkills: [{ id: "s2", name: "Team leadership" }],

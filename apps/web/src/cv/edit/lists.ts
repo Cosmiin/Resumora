@@ -34,6 +34,7 @@ export function emptyItem(list: ListKey, id: string): Item {
         current: false,
         description: "",
         bullets: [{ id: `${id}-b1`, text: "" }],
+        notes: [],
       };
     case "education":
       return { id, school: "", degree: "", field: "", startDate: "", endDate: "", notes: "" };

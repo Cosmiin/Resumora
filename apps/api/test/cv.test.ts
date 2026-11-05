@@ -28,6 +28,12 @@ beforeEach(() => {
     importRepo: () => {
       throw new Error("not used");
     },
+    insightsRepo: () => {
+      throw new Error("not used");
+    },
+    model: () => {
+      throw new Error("not used");
+    },
     queue: { send: async () => {} },
     log: vi.fn(),
   });
@@ -180,6 +186,9 @@ describe("old v1 CVs", () => {
         if (!(id in versions)) return null;
         row = versions[id];
         return { ok: true, version: 2, updatedAt: "2026-11-04T10:01:00Z" };
+      },
+      async snapshot() {
+        throw new Error("not used");
       },
     };
   }

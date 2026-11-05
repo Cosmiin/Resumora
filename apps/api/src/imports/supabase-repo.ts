@@ -74,8 +74,8 @@ export function supabaseImportRepo(env: SupabaseEnv, user: AuthUser): ImportRepo
       return count ?? 0;
     },
 
-    async apply(id, expectedVersion) {
-      const { data, error } = await db.rpc("apply_import", { p_import_id: id, p_expected_version: expectedVersion });
+    async apply(id, expectedVersion, content) {
+      const { data, error } = await db.rpc("apply_import", { p_import_id: id, p_expected_version: expectedVersion, p_content: content ?? null });
       if (error) throw new Error(`apply_import failed: ${error.message}`);
       const row = (data as { version: number; updated_at: string; conflict: boolean }[])[0];
       return row ? ({ ok: !row.conflict, version: row.version, updatedAt: row.updated_at } satisfies SaveResult) : null;

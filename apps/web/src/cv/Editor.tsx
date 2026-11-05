@@ -3,7 +3,7 @@ import type { CvContent, CvResponse, SaveResponse } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
-import { conflictFrom, isConflict, useAutosave, type SaveStatus } from "./useAutosave.ts";
+import { conflictFrom, isConflict, useAutosave, useWaitForSave, type SaveStatus } from "./useAutosave.ts";
 import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryPanel } from "./HistoryPanel.tsx";
 import { whenLabel } from "./historyFormat.ts";
@@ -19,6 +19,9 @@ import { useOpenedSections } from "./edit/useOpenedSections.ts";
 import { HelperPanel } from "./panel/HelperPanel.tsx";
 import { BottomSheet, type SheetState } from "./panel/BottomSheet.tsx";
 import { useMediaQuery } from "../hooks/useMediaQuery.ts";
+import { useRoleScores } from "./enrich/useRoleScores.ts";
+import { FocusOpenProvider, type FocusTarget } from "./enrich/focus-context.ts";
+import { FocusMode } from "./enrich/FocusMode.tsx";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
   saved: "cv.status.saved",
@@ -45,10 +48,29 @@ export function Editor({ initial }: { initial: CvResponse }) {
   const focusField = useFocusAfterRender(pageRef);
   const [sectionFocus, clearFocus] = useFocusSection(pageRef);
   // One stable dispatch: rows on the page skip re-rendering unless their own data changed.
-  const dispatch = useCallback((a: CvAction) => setContent((c) => cvReducer(c, a)), [setContent]);
+  const { waitForSave, markEdited } = useWaitForSave(status);
+  const dispatch = useCallback(
+    (a: CvAction) =>
+      setContent((c) => {
+        const next = cvReducer(c, a);
+        if (next !== c) markEdited();
+        return next;
+      }),
+    [setContent, markEdited],
+  );
   const focusPage = useCallback(() => pageRef.current?.focus(), []);
+  const { scores, retry } = useRoleScores({ cv: content, status });
   const phone = useMediaQuery("(max-width: 899px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
+  const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
+  // Focus mode hands focus back to its opener; if the opener is gone by then (the score card's
+  // button disappears at 100), the page takes it, so keyboard focus is never left on <body>.
+  const closeFocus = useCallback(() => {
+    setFocusTarget(null);
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body) focusPage();
+    });
+  }, [focusPage]);
 
   // When the import screen closes (cancel, applied or conflict), focus goes back to Import CV.
   // This runs after render, once the top bar is no longer inert and can take focus.
@@ -123,15 +145,19 @@ export function Editor({ initial }: { initial: CvResponse }) {
       onFocusPage={focusPage}
       opened={opened}
       onOpen={onOpen}
+      scores={scores}
+      onRetry={retry}
+      waitForSave={waitForSave}
     />
   );
 
   return (
-    <AppShell actions={actions} inert={importId !== null}>
+    <AppShell actions={actions} inert={importId !== null || focusTarget !== null}>
       <main className="editor">
       {/* While an import is open the whole workspace is inert. While history is open only the page is,
           so a restore can't race the user's typing; the history panel stays usable. */}
-      <div className="editor-workspace" inert={importId !== null}>
+      <FocusOpenProvider value={setFocusTarget}>
+      <div className="editor-workspace" inert={importId !== null || focusTarget !== null}>
         <div className="stage" ref={pageRef} tabIndex={-1} onFocus={() => setSheet("peek")}>
           {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
           {notices}
@@ -144,7 +170,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
             {historyOpen ? (
               <CvDocument content={preview?.content ?? content} showUnsorted />
             ) : (
-              <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} />
+              <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} />
             )}
           </div>
         </div>
@@ -163,6 +189,18 @@ export function Editor({ initial }: { initial: CvResponse }) {
           panel
         )}
       </div>
+      </FocusOpenProvider>
+      {focusTarget && !historyOpen && (
+        <FocusMode
+          key={`${focusTarget.roleId}:${focusTarget.bulletId ?? ""}:${focusTarget.mode}`}
+          target={focusTarget}
+          cv={content}
+          dispatch={dispatch}
+          scores={scores}
+          waitForSave={waitForSave}
+          onClose={closeFocus}
+        />
+      )}
       {importId && (
         <ImportScreen
           importId={importId}

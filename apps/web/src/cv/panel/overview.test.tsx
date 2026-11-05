@@ -27,7 +27,7 @@ function Harness({ initial }: { initial: CvContent }) {
 const state = () => JSON.parse(screen.getByTestId("json").textContent ?? "{}") as CvContent;
 
 function role(id: string): Experience {
-  return { id, company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: true, description: "", bullets: [] };
+  return { id, company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: true, description: "", bullets: [], notes: [] };
 }
 const filled = (): CvContent => ({
   ...emptyCv(),

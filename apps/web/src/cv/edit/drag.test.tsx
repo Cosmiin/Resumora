@@ -31,6 +31,7 @@ function role(id: string, title: string): Experience {
     current: false,
     description: "",
     bullets: [],
+    notes: [],
   };
 }
 const initial = (): CvContent => ({

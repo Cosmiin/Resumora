@@ -18,6 +18,16 @@ vi.mock("../../auth/AuthProvider.tsx", () => ({
   useAuth: () => ({ loading: false, session: { user: { id: "user-a" } } }),
 }));
 
+// Scores ask the API in the background; keep them quiet and off the network.
+const enrichApi = vi.hoisted(() => ({
+  getScores: vi.fn(async () => []),
+  scoreRole: vi.fn(() => new Promise(() => {})),
+  createVoiceSession: vi.fn(),
+  streamRewrite: vi.fn(),
+  getSkillSuggestions: vi.fn(),
+}));
+vi.mock("../enrich/enrich-api.ts", () => enrichApi);
+
 import { CvPage } from "../CvPage.tsx";
 
 /** jsdom has no matchMedia: pretend the screen is a phone. */

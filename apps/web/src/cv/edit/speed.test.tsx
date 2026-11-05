@@ -17,6 +17,7 @@ function role(n: number): Experience {
     current: false,
     description: "",
     bullets: Array.from({ length: 8 }, (_, i) => ({ id: `r${n}-b${i}`, text: `Bullet ${i}` })),
+    notes: [],
   };
 }
 

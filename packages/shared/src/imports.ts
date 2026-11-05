@@ -160,6 +160,7 @@ export function toCvContent(draft: ImportDraft): ImportResult {
         current: e.current,
         description: clip(e.description, label, MAX_LONG_TEXT),
         bullets: e.bullets.slice(0, MAX_BULLETS).map((text) => ({ id: newId(), text: clip(text, label) })),
+        notes: [],
       };
     });
   const experience = jobs(draft.experience, "experience", "an experience entry");

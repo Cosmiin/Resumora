@@ -83,5 +83,10 @@ export function supabaseCvRepo(env: SupabaseEnv, user: AuthUser): CvRepo {
       const rows = data as SaveRow[];
       return rows.length ? toSaveResult(rows) : null;
     },
+
+    async snapshot(reason) {
+      const { error } = await db.rpc("snapshot_base_cv", { p_reason: reason });
+      if (error) throw new Error(`snapshot_base_cv failed: ${error.message}`);
+    },
   };
 }

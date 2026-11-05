@@ -6,16 +6,21 @@ import { useFocusAfterRender } from "../useFocusAfterRender.ts";
 import { AddButton } from "./AddButton.tsx";
 import { DragList } from "../DragList.tsx";
 import { RoleItem, roleName } from "./RoleItem.tsx";
+import type { RoleScoreState } from "../../enrich/useRoleScores.ts";
 
 type Props = {
   list: "experience" | "volunteering";
   items: Experience[];
   locale: Locale;
+  /** Scores by role id; only experience roles have them. */
+  scores?: ReadonlyMap<string, RoleScoreState>;
+  /** The role whose tools are open in the panel. */
+  toolsRoleId?: string;
   dispatch(a: CvAction): void;
 };
 
 /** Experience or volunteering: every role typed in place. */
-export function RolesEdit({ list, items, locale, dispatch }: Props) {
+export function RolesEdit({ list, items, locale, dispatch, scores, toolsRoleId }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
   const add = useCallback(() => {
@@ -28,7 +33,7 @@ export function RolesEdit({ list, items, locale, dispatch }: Props) {
   return (
     <div ref={root}>
       <DragList items={items} onMove={move} label={label}>
-        {(role) => <RoleItem role={role} list={list} locale={locale} dispatch={dispatch} />}
+        {(role) => <RoleItem role={role} list={list} locale={locale} dispatch={dispatch} score={scores?.get(role.id)} toolsOpen={role.id === toolsRoleId} />}
       </DragList>
       <AddButton label={t("edit.add.role")} onClick={add} />
     </div>

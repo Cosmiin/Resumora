@@ -41,6 +41,7 @@ function v1Cv(): CvContentV1 {
           { id: "b1", text: "One" },
           { id: "b2", text: "Two" },
         ],
+        notes: [],
       },
     ],
     education: [{ id: "d1", school: "UBB", degree: "BSc", field: "CS", startDate: "2015", endDate: "2019", notes: "" }],

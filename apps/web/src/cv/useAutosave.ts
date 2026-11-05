@@ -171,3 +171,66 @@ export function conflictFrom(err: ApiClientError): Conflict {
     updatedAt: typeof current?.updatedAt === "string" ? current.updatedAt : "",
   };
 }
+
+/** How long a rewrite waits for a save before giving up. */
+export const SAVE_WAIT_MS = 15_000;
+
+/** The latest edits could not be saved in time, so anything that reads the saved CV would read older text. */
+export class SaveNotDoneError extends Error {
+  constructor() {
+    super("The latest changes are not saved.");
+  }
+}
+
+const failedStatus = (s: SaveStatus) => s === "error" || s === "conflict" || s === "invalid";
+
+type Waiter = { resolve(): void; reject(err: Error): void };
+
+/**
+ * `waitForSave()` resolves when autosave next reports "saved", or at once when nothing is waiting
+ * to be saved. It rejects with SaveNotDoneError when autosave reports an error, a conflict or
+ * invalid content, or after `SAVE_WAIT_MS`. `markEdited()` tells it about an edit that the
+ * status doesn't show yet.
+ */
+export function useWaitForSave(status: SaveStatus): { waitForSave(): Promise<void>; markEdited(): void } {
+  const current = useRef(status);
+  const edited = useRef(false);
+  const waiters = useRef(new Set<Waiter>());
+
+  useEffect(() => {
+    current.current = status;
+    if (status !== "saved" && !failedStatus(status)) return;
+    if (status === "saved") edited.current = false;
+    const done = [...waiters.current];
+    waiters.current.clear();
+    done.forEach((w) => (status === "saved" ? w.resolve() : w.reject(new SaveNotDoneError())));
+  }, [status]);
+
+  const markEdited = useCallback(() => {
+    edited.current = true;
+  }, []);
+
+  const waitForSave = useCallback(() => {
+    if (current.current === "saved" && !edited.current) return Promise.resolve();
+    if (failedStatus(current.current)) return Promise.reject(new SaveNotDoneError());
+    return new Promise<void>((resolve, reject) => {
+      const waiter: Waiter = {
+        resolve: () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      };
+      const timer = setTimeout(() => {
+        waiters.current.delete(waiter);
+        reject(new SaveNotDoneError());
+      }, SAVE_WAIT_MS);
+      waiters.current.add(waiter);
+    });
+  }, []);
+
+  return { waitForSave, markEdited };
+}

@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(23);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -91,6 +91,31 @@ select results_eq(
   $$ select reason, content->>'n' from public.base_cv_versions $$,
   $$ values ('import'::text, 'imported'::text) $$,
   'the previous CV is kept as an import snapshot');
+
+-- ── apply_import with p_content (re-import keeps notes) ────────────────────
+reset role;
+insert into public.cv_imports (id, user_id, file_name, storage_path, status, result) values
+  ('aaaaaaaa-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'd.pdf', 'x', 'ready',
+   '{"content":{"n":"fourth"},"warnings":[]}');
+set local role authenticated;
+
+select results_eq(
+  $$ select version, conflict from public.apply_import('aaaaaaaa-0000-0000-0000-000000000004', 1, '{"n":"carried"}'::jsonb) $$,
+  $$ values (2, true) $$,
+  'a stale version still reports a conflict when content is given');
+
+select results_eq(
+  $$ select version, conflict from public.apply_import('aaaaaaaa-0000-0000-0000-000000000004', 2, '{"n":"carried"}'::jsonb) $$,
+  $$ values (3, false) $$,
+  'apply with content bumps the version');
+select is(
+  (select content->>'n' from public.base_cvs where user_id = '11111111-1111-1111-1111-111111111111'),
+  'carried',
+  'the given content is saved instead of the stored import result');
+select is(
+  (select count(*)::int from public.base_cv_versions where reason = 'import' and content->>'n' = 'second'),
+  1,
+  'the replaced CV is still kept as an import snapshot when content is given');
 
 -- ── Daily limit, enforced in the database so parallel uploads can't get past it ──
 set local request.jwt.claims to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';

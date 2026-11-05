@@ -1,4 +1,4 @@
-import type { ImportResponse, ImportResult } from "@resumora/shared";
+import type { CvContent, ImportResponse, ImportResult } from "@resumora/shared";
 import type { AiCallLog } from "../ai/call-model.ts";
 import type { SaveResult } from "../cv/repo.ts";
 import type { FileFormat, ImportFailureCode } from "./extract-text.ts";
@@ -26,8 +26,8 @@ export interface ImportRepo {
   get(id: string): Promise<ImportResponse | null>;
   /** Imports created since `iso`, for the daily limit. */
   countSince(iso: string): Promise<number>;
-  /** null when the import isn't this user's or isn't ready. */
-  apply(id: string, expectedVersion: number): Promise<SaveResult | null>;
+  /** Saves `content` when given, otherwise the import's own result. null when the import isn't this user's or isn't ready. */
+  apply(id: string, expectedVersion: number, content?: CvContent): Promise<SaveResult | null>;
 }
 
 export type ImportJob = { id: string; userId: string; storagePath: string };

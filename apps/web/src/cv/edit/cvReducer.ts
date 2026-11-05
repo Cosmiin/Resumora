@@ -2,12 +2,16 @@ import {
   MAX_ACHIEVEMENTS,
   MAX_BULLETS,
   MAX_ITEMS,
+  MAX_NOTES,
   MAX_TITLES,
   SKILL_GROUPS,
   isSectionEmpty,
   newId,
   normalizeLayout,
+  notesHash,
   type CvContent,
+  type Note,
+  type RoleFacts,
   type SectionKey,
   type SkillGroup,
 } from "@resumora/shared";
@@ -39,6 +43,7 @@ export type CvAction =
   | { type: "addSkill"; group: SkillGroup; name: string }
   | { type: "removeSkill"; group: SkillGroup; skillId: string }
   | { type: "moveSkill"; skillId: string; to: SkillGroup }
+  | { type: "moveSkills"; moves: { skillId: string; group: SkillGroup }[] }
   | { type: "addInterest"; name: string }
   | { type: "removeInterest"; itemId: string }
   | { type: "setSummary"; value: string }
@@ -47,6 +52,10 @@ export type CvAction =
   | { type: "moveSection"; from: number; to: number }
   | { type: "addSection"; key: SectionKey; id: string }
   | { type: "addCustomSection"; id: string; title: string }
+  | { type: "replaceBullet"; roleId: string; bulletId: string; text: string }
+  | { type: "addBullets"; roleId: string; texts: string[] }
+  | { type: "setFacts"; roleId: string; facts: RoleFacts | null }
+  | { type: "setNote"; roleId: string; note: Note }
   | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean };
 
 /**
@@ -208,6 +217,8 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       return { ...cv, [action.group]: cv[action.group].filter((s) => s.id !== action.skillId) };
     case "moveSkill":
       return moveSkill(cv, action.skillId, action.to);
+    case "moveSkills":
+      return action.moves.reduce((next, m) => moveSkill(next, m.skillId, m.group), cv);
     case "addInterest": {
       const name = action.name.trim();
       if (name === "" || cv.interests.some((i) => i.name.trim().toLowerCase() === name.toLowerCase())) return cv;
@@ -239,6 +250,39 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (next === cv) return cv;
       const custom = next.custom.map((c) => (c.id === action.id ? { ...c, title: action.title } : c));
       return unhide({ ...next, custom }, "other");
+    }
+    case "replaceBullet":
+      return bulletAction(cv, { type: "setBullet", owner: { list: "experience", itemId: action.roleId }, bulletId: action.bulletId, text: action.text });
+    case "addBullets": {
+      const owner = { list: "experience", itemId: action.roleId } as const;
+      const bullets = getBullets(cv, owner);
+      if (!bullets || !action.texts.length || bullets.length >= MAX_BULLETS) return cv;
+      const added = action.texts.slice(0, MAX_BULLETS - bullets.length).map((text) => ({ id: newId(), text }));
+      return withBullets(cv, owner, [...bullets, ...added]);
+    }
+    case "setFacts": {
+      const role = cv.experience.find((r) => r.id === action.roleId);
+      if (!role) return cv;
+      const before = role.facts ?? null;
+      const facts = action.facts;
+      if (facts && notesHash(role.notes) !== facts.fromNotes) return cv;
+      if (before === facts || (before && facts && before.fromNotes === facts.fromNotes && before.updatedAt === facts.updatedAt
+        && before.items.length === facts.items.length && before.items.every((item, i) => item === facts.items[i]))) return cv;
+      return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, facts } : r)) };
+    }
+    case "setNote": {
+      const role = cv.experience.find((r) => r.id === action.roleId);
+      if (!role) return cv;
+      const exists = role.notes.some((n) => n.id === action.note.id);
+      let kept = role.notes;
+      if (!exists && kept.length >= MAX_NOTES) {
+        // Full: the newest answers win, so the oldest notes make room (as when notes are carried over).
+        const oldestFirst = [...kept].sort((a, b) => (a.askedAt < b.askedAt ? -1 : a.askedAt > b.askedAt ? 1 : 0));
+        const drop = new Set(oldestFirst.slice(0, kept.length - MAX_NOTES + 1));
+        kept = kept.filter((n) => !drop.has(n));
+      }
+      const notes = exists ? kept.map((n) => (n.id === action.note.id ? action.note : n)) : [...kept, action.note];
+      return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, notes } : r)) };
     }
     case "setCurrent": {
       const items = cv[action.list];

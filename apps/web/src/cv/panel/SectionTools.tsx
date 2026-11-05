@@ -3,6 +3,11 @@ import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
+import { useOpenFocus } from "../enrich/focus-context.ts";
+import { ScoreCard } from "../enrich/ScoreCard.tsx";
+import { SkillsTools } from "../enrich/SkillsTools.tsx";
+import { SummaryTools } from "../enrich/SummaryTools.tsx";
+import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 import type { PanelFocus } from "./HelperPanel.tsx";
 
 type Props = {
@@ -12,6 +17,10 @@ type Props = {
   onBack(): void;
   /** Move the cursor to the page itself (used when what had it is gone). */
   onFocusPage(): void;
+  scores?: ReadonlyMap<string, RoleScoreState>;
+  onRetry?(roleId: string): void;
+  /** Resolves once autosave has saved the latest edits (the rewrite reads the saved CV). */
+  waitForSave?(): Promise<void>;
 };
 
 function Eye() {
@@ -57,6 +66,24 @@ function RoleBox({ cv, dispatch, list, itemId, onFocusPage }: Pick<Props, "cv" |
   );
 }
 
+const savedNow = () => Promise.resolve();
+
+/** The role's score card; its button opens focus mode, which the editor renders over the page. */
+function RoleEnrich({ cv, roleId, scores, onRetry }: Pick<Props, "cv" | "scores" | "onRetry"> & { roleId: string }) {
+  const open = useOpenFocus();
+  const role = cv.experience.find((r) => r.id === roleId);
+  const score = scores?.get(roleId);
+  if (!role || !score) return null;
+  return (
+    <ScoreCard
+      role={role}
+      score={score}
+      onImprove={(mode) => open?.({ roleId, mode })}
+      onRetry={() => onRetry?.(roleId)}
+    />
+  );
+}
+
 /** Skills the importer could not place: send each one to a group. */
 function ToSortBox({ cv, dispatch }: Pick<Props, "cv" | "dispatch">) {
   if (cv.unclearSkills.length === 0) return null;
@@ -79,7 +106,7 @@ function ToSortBox({ cv, dispatch }: Pick<Props, "cv" | "dispatch">) {
 }
 
 /** The tools for the part of the CV the cursor is in. */
-export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage }: Props) {
+export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores, onRetry, waitForSave = savedNow }: Props) {
   const { key, itemId } = focus;
   const layout = normalizeLayout(cv.layout);
   const standard = CATEGORY[key].label[cv.locale];
@@ -118,9 +145,14 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage }: Props
           </button>
         </p>
       )}
+      {key === "experience" && itemId && (
+        <RoleEnrich key={itemId} cv={cv} roleId={itemId} scores={scores} onRetry={onRetry} />
+      )}
       {(key === "experience" || key === "volunteering") && itemId && (
         <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onFocusPage={onFocusPage} />
       )}
+      {key === "summary" && <SummaryTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
+      {key === "skills" && <SkillsTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
       {key === "skills" && <ToSortBox cv={cv} dispatch={dispatch} />}
       <div>
         <p className="p-sub">{t("panel.tools.tips")}</p>

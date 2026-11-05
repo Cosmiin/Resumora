@@ -11,6 +11,7 @@ export const MAX_TEXT = 2000;
 export const MAX_LONG_TEXT = 4000;
 export const MAX_TITLES = 2;
 export const MAX_ACHIEVEMENTS = 10;
+export const MAX_NOTES = 25;
 
 const text = (max = MAX_TEXT) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -21,6 +22,23 @@ export const YearMonthSchema = z
   .regex(/^(\d{4}(-(0[1-9]|1[0-2]))?)?$/, "Use YYYY-MM or YYYY");
 
 export const BulletSchema = z.object({ id, text: text() }).strict();
+
+/** The person's answer to a question about a role. Stored hidden in the CV, never rendered. */
+export const NoteSchema = z
+  .object({
+    id,
+    question: text(MAX_TEXT),
+    answer: text(MAX_LONG_TEXT),
+    /** How the answer was given: a tapped option, typed words, or voice. */
+    via: z.array(z.enum(["pick", "type", "voice"])).min(1).max(3),
+    askedAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const RoleFactsSchema = z
+  .object({ items: z.array(text(160)).max(8), fromNotes: z.string(), updatedAt: z.iso.datetime() })
+  .strict();
+export type RoleFacts = z.infer<typeof RoleFactsSchema>;
 
 export const ExperienceSchema = z
   .object({
@@ -34,6 +52,8 @@ export const ExperienceSchema = z
     /** Short statement of the role's scope, kept word for word from the CV. */
     description: text(MAX_LONG_TEXT),
     bullets: z.array(BulletSchema).max(MAX_BULLETS),
+    notes: z.array(NoteSchema).max(MAX_NOTES).default([]),
+    facts: RoleFactsSchema.nullable().optional(),
   })
   .strict();
 
@@ -147,6 +167,7 @@ export const CvContentSchema = z
 
 export type CvContent = z.infer<typeof CvContentSchema>;
 export type CvContentV1 = z.infer<typeof CvContentV1Schema>;
+export type Note = z.infer<typeof NoteSchema>;
 export type Experience = z.infer<typeof ExperienceSchema>;
 export type Skill = z.infer<typeof SkillSchema>;
 export type Bullet = z.infer<typeof BulletSchema>;

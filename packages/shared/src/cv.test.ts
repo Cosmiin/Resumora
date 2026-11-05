@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, emptyCv, newId, type CvContent } from "./index.ts";
+import { CvContentSchema, ExperienceSchema, MAX_NOTES, emptyCv, newId, type CvContent } from "./index.ts";
 
 function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
   return {
@@ -12,6 +12,7 @@ function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
     current: true,
     description: "",
     bullets: [],
+    notes: [],
     ...overrides,
   };
 }
@@ -21,6 +22,36 @@ function withExperience(items: CvContent["experience"]): CvContent {
 }
 
 describe("CvContentSchema", () => {
+  it("accepts missing facts without adding a default", () => {
+    expect(ExperienceSchema.parse(experience()).facts).toBeUndefined();
+  });
+
+  it("accepts null facts", () => {
+    expect(ExperienceSchema.parse(experience({ facts: null })).facts).toBeNull();
+  });
+
+  it("limits facts to eight items of 160 characters", () => {
+    const withFacts = (count: number, length = 160) => ({
+      ...experience(),
+      facts: { items: Array.from({ length: count }, () => "x".repeat(length)), fromNotes: "hash", updatedAt: "2026-11-05T00:00:00Z" },
+    });
+    expect(ExperienceSchema.safeParse(withFacts(8)).success).toBe(true);
+    expect(ExperienceSchema.safeParse(withFacts(9)).success).toBe(false);
+    expect(ExperienceSchema.safeParse(withFacts(1, 161)).success).toBe(false);
+  });
+
+  it("accepts 25 notes and rejects 26", () => {
+    const withNotes = (count: number) => ({
+      ...experience(),
+      notes: Array.from({ length: count }, (_, i) => ({
+        id: `n${i}`, question: "Q", answer: "A", via: ["type"], askedAt: "2026-11-05T00:00:00Z",
+      })),
+    });
+    expect(MAX_NOTES).toBe(25);
+    expect(ExperienceSchema.safeParse(withNotes(25)).success).toBe(true);
+    expect(ExperienceSchema.safeParse(withNotes(26)).success).toBe(false);
+  });
+
   it("emptyCv parses", () => {
     expect(() => CvContentSchema.parse(emptyCv())).not.toThrow();
     expect(emptyCv().schemaVersion).toBe(2);

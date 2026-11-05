@@ -27,7 +27,7 @@ function Harness({ initial }: { initial: CvContent }) {
 }
 
 function role(over: Partial<Experience> = {}): Experience {
-  return { id: "r1", company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: false, description: "", bullets: [], ...over };
+  return { id: "r1", company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: false, description: "", bullets: [], notes: [], ...over };
 }
 const filled = (r: Experience = role()): CvContent => ({
   ...emptyCv(),
@@ -95,9 +95,9 @@ describe("section tools", () => {
   });
 
   it("AI buttons are visible, marked Coming next and do nothing", async () => {
-    render(<Harness initial={filled()} />);
-    await userEvent.click(roleTitle());
-    const btn = screen.getByRole("button", { name: /Strengthen these bullets/ });
+    render(<Harness initial={{ ...filled(), achievements: [{ id: "a1", text: "Won an award" }] }} />);
+    await userEvent.click(screen.getByDisplayValue("Won an award"));
+    const btn = screen.getByRole("button", { name: /Pull achievements from my roles/ });
     expect(btn).toHaveAttribute("aria-disabled", "true");
     expect(btn).toHaveAttribute("title", "Arrives in the next project");
     expect(btn).toHaveTextContent("Coming next");

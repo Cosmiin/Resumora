@@ -5,6 +5,7 @@ import { MissingBox } from "./MissingBox.tsx";
 import { SectionHeading } from "./SectionHeading.tsx";
 import { useFocusAfterRender } from "./useFocusAfterRender.ts";
 import { HeaderEdit } from "./sections/HeaderEdit.tsx";
+import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 import { firstFieldKey, sectionRenderers } from "./sections/renderers.tsx";
 
 type Props = {
@@ -13,10 +14,12 @@ type Props = {
   /** Sections added this visit that stay on the page while empty (see useOpenedSections). */
   opened: ReadonlySet<SectionKey>;
   onOpen(key: SectionKey): void;
+  scores?: ReadonlyMap<string, RoleScoreState>;
+  toolsRoleId?: string;
 };
 
 /** The CV page where every piece of text is typed in place. */
-export function EditablePage({ cv, dispatch, opened, onOpen }: Props) {
+export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
 
@@ -51,7 +54,7 @@ export function EditablePage({ cv, dispatch, opened, onOpen }: Props) {
               {key !== "other" && (
                 <SectionHeading sectionKey={key} title={layout.titles[key] ?? ""} locale={cv.locale} dispatch={dispatch} />
               )}
-              <Body cv={cv} dispatch={dispatch} />
+              <Body cv={cv} dispatch={dispatch} scores={scores} toolsRoleId={toolsRoleId} />
             </section>
           );
         }
