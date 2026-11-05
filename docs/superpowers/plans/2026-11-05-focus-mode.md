@@ -597,3 +597,32 @@ The migration, the SQL test, the db-steps doc and this plan were written by Clau
 **Acceptance tests:** each removed class has no remaining reference in `apps/web/src`; typecheck, lint and the full test suite pass.
 
 **Out of scope:** everything else.
+
+---
+
+## Task 13: Fourth whole-branch review fixes: stale queue grades, temporary id collisions
+
+Added after the fourth whole-branch review (2026-11-05).
+
+```
+---
+files: [apps/web/src/cv/enrich/useFocusSession.ts, apps/web/src/cv/enrich/focus-session.test.tsx, apps/api/src/enrich/brain-dump.ts, apps/api/src/enrich/brain-dump.test.ts, docs/superpowers/plans/2026-11-05-focus-mode.md]
+new_files: []
+deps: false
+size: 100
+---
+```
+
+This plan was edited by Claude. **Do not modify it.**
+
+**Goal:** two fixes.
+
+1. **Stale grades when building the queue.** In `useFocusSession`'s `buildQueue`, use the stored result's per-bullet grades (score and impact) only when `result.fingerprint === fingerprint(role, cv.locale)`. Otherwise treat every bullet as having no grade: it is kept in the queue in both modes, and in `improve` mode sorts as score 0 (CV order among ties), with the ✨-chosen bullet still first. The same rule applies wherever the queue is rebuilt (after the brain dump).
+2. **Temporary ids in the brain dump.** In `brainDump`, generate the proposals' temporary ids so they never equal an id already in the role: start from `new1`, and skip any candidate that is already a bullet id (or already used by an earlier proposal). Returned proposal ids stay unique.
+
+**Acceptance tests:**
+- `focus-session.test.tsx`: with a stored result whose fingerprint does not match the role (the role was edited after scoring) and that has a bullet at 100, opening in `improve` mode keeps that bullet in the queue; with a matching fingerprint the 100 bullet is still excluded (unless chosen with ✨).
+- `brain-dump.test.ts`: a role whose saved bullet has id `new1` gets proposals with ids that differ from every saved id, and the grading call succeeds.
+- Typecheck, lint and the full test suite pass.
+
+**Out of scope:** everything else.

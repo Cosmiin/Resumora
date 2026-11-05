@@ -107,6 +107,26 @@ describe("POST /v1/enrich/brain-dump", () => {
     expect(model.requests).toHaveLength(2);
   });
 
+  it("skips saved new1 and new3 ids and grades unique proposals", async () => {
+    role.bullets = [
+      { id: "new1", text: "Managed the payroll office." },
+      { id: "new3", text: "Organised office meetings." },
+    ];
+    await save();
+    const proposed = [
+      { id: "new2", text: texts[0]! }, { id: "new4", text: texts[1]! },
+      { id: "new5", text: texts[2]! }, { id: "new6", text: texts[3]! },
+    ];
+    const answers = [{ bullets: texts }, allSpecific({ ...role, bullets: proposed })];
+    model = fakeModel(() => answers.shift());
+
+    const got = await result();
+    expect(got.proposals).toEqual(proposed.map((b) => ({ ...b, score: 100 })));
+    expect(got.roleAfterAll).toBe(100);
+    expect(new Set(got.proposals.map((b) => b.id)).size).toBe(4);
+    expect(got.proposals.every((b) => role.bullets.every((saved) => saved.id !== b.id))).toBe(true);
+  });
+
   it("drops invented numbers and keeps a number from the saved ramble", async () => {
     answer(["Prepared payroll for 999 staff.", "Prepared payroll for 75 staff using Sage."]);
     expect((await result()).proposals).toEqual([{ id: "new1", text: "Prepared payroll for 75 staff using Sage.", score: 100 }]);

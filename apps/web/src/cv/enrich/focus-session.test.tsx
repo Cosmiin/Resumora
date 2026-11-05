@@ -83,6 +83,31 @@ describe("useFocusSession", () => {
     expect(h.result.current.position).toBe(0);
     expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
   });
+  it.each([
+    { mode: "improve" as const, bulletId: undefined, queue: ["b0", "b1", "b2", "b3"] },
+    { mode: "improve" as const, bulletId: "b2", queue: ["b2", "b0", "b1", "b3"] },
+    { mode: "standOut" as const, bulletId: undefined, queue: ["b0", "b1", "b2", "b3"] },
+  ])("ignores grades after editing the role: $mode, chosen $bulletId", ({ mode, bulletId, queue }) => {
+    const r = role(4);
+    const stored = score(r);
+    r.bullets[0]!.text = "Built an updated tool";
+    const h = mount({ mode, bulletId, scores: new Map([["r", { state: "ready", result: stored }]]) }, r);
+    expect(h.result.current.queue).toEqual(queue);
+  });
+  it("keeps a chosen 100 bullet first when the fingerprint matches", () => {
+    expect(mount({ bulletId: "b2" }).result.current.queue).toEqual(["b2", "b0", "b1"]);
+  });
+  it.each(["improve", "standOut"] as const)("ignores stale grades when rebuilding after a brain dump: %s", async (mode) => {
+    const r = role(2);
+    const stored = score(r);
+    Object.assign(stored.bullets[0]!, { score: 100, impact: "specific" });
+    const h = mount({ mode, scores: new Map([["r", { state: "ready", result: stored }]]) }, r);
+    await submit(h, "Built weekly reports");
+    act(() => h.result.current.addSelected(["p"]));
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    const addedId = h.opts().cv.experience[0]!.bullets[2]!.id;
+    expect(h.result.current.queue).toEqual(["b0", "b1", addedId]);
+  });
   it("standOut keeps only impact below specific in CV order", () => {
     const h = mount({ mode: "standOut", bulletId: "b3" }, role(4));
     expect(h.result.current.queue).toEqual(["b0", "b1", "b3"]);
@@ -368,7 +393,8 @@ describe("useFocusSession", () => {
     expect(h.result.current.step).toEqual({ kind: "scoring", source: "dump" });
     await act(async () => vi.advanceTimersByTimeAsync(1));
     const addedId = h.opts().cv.experience[0]!.bullets[2]!.id;
-    expect(h.result.current.step).toMatchObject({ kind: "proposal", bulletId: addedId });
+    expect(h.result.current.queue).toEqual(["b0", "b1", addedId]);
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b0" });
     expect(h.result.current.busy).toBe(false);
   });
   it("a fresh score that did not rise goes directly to its queue", async () => {

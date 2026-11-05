@@ -41,13 +41,18 @@ export async function brainDump(
       maxOutputTokens: 1200,
     });
     const seen = new Set(role.bullets.map((b) => repeatKey(b.text)));
+    const usedIds = new Set(role.bullets.map((b) => b.id));
     const survivors: { id: string; text: string }[] = [];
+    let nextId = 1;
     for (const raw of answer.bullets) {
       const text = squash(raw);
       const key = repeatKey(text);
       if (checkProposal(role, "new", text) !== "ok" || seen.has(key)) continue;
       seen.add(key);
-      survivors.push({ id: `new${survivors.length + 1}`, text });
+      while (usedIds.has(`new${nextId}`)) nextId++;
+      const id = `new${nextId++}`;
+      usedIds.add(id);
+      survivors.push({ id, text });
       if (survivors.length === slots) break;
     }
     const roleBefore = before?.score ?? null;

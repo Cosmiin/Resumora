@@ -33,7 +33,8 @@ type Options = {
 type View = { step: FocusStep; queue: string[]; position: number; busy: boolean };
 
 function buildQueue(role: Experience | undefined, result: RoleResult | undefined, opts: Options): string[] {
-  const grades = new Map(result?.bullets.map((b) => [b.id, b]));
+  const grades = new Map(role && result && result.fingerprint === fingerprint(role, opts.cv.locale)
+    ? result.bullets.map((b) => [b.id, b]) : []);
   // The bullet picked with ✨ is always in the queue, even at 100: focus mode opens on that bullet.
   const bullets = (role?.bullets ?? []).filter((b) => b.id === opts.bulletId || (opts.mode === "improve"
     ? grades.get(b.id)?.score !== 100 : grades.get(b.id)?.impact !== "specific"));
