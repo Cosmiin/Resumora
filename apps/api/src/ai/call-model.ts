@@ -82,6 +82,22 @@ export function providersFromEnv(
   return all.filter((p) => p.apiKey && p.model);
 }
 
+/**
+ * The provider-specific part of a chat-completions body: the token limit and the privacy routing.
+ * Shared by callModel and streamModel so both send CVs only where callModel would.
+ */
+export function providerRequestFields(provider: Provider, maxOutputTokens: number): Record<string, unknown> {
+  return provider.name === "openai"
+    ? // GPT-5 models reject `max_tokens`; `store: false` keeps CVs out of OpenAI's stored completions.
+      { max_completion_tokens: maxOutputTokens, store: false }
+    : {
+        max_tokens: maxOutputTokens,
+        // CVs are personal data: only endpoints that neither keep nor train on it, and that
+        // support every parameter we send (structured output), may serve the request.
+        provider: { data_collection: "deny", zdr: true, require_parameters: true },
+      };
+}
+
 /** The chat-completions content for the user message; both providers take the same file part. */
 function userContent(user: string | UserPart[]): string | unknown[] {
   if (typeof user === "string") return user;
@@ -113,15 +129,7 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
     JSON.stringify({
       model: provider.model,
       temperature: 0,
-      ...(provider.name === "openai"
-        ? // GPT-5 models reject `max_tokens`; `store: false` keeps CVs out of OpenAI's stored completions.
-          { max_completion_tokens: req.maxOutputTokens, store: false }
-        : {
-            max_tokens: req.maxOutputTokens,
-            // CVs are personal data: only endpoints that neither keep nor train on it, and that
-            // support every parameter we send (structured output), may serve the request.
-            provider: { data_collection: "deny", zdr: true, require_parameters: true },
-          }),
+      ...providerRequestFields(provider, req.maxOutputTokens),
       messages: [
         { role: "system", content: req.system },
         { role: "user", content: userContent(req.user) },
