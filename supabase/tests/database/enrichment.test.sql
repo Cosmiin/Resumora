@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(29);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -116,6 +116,13 @@ select throws_ok(
   $$ select public.log_ai_call('not_a_task', 'p', 'm', 'ok', null, 1, 1, 1) $$,
   '22023', null,
   'an unknown task is rejected');
+select lives_ok(
+  $$ do $d$ begin
+       perform public.log_ai_call('enrich_improve_bullet', 'p', 'm', 'ok', null, 1, 1, 1);
+       perform public.log_ai_call('enrich_brain_dump', 'p', 'm', 'ok', null, 1, 1, 1);
+       perform public.log_ai_call('enrich_role_facts', 'p', 'm', 'ok', null, 1, 1, 1);
+     end $d$ $$,
+  'the focus-mode tasks are logged');
 
 -- ── Voice sessions: 20 a day per user ───────────────────────────────────────
 select is(

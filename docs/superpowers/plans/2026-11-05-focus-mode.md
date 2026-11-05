@@ -574,3 +574,26 @@ This plan was edited by Claude. **Do not modify it.**
 - Typecheck, lint and the full test suite pass.
 
 **Out of scope:** everything else.
+
+---
+
+## Task 12: Third whole-branch review fixes: AI call logging, leftover styles
+
+Added after the third whole-branch review (2026-11-05). The logging fix is a database change, written by Claude (`log_ai_call`'s allowlist did not include the three new tasks, so their `ai_calls` rows were rejected); Codex removes the dead styles.
+
+```
+---
+files: [apps/web/src/styles/enrich.css, supabase/tests/database/enrichment.test.sql, docs/superpowers/plans/2026-11-05-focus-mode-db-steps.md, docs/superpowers/plans/2026-11-05-focus-mode.md]
+new_files: [supabase/migrations/20261107010000_focus_ai_tasks.sql]
+deps: false
+size: 120
+---
+```
+
+The migration, the SQL test, the db-steps doc and this plan were written by Claude. **Do not modify them.**
+
+**Goal:** remove the styles only the deleted `QuestionFlow` / `RewriteReview` used from `apps/web/src/styles/enrich.css`: at least `.qbox`, `.qcount`, `.qtext`, `.qfor`, plus any other selector in that file whose class no longer appears in any `.tsx` file under `apps/web/src` (search before removing each one; keep anything still referenced, including by `SummaryTools`, `SkillsTools`, `ScoreCard`, `AnswerBox` and the page).
+
+**Acceptance tests:** each removed class has no remaining reference in `apps/web/src`; typecheck, lint and the full test suite pass.
+
+**Out of scope:** everything else.
