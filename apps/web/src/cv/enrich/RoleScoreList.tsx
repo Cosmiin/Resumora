@@ -1,7 +1,7 @@
 import { band, type Experience } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
-import { ScorePill } from "./ScorePill.tsx";
+import { ScorePillBadge } from "./ScorePill.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 type Props = {
@@ -18,6 +18,13 @@ function labelOf(s: RoleScoreState): string {
   return n === null ? "" : t(`enrich.band.${band(n)}`);
 }
 
+function nameOf(role: Experience, s: RoleScoreState): string {
+  const name = roleName(role, "experience");
+  const n = s.result?.score ?? null;
+  if (n !== null && s.state !== "none" && s.state !== "unavailable") return t("enrich.roles.rowLabel", { name, n, band: t(`enrich.band.${band(n)}`) });
+  return `${name}, ${labelOf(s) || t("enrich.pill.scoring")}`;
+}
+
 /** "Your roles" in the panel overview: one row per experience, in CV order. */
 export function RoleScoreList({ roles, scores, onOpen }: Props) {
   if (roles.length === 0) return null;
@@ -29,8 +36,8 @@ export function RoleScoreList({ roles, scores, onOpen }: Props) {
           const state = scores.get(role.id) ?? { state: "scoring" as const };
           return (
             <li key={role.id}>
-              <ScorePill roleId={role.id} state={state} onOpen={() => onOpen(role.id)} />
-              <button type="button" className="role-open" onClick={() => onOpen(role.id)}>
+              <button type="button" className="role-open" aria-label={nameOf(role, state)} onClick={() => onOpen(role.id)}>
+                <ScorePillBadge state={state} />
                 <span className="rname">{roleName(role, "experience")}</span>
                 <span className="rband">{labelOf(state)}</span>
               </button>

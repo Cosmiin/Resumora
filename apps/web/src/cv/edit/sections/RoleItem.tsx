@@ -3,7 +3,7 @@ import { MAX_LONG_TEXT, newId, type Experience, type Locale } from "@resumora/sh
 import { t } from "../../../i18n/t.ts";
 import type { MessageKey } from "../../../i18n/en.ts";
 import { PRESENT } from "../../page/blocks.ts";
-import { BulletList } from "../BulletList.tsx";
+import { BulletList, type WeakMark } from "../BulletList.tsx";
 import type { CvAction } from "../cvReducer.ts";
 import { DateField } from "../DateField.tsx";
 import { ItemDate } from "../ItemDate.tsx";
@@ -35,10 +35,10 @@ export function roleName(role: Experience, list: "experience" | "volunteering"):
 }
 
 /** Bullets scored below 75 with the tip for each, once the score matches the text. */
-function weakBullets(score: RoleScoreState | undefined): ReadonlyMap<string, string> | undefined {
+function weakBullets(score: RoleScoreState | undefined): ReadonlyMap<string, WeakMark> | undefined {
   if (score?.state !== "ready" || !score.result) return undefined;
   const weak = score.result.bullets.filter((b) => b.score < 75);
-  return weak.length ? new Map(weak.map((b) => [b.id, issueTip(b.issue, b.tip)])) : undefined;
+  return weak.length ? new Map(weak.map((b) => [b.id, { tip: issueTip(b.issue, b.tip), mid: b.score >= 40 }])) : undefined;
 }
 
 /** One role on the page. Memoised: typing in one role leaves the others alone. */

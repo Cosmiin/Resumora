@@ -87,17 +87,23 @@ describe("score card", () => {
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("Add the result: what changed, by how much, or why it mattered.");
   });
 
-  it("hides Answer questions when there are none, and always offers Rewrite bullets", async () => {
+  it("hides the Answer button when there are none, and always offers Rewrite bullets", async () => {
     const fns = card(ready(result({ questions: [] })));
-    expect(screen.queryByRole("button", { name: "Answer questions" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Answer/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Rewrite bullets" }));
     expect(fns.onRewrite).toHaveBeenCalled();
   });
 
-  it("shows Answer questions when there are questions", async () => {
+  it("counts the questions on the Answer button", async () => {
     const fns = card(ready());
-    await userEvent.click(screen.getByRole("button", { name: "Answer questions" }));
+    await userEvent.click(screen.getByRole("button", { name: "Answer 1 question" }));
     expect(fns.onAnswer).toHaveBeenCalled();
+  });
+
+  it("uses the plural for several questions", () => {
+    const q = { bulletId: "b1", text: "Which tasks?", options: [] };
+    card(ready(result({ questions: [q, q, q] })));
+    expect(screen.getByRole("button", { name: "Answer 3 questions" })).toBeInTheDocument();
   });
 
   it("says the score is unavailable and offers Try again", async () => {
@@ -161,8 +167,25 @@ describe("weak bullet markers", () => {
     expect(marks[1]).toHaveAttribute("title", "Name the tool, system, client or task so a reader can picture it.");
     const described = document.getElementById(marks[0]!.getAttribute("aria-describedby")!);
     expect(described).toHaveTextContent("Name the tasks you did.");
+    expect(marks[0]).toHaveClass("weak-mark");
+    expect(marks[0]).not.toHaveClass("mid"); // 30 is below 40
+    expect(marks[1]).toHaveClass("mid"); // 40 is mid
     await userEvent.click(screen.getByRole("button", { name: "← All sections" }));
     expect(screen.queryAllByRole("button", { name: "Weak bullet" })).toHaveLength(0);
+  });
+
+  it("clicking a marker shows and hides its tip", async () => {
+    render(<Harness initial={cvOf(role())} scores={scores} />);
+    await userEvent.click(screen.getByRole("textbox", { name: "Role title" }));
+    const mark = screen.getAllByRole("button", { name: "Weak bullet" })[0]!;
+    const tip = document.getElementById(mark.getAttribute("aria-describedby")!)!;
+    expect(mark).toHaveAttribute("aria-expanded", "false");
+    expect(tip).not.toHaveClass("is-open");
+    await userEvent.click(mark);
+    expect(mark).toHaveAttribute("aria-expanded", "true");
+    expect(tip).toHaveClass("is-open");
+    await userEvent.click(mark);
+    expect(tip).not.toHaveClass("is-open");
   });
 
   it("show only on the role that is open", async () => {
@@ -190,6 +213,8 @@ describe("Your roles", () => {
     expect(rows[0]).toHaveTextContent("Dev");
     expect(rows[0]).toHaveTextContent("62");
     expect(rows[0]).toHaveTextContent("A good start");
+    expect(within(rows[0]!).getAllByRole("button")).toHaveLength(1);
+    expect(within(rows[0]!).getByRole("button")).toHaveAccessibleName("Dev, score 62 of 100, A good start");
     expect(rows[1]).toHaveTextContent("Lead");
     expect(rows[1]).toHaveTextContent("…");
     expect(rows[2]).toHaveTextContent("Intern");

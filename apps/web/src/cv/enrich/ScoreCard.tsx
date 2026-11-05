@@ -62,7 +62,7 @@ export function ScoreCard({ role, score, onAnswer, onRewrite, onRetry }: Props) 
     head = (
       <div className="score-top">
         <div className="score-meta">
-          <strong>{t(score.state === "none" ? "enrich.card.noBullets" : "enrich.card.scoring")}</strong>
+          <strong>{t(score.state === "none" ? "enrich.pill.noBullets" : "enrich.card.scoring")}</strong>
         </div>
       </div>
     );
@@ -93,7 +93,7 @@ export function ScoreCard({ role, score, onAnswer, onRewrite, onRetry }: Props) 
         <div className="row-btns">
           {questions > 0 && (
             <button type="button" className="btn primary" onClick={onAnswer}>
-              {t("enrich.card.answer")}
+              {t(questions === 1 ? "enrich.card.answerOne" : "enrich.card.answerMany", { n: questions })}
             </button>
           )}
           <button type="button" className={questions > 0 ? "btn" : "btn primary"} onClick={onRewrite}>

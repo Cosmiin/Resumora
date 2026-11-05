@@ -10,8 +10,8 @@ function shown(result: RoleResult | undefined) {
   return result && result.score !== null ? { n: result.score, b: band(result.score) } : null;
 }
 
-/** A role's score in the page margin. Editor-only: the read-only page and the PDF never draw it. */
-export function ScorePill({ roleId, state, onOpen }: Props) {
+/** What a pill shows for a state: its text, spoken label and class names. */
+function pillView(state: RoleScoreState): { text: string; label: string; cls: string } {
   const score = state.state === "none" ? null : shown(state.result);
   let text = "–";
   let label = t(state.state === "none" ? "enrich.pill.noBullets" : "enrich.pill.unavailable");
@@ -33,9 +33,25 @@ export function ScorePill({ roleId, state, onOpen }: Props) {
       if (state.state === "scoring") text = "…";
     }
   }
+  return { text, label, cls };
+}
+
+/** A role's score in the page margin. Editor-only: the read-only page and the PDF never draw it. */
+export function ScorePill({ roleId, state, onOpen }: Props) {
+  const { text, label, cls } = pillView(state);
   return (
     <button type="button" className={cls} data-score-for={roleId} aria-label={label} onClick={onOpen}>
       {text}
     </button>
+  );
+}
+
+/** The same pill as plain text, for inside another button. */
+export function ScorePillBadge({ state }: { state: RoleScoreState }) {
+  const { text, cls } = pillView(state);
+  return (
+    <span className={cls} aria-hidden="true">
+      {text}
+    </span>
   );
 }
