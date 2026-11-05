@@ -330,3 +330,62 @@ describe("applyProposals", () => {
     expect(texts(next)[0]).toBe("first");
   });
 });
+
+describe("focus actions", () => {
+  const facts = { items: ["Built APIs"], fromNotes: "notes-1", updatedAt: "2026-11-05T10:00:00.000Z" };
+
+  it("replaceBullet changes only the selected text and keeps its id", () => {
+    const cv = { ...withRole(["First", "Second"]), experience: [role("e1", ["First", "Second"]), role("e2", ["Other"])] };
+    const next = cvReducer(cv, { type: "replaceBullet", roleId: "e1", bulletId: "e1-b2", text: "Improved" });
+    expect(next.experience[0]).toEqual({ ...cv.experience[0], bullets: [{ id: "e1-b1", text: "First" }, { id: "e1-b2", text: "Improved" }] });
+    expect(next.experience[0]!.bullets[0]).toBe(cv.experience[0]!.bullets[0]);
+    expect(next.experience[1]).toBe(cv.experience[1]);
+    expect(cv.experience[0]!.bullets[1]!.text).toBe("Second");
+  });
+
+  it("replaceBullet returns the same CV for unchanged text or missing targets", () => {
+    const cv = withRole(["First"]);
+    expect(cvReducer(cv, { type: "replaceBullet", roleId: "e1", bulletId: "e1-b1", text: "First" })).toBe(cv);
+    expect(cvReducer(cv, { type: "replaceBullet", roleId: "e1", bulletId: "missing", text: "New" })).toBe(cv);
+    expect(cvReducer(cv, { type: "replaceBullet", roleId: "missing", bulletId: "e1-b1", text: "New" })).toBe(cv);
+  });
+
+  it("addBullets appends only two of three texts to an 18-bullet role with new ids", () => {
+    const cv = withRole(Array.from({ length: 18 }, (_, i) => "Bullet " + i));
+    const next = cvReducer(cv, { type: "addBullets", roleId: "e1", texts: ["One", "Two", "Three"] });
+    const bullets = next.experience[0]!.bullets;
+    expect(bullets).toHaveLength(20);
+    expect(bullets.slice(0, 18)).toEqual(cv.experience[0]!.bullets);
+    expect(bullets.slice(18).map((b) => b.text)).toEqual(["One", "Two"]);
+    expect(bullets.slice(18).every((b) => b.id.length > 0)).toBe(true);
+    expect(new Set(bullets.map((b) => b.id)).size).toBe(20);
+    expect(cv.experience[0]!.bullets).toHaveLength(18);
+  });
+
+  it("addBullets returns the same CV for no texts, a full role or a missing role", () => {
+    const cv = withRole(["First"]);
+    const full = withRole(Array.from({ length: MAX_BULLETS }, () => "Bullet"));
+    expect(cvReducer(cv, { type: "addBullets", roleId: "e1", texts: [] })).toBe(cv);
+    expect(cvReducer(full, { type: "addBullets", roleId: "e1", texts: ["New"] })).toBe(full);
+    expect(cvReducer(cv, { type: "addBullets", roleId: "missing", texts: ["New"] })).toBe(cv);
+  });
+
+  it("setFacts sets and clears a role's facts without changing its other content", () => {
+    const cv = withRole(["First"]);
+    const next = cvReducer(cv, { type: "setFacts", roleId: "e1", facts });
+    expect(next.experience[0]).toEqual({ ...cv.experience[0], facts });
+    const cleared = cvReducer(next, { type: "setFacts", roleId: "e1", facts: null });
+    expect(cleared.experience[0]).toEqual({ ...cv.experience[0], facts: null });
+    expect(cv.experience[0]!.facts).toBeUndefined();
+  });
+
+  it("setFacts returns the same CV for equal facts, no facts or a missing role", () => {
+    const cv = withRole(["First"], { facts });
+    expect(cvReducer(cv, { type: "setFacts", roleId: "e1", facts: { ...facts, items: [...facts.items] } })).toBe(cv);
+    expect(cvReducer(cv, { type: "setFacts", roleId: "missing", facts })).toBe(cv);
+    const absent = withRole(["First"]);
+    expect(cvReducer(absent, { type: "setFacts", roleId: "e1", facts: null })).toBe(absent);
+    const cleared = withRole(["First"], { facts: null });
+    expect(cvReducer(cleared, { type: "setFacts", roleId: "e1", facts: null })).toBe(cleared);
+  });
+});

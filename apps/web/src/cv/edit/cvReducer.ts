@@ -10,6 +10,7 @@ import {
   normalizeLayout,
   type CvContent,
   type Note,
+  type RoleFacts,
   type SectionKey,
   type SkillGroup,
 } from "@resumora/shared";
@@ -50,6 +51,9 @@ export type CvAction =
   | { type: "moveSection"; from: number; to: number }
   | { type: "addSection"; key: SectionKey; id: string }
   | { type: "addCustomSection"; id: string; title: string }
+  | { type: "replaceBullet"; roleId: string; bulletId: string; text: string }
+  | { type: "addBullets"; roleId: string; texts: string[] }
+  | { type: "setFacts"; roleId: string; facts: RoleFacts | null }
   | { type: "setNote"; roleId: string; note: Note }
   | { type: "applyProposals"; roleId: string; accepted: { replaces: string | null; text: string }[] }
   | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean };
@@ -271,6 +275,19 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (next === cv) return cv;
       const custom = next.custom.map((c) => (c.id === action.id ? { ...c, title: action.title } : c));
       return unhide({ ...next, custom }, "other");
+    }
+    case "replaceBullet":
+      return bulletAction(cv, { type: "setBullet", owner: { list: "experience", itemId: action.roleId }, bulletId: action.bulletId, text: action.text });
+    case "addBullets":
+      return applyProposals(cv, { type: "applyProposals", roleId: action.roleId, accepted: action.texts.map((text) => ({ replaces: null, text })) });
+    case "setFacts": {
+      const role = cv.experience.find((r) => r.id === action.roleId);
+      if (!role) return cv;
+      const before = role.facts ?? null;
+      const facts = action.facts;
+      if (before === facts || (before && facts && before.fromNotes === facts.fromNotes && before.updatedAt === facts.updatedAt
+        && before.items.length === facts.items.length && before.items.every((item, i) => item === facts.items[i]))) return cv;
+      return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, facts } : r)) };
     }
     case "setNote": {
       const role = cv.experience.find((r) => r.id === action.roleId);

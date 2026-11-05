@@ -1,5 +1,16 @@
 import { z } from "zod";
-import { RewriteEventSchemas, RoleResultSchema, type RewriteEvent, type RoleResult } from "@resumora/shared";
+import {
+  BrainDumpAnswerSchema,
+  ImproveAnswerSchema,
+  RewriteEventSchemas,
+  RoleFactsAnswerSchema,
+  RoleResultSchema,
+  type BrainDumpAnswer,
+  type ImproveAnswer,
+  type RewriteEvent,
+  type RoleFactsAnswer,
+  type RoleResult,
+} from "@resumora/shared";
 import { ApiClientError, apiFetch, authedFetch, errorOf } from "../../lib/api.ts";
 
 const ScoresSchema = z.object({ items: z.array(RoleResultSchema) });
@@ -12,6 +23,18 @@ export async function getScores(): Promise<RoleResult[]> {
 /** Scores one role of the saved CV. 409 `not_saved`: the role isn't saved yet, or its text has moved on. */
 export function scoreRole(roleId: string, fingerprint: string): Promise<RoleResult> {
   return apiFetch("/v1/enrich/score", { method: "POST", json: { roleId, fingerprint }, schema: RoleResultSchema });
+}
+
+export function improveBullet(input: { roleId: string; bulletId: string; fingerprint: string }): Promise<ImproveAnswer> {
+  return apiFetch("/v1/enrich/improve-bullet", { method: "POST", json: input, schema: ImproveAnswerSchema });
+}
+
+export function brainDump(input: { roleId: string; fingerprint: string }): Promise<BrainDumpAnswer> {
+  return apiFetch("/v1/enrich/brain-dump", { method: "POST", json: input, schema: BrainDumpAnswerSchema });
+}
+
+export function roleFacts(roleId: string): Promise<RoleFactsAnswer> {
+  return apiFetch("/v1/enrich/role-facts", { method: "POST", json: { roleId }, schema: RoleFactsAnswerSchema });
 }
 
 const VoiceSessionSchema = z.object({ clientSecret: z.string().min(1), expiresAt: z.string(), model: z.string() });
