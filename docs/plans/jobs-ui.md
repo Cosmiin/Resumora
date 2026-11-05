@@ -202,11 +202,11 @@ size: 450
 ---
 
 **Goal:** a signed-in user at `/jobs` sees their jobs as a full-width list and adds a job from a dialog, as in mockup v2.
-- **Route and nav:** `router.tsx` adds `{ path: "/jobs", element: <JobsPage /> }` inside the `RequireAuth` children. `AppShell` gets a second `NavLink` "Jobs" (`nav.jobs`) to `/jobs`, after "My CV". `main.tsx` imports `./styles/jobs.css`.
+- **Route and nav:** `router.tsx` adds `{ path: "/jobs", element: <JobsPage /> }` inside the `RequireAuth` children. `AppShell` gets a second `NavLink` "Jobs" (`nav.jobs`) to `/jobs`, after "My CV". `main.tsx` imports `./styles/jobs.css`. (Added during the build: both nav links ask `app.leaveUnsaved` when the CV editor has unsaved changes, like Sign out, since the editor drops a pending autosave on unmount; `en.ts` gained that key.)
 - **Page head:** `<h1>` "Jobs" and a primary **+ Add job** button.
 - **List:** first page from `listJobs()` in a query keyed `["jobs", userId]` (`userId` as in `useMyCv`). Each job is one row: a link to `/jobs/:id` showing the title (or, when there is no title yet, the link's host without `www.`), "company · location" (or the host), a badge ("Reading job…" for `queued`/`processing`, "Failed" for `failed`, none otherwise), and the date (`createdAt` formatted with `toLocaleDateString` in `en-GB`, day and short month).
-- **Load more:** shown while the last loaded page has a `nextCursor`; it fetches the next page with `listJobs(cursor)` and appends it. Rows are de-duplicated by id, the first page's copy winning (a new job shifts the first page). Extra pages are dropped when the user changes (sign-out).
-- **Polling:** while any row on the first page is `queued` or `processing`, the first-page query refetches every 3 s. Polling stops 2 minutes after it started; the 2-minute window starts again after each successful add. Once stopped with rows still busy, a line under the list says "Still reading. Reload the page to check again."
+- **Load more (one infinite query, changed during the build):** the list is one `useInfiniteQuery` keyed `["jobs", userId]` (`listJobs(pageParam)`, next param = `nextCursor`). **Load more** calls `fetchNextPage()` while `hasNextPage`. Rows are all pages' items de-duplicated by id. A refetch reloads every loaded page in order from the new cursors, so an added or removed job never leaves a gap or a duplicate. (Hand-kept extra pages had gaps and races in three review rounds.)
+- **Polling:** while any loaded row is `queued` or `processing`, the query refetches every 3 s; this reloads all loaded pages, usually one, and replaces the spec's "polling reloads only the first page". Polling stops 2 minutes after it started; the 2-minute window starts again after each successful add. Once stopped with rows still busy, a line under the list says "Still reading. Reload the page to check again."
 - **Search:** a `type="search"` field labelled "Search your jobs" filters the loaded rows, case-insensitively, by title, company, location and link host. No match shows `No jobs match "{q}".` While a search is active, Load more is hidden.
 - **Empty:** no jobs → "No jobs yet", the text, and a second **+ Add job** button. **Error:** the list query fails → `role="alert"` "Something went wrong loading your jobs. Reload the page." with a **Try again** button that refetches.
 - **Add job dialog** (`AddJobDialog.tsx`): opens from either Add button. Fields "Link to the job ad" (`type="url"`) and "Job description" (textarea), a live counter (`{n} of at least 200 characters` under 200 trimmed chars, else `{n} characters`, `n` formatted with `toLocaleString("en")`), the "Soon a link alone…" hint, the extension card ("Save jobs in one click" + "Soon" tag + text; not a link), **Cancel** and **Add job**. Client checks before sending: the link must parse with `new URL()` and use `http:`/`https:`, else the `invalid_url` message under the link field (`aria-invalid`, `aria-describedby`); the trimmed text must be ≥ 200 chars, else the `text_too_short` message. Submit calls `createJob(url.trim(), text)`. While sending, Add job is disabled.
@@ -288,3 +288,21 @@ size: 350
 - All existing web tests pass; typecheck passes.
 
 **Out of scope:** autosave, editing the pasted ad, unsaved-changes warnings on navigation, tailoring.
+
+## Task 6: Keep the job list on screen when a background refetch fails
+
+---
+files: [apps/web/src/jobs/JobsPage.tsx, apps/web/src/jobs/jobs-page.test.tsx, docs/plans/jobs-ui.md]
+new_files: []
+deps: false
+size: 40
+---
+
+**Goal:** fix the whole-branch review finding. `JobsPage.tsx` shows the load-error state whenever `query.isError` is true, so a failed background refetch (polling, or a page after the first failing to reload) hides rows the user already sees. Show the error state (with Try again) only when there is no list data yet. When data exists and a refetch fails, keep the rows and show a small `role="status"` line under the list with `jobs.loadError` and a **Try again** button that refetches; the line goes away after a successful refetch. Polling keeps its 3 s / 2 minute rules. (This task's `docs/plans/jobs-ui.md` change records the Task 3 build decisions; it is already made.)
+
+**Acceptance tests** (`apps/web/src/jobs/jobs-page.test.tsx`):
+- With rows shown, a refetch that rejects keeps every row visible and shows the status line with Try again; Try again refetches and, on success, removes the line.
+- With no data yet, a failed first load still shows the `role="alert"` error with Try again (existing test).
+- All existing web tests pass; typecheck passes.
+
+**Out of scope:** anything else in the list, the job page, the API.

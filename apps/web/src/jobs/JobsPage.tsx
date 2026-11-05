@@ -88,7 +88,7 @@ function JobsList({ userId }: { userId: string }) {
           <input type="search" value={search} placeholder={t("jobs.searchPlaceholder")}
             onChange={(e) => setSearch(e.target.value)} />
         </label>
-        {query.isPending ? <p>{t("app.loading")}</p> : query.isError ? (
+        {query.isPending ? <p>{t("app.loading")}</p> : query.isError && !query.data ? (
           <div className="jobs-state">
             <p role="alert">{t("jobs.loadError")}</p>
             <button type="button" onClick={() => void query.refetch()}>{t("jobs.retry")}</button>
@@ -122,6 +122,12 @@ function JobsList({ userId }: { userId: string }) {
             {!q && query.hasNextPage && <button type="button" className="secondary jobs-load-more" disabled={query.isFetchingNextPage}
               onClick={() => void loadMore()}>{t("jobs.loadMore")}</button>}
           </>
+        )}
+        {query.isError && query.data && (
+          <p role="status" className="jobs-note">
+            {t("jobs.loadError")}{" "}
+            <button type="button" className="secondary" onClick={() => void query.refetch()}>{t("jobs.retry")}</button>
+          </p>
         )}
       </main>
       {dialogOpen && <AddJobDialog onClose={() => setDialogOpen(false)} onAdded={added} />}

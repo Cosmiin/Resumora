@@ -180,6 +180,41 @@ describe("jobs list", () => {
 });
 
 describe("jobs polling", () => {
+  it.each([0, 1])("keeps every row when refetching page %i fails and retries", async (failedPage) => {
+    vi.useFakeTimers();
+    let failing = false;
+    let ready = false;
+    vi.mocked(listJobs).mockImplementation(async (cursor) => {
+      if (failing && (cursor ? 1 : 0) === failedPage) throw new Error("offline");
+      return cursor
+        ? page([{ ...job, id: "older", title: "Older job" }])
+        : page([{ ...job, status: ready ? "ready" : "queued" }], "next");
+    });
+    await act(async () => { renderJobs(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Load more" })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(screen.getByRole("link", { name: /Engineer/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Older job/ })).toBeInTheDocument();
+
+    failing = true;
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(screen.getByRole("link", { name: /Engineer/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Older job/ })).toBeInTheDocument();
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Something went wrong loading your jobs.");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    failing = false;
+    ready = true;
+    await act(async () => { fireEvent.click(within(status).getByRole("button", { name: "Try again" })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Engineer/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Older job/ })).toBeInTheDocument();
+    expect(screen.queryByText("Reading job…")).not.toBeInTheDocument();
+  });
+
   it.each([0, 1])("polls all loaded pages while page %i has busy jobs, then stops when ready", async (busyPage) => {
     vi.useFakeTimers();
     let ready = false;
