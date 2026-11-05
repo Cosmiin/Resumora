@@ -135,7 +135,7 @@ describe("memoryJobs", () => {
     expect((await b.list({ limit: 50, after: null })).items.map((job) => job.id)).toEqual(["other"]);
   });
 
-  it("lists newest first and excludes source text and JSON-LD from public results", async () => {
+  it("lists newest first without source text or JSON-LD and returns source text in the detail", async () => {
     const repo = store.repoFor("a");
     await repo.create(input("first"));
     clock = new Date("2026-11-05T11:00:00Z");
@@ -143,10 +143,13 @@ describe("memoryJobs", () => {
     const page = await repo.list({ limit: 50, after: null });
     expect(page.items.map((job) => job.id)).toEqual(["second", "first"]);
     expect(page.next).toBeNull();
-    for (const job of [...page.items, await repo.get("first")]) {
+    for (const job of page.items) {
       for (const field of ["rawText", "raw_text", "jsonLd", "json_ld"]) expect(job).not.toHaveProperty(field);
     }
     expect(page.items[0]).not.toHaveProperty("extracted");
+    const job = await repo.get("first");
+    expect(job).toHaveProperty("rawText", input("first").rawText);
+    for (const field of ["raw_text", "jsonLd", "json_ld"]) expect(job).not.toHaveProperty(field);
   });
 
   it("pages newest first with no repeated or skipped jobs, including tied timestamps", async () => {

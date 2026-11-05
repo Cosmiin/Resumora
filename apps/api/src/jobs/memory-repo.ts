@@ -63,7 +63,7 @@ export function memoryJobs(opts: { now?: () => Date }) {
       const row = rows.get(id);
       if (!row || row.userId !== userId) return null;
       return {
-        ...toListItem(row), extracted: structuredClone(row.extracted), editedByUser: row.editedByUser,
+        ...toListItem(row), rawText: row.rawText, extracted: structuredClone(row.extracted), editedByUser: row.editedByUser,
         version: row.version, updatedAt: row.updatedAt,
       };
     },

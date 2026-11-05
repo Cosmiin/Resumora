@@ -41,7 +41,12 @@ export function AppShell(props: {
       <header className="app-header" inert={inert}>
         <strong className="app-brand">{t("app.name")}</strong>
         <nav aria-label={t("nav.main")} className="app-nav">
-          <NavLink to="/cv">{t("nav.myCv")}</NavLink>
+          <NavLink to="/cv" onClick={(event) => {
+            if (hasUnsavedChanges() && !window.confirm(t("app.leaveUnsaved"))) event.preventDefault();
+          }}>{t("nav.myCv")}</NavLink>
+          <NavLink to="/jobs" onClick={(event) => {
+            if (hasUnsavedChanges() && !window.confirm(t("app.leaveUnsaved"))) event.preventDefault();
+          }}>{t("nav.jobs")}</NavLink>
         </nav>
         <div className="app-actions">{actions}</div>
         <div className="app-account" ref={accountRef}>

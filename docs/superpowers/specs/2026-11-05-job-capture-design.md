@@ -166,7 +166,7 @@ All errors use `{ error: { code, message, requestId } }`. All routes need `Autho
 |---|---|---|
 | `POST /v1/jobs` | `{ url, pageText?, jsonLd? }` → `202 { id }` or `200 { id, existing: true }` | `pageText` max 60k chars, body max ~100 KB; `pageText` under 200 chars → `text_too_short` |
 | `GET /v1/jobs?limit=&cursor=` | → `{ items, nextCursor }`; each item is `{ id, status, errorCode, title, company, location, source, url, createdAt }` (camelCase, like the other API responses) | newest first, ordered by (`created_at` desc, `id` desc); `limit` 1–100, default 50; `nextCursor` is an opaque string for the next page, or `null` on the last page; a bad `limit` or `cursor` → 400 `invalid_request` |
-| `GET /v1/jobs/:id` | → full job without `raw_text` | 404 if not the user's |
+| `GET /v1/jobs/:id` | → full job, with the saved text as `rawText` (the list never carries it); never `jsonLd` | 404 if not the user's |
 | `PATCH /v1/jobs/:id` | `{ version, extracted }` → updated job | only when `ready`; validates `JobExtraction`; sets `edited_by_user`; 409 on version mismatch |
 | `PUT /v1/jobs/:id/text` | `{ text }` → `202` | only when `needs_text` or `failed`; saves text, re-queues |
 | `POST /v1/jobs/:id/retry` | → `202` | only when `failed` with `ai_failed`; re-queues using `raw_text`; counts toward the limit |

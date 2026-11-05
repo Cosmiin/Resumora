@@ -61,8 +61,11 @@ async function error(res: Response, status: number, code: string, message?: stri
   expect(res.status).toBe(status);
   expect(await res.json()).toMatchObject({ error: { code, ...(message ? { message } : {}), requestId: expect.any(String) } });
 }
-function publicFields(value: unknown) {
+function listFields(value: unknown) {
   expect(JSON.stringify(value)).not.toMatch(/"(rawText|raw_text|jsonLd|json_ld)"\s*:/);
+}
+function jobFields(value: unknown) {
+  expect(JSON.stringify(value)).not.toMatch(/"(raw_text|jsonLd|json_ld)"\s*:/);
 }
 
 describe("job endpoints", () => {
@@ -166,12 +169,12 @@ describe("job endpoints", () => {
     const list = (await res.json()) as JobListPage;
     expect(list.items.map((item) => item.id)).toEqual([second, first]);
     expect(list.nextCursor).toBeNull();
-    publicFields(list);
+    listFields(list);
     const detail = await get(first);
     expect(detail.status).toBe(200);
     const job = await detail.json();
-    expect(job).toMatchObject({ id: first, version: 1, editedByUser: false });
-    publicFields(job);
+    expect(job).toMatchObject({ id: first, version: 1, editedByUser: false, rawText: body.pageText });
+    jobFields(job);
     await error(await get(other), 404, "not_found");
     await error(await patch(other), 404, "not_found");
     await error(await remove(other), 404, "not_found");
@@ -196,8 +199,8 @@ describe("job endpoints", () => {
     const rest = await second.json() as JobListPage;
     expect(rest.items.map((job) => job.id)).toEqual(ids.slice(2));
     expect(rest.nextCursor).toBeNull();
-    publicFields(page);
-    publicFields(rest);
+    listFields(page);
+    listFields(rest);
   });
 
   it.each(["limit=500", "limit=abc", "limit=0", "cursor=bad", "cursor=", `cursor=${"x".repeat(201)}`])
@@ -214,8 +217,8 @@ describe("job endpoints", () => {
     const res = await patch(id, 1, { ...extracted, title: "Senior Engineer" });
     expect(res.status).toBe(200);
     const updated = await res.json();
-    expect(updated).toMatchObject({ id, version: 2, editedByUser: true, title: "Senior Engineer", extracted: { title: "Senior Engineer" } });
-    publicFields(updated);
+    expect(updated).toMatchObject({ id, version: 2, editedByUser: true, title: "Senior Engineer", extracted: { title: "Senior Engineer" }, rawText: body.pageText });
+    jobFields(updated);
     await error(await patch(id), 409, "version_conflict", "This job changed elsewhere. Reload to see the latest.");
     expect(await store.repoFor("user-a").get(id)).toMatchObject({ version: 2, title: "Senior Engineer" });
   });
