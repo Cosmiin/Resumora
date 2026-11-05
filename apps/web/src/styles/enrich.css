@@ -1,0 +1,12 @@
+/* Score pill: in the role's left margin, past the drag grip. Editor-only. */
+.cv-role { position: relative; }
+.score-pill { position: absolute; inset-inline-start: -58px; inset-block-start: 2px; min-width: 32px; height: 22px; display: inline-grid; place-items: center; padding: 0 6px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--sage-200); background: var(--sage-50); color: var(--sage-500); font: 700 12px/1 var(--font-sans); font-variant-numeric: tabular-nums; cursor: pointer; }
+.score-pill.is-clear { color: var(--pine-700); border-color: var(--pine-200); background: var(--pine-50); }
+.score-pill.is-good { color: var(--marigold-800); border-color: var(--marigold-200); background: var(--marigold-100); }
+.score-pill.is-work { color: var(--rose-600); border-color: var(--rose-200); background: var(--rose-50); }
+.score-pill.is-previous { opacity: 0.6; }
+.score-pill:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
+/* Narrow pages have no left margin to spare: the pill sits above the role instead. */
+@media (max-width: 720px) {
+  .score-pill { position: static; margin-block-end: 2px; }
+}

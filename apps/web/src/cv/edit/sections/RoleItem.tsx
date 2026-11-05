@@ -11,11 +11,16 @@ import { ItemField } from "../ItemField.tsx";
 import { useFocusAfterRender } from "../useFocusAfterRender.ts";
 import { AddButton } from "./AddButton.tsx";
 import { RemoveButton } from "./RemoveButton.tsx";
+import { ScorePill } from "../../enrich/ScorePill.tsx";
+import type { RoleScoreState } from "../../enrich/useRoleScores.ts";
+import { focusField } from "../focus.ts";
 
 type Props = {
   role: Experience;
   list: "experience" | "volunteering";
   locale: Locale;
+  /** This role's score; left out where roles are not scored. */
+  score?: RoleScoreState;
   dispatch(a: CvAction): void;
 };
 
@@ -27,7 +32,7 @@ export function roleName(role: Experience, list: "experience" | "volunteering"):
 }
 
 /** One role on the page. Memoised: typing in one role leaves the others alone. */
-export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch }: Props) {
+export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, score }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
   const itemId = role.id;
@@ -53,6 +58,10 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch }:
     focusLater(`bullet-${id}`);
   }, [dispatch, owner, focusLater]);
 
+  const openRole = useCallback(() => {
+    if (root.current) focusField(root.current, `${list}-${itemId}-title`);
+  }, [list, itemId]);
+
   const field = (f: TextField, label: MessageKey, placeholder: MessageKey, className?: string, multiline?: boolean) => (
     <ItemField
       list={list}
@@ -70,6 +79,7 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch }:
 
   return (
     <div className="cv-line cv-role" data-item={itemId} ref={root} role="group" aria-label={name}>
+      {score && <ScorePill roleId={itemId} state={score} onOpen={openRole} />}
       <div className="cv-item-head">
         {field("title", "edit.role.title", "edit.role.titlePlaceholder", "cv-item-title")}
         <span className="cv-item-dates cv-role-dates">

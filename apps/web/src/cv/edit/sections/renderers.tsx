@@ -18,8 +18,8 @@ const simple = (list: SimpleList): SectionRenderer =>
 export const sectionRenderers: Partial<Record<SectionKey, SectionRenderer>> = {
   summary: SummaryEdit,
   achievements: AchievementsEdit,
-  experience: function Experience({ cv, dispatch }) {
-    return <RolesEdit list="experience" items={cv.experience} locale={cv.locale} dispatch={dispatch} />;
+  experience: function Experience({ cv, dispatch, scores }) {
+    return <RolesEdit list="experience" items={cv.experience} locale={cv.locale} dispatch={dispatch} scores={scores} />;
   },
   volunteering: function Volunteering({ cv, dispatch }) {
     return <RolesEdit list="volunteering" items={cv.volunteering} locale={cv.locale} dispatch={dispatch} />;

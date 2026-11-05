@@ -19,6 +19,7 @@ import { useOpenedSections } from "./edit/useOpenedSections.ts";
 import { HelperPanel } from "./panel/HelperPanel.tsx";
 import { BottomSheet, type SheetState } from "./panel/BottomSheet.tsx";
 import { useMediaQuery } from "../hooks/useMediaQuery.ts";
+import { useRoleScores } from "./enrich/useRoleScores.ts";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
   saved: "cv.status.saved",
@@ -47,6 +48,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
   // One stable dispatch: rows on the page skip re-rendering unless their own data changed.
   const dispatch = useCallback((a: CvAction) => setContent((c) => cvReducer(c, a)), [setContent]);
   const focusPage = useCallback(() => pageRef.current?.focus(), []);
+  const { scores } = useRoleScores({ cv: content, status });
   const phone = useMediaQuery("(max-width: 899px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
 
@@ -144,7 +146,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
             {historyOpen ? (
               <CvDocument content={preview?.content ?? content} showUnsorted />
             ) : (
-              <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} />
+              <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} />
             )}
           </div>
         </div>
