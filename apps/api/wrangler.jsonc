@@ -7,7 +7,10 @@
   // Every 5 minutes: fail imports stuck for 15+ minutes and delete their files.
   "triggers": { "crons": ["*/5 * * * *"] },
   "queues": {
-    "producers": [{ "binding": "IMPORTS", "queue": "resumora-imports" }],
+    "producers": [
+      { "binding": "IMPORTS", "queue": "resumora-imports" },
+      { "binding": "JOBS", "queue": "resumora-jobs" }
+    ],
     "consumers": [{ "queue": "resumora-imports", "max_batch_size": 1, "max_retries": 3 }]
   }
 }

@@ -25,9 +25,13 @@ beforeEach(async () => {
     importRepo: () => {
       throw new Error("not used");
     },
+    jobRepo: () => {
+      throw new Error("job repo not used in these tests");
+    },
     insightsRepo: (user) => memoryInsightsRepo(user.id, store),
     model: () => model.deps,
     queue: { send: async () => {} },
+    jobQueue: { send: async () => {} },
     log: vi.fn(),
   });
 });
@@ -59,9 +63,13 @@ describe("/v1/enrich", () => {
       importRepo: () => {
         throw new Error("not used");
       },
+      jobRepo: () => {
+        throw new Error("job repo not used in these tests");
+      },
       insightsRepo: (user) => memoryInsightsRepo(user.id, store),
       model: () => model.deps,
       queue: { send: async () => {} },
+      jobQueue: { send: async () => {} },
       log: vi.fn(),
     });
     const res = await app2.request("/v1/enrich/scores", { headers: { authorization: "Bearer other" } });

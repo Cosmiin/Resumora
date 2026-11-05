@@ -129,9 +129,13 @@ function setup(opts: { cv: CvContent; answer: string; scores?: RoleResult; statu
     importRepo: () => {
       throw new Error("not used");
     },
+    jobRepo: () => {
+      throw new Error("job repo not used in these tests");
+    },
     insightsRepo: (u) => memoryInsightsRepo(u.id, store),
     model: () => model,
     queue: { send: async () => {} },
+    jobQueue: { send: async () => {} },
     log: vi.fn(),
   });
   const ready = (async () => {

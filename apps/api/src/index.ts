@@ -6,6 +6,7 @@ import { supabaseAiCallLogger, supabaseInsightsRepo } from "./enrich/supabase-re
 import { handleImportMessage, sweepStaleImports } from "./imports/consumer.ts";
 import type { ImportMessage } from "./imports/repo.ts";
 import { supabaseImportAdmin, supabaseImportRepo } from "./imports/supabase-repo.ts";
+import { supabaseJobRepo } from "./jobs/supabase-repo.ts";
 import type { Env } from "./env.ts";
 
 const log = (entry: Record<string, unknown>) => console.error(JSON.stringify(entry));
@@ -16,6 +17,7 @@ function realDeps(env: Env): AppDeps {
     verifyToken: supabaseVerifier(env),
     cvRepo: (user) => supabaseCvRepo(env, user),
     importRepo: (user) => supabaseImportRepo(env, user),
+    jobRepo: (user) => supabaseJobRepo(env, user),
     insightsRepo: (user) => supabaseInsightsRepo(env, user),
     model: (user) => ({
       providers: providersFromEnv(env),
@@ -28,6 +30,7 @@ function realDeps(env: Env): AppDeps {
       logCall: supabaseAiCallLogger(env, user),
     }),
     queue: { send: async (message) => void (await env.IMPORTS.send(message)) },
+    jobQueue: { send: async (message) => void (await env.JOBS.send(message)) },
     log,
   };
 }
