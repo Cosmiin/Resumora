@@ -6,7 +6,7 @@ import {
   fingerprint,
   type RoleResult,
 } from "@resumora/shared";
-import { AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
+import { AiInputRejectedError, AiOutputTooLongError, AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import { scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
@@ -49,8 +49,8 @@ export async function scoreRole(
     });
     result = buildRoleResult(role, answer, input.fingerprint);
   } catch (err) {
-    if (err instanceof AiUnavailableError) throw new ApiError(503, "ai_unavailable", "The AI service is unavailable right now. Try again soon.");
-    if (err instanceof EnrichParseError) throw new ApiError(502, "ai_bad_answer", "The AI gave an answer we couldn't use. Try again.");
+    if (err instanceof AiUnavailableError || err instanceof AiInputRejectedError) throw new ApiError(503, "ai_unavailable", "The AI service is unavailable right now. Try again soon.");
+    if (err instanceof EnrichParseError || err instanceof AiOutputTooLongError) throw new ApiError(502, "ai_bad_answer", "The AI gave an answer we couldn't use. Try again.");
     throw err;
   }
   await deps.insights.put(role.id, result);

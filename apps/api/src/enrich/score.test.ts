@@ -1,4 +1,18 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AiInputRejectedError, AiOutputTooLongError } from "../ai/call-model.ts";
+
+/** Set to make callModel throw this error instead of calling the (fake) provider. */
+const forced = vi.hoisted(() => ({ error: null as Error | null }));
+vi.mock("../ai/call-model.ts", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../ai/call-model.ts")>();
+  return {
+    ...real,
+    callModel: (...args: Parameters<typeof real.callModel>) => {
+      if (forced.error) return Promise.reject(forced.error);
+      return real.callModel(...args);
+    },
+  };
+});
 import { SCORE_POLICY, emptyCv, fingerprint, type CvContent, type Experience } from "@resumora/shared";
 import { ApiError } from "../errors.ts";
 import { memoryCvRepo } from "../cv/memory-repo.ts";
@@ -18,6 +32,7 @@ async function save(...roles: Experience[]) {
 const fp = (r: Experience) => fingerprint(r, content.locale);
 
 beforeEach(() => {
+  forced.error = null;
   cv = memoryCvRepo();
   insights = memoryInsightsRepo("user-1");
 });
@@ -102,6 +117,20 @@ describe("scoreRole", () => {
     await expect(run(fakeModel(() => ({}), 500), role)).rejects.toMatchObject({ status: 503 });
   });
 
+  it("502 when the answer is cut off at the output limit", async () => {
+    const role = roleWith(["One"]);
+    await save(role);
+    forced.error = new AiOutputTooLongError();
+    await expect(run(fakeModel(() => ({})), role)).rejects.toMatchObject({ status: 502, code: "ai_bad_answer" });
+  });
+
+  it("503 when every provider rejects the input", async () => {
+    const role = roleWith(["One"]);
+    await save(role);
+    forced.error = new AiInputRejectedError();
+    await expect(run(fakeModel(() => ({})), role)).rejects.toMatchObject({ status: 503, code: "ai_unavailable" });
+  });
+
   it("removes rows for roles that are no longer in the saved CV", async () => {
     const gone = roleWith(["Old"]);
     const kept = roleWith(["New"]);
@@ -123,6 +152,21 @@ describe("score prompt", () => {
     for (const b of role.bullets) expect(message).toContain(JSON.stringify({ id: b.id, text: b.text }));
     expect(message).not.toContain("Secret Corp");
     expect(message).not.toContain("2019");
+  });
+
+  it("contains all 7 calibration lines and no unsupported-language escape", () => {
+    const prompt = scoreSystemPrompt("en");
+    for (const line of [
+      "Responsible for various administrative tasks.",
+      "Prepared employment contracts for temporary workers.",
+      "Supported Romanian market-entry planning through partner outreach.",
+      "Coordinated onboarding documentation between recruiters and payroll teams.",
+      "Increased efficiency by 75% using advanced solutions.",
+      "Investigated failed API requests using application logs.",
+      "Cut onboarding time from 3 days to 20 minutes by introducing video ID checks.",
+    ]) expect(prompt).toContain(line);
+    expect(prompt).not.toContain("unsupported-language");
+    expect(prompt).toContain("10–50");
   });
 
   it("names the CV language and keeps the output rule", () => {

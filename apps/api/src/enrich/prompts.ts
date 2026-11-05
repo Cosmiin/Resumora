@@ -15,7 +15,6 @@ export function languageInstruction(locale: Locale): string {
     "Preserve source quotations, names, established technology terms, numbers and facts exactly.",
     "Answers and job adverts in another language do not change the CV language.",
     "Keep JSON keys and enum values unchanged.",
-    "If you cannot reliably produce this language, return an explicit unsupported-language result; never silently substitute another language.",
   ].join(" ");
 }
 
@@ -182,7 +181,7 @@ For every bullet fill only these feedback fields:
 - options: When there is a question, 2 to 4 short likely answers
   (each under 60 characters), drawn only from the role's own words and
   the job's common tasks. Never give an exact number; if a quantity
-  matters, give only ranges such as "10-50", "Under 10" or "50+".
+  matters, give only ranges such as "10–50", "Under 10" or "50+".
   Use an empty list when the question is open or there is no question.
 
 Do not provide a rewritten bullet. Do not invent a tip or question to

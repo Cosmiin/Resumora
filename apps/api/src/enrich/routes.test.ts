@@ -48,6 +48,26 @@ describe("/v1/enrich", () => {
     expect(list.items).toEqual([result]);
   });
 
+  it("GET /scores is scoped to the signed-in user", async () => {
+    await score({ roleId: role.id, fingerprint: fp });
+    expect(await memoryInsightsRepo("user-1", store).list()).toHaveLength(1);
+    expect(await memoryInsightsRepo("user-2", store).list()).toEqual([]);
+    const app2 = createApp({
+      appOrigin: "http://127.0.0.1:5173",
+      verifyToken: async (token) => (token === "other" ? { id: "user-2", token } : null),
+      cvRepo: () => memoryCvRepo(),
+      importRepo: () => {
+        throw new Error("not used");
+      },
+      insightsRepo: (user) => memoryInsightsRepo(user.id, store),
+      model: () => model.deps,
+      queue: { send: async () => {} },
+      log: vi.fn(),
+    });
+    const res = await app2.request("/v1/enrich/scores", { headers: { authorization: "Bearer other" } });
+    expect(await res.json()).toEqual({ items: [] });
+  });
+
   it("409 not_saved for a stale fingerprint", async () => {
     const res = await score({ roleId: role.id, fingerprint: "old" });
     expect(res.status).toBe(409);
