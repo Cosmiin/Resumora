@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { ZodError } from "zod";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { supabaseCvRepo } from "../src/cv/supabase-repo.ts";
 import { supabaseImportAdmin, supabaseImportRepo } from "../src/imports/supabase-repo.ts";
+import { supabaseJobAdmin, supabaseJobRepo } from "../src/jobs/supabase-repo.ts";
+import { ApiError } from "../src/errors.ts";
 import { CV_LINES, makePdf } from "./fixtures.ts";
 
 // Runs against a local stack: `npm run db:start`, then
@@ -13,6 +15,66 @@ const anonKey = process.env.SUPABASE_TEST_ANON_KEY ?? "";
 const serviceKey = process.env.SUPABASE_TEST_SERVICE_KEY ?? "";
 
 const cvNamed = (fullName: string): CvContent => ({ ...emptyCv(), basics: { ...emptyCv().basics, fullName } });
+
+describe("supabaseJobRepo error mapping", () => {
+  const env = { SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "test-key" };
+  const user = { id: "user-a", token: "test-token" };
+  const input = { id: "new-job", source: "link" as const, url: "https://example.test/job", urlNormalized: "https://example.test/job", rawText: "Private text", jsonLd: null };
+  const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("maps the database job_limit message to the public 429 error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ message: "job_limit", code: "P0001" }, 400)));
+    const error = await supabaseJobRepo(env, user).create(input).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 429, code: "job_limit", message: "You can add up to 30 jobs per day." });
+  });
+
+  it("maps a unique violation to the existing job's id", async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(response({ message: "duplicate key", code: "23505" }, 409))
+      .mockResolvedValueOnce(response({ id: "first-job" }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await supabaseJobRepo(env, user).create(input)).toEqual({ id: "first-job", existing: true });
+    expect(String(fetch.mock.calls[1]?.[0])).toContain("url_normalized=eq.");
+  });
+
+  it("does not treat other insert failures as a job limit or duplicate", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ message: "permission denied", code: "42501" }, 403)));
+    await expect(supabaseJobRepo(env, user).create(input)).rejects.toThrow("jobs insert failed: permission denied");
+  });
+
+  it("does not return an existing result when a unique violation has no matching URL", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(response({ message: "duplicate id", code: "23505" }, 409))
+      .mockResolvedValueOnce(response(null)));
+    await expect(supabaseJobRepo(env, user).create(input)).rejects.toThrow("jobs insert failed: duplicate id");
+  });
+});
+
+describe("supabaseJobAdmin claims", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("returns null when another start has already raised attempts", async () => {
+    const row = { id: "job", user_id: "a", raw_text: "Private page text", json_ld: null, status: "processing", attempts: 1 };
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method !== "PATCH") return Response.json({ ...row });
+      const expected = new URL(url).searchParams.get("attempts");
+      if (expected !== null && expected !== `eq.${row.attempts}`) return Response.json(null);
+      Object.assign(row, JSON.parse(String(init.body)));
+      return Response.json({ id: row.id });
+    }));
+    const admin = supabaseJobAdmin({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "test-key" });
+
+    const results = await Promise.all([admin.start("job"), admin.start("job")]);
+
+    expect(results.filter((result) => result !== null)).toEqual([
+      { id: "job", userId: "a", rawText: "Private page text", jsonLd: null },
+    ]);
+    expect(results.filter((result) => result === null)).toHaveLength(1);
+    expect(row.attempts).toBe(2);
+  });
+});
 
 async function signedInUser() {
   const admin = createClient(url!, serviceKey, { auth: { persistSession: false } });
