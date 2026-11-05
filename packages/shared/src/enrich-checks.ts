@@ -141,7 +141,7 @@ function parseNumber(raw: string, hasScale: boolean): number {
   return Number(`${parts.join("")}.${decimals}`);
 }
 
-const NUMBER = /(?<!\p{L})(?:\d{1,3}(?:[\s\u00a0\u202f']\d{3})+(?:[.,]\d+)?(?!\d)|\d+(?:[.,]\d+)*)/gu;
+const NUMBER = /(?<![\p{Lu}\p{N}])(?:\d{1,3}(?:[\s\u00a0\u202f']\d{3})+(?:[.,]\d+)?(?!\d)|\d+(?:[.,]\d+)*)/gu;
 
 /** Numbers in `text` as plain strings: separators normalised, scales applied, `%` and units dropped. */
 export function numbersIn(text: string): string[] {

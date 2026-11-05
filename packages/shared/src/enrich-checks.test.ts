@@ -198,6 +198,9 @@ describe("numbersIn", () => {
   it("ignores digits glued to a letter, as in B2B, GA4 and Q3", () => {
     expect(numbersIn("B2B clients")).toEqual([]);
     expect(numbersIn("GA4 and Q3")).toEqual([]);
+    expect(numbersIn("ISO27001 and Q32020 and Y2K")).toEqual([]);
+    expect(numbersIn("x3")).toEqual(["3"]);
+    expect(numbersIn("grew sales x3")).toEqual(["3"]);
     expect(numbersIn("3B users")).toEqual(["3000000000"]);
   });
   it("reads 0.250 as a decimal", () => {
