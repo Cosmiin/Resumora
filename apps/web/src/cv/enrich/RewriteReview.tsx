@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DropReason, Experience, RewriteEvent } from "@resumora/shared";
+import { MAX_BULLETS, type DropReason, type Experience, type RewriteEvent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { streamRewrite } from "./enrich-api.ts";
@@ -21,6 +21,12 @@ export type Proposal = {
 };
 
 type Phase = "drafting" | "streaming" | "done" | "error";
+
+/** Each bullet's text by id, as it was when a stream started. */
+const textsOf = (role: Experience) => new Map(role.bullets.map((b) => [b.id, b.text]));
+
+/** The stream run a proposal came from (its key starts with it). */
+const runOf = (p: Proposal) => Number(p.key.slice(0, p.key.indexOf(":")));
 
 /** Ready or used: a proposal that a retry keeps, and that a new one for the same bullet would repeat. */
 const settled = (p: Proposal) => p.state === "ready" || p.state === "used";
@@ -65,6 +71,8 @@ export function RewriteReview({ role, dispatch, onClose }: Props) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [phase, setPhase] = useState<Phase>("drafting");
   const [run, setRun] = useState(0);
+  /** The bullets' texts when each run started: a proposal is for that text, not for a later edit. */
+  const [started, setStarted] = useState(() => new Map([[0, textsOf(role)]]));
   const roleId = role.id;
 
   useEffect(() => {
@@ -78,7 +86,17 @@ export function RewriteReview({ role, dispatch, onClose }: Props) {
   }, [roleId, run]);
 
   const exists = (p: Proposal) => p.replaces === null || role.bullets.some((b) => b.id === p.replaces);
-  const usable = proposals.filter((p) => p.state === "ready" && exists(p));
+  /** The person edited the bullet after this proposal's stream started, so using it would undo that edit. */
+  const changed = (p: Proposal) => {
+    if (p.replaces === null) return false;
+    const now = role.bullets.find((b) => b.id === p.replaces);
+    return !!now && started.get(runOf(p))?.get(p.replaces) !== now.text;
+  };
+  const room = MAX_BULLETS - role.bullets.length;
+  const ready = proposals.filter((p) => p.state === "ready" && exists(p) && !changed(p));
+  // New bullets only while the role has room for them: the reducer leaves out the rest.
+  let newLeft = room;
+  const usable = ready.filter((p) => p.replaces !== null || newLeft-- > 0);
 
   const apply = (list: Proposal[]) => {
     if (list.length === 0) return;
@@ -91,6 +109,7 @@ export function RewriteReview({ role, dispatch, onClose }: Props) {
 
   // Starts over. Ready and used proposals stay; the new stream fills in the rest.
   const retry = () => {
+    setStarted((m) => new Map(m).set(run + 1, textsOf(role)));
     setProposals((list) => list.filter(settled));
     setPhase("drafting");
     setRun((n) => n + 1);
@@ -114,7 +133,7 @@ export function RewriteReview({ role, dispatch, onClose }: Props) {
         <>
           <p className="p-sub">{t("enrich.review.title")}</p>
           {proposals.map((p) => (
-            <ProposalRow key={p.key} p={p} role={role} stopped={finished} onUse={() => apply([p])} onKeep={() => keep(p.key)} />
+            <ProposalRow key={p.key} p={p} role={role} stopped={finished} changed={changed(p)} full={room <= 0} onUse={() => apply([p])} onKeep={() => keep(p.key)} />
           ))}
           {nothing && <p className="review-note">{t("enrich.review.nothing")}</p>}
           {phase === "error" && (
@@ -142,10 +161,10 @@ export function RewriteReview({ role, dispatch, onClose }: Props) {
   );
 }
 
-type RowProps = { p: Proposal; role: Experience; stopped: boolean; onUse(): void; onKeep(): void };
+type RowProps = { p: Proposal; role: Experience; stopped: boolean; changed: boolean; full: boolean; onUse(): void; onKeep(): void };
 
 /** One proposal: the bullet it replaces (or "New bullet"), the new text, and what can be done with it. */
-function ProposalRow({ p, role, stopped, onUse, onKeep }: RowProps) {
+function ProposalRow({ p, role, stopped, changed, full, onUse, onKeep }: RowProps) {
   const original = p.replaces === null ? undefined : role.bullets.find((b) => b.id === p.replaces);
   const removed = p.replaces !== null && !original && p.state !== "used";
   // A half-written proposal whose stream stopped is shown as it was left, never with buttons.
@@ -164,11 +183,15 @@ function ProposalRow({ p, role, stopped, onUse, onKeep }: RowProps) {
       <span className="prop-new">{p.text}</span>
       {p.state === "dropped" && p.reason && <span className="prop-why">{t(`enrich.drop.${p.reason}`)}</span>}
       {live && <span className="prop-hint">{t("enrich.review.writing")}</span>}
-      {p.state === "ready" && !removed && (
+      {p.state === "ready" && !removed && changed && <span className="prop-why">{t("enrich.review.bulletChanged")}</span>}
+      {p.state === "ready" && p.replaces === null && full && <span className="prop-why">{t("enrich.review.roleFull")}</span>}
+      {p.state === "ready" && !removed && !changed && (
         <div className="row-btns">
-          <button type="button" className="btn small primary" onClick={onUse}>
-            {t("enrich.review.use")}
-          </button>
+          {!(p.replaces === null && full) && (
+            <button type="button" className="btn small primary" onClick={onUse}>
+              {t("enrich.review.use")}
+            </button>
+          )}
           <button type="button" className="btn small" onClick={onKeep}>
             {t("enrich.review.keep")}
           </button>

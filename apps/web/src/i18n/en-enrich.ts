@@ -1,5 +1,7 @@
-/** Copy for the Summary and Skills tools in the helper panel. Spread into `en`. */
+/** Copy for the enrich tools in the helper panel (Summary, Skills, rewrite review). Spread into `en`. */
 export const enrichSectionsEn = {
+  "enrich.review.bulletChanged": "This bullet changed. Try again",
+  "enrich.review.roleFull": "This role is full",
   "enrich.checklist": "Checklist",
   "enrich.summary.sentences": "2 to 4 sentences",
   "enrich.summary.sentencesFix": "Aim for two to four short sentences.",

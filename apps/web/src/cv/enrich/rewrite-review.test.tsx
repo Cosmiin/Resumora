@@ -2,7 +2,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { emptyCv, type CvContent, type RewriteEvent } from "@resumora/shared";
+import { MAX_BULLETS, emptyCv, type CvContent, type RewriteEvent } from "@resumora/shared";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 
 const api = vi.hoisted(() => ({ streamRewrite: vi.fn() }));
@@ -45,8 +45,8 @@ function fakeStream() {
 }
 
 /** The review over a real reducer, with an undo stack so one undo step can be checked. */
-function Harness({ onAction, onClose }: { onAction(a: CvAction): void; onClose(): void }) {
-  const [h, setH] = useState<{ past: CvContent[]; cv: CvContent }>({ past: [], cv: initial });
+function Harness({ onAction, onClose, start = initial }: { onAction(a: CvAction): void; onClose(): void; start?: CvContent }) {
+  const [h, setH] = useState<{ past: CvContent[]; cv: CvContent }>({ past: [], cv: start });
   const dispatch = (a: CvAction) => {
     onAction(a);
     setH((s) => {
@@ -56,6 +56,7 @@ function Harness({ onAction, onClose }: { onAction(a: CvAction): void; onClose()
   };
   const undo = () => setH((s) => (s.past.length ? { past: s.past.slice(0, -1), cv: s.past.at(-1)! } : s));
   const removeB2 = () => dispatch({ type: "joinBullet", owner: { list: "experience", itemId: "r1" }, bulletId: "b2" });
+  const editB1 = () => dispatch({ type: "setBullet", owner: { list: "experience", itemId: "r1" }, bulletId: "b1", text: "Did invoices" });
   return (
     <>
       <ul data-testid="bullets">
@@ -69,6 +70,9 @@ function Harness({ onAction, onClose }: { onAction(a: CvAction): void; onClose()
       <button type="button" onClick={removeB2}>
         Remove b2
       </button>
+      <button type="button" onClick={editB1}>
+        Edit b1
+      </button>
       <div data-testid="review">
         <RewriteReview role={h.cv.experience[0]!} dispatch={dispatch} onClose={onClose} />
       </div>
@@ -76,11 +80,11 @@ function Harness({ onAction, onClose }: { onAction(a: CvAction): void; onClose()
   );
 }
 
-function review() {
+function review(start?: CvContent) {
   const stream = fakeStream();
   const onAction = vi.fn<(a: CvAction) => void>();
   const onClose = vi.fn();
-  const view = render(<Harness onAction={onAction} onClose={onClose} />);
+  const view = render(<Harness onAction={onAction} onClose={onClose} start={start} />);
   return { stream, onAction, onClose, view, user: userEvent.setup() };
 }
 const bulletTexts = () => within(screen.getByTestId("bullets")).getAllByRole("listitem").map((li) => li.textContent);
@@ -193,6 +197,46 @@ describe("rewrite review", () => {
     const p = proposal("New b2");
     expect(within(p).getByText("This bullet was removed")).toBeInTheDocument();
     expect(within(p).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("a bullet edited while its proposal streams cannot be overwritten, and Use all leaves it out", async () => {
+    const { stream, onAction, user } = review();
+    stream.emit({ event: "start", data: { index: 0, replaces: "b1" } });
+    await user.click(screen.getByRole("button", { name: "Edit b1" }));
+    stream.emit({ event: "ready", data: { index: 0, text: "New b1" } });
+    ready(stream, 1, "b2", "New b2");
+    ready(stream, 2, "b3", "New b3");
+    const p = proposal("New b1");
+    expect(within(p).getByText("This bullet changed. Try again")).toBeInTheDocument();
+    expect(within(p).queryByRole("button")).not.toBeInTheDocument();
+    onAction.mockClear();
+    await user.click(screen.getByRole("button", { name: "Use all 2" }));
+    expect(onAction).toHaveBeenCalledWith(apply([{ replaces: "b2", text: "New b2" }, { replaces: "b3", text: "New b3" }]));
+    expect(bulletTexts()).toEqual(["Did invoices", "New b2", "New b3"]);
+  });
+
+  it("Try again takes a fresh copy of the bullets, so an edit made before it is fine", async () => {
+    const { stream, user } = review();
+    stream.emit({ event: "error", data: { code: "ai_unavailable", message: "x" } });
+    await user.click(screen.getByRole("button", { name: "Edit b1" }));
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    ready(stream, 0, "b1", "New b1");
+    expect(within(proposal("New b1")).getByRole("button", { name: "Use this" })).toBeInTheDocument();
+  });
+
+  it("a role at the bullet limit says new bullets don't fit, and Use all skips them", async () => {
+    const full = structuredClone(initial);
+    full.experience[0]!.bullets = Array.from({ length: MAX_BULLETS }, (_, i) => ({ id: `b${i + 1}`, text: `Bullet ${i + 1}` }));
+    const { stream, onAction, user } = review(full);
+    ready(stream, 0, null, "Extra bullet");
+    ready(stream, 1, "b1", "New b1");
+    ready(stream, 2, "b2", "New b2");
+    const p = proposal("Extra bullet");
+    expect(within(p).getByText("This role is full")).toBeInTheDocument();
+    expect(within(p).queryByRole("button", { name: "Use this" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Use all 2" }));
+    expect(onAction).toHaveBeenCalledWith(apply([{ replaces: "b1", text: "New b1" }, { replaces: "b2", text: "New b2" }]));
+    expect(within(p).queryByText("✓ Used")).not.toBeInTheDocument();
   });
 
   it("a stream error keeps ready proposals usable and offers Try again", async () => {
