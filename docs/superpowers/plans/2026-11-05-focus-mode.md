@@ -94,7 +94,7 @@ The docs, migration and SQL test files in `new_files` were written by Claude bef
   - `RoleFactsAnswerSchema = z.object({ facts: z.array(z.string()).max(8), fromNotes: z.string() }).strict()`, type `RoleFactsAnswer`
 
 **`mergeGrades` algorithm** (it reuses `buildRoleResult` so the zero rules, issue order, questions and `nextStep` stay in one place):
-1. For each bullet of `role`, take the `graded` entry with its id. Otherwise rebuild a `ModelBullet` from `stored.bullets` with the same id: `meaningful: issue !== "example"`, the four grades, `issue`, `duplicateOf: null`, `tip`, `question`, and `options` from `stored.questions.find(q => q.bulletId === id)?.options ?? []`.
+1. For each bullet of `role`, take the `graded` entry with its id. Otherwise rebuild a `ModelBullet` from `stored.bullets` with the same id: `meaningful: issue !== "example"`, the four grades, `issue`, `duplicateOf`: the id of the role's first bullet when the stored issue is `duplicate` (a flagged duplicate is never first, so this keeps its score at 0), else `null`; `tip`, `question`, and `options` from `stored.questions.find(q => q.bulletId === id)?.options ?? []`.
 2. If a bullet has neither, throw `EnrichParseError`.
 3. Return `buildRoleResult(role, { bullets, nextStepId: stored?.nextStep?.bulletId ?? null }, fingerprintValue)`.
 

@@ -12,6 +12,8 @@ import { createVoiceSession, VoiceUnavailableError, type VoiceDeps } from "../ai
 import type { InsightsRepo } from "./repo.ts";
 import { scoreRole } from "./score.ts";
 import { improveBullet } from "./improve.ts";
+import { brainDump } from "./brain-dump.ts";
+import { roleFacts } from "./role-facts.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
 import { checkProposal, checkSummary, keepAsIsIds, rewriteEvents } from "./rewrite.ts";
@@ -69,6 +71,40 @@ export function enrichRoutes(deps: {
     } catch (err) {
       if (err instanceof ApiError && err.status >= 500) {
         console.error(JSON.stringify({ msg: "improve bullet failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/brain-dump", async (c) => {
+    const body = ScoreBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
+    const user = c.get("user");
+    try {
+      return c.json(await brainDump(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "brain dump failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/role-facts", async (c) => {
+    const body = RoleBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId.");
+    const user = c.get("user");
+    try {
+      return c.json(await roleFacts(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "role facts failed", code: err.code, requestId: c.get("requestId") }));
       }
       throw err;
     }

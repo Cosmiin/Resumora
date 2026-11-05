@@ -140,7 +140,9 @@ describe("POST /v1/enrich/improve-bullet", () => {
     initial.bullets[1]!.issue = "duplicate";
     initial.bullets[1]!.duplicateOf = role.bullets[0]!.id;
     await save();
-    expect(await (await post()).json()).toMatchObject({ proposal: { text: proposal }, bulletAfter: 80 });
+    expect(await (await post()).json()).toMatchObject({
+      proposal: { text: proposal }, bulletAfter: 80, roleBefore: 22, roleAfter: 40,
+    });
     expect(await insights.pending(role.id)).toEqual([]);
   });
 

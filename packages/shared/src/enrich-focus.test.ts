@@ -39,6 +39,20 @@ describe("mergeGrades", () => {
       .toEqual(stored.questions.find((q) => q.bulletId === "b2"));
   });
 
+  it("keeps a stored semantic duplicate at zero when another bullet is re-graded", () => {
+    const r = role(["Handled orders", "Processed customer orders"]);
+    const stored = buildRoleResult(r, {
+      bullets: [grade("b1"), grade("b2", { duplicateOf: "b1", issue: "duplicate" })],
+      nextStepId: null,
+    }, "old");
+    expect(stored.score).toBe(40);
+
+    const result = mergeGrades(r, stored, [grade("b1")], "new");
+
+    expect(result.bullets[1]).toMatchObject({ score: 0, issue: "duplicate" });
+    expect(result.score).toBe(40);
+    expect(result.score).toBe(stored.score);
+  });
   it("throws if a bullet has neither fresh nor stored grades", () => {
     expect(() => mergeGrades(role(), null, [grade("b1")], "fp")).toThrow(EnrichParseError);
     const stored = buildRoleResult(role(["Handled orders"]), { bullets: [grade("b1")], nextStepId: null }, "old");

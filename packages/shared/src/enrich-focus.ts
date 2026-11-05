@@ -24,7 +24,7 @@ export function mergeGrades(
       specificity: old.specificity,
       impact: old.impact,
       issue: old.issue,
-      duplicateOf: null,
+      duplicateOf: old.issue === "duplicate" ? role.bullets[0]!.id : null,
       tip: old.tip,
       question: old.question,
       options: stored?.questions.find((q) => q.bulletId === id)?.options ?? [],
