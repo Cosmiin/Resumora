@@ -51,6 +51,10 @@ beforeEach(async () => {
     insightsRepo: (user) => memoryInsightsRepo(user.id, store),
     model: () => model.deps,
     importRepo: () => { throw new Error("not used"); },
+    jobRepo: () => {
+      throw new Error("job repo not used in these tests");
+    },
+    jobQueue: { send: async () => {} },
     queue: { send: async () => {} },
     log: vi.fn(),
   });

@@ -6,6 +6,8 @@ import { ApiError, errorBody, toErrorResponse, type LogFn } from "./errors.ts";
 import { cvRoutes } from "./cv/routes.ts";
 import type { ImportMessage, ImportRepo } from "./imports/repo.ts";
 import { importRoutes } from "./imports/routes.ts";
+import type { JobMessage, JobRepo } from "./jobs/repo.ts";
+import { jobRoutes } from "./jobs/routes.ts";
 import type { ModelDeps } from "./ai/call-model.ts";
 import type { VoiceDeps } from "./ai/voice-session.ts";
 import type { InsightsRepo } from "./enrich/repo.ts";
@@ -18,6 +20,7 @@ export type AppDeps = {
   verifyToken(token: string): Promise<AuthUser | null>;
   cvRepo(user: AuthUser): CvRepo;
   importRepo(user: AuthUser): ImportRepo;
+  jobRepo(user: AuthUser): JobRepo;
   insightsRepo(user: AuthUser): InsightsRepo;
   /** Model access for request handlers, logging each call as this user. */
   model(user: AuthUser): ModelDeps;
@@ -25,7 +28,8 @@ export type AppDeps = {
   voice?(user: AuthUser): VoiceDeps;
   /** Where new imports are sent for processing. */
   queue: { send(message: ImportMessage): Promise<void> };
-  /** Injectable clock for the daily import limit. */
+  jobQueue: { send(message: JobMessage): Promise<void> };
+  /** Injectable clock for the daily import and job limits. */
   now?: () => Date;
   log: LogFn;
 };
@@ -47,7 +51,7 @@ export function createApp(deps: AppDeps) {
     cors({
       origin: (origin) => (origin === deps.appOrigin ? origin : null),
       allowHeaders: ["authorization", "content-type"],
-      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       exposeHeaders: ["x-request-id"],
     }),
   );
@@ -70,6 +74,10 @@ export function createApp(deps: AppDeps) {
   );
 
   app.route("/v1/enrich", enrichRoutes({ cvRepo: deps.cvRepo, insightsRepo: deps.insightsRepo, model: deps.model, voice: deps.voice }));
+  app.route(
+    "/v1/jobs",
+    jobRoutes({ repoFor: (c) => deps.jobRepo(c.get("user")), queue: deps.jobQueue, now: deps.now ?? (() => new Date()) }),
+  );
 
   app.notFound((c) => c.json(errorBody("not_found", "Not found.", c.get("requestId")), 404));
 

@@ -28,6 +28,9 @@ beforeEach(() => {
     importRepo: () => {
       throw new Error("not used");
     },
+    jobRepo: () => {
+      throw new Error("not used");
+    },
     insightsRepo: () => {
       throw new Error("not used");
     },
@@ -35,6 +38,7 @@ beforeEach(() => {
       throw new Error("not used");
     },
     queue: { send: async () => {} },
+    jobQueue: { send: async () => {} },
     log: vi.fn(),
   });
 });

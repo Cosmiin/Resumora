@@ -29,6 +29,9 @@ beforeEach(() => {
     verifyToken: async (token) => (USERS[token] ? { id: USERS[token], token } : null),
     cvRepo: (user) => cvRepos[user.id]!,
     importRepo: (user) => store.repoFor(user.id),
+    jobRepo: () => {
+      throw new Error("not used");
+    },
     insightsRepo: () => {
       throw new Error("not used");
     },
@@ -36,6 +39,7 @@ beforeEach(() => {
       throw new Error("not used");
     },
     queue: { send: async (m) => void sent.push(m) },
+    jobQueue: { send: async () => {} },
     now: () => clock,
     log: vi.fn(),
   });

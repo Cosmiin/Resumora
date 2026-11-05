@@ -61,6 +61,10 @@ beforeEach(async () => {
     insightsRepo: () => insights,
     model: () => model.deps,
     importRepo: () => { throw new Error("not used"); },
+    jobRepo: () => {
+      throw new Error("job repo not used in these tests");
+    },
+    jobQueue: { send: async () => {} },
     queue: { send: async () => {} }, log,
   });
 });

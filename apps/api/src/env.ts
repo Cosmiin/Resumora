@@ -1,3 +1,5 @@
+import type { JobMessage } from "./jobs/repo.ts";
+
 export type Env = {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
@@ -10,6 +12,7 @@ export type Env = {
   OPENAI_MODEL: string;
   /** Queue of imports to process (Cloudflare Queues; simulated locally by wrangler dev). */
   IMPORTS: Queue<{ importId: string; userId: string }>;
+  JOBS: Queue<JobMessage>;
 };
 
 /** The signed-in user making the request. `token` is their Supabase access token. */

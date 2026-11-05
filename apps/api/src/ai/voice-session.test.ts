@@ -91,6 +91,9 @@ describe("POST /v1/enrich/voice-session", () => {
       importRepo: () => {
         throw new Error("not used");
       },
+      jobRepo: () => {
+        throw new Error("job repo not used in these tests");
+      },
       insightsRepo: (u) => memoryInsightsRepo(u.id, new Map(), aiCalls),
       model: () => {
         throw new Error("not used");
@@ -103,6 +106,7 @@ describe("POST /v1/enrich/voice-session", () => {
         },
       }),
       queue: { send: async () => {} },
+      jobQueue: { send: async () => {} },
       log: vi.fn(),
     });
     const post = async () => {

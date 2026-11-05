@@ -1,0 +1,24 @@
+Atelier Digital Verde
+Cariere / Inginer testare software
+București, România · Hibrid · Normă întreagă
+
+Căutăm un Inginer testare software pentru echipa care dezvoltă o aplicație de gestiune pentru biblioteci. Atelier Digital Verde este o companie fictivă de produse software. Rolul este permanent, cu două zile pe săptămână la biroul din București.
+
+Responsabilități
+- Pregătirea planurilor de testare pentru funcționalități noi.
+- Raportarea erorilor cu pași clari de reproducere.
+- Colaborarea cu dezvoltatorii pentru verificarea corecțiilor.
+
+Cerințe obligatorii
+- Minimum doi ani de experiență în testare software.
+- Experiență în scrierea testelor automate cu Playwright.
+- Cunoștințe de SQL.
+- Cunoașterea limbii române la nivel avansat.
+- Cunoașterea limbii engleze la nivel B2.
+
+Constituie un avantaj, dar nu este obligatoriu
+- Experiență în testarea aplicațiilor accesibile.
+
+Beneficii: abonament de transport, buget de formare și program flexibil. Salariul nu este publicat în acest anunț. Aplică prin formularul de pe această pagină.
+
+Înapoi la posturi | Politica de confidențialitate | Preferințe cookie
