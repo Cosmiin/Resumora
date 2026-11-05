@@ -120,9 +120,12 @@ export async function* streamModel(deps: ModelDeps, req: StreamRequest): AsyncGe
       if (!res.body) throw new StreamFailure("empty response");
       reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
 
+      // Keep-alive comments don't count: the deadline moves only when real text arrives.
+      // Before the first text it is one fixed deadline for the whole attempt.
+      let deadline = started + firstMs;
       let buffer = "";
       for (;;) {
-        const { done, value } = await Promise.race([within(reader.read(), yielded ? gapMs : firstMs), abort.promise]);
+        const { done, value } = await Promise.race([within(reader.read(), Math.max(0, deadline - Date.now())), abort.promise]);
         if (done) break;
         buffer += value;
         let newline = buffer.indexOf("\n");
@@ -132,6 +135,8 @@ export async function* streamModel(deps: ModelDeps, req: StreamRequest): AsyncGe
           if (text !== undefined) {
             yielded = true;
             yield text;
+            // Measured from when reading resumes, so a slow reader doesn't eat into the gap.
+            deadline = Date.now() + gapMs;
           }
           newline = buffer.indexOf("\n");
         }

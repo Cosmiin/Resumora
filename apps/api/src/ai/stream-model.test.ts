@@ -110,6 +110,39 @@ describe("streamModel", () => {
     expect(await collect(streamModel({ ...deps, timeoutMs: 30 }, request))).toEqual(["late answer"]);
   });
 
+  /** Sends `pieces`, then a keep-alive comment every 10 ms until cancelled: reads succeed, but no more text arrives. */
+  function keepAlive(pieces: string[]) {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const next = pieces.shift();
+        if (next !== undefined) return void controller.enqueue(enc.encode(next));
+        return new Promise<void>((resolve) =>
+          setTimeout(() => {
+            if (!cancelled) controller.enqueue(enc.encode(": OPENROUTER PROCESSING\n\n"));
+            resolve();
+          }, 10),
+        );
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+  }
+
+  it("falls back when a provider sends only keep-alive comments past the first-chunk deadline", async () => {
+    const { deps, logs } = setup(keepAlive([]), goodStream("from second"));
+    expect(await collect(streamModel({ ...deps, timeoutMs: 60 }, request))).toEqual(["from second"]);
+    expect(logs.map((l) => [l.provider, l.status])).toEqual([["openrouter", "error"], ["openai", "ok"]]);
+  });
+
+  it("times out on a gap after text even while keep-alive comments arrive", async () => {
+    const { deps, calls } = setup(keepAlive([delta("half")]), goodStream("never"));
+    await expect(collect(streamModel({ ...deps, timeoutMs: 60 }, request))).rejects.toBeInstanceOf(AiStreamBrokenError);
+    expect(calls).toHaveLength(1);
+  });
+
   it("stops and logs an aborted call when the signal fires", async () => {
     const controller = new AbortController();
     const { deps, calls, logs } = setup(sse([delta("one")], { hang: true }), goodStream("never"));
