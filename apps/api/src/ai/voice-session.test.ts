@@ -32,7 +32,7 @@ describe("createVoiceSession", () => {
     expect(requests[0]!.url).toBe("https://api.openai.com/v1/realtime/client_secrets");
     expect(requests[0]!.headers.get("authorization")).toBe(`Bearer ${KEY}`);
     expect(requests[0]!.body).toEqual({
-      expires_after: { anchor: "created_at", seconds: 60 },
+      expires_after: { anchor: "created_at", seconds: 10 },
       session: {
         type: "transcription",
         audio: { input: { transcription: { model: "gpt-4o-mini-transcribe", language: "ro" }, turn_detection: { type: "server_vad" } } },

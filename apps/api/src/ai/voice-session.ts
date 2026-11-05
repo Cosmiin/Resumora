@@ -4,7 +4,7 @@
  *
  * Create the key (server side, Bearer = our OpenAI key):
  *   POST https://api.openai.com/v1/realtime/client_secrets
- *   { "expires_after": { "anchor": "created_at", "seconds": 60 },
+ *   { "expires_after": { "anchor": "created_at", "seconds": 10 },
  *     "session": { "type": "transcription",
  *       "audio": { "input": {
  *         "transcription": { "model": "gpt-4o-mini-transcribe", "language": "en" | "ro" },
@@ -12,7 +12,10 @@
  *   Answer: { value: "ek_...", expires_at: <unix seconds>, session: {...} }. Use the top-level
  *   expires_at (session.expires_at is 0). The old /v1/realtime/transcription_sessions returns 404.
  *   expires_after only limits how long the key can START a session; the 60 s recording cap is
- *   enforced in the browser.
+ *   enforced in the browser. 10 s was confirmed accepted on 2026-11-05.
+ *   Residual risk: while the key is valid it can start more than one session, so within those
+ *   10 s one counted key could open several transcription sessions. The short lifetime keeps
+ *   that window small; the browser connects as soon as it gets the key.
  *
  * Browser connection:
  *   new WebSocket("wss://api.openai.com/v1/realtime?intent=transcription",
@@ -27,7 +30,7 @@ import type { AiCallLog } from "./call-model.ts";
 
 export const VOICE_TASK = "enrich_voice";
 /** How long the temporary key can start a session. Not the same as VOICE.maxSeconds, the recording cap the browser enforces. */
-const VOICE_KEY_SECONDS = 60;
+const VOICE_KEY_SECONDS = 10;
 const ENDPOINT = "https://api.openai.com/v1/realtime/client_secrets";
 
 export type VoiceDeps = {

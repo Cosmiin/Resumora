@@ -21,7 +21,7 @@ const attempts = [
     name: "POST /v1/realtime/client_secrets",
     url: "https://api.openai.com/v1/realtime/client_secrets",
     body: {
-      expires_after: { anchor: "created_at", seconds: 60 },
+      expires_after: { anchor: "created_at", seconds: 10 },
       session: { type: "transcription", audio: { input: { transcription, turn_detection: vad } } },
     },
   },
