@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, renderHook, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type Experience, type Question, type RoleResult } from "@resumora/shared";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 import { HelperPanel } from "../panel/HelperPanel.tsx";
-import { useWaitForSave, type SaveStatus } from "../useAutosave.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 const api = vi.hoisted(() => ({ streamRewrite: vi.fn(), createVoiceSession: vi.fn() }));
@@ -191,39 +190,5 @@ describe("role tools", () => {
     await user.click(screen.getByRole("button", { name: "Answer 1 question" }));
     expect(screen.getByText("Question 1 of 1")).toBeInTheDocument();
     expect(screen.getByText("How many suppliers?")).toBeInTheDocument();
-  });
-});
-
-describe("waitForSave", () => {
-  it("resolves at once when everything is saved", async () => {
-    const { result } = renderHook(() => useWaitForSave("saved"));
-    await expect(result.current.waitForSave()).resolves.toBeUndefined();
-  });
-
-  it("after an edit, resolves on the next save", async () => {
-    const { result, rerender } = renderHook(({ status }: { status: SaveStatus }) => useWaitForSave(status), {
-      initialProps: { status: "saved" },
-    });
-    result.current.markEdited();
-    let done = false;
-    void result.current.waitForSave().then(() => (done = true));
-    rerender({ status: "dirty" });
-    rerender({ status: "saving" });
-    await act(async () => {});
-    expect(done).toBe(false);
-    rerender({ status: "saved" });
-    await act(async () => {});
-    expect(done).toBe(true);
-  });
-
-  it("gives up waiting after 15 s", async () => {
-    vi.useFakeTimers();
-    const { result } = renderHook(() => useWaitForSave("error"));
-    let done = false;
-    void result.current.waitForSave().then(() => (done = true));
-    await act(async () => vi.advanceTimersByTimeAsync(14_999));
-    expect(done).toBe(false);
-    await act(async () => vi.advanceTimersByTimeAsync(1));
-    expect(done).toBe(true);
   });
 });

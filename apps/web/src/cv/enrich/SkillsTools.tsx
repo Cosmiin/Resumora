@@ -112,6 +112,7 @@ function SortProposals({ cv, answer, dispatch }: { cv: CvContent; answer: Skills
 export function SkillsTools({ cv, dispatch, waitForSave }: Props) {
   const [ask, setAsk] = useState<Ask>({ status: "idle" });
   const [shown, setShown] = useState<Shown | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const alive = useRef(true);
   const latest = useRef(0);
   useEffect(() => {
@@ -125,9 +126,19 @@ export function SkillsTools({ cv, dispatch, waitForSave }: Props) {
   const open = async (which: Shown) => {
     setShown(which);
     const mine = ++latest.current;
+    setSaveFailed(false);
     setAsk({ status: "loading" });
     try {
       await waitForSave();
+    } catch {
+      // The server reads the saved CV, so it would answer for older text.
+      if (alive.current && mine === latest.current) {
+        setAsk({ status: "idle" });
+        setSaveFailed(true);
+      }
+      return;
+    }
+    try {
       const answer = await getSkillSuggestions();
       if (alive.current && mine === latest.current) setAsk({ status: "ready", answer });
     } catch {
@@ -156,6 +167,11 @@ export function SkillsTools({ cv, dispatch, waitForSave }: Props) {
       {busy && (
         <p className="working" role="status">
           {t("enrich.skills.reading")}
+        </p>
+      )}
+      {saveFailed && (
+        <p className="review-note" role="alert">
+          {t("enrich.summary.saveFailed")}
         </p>
       )}
       {ask.status === "failed" && (

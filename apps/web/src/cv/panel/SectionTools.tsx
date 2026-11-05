@@ -75,6 +75,7 @@ type RoleView = { kind: "card" } | { kind: "questions"; questions: Question[] } 
 /** The role's score card, or in its place the questions or the rewrite review. */
 function RoleEnrich({ cv, dispatch, roleId, scores, onRetry, waitForSave }: Pick<Props, "cv" | "dispatch" | "scores" | "onRetry"> & { roleId: string; waitForSave(): Promise<void> }) {
   const [view, setView] = useState<RoleView>({ kind: "card" });
+  const [saveFailed, setSaveFailed] = useState(false);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -92,18 +93,35 @@ function RoleEnrich({ cv, dispatch, roleId, scores, onRetry, waitForSave }: Pick
     // Questions already answered in a note are not asked again.
     const questions = score.state === "ready" && score.result ? openQuestions(role, score.result.questions) : [];
     const rewrite = async () => {
+      setSaveFailed(false);
       setView({ kind: "drafting" });
-      await waitForSave();
+      try {
+        await waitForSave();
+      } catch {
+        // The rewrite reads the saved CV, so it would work on older text: back to the card.
+        if (alive.current) {
+          setSaveFailed(true);
+          setView((v) => (v.kind === "drafting" ? { kind: "card" } : v));
+        }
+        return;
+      }
       if (alive.current) setView((v) => (v.kind === "drafting" ? { kind: "review" } : v));
     };
     return (
-      <ScoreCard
-        role={role}
-        score={score}
-        onAnswer={() => questions.length > 0 && setView({ kind: "questions", questions })}
-        onRewrite={() => void rewrite()}
-        onRetry={() => onRetry?.(roleId)}
-      />
+      <>
+        {saveFailed && (
+          <p className="review-note" role="alert">
+            {t("enrich.summary.saveFailed")}
+          </p>
+        )}
+        <ScoreCard
+          role={role}
+          score={score}
+          onAnswer={() => questions.length > 0 && setView({ kind: "questions", questions })}
+          onRewrite={() => void rewrite()}
+          onRetry={() => onRetry?.(roleId)}
+        />
+      </>
     );
   }
 

@@ -21,6 +21,7 @@ export function QuestionFlow({ role, questions, dispatch, waitForSave, onDraft, 
   const [answer, setAnswer] = useState<{ value: string; via: Via[] }>({ value: "", via: [] });
   const [saved, setSaved] = useState(0);
   const [drafting, setDrafting] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -53,8 +54,18 @@ export function QuestionFlow({ role, questions, dispatch, waitForSave, onDraft, 
   };
 
   const draft = async () => {
+    setSaveFailed(false);
     setDrafting(true);
-    await waitForSave();
+    try {
+      await waitForSave();
+    } catch {
+      // The draft reads the saved answers, so it waits until they are saved.
+      if (alive.current) {
+        setDrafting(false);
+        setSaveFailed(true);
+      }
+      return;
+    }
     if (alive.current) onDraft();
   };
 
@@ -64,6 +75,11 @@ export function QuestionFlow({ role, questions, dispatch, waitForSave, onDraft, 
       <div className="box question-flow">
         {saved > 0 && <strong>{saved === 1 ? t("enrich.questions.thanksOne") : t("enrich.questions.thanksMany", { n: saved })}</strong>}
         <p className="fine">{t("enrich.questions.draftNote")}</p>
+        {saveFailed && (
+          <p className="review-note" role="alert">
+            {t("enrich.summary.saveFailed")}
+          </p>
+        )}
         {drafting ? (
           <p className="working" role="status">
             {t("enrich.review.drafting")}
