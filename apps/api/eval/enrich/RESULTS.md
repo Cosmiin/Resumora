@@ -1,5 +1,41 @@
 # Experience score and rewrite evaluation
 
+## Focus mode
+
+Policy: `score/2`. Not run yet; Claude fills this table after the live run (step C).
+Run only the focus cases with `EVAL_CASE=focus- npm run eval:enrich` (PowerShell:
+`$env:EVAL_CASE='focus-'; npm run eval:enrich`). Never part of `npm test` or CI.
+
+Pass rules:
+- 0 invented numbers across single-bullet and brain-dump cases, checked with `hasUnknownNumber`
+  against the saved role and notes, both before and after proposal filtering.
+- After grade > before grade in at least 5 of the 6 improve cases.
+- Each brain dump returns at least 1 proposal in the CV's language.
+- Supplied numbers are preserved when a proposal is offered; a picked range stays a range;
+  forbidden numbers never appear.
+- Review language manually: there is no existing language-check function in the runner.
+  Every proposal must use the CV's language; Romanian cases must contain no English sentence.
+  The automated result alone does not certify this rule.
+
+`enrich-last.json` contains `improves` and `dumps` alongside the existing `scores`: before/after
+grades (the target bullet for improve, the role for a dump), `needsDetail` (null for dumps),
+raw and returned proposal text, invented-number text, number expectations, language review flags,
+input/output tokens, seconds, cost, and gateway call logs. A needs-detail response keeps the old
+grade and does not count as an improvement. Token totals include usage reported in gateway logs.
+
+| Case | Before | After | needsDetail | Invented numbers | Language review | Tokens in/out | Seconds | Pass |
+|---|---|---|---|---|---|---|---|---|
+| focus-en-vague-answer | | | | | | | | |
+| focus-en-rangeOnly | | | | | | | | |
+| focus-en-80-result | | | | | | | | |
+| focus-ro-role | | | | | | | | |
+| focus-en-duplicate-trap | | | | | | | | |
+| focus-en-forbid-number | | | | | | | | |
+| focus-en-brain-dump | | | | | | | | |
+| focus-ro-brain-dump | | | | | | | | |
+
+## Earlier evaluation runs
+
 Date: 2026-11-05 · Score policy: `score/1` · Command: `npm run eval:enrich` · Never run in CI.
 
 ## What this means

@@ -1,14 +1,21 @@
-// Manual evaluation: scores synthetic roles with the real AI providers.
+// Manual evaluation: scores and improves synthetic roles with the real AI providers.
 // Run from the repo root: npm run eval:enrich
 // Only some cases: EVAL_CASE=ro npm run eval:enrich   (matches the start of the case id)
+// Focus cases only: EVAL_CASE=focus- npm run eval:enrich
 // The full run is saved to apps/api/node_modules/.cache/eval/enrich-last.json for a closer look.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { ModelScoreSchema, buildRoleResult, fingerprint, isAllowedOption, type Grade, type Experience } from "@resumora/shared";
+import { BRAIN_DUMP_QUESTION, ModelScoreSchema, buildRoleResult, emptyCv, fingerprint, hasUnknownNumber, isAllowedOption, type Grade, type Experience } from "@resumora/shared";
 import { callModel, providersFromEnv, type AiCallLog, type ModelDeps } from "../../src/ai/call-model.ts";
+import { memoryCvRepo } from "../../src/cv/memory-repo.ts";
+import { brainDump } from "../../src/enrich/brain-dump.ts";
+import { improveBullet } from "../../src/enrich/improve.ts";
+import { memoryInsightsRepo } from "../../src/enrich/memory-repo.ts";
 import { scoreSystemPrompt, scoreUserMessage } from "../../src/enrich/prompts.ts";
-import { SCORE_CASES, type ScoreCase } from "./cases.ts";
+import { roleSources } from "../../src/enrich/rewrite.ts";
+import { scoreRole } from "../../src/enrich/score.ts";
+import { DUMP_CASES, IMPROVE_CASES, SCORE_CASES, type DumpCase, type ImproveCase, type ScoreCase } from "./cases.ts";
 
 const OUT = join(import.meta.dirname, "../../node_modules/.cache/eval/enrich-last.json");
 /** USD per token, from openrouter.ai/api/v1/models on 2026-11-04 (same table as the import eval). */
@@ -90,9 +97,96 @@ async function runScoreCase(c: ScoreCase): Promise<ScoreRow> {
   }
 }
 
+// ---------- focus cases ----------
+
+type FocusRow = {
+  id: string; before: number | null; after: number | null; needsDetail: boolean | null;
+  texts: string[]; rawTexts: string[]; inventedNumbers: string[]; numberExpectationMet: boolean;
+  language: { expected: string; manualReview: true; rule: string };
+  tokens: { input: number; output: number }; seconds: number; cost: number; unpriced?: string;
+  calls: AiCallLog[]; error?: string;
+};
+
+async function runFocusCase(c: ImproveCase | DumpCase): Promise<FocusRow> {
+  const calls: AiCallLog[] = [], rawTexts: string[] = [], texts: string[] = [];
+  const model = makeModel(calls);
+  // Observe generation before the service filters it; the gateway still parses and logs every call.
+  const realFetch = model.fetch;
+  model.fetch = async (url, init) => {
+    const response = await realFetch(url, init);
+    const task = JSON.parse(String(init?.body)).response_format?.json_schema?.name;
+    if (response.ok && (task === "enrich_improve_bullet" || task === "enrich_brain_dump")) {
+      try {
+        const completion = await response.clone().json() as { choices?: { message?: { content?: string } }[] };
+        const answer = JSON.parse(completion.choices?.[0]?.message?.content ?? "") as { text?: unknown; bullets?: unknown[] };
+        rawTexts.push(...[answer.text, ...(Array.isArray(answer.bullets) ? answer.bullets : [])].filter((t): t is string => typeof t === "string"));
+      } catch { /* Invalid answers are handled by callModel, including retries. */ }
+    }
+    return response;
+  };
+  const role: Experience = { ...c.role, notes: [...c.role.notes, ...("bulletId" in c ? c.notes : [{
+    id: "ramble", question: BRAIN_DUMP_QUESTION, answer: c.ramble, via: ["type" as const], askedAt: "2026-11-05T10:00:00.000Z",
+  }])] };
+  const cv = memoryCvRepo();
+  const deps = { cv, insights: memoryInsightsRepo("eval"), model, userId: "eval" };
+  const input = { roleId: role.id, fingerprint: fingerprint(role, c.locale) };
+  let before: number | null = null, after: number | null = null, needsDetail: boolean | null = null, error: string | undefined;
+  const started = Date.now();
+  try {
+    await cv.save({ ...emptyCv(c.locale), experience: [role] }, 0);
+    const scored = await scoreRole(deps, input);
+    if ("bulletId" in c) {
+      before = scored.bullets.find((b) => b.id === c.bulletId)!.score;
+      after = before; // With no proposal the saved bullet keeps its grade.
+      const answer = await improveBullet(deps, { ...input, bulletId: c.bulletId });
+      needsDetail = "needsDetail" in answer;
+      if ("proposal" in answer) { texts.push(answer.proposal.text); after = answer.bulletAfter; }
+    } else {
+      before = scored.score;
+      const answer = await brainDump(deps, input);
+      after = answer.roleAfterAll;
+      texts.push(...answer.proposals.map((p) => p.text));
+    }
+  } catch (err) { error = err instanceof Error ? err.message : String(err); }
+  const matchesExpectedNumber = (text: string, expected: string) => {
+    const parts = expected.match(/\d+(?:[.,]\d+)?/g) ?? [];
+    if (parts.length !== 2) return text.includes(expected);
+    const [low, high] = parts.map((n) => n.replace(/[.,]/g, "\\$&"));
+    return new RegExp(`(?<!\\d)${low}(?:\\s*[-–—]\\s*|\\s+(?:to|and|si|și|pana la|până la)\\s+)${high}(?!\\d)`, "i").test(text);
+  };
+  return {
+    id: c.id, before, after, needsDetail, texts, rawTexts, error,
+    inventedNumbers: [...new Set([...rawTexts, ...texts].filter((t) => hasUnknownNumber(t, roleSources(role))))],
+    numberExpectationMet: !("bulletId" in c) ||
+      ((!c.expectNumber || texts.every((t) => matchesExpectedNumber(t, c.expectNumber!))) &&
+       (!c.forbidNumber || [...rawTexts, ...texts].every((t) => !t.includes(c.forbidNumber!)))),
+    language: { expected: c.locale, manualReview: true, rule: c.locale === "ro" ? "Romanian only; no English sentence" : "English only" },
+    tokens: { input: calls.reduce((n, call) => n + (call.inputTokens ?? 0), 0), output: calls.reduce((n, call) => n + (call.outputTokens ?? 0), 0) },
+    seconds: (Date.now() - started) / 1000, ...costOf(calls), calls,
+  };
+}
+
+function reportFocus(improves: FocusRow[], dumps: FocusRow[]) {
+  const rows = [...improves, ...dumps];
+  if (!rows.length) return true;
+  const improved = improves.filter((r) => !r.error && r.before !== null && r.after !== null && r.after > r.before).length;
+  const checks: [string, boolean][] = [
+    ["no failed focus cases", rows.every((r) => !r.error)],
+    ["0 invented numbers, including before filtering", rows.every((r) => !r.inventedNumbers.length)],
+    ["supplied numbers and picked ranges preserved; forbidden numbers absent", rows.every((r) => r.numberExpectationMet)],
+    [`improve after > before (${improved}/${improves.length}; full-run bar 5/6)`, improved >= Math.min(5, improves.length)],
+    ["each brain dump returns at least one proposal", dumps.every((r) => r.texts.length >= 1)],
+  ];
+  for (const r of rows) process.stdout.write(`${r.id}: ${r.before ?? "-"} -> ${r.after ?? "-"}; needsDetail=${r.needsDetail ?? "n/a"}; invented=${r.inventedNumbers.length}; tokens=${r.tokens.input}/${r.tokens.output}; ${r.seconds.toFixed(1)}s${r.error ? `; ERROR ${r.error}` : ""}\n`);
+  for (const [name, pass] of checks) process.stdout.write(`${pass ? "PASS" : "FAIL"}  ${name}\n`);
+  process.stdout.write("MANUAL REVIEW: verify every proposal's language in enrich-last.json; Romanian cases must contain no English sentence. Automated checks alone do not establish the full pass bar.\n");
+  return checks.every(([, pass]) => pass);
+}
+
 // ---------- report ----------
 
 function report(scores: ScoreRow[]) {
+  if (!scores.length) return true;
   const out: string[] = [pad("score case", 26) + pad("bullets ok", 12) + pad("secs", 7) + pad("cost", 9) + "notes"];
   for (const r of scores) {
     const okCount = r.bullets.filter((b) => b.ok).length;
@@ -133,16 +227,20 @@ function report(scores: ScoreRow[]) {
   );
   for (const [name, pass] of checks) out.push(`${pass ? "PASS" : "FAIL"}  ${name}`);
   process.stdout.write(`\n${out.join("\n")}\n`);
-  mkdirSync(join(OUT, ".."), { recursive: true });
-  writeFileSync(OUT, JSON.stringify({ scores }, null, 2));
   return checks.every(([, pass]) => pass);
 }
 
-it("scores the evaluation roles and meets the pass bar", async () => {
+it("evaluates score and focus cases against the pass bar (language reviewed manually)", async () => {
   const only = process.env.EVAL_CASE;
   const pick = <T extends { id: string }>(list: T[]) => list.filter((c) => !only || c.id.startsWith(only));
   const scores: ScoreRow[] = [];
+  const improves: FocusRow[] = [], dumps: FocusRow[] = [];
   for (const c of pick(SCORE_CASES)) scores.push(await runScoreCase(c));
-  expect(scores.length).toBeGreaterThan(0);
-  expect(report(scores)).toBe(true);
+  for (const c of pick(IMPROVE_CASES)) improves.push(await runFocusCase(c));
+  for (const c of pick(DUMP_CASES)) dumps.push(await runFocusCase(c));
+  mkdirSync(join(OUT, ".."), { recursive: true });
+  writeFileSync(OUT, JSON.stringify({ scores, improves, dumps }, null, 2));
+  expect(scores.length + improves.length + dumps.length).toBeGreaterThan(0);
+  const scorePass = report(scores), focusPass = reportFocus(improves, dumps);
+  expect(scorePass && focusPass).toBe(true);
 });
