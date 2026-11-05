@@ -183,6 +183,14 @@ describe("skills", () => {
     expect(cvReducer(cv, { type: "moveSkills", moves: [] })).toBe(cv);
   });
 
+  it("moveSkills can move a skill already sitting in a group to the other group", () => {
+    let cv = cvReducer(emptyCv(), { type: "addSkill", group: "technicalSkills", name: "Excel" });
+    const id = cv.technicalSkills[0]!.id;
+    cv = cvReducer(cv, { type: "moveSkills", moves: [{ skillId: id, group: "professionalSkills" }] });
+    expect(cv.technicalSkills).toEqual([]);
+    expect(cv.professionalSkills).toEqual([{ id, name: "Excel" }]);
+  });
+
   it("removeSkill removes", () => {
     let cv = cvReducer(emptyCv(), { type: "addSkill", group: "technicalSkills", name: "Go" });
     cv = cvReducer(cv, { type: "removeSkill", group: "technicalSkills", skillId: cv.technicalSkills[0]!.id });

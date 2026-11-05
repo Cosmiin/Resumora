@@ -22,11 +22,16 @@ const arrowLabel = (g: SkillGroup) => t(g === "technicalSkills" ? "enrich.skills
 function Suggestions({ cv, answer, dispatch }: { cv: CvContent; answer: SkillsAnswer; dispatch(a: CvAction): void }) {
   const listed = (name: string) =>
     [...cv.technicalSkills, ...cv.professionalSkills, ...cv.unclearSkills].some((s) => s.name.trim().toLowerCase() === name.trim().toLowerCase());
-  if (answer.suggestions.length === 0) return <p className="review-note">{t("enrich.skills.noSuggestions")}</p>;
+  const seen = new Set<string>();
+  const suggestions = answer.suggestions.filter((s) => {
+    const key = s.name.trim().toLowerCase();
+    return seen.has(key) ? false : (seen.add(key), true);
+  });
+  if (suggestions.length === 0) return <p className="review-note">{t("enrich.skills.noSuggestions")}</p>;
   return (
     <>
       <p className="fine">{t("enrich.skills.suggestNote")}</p>
-      {answer.suggestions.map((s) => {
+      {suggestions.map((s) => {
         const done = listed(s.name);
         return (
           <div className="sugg" key={s.name}>
@@ -108,6 +113,7 @@ export function SkillsTools({ cv, dispatch, waitForSave }: Props) {
   const [ask, setAsk] = useState<Ask>({ status: "idle" });
   const [shown, setShown] = useState<Shown | null>(null);
   const alive = useRef(true);
+  const latest = useRef(0);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -115,17 +121,17 @@ export function SkillsTools({ cv, dispatch, waitForSave }: Props) {
     };
   }, []);
 
-  /** One request answers both buttons; the second button reuses the first answer. */
-  const open = async (which: Shown, fresh = false) => {
+  /** Every click asks again, so the answer matches the CV as it is now. */
+  const open = async (which: Shown) => {
     setShown(which);
-    if (ask.status === "ready" && !fresh) return;
+    const mine = ++latest.current;
     setAsk({ status: "loading" });
     try {
       await waitForSave();
       const answer = await getSkillSuggestions();
-      if (alive.current) setAsk({ status: "ready", answer });
+      if (alive.current && mine === latest.current) setAsk({ status: "ready", answer });
     } catch {
-      if (alive.current) setAsk({ status: "failed" });
+      if (alive.current && mine === latest.current) setAsk({ status: "failed" });
     }
   };
 
@@ -155,7 +161,7 @@ export function SkillsTools({ cv, dispatch, waitForSave }: Props) {
       {ask.status === "failed" && (
         <p className="review-note" role="alert">
           {t("enrich.skills.failed")}{" "}
-          <button type="button" className="link" onClick={() => void open(shown ?? "suggest", true)}>
+          <button type="button" className="link" onClick={() => void open(shown ?? "suggest")}>
             {t("enrich.skills.tryAgain")}
           </button>
         </p>

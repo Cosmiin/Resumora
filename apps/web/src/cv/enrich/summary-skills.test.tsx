@@ -51,6 +51,9 @@ function Harness({ focus, waitForSave, onAction, initial = base }: { focus: Cate
       <p data-testid="technical">{h.cv.technicalSkills.map((s) => s.name).join("|")}</p>
       <p data-testid="professional">{h.cv.professionalSkills.map((s) => s.name).join("|")}</p>
       <p data-testid="unclear">{h.cv.unclearSkills.map((s) => s.name).join("|")}</p>
+      <button type="button" onClick={() => dispatch({ type: "setSummary", value: "Edited meanwhile." })}>
+        Edit summary
+      </button>
       <button type="button" onClick={undo}>
         Undo
       </button>
@@ -163,6 +166,35 @@ describe("summary tools", () => {
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(api.streamRewrite).toHaveBeenCalledTimes(2);
   });
+
+  it("a summary edited after the rewrite started cannot be overwritten", async () => {
+    const stream = fakeStream();
+    const onAction = vi.fn<(a: CvAction) => void>();
+    render(<Harness focus="summary" onAction={onAction} />);
+    await userEvent.click(screen.getByRole("button", { name: "Rewrite my summary" }));
+    await waitFor(() => expect(api.streamRewrite).toHaveBeenCalledTimes(1));
+    stream.emit({ event: "start", data: { index: 0, replaces: "summary" } });
+    stream.emit({ event: "ready", data: { index: 0, text: "Operations Coordinator with 5 years." } });
+    await userEvent.click(screen.getByRole("button", { name: "Edit summary" }));
+    expect(screen.getByRole("button", { name: "Use this" })).toBeDisabled();
+    expect(screen.getByText(/Your summary changed. Try again/)).toBeInTheDocument();
+    onAction.mockClear();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(api.streamRewrite).toHaveBeenCalledTimes(2));
+    stream.emit({ event: "start", data: { index: 0, replaces: "summary" } });
+    stream.emit({ event: "ready", data: { index: 0, text: "Fresh rewrite." } });
+    expect(screen.getByRole("button", { name: "Use this" })).toBeEnabled();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("if the save fails, it goes back to idle with a short message", async () => {
+    const waitForSave = vi.fn(() => Promise.reject(new Error("offline")));
+    render(<Harness focus="summary" waitForSave={waitForSave} />);
+    await userEvent.click(screen.getByRole("button", { name: "Rewrite my summary" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't save your changes first.");
+    expect(screen.getByRole("button", { name: "Rewrite my summary" })).toBeEnabled();
+    expect(api.streamRewrite).not.toHaveBeenCalled();
+  });
 });
 
 describe("skills tools", () => {
@@ -254,6 +286,31 @@ describe("skills tools", () => {
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("button", { name: "Add SQL" })).toBeInTheDocument();
     expect(api.getSkillSuggestions).toHaveBeenCalledTimes(2);
+  });
+
+  it("each click asks again, for Suggest and for Sort", async () => {
+    api.getSkillSuggestions.mockResolvedValue(answer);
+    render(<Harness focus="skills" />);
+    await userEvent.click(screen.getByRole("button", { name: "Suggest skills from my experience" }));
+    await screen.findByRole("button", { name: "Add SQL" });
+    await userEvent.click(screen.getByRole("button", { name: "Suggest skills from my experience" }));
+    await waitFor(() => expect(api.getSkillSuggestions).toHaveBeenCalledTimes(2));
+    await userEvent.click(screen.getByRole("button", { name: "Sort for me" }));
+    await waitFor(() => expect(api.getSkillSuggestions).toHaveBeenCalledTimes(3));
+  });
+
+  it("a name returned twice is shown once", async () => {
+    api.getSkillSuggestions.mockResolvedValue({
+      suggestions: [
+        { name: "SQL", group: "technicalSkills", evidence: "a" },
+        { name: "sql", group: "technicalSkills", evidence: "b" },
+      ],
+      sort: [],
+    });
+    render(<Harness focus="skills" />);
+    await userEvent.click(screen.getByRole("button", { name: "Suggest skills from my experience" }));
+    await screen.findByRole("button", { name: "Add SQL" });
+    expect(screen.getAllByRole("button", { name: /^Add sql$/i })).toHaveLength(1);
   });
 });
 

@@ -17,7 +17,7 @@ type Props = {
 type Phase = "drafting" | "streaming" | "done" | "error";
 
 /** The summary rewrite as it streams: muted until it passes every check, then "Use this" / "Keep mine". */
-function SummaryRewrite({ summary, dispatch, onClose }: { summary: string; dispatch(a: CvAction): void; onClose(): void }) {
+function SummaryRewrite({ summary, started, dispatch, onClose, onRestart }: { summary: string; started: string; dispatch(a: CvAction): void; onClose(): void; onRestart(): void }) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [phase, setPhase] = useState<Phase>("drafting");
   const [run, setRun] = useState(0);
@@ -50,6 +50,7 @@ function SummaryRewrite({ summary, dispatch, onClose }: { summary: string; dispa
       </p>
     );
   }
+  const changed = summary !== started;
   const finished = phase === "done" || phase === "error";
   const shown = proposals.filter((p) => p.state !== "kept");
   const nothing = phase === "done" && !proposals.some((p) => p.state !== "dropped");
@@ -65,9 +66,18 @@ function SummaryRewrite({ summary, dispatch, onClose }: { summary: string; dispa
             {live && <span className="prop-hint">{t("enrich.review.writing")}</span>}
             {p.state === "ready" && (
               <>
-                <span className="prop-hint">{t("enrich.summary.source")}</span>
+                {changed ? (
+                  <span className="prop-why">
+                    {t("enrich.summary.changed")}{" "}
+                    <button type="button" className="link" onClick={onRestart}>
+                      {t("enrich.review.tryAgain")}
+                    </button>
+                  </span>
+                ) : (
+                  <span className="prop-hint">{t("enrich.summary.source")}</span>
+                )}
                 <div className="row-btns">
-                  <button type="button" className="btn small primary" onClick={() => use(p)}>
+                  <button type="button" className="btn small primary" disabled={changed} onClick={() => use(p)}>
                     {t("enrich.review.use")}
                   </button>
                   <button type="button" className="btn small" onClick={onClose}>
@@ -115,6 +125,8 @@ const FIX: Record<string, { label: MessageKey; fix: MessageKey }> = {
 /** The Summary section's checklist, and "Rewrite my summary". */
 export function SummaryTools({ cv, dispatch, waitForSave }: Props) {
   const [step, setStep] = useState<"idle" | "drafting" | "review">("idle");
+  const [started, setStarted] = useState("");
+  const [failed, setFailed] = useState(false);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -124,8 +136,18 @@ export function SummaryTools({ cv, dispatch, waitForSave }: Props) {
   }, []);
 
   const start = async () => {
+    setFailed(false);
+    setStarted(cv.basics.summary);
     setStep("drafting");
-    await waitForSave();
+    try {
+      await waitForSave();
+    } catch {
+      if (alive.current) {
+        setFailed(true);
+        setStep("idle");
+      }
+      return;
+    }
     if (alive.current) setStep((s) => (s === "drafting" ? "review" : s));
   };
 
@@ -134,6 +156,11 @@ export function SummaryTools({ cv, dispatch, waitForSave }: Props) {
     <div className="box">
       <p className="p-sub">{t("enrich.checklist")}</p>
       <Checklist items={items} />
+      {failed && (
+        <p className="review-note" role="alert">
+          {t("enrich.summary.saveFailed")}
+        </p>
+      )}
       {step === "idle" && (
         <div className="row-btns">
           <button type="button" className="btn small primary" onClick={() => void start()}>
@@ -146,7 +173,7 @@ export function SummaryTools({ cv, dispatch, waitForSave }: Props) {
           {t("enrich.summary.drafting")}
         </p>
       )}
-      {step === "review" && <SummaryRewrite summary={cv.basics.summary} dispatch={dispatch} onClose={() => setStep("idle")} />}
+      {step === "review" && <SummaryRewrite summary={cv.basics.summary} started={started} dispatch={dispatch} onClose={() => setStep("idle")} onRestart={() => void start()} />}
     </div>
   );
 }
