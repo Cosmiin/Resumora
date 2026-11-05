@@ -46,6 +46,14 @@ describe("atsChecks", () => {
     expect(atsChecks(role(["Worked in Iași on my own", "ok"]))).toEqual(["firstPerson"]);
     expect(atsChecks(role(["Worked in Iași", "Meetings and memes"]))).toEqual([]);
   });
+  it("does not treat EU, Phase I, I.T. or Level I as first person", () => {
+    for (const t of ["Managed EU funds", "Phase I rollout", "Ran I.T. support", "Passed Level I", "Fixed I/O errors", "Studied ME"]) {
+      expect(atsChecks(role([t, "ok"]))).toEqual([]);
+    }
+    expect(atsChecks(role(["I'm responsible for payroll", "ok"]))).toEqual(["firstPerson"]);
+    expect(atsChecks(role(["Then I led the team", "ok"]))).toEqual(["firstPerson"]);
+    expect(atsChecks(role(["Led me team", "ok"]))).toEqual(["firstPerson"]);
+  });
   it("flags missing dates", () => {
     expect(atsChecks(role(twoBullets, { startDate: "" }))).toEqual(["missingDates"]);
     expect(atsChecks(role(twoBullets, { endDate: "", current: false }))).toEqual(["missingDates"]);
@@ -102,6 +110,11 @@ describe("summaryChecklist", () => {
     expect(get(older, "mentionsRole")).toBe(false);
     expect(get(cv({ summary: "Anything." }), "mentionsRole")).toBe(false);
   });
+  it("matches whole words only", () => {
+    const c = cv({ summary: "Misleading claims.", experience: [role(twoBullets, { title: "Lead Engineer" })] });
+    expect(get(c, "mentionsRole")).toBe(false);
+    expect(get(cv({ summary: "Team lead.", experience: [role(twoBullets, { title: "Lead Engineer" })] }), "mentionsRole")).toBe(true);
+  });
   it("ignores short title words", () => {
     const c = cv({ summary: "Works in HR and IT.", experience: [role(twoBullets, { title: "HR IT Lead" })] });
     expect(get(c, "mentionsRole")).toBe(false);
@@ -128,6 +141,14 @@ describe("skillsChecklist", () => {
   it("recognises GA4 and Node.js and skips the stop list", () => {
     const c = cv({ experience: [role(["Tracked GA4 events for the CEO and CV tool in Node.js, EU"])] });
     expect(skillsChecklist(c)[1]?.missing).toEqual(["GA4", "Node.js"]);
+  });
+  it("skips quarters, plurals of abbreviations, e.g. and the extended stop list", () => {
+    const c = cv({ experience: [role(["Hit Q3 KPIs, e.g. U.S. ROI for IT, B2B and S.R.L. clients"])] });
+    expect(skillsChecklist(c)[1]).toEqual({ key: "toolsListed", ok: true, missing: [] });
+  });
+  it("lists camel-case and letter-digit tools", () => {
+    const c = cv({ experience: [role(["Wrote JavaScript and Python3"])] });
+    expect(skillsChecklist(c)[1]?.missing).toEqual(["JavaScript", "Python3"]);
   });
   it("does not list plain capitalised words", () => {
     const c = cv({ experience: [role(["Built reports for Marketing"])] });
@@ -157,6 +178,25 @@ describe("numbersIn", () => {
   });
   it("does not read 'min' as a million", () => {
     expect(numbersIn("5 min")).toEqual(["5"]);
+  });
+  it("reads milion, miliard and billion scales", () => {
+    expect(numbersIn("1 milion de clienți")).toEqual(["1000000"]);
+    expect(numbersIn("2 millions, 3 miliarde, 1 billion, 2B")).toEqual(["2000000", "3000000000", "1000000000", "2000000000"]);
+    expect(hasUnknownNumber("1M customers", ["1 milion clienți"])).toBe(false);
+  });
+  it("reads space, non-breaking space and apostrophe thousands as one number", () => {
+    expect(numbersIn("10 000")).toEqual(["10000"]);
+    expect(numbersIn("10 000 and 10'000")).toEqual(["10000", "10000"]);
+    expect(hasUnknownNumber("10,000 users", ["10 000 users"])).toBe(false);
+  });
+  it("takes a one-letter scale only when attached and not followed by a letter, digit or &", () => {
+    expect(numbersIn("Led 3 M&A deals")).toEqual(["3"]);
+    expect(numbersIn("3M&A deals")).toEqual(["3"]);
+    expect(numbersIn("6 M")).toEqual(["6"]);
+    expect(numbersIn("3M users")).toEqual(["3000000"]);
+  });
+  it("reads 0.250 as a decimal", () => {
+    expect(numbersIn("0.250")).toEqual(["0.25"]);
   });
 });
 

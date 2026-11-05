@@ -12,12 +12,22 @@ export type AtsTip =
   | "manyBullets"
   | "oddCharacters";
 
-// "I" is case-sensitive so a lowercase "i" is not caught; the other words ignore case.
-const FIRST_PERSON = /(?<![\p{L}\p{N}])(?:I|[Mm][Yy]|[Mm][Ee]|[Ee][Uu]|[Mm][Ee][Uu]|[Mm][Ee][Aa])(?![\p{L}\p{N}])/u;
+// The words count only as written in normal text ("eu", "Eu", "me", "Me"...), so all-caps "EU"
+// (European Union) and "ME" do not count.
+const FIRST_PERSON_WORDS = /(?<![\p{L}\p{N}])(?:[Mm]y|[Mm]e|[Ee]u|[Mm]eu|[Mm]ea)(?![\p{L}\p{N}])/u;
+// "I" counts only before a lowercase word or an apostrophe ("I managed", "I'm"), never in
+// "I.T.", "I/O" or "Level I".
+const FIRST_PERSON_I = /(?<![\p{L}\p{N}])I(?=['’]|\s+\p{Ll})/gu;
+// Words that put a Roman numeral after them ("Phase I rollout"), in English and Romanian.
+const NUMERAL_HEAD = /(?:phase|level|type|part|stage|tier|class|grade|chapter|step|category|section|volume|vol|group|series|fa[zț]a|nivel|etapa|tip|clasa|capitol)\s+$/iu;
 const ODD_CHARS = /[\t★►✓]|\p{Extended_Pictographic}/u;
 
 export function hasFirstPerson(text: string): boolean {
-  return FIRST_PERSON.test(text);
+  if (FIRST_PERSON_WORDS.test(text)) return true;
+  for (const m of text.matchAll(FIRST_PERSON_I)) {
+    if (!NUMERAL_HEAD.test(text.slice(0, m.index))) return true;
+  }
+  return false;
 }
 
 export function atsChecks(role: Experience): AtsTip[] {
@@ -47,9 +57,11 @@ function mentionsRole(summary: string, latest: Experience | undefined): boolean 
   const title = latest?.title.trim().toLowerCase();
   if (!title) return false;
   const lower = summary.toLowerCase();
-  if (lower.includes(title)) return true;
+  const whole = (w: string) =>
+    new RegExp(`(?<![\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u").test(lower);
+  if (whole(title)) return true;
   const words = title.match(/\p{L}{4,}/gu) ?? [];
-  return words.some((w) => lower.includes(w));
+  return words.some(whole);
 }
 
 export function summaryChecklist(cv: CvContent): SummaryCheck[] {
@@ -66,14 +78,18 @@ export function summaryChecklist(cv: CvContent): SummaryCheck[] {
 
 export type SkillsCheck = { key: "nothingToSort" | "toolsListed"; ok: boolean; missing?: string[] };
 
-const NOT_TOOLS = new Set(["CV", "HR", "CEO", "EU", "RO", "UK", "USA", "PM"]);
+const NOT_TOOLS = new Set([
+  "CV", "HR", "CEO", "EU", "RO", "UK", "USA", "PM", "IT", "KPI", "KPIs", "ROI", "B2B", "B2C",
+  "FY", "UE", "SRL", "SA", "TVA",
+]);
 
 function isToolLike(word: string): boolean {
-  if (NOT_TOOLS.has(word)) return false;
+  if (NOT_TOOLS.has(word) || /^Q[1-4]$/.test(word)) return false;
   return (
     /^\p{Lu}{2,6}$/u.test(word) || // SQL
-    /^\p{L}[\p{L}\p{N}]*[\p{Lu}\p{N}]/u.test(word) || // GA4, PowerBI
-    /\p{L}\.\p{L}/u.test(word) // Node.js
+    /^\p{L}+\p{N}+$/u.test(word) || // GA4
+    /^\p{Lu}?\p{Ll}+(?:\p{Lu}+\p{Ll}*)+\p{N}*$/u.test(word) || // PowerBI, JavaScript
+    /^\p{L}{2,}\.\p{L}{2,}$/u.test(word) // Node.js, not "e.g" or "U.S"
   );
 }
 
@@ -98,33 +114,43 @@ export function skillsChecklist(cv: CvContent): SkillsCheck[] {
   ];
 }
 
+// Word scales may follow a space ("1,2 mil"). A single letter counts only when attached to the
+// number ("3M users") and not followed by a letter, digit or "&", so "3 M&A" and "6 M" are not scales.
 const SCALES: [RegExp, number][] = [
-  [/^\s?(?:milioane|million|mil)(?![\p{L}])/iu, 1_000_000],
-  [/^\s?M(?![\p{L}])/u, 1_000_000],
-  [/^\s?(?:mii|k)(?![\p{L}])/iu, 1_000],
+  [/^\s?(?:miliarde|miliard|billions?|mld|bn)(?![\p{L}\p{N}])/iu, 1_000_000_000],
+  [/^\s?(?:milioane|milion|millions?|mil)(?![\p{L}\p{N}])/iu, 1_000_000],
+  [/^\s?mii(?![\p{L}\p{N}])/iu, 1_000],
+  [/^B(?![\p{L}\p{N}&])/u, 1_000_000_000],
+  [/^M(?![\p{L}\p{N}&])/u, 1_000_000],
+  [/^[kK](?![\p{L}\p{N}&])/u, 1_000],
 ];
 
 /**
  * Reads one number token. Ruling: a comma or dot followed by exactly 3 digits, with no scale
- * suffix, is a thousands separator ("1,200" and "1.200" are both 1200). Any other single
- * separator is a decimal ("1,2" and "1.2" are both 1.2).
+ * suffix, is a thousands separator ("1,200" and "1.200" are both 1200); the first group may not
+ * start with 0, so "0.250" is a decimal. Any other single separator is a decimal ("1,2" and
+ * "1.2" are both 1.2). Spaces, non-breaking spaces and apostrophes between groups of 3 digits
+ * ("10 000", "10'000") are thousands separators too.
  */
-function parseNumber(token: string, hasScale: boolean): number {
-  if (!hasScale && /^\d{1,3}(?:[.,]\d{3})+$/.test(token)) return Number(token.replace(/[.,]/g, ""));
+function parseNumber(raw: string, hasScale: boolean): number {
+  const token = raw.replace(/[\s\u00a0\u202f']/g, "");
+  if (!hasScale && /^[1-9]\d{0,2}(?:[.,]\d{3})+$/.test(token)) return Number(token.replace(/[.,]/g, ""));
   const parts = token.split(/[.,]/);
   if (parts.length === 1) return Number(token);
   const decimals = parts.pop()!;
   return Number(`${parts.join("")}.${decimals}`);
 }
 
+const NUMBER = /\d{1,3}(?:[\s\u00a0\u202f']\d{3})+(?:[.,]\d+)?(?!\d)|\d+(?:[.,]\d+)*/g;
+
 /** Numbers in `text` as plain strings: separators normalised, scales applied, `%` and units dropped. */
 export function numbersIn(text: string): string[] {
   const out: string[] = [];
-  for (const m of text.matchAll(/\d+(?:[.,]\d+)*/g)) {
+  for (const m of text.matchAll(NUMBER)) {
     const rest = text.slice(m.index + m[0].length);
     const scale = SCALES.find(([re]) => re.test(rest));
-    const value = parseNumber(m[0], Boolean(scale));
-    out.push(String(Math.round(value * (scale?.[1] ?? 1) * 1e6) / 1e6));
+    const value = parseNumber(m[0], Boolean(scale)) * (scale?.[1] ?? 1);
+    out.push(String(scale ? Math.round(value) : Math.round(value * 1e6) / 1e6));
   }
   return out;
 }
