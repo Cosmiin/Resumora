@@ -1,5 +1,6 @@
 import { CATEGORIES } from "@resumora/shared";
 import { describe, expect, it } from "vitest";
+import { improveBulletSystemPrompt } from "../src/enrich/focus-prompts.ts";
 import { buildExtractPrompt, extractPrompt } from "../src/imports/prompts.ts";
 
 describe("buildExtractPrompt", () => {
@@ -36,5 +37,13 @@ describe("buildExtractPrompt category rules", () => {
     expect(prompt).not.toContain("(also: )");
     expect(prompt).toContain("(driving licence, references, availability…)");
     expect(prompt).not.toContain("(volunteering, awards, publications");
+  });
+});
+
+describe("improveBulletSystemPrompt", () => {
+  it("forbids adding a purpose, reason or result absent from the original bullet or role notes", () => {
+    expect(improveBulletSystemPrompt("en")).toContain(
+      `Do not add a purpose, reason or result ("to ...", "so that ...", "resulting in ...") unless the original bullet or the role's notes state it.`,
+    );
   });
 });
