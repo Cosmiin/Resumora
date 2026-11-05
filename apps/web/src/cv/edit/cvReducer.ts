@@ -2,12 +2,14 @@ import {
   MAX_ACHIEVEMENTS,
   MAX_BULLETS,
   MAX_ITEMS,
+  MAX_NOTES,
   MAX_TITLES,
   SKILL_GROUPS,
   isSectionEmpty,
   newId,
   normalizeLayout,
   type CvContent,
+  type Note,
   type SectionKey,
   type SkillGroup,
 } from "@resumora/shared";
@@ -47,6 +49,7 @@ export type CvAction =
   | { type: "moveSection"; from: number; to: number }
   | { type: "addSection"; key: SectionKey; id: string }
   | { type: "addCustomSection"; id: string; title: string }
+  | { type: "setNote"; roleId: string; note: Note }
   | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean };
 
 /**
@@ -239,6 +242,14 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (next === cv) return cv;
       const custom = next.custom.map((c) => (c.id === action.id ? { ...c, title: action.title } : c));
       return unhide({ ...next, custom }, "other");
+    }
+    case "setNote": {
+      const role = cv.experience.find((r) => r.id === action.roleId);
+      if (!role) return cv;
+      const exists = role.notes.some((n) => n.id === action.note.id);
+      if (!exists && role.notes.length >= MAX_NOTES) return cv;
+      const notes = exists ? role.notes.map((n) => (n.id === action.note.id ? action.note : n)) : [...role.notes, action.note];
+      return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, notes } : r)) };
     }
     case "setCurrent": {
       const items = cv[action.list];

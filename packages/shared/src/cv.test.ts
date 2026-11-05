@@ -12,6 +12,7 @@ function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
     current: true,
     description: "",
     bullets: [],
+    notes: [],
     ...overrides,
   };
 }

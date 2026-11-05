@@ -14,6 +14,7 @@ function role(id: string, bullets: string[], extra: Partial<Experience> = {}): E
     description: "",
     bullets: bullets.map((text, i) => ({ id: `${id}-b${i + 1}`, text })),
     ...extra,
+    notes: extra.notes ?? [],
   };
 }
 
@@ -221,5 +222,28 @@ describe("no-ops", () => {
     expect(cvReducer(cv, { type: "moveItem", list: "experience", from: 0, to: 0 })).toBe(cv);
     expect(cvReducer(cv, { type: "setSectionTitle", key: "experience", value: "" })).toBe(cv);
     expect(cvReducer(cv, { type: "setSummary", value: "" })).toBe(cv);
+  });
+});
+
+describe("setNote", () => {
+  const note = (answer: string) => ({
+    id: "n1", question: "How many?", answer, via: ["type" as const], askedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  it("adds a note, then replaces it by id", () => {
+    const added = cvReducer(withRole(["x"]), { type: "setNote", roleId: "e1", note: note("first") });
+    expect(added.experience[0]!.notes).toEqual([note("first")]);
+    const replaced = cvReducer(added, { type: "setNote", roleId: "e1", note: note("second") });
+    expect(replaced.experience[0]!.notes).toEqual([note("second")]);
+  });
+
+  it("ignores an unknown role", () => {
+    const cv = withRole(["x"]);
+    expect(cvReducer(cv, { type: "setNote", roleId: "nope", note: note("a") })).toBe(cv);
+  });
+
+  it("new roles start with no notes", () => {
+    const cv = cvReducer(emptyCv(), { type: "addItem", list: "experience", id: "e9" });
+    expect(cv.experience[0]!.notes).toEqual([]);
   });
 });

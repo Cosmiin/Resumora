@@ -33,6 +33,7 @@ function role(texts: string[], over: Partial<Experience> = {}): Experience {
     current: false,
     description: "Desc",
     bullets: texts.map((text, i) => ({ id: `b${i + 1}`, text })),
+    notes: [],
     ...over,
   };
 }

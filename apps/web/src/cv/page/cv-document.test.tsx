@@ -104,3 +104,15 @@ describe("CvDocument", () => {
     expect(screen.getByText("Best Newcomer")).toBeInTheDocument();
   });
 });
+
+describe("CvDocument notes", () => {
+  it("never renders a note", () => {
+    const cv = sampleCv();
+    cv.experience[0]!.notes = [
+      { id: "n1", question: "SECRET-QUESTION", answer: "SECRET-NOTE", via: ["type"], askedAt: "2026-01-01T00:00:00.000Z" },
+    ];
+    const { container } = render(<CvDocument content={cv} />);
+    expect(container.textContent).not.toContain("SECRET-NOTE");
+    expect(container.textContent).not.toContain("SECRET-QUESTION");
+  });
+});

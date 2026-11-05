@@ -31,6 +31,7 @@ export function sampleCv(overrides: Partial<CvContent> = {}): CvContent {
           { id: "b-1", text: "Launched self-service invoicing used by 4,000 customers." },
           { id: "b-2", text: "Cut onboarding time from two weeks to three days." },
         ],
+        notes: [],
       },
       {
         id: "exp-2",
@@ -42,6 +43,7 @@ export function sampleCv(overrides: Partial<CvContent> = {}): CvContent {
         current: false,
         description: "",
         bullets: [{ id: "b-3", text: "Built the first usage dashboard for the sales team." }],
+        notes: [],
       },
       {
         id: "exp-3",
@@ -53,6 +55,7 @@ export function sampleCv(overrides: Partial<CvContent> = {}): CvContent {
         current: false,
         description: "",
         bullets: [],
+        notes: [],
       },
     ],
     education: [

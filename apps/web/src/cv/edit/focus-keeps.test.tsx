@@ -64,7 +64,7 @@ describe("sections stay while being edited", () => {
 describe("Escape on a picked grip", () => {
   it("puts the order back and keeps focus on the grip", async () => {
     const role = (id: string, title: string) => ({
-      id, company: "Acme", title, location: "", startDate: "2020-03", endDate: "2022-05", current: false, description: "", bullets: [],
+      id, company: "Acme", title, location: "", startDate: "2020-03", endDate: "2022-05", current: false, description: "", bullets: [], notes: [],
     });
     render(<Harness initial={{ ...emptyCv(), experience: [role("a", "Alpha"), role("b", "Beta")] }} />);
     screen.getByRole("button", { name: "Reorder Alpha" }).focus();
@@ -78,7 +78,7 @@ describe("Escape on a picked grip", () => {
 
 describe("Escape on a picked grip that did not move", () => {
   it("keeps focus on the grip", async () => {
-    const role = { id: "a", company: "Acme", title: "Alpha", location: "", startDate: "2020-03", endDate: "2022-05", current: false, description: "", bullets: [] };
+    const role = { id: "a", company: "Acme", title: "Alpha", location: "", startDate: "2020-03", endDate: "2022-05", current: false, description: "", bullets: [], notes: [] };
     render(<Harness initial={{ ...emptyCv(), experience: [role] }} />);
     const grip = screen.getByRole("button", { name: "Reorder Alpha" });
     grip.focus();

@@ -27,7 +27,7 @@ function Harness({ initial }: { initial: CvContent }) {
 }
 
 function role(over: Partial<Experience> = {}): Experience {
-  return { id: "r1", company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: false, description: "", bullets: [], ...over };
+  return { id: "r1", company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: false, description: "", bullets: [], notes: [], ...over };
 }
 const filled = (r: Experience = role()): CvContent => ({
   ...emptyCv(),

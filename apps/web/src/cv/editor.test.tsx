@@ -61,7 +61,7 @@ describe("CV editor", () => {
     withCv({
       basics,
       experience: [
-        { id: "r1", company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: true, description: "", bullets: [] },
+        { id: "r1", company: "Acme", title: "Dev", location: "", startDate: "2020-03", endDate: "", current: true, description: "", bullets: [], notes: [] },
       ],
     });
     renderPage();

@@ -18,7 +18,7 @@ const imported: CvContent = {
   ...named("Ana Popescu"),
   basics: { ...named("Ana Popescu").basics, titles: ["Senior Product Manager"] },
   experience: [
-    { id: "e1", company: "Acme SRL", title: "Product Manager", location: "", startDate: "2019", endDate: "2024-03", current: false, description: "Owned onboarding.", bullets: [{ id: "b1", text: "Led the redesign." }] },
+    { id: "e1", company: "Acme SRL", title: "Product Manager", location: "", startDate: "2019", endDate: "2024-03", current: false, description: "Owned onboarding.", bullets: [{ id: "b1", text: "Led the redesign." }], notes: [] },
   ],
   technicalSkills: [{ id: "s1", name: "SQL" }],
   professionalSkills: [{ id: "s2", name: "Team leadership" }],

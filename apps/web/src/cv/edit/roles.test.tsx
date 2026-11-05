@@ -31,6 +31,7 @@ function role(over: Partial<Experience> = {}): Experience {
     current: false,
     description: "",
     bullets: [{ id: "b1", text: "Shipped it" }],
+    notes: [],
     ...over,
   };
 }
