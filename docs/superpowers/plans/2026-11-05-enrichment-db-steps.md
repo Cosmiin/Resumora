@@ -14,7 +14,9 @@ Run:
 npx supabase migration list
 ```
 
-You should see the earlier migrations on both sides (Local and Remote), and a new one, `20261106000000`, with a Local value only. If it asks you to log in or link the project, do that first (`npx supabase login`, then `npx supabase link`), and pick the Resumora project.
+You should see the earlier migrations on both sides (Local and Remote), and a new one, `20261106000000`, with a Local value only.
+
+If it asks you to log in or link the project, do that first: run `npx supabase login`, then `npx supabase link`. The link command shows a list of projects. Pick the Resumora one (project ref `aquvhqbkvrtzhbmezkci`). It may ask for the database password, which you can find in the Supabase dashboard under Project Settings, then Database.
 
 ## 3. Apply the new migration
 
@@ -51,7 +53,13 @@ select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public' and proname in ('snapshot_base_cv', 'log_ai_call');
 ```
 
-If all three show the expected rows, you are done. Tell me and I will carry on with the next task.
+The signed-out visitor cannot run the logging function (expect `false`):
+
+```sql
+select has_function_privilege('anon', 'public.log_ai_call(text,text,text,text,text,int,int,int)', 'execute');
+```
+
+If all four show the expected rows, you are done. Tell me and I will carry on with the next task.
 
 ## If something goes wrong
 

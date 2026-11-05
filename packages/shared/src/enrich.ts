@@ -48,6 +48,7 @@ export type Question = z.infer<typeof QuestionSchema>;
 
 export const RoleResultSchema = z
   .object({
+    roleId: id,
     policy: z.string(),
     fingerprint: z.string(),
     score: z.number().int().min(0).max(100).nullable(),
@@ -203,7 +204,7 @@ export function buildRoleResult(role: Experience, model: ModelScore, fingerprint
   const score =
     bullets.length === 0 ? null : Math.round(bullets.reduce((sum, b) => sum + b.score, 0) / bullets.length);
 
-  return { policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions };
+  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions };
 }
 
 /** Small synchronous 53-bit string hash (cyrb53), so the browser and the worker agree. */

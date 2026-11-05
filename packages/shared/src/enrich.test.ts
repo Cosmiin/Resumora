@@ -88,6 +88,10 @@ describe("isAllowedOption", () => {
 });
 
 describe("buildRoleResult", () => {
+  it("carries the role id", () => {
+    expect(buildRoleResult(role(["Led a team"]), model([mb("b1")]), "fp").roleId).toBe("r1");
+  });
+
   it("scores a placeholder 0 with issue example even if graded specific", () => {
     const r = buildRoleResult(role(["TODO"]), model([mb("b1")]), "fp");
     expect(r.bullets[0]).toMatchObject({ score: 0, issue: "example" });

@@ -11,10 +11,10 @@ function clientFor(env: SupabaseEnv, user: AuthUser): SupabaseClient {
   });
 }
 
-/** A stored result that no longer matches the schema is dropped: it is only a cache. */
-function parseResult(value: unknown): RoleResult | null {
+/** A stored result that no longer matches the schema, or that names another role, is dropped: it is only a cache. */
+function parseResult(value: unknown, roleId: string): RoleResult | null {
   const parsed = RoleResultSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+  return parsed.success && parsed.data.roleId === roleId ? parsed.data : null;
 }
 
 /** InsightsRepo backed by Supabase, querying as the signed-in user so RLS applies. */
@@ -22,18 +22,19 @@ export function supabaseInsightsRepo(env: SupabaseEnv, user: AuthUser): Insights
   const db = clientFor(env, user);
   return {
     async list() {
-      const { data, error } = await db.from("cv_insights").select("result");
+      const { data, error } = await db.from("cv_insights").select("role_id, result");
       if (error) throw new Error(`cv_insights select failed: ${error.message}`);
-      return data.flatMap((r) => parseResult(r.result) ?? []);
+      return data.flatMap((r) => parseResult(r.result, r.role_id) ?? []);
     },
 
     async get(roleId) {
-      const { data, error } = await db.from("cv_insights").select("result").eq("role_id", roleId).maybeSingle();
+      const { data, error } = await db.from("cv_insights").select("role_id, result").eq("role_id", roleId).maybeSingle();
       if (error) throw new Error(`cv_insights select failed: ${error.message}`);
-      return data ? parseResult(data.result) : null;
+      return data ? parseResult(data.result, data.role_id) : null;
     },
 
     async put(roleId, result) {
+      if (result.roleId !== roleId) throw new Error("result belongs to a different role");
       const { error } = await db.from("cv_insights").upsert(
         {
           user_id: user.id,

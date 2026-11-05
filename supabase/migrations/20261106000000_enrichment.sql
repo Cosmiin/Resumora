@@ -15,7 +15,7 @@ create table public.cv_insights (
 
 alter table public.cv_insights enable row level security;
 
-revoke all on table public.cv_insights from anon;
+revoke all on table public.cv_insights from anon, authenticated;
 grant select, insert, update, delete on table public.cv_insights to authenticated;
 
 create policy "own insights: read" on public.cv_insights
@@ -74,9 +74,12 @@ begin
   if v_user is null then
     raise exception 'not signed in' using errcode = '42501';
   end if;
+  if p_task not in ('cv_admit', 'cv_extract', 'enrich_score', 'enrich_rewrite_role', 'enrich_rewrite_summary', 'enrich_skills', 'enrich_voice') then
+    raise exception 'unknown ai task' using errcode = '22023';
+  end if;
 
   insert into public.ai_calls (user_id, task, provider, model, status, error, duration_ms, input_tokens, output_tokens)
-    values (v_user, p_task, p_provider, p_model, p_status, p_error, p_duration_ms, p_input_tokens, p_output_tokens);
+    values (v_user, p_task, p_provider, p_model, p_status, left(p_error, 500), p_duration_ms, p_input_tokens, p_output_tokens);
 end;
 $$;
 

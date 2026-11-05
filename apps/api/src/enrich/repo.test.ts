@@ -4,8 +4,8 @@ import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { HISTORY_LIMIT } from "../cv/repo.ts";
 import { memoryInsightsRepo, type MemoryInsightsStore } from "./memory-repo.ts";
 
-const result = (fingerprint: string): RoleResult =>
-  RoleResultSchema.parse({ policy: "score/1", fingerprint, score: null, bullets: [], nextStep: null, questions: [] });
+const result = (fingerprint: string, roleId = "r1"): RoleResult =>
+  RoleResultSchema.parse({ roleId, policy: "score/1", fingerprint, score: null, bullets: [], nextStep: null, questions: [] });
 
 describe("memoryInsightsRepo", () => {
   it("put then get round-trips, and get is null for an unknown role", async () => {
@@ -36,11 +36,11 @@ describe("memoryInsightsRepo", () => {
     const store: MemoryInsightsStore = new Map();
     const repo = memoryInsightsRepo("u1", store);
     await repo.put("r1", result("a"));
-    await repo.put("r2", result("b"));
-    await repo.put("r3", result("c"));
+    await repo.put("r2", result("b", "r2"));
+    await repo.put("r3", result("c", "r3"));
     await memoryInsightsRepo("u2", store).put("r1", result("other"));
     await repo.remove(["r1", "r3"]);
-    expect(await repo.list()).toEqual([result("b")]);
+    expect(await repo.list()).toEqual([result("b", "r2")]);
     expect(await memoryInsightsRepo("u2", store).get("r1")).toEqual(result("other"));
   });
 });
@@ -67,5 +67,13 @@ describe("memoryCvRepo.snapshot", () => {
     await repo.save(emptyCv(), 0);
     for (let i = 0; i < HISTORY_LIMIT + 5; i++) await repo.snapshot("ai");
     expect(await repo.listHistory()).toHaveLength(HISTORY_LIMIT);
+  });
+});
+
+describe("role id check", () => {
+  it("put refuses a result that belongs to another role", async () => {
+    const repo = memoryInsightsRepo("u1");
+    await expect(repo.put("r1", result("a", "r2"))).rejects.toThrow(/different role/);
+    expect(await repo.list()).toEqual([]);
   });
 });

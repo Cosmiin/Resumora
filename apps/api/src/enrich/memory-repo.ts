@@ -16,6 +16,7 @@ export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = 
       return row ? structuredClone(row.result) : null;
     },
     async put(roleId, result) {
+      if (result.roleId !== roleId) throw new Error("result belongs to a different role");
       store.set(key(roleId), { userId, result: structuredClone(result) });
     },
     async remove(roleIds) {
