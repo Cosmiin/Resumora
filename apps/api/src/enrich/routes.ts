@@ -9,6 +9,7 @@ import type { AuthUser } from "../env.ts";
 import { ApiError } from "../errors.ts";
 import type { InsightsRepo } from "./repo.ts";
 import { scoreRole } from "./score.ts";
+import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
 import { checkProposal, checkSummary, keepAsIsIds, rewriteEvents } from "./rewrite.ts";
 import { rewriteRoleSystemPrompt, rewriteRoleUserMessage, rewriteSummarySystemPrompt, rewriteSummaryUserMessage } from "./rewrite-prompts.ts";
@@ -82,6 +83,11 @@ export function enrichRoutes(deps: {
       signal: c.req.raw.signal,
     });
     return sendEvents(c, rewriteEvents(chunks, (key, text) => checkSummary(content, key, text)));
+  });
+
+  app.post("/skills", async (c) => {
+    const user = c.get("user");
+    return c.json(await suggestSkills({ cv: deps.cvRepo(user), model: deps.model(user), userId: user.id }));
   });
 
   return app;

@@ -88,6 +88,20 @@ describe("/v1/enrich", () => {
     expect((await score({ roleId: role.id, fingerprint: fp })).status).toBe(503);
   });
 
+  it("POST /skills returns checked suggestions and needs sign-in", async () => {
+    expect((await app.request("/v1/enrich/skills", { method: "POST" })).status).toBe(401);
+    model = fakeModel(() => ({
+      suggestions: [
+        { name: "payroll", group: "professionalSkills", evidence: "Payroll for 40 staff" },
+        { name: "Python", group: "technicalSkills", evidence: "Payroll for 40 staff" },
+      ],
+      sort: [],
+    }));
+    const res = await app.request("/v1/enrich/skills", { method: "POST", headers: auth });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ suggestions: [{ name: "payroll", group: "professionalSkills", evidence: "Payroll for 40 staff" }], sort: [] });
+  });
+
   it("400 for a malformed body", async () => {
     expect((await score({ roleId: 5 })).status).toBe(400);
   });
