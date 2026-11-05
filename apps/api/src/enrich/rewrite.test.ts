@@ -7,7 +7,7 @@ import { memoryCvRepo } from "../cv/memory-repo.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { roleWith } from "./fake-model.ts";
 import { memoryInsightsRepo } from "./memory-repo.ts";
-import { checkProposal, rewriteEvents } from "./rewrite.ts";
+import { checkProposal, checkSummary, rewriteEvents } from "./rewrite.ts";
 
 const note = (answer: string, question = "How often?") => ({ id: newId(), question, answer, via: ["pick" as const], askedAt: "2026-11-01T10:00:00.000Z" });
 
@@ -28,24 +28,29 @@ describe("checkProposal", () => {
   const [b1, b2] = role.bullets;
 
   it("accepts a changed proposal with known numbers", () => {
-    expect(checkProposal(role, b1!.id, "Drafted contracts for 40 workers each month.", role.notes)).toBe("ok");
+    expect(checkProposal(role, b1!.id, "Drafted contracts for 40 workers each month.")).toBe("ok");
   });
   it("accepts both ends of a range picked in a note, but not an exact number from nowhere", () => {
-    expect(checkProposal(role, b2!.id, "Answered 10–50 calls a week.", role.notes)).toBe("ok");
-    expect(checkProposal(role, b2!.id, "Answered 30 calls a week.", role.notes)).toBe("number");
+    expect(checkProposal(role, b2!.id, "Answered 10–50 calls a week.")).toBe("ok");
+    expect(checkProposal(role, b2!.id, "Answered 30 calls a week.")).toBe("number");
   });
   it("drops 221 characters or more", () => {
-    expect(checkProposal(role, b2!.id, "x".repeat(220), role.notes)).toBe("ok");
-    expect(checkProposal(role, b2!.id, "x".repeat(221), role.notes)).toBe("length");
+    expect(checkProposal(role, b2!.id, "x".repeat(220))).toBe("ok");
+    expect(checkProposal(role, b2!.id, "x".repeat(221))).toBe("length");
   });
   it("drops unknown ids, new without notes, and unchanged text", () => {
-    expect(checkProposal(role, "nope", "Something new here.", role.notes)).toBe("unknownBullet");
-    expect(checkProposal({ ...role, notes: [] }, "new", "Trained staff.", [])).toBe("newWithoutNote");
-    expect(checkProposal(role, "new", "Trained staff.", role.notes)).toBe("ok");
-    expect(checkProposal(role, b2!.id, "  Answered   phones.  ", role.notes)).toBe("unchanged");
+    expect(checkProposal(role, "nope", "Something new here.")).toBe("unknownBullet");
+    expect(checkProposal({ ...role, notes: [] }, "new", "Trained staff.")).toBe("newWithoutNote");
+    expect(checkProposal(role, "new", "Trained staff.")).toBe("ok");
+    expect(checkProposal(role, b2!.id, "  Answered   phones.  ")).toBe("unchanged");
+  });
+  it("drops an over-long summary", () => {
+    const cv = { ...emptyCv("en"), basics: { ...emptyCv("en").basics, summary: "Short." } };
+    expect(checkSummary(cv, "summary", "x".repeat(600))).toBe("ok");
+    expect(checkSummary(cv, "summary", "x".repeat(601))).toBe("length");
   });
   it("drops a proposal for a keep-as-is bullet", () => {
-    expect(checkProposal(role, b2!.id, "Handled calls.", role.notes, new Set([b2!.id]))).toBe("unchanged");
+    expect(checkProposal(role, b2!.id, "Handled calls.", new Set([b2!.id]))).toBe("unchanged");
   });
 });
 
@@ -73,6 +78,13 @@ describe("rewriteEvents", () => {
     expect(events.find((e) => e.event === "ready")!.data).toMatchObject({ index: 0 });
     expect(names.slice(-2)).toEqual(["error", "done"]);
     expect(events.at(-2)!.data).toMatchObject({ code: "stream_broken" });
+    expect(names).not.toContain("dropped");
+  });
+
+  it("drops a repeated key as unknownBullet, but allows several new blocks", async () => {
+    const events = await collect(rewriteEvents(chunks("### b1\nA.\n### b1\nB.\n### new\nC.\n### new\nD.\n### end\n"), check));
+    expect(events.filter((e) => e.event === "ready").map((e) => e.data.index)).toEqual([0, 2, 3]);
+    expect(events.find((e) => e.event === "dropped")!.data).toEqual({ index: 1, reason: "unknownBullet" });
   });
 
   it("unavailable AI becomes an ai_unavailable error", async () => {
@@ -169,7 +181,7 @@ describe("POST /v1/enrich/rewrite-role", () => {
     expect(events.find((e) => e.event === "dropped")!.data).toEqual({ index: 1, reason: "unchanged" });
     expect(events.at(-1)).toEqual({ event: "done", data: {} });
     const user = bodies[0]!.messages[1]!.content;
-    expect(user).toContain("Q: How many calls?\nA: 10–50 a week");
+    expect(user).toContain('Q: "How many calls?"\nA: "10–50 a week"');
     expect(user).toMatch(new RegExp(`${b2!.id}.*keep as is`));
     expect(user).not.toMatch(new RegExp(`${b1!.id}.*keep as is`));
   });
@@ -201,7 +213,7 @@ describe("POST /v1/enrich/rewrite-summary", () => {
     expect(events.map((e) => e.event)).toContain("ready");
     expect(events.find((e) => e.event === "start")!.data).toEqual({ index: 0, replaces: "summary" });
     const user = bodies[0]!.messages[1]!.content;
-    for (const part of ["Payroll Specialist", "Acme Payroll", "Beta Hotel", "Receptionist", "2017-03", "2019-12", "Ran the front desk.", "Q: How many?\nA: Under 10 a day"]) {
+    for (const part of ["Payroll Specialist", "Acme Payroll", "Beta Hotel", "Receptionist", "2017-03", "2019-12", "Ran the front desk.", 'Q: "How many?"\nA: "Under 10 a day"']) {
       expect(user).toContain(part);
     }
   });

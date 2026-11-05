@@ -93,6 +93,12 @@ describe("streamModel", () => {
     await expect(collect(streamModel(deps, request))).rejects.toBeInstanceOf(AiStreamBrokenError);
   });
 
+  it("treats a content_filter finish after the first chunk as broken", async () => {
+    const filtered = `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "content_filter" }] })}\n\n`;
+    const { deps } = setup(sse([delta("half"), filtered, "data: [DONE]\n\n"]));
+    await expect(collect(streamModel(deps, request))).rejects.toBeInstanceOf(AiStreamBrokenError);
+  });
+
   it("throws AiUnavailableError when every provider fails before the first chunk", async () => {
     const { deps, logs } = setup(status(500), sse([": only a comment\n\n", "data: [DONE]\n\n"]));
     await expect(collect(streamModel(deps, request))).rejects.toBeInstanceOf(AiUnavailableError);

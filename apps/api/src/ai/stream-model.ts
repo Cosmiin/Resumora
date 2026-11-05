@@ -96,7 +96,8 @@ export async function* streamModel(deps: ModelDeps, req: StreamRequest): AsyncGe
       if (data.usage) usage = data.usage;
       const choice = data.choices?.[0];
       if (choice?.finish_reason === "length") throw new StreamFailure("output cut off at the length limit");
-      if (choice?.finish_reason) complete = true;
+      if (choice?.finish_reason === "stop") complete = true;
+      else if (choice?.finish_reason) throw new StreamFailure(`stopped by the provider: ${choice.finish_reason}`);
       const content = choice?.delta?.content;
       return typeof content === "string" && content !== "" ? content : undefined;
     };

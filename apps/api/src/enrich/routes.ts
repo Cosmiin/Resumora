@@ -65,7 +65,7 @@ export function enrichRoutes(deps: {
       maxOutputTokens: 2500,
       signal: c.req.raw.signal,
     });
-    return sendEvents(c, rewriteEvents(chunks, (key, text) => checkProposal(role, key, text, role.notes, keep)));
+    return sendEvents(c, rewriteEvents(chunks, (key, text) => checkProposal(role, key, text, keep)));
   });
 
   app.post("/rewrite-summary", async (c) => {
