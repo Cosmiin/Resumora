@@ -346,6 +346,7 @@ export const en = {
   "edit.skills.professional": "Add professional skill",
   "edit.skills.sort": "Add skill to sort",
   "enrich.focus.followUpQuestion": "What else can you tell us about this?",
+  "enrich.focus.voice.gettingReady": "Getting the mic ready…",
   ...enrichSectionsEn,
 } as const;
 

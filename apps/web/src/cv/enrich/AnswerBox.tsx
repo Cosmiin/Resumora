@@ -12,6 +12,7 @@ type Props = {
   onChange(value: string, via: Via[]): void;
   /** The CV's language, so screen readers read the answer in it. */
   locale?: Locale;
+  maxSeconds?: number;
   /** Told when voice starts or stops being busy (asking for the mic, recording, finishing the last words). */
   onBusyChange?(busy: boolean): void;
 };
@@ -92,8 +93,8 @@ const MicIcon = (
 );
 
 /** One question's answer: pick option chips, type, or speak. It never saves on its own. */
-export function AnswerBox({ question, value, via, onChange, locale = "en", onBusyChange }: Props) {
-  const voice = useVoice({ locale });
+export function AnswerBox({ question, value, via, onChange, locale = "en", maxSeconds = VOICE.maxSeconds, onBusyChange }: Props) {
+  const voice = useVoice({ locale, maxSeconds });
   const field = useRef<HTMLTextAreaElement>(null);
   const seen = useSyncExternalStore(onNoticeChange, noticeSeen);
   // spoken pieces can arrive faster than re-renders, so they build on the latest text
@@ -113,7 +114,8 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", onBus
 
   const { state } = voice;
   const recording = state === "recording";
-  const busy = state === "asking" || recording || state === "stopping";
+  const countingDown = state === "countdown";
+  const busy = state === "asking" || countingDown || recording || state === "stopping";
   useEffect(() => {
     onBusyChange?.(busy);
   }, [busy, onBusyChange]);
@@ -126,10 +128,10 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", onBus
         : state === "idle" && voice.interrupted
           ? t("enrich.voice.interrupted")
           : null;
-  const left = VOICE.maxSeconds - voice.seconds;
+  const left = maxSeconds - voice.seconds;
 
   const onMic = () => {
-    if (recording) return voice.stop();
+    if (recording || countingDown) return voice.stop();
     if (state !== "idle") return;
     if (!seen) markNoticeSeen();
     voice.start();
@@ -167,7 +169,7 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", onBus
             type="button"
             className="mic"
             aria-pressed={recording}
-            aria-label={t(recording ? "enrich.voice.stop" : "enrich.voice.start")}
+            aria-label={t(recording || countingDown ? "enrich.voice.stop" : "enrich.voice.start")}
             aria-busy={state === "asking" || state === "stopping"}
             disabled={state === "asking" || state === "stopping"}
             onClick={onMic}
@@ -176,9 +178,15 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", onBus
           </button>
         )}
       </div>
+      {countingDown && (
+        <>
+          <div data-testid="voice-countdown" aria-live="polite">{voice.count}</div>
+          {voice.count === 1 && voice.connecting && <p>{t("enrich.focus.voice.gettingReady")}</p>}
+        </>
+      )}
       {recording && (
         <span className="answer-rec">
-          {t("enrich.voice.listening", { time: clock(voice.seconds), max: clock(VOICE.maxSeconds) })}
+          {t("enrich.voice.listening", { time: clock(voice.seconds), max: clock(maxSeconds) })}
           {left <= 10 && <span className="answer-countdown">{t("enrich.voice.endsIn", { n: left })}</span>}
         </span>
       )}
