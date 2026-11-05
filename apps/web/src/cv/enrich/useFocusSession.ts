@@ -34,8 +34,9 @@ type View = { step: FocusStep; queue: string[]; position: number; busy: boolean 
 
 function buildQueue(role: Experience | undefined, result: RoleResult | undefined, opts: Options): string[] {
   const grades = new Map(result?.bullets.map((b) => [b.id, b]));
-  const bullets = (role?.bullets ?? []).filter((b) => opts.mode === "improve"
-    ? grades.get(b.id)?.score !== 100 : grades.get(b.id)?.impact !== "specific");
+  // The bullet picked with ✨ is always in the queue, even at 100: focus mode opens on that bullet.
+  const bullets = (role?.bullets ?? []).filter((b) => b.id === opts.bulletId || (opts.mode === "improve"
+    ? grades.get(b.id)?.score !== 100 : grades.get(b.id)?.impact !== "specific"));
   if (opts.mode === "improve") {
     bullets.sort((a, b) => (grades.get(a.id)?.score ?? 0) - (grades.get(b.id)?.score ?? 0));
     const chosen = bullets.findIndex((b) => b.id === opts.bulletId);
@@ -269,11 +270,13 @@ export function useFocusSession(opts: Options): {
       if (available() && s.view.step.kind === "failed" && s.lastCall) void run(s.lastCall.bulletId, true);
     },
     close() {
-      if (!available()) return;
+      // Works while busy too (✕ / Esc at any point): every await in `run` re-checks `closed`.
       const s = session.current;
+      if (s.closed) return;
       const o = current.current;
       s.closed = true;
-      if (s.notesChanged) void roleFacts(o.roleId).then(({ facts, fromNotes }) => {
+      // role-facts reads the saved notes, so it waits for the last answer to be saved.
+      if (s.notesChanged) void o.waitForSave().then(() => roleFacts(o.roleId)).then(({ facts, fromNotes }) => {
         if (current.current.cv.experience.some((r) => r.id === o.roleId)) o.dispatch({
           type: "setFacts", roleId: o.roleId, facts: { items: facts, fromNotes, updatedAt: new Date().toISOString() },
         });

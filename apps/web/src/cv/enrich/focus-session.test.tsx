@@ -99,7 +99,7 @@ describe("useFocusSession", () => {
     expect(api.improveBullet).toHaveBeenCalledTimes(1);
     expect(h.result.current.step.kind).toBe("proposal");
   });
-  it("saves the note before the API, waits for saving, and ignores all actions while busy", async () => {
+  it("saves the note before the API, waits for saving, and ignores all actions but close while busy", async () => {
     const gate = deferred();
     const waitForSave = vi.fn(() => gate.promise);
     const h = mount({ waitForSave });
@@ -108,7 +108,7 @@ describe("useFocusSession", () => {
       h.result.current.submitAnswer("Again", ["type"]);
       h.result.current.skip(); h.result.current.keepMine(); h.result.current.useProposal();
       h.result.current.addSelected(["p"]); h.result.current.next();
-      h.result.current.retry(); h.result.current.close();
+      h.result.current.retry();
     });
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     expect(h.dispatch).toHaveBeenCalledWith({
@@ -188,7 +188,7 @@ describe("useFocusSession", () => {
     expect(api.improveBullet).toHaveBeenCalledTimes(2);
     expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
   });
-  it("the attempt cap waits for the last note to save before advancing or closing", async () => {
+  it("the attempt cap waits for the last note to save before advancing, and role facts wait for it too", async () => {
     api.improveBullet.mockResolvedValue({ needsDetail: true });
     const waitForSave = vi.fn().mockResolvedValue(undefined);
     const h = mount({ waitForSave });
@@ -201,15 +201,28 @@ describe("useFocusSession", () => {
     expect(waitForSave).toHaveBeenCalledTimes(3);
     expect(h.result.current.busy).toBe(true);
     expect(h.result.current.position).toBe(0);
+    // ✕ / Esc work while busy: the screen closes at once, but role facts wait for the last note's save.
     act(() => h.result.current.close());
+    expect(h.opts().onClose).toHaveBeenCalledTimes(1);
     expect(api.roleFacts).not.toHaveBeenCalled();
-    expect(h.opts().onClose).not.toHaveBeenCalled();
+    await act(async () => gate.resolve());
+    expect(api.roleFacts).toHaveBeenCalledTimes(1);
+    expect(api.improveBullet).toHaveBeenCalledTimes(2);
+  });
+  it("the attempt cap moves to the next bullet once the last note is saved", async () => {
+    api.improveBullet.mockResolvedValue({ needsDetail: true });
+    const waitForSave = vi.fn().mockResolvedValue(undefined);
+    const h = mount({ waitForSave });
+    await submit(h);
+    await submit(h, "More detail");
+    const gate = deferred();
+    waitForSave.mockImplementationOnce(() => gate.promise);
+    await submit(h, "Final detail");
+    expect(h.result.current.busy).toBe(true);
     await act(async () => gate.resolve());
     expect(h.result.current.busy).toBe(false);
     expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
     expect(api.improveBullet).toHaveBeenCalledTimes(2);
-    act(() => h.result.current.close());
-    expect(api.roleFacts).toHaveBeenCalledTimes(1);
   });
   it("409 twice fails as saving and retry repeats the last call without another note", async () => {
     api.improveBullet.mockRejectedValueOnce(new ApiClientError(409, "not_saved", "save"))
@@ -325,8 +338,8 @@ describe("useFocusSession", () => {
     h.dispatch.mockClear();
     act(() => h.result.current.close());
     expect(h.opts().onClose).toHaveBeenCalledTimes(1);
-    expect(api.roleFacts).toHaveBeenCalledWith("r");
     await settle();
+    expect(api.roleFacts).toHaveBeenCalledWith("r");
     expect(h.dispatch).toHaveBeenCalledExactlyOnceWith({
       type: "setFacts", roleId: "r",
       facts: { items: ["Used Python"], fromNotes: hashText("notes"), updatedAt: expect.any(String) },

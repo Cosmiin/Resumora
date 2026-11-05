@@ -13,6 +13,12 @@ type Props = {
   /** The CV's language, so screen readers read the answer in it. */
   locale?: Locale;
   maxSeconds?: number;
+  /** Replaces the default "Pick, type or speak…" placeholder. */
+  placeholder?: string;
+  /** No option chips (the brain dump): just the text box and the mic. */
+  plain?: boolean;
+  /** While the answer is being sent: nothing can be added, since it would not be part of what was sent. */
+  readOnly?: boolean;
   /** Told when voice starts or stops being busy (asking for the mic, recording, finishing the last words). */
   onBusyChange?(busy: boolean): void;
 };
@@ -93,7 +99,7 @@ const MicIcon = (
 );
 
 /** One question's answer: pick option chips, type, or speak. It never saves on its own. */
-export function AnswerBox({ question, value, via, onChange, locale = "en", maxSeconds = VOICE.maxSeconds, onBusyChange }: Props) {
+export function AnswerBox({ question, value, via, onChange, locale = "en", maxSeconds = VOICE.maxSeconds, placeholder, plain = false, readOnly = false, onBusyChange }: Props) {
   const voice = useVoice({ locale, maxSeconds });
   const field = useRef<HTMLTextAreaElement>(null);
   const seen = useSyncExternalStore(onNoticeChange, noticeSeen);
@@ -119,7 +125,7 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
   useEffect(() => {
     onBusyChange?.(busy);
   }, [busy, onBusyChange]);
-  const micShown = state !== "denied" && state !== "unavailable" && state !== "limit";
+  const micShown = !readOnly && state !== "denied" && state !== "unavailable" && state !== "limit";
   const message =
     state === "denied"
       ? t("enrich.voice.denied")
@@ -138,8 +144,8 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
   };
 
   return (
-    <div className="answer-box">
-      <div className="answer-opts" role="group" aria-label={t("enrich.answer.options")}>
+    <div className={plain ? "answer-box is-plain" : "answer-box"}>
+      {!plain && <div className="answer-opts" role="group" aria-label={t("enrich.answer.options")}>
         {question.options.map((o, i) => (
           <button
             key={`${i}:${o}`}
@@ -154,14 +160,15 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
         <button type="button" className="answer-opt is-other" onClick={() => field.current?.focus()}>
           {t("enrich.answer.other")}
         </button>
-      </div>
+      </div>}
       <div className={micShown ? "answer-field has-mic" : "answer-field"}>
         <textarea
           ref={field}
           lang={locale}
           aria-label={t("enrich.answer.label")}
-          placeholder={t("enrich.answer.placeholder")}
+          placeholder={placeholder ?? t("enrich.answer.placeholder")}
           value={value}
+          readOnly={readOnly}
           onChange={(e) => onChange(e.target.value, addVia(via, "type"))}
         />
         {micShown && (
@@ -179,16 +186,36 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
         )}
       </div>
       {countingDown && (
-        <>
-          <div data-testid="voice-countdown" aria-live="polite">{voice.count}</div>
-          {voice.count === 1 && voice.connecting && <p>{t("enrich.focus.voice.gettingReady")}</p>}
-        </>
+        <div className="voice-cue">
+          {/* The live region stays put (so it is announced); the number inside is keyed so each 3 / 2 / 1 pops in. */}
+          <div className="voice-count" data-testid="voice-countdown" aria-live="polite">
+            <span key={voice.count}>{voice.count}</span>
+          </div>
+          <p className="voice-ready">
+            {voice.count === 1 && voice.connecting ? t("enrich.focus.voice.gettingReady") : t("enrich.focus.voice.getReady")}
+          </p>
+        </div>
       )}
       {recording && (
-        <span className="answer-rec">
-          {t("enrich.voice.listening", { time: clock(voice.seconds), max: clock(maxSeconds) })}
-          {left <= 10 && <span className="answer-countdown">{t("enrich.voice.endsIn", { n: left })}</span>}
-        </span>
+        <div className="answer-rec">
+          {voice.seconds < 2 && (
+            <span className="voice-go">
+              <span className="voice-dot" aria-hidden="true" />
+              {t("enrich.focus.voice.go")}
+            </span>
+          )}
+          <div className="voice-bar">
+            <span className="voice-wave" aria-hidden="true">
+              {Array.from({ length: 12 }, (_, i) => (
+                <i key={i} style={{ animationDelay: `${(i * 0.37) % 1}s` }} />
+              ))}
+            </span>
+            <span className="voice-time">
+              {t("enrich.voice.listening", { time: clock(voice.seconds), max: clock(maxSeconds) })}
+            </span>
+            {left <= 10 && <span className="answer-countdown">{t("enrich.voice.endsIn", { n: left })}</span>}
+          </div>
+        </div>
       )}
       {state === "stopping" && <span className="answer-rec is-finishing">{t("enrich.voice.finishing")}</span>}
       {micShown && (

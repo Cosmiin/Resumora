@@ -110,7 +110,7 @@ async function readRewrite(path: string, body: unknown, emit: (e: RewriteEvent) 
 }
 
 /**
- * Streams a rewrite (`/v1/enrich/rewrite-role` or `/v1/enrich/rewrite-summary`) as the signed-in user.
+ * Streams a rewrite (`/v1/enrich/rewrite-summary`) as the signed-in user.
  * Every event is checked against the shared schemas. A failure before the stream is an `error` event
  * with the server's code; a break after it is `error` with code `stream_broken`. Aborting is silent.
  */

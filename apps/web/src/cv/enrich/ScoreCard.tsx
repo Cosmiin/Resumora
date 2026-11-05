@@ -1,14 +1,15 @@
 import type { CSSProperties } from "react";
-import { atsChecks, band, clearCount, type Experience, type Question } from "@resumora/shared";
+import { atsChecks, band, clearCount, type Experience } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { atsTipText, issueTip } from "./tips.ts";
+import type { FocusMode } from "./useFocusSession.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 type Props = {
   role: Experience;
   score: RoleScoreState;
-  onAnswer(): void;
-  onRewrite(): void;
+  /** Opens focus mode on this role. */
+  onImprove(mode: FocusMode): void;
   onRetry(): void;
 };
 
@@ -24,14 +25,8 @@ function tipsOf(role: Experience, score: RoleScoreState): { text: string; ats: b
   return tips.slice(0, 2);
 }
 
-/** The questions not answered yet: a note on the role with the same question text means it was. */
-export function openQuestions(role: Experience, questions: readonly Question[]): Question[] {
-  const answered = new Set(role.notes.map((n) => n.question.trim()));
-  return questions.filter((q) => !answered.has(q.text.trim()));
-}
-
 /** The score, what to fix first, and the two actions: the top of a role's tools in the panel. */
-export function ScoreCard({ role, score, onAnswer, onRewrite, onRetry }: Props) {
+export function ScoreCard({ role, score, onImprove, onRetry }: Props) {
   const hasBullets = role.bullets.some((b) => b.text.trim() !== "");
   const result = score.result;
   const n = result?.score ?? null;
@@ -76,7 +71,8 @@ export function ScoreCard({ role, score, onAnswer, onRewrite, onRetry }: Props) 
   }
 
   const tips = shown ? tipsOf(role, score) : [];
-  const questions = score.state === "ready" && result ? openQuestions(role, result.questions).length : 0;
+  // At 80+ the only way up is a result (a number, scale, frequency or reason).
+  const standOut = shown && n !== null && n >= 80 && result !== undefined && result.bullets.some((b) => b.impact !== "specific");
 
   return (
     <div className="box score-card">
@@ -97,15 +93,11 @@ export function ScoreCard({ role, score, onAnswer, onRewrite, onRetry }: Props) 
           )}
         </ul>
       )}
-      {hasBullets && (
+      {standOut && <p className="stand-out-hint">{t("enrich.card.standOutHint")}</p>}
+      {(hasBullets || role.bullets.length <= 2) && n !== 100 && (
         <div className="row-btns">
-          {questions > 0 && (
-            <button type="button" className="btn primary" onClick={onAnswer}>
-              {t(questions === 1 ? "enrich.card.answerOne" : "enrich.card.answerMany", { n: questions })}
-            </button>
-          )}
-          <button type="button" className={questions > 0 ? "btn" : "btn primary"} onClick={onRewrite}>
-            {t("enrich.card.rewrite")}
+          <button type="button" className="btn primary" onClick={() => onImprove(standOut ? "standOut" : "improve")}>
+            {t(standOut ? "enrich.card.standOut" : "enrich.card.improve")}
           </button>
         </div>
       )}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { emptyCv, type CategoryKey, type CvContent, type Question, type RoleResult } from "@resumora/shared";
+import { emptyCv, type CategoryKey, type CvContent, type RoleResult } from "@resumora/shared";
 import { cvReducer } from "../edit/cvReducer.ts";
 import { SaveNotDoneError, useWaitForSave, type SaveStatus } from "../useAutosave.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
@@ -11,7 +11,6 @@ const api = vi.hoisted(() => ({ streamRewrite: vi.fn(), getSkillSuggestions: vi.
 vi.mock("./enrich-api.ts", () => api);
 
 import { SectionTools } from "../panel/SectionTools.tsx";
-import { QuestionFlow } from "./QuestionFlow.tsx";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -101,25 +100,6 @@ function Tools({ focus }: { focus: { key: CategoryKey; itemId?: string } }) {
 }
 
 describe("when the save before an AI step fails", () => {
-  it("Rewrite bullets goes back to the score card with a short message", async () => {
-    render(<Tools focus={{ key: "experience", itemId: "r1" }} />);
-    await userEvent.click(screen.getByRole("button", { name: "Rewrite bullets" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't save your changes first.");
-    expect(screen.getByRole("button", { name: "Rewrite bullets" })).toBeInTheDocument();
-    expect(api.streamRewrite).not.toHaveBeenCalled();
-  });
-
-  it("Draft improved bullets stays on the questions with a short message", async () => {
-    const onDraft = vi.fn();
-    const questions: Question[] = [{ bulletId: "b1", text: "Which reports?", options: [], kind: "detail" }];
-    render(<QuestionFlow role={role} questions={questions} dispatch={() => {}} waitForSave={failedSave} onDraft={onDraft} />);
-    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
-    await userEvent.click(screen.getByRole("button", { name: "Draft improved bullets" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't save your changes first.");
-    expect(screen.getByRole("button", { name: "Draft improved bullets" })).toBeInTheDocument();
-    expect(onDraft).not.toHaveBeenCalled();
-  });
-
   it("Suggest skills does not ask the server and shows a short message", async () => {
     render(<Tools focus={{ key: "skills" }} />);
     await userEvent.click(screen.getByRole("button", { name: "Suggest skills from my experience" }));
