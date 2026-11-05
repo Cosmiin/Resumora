@@ -154,18 +154,24 @@ describe("job response schemas", () => {
   it("accepts queued list items and full jobs before extraction", () => {
     expect(JobListItemSchema.safeParse(listItem).success).toBe(true);
     expect(JobSchema.safeParse({
-      ...listItem, extracted: null, editedByUser: false, version: 1, updatedAt: listItem.createdAt,
+      ...listItem, rawText: null, extracted: null, editedByUser: false, version: 1, updatedAt: listItem.createdAt,
     }).success).toBe(true);
   });
 
   it("accepts ready jobs and validates response enums", () => {
     expect(JobSchema.safeParse({
       ...listItem, status: "ready", source: "extension", title: extraction.title,
-      extracted: extraction, editedByUser: true, version: 2, updatedAt: listItem.createdAt,
+      rawText: "Original job text", extracted: extraction, editedByUser: true, version: 2, updatedAt: listItem.createdAt,
     }).success).toBe(true);
     for (const invalid of [{ status: "done" }, { source: "email" }, { errorCode: "unknown" }]) {
       expect(JobListItemSchema.safeParse({ ...listItem, ...invalid }).success).toBe(false);
     }
+  });
+
+  it("requires rawText on full jobs", () => {
+    expect(JobSchema.safeParse({
+      ...listItem, extracted: null, editedByUser: false, version: 1, updatedAt: listItem.createdAt,
+    }).success).toBe(false);
   });
 });
 

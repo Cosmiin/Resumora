@@ -74,6 +74,7 @@ export const JobListPageSchema = z.object({
 export type JobListPage = z.infer<typeof JobListPageSchema>;
 
 export const JobSchema = JobListItemSchema.extend({
+  rawText: z.string().nullable(),
   extracted: JobExtractionSchema.nullable(),
   editedByUser: z.boolean(),
   version: z.number().int().min(1),
