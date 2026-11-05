@@ -127,6 +127,22 @@ describe("useRoleScores", () => {
     expect(hook.current.scores.get("r1")!.state).toBe("ready");
   });
 
+  it("a late 409 for older text does not park a role whose newer text was already saved", async () => {
+    const r1 = role(1);
+    let reject!: (e: unknown) => void;
+    api.scoreRole.mockImplementationOnce(() => new Promise<RoleResult>((_, rej) => (reject = rej)));
+    const { rerender } = await mount(cvOf(r1));
+    await wait(2100);
+    const edited = { ...r1, bullets: [{ id: "r1-b0", text: "Ran the weekly rota for 30 people" }, r1.bullets[1]!] };
+    rerender({ cv: cvOf(edited), status: "dirty" });
+    rerender({ cv: cvOf(edited), status: "saved" }); // this save happens before the 409 comes back
+    api.scoreRole.mockResolvedValueOnce(result(edited, 55));
+    await act(async () => reject(conflict()));
+    await wait(2100);
+    expect(api.scoreRole).toHaveBeenCalledTimes(2);
+    expect(api.scoreRole).toHaveBeenLastCalledWith("r1", print(edited));
+  });
+
   it.each([503, 502])("a %i keeps the last score, says unavailable, and retry asks again", async (status) => {
     const r1 = role(1);
     const old = result(r1, 60, "older-print");

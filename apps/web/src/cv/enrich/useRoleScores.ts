@@ -52,9 +52,10 @@ export function useRoleScores({ cv, status }: Props): {
   const alive = useRef(false);
   const loadStarted = useRef(false);
   const busy = useRef(false);
-  const roleIds = useRef(new Set<string>());
+  /** The roles as they are now, for answers that come back after the text moved on. */
+  const current = useRef({ experience, locale });
   useEffect(() => {
-    roleIds.current = new Set(experience.map((r) => r.id));
+    current.current = { experience, locale };
   });
 
   useEffect(() => {
@@ -89,12 +90,16 @@ export function useRoleScores({ cv, status }: Props): {
     try {
       const result = await scoreRole(roleId, print);
       if (!alive.current) return;
-      if (roleIds.current.has(roleId)) setResults((m) => new Map(m).set(roleId, result));
+      if (current.current.experience.some((r) => r.id === roleId)) setResults((m) => new Map(m).set(roleId, result));
       setFailed((m) => (m.has(roleId) ? new Map([...m].filter(([k]) => k !== roleId)) : m));
     } catch (err) {
       if (!alive.current) return;
-      if (err instanceof ApiClientError && err.status === 409) waiting.current.add(roleId);
-      else setFailed((m) => new Map(m).set(roleId, print)); // 502, 503 and anything else
+      if (err instanceof ApiClientError && err.status === 409) {
+        // Park the role until the next save only if its text is still what was sent. If it moved on,
+        // that newer text may already be saved, and no other save would come to wake it up.
+        const now = current.current.experience.find((r) => r.id === roleId);
+        if (now && printOf(now, current.current.locale) === print) waiting.current.add(roleId);
+      } else setFailed((m) => new Map(m).set(roleId, print)); // 502, 503 and anything else
     } finally {
       busy.current = false;
       if (alive.current) {
