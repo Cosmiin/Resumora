@@ -1,0 +1,43 @@
+LinkedIn
+Home | My Network | Jobs | Messaging | Notifications | Me | For Business
+Search by title, skill, or company
+Try Premium for free
+
+Harbor Metric
+Data Engineer
+Berlin, Germany — Reposted 2 days ago — 42 people clicked apply
+Promoted by hirer — Responses managed off LinkedIn
+Hybrid — Full-time
+Apply | Save | Show more options
+
+About the job
+Harbor Metric helps local transport operators understand passenger demand. We are hiring a Data Engineer for our Berlin data platform team. You will build dependable pipelines with product analysts and platform engineers.
+
+Responsibilities
+- Maintain daily data ingestion pipelines.
+- Improve data quality monitoring.
+- Document data models for analysts.
+
+Required for this role
+- Three years of data engineering experience.
+- Proficiency with Python.
+- Proficiency with SQL.
+- Experience building Apache Airflow pipelines.
+- Experience using a cloud data warehouse.
+
+Nice to have
+- Experience with Apache Kafka.
+
+Benefits include a transit pass, flexible start times and a training budget.
+
+See less | Set alert for similar jobs | Data Engineer, Berlin
+Meet the hiring team: team profile unavailable
+People also viewed
+Senior Data Scientist — Unrelated Example Labs — Munich — salary from EUR 90,000
+Analytics Manager — Other Example Systems — Remote — MBA preferred
+These are recommendations, not part of Harbor Metric's job description.
+
+About the company | 210 followers | Follow
+Job search smarter with Premium | Try Premium for EUR 0
+About | Accessibility | User Agreement | Privacy Policy | Cookie Policy
+Messaging overlay | You have no new messages

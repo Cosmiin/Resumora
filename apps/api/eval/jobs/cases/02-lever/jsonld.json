@@ -1,0 +1,16 @@
+{
+  "@context": "https://schema.org",
+  "@type": "JobPosting",
+  "title": "Product Designer",
+  "hiringOrganization": {
+    "@type": "Organization",
+    "name": "Pebble Atlas"
+  },
+  "employmentType": "FULL_TIME",
+  "jobLocationType": "TELECOMMUTE",
+  "applicantLocationRequirements": {
+    "@type": "Country",
+    "name": "Ireland"
+  },
+  "datePosted": "2026-11-02"
+}

@@ -1,0 +1,27 @@
+Lumen Orchard Careers
+All jobs / Engineering / Senior Backend Engineer
+Senior Backend Engineer
+Lumen Orchard | London, United Kingdom | Hybrid | Full time
+
+Lumen Orchard builds inventory software for independent food shops. We are adding a senior engineer to the team that owns our ordering API. This is a permanent role with two days each week in our London office.
+
+What you will do
+- Build services that keep shop inventory up to date.
+- Review changes with the engineering team.
+- Help investigate production incidents during working hours.
+
+Required qualifications
+- At least five years of backend engineering experience.
+- Experience building services with TypeScript.
+- Experience using PostgreSQL.
+- Experience designing HTTP APIs.
+- Written English suitable for technical documentation.
+
+Nice to have
+- Experience operating services on Cloudflare Workers.
+
+Benefits include 28 days of annual leave, a learning budget and a pension contribution. Compensation will be discussed during the interview process; no salary range is published.
+
+Apply for this job
+Application form: resume upload, optional cover letter, submit application.
+Powered by Greenhouse | Privacy notice | Cookie preferences
