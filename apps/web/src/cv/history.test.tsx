@@ -147,10 +147,13 @@ describe("version history", () => {
     }
   });
 
-  it("restore replaces the editor content", async () => {
+  it("restore replaces the editor content and flags an empty section added this visit", async () => {
     const user = userEvent.setup();
     api.restoreHistory.mockResolvedValue({ version: 3, updatedAt: "2026-11-04T10:30:00Z" });
     renderPage();
+    await user.click(await screen.findByRole("button", { name: "Add Summary" }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: "Add Summary" })).not.toBeInTheDocument();
     const panel = await openHistory(user);
     const [, older] = await within(panel).findAllByRole("listitem");
     api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });
@@ -161,6 +164,7 @@ describe("version history", () => {
 
     expect(api.restoreHistory).toHaveBeenCalledWith("h1", 2);
     await waitFor(() => expect(nameField()).toHaveValue("Old Name"));
+    expect(screen.getByRole("button", { name: "Add Summary" })).toBeInTheDocument();
     expect(screen.getByText("Saved")).toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "History" })).not.toBeInTheDocument();
   });
@@ -207,10 +211,13 @@ describe("version history blocks editing", () => {
     expect(field).toBeDefined();
   });
 
-  it("offers Load latest when the restore worked but reloading failed", async () => {
+  it("Load latest flags an empty section when the restore worked but reloading failed", async () => {
     const user = userEvent.setup();
     api.restoreHistory.mockResolvedValue({ version: 3, updatedAt: "2026-11-04T10:30:00Z" });
     renderPage();
+    await user.click(await screen.findByRole("button", { name: "Add Summary" }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("button", { name: "Add Summary" })).not.toBeInTheDocument();
     const panel = await openHistory(user);
     const [, older] = await within(panel).findAllByRole("listitem");
     api.getCv.mockRejectedValueOnce(new ApiClientError(0, "network", "offline"));
@@ -220,8 +227,10 @@ describe("version history blocks editing", () => {
     await user.click(restoreButton);
 
     expect(await screen.findByRole("button", { name: "Load latest" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add Summary" })).not.toBeInTheDocument();
     api.getCv.mockResolvedValue({ content: named("Old Name"), version: 3, updatedAt: "2026-11-04T10:30:00Z" });
     await user.click(screen.getByRole("button", { name: "Load latest" }));
     await waitFor(() => expect(nameField()).toHaveValue("Old Name"));
+    expect(screen.getByRole("button", { name: "Add Summary" })).toBeInTheDocument();
   });
 });
