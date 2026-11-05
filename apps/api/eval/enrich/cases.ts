@@ -1,6 +1,6 @@
 // Fictional people only. Score cases carry the grades a careful reviewer expects, in the order
 // contribution / clarity / specificity / impact. Bullets marked `zero` are checked another way (see run.eval.ts).
-import type { Experience, Grade, Locale } from "@resumora/shared";
+import type { Grade, Locale } from "@resumora/shared";
 
 type G = Grade;
 const M: G = "missing";
@@ -130,50 +130,5 @@ export const SCORE_CASES: ScoreCase[] = [
       { text: "Răspuns clienților prin e-mail cu privire la livrări întârziate.", expected: { zero: "paraphrasedDuplicate" } },
       { text: "Actualizat zilnic tabelul de urmărire a comenzilor.", expected: g(S, S, S, M) },
     ],
-  },
-];
-
-export type RewriteCase = { id: string; trap: string; locale: Locale; role: Experience; usesNumber?: string; rangeOnly?: string };
-
-const role = (id: string, title: string, bullets: string[], notes: [string, string, "pick" | "type"][] = []): Experience => ({
-  id, company: "Fictional Co", title, location: "", startDate: "2021-01", endDate: "2023-06", current: false, description: "",
-  bullets: bullets.map((text, i) => ({ id: `b${i + 1}`, text })),
-  notes: notes.map(([question, answer, via], i) => ({ id: `n${i + 1}`, question, answer, via: [via], askedAt: "2026-11-05T09:00:00.000Z" })),
-});
-
-export const REWRITE_CASES: RewriteCase[] = [
-  {
-    id: "vague-number", trap: "A bullet already holds a vague number (40%); the note explains the work but adds no figures.", locale: "en",
-    role: role("r1", "Support Team Lead", ["Improved response times by 40% across the support desk.", "Handled escalations."], [
-      ["What did you do to improve response times?", "I set up a shared inbox with saved replies and a rota for who answers first.", "type"],
-    ]),
-  },
-  {
-    id: "answer-adds-number", trap: "The note gives a real figure (about 60 calls a day); the rewrite may use it.", locale: "en", usesNumber: "60",
-    role: role("r2", "Receptionist", ["Answered customer calls.", "Kept the visitor log."], [
-      ["About how many calls did you take a day?", "About 60 calls a day, mostly booking questions.", "type"],
-    ]),
-  },
-  {
-    id: "no-answers", trap: "No notes at all: the rewrite must not add any number.", locale: "en",
-    role: role("r3", "Dispatcher", ["Did various admin tasks.", "Prepared delivery schedules for drivers."]),
-  },
-  {
-    id: "duplicate-pair", trap: "Two bullets say the same thing; one note belongs to both.", locale: "en",
-    role: role("r4", "Store Assistant", ["Helped customers find products.", "Assisted shoppers in finding items.", "Restocked shelves in the morning."], [
-      ["What kind of products did customers ask about most?", "Mostly garden tools and paint.", "type"],
-    ]),
-  },
-  {
-    id: "romanian-role", trap: "A Romanian role: the rewrite must stay in Romanian.", locale: "ro",
-    role: role("r5", "Asistent de depozit", ["Ajutat la pregătirea comenzilor.", "Răspuns de diverse activități în depozit."], [
-      ["Ce ai făcut concret la pregătirea comenzilor?", "Am scanat codurile de bare și am împachetat coletele pentru curier.", "type"],
-    ]),
-  },
-  {
-    id: "range-only", trap: "The note is only a picked range (10–50 a week); the rewrite may use the range, never an exact number.", locale: "en", rangeOnly: "10–50",
-    role: role("r6", "Training Assistant", ["Trained new staff.", "Prepared welcome packs."], [
-      ["How many new people did you train?", "10–50 a week", "pick"],
-    ]),
   },
 ];

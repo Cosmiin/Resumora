@@ -16,11 +16,10 @@ import { brainDump } from "./brain-dump.ts";
 import { roleFacts } from "./role-facts.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
-import { checkProposal, checkSummary, keepAsIsIds, rewriteEvents } from "./rewrite.ts";
-import { rewriteRoleSystemPrompt, rewriteRoleUserMessage, rewriteSummarySystemPrompt, rewriteSummaryUserMessage } from "./rewrite-prompts.ts";
+import { checkSummary, rewriteEvents } from "./rewrite.ts";
+import { rewriteSummarySystemPrompt, rewriteSummaryUserMessage } from "./rewrite-prompts.ts";
 
 const RoleBody = z.object({ roleId: z.string().min(1).max(64) });
-const notSaved = () => new ApiError(409, "not_saved", "Your latest changes aren't saved yet. Try again in a moment.");
 
 const ScoreBody = z.object({ roleId: z.string().min(1).max(64), fingerprint: z.string().min(1).max(64) });
 const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
@@ -118,27 +117,6 @@ export function enrichRoutes(deps: {
         await stream.writeSSE({ event: e.event, data: JSON.stringify(RewriteEventSchemas[e.event].parse(e.data)) });
       }
     });
-
-  app.post("/rewrite-role", async (c) => {
-    const body = RoleBody.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId.");
-    const user = c.get("user");
-    const cv = deps.cvRepo(user);
-    const { content } = await cv.get();
-    const role = content.experience.find((r) => r.id === body.data.roleId);
-    if (!role) throw notSaved();
-    const keep = await keepAsIsIds(role, content.locale, deps.insightsRepo(user));
-    await cv.snapshot("ai");
-    const chunks = streamModel(deps.model(user), {
-      userId: user.id,
-      task: "enrich_rewrite_role",
-      system: rewriteRoleSystemPrompt(content.locale),
-      user: rewriteRoleUserMessage(role, keep),
-      maxOutputTokens: 2500,
-      signal: c.req.raw.signal,
-    });
-    return sendEvents(c, rewriteEvents(chunks, (key, text) => checkProposal(role, key, text, keep)));
-  });
 
   app.post("/rewrite-summary", async (c) => {
     const user = c.get("user");

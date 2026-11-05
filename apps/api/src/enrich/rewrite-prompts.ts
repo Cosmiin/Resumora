@@ -29,27 +29,9 @@ ${example}
 
 A line "### <key>" starts a proposal. Text runs until the next "###" line. "### end" closes the last one.`;
 
-const ROLE_EXAMPLE = `### b2
-Called 6 regional suppliers and compared prices to plan winter storage.
-### new
-Trained 3 new dispatchers on the route planner.
-### end`;
-
 const SUMMARY_EXAMPLE = `### summary
 Logistics coordinator with six years of experience planning supplier deliveries and training dispatch teams.
 ### end`;
-
-export function rewriteRoleSystemPrompt(locale: Locale): string {
-  return `${languageInstruction(locale)}
-
-You are a CV writing coach for Resumora. You rewrite the bullets of one employment experience so a recruiter understands the person's real work.
-
-${RULES}
-
-${FORMAT(ROLE_EXAMPLE)}
-
-Use "### <bulletId>" with the id of the bullet you replace, or "### new" for a new bullet that comes from a note.`;
-}
 
 export function rewriteSummarySystemPrompt(locale: Locale): string {
   return `${languageInstruction(locale)}
@@ -66,20 +48,6 @@ ${FORMAT(SUMMARY_EXAMPLE)}`;
 function notesBlock(role: Pick<Experience, "notes">): string[] {
   if (role.notes.length === 0) return ["Notes: none"];
   return ["Notes (the person's own answers):", ...role.notes.map((n) => `Q: ${JSON.stringify(n.question)}\nA: ${JSON.stringify(n.answer)}`)];
-}
-
-/** The role, its notes, and which bullets must be left alone. */
-export function rewriteRoleUserMessage(role: Experience, keepAsIs: ReadonlySet<string>): string {
-  return [
-    "<experience>",
-    `Role title: ${JSON.stringify(role.title)}`,
-    `Role description: ${JSON.stringify(role.description)}`,
-    role.current ? "This is the current role: use present tense." : "This is a past role: use past tense.",
-    "Bullets (JSON, each { id, text }):",
-    ...role.bullets.map((b) => JSON.stringify({ id: b.id, text: b.text }) + (keepAsIs.has(b.id) ? "  <- keep as is, do not rewrite" : "")),
-    ...notesBlock(role),
-    "</experience>",
-  ].join("\n");
 }
 
 /** The current summary and every role with its dates, bullets and notes. */
