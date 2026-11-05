@@ -537,3 +537,40 @@ The decision record in `new_files` and this plan were written by Claude. **Do no
 - Typecheck, lint and the full test suite pass.
 
 **Out of scope:** the score route, prompts, the migration, styles.
+
+---
+
+## Task 11: Second whole-branch review fixes: paraphrase duplicates, summary drop reasons, stale facts
+
+Added after the second whole-branch review (2026-11-05).
+
+```
+---
+files: [packages/shared/src/enrich-focus.ts, packages/shared/src/enrich-focus.test.ts, apps/api/src/enrich/improve.ts, apps/api/src/enrich/improve.test.ts, apps/api/src/enrich/role-facts.ts, apps/web/src/cv/enrich/useFocusSession.ts, apps/web/src/cv/enrich/focus-session.test.tsx, apps/web/src/i18n/en.ts, apps/web/src/cv/enrich/summary-skills.test.tsx, apps/web/src/cv/edit/cvReducer.ts, apps/web/src/cv/edit/cvReducer.test.ts, docs/superpowers/plans/2026-11-05-focus-mode.md]
+new_files: []
+deps: false
+size: 200
+---
+```
+
+This plan was edited by Claude. **Do not modify it.**
+
+**Goal:** three fixes.
+
+1. **A proposal that paraphrases a later bullet.** In `improveBullet`, grade the swapped role with the target bullet moved to the **end** of the bullet list (a grading-only copy; the real order is unchanged everywhere else). The scorer then sees every other bullet before the proposal, so a near-duplicate comes back with `duplicateOf` set. If the graded bullet has `duplicateOf !== null` or `meaningful === false`, return `{ needsDetail: true }`. `mergeGrades` and the cached prediction keep using the real order.
+2. **Summary drop reasons.** Restore these five strings in `apps/web/src/i18n/en.ts` exactly as they were (they were removed by mistake; `SummaryTools.tsx` builds the key as `` `enrich.drop.${reason}` ``):
+   - `"enrich.drop.number": "Left out: it added a number you didn't give us"`
+   - `"enrich.drop.length": "Left out: it was too long for one bullet"`
+   - `"enrich.drop.unknownBullet": "Left out: it was for a bullet that isn't in this role"`
+   - `"enrich.drop.unchanged": "Left out: it said the same as your bullet"`
+   - `"enrich.drop.newWithoutNote": "Left out: a new bullet needs an answer from you first"`
+3. **Stale facts after a History restore.** Add to `enrich-focus.ts`: `export function notesHash(notes: readonly Note[]): string`, which returns `hashText(notes.map((n) => n.id + "\u0000" + n.answer).join("\u0001"))` (the formula `role-facts.ts` uses today; make `role-facts.ts` call it). In `useFocusSession`'s `close()`, dispatch `setFacts` only if the role still exists **and** `notesHash(role.notes)` of the current role equals the returned `fromNotes`.
+
+**Acceptance tests:**
+- `improve.test.ts`: the grading request lists the target bullet last; a graded answer with `duplicateOf` set gives `needsDetail` and caches nothing.
+- `enrich-focus.test.ts`: `notesHash` changes when an answer or an id changes, and is stable otherwise.
+- `focus-session.test.tsx`: a role-facts answer whose `fromNotes` no longer matches the role's notes (the notes changed after close) dispatches nothing; a matching one dispatches `setFacts` as before.
+- `summary-skills.test.tsx`: a dropped summary proposal with reason `number` shows "Left out: it added a number you didn't give us".
+- Typecheck, lint and the full test suite pass.
+
+**Out of scope:** everything else.

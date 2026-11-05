@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  BRAIN_DUMP_QUESTION, emptyCv, fingerprint, hashText,
+  BRAIN_DUMP_QUESTION, emptyCv, fingerprint, notesHash,
   type CvContent, type Experience, type RoleResult,
 } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
@@ -73,7 +73,7 @@ describe("useFocusSession", () => {
       proposals: [{ id: "p", text: "Built weekly reports", score: 80 }],
       roleBefore: 40, roleAfterAll: 70,
     });
-    api.roleFacts.mockResolvedValue({ facts: ["Used Python"], fromNotes: hashText("notes") });
+    api.roleFacts.mockResolvedValue({ facts: ["Used Python"], fromNotes: notesHash([]) });
   });
   afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
 
@@ -382,6 +382,8 @@ describe("useFocusSession", () => {
   it("close immediately calls onClose and collects facts only after changed notes", async () => {
     const h = mount();
     await submit(h);
+    const fromNotes = notesHash(h.opts().cv.experience[0]!.notes);
+    api.roleFacts.mockResolvedValueOnce({ facts: ["Used Python"], fromNotes });
     h.dispatch.mockClear();
     act(() => h.result.current.close());
     expect(h.opts().onClose).toHaveBeenCalledTimes(1);
@@ -389,8 +391,25 @@ describe("useFocusSession", () => {
     expect(api.roleFacts).toHaveBeenCalledWith("r");
     expect(h.dispatch).toHaveBeenCalledExactlyOnceWith({
       type: "setFacts", roleId: "r",
-      facts: { items: ["Used Python"], fromNotes: hashText("notes"), updatedAt: expect.any(String) },
+      facts: { items: ["Used Python"], fromNotes, updatedAt: expect.any(String) },
     });
+  });
+  it.each(["restored notes", "removed role"])("discards facts returned after close for %s", async (change) => {
+    const h = mount();
+    await submit(h);
+    const fromNotes = notesHash(h.opts().cv.experience[0]!.notes);
+    const gate = deferred();
+    api.roleFacts.mockImplementationOnce(async () => {
+      await gate.promise;
+      return { facts: ["Used Python"], fromNotes };
+    });
+    act(() => h.result.current.close());
+    await settle();
+    expect(api.roleFacts).toHaveBeenCalledExactlyOnceWith("r");
+    h.update({ cv: { ...h.opts().cv, experience: change === "restored notes" ? [role()] : [] } });
+    h.dispatch.mockClear();
+    await act(async () => gate.resolve());
+    expect(h.dispatch).not.toHaveBeenCalled();
   });
   it("close without notes makes no facts call and facts failures dispatch nothing", async () => {
     const unchanged = mount();

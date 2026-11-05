@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_BULLETS, MAX_NOTES, emptyCv, type CvContent, type Experience } from "@resumora/shared";
+import { MAX_BULLETS, MAX_NOTES, emptyCv, notesHash, type CvContent, type Experience } from "@resumora/shared";
 import { cvReducer, sectionsOnCv } from "./cvReducer.ts";
 
 function role(id: string, bullets: string[], extra: Partial<Experience> = {}): Experience {
@@ -289,7 +289,7 @@ describe("setNote", () => {
 });
 
 describe("focus actions", () => {
-  const facts = { items: ["Built APIs"], fromNotes: "notes-1", updatedAt: "2026-11-05T10:00:00.000Z" };
+  const facts = { items: ["Built APIs"], fromNotes: notesHash([]), updatedAt: "2026-11-05T10:00:00.000Z" };
 
   it("replaceBullet changes only the selected text and keeps its id", () => {
     const cv = { ...withRole(["First", "Second"]), experience: [role("e1", ["First", "Second"]), role("e2", ["Other"])] };
@@ -334,6 +334,17 @@ describe("focus actions", () => {
     const cleared = cvReducer(next, { type: "setFacts", roleId: "e1", facts: null });
     expect(cleared.experience[0]).toEqual({ ...cv.experience[0], facts: null });
     expect(cv.experience[0]!.facts).toBeUndefined();
+  });
+
+  it("setFacts ignores facts from notes changed by a restore", () => {
+    const cv = withRole(["First"], { notes: [{
+      id: "n1", question: "What did you build?", answer: "Built APIs", via: ["type"],
+      askedAt: "2026-11-05T10:00:00.000Z",
+    }] });
+    const returnedFacts = { ...facts, fromNotes: notesHash(cv.experience[0]!.notes) };
+    expect(cvReducer(cv, { type: "setFacts", roleId: "e1", facts: returnedFacts }).experience[0]!.facts).toEqual(returnedFacts);
+    const restored = withRole(["First"]);
+    expect(cvReducer(restored, { type: "setFacts", roleId: "e1", facts: returnedFacts })).toBe(restored);
   });
 
   it("setFacts returns the same CV for equal facts, no facts or a missing role", () => {

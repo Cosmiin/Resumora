@@ -81,6 +81,31 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(model.logged.every((entry) => entry.userId === "user-a")).toBe(true);
   });
 
+  it("grades the target last without changing the saved or cached bullet order", async () => {
+    expect((await post()).status).toBe(200);
+    const messages = model.requests[1]!.messages as { role: string; content: string }[];
+    const user = messages[1]!.content;
+    const bullets = JSON.parse(user.split("\n").find((line) => line.startsWith("["))!);
+    expect(bullets).toEqual([
+      role.bullets[1], { ...role.bullets[0], text: proposal },
+    ]);
+    expect((await cv.get()).content.experience[0]!.bullets).toEqual(role.bullets);
+    const pending = await insights.pending(role.id);
+    expect(pending[0]!.result.bullets.map((b) => b.id)).toEqual(role.bullets.map((b) => b.id));
+  });
+
+  it.each(["duplicate", "not meaningful"])("needs detail for a proposal graded as %s and caches nothing", async (kind) => {
+    answer("Reviewed employee contracts.");
+    Object.assign(grade.bullets[0]!, kind === "duplicate"
+      ? { duplicateOf: role.bullets[1]!.id }
+      : { meaningful: false });
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ needsDetail: true });
+    expect(model.requests).toHaveLength(2);
+    expect(await insights.pending(role.id)).toEqual([]);
+  });
+
   it.each([proposal, null])("copies the saved CV once before any model call, including needsDetail: %s", async (text) => {
     await insights.remove([role.id]);
     const snapshot = vi.spyOn(cv, "snapshot");

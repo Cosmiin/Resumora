@@ -41,7 +41,13 @@ export async function improveBullet(
     }
 
     const swapped = { ...role, bullets: role.bullets.map((b) => b.id === input.bulletId ? { ...b, text } : b) };
-    const graded = await gradeBullets(deps, swapped, content.locale, [input.bulletId]);
+    // Grade the proposal after every other bullet so paraphrases can be marked as duplicates.
+    const gradingRole = { ...swapped, bullets: [
+      ...swapped.bullets.filter((b) => b.id !== input.bulletId),
+      swapped.bullets.find((b) => b.id === input.bulletId)!,
+    ] };
+    const graded = await gradeBullets(deps, gradingRole, content.locale, [input.bulletId]);
+    if (graded[0]!.duplicateOf !== null || graded[0]!.meaningful === false) return { needsDetail: true };
     const predicted = mergeGrades(swapped, before, graded, fingerprint(swapped, content.locale));
     const bulletBefore = before.bullets.find((b) => b.id === input.bulletId)!.score;
     const after = predicted.bullets.find((b) => b.id === input.bulletId)!.score;

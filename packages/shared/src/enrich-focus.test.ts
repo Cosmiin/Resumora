@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   BRAIN_DUMP_QUESTION, BrainDumpAnswerSchema, EnrichParseError, ExperienceSchema,
-  ImproveAnswerSchema, MAX_PENDING, RoleFactsAnswerSchema, buildRoleResult, mergeGrades,
-  type Experience, type ModelBullet,
+  ImproveAnswerSchema, MAX_PENDING, RoleFactsAnswerSchema, buildRoleResult, hashText, mergeGrades, notesHash,
+  type Experience, type ModelBullet, type Note,
 } from "./index.ts";
 
 function role(texts = ["Handled orders", "Prepared contracts"]): Experience {
@@ -19,6 +19,21 @@ function grade(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
     question: "How many?", options: ["Under 10", "10-50"], ...over,
   };
 }
+
+describe("notesHash", () => {
+  it("is stable for the same ids and answers, and changes when either changes", () => {
+    const notes: readonly Note[] = [
+      { id: "n1", answer: "Used SQL", question: "Which tool?", via: ["type"], askedAt: "2026-11-05T10:00:00.000Z" },
+      { id: "n2", answer: "Weekly reports", question: "What for?", via: ["type"], askedAt: "2026-11-05T10:00:00.000Z" },
+    ];
+    const hash = notesHash(notes);
+    expect(hash).toBe(hashText("n1\u0000Used SQL\u0001n2\u0000Weekly reports"));
+    expect(notesHash(notes.map((n) => ({ ...n })))).toBe(hash);
+    expect(notesHash(notes.map((n) => ({ ...n, question: "Another question?" })))).toBe(hash);
+    expect(notesHash(notes.map((n) => ({ ...n, answer: "Used Python" })))).not.toBe(hash);
+    expect(notesHash(notes.map((n) => ({ ...n, id: "other-" + n.id })))).not.toBe(hash);
+  });
+});
 
 describe("mergeGrades", () => {
   it("replaces one bullet's grades and recomputes the rounded role mean", () => {

@@ -8,6 +8,7 @@ import {
   isSectionEmpty,
   newId,
   normalizeLayout,
+  notesHash,
   type CvContent,
   type Note,
   type RoleFacts,
@@ -264,6 +265,7 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (!role) return cv;
       const before = role.facts ?? null;
       const facts = action.facts;
+      if (facts && notesHash(role.notes) !== facts.fromNotes) return cv;
       if (before === facts || (before && facts && before.fromNotes === facts.fromNotes && before.updatedAt === facts.updatedAt
         && before.items.length === facts.items.length && before.items.every((item, i) => item === facts.items[i]))) return cv;
       return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, facts } : r)) };

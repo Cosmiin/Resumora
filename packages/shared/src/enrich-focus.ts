@@ -1,9 +1,13 @@
 import { z } from "zod";
-import type { Experience } from "./cv.ts";
-import { buildRoleResult, EnrichParseError, type ModelBullet, type RoleResult } from "./enrich.ts";
+import type { Experience, Note } from "./cv.ts";
+import { buildRoleResult, EnrichParseError, hashText, type ModelBullet, type RoleResult } from "./enrich.ts";
 
 export const BRAIN_DUMP_QUESTION = "What did a normal week here look like?";
 export const MAX_PENDING = 5;
+
+export function notesHash(notes: readonly Note[]): string {
+  return hashText(notes.map((n) => n.id + "\u0000" + n.answer).join("\u0001"));
+}
 
 export function mergeGrades(
   role: Experience,

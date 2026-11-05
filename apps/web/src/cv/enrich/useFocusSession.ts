@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  BRAIN_DUMP_QUESTION, MAX_LONG_TEXT, fingerprint, hashText, newId,
+  BRAIN_DUMP_QUESTION, MAX_LONG_TEXT, fingerprint, hashText, newId, notesHash,
   type CvContent, type Experience, type Question, type RoleResult,
 } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
@@ -286,7 +286,8 @@ export function useFocusSession(opts: Options): {
       s.closed = true;
       // role-facts reads the saved notes, so it waits for the last answer to be saved.
       if (s.notesChanged) void o.waitForSave().then(() => roleFacts(o.roleId)).then(({ facts, fromNotes }) => {
-        if (current.current.cv.experience.some((r) => r.id === o.roleId)) o.dispatch({
+        const role = current.current.cv.experience.find((r) => r.id === o.roleId);
+        if (role && notesHash(role.notes) === fromNotes) o.dispatch({
           type: "setFacts", roleId: o.roleId, facts: { items: facts, fromNotes, updatedAt: new Date().toISOString() },
         });
       }).catch(() => undefined);
