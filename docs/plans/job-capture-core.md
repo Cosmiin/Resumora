@@ -191,3 +191,33 @@ For each case the eval checks: `isJobPosting` matches; for postings, `title` and
 - Running the eval against real providers is done afterwards by Claude in a checkout with keys; it is not part of this task.
 
 **Out of scope:** prompt changes, API routes, database.
+
+## Task 7: Paginate the job list
+
+---
+files: [packages/shared/src/jobs.ts, packages/shared/src/jobs.test.ts, apps/api/src/jobs/repo.ts, apps/api/src/jobs/memory-repo.ts, apps/api/src/jobs/supabase-repo.ts, apps/api/src/jobs/routes.ts, apps/api/test/jobs-repo.test.ts, apps/api/test/jobs.test.ts, apps/api/test/supabase-repo.test.ts, docs/superpowers/specs/2026-11-05-job-capture-design.md, docs/plans/job-capture-core.md]
+new_files: []
+deps: false
+size: 260
+---
+
+**Why:** the branch review found that `list()` in `apps/api/src/jobs/supabase-repo.ts` has no limit while PostgREST caps every response at `max_rows = 1000` (`supabase/config.toml`), so `GET /v1/jobs` silently dropped older jobs. The spec (API table, "Job list and job view", Errors table) now defines keyset pagination; the spec and this plan file are already edited by Claude and must not be changed by the build.
+
+**Goal:**
+- `packages/shared/src/jobs.ts`: `JobListQuerySchema` = `{ limit: integer 1–100 from a query string, default 50; cursor?: string, max 200 chars }`; `JobListPageSchema` = `{ items: JobListItem[]; nextCursor: string | null }`. Export the types.
+- `apps/api/src/jobs/repo.ts`: `type JobCursor = { createdAt: string; id: string }`; `encodeJobCursor(c: JobCursor): string` (base64url of JSON) and `decodeJobCursor(s: string): JobCursor | null`. Decode returns null unless both hold: `createdAt` is a UTC ISO-8601 timestamp (`/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|\+00:00)$/`, the form Supabase returns) whose first 19 characters equal `new Date(createdAt).toISOString().slice(0, 19)` (this rejects `2026-02-30…`, `…T99:…` and other values Postgres would refuse); and `id` is a UUID (`/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`), because `jobs.id` is a `uuid` column. This strict check matters twice: the values go into a PostgREST filter string, and a value Postgres rejects would turn into a 500 instead of a 400. Tests that page through the memory repo use UUID ids. `JobRepo.list` becomes `list(page: { limit: number; after: JobCursor | null }): Promise<{ items: JobListItem[]; next: JobCursor | null }>`.
+- Order is `created_at desc, id desc`. With `after`, return only rows strictly after it in that order: `created_at < after.createdAt`, or `created_at = after.createdAt and id < after.id`. Fetch `limit + 1` rows to know whether `next` is set; `next` is the last returned row's `{ createdAt, id }`.
+- `supabase-repo.ts`: build the cursor from the raw `created_at` string the database returns (never round-trip it through `Date`, which drops microseconds and would skip or repeat rows). Use `.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit + 1)` and, with `after`, `.or(...)` with both values double-quoted in the filter.
+- `memory-repo.ts`: the same order and cursor rule over its rows.
+- `routes.ts`: `GET /` parses the query with `JobListQuerySchema`; a bad `limit`, or a `cursor` that `decodeJobCursor` rejects → `400 invalid_request` with the spec's message. Responds `{ items, nextCursor: next ? encodeJobCursor(next) : null }`.
+
+**Acceptance tests:**
+- Shared: `limit` "0", "101" and "abc" are rejected; a missing `limit` gives 50.
+- `decodeJobCursor`: round-trips `encodeJobCursor`; returns null for garbage, for a non-UUID `id` (including one containing `,` `)` or `"`), for a non-UTC or non-ISO `createdAt`, and for `2026-02-30T00:00:00Z` and `2026-01-01T99:00:00Z`.
+- Memory repo: 5 jobs, `limit: 2` → pages of 2, 2, 1 with the last `next` null, no job repeated or skipped, newest first; two jobs with the same `created_at` are both returned once across a page boundary (ordered by `id` desc).
+- Supabase repo (`apps/api/test/supabase-repo.test.ts`, with the existing fake client style): the query asks for `limit + 1` rows ordered by `created_at` then `id` descending, and the `next` cursor keeps the exact `created_at` string the fake returned (with microseconds).
+- Routes: `GET /v1/jobs?limit=2` → 2 items and a `nextCursor`; following it returns the rest and then `nextCursor: null`; `?limit=500` and `?cursor=bad` → 400 `invalid_request`; another user's jobs never appear; no response contains `rawText`, `raw_text`, `jsonLd` or `json_ld`.
+- Update the existing list tests in `apps/api/test/jobs-repo.test.ts` and `apps/api/test/jobs.test.ts` to the new shapes.
+- `npm run typecheck` passes and all existing tests pass.
+
+**Out of scope:** database changes (the `(user_id, created_at desc)` index already serves this order), web UI, other routes.

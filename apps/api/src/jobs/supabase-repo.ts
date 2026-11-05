@@ -65,10 +65,18 @@ export function supabaseJobRepo(env: SupabaseEnv, user: AuthUser): JobRepo {
       if (error) throw new Error(`job_runs count failed: ${error.message}`);
       return count ?? 0;
     },
-    async list() {
-      const { data, error } = await db.from("jobs").select(LIST_COLUMNS).order("created_at", { ascending: false });
+    async list({ limit, after }) {
+      let query = db.from("jobs").select(LIST_COLUMNS)
+        .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit + 1);
+      if (after) {
+        query = query.or(`created_at.lt."${after.createdAt}",and(created_at.eq."${after.createdAt}",id.lt."${after.id}")`);
+      }
+      const { data, error } = await query;
       if (error) throw new Error(`jobs select failed: ${error.message}`);
-      return (data as Row[]).map(toListItem);
+      const rows = data as Row[];
+      const items = rows.slice(0, limit).map(toListItem);
+      const last = rows[limit - 1];
+      return { items, next: rows.length > limit && last ? { createdAt: last.created_at, id: last.id } : null };
     },
     async get(id) {
       const { data, error } = await db.from("jobs").select(COLUMNS).eq("id", id).maybeSingle();

@@ -50,9 +50,14 @@ export function memoryJobs(opts: { now?: () => Date }) {
     async countRunsSince(iso) {
       return runs.filter((run) => run.userId === userId && run.createdAt >= iso).length;
     },
-    async list() {
-      return [...rows.values()].filter((row) => row.userId === userId)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(toListItem);
+    async list({ limit, after }) {
+      const page = [...rows.values()].filter((row) => row.userId === userId && (!after
+        || row.createdAt < after.createdAt || (row.createdAt === after.createdAt && row.id < after.id)))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+        .slice(0, limit + 1);
+      const items = page.slice(0, limit).map(toListItem);
+      const last = items.at(-1);
+      return { items, next: page.length > limit && last ? { createdAt: last.createdAt, id: last.id } : null };
     },
     async get(id) {
       const row = rows.get(id);

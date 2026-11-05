@@ -165,7 +165,7 @@ All errors use `{ error: { code, message, requestId } }`. All routes need `Autho
 | Route | Body / result | Notes |
 |---|---|---|
 | `POST /v1/jobs` | `{ url, pageText?, jsonLd? }` → `202 { id }` or `200 { id, existing: true }` | `pageText` max 60k chars, body max ~100 KB; `pageText` under 200 chars → `text_too_short` |
-| `GET /v1/jobs` | → list of `{ id, status, errorCode, title, company, location, source, url, createdAt }` (camelCase, like the other API responses) | newest first |
+| `GET /v1/jobs?limit=&cursor=` | → `{ items, nextCursor }`; each item is `{ id, status, errorCode, title, company, location, source, url, createdAt }` (camelCase, like the other API responses) | newest first, ordered by (`created_at` desc, `id` desc); `limit` 1–100, default 50; `nextCursor` is an opaque string for the next page, or `null` on the last page; a bad `limit` or `cursor` → 400 `invalid_request` |
 | `GET /v1/jobs/:id` | → full job without `raw_text` | 404 if not the user's |
 | `PATCH /v1/jobs/:id` | `{ version, extracted }` → updated job | only when `ready`; validates `JobExtraction`; sets `edited_by_user`; 409 on version mismatch |
 | `PUT /v1/jobs/:id/text` | `{ text }` → `202` | only when `needs_text` or `failed`; saves text, re-queues |
@@ -199,7 +199,7 @@ The row shows "We couldn't read this page." with a textarea **Paste the job desc
 
 ## Job list and job view
 
-- **List:** title, company, location, source icon, date, and a status badge (Reading… / Needs text / Failed). Newest first.
+- **List:** title, company, location, source icon, date, and a status badge (Reading… / Needs text / Failed). Newest first, 50 at a time with **Load more** while `nextCursor` is set. Polling reloads only the first page (new jobs always land there).
 - **View:** all extracted fields; requirements grouped as **Must have** and **Nice to have**; a link to the original posting.
 - **Edit:** a form over the same fields; requirements can be added, removed, and switched between must and nice. Save sends `PATCH` with `version`.
 - **Delete:** confirm, then `DELETE`.
@@ -251,6 +251,7 @@ Pages the extension can't script (`chrome://`, the Web Store, PDF viewer) show "
 | POST | `payload_too_large` | 413 | "This page is too large to send." |
 | POST/PUT text/retry | `job_limit` | 429 | "You can add up to 30 jobs per day." |
 | POST | duplicate | 200 `existing: true` | "Already in your list" |
+| GET list | `invalid_request` | 400 | "Something went wrong loading your jobs. Reload the page." |
 | PATCH | `version_conflict` | 409 | "This job changed elsewhere. Reload to see the latest." |
 | PATCH/PUT/retry | `wrong_status` | 409 | "This job can't be changed right now." |
 | Worker | `fetch_blocked`, `page_empty` | `needs_text` | paste box |

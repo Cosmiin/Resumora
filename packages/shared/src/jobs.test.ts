@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  CreateJobBodySchema, JobExtractionSchema, JobListItemSchema, JobPatchBodySchema,
+  CreateJobBodySchema, JobExtractionSchema, JobListItemSchema, JobListPageSchema, JobListQuerySchema, JobPatchBodySchema,
   JobSchema, findJobPosting, normalizeJobUrl, type JobExtraction,
 } from "./jobs.ts";
 
@@ -128,7 +128,29 @@ describe("JobPatchBodySchema", () => {
   });
 });
 
+describe("JobListQuerySchema", () => {
+  it("defaults to 50 and parses query string limits", () => {
+    expect(JobListQuerySchema.parse({})).toEqual({ limit: 50 });
+    for (const limit of ["1", "50", "100"]) {
+      expect(JobListQuerySchema.parse({ limit, cursor: "next" })).toEqual({ limit: Number(limit), cursor: "next" });
+    }
+    expect(JobListQuerySchema.safeParse({ cursor: "x".repeat(200) }).success).toBe(true);
+    expect(JobListQuerySchema.safeParse({ cursor: "x".repeat(201) }).success).toBe(false);
+  });
+
+  it.each(["0", "101", "abc", "1.5", ""])("rejects limit %s", (limit) => {
+    expect(JobListQuerySchema.safeParse({ limit }).success).toBe(false);
+  });
+});
+
 describe("job response schemas", () => {
+  it("accepts list pages with an optional next page", () => {
+    expect(JobListPageSchema.parse({ items: [listItem], nextCursor: "next" }))
+      .toEqual({ items: [listItem], nextCursor: "next" });
+    expect(JobListPageSchema.parse({ items: [], nextCursor: null })).toEqual({ items: [], nextCursor: null });
+    expect(JobListPageSchema.safeParse({ items: [listItem] }).success).toBe(false);
+  });
+
   it("accepts queued list items and full jobs before extraction", () => {
     expect(JobListItemSchema.safeParse(listItem).success).toBe(true);
     expect(JobSchema.safeParse({

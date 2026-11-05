@@ -48,6 +48,12 @@ export const JobPatchBodySchema = z.object({
 });
 export type JobPatchBody = z.infer<typeof JobPatchBodySchema>;
 
+export const JobListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().max(200).optional(),
+});
+export type JobListQuery = z.infer<typeof JobListQuerySchema>;
+
 export const JobListItemSchema = z.object({
   id: z.string(),
   status: JobStatusSchema,
@@ -60,6 +66,12 @@ export const JobListItemSchema = z.object({
   createdAt: z.string(),
 });
 export type JobListItem = z.infer<typeof JobListItemSchema>;
+
+export const JobListPageSchema = z.object({
+  items: z.array(JobListItemSchema),
+  nextCursor: z.string().nullable(),
+});
+export type JobListPage = z.infer<typeof JobListPageSchema>;
 
 export const JobSchema = JobListItemSchema.extend({
   extracted: JobExtractionSchema.nullable(),

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { JobExtraction } from "@resumora/shared";
+import type { JobExtraction, JobListPage } from "@resumora/shared";
 import { createApp, type AppDeps } from "../src/app.ts";
 import { memoryJobs } from "../src/jobs/memory-repo.ts";
 import { JOBS_PER_DAY, type JobMessage } from "../src/jobs/repo.ts";
@@ -163,8 +163,9 @@ describe("job endpoints", () => {
     const other = await create(body, "token-b");
     const res = await get();
     expect(res.status).toBe(200);
-    const list = (await res.json()) as { id: string }[];
-    expect(list.map((item) => item.id)).toEqual([second, first]);
+    const list = (await res.json()) as JobListPage;
+    expect(list.items.map((item) => item.id)).toEqual([second, first]);
+    expect(list.nextCursor).toBeNull();
     publicFields(list);
     const detail = await get(first);
     expect(detail.status).toBe(200);
@@ -175,6 +176,34 @@ describe("job endpoints", () => {
     await error(await patch(other), 404, "not_found");
     await error(await remove(other), 404, "not_found");
     expect(store.rows.has(other)).toBe(true);
+  });
+
+  it("follows list cursors and keeps other users and private fields off every page", async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      clock = new Date(clock.getTime() + 1000);
+      ids.unshift(await create({ ...body, url: `https://example.test/jobs/${i}` }));
+    }
+    await create(body, "token-b");
+    const request = (query: string) => app.request(`/v1/jobs?${query}`, { headers: { authorization: "Bearer token-a" } });
+    const first = await request("limit=2");
+    expect(first.status).toBe(200);
+    const page = await first.json() as JobListPage;
+    expect(page.items.map((job) => job.id)).toEqual(ids.slice(0, 2));
+    expect(page.nextCursor).toEqual(expect.any(String));
+    const second = await request(`limit=2&cursor=${encodeURIComponent(page.nextCursor!)}`);
+    expect(second.status).toBe(200);
+    const rest = await second.json() as JobListPage;
+    expect(rest.items.map((job) => job.id)).toEqual(ids.slice(2));
+    expect(rest.nextCursor).toBeNull();
+    publicFields(page);
+    publicFields(rest);
+  });
+
+  it.each(["limit=500", "limit=abc", "limit=0", "cursor=bad", "cursor=", `cursor=${"x".repeat(201)}`])
+  ("rejects invalid list queries: %s", async (query) => {
+    const res = await app.request(`/v1/jobs?${query}`, { headers: { authorization: "Bearer token-a" } });
+    await error(res, 400, "invalid_request", "Something went wrong loading your jobs. Reload the page.");
   });
 
   it("rejects queued edits, saves ready edits, and rejects stale versions", async () => {
@@ -207,7 +236,7 @@ describe("job endpoints", () => {
     await error(await get(id), 404, "not_found");
     await error(await remove(id), 404, "not_found");
     await error(await patch(id), 404, "not_found");
-    expect(await (await get()).json()).toEqual([]);
+    expect(await (await get()).json()).toEqual({ items: [], nextCursor: null });
   });
 
   it("returns 404 for malformed ids", async () => {

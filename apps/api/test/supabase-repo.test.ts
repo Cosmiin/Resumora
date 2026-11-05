@@ -23,6 +23,35 @@ describe("supabaseJobRepo error mapping", () => {
   const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   afterEach(() => vi.unstubAllGlobals());
 
+  it("limits and orders pages, quotes cursor filters and keeps timestamp microseconds", async () => {
+    const rows = [3, 2, 1].map((id) => ({
+      id: `00000000-0000-4000-8000-00000000000${id}`, status: "queued", error_code: null,
+      title: null, company: null, location: null, source: "link", url: input.url,
+      created_at: "2026-11-05T10:00:00.123456+00:00",
+    }));
+    const fetch = vi.fn().mockResolvedValueOnce(response(rows)).mockResolvedValueOnce(response(rows.slice(2)));
+    vi.stubGlobal("fetch", fetch);
+    const repo = supabaseJobRepo(env, user);
+    const first = await repo.list({ limit: 2, after: null });
+    expect(first.items.map((job) => job.id)).toEqual(rows.slice(0, 2).map((job) => job.id));
+    expect(first.next).toEqual({ createdAt: rows[1]!.created_at, id: rows[1]!.id });
+    const params = new URL(String(fetch.mock.calls[0]?.[0])).searchParams;
+    expect(params.get("order")).toBe("created_at.desc,id.desc");
+    expect(params.get("limit")).toBe("3");
+    expect(params.has("or")).toBe(false);
+    expect(params.get("select")).not.toMatch(/raw_text|json_ld/);
+
+    const second = await repo.list({ limit: 2, after: first.next });
+    expect(second.items.map((job) => job.id)).toEqual([rows[2]!.id]);
+    expect(second.next).toBeNull();
+    const nextParams = new URL(String(fetch.mock.calls[1]?.[0])).searchParams;
+    expect(nextParams.get("order")).toBe("created_at.desc,id.desc");
+    expect(nextParams.get("limit")).toBe("3");
+    expect(nextParams.get("or")).toBe(
+      `(created_at.lt."${rows[1]!.created_at}",and(created_at.eq."${rows[1]!.created_at}",id.lt."${rows[1]!.id}"))`,
+    );
+  });
+
   it("maps the database job_limit message to the public 429 error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ message: "job_limit", code: "P0001" }, 400)));
     const error = await supabaseJobRepo(env, user).create(input).catch((e: unknown) => e);

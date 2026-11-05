@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { JobExtraction } from "@resumora/shared";
 import { ApiError } from "../src/errors.ts";
 import { memoryJobs } from "../src/jobs/memory-repo.ts";
-import { JOBS_PER_DAY } from "../src/jobs/repo.ts";
+import { JOBS_PER_DAY, decodeJobCursor, encodeJobCursor } from "../src/jobs/repo.ts";
 
 const extracted: JobExtraction = {
   title: "Engineer", company: "Example", location: "Bucharest", workMode: "hybrid",
@@ -19,6 +19,34 @@ let store: ReturnType<typeof memoryJobs>;
 beforeEach(() => {
   clock = new Date("2026-11-05T10:00:00Z");
   store = memoryJobs({ now: () => clock });
+});
+
+describe("job cursors", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  it.each(["2026-11-05T10:00:00Z", "2026-11-05T10:00:00.123456+00:00", "2026-11-05T10:00:00.1Z"])
+  ("round-trips UTC timestamps without losing precision: %s", (createdAt) => {
+    const cursor = { createdAt, id };
+    const encoded = encodeJobCursor(cursor);
+    expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(decodeJobCursor(encoded)).toEqual(cursor);
+  });
+
+  it.each(["garbage", "", btoa("not json"), btoa("null"), btoa("[]"), btoa("{}")])
+  ("rejects malformed cursors (%#)", (cursor) => {
+    expect(decodeJobCursor(cursor)).toBeNull();
+  });
+
+  it.each(["job-1", 'bad,id', 'bad)id', 'bad"id', "00000000-0000-4000-8000-00000000000g"])
+  ("rejects non-UUID ids: %s", (invalidId) => {
+    expect(decodeJobCursor(encodeJobCursor({ createdAt: "2026-11-05T10:00:00Z", id: invalidId }))).toBeNull();
+  });
+
+  it.each([
+    "2026-11-05", "2026-11-05 10:00:00Z", "2026-11-05T10:00:00", "2026-11-05T10:00:00+03:00",
+    "2026-02-30T00:00:00Z", "2026-01-01T99:00:00Z", "2026-11-05T10:00:00.1234567Z",
+  ])("rejects non-UTC, non-ISO and impossible timestamps: %s", (createdAt) => {
+    expect(decodeJobCursor(encodeJobCursor({ createdAt, id }))).toBeNull();
+  });
 });
 
 describe("memoryJobs", () => {
@@ -102,9 +130,9 @@ describe("memoryJobs", () => {
     expect(await b.patch("private", 1, extracted)).toBe("not_found");
     expect(await b.findByUrl(input("private").urlNormalized)).toBeNull();
     expect(await b.countRunsSince("2026-01-01T00:00:00Z")).toBe(0);
-    expect(await b.list()).toEqual([]);
+    expect(await b.list({ limit: 50, after: null })).toEqual({ items: [], next: null });
     await b.create({ ...input("other"), urlNormalized: input("private").urlNormalized });
-    expect((await b.list()).map((job) => job.id)).toEqual(["other"]);
+    expect((await b.list({ limit: 50, after: null })).items.map((job) => job.id)).toEqual(["other"]);
   });
 
   it("lists newest first and excludes source text and JSON-LD from public results", async () => {
@@ -112,11 +140,35 @@ describe("memoryJobs", () => {
     await repo.create(input("first"));
     clock = new Date("2026-11-05T11:00:00Z");
     await repo.create(input("second"));
-    expect((await repo.list()).map((job) => job.id)).toEqual(["second", "first"]);
-    for (const job of [...await repo.list(), await repo.get("first")]) {
+    const page = await repo.list({ limit: 50, after: null });
+    expect(page.items.map((job) => job.id)).toEqual(["second", "first"]);
+    expect(page.next).toBeNull();
+    for (const job of [...page.items, await repo.get("first")]) {
       for (const field of ["rawText", "raw_text", "jsonLd", "json_ld"]) expect(job).not.toHaveProperty(field);
     }
-    expect((await repo.list())[0]).not.toHaveProperty("extracted");
+    expect(page.items[0]).not.toHaveProperty("extracted");
+  });
+
+  it("pages newest first with no repeated or skipped jobs, including tied timestamps", async () => {
+    const repo = store.repoFor("a");
+    const ids = [1, 2, 3, 4, 5].map((i) => `00000000-0000-4000-8000-00000000000${i}`);
+    for (const [index, id] of ids.entries()) {
+      clock = new Date(`2026-11-05T10:00:0${Math.min(index, 3)}Z`);
+      await repo.create(input(id));
+    }
+    const first = await repo.list({ limit: 2, after: null });
+    expect(first.items.map((job) => job.id)).toEqual([ids[4], ids[3]]);
+    expect(first.next).toEqual({ createdAt: clock.toISOString(), id: ids[3] });
+    const second = await repo.list({ limit: 2, after: decodeJobCursor(encodeJobCursor(first.next!)) });
+    expect(second.items.map((job) => job.id)).toEqual([ids[2], ids[1]]);
+    const third = await repo.list({ limit: 2, after: decodeJobCursor(encodeJobCursor(second.next!)) });
+    expect(third.items.map((job) => job.id)).toEqual([ids[0]]);
+    expect(third.next).toBeNull();
+
+    const tied = await repo.list({ limit: 1, after: null });
+    const following = await repo.list({ limit: 1, after: tied.next });
+    expect(tied.items.map((job) => job.id)).toEqual([ids[4]]);
+    expect(following.items.map((job) => job.id)).toEqual([ids[3]]);
   });
 
   it.each(["queued", "processing"])("allows only one concurrent start of a %s job", async (status) => {

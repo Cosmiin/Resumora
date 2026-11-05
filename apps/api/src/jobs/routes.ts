@@ -1,9 +1,9 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { CreateJobBodySchema, JobPatchBodySchema, findJobPosting, normalizeJobUrl } from "@resumora/shared";
+import { CreateJobBodySchema, JobListQuerySchema, JobPatchBodySchema, findJobPosting, normalizeJobUrl } from "@resumora/shared";
 import type { AppEnv } from "../app.ts";
 import { ApiError } from "../errors.ts";
-import { JOBS_PER_DAY, type JobMessage, type JobRepo } from "./repo.ts";
+import { JOBS_PER_DAY, decodeJobCursor, encodeJobCursor, type JobMessage, type JobRepo } from "./repo.ts";
 
 const MAX_BODY_BYTES = 100 * 1024;
 const DAY_MS = 24 * 60 * 60_000;
@@ -62,7 +62,16 @@ export function jobRoutes(deps: {
     return c.json({ id: created.id }, 202);
   });
 
-  app.get("/", async (c) => c.json(await deps.repoFor(c).list()));
+  app.get("/", async (c) => {
+    const invalid = () => new ApiError(400, "invalid_request", "Something went wrong loading your jobs. Reload the page.");
+    const parsed = JobListQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) throw invalid();
+    const { limit, cursor } = parsed.data;
+    const after = cursor === undefined ? null : decodeJobCursor(cursor);
+    if (cursor !== undefined && !after) throw invalid();
+    const { items, next } = await deps.repoFor(c).list({ limit, after });
+    return c.json({ items, nextCursor: next ? encodeJobCursor(next) : null });
+  });
 
   app.get("/:id", async (c) => {
     const id = c.req.param("id");
