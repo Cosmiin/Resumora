@@ -1,9 +1,9 @@
-import type { RoleResult } from "@resumora/shared";
+import { MAX_PENDING, RoleResultSchema, type RoleResult } from "@resumora/shared";
 import { VOICE_TASK } from "../ai/voice-session.ts";
-import type { InsightsRepo } from "./repo.ts";
+import type { InsightsRepo, PendingEntry } from "./repo.ts";
 
 /** Rows of all users, keyed by `userId/roleId`. Shared between repos in a test to show users stay apart. */
-export type MemoryInsightsStore = Map<string, { userId: string; result: RoleResult }>;
+export type MemoryInsightsStore = Map<string, { userId: string; result: RoleResult; pending: PendingEntry[] }>;
 
 /** `ai_calls` rows of all users, for counting in tests. */
 export type MemoryAiCalls = { userId: string; task: string; status: "ok" | "error"; createdAt: string }[];
@@ -21,7 +21,23 @@ export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = 
     },
     async put(roleId, result) {
       if (result.roleId !== roleId) throw new Error("result belongs to a different role");
-      store.set(key(roleId), { userId, result: structuredClone(result) });
+      store.set(key(roleId), { userId, result: structuredClone(result), pending: store.get(key(roleId))?.pending ?? [] });
+    },
+    async pending(roleId) {
+      return structuredClone((store.get(key(roleId))?.pending ?? []).filter((entry) =>
+        RoleResultSchema.safeParse(entry.result).success && entry.result.roleId === roleId && entry.fingerprint === entry.result.fingerprint,
+      ));
+    },
+    async putPending(roleId, result) {
+      const row = store.get(key(roleId));
+      if (!row) return;
+      if (result.roleId !== roleId) throw new Error("result belongs to a different role");
+      const pending = row.pending.filter((entry) =>
+        RoleResultSchema.safeParse(entry.result).success && entry.result.roleId === roleId &&
+        entry.fingerprint === entry.result.fingerprint && entry.fingerprint !== result.fingerprint,
+      );
+      pending.push({ fingerprint: result.fingerprint, result: structuredClone(result), at: new Date().toISOString() });
+      row.pending = pending.sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-MAX_PENDING);
     },
     async remove(roleIds) {
       for (const id of roleIds) store.delete(key(id));

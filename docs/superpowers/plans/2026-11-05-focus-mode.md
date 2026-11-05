@@ -20,7 +20,7 @@
 ## Global Constraints
 
 - Every route needs sign-in, reads the **saved** CV, goes through the AI gateway (`callModel`), and logs one `ai_calls` row per model call.
-- Error shape: `AiUnavailableError`/`AiInputRejectedError` → 503 `ai_unavailable`; parse or length failure after retries → 502 `ai_bad_answer`; role missing or fingerprint ≠ saved → 409 `not_saved`; unknown bullet → 404 `bullet_not_found`; no ramble → 400 `no_brain_dump`.
+- Error shape: `AiUnavailableError`/`AiInputRejectedError` → 503 `ai_unavailable`; an answer that fails the schema on every retry is reported by `callModel` as `AiUnavailableError` → 503 (as `scoreRole` does today); a schema-valid answer our code rejects (`EnrichParseError`, e.g. wrong bullet ids) or a length cut-off → 502 `ai_bad_answer`; role missing or fingerprint ≠ saved → 409 `not_saved`; unknown bullet → 404 `bullet_not_found`; no ramble → 400 `no_brain_dump`.
 - Writing rules for every generated bullet: only facts from the role's text and notes; the CV's language; verb first; past tense for past roles, present for the current role; ≤ 220 characters; no first person; tool, product and domain names kept exactly; a picked range stays a range.
 - Model task ids: `enrich_score`, `enrich_improve_bullet`, `enrich_brain_dump`, `enrich_role_facts`.
 - Policy id `score/2`. `MAX_QUESTIONS` 20. `MAX_NOTES` 25. Facts: ≤ 8 items of ≤ 160 characters. Pending: ≤ 5 entries per role.
@@ -118,7 +118,7 @@ The docs, migration and SQL test files in `new_files` were written by Claude bef
 
 ```
 ---
-files: [apps/api/src/enrich/repo.ts, apps/api/src/enrich/memory-repo.ts, apps/api/src/enrich/supabase-repo.ts, apps/api/src/enrich/score.ts, apps/api/src/enrich/score.test.ts, apps/api/src/enrich/repo.test.ts, apps/api/src/enrich/prompts.ts, apps/api/src/enrich/fake-model.ts]
+files: [apps/api/src/enrich/repo.ts, apps/api/src/enrich/memory-repo.ts, apps/api/src/enrich/supabase-repo.ts, apps/api/src/enrich/score.ts, apps/api/src/enrich/score.test.ts, apps/api/src/enrich/repo.test.ts, apps/api/src/enrich/prompts.ts, apps/api/src/enrich/fake-model.ts, docs/superpowers/plans/2026-11-05-focus-mode.md]
 new_files: []
 deps: false
 size: 220
@@ -137,7 +137,7 @@ size: 220
 **Behaviour:**
 - `putPending`: reads the row's `pending`, drops entries that fail `RoleResultSchema`, replaces any entry with the same fingerprint, appends `{ fingerprint: result.fingerprint, result, at: now ISO }`, keeps the newest `MAX_PENDING` by `at`, and writes **only** `pending` with `update(...).eq("role_id", roleId)`. **If no row exists it does nothing** (no insert: `fingerprint`/`policy`/`result` are NOT NULL). `put` keeps sending only the main columns, so it never touches `pending`. The memory repo follows the same rules.
 - `scoreRole`: (1) a cached main row with matching fingerprint and policy wins, as today; (2) else a `pending` entry whose `fingerprint` matches and whose `result.policy === SCORE_POLICY` is written with `put` and returned, with no model call; (3) else score as today.
-- `gradeBullets` calls `callModel` with task `enrich_score`, `scoreSystemPrompt(locale)`, `scoreUserMessage(role, ids)`, and a schema that is `ModelScoreSchema` refined so that `bullets` holds exactly `ids` (any other set is an `EnrichParseError`). It returns those bullets. `maxOutputTokens: 600 + 180 * ids.length`.
+- `gradeBullets` calls `callModel` with task `enrich_score`, `scoreSystemPrompt(locale)`, `scoreUserMessage(role, ids)`, and the plain `ModelScoreSchema`. **After** the call, as `buildRoleResult` does for `scoreRole`, it throws `EnrichParseError` unless `bullets` holds exactly `ids` (so a wrong id set is a 502 with no retries, and no state is captured from inside the schema). It returns those bullets. `maxOutputTokens: 600 + 180 * ids.length`.
 - `scoreUserMessage` with `gradeOnly` adds one final line: `Grade only these bullets: <ids joined by ", ">. Return entries for those ids only; the other bullets are context.`
 - `scoreSystemPrompt` adds, in the feedback rules: when a bullet's only gap is impact, the question asks for a result (how many, how often, for whom, or what changed), and its options are ranges.
 

@@ -1,8 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { RoleResultSchema, type RoleResult } from "@resumora/shared";
+import { z } from "zod";
+import { MAX_PENDING, RoleResultSchema, type RoleResult } from "@resumora/shared";
 import type { AiCallLog } from "../ai/call-model.ts";
 import type { AuthUser, SupabaseEnv } from "../env.ts";
-import type { InsightsRepo } from "./repo.ts";
+import type { InsightsRepo, PendingEntry } from "./repo.ts";
 
 function clientFor(env: SupabaseEnv, user: AuthUser): SupabaseClient {
   return createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
@@ -15,6 +16,16 @@ function clientFor(env: SupabaseEnv, user: AuthUser): SupabaseClient {
 function parseResult(value: unknown, roleId: string): RoleResult | null {
   const parsed = RoleResultSchema.safeParse(value);
   return parsed.success && parsed.data.roleId === roleId ? parsed.data : null;
+}
+
+const PendingEntrySchema = z.object({ fingerprint: z.string(), result: RoleResultSchema, at: z.iso.datetime() });
+
+function parsePending(value: unknown, roleId: string): PendingEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const parsed = PendingEntrySchema.safeParse(entry);
+    return parsed.success && parsed.data.result.roleId === roleId && parsed.data.fingerprint === parsed.data.result.fingerprint ? [parsed.data] : [];
+  });
 }
 
 /** InsightsRepo backed by Supabase, querying as the signed-in user so RLS applies. */
@@ -47,6 +58,24 @@ export function supabaseInsightsRepo(env: SupabaseEnv, user: AuthUser): Insights
         { onConflict: "user_id,role_id" },
       );
       if (error) throw new Error(`cv_insights upsert failed: ${error.message}`);
+    },
+
+    async pending(roleId) {
+      const { data, error } = await db.from("cv_insights").select("pending").eq("role_id", roleId).maybeSingle();
+      if (error) throw new Error(`cv_insights select failed: ${error.message}`);
+      return data ? parsePending(data.pending, roleId) : [];
+    },
+
+    async putPending(roleId, result) {
+      const { data, error } = await db.from("cv_insights").select("pending").eq("role_id", roleId).maybeSingle();
+      if (error) throw new Error(`cv_insights select failed: ${error.message}`);
+      if (!data) return;
+      if (result.roleId !== roleId) throw new Error("result belongs to a different role");
+      const pending = parsePending(data.pending, roleId).filter((entry) => entry.fingerprint !== result.fingerprint);
+      pending.push({ fingerprint: result.fingerprint, result, at: new Date().toISOString() });
+      const { error: updateError } = await db.from("cv_insights")
+        .update({ pending: pending.sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-MAX_PENDING) }).eq("role_id", roleId);
+      if (updateError) throw new Error(`cv_insights update failed: ${updateError.message}`);
     },
 
     async remove(roleIds) {
