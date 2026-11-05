@@ -4,8 +4,11 @@ import type { InsightsRepo } from "./repo.ts";
 /** Rows of all users, keyed by `userId/roleId`. Shared between repos in a test to show users stay apart. */
 export type MemoryInsightsStore = Map<string, { userId: string; result: RoleResult }>;
 
+/** `ai_calls` rows of all users, for counting in tests. */
+export type MemoryAiCalls = { userId: string; task: string; createdAt: string }[];
+
 /** In-memory InsightsRepo for tests, scoped to one user. */
-export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = new Map()): InsightsRepo {
+export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = new Map(), aiCalls: MemoryAiCalls = []): InsightsRepo {
   const key = (roleId: string) => `${userId}/${roleId}`;
   return {
     async list() {
@@ -21,6 +24,9 @@ export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = 
     },
     async remove(roleIds) {
       for (const id of roleIds) store.delete(key(id));
+    },
+    async countAiCallsSince(task, sinceIso) {
+      return aiCalls.filter((c) => c.userId === userId && c.task === task && c.createdAt >= sinceIso).length;
     },
   };
 }

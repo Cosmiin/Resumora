@@ -7,6 +7,8 @@ import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import type { AuthUser } from "../env.ts";
 import { ApiError } from "../errors.ts";
+import { VOICE, type Locale } from "@resumora/shared";
+import { createVoiceSession, VoiceUnavailableError, VOICE_TASK, type VoiceDeps } from "../ai/voice-session.ts";
 import type { InsightsRepo } from "./repo.ts";
 import { scoreRole } from "./score.ts";
 import { suggestSkills } from "./skills.ts";
@@ -23,6 +25,9 @@ export function enrichRoutes(deps: {
   cvRepo(user: AuthUser): CvRepo;
   insightsRepo(user: AuthUser): InsightsRepo;
   model(user: AuthUser): ModelDeps;
+  /** Not set in tests that never use voice. */
+  voice?(user: AuthUser): VoiceDeps;
+  now?: () => Date;
 }) {
   const app = new Hono<AppEnv>();
 
@@ -88,6 +93,22 @@ export function enrichRoutes(deps: {
   app.post("/skills", async (c) => {
     const user = c.get("user");
     return c.json(await suggestSkills({ cv: deps.cvRepo(user), model: deps.model(user), userId: user.id }));
+  });
+
+  app.post("/voice-session", async (c) => {
+    const user = c.get("user");
+    if (!deps.voice) throw new ApiError(503, "ai_unavailable", "Voice answers aren't available right now.");
+    const since = new Date((deps.now?.() ?? new Date()).getTime() - 24 * 3600_000).toISOString();
+    if ((await deps.insightsRepo(user).countAiCallsSince(VOICE_TASK, since)) >= VOICE.perDay) {
+      throw new ApiError(429, "voice_limit", "You've used today's voice answers. You can still type or pick.");
+    }
+    const locale: Locale = (await deps.cvRepo(user).get()).content.locale;
+    try {
+      return c.json(await createVoiceSession(deps.voice(user), { userId: user.id, locale }));
+    } catch (e) {
+      if (e instanceof VoiceUnavailableError) throw new ApiError(503, "ai_unavailable", "Voice answers aren't available right now. You can still type or pick.");
+      throw e;
+    }
   });
 
   return app;

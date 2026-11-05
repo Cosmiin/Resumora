@@ -22,6 +22,11 @@ function realDeps(env: Env): AppDeps {
       fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
       logCall: supabaseAiCallLogger(env, user),
     }),
+    voice: (user) => ({
+      fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
+      apiKey: env.OPENAI_API_KEY,
+      logCall: supabaseAiCallLogger(env, user),
+    }),
     queue: { send: async (message) => void (await env.IMPORTS.send(message)) },
     log,
   };

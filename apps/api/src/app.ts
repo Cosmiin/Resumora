@@ -7,6 +7,7 @@ import { cvRoutes } from "./cv/routes.ts";
 import type { ImportMessage, ImportRepo } from "./imports/repo.ts";
 import { importRoutes } from "./imports/routes.ts";
 import type { ModelDeps } from "./ai/call-model.ts";
+import type { VoiceDeps } from "./ai/voice-session.ts";
 import type { InsightsRepo } from "./enrich/repo.ts";
 import { enrichRoutes } from "./enrich/routes.ts";
 
@@ -20,6 +21,8 @@ export type AppDeps = {
   insightsRepo(user: AuthUser): InsightsRepo;
   /** Model access for request handlers, logging each call as this user. */
   model(user: AuthUser): ModelDeps;
+  /** Live voice sessions (OpenAI key and logging). */
+  voice?(user: AuthUser): VoiceDeps;
   /** Where new imports are sent for processing. */
   queue: { send(message: ImportMessage): Promise<void> };
   /** Injectable clock for the daily import limit. */
@@ -66,7 +69,7 @@ export function createApp(deps: AppDeps) {
     importRoutes({ repoFor: (c) => deps.importRepo(c.get("user")), queue: deps.queue, now: deps.now ?? (() => new Date()) }),
   );
 
-  app.route("/v1/enrich", enrichRoutes({ cvRepo: deps.cvRepo, insightsRepo: deps.insightsRepo, model: deps.model }));
+  app.route("/v1/enrich", enrichRoutes({ cvRepo: deps.cvRepo, insightsRepo: deps.insightsRepo, model: deps.model, voice: deps.voice, now: deps.now }));
 
   app.notFound((c) => c.json(errorBody("not_found", "Not found.", c.get("requestId")), 404));
 

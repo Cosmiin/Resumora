@@ -238,3 +238,6 @@ export function band(score: number): Band {
 export function clearCount(result: Pick<RoleResult, "bullets">): { clear: number; total: number } {
   return { clear: result.bullets.filter((b) => b.score >= 75).length, total: result.bullets.length };
 }
+
+/** Voice answers: at most 60 s per recording, 20 sessions per user per day. */
+export const VOICE = { maxSeconds: 60, perDay: 20, model: "gpt-4o-mini-transcribe" } as const;

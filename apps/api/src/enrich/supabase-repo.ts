@@ -54,6 +54,16 @@ export function supabaseInsightsRepo(env: SupabaseEnv, user: AuthUser): Insights
       const { error } = await db.from("cv_insights").delete().in("role_id", roleIds);
       if (error) throw new Error(`cv_insights delete failed: ${error.message}`);
     },
+
+    async countAiCallsSince(task, sinceIso) {
+      const { count, error } = await db
+        .from("ai_calls")
+        .select("id", { count: "exact", head: true })
+        .eq("task", task)
+        .gte("created_at", sinceIso);
+      if (error) throw new Error(`ai_calls count failed: ${error.message}`);
+      return count ?? 0;
+    },
   };
 }
 
