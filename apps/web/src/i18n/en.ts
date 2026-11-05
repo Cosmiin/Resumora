@@ -335,6 +335,7 @@ export const en = {
   "enrich.focus.bulletScore": "Score {n}",
   "enrich.focus.improve": "Improve this bullet →",
   "enrich.focus.skip": "Skip",
+  "enrich.focus.scoring": "Checking your new score…",
   "enrich.focus.working": "Improving your bullet…",
   "enrich.focus.proposal.eyebrow": "A clearer version",
   "enrich.focus.proposal.was": "Was",

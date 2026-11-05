@@ -21,6 +21,8 @@ export async function improveBullet(
     throw new ApiError(404, "bullet_not_found", "This bullet is no longer in the role.");
   }
 
+  await deps.cv.snapshot("ai");
+
   try {
     const before = await scoreRole(deps, input);
     const answer = await callModel(deps.model, {
@@ -45,7 +47,8 @@ export async function improveBullet(
     const after = predicted.bullets.find((b) => b.id === input.bulletId)!.score;
     if (after <= bulletBefore) return { needsDetail: true };
 
-    if (!before.bullets.some((b) => b.id !== input.bulletId && b.issue === "duplicate")) {
+    const cached = !before.bullets.some((b) => b.id !== input.bulletId && b.issue === "duplicate");
+    if (cached) {
       await deps.insights.putPending(role.id, predicted);
     }
     return {
@@ -54,6 +57,7 @@ export async function improveBullet(
       bulletAfter: after,
       roleBefore: before.score,
       roleAfter: predicted.score!,
+      cached,
     };
   } catch (err) {
     aiError(err);

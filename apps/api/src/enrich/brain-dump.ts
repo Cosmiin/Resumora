@@ -21,6 +21,8 @@ export async function brainDump(
     .sort((a, b) => Date.parse(b.askedAt) - Date.parse(a.askedAt))[0];
   if (!ramble) throw new ApiError(400, "no_brain_dump", "Save a brain dump for this role first.");
 
+  await deps.cv.snapshot("ai");
+
   const slots = Math.min(4, MAX_BULLETS - role.bullets.length);
   if (slots === 0) {
     const cached = await deps.insights.get(role.id);

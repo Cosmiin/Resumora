@@ -41,6 +41,7 @@ export const ImproveAnswerSchema = z.union([
     bulletAfter: z.number().int(),
     roleBefore: z.number().int().nullable(),
     roleAfter: z.number().int(),
+    cached: z.boolean(),
   }).strict(),
 ]);
 export type ImproveAnswer = z.infer<typeof ImproveAnswerSchema>;

@@ -24,7 +24,7 @@ type Props = {
 };
 
 const FOCUSABLE = 'button:not(:disabled), textarea:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
-const DUMP_KINDS = new Set<FocusStep["kind"]>(["brainDump", "dumpWorking", "dumpEmpty", "dumpPick", "dumpScoring"]);
+const DUMP_KINDS = new Set<FocusStep["kind"]>(["brainDump", "dumpWorking", "dumpEmpty", "dumpPick"]);
 const SELF_FOCUSING = new Set<FocusStep["kind"]>(["proposal", "celebrate"]);
 
 /** Full-screen focus mode: the role on the left, one step at a time on the right. */
@@ -110,7 +110,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
   const grades = new Map(result?.bullets.map((b) => [b.id, b.score]));
   const scoreOf = (id: string) => (fresh ? grades.get(id) : (accepted.get(id) ?? grades.get(id)));
   const currentId = "bulletId" in step ? step.bulletId : step.kind === "celebrate" ? undefined : queue[position];
-  const dumping = DUMP_KINDS.has(step.kind);
+  const dumping = DUMP_KINDS.has(step.kind) || (step.kind === "scoring" && step.source === "dump");
   const dates = formatRange(role.startDate, role.endDate, role.current, cv.locale);
 
   const proposalText = step.kind === "proposal" ? role.bullets.find((b) => b.id === step.bulletId)?.text ?? "" : "";
@@ -191,7 +191,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
         {step.kind === "dumpPick" && (
           <DumpPickStep proposals={step.proposals} roleAfterAll={step.roleAfterAll} busy={busy} onAdd={session.addSelected} />
         )}
-        {step.kind === "dumpScoring" && <Working text={t("enrich.focus.dump.scoring")} />}
+        {step.kind === "scoring" && <Working text={t(step.source === "dump" ? "enrich.focus.dump.scoring" : "enrich.focus.scoring")} />}
         {(step.kind === "question" || step.kind === "needsDetail") && (
           <QuestionStep
             key={stepKey}

@@ -66,7 +66,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     const result = ImproveAnswerSchema.parse(await res.json());
     expect(result).toEqual({
       proposal: { bulletId: input().bulletId, text: proposal },
-      bulletBefore: 43, bulletAfter: 80, roleBefore: 72, roleAfter: 90,
+      bulletBefore: 43, bulletAfter: 80, roleBefore: 72, roleAfter: 90, cached: true,
     });
     const swapped = { ...role, bullets: role.bullets.map((b, i) => i === 0 ? { ...b, text: proposal } : b) };
     const predicted = buildRoleResult(swapped, { ...initial, bullets: [grade.bullets[0]!, initial.bullets[1]!] }, fingerprint(swapped, "en"));
@@ -79,6 +79,25 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(model.requests).toHaveLength(2);
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_improve_bullet", "enrich_score"]);
     expect(model.logged.every((entry) => entry.userId === "user-a")).toBe(true);
+  });
+
+  it.each([proposal, null])("copies the saved CV once before any model call, including needsDetail: %s", async (text) => {
+    await insights.remove([role.id]);
+    const snapshot = vi.spyOn(cv, "snapshot");
+    const answers = [initial, { text }, grade];
+    model = fakeModel(() => {
+      expect(snapshot).toHaveBeenCalledExactlyOnceWith("ai");
+      return answers.shift();
+    });
+    const saved = await cv.get();
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(snapshot).toHaveBeenCalledExactlyOnceWith("ai");
+    const history = await cv.listHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0]!.reason).toBe("ai");
+    expect((await cv.getHistory(history[0]!.id))?.content).toEqual(saved.content);
+    expect(await res.json()).toMatchObject(text === null ? { needsDetail: true } : { cached: true });
   });
 
   it.each(["equal", "lower"])("needs detail for an %s grade and stores no prediction", async (kind) => {
@@ -141,7 +160,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     initial.bullets[1]!.duplicateOf = role.bullets[0]!.id;
     await save();
     expect(await (await post()).json()).toMatchObject({
-      proposal: { text: proposal }, bulletAfter: 80, roleBefore: 22, roleAfter: 40,
+      proposal: { text: proposal }, bulletAfter: 80, roleBefore: 22, roleAfter: 40, cached: false,
     });
     expect(await insights.pending(role.id)).toEqual([]);
   });
@@ -159,7 +178,9 @@ describe("POST /v1/enrich/improve-bullet", () => {
     [{ roleId: "missing" }, 409, "not_saved"],
     [{ bulletId: "missing" }, 404, "bullet_not_found"],
   ])("rejects unsaved roles or unknown bullets: %j", async (override, status, code) => {
+    const snapshot = vi.spyOn(cv, "snapshot");
     const res = await post({ ...input(), ...override });
+    expect(snapshot).not.toHaveBeenCalled();
     expect(res.status).toBe(status);
     expect(await res.json()).toMatchObject({ error: { code, requestId: expect.any(String) } });
     expect(model.requests).toHaveLength(0);

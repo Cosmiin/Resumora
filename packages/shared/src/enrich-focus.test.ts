@@ -82,9 +82,12 @@ describe("focus answers", () => {
 
   it("accepts either a detail request or a complete improvement", () => {
     const proposal = { proposal: { bulletId: "b1", text: "Handled orders" }, bulletBefore: 43, bulletAfter: 80,
-      roleBefore: null, roleAfter: 80 };
+      roleBefore: null, roleAfter: 80, cached: true };
     expect(ImproveAnswerSchema.safeParse({ needsDetail: true }).success).toBe(true);
     expect(ImproveAnswerSchema.safeParse(proposal).success).toBe(true);
+    expect(ImproveAnswerSchema.safeParse({ ...proposal, cached: false }).success).toBe(true);
+    expect(ImproveAnswerSchema.safeParse({ ...proposal, cached: undefined }).success).toBe(false);
+    expect(ImproveAnswerSchema.safeParse({ ...proposal, cached: "true" }).success).toBe(false);
     expect(ImproveAnswerSchema.safeParse({ needsDetail: false }).success).toBe(false);
     expect(ImproveAnswerSchema.safeParse({ ...proposal, bulletAfter: 80.5 }).success).toBe(false);
     expect(ImproveAnswerSchema.safeParse({ ...proposal, needsDetail: true }).success).toBe(false);

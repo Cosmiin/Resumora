@@ -16,10 +16,10 @@ export type FocusStep =
   | { kind: "dumpWorking" }
   | { kind: "dumpPick"; proposals: { id: string; text: string; score: number }[]; roleAfterAll: number | null }
   | { kind: "dumpEmpty" }
-  | { kind: "dumpScoring" }
+  | { kind: "scoring"; source: "dump" | "bullet" }
   | { kind: "question"; bulletId: string; question: Question | null }
   | { kind: "working"; bulletId: string }
-  | { kind: "proposal"; bulletId: string; text: string; bulletBefore: number; bulletAfter: number; roleBefore: number | null; roleAfter: number }
+  | { kind: "proposal"; bulletId: string; text: string; bulletBefore: number; bulletAfter: number; roleBefore: number | null; roleAfter: number; cached: boolean }
   | { kind: "needsDetail"; bulletId: string; question: Question | null }
   | { kind: "failed"; bulletId: string | null; reason: "unavailable" | "saving" }
   | { kind: "celebrate"; from: number | null; to: number; next: "queue" | "done" }
@@ -70,7 +70,7 @@ export function useFocusSession(opts: Options): {
     view, alive: true, closed: false, notesChanged: false, lastCelebrated: null as number | null,
     attempts: new Map<string, number>(), answered: new Set<string>(), rerun: new Set<string>(),
     lastCall: undefined as { bulletId: string | null; counted: boolean } | undefined,
-    callText: "", dumpBefore: null as number | null, dumpPrint: "", afterCelebrate: 0,
+    callText: "", scoreBefore: null as number | null, scorePrint: "", afterCelebrate: 0,
   });
   useEffect(() => { current.current = opts; });
   useEffect(() => {
@@ -128,11 +128,11 @@ export function useFocusSession(opts: Options): {
                 question: question && !s.answered.has(questionKey(bulletId, question)) ? question : null } });
             } else update({ busy: false, step: { kind: "proposal", bulletId, text: answer.proposal.text,
               bulletBefore: answer.bulletBefore, bulletAfter: answer.bulletAfter,
-              roleBefore: answer.roleBefore, roleAfter: answer.roleAfter } });
+              roleBefore: answer.roleBefore, roleAfter: answer.roleAfter, cached: answer.cached } });
           } else {
             const answer = await brainDump({ roleId: o.roleId, fingerprint: print });
             if (!s.alive || s.closed) return;
-            s.dumpBefore = answer.roleBefore;
+            s.scoreBefore = answer.roleBefore;
             update({ busy: false, step: answer.proposals.length
               ? { kind: "dumpPick", proposals: answer.proposals, roleAfterAll: answer.roleAfterAll }
               : { kind: "dumpEmpty" } });
@@ -155,33 +155,35 @@ export function useFocusSession(opts: Options): {
     if (view.step.kind === "working") void run(view.step.bulletId);
   }, [view.step, run]);
 
-  const finishDump = useCallback((fresh?: RoleResult) => {
+  const finishScoring = useCallback((fresh?: RoleResult) => {
     const s = session.current;
-    if (s.closed || s.view.step.kind !== "dumpScoring") return;
+    if (s.closed || s.view.step.kind !== "scoring") return;
     const o = current.current;
     const role = o.cv.experience.find((r) => r.id === o.roleId);
-    const queue = buildQueue(role, fresh ?? o.scores.get(o.roleId)?.result, o);
-    if (fresh?.score != null && (s.dumpBefore === null || fresh.score > s.dumpBefore)) {
-      s.afterCelebrate = 0;
-      update({ busy: false, queue, position: 0, step: {
-        kind: "celebrate", from: s.dumpBefore, to: fresh.score, next: queue.length ? "queue" : "done",
+    const dumping = s.view.step.source === "dump";
+    const queue = dumping ? buildQueue(role, fresh ?? o.scores.get(o.roleId)?.result, o) : s.view.queue;
+    const position = dumping ? 0 : s.view.position + 1;
+    if (fresh?.score != null && (s.scoreBefore === null || fresh.score > s.scoreBefore)) {
+      s.afterCelebrate = position;
+      update({ busy: false, queue, position: dumping ? 0 : s.view.position, step: {
+        kind: "celebrate", from: s.scoreBefore, to: fresh.score, next: position < queue.length ? "queue" : "done",
       } });
-    } else go(0, queue);
+    } else go(position, queue);
   }, [go, update]);
   useEffect(() => {
-    if (view.step.kind !== "dumpScoring") return;
-    const timer = setTimeout(() => finishDump(), 15000);
+    if (view.step.kind !== "scoring") return;
+    const timer = setTimeout(() => finishScoring(), 15000);
     return () => clearTimeout(timer);
-  }, [view.step.kind, finishDump]);
+  }, [view.step.kind, finishScoring]);
   useEffect(() => {
-    if (view.step.kind !== "dumpScoring") return;
+    if (view.step.kind !== "scoring") return;
     const o = current.current;
     const role = o.cv.experience.find((r) => r.id === o.roleId);
     const entry = o.scores.get(o.roleId);
     if (role && entry?.state === "ready" && entry.result
-      && entry.result.fingerprint !== session.current.dumpPrint
-      && entry.result.fingerprint === fingerprint(role, o.cv.locale)) finishDump(entry.result);
-  }, [opts.cv, opts.roleId, opts.scores, view.step.kind, finishDump]);
+      && entry.result.fingerprint !== session.current.scorePrint
+      && entry.result.fingerprint === fingerprint(role, o.cv.locale)) finishScoring(entry.result);
+  }, [opts.cv, opts.roleId, opts.scores, view.step.kind, finishScoring]);
   useEffect(() => {
     const o = current.current;
     if (!o.cv.experience.some((r) => r.id === o.roleId) && !session.current.closed) {
@@ -246,10 +248,17 @@ export function useFocusSession(opts: Options): {
         void run(step.bulletId);
         return;
       }
-      s.afterCelebrate = s.view.position + 1;
-      update({ step: { kind: "celebrate", from: step.roleBefore, to: step.roleAfter,
-        next: s.afterCelebrate < s.view.queue.length ? "queue" : "done" } });
       o.dispatch({ type: "replaceBullet", roleId: o.roleId, bulletId: step.bulletId, text: step.text });
+      if (!step.cached) {
+        s.scoreBefore = step.roleBefore;
+        s.scorePrint = fingerprint(role!, o.cv.locale);
+        update({ busy: true, step: { kind: "scoring", source: "bullet" } });
+      } else if (step.roleBefore !== null && step.roleAfter <= step.roleBefore) go(s.view.position + 1);
+      else {
+        s.afterCelebrate = s.view.position + 1;
+        update({ step: { kind: "celebrate", from: step.roleBefore, to: step.roleAfter,
+          next: s.afterCelebrate < s.view.queue.length ? "queue" : "done" } });
+      }
     },
     addSelected(ids) {
       if (!available()) return;
@@ -260,8 +269,8 @@ export function useFocusSession(opts: Options): {
       const o = current.current;
       const role = o.cv.experience.find((r) => r.id === o.roleId);
       if (!role) return;
-      s.dumpPrint = fingerprint(role, o.cv.locale);
-      update({ busy: true, step: { kind: "dumpScoring" } });
+      s.scorePrint = fingerprint(role, o.cv.locale);
+      update({ busy: true, step: { kind: "scoring", source: "dump" } });
       o.dispatch({ type: "addBullets", roleId: o.roleId, texts });
     },
     next: advance,

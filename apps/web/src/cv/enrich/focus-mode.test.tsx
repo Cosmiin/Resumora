@@ -42,7 +42,7 @@ const result: RoleResult = {
   questions: [{ bulletId: "b1", text: "Roughly how many drivers did you plan for each day?", options: ["Under 10", "10–50"], kind: "detail" }],
 };
 const scores = new Map<string, RoleScoreState>([["r1", { state: "ready", result }]]);
-const proposal = { proposal: { bulletId: "b1", text: "Planned daily routes for 10–50 regional drivers." }, bulletBefore: 43, bulletAfter: 80, roleBefore: 52, roleAfter: 71 };
+const proposal = { proposal: { bulletId: "b1", text: "Planned daily routes for 10–50 regional drivers." }, bulletBefore: 43, bulletAfter: 80, roleBefore: 52, roleAfter: 71, cached: true };
 
 function Harness({ onAction, onClose = () => {} }: { onAction?(a: CvAction): void; onClose?(): void }) {
   const [state, apply] = useReducer(cvReducer, cv);
@@ -100,6 +100,19 @@ describe("focus mode", () => {
     expect(screen.getByRole("heading", { name: "Up from 52. Nice work! 🎉" })).toBeInTheDocument();
     expect(screen.getByText("Your Dispatcher role is almost in the Clear band.")).toBeInTheDocument();
     expect(screen.getAllByTestId("confetti").length).toBeGreaterThan(0);
+  });
+
+  it("checks the fresh score after accepting an uncached proposal", async () => {
+    api.improveBullet.mockResolvedValue({ ...proposal, cached: false });
+    const actions: CvAction[] = [];
+    render(<Harness onAction={(a) => actions.push(a)} />);
+    await answerFirstQuestion();
+    await userEvent.click(await screen.findByRole("button", { name: "Use this" }));
+    expect(screen.getByRole("heading", { name: "Checking your new score…" })).toBeInTheDocument();
+    expect(actions.filter((a) => a.type === "replaceBullet")).toHaveLength(1);
+    expect(screen.getByTestId("saved-b1")).toHaveTextContent(proposal.proposal.text);
+    expect(screen.queryAllByTestId("confetti")).toHaveLength(0);
+    expect(screen.queryByRole("heading", { name: /Nice work/ })).toBeNull();
   });
 
   it("with reduced motion, shows no confetti and the final score at once", async () => {

@@ -33,7 +33,7 @@ function score(r: Experience, value: number | null = 40): RoleResult {
 }
 const proposal = {
   proposal: { bulletId: "b0", text: "Built the reporting tool in Python" },
-  bulletBefore: 20, bulletAfter: 80, roleBefore: 40, roleAfter: 70,
+  bulletBefore: 20, bulletAfter: 80, roleBefore: 40, roleAfter: 70, cached: true,
 };
 type Options = Parameters<typeof useFocusSession>[0];
 function mount(overrides: Partial<Options> = {}, r = role()) {
@@ -147,6 +147,53 @@ describe("useFocusSession", () => {
     expect(h.result.current.step).toEqual({ kind: "celebrate", from: 40, to: 70, next: "queue" });
     act(() => h.result.current.next());
     expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+  });
+  it.each([40, 35])("accepts a cached proposal without celebrating a role score of %i", async (roleAfter) => {
+    api.improveBullet.mockResolvedValue({ ...proposal, roleAfter });
+    const h = mount();
+    await submit(h);
+    h.dispatch.mockClear();
+    act(() => h.result.current.useProposal());
+    expect(h.dispatch).toHaveBeenCalledExactlyOnceWith({
+      type: "replaceBullet", roleId: "r", bulletId: "b0", text: proposal.proposal.text,
+    });
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+  });
+  it.each([80, 40, 35])("waits for a fresh score for an uncached proposal and only celebrates an increase: %i", async (value) => {
+    api.improveBullet.mockResolvedValue({ ...proposal, cached: false });
+    const h = mount();
+    await submit(h);
+    h.dispatch.mockClear();
+    act(() => { h.result.current.useProposal(); h.result.current.useProposal(); });
+    expect(h.dispatch).toHaveBeenCalledExactlyOnceWith({
+      type: "replaceBullet", roleId: "r", bulletId: "b0", text: proposal.proposal.text,
+    });
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "bullet" });
+    expect(h.result.current.busy).toBe(true);
+    const fresh = score(h.opts().cv.experience[0]!, value);
+    h.update({ scores: new Map([["r", { state: "ready", result: { ...fresh, fingerprint: "old" } }]]) });
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "bullet" });
+    h.update({ scores: new Map([["r", { state: "scoring", result: fresh }]]) });
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "bullet" });
+    h.update({ scores: new Map([["r", { state: "ready", result: fresh }]]) });
+    expect(h.result.current.busy).toBe(false);
+    if (value > proposal.roleBefore) {
+      expect(h.result.current.step).toEqual({ kind: "celebrate", from: 40, to: value, next: "queue" });
+      act(() => h.result.current.next());
+    }
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    expect(h.result.current.position).toBe(1);
+  });
+  it("moves to the next bullet after 15 seconds without a fresh score for an uncached proposal", async () => {
+    api.improveBullet.mockResolvedValue({ ...proposal, cached: false });
+    const h = mount();
+    await submit(h);
+    act(() => h.result.current.useProposal());
+    await act(async () => vi.advanceTimersByTimeAsync(14999));
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "bullet" });
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    expect(h.result.current.busy).toBe(false);
   });
   it("keepMine and skip advance without celebrating and finish with the current score", async () => {
     const h = mount();
@@ -299,14 +346,14 @@ describe("useFocusSession", () => {
     expect(h.dispatch.mock.calls.filter(([a]) => a.type === "addBullets")).toEqual([
       [{ type: "addBullets", roleId: "r", texts: ["Built weekly reports"] }],
     ]);
-    expect(h.result.current.step).toEqual({ kind: "dumpScoring" });
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "dump" });
     expect(h.result.current.busy).toBe(true);
     const r = h.opts().cv.experience[0]!;
     const fresh = { ...score(r, 75), bullets: score(r).bullets.map((b) => ({ ...b, score: 100 })) };
     h.update({ scores: new Map([["r", { state: "ready", result: { ...fresh, fingerprint: "old" } }]]) });
-    expect(h.result.current.step.kind).toBe("dumpScoring");
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "dump" });
     h.update({ scores: new Map([["r", { state: "scoring", result: fresh }]]) });
-    expect(h.result.current.step.kind).toBe("dumpScoring");
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "dump" });
     h.update({ scores: new Map([["r", { state: "ready", result: fresh }]]) });
     expect(h.result.current.step).toEqual({ kind: "celebrate", from: 40, to: 75, next: "done" });
     expect(h.result.current.busy).toBe(false);
@@ -318,7 +365,7 @@ describe("useFocusSession", () => {
     const h = await dump();
     act(() => h.result.current.addSelected(["p"]));
     await act(async () => vi.advanceTimersByTimeAsync(14999));
-    expect(h.result.current.step.kind).toBe("dumpScoring");
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "dump" });
     await act(async () => vi.advanceTimersByTimeAsync(1));
     const addedId = h.opts().cv.experience[0]!.bullets[2]!.id;
     expect(h.result.current.step).toMatchObject({ kind: "proposal", bulletId: addedId });

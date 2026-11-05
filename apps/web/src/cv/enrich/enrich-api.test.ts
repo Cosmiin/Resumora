@@ -24,7 +24,7 @@ describe("focus API", () => {
       call: () => improveBullet({ roleId: "r1", bulletId: "b1", fingerprint: "saved-1" }),
       path: "/v1/enrich/improve-bullet",
       body: { roleId: "r1", bulletId: "b1", fingerprint: "saved-1" },
-      answer: { proposal: { bulletId: "b1", text: "Built APIs" }, bulletBefore: 43, bulletAfter: 80, roleBefore: null, roleAfter: 80 },
+      answer: { proposal: { bulletId: "b1", text: "Built APIs" }, bulletBefore: 43, bulletAfter: 80, roleBefore: null, roleAfter: 80, cached: true },
       invalid: { needsDetail: false },
     },
     {

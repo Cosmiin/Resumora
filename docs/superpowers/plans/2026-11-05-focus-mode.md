@@ -500,3 +500,40 @@ Done when:
   - the summary rewrite still streams;
   - screenshots to the user.
 - [ ] Push or PR only after the user says yes.
+
+---
+
+## Task 10: Whole-branch review fixes: History copy, honest celebration, reducer cleanup
+
+Added after the whole-branch review (2026-11-05). The user chose: the History copy goes back, and an uncached prediction is never celebrated.
+
+```
+---
+files: [packages/shared/src/enrich-focus.ts, packages/shared/src/enrich-focus.test.ts, apps/api/src/enrich/improve.ts, apps/api/src/enrich/improve.test.ts, apps/api/src/enrich/brain-dump.ts, apps/api/src/enrich/brain-dump.test.ts, apps/web/src/cv/enrich/useFocusSession.ts, apps/web/src/cv/enrich/focus-session.test.tsx, apps/web/src/cv/enrich/FocusMode.tsx, apps/web/src/cv/enrich/focus-mode.test.tsx, apps/web/src/cv/enrich/enrich-api.test.ts, apps/web/src/cv/edit/cvReducer.ts, apps/web/src/cv/edit/cvReducer.test.ts, apps/web/src/i18n/en.ts, docs/superpowers/plans/2026-11-05-focus-mode.md]
+new_files: [docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md]
+deps: false
+size: 320
+---
+```
+
+The decision record in `new_files` and this plan were written by Claude. **Do not modify them.**
+
+**Goal:** four fixes from the whole-branch review.
+
+1. **History copy before AI changes.** `improveBullet` and `brainDump` call `deps.cv.snapshot("ai")` once per call, after the 409/404/400 checks and before the first model call, as the summary route does (`routes.ts`, `cv.snapshot("ai")`). The snapshot function already skips a copy when History's newest copy holds the same CV.
+2. **Never celebrate a number that is not stored.** `ImproveAnswerSchema`'s proposal variant gains `cached: z.boolean()`: true when `putPending` was called, false when caching was skipped (another bullet is a duplicate). In `useFocusSession`:
+   - the step `{ kind: "dumpScoring" }` becomes `{ kind: "scoring"; source: "dump" | "bullet" }`; the existing wait (a `ready` score whose fingerprint equals the current role's, or 15 s) is shared by both sources;
+   - `useProposal` with `cached: false` dispatches `replaceBullet`, then goes to `{ kind: "scoring", source: "bullet" }`, and when the fresh score arrives celebrates from `roleBefore` to the fresh score if it is higher, else moves to the next bullet; on the 15 s timeout it moves to the next bullet;
+   - `FocusMode` shows "Scoring your new bullets…" for `source: "dump"` (existing key) and "Checking your new score…" for `source: "bullet"` (new key `enrich.focus.scoring` in `en.ts`).
+3. **No celebration without a change.** `useProposal` with `cached: true` and `roleAfter <= roleBefore` (and `roleBefore !== null`) dispatches `replaceBullet` and moves to the next bullet with no `celebrate` step. The same rule holds for a fresh score in point 2.
+4. **Reducer cleanup.** Remove the `applyProposals` variant from `CvAction` and its case. `addBullets` appends its texts directly (new ids with `newId()`, stops at `MAX_BULLETS`, unchanged CV for an empty list). Remove or adapt the `applyProposals` tests so `addBullets` keeps its coverage.
+
+**Acceptance tests:**
+- `improve.test.ts`: one `ai` snapshot per call, taken before the model call (also when the answer is `needsDetail`); `cached: true` with a stored prediction; `cached: false` and nothing in `pending` when another bullet is a duplicate.
+- `brain-dump.test.ts`: one `ai` snapshot per call; none when the request fails the 409 or 400 checks.
+- `focus-session.test.tsx`: `cached: true` with `roleAfter === roleBefore` → one `replaceBullet`, no `celebrate`, next bullet; `cached: false` → `scoring`/`bullet`, then `celebrate` with the fresh score when a matching higher score arrives; a matching score that is not higher → next bullet, no `celebrate`; 15 s without a score → next bullet; the brain-dump flow still passes through `scoring`/`dump`.
+- `focus-mode.test.tsx` and `enrich-api.test.ts`: fixtures gain `cached`; "Checking your new score…" shows for an uncached proposal.
+- `cvReducer.test.ts`: `addBullets` still appends with new ids and caps at 20; no `applyProposals`.
+- Typecheck, lint and the full test suite pass.
+
+**Out of scope:** the score route, prompts, the migration, styles.

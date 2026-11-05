@@ -84,6 +84,24 @@ describe("POST /v1/enrich/brain-dump", () => {
     expect(await insights.pending(role.id)).toEqual([]);
   });
 
+  it("copies the saved CV once before the first model call", async () => {
+    await insights.remove([role.id]);
+    const snapshot = vi.spyOn(cv, "snapshot");
+    const added = { ...role, bullets: [{ id: "new1", text: texts[0]! }] };
+    const answers = [initial, { bullets: [texts[0]] }, allSpecific(added)];
+    model = fakeModel(() => {
+      expect(snapshot).toHaveBeenCalledExactlyOnceWith("ai");
+      return answers.shift();
+    });
+    const saved = await cv.get();
+    await result();
+    expect(snapshot).toHaveBeenCalledExactlyOnceWith("ai");
+    const history = await cv.listHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0]!.reason).toBe("ai");
+    expect((await cv.getHistory(history[0]!.id))?.content).toEqual(saved.content);
+  });
+
   it("keeps four proposals when all pass", async () => {
     expect((await result()).proposals).toEqual(texts.map((text, i) => ({ id: `new${i + 1}`, text, score: 100 })));
     expect(model.requests).toHaveLength(2);
@@ -123,10 +141,12 @@ describe("POST /v1/enrich/brain-dump", () => {
     expect(model.requests).toHaveLength(2);
   });
   it("requires a ramble", async () => {
+    const snapshot = vi.spyOn(cv, "snapshot");
     role.notes = [{ ...note(), question: "Which tool?" }];
     await save();
     const res = await post();
     expect(res.status).toBe(400);
+    expect(snapshot).not.toHaveBeenCalled();
     expect(await res.json()).toMatchObject({ error: { code: "no_brain_dump", requestId: expect.any(String) } });
     expect(model.requests).toHaveLength(0);
   });
@@ -186,7 +206,9 @@ describe("POST /v1/enrich/brain-dump", () => {
   });
 
   it.each([{ fingerprint: "stale" }, { roleId: "missing" }])("rejects unsaved roles: %j", async (override) => {
+    const snapshot = vi.spyOn(cv, "snapshot");
     const res = await post({ ...input(), ...override });
+    expect(snapshot).not.toHaveBeenCalled();
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ error: { code: "not_saved" } });
     expect(model.requests).toHaveLength(0);
