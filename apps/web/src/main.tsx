@@ -1,25 +1,23 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { AuthShell } from "./auth/AuthShell";
-import { ConnectedApp } from "./auth/ConnectedApp";
-import "./styles.css";
-import { clearRetiredStorage } from "./base/storage-upgrade";
+import { RouterProvider, createBrowserRouter } from "react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "./auth/AuthProvider.tsx";
+import { routes } from "./router.tsx";
+import "./styles/tokens.css";
+import "./styles/app.css";
 
-try {
-  clearRetiredStorage(window.sessionStorage);
-  clearRetiredStorage(window.localStorage);
-} catch {}
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+});
+const router = createBrowserRouter(routes);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthShell accountMenuInShell>
-      {(account, transport, accountActions) => (
-        <ConnectedApp
-          account={account}
-          transport={transport}
-          accountActions={accountActions}
-        />
-      )}
-    </AuthShell>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </QueryClientProvider>
   </StrictMode>,
 );

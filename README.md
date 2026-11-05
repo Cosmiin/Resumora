@@ -1,15 +1,34 @@
 # Resumora
 
-Resumora is a CV application with authentication, document ingestion, profile editing and enrichment. My Profile is the main workspace. Each account has one Base CV, with saved history and content-language support.
+Build one strong CV, then tailor it to every job you apply for.
 
-The active development app runs in Linux/WSL and uses hosted Supabase and OpenRouter/OpenAI. Follow the [environment guide](docs/setup/environment.md) before starting or diagnosing it:
+- **My CV** — import your existing CV (PDF or Word), review it, edit it with live preview.
+- **Improve with AI** — answer a few questions per role and get stronger bullet points.
+- **Tailor to a job** — a browser extension captures a job page; Resumora scores your CV against it and proposes a tailored version you accept item by item.
+- **Export** — clean templates, PDF download.
+
+> This branch is a lean rebuild. See the [design](docs/superpowers/specs/2026-11-04-rebuild-design.md) and the [audit](docs/audit-2026-11-04.md) that led to it.
+
+## Quick start
+
+Prerequisites: Node 26 LTS, Docker Desktop, Supabase CLI.
 
 ```sh
-nvm use
-npm run dev:start
-npm run dev:doctor
+npm install
+npm run db:start          # local Supabase (prints URL + keys)
+cp apps/api/.dev.vars.example apps/api/.dev.vars
+cp apps/web/.env.example apps/web/.env.local
+# fill both with the values from `supabase status`
+npm run dev               # API on :8788, web on :5173
 ```
 
-Use the pinned Node version and existing npm workspaces. Runtime configuration belongs in the ignored `apps/api/.dev.vars`; keep credentials out of source and browser variables. The usual browser address is `http://127.0.0.1:15173/#/profile`; inspect the actual checkout configuration.
+Open http://127.0.0.1:5173.
 
-For a new contributor or AI session, start with the [current-state handoff](docs/HANDOFF.md). See the [documentation index](docs/README.md), [local development](docs/setup/local-development.md), [authentication](docs/setup/authentication.md), and [CV import](docs/setup/cv-import-enrichment.md) guides. A running local process does not establish hosted-provider availability. Cloud deployment is a separate operation.
+## Checks
+
+```sh
+npm run lint && npm run typecheck && npm test
+npm run db:test           # database tests (needs db:start)
+```
+
+See [AGENTS.md](AGENTS.md) for conventions.

@@ -1,39 +1,30 @@
 {
   "name": "@resumora/web",
-  "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "test": "vitest run",
-    "format:check": "prettier --check src vitest.config.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fontsource-variable/bricolage-grotesque": "5.3.0",
-    "@fontsource-variable/figtree": "5.3.0",
-    "@fontsource-variable/source-serif-4": "5.3.1",
-    "@resumora/contracts": "0.0.0",
-    "@tesseract.js-data/eng": "1.0.0",
-    "@tesseract.js-data/ron": "1.0.0",
-    "lucide-react": "1.61.0",
-    "pdfjs-dist": "5.4.624",
-    "pdfjs-dist-export": "npm:pdfjs-dist@6.4.299",
+    "@resumora/shared": "*",
+    "@supabase/supabase-js": "2.119.0",
+    "@tanstack/react-query": "5.105.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "tesseract.js": "6.0.1",
-    "tesseract.js-core": "6.1.2"
+    "react-router": "8.5.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "6.1.2",
+    "@vitejs/plugin-react": "6.2.1",
     "jsdom": "30.1.3",
-    "prettier": "3.9.10",
-    "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vite": "8.3.5"
   }
 }

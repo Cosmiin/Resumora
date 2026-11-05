@@ -1,37 +1,17 @@
-name: Local foundation checks
-
+name: CI
 on:
-  pull_request:
   push:
-    branches: [main]
-
-permissions:
-  contents: read
-
+  pull_request:
 jobs:
   check:
-    name: Install, types, build and local HTTP checks
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      WRANGLER_SEND_METRICS: 'false'
-      APP_ORIGIN: 'https://resumora-build.invalid'
-      API_ORIGIN: 'https://resumora-build.invalid'
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up pinned Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
-          package-manager-cache: false
-      - name: Set up pinned npm
-        run: npm install --global npm@10.9.9 --ignore-scripts
-      - name: Install locked dependencies
-        run: npm ci --ignore-scripts
-      - name: Check types, build and local HTTP behavior
-        run: npm run typecheck && npm run test:web && npm run build && npm run test:dev-secrets && npm run test:dev-config
-      - name: Check synthetic OpenAI accounting and protected admin routes
-        run: npm test --workspace @resumora/api
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test

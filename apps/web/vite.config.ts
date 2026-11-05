@@ -1,49 +1,22 @@
-import { defineConfig, loadEnv, type Plugin } from "vite";
+/// <reference types="vitest/config" />
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { fileURLToPath } from "node:url";
 
-export default defineConfig(({ command, mode }) => {
-  const env = loadEnv(mode, fileURLToPath(new URL(".", import.meta.url)), "");
-  const appOrigin =
-    env.APP_ORIGIN ??
-    (command === "serve" ? "http://127.0.0.1:5173" : undefined);
-  const apiOrigin = env.API_ORIGIN ?? appOrigin;
-  return {
-    plugins: [react()],
-    server: {
-      host: "127.0.0.1",
-      port: 5173,
-      strictPort: true,
-      headers: { "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer" },
-      fs: {
-        // Do not expose the Worker or the rest of the workspace through /@fs/.
-        allow: [".", "../../packages/contracts", "../../node_modules"].map(
-          (path) => fileURLToPath(new URL(path, import.meta.url)),
-        ),
-        deny: [
-          ".env",
-          ".env.*",
-          "*.{crt,pem,key,p12,pfx,cer,der}",
-          ".npmrc",
-          ".yarnrc.yml",
-          "**/.git/**",
-          "**/apps/api/**",
-          "**/node_modules/@resumora/api/**",
-        ],
-      },
-      proxy: {
-        "/v1": {
-          target: "http://127.0.0.1:8787",
-          // Preserve the browser origin for future Worker origin/CSRF checks.
-          changeOrigin: false,
-        },
-      },
-    },
-    preview: {
-      host: "127.0.0.1",
-      port: 4173,
-      strictPort: true,
-      headers: { "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer" },
-    },
-  };
+const api = "http://127.0.0.1:8788";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: "127.0.0.1",
+    port: 5173,
+    strictPort: true,
+    proxy: { "/v1": api, "/health": api },
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["src/test/setup.ts"],
+    // Tests never talk to Supabase; placeholders keep them independent of a local .env.local.
+    env: { VITE_SUPABASE_URL: "http://127.0.0.1:54321", VITE_SUPABASE_ANON_KEY: "test-anon-key" },
+    pool: "threads",
+  },
 });
