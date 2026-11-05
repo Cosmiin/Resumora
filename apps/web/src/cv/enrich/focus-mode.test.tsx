@@ -80,6 +80,9 @@ describe("focus mode", () => {
     const dialog = screen.getByRole("dialog", { name: "Improve your Dispatcher role" });
     expect(within(dialog).getByText("Question 1 of 3")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Roughly how many drivers did you plan for each day?" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Under 10" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "10\u201350" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Something else" })).toBeInTheDocument();
     const current = dialog.querySelector('[aria-current="true"]');
     expect(current).toHaveTextContent("Responsible for planning routes for drivers.");
     expect(within(dialog).getByText("52")).toBeInTheDocument();
@@ -143,6 +146,7 @@ describe("focus mode", () => {
     expect(await screen.findByText("We need a bit more detail to improve this one.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "What else can you tell us about this?" })).toBeInTheDocument();
     expect(screen.getByLabelText("Your answer")).toHaveAttribute("placeholder", "Anything else about this? Numbers, who it was for, what changed.");
+    expect(screen.queryByRole("button", { name: "Something else" })).not.toBeInTheDocument();
   });
 
   it("Esc closes focus mode and keeps the accepted bullet", async () => {

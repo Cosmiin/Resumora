@@ -27,6 +27,7 @@ export function QuestionStep({ bulletId, question, needsDetail, locale, busy, on
       <h2 className="fm-q" id="fm-step-title">{asked.text}</h2>
       <AnswerBox
         question={asked}
+        plain={question === null}
         value={value}
         via={via}
         onChange={(v, how) => {
