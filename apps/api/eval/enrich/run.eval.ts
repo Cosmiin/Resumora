@@ -176,6 +176,7 @@ function report(scores: ScoreRow[], rewrites: RewriteRow[]) {
       pad(r.id, 26) + pad(r.ready.length, 7) + pad(r.dropped.length, 9) + pad(r.firstWordMs === null ? "-" : `${r.firstWordMs} ms`, 10) + pad(r.seconds.toFixed(1), 7) + pad(usd(r.cost), 9) +
         pad(r.rawUnknownNumbers, 6) + pad(r.languageOk ? "ok" : "FAIL", 6) + (r.pass ? "PASS" : `FAIL${r.error ? ` (${r.error})` : ""}`),
     );
+    if (r.usedNumber !== null) out.push(`    answer number used: ${r.usedNumber}`);
     for (const d of r.dropped) out.push(`    dropped ${d.replaces ?? "new"}: ${d.reason}`);
   }
 

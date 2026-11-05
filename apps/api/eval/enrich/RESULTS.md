@@ -4,19 +4,19 @@ Date: 2026-11-05 · Score policy: `score/1` · Command: `npm run eval:enrich` ·
 
 ## What this means
 
-We asked the real AI to grade 38 bullet points from 15 made-up roles (9 English, 6 Romanian), and to
+We asked the real AI to review 43 bullet points from 15 made-up roles (38 graded against the grades we expected, plus 5 that must score 0) (9 English, 6 Romanian), and to
 rewrite bullets in 6 more made-up roles built to tempt it into mistakes. We ran the whole set twice.
 Both runs passed every check.
 
-- **Grading is close to what a careful person would say.** In both runs, 37 of 38 bullets were graded
+- **Grading agrees with the expectations we wrote ourselves.** In both runs, 37 of 38 bullets were graded
   within one step of what we expected on all four parts (contribution, clarity, specificity, impact).
   That is 97%, against a bar of 90%. The one miss was a Romanian line about updating an order sheet
   "daily": the AI said "daily" is a clear result; we had said no result. On reflection the AI has a
   fair point, and we left our expectation as it was rather than change it after the fact.
 - **Empty and repeated bullets get zero.** "TBD", "de completat" and a bullet copied word for word
-  scored 0 every time. The AI also noticed both reworded repeats on its own.
-- **The AI did not invent numbers.** Across 12 rewrite runs it never put in a figure that was not in
-  the person's own text or answers. A figure they did give ("about 60 calls a day") was used. A
+  scored 0 every time. The 2 reworded repeats also scored 0 in both runs (reported, not part of the bar).
+- **The AI did not invent numbers.** Across 12 rewrite runs the check found 0 figures (in all 12) that were not that was not in
+  the person's own text or answers. In the example where the person gave a figure ("about 60 calls a day"), the rewrite used it (seen when reading the output; the eval prints this as usedNumber). A
   range they picked ("10–50 a week") stayed a range. The code check that would have caught an
   invented number had nothing to catch, so the AI itself is behaving, not just the safety net.
 - **Answer choices never contained an exact number** (0 of 112 choices across the two runs).
@@ -82,8 +82,8 @@ The single graded miss in both runs: `ro-duplicat-parafrazat`, "Actualizat zilni
 comenzilor." The AI graded impact "specific" (daily = a stated frequency); we expected "missing".
 
 Per-case detail of the rewrite traps (both runs): the vague number (40%) was kept and no new figure was
-added; the real answer (60 calls) was used; with no answers no number was added; the duplicate pair
-came back as two separate rewrites, neither dropped; the Romanian role stayed Romanian; the picked range
+added; the real answer (60 calls) appeared in the rewrite; with no answers no number was added; the duplicate pair
+came back as two separate rewrites, none was dropped; the Romanian role stayed Romanian; the picked range
 stayed a range.
 
 ## Prompt changes
