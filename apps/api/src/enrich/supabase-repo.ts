@@ -60,6 +60,7 @@ export function supabaseInsightsRepo(env: SupabaseEnv, user: AuthUser): Insights
         .from("ai_calls")
         .select("id", { count: "exact", head: true })
         .eq("task", task)
+        .eq("status", "ok")
         .gte("created_at", sinceIso);
       if (error) throw new Error(`ai_calls count failed: ${error.message}`);
       return count ?? 0;

@@ -26,6 +26,8 @@ import { VOICE } from "@resumora/shared";
 import type { AiCallLog } from "./call-model.ts";
 
 export const VOICE_TASK = "enrich_voice";
+/** How long the temporary key can start a session. Not the same as VOICE.maxSeconds, the recording cap the browser enforces. */
+const VOICE_KEY_SECONDS = 60;
 const ENDPOINT = "https://api.openai.com/v1/realtime/client_secrets";
 
 export type VoiceDeps = {
@@ -49,19 +51,15 @@ export async function createVoiceSession(
   { userId, locale }: { userId: string; locale: "en" | "ro" },
 ): Promise<VoiceSession> {
   const started = Date.now();
-  const log = async (status: "ok" | "error", error?: string) => {
-    try {
-      await deps.logCall({ userId, task: VOICE_TASK, provider: "openai", model: VOICE.model, status, error, durationMs: Date.now() - started });
-    } catch {
-      // A failed log must not break the answer.
-    }
-  };
+  const log = (status: "ok" | "error", error?: string) =>
+    deps.logCall({ userId, task: VOICE_TASK, provider: "openai", model: VOICE.model, status, error, durationMs: Date.now() - started });
+  let session: VoiceSession;
   try {
     const res = await deps.fetch(ENDPOINT, {
       method: "POST",
       headers: { authorization: `Bearer ${deps.apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
-        expires_after: { anchor: "created_at", seconds: VOICE.maxSeconds },
+        expires_after: { anchor: "created_at", seconds: VOICE_KEY_SECONDS },
         session: {
           type: "transcription",
           audio: {
@@ -76,10 +74,17 @@ export async function createVoiceSession(
     if (!res.ok) throw new Error(`OpenAI answered ${res.status}`);
     const body = (await res.json()) as { value?: unknown; expires_at?: unknown };
     if (typeof body.value !== "string" || typeof body.expires_at !== "number") throw new Error("OpenAI answer had no key");
-    await log("ok");
-    return { clientSecret: body.value, expiresAt: new Date(body.expires_at * 1000).toISOString(), model: VOICE.model };
+    session = { clientSecret: body.value, expiresAt: new Date(body.expires_at * 1000).toISOString(), model: VOICE.model };
   } catch (e) {
-    await log("error", e instanceof Error ? e.message : "unknown error");
+    // A failed log here must not hide the real failure.
+    await log("error", e instanceof Error ? e.message : "unknown error").catch(() => {});
     throw new VoiceUnavailableError();
   }
+  // An unlogged session would not count toward the daily limit, so the key is not handed out.
+  try {
+    await log("ok");
+  } catch {
+    throw new VoiceUnavailableError();
+  }
+  return session;
 }

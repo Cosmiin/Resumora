@@ -5,7 +5,7 @@ import type { InsightsRepo } from "./repo.ts";
 export type MemoryInsightsStore = Map<string, { userId: string; result: RoleResult }>;
 
 /** `ai_calls` rows of all users, for counting in tests. */
-export type MemoryAiCalls = { userId: string; task: string; createdAt: string }[];
+export type MemoryAiCalls = { userId: string; task: string; status: "ok" | "error"; createdAt: string }[];
 
 /** In-memory InsightsRepo for tests, scoped to one user. */
 export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = new Map(), aiCalls: MemoryAiCalls = []): InsightsRepo {
@@ -26,7 +26,7 @@ export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = 
       for (const id of roleIds) store.delete(key(id));
     },
     async countAiCallsSince(task, sinceIso) {
-      return aiCalls.filter((c) => c.userId === userId && c.task === task && c.createdAt >= sinceIso).length;
+      return aiCalls.filter((c) => c.userId === userId && c.task === task && c.status === "ok" && c.createdAt >= sinceIso).length;
     },
   };
 }

@@ -62,6 +62,15 @@ describe("createVoiceSession", () => {
     expect(JSON.stringify(calls[0])).not.toContain(KEY);
   });
 
+  it("a failed log on an ok answer throws and returns no secret; a failed log on an error answer still throws unavailable", async () => {
+    const ok = deps();
+    ok.d.logCall = async () => { throw new Error("db down"); };
+    await expect(createVoiceSession(ok.d, { userId: "u1", locale: "en" })).rejects.toThrow(/unavailable/);
+    const bad = deps(() => new Response("x", { status: 500 }));
+    bad.d.logCall = async () => { throw new Error("db down"); };
+    await expect(createVoiceSession(bad.d, { userId: "u1", locale: "en" })).rejects.toThrow(/unavailable/);
+  });
+
   it("a network error throws and logs an error row", async () => {
     const { d, calls } = deps(() => Promise.reject(new TypeError("fetch failed")));
     await expect(createVoiceSession(d, { userId: "u1", locale: "en" })).rejects.toThrow(/unavailable/);
@@ -71,11 +80,11 @@ describe("createVoiceSession", () => {
 
 describe("POST /v1/enrich/voice-session", () => {
   const auth = { authorization: "Bearer good" };
-  function setup(opts: { locale?: "en" | "ro"; answer?: () => Response; recent?: number } = {}) {
+  function setup(opts: { locale?: "en" | "ro"; answer?: () => Response; recent?: number; failLog?: boolean } = {}) {
     const { d, requests, calls } = deps(opts.answer);
     const aiCalls: MemoryAiCalls = [];
     for (let i = 0; i < (opts.recent ?? 0); i++) {
-      aiCalls.push({ userId: "user-1", task: "enrich_voice", createdAt: new Date(Date.now() - 60_000).toISOString() });
+      aiCalls.push({ userId: "user-1", task: "enrich_voice", status: "ok" as const, createdAt: new Date(Date.now() - 60_000).toISOString() });
     }
     const cv = memoryCvRepo();
     const ready = opts.locale ? cv.save(emptyCv(opts.locale), 0) : Promise.resolve();
@@ -93,8 +102,9 @@ describe("POST /v1/enrich/voice-session", () => {
       voice: () => ({
         ...d,
         logCall: async (e) => {
+          if (opts.failLog) throw new Error("db down");
           await d.logCall(e);
-          aiCalls.push({ userId: e.userId, task: e.task, createdAt: new Date().toISOString() });
+          aiCalls.push({ userId: e.userId, task: e.task, status: e.status, createdAt: new Date().toISOString() });
         },
       }),
       queue: { send: async () => {} },
@@ -135,11 +145,25 @@ describe("POST /v1/enrich/voice-session", () => {
   it("does not count rows older than 24 hours, or other users' rows", async () => {
     const old = new Date(Date.now() - 25 * 3600_000).toISOString();
     const rows: MemoryAiCalls = [
-      ...Array.from({ length: 25 }, () => ({ userId: "u", task: "enrich_voice", createdAt: old })),
-      ...Array.from({ length: 25 }, () => ({ userId: "other", task: "enrich_voice", createdAt: new Date().toISOString() })),
+      ...Array.from({ length: 25 }, () => ({ userId: "u", task: "enrich_voice", status: "ok" as const, createdAt: old })),
+      ...Array.from({ length: 25 }, () => ({ userId: "other", task: "enrich_voice", status: "ok" as const, createdAt: new Date().toISOString() })),
     ];
     const since = new Date(Date.now() - 24 * 3600_000).toISOString();
     expect(await memoryInsightsRepo("u", new Map(), rows).countAiCallsSince("enrich_voice", since)).toBe(0);
+  });
+
+  it("does not count error rows toward the limit", async () => {
+    const rows: MemoryAiCalls = Array.from({ length: 30 }, () => ({ userId: "u", task: "enrich_voice", status: "error" as const, createdAt: new Date().toISOString() }));
+    const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+    expect(await memoryInsightsRepo("u", new Map(), rows).countAiCallsSince("enrich_voice", since)).toBe(0);
+  });
+
+  it("503 with no secret when logging the ok row fails", async () => {
+    const s = setup({ failLog: true });
+    const res = await s.post();
+    expect(res.status).toBe(503);
+    expect(await code(res)).toBe("ai_unavailable");
+    expect(s.requests).toHaveLength(1);
   });
 
   it("503 ai_unavailable when OpenAI fails, and an error row is logged", async () => {

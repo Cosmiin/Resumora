@@ -1,13 +1,12 @@
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
-import { RewriteEventSchemas, type RewriteEvent } from "@resumora/shared";
+import { RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
 import { z } from "zod";
 import type { AppEnv } from "../app.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import type { AuthUser } from "../env.ts";
 import { ApiError } from "../errors.ts";
-import { VOICE, type Locale } from "@resumora/shared";
 import { createVoiceSession, VoiceUnavailableError, VOICE_TASK, type VoiceDeps } from "../ai/voice-session.ts";
 import type { InsightsRepo } from "./repo.ts";
 import { scoreRole } from "./score.ts";
