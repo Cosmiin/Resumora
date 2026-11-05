@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_BULLETS, emptyCv, type CvContent, type Experience } from "@resumora/shared";
+import { MAX_BULLETS, MAX_NOTES, emptyCv, type CvContent, type Experience } from "@resumora/shared";
 import { cvReducer, sectionsOnCv } from "./cvReducer.ts";
 
 function role(id: string, bullets: string[], extra: Partial<Experience> = {}): Experience {
@@ -235,6 +235,20 @@ describe("setNote", () => {
     expect(added.experience[0]!.notes).toEqual([note("first")]);
     const replaced = cvReducer(added, { type: "setNote", roleId: "e1", note: note("second") });
     expect(replaced.experience[0]!.notes).toEqual([note("second")]);
+  });
+
+  it("when the role is full, the oldest note makes room for the new one", () => {
+    const at = (day: number) => `2026-01-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+    // Not in date order, so "oldest" means by askedAt, not by position.
+    const full = Array.from({ length: MAX_NOTES }, (_, i) => ({
+      id: `n${i}`, question: "Q", answer: `a${i}`, via: ["type" as const], askedAt: at(i === 3 ? 1 : i + 10),
+    }));
+    const cv = withRole(["x"], { notes: full });
+    const fresh = { id: "new", question: "Q", answer: "latest", via: ["voice" as const], askedAt: at(28) };
+    const notes = cvReducer(cv, { type: "setNote", roleId: "e1", note: fresh }).experience[0]!.notes;
+    expect(notes).toHaveLength(MAX_NOTES);
+    expect(notes.some((n) => n.id === "n3")).toBe(false);
+    expect(notes.at(-1)).toEqual(fresh);
   });
 
   it("ignores an unknown role", () => {

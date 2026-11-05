@@ -83,6 +83,7 @@
 .working::before { content: ""; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid var(--sage-200); border-top-color: var(--pine-600); animation: working-spin 0.8s linear infinite; }
 @keyframes working-spin { to { transform: rotate(360deg); } }
 .rewrite-review .p-sub { margin: 0; }
+.btn.small { font-size: 12px; padding: 3px 10px; }
 .prop { border: 1px solid var(--sage-200); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
 .prop-old { font-size: 12.5px; color: var(--sage-500); text-decoration: line-through; text-decoration-color: var(--sage-300); }
 .prop-label { font-size: 12px; font-weight: 600; color: var(--sage-600); }

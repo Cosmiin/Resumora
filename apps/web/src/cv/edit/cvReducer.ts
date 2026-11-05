@@ -273,8 +273,14 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const role = cv.experience.find((r) => r.id === action.roleId);
       if (!role) return cv;
       const exists = role.notes.some((n) => n.id === action.note.id);
-      if (!exists && role.notes.length >= MAX_NOTES) return cv;
-      const notes = exists ? role.notes.map((n) => (n.id === action.note.id ? action.note : n)) : [...role.notes, action.note];
+      let kept = role.notes;
+      if (!exists && kept.length >= MAX_NOTES) {
+        // Full: the newest answers win, so the oldest notes make room (as when notes are carried over).
+        const oldestFirst = [...kept].sort((a, b) => (a.askedAt < b.askedAt ? -1 : a.askedAt > b.askedAt ? 1 : 0));
+        const drop = new Set(oldestFirst.slice(0, kept.length - MAX_NOTES + 1));
+        kept = kept.filter((n) => !drop.has(n));
+      }
+      const notes = exists ? kept.map((n) => (n.id === action.note.id ? action.note : n)) : [...kept, action.note];
       return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, notes } : r)) };
     }
     case "applyProposals":

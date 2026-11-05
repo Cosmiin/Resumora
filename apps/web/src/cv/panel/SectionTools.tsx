@@ -104,7 +104,7 @@ function RoleEnrich({ cv, dispatch, roleId, scores, onRetry, waitForSave }: Pick
     );
   }
 
-  // The review has its own way back, which keeps the proposals already chosen.
+  // The review has its own "Back to score" link, next to its Done button.
   if (view.kind === "review") return <RewriteReview role={role} dispatch={dispatch} onClose={back} />;
 
   return (

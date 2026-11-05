@@ -319,6 +319,7 @@ export const en = {
   "enrich.review.drafting": "Drafting from your bullets and answers…",
   "enrich.review.title": "Suggested bullets",
   "enrich.review.newBullet": "New bullet",
+  "enrich.review.removed": "This bullet was removed",
   "enrich.review.writing": "Writing… buttons appear once it passes the checks.",
   "enrich.review.use": "Use this",
   "enrich.review.keep": "Keep mine",
