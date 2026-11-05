@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(21);
+select plan(23);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -63,7 +63,23 @@ select is(
   (select count(*)::int from public.base_cv_versions where reason = 'ai' and content = '{"n":"current"}'),
   1, 'the copy holds the current CV with reason ai');
 
-select public.snapshot_base_cv('ai') from generate_series(1, 60);
+-- A second copy of the same CV (a rewrite, then Try again) adds nothing.
+select public.snapshot_base_cv('ai');
+select is((select count(*)::int from public.base_cv_versions), 1, 'two copies of the same CV leave one row');
+
+-- After the CV changes, the next copy is kept.
+update public.base_cvs set content = '{"n":"edited"}' where user_id = '11111111-1111-1111-1111-111111111111';
+select public.snapshot_base_cv('ai');
+select is((select count(*)::int from public.base_cv_versions), 2, 'a copy of a changed CV is kept');
+
+do $
+begin
+  for i in 1..60 loop
+    update public.base_cvs set content = jsonb_build_object('n', i) where user_id = '11111111-1111-1111-1111-111111111111';
+    perform public.snapshot_base_cv('ai');
+  end loop;
+end
+$;
 select is((select count(*)::int from public.base_cv_versions), 50, 'History keeps 50 rows');
 
 select throws_ok(
