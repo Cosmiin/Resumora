@@ -260,3 +260,21 @@ label.checkbox input {
   z-index: 9;
   background: rgb(15 40 38 / 25%);
 }
+
+/* Skill groups */
+.skill-group { margin-block: var(--space-3, 12px); }
+.skill-group h3 { font-size: 1rem; margin-block-end: 4px; }
+.skill-group-unclear { border-inline-start: 3px solid var(--color-warning, #b7791f); padding-inline-start: 12px; }
+.skill-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.skill-list { display: flex; flex-wrap: wrap; gap: 6px 16px; padding-inline-start: 18px; }
+.hint { color: var(--color-text-muted, #666); font-size: 0.9rem; }
+
+/* Import */
+.import-dialog { width: min(640px, 100%); }
+.import-review section { margin-block: 12px; }
+.import-review h3 { font-size: 1rem; margin-block-end: 4px; }
+.import-name { font-size: 1.25rem; font-weight: 600; margin: 0; }
+.import-entry { margin-block-end: 12px; }
+.import-warnings { border-inline-start: 3px solid var(--color-warning, #b7791f); padding-inline-start: 12px; }
+.preserve-lines { white-space: pre-line; }
+.dialog-actions { display: flex; gap: 8px; margin-block-start: 16px; }

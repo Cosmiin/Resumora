@@ -2,5 +2,12 @@
   "name": "resumora-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
-  "compatibility_flags": ["nodejs_compat"]
+  "compatibility_flags": ["nodejs_compat"],
+  // Imports: the API sends one message per upload; the same Worker consumes them.
+  // Every 5 minutes: fail imports stuck for 15+ minutes and delete their files.
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "queues": {
+    "producers": [{ "binding": "IMPORTS", "queue": "resumora-imports" }],
+    "consumers": [{ "queue": "resumora-imports", "max_batch_size": 1, "max_retries": 3 }]
+  }
 }

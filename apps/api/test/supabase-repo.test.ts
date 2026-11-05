@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { ZodError } from "zod";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { supabaseCvRepo } from "../src/cv/supabase-repo.ts";
+import { supabaseImportAdmin, supabaseImportRepo } from "../src/imports/supabase-repo.ts";
+import { CV_LINES, makePdf } from "./fixtures.ts";
 
 // Runs against a local stack: `npm run db:start`, then
 // SUPABASE_TEST_URL, SUPABASE_TEST_ANON_KEY and SUPABASE_TEST_SERVICE_KEY from `supabase status`.
@@ -65,5 +67,35 @@ describe.skipIf(!url)("supabaseCvRepo against local Supabase", () => {
     const bView = await b.get();
     expect(bView.version).toBe(0);
     expect(bView.content.basics.fullName).toBe("");
+  });
+});
+
+describe.skipIf(!url)("supabaseImportRepo against local Supabase", () => {
+  const env = { SUPABASE_URL: url!, SUPABASE_ANON_KEY: anonKey, SUPABASE_SERVICE_ROLE_KEY: serviceKey };
+
+  it("import row and file are private to the user", async () => {
+    const userA = await signedInUser();
+    const userB = await signedInUser();
+    const a = supabaseImportRepo(env, userA);
+    const id = crypto.randomUUID();
+    const created = await a.create({ id, fileName: "cv.pdf", format: "pdf", bytes: makePdf(CV_LINES) });
+    expect(created).toMatchObject({ id, status: "queued", error: null, result: null });
+    expect(await a.countSince(new Date(Date.now() - 60_000).toISOString())).toBe(1);
+
+    expect(await supabaseImportRepo(env, userB).get(id)).toBeNull();
+    expect(await supabaseImportRepo(env, userB).apply(id, 0)).toBeNull();
+
+    // The consumer finishes it; then A applies it.
+    const admin = supabaseImportAdmin(env);
+    const job = await admin.start(id);
+    expect(job).toMatchObject({ id, userId: userA.id });
+    expect((await admin.download(job!)).byteLength).toBeGreaterThan(100);
+    await admin.finish(id, { content: cvNamed("From import"), warnings: ["check dates"] });
+    await admin.deleteFile(job!);
+
+    expect((await a.get(id))?.result?.warnings).toEqual(["check dates"]);
+    expect(await a.apply(id, 0)).toMatchObject({ ok: true, version: 1 });
+    expect((await supabaseCvRepo(env, userA).get()).content.basics.fullName).toBe("From import");
+    expect((await a.get(id))?.status).toBe("applied");
   });
 });

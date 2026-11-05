@@ -82,7 +82,7 @@ function PreviewSummary({ content }: { content: CvContent }) {
   return (
     <div className="history-preview">
       <p>{content.basics.fullName || "—"}</p>
-      {content.basics.headline && <p>{content.basics.headline}</p>}
+      {content.basics.titles.length > 0 && <p>{content.basics.titles.join(" · ")}</p>}
       <ul>
         {content.experience.map((e) => (
           <li key={e.id}>{[e.title, e.company].filter(Boolean).join(" · ")}</li>

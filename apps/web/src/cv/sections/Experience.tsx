@@ -1,6 +1,6 @@
-import { MAX_BULLETS, newId, type Experience } from "@resumora/shared";
+import { MAX_BULLETS, MAX_LONG_TEXT, newId, type Experience } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
-import { ItemList, TextField, set } from "../fields.tsx";
+import { DateField, ItemList, TextField, set } from "../fields.tsx";
 
 const blank = (): Omit<Experience, "id"> => ({
   company: "",
@@ -9,6 +9,7 @@ const blank = (): Omit<Experience, "id"> => ({
   startDate: "",
   endDate: "",
   current: false,
+  description: "",
   bullets: [],
 });
 
@@ -26,9 +27,9 @@ export function ExperienceSection({ items, onChange }: { items: Experience[]; on
             <TextField label={t("cv.company")} value={exp.company} onChange={(v) => update(set(exp, "company", v))} />
             <TextField label={t("cv.title")} value={exp.title} onChange={(v) => update(set(exp, "title", v))} />
             <TextField label={t("cv.location")} value={exp.location} onChange={(v) => update(set(exp, "location", v))} />
-            <TextField label={t("cv.startDate")} type="month" value={exp.startDate} onChange={(v) => update(set(exp, "startDate", v))} />
+            <DateField label={t("cv.startDate")} value={exp.startDate} onChange={(v) => update(set(exp, "startDate", v))} />
             {!exp.current && (
-              <TextField label={t("cv.endDate")} type="month" value={exp.endDate} onChange={(v) => update(set(exp, "endDate", v))} />
+              <DateField label={t("cv.endDate")} value={exp.endDate} onChange={(v) => update(set(exp, "endDate", v))} />
             )}
             <label className="checkbox">
               <input
@@ -39,6 +40,13 @@ export function ExperienceSection({ items, onChange }: { items: Experience[]; on
               {t("cv.current")}
             </label>
           </div>
+          <TextField
+            label={t("cv.roleDescription")}
+            multiline
+            maxLength={MAX_LONG_TEXT}
+            value={exp.description}
+            onChange={(v) => update(set(exp, "description", v))}
+          />
           <ol className="cv-bullets">
             {exp.bullets.map((bullet, i) => (
               <li key={bullet.id}>
