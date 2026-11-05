@@ -11,6 +11,7 @@ import { AnswerBox, type Via } from "./AnswerBox.tsx";
 
 const question: Question = {
   bulletId: "b1",
+  kind: "detail",
   text: "What papers did you handle?",
   options: ["Customs papers", "Carrier invoices", "Delivery notes"],
 };

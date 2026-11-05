@@ -5,7 +5,7 @@ import { HISTORY_LIMIT } from "../cv/repo.ts";
 import { memoryInsightsRepo, type MemoryInsightsStore } from "./memory-repo.ts";
 
 const result = (fingerprint: string, roleId = "r1"): RoleResult =>
-  RoleResultSchema.parse({ roleId, policy: "score/1", fingerprint, score: null, bullets: [], nextStep: null, questions: [] });
+  RoleResultSchema.parse({ roleId, policy: "score/2", fingerprint, score: null, bullets: [], nextStep: null, questions: [] });
 
 describe("memoryInsightsRepo", () => {
   it("put then get round-trips, and get is null for an unknown role", async () => {

@@ -25,15 +25,31 @@ describe("notes in the schema", () => {
     expect(parsed.experience[0]!.notes).toEqual([]);
   });
 
-  it("11 notes fail validation, 10 pass", () => {
+  it("26 notes fail validation, 25 pass", () => {
     const many = (n: number) => cvWith(role("r1", "Acme", "Dev", Array.from({ length: n }, (_, i) => note(`n${i}`))));
-    expect(MAX_NOTES).toBe(10);
-    expect(CvContentSchema.safeParse(many(10)).success).toBe(true);
-    expect(CvContentSchema.safeParse(many(11)).success).toBe(false);
+    expect(MAX_NOTES).toBe(25);
+    expect(CvContentSchema.safeParse(many(25)).success).toBe(true);
+    expect(CvContentSchema.safeParse(many(26)).success).toBe(false);
   });
 });
 
 describe("carryNotes", () => {
+  const facts = { items: ["Used SQL"], fromNotes: "hash", updatedAt: "2026-11-05T00:00:00Z" };
+
+  it.each([undefined, null])("carries facts when incoming facts are %s, even without notes", (incomingFacts) => {
+    const current = cvWith({ ...role("old", " Acme ", "DEV"), facts });
+    const incoming = cvWith({ ...role("new", "acme", "dev"), facts: incomingFacts });
+    expect(carryNotes(current, incoming).experience[0]!.facts).toEqual(facts);
+    expect(incoming.experience[0]!.facts).toBe(incomingFacts);
+  });
+
+  it("keeps incoming non-null facts", () => {
+    const current = cvWith({ ...role("old", "Acme", "Dev"), facts });
+    const own = { ...facts, items: [] };
+    const incoming = cvWith({ ...role("new", "Acme", "Dev"), facts: own });
+    expect(carryNotes(current, incoming).experience[0]!.facts).toEqual(own);
+  });
+
   it("copies notes when company and title match ignoring case and spaces", () => {
     const current = cvWith(role("old", "  Acme   SRL ", "Product  Manager", [note("n1")]));
     const incoming = cvWith(role("new", "acme srl", "product manager"));
@@ -63,11 +79,11 @@ describe("carryNotes", () => {
 
   it("caps at MAX_NOTES keeping the newest by askedAt", () => {
     const day = (i: number) => `2026-01-${String(i + 1).padStart(2, "0")}T00:00:00.000Z`;
-    const old = Array.from({ length: 10 }, (_, i) => note(`o${i}`, day(i)));
+    const old = Array.from({ length: MAX_NOTES }, (_, i) => note(`o${i}`, day(i)));
     const current = cvWith(role("old", "Acme", "Dev", old));
     const incoming = cvWith(role("new", "Acme", "Dev", [note("fresh", "2026-02-01T00:00:00.000Z")]));
     const notes = carryNotes(current, incoming).experience[0]!.notes;
-    expect(notes).toHaveLength(10);
+    expect(notes).toHaveLength(MAX_NOTES);
     expect(notes.map((n) => n.id)).toContain("fresh");
     expect(notes.map((n) => n.id)).not.toContain("o0");
   });

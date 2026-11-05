@@ -18,6 +18,7 @@ import { useVoice } from "./useVoice.ts";
 
 const question: Question = {
   bulletId: "b1",
+  kind: "detail",
   text: "What papers did you handle?",
   options: ["Customs papers", "Carrier invoices", "Delivery notes"],
 };

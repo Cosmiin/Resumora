@@ -11,7 +11,7 @@ export const MAX_TEXT = 2000;
 export const MAX_LONG_TEXT = 4000;
 export const MAX_TITLES = 2;
 export const MAX_ACHIEVEMENTS = 10;
-export const MAX_NOTES = 10;
+export const MAX_NOTES = 25;
 
 const text = (max = MAX_TEXT) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -35,6 +35,11 @@ export const NoteSchema = z
   })
   .strict();
 
+export const RoleFactsSchema = z
+  .object({ items: z.array(text(160)).max(8), fromNotes: z.string(), updatedAt: z.iso.datetime() })
+  .strict();
+export type RoleFacts = z.infer<typeof RoleFactsSchema>;
+
 export const ExperienceSchema = z
   .object({
     id,
@@ -48,6 +53,7 @@ export const ExperienceSchema = z
     description: text(MAX_LONG_TEXT),
     bullets: z.array(BulletSchema).max(MAX_BULLETS),
     notes: z.array(NoteSchema).max(MAX_NOTES).default([]),
+    facts: RoleFactsSchema.nullable().optional(),
   })
   .strict();
 

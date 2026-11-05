@@ -43,8 +43,8 @@ function role(): Experience {
 }
 
 const questions: Question[] = [
-  { bulletId: "b1", text: "Which tasks did you do?", options: ["Invoices", "Orders"] },
-  { bulletId: "b2", text: "How many suppliers?", options: ["Under 10", "10–50"] },
+  { bulletId: "b1", text: "Which tasks did you do?", options: ["Invoices", "Orders"], kind: "detail" },
+  { bulletId: "b2", text: "How many suppliers?", options: ["Under 10", "10–50"], kind: "result" },
 ];
 
 beforeEach(() => {
@@ -143,7 +143,7 @@ describe("role tools", () => {
   const scoreOf = (qs: Question[]): RoleScoreState => {
     const result: RoleResult = {
       roleId: "r1",
-      policy: "score/1",
+      policy: "score/2",
       fingerprint: "x",
       score: 40,
       bullets: ["b1", "b2"].map((id) => ({

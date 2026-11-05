@@ -267,7 +267,7 @@ describe("setNote", () => {
     const at = (day: number) => `2026-01-${String(day).padStart(2, "0")}T00:00:00.000Z`;
     // Not in date order, so "oldest" means by askedAt, not by position.
     const full = Array.from({ length: MAX_NOTES }, (_, i) => ({
-      id: `n${i}`, question: "Q", answer: `a${i}`, via: ["type" as const], askedAt: at(i === 3 ? 1 : i + 10),
+      id: `n${i}`, question: "Q", answer: `a${i}`, via: ["type" as const], askedAt: at(i === 3 ? 1 : i + 2),
     }));
     const cv = withRole(["x"], { notes: full });
     const fresh = { id: "new", question: "Q", answer: "latest", via: ["voice" as const], askedAt: at(28) };

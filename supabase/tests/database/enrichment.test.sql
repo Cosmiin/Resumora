@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(28);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -17,6 +17,15 @@ select lives_ok(
      values ('11111111-1111-1111-1111-111111111111', 'r1', 'fp', 'score/1', '{"roleId":"r1"}') $$,
   'a user can store their own insight');
 select is((select count(*)::int from public.cv_insights), 1, 'a user reads their own insight');
+
+-- Focus mode: predicted results live in `pending` on the same row.
+select col_type_is('public', 'cv_insights', 'pending', 'jsonb', 'cv_insights.pending is jsonb');
+select is(
+  (select pending from public.cv_insights where role_id = 'r1'),
+  '[]'::jsonb, 'a new insight starts with no pending predictions');
+select isnt_empty(
+  $$ update public.cv_insights set pending = '[{"fingerprint":"fp2"}]' where role_id = 'r1' returning 1 $$,
+  'a user can store pending predictions on their own insight');
 
 -- ── User B sees none of it ─────────────────────────────────────────────────
 set local request.jwt.claims to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
@@ -33,6 +42,14 @@ select throws_ok(
      values ('11111111-1111-1111-1111-111111111111', 'r2', 'fp', 'score/1', '{}') $$,
   '42501', null,
   'a user cannot store an insight for someone else');
+
+-- User A's row 'r1' holds pending = '[{"fingerprint":"fp2"}]': user B can neither read nor overwrite it.
+select is_empty(
+  $$ select pending from public.cv_insights where role_id = 'r1' $$,
+  'another user cannot read pending predictions');
+select is_empty(
+  $$ update public.cv_insights set pending = '[]' where role_id = 'r1' returning 1 $$,
+  'another user cannot overwrite pending predictions');
 
 -- ── Signed-out visitors ────────────────────────────────────────────────────
 set local role anon;

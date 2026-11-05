@@ -81,7 +81,7 @@ const role = {
 const cv: CvContent = { ...emptyCv(), experience: [role], unclearSkills: [{ id: "u1", name: "Docker" }] };
 const score: RoleScoreState = {
   state: "ready",
-  result: { roleId: "r1", policy: "score/1", fingerprint: "x", score: 40, bullets: [], nextStep: null, questions: [] } satisfies RoleResult,
+  result: { roleId: "r1", policy: "score/2", fingerprint: "x", score: 40, bullets: [], nextStep: null, questions: [] } satisfies RoleResult,
 };
 const failedSave = () => Promise.reject(new SaveNotDoneError());
 
@@ -111,7 +111,7 @@ describe("when the save before an AI step fails", () => {
 
   it("Draft improved bullets stays on the questions with a short message", async () => {
     const onDraft = vi.fn();
-    const questions: Question[] = [{ bulletId: "b1", text: "Which reports?", options: [] }];
+    const questions: Question[] = [{ bulletId: "b1", text: "Which reports?", options: [], kind: "detail" }];
     render(<QuestionFlow role={role} questions={questions} dispatch={() => {}} waitForSave={failedSave} onDraft={onDraft} />);
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
     await userEvent.click(screen.getByRole("button", { name: "Draft improved bullets" }));

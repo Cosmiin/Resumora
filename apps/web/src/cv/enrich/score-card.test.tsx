@@ -38,7 +38,7 @@ function result(over: Partial<RoleResult> = {}): RoleResult {
   const scores = [30, 80, 90, 76, 40];
   return {
     roleId: "r1",
-    policy: "score/1",
+    policy: "score/2",
     fingerprint: "x",
     score: 62,
     bullets: scores.map((score, i) => ({
@@ -53,7 +53,7 @@ function result(over: Partial<RoleResult> = {}): RoleResult {
       question: null,
     })),
     nextStep: { bulletId: "b1", issue: "specificity", tip: "Name the tasks you did." },
-    questions: [{ bulletId: "b1", text: "Which tasks?", options: ["Rota", "Orders"] }],
+    questions: [{ bulletId: "b1", text: "Which tasks?", options: ["Rota", "Orders"], kind: "detail" }],
     ...over,
   };
 }
@@ -101,7 +101,7 @@ describe("score card", () => {
   });
 
   it("uses the plural for several questions", () => {
-    const q = { bulletId: "b1", text: "Which tasks?", options: [] };
+    const q = { bulletId: "b1", text: "Which tasks?", options: [], kind: "detail" as const };
     card(ready(result({ questions: [q, q, q] })));
     expect(screen.getByRole("button", { name: "Answer 3 questions" })).toBeInTheDocument();
   });
@@ -129,7 +129,7 @@ describe("score card", () => {
   });
 
   it("does not count questions already answered in a note", () => {
-    const q = (text: string) => ({ bulletId: "b1", text, options: [] });
+    const q = (text: string) => ({ bulletId: "b1", text, options: [], kind: "detail" as const });
     const note = { id: "n1", question: "Which tasks?", answer: "Rota", via: ["type" as const], askedAt: "2026-11-05T10:00:00Z" };
     card(ready(result({ questions: [q("Which tasks?"), q("How many people?")] })), role({ notes: [note] }));
     expect(screen.getByRole("button", { name: "Answer 1 question" })).toBeInTheDocument();

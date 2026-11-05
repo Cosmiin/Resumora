@@ -28,7 +28,7 @@ function merge(carried: Note[], own: Note[]): Note[] {
 }
 
 /**
- * Copies the notes of each current role onto the incoming role with the same company and title
+ * Copies the notes and facts of each current role onto the incoming role with the same company and title
  * (trimmed, lowercased, spaces collapsed). A role that matches more than one role on either
  * side is skipped. Incoming notes win on equal ids; at most MAX_NOTES are kept, newest first.
  */
@@ -40,8 +40,8 @@ export function carryNotes(current: CvContent, incoming: CvContent): CvContent {
     experience: incoming.experience.map((role) => {
       const k = key(role.company, role.title);
       const old = before.get(k);
-      if (!old || after.get(k) !== role || old.notes.length === 0) return role;
-      return { ...role, notes: merge(old.notes, role.notes) };
+      if (!old || after.get(k) !== role) return role;
+      return { ...role, notes: merge(old.notes, role.notes), facts: role.facts ?? old.facts };
     }),
   };
 }
