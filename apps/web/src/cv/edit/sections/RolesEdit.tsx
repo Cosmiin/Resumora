@@ -14,11 +14,13 @@ type Props = {
   locale: Locale;
   /** Scores by role id; only experience roles have them. */
   scores?: ReadonlyMap<string, RoleScoreState>;
+  /** The role whose tools are open in the panel. */
+  toolsRoleId?: string;
   dispatch(a: CvAction): void;
 };
 
 /** Experience or volunteering: every role typed in place. */
-export function RolesEdit({ list, items, locale, dispatch, scores }: Props) {
+export function RolesEdit({ list, items, locale, dispatch, scores, toolsRoleId }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
   const add = useCallback(() => {
@@ -31,7 +33,7 @@ export function RolesEdit({ list, items, locale, dispatch, scores }: Props) {
   return (
     <div ref={root}>
       <DragList items={items} onMove={move} label={label}>
-        {(role) => <RoleItem role={role} list={list} locale={locale} dispatch={dispatch} score={scores?.get(role.id)} />}
+        {(role) => <RoleItem role={role} list={list} locale={locale} dispatch={dispatch} score={scores?.get(role.id)} toolsOpen={role.id === toolsRoleId} />}
       </DragList>
       <AddButton label={t("edit.add.role")} onClick={add} />
     </div>

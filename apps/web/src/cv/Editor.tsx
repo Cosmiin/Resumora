@@ -48,7 +48,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
   // One stable dispatch: rows on the page skip re-rendering unless their own data changed.
   const dispatch = useCallback((a: CvAction) => setContent((c) => cvReducer(c, a)), [setContent]);
   const focusPage = useCallback(() => pageRef.current?.focus(), []);
-  const { scores } = useRoleScores({ cv: content, status });
+  const { scores, retry } = useRoleScores({ cv: content, status });
   const phone = useMediaQuery("(max-width: 899px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
 
@@ -125,6 +125,8 @@ export function Editor({ initial }: { initial: CvResponse }) {
       onFocusPage={focusPage}
       opened={opened}
       onOpen={onOpen}
+      scores={scores}
+      onRetry={retry}
     />
   );
 
@@ -146,7 +148,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
             {historyOpen ? (
               <CvDocument content={preview?.content ?? content} showUnsorted />
             ) : (
-              <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} />
+              <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} />
             )}
           </div>
         </div>

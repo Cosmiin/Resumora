@@ -15,10 +15,11 @@ type Props = {
   opened: ReadonlySet<SectionKey>;
   onOpen(key: SectionKey): void;
   scores?: ReadonlyMap<string, RoleScoreState>;
+  toolsRoleId?: string;
 };
 
 /** The CV page where every piece of text is typed in place. */
-export function EditablePage({ cv, dispatch, opened, onOpen, scores }: Props) {
+export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
 
@@ -53,7 +54,7 @@ export function EditablePage({ cv, dispatch, opened, onOpen, scores }: Props) {
               {key !== "other" && (
                 <SectionHeading sectionKey={key} title={layout.titles[key] ?? ""} locale={cv.locale} dispatch={dispatch} />
               )}
-              <Body cv={cv} dispatch={dispatch} scores={scores} />
+              <Body cv={cv} dispatch={dispatch} scores={scores} toolsRoleId={toolsRoleId} />
             </section>
           );
         }

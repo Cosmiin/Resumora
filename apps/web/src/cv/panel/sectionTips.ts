@@ -16,7 +16,6 @@ const LIST_TIPS: MessageKey[] = ["panel.tip.list.1"];
 const AI_BUTTONS: Partial<Record<CategoryKey, MessageKey[]>> = {
   summary: ["panel.ai.summary.rewrite", "panel.ai.summary.tailor"],
   achievements: ["panel.ai.achievements.pull"],
-  experience: ["panel.ai.experience.strengthen", "panel.ai.experience.numbers"],
   skills: ["panel.ai.skills.suggest", "panel.ai.skills.sort"],
 };
 

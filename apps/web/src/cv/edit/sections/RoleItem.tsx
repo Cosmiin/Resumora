@@ -14,6 +14,7 @@ import { RemoveButton } from "./RemoveButton.tsx";
 import { ScorePill } from "../../enrich/ScorePill.tsx";
 import type { RoleScoreState } from "../../enrich/useRoleScores.ts";
 import { focusField } from "../focus.ts";
+import { issueTip } from "../../enrich/tips.ts";
 
 type Props = {
   role: Experience;
@@ -21,6 +22,8 @@ type Props = {
   locale: Locale;
   /** This role's score; left out where roles are not scored. */
   score?: RoleScoreState;
+  /** The panel is showing this role's tools, so weak bullets get a marker. */
+  toolsOpen?: boolean;
   dispatch(a: CvAction): void;
 };
 
@@ -31,8 +34,15 @@ export function roleName(role: Experience, list: "experience" | "volunteering"):
   return role.title || role.company || t(`edit.role.untitled.${list}`);
 }
 
+/** Bullets scored below 75 with the tip for each, once the score matches the text. */
+function weakBullets(score: RoleScoreState | undefined): ReadonlyMap<string, string> | undefined {
+  if (score?.state !== "ready" || !score.result) return undefined;
+  const weak = score.result.bullets.filter((b) => b.score < 75);
+  return weak.length ? new Map(weak.map((b) => [b.id, issueTip(b.issue, b.tip)])) : undefined;
+}
+
 /** One role on the page. Memoised: typing in one role leaves the others alone. */
-export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, score }: Props) {
+export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, score, toolsOpen }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
   const itemId = role.id;
@@ -57,6 +67,8 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, s
     dispatch({ type: "addBullet", owner, newId: id });
     focusLater(`bullet-${id}`);
   }, [dispatch, owner, focusLater]);
+
+  const marks = useMemo(() => (toolsOpen ? weakBullets(score) : undefined), [toolsOpen, score]);
 
   const openRole = useCallback(() => {
     if (root.current) focusField(root.current, `${list}-${itemId}-title`);
@@ -128,7 +140,7 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, s
       <div className={role.description ? "cv-role-desc" : "cv-role-desc is-empty"}>
         {field("description", "edit.role.description", "edit.role.descriptionPlaceholder", undefined, true)}
       </div>
-      <BulletList owner={owner} bullets={role.bullets} dispatch={dispatch} ownerName={name} />
+      <BulletList owner={owner} bullets={role.bullets} dispatch={dispatch} ownerName={name} marks={marks} />
       <AddButton label={t("edit.add.bullet")} onClick={addBullet} />
     </div>
   );

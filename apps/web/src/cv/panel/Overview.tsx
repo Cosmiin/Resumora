@@ -3,6 +3,8 @@ import { CATEGORY, SECTION_KEYS, missingCategories, newId, normalizeLayout, type
 import { t } from "../../i18n/t.ts";
 import { sectionsOnCv, type CvAction } from "../edit/cvReducer.ts";
 import { DragList } from "../edit/DragList.tsx";
+import { RoleScoreList } from "../enrich/RoleScoreList.tsx";
+import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 import { firstFieldKey } from "../edit/sections/renderers.tsx";
 
 type Props = {
@@ -13,6 +15,7 @@ type Props = {
   /** Sections added this visit that count as present while still empty. */
   opened: ReadonlySet<SectionKey>;
   onOpen(key: SectionKey): void;
+  scores?: ReadonlyMap<string, RoleScoreState>;
 };
 
 const CUSTOM = "custom";
@@ -27,7 +30,7 @@ function Eye({ on }: { on: boolean }) {
 }
 
 /** The panel's home view: what is missing, the sections on the CV (order, hide) and a way to add more. */
-export function Overview({ cv, dispatch, onFocusField, opened, onOpen }: Props) {
+export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores }: Props) {
   const layout = normalizeLayout(cv.layout);
   const nameOf = (key: SectionKey) => layout.titles[key] || CATEGORY[key].label[cv.locale];
   const saved = sectionsOnCv(cv);
@@ -93,6 +96,10 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen }: Props) 
           </div>
         )}
       </div>
+
+      {scores && (
+        <RoleScoreList roles={cv.experience} scores={scores} onOpen={(id) => onFocusField(`experience-${id}-title`)} />
+      )}
 
       <div>
         <p className="p-sub">{t("panel.overview.sections")}</p>

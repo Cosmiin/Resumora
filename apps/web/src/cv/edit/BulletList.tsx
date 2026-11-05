@@ -10,6 +10,8 @@ type Props = {
   bullets: Bullet[];
   dispatch(a: CvAction): void;
   ownerName: string;
+  /** Tips for weak bullets by bullet id; only passed while the role's score card is open. */
+  marks?: ReadonlyMap<string, string>;
 };
 
 type ItemProps = {
@@ -22,6 +24,8 @@ type ItemProps = {
   ownerName: string;
   focusLater(id: string, caret: number): void;
   readText(id: string): number;
+  /** Why this bullet is weak; shown as a faint marker. */
+  mark?: string;
 };
 
 const BulletItem = memo(function BulletItem({
@@ -34,6 +38,7 @@ const BulletItem = memo(function BulletItem({
   ownerName,
   focusLater,
   readText,
+  mark,
 }: ItemProps) {
   const owner = useMemo(
     () => (ownerList === "achievements" ? { list: ownerList } : { list: ownerList, itemId: ownerItemId ?? "" }) as BulletOwner,
@@ -72,6 +77,20 @@ const BulletItem = memo(function BulletItem({
 
   return (
     <li>
+      {mark && (
+        <>
+          <button
+            type="button"
+            className="weak-mark"
+            title={mark}
+            aria-label={t("enrich.card.weakBullet")}
+            aria-describedby={`weak-tip-${id}`}
+          />
+          <span className="weak-tip" id={`weak-tip-${id}`}>
+            {mark}
+          </span>
+        </>
+      )}
       <PageField
         multiline
         fieldKey={`bullet-${id}`}
@@ -86,7 +105,7 @@ const BulletItem = memo(function BulletItem({
 });
 
 /** Bullets that behave like lines in a word processor: Enter splits, Backspace at the start joins. */
-export function BulletList({ owner, bullets, dispatch, ownerName }: Props) {
+export function BulletList({ owner, bullets, dispatch, ownerName, marks }: Props) {
   const root = useRef<HTMLUListElement>(null);
   const ownerItemId = owner.list === "achievements" ? undefined : owner.itemId;
 
@@ -116,6 +135,7 @@ export function BulletList({ owner, bullets, dispatch, ownerName }: Props) {
           ownerName={ownerName}
           focusLater={focusLater}
           readText={readText}
+          mark={marks?.get(bullet.id)}
         />
       ))}
     </ul>

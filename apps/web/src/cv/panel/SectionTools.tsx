@@ -3,6 +3,8 @@ import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
+import { ScoreCard } from "../enrich/ScoreCard.tsx";
+import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 import type { PanelFocus } from "./HelperPanel.tsx";
 
 type Props = {
@@ -12,7 +14,11 @@ type Props = {
   onBack(): void;
   /** Move the cursor to the page itself (used when what had it is gone). */
   onFocusPage(): void;
+  scores?: ReadonlyMap<string, RoleScoreState>;
+  onRetry?(roleId: string): void;
 };
+
+const noop = () => undefined;
 
 function Eye() {
   return (
@@ -57,6 +63,14 @@ function RoleBox({ cv, dispatch, list, itemId, onFocusPage }: Pick<Props, "cv" |
   );
 }
 
+/** The score card for one role. Answering and rewriting are wired in a later task. */
+function RoleScoreCard({ cv, roleId, scores, onRetry }: Pick<Props, "cv" | "scores" | "onRetry"> & { roleId: string }) {
+  const role = cv.experience.find((r) => r.id === roleId);
+  const score = scores?.get(roleId);
+  if (!role || !score) return null;
+  return <ScoreCard role={role} score={score} onAnswer={noop} onRewrite={noop} onRetry={() => onRetry?.(roleId)} />;
+}
+
 /** Skills the importer could not place: send each one to a group. */
 function ToSortBox({ cv, dispatch }: Pick<Props, "cv" | "dispatch">) {
   if (cv.unclearSkills.length === 0) return null;
@@ -79,7 +93,7 @@ function ToSortBox({ cv, dispatch }: Pick<Props, "cv" | "dispatch">) {
 }
 
 /** The tools for the part of the CV the cursor is in. */
-export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage }: Props) {
+export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores, onRetry }: Props) {
   const { key, itemId } = focus;
   const layout = normalizeLayout(cv.layout);
   const standard = CATEGORY[key].label[cv.locale];
@@ -118,6 +132,7 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage }: Props
           </button>
         </p>
       )}
+      {key === "experience" && itemId && <RoleScoreCard cv={cv} roleId={itemId} scores={scores} onRetry={onRetry} />}
       {(key === "experience" || key === "volunteering") && itemId && (
         <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onFocusPage={onFocusPage} />
       )}
