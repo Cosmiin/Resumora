@@ -221,4 +221,18 @@ describe("hasUnknownNumber", () => {
   it("accepts a proposal with no numbers", () => {
     expect(hasUnknownNumber("Improved onboarding", [])).toBe(false);
   });
+  it("rejects digits glued to capitals that appear in no source", () => {
+    expect(hasUnknownNumber("Saved USD1800 a year", ["Saved USD 900 a year"])).toBe(true);
+    expect(hasUnknownNumber("Closed Q5 targets", ["Closed Q4 targets"])).toBe(true);
+    expect(hasUnknownNumber("Cut costs by EUR500.", ["Cut costs"])).toBe(true);
+  });
+  it("accepts glued tokens found whole in a source, in any case", () => {
+    expect(hasUnknownNumber("GA4 reports for the team", ["set up GA4"])).toBe(false);
+    expect(hasUnknownNumber("Grew B2B sales", ["B2B sales"])).toBe(false);
+    expect(hasUnknownNumber("Led the ISO27001 audit.", ["iso27001 audit"])).toBe(false);
+    expect(hasUnknownNumber("Shipped in Q4.", ["Q4, 2023"])).toBe(false);
+  });
+  it("does not take a glued token from inside a longer source token", () => {
+    expect(hasUnknownNumber("Built GA4 dashboards", ["GA45 migration"])).toBe(true);
+  });
 });

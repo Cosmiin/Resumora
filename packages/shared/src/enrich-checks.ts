@@ -155,8 +155,20 @@ export function numbersIn(text: string): string[] {
   return out;
 }
 
-/** True when the proposal has a number that appears in none of the sources. */
+// Digits glued to a capital letter ("USD1800", "GA4", "B2B", "ISO27001", "Q4"). numbersIn skips
+// these, so they are compared as whole tokens instead.
+// A source may write them in any case ("iso27001"), so sources accept any letter before the digits.
+const GLUED = /(?<![\p{L}\p{N}])\p{L}*\p{Lu}\p{N}[\p{L}\p{N}.,]*/gu;
+const LETTERS_THEN_DIGITS = /(?<![\p{L}\p{N}])\p{L}+\p{N}[\p{L}\p{N}.,]*/gu;
+
+function tokens(text: string, re: RegExp): string[] {
+  return [...text.matchAll(re)].map((m) => m[0].replace(/[.,]+$/, "").toLowerCase());
+}
+
+/** True when the proposal has a number, or a glued token like "USD1800", that appears in none of the sources. */
 export function hasUnknownNumber(proposal: string, sources: string[]): boolean {
   const known = new Set(sources.flatMap(numbersIn));
-  return numbersIn(proposal).some((n) => !known.has(n));
+  if (numbersIn(proposal).some((n) => !known.has(n))) return true;
+  const knownGlued = new Set(sources.flatMap((s) => tokens(s, LETTERS_THEN_DIGITS)));
+  return tokens(proposal, GLUED).some((t) => !knownGlued.has(t));
 }
