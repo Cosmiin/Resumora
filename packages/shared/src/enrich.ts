@@ -221,9 +221,12 @@ function cyrb53(str: string): number {
   return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 }
 
-/** Changes when anything the score depends on changes: texts, title, description, locale or policy. */
+/**
+ * Changes when anything the score depends on changes: bullet ids and texts, title, description, locale or policy.
+ * Ids count because the result points at bullets by id: a bullet deleted and retyped gets a new id.
+ */
 export function fingerprint(role: Experience, locale: Locale): string {
-  const parts = [SCORE_POLICY, locale, role.title, role.description, ...role.bullets.map((b) => b.text)];
+  const parts = [SCORE_POLICY, locale, role.title, role.description, ...role.bullets.flatMap((b) => [b.id, b.text])];
   return cyrb53(parts.join("\u0000")).toString(16);
 }
 

@@ -247,6 +247,10 @@ describe("fingerprint", () => {
     expect(fingerprint(role(["one", "two"], { title: "Other" }), "en")).not.toBe(fp);
     expect(fingerprint(base, "ro")).not.toBe(fp);
   });
+  it("changes when a bullet keeps its text but gets a new id", () => {
+    const retyped = { ...base, bullets: [base.bullets[0]!, { id: "b9", text: "two" }] };
+    expect(fingerprint(retyped, "en")).not.toBe(fp);
+  });
   it("ignores company and dates", () => {
     expect(
       fingerprint(role(["one", "two"], { company: "Z", startDate: "2000", endDate: "", current: true }), "en"),
