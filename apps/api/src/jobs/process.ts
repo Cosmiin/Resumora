@@ -8,18 +8,18 @@ export async function processJob(
   work: JobWork,
 ): Promise<{ ok: true; extracted: JobExtraction } | { ok: false; code: "not_a_job" | "ai_failed" }> {
   try {
+    const today = deps.now?.() ?? new Date();
     const extracted = await callModel(deps.model, {
       userId: work.userId,
       task: "job_extract",
       schema: JobExtractionSchema,
       system: jobExtractPrompt,
-      user: buildJobUserPrompt(work),
+      user: buildJobUserPrompt(work, today.toISOString().slice(0, 10)),
       maxOutputTokens: 2000,
     });
     if (!extracted.isJobPosting) return { ok: false, code: "not_a_job" };
     if (!extracted.title.trim()) return { ok: false, code: "ai_failed" };
     if (extracted.applyBy) {
-      const today = deps.now?.() ?? new Date();
       const earliest = new Date(today);
       const latest = new Date(today);
       earliest.setUTCFullYear(today.getUTCFullYear() - 1);

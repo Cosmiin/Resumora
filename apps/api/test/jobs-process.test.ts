@@ -29,7 +29,8 @@ function fakeModel(answer: unknown = extracted, crash = false) {
 describe("job user prompt", () => {
   it("labels JSON-LD before the page text", () => {
     const jsonLd = { "@type": "JobPosting", title: "Engineer" };
-    const prompt = buildJobUserPrompt({ ...work, jsonLd });
+    const prompt = buildJobUserPrompt({ ...work, jsonLd }, "2026-11-06");
+    expect(prompt.startsWith("Today's date: 2026-11-06.\n")).toBe(true);
     expect(prompt).toContain("JSON-LD");
     expect(prompt).toContain(JSON.stringify(jsonLd));
     expect(prompt).toContain(work.rawText);
@@ -37,13 +38,13 @@ describe("job user prompt", () => {
   });
 
   it("omits the JSON-LD block when absent", () => {
-    const prompt = buildJobUserPrompt(work);
+    const prompt = buildJobUserPrompt(work, "2026-11-06");
     expect(prompt).toContain(work.rawText);
     expect(prompt).not.toContain("JSON-LD");
   });
 
   it("caps page text at 30,000 characters", () => {
-    const prompt = buildJobUserPrompt({ ...work, rawText: "x".repeat(30_000) + "PRIVATE TAIL" });
+    const prompt = buildJobUserPrompt({ ...work, rawText: "x".repeat(30_000) + "PRIVATE TAIL" }, "2026-11-06");
     expect(prompt).toContain("x".repeat(30_000));
     expect(prompt).not.toContain("PRIVATE TAIL");
   });
@@ -52,13 +53,24 @@ describe("job user prompt", () => {
 describe("job extraction", () => {
   it("returns a valid extraction with the job task and output limit", async () => {
     const { model, fetch, logCall } = fakeModel();
-    expect(await processJob({ model }, work)).toEqual({ ok: true, extracted });
+    const now = () => new Date("2026-11-06T12:00:00Z");
+    expect(await processJob({ model, now }, work)).toEqual({ ok: true, extracted });
     const request = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
     expect(request.response_format.json_schema.name).toBe("job_extract");
     expect(request.max_tokens).toBe(2000);
+    expect(request.messages[1].content.startsWith("Today's date: 2026-11-06.\n")).toBe(true);
     expect(request.messages[1].content).toContain(work.rawText);
     expect(logCall).toHaveBeenCalledWith(expect.objectContaining({ userId: work.userId, task: "job_extract", status: "ok" }));
     expect(JSON.stringify(logCall.mock.calls)).not.toContain(work.rawText);
+  });
+
+  it("sends the deadline format and year rules to the model", async () => {
+    const { model, fetch } = fakeModel();
+    await processJob({ model }, work);
+    const request = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
+    expect(request.messages[0].content).toContain("Write applyBy as YYYY-MM-DD");
+    expect(request.messages[0].content).toContain("copying the year exactly as the page writes it");
+    expect(request.messages[0].content).toContain("use the next such date on or after today");
   });
 
   it.each(["3011-11-30", "2025-11-05", "2028-11-07"])("clears an implausible deadline %s and keeps every other field", async (applyBy) => {
