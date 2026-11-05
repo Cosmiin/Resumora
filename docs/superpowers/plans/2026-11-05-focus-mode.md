@@ -626,3 +626,34 @@ This plan was edited by Claude. **Do not modify it.**
 - Typecheck, lint and the full test suite pass.
 
 **Out of scope:** everything else.
+
+---
+
+## Task 14: Hands-on fixes: wide-screen layout, plain follow-up box
+
+Found in the hands-on check in the running app (2026-11-05, a ~1570 px wide window). The user chose layout B.
+
+```
+---
+files: [apps/web/src/styles/focus.css, apps/web/src/cv/enrich/QuestionStep.tsx, apps/web/src/cv/enrich/focus-mode.test.tsx, docs/superpowers/plans/2026-11-05-focus-mode.md]
+new_files: []
+deps: false
+size: 40
+---
+```
+
+This plan was edited by Claude. **Do not modify it.**
+
+**Goal:** two fixes.
+
+1. **Layout B: a fixed role column, both columns centred.** On wide screens the left column stretched to half the window and the right column stopped at 680 px, leaving a large empty area on the right. In `apps/web/src/styles/focus.css`:
+   - `.focus-mode` gets `grid-template-columns: minmax(300px, 380px) minmax(0, 720px); justify-content: center;` (the background stays full-screen, because it is on `.focus-mode` itself);
+   - `.fm-right` drops its `max-width: 680px`, because the grid column now caps it;
+   - the phone rule (`@media (max-width: 760px)`) is unchanged: one column, the role on top.
+2. **The "anything else?" box is plain.** When `QuestionStep` has no stored question (the follow-up after "We need a bit more detail"), it renders `AnswerBox` with `plain`, so the lone "Something else" chip is not shown. A step with a stored question keeps its chips.
+
+**Acceptance tests:**
+- `focus-mode.test.tsx`: in the needs-detail follow-up (free text), there is no "Something else" button; on a question step with options, the options and "Something else" are shown as before.
+- Typecheck, lint and the full test suite pass.
+
+**Out of scope:** everything else.

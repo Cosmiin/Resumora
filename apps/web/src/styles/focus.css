@@ -4,7 +4,7 @@
 
 .focus-mode {
   position: fixed; inset: 0; z-index: 1000;
-  display: grid; grid-template-columns: minmax(300px, 1fr) minmax(0, 1.3fr);
+  display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 720px); justify-content: center;
   background: radial-gradient(1200px 500px at 30% 0%, var(--white) 0%, var(--sage-50) 60%);
   color: var(--text-strong); font-family: var(--font-sans);
   animation: fm-in var(--dur-slow) var(--ease-out);
@@ -39,7 +39,7 @@
 .fm-score b { font-family: var(--font-display); font-size: var(--text-stat); font-weight: var(--weight-medium); letter-spacing: var(--tracking-stat); line-height: 1; font-variant-numeric: tabular-nums; }
 
 /* ── Right: one step ──────────────────────────────────────────────────── */
-.fm-right { position: relative; width: 100%; max-width: 680px; box-sizing: border-box; padding: var(--space-12) var(--space-11) var(--space-10); overflow-y: auto; }
+.fm-right { position: relative; width: 100%; box-sizing: border-box; padding: var(--space-12) var(--space-11) var(--space-10); overflow-y: auto; }
 .fm-close {
   /* Above the celebration overlay (z-index 2): ✕ works at any point. */
   position: absolute; z-index: 3; top: var(--space-6); inset-inline-end: var(--space-6);
