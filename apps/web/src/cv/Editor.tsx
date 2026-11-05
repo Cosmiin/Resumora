@@ -44,7 +44,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
   const importButton = useRef<HTMLButtonElement>(null);
   const importWasOpen = useRef(false);
   const pageRef = useRef<HTMLDivElement>(null);
-  const [opened, onOpen] = useOpenedSections();
+  const [opened, onOpen, clearOpened] = useOpenedSections();
   const focusField = useFocusAfterRender(pageRef);
   const [sectionFocus, clearFocus] = useFocusSection(pageRef);
   // One stable dispatch: rows on the page skip re-rendering unless their own data changed.
@@ -104,6 +104,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
     }
     try {
       autosave.reset(await getCv());
+      clearOpened();
     } catch {
       // The restore is saved, but our copy is now out of date: let the user load it.
       autosave.reportConflict(restored);
@@ -119,7 +120,10 @@ export function Editor({ initial }: { initial: CvResponse }) {
           {t("cv.invalid", { problem: autosave.problem })}
         </p>
       )}
-      {conflict && <ConflictBanner onLoadLatest={loadLatest} onKeepMine={keepMine} />}
+      {conflict && <ConflictBanner onLoadLatest={async () => {
+        await loadLatest();
+        clearOpened();
+      }} onKeepMine={keepMine} />}
     </>
   );
 
@@ -209,6 +213,7 @@ export function Editor({ initial }: { initial: CvResponse }) {
           onClose={() => setImportId(null)}
           onApplied={(cv) => {
             autosave.reset(cv);
+            clearOpened();
             setImportId(null);
           }}
           onConflict={(c) => {
