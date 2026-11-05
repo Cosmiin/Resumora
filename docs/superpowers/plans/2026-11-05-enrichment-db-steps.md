@@ -1,0 +1,58 @@
+# Database steps for CV enrichment (you run these)
+
+This adds one new table (`cv_insights`) and two small database functions. It changes nothing that exists today. Nothing has been applied yet.
+
+## 1. Open a terminal in the project
+
+Open a terminal in the project folder (the one that contains the `supabase` folder).
+
+## 2. Check which project you are connected to
+
+Run:
+
+```
+npx supabase migration list
+```
+
+You should see the earlier migrations on both sides (Local and Remote), and a new one, `20261106000000`, with a Local value only. If it asks you to log in or link the project, do that first (`npx supabase login`, then `npx supabase link`), and pick the Resumora project.
+
+## 3. Apply the new migration
+
+Run:
+
+```
+npx supabase db push
+```
+
+It lists the migration it is about to apply (`20261106000000_enrichment.sql`). Answer `Y` to continue.
+
+## 4. Check that it worked
+
+Open the Supabase dashboard, go to SQL Editor, and run each of these. They only read data.
+
+Table exists and is protected (expect one row, `rowsecurity` = true):
+
+```sql
+select tablename, rowsecurity from pg_tables
+where schemaname = 'public' and tablename = 'cv_insights';
+```
+
+Four policies exist (expect 4 rows, names starting with "own insights"):
+
+```sql
+select policyname, cmd from pg_policies
+where schemaname = 'public' and tablename = 'cv_insights' order by policyname;
+```
+
+Both functions exist (expect 2 rows):
+
+```sql
+select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and proname in ('snapshot_base_cv', 'log_ai_call');
+```
+
+If all three show the expected rows, you are done. Tell me and I will carry on with the next task.
+
+## If something goes wrong
+
+Copy the error message and send it to me. Do not try to fix it by hand in the SQL editor. The migration only adds new things, so nothing existing is at risk.

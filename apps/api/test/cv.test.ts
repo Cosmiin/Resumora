@@ -181,6 +181,9 @@ describe("old v1 CVs", () => {
         row = versions[id];
         return { ok: true, version: 2, updatedAt: "2026-11-04T10:01:00Z" };
       },
+      async snapshot() {
+        throw new Error("not used");
+      },
     };
   }
 
