@@ -155,20 +155,27 @@ export function numbersIn(text: string): string[] {
   return out;
 }
 
-// Digits glued to a capital letter ("USD1800", "GA4", "B2B", "ISO27001", "Q4"). numbersIn skips
-// these, so they are compared as whole tokens instead.
-// A source may write them in any case ("iso27001"), so sources accept any letter before the digits.
-const GLUED = /(?<![\p{L}\p{N}])\p{L}*\p{Lu}\p{N}[\p{L}\p{N}.,]*/gu;
-const LETTERS_THEN_DIGITS = /(?<![\p{L}\p{N}])\p{L}+\p{N}[\p{L}\p{N}.,]*/gu;
+// A whole run of letters and digits, with "." or "," allowed only between two digits ("USD1,800").
+const WORD_RUN = /(?<![\p{L}\p{N}])(?:[\p{L}\p{N}]|(?<=\p{N})[.,](?=\p{N}))+/gu;
+// A plain number with a scale or unit that numbersIn already reads ("5k", "1.2M", "3bn", "20min",
+// "10x", "x3"). These stay with numbersIn and are not compared as glued tokens.
+const NUMBER_WITH_UNIT =
+  /^(?:\d+(?:[.,]\d+)*(?:k|m|b|bn|mld|mil|mii|milion|milioane|miliard|miliarde|millions?|billions?|min|mins|h|hrs?|x|s|sec|ms|d|days?|w|wk|mo|y|yrs?|pp|pts?|kg|km|kb|mb|gb|tb)|x\d+(?:[.,]\d+)*)$/u;
 
-function tokens(text: string, re: RegExp): string[] {
-  return [...text.matchAll(re)].map((m) => m[0].replace(/[.,]+$/, "").toLowerCase());
+/**
+ * Glued tokens: runs with at least one letter and one digit, in any order ("USD1800", "GA4",
+ * "2024Q3", "1H2025"), lowercased. numbersIn cannot read them, so they are compared whole.
+ */
+function gluedTokens(text: string): string[] {
+  return [...text.matchAll(WORD_RUN)]
+    .map((m) => m[0].toLowerCase())
+    .filter((t) => /\p{L}/u.test(t) && /\p{N}/u.test(t) && !NUMBER_WITH_UNIT.test(t));
 }
 
 /** True when the proposal has a number, or a glued token like "USD1800", that appears in none of the sources. */
 export function hasUnknownNumber(proposal: string, sources: string[]): boolean {
   const known = new Set(sources.flatMap(numbersIn));
   if (numbersIn(proposal).some((n) => !known.has(n))) return true;
-  const knownGlued = new Set(sources.flatMap((s) => tokens(s, LETTERS_THEN_DIGITS)));
-  return tokens(proposal, GLUED).some((t) => !knownGlued.has(t));
+  const knownGlued = new Set(sources.flatMap(gluedTokens));
+  return gluedTokens(proposal).some((t) => !knownGlued.has(t));
 }
