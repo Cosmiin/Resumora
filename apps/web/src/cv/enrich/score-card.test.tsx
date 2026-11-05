@@ -1,6 +1,6 @@
 import { useReducer, useRef } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import { EditablePage } from "../edit/EditablePage.tsx";
@@ -111,6 +111,31 @@ describe("score card", () => {
     expect(screen.getByText("Score unavailable")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(fns.onRetry).toHaveBeenCalled();
+  });
+
+  it("while scoring again, shows the older score marked as previous", () => {
+    card({ state: "scoring", result: result() });
+    expect(screen.getByText("62")).toBeInTheDocument();
+    expect(screen.getByText(/This score is for earlier text/)).toBeInTheDocument();
+  });
+
+  it("when unavailable with an older score, shows it as previous with Score unavailable and Try again", async () => {
+    const fns = card({ state: "unavailable", result: result() });
+    expect(screen.getByText("62")).toBeInTheDocument();
+    expect(screen.getByText(/This score is for earlier text/)).toBeInTheDocument();
+    expect(screen.getByText("Score unavailable")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(fns.onRetry).toHaveBeenCalled();
+  });
+
+  it("does not count questions already answered in a note", () => {
+    const q = (text: string) => ({ bulletId: "b1", text, options: [] });
+    const note = { id: "n1", question: "Which tasks?", answer: "Rota", via: ["type" as const], askedAt: "2026-11-05T10:00:00Z" };
+    card(ready(result({ questions: [q("Which tasks?"), q("How many people?")] })), role({ notes: [note] }));
+    expect(screen.getByRole("button", { name: "Answer 1 question" })).toBeInTheDocument();
+    cleanup();
+    card(ready(result({ questions: [q("Which tasks?")] })), role({ notes: [note] }));
+    expect(screen.queryByRole("button", { name: /^Answer/ })).toBeNull();
   });
 
   it("asks for bullets when the role has none", () => {

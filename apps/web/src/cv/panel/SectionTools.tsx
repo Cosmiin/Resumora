@@ -6,7 +6,7 @@ import { roleName } from "../edit/sections/RoleItem.tsx";
 import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
 import { QuestionFlow } from "../enrich/QuestionFlow.tsx";
 import { RewriteReview } from "../enrich/RewriteReview.tsx";
-import { ScoreCard } from "../enrich/ScoreCard.tsx";
+import { ScoreCard, openQuestions } from "../enrich/ScoreCard.tsx";
 import { SkillsTools } from "../enrich/SkillsTools.tsx";
 import { SummaryTools } from "../enrich/SummaryTools.tsx";
 import type { RoleScoreState } from "../enrich/useRoleScores.ts";
@@ -89,7 +89,8 @@ function RoleEnrich({ cv, dispatch, roleId, scores, onRetry, waitForSave }: Pick
 
   if (view.kind === "card") {
     if (!score) return null;
-    const questions = score.state === "ready" ? (score.result?.questions ?? []) : [];
+    // Questions already answered in a note are not asked again.
+    const questions = score.state === "ready" && score.result ? openQuestions(role, score.result.questions) : [];
     const rewrite = async () => {
       setView({ kind: "drafting" });
       await waitForSave();

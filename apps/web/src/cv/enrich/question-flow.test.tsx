@@ -180,6 +180,18 @@ describe("role tools", () => {
     await user.click(screen.getByRole("button", { name: "← Back to score" }));
     expect(screen.getByRole("button", { name: "Rewrite bullets" })).toBeInTheDocument();
   });
+
+  it("an answered question is not offered again, in the count or the flow", async () => {
+    const user = userEvent.setup();
+    render(<Panel qs={questions} waitForSave={() => Promise.resolve()} />);
+    await user.click(screen.getByRole("button", { name: "Answer 2 questions" }));
+    await user.type(screen.getByRole("textbox", { name: "Your answer" }), "Invoices");
+    await user.click(screen.getByRole("button", { name: "Save answer" }));
+    await user.click(screen.getByRole("button", { name: "← Back to score" }));
+    await user.click(screen.getByRole("button", { name: "Answer 1 question" }));
+    expect(screen.getByText("Question 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("How many suppliers?")).toBeInTheDocument();
+  });
 });
 
 describe("waitForSave", () => {

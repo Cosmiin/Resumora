@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { atsChecks, band, clearCount, type Experience } from "@resumora/shared";
+import { atsChecks, band, clearCount, type Experience, type Question } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { atsTipText, issueTip } from "./tips.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
@@ -24,12 +24,28 @@ function tipsOf(role: Experience, score: RoleScoreState): { text: string; ats: b
   return tips.slice(0, 2);
 }
 
+/** The questions not answered yet: a note on the role with the same question text means it was. */
+export function openQuestions(role: Experience, questions: readonly Question[]): Question[] {
+  const answered = new Set(role.notes.map((n) => n.question.trim()));
+  return questions.filter((q) => !answered.has(q.text.trim()));
+}
+
 /** The score, what to fix first, and the two actions: the top of a role's tools in the panel. */
 export function ScoreCard({ role, score, onAnswer, onRewrite, onRetry }: Props) {
   const hasBullets = role.bullets.some((b) => b.text.trim() !== "");
   const result = score.result;
   const n = result?.score ?? null;
-  const shown = score.state !== "none" && score.state !== "unavailable" && result !== undefined && n !== null;
+  const shown = score.state !== "none" && result !== undefined && n !== null;
+  // While a new score is on its way, or after it failed, the score shown is for earlier text.
+  const previous = shown && score.state !== "ready";
+  const retry = score.state === "unavailable" && (
+    <div className="score-meta">
+      <strong>{t("enrich.card.unavailable")}</strong>
+      <button type="button" className="btn" onClick={onRetry}>
+        {t("enrich.card.tryAgain")}
+      </button>
+    </div>
+  );
 
   let head;
   if (shown) {
@@ -48,16 +64,7 @@ export function ScoreCard({ role, score, onAnswer, onRewrite, onRetry }: Props) 
       </div>
     );
   } else if (score.state === "unavailable") {
-    head = (
-      <div className="score-top">
-        <div className="score-meta">
-          <strong>{t("enrich.card.unavailable")}</strong>
-          <button type="button" className="btn" onClick={onRetry}>
-            {t("enrich.card.tryAgain")}
-          </button>
-        </div>
-      </div>
-    );
+    head = <div className="score-top">{retry}</div>;
   } else {
     head = (
       <div className="score-top">
@@ -69,12 +76,13 @@ export function ScoreCard({ role, score, onAnswer, onRewrite, onRetry }: Props) 
   }
 
   const tips = shown ? tipsOf(role, score) : [];
-  const questions = score.state === "ready" ? (result?.questions.length ?? 0) : 0;
+  const questions = score.state === "ready" && result ? openQuestions(role, result.questions).length : 0;
 
   return (
     <div className="box score-card">
       {head}
-      {score.state === "previous" && <p className="fine">{t("enrich.card.previous")}</p>}
+      {shown && retry}
+      {previous && <p className="fine">{t("enrich.card.previous")}</p>}
       {shown && (
         <ul className="tips">
           {tips.length === 0 ? (
