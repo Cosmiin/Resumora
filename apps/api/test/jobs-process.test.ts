@@ -61,6 +61,19 @@ describe("job extraction", () => {
     expect(JSON.stringify(logCall.mock.calls)).not.toContain(work.rawText);
   });
 
+  it.each(["3011-11-30", "2025-11-05", "2028-11-07"])("clears an implausible deadline %s and keeps every other field", async (applyBy) => {
+    const { model } = fakeModel({ ...extracted, applyBy });
+    const now = () => new Date("2026-11-06T12:00:00Z");
+    expect(await processJob({ model, now }, work)).toEqual({ ok: true, extracted });
+  });
+
+  it.each(["2026-11-30", "2025-11-06", "2028-11-06", null])("keeps a plausible or missing deadline %s", async (applyBy) => {
+    const answer = { ...extracted, applyBy };
+    const { model } = fakeModel(answer);
+    const now = () => new Date("2026-11-06T12:00:00Z");
+    expect(await processJob({ model, now }, work)).toEqual({ ok: true, extracted: answer });
+  });
+
   it("rejects a page that is not a job posting", async () => {
     const { model } = fakeModel({ ...extracted, title: "", isJobPosting: false });
     expect(await processJob({ model }, work)).toEqual({ ok: false, code: "not_a_job" });

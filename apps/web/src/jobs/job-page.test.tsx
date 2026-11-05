@@ -56,9 +56,10 @@ describe("job page", () => {
     const { client } = renderJob(); await ready();
     expect(getJob).toHaveBeenCalledWith("one");
     expect(client.getQueryData(["job", "u1", "one"])).toEqual(job);
-    for (const text of ["Acme · London", "Hybrid", "Full time", "7,000–9,000 RON / month", "Apply by 2026-12-01"]) {
+    for (const text of ["Acme · London", "Hybrid", "Full time", "7,000–9,000 RON / month", "Apply by 1 Dec 2026"]) {
       expect(screen.getByText(text)).toBeInTheDocument();
     }
+    expect(screen.queryByText(/2026-12-01/)).not.toBeInTheDocument();
     expect(screen.queryByText("Not stated")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tailor your CV →" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Job ad" })).toHaveAttribute("aria-selected", "true");

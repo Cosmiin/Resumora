@@ -83,6 +83,10 @@ function JobView({ id, userId }: { id: string; userId: string }) {
       <button type="button" className="secondary" disabled={deleting} onClick={() => { setConfirmDelete(false); setDeleteError(null); }}>{t("job.deleteCancel")}</button>
     </> : <button type="button" className="secondary danger" onClick={() => setConfirmDelete(true)}>{t("job.delete")}</button>}
   </div>;
+  const applyByText = extracted?.applyBy
+    ? new Date(`${extracted.applyBy}T00:00:00Z`).toLocaleDateString("en-GB", {
+      day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+    }) : null;
   const salary = extracted?.salary;
   const salaryText = salary && (salary.min !== null || salary.max !== null)
     ? [salary.min, salary.max].filter((value) => value !== null).map((value) => value.toLocaleString("en")).join("–")
@@ -121,7 +125,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           {extracted.employmentType !== "unknown" && <span className="fact">{t(`job.type.${extracted.employmentType}`)}</span>}
           {extracted.seniority !== "unknown" && <span className="fact">{t(`job.seniority.${extracted.seniority}`)}</span>}
           {salaryText !== null && <span className="fact">{salaryText}</span>}
-          {extracted.applyBy && <span className="fact">{t("job.applyBy", { date: extracted.applyBy })}</span>}
+          {applyByText && <span className="fact">{t("job.applyBy", { date: applyByText })}</span>}
         </div>
         <div className="tailor">
           <div><strong>{t("job.tailor.title")} <span className="job-soon">{t("jobs.soon")}</span></strong><span>{t("job.tailor.text")}</span></div>
