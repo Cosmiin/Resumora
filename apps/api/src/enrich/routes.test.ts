@@ -102,6 +102,21 @@ describe("/v1/enrich", () => {
     expect(await res.json()).toEqual({ suggestions: [{ name: "payroll", group: "professionalSkills", evidence: "Payroll for 40 staff" }], sort: [] });
   });
 
+  it("413 content_too_large for a 20 KB body, before any repo or model call", async () => {
+    const big = JSON.stringify({ roleId: role.id, fingerprint: fp, pad: "x".repeat(20 * 1024) });
+    const declared = await app.request("/v1/enrich/score", {
+      method: "POST",
+      headers: { ...auth, "content-length": String(big.length) },
+      body: big,
+    });
+    expect(declared.status).toBe(413);
+    expect(await code(declared)).toBe("content_too_large");
+    const streamed = await app.request("/v1/enrich/rewrite-role", { method: "POST", headers: auth, body: big });
+    expect(streamed.status).toBe(413);
+    expect(model.requests).toHaveLength(0);
+    expect(store.size).toBe(0);
+  });
+
   it("400 for a malformed body", async () => {
     expect((await score({ roleId: 5 })).status).toBe(400);
   });

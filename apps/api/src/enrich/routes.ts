@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import { RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
 import { z } from "zod";
@@ -20,6 +21,9 @@ const notSaved = () => new ApiError(409, "not_saved", "Your latest changes aren'
 
 const ScoreBody = z.object({ roleId: z.string().min(1).max(64), fingerprint: z.string().min(1).max(64) });
 
+/** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */
+const MAX_BODY_BYTES = 16 * 1024;
+
 export function enrichRoutes(deps: {
   cvRepo(user: AuthUser): CvRepo;
   insightsRepo(user: AuthUser): InsightsRepo;
@@ -29,6 +33,14 @@ export function enrichRoutes(deps: {
   now?: () => Date;
 }) {
   const app = new Hono<AppEnv>();
+  app.use(
+    bodyLimit({
+      maxSize: MAX_BODY_BYTES,
+      onError: () => {
+        throw new ApiError(413, "content_too_large", "This request is too large.");
+      },
+    }),
+  );
 
   app.get("/scores", async (c) => c.json({ items: await deps.insightsRepo(c.get("user")).list() }));
 
