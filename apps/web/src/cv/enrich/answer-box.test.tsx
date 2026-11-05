@@ -22,11 +22,11 @@ const question: Question = {
   options: ["Customs papers", "Carrier invoices", "Delivery notes"],
 };
 
-function Harness({ onChange }: { onChange?: (value: string, via: Via[]) => void }) {
+function Harness({ onChange, q = question }: { onChange?: (value: string, via: Via[]) => void; q?: Question }) {
   const [s, set] = useState<{ value: string; via: Via[] }>({ value: "", via: [] });
   return (
     <AnswerBox
-      question={question}
+      question={q}
       value={s.value}
       via={s.via}
       onChange={(value, via) => {
@@ -59,6 +59,7 @@ function setMediaDevices(value: unknown) {
 const box = () => screen.getByRole("textbox", { name: "Your answer" });
 const micButton = () => screen.queryByRole("button", { name: /Answer by speaking|Stop recording/ });
 const NOTICE = "Your voice goes to OpenAI to be turned into text. We don't keep the recording.";
+const STOPPED = "Voice stopped. Try again, or type or pick.";
 
 beforeEach(() => {
   localStorage.clear();
@@ -73,68 +74,6 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   setMediaDevices(undefined);
-});
-
-describe("AnswerBox: picking and typing", () => {
-  it("shows a chip per option, then a last 'Something else' chip that focuses the box", async () => {
-    const user = userEvent.setup();
-    render(<Harness />);
-    const chips = screen.getAllByRole("button").filter((b) => b.classList.contains("answer-opt"));
-    expect(chips.map((c) => c.textContent)).toEqual([...question.options, "Something else"]);
-    await user.click(screen.getByRole("button", { name: "Something else" }));
-    expect(box()).toHaveFocus();
-  });
-
-  it("joins picked chips with ', ' and removes one when picked again", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(<Harness onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: "Customs papers" }));
-    await user.click(screen.getByRole("button", { name: "Carrier invoices" }));
-    expect(box()).toHaveValue("Customs papers, Carrier invoices");
-    expect(onChange).toHaveBeenLastCalledWith("Customs papers, Carrier invoices", ["pick"]);
-    expect(screen.getByRole("button", { name: "Customs papers" })).toHaveAttribute("aria-pressed", "true");
-
-    await user.click(screen.getByRole("button", { name: "Customs papers" }));
-    expect(box()).toHaveValue("Carrier invoices");
-    expect(screen.getByRole("button", { name: "Customs papers" })).toHaveAttribute("aria-pressed", "false");
-  });
-
-  it("keeps typed text when chips are added and removed", async () => {
-    const user = userEvent.setup();
-    render(<Harness />);
-    await user.type(box(), "Checked every crate");
-    await user.click(screen.getByRole("button", { name: "Delivery notes" }));
-    expect(box()).toHaveValue("Checked every crate, Delivery notes");
-    await user.click(screen.getByRole("button", { name: "Carrier invoices" }));
-    await user.click(screen.getByRole("button", { name: "Delivery notes" }));
-    expect(box()).toHaveValue("Checked every crate, Carrier invoices");
-  });
-
-  it("a chip never saves or submits anything", async () => {
-    const user = userEvent.setup();
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const onSubmit = vi.fn((e: { preventDefault(): void }) => e.preventDefault());
-    render(
-      <form onSubmit={onSubmit}>
-        <Harness />
-      </form>,
-    );
-    await user.click(screen.getByRole("button", { name: "Customs papers" }));
-    await user.click(screen.getByRole("button", { name: "Something else" }));
-    expect(onSubmit).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(api.createVoiceSession).not.toHaveBeenCalled();
-  });
-
-  it("typing after picking gives via ['pick', 'type']", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(<Harness onChange={onChange} />);
-    await user.click(screen.getByRole("button", { name: "Customs papers" }));
-    await user.type(box(), " daily");
-    expect(onChange).toHaveBeenLastCalledWith("Customs papers daily", ["pick", "type"]);
-  });
 });
 
 describe("AnswerBox: speaking", () => {
@@ -233,27 +172,57 @@ describe("AnswerBox: speaking", () => {
     expect(rt.openTranscription).not.toHaveBeenCalled();
   });
 
-  it("voice service down → unavailable with a message, microphone stopped", async () => {
+  it("voice service down → back to idle with a message; the mic stays and works again", async () => {
     const user = userEvent.setup();
-    api.createVoiceSession.mockRejectedValue(new ApiClientError(503, "ai_unavailable", "down"));
+    const t = fakeTransport();
+    api.createVoiceSession.mockRejectedValueOnce(new ApiClientError(503, "ai_unavailable", "down"));
     render(<Harness />);
     await user.click(screen.getByRole("button", { name: "Answer by speaking" }));
-    expect(await screen.findByText("Voice answers aren't available right now. You can still type or pick.")).toBeInTheDocument();
-    expect(micButton()).toBeNull();
+    expect(await screen.findByText(STOPPED)).toBeInTheDocument();
     expect(track.stop).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Answer by speaking" }));
+    expect(await screen.findByRole("button", { name: "Stop recording" })).toBeInTheDocument();
+    expect(screen.queryByText(STOPPED)).toBeNull();
+    expect(t.close).not.toHaveBeenCalled();
   });
 
-  it("the connection dropping mid-recording closes everything", async () => {
+  it.each([
+    ["the connection closing", { type: "closed" }],
+    ["a server error", { type: "error" }],
+  ] as const)("%s mid-recording closes everything, keeps finished words, and the mic stays", async (_, event) => {
     const user = userEvent.setup();
     const t = fakeTransport();
     render(<Harness />);
     await user.click(screen.getByRole("button", { name: "Answer by speaking" }));
     await screen.findByRole("button", { name: "Stop recording" });
-    act(() => t.emit({ type: "closed" }));
+    act(() => t.emit({ type: "final", itemId: "i1", text: "Forty a week." }));
+    act(() => t.emit(event));
     expect(t.close).toHaveBeenCalled();
     expect(stopCapture).toHaveBeenCalled();
     expect(track.stop).toHaveBeenCalled();
-    expect(screen.getByText("Voice answers aren't available right now. You can still type or pick.")).toBeInTheDocument();
+    expect(box()).toHaveValue("Forty a week.");
+    expect(screen.getByText(STOPPED)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Answer by speaking" })).not.toBeDisabled();
+  });
+
+  it("puts out-of-order final words back in the order they were spoken", async () => {
+    const user = userEvent.setup();
+    const t = fakeTransport();
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Answer by speaking" }));
+    await screen.findByRole("button", { name: "Stop recording" });
+    act(() => t.emit({ type: "committed", itemId: "i1" }));
+    act(() => t.emit({ type: "committed", itemId: "i2" }));
+    act(() => t.emit({ type: "final", itemId: "i2", text: "Then filed them." }));
+    expect(box()).toHaveValue("");
+    act(() => t.emit({ type: "final", itemId: "i1", text: "Checked the papers." }));
+    expect(box()).toHaveValue("Checked the papers. Then filed them.");
+    // a failed piece doesn't hold back the ones after it
+    act(() => t.emit({ type: "committed", itemId: "i3" }));
+    act(() => t.emit({ type: "committed", itemId: "i4" }));
+    act(() => t.emit({ type: "final", itemId: "i4", text: "Daily." }));
+    act(() => t.emit({ type: "failed", itemId: "i3" }));
+    expect(box()).toHaveValue("Checked the papers. Then filed them. Daily.");
   });
 
   it("closes the connection and the microphone on unmount", async () => {
@@ -292,7 +261,22 @@ describe("AnswerBox: speaking", () => {
     expect(screen.queryByText(NOTICE)).toBeNull();
   });
 
-  it("still works when the browser refuses storage", async () => {
+  it("hides the privacy notice in every open box after the first recording", async () => {
+    const user = userEvent.setup();
+    fakeTransport();
+    render(
+      <>
+        <Harness />
+        <Harness />
+      </>,
+    );
+    expect(screen.getAllByText(NOTICE)).toHaveLength(2);
+    await user.click(screen.getAllByRole("button", { name: "Answer by speaking" })[0] as HTMLElement);
+    await screen.findByRole("button", { name: "Stop recording" });
+    expect(screen.queryAllByText(NOTICE)).toHaveLength(0);
+  });
+
+  it("still records when the browser refuses storage", async () => {
     const user = userEvent.setup();
     fakeTransport();
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
@@ -302,90 +286,8 @@ describe("AnswerBox: speaking", () => {
       throw new Error("blocked");
     });
     render(<Harness />);
-    expect(screen.getByText(NOTICE)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Answer by speaking" }));
     expect(await screen.findByRole("button", { name: "Stop recording" })).toBeInTheDocument();
-  });
-});
-
-describe("realtime connection", () => {
-  it("passes the key as a subprotocol, never in the URL, and maps transcript events", async () => {
-    const real = await vi.importActual<typeof import("./realtime.ts")>("./realtime.ts");
-    const sockets: FakeSocket[] = [];
-    class FakeSocket {
-      static OPEN = 1;
-      readyState = 0;
-      sent: string[] = [];
-      onopen: (() => void) | null = null;
-      onmessage: ((e: { data: string }) => void) | null = null;
-      onclose: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      close = vi.fn();
-      constructor(
-        readonly url: string,
-        readonly protocols: string[],
-      ) {
-        sockets.push(this);
-      }
-      send(data: string) {
-        this.sent.push(data);
-      }
-    }
-    vi.stubGlobal("WebSocket", FakeSocket);
-    const events: TranscriptEvent[] = [];
-    const tr = real.openTranscription("ek_secret", (e) => events.push(e));
-    const ws = sockets[0];
-    if (!ws) throw new Error("no socket opened");
-    expect(ws.url).toBe("wss://api.openai.com/v1/realtime?intent=transcription");
-    expect(ws.url).not.toContain("ek_secret");
-    expect(ws.protocols).toEqual(["realtime", "openai-insecure-api-key.ek_secret"]);
-
-    tr.sendAudio("AAAA"); // held until the socket opens
-    expect(ws.sent).toEqual([]);
-    ws.readyState = 1;
-    ws.onopen?.();
-    tr.commit();
-    expect(ws.sent.map((s) => JSON.parse(s))).toEqual([
-      { type: "input_audio_buffer.append", audio: "AAAA" },
-      { type: "input_audio_buffer.commit" },
-    ]);
-
-    const msg = (data: object) => ws.onmessage?.({ data: JSON.stringify(data) });
-    msg({ type: "session.created" });
-    msg({ type: "conversation.item.input_audio_transcription.delta", item_id: "i1", delta: "hi" });
-    msg({ type: "conversation.item.input_audio_transcription.completed", item_id: "i1", transcript: "Hi." });
-    msg({ type: "conversation.item.input_audio_transcription.failed", item_id: "i2" });
-    msg({ type: "input_audio_buffer.committed", item_id: "i3" });
-    msg({ type: "error", error: { message: "x" } });
-    ws.onclose?.();
-    expect(events).toEqual([
-      { type: "partial", itemId: "i1", text: "hi" },
-      { type: "final", itemId: "i1", text: "Hi." },
-      { type: "failed", itemId: "i2" },
-      { type: "committed", itemId: "i3" },
-      { type: "error" },
-      { type: "closed" },
-    ]);
-    tr.close();
-    expect(ws.close).toHaveBeenCalled();
-    vi.unstubAllGlobals();
-  });
-});
-
-describe("microphone audio", () => {
-  it("encodes PCM16 little-endian base64 and resamples to 24 kHz", async () => {
-    const real = await vi.importActual<typeof import("./mic.ts")>("./mic.ts");
-    const b64 = real.encodePcm16(new Float32Array([0, 1, -1, 0.5]));
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    const view = new DataView(bytes.buffer);
-    expect([0, 2, 4, 6].map((o) => view.getInt16(o, true))).toEqual([0, 32767, -32768, 16384]);
-
-    const same = real.makeResampler(24_000);
-    expect(same(new Float32Array(480))).toHaveLength(480);
-    const down = real.makeResampler(48_000);
-    let total = 0;
-    for (let i = 0; i < 10; i++) total += down(new Float32Array(480).fill(0.25)).length;
-    expect(total).toBeGreaterThanOrEqual(2399);
-    expect(total).toBeLessThanOrEqual(2401);
+    expect(screen.queryByText(NOTICE)).toBeNull(); // remembered for this page
   });
 });

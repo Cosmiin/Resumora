@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { VOICE, type Locale, type Note, type Question } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { useVoice } from "./useVoice.ts";
@@ -17,15 +17,26 @@ type Props = {
 const SEP = ", ";
 const NOTICE_KEY = "resumora.voiceNoticeSeen";
 
-const isPicked = (value: string, option: string) => value.split(SEP).some((s) => s.trim() === option);
+/** Where `option` sits in `value` as a whole ", "-bounded piece, or -1. Options may contain ", " themselves. */
+function findPiece(value: string, option: string): number {
+  for (let i = value.indexOf(option); i >= 0; i = value.indexOf(option, i + 1)) {
+    const end = i + option.length;
+    const startOk = i === 0 || value.slice(i - SEP.length, i) === SEP;
+    const endOk = end === value.length || value.startsWith(SEP, end);
+    if (startOk && endOk) return i;
+  }
+  return -1;
+}
+
+const isPicked = (value: string, option: string) => option !== "" && findPiece(value, option) >= 0;
 
 /** Adds the option as its own ", " piece, or removes exactly that piece and nothing else. */
 function togglePick(value: string, option: string): string {
-  const parts = value.split(SEP);
-  const i = parts.findIndex((s) => s.trim() === option);
+  const i = findPiece(value, option);
   if (i >= 0) {
-    parts.splice(i, 1);
-    return parts.join(SEP);
+    const end = i + option.length;
+    if (value.startsWith(SEP, end)) return value.slice(0, i) + value.slice(end + SEP.length);
+    return value.slice(0, Math.max(0, i - SEP.length)) + value.slice(end);
   }
   const base = value.replace(/[\s,]+$/, "");
   return base ? base + SEP + option : option;
@@ -35,26 +46,37 @@ function togglePick(value: string, option: string): string {
 function appendSpoken(value: string, text: string, options: string[]): string {
   const base = value.replace(/\s+$/, "");
   if (!base) return text;
-  const last = base.split(SEP).at(-1)?.trim() ?? "";
-  return base + (options.includes(last) ? SEP : " ") + text;
+  const afterOption = options.some((o) => o && (base === o || base.endsWith(SEP + o)));
+  return base + (afterOption ? SEP : " ") + text;
 }
 
 const addVia = (via: Via[], how: Via): Via[] => (via.includes(how) ? via : [...via, how]);
+
+// The privacy notice shows until the first recording, in every box on the page at once.
+let seenThisPage = false;
+const noticeListeners = new Set<() => void>();
 
 function noticeSeen(): boolean {
   try {
     return localStorage.getItem(NOTICE_KEY) === "1";
   } catch {
-    return false;
+    return seenThisPage; // private mode or blocked storage: remember for this page only
   }
 }
 
 function markNoticeSeen() {
+  seenThisPage = true;
   try {
     localStorage.setItem(NOTICE_KEY, "1");
   } catch {
-    // private mode or blocked storage: the notice shows again next time
+    // blocked storage: `seenThisPage` covers this page
   }
+  noticeListeners.forEach((l) => l());
+}
+
+function onNoticeChange(listener: () => void) {
+  noticeListeners.add(listener);
+  return () => void noticeListeners.delete(listener);
 }
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -71,8 +93,7 @@ const MicIcon = (
 export function AnswerBox({ question, value, via, onChange, locale = "en" }: Props) {
   const voice = useVoice({ locale });
   const field = useRef<HTMLTextAreaElement>(null);
-  const [seen, setSeen] = useState(noticeSeen);
-  const [tried, setTried] = useState(false);
+  const seen = useSyncExternalStore(onNoticeChange, noticeSeen);
   // spoken pieces can arrive faster than re-renders, so they build on the latest text
   const latest = useRef({ value, via, onChange, options: question.options });
   useEffect(() => {
@@ -96,19 +117,15 @@ export function AnswerBox({ question, value, via, onChange, locale = "en" }: Pro
       ? t("enrich.voice.denied")
       : state === "limit"
         ? t("enrich.voice.limit")
-        : state === "unavailable" && tried
-          ? t("enrich.voice.unavailable")
+        : state === "idle" && voice.interrupted
+          ? t("enrich.voice.interrupted")
           : null;
   const left = VOICE.maxSeconds - voice.seconds;
 
   const onMic = () => {
     if (recording) return voice.stop();
     if (state !== "idle") return;
-    if (!seen) {
-      markNoticeSeen();
-      setSeen(true);
-    }
-    setTried(true);
+    if (!seen) markNoticeSeen();
     voice.start();
   };
 

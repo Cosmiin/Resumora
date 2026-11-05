@@ -305,7 +305,7 @@ export const en = {
   "enrich.voice.notice": "Your voice goes to OpenAI to be turned into text. We don't keep the recording.",
   "enrich.voice.denied": "Microphone blocked. You can still type or pick.",
   "enrich.voice.limit": "You've used today's voice answers. You can still type or pick.",
-  "enrich.voice.unavailable": "Voice answers aren't available right now. You can still type or pick.",
+  "enrich.voice.interrupted": "Voice stopped. Try again, or type or pick.",
   "edit.education.degree": "Degree",
   "edit.education.school": "School",
   "edit.education.field": "Field of study",
