@@ -66,7 +66,7 @@ export function createApp(deps: AppDeps) {
   app.route("/v1/cv", cvRoutes((c) => deps.cvRepo(c.get("user"))));
   app.route(
     "/v1/imports",
-    importRoutes({ repoFor: (c) => deps.importRepo(c.get("user")), queue: deps.queue, now: deps.now ?? (() => new Date()) }),
+    importRoutes({ repoFor: (c) => deps.importRepo(c.get("user")), cvRepoFor: (c) => deps.cvRepo(c.get("user")), queue: deps.queue, now: deps.now ?? (() => new Date()) }),
   );
 
   app.route("/v1/enrich", enrichRoutes({ cvRepo: deps.cvRepo, insightsRepo: deps.insightsRepo, model: deps.model, voice: deps.voice, now: deps.now }));

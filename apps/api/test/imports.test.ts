@@ -154,6 +154,49 @@ describe("import endpoints", () => {
     expect((await apply(id, 0)).status).toBe(200);
     expect((await json(await apply(id, 1))).error.code).toBe("import_not_ready");
   });
+
+  describe("re-import keeps notes", () => {
+    const note = { id: "n1", question: "How many?", answer: "About 20", via: ["type" as const], askedAt: "2026-11-01T10:00:00.000Z" };
+    const role = (company: string, notes: (typeof note)[] = []) => ({
+      id: crypto.randomUUID(), company, title: "Engineer", location: "", startDate: "2020", endDate: "2022",
+      current: false, description: "", bullets: [], notes,
+    });
+    const withRoles = (fullName: string, experience: ReturnType<typeof role>[]) => ({
+      ...emptyCv(), basics: { ...emptyCv().basics, fullName }, experience,
+    });
+    async function readyWith(content: ReturnType<typeof withRoles>) {
+      const { id } = await json(await upload(makePdf(CV_LINES)));
+      await store.admin.start(id);
+      await store.admin.finish(id, { content, warnings: [], sourceHeadings: [], unsourcedLines: [], isScan: false });
+      return id as string;
+    }
+
+    it("keeps the notes of a role that matches by company and title", async () => {
+      await cvRepos["user-a"]!.save(withRoles("Old", [role("Acme", [note])]), 0);
+      const id = await readyWith(withRoles("New", [role(" ACME ")]));
+      expect((await apply(id, 1)).status).toBe(200);
+      const saved = (await cvRepos["user-a"]!.get()).content;
+      expect(saved.basics.fullName).toBe("New");
+      expect(saved.experience[0]!.notes).toEqual([note]);
+    });
+
+    it("saves the imported content unchanged when no role matches", async () => {
+      await cvRepos["user-a"]!.save(withRoles("Old", [role("Acme", [note])]), 0);
+      const imported = withRoles("New", [role("Globex")]);
+      const id = await readyWith(imported);
+      expect((await apply(id, 1)).status).toBe(200);
+      expect((await cvRepos["user-a"]!.get()).content).toEqual(imported);
+    });
+
+    it("still returns 409 on a stale version", async () => {
+      await cvRepos["user-a"]!.save(withRoles("Old", [role("Acme", [note])]), 0);
+      const id = await readyWith(withRoles("New", [role("Acme")]));
+      const res = await apply(id, 0);
+      expect(res.status).toBe(409);
+      expect(await json(res)).toMatchObject({ error: { code: "version_conflict" }, current: { version: 1 } });
+      expect((await cvRepos["user-a"]!.get()).content.basics.fullName).toBe("Old");
+    });
+  });
 });
 
 // ── Queue consumer ───────────────────────────────────────────────────────────

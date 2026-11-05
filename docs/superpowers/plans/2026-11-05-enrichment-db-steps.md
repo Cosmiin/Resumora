@@ -1,6 +1,6 @@
 # Database steps for CV enrichment (you run these)
 
-This adds one new table (`cv_insights`) and two small database functions. It changes nothing that exists today. Nothing has been applied yet.
+This adds one new table (`cv_insights`) and two small database functions (migration `20261106000000`). A second migration, `20261106010000`, replaces the function that applies an imported CV so it can keep each role's notes when you import again. Nothing has been applied yet.
 
 ## 1. Open a terminal in the project
 
@@ -14,7 +14,7 @@ Run:
 npx supabase migration list
 ```
 
-You should see the earlier migrations on both sides (Local and Remote), and a new one, `20261106000000`, with a Local value only.
+You should see the earlier migrations on both sides (Local and Remote), and two new ones, `20261106000000` and `20261106010000`, with a Local value only.
 
 If it asks you to log in or link the project, do that first: run `npx supabase login`, then `npx supabase link`. The link command shows a list of projects. Pick the Resumora one (project ref `aquvhqbkvrtzhbmezkci`). It may ask for the database password, which you can find in the Supabase dashboard under Project Settings, then Database.
 
@@ -26,7 +26,7 @@ Run:
 npx supabase db push
 ```
 
-It lists the migration it is about to apply (`20261106000000_enrichment.sql`). Answer `Y` to continue.
+It lists the migrations it is about to apply (`20261106000000_enrichment.sql` and `20261106010000_apply_import_content.sql`). Answer `Y` to continue.
 
 ## 4. Check that it worked
 
@@ -59,8 +59,22 @@ The signed-out visitor cannot run the logging function (expect `false`):
 select has_function_privilege('anon', 'public.log_ai_call(text,text,text,text,text,int,int,int)', 'execute');
 ```
 
-If all four show the expected rows, you are done. Tell me and I will carry on with the next task.
+The import function was replaced, not duplicated (expect exactly 1 row, with 3 arguments):
+
+```sql
+select pg_get_function_identity_arguments(p.oid) as arguments
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and proname = 'apply_import';
+```
+
+The signed-out visitor cannot run it (expect `false`):
+
+```sql
+select has_function_privilege('anon', 'public.apply_import(uuid,int,jsonb)', 'execute');
+```
+
+If all of them show the expected rows, you are done. Tell me and I will carry on with the next task.
 
 ## If something goes wrong
 
-Copy the error message and send it to me. Do not try to fix it by hand in the SQL editor. The migration only adds new things, so nothing existing is at risk.
+Copy the error message and send it to me. Do not try to fix it by hand in the SQL editor. The first migration only adds new things. The second swaps one function for a new version of itself; your CVs and imports are not touched.

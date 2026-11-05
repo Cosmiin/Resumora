@@ -1,6 +1,8 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
+import { carryNotes, CvContentSchema, type CvContent } from "@resumora/shared";
 import type { AppEnv } from "../app.ts";
+import type { CvRepo } from "../cv/repo.ts";
 import { saveResponse } from "../cv/routes.ts";
 import { ApiError } from "../errors.ts";
 import { sniffFormat } from "./extract-text.ts";
@@ -16,6 +18,7 @@ const notFound = () => new ApiError(404, "not_found", "That import doesn't exist
 
 export function importRoutes(deps: {
   repoFor(c: Context<AppEnv>): ImportRepo;
+  cvRepoFor(c: Context<AppEnv>): CvRepo;
   queue: { send(message: ImportMessage): Promise<void> };
   now(): Date;
 }) {
@@ -60,7 +63,15 @@ export function importRoutes(deps: {
     if (!found) throw notFound();
     const notReady = () => new ApiError(409, "import_not_ready", "This import can't be used (it isn't ready, or was already used).");
     if (found.status !== "ready") throw notReady();
-    const result = await repo.apply(id, version);
+    // Keep the notes of roles that match an old role. Anything unexpected falls back to the
+    // imported content as it is, so notes never block an import.
+    let content: CvContent | undefined;
+    if (found.result) {
+      const current = await deps.cvRepoFor(c).get();
+      const carried = current.version > 0 ? CvContentSchema.safeParse(carryNotes(current.content, found.result.content)) : null;
+      content = carried?.success ? carried.data : undefined;
+    }
+    const result = await repo.apply(id, version, content);
     if (!result) throw notReady(); // applied by another tab in the meantime
     return saveResponse(c, result);
   });

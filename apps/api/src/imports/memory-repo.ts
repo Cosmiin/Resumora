@@ -54,10 +54,10 @@ export function memoryImports(opts: { now?: () => Date; cvRepo(userId: string): 
     async countSince(iso) {
       return [...rows.values()].filter((r) => r.userId === userId && r.createdAt >= iso).length;
     },
-    async apply(id, expectedVersion) {
+    async apply(id, expectedVersion, content) {
       const row = rows.get(id);
       if (!row || row.userId !== userId || row.status !== "ready" || !row.result) return null;
-      const saved = await opts.cvRepo(userId).save(row.result.content, expectedVersion);
+      const saved = await opts.cvRepo(userId).save(content ?? row.result.content, expectedVersion);
       if (saved.ok) row.status = "applied";
       return saved;
     },
