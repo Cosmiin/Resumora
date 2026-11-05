@@ -19,7 +19,7 @@ const FIRST_PERSON_WORDS = /(?<![\p{L}\p{N}])(?:[Mm]y|[Mm]e|[Ee]u|[Mm]eu|[Mm]ea)
 // "I.T.", "I/O" or "Level I".
 const FIRST_PERSON_I = /(?<![\p{L}\p{N}])I(?=['’]|\s+\p{Ll})/gu;
 // Words that put a Roman numeral after them ("Phase I rollout"), in English and Romanian.
-const NUMERAL_HEAD = /(?:phase|level|type|part|stage|tier|class|grade|chapter|step|category|section|volume|vol|group|series|fa[zț]a|nivel|etapa|tip|clasa|capitol)\s+$/iu;
+const NUMERAL_HEAD = /(?:phase|level|type|part|stage|tier|class|grade|chapter|step|category|section|volume|vol|group|series|fa[zț][aă]|nivel|etap[aă]|tip|clas[aă]|capitol|sec[țt]iune|pas|grup[aă]|serie|categorie|parte|volum)\s+$/iu;
 const ODD_CHARS = /[\t★►✓]|\p{Extended_Pictographic}/u;
 
 export function hasFirstPerson(text: string): boolean {
@@ -141,7 +141,7 @@ function parseNumber(raw: string, hasScale: boolean): number {
   return Number(`${parts.join("")}.${decimals}`);
 }
 
-const NUMBER = /\d{1,3}(?:[\s\u00a0\u202f']\d{3})+(?:[.,]\d+)?(?!\d)|\d+(?:[.,]\d+)*/g;
+const NUMBER = /(?<!\p{L})(?:\d{1,3}(?:[\s\u00a0\u202f']\d{3})+(?:[.,]\d+)?(?!\d)|\d+(?:[.,]\d+)*)/gu;
 
 /** Numbers in `text` as plain strings: separators normalised, scales applied, `%` and units dropped. */
 export function numbersIn(text: string): string[] {

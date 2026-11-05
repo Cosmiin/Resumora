@@ -47,7 +47,7 @@ describe("atsChecks", () => {
     expect(atsChecks(role(["Worked in Iași", "Meetings and memes"]))).toEqual([]);
   });
   it("does not treat EU, Phase I, I.T. or Level I as first person", () => {
-    for (const t of ["Managed EU funds", "Phase I rollout", "Ran I.T. support", "Passed Level I", "Fixed I/O errors", "Studied ME"]) {
+    for (const t of ["Managed EU funds", "Phase I rollout", "Ran I.T. support", "Passed Level I", "Fixed I/O errors", "Fază I implementată", "Etapă I finalizată","Studied ME"]) {
       expect(atsChecks(role([t, "ok"]))).toEqual([]);
     }
     expect(atsChecks(role(["I'm responsible for payroll", "ok"]))).toEqual(["firstPerson"]);
@@ -194,6 +194,11 @@ describe("numbersIn", () => {
     expect(numbersIn("3M&A deals")).toEqual(["3"]);
     expect(numbersIn("6 M")).toEqual(["6"]);
     expect(numbersIn("3M users")).toEqual(["3000000"]);
+  });
+  it("ignores digits glued to a letter, as in B2B, GA4 and Q3", () => {
+    expect(numbersIn("B2B clients")).toEqual([]);
+    expect(numbersIn("GA4 and Q3")).toEqual([]);
+    expect(numbersIn("3B users")).toEqual(["3000000000"]);
   });
   it("reads 0.250 as a decimal", () => {
     expect(numbersIn("0.250")).toEqual(["0.25"]);
