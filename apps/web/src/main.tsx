@@ -14,6 +14,7 @@ import "./styles/review.css";
 import "./styles/cv-page.css";
 import "./styles/panel.css";
 import "./styles/enrich.css";
+import "./styles/jobs.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },

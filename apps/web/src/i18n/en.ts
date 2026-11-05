@@ -11,6 +11,7 @@ export const en = {
   "nav.account": "Account: {email}",
   "app.signOut": "Sign out",
   "app.signOutUnsaved": "You have unsaved changes. Sign out anyway?",
+  "app.leaveUnsaved": "You have unsaved changes. Leave this page anyway?",
 
   "auth.signIn.title": "Welcome back",
   "auth.signIn.subtitle": "Sign in to continue with your CV.",
