@@ -16,33 +16,28 @@ type Props = {
 
 type Phase = "drafting" | "streaming" | "done" | "error";
 
-/** The summary rewrite as it streams: muted until it passes every check, then "Use this" / "Keep mine". */
+/**
+ * The summary rewrite as it streams: muted until it passes every check, then "Use this" / "Keep mine".
+ * Every Try again goes through `onRestart`: a fresh copy of the summary, after the latest edits are saved.
+ */
 function SummaryRewrite({ summary, started, dispatch, onClose, onRestart }: { summary: string; started: string; dispatch(a: CvAction): void; onClose(): void; onRestart(): void }) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [phase, setPhase] = useState<Phase>("drafting");
-  const [run, setRun] = useState(0);
 
   useEffect(() => {
     const controller = streamRewrite("/v1/enrich/rewrite-summary", {}, (e) => {
       if (e.event === "start") setPhase((p) => (p === "drafting" ? "streaming" : p));
       else if (e.event === "done") setPhase("done");
       else if (e.event === "error") setPhase("error");
-      setProposals((list) => onEvent(list, run, e));
+      setProposals((list) => onEvent(list, 0, e));
     });
     return () => controller.abort();
-  }, [run]);
+  }, []);
 
   const use = (p: Proposal) => {
     dispatch({ type: "setSummary", value: p.text });
     setProposals((list) => list.map((x) => (x.key === p.key ? { ...x, state: "used" } : x)));
   };
-  // Starts over. A rewrite already used stays.
-  const retry = () => {
-    setProposals((list) => list.filter((p) => p.state === "used"));
-    setPhase("drafting");
-    setRun((n) => n + 1);
-  };
-
   if (phase === "drafting") {
     return (
       <p className="working" role="status">
@@ -98,7 +93,7 @@ function SummaryRewrite({ summary, started, dispatch, onClose, onRestart }: { su
       {phase === "error" && (
         <p className="review-note" role="alert">
           {t(proposals.length > 0 ? "enrich.review.broken" : "enrich.review.failed")}{" "}
-          <button type="button" className="link" onClick={retry}>
+          <button type="button" className="link" onClick={onRestart}>
             {t("enrich.review.tryAgain")}
           </button>
         </p>

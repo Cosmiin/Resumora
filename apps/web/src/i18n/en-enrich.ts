@@ -16,7 +16,7 @@ export const enrichSectionsEn = {
   "enrich.summary.rewrite": "Rewrite my summary",
   "enrich.summary.drafting": "Drafting from your summary and roles…",
   "enrich.summary.source": "Built from your summary, your roles and your saved answers.",
-  "enrich.summary.changed": "Your summary changed. Try again",
+  "enrich.summary.changed": "Your summary changed.",
   "enrich.summary.saveFailed": "Couldn't save your changes first.",
   "enrich.summary.used": "✓ Summary updated. Ctrl+Z undoes it.",
   "enrich.skills.nothingToSort": "Every skill is in a group",

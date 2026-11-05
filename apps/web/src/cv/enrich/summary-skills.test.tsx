@@ -156,15 +156,17 @@ describe("summary tools", () => {
     expect(screen.queryByRole("button", { name: "Use this" })).toBeNull();
   });
 
-  it("a stream error with nothing ready offers Try again, which asks again", async () => {
+  it("a stream error with nothing ready offers Try again, which waits for the save and asks again", async () => {
     const stream = fakeStream();
-    render(<Harness focus="summary" />);
+    const waitForSave = vi.fn(() => Promise.resolve());
+    render(<Harness focus="summary" waitForSave={waitForSave} />);
     await userEvent.click(screen.getByRole("button", { name: "Rewrite my summary" }));
     await waitFor(() => expect(api.streamRewrite).toHaveBeenCalled());
     stream.emit({ event: "error", data: { code: "ai_unavailable", message: "x" } });
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't draft suggestions right now.");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(api.streamRewrite).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(api.streamRewrite).toHaveBeenCalledTimes(2));
+    expect(waitForSave).toHaveBeenCalledTimes(2);
   });
 
   it("a summary edited after the rewrite started cannot be overwritten", async () => {
@@ -177,7 +179,7 @@ describe("summary tools", () => {
     stream.emit({ event: "ready", data: { index: 0, text: "Operations Coordinator with 5 years." } });
     await userEvent.click(screen.getByRole("button", { name: "Edit summary" }));
     expect(screen.getByRole("button", { name: "Use this" })).toBeDisabled();
-    expect(screen.getByText(/Your summary changed. Try again/)).toBeInTheDocument();
+    expect(screen.getByText(/Your summary changed./)).toBeInTheDocument();
     onAction.mockClear();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(api.streamRewrite).toHaveBeenCalledTimes(2));
