@@ -10,3 +10,4 @@ export * from "./enrich.ts";
 export * from "./enrich-checks.ts";
 export * from "./notes.ts";
 export * from "./enrich-stream.ts";
+export * from "./jobs.ts";
