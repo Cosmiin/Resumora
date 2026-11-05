@@ -306,3 +306,18 @@ size: 40
 - All existing web tests pass; typecheck passes.
 
 **Out of scope:** anything else in the list, the job page, the API.
+
+## Task 7: No Cancel while a job save is in flight
+
+---
+files: [apps/web/src/jobs/JobEditForm.tsx, apps/web/src/jobs/job-edit.test.tsx, docs/plans/jobs-ui.md]
+new_files: []
+deps: false
+size: 20
+---
+
+**Goal:** fix the second whole-branch review finding. While a save is in flight, `JobEditForm.tsx`'s **Cancel** (and the conflict **Reload**) stay enabled, so a user can cancel, reopen Edit and type, and the first save's response then closes the reopened form and drops the new draft. Disable Cancel and Reload while `saving` is true, like Save already is.
+
+**Acceptance tests** (`apps/web/src/jobs/job-edit.test.tsx`): while `patchJob` is pending, Cancel is disabled; after it resolves, the page leaves edit mode as before. All existing web tests pass; typecheck passes.
+
+**Out of scope:** anything else.

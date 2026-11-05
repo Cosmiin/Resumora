@@ -146,11 +146,11 @@ export function JobEditForm({ id, version: currentVersion, extracted, onSaved, o
       <p id="job-benefits-hint" className="jobs-note">{t("edit.job.onePerLine")}</p>
     </div>
     {error && <div role="alert" id="job-edit-error" className="jobs-field-error">{error.message}
-      {error.code === "version_conflict" && <> <button className="link" type="button" onClick={() => void reload()}>{t("edit.job.reload")}</button></>}
+      {error.code === "version_conflict" && <> <button className="link" type="button" disabled={saving} onClick={() => void reload()}>{t("edit.job.reload")}</button></>}
     </div>}
     <div className="form-foot">
       <button type="submit" disabled={saving}>{t(saving ? "edit.job.saving" : "edit.job.save")}</button>
-      <button type="button" className="secondary" onClick={onCancel}>{t("edit.job.cancel")}</button>
+      <button type="button" className="secondary" disabled={saving} onClick={onCancel}>{t("edit.job.cancel")}</button>
     </div>
   </form>;
 }

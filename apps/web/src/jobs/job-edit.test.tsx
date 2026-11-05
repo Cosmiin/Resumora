@@ -216,11 +216,12 @@ describe("edit job summary", () => {
     await save(); expect(patchJob).toHaveBeenCalledWith("one", 1, { ...extracted, salary });
   });
 
-  it("keeps the form while saving and disables Save until completion", async () => {
+  it("keeps the form while saving and disables Save and Cancel until completion", async () => {
     let finish!: (value: Job) => void;
     vi.mocked(patchJob).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
     renderJob(); await edit(); await save();
     expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
     await act(async () => { finish({ ...job, editedByUser: true, version: 2 }); });
     expect(await screen.findByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true");
   });
