@@ -72,14 +72,14 @@ update public.base_cvs set content = '{"n":"edited"}' where user_id = '11111111-
 select public.snapshot_base_cv('ai');
 select is((select count(*)::int from public.base_cv_versions), 2, 'a copy of a changed CV is kept');
 
-do $
+do $$
 begin
   for i in 1..60 loop
     update public.base_cvs set content = jsonb_build_object('n', i) where user_id = '11111111-1111-1111-1111-111111111111';
     perform public.snapshot_base_cv('ai');
   end loop;
 end
-$;
+$$;
 select is((select count(*)::int from public.base_cv_versions), 50, 'History keeps 50 rows');
 
 select throws_ok(
