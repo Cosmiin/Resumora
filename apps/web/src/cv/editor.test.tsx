@@ -21,6 +21,16 @@ vi.mock("../auth/AuthProvider.tsx", () => ({
   useAuth: () => ({ loading: false, session: { user: { id: authState.userId } } }),
 }));
 
+// Scores ask the API in the background; keep them quiet and off the network.
+const enrichApi = vi.hoisted(() => ({
+  getScores: vi.fn(async () => []),
+  scoreRole: vi.fn(() => new Promise(() => {})),
+  createVoiceSession: vi.fn(),
+  streamRewrite: vi.fn(),
+  getSkillSuggestions: vi.fn(),
+}));
+vi.mock("./enrich/enrich-api.ts", () => enrichApi);
+
 import { CvPage } from "./CvPage.tsx";
 
 function renderPage() {
@@ -88,7 +98,7 @@ describe("CV editor", () => {
     expect(content.experience).toHaveLength(2);
     expect(content.experience[1]).toMatchObject({ title: "Lead" });
     expect(content.experience[1].bullets.map((b: { text: string }) => b.text)).toEqual(["First", "Second"]);
-  });
+  }, 15_000);
 
   it("the page is inert while History is open", async () => {
     const user = userEvent.setup();

@@ -11,6 +11,16 @@ vi.mock("../cv/cv-api.ts", () => cvApi);
 const importsApi = vi.hoisted(() => ({ startImport: vi.fn(), getImport: vi.fn(), applyImport: vi.fn() }));
 vi.mock("./imports-api.ts", () => importsApi);
 
+// Scores ask the API in the background; keep them quiet and off the network.
+const enrichApi = vi.hoisted(() => ({
+  getScores: vi.fn(async () => []),
+  scoreRole: vi.fn(() => new Promise(() => {})),
+  createVoiceSession: vi.fn(),
+  streamRewrite: vi.fn(),
+  getSkillSuggestions: vi.fn(),
+}));
+vi.mock("../cv/enrich/enrich-api.ts", () => enrichApi);
+
 import { CvPage } from "../cv/CvPage.tsx";
 
 const named = (fullName: string): CvContent => ({ ...emptyCv(), basics: { ...emptyCv().basics, fullName } });
