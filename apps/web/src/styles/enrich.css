@@ -45,3 +45,31 @@
 @media (max-width: 720px) {
   .weak-mark { inset-inline-start: -16px; }
 }
+
+/* Answer box: pick, type or speak */
+.answer-box { display: grid; gap: 8px; }
+.answer-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.answer-opt { font: inherit; font-size: 12.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--sage-300); background: var(--white); color: var(--pine-800); cursor: pointer; }
+.answer-opt[aria-pressed="true"] { background: var(--pine-600); border-color: var(--pine-600); color: var(--white); }
+.answer-opt.is-other { border-style: dashed; color: var(--sage-600); }
+.answer-opt:focus-visible, .mic:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
+.answer-field { position: relative; }
+.answer-field textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; min-height: 76px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--sage-300); resize: vertical; color: var(--pine-800); }
+.answer-field.has-mic textarea { padding-inline-end: 44px; }
+.answer-field textarea:focus { outline: 2px solid var(--pine-200); border-color: var(--pine-600); }
+.mic { position: absolute; inset-inline-end: 8px; inset-block-end: 10px; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid var(--sage-300); background: var(--white); color: var(--pine-700); cursor: pointer; display: grid; place-items: center; }
+.mic svg { width: 14px; height: 14px; }
+.mic:disabled { opacity: 0.6; cursor: progress; }
+.mic[aria-pressed="true"] { background: var(--rose-600); border-color: var(--rose-600); color: var(--white); animation: mic-pulse 1.2s ease-in-out infinite; }
+@keyframes mic-pulse { 50% { box-shadow: 0 0 0 6px rgb(154 65 69 / 0.18); } }
+.answer-rec { font-size: 12px; color: var(--rose-600); display: flex; align-items: center; gap: 6px; }
+.answer-rec::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--rose-600); }
+.answer-rec.is-finishing { color: var(--sage-600); }
+.answer-rec.is-finishing::before { background: var(--sage-500); }
+.answer-countdown { font-weight: 700; }
+.answer-partial { font-size: 13px; color: var(--sage-500); font-style: italic; }
+.answer-voice-msg { font-size: 12px; color: var(--sage-600); margin: 0; }
+.voice-note { font-size: 11.5px; color: var(--sky-600); background: var(--sky-50); border: 1px solid var(--sky-200); border-radius: 7px; padding: 6px 9px; margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .mic[aria-pressed="true"] { animation: none; box-shadow: 0 0 0 3px rgb(154 65 69 / 0.25); }
+}

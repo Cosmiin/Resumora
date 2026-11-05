@@ -13,3 +13,14 @@ export async function getScores(): Promise<RoleResult[]> {
 export function scoreRole(roleId: string, fingerprint: string): Promise<RoleResult> {
   return apiFetch("/v1/enrich/score", { method: "POST", json: { roleId, fingerprint }, schema: RoleResultSchema });
 }
+
+const VoiceSessionSchema = z.object({ clientSecret: z.string().min(1), expiresAt: z.string(), model: z.string() });
+export type VoiceSession = z.infer<typeof VoiceSessionSchema>;
+
+/**
+ * A short-lived OpenAI key for one live voice answer. Never log or store `clientSecret`.
+ * 429 `voice_limit`: today's voice answers are used up. 503 `ai_unavailable`: voice is down.
+ */
+export function createVoiceSession(): Promise<VoiceSession> {
+  return apiFetch("/v1/enrich/voice-session", { method: "POST", schema: VoiceSessionSchema });
+}
