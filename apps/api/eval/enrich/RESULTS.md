@@ -95,3 +95,30 @@ None. The pass bar was met on the first run with the prompts as they were, so `p
 
 Prices found for every call (no "no price" warning), so the cost covers all calls. Cases and expected
 grades are in `cases.ts`; the expectations were written before the first run and not changed after it.
+
+## Run 3: after the Romanian rewrite rule (2026-11-05)
+
+One line was added to the rewrite rules in `rewrite-prompts.ts`: for Romanian, start with a past participle or
+a noun ("Coordonat…", "Coordonarea…"), never with "Am …". Earlier runs sometimes opened a Romanian rewrite in
+the first person ("Am scanat…"). The rest of the rules text is unchanged. The eval was run once after the change.
+
+| | Run 3 |
+|---|---|
+| Overall | PASS (all six checks) |
+| Grades within one step (all four parts) | 37 / 38 (97.4%) |
+| Contribution / clarity / specificity / impact | 38 / 38 / 38 / 37 |
+| Placeholder and exact duplicate score 0 | 3 / 3 |
+| Paraphrased duplicates scored 0 (reported) | 2 / 2 |
+| Rewrite cases passing | 6 / 6 |
+| Unknown numbers before / after the check | 0 / 0 |
+| Options with an exact number (before the filter) | 0 of 52 |
+| Time to first word, average / worst | 607 ms / 739 ms |
+| Slowest case | en-hr-coordinator, 2.9 s |
+| Most expensive case | ro-rezultate-vagi, $0.0013 |
+| Total cost | $0.0189 |
+| Run length | 34.5 s |
+
+Romanian rewrites in the first person: none. Both proposals for `romanian-role` open with a past participle
+("Scanat coduri de bare și împachetat colete…", "Gestionat diverse activități operaționale…").
+The single graded miss is the same as before: `ro-duplicat-parafrazat`, impact graded "specific" for
+"Actualizat zilnic tabelul de urmărire a comenzilor."
