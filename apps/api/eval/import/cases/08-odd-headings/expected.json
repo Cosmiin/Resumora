@@ -1,0 +1,156 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "Full-stack Developer"
+      ],
+      "phone": "+40 700 000 088",
+      "location": "Oradea, Romania",
+      "website": "nadiaokafor.example.com",
+      "linkedin": "",
+      "summary": "I build web apps for small teams, from the database to the button. I enjoy products where one person can see the whole picture.",
+      "fullName": "Nadia Okafor",
+      "email": "nadia.okafor@example.com"
+    },
+    "experience": [
+      {
+        "company": "Kiln Studio",
+        "title": "Full-stack Developer",
+        "location": "Oradea, Romania",
+        "startDate": "2021-01",
+        "endDate": "",
+        "current": true,
+        "description": "Develop booking tools for craft studios and small galleries.",
+        "bullets": [
+          {
+            "text": "Shipped a booking calendar that now handles 3,000 reservations a month."
+          },
+          {
+            "text": "Replaced a spreadsheet-based invoicing process with an automated one."
+          }
+        ]
+      },
+      {
+        "company": "Freelance",
+        "title": "Web Developer",
+        "location": "Remote",
+        "startDate": "2018-06",
+        "endDate": "2020-12",
+        "current": false,
+        "description": "Websites and small tools for local businesses.",
+        "bullets": [
+          {
+            "text": "Delivered 17 projects for clients in four countries."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "University of Oradea",
+        "degree": "Bachelor's degree",
+        "field": "Computer Science",
+        "startDate": "2014",
+        "endDate": "2018",
+        "notes": ""
+      }
+    ],
+    "languages": [],
+    "certifications": [],
+    "projects": [
+      {
+        "name": "Potluck",
+        "description": "A free app for planning shared dinners, used by about 800 people.",
+        "url": "potluck.example.com"
+      },
+      {
+        "name": "Tidemark",
+        "description": "An open-source tool that checks websites for broken links.",
+        "url": "github.com/nadia-example/tidemark"
+      }
+    ],
+    "custom": [],
+    "achievements": [],
+    "volunteering": [],
+    "awards": [],
+    "courses": [],
+    "publications": [],
+    "interests": [
+      {
+        "name": "bouldering"
+      },
+      {
+        "name": "pottery"
+      },
+      {
+        "name": "board games"
+      }
+    ],
+    "technicalSkills": [
+      {
+        "name": "TypeScript"
+      },
+      {
+        "name": "React"
+      },
+      {
+        "name": "Node.js"
+      },
+      {
+        "name": "PostgreSQL"
+      },
+      {
+        "name": "Docker"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "Product thinking"
+      },
+      {
+        "name": "Clear writing"
+      }
+    ],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "A bit about me",
+      "category": "summary"
+    },
+    {
+      "heading": "Where I've worked",
+      "category": "experience"
+    },
+    {
+      "heading": "What I've built",
+      "category": "projects"
+    },
+    {
+      "heading": "Toolbox",
+      "category": "skills"
+    },
+    {
+      "heading": "Where I studied",
+      "category": "education"
+    },
+    {
+      "heading": "Hobby-uri",
+      "category": "interests"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    },
+    {
+      "key": "languages",
+      "level": "tip"
+    }
+  ]
+}

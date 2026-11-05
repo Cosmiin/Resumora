@@ -5,6 +5,7 @@ import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 import { useAuth } from "./AuthProvider.tsx";
 import { authErrorKey } from "./authErrors.ts";
+import { AuthLayout } from "./AuthLayout.tsx";
 
 type Mode = "signIn" | "signUp" | "forgot";
 
@@ -66,9 +67,10 @@ export function LoginPage() {
   }
 
   return (
-    <main className="auth-page">
-      <form className="auth-card" onSubmit={submit}>
-        <h1>{t(titles[mode])}</h1>
+    <AuthLayout>
+      <form className="auth-form" onSubmit={submit}>
+        <h2>{t(titles[mode])}</h2>
+        {mode === "signIn" && <p className="auth-subtitle">{t("auth.signIn.subtitle")}</p>}
         <label>
           {t("auth.email")}
           <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -95,6 +97,6 @@ export function LoginPage() {
           {mode === "signIn" && <button type="button" className="link" onClick={() => switchTo("forgot")}>{t("auth.toForgot")}</button>}
         </div>
       </form>
-    </main>
+    </AuthLayout>
   );
 }

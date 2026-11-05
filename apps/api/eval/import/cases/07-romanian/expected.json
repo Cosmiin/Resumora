@@ -1,0 +1,170 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "ro",
+    "basics": {
+      "firstName": "Ana-Maria",
+      "lastName": "Țârcă",
+      "titles": [
+        "Specialist Resurse Umane"
+      ],
+      "phone": "+40 700 000 077",
+      "location": "Sibiu, România",
+      "website": "",
+      "linkedin": "",
+      "summary": "Specialist în resurse umane cu opt ani de experiență în recrutare și relații cu angajații. Îmi place să construiesc procese simple și corecte pentru oameni.",
+      "fullName": "Ana-Maria Țârcă",
+      "email": "ana-maria.tarca@example.com"
+    },
+    "experience": [
+      {
+        "company": "Transilvania Industrial",
+        "title": "Specialist Resurse Umane",
+        "location": "Sibiu, România",
+        "startDate": "2020-09",
+        "endDate": "",
+        "current": true,
+        "description": "Răspund de recrutarea și integrarea pentru o fabrică cu 300 de angajați.",
+        "bullets": [
+          {
+            "text": "Am redus timpul mediu de angajare de la 45 la 28 de zile."
+          },
+          {
+            "text": "Am introdus un program de integrare pentru angajații noi, cu mentor din echipă."
+          },
+          {
+            "text": "Am organizat două târguri de joburi în colaborare cu universitatea din Sibiu."
+          }
+        ]
+      },
+      {
+        "company": "Carpați Servicii",
+        "title": "Recruiter",
+        "location": "Sibiu, România",
+        "startDate": "2016-03",
+        "endDate": "2020-08",
+        "current": false,
+        "description": "Recrutare pentru poziții administrative și tehnice.",
+        "bullets": [
+          {
+            "text": "Am recrutat peste 120 de persoane în patru ani."
+          },
+          {
+            "text": "Am pregătit contractele și dosarele de personal pentru angajații noi."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "Universitatea „Lucian Blaga” din Sibiu",
+        "degree": "Licență",
+        "field": "Psihologie",
+        "startDate": "2012",
+        "endDate": "2016",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "Română",
+        "level": "Nativă"
+      },
+      {
+        "name": "Engleză",
+        "level": "Avansat (C1)"
+      },
+      {
+        "name": "Germană",
+        "level": "Începător (A2)"
+      }
+    ],
+    "certifications": [
+      {
+        "name": "Specialist în Managementul Resurselor Umane",
+        "issuer": "CNFPA",
+        "date": "2019-06"
+      }
+    ],
+    "projects": [],
+    "custom": [],
+    "achievements": [],
+    "volunteering": [],
+    "awards": [],
+    "courses": [],
+    "publications": [],
+    "interests": [
+      {
+        "name": "drumeții montane"
+      },
+      {
+        "name": "fotografie"
+      },
+      {
+        "name": "șah"
+      }
+    ],
+    "technicalSkills": [
+      {
+        "name": "Excel"
+      },
+      {
+        "name": "Revisal"
+      },
+      {
+        "name": "LinkedIn Recruiter"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "Recrutare"
+      },
+      {
+        "name": "Interviuri structurate"
+      },
+      {
+        "name": "Comunicare"
+      },
+      {
+        "name": "Legislația muncii"
+      }
+    ],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "Profil",
+      "category": "summary"
+    },
+    {
+      "heading": "Experiență profesională",
+      "category": "experience"
+    },
+    {
+      "heading": "Competențe",
+      "category": "skills"
+    },
+    {
+      "heading": "Educație și formare",
+      "category": "education"
+    },
+    {
+      "heading": "Limbi străine",
+      "category": "languages"
+    },
+    {
+      "heading": "Certificări",
+      "category": "certifications"
+    },
+    {
+      "heading": "Interese",
+      "category": "interests"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    }
+  ]
+}

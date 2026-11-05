@@ -1,0 +1,72 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { formatYearMonth, parseTypedDate, type Locale } from "@resumora/shared";
+import { t } from "../../i18n/t.ts";
+import { PageField } from "./PageField.tsx";
+
+type Props = {
+  value: string;
+  locale: Locale;
+  label: string;
+  placeholder?: string;
+  onCommit(value: string): void;
+  onPresent?(): void;
+  fieldKey: string;
+  /** Room for a long placeholder such as "Mon YYYY or present". */
+  wide?: boolean;
+};
+
+/** A date typed in free form: valid text is saved at once, anything else waits with a hint. */
+export function DateField({ value, locale, label, placeholder, onCommit, onPresent, fieldKey, wide }: Props) {
+  const shown = formatYearMonth(value, locale);
+  const [text, setText] = useState(shown);
+  const [invalid, setInvalid] = useState(false);
+  const focused = useRef(false);
+
+  // Follow outside changes (undo, history) unless the person is in the middle of typing.
+  useEffect(() => {
+    if (!focused.current) {
+      setText(shown);
+      setInvalid(false);
+    }
+  }, [shown]);
+
+  const change = useCallback((next: string) => {
+    setText(next);
+    const parsed = parseTypedDate(next);
+    if (!parsed.ok) {
+      setInvalid(true);
+      return;
+    }
+    setInvalid(false);
+    if (parsed.present) onPresent?.();
+    else onCommit(parsed.value);
+  }, [onCommit, onPresent]);
+
+  const onFocus = useCallback(() => {
+    focused.current = true;
+  }, []);
+  const onBlur = useCallback(() => {
+    focused.current = false;
+    setText(shown);
+    setInvalid(false);
+  }, [shown]);
+
+  return (
+    <span className={wide ? "cv-date-field is-wide" : "cv-date-field"}>
+      <PageField
+        fieldKey={fieldKey}
+        label={label}
+        placeholder={placeholder}
+        value={text}
+        onChange={change}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />
+      {invalid ? (
+        <span className="date-hint" role="status">
+          {t("edit.dateHint")}
+        </span>
+      ) : null}
+    </span>
+  );
+}

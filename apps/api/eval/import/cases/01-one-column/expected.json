@@ -1,0 +1,155 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "Backend Engineer"
+      ],
+      "phone": "+40 700 000 011",
+      "location": "Cluj-Napoca, Romania",
+      "website": "",
+      "linkedin": "linkedin.com/in/marcus-ellery-example",
+      "summary": "Backend engineer with seven years of experience building payment and billing services. I like small, well-tested services and clear documentation.",
+      "fullName": "Marcus Ellery",
+      "email": "marcus.ellery@example.com"
+    },
+    "experience": [
+      {
+        "company": "Northwind Payments",
+        "title": "Senior Backend Engineer",
+        "location": "Cluj-Napoca, Romania",
+        "startDate": "2021-03",
+        "endDate": "",
+        "current": true,
+        "description": "Own the billing service used by 40 merchant integrations.",
+        "bullets": [
+          {
+            "text": "Cut invoice generation time from 11 minutes to 90 seconds by moving it to a queue-based worker."
+          },
+          {
+            "text": "Led the migration from a single PostgreSQL instance to a primary with two read replicas."
+          },
+          {
+            "text": "Mentored three junior engineers through their first production releases."
+          }
+        ]
+      },
+      {
+        "company": "Brightloop",
+        "title": "Backend Engineer",
+        "location": "Remote",
+        "startDate": "2018-09",
+        "endDate": "2021-02",
+        "current": false,
+        "description": "Worked on the subscription platform for a mid-size software company.",
+        "bullets": [
+          {
+            "text": "Built the webhook delivery system with retries and a replay tool for support."
+          },
+          {
+            "text": "Reduced failed payments by 18% by adding smarter retry timing."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "Technical University of Cluj-Napoca",
+        "degree": "Bachelor of Engineering",
+        "field": "Computer Science",
+        "startDate": "2014",
+        "endDate": "2018",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "English",
+        "level": "Fluent"
+      },
+      {
+        "name": "Romanian",
+        "level": "Native"
+      }
+    ],
+    "certifications": [
+      {
+        "name": "AWS Certified Developer – Associate",
+        "issuer": "Amazon Web Services",
+        "date": "2022-05"
+      }
+    ],
+    "projects": [],
+    "custom": [],
+    "achievements": [],
+    "volunteering": [],
+    "awards": [],
+    "courses": [],
+    "publications": [],
+    "interests": [],
+    "technicalSkills": [
+      {
+        "name": "Go"
+      },
+      {
+        "name": "PostgreSQL"
+      },
+      {
+        "name": "Kafka"
+      },
+      {
+        "name": "Docker"
+      },
+      {
+        "name": "Terraform"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "System design"
+      },
+      {
+        "name": "Code review"
+      },
+      {
+        "name": "Mentoring"
+      }
+    ],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "Profile",
+      "category": "summary"
+    },
+    {
+      "heading": "Work Experience",
+      "category": "experience"
+    },
+    {
+      "heading": "Skills",
+      "category": "skills"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    },
+    {
+      "heading": "Certifications",
+      "category": "certifications"
+    }
+  ],
+  "flags": [
+    {
+      "key": "achievements",
+      "level": "missing"
+    }
+  ]
+}

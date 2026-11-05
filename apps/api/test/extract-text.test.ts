@@ -1,5 +1,6 @@
+import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { ImportFailure, extractText, sniffFormat } from "../src/imports/extract-text.ts";
+import { ImportFailure, MAX_PAGES, extractText, sniffFormat } from "../src/imports/extract-text.ts";
 import { CV_LINES, makeDocx, makePdf } from "./fixtures.ts";
 
 const failureCode = (p: Promise<unknown>) =>
@@ -7,6 +8,17 @@ const failureCode = (p: Promise<unknown>) =>
     () => "no error",
     (e: unknown) => (e instanceof ImportFailure ? e.code : `other: ${String(e)}`),
   );
+
+// A 1x1 PNG.
+const PNG_1X1 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+async function makeImagePdf(pages: number): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const image = await doc.embedPng(Buffer.from(PNG_1X1, "base64"));
+  for (let i = 0; i < pages; i++) doc.addPage([612, 792]).drawImage(image, { x: 0, y: 0, width: 612, height: 792 });
+  return doc.save();
+}
 
 describe("sniffFormat", () => {
   it("sniffs pdf and docx", async () => {
@@ -23,20 +35,47 @@ describe("sniffFormat", () => {
 
 describe("extractText", () => {
   it("reads a pdf", async () => {
-    const text = await extractText(makePdf(CV_LINES), "pdf");
+    const { text } = await extractText(makePdf(CV_LINES), "pdf");
     expect(text).toContain("Ana Popescu");
     expect(text).toContain("Led the redesign of the onboarding flow");
   });
 
   it("reads a docx with Romanian diacritics", async () => {
-    const text = await extractText(await makeDocx(["Ștefan Țărănescu", ...CV_LINES]), "docx");
+    const { text } = await extractText(await makeDocx(["Ștefan Țărănescu", ...CV_LINES]), "docx");
     expect(text).toContain("Ștefan Țărănescu");
     expect(text).toContain("Senior Product Manager");
     expect(text.split("\n").length).toBeGreaterThan(3); // paragraphs stay on separate lines
   });
 
-  it("no text means scanned", async () => {
-    expect(await failureCode(extractText(makePdf([]), "pdf"))).toBe("no_text");
+  it("reports the page count of a normal pdf", async () => {
+    const result = await extractText(makePdf(CV_LINES), "pdf");
+    expect(result.pages).toBe(1);
+    expect(result.isScan).toBe(false);
+  });
+
+  it("a 9-page pdf fails with too_many_pages", async () => {
+    expect(MAX_PAGES).toBe(8);
+    expect(await failureCode(extractText(await makeImagePdf(9), "pdf"))).toBe("too_many_pages");
+  });
+
+  it("an image-only pdf is a scan, not a failure", async () => {
+    const result = await extractText(await makeImagePdf(2), "pdf");
+    expect(result).toMatchObject({ pages: 2, isScan: true });
+  });
+
+  it("exactly 8 pages is accepted", async () => {
+    expect(await extractText(await makeImagePdf(8), "pdf")).toMatchObject({ pages: 8, isScan: true });
+  });
+
+  it("a pdf with few letters spread over lots of spaces is a scan", async () => {
+    const lines = Array.from({ length: 15 }, () => "a a a a a a a a a a"); // 150 letters, text longer than 200 characters
+    const result = await extractText(makePdf(lines), "pdf");
+    expect(result.text.length).toBeGreaterThan(200);
+    expect(result.isScan).toBe(true);
+  });
+
+  it("an empty docx still fails with no_text", async () => {
+    expect(await failureCode(extractText(await makeDocx([]), "docx"))).toBe("no_text");
   });
 
   it("too long", async () => {

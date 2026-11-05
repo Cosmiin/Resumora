@@ -1,0 +1,176 @@
+.save-status {
+  font-size: 0.9rem;
+  color: var(--sage-600, #536b69);
+}
+.save-status-error,
+.save-status-conflict {
+  color: #a33a2b;
+}
+.cv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cv-bullets {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.cv-bullets li > button {
+  margin-top: 0.25rem;
+}
+.conflict-banner {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--marigold-500, #e9a23b);
+  background: var(--marigold-50, #fffaf0);
+  border-radius: 12px;
+}
+.conflict-banner p {
+  margin: 0.35rem 0 0.75rem;
+}
+
+/* Skill groups */
+.skill-group { margin-block: var(--space-3, 12px); }
+.skill-group h3 { font-size: 1rem; margin-block-end: 4px; }
+.skill-group-unclear { border-inline-start: 3px solid var(--color-warning, #b7791f); padding-inline-start: 12px; }
+.skill-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.hint { color: var(--color-text-muted, #666); font-size: 0.9rem; }
+
+/* Editor: the page on the left, the helper panel (or History) on the right */
+.editor { padding: 0; }
+.editor-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: start; min-height: 760px; }
+.stage { padding: 28px 24px 40px; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
+.stage:focus { outline: none; }
+.editor-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; justify-items: stretch; min-width: 0; }
+.panel {
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: var(--white);
+  border-left: 1px solid var(--sage-200);
+  padding: 20px 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); /* a long option or word must not widen the column */
+  align-content: start;
+  gap: 22px;
+  min-width: 0;
+}
+.editor-workspace > .side-panel { max-width: none; }
+
+/* Under 900px the panel becomes a bottom sheet (see .sheet below). */
+@media (max-width: 899px) {
+  .editor-workspace { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .panel { position: static; max-height: none; border-left: 0; border-top: 1px solid var(--sage-200); }
+  .stage { padding: 16px 10px; }
+}
+
+/* Phone sheet: a short peek, or up to 80% of the screen when full. */
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  background: var(--white); border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgb(15 40 38 / 16%);
+  padding: 0 0 env(safe-area-inset-bottom);
+}
+.sheet.peek { max-height: calc(176px + env(safe-area-inset-bottom)); }
+.sheet.full { max-height: 80vh; }
+.sheet-grip { display: block; width: 100%; min-height: 28px; padding: 12px 0 8px; border: 0; border-radius: 18px 18px 0 0; background: none; cursor: grab; touch-action: none; }
+.sheet-grip::before { content: ""; display: block; width: 36px; height: 4px; margin: 0 auto; border-radius: 4px; background: var(--sage-300); }
+.sheet-grip:focus-visible { outline: 2px solid var(--pine-600); outline-offset: -2px; }
+.sheet-body { min-height: 0; overflow: hidden; }
+.sheet.full .sheet-body { overflow-y: auto; }
+.sheet .panel { border-top: 0; padding: 4px 16px 16px; }
+/* Room to scroll the end of the page above the sheet. */
+.editor-workspace:has(.sheet) .stage { padding-bottom: calc(190px + env(safe-area-inset-bottom)); }
+
+.side-panel {
+  flex: 1 1 400px;
+  max-width: 460px;
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background: var(--white);
+  border-inline-start: 1px solid var(--border-subtle);
+}
+.side-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.side-panel-section {
+  margin: 0;
+  font: 600 11px/1.4 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pine-600);
+}
+.side-panel-title { margin: 2px 0 0; font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; color: var(--pine-800); overflow-wrap: anywhere; }
+.side-panel-close {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--pine-800);
+  border: 1px solid var(--border-subtle);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+.side-panel-back { display: none; font-size: 0.95rem; }
+.side-panel-body { display: grid; gap: 12px; }
+.side-panel-footer { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+
+
+@media (max-width: 900px) {
+  .side-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    align-content: start;
+  }
+  .side-panel-close-icon { display: none; }
+  .side-panel-back { display: inline; }
+  .side-panel-header { flex-direction: row-reverse; justify-content: flex-end; }
+}
+
+
+/* Below 900px history is a bottom sheet: the previewed page stays visible above it, the list
+   scrolls inside the sheet and Restore stays in view at its foot. */
+@media (max-width: 900px) {
+  .side-panel.history-panel {
+    inset: auto 0 0 0;
+    max-height: 55vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--shadow-page);
+  }
+  .history-panel > * { flex-shrink: 0; }
+  .history-panel > .side-panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  /* Room to scroll the end of the page above the sheet. */
+  .editor-workspace:has(.history-panel) .stage { padding-bottom: 55vh; }
+}
+
+.history-intro, .history-hint { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+.history-group { display: grid; gap: 8px; }
+.history-day { margin: 0; font: 600 11px/1.4 var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--pine-600); }
+.history-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.history-item { width: 100%; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; text-align: start; background: var(--white); color: var(--pine-800); border: 1px solid var(--border-subtle); }
+.history-item:hover { background: var(--surface-hover); }
+.history-item[aria-pressed="true"] { border-color: var(--pine-600); background: var(--surface-hover); }
+.history-time { font-weight: 600; }
+.history-reason { font-size: 0.85rem; color: var(--text-muted); }
+.history-notice { margin: 0 auto; max-width: 680px; width: 100%; padding: 8px 12px; box-sizing: border-box; background: var(--white); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--pine-800); font-size: 0.9rem; }

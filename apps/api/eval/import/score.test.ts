@@ -1,0 +1,152 @@
+import { emptyCv, type ImportResult } from "@resumora/shared";
+import { describe, expect, it } from "vitest";
+import { scoreCase, type Expected } from "./score.ts";
+
+const content = {
+  schemaVersion: 2,
+  locale: "ro",
+  basics: { fullName: "Ana Șerban", email: "ana@example.com", summary: "Dezvoltator cu experiență.", titles: ["Inginer"] },
+  experience: [
+    { company: "Alpha SRL", title: "Dezvoltator", description: "", bullets: [{ text: "Am construit un API." }, { text: "Am redus costurile." }] },
+    { company: "Beta SA", title: "Analist", description: "", bullets: [{ text: "Rapoarte lunare." }] },
+  ],
+  achievements: [{ text: "Premiul clienților" }],
+  education: [{ school: "Universitatea București", degree: "Licență" }],
+  technicalSkills: [{ name: "TypeScript" }],
+  professionalSkills: [{ name: "Comunicare" }],
+  unclearSkills: [],
+  languages: [{ name: "Română", level: "nativ" }],
+  custom: [],
+};
+
+const expected: Expected = {
+  content,
+  headings: [
+    { heading: "Experiență", category: "experience" },
+    { heading: "Aptitudini", category: "skills" },
+  ],
+  flags: [],
+};
+
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+function actualFrom(c: Record<string, unknown>, headings = expected.headings): ImportResult {
+  return {
+    content: { ...emptyCv(), ...clone(c), basics: { ...emptyCv().basics, ...(c.basics as object) } },
+    warnings: [],
+    sourceHeadings: headings,
+    unsourcedLines: [],
+    isScan: false,
+  } as unknown as ImportResult;
+}
+
+describe("scoreCase", () => {
+  it("identical content scores 1.0", () => {
+    const score = scoreCase(expected, actualFrom(content));
+    expect(score.fieldAccuracy).toBe(1);
+    expect(score.sectionsOk).toBe(true);
+    expect(score.diacriticsOk).toBe(true);
+    expect(score.invented).toEqual([]);
+  });
+
+  it("a missing bullet lowers accuracy", () => {
+    const c = clone(content);
+    c.experience[0]!.bullets.pop();
+    expect(scoreCase(expected, actualFrom(c)).fieldAccuracy).toBeLessThan(1);
+  });
+
+  it("a changed diacritic fails diacriticsOk", () => {
+    const c = clone(content);
+    c.basics.fullName = "Ana Serban";
+    const score = scoreCase(expected, actualFrom(c));
+    expect(score.diacriticsOk).toBe(false);
+    expect(score.fieldAccuracy).toBeLessThan(1);
+  });
+
+  it("items in a different order still match", () => {
+    const c = clone(content);
+    c.experience.reverse();
+    expect(scoreCase(expected, actualFrom(c)).fieldAccuracy).toBe(1);
+  });
+
+  it("a missing heading fails sectionsOk, and a line not in the source is invented", () => {
+    const c = clone(content);
+    c.achievements = [{ text: "Premiu inventat de model" }];
+    const score = scoreCase(expected, actualFrom(c, [expected.headings[0]!]), "Ana Șerban Premiul clienților Alpha SRL");
+    expect(score.sectionsOk).toBe(false);
+    expect(score.invented).toContain("Premiu inventat de model");
+  });
+
+  it("an extra item lowers accuracy and is listed", () => {
+    const c = clone(content);
+    c.experience.push({ company: "Gamma SRL", title: "Manager", description: "", bullets: [{ text: "Echipa mare." }] });
+    const score = scoreCase(expected, actualFrom(c));
+    expect(score.fieldAccuracy).toBeLessThan(1);
+    expect(score.extra).toEqual(["experience: Gamma SRL Manager"]);
+  });
+
+  it("a changed boolean and a filled field that should be empty both count", () => {
+    const e = clone(expected);
+    (e.content.experience as Record<string, unknown>[])[0]!.current = true;
+    const c = clone(content) as Record<string, unknown>;
+    (c.experience as Record<string, unknown>[])[0]!.current = false;
+    expect(scoreCase(e, actualFrom(c)).fieldAccuracy).toBeLessThan(1);
+    const filled = clone(content);
+    filled.experience[0]!.description = "Invented text";
+    expect(scoreCase(expected, actualFrom(filled)).fieldAccuracy).toBeLessThan(1);
+  });
+
+  it("a heading in the wrong category fails sectionsOk and says so", () => {
+    const wrong = [expected.headings[0]!, { heading: "Aptitudini", category: "other" as const }];
+    const score = scoreCase(expected, actualFrom(content, wrong));
+    expect(score.sectionsOk).toBe(false);
+    expect(score.sectionProblems).toEqual(['"Aptitudini" -> got other, expected skills']);
+  });
+
+  it("a filled first/last name pair is right when it spells the full name, in either order", () => {
+    const e = clone(expected);
+    Object.assign(e.content.basics as object, { firstName: "", lastName: "" });
+    const withNames = (firstName: string, lastName: string) => {
+      const c = clone(content);
+      Object.assign(c.basics, { firstName, lastName });
+      return scoreCase(e, actualFrom(c)).fieldAccuracy;
+    };
+    expect(withNames("Ana", "Șerban")).toBe(1);
+    expect(withNames("Șerban", "Ana")).toBe(1);
+    expect(withNames("Ana", "")).toBeLessThan(1);
+    expect(withNames("Ana", "Serban")).toBeLessThan(1);
+    const keyed = clone(content);
+    Object.assign(keyed.basics, { firstName: "Ana", lastName: "Șerban" });
+    expect(scoreCase({ ...expected, content: keyed }, actualFrom({ ...keyed, basics: { ...keyed.basics, firstName: "Șerban", lastName: "Ana" } })).fieldAccuracy).toBeLessThan(1);
+  });
+
+  it("a skill in the wrong group counts as one miss, not also as extra", () => {
+    const c = clone(content) as Record<string, unknown>;
+    c.technicalSkills = [{ name: "TypeScript" }, { name: "comunicare" }];
+    c.professionalSkills = [];
+    const score = scoreCase(expected, actualFrom(c));
+    expect(score.misplaced).toEqual(["comunicare: got technicalSkills, expected professionalSkills"]);
+    expect(score.extra).toEqual([]);
+    expect(score.fieldAccuracy).toBeLessThan(1);
+    const leaves = scoreCase(expected, actualFrom(content));
+    expect(leaves.misplaced).toEqual([]);
+  });
+
+  it("a skill that is in its right group too is still extra in the other one", () => {
+    const c = clone(content) as Record<string, unknown>;
+    c.technicalSkills = [{ name: "TypeScript" }, { name: "Comunicare" }];
+    const score = scoreCase(expected, actualFrom(c));
+    expect(score.misplaced).toEqual([]);
+    expect(score.extra).toEqual(["technicalSkills: Comunicare"]);
+  });
+
+  it("flags match in any order", () => {
+    const flags = [{ key: "summary", level: "missing" }, { key: "languages", level: "tip" }];
+    const e: Expected = { ...expected, flags: [...flags].reverse() };
+    const c = clone(content) as Record<string, unknown>;
+    c.basics = { ...(c.basics as object), summary: "" };
+    c.languages = [];
+    expect(scoreCase(e, actualFrom(c)).flagsOk).toBe(true);
+    expect(scoreCase({ ...e, flags: [flags[0]!] }, actualFrom(c)).flagsOk).toBe(false);
+  });
+});

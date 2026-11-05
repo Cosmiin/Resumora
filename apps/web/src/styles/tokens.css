@@ -129,7 +129,7 @@
   --radius-sm: 6px;
   --radius-field: 7px;
   --radius-md: 8px;
-  --radius-lg: 10px;
+  --radius-lg: 12px;
   --radius-card: 14px;
   --radius-dialog: 15px;
   --radius-hero: 18px;
@@ -139,10 +139,11 @@
 }
 
 :root {
-  --font-display:
-    "Bricolage Grotesque", "Figtree", ui-sans-serif, system-ui, sans-serif;
-  --font-sans:
-    "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Newsreader Variable", Georgia, serif;
+  --font-sans: "Instrument Sans Variable", system-ui, sans-serif;
+  --shadow-page: 0 1px 2px rgb(15 40 38 / 0.06), 0 12px 40px rgb(15 40 38 / 0.08);
+  --outline-selected: 2px solid var(--pine-600);
+  --surface-selected-block: var(--pine-50);
   --font-document: "Source Serif 4", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   --weight-regular: 400;

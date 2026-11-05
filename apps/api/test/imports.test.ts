@@ -53,7 +53,7 @@ async function readyImport(fullName = "Imported") {
   const { id } = await json(await upload(makePdf(CV_LINES)));
   const content = { ...emptyCv(), basics: { ...emptyCv().basics, fullName } };
   await store.admin.start(id);
-  await store.admin.finish(id, { content, warnings: [] });
+  await store.admin.finish(id, { content, warnings: [], sourceHeadings: [], unsourcedLines: [], isScan: false });
   return id as string;
 }
 

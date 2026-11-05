@@ -6,7 +6,9 @@
     "dev": "wrangler dev --port 8788 --ip 127.0.0.1",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "wrangler deploy --dry-run --outdir dist"
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "eval:import": "vitest run --config vitest.eval.config.ts",
+    "eval:generate": "esbuild eval/import/generate.ts --bundle --platform=node --format=esm --packages=external --outfile=node_modules/.cache/eval/generate.mjs --log-level=warning && node node_modules/.cache/eval/generate.mjs"
   },
   "dependencies": {
     "@resumora/shared": "*",
@@ -18,7 +20,9 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261104.1",
+    "docx": "9.15.2",
     "jszip": "3.10.2",
+    "pdf-lib": "1.17.1",
     "wrangler": "4.157.0"
   }
 }

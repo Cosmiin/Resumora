@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SECTION_KEYS, type SectionKey } from "./categories.ts";
 
 /** Max serialized size of a CV body accepted by the API. */
 export const MAX_CV_BYTES = 256 * 1024;
@@ -9,6 +10,7 @@ export const MAX_BULLETS = 20;
 export const MAX_TEXT = 2000;
 export const MAX_LONG_TEXT = 4000;
 export const MAX_TITLES = 2;
+export const MAX_ACHIEVEMENTS = 10;
 
 const text = (max = MAX_TEXT) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -87,26 +89,71 @@ export const BasicsSchema = z
   })
   .strict();
 
+const sectionKey = z.enum(SECTION_KEYS as unknown as [SectionKey, ...SectionKey[]]);
+
+export const AwardSchema = z
+  .object({ id, name: text(), issuer: text(), date: YearMonthSchema, description: text(MAX_LONG_TEXT) })
+  .strict();
+export const CourseSchema = z.object({ id, name: text(), provider: text(), date: YearMonthSchema }).strict();
+export const PublicationSchema = z
+  .object({ id, title: text(), publisher: text(), date: YearMonthSchema, url: text() })
+  .strict();
+export const InterestSchema = z.object({ id, name: text() }).strict();
+
+/** Section order, hidden sections and custom headings of a CV. */
+export const LayoutSchema = z
+  .object({
+    order: z.array(sectionKey).max(SECTION_KEYS.length),
+    hidden: z.array(sectionKey).max(SECTION_KEYS.length),
+    titles: z.partialRecord(sectionKey, text()),
+  })
+  .strict();
+export type Layout = z.infer<typeof LayoutSchema>;
+
+export function defaultLayout(): Layout {
+  return { order: [...SECTION_KEYS], hidden: [], titles: {} };
+}
+
+const v1Shape = {
+  locale: z.enum(["en", "ro"]),
+  basics: BasicsSchema,
+  experience: z.array(ExperienceSchema).max(MAX_ITEMS),
+  education: z.array(EducationSchema).max(MAX_ITEMS),
+  technicalSkills: z.array(SkillSchema).max(MAX_ITEMS),
+  professionalSkills: z.array(SkillSchema).max(MAX_ITEMS),
+  unclearSkills: z.array(SkillSchema).max(MAX_ITEMS),
+  languages: z.array(LanguageSchema).max(MAX_ITEMS),
+  certifications: z.array(CertificationSchema).max(MAX_ITEMS),
+  projects: z.array(ProjectSchema).max(MAX_ITEMS),
+  custom: z.array(CustomSectionSchema).max(MAX_ITEMS),
+};
+
+/** The first stored format; still readable, upgraded to v2 on read. */
+export const CvContentV1Schema = z.object({ schemaVersion: z.literal(1), ...v1Shape }).strict();
+
 export const CvContentSchema = z
   .object({
-    schemaVersion: z.literal(1),
-    locale: z.enum(["en", "ro"]),
-    basics: BasicsSchema,
-    experience: z.array(ExperienceSchema).max(MAX_ITEMS),
-    education: z.array(EducationSchema).max(MAX_ITEMS),
-    technicalSkills: z.array(SkillSchema).max(MAX_ITEMS),
-    professionalSkills: z.array(SkillSchema).max(MAX_ITEMS),
-    unclearSkills: z.array(SkillSchema).max(MAX_ITEMS),
-    languages: z.array(LanguageSchema).max(MAX_ITEMS),
-    certifications: z.array(CertificationSchema).max(MAX_ITEMS),
-    projects: z.array(ProjectSchema).max(MAX_ITEMS),
-    custom: z.array(CustomSectionSchema).max(MAX_ITEMS),
+    schemaVersion: z.literal(2),
+    ...v1Shape,
+    achievements: z.array(BulletSchema).max(MAX_ACHIEVEMENTS),
+    volunteering: z.array(ExperienceSchema).max(MAX_ITEMS),
+    awards: z.array(AwardSchema).max(MAX_ITEMS),
+    courses: z.array(CourseSchema).max(MAX_ITEMS),
+    publications: z.array(PublicationSchema).max(MAX_ITEMS),
+    interests: z.array(InterestSchema).max(MAX_ITEMS),
+    layout: LayoutSchema,
   })
   .strict();
 
 export type CvContent = z.infer<typeof CvContentSchema>;
+export type CvContentV1 = z.infer<typeof CvContentV1Schema>;
 export type Experience = z.infer<typeof ExperienceSchema>;
 export type Skill = z.infer<typeof SkillSchema>;
+export type Bullet = z.infer<typeof BulletSchema>;
+export type Award = z.infer<typeof AwardSchema>;
+export type Course = z.infer<typeof CourseSchema>;
+export type Publication = z.infer<typeof PublicationSchema>;
+export type Interest = z.infer<typeof InterestSchema>;
 export type Locale = CvContent["locale"];
 
 export function newId(): string {
@@ -115,7 +162,7 @@ export function newId(): string {
 
 export function emptyCv(locale: Locale = "en"): CvContent {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     locale,
     basics: {
       fullName: "",
@@ -138,5 +185,12 @@ export function emptyCv(locale: Locale = "en"): CvContent {
     certifications: [],
     projects: [],
     custom: [],
+    achievements: [],
+    volunteering: [],
+    awards: [],
+    courses: [],
+    publications: [],
+    interests: [],
+    layout: defaultLayout(),
   };
 }

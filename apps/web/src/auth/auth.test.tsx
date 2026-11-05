@@ -41,8 +41,17 @@ beforeEach(() => {
 describe("authentication", () => {
   it("redirects to login when signed out", async () => {
     const router = renderAt("/cv");
-    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/login");
+  });
+
+  it("login page shows the product promise", async () => {
+    renderAt("/login");
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Your CV, organized and ready for every application." }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
+    expect(screen.getByText("Sign in to continue with your CV.")).toBeInTheDocument();
   });
 
   it("shows readable error on wrong password", async () => {
@@ -84,14 +93,30 @@ describe("authentication", () => {
       error: null,
     });
     renderAt("/");
-    expect(await screen.findByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Account: ana@example.com" })).toBeInTheDocument();
+  });
+});
+
+const signedIn = { data: { session: { access_token: "t", user: { id: "u1", email: "ana@example.com" } } }, error: null };
+
+async function openAccountMenu() {
+  await userEvent.click(await screen.findByRole("button", { name: "Account: ana@example.com" }));
+}
+
+describe("top bar", () => {
+  it("shows My CV and the account menu signs out", async () => {
+    auth.getSession.mockResolvedValue(signedIn);
+    auth.signOut.mockResolvedValue({ error: null });
+    renderAt("/cv");
+    expect(await screen.findByRole("link", { name: "My CV" })).toHaveAttribute("aria-current", "page");
+    await openAccountMenu();
     expect(screen.getByText("ana@example.com")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(auth.signOut).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("sign out", () => {
-  const signedIn = { data: { session: { access_token: "t", user: { id: "u1", email: "ana@example.com" } } }, error: null };
-
   it("asks first when there are unsaved changes", async () => {
     auth.getSession.mockResolvedValue(signedIn);
     auth.signOut.mockResolvedValue({ error: null });
@@ -99,7 +124,8 @@ describe("sign out", () => {
     renderAt("/cv");
     setUnsavedChanges(true);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    await openAccountMenu();
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(confirm).toHaveBeenCalledWith("You have unsaved changes. Sign out anyway?");
     expect(auth.signOut).not.toHaveBeenCalled();
 
@@ -114,7 +140,8 @@ describe("sign out", () => {
     auth.signOut.mockResolvedValue({ error: null });
     const confirm = vi.spyOn(window, "confirm");
     renderAt("/cv");
-    await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    await openAccountMenu();
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(confirm).not.toHaveBeenCalled();
     expect(auth.signOut).toHaveBeenCalledTimes(1);
     confirm.mockRestore();

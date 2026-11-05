@@ -8,17 +8,27 @@ import {
   MAX_TITLES,
   SKILL_GROUPS,
   YearMonthSchema,
+  defaultLayout,
   emptyCv,
+  MAX_ACHIEVEMENTS,
   newId,
   type CvContent,
   type Skill,
 } from "./cv.ts";
+import { SECTION_KEYS, type SectionKey } from "./categories.ts";
+import { StoredCvSchema } from "./upgrade.ts";
 
 /** "Is this a CV?" — the first, cheap AI step of an import. */
 export const AdmitSchema = z.object({ kind: z.enum(["cv", "not_cv", "uncertain"]), reason: z.string() }).strict();
 export type Admit = z.infer<typeof AdmitSchema>;
 
 const s = z.string();
+const jobShape = z
+  .object({
+    company: s, title: s, location: s, startDate: s, endDate: s,
+    current: z.boolean(), description: s, bullets: z.array(s),
+  })
+  .strict();
 
 /**
  * What the extraction model returns: the CV shape without ids, with plain strings for skills and
@@ -35,14 +45,9 @@ export const ImportDraftSchema = z
         email: s, phone: s, location: s, website: s, linkedin: s, summary: s,
       })
       .strict(),
-    experience: z.array(
-      z
-        .object({
-          company: s, title: s, location: s, startDate: s, endDate: s,
-          current: z.boolean(), description: s, bullets: z.array(s),
-        })
-        .strict(),
-    ),
+    achievements: z.array(s),
+    experience: z.array(jobShape),
+    volunteering: z.array(jobShape),
     education: z.array(z.object({ school: s, degree: s, field: s, startDate: s, endDate: s, notes: s }).strict()),
     technicalSkills: z.array(s),
     professionalSkills: z.array(s),
@@ -51,6 +56,12 @@ export const ImportDraftSchema = z
     certifications: z.array(z.object({ name: s, issuer: s, date: s }).strict()),
     projects: z.array(z.object({ name: s, description: s, url: s }).strict()),
     custom: z.array(z.object({ title: s, details: s }).strict()),
+    awards: z.array(z.object({ name: s, issuer: s, date: s, description: s }).strict()),
+    courses: z.array(z.object({ name: s, provider: s, date: s }).strict()),
+    publications: z.array(z.object({ title: s, publisher: s, date: s, url: s }).strict()),
+    interests: z.array(s),
+    /** Every heading in the file as written, with the category its content went to (a plain string, so an unknown key does not fail the parse). */
+    sourceHeadings: z.array(z.object({ heading: s, category: s }).strict()),
   })
   .strict();
 export type ImportDraft = z.infer<typeof ImportDraftSchema>;
@@ -59,17 +70,39 @@ export function emptyDraft(): ImportDraft {
   const { basics } = emptyCv();
   return {
     detectedLocale: "en", warnings: [], basics,
-    experience: [], education: [], technicalSkills: [], professionalSkills: [], unclearSkills: [],
+    achievements: [], experience: [], volunteering: [], education: [], technicalSkills: [], professionalSkills: [], unclearSkills: [],
     languages: [], certifications: [], projects: [], custom: [],
+    awards: [], courses: [], publications: [], interests: [], sourceHeadings: [],
   };
 }
 
+/** The warning the API adds for a scanned file; the review shows it from `isScan` instead. */
+export const SCAN_WARNING = "This file is a scan. Check every line.";
+
 /** What a finished import holds, ready for review. */
+export type SourceHeading = { heading: string; category: SectionKey };
+const SourceHeadingSchema = z.object({
+  heading: z.string(),
+  category: z.enum(SECTION_KEYS as [SectionKey, ...SectionKey[]]),
+});
+
 export const ImportResultSchema = z.object({
-  content: CvContentSchema,
+  content: StoredCvSchema,
   warnings: z.array(z.string().max(500)).max(50),
+  sourceHeadings: z.array(SourceHeadingSchema).default([]),
+  unsourcedLines: z.array(z.string()).default([]),
+  isScan: z.boolean().default(false),
 });
 export type ImportResult = z.infer<typeof ImportResultSchema>;
+
+/** "Master of Arts, History" with field "History" is degree "Master of Arts": the field is not kept twice. */
+function withoutField(degree: string, field: string): string {
+  const d = degree.trim();
+  const f = field.trim();
+  if (!f || !d.endsWith(f)) return degree;
+  const rest = d.slice(0, -f.length).replace(/\s*[,–-]\s*$/, "");
+  return rest && rest.length < d.length - f.length ? rest : degree;
+}
 
 /**
  * Turns the model's draft into valid CV content: adds ids, keeps lists and texts within the CV
@@ -112,22 +145,24 @@ export function toCvContent(draft: ImportDraft): ImportResult {
     summary: clip(b.summary, "the summary", MAX_LONG_TEXT),
   };
 
-  const experience = list(draft.experience, "experience entries").map((e) => {
-    if (e.bullets.length > MAX_BULLETS) {
-      warn(`Some bullets were left out of ${e.company || "an experience entry"}: only the first ${MAX_BULLETS} were kept.`);
-    }
-    return {
-      id: newId(),
-      company: clip(e.company, "experience"),
-      title: clip(e.title, "experience"),
-      location: clip(e.location, "experience"),
-      startDate: date(e.startDate, "experience"),
-      endDate: e.current ? "" : date(e.endDate, "experience"),
-      current: e.current,
-      description: clip(e.description, "experience", MAX_LONG_TEXT),
-      bullets: e.bullets.slice(0, MAX_BULLETS).map((text) => ({ id: newId(), text: clip(text, "experience") })),
-    };
-  });
+  const jobs = (items: ImportDraft["experience"], label: string, entry: string) =>
+    list(items, `${label} entries`).map((e) => {
+      if (e.bullets.length > MAX_BULLETS) {
+        warn(`Some bullets were left out of ${e.company || entry}: only the first ${MAX_BULLETS} were kept.`);
+      }
+      return {
+        id: newId(),
+        company: clip(e.company, label),
+        title: clip(e.title, label),
+        location: clip(e.location, label),
+        startDate: date(e.startDate, label),
+        endDate: e.current ? "" : date(e.endDate, label),
+        current: e.current,
+        description: clip(e.description, label, MAX_LONG_TEXT),
+        bullets: e.bullets.slice(0, MAX_BULLETS).map((text) => ({ id: newId(), text: clip(text, label) })),
+      };
+    });
+  const experience = jobs(draft.experience, "experience", "an experience entry");
 
   // A skill appears once: the first group wins (technical → professional → unclear).
   const seen = new Set<string>();
@@ -147,14 +182,14 @@ export function toCvContent(draft: ImportDraft): ImportResult {
   }
 
   const content: CvContent = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     locale: draft.detectedLocale === "ro" ? "ro" : "en",
     basics,
     experience,
     education: list(draft.education, "education entries").map((e) => ({
       id: newId(),
       school: clip(e.school, "education"),
-      degree: clip(e.degree, "education"),
+      degree: clip(withoutField(e.degree, e.field), "education"),
       field: clip(e.field, "education"),
       startDate: date(e.startDate, "education"),
       endDate: date(e.endDate, "education"),
@@ -179,7 +214,48 @@ export function toCvContent(draft: ImportDraft): ImportResult {
       title: clip(c.title, "other sections"),
       details: clip(c.details, "other sections", MAX_LONG_TEXT),
     })),
+    achievements: list(draft.achievements, "achievements", MAX_ACHIEVEMENTS).map((text) => ({ id: newId(), text: clip(text, "achievements") })),
+    volunteering: jobs(draft.volunteering, "volunteering", "a volunteering entry"),
+    awards: list(draft.awards, "awards").map((a) => ({
+      id: newId(),
+      name: clip(a.name, "awards"),
+      issuer: clip(a.issuer, "awards"),
+      date: date(a.date, "awards"),
+      description: clip(a.description, "awards", MAX_LONG_TEXT),
+    })),
+    courses: list(draft.courses, "courses").map((c) => ({
+      id: newId(),
+      name: clip(c.name, "courses"),
+      provider: clip(c.provider, "courses"),
+      date: date(c.date, "courses"),
+    })),
+    publications: list(draft.publications, "publications").map((p) => ({
+      id: newId(),
+      title: clip(p.title, "publications"),
+      publisher: clip(p.publisher, "publications"),
+      date: date(p.date, "publications"),
+      url: clip(p.url, "publications"),
+    })),
+    interests: list(draft.interests.map((n) => n.trim()).filter(Boolean), "interests").map((name) => ({ id: newId(), name: clip(name, "interests") })),
+    layout: defaultLayout(),
   };
 
-  return { content: CvContentSchema.parse(content), warnings: warnings.slice(0, 50) };
+  const known = new Set<string>(SECTION_KEYS);
+  const sourceHeadings: SourceHeading[] = draft.sourceHeadings.map((h) => {
+    // A field path ("basics.summary") means its last part; a skill group's name means the skills section.
+    const key = h.category.split(".").pop()!.trim();
+    if (key === "custom") return { heading: h.heading, category: "other" };
+    if (known.has(key)) return { heading: h.heading, category: key as SectionKey };
+    if ((SKILL_GROUPS as readonly string[]).includes(key)) return { heading: h.heading, category: "skills" };
+    warn(`The heading "${h.heading.slice(0, 100)}" didn't match a known section, so it was filed under other.`);
+    return { heading: h.heading, category: "other" };
+  });
+
+  return {
+    content: CvContentSchema.parse(content),
+    warnings: warnings.slice(0, 50),
+    sourceHeadings,
+    unsourcedLines: [],
+    isScan: false,
+  };
 }

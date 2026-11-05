@@ -1,0 +1,152 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "Data Analyst"
+      ],
+      "phone": "+40 700 000 033",
+      "location": "Timișoara, Romania",
+      "website": "",
+      "linkedin": "",
+      "summary": "Data analyst who explains numbers to people who do not like numbers.",
+      "fullName": "Tomás Varga",
+      "email": "tomas.varga@example.com"
+    },
+    "experience": [
+      {
+        "company": "Aurora Retail",
+        "title": "Data Analyst",
+        "location": "Timișoara, Romania",
+        "startDate": "2019-10",
+        "endDate": "",
+        "current": true,
+        "description": "Analyse sales and customer data for 60 shops.",
+        "bullets": [
+          {
+            "text": "Automated the weekly sales report, saving six hours of manual work."
+          },
+          {
+            "text": "Created a store ranking model used in yearly planning."
+          }
+        ]
+      },
+      {
+        "company": "Delta Consulting",
+        "title": "Junior Analyst",
+        "location": "Timișoara, Romania",
+        "startDate": "2017",
+        "endDate": "2019",
+        "current": false,
+        "description": "Prepared reports for telecom clients.",
+        "bullets": [
+          {
+            "text": "Cleaned and merged survey data from five countries."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "West University of Timișoara",
+        "degree": "Bachelor's degree",
+        "field": "Statistics",
+        "startDate": "2013",
+        "endDate": "2017",
+        "notes": ""
+      }
+    ],
+    "languages": [
+      {
+        "name": "Hungarian",
+        "level": "Native"
+      },
+      {
+        "name": "English",
+        "level": "Advanced"
+      }
+    ],
+    "certifications": [
+      {
+        "name": "Microsoft Certified: Data Analyst Associate",
+        "issuer": "Microsoft",
+        "date": "2021-02"
+      }
+    ],
+    "projects": [],
+    "custom": [],
+    "achievements": [
+      {
+        "text": "Built a churn dashboard that the retention team now uses every Monday."
+      },
+      {
+        "text": "Found a pricing error that was costing 4% of monthly revenue."
+      },
+      {
+        "text": "Trained 30 colleagues to write their own SQL queries."
+      }
+    ],
+    "volunteering": [],
+    "awards": [],
+    "courses": [],
+    "publications": [],
+    "interests": [],
+    "technicalSkills": [
+      {
+        "name": "SQL"
+      },
+      {
+        "name": "Python"
+      },
+      {
+        "name": "Power BI"
+      },
+      {
+        "name": "Excel"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "Data storytelling"
+      },
+      {
+        "name": "Stakeholder communication"
+      }
+    ],
+    "unclearSkills": []
+  },
+  "headings": [
+    {
+      "heading": "Skills",
+      "category": "skills"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    },
+    {
+      "heading": "Summary",
+      "category": "summary"
+    },
+    {
+      "heading": "Experience",
+      "category": "experience"
+    },
+    {
+      "heading": "Key Achievements",
+      "category": "achievements"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    },
+    {
+      "heading": "Certifications",
+      "category": "certifications"
+    }
+  ],
+  "flags": []
+}

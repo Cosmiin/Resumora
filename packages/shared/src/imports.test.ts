@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, MAX_BULLETS, MAX_ITEMS } from "./cv.ts";
-import { ImportDraftSchema, emptyDraft, toCvContent, type ImportDraft } from "./imports.ts";
+import { CvContentSchema, MAX_BULLETS, MAX_ITEMS, defaultLayout, emptyCv } from "./cv.ts";
+import { ImportDraftSchema, ImportResultSchema, emptyDraft, toCvContent, type ImportDraft } from "./imports.ts";
 
 const draftWith = (overrides: Partial<ImportDraft>): ImportDraft => ({ ...emptyDraft(), ...overrides });
 const job = (company: string, bullets: string[] = []) => ({
@@ -8,6 +8,15 @@ const job = (company: string, bullets: string[] = []) => ({
 });
 
 describe("toCvContent", () => {
+  it("returns v2 with the default layout", () => {
+    const { content } = toCvContent(draftWith({ experience: [job("Acme")] }));
+    expect(content.schemaVersion).toBe(2);
+    expect(content.layout).toEqual(defaultLayout());
+    for (const list of [content.achievements, content.volunteering, content.awards, content.courses, content.publications, content.interests]) {
+      expect(list).toEqual([]);
+    }
+  });
+
   it("assigns ids", () => {
     const { content } = toCvContent(
       draftWith({ experience: [job("Acme", ["Did a thing"])], technicalSkills: ["SQL"], custom: [{ title: "Awards", details: "Best PM 2021" }] }),
@@ -61,7 +70,92 @@ describe("toCvContent", () => {
     expect(warnings.some((w) => /title/i.test(w))).toBe(true);
   });
 
+  it("maps achievements, volunteering, awards, courses, publications and interests", () => {
+    const { content, warnings } = toCvContent(
+      draftWith({
+        achievements: ["Doubled sales", ...Array.from({ length: 11 }, () => "x")],
+        volunteering: [job("Red Cross", ["Helped"])],
+        awards: [{ name: "Best PM", issuer: "Acme", date: "2021-05", description: "Top of 40" }],
+        courses: [{ name: "Scrum", provider: "Udemy", date: "bad" }],
+        publications: [{ title: "On CVs", publisher: "Journal", date: "2019", url: "https://x.ro" }],
+        interests: ["Chess"],
+      }),
+    );
+    expect(content.achievements).toHaveLength(10);
+    expect(content.achievements[0]).toEqual({ id: expect.any(String), text: "Doubled sales" });
+    expect(content.volunteering[0]).toMatchObject({ company: "Red Cross", bullets: [{ id: expect.any(String), text: "Helped" }] });
+    expect(content.awards[0]).toMatchObject({ id: expect.any(String), name: "Best PM", issuer: "Acme", date: "2021-05", description: "Top of 40" });
+    expect(content.courses[0]).toMatchObject({ name: "Scrum", provider: "Udemy", date: "" });
+    expect(content.publications[0]).toMatchObject({ title: "On CVs", publisher: "Journal", date: "2019", url: "https://x.ro" });
+    expect(content.interests).toEqual([{ id: expect.any(String), name: "Chess" }]);
+    expect(warnings.some((w) => /achievements/i.test(w) && w.includes("10"))).toBe(true);
+    expect(warnings.some((w) => /date/i.test(w))).toBe(true);
+    expect(CvContentSchema.safeParse(content).success).toBe(true);
+  });
+
+  it("maps sourceHeadings and turns an unknown category into other with a warning", () => {
+    const result = toCvContent(
+      draftWith({ sourceHeadings: [{ heading: "Work history", category: "experience" }, { heading: "Hobbies & stuff", category: "banana" }] }),
+    );
+    expect(result.sourceHeadings).toEqual([
+      { heading: "Work history", category: "experience" },
+      { heading: "Hobbies & stuff", category: "other" },
+    ]);
+    expect(result.warnings.some((w) => w.includes("Hobbies & stuff"))).toBe(true);
+  });
+
+  it("maps the category custom to other without a warning", () => {
+    const result = toCvContent(draftWith({ sourceHeadings: [{ heading: "Extras", category: "custom" }] }));
+    expect(result.sourceHeadings).toEqual([{ heading: "Extras", category: "other" }]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("does not keep the field of study twice when the degree line also names it", () => {
+    const edu = (degree: string, field: string) => ({ school: "Uni", degree, field, startDate: "", endDate: "", notes: "" });
+    const result = toCvContent(
+      draftWith({ education: [edu("Master of Arts, History", "History"), edu("BA History", "History"), edu("History", "History"), edu("MSc – Data", "")] }),
+    );
+    expect(result.content.education.map((e) => e.degree)).toEqual(["Master of Arts", "BA History", "History", "MSc – Data"]);
+  });
+
+  it("files a heading named after a skill group under skills, and a field path under its last part", () => {
+    const result = toCvContent(
+      draftWith({
+        sourceHeadings: [
+          { heading: "Skills", category: "technicalSkills" },
+          { heading: "Strengths", category: "professionalSkills" },
+          { heading: "Profile", category: "basics.summary" },
+        ],
+      }),
+    );
+    expect(result.sourceHeadings).toEqual([
+      { heading: "Skills", category: "skills" },
+      { heading: "Strengths", category: "skills" },
+      { heading: "Profile", category: "summary" },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
   it("the draft schema accepts what the editor never would, so it can be trimmed instead of retried", () => {
     expect(ImportDraftSchema.safeParse(draftWith({ technicalSkills: Array.from({ length: 60 }, (_, i) => `S${i}`) })).success).toBe(true);
+  });
+});
+
+describe("ImportResultSchema", () => {
+  it("upgrades a stored v1 result", () => {
+    const v1: Record<string, unknown> = { ...emptyCv(), schemaVersion: 1 };
+    for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests"]) delete v1[key];
+    const parsed = ImportResultSchema.parse({ content: v1, warnings: ["check dates"] });
+    expect(parsed.content.schemaVersion).toBe(2);
+    expect(parsed.content.layout).toEqual(defaultLayout());
+    expect(parsed.content.achievements).toEqual([]);
+    expect(parsed.warnings).toEqual(["check dates"]);
+  });
+
+  it("accepts an old result without sourceHeadings", () => {
+    const parsed = ImportResultSchema.parse({ content: emptyCv(), warnings: [] });
+    expect(parsed.sourceHeadings).toEqual([]);
+    expect(parsed.unsourcedLines).toEqual([]);
+    expect(parsed.isScan).toBe(false);
   });
 });

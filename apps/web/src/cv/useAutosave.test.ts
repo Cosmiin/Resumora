@@ -40,6 +40,35 @@ describe("useAutosave", () => {
     expect(result.current.status).toBe("saved");
   });
 
+  it("setContent accepts an updater that sees the latest content", async () => {
+    const save = vi.fn<Save>().mockResolvedValue(saved(2));
+    const { result } = setup(save);
+    act(() => {
+      result.current.setContent((c) => ({ ...c, basics: { ...c.basics, fullName: c.basics.fullName + "A" } }));
+      result.current.setContent((c) => ({ ...c, basics: { ...c.basics, fullName: c.basics.fullName + "B" } }));
+    });
+    expect(result.current.content.basics.fullName).toBe("AB");
+    await advance(1000);
+    expect(save).toHaveBeenCalledWith(named("AB"), 1);
+  });
+
+  it("an updater that changes nothing does not start a save", async () => {
+    const save = vi.fn<Save>().mockResolvedValue(saved(2));
+    const { result } = setup(save);
+    act(() => result.current.setContent((c) => c));
+    expect(result.current.status).toBe("saved");
+    await advance(2000);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("setContent keeps the same identity across renders", () => {
+    const { result, rerender } = setup(vi.fn<Save>());
+    const first = result.current.setContent;
+    act(() => result.current.setContent(named("x")));
+    rerender();
+    expect(result.current.setContent).toBe(first);
+  });
+
   it("serializes saves", async () => {
     let finishFirst!: (v: ReturnType<typeof saved>) => void;
     const save = vi.fn<Save>()

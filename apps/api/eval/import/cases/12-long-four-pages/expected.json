@@ -1,0 +1,423 @@
+{
+  "content": {
+    "schemaVersion": 2,
+    "locale": "en",
+    "basics": {
+      "firstName": "",
+      "lastName": "",
+      "titles": [
+        "Programme Director",
+        "Global Health"
+      ],
+      "phone": "+40 700 000 112",
+      "location": "Manchester, United Kingdom",
+      "website": "margaretosei.example.com",
+      "linkedin": "linkedin.com/in/margaret-osei-example",
+      "summary": "Programme director with sixteen years in public health and humanitarian work. I turn complex funding and field realities into programmes that run on time, stay on budget and reach the people they are meant for.",
+      "fullName": "Margaret Osei",
+      "email": "margaret.osei@example.com"
+    },
+    "experience": [
+      {
+        "company": "Helix Health Foundation",
+        "title": "Programme Director",
+        "location": "Manchester, United Kingdom",
+        "startDate": "2020-02",
+        "endDate": "",
+        "current": true,
+        "description": "Direct a portfolio of eleven health programmes across six countries with a combined budget of 18 million pounds.",
+        "bullets": [
+          {
+            "text": "Brought three programmes back on budget within nine months after a funding review."
+          },
+          {
+            "text": "Built a monitoring framework adopted by all eleven programme teams."
+          },
+          {
+            "text": "Negotiated two multi-year grants worth 6.5 million pounds in total."
+          },
+          {
+            "text": "Lead a leadership team of seven programme managers and two finance partners."
+          },
+          {
+            "text": "Present quarterly results to the board and to the three largest donors."
+          }
+        ]
+      },
+      {
+        "company": "Helix Health Foundation",
+        "title": "Senior Programme Manager",
+        "location": "Manchester, United Kingdom",
+        "startDate": "2016-09",
+        "endDate": "2020-01",
+        "current": false,
+        "description": "Managed the maternal health programme in West Africa.",
+        "bullets": [
+          {
+            "text": "Trained 1,200 community health workers in four regions."
+          },
+          {
+            "text": "Cut the reporting cycle from 90 to 45 days with a mobile data tool."
+          },
+          {
+            "text": "Opened a second field office and hired a team of 14."
+          },
+          {
+            "text": "Worked with ministries of health on national guidelines."
+          }
+        ]
+      },
+      {
+        "company": "Northern Relief Alliance",
+        "title": "Programme Manager",
+        "location": "Leeds, United Kingdom",
+        "startDate": "2013-01",
+        "endDate": "2016-08",
+        "current": false,
+        "description": "Ran emergency response and recovery programmes after floods and storms.",
+        "bullets": [
+          {
+            "text": "Coordinated aid for 25,000 people after the 2015 winter floods."
+          },
+          {
+            "text": "Set up a volunteer network of 300 people ready to deploy within 48 hours."
+          },
+          {
+            "text": "Wrote the alliance's first safeguarding policy."
+          },
+          {
+            "text": "Reduced the cost per household supported by 20%."
+          }
+        ]
+      },
+      {
+        "company": "Northern Relief Alliance",
+        "title": "Project Officer",
+        "location": "Leeds, United Kingdom",
+        "startDate": "2010-06",
+        "endDate": "2012-12",
+        "current": false,
+        "description": "Supported project teams with planning, budgets and reports.",
+        "bullets": [
+          {
+            "text": "Prepared monthly budget reports for eight projects."
+          },
+          {
+            "text": "Organised training days for 150 volunteers."
+          },
+          {
+            "text": "Wrote donor reports that secured two renewals."
+          }
+        ]
+      },
+      {
+        "company": "City of Leeds Council",
+        "title": "Policy Assistant",
+        "location": "Leeds, United Kingdom",
+        "startDate": "2008-09",
+        "endDate": "2010-05",
+        "current": false,
+        "description": "Worked in the public health policy team.",
+        "bullets": [
+          {
+            "text": "Researched and summarised evidence for three local health strategies."
+          },
+          {
+            "text": "Drafted answers to public enquiries and councillor questions."
+          },
+          {
+            "text": "Helped organise a city-wide wellbeing survey with 4,000 responses."
+          }
+        ]
+      },
+      {
+        "company": "Harlow Community Trust",
+        "title": "Research Intern",
+        "location": "Leeds, United Kingdom",
+        "startDate": "2008-01",
+        "endDate": "2008-08",
+        "current": false,
+        "description": "Short placement during the final year of studies.",
+        "bullets": [
+          {
+            "text": "Interviewed 40 residents for a study on access to local services."
+          },
+          {
+            "text": "Prepared tables and charts for the trust's annual report."
+          }
+        ]
+      }
+    ],
+    "education": [
+      {
+        "school": "University of Manchester",
+        "degree": "Master of Public Health",
+        "field": "Global Health Policy",
+        "startDate": "2011",
+        "endDate": "2012",
+        "notes": "Graduated with distinction. Dissertation on community health workers in rural Ghana."
+      },
+      {
+        "school": "University of Leeds",
+        "degree": "Bachelor's degree",
+        "field": "Sociology",
+        "startDate": "2005",
+        "endDate": "2008",
+        "notes": "First class honours."
+      }
+    ],
+    "languages": [
+      {
+        "name": "English",
+        "level": "Native"
+      },
+      {
+        "name": "Twi",
+        "level": "Fluent"
+      },
+      {
+        "name": "French",
+        "level": "Professional working proficiency"
+      }
+    ],
+    "certifications": [
+      {
+        "name": "PMP – Project Management Professional",
+        "issuer": "Project Management Institute",
+        "date": "2017-06"
+      },
+      {
+        "name": "PRINCE2 Practitioner",
+        "issuer": "AXELOS",
+        "date": "2014-03"
+      },
+      {
+        "name": "Certified Humanitarian Professional",
+        "issuer": "CHS Alliance",
+        "date": "2019-10"
+      }
+    ],
+    "projects": [
+      {
+        "name": "Mobile Data Collection Rollout",
+        "description": "Introduced tablets and an offline reporting app to 160 clinics, replacing paper registers.",
+        "url": ""
+      },
+      {
+        "name": "Community Health Worker Handbook",
+        "description": "Wrote and field-tested a plain-language handbook now used in three countries.",
+        "url": "helixhealth.example.com/handbook"
+      }
+    ],
+    "custom": [
+      {
+        "title": "References",
+        "details": "Available on request."
+      }
+    ],
+    "achievements": [
+      {
+        "text": "Directed programmes reaching 2.1 million people across six countries."
+      },
+      {
+        "text": "Raised 6.5 million pounds in multi-year grants from institutional donors."
+      },
+      {
+        "text": "Built and led teams of up to 40 people across four time zones."
+      },
+      {
+        "text": "Introduced a monitoring framework now used by all eleven programmes at Helix."
+      }
+    ],
+    "volunteering": [
+      {
+        "company": "Leeds Food Bank",
+        "title": "Trustee",
+        "location": "Leeds, United Kingdom",
+        "startDate": "2014-01",
+        "endDate": "2019-12",
+        "current": false,
+        "description": "Served on the board of a food bank supporting 1,500 households a year.",
+        "bullets": [
+          {
+            "text": "Chaired the finance committee for three years."
+          },
+          {
+            "text": "Led a fundraising drive that raised 85,000 pounds."
+          }
+        ]
+      },
+      {
+        "company": "Girls Who Code Manchester",
+        "title": "Mentor",
+        "location": "Manchester, United Kingdom",
+        "startDate": "2021-03",
+        "endDate": "",
+        "current": true,
+        "description": "Mentor teenage girls in a weekly after-school coding club.",
+        "bullets": [
+          {
+            "text": "Run monthly sessions on careers in technology and health."
+          }
+        ]
+      }
+    ],
+    "awards": [
+      {
+        "name": "Public Health Leader of the Year",
+        "issuer": "UK Global Health Network",
+        "date": "2022-11",
+        "description": "Awarded for leadership of the maternal health programme in West Africa."
+      },
+      {
+        "name": "Chair's Award",
+        "issuer": "Northern Relief Alliance",
+        "date": "2016-07",
+        "description": "Awarded for the response to the 2015 winter floods."
+      }
+    ],
+    "courses": [
+      {
+        "name": "Leading Complex Programmes",
+        "provider": "London School of Hygiene and Tropical Medicine",
+        "date": "2018-05"
+      },
+      {
+        "name": "Donor Relations and Grant Writing",
+        "provider": "Bond",
+        "date": "2015-02"
+      },
+      {
+        "name": "Safeguarding for Managers",
+        "provider": "Humentum",
+        "date": "2016-11"
+      }
+    ],
+    "publications": [
+      {
+        "title": "Community health workers and maternal outcomes in rural West Africa",
+        "publisher": "Journal of Global Health Practice",
+        "date": "2019-08",
+        "url": ""
+      },
+      {
+        "title": "Counting what counts: monitoring frameworks for small programmes",
+        "publisher": "Development in Practice",
+        "date": "2021-04",
+        "url": ""
+      }
+    ],
+    "interests": [
+      {
+        "name": "long-distance running"
+      },
+      {
+        "name": "community gardening"
+      },
+      {
+        "name": "choir singing"
+      }
+    ],
+    "technicalSkills": [
+      {
+        "name": "DHIS2"
+      },
+      {
+        "name": "Power BI"
+      },
+      {
+        "name": "Microsoft Project"
+      },
+      {
+        "name": "KoBoToolbox"
+      }
+    ],
+    "professionalSkills": [
+      {
+        "name": "Programme management"
+      },
+      {
+        "name": "Donor relations"
+      },
+      {
+        "name": "Budget management"
+      },
+      {
+        "name": "Monitoring and evaluation"
+      },
+      {
+        "name": "Team leadership"
+      },
+      {
+        "name": "Stakeholder engagement"
+      },
+      {
+        "name": "Safeguarding"
+      }
+    ],
+    "unclearSkills": [
+      {
+        "name": "Advanced skills"
+      }
+    ]
+  },
+  "headings": [
+    {
+      "heading": "Profile",
+      "category": "summary"
+    },
+    {
+      "heading": "Key Achievements",
+      "category": "achievements"
+    },
+    {
+      "heading": "Professional Experience",
+      "category": "experience"
+    },
+    {
+      "heading": "Skills",
+      "category": "skills"
+    },
+    {
+      "heading": "Education",
+      "category": "education"
+    },
+    {
+      "heading": "Certifications",
+      "category": "certifications"
+    },
+    {
+      "heading": "Projects",
+      "category": "projects"
+    },
+    {
+      "heading": "Volunteering",
+      "category": "volunteering"
+    },
+    {
+      "heading": "Awards",
+      "category": "awards"
+    },
+    {
+      "heading": "Training Courses",
+      "category": "courses"
+    },
+    {
+      "heading": "Publications",
+      "category": "publications"
+    },
+    {
+      "heading": "Languages",
+      "category": "languages"
+    },
+    {
+      "heading": "Interests",
+      "category": "interests"
+    },
+    {
+      "heading": "References",
+      "category": "other"
+    }
+  ],
+  "flags": []
+}

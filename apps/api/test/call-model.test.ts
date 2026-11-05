@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AiOutputTooLongError, AiUnavailableError, callModel, providersFromEnv, type AiCallLog, type ModelDeps } from "../src/ai/call-model.ts";
+import { AiInputRejectedError, AiOutputTooLongError, AiUnavailableError, callModel, providersFromEnv, type AiCallLog, type ModelDeps } from "../src/ai/call-model.ts";
 
 const Answer = z.object({ answer: z.string() }).strict();
 
@@ -174,6 +174,59 @@ describe("callModel limits", () => {
     const { fetch } = fakeFetch(slow);
     const { d } = deps(fetch, { timeoutMs: 20 });
     await expect(callModel(d, { ...request, timeoutMs: 500 })).resolves.toEqual({ answer: "slow but fine" });
+  });
+});
+
+describe("callModel file parts", () => {
+  const pdfRequest = {
+    ...request,
+    user: [
+      { type: "text" as const, text: "Read this CV" },
+      { type: "pdf" as const, filename: "cv.pdf", base64: "JVBERi0xLjQ=" },
+    ],
+  };
+  const rejected = () => new Response(JSON.stringify({ error: { message: "File input not supported" } }), { status: 400 });
+
+  it("sends a PDF part in the provider's file format", async () => {
+    const { fetch, calls } = fakeFetch(ok({ answer: "yes" }));
+    await callModel(deps(fetch).d, pdfRequest);
+    const content = (calls[0]!.body.messages as { content: unknown }[])[1]!.content as { file?: { filename: string; file_data: string } }[];
+    expect(content[0]).toEqual({ type: "text", text: "Read this CV" });
+    expect(content[1]).toEqual({
+      type: "file",
+      file: { filename: "cv.pdf", file_data: "data:application/pdf;base64,JVBERi0xLjQ=" },
+    });
+  });
+
+  it("a plain string user message is sent as before", async () => {
+    const { fetch, calls } = fakeFetch(ok({ answer: "yes" }));
+    await callModel(deps(fetch).d, request);
+    expect((calls[0]!.body.messages as { content: unknown }[])[1]!.content).toBe(USER);
+  });
+
+  it("a rejected file part on both providers throws AiInputRejectedError", async () => {
+    const { fetch, calls } = fakeFetch(rejected(), rejected());
+    const { d, logs } = deps(fetch);
+    await expect(callModel(d, pdfRequest)).rejects.toBeInstanceOf(AiInputRejectedError);
+    expect(calls).toHaveLength(2);
+    expect(JSON.stringify(logs)).not.toContain("JVBERi0xLjQ=");
+  });
+
+  it("a rejected file part on OpenRouter falls through to OpenAI", async () => {
+    const { fetch, calls } = fakeFetch(rejected(), ok({ answer: "from openai" }));
+    await expect(callModel(deps(fetch).d, pdfRequest)).resolves.toEqual({ answer: "from openai" });
+    expect(calls[1]!.url).toBe("https://openai.test/v1/chat/completions");
+  });
+
+  it("a plain text request is never an input rejection, even with an 'unsupported' body", async () => {
+    const unsupported = () => new Response(JSON.stringify({ error: { message: "unsupported parameter in profile" } }), { status: 400 });
+    const { fetch } = fakeFetch(unsupported(), unsupported());
+    await expect(callModel(deps(fetch).d, request)).rejects.toBeInstanceOf(AiUnavailableError);
+  });
+
+  it("a rejection on one provider and an outage on the other is not an input rejection", async () => {
+    const { fetch } = fakeFetch(rejected(), status(500), status(500));
+    await expect(callModel(deps(fetch).d, pdfRequest)).rejects.toBeInstanceOf(AiUnavailableError);
   });
 });
 

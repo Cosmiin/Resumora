@@ -90,7 +90,7 @@ describe.skipIf(!url)("supabaseImportRepo against local Supabase", () => {
     const job = await admin.start(id);
     expect(job).toMatchObject({ id, userId: userA.id });
     expect((await admin.download(job!)).byteLength).toBeGreaterThan(100);
-    await admin.finish(id, { content: cvNamed("From import"), warnings: ["check dates"] });
+    await admin.finish(id, { content: cvNamed("From import"), warnings: ["check dates"], sourceHeadings: [], unsourcedLines: [], isScan: false });
     await admin.deleteFile(job!);
 
     expect((await a.get(id))?.result?.warnings).toEqual(["check dates"]);
