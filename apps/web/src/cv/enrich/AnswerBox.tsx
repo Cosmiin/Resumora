@@ -12,6 +12,8 @@ type Props = {
   onChange(value: string, via: Via[]): void;
   /** The CV's language, so screen readers read the answer in it. */
   locale?: Locale;
+  /** Told when voice starts or stops being busy (asking for the mic, recording, finishing the last words). */
+  onBusyChange?(busy: boolean): void;
 };
 
 const SEP = ", ";
@@ -90,7 +92,7 @@ const MicIcon = (
 );
 
 /** One question's answer: pick option chips, type, or speak. It never saves on its own. */
-export function AnswerBox({ question, value, via, onChange, locale = "en" }: Props) {
+export function AnswerBox({ question, value, via, onChange, locale = "en", onBusyChange }: Props) {
   const voice = useVoice({ locale });
   const field = useRef<HTMLTextAreaElement>(null);
   const seen = useSyncExternalStore(onNoticeChange, noticeSeen);
@@ -111,6 +113,10 @@ export function AnswerBox({ question, value, via, onChange, locale = "en" }: Pro
 
   const { state } = voice;
   const recording = state === "recording";
+  const busy = state === "asking" || recording || state === "stopping";
+  useEffect(() => {
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
   const micShown = state !== "denied" && state !== "unavailable" && state !== "limit";
   const message =
     state === "denied"

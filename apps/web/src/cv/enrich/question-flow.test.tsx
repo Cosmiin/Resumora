@@ -9,6 +9,18 @@ import type { RoleScoreState } from "./useRoleScores.ts";
 
 const api = vi.hoisted(() => ({ streamRewrite: vi.fn(), createVoiceSession: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
+/** Voice the test moves by hand: `voice.set` changes its state. */
+const voice = vi.hoisted(() => ({ set: (_s: string) => {}, onFinal: () => {} }));
+vi.mock("./useVoice.ts", async () => {
+  const { useState } = await import("react");
+  return {
+    useVoice: () => {
+      const [state, setState] = useState("idle");
+      voice.set = setState;
+      return { state, partial: "", seconds: 0, interrupted: false, start: () => setState("recording"), stop: () => setState("stopping"), onFinal: voice.onFinal };
+    },
+  };
+});
 
 import { QuestionFlow } from "./QuestionFlow.tsx";
 
@@ -85,6 +97,20 @@ describe("question flow", () => {
   it("Save answer waits until there is an answer", () => {
     flow();
     expect(screen.getByRole("button", { name: "Save answer" })).toBeDisabled();
+  });
+
+  it("Save answer and Skip wait while voice is recording or finishing the last words", async () => {
+    const user = userEvent.setup();
+    flow();
+    await user.type(screen.getByRole("textbox", { name: "Your answer" }), "Invoices");
+    await user.click(screen.getByRole("button", { name: "Answer by speaking" }));
+    expect(screen.getByRole("button", { name: "Save answer" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Skip" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Stop recording" }));
+    expect(screen.getByRole("button", { name: "Save answer" })).toBeDisabled();
+    act(() => voice.set("idle"));
+    expect(screen.getByRole("button", { name: "Save answer" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Skip" })).toBeEnabled();
   });
 
   it("Skip saves nothing and moves on", async () => {

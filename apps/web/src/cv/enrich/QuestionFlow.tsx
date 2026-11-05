@@ -22,6 +22,8 @@ export function QuestionFlow({ role, questions, dispatch, waitForSave, onDraft, 
   const [saved, setSaved] = useState(0);
   const [drafting, setDrafting] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  /** Voice is recording or finishing: saving or skipping now would lose the last words. */
+  const [voiceBusy, setVoiceBusy] = useState(false);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -115,12 +117,13 @@ export function QuestionFlow({ role, questions, dispatch, waitForSave, onDraft, 
           via={answer.via}
           onChange={(value, via) => setAnswer({ value, via })}
           locale={locale}
+          onBusyChange={setVoiceBusy}
         />
         <div className="row-btns">
-          <button type="button" className="btn" onClick={next}>
+          <button type="button" className="btn" disabled={voiceBusy} onClick={next}>
             {t("enrich.questions.skip")}
           </button>
-          <button type="button" className="btn primary" disabled={answer.value.trim() === ""} onClick={() => save(question)}>
+          <button type="button" className="btn primary" disabled={voiceBusy || answer.value.trim() === ""} onClick={() => save(question)}>
             {t("enrich.questions.save")}
           </button>
         </div>
