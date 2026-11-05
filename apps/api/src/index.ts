@@ -2,6 +2,7 @@ import { createApp, type AppDeps } from "./app.ts";
 import { supabaseVerifier } from "./auth.ts";
 import { providersFromEnv } from "./ai/call-model.ts";
 import { supabaseCvRepo } from "./cv/supabase-repo.ts";
+import { supabaseAiCallLogger, supabaseInsightsRepo } from "./enrich/supabase-repo.ts";
 import { handleImportMessage, sweepStaleImports } from "./imports/consumer.ts";
 import type { ImportMessage } from "./imports/repo.ts";
 import { supabaseImportAdmin, supabaseImportRepo } from "./imports/supabase-repo.ts";
@@ -15,6 +16,12 @@ function realDeps(env: Env): AppDeps {
     verifyToken: supabaseVerifier(env),
     cvRepo: (user) => supabaseCvRepo(env, user),
     importRepo: (user) => supabaseImportRepo(env, user),
+    insightsRepo: (user) => supabaseInsightsRepo(env, user),
+    model: (user) => ({
+      providers: providersFromEnv(env),
+      fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
+      logCall: supabaseAiCallLogger(env, user),
+    }),
     queue: { send: async (message) => void (await env.IMPORTS.send(message)) },
     log,
   };

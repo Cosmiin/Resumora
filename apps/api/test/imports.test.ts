@@ -29,6 +29,12 @@ beforeEach(() => {
     verifyToken: async (token) => (USERS[token] ? { id: USERS[token], token } : null),
     cvRepo: (user) => cvRepos[user.id]!,
     importRepo: (user) => store.repoFor(user.id),
+    insightsRepo: () => {
+      throw new Error("not used");
+    },
+    model: () => {
+      throw new Error("not used");
+    },
     queue: { send: async (m) => void sent.push(m) },
     now: () => clock,
     log: vi.fn(),

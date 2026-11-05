@@ -12,6 +12,12 @@ function deps(overrides: Partial<AppDeps> = {}): AppDeps {
     importRepo: () => {
       throw new Error("import repo not used in these tests");
     },
+    insightsRepo: () => {
+      throw new Error("not used");
+    },
+    model: () => {
+      throw new Error("not used");
+    },
     queue: { send: async () => {} },
     log: vi.fn(),
     ...overrides,
