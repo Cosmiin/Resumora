@@ -121,8 +121,9 @@ select lives_ok(
        perform public.log_ai_call('enrich_improve_bullet', 'p', 'm', 'ok', null, 1, 1, 1);
        perform public.log_ai_call('enrich_brain_dump', 'p', 'm', 'ok', null, 1, 1, 1);
        perform public.log_ai_call('enrich_role_facts', 'p', 'm', 'ok', null, 1, 1, 1);
+       perform public.log_ai_call('job_extract', 'p', 'm', 'ok', null, 1, 1, 1);
      end $d$ $$,
-  'the focus-mode tasks are logged');
+  'the focus-mode and job capture tasks are logged');
 
 -- ── Voice sessions: 20 a day per user ───────────────────────────────────────
 select is(

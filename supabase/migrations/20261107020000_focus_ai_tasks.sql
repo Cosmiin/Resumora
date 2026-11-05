@@ -1,6 +1,8 @@
 -- Focus mode: log_ai_call accepts the three new model tasks (enrich_improve_bullet,
 -- enrich_brain_dump, enrich_role_facts). Without them every focus-mode call is rejected by the
 -- allowlist and never reaches ai_calls. enrich_rewrite_role stays allowed for older API builds.
+-- job_extract (rebuild/jobs-core's job capture) is added here too: its calls were rejected the
+-- same way, and one replacement of this function avoids two branches overwriting each other's list.
 -- Same body, security and grants as 20261106000000_enrichment.sql; only the list changes.
 
 create or replace function public.log_ai_call(
@@ -21,7 +23,8 @@ begin
   if p_task not in (
     'cv_admit', 'cv_extract',
     'enrich_score', 'enrich_rewrite_role', 'enrich_rewrite_summary', 'enrich_skills', 'enrich_voice',
-    'enrich_improve_bullet', 'enrich_brain_dump', 'enrich_role_facts'
+    'enrich_improve_bullet', 'enrich_brain_dump', 'enrich_role_facts',
+    'job_extract'
   ) then
     raise exception 'unknown ai task' using errcode = '22023';
   end if;

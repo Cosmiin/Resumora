@@ -1,8 +1,10 @@
 # Database steps for focus mode (you run these)
 
 Two migrations:
-- `20261107000000` adds one column, `pending`, to the existing `cv_insights` table. It holds up to 5 predicted role scores per role, so the score shown in the celebration is the score that gets stored. Existing rows get an empty list. No policy changes: the table's four owner-only policies already cover the new column.
-- `20261107010000` lets the AI call log accept focus mode's three new tasks (`enrich_improve_bullet`, `enrich_brain_dump`, `enrich_role_facts`). Without it, those calls work but are never recorded in `ai_calls`. The function is replaced with the same body, security and grants; only its list of allowed tasks grows.
+- `20261107010000` adds one column, `pending`, to the existing `cv_insights` table. It holds up to 5 predicted role scores per role, so the score shown in the celebration is the score that gets stored. Existing rows get an empty list. No policy changes: the table's four owner-only policies already cover the new column.
+- `20261107020000` lets the AI call log accept focus mode's three new tasks (`enrich_improve_bullet`, `enrich_brain_dump`, `enrich_role_facts`) and job capture's `job_extract`. Without it, those calls work but are never recorded in `ai_calls`. The function is replaced with the same body, security and grants; only its list of allowed tasks grows.
+
+These come after `20261107000000_jobs.sql` from the jobs work, which took that number first. Apply them after (or together with) the jobs migration.
 
 Nothing has been applied yet.
 
@@ -18,7 +20,7 @@ Run:
 npx supabase migration list
 ```
 
-You should see every earlier migration on both sides (Local and Remote), and two new ones, `20261107000000` and `20261107010000`, with a Local value only.
+You should see every earlier migration on both sides (Local and Remote), and two new ones, `20261107010000` and `20261107020000`, with a Local value only.
 
 If it asks you to log in or link the project, do that first: run `npx supabase login`, then `npx supabase link`, and pick the Resumora project (ref `aquvhqbkvrtzhbmezkci`).
 
@@ -30,7 +32,7 @@ Run:
 npx supabase db push
 ```
 
-It lists `20261107000000_insights_pending.sql` and `20261107010000_focus_ai_tasks.sql`. Answer `Y` to continue.
+It lists `20261107010000_insights_pending.sql` and `20261107020000_focus_ai_tasks.sql`. Answer `Y` to continue.
 
 ## 4. Check that it worked
 

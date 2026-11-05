@@ -55,7 +55,7 @@ At the end (Claude step C), `rebuild/enrichment` is fast-forwarded to `rebuild/f
 Not a Codex task: the database stays with Claude and the user (CODEX-DELEGATION › Never delegate).
 
 - [ ] Create the worktree above. Copy the spec, the mockups and this plan from `resumora-enrichment/docs/superpowers/` into the same paths in `resumora-focus`. They are listed in Task 1's `new_files`, so they go in with the first build commit.
-- [ ] Write `supabase/migrations/20261107000000_insights_pending.sql`:
+- [ ] Write `supabase/migrations/20261107010000_insights_pending.sql`:
   ```sql
   alter table public.cv_insights add column pending jsonb not null default '[]'::jsonb;
   ```
@@ -71,7 +71,7 @@ Not a Codex task: the database stays with Claude and the user (CODEX-DELEGATION 
 ```
 ---
 files: [packages/shared/src/enrich.ts, packages/shared/src/enrich.test.ts, packages/shared/src/cv.ts, packages/shared/src/cv.test.ts, packages/shared/src/notes.ts, packages/shared/src/notes.test.ts, packages/shared/src/index.ts, apps/api/src/enrich/repo.test.ts, apps/web/src/cv/edit/cvReducer.test.ts, apps/web/src/cv/enrich/question-flow.test.tsx, apps/web/src/cv/enrich/save-failed.test.tsx, apps/web/src/cv/enrich/score-card.test.tsx, apps/web/src/cv/enrich/scores.test.tsx, apps/web/src/cv/enrich/answer-box.test.tsx, apps/web/src/cv/enrich/answer-picks.test.tsx, supabase/tests/database/enrichment.test.sql]
-new_files: [packages/shared/src/enrich-focus.ts, packages/shared/src/enrich-focus.test.ts, docs/superpowers/specs/2026-11-05-focus-mode-design.md, docs/superpowers/specs/reference/focus-mode/focus-layout.html, docs/superpowers/specs/reference/focus-mode/braindump-voice.html, docs/superpowers/specs/reference/focus-mode/celebration.html, docs/superpowers/plans/2026-11-05-focus-mode.md, supabase/migrations/20261107000000_insights_pending.sql, docs/superpowers/plans/2026-11-05-focus-mode-db-steps.md]
+new_files: [packages/shared/src/enrich-focus.ts, packages/shared/src/enrich-focus.test.ts, docs/superpowers/specs/2026-11-05-focus-mode-design.md, docs/superpowers/specs/reference/focus-mode/focus-layout.html, docs/superpowers/specs/reference/focus-mode/braindump-voice.html, docs/superpowers/specs/reference/focus-mode/celebration.html, docs/superpowers/plans/2026-11-05-focus-mode.md, supabase/migrations/20261107010000_insights_pending.sql, docs/superpowers/plans/2026-11-05-focus-mode-db-steps.md]
 deps: false
 size: 800        # ~1250 of the changed lines are the docs, migration and SQL test written before the build
 ---
@@ -584,7 +584,7 @@ Added after the third whole-branch review (2026-11-05). The logging fix is a dat
 ```
 ---
 files: [apps/web/src/styles/enrich.css, supabase/tests/database/enrichment.test.sql, docs/superpowers/plans/2026-11-05-focus-mode-db-steps.md, docs/superpowers/plans/2026-11-05-focus-mode.md]
-new_files: [supabase/migrations/20261107010000_focus_ai_tasks.sql]
+new_files: [supabase/migrations/20261107020000_focus_ai_tasks.sql]
 deps: false
 size: 120
 ---
