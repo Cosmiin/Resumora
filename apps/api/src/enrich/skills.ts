@@ -17,6 +17,12 @@ const MAX_SUGGESTIONS = 15;
 /** Lower case with runs of spaces collapsed, so the comparison ignores case and spacing. */
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
+/** True when `name` stands alone in `text`: the characters around it are not letters or digits. Both are already normalised. */
+function hasWord(text: string, name: string): boolean {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "u").test(text);
+}
+
 /**
  * Suggests skills the saved experience shows, and groups the "to sort" skills.
  * Every suggestion is checked against the person's own text; the rest are dropped.
@@ -52,7 +58,8 @@ export async function suggestSkills(deps: { cv: CvRepo; model: ModelDeps; userId
     const name = norm(s.name);
     const evidence = norm(s.evidence);
     if (!name || !evidence || taken.has(name)) continue; // empty, already listed, or the same as an earlier suggestion
-    if (!texts.some((t) => t.includes(name)) || !texts.some((t) => t.includes(evidence))) continue;
+    // The name and the evidence must both sit in the same single field.
+    if (!texts.some((t) => t.includes(evidence) && hasWord(t, name))) continue;
     taken.add(name);
     suggestions.push({ name: s.name.trim(), group: s.group, evidence: s.evidence.trim() });
     if (suggestions.length === MAX_SUGGESTIONS) break;

@@ -20,7 +20,7 @@ let cv: ReturnType<typeof memoryCvRepo>;
 const role = roleWith(["Ran payroll in SAP and trained 3 new colleagues."], {
   title: "Payroll Specialist",
   description: "Monthly payroll for 40 staff.",
-  notes: [{ id: newId(), question: "q", answer: "I used Excel   macros daily", via: ["type"] }],
+  notes: [{ id: newId(), question: "q", answer: "I used Excel   macros daily", via: ["type"], askedAt: "2026-11-01T10:00:00.000Z" }],
 });
 const skill = (name: string) => ({ id: newId(), name });
 
@@ -90,6 +90,21 @@ describe("suggestSkills", () => {
   it("drops evidence that spans two separate texts", async () => {
     await save();
     const { result } = await run({ suggestions: [sug("staff", "Payroll Specialist Monthly payroll for 40 staff.")], sort: [] });
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it("matches the name only as a whole word", async () => {
+    await save({}, [roleWith(["Ran payroll", "wrote C and Go", "Built tools in C++", "Used tool10 daily"])]);
+    const { result } = await run({
+      suggestions: [sug("C", "Ran payroll"), sug("C", "wrote C and Go"), sug("C++", "Built tools in C++"), sug("tool1", "Used tool10 daily")],
+      sort: [],
+    });
+    expect(result.suggestions.map((s) => [s.name, s.evidence])).toEqual([["C", "wrote C and Go"], ["C++", "Built tools in C++"]]);
+  });
+
+  it("drops a name that appears only in a different field from its evidence", async () => {
+    await save({}, [roleWith(["Ran payroll monthly", "Led the Kanban board"])]);
+    const { result } = await run({ suggestions: [sug("Kanban", "Ran payroll monthly")], sort: [] });
     expect(result.suggestions).toEqual([]);
   });
 
