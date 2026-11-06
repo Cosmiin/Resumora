@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import type { JobListItem, JobListPage } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
@@ -28,6 +28,8 @@ function JobsList({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [initialUrl, setInitialUrl] = useState<string>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const opener = useRef<HTMLButtonElement | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   const [pollStartedAt, setPollStartedAt] = useState<number | null>(null);
@@ -41,6 +43,21 @@ function JobsList({ userId }: { userId: string }) {
   });
   const rows = uniqueJobs(query.data?.pages ?? []);
   const busy = rows.some(isReading);
+
+  useEffect(() => {
+    const add = searchParams.get("add");
+    if (add === null) return;
+    try {
+      if (["http:", "https:"].includes(new URL(add).protocol)) {
+        opener.current = addButton.current;
+        setInitialUrl(add);
+        setDialogOpen(true);
+      }
+    } catch { /* Invalid URL. */ }
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete("add");
+    setSearchParams(remaining, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (busy) setPollStartedAt((started) => started ?? Date.now());
@@ -65,6 +82,7 @@ function JobsList({ userId }: { userId: string }) {
   }
   function open(event: MouseEvent<HTMLButtonElement>) {
     opener.current = event.currentTarget;
+    setInitialUrl(undefined);
     setDialogOpen(true);
   }
   async function added() {
@@ -130,7 +148,7 @@ function JobsList({ userId }: { userId: string }) {
           </p>
         )}
       </main>
-      {dialogOpen && <AddJobDialog onClose={() => setDialogOpen(false)} onAdded={added} />}
+      {dialogOpen && <AddJobDialog key={initialUrl} initialUrl={initialUrl} onClose={() => setDialogOpen(false)} onAdded={added} />}
     </AppShell>
   );
 }

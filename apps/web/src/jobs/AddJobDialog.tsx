@@ -4,8 +4,10 @@ import { ApiClientError } from "../lib/api.ts";
 import { t } from "../i18n/t.ts";
 import { createJob } from "./jobs-api.ts";
 
-export function AddJobDialog({ onClose, onAdded }: { onClose(): void; onAdded(): void }) {
-  const [url, setUrl] = useState("");
+export function AddJobDialog({ onClose, onAdded, initialUrl }: { onClose(): void; onAdded(): void; initialUrl?: string }) {
+  const [url, setUrl] = useState(initialUrl ?? "");
+  const [pasteOpen, setPasteOpen] = useState(initialUrl !== undefined);
+  const [installOpen, setInstallOpen] = useState(false);
   const [text, setText] = useState("");
   const [urlError, setUrlError] = useState(false);
   const [textError, setTextError] = useState(false);
@@ -14,16 +16,21 @@ export function AddJobDialog({ onClose, onAdded }: { onClose(): void; onAdded():
   const [sending, setSending] = useState(false);
   const urlField = useRef<HTMLInputElement>(null);
   const textField = useRef<HTMLTextAreaElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
   const active = useRef(true);
   const count = text.trim().length;
 
   useEffect(() => {
     active.current = true;
-    urlField.current?.focus();
+    closeButton.current?.focus();
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { active.current = false; document.body.style.overflow = overflow; };
   }, []);
+
+  useEffect(() => {
+    if (pasteOpen) (initialUrl !== undefined ? textField.current : urlField.current)?.focus();
+  }, [pasteOpen, initialUrl]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -75,33 +82,50 @@ export function AddJobDialog({ onClose, onAdded }: { onClose(): void; onAdded():
       <div className="add-job-dialog" role="dialog" aria-modal="true" aria-labelledby="add-job-title" onKeyDown={onKeyDown}>
         <header className="jobs-heading">
           <h2 id="add-job-title">{t("jobs.dialog.title")}</h2>
-          <button type="button" className="secondary jobs-close" aria-label={t("jobs.dialog.close")} onClick={onClose}>×</button>
+          <button ref={closeButton} type="button" className="secondary jobs-close" aria-label={t("jobs.dialog.close")} onClick={onClose}>×</button>
         </header>
-        <form noValidate onSubmit={(event) => void submit(event)}>
-          <label htmlFor="job-url">{t("jobs.dialog.url")}</label>
-          <input id="job-url" ref={urlField} type="url" value={url} onChange={(e) => setUrl(e.target.value)}
-            aria-invalid={urlError || undefined} aria-describedby={urlError ? "job-url-error" : undefined} />
-          {urlError && <p className="jobs-field-error" id="job-url-error">{t("jobs.error.invalid_url")}</p>}
-          <label htmlFor="job-text">{t("jobs.dialog.text")}</label>
-          <textarea id="job-text" ref={textField} rows={7} value={text} onChange={(e) => setText(e.target.value)}
-            placeholder={t("jobs.dialog.textPlaceholder")} aria-invalid={textError || undefined}
-            aria-describedby={`job-text-count${textError ? " job-text-error" : ""}`} />
-          <p className="jobs-note" id="job-text-count" aria-live="polite">
-            {t(count < 200 ? "jobs.dialog.countLow" : "jobs.dialog.count", { n: count.toLocaleString("en") })}
-          </p>
-          {textError && <p className="jobs-field-error" id="job-text-error">{t("jobs.error.text_too_short")}</p>}
-          <p className="jobs-note">{t("jobs.dialog.linkSoon")}</p>
-          <div className="jobs-extension">
-            <div><strong>{t("jobs.dialog.extTitle")}</strong><span className="job-badge">{t("jobs.soon")}</span></div>
-            <p>{t("jobs.dialog.extText")}</p>
-          </div>
-          {existingId && <p role="status">{t("jobs.dialog.duplicate")} <Link to={`/jobs/${existingId}`}>{t("jobs.dialog.openIt")}</Link></p>}
-          {error && <p role="alert" className="jobs-field-error">{error}</p>}
-          <footer className="jobs-dialog-actions">
-            <button type="button" className="secondary" onClick={onClose}>{t("jobs.dialog.cancel")}</button>
-            <button type="submit" disabled={sending}>{t("jobs.dialog.submit")}</button>
-          </footer>
-        </form>
+        <section className="jobs-extension" aria-labelledby="job-extension-title">
+          <h3 id="job-extension-title">{t("jobs.dialog.extTitle")}</h3>
+          <ol>
+            <li>{t("jobs.dialog.extStep1")}</li>
+            <li>{t("jobs.dialog.extStep2")}</li>
+            <li>{t("jobs.dialog.extStep3")}</li>
+          </ol>
+          <button type="button" className="secondary" aria-expanded={installOpen} aria-controls="job-install-steps"
+            onClick={() => setInstallOpen(!installOpen)}>{t("jobs.dialog.installToggle")}</button>
+          <ol id="job-install-steps" hidden={!installOpen}>
+            <li>{t("jobs.dialog.install1")}</li>
+            <li>{t("jobs.dialog.install2")}</li>
+            <li>{t("jobs.dialog.install3")}</li>
+            <li>{t("jobs.dialog.install4")}</li>
+          </ol>
+        </section>
+        <button type="button" className="secondary jobs-paste-toggle" aria-expanded={pasteOpen} aria-controls="job-paste"
+          onClick={() => setPasteOpen(!pasteOpen)}>{t("jobs.dialog.pasteToggle")}</button>
+        <div id="job-paste">
+          {pasteOpen && (
+            <form noValidate onSubmit={(event) => void submit(event)}>
+              <label htmlFor="job-url">{t("jobs.dialog.url")}</label>
+              <input id="job-url" ref={urlField} type="url" value={url} onChange={(e) => setUrl(e.target.value)}
+                aria-invalid={urlError || undefined} aria-describedby={urlError ? "job-url-error" : undefined} />
+              {urlError && <p className="jobs-field-error" id="job-url-error">{t("jobs.error.invalid_url")}</p>}
+              <label htmlFor="job-text">{t("jobs.dialog.text")}</label>
+              <textarea id="job-text" ref={textField} rows={7} value={text} onChange={(e) => setText(e.target.value)}
+                placeholder={t("jobs.dialog.textPlaceholder")} aria-invalid={textError || undefined}
+                aria-describedby={`job-text-count${textError ? " job-text-error" : ""}`} />
+              <p className="jobs-note" id="job-text-count" aria-live="polite">
+                {t(count < 200 ? "jobs.dialog.countLow" : "jobs.dialog.count", { n: count.toLocaleString("en") })}
+              </p>
+              {textError && <p className="jobs-field-error" id="job-text-error">{t("jobs.error.text_too_short")}</p>}
+              {existingId && <p role="status">{t("jobs.dialog.duplicate")} <Link to={`/jobs/${existingId}`}>{t("jobs.dialog.openIt")}</Link></p>}
+              {error && <p role="alert" className="jobs-field-error">{error}</p>}
+              <footer className="jobs-dialog-actions">
+                <button type="button" className="secondary" onClick={onClose}>{t("jobs.dialog.cancel")}</button>
+                <button type="submit" disabled={sending}>{t("jobs.dialog.submit")}</button>
+              </footer>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
