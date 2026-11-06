@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAuth } from "./auth";
 import { environmentsFrom, type EnvId } from "./environments";
 import { memoryStorage } from "./storage";
@@ -32,10 +32,14 @@ function setup(options: {
   signInStatus?: number;
   refreshError?: string;
   offline?: boolean;
+  stalled?: boolean;
   logoutError?: boolean;
 } = {}) {
   const storage = memoryStorage();
-  const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    if (options.stalled) return new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+    });
     if (options.offline) throw new TypeError("Network unavailable");
     const url = new URL(input instanceof Request ? input.url : String(input));
     const env = url.hostname === "127.0.0.1" ? "local" : "hosted";
@@ -164,6 +168,46 @@ describe("environment sign-in", () => {
       ok: false, message: "Something went wrong. Try again.",
     });
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("request timeouts", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(AbortSignal, "timeout").mockImplementation((milliseconds) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), milliseconds);
+      return controller.signal;
+    });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("reports offline after 20 seconds and keeps the session when refresh stalls", async () => {
+    const { auth, storage } = setup({ stalled: true });
+    const storedSession = JSON.stringify(session("local", true));
+    await storage.set("resumora-auth-local", storedSession);
+    const finished = vi.fn();
+    const result = auth.accessToken("local").then(finished);
+    await vi.advanceTimersByTimeAsync(19_999);
+    expect(finished).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await result;
+    expect(finished).toHaveBeenCalledWith({ offline: true });
+    expect(await storage.get("resumora-auth-local")).toBe(storedSession);
+  });
+
+  it("shows the Local connection message after 20 seconds when sign-in stalls", async () => {
+    const { auth } = setup({ stalled: true });
+    const finished = vi.fn();
+    const result = auth.signIn("local", email, password).then(finished);
+    await vi.advanceTimersByTimeAsync(19_999);
+    expect(finished).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await result;
+    expect(finished).toHaveBeenCalledWith({
+      ok: false, message: "Can't reach Resumora. Is the app running?",
+    });
   });
 });
 

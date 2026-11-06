@@ -8,6 +8,8 @@ import { copy } from "./copy";
 import type { EnvConfig, EnvId } from "./environments";
 import type { KeyValueStorage } from "./storage";
 
+export const AUTH_TIMEOUT_MS = 20_000;
+
 export interface Auth {
   email(env: EnvId): Promise<string | null>;
   signIn(env: EnvId, email: string, password: string): Promise<
@@ -42,7 +44,16 @@ export function createAuth(deps: {
           autoRefreshToken: false,
           detectSessionInUrl: false,
         },
-        ...(deps.fetch ? { global: { fetch: deps.fetch } } : {}),
+        global: {
+          fetch: (input, init) => {
+            const timeout = AbortSignal.timeout(AUTH_TIMEOUT_MS);
+            const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+            return (deps.fetch ?? fetch)(input, {
+              ...init,
+              signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+            });
+          },
+        },
       });
       clients.set(env, client);
     }
@@ -91,7 +102,16 @@ export function createAuth(deps: {
     async accessToken(env) {
       const client = clientFor(env);
       if (!client) return null;
-      const { data, error } = await client.auth.getSession();
+      // Supabase retries refresh failures, so limit the whole session lookup too.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const result = await Promise.race([
+        client.auth.getSession(),
+        new Promise<null>((resolve) => {
+          timer = setTimeout(() => resolve(null), AUTH_TIMEOUT_MS);
+        }),
+      ]).finally(() => clearTimeout(timer));
+      if (!result) return { offline: true };
+      const { data, error } = result;
       if (data.session) return { token: data.session.access_token };
       if (error) {
         if (isAuthRetryableFetchError(error)) return { offline: true };
