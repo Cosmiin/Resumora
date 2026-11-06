@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { sampleCv } from "../../test/sample-cv.ts";
 import { CvDocument } from "./CvDocument.tsx";
+import { RoleItem } from "../edit/sections/RoleItem.tsx";
+import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 
 describe("CvDocument", () => {
   it("draws every filled section", () => {
@@ -114,5 +116,39 @@ describe("CvDocument notes", () => {
     const { container } = render(<CvDocument content={cv} />);
     expect(container.textContent).not.toContain("SECRET-NOTE");
     expect(container.textContent).not.toContain("SECRET-QUESTION");
+  });
+});
+
+
+describe("CV role score", () => {
+  function renderRole() {
+    const role = sampleCv().experience[0]!;
+    const score: RoleScoreState = {
+      state: "ready",
+      result: {
+        roleId: role.id, policy: "score/2", fingerprint: "current", score: 84,
+        bullets: [], nextStep: null, questions: [],
+      },
+    };
+    return render(<RoleItem role={role} list="experience" locale="en" dispatch={() => {}} score={score} />);
+  }
+
+  it("places the score directly after the title inside the role heading row", () => {
+    renderRole();
+    const title = screen.getByRole("textbox", { name: "Role title" });
+    const heading = title.closest(".cv-item-head")!;
+    const pill = within(heading as HTMLElement).getByRole("button", { name: "Score 84 of 100, Clear. Open tips" });
+    expect(title.nextElementSibling).toBe(pill);
+    expect(pill.parentElement).toBe(heading);
+  });
+
+  it("marks the score pill as hidden when printed", () => {
+    const { container } = renderRole();
+    expect(container.querySelector("[data-score-for]")).toHaveClass("no-print");
+  });
+
+  it("leaves no score pill in the old role gutter", () => {
+    const { container } = renderRole();
+    expect(container.querySelector(".cv-role > .score-pill")).toBeNull();
   });
 });

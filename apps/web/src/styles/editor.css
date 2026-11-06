@@ -65,7 +65,24 @@
 }
 .editor-workspace > .side-panel { max-width: none; }
 
-/* Under 900px the panel becomes a bottom sheet (see .sheet below). */
+/* Centre the CV and its docked panel together on desktop. */
+@media (width > 900px) {
+  .editor-workspace {
+    display: flex;
+    justify-content: center;
+    gap: var(--gap-grid);
+    padding: 28px 24px 40px;
+  }
+  .stage { flex: 0 1 680px; padding: 0; }
+  .editor-workspace > .panel {
+    flex: none;
+    width: 340px;
+    top: 28px;
+    max-height: calc(100vh - 56px);
+  }
+}
+
+/* On narrow screens the panel becomes a bottom sheet (see .sheet below). */
 @media (max-width: 899px) {
   .editor-workspace { grid-template-columns: minmax(0, 1fr); min-height: 0; }
   .panel { position: static; max-height: none; border-left: 0; border-top: 1px solid var(--sage-200); }

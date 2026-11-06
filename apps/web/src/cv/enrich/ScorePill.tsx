@@ -4,7 +4,7 @@ import type { RoleScoreState } from "./useRoleScores.ts";
 
 type Props = { roleId: string; state: RoleScoreState; onOpen(): void };
 
-const bandClass = { clear: "is-clear", goodStart: "is-good", needsWork: "is-work" } as const;
+const bandClass = { clear: "is-clear", goodStart: "is-good", needsWork: "is-good" } as const;
 
 function shown(result: RoleResult | undefined) {
   return result && result.score !== null ? { n: result.score, b: band(result.score) } : null;
@@ -36,11 +36,11 @@ function pillView(state: RoleScoreState): { text: string; label: string; cls: st
   return { text, label, cls };
 }
 
-/** A role's score in the page margin. Editor-only: the read-only page and the PDF never draw it. */
+/** A role's score beside its title. Editor-only: the read-only page and the PDF never draw it. */
 export function ScorePill({ roleId, state, onOpen }: Props) {
   const { text, label, cls } = pillView(state);
   return (
-    <button type="button" className={cls} data-score-for={roleId} aria-label={label} onClick={onOpen}>
+    <button type="button" className={`${cls} no-print`} data-score-for={roleId} aria-label={label} onClick={onOpen}>
       {text}
     </button>
   );
