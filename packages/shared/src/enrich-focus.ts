@@ -41,7 +41,10 @@ export function mergeGrades(
 }
 
 export const ImproveAnswerSchema = z.union([
-  z.object({ needsDetail: z.literal(true) }).strict(),
+  z.object({
+    needsDetail: z.literal(true),
+    nextQuestion: z.object({ text: z.string(), options: z.array(z.string().max(60)).max(4) }).nullable().default(null),
+  }).strict(),
   z.object({
     proposal: z.object({ bulletId: z.string(), text: z.string() }),
     bulletBefore: z.number().int(),

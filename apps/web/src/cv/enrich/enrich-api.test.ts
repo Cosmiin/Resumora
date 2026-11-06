@@ -64,7 +64,7 @@ describe("focus API", () => {
   }
 
   it("improveBullet accepts a request for more detail", async () => {
-    fetchMock.mockResolvedValue(Response.json({ needsDetail: true }));
-    await expect(improveBullet({ roleId: "r1", bulletId: "b1", fingerprint: "saved-1" })).resolves.toEqual({ needsDetail: true });
+    fetchMock.mockResolvedValue(Response.json({ needsDetail: true, nextQuestion: null }));
+    await expect(improveBullet({ roleId: "r1", bulletId: "b1", fingerprint: "saved-1" })).resolves.toEqual({ needsDetail: true, nextQuestion: null });
   });
 });
