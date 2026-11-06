@@ -185,7 +185,7 @@ describe("useFocusSession", () => {
     act(() => h.result.current.addSelected(["p"]));
     await act(async () => vi.advanceTimersByTimeAsync(15000));
     const addedId = h.opts().cv.experience[0]!.bullets[2]!.id;
-    expect(h.result.current.queue).toEqual(["b0", "b1", addedId]);
+    expect(h.result.current.queue).toEqual(["b1", "b0", addedId]);
   });
   it("standOut keeps only impact below specific in CV order", () => {
     const h = mount({ mode: "standOut", bulletId: "b3" }, role(4));
@@ -481,19 +481,20 @@ describe("useFocusSession", () => {
   });
   it("stores brain dumps with the shared question and shows dumpEmpty for no proposals", async () => {
     api.brainDump.mockResolvedValue({ proposals: [], roleBefore: null, roleAfterAll: null });
-    const h = await dump();
+    const h = mount({}, role(1));
+    await submit(h, "Built reports every week");
     expect(h.dispatch.mock.calls[0]![0]).toMatchObject({ type: "setNote", note: { question: BRAIN_DUMP_QUESTION } });
     expect(h.result.current.step).toEqual({ kind: "dumpEmpty" });
     act(() => h.result.current.next());
     expect(h.result.current.step.kind).toBe("question");
   });
-  it("skipping a failed brain dump skips the already shown bullet question", async () => {
+  it("skipping a failed free talk returns to the same bullet question", async () => {
     api.brainDump.mockRejectedValueOnce(new ApiClientError(503, "ai_unavailable", "down"));
     const h = await dump();
     expect(h.result.current.step).toEqual({ kind: "failed", bulletId: null, reason: "unavailable" });
     act(() => h.result.current.skip());
-    expect(h.result.current.position).toBe(1);
-    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    expect(h.result.current.position).toBe(0);
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b0", asked: 1 });
   });
   it("addSelected waits for a matching ready score, celebrates, then builds the fresh queue", async () => {
     const h = await dump();
@@ -525,7 +526,7 @@ describe("useFocusSession", () => {
     await act(async () => vi.advanceTimersByTimeAsync(1));
     const addedId = h.opts().cv.experience[0]!.bullets[2]!.id;
     expect(h.result.current.queue).toEqual(["b0", "b1", addedId]);
-    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b0", asked: 1 });
     expect(h.result.current.busy).toBe(false);
   });
   it("a fresh score that did not rise goes directly to its queue", async () => {
@@ -536,6 +537,40 @@ describe("useFocusSession", () => {
     expect(h.result.current.step.kind).toBe("question");
     expect(h.result.current.queue).toEqual(["b0", "b1"]);
   });
+  it.each(["role", "bullet", "follow-up"])("returns to the same %s question after accepting free-talk proposals", async (source) => {
+    const r = role();
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions } }]]) }, r);
+    act(() => h.result.current.skip());
+    if (source !== "role") {
+      act(() => h.result.current.skip());
+      act(() => h.result.current.skip());
+    }
+    if (source === "follow-up") {
+      api.improveBullet.mockResolvedValueOnce({ needsDetail: true, nextQuestion: { text: "Which processes?", options: [] } });
+      await submit(h);
+    }
+    const previous = h.result.current.step;
+    act(() => h.result.current.freeTalk());
+    await submit(h, "Built weekly reports");
+    act(() => h.result.current.addSelected(["p"]));
+    const fresh = score(h.opts().cv.experience[0]!, 70);
+    fresh.roleQuestions = [];
+    fresh.questions[1]!.text = "Who used the reports?";
+    h.update({ scores: new Map([["r", { state: "ready", result: fresh }]]) });
+    expect(h.result.current.step.kind).toBe("celebrate");
+    act(() => h.result.current.next());
+    expect(h.result.current.step).toEqual(previous);
+    expect(h.result.current.roleQuestions).toEqual(roleQuestions);
+    if (source !== "role") expect(h.result.current.queue).not.toContain("b0");
+    expect(api.brainDump).toHaveBeenCalledTimes(1);
+    expect(api.improveBullet).toHaveBeenCalledTimes(source === "follow-up" ? 1 : 0);
+    if (source !== "role") {
+      act(() => h.result.current.skip());
+      const addedId = h.opts().cv.experience[0]!.bullets[3]!.id;
+      expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: addedId });
+    }
+  });
+
   it("returns to the remaining bullets after free talk rebuilds the queue", async () => {
     const h = mount();
     act(() => h.result.current.skip());
@@ -568,19 +603,21 @@ describe("useFocusSession", () => {
     }
     expect(api.improveBullet).not.toHaveBeenCalled();
   });
-  it("skips already shown questions when returning from free talk", async () => {
+  it("restores the same follow-up question when returning from free talk", async () => {
     needsDetails();
     const h = mount();
     await submit(h);
+    const previous = h.result.current.step;
     act(() => h.result.current.freeTalk());
     act(() => h.result.current.skip());
-    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    expect(h.result.current.step).toEqual(previous);
     expect(api.improveBullet).toHaveBeenCalledTimes(1);
   });
-  it("keeps a session-wide question budget across repeated free-talk rescoring", async () => {
+  it("keeps the same question and budget across repeated free-talk rescoring", async () => {
     const h = mount();
+    const previous = h.result.current.step;
     const questions = ["Who used the reports?", "Which processes did you own?", "What changed after the reports?"];
-    for (const [i, text] of questions.entries()) {
+    for (const text of questions) {
       api.brainDump.mockResolvedValueOnce({ proposals: [{ id: "p", text, score: 80 }], roleBefore: 40, roleAfterAll: 70 });
       act(() => h.result.current.freeTalk());
       await submit(h, text);
@@ -589,9 +626,7 @@ describe("useFocusSession", () => {
       fresh.bullets = fresh.bullets.map((b) => ({ ...b, score: b.id === "b0" ? 20 : b.id === "b1" ? 60 : 100 }));
       fresh.questions[0]!.text = text;
       h.update({ scores: new Map([["r", { state: "ready", result: fresh }]]) });
-      expect(h.result.current.step).toMatchObject(i < 2
-        ? { kind: "question", bulletId: "b0", question: { text }, asked: i + 2 }
-        : { kind: "question", bulletId: "b1", asked: 1 });
+      expect(h.result.current.step).toEqual(previous);
     }
     expect(api.improveBullet).not.toHaveBeenCalled();
   });
@@ -613,6 +648,8 @@ describe("useFocusSession", () => {
         fresh.questions[0]!.text = "What changed after the reports?";
         h.update({ scores: new Map([["r", { state: "ready", result: fresh }]]) });
       }
+      expect(h.result.current.step).toMatchObject({ kind: "needsDetail", bulletId: "b0", asked: 3 });
+      await submit(h, "Finance");
     }
     expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1", asked: 1 });
     act(() => h.result.current.freeTalk());
@@ -624,7 +661,7 @@ describe("useFocusSession", () => {
     fresh.questions[1]!.text = "Who used the second tool?";
     h.update({ scores: new Map([["r", { state: "ready", result: fresh }]]) });
     expect(h.result.current.queue).not.toContain("b0");
-    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1", asked: 2 });
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1", asked: 1 });
   });
   it("close immediately calls onClose and collects facts only after changed notes", async () => {
     const h = mount();

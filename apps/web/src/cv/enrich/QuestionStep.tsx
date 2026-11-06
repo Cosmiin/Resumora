@@ -37,7 +37,7 @@ export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, on
         locale={locale}
         onBusyChange={setVoiceBusy}
       />
-      <button type="button" className="fm-ghost" onClick={onFreeTalk} disabled={busy}>
+      <button type="button" className="fm-ghost fm-free-talk" onClick={onFreeTalk} disabled={busy}>
         {t("enrich.focus.freeTalk")}
       </button>
       <div className="fm-foot">

@@ -104,6 +104,7 @@ export function useFocusSession(opts: Options): {
     result: opts.scores.get(opts.roleId)?.result, openingStarted: false, roleAnswered: false,
     shown: initial.shown, completed: initial.completed,
     rerun: new Set<string>(), returnPosition: 0,
+    returnStep: null as Extract<FocusStep, { kind: "role" | "question" | "needsDetail" }> | null,
     lastCall: undefined as { bulletId: string | null; source?: "answers" } | undefined,
     callText: "", scoreBefore: null as number | null, scorePrint: "", afterCelebrate: 0,
   });
@@ -123,6 +124,21 @@ export function useFocusSession(opts: Options): {
     const s = session.current;
     const o = current.current;
     const role = o.cv.experience.find((r) => r.id === o.roleId);
+    const resume = s.returnStep;
+    s.returnStep = null;
+    if (resume?.kind === "role") {
+      update({ queue, position: s.returnPosition, busy: false, step: resume });
+      return;
+    }
+    if (resume && queue.includes(resume.bulletId) && role?.bullets.some((b) => b.id === resume.bulletId)) {
+      const at = queue.indexOf(resume.bulletId);
+      const before = queue.slice(0, at);
+      const done = before.filter((id) => s.completed.has(id));
+      // A newly scored bullet may sort before this one; keep it for after the question we paused.
+      queue = [...done, resume.bulletId, ...before.filter((id) => !s.completed.has(id)), ...queue.slice(at + 1)];
+      update({ queue, position: done.length, busy: false, step: resume });
+      return;
+    }
     const entry = o.scores.get(o.roleId);
     const result = entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)
       ? entry.result : session.current.result;
@@ -162,6 +178,7 @@ export function useFocusSession(opts: Options): {
             const answer = await brainDump({ roleId: o.roleId, fingerprint: print, ...(source ? { source } : {}) });
             if (!s.alive || s.closed) return;
             s.scoreBefore = answer.roleBefore;
+            if (!answer.proposals.length && s.returnStep) { go(s.returnPosition); return; }
             update({ busy: false, step: answer.proposals.length
               ? { kind: "dumpPick", proposals: answer.proposals, roleAfterAll: answer.roleAfterAll }
               : { kind: "dumpEmpty" } });
@@ -218,11 +235,11 @@ export function useFocusSession(opts: Options): {
     const dumping = s.view.step.source === "dump";
     const queue = dumping ? buildQueue(role, fresh ?? o.scores.get(o.roleId)?.result, o).filter((id) => !s.completed.has(id)) : s.view.queue;
     const position = dumping ? 0 : s.view.position + 1;
-    if (fresh) s.result = fresh;
+    if (fresh) s.result = { ...fresh, roleQuestions: s.result?.roleQuestions ?? fresh.roleQuestions };
     if (fresh?.score != null && (s.scoreBefore === null || fresh.score > s.scoreBefore)) {
       s.afterCelebrate = position;
       update({ busy: false, queue, position: dumping ? 0 : s.view.position, step: {
-        kind: "celebrate", from: s.scoreBefore, to: fresh.score, next: position < queue.length ? "queue" : "done",
+        kind: "celebrate", from: s.scoreBefore, to: fresh.score, next: s.returnStep?.kind === "role" || position < queue.length ? "queue" : "done",
       } });
     } else go(position, queue);
   }, [go, update]);
@@ -347,7 +364,10 @@ export function useFocusSession(opts: Options): {
     freeTalk() {
       const s = session.current;
       if (!available()) return;
+      const step = s.view.step;
+      if (step.kind !== "role" && step.kind !== "question" && step.kind !== "needsDetail") return;
       s.returnPosition = s.view.position;
+      s.returnStep = step;
       update({ step: { kind: "brainDump" } });
     },
     close() {

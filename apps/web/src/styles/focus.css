@@ -69,6 +69,7 @@
 .fm-btn:disabled { background: var(--sage-200); color: var(--text-muted); box-shadow: none; cursor: default; transform: none; }
 .fm-ghost { padding: 8px 4px; border: 0; background: none; font: inherit; color: var(--text-muted); cursor: pointer; }
 .fm-ghost:hover:not(:disabled) { color: var(--text-strong); text-decoration: underline; text-underline-offset: 3px; }
+.fm-free-talk { margin-top: var(--space-3); color: var(--action-primary); font-size: var(--text-sm); text-align: start; text-decoration: underline; }
 
 /* The answer box inside focus mode: roomier than in the panel. */
 .focus-mode .answer-box { gap: var(--space-3); }

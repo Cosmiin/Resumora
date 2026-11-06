@@ -186,6 +186,8 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
         {(step.kind === "brainDump" || step.kind === "dumpWorking" || step.kind === "dumpEmpty") && (
           <BrainDumpStep
             roleId={role.id}
+            title={role.title}
+            company={role.company}
             value={dump.value}
             via={dump.via}
             onChange={(value, via) => setDump({ value, via })}
