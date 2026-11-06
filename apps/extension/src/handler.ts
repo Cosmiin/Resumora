@@ -1,13 +1,14 @@
 import type { Auth } from "./auth";
-import { copy } from "./copy";
 import type { EnvConfig, EnvId } from "./environments";
 import type { PopupState, Request, SignInReply } from "./messages";
 import { getEnvId, setEnvId, type KeyValueStorage } from "./storage";
+import type { createSaver } from "./save";
 
 export function createHandler(deps: {
   storage: KeyValueStorage;
   auth: Auth;
   environments: Record<EnvId, EnvConfig>;
+  saver: ReturnType<typeof createSaver>;
 }): (req: Request) => Promise<unknown> {
   const state = async (env: EnvId): Promise<PopupState> => ({
     env,
@@ -37,7 +38,7 @@ export function createHandler(deps: {
         await setEnvId(deps.storage, req.env);
         return state(req.env);
       case "saveActiveTab":
-        return { kind: "error", message: copy.somethingWrong };
+        return deps.saver.saveActiveTab();
     }
   };
 }

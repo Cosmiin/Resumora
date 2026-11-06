@@ -16,3 +16,11 @@ export interface PopupState {
 export type SignInReply =
   | { ok: true; state: PopupState }
   | { ok: false; message: string };
+
+export type SaveResult =
+  | { kind: "saved"; openUrl: string }
+  | { kind: "existing"; openUrl: string }
+  | { kind: "couldntRead"; pasteUrl: string }
+  | { kind: "cantRead" }
+  | { kind: "signedOut"; message: string | null }
+  | { kind: "error"; message: string; requestId: string | null };

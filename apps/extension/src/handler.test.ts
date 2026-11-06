@@ -19,7 +19,8 @@ function setup(hostedConfigured = false) {
     accessToken: vi.fn<Auth["accessToken"]>(async () => null),
     refresh: vi.fn<Auth["refresh"]>(async () => null),
   };
-  return { storage, auth, emails, handler: createHandler({ storage, auth, environments }) };
+  const saver = { saveActiveTab: vi.fn().mockResolvedValue({ kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/id" }) };
+  return { storage, auth, emails, saver, handler: createHandler({ storage, auth, environments, saver }) };
 }
 
 describe("popup message handler", () => {
@@ -84,11 +85,12 @@ describe("popup message handler", () => {
     expect(emails.get("local")).toBe("local@example.test");
   });
 
-  it("returns the placeholder error for saving", async () => {
-    const { handler } = setup();
+  it("returns the saver's result for saving", async () => {
+    const { handler, saver } = setup();
     expect(await handler({ type: "saveActiveTab" })).toEqual({
-      kind: "error", message: "Something went wrong. Try again.",
+      kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/id",
     });
+    expect(saver.saveActiveTab).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -112,6 +114,31 @@ describe("Chrome storage adapter", () => {
 });
 
 describe("background messages", () => {
+  it("queries the active tab and injects the reader in two calls before saving", async () => {
+    vi.stubGlobal("chrome", { runtime: { onMessage: { addListener: vi.fn() } }, storage: { local: {} } });
+    try {
+      const { createBackground } = await import("./background");
+      const read = { url: "https://jobs.example.test/ad", pageText: "x".repeat(300), jsonLd: [] };
+      const query = vi.fn(async () => [{ id: 7, url: read.url }]);
+      const executeScript = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([{ result: read }]);
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const handler = createBackground({
+        runtime: chrome.runtime,
+        storage: { local: { get: async () => ({}) } },
+        tabs: { query }, scripting: { executeScript },
+      }, fetch);
+      expect(await handler({ type: "saveActiveTab" })).toEqual({ kind: "signedOut", message: null });
+      expect(query).toHaveBeenCalledExactlyOnceWith({ active: true, currentWindow: true });
+      expect(executeScript).toHaveBeenNthCalledWith(1, { target: { tabId: 7 }, files: ["reader.js"] });
+      expect(executeScript).toHaveBeenNthCalledWith(2, { target: { tabId: 7 }, func: expect.any(Function) });
+      vi.stubGlobal("__resumoraReadPage", () => read);
+      expect(executeScript.mock.calls[1]![0].func()).toEqual(read);
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps the response channel open and answers failures with safe copy", async () => {
     const addListener = vi.fn();
     vi.stubGlobal("chrome", { runtime: { onMessage: { addListener } }, storage: { local: {} } });
@@ -127,7 +154,7 @@ describe("background messages", () => {
       handler.mockRejectedValueOnce(new Error("Private exception details"));
       expect(listener({ type: "getState" }, {}, sendResponse)).toBe(true);
       await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledWith({
-        kind: "error", message: "Something went wrong. Try again.",
+        kind: "error", message: "Something went wrong. Try again.", requestId: null,
       }));
     } finally {
       vi.unstubAllGlobals();

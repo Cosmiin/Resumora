@@ -37,3 +37,26 @@ main {
 footer {
   padding: 0 16px 16px;
 }
+
+h2 { margin: 0 0 12px; font-size: 18px; }
+p { line-height: 1.5; overflow-wrap: anywhere; }
+label { display: block; margin: 12px 0; font-size: 14px; }
+input, select, button { box-sizing: border-box; font: inherit; }
+input, select { display: block; width: 100%; margin-top: 6px; padding: 8px; }
+button { padding: 8px 12px; cursor: pointer; }
+main > button, form > button { width: 100%; }
+a, small { display: block; margin: 12px 0; }
+small { overflow-wrap: anywhere; color: #475569; }
+[role="alert"] { color: #b91c1c; }
+.spinner {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin-bottom: 12px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #334155;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
