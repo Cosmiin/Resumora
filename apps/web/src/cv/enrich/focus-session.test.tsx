@@ -28,6 +28,7 @@ function score(r: Experience, value: number | null = 40): RoleResult {
       specificity: "partial", impact: i === 2 ? "specific" : "partial",
       issue: "specificity", tip: null, question: "Which tools?",
     })),
+    roleQuestions: [],
     questions: r.bullets.map((b) => ({ bulletId: b.id, text: "Which tools?", options: [], kind: "detail" })),
   };
 }

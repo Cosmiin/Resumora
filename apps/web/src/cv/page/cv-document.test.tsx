@@ -127,7 +127,7 @@ describe("CV role score", () => {
       state: "ready",
       result: {
         roleId: role.id, policy: "score/2", fingerprint: "current", score: 84,
-        bullets: [], nextStep: null, questions: [],
+        bullets: [], nextStep: null, questions: [], roleQuestions: [],
       },
     };
     return render(<RoleItem role={role} list="experience" locale="en" dispatch={() => {}} score={score} />);

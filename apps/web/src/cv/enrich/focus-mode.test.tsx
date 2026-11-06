@@ -39,6 +39,7 @@ const result: RoleResult = {
   roleId: "r1", policy: "score/2", fingerprint: "stale", score: 52,
   bullets: [grade("b1", 43), grade("b2", 56), grade("b3", 58)],
   nextStep: null,
+  roleQuestions: [],
   questions: [{ bulletId: "b1", text: "Roughly how many drivers did you plan for each day?", options: ["Under 10", "10–50"], kind: "detail" }],
 };
 const scores = new Map<string, RoleScoreState>([["r1", { state: "ready", result }]]);

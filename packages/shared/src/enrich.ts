@@ -2,11 +2,12 @@ import { z } from "zod";
 import type { Experience, Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/2";
+export const SCORE_POLICY = "score/3";
 
 export const WEIGHTS = { contribution: 35, clarity: 25, specificity: 20, impact: 20 } as const;
 
 export const MAX_QUESTIONS = 20;
+export const MAX_ROLE_QUESTIONS = 3;
 
 export const GradeSchema = z.enum(["missing", "partial", "specific"]);
 export type Grade = z.infer<typeof GradeSchema>;
@@ -37,7 +38,14 @@ export const ModelBulletSchema = z
 export type ModelBullet = z.infer<typeof ModelBulletSchema>;
 
 export const ModelScoreSchema = z
-  .object({ bullets: z.array(ModelBulletSchema), nextStepId: id.nullable() })
+  .object({
+    bullets: z.array(ModelBulletSchema),
+    nextStepId: id.nullable(),
+    roleQuestions: z.array(z.object({
+      text: z.string().max(240),
+      options: z.array(z.string().max(60)).max(4),
+    }).strict()).max(MAX_ROLE_QUESTIONS).default([]),
+  })
   .strict();
 export type ModelScore = z.infer<typeof ModelScoreSchema>;
 
@@ -54,6 +62,11 @@ export const QuestionSchema = z
   .object({ bulletId: id, text: z.string(), options: z.array(z.string()), kind: QuestionKindSchema })
   .strict();
 export type Question = z.infer<typeof QuestionSchema>;
+
+export const RoleQuestionSchema = z
+  .object({ id, text: z.string(), options: z.array(z.string().max(60)).max(4), kind: z.literal("role") })
+  .strict();
+export type RoleQuestion = z.infer<typeof RoleQuestionSchema>;
 
 export const RoleResultSchema = z
   .object({
@@ -78,6 +91,7 @@ export const RoleResultSchema = z
     ),
     nextStep: z.object({ bulletId: id, issue: IssueSchema, tip: z.string().nullable() }).strict().nullable(),
     questions: z.array(QuestionSchema).max(MAX_QUESTIONS),
+    roleQuestions: z.array(RoleQuestionSchema).max(MAX_ROLE_QUESTIONS).default([]),
   })
   .strict();
 export type RoleResult = z.infer<typeof RoleResultSchema>;
@@ -151,7 +165,7 @@ function normalizedIssue(m: ModelBullet, unusable: boolean, duplicate: boolean):
 
 type ResultBullet = RoleResult["bullets"][number];
 
-export function buildRoleResult(role: Experience, model: ModelScore, fingerprintValue: string): RoleResult {
+export function buildRoleResult(role: Experience, model: z.input<typeof ModelScoreSchema>, fingerprintValue: string): RoleResult {
   const ids = role.bullets.map((b) => b.id);
   const byId = new Map<string, ModelBullet>();
   for (const m of model.bullets) {
@@ -213,7 +227,10 @@ export function buildRoleResult(role: Experience, model: ModelScore, fingerprint
   const score =
     bullets.length === 0 ? null : Math.round(bullets.reduce((sum, b) => sum + b.score, 0) / bullets.length);
 
-  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions };
+  const roleQuestions: RoleQuestion[] = (model.roleQuestions ?? []).slice(0, MAX_ROLE_QUESTIONS).map((q, i) => ({
+    id: `rq${i + 1}`, text: q.text, options: q.options.filter(isAllowedOption), kind: "role",
+  }));
+  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions };
 }
 
 /** Small synchronous 53-bit string hash (cyrb53), so the browser and the worker agree. */

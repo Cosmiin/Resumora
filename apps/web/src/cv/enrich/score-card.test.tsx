@@ -53,6 +53,7 @@ function result(over: Partial<RoleResult> = {}): RoleResult {
       question: null,
     })),
     nextStep: { bulletId: "b1", issue: "specificity", tip: "Name the tasks you did." },
+    roleQuestions: [],
     questions: [{ bulletId: "b1", text: "Which tasks?", options: ["Rota", "Orders"], kind: "detail" }],
     ...over,
   };

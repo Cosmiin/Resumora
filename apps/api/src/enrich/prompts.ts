@@ -173,23 +173,42 @@ supplied bullet id. Otherwise duplicateOf must be null.
 
 ACTIONABLE FEEDBACK
 
+Pick missing facts using these topics in priority order:
+| Topic | What it finds out | Example options |
+| Tools | Software, platforms and methods used | Excel, SAP, Workday |
+| Reporting line | Who the person reported to | The CEO, A department head, The owner |
+| Leading people | Whether people reported to them and how many | No, 1–5 people, 6–20, 20+ |
+| Who they worked with | Teams, clients, partners and stakeholders | Business users, External vendors, Finance |
+| Processes | What they ran, owned or set up and how often | Payroll prep, Onboarding, Vendor contracts |
+| Scope | Size and reach, using ranges only | Under 50, 50–200, 200+ |
+| Results | What changed because of their work | Faster, Fewer errors, Lower cost |
+
+Return 1–3 roleQuestions about useful role-wide facts left unknown by the CV
+and notes, including when the role has no bullets. Return [] if none are needed.
+Role questions ask only about tools, reporting line, leading people and who they worked with.
+Never ask about something the CV or the notes already answer.
+For bullet questions, pick the most useful missing topic: usually processes,
+tools or scope for detail, and results for result.
+
 For every bullet fill only these feedback fields:
 - tip: One short sentence naming the smallest material information gap
   or wording problem. Use null when no change is needed.
 - question: At most one direct question that would obtain the most
   useful missing fact. Use null if no additional fact is needed.
-- options: When there is a question, 2 to 4 short likely answers
-  (each under 60 characters), drawn only from the role's own words and
-  the job's common tasks. Never give an exact number; if a quantity
-  matters, give only ranges such as "10–50", "Under 10" or "50+".
-  Use an empty list when the question is open or there is no question.
+- options: Provide 3–4 options for every question, role or bullet,
+  each at most 60 characters, drawn only from the role's own words and
+  the job's common tasks. Options are guesses for the person to confirm,
+  not facts to assume. Never give an exact number; if a quantity matters,
+  give only ranges such as "10–50", "Under 10" or "50+".
+  Use an empty list only when there is no question. The app adds a fixed
+  "Something else" chip last; do not include it in the options.
 
 Do not provide a rewritten bullet. Do not invent a tip or question to
 fill a field. Keep each tip and question to one sentence, preferably no
 more than 20 words. Address the user naturally and respectfully.
 
 When a bullet's only gap is impact, ask for a result: how many, how often,
-for whom, or what changed. Its answer options must be ranges.
+for whom, or what changed. Any numeric answer options must be ranges.
 
 For unusable text, ask about a real task.
 For duplicates, recommend consolidation; do not invent a need for
@@ -210,6 +229,7 @@ OUTPUT
 
 Return only JSON matching the supplied response schema.
 Return every supplied bullet id exactly once, and no other id.
+For a role with no bullets, return bullets [] and nextStepId null, plus roleQuestions.
 If specific ids are selected for grading, return only those ids; the rest are context.
 Return grades, not numbers. The application calculates all scores.`;
 
@@ -218,7 +238,7 @@ export function scoreSystemPrompt(locale: Locale): string {
 }
 
 /** The role as the model sees it: context for the title and description, bullets to grade. No company, no dates. */
-export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets">, gradeOnly?: readonly string[]): string {
+export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes">, gradeOnly?: readonly string[]): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));
   return [
     "<experience>",
@@ -226,6 +246,8 @@ export function scoreUserMessage(role: Pick<Experience, "title" | "description" 
     `Role description (context only, not graded): ${JSON.stringify(role.description)}`,
     "Bullets to grade (JSON, each { id, text }):",
     JSON.stringify(bullets),
+    "Role notes (context only, not graded):",
+    JSON.stringify(role.notes.map(({ question, answer }) => ({ question, answer }))),
     "</experience>",
     ...(gradeOnly ? [`Grade only these bullets: ${gradeOnly.join(", ")}. Return entries for those ids only; the other bullets are context.`] : []),
   ].join("\n");

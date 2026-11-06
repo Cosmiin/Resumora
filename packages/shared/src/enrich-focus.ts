@@ -34,7 +34,10 @@ export function mergeGrades(
       options: stored?.questions.find((q) => q.bulletId === id)?.options ?? [],
     };
   });
-  return buildRoleResult(role, { bullets, nextStepId: stored?.nextStep?.bulletId ?? null }, fingerprintValue);
+  return {
+    ...buildRoleResult(role, { bullets, nextStepId: stored?.nextStep?.bulletId ?? null }, fingerprintValue),
+    roleQuestions: stored?.roleQuestions ?? [],
+  };
 }
 
 export const ImproveAnswerSchema = z.union([
