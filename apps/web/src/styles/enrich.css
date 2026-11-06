@@ -68,8 +68,9 @@
 .answer-rec.is-finishing::before { background: var(--sage-500); }
 .answer-countdown { font-weight: 700; }
 .answer-partial { font-size: 13px; color: var(--sage-500); font-style: italic; }
+.voice-word-new { animation: voice-word-in 300ms ease-out; }
+@keyframes voice-word-in { from { opacity: 0; } to { opacity: 1; } }
 .answer-voice-msg { font-size: 12px; color: var(--sage-600); margin: 0; }
-.voice-note { font-size: 11.5px; color: var(--sky-600); background: var(--sky-50); border: 1px solid var(--sky-200); border-radius: 7px; padding: 6px 9px; margin: 0; }
 
 /* Summary rewrite review */
 .rewrite-review { display: grid; gap: 10px; justify-items: stretch; }
@@ -95,6 +96,7 @@
 .prop.kept { opacity: 0.55; }
 .review-note { font-size: 12px; color: var(--sage-600); background: var(--sage-50); border-radius: 8px; padding: 8px 10px; margin: 0; }
 @media (prefers-reduced-motion: reduce) {
+  .voice-word-new { animation: none; }
   .mic[aria-pressed="true"] { animation: none; box-shadow: 0 0 0 3px rgb(154 65 69 / 0.25); }
   .prop.streaming .prop-new::after { animation: none; }
   .working::before { animation: none; }

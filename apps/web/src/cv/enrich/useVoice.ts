@@ -11,6 +11,10 @@ export type VoiceState = "idle" | "asking" | "countdown" | "recording" | "stoppi
 /** After stop, how long to wait for the last words before closing. */
 const STOP_WAIT_MS = 1500;
 
+export function latinOnly(text: string): string {
+  return text.replace(/[^\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]/gu, "").replace(/\s+/gu, " ").trim();
+}
+
 /** One recording: everything that has to be closed when it ends. */
 type Live = {
   stream?: MediaStream;
@@ -74,7 +78,7 @@ export function useVoice({ maxSeconds = VOICE.maxSeconds }: { locale: Locale; ma
   const [state, setState] = useState<VoiceState>(() => (supported() ? "idle" : "unavailable"));
   const [count, setCount] = useState<3 | 2 | 1 | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const [partial, setPartial] = useState("");
+  const [partialWords, setPartialWords] = useState<{ key: string; text: string }[]>([]);
   const [seconds, setSeconds] = useState(0);
   const [interrupted, setInterrupted] = useState(false);
   const live = useRef<Live | null>(null);
@@ -92,7 +96,7 @@ export function useVoice({ maxSeconds = VOICE.maxSeconds }: { locale: Locale; ma
       }
       setCount(null);
       setConnecting(false);
-      setPartial("");
+      setPartialWords([]);
       setInterrupted(broke);
       setState(next);
     },
@@ -114,11 +118,20 @@ export function useVoice({ maxSeconds = VOICE.maxSeconds }: { locale: Locale; ma
   const onEvent = useCallback(
     (l: Live, e: TranscriptEvent) => {
       if (live.current !== l) return;
-      const show = () => setPartial([...l.partials.values()].map((s) => s.trim()).filter(Boolean).join(" "));
+      const show = () => setPartialWords([...l.partials].flatMap(([itemId, text]) => {
+        const clean = latinOnly(text);
+        return clean ? clean.split(" ").map((text, i) => ({ key: `${itemId}:${i}`, text })) : [];
+      }));
       const finished = () => l.stopping && !l.awaitingCommit && l.order.length === 0;
       switch (e.type) {
         case "partial":
+          if (!latinOnly(e.text)) {
+            const previous = l.partials.get(e.itemId);
+            if (previous !== undefined && /\s/u.test(e.text)) l.partials.set(e.itemId, previous + " ");
+            return;
+          }
           track(l, e.itemId);
+          // Keep delta boundaries: a piece can end with a space or in the middle of a word.
           l.partials.set(e.itemId, (l.partials.get(e.itemId) ?? "") + e.text);
           return show();
         case "committed":
@@ -129,7 +142,7 @@ export function useVoice({ maxSeconds = VOICE.maxSeconds }: { locale: Locale; ma
         case "failed":
           track(l, e.itemId);
           l.partials.delete(e.itemId);
-          l.done.set(e.itemId, e.type === "final" ? e.text : "");
+          l.done.set(e.itemId, e.type === "final" ? latinOnly(e.text) : "");
           show();
           drain(l, emit);
           if (finished()) end("idle");
@@ -152,7 +165,7 @@ export function useVoice({ maxSeconds = VOICE.maxSeconds }: { locale: Locale; ma
     live.current = l;
     setState("asking");
     setInterrupted(false);
-    setPartial("");
+    setPartialWords([]);
     setSeconds(0);
     let secret: string;
     try {
@@ -233,7 +246,8 @@ export function useVoice({ maxSeconds = VOICE.maxSeconds }: { locale: Locale; ma
     state,
     count,
     connecting,
-    partial,
+    partial: partialWords.map((word) => word.text).join(" "),
+    partialWords,
     seconds,
     interrupted,
     start: () => void start(),
