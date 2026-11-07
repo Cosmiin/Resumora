@@ -10,16 +10,24 @@ const BrainDumpSchema = z.object({ bullets: z.array(z.string()).max(4) });
 
 export async function brainDump(
   deps: ScoreDeps,
-  input: { roleId: string; fingerprint: string },
+  input: { roleId: string; fingerprint: string; source?: "ramble" | "answers" },
 ): Promise<BrainDumpAnswer> {
   const { content } = await deps.cv.get();
   const role = content.experience.find((r) => r.id === input.roleId);
   if (!role || fingerprint(role, content.locale) !== input.fingerprint) {
     throw new ApiError(409, "not_saved", "Your latest changes aren't saved yet. Try again in a moment.");
   }
-  const ramble = role.notes.filter((n) => n.question === BRAIN_DUMP_QUESTION)
-    .sort((a, b) => Date.parse(b.askedAt) - Date.parse(a.askedAt))[0];
-  if (!ramble) throw new ApiError(400, "no_brain_dump", "Save a brain dump for this role first.");
+  const source = input.source ?? "ramble";
+  const notes = role.notes.filter((n) => source === "answers"
+    ? n.question !== BRAIN_DUMP_QUESTION : n.question === BRAIN_DUMP_QUESTION)
+    .sort((a, b) => Date.parse(b.askedAt) - Date.parse(a.askedAt));
+  if (!notes.length) {
+    if (source === "answers") throw new ApiError(400, "no_answers", "Save answers for this role first.");
+    throw new ApiError(400, "no_brain_dump", "Save a brain dump for this role first.");
+  }
+  const details = source === "answers"
+    ? notes.slice(0, 10).map((n) => "Q: " + n.question + " A: " + n.answer).join("\n")
+    : notes[0]!.answer;
 
   await deps.cv.snapshot("ai");
 
@@ -37,7 +45,7 @@ export async function brainDump(
       task: "enrich_brain_dump",
       schema: BrainDumpSchema,
       system: brainDumpSystemPrompt(content.locale),
-      user: brainDumpUserMessage(role, ramble.answer),
+      user: brainDumpUserMessage(role, details, source),
       maxOutputTokens: 1200,
     });
     const seen = new Set(role.bullets.map((b) => repeatKey(b.text)));

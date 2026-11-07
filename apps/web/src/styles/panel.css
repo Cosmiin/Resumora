@@ -1,4 +1,7 @@
 /* Helper panel (right-hand side). Width and the bottom sheet are set by the editor layout. */
+.panel { font-size: 14px; }
+.panel :is(.tips, .toggle, .box-title, .sort-row, .add-sec select, .ai button, .role-open) { font-size: 14px; }
+.panel .role-open { padding: 10px; }
 .panel-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 .p-h { font-family: var(--font-display); font-size: 20px; font-weight: 500; margin: 0; color: var(--pine-800); }
 .p-sub { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage-600); margin: 0 0 8px; }
@@ -10,14 +13,14 @@
 .flag strong { font-weight: 600; color: var(--pine-800); }
 .flag .why { grid-column: 1 / -1; font-size: 12.5px; color: var(--sage-600); line-height: 1.45; }
 .flag .btn { padding: 3px 10px; font-size: 12px; }
-.all-good { padding: 10px 12px; border-radius: 10px; background: var(--pine-50); color: var(--pine-700); font-size: 13px; }
+.all-good { padding: 10px 12px; border-radius: 10px; background: var(--pine-50); color: var(--pine-700); font-size: 14px; }
 
 /* Section list: each row is a DragList row with its own grip on the left. */
 .sec-list { display: grid; gap: 2px; }
-.sec-row { display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 2px; border-radius: 8px; }
+.sec-row { display: flex; align-items: center; gap: 4px; padding: 10px; border-radius: 8px; }
 .sec-row:hover { background: var(--sage-50); }
 .sec-row .drag-grip { position: static; opacity: 1; flex: none; }
-.sec-row .name { flex: 1; min-width: 0; font-size: 13.5px; }
+.sec-row .name { flex: 1; min-width: 0; font-size: 14px; }
 .sec-row .name.off { color: var(--sage-500); text-decoration: line-through; text-decoration-color: var(--sage-300); }
 .sec-row .badge { font-size: 11px; color: var(--sage-500); margin-inline-end: 4px; }
 .sec-row.is-dragging { background: var(--surface-card); }
@@ -26,8 +29,9 @@
 .icon-btn:focus-visible { outline: 2px solid var(--pine-600); }
 .icon-btn[aria-pressed="false"] { color: var(--sage-500); }
 
-.add-sec { display: flex; gap: 8px; margin-top: 10px; }
-.add-sec select { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--sage-300); background: var(--white); color: var(--pine-800); }
+.add-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 10px; }
+.add-sec select { width: 100%; box-sizing: border-box; min-width: 0; font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--sage-300); background: var(--white); color: var(--pine-800); }
+.add-sec .btn { justify-self: start; }
 .fine { font-size: 12px; color: var(--sage-500); margin: 8px 0 0; }
 
 /* Base button used on the page (missing boxes) and in the panel. */
@@ -54,7 +58,7 @@
 .row-btns .btn { font-size: 12px; padding: 4px 10px; }
 .tips { margin: 0; padding-left: 18px; font-size: 13px; color: var(--sage-600); display: grid; gap: 4px; }
 .ai { display: grid; gap: 6px; }
-.ai button { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; font: inherit; font-size: 13px; padding: 8px 12px; border-radius: 9px; border: 1px dashed var(--sage-300); background: var(--sage-50); color: var(--sage-600); cursor: not-allowed; }
+.ai button { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; font: inherit; font-size: 13px; padding: 10px; border-radius: 9px; border: 1px dashed var(--sage-300); background: var(--sage-50); color: var(--sage-600); cursor: not-allowed; }
 .soon { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--marigold-800); background: var(--marigold-100); padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
 .sort-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
 .sort-row .chip { padding: 1px 9px; border-radius: var(--radius-pill); background: var(--marigold-100); color: var(--marigold-800); outline: 1px dashed var(--marigold-600); font-size: 12px; }

@@ -64,7 +64,14 @@ describe("focus API", () => {
   }
 
   it("improveBullet accepts a request for more detail", async () => {
-    fetchMock.mockResolvedValue(Response.json({ needsDetail: true }));
-    await expect(improveBullet({ roleId: "r1", bulletId: "b1", fingerprint: "saved-1" })).resolves.toEqual({ needsDetail: true });
+    fetchMock.mockResolvedValue(Response.json({ needsDetail: true, nextQuestion: null }));
+    await expect(improveBullet({ roleId: "r1", bulletId: "b1", fingerprint: "saved-1" })).resolves.toEqual({ needsDetail: true, nextQuestion: null });
+  });
+
+  it("brainDump sends role answers as its optional source", async () => {
+    fetchMock.mockResolvedValue(Response.json({ proposals: [], roleBefore: null, roleAfterAll: null }));
+    await brainDump({ roleId: "r1", fingerprint: "saved-1", source: "answers" });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ roleId: "r1", fingerprint: "saved-1", source: "answers" });
   });
 });

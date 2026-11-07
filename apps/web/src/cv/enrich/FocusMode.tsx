@@ -88,7 +88,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  const stepKey = `${step.kind}:${"bulletId" in step ? step.bulletId : ""}`;
+  const stepKey = `${step.kind}:${"bulletId" in step ? step.bulletId : ""}:${"index" in step ? step.index : "asked" in step ? step.asked : ""}`;
   useEffect(() => {
     if (SELF_FOCUSING.has(step.kind)) return;
     const frame = requestAnimationFrame(() => {
@@ -104,17 +104,19 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
   if (!role) return null;
   const name = roleName(role, "experience");
   const entry = scores.get(role.id);
-  const result = entry?.result;
-  const fresh = entry?.state === "ready" && result?.fingerprint === fingerprint(role, cv.locale);
+  const result = entry?.state === "ready" && entry.result?.fingerprint === fingerprint(role, cv.locale)
+    ? entry.result : session.result ?? entry?.result;
+  const fresh = result?.fingerprint === fingerprint(role, cv.locale);
   const roleScore = fresh ? (result?.score ?? null) : (known ?? result?.score ?? null);
   const grades = new Map(result?.bullets.map((b) => [b.id, b.score]));
   const scoreOf = (id: string) => (fresh ? grades.get(id) : (accepted.get(id) ?? grades.get(id)));
-  const currentId = "bulletId" in step ? step.bulletId : step.kind === "celebrate" ? undefined : queue[position];
+  const currentId = "bulletId" in step ? step.bulletId : step.kind === "celebrate" || step.kind === "role" ? undefined : queue[position];
   const dumping = DUMP_KINDS.has(step.kind) || (step.kind === "scoring" && step.source === "dump");
   const dates = formatRange(role.startDate, role.endDate, role.current, cv.locale);
 
   const proposalText = step.kind === "proposal" ? role.bullets.find((b) => b.id === step.bulletId)?.text ?? "" : "";
-  const inQueue = !dumping && step.kind !== "roleDone" && queue.length > 0;
+  const inQueue = !dumping && step.kind !== "roleDone" && step.kind !== "role"
+    && !(step.kind === "scoring" && step.source === "opening") && queue.length > 0;
   const asking = step.kind === "question" && step.question !== null;
 
   return createPortal(
@@ -173,10 +175,19 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
             </p>
           </>
         )}
+        {step.kind === "role" && (
+          <>
+            <p className="fm-eyebrow">{t("enrich.focus.roleEyebrow", { n: step.index + 1, total: session.roleQuestions.length })}</p>
+            <QuestionStep key={stepKey} question={session.roleQuestions[step.index]!} needsDetail={false}
+              locale={cv.locale} busy={busy} onSubmit={session.submitAnswer} onSkip={session.skip} onFreeTalk={session.freeTalk} />
+          </>
+        )}
 
         {(step.kind === "brainDump" || step.kind === "dumpWorking" || step.kind === "dumpEmpty") && (
           <BrainDumpStep
             roleId={role.id}
+            title={role.title}
+            company={role.company}
             value={dump.value}
             via={dump.via}
             onChange={(value, via) => setDump({ value, via })}
@@ -191,17 +202,17 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
         {step.kind === "dumpPick" && (
           <DumpPickStep proposals={step.proposals} roleAfterAll={step.roleAfterAll} busy={busy} onAdd={session.addSelected} />
         )}
-        {step.kind === "scoring" && <Working text={t(step.source === "dump" ? "enrich.focus.dump.scoring" : "enrich.focus.scoring")} />}
+        {step.kind === "scoring" && <Working text={t(step.source === "dump" ? "enrich.focus.dump.scoring" : step.source === "opening" ? "enrich.focus.loading" : "enrich.focus.scoring")} />}
         {(step.kind === "question" || step.kind === "needsDetail") && (
           <QuestionStep
             key={stepKey}
-            bulletId={step.bulletId}
             question={step.question}
             needsDetail={step.kind === "needsDetail"}
             locale={cv.locale}
             busy={busy}
             onSubmit={session.submitAnswer}
             onSkip={session.skip}
+            onFreeTalk={session.freeTalk}
           />
         )}
         {step.kind === "working" && <Working text={t("enrich.focus.working")} />}

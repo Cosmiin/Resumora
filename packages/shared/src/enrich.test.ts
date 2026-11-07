@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EnrichParseError,
   MAX_QUESTIONS,
+  ModelScoreSchema,
   RoleResultSchema,
   SCORE_POLICY,
   band,
@@ -19,6 +20,7 @@ import {
   type ModelScore,
 } from "./enrich.ts";
 import type { Experience } from "./cv.ts";
+import { mergeGrades } from "./enrich-focus.ts";
 
 const g = (a: Grade, b: Grade, c: Grade, d: Grade) => ({
   contribution: a,
@@ -57,11 +59,11 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
   };
 }
 
-const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId });
+const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [] });
 
 describe("bulletScore", () => {
-  it("uses policy score/2", () => {
-    expect(SCORE_POLICY).toBe("score/2");
+  it("uses policy score/3", () => {
+    expect(SCORE_POLICY).toBe("score/3");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -104,6 +106,38 @@ describe("isAllowedOption", () => {
 });
 
 describe("buildRoleResult", () => {
+  it("parses a stored score/2 row without role questions", () => {
+    const stored = {
+      roleId: "r1", policy: "score/2", fingerprint: "old", score: null,
+      bullets: [], nextStep: null, questions: [],
+    };
+    expect(RoleResultSchema.parse(stored)).toEqual({ ...stored, roleQuestions: [] });
+  });
+
+  it("keeps at most three role questions, with ids and allowed options", () => {
+    const roleQuestions = [
+      { text: "Did anyone report to you?", options: ["No", "Managed 37 people", "20+"] },
+      { text: "Which tools did you use?", options: ["Excel", "SAP", "Workday"] },
+      { text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"] },
+      { text: "Who did you work with?", options: ["Finance", "HR", "Vendors"] },
+    ];
+    const result = buildRoleResult(role([]), { ...model([]), roleQuestions }, "fp");
+    expect(result.roleQuestions).toEqual([
+      { id: "rq1", text: "Did anyone report to you?", options: ["No", "20+"], kind: "role" },
+      { id: "rq2", ...roleQuestions[1], kind: "role" },
+      { id: "rq3", ...roleQuestions[2], kind: "role" },
+    ]);
+    expect(RoleResultSchema.parse(result)).toEqual(result);
+    expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions }).success).toBe(false);
+    expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions: roleQuestions.slice(0, 3) }).success).toBe(true);
+  });
+
+  it("builds bullet-only grade results without role questions", () => {
+    const grades = { bullets: [mb("b1")], nextStepId: null };
+    expect(buildRoleResult(role(["Prepared payroll files"]), grades, "fp").roleQuestions).toEqual([]);
+    expect(ModelScoreSchema.parse(grades).roleQuestions).toEqual([]);
+  });
+
   it("carries the role id", () => {
     expect(buildRoleResult(role(["Led a team"]), model([mb("b1")]), "fp").roleId).toBe("r1");
   });
@@ -261,6 +295,20 @@ describe("buildRoleResult", () => {
     expect(() => buildRoleResult(role(["a1"]), model([mb("zz")]), "fp")).toThrow(EnrichParseError);
     expect(() => buildRoleResult(role(["a1", "a2"]), model([mb("b1")]), "fp")).toThrow(EnrichParseError);
     expect(() => buildRoleResult(role(["a1"]), model([mb("b1"), mb("b1")]), "fp")).toThrow(EnrichParseError);
+  });
+});
+
+describe("mergeGrades role questions", () => {
+  it("preserves stored role questions and their ids when a bullet is re-graded", () => {
+    const r = role(["Prepared payroll files"]);
+    const stored = buildRoleResult(r, model([mb("b1")]), "old");
+    stored.roleQuestions = [{ id: "rq2", text: "Who did you report to?", options: ["The CEO", "The owner"], kind: "role" }];
+    const result = mergeGrades(r, stored, [mb("b1", { impact: "missing", issue: "impact" })], "new");
+    expect(result.roleQuestions).toEqual([
+      { id: "rq2", text: "Who did you report to?", options: ["The CEO", "The owner"], kind: "role" },
+    ]);
+    expect(result.score).toBe(80);
+    expect(result.fingerprint).toBe("new");
   });
 });
 

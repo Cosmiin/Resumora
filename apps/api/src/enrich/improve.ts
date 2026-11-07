@@ -1,4 +1,4 @@
-import { fingerprint, mergeGrades, repeatKey, type ImproveAnswer } from "@resumora/shared";
+import { fingerprint, isAllowedOption, mergeGrades, repeatKey, type ImproveAnswer } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
@@ -6,7 +6,10 @@ import { improveBulletSystemPrompt, improveBulletUserMessage } from "./focus-pro
 import { checkProposal, squash } from "./rewrite.ts";
 import { aiError, gradeBullets, scoreRole, type ScoreDeps } from "./score.ts";
 
-const ImproveSchema = z.object({ text: z.string().nullable() });
+const ImproveSchema = z.object({
+  text: z.string().nullable(),
+  nextQuestion: z.object({ text: z.string(), options: z.array(z.string().max(60)).max(4) }).nullable(),
+});
 
 export async function improveBullet(
   deps: ScoreDeps,
@@ -33,11 +36,16 @@ export async function improveBullet(
       user: improveBulletUserMessage(role, input.bulletId),
       maxOutputTokens: 600,
     });
-    if (answer.text === null) return { needsDetail: true };
+    const question = answer.nextQuestion;
+    const nextQuestion = question && !role.notes.some((n) =>
+      n.question.trim().toLowerCase() === question.text.trim().toLowerCase())
+      ? { text: question.text, options: question.options.filter(isAllowedOption) }
+      : null;
+    if (answer.text === null) return { needsDetail: true, nextQuestion };
     const text = squash(answer.text);
     if (checkProposal(role, input.bulletId, text) !== "ok" ||
       role.bullets.some((b) => b.id !== input.bulletId && repeatKey(b.text) === repeatKey(text))) {
-      return { needsDetail: true };
+      return { needsDetail: true, nextQuestion };
     }
 
     const swapped = { ...role, bullets: role.bullets.map((b) => b.id === input.bulletId ? { ...b, text } : b) };
@@ -47,11 +55,11 @@ export async function improveBullet(
       swapped.bullets.find((b) => b.id === input.bulletId)!,
     ] };
     const graded = await gradeBullets(deps, gradingRole, content.locale, [input.bulletId]);
-    if (graded[0]!.duplicateOf !== null || graded[0]!.meaningful === false) return { needsDetail: true };
+    if (graded[0]!.duplicateOf !== null || graded[0]!.meaningful === false) return { needsDetail: true, nextQuestion };
     const predicted = mergeGrades(swapped, before, graded, fingerprint(swapped, content.locale));
     const bulletBefore = before.bullets.find((b) => b.id === input.bulletId)!.score;
     const after = predicted.bullets.find((b) => b.id === input.bulletId)!.score;
-    if (after <= bulletBefore) return { needsDetail: true };
+    if (after <= bulletBefore) return { needsDetail: true, nextQuestion };
 
     const cached = !before.bullets.some((b) => b.id !== input.bulletId && b.issue === "duplicate");
     if (cached) {

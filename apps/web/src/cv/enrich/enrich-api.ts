@@ -29,7 +29,7 @@ export function improveBullet(input: { roleId: string; bulletId: string; fingerp
   return apiFetch("/v1/enrich/improve-bullet", { method: "POST", json: input, schema: ImproveAnswerSchema });
 }
 
-export function brainDump(input: { roleId: string; fingerprint: string }): Promise<BrainDumpAnswer> {
+export function brainDump(input: { roleId: string; fingerprint: string; source?: "answers" }): Promise<BrainDumpAnswer> {
   return apiFetch("/v1/enrich/brain-dump", { method: "POST", json: input, schema: BrainDumpAnswerSchema });
 }
 

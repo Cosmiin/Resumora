@@ -32,7 +32,7 @@ function role(n: number, texts: string[] = ["Ran the weekly rota", "Cut waiting 
 const cvOf = (...roles: Experience[]): CvContent => ({ ...emptyCv(), experience: roles });
 const print = (r: Experience) => fingerprint(r, "en");
 function result(r: Experience, score: number | null = 80, fp = print(r)): RoleResult {
-  return { roleId: r.id, policy: "score/2", fingerprint: fp, score, bullets: [], nextStep: null, questions: [] };
+  return { roleId: r.id, policy: "score/2", fingerprint: fp, score, bullets: [], nextStep: null, questions: [], roleQuestions: [] };
 }
 const conflict = () => new ApiClientError(409, "not_saved", "not saved");
 

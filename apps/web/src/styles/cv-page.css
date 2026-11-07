@@ -150,3 +150,13 @@
   .cv-role-desc.is-empty { opacity: 0.55; }
 }
 
+
+/* Editor scores stay beside the title; dates retain the remaining row space. */
+.cv-role .cv-item-head { justify-content: flex-start; }
+.cv-role .cv-item-head > input:first-child { flex: 0 1 auto; }
+.cv-role .cv-item-head > .cv-role-dates { margin-inline-start: auto; }
+.cv-role .score-pill { position: static; flex: none; margin: 0; }
+
+@media print {
+  .no-print { display: none !important; }
+}

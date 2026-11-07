@@ -1,25 +1,26 @@
 import { useState } from "react";
-import type { Locale, Question } from "@resumora/shared";
+import { isAllowedOption, type Locale, type Question, type RoleQuestion } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { AnswerBox, type Via } from "./AnswerBox.tsx";
 
 type Props = {
-  bulletId: string;
-  /** The bullet's stored question, or null for the free "anything else?" box. */
-  question: Question | null;
+  question: Question | RoleQuestion;
   needsDetail: boolean;
   locale: Locale;
   busy: boolean;
   onSubmit(text: string, via: Via[]): void;
   onSkip(): void;
+  onFreeTalk(): void;
 };
 
 /** One question about the current bullet; the answer turns into a proposal right away. */
-export function QuestionStep({ bulletId, question, needsDetail, locale, busy, onSubmit, onSkip }: Props) {
+export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, onSkip, onFreeTalk }: Props) {
   const [value, setValue] = useState("");
   const [via, setVia] = useState<Via[]>([]);
   const [voiceBusy, setVoiceBusy] = useState(false);
-  const asked: Question = question ?? { bulletId, text: t("enrich.focus.followUpQuestion"), options: [], kind: "detail" };
+  const options = question.options.filter((o) => o.length <= 60 && isAllowedOption(o)).slice(0, 4);
+  const asked: Question = { ...question, bulletId: "bulletId" in question ? question.bulletId : question.id,
+    kind: question.kind === "role" ? "detail" : question.kind, options: options.length >= 2 ? options : [] };
 
   return (
     <>
@@ -27,7 +28,6 @@ export function QuestionStep({ bulletId, question, needsDetail, locale, busy, on
       <h2 className="fm-q" id="fm-step-title">{asked.text}</h2>
       <AnswerBox
         question={asked}
-        plain={question === null}
         value={value}
         via={via}
         onChange={(v, how) => {
@@ -35,9 +35,11 @@ export function QuestionStep({ bulletId, question, needsDetail, locale, busy, on
           setVia(how);
         }}
         locale={locale}
-        placeholder={question ? undefined : t("enrich.focus.followUpPlaceholder")}
         onBusyChange={setVoiceBusy}
       />
+      <button type="button" className="fm-ghost fm-free-talk" onClick={onFreeTalk} disabled={busy}>
+        {t("enrich.focus.freeTalk")}
+      </button>
       <div className="fm-foot">
         <button type="button" className="fm-ghost" onClick={onSkip} disabled={busy}>
           {t("enrich.focus.skip")}
@@ -48,7 +50,7 @@ export function QuestionStep({ bulletId, question, needsDetail, locale, busy, on
           disabled={busy || voiceBusy || value.trim() === ""}
           onClick={() => onSubmit(value, via)}
         >
-          {t("enrich.focus.improve")}
+          {t(question.kind === "role" ? "enrich.focus.continue" : "enrich.focus.improve")}
         </button>
       </div>
     </>

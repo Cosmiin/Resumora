@@ -23,6 +23,7 @@ const RoleBody = z.object({ roleId: z.string().min(1).max(64) });
 
 const ScoreBody = z.object({ roleId: z.string().min(1).max(64), fingerprint: z.string().min(1).max(64) });
 const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
+const BrainDumpBody = ScoreBody.extend({ source: z.enum(["ramble", "answers"]).default("ramble") });
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */
 const MAX_BODY_BYTES = 16 * 1024;
@@ -76,7 +77,7 @@ export function enrichRoutes(deps: {
   });
 
   app.post("/brain-dump", async (c) => {
-    const body = ScoreBody.safeParse(await c.req.json().catch(() => null));
+    const body = BrainDumpBody.safeParse(await c.req.json().catch(() => null));
     if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
     const user = c.get("user");
     try {

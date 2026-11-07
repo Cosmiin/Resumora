@@ -8,6 +8,7 @@ import { scoreRole } from "./score.ts";
 
 const headers = { authorization: "Bearer user-a", "content-type": "application/json" };
 const proposal = "Prepared payroll files for staff.";
+const nextQuestion = { text: "Which tools did you use?", options: ["Excel", "SAP", "Something with 12 users"] };
 let role: Experience;
 let cv: ReturnType<typeof memoryCvRepo>;
 let insights: ReturnType<typeof memoryInsightsRepo>;
@@ -26,9 +27,9 @@ async function save() {
   await insights.put(role.id, buildRoleResult(role, initial, fingerprint(role, "en")));
 }
 
-function answer(text: string | null) {
+function answer(text: string | null, nextQuestion: { text: string; options: string[] } | null = null) {
   let calls = 0;
-  model = fakeModel(() => calls++ === 0 ? { text } : grade);
+  model = fakeModel(() => calls++ === 0 ? { text, nextQuestion } : grade);
 }
 
 beforeEach(async () => {
@@ -64,6 +65,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("POST /v1/enrich/improve-bullet", () => {
   it("offers a better bullet and promotes its prediction after saving without another model call", async () => {
+    answer(proposal, nextQuestion);
     const saved = await cv.get();
     const res = await post();
     expect(res.status).toBe(200);
@@ -85,6 +87,47 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(model.logged.every((entry) => entry.userId === "user-a")).toBe(true);
   });
 
+  it("returns the model's next question with unsafe options removed when no rewrite is possible", async () => {
+    answer(null, nextQuestion);
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(ImproveAnswerSchema.parse(await res.json())).toEqual({
+      needsDetail: true, nextQuestion: { ...nextQuestion, options: ["Excel", "SAP"] },
+    });
+    expect(model.requests).toHaveLength(1);
+  });
+
+  it.each(["equal", "lower", "duplicate", "not meaningful", "invalid"])(
+    "keeps the model's next question when a proposal is %s", async (kind) => {
+      answer(kind === "invalid" ? "Prepared payroll for 999 staff." : proposal, nextQuestion);
+      if (kind === "equal" || kind === "lower") {
+        grade = { ...initial, bullets: [{ ...initial.bullets[0]!,
+          ...(kind === "lower" ? { contribution: "missing" as const } : {}),
+        }] };
+      } else if (kind === "duplicate") grade.bullets[0]!.duplicateOf = role.bullets[1]!.id;
+      else if (kind === "not meaningful") grade.bullets[0]!.meaningful = false;
+      const res = await post();
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        needsDetail: true, nextQuestion: { ...nextQuestion, options: ["Excel", "SAP"] },
+      });
+      expect(await insights.pending(role.id)).toEqual([]);
+    },
+  );
+
+  it.each([nextQuestion.text, "  WHICH TOOLS DID YOU USE?  "])(
+    "suppresses a next question already present in any role note: %s", async (question) => {
+      role.notes = [
+        { id: "n1", question: "Who did you report to?", answer: "CEO", via: ["type"], askedAt: "2026-11-05T10:00:00.000Z" },
+        { id: "n2", question, answer: "Excel", via: ["pick"], askedAt: "2026-11-05T11:00:00.000Z" },
+      ];
+      await save();
+      answer(null, { ...nextQuestion, text: " " + nextQuestion.text + " " });
+      expect(await (await post()).json()).toEqual({ needsDetail: true, nextQuestion: null });
+      expect(model.requests).toHaveLength(1);
+    },
+  );
+
   it("grades the target last without changing the saved or cached bullet order", async () => {
     expect((await post()).status).toBe(200);
     const messages = model.requests[1]!.messages as { role: string; content: string }[];
@@ -105,7 +148,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
       : { meaningful: false });
     const res = await post();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ needsDetail: true });
+    expect(await res.json()).toEqual({ needsDetail: true, nextQuestion: null });
     expect(model.requests).toHaveLength(2);
     expect(await insights.pending(role.id)).toEqual([]);
   });
@@ -113,7 +156,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
   it.each([proposal, null])("copies the saved CV once before any model call, including needsDetail: %s", async (text) => {
     await insights.remove([role.id]);
     const snapshot = vi.spyOn(cv, "snapshot");
-    const answers = [initial, { text }, grade];
+    const answers = [initial, { text, nextQuestion: null }, grade];
     model = fakeModel(() => {
       expect(snapshot).toHaveBeenCalledExactlyOnceWith("ai");
       return answers.shift();
@@ -126,19 +169,19 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(history).toHaveLength(1);
     expect(history[0]!.reason).toBe("ai");
     expect((await cv.getHistory(history[0]!.id))?.content).toEqual(saved.content);
-    expect(await res.json()).toMatchObject(text === null ? { needsDetail: true } : { cached: true });
+    expect(await res.json()).toMatchObject(text === null ? { needsDetail: true, nextQuestion: null } : { cached: true });
   });
 
   it.each(["equal", "lower"])("needs detail for an %s grade and stores no prediction", async (kind) => {
     grade = { ...initial, bullets: [{ ...initial.bullets[0]!, ...(kind === "lower" ? { contribution: "missing" as const } : {}) }] };
-    expect(await (await post()).json()).toEqual({ needsDetail: true });
+    expect(await (await post()).json()).toEqual({ needsDetail: true, nextQuestion: null });
     expect(model.requests).toHaveLength(2);
     expect(await insights.pending(role.id)).toEqual([]);
   });
 
   it("needs detail for null without asking the scorer", async () => {
     answer(null);
-    expect(await (await post()).json()).toEqual({ needsDetail: true });
+    expect(await (await post()).json()).toEqual({ needsDetail: true, nextQuestion: null });
     expect(model.requests).toHaveLength(1);
     expect(await insights.pending(role.id)).toEqual([]);
   });
@@ -146,7 +189,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
   it.each(["Prepared payroll for 999 staff.", "", "Helped with payroll.", "Prepared " + "payroll ".repeat(32)])(
     "rejects an unsupported number, blank, unchanged or overlong proposal: %s", async (text) => {
       answer(text);
-      expect(await (await post()).json()).toEqual({ needsDetail: true });
+      expect(await (await post()).json()).toEqual({ needsDetail: true, nextQuestion: null });
       expect(model.requests).toHaveLength(1);
       expect(await insights.pending(role.id)).toEqual([]);
     },
@@ -179,7 +222,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
 
   it("rejects a repeat of another bullet with different case and spacing", async () => {
     answer("  CHECKED   employment contracts.  ");
-    expect(await (await post()).json()).toEqual({ needsDetail: true });
+    expect(await (await post()).json()).toEqual({ needsDetail: true, nextQuestion: null });
     expect(model.requests).toHaveLength(1);
     expect(await insights.pending(role.id)).toEqual([]);
   });
@@ -196,7 +239,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
 
   it("scores an uncached saved role before rewriting", async () => {
     await insights.remove([role.id]);
-    const answers = [initial, { text: proposal }, grade];
+    const answers = [initial, { text: proposal, nextQuestion: null }, grade];
     model = fakeModel(() => answers.shift());
     expect(await (await post()).json()).toMatchObject({ bulletBefore: 43, bulletAfter: 80 });
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_score", "enrich_improve_bullet", "enrich_score"]);

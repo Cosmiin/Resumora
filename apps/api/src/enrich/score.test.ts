@@ -13,7 +13,7 @@ vi.mock("../ai/call-model.ts", async (importOriginal) => {
     },
   };
 });
-import { SCORE_POLICY, buildRoleResult, emptyCv, fingerprint, type CvContent, type Experience } from "@resumora/shared";
+import { RoleResultSchema, SCORE_POLICY, buildRoleResult, emptyCv, fingerprint, type CvContent, type Experience } from "@resumora/shared";
 import { ApiError } from "../errors.ts";
 import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { memoryInsightsRepo } from "./memory-repo.ts";
@@ -41,6 +41,37 @@ const run = (model: ReturnType<typeof fakeModel>, role: Experience, sent = fp(ro
   scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: sent });
 
 describe("scoreRole", () => {
+  it.each(["cached", "pending", "fresh"])("drops answered role questions from %s results without changing the fingerprint", async (source) => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    const answer = {
+      ...allSpecific(role),
+      roleQuestions: [
+        { text: "  Which tools did you use?  ", options: ["Excel", "SAP", "Workday"] },
+        { text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"] },
+      ],
+    };
+    const stored = buildRoleResult(role, answer, fp(role));
+    if (source === "cached") await insights.put(role.id, stored);
+    if (source === "pending") {
+      await insights.put(role.id, { ...stored, fingerprint: "old" });
+      await insights.putPending(role.id, stored);
+    }
+    role.notes.push({ id: "n1", question: "  WHICH TOOLS DID YOU USE?  ", answer: "SAP", via: ["type"], askedAt: "2026-11-06T00:00:00Z" });
+    await save(role);
+    expect(fp(role)).toBe(stored.fingerprint);
+    const model = fakeModel(() => answer);
+    const result = await run(model, role);
+    expect(result.roleQuestions).toEqual([
+      { id: "rq2", text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"], kind: "role" },
+    ]);
+    expect(result.fingerprint).toBe(stored.fingerprint);
+    role.notes.push({ id: "n2", question: "who did you report to?", answer: "The CEO", via: ["type"], askedAt: "2026-11-06T00:01:00Z" });
+    await save(role);
+    expect((await run(model, role)).roleQuestions).toEqual([]);
+    expect(model.requests).toHaveLength(source === "fresh" ? 1 : 0);
+  });
+
   it("asks the model once for a missing row and stores the result", async () => {
     const role = roleWith(["Prepared employment contracts for temporary workers."]);
     await save(role);
@@ -100,13 +131,19 @@ describe("scoreRole", () => {
     expect(model.requests).toHaveLength(1);
   });
 
-  it("asks again when the cached row is from another policy", async () => {
+  it("re-grades a stored score/2 row once", async () => {
     const role = roleWith(["Prepared payroll files."]);
     await save(role);
     const old = await run(fakeModel(() => allSpecific(role)), role);
-    await insights.put(role.id, { ...old, policy: "score/0" });
+    const stored = {
+      roleId: role.id, policy: "score/2", fingerprint: old.fingerprint, score: old.score,
+      bullets: old.bullets, nextStep: old.nextStep, questions: old.questions,
+    };
+    await insights.put(role.id, RoleResultSchema.parse(stored));
     const model = fakeModel(() => allSpecific(role));
-    expect((await run(model, role)).policy).toBe(SCORE_POLICY);
+    const result = await run(model, role);
+    expect(result.policy).toBe("score/3");
+    expect(await run(model, role)).toEqual(result);
     expect(model.requests).toHaveLength(1);
   });
 
@@ -126,13 +163,30 @@ describe("scoreRole", () => {
     await expect(failure).rejects.toMatchObject({ status: 409, code: "not_saved" });
   });
 
-  it("a role with no bullets has a null score and no call", async () => {
+  it("scores and stores role questions for a role with no bullets", async () => {
     const role = roleWith([]);
     await save(role);
-    const model = fakeModel(() => ({}));
+    const model = fakeModel(() => ({
+      ...allSpecific(role),
+      roleQuestions: [
+        { text: "Which tools did you use?", options: ["Excel", "SAP", "Workday"] },
+        { text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"] },
+      ],
+    }));
     const result = await run(model, role);
-    expect(result.score).toBeNull();
-    expect(model.requests).toHaveLength(0);
+    expect(result).toMatchObject({
+      score: null, bullets: [], nextStep: null, questions: [],
+      roleQuestions: [
+        { id: "rq1", text: "Which tools did you use?", options: ["Excel", "SAP", "Workday"], kind: "role" },
+        { id: "rq2", text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"], kind: "role" },
+      ],
+    });
+    expect(model.requests).toHaveLength(1);
+    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 600 });
+    expect(JSON.stringify(model.requests[0]?.messages)).toContain("[]");
+    expect(await insights.get(role.id)).toEqual(result);
+    expect(await run(model, role)).toEqual(result);
+    expect(model.requests).toHaveLength(1);
   });
 
   it("502 and nothing stored when the model grades an id that was not sent or skips one", async () => {
@@ -234,6 +288,32 @@ describe("gradeBullets", () => {
 });
 
 describe("score prompt", () => {
+  it("prioritizes the seven topics and limits role questions to the first four", () => {
+    const prompt = scoreSystemPrompt("en");
+    const topics = ["| Tools |", "| Reporting line |", "| Leading people |", "| Who they worked with |", "| Processes |", "| Scope |", "| Results |"];
+    let previous = -1;
+    for (const topic of topics) {
+      const position = prompt.indexOf(topic);
+      expect(position).toBeGreaterThan(previous);
+      previous = position;
+    }
+    expect(prompt).toContain("Role questions ask only about tools, reporting line, leading people and who they worked with.");
+  });
+
+  it("requires options for every question and avoids facts already answered", () => {
+    const prompt = scoreSystemPrompt("en");
+    expect(prompt).toContain("3–4 options for every question");
+    expect(prompt).toContain("Never ask about something the CV or the notes already answer.");
+    expect(prompt).not.toContain("Use an empty list when the question is open");
+  });
+
+  it("includes the role's notes so known facts are not asked again", () => {
+    const role = roleWith([], {
+      notes: [{ id: "n1", question: "Which tools did you use?", answer: "SAP", via: ["type"], askedAt: "2026-11-06T00:00:00Z" }],
+    });
+    expect(scoreUserMessage(role)).toContain(JSON.stringify({ question: "Which tools did you use?", answer: "SAP" }));
+  });
+
   it("sends title and description as context and every bullet as { id, text }, with no company or dates", () => {
     const role = roleWith(["First", "Second"], { company: "Secret Corp", startDate: "2019-03" });
     const message = scoreUserMessage(role);

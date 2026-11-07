@@ -3,10 +3,10 @@ import { BRAIN_DUMP_QUESTION, MAX_LONG_TEXT, type Locale, type Question } from "
 import { t } from "../../i18n/t.ts";
 import { AnswerBox, type Via } from "./AnswerBox.tsx";
 
-const PROMPTS = ["enrich.focus.dump.prompt1", "enrich.focus.dump.prompt2", "enrich.focus.dump.prompt3", "enrich.focus.dump.prompt4"] as const;
-
 type DumpProps = {
   roleId: string;
+  title: string;
+  company: string;
   /** Kept by the caller, so the ramble survives a failed call. */
   value: string;
   via: Via[];
@@ -21,18 +21,28 @@ type DumpProps = {
 };
 
 /** "Tell us more": a ramble, typed or spoken, that becomes new bullets. */
-export function BrainDumpStep({ roleId, value, via, onChange, locale, working, empty, busy, onSubmit, onSkip }: DumpProps) {
+export function BrainDumpStep({ roleId, title, company, value, via, onChange, locale, working, empty, busy, onSubmit, onSkip }: DumpProps) {
   const [voiceBusy, setVoiceBusy] = useState(false);
+  title = title.trim();
+  company = company.trim();
   const question: Question = { bulletId: roleId, text: BRAIN_DUMP_QUESTION, options: [], kind: "detail" };
+  const prompts = [
+    t(title ? "enrich.focus.dump.prompt1" : "enrich.focus.dump.prompt1Fallback", { title }),
+    t(company ? "enrich.focus.dump.prompt2" : "enrich.focus.dump.prompt2Fallback", { company }),
+    t("enrich.focus.dump.prompt3"),
+    t("enrich.focus.dump.prompt4"),
+  ];
 
   return (
     <div className="fm-dump">
       <p className="fm-eyebrow">{t("enrich.focus.dump.eyebrow")}</p>
-      <h2 className="fm-q is-big" id="fm-step-title">{t("enrich.focus.dump.question")}</h2>
+      <h2 className="fm-q is-big" id="fm-step-title">
+        {t(title && company ? "enrich.focus.dump.question" : "enrich.focus.dump.questionFallback", { title, company })}
+      </h2>
       <p className="fm-hint">{t("enrich.focus.dump.hint")}</p>
       <ul className="fm-prompts">
-        {PROMPTS.map((k) => (
-          <li key={k}>{t(k)}</li>
+        {prompts.map((prompt) => (
+          <li key={prompt}>{prompt}</li>
         ))}
       </ul>
       <AnswerBox

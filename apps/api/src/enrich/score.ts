@@ -47,7 +47,8 @@ const notSaved = () => new ApiError(409, "not_saved", "Your latest changes aren'
 
 /**
  * Scores one role of the saved CV. A cached result for the same fingerprint and policy is returned
- * as it is; otherwise the model grades the bullets and the app computes the numbers.
+ * without another model call; otherwise the model grades the bullets and the app computes the numbers.
+ * Role questions already answered in the role notes are omitted.
  * Also removes cached rows for roles that are no longer in the saved CV.
  */
 export async function scoreRole(
@@ -63,31 +64,30 @@ export async function scoreRole(
   if (!role || fingerprint(role, content.locale) !== input.fingerprint) throw notSaved();
 
   const cached = await deps.insights.get(role.id);
-  if (cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY) return cached;
-
-  const pending = (await deps.insights.pending(role.id)).find((entry) => entry.fingerprint === input.fingerprint && entry.result.policy === SCORE_POLICY);
-  if (pending) {
-    await deps.insights.put(role.id, pending.result);
-    return pending.result;
-  }
-
-  // No bullets: nothing to grade. The null-score result is cheap to rebuild, so it is not stored.
-  if (role.bullets.length === 0) return buildRoleResult(role, { bullets: [], nextStepId: null }, input.fingerprint);
-
   let result: RoleResult;
-  try {
-    const answer = await callModel(deps.model, {
-      userId: deps.userId,
-      task: "enrich_score",
-      schema: ModelScoreSchema,
-      system: scoreSystemPrompt(content.locale),
-      user: scoreUserMessage(role),
-      maxOutputTokens: Math.min(4000, 600 + 180 * role.bullets.length),
-    });
-    result = buildRoleResult(role, answer, input.fingerprint);
-  } catch (err) {
-    aiError(err);
+  if (cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY) {
+    result = cached;
+  } else {
+    const pending = (await deps.insights.pending(role.id)).find((entry) => entry.fingerprint === input.fingerprint && entry.result.policy === SCORE_POLICY);
+    if (pending) {
+      result = pending.result;
+    } else {
+      try {
+        const answer = await callModel(deps.model, {
+          userId: deps.userId,
+          task: "enrich_score",
+          schema: ModelScoreSchema,
+          system: scoreSystemPrompt(content.locale),
+          user: scoreUserMessage(role),
+          maxOutputTokens: Math.min(4000, 600 + 180 * role.bullets.length),
+        });
+        result = buildRoleResult(role, answer, input.fingerprint);
+      } catch (err) {
+        aiError(err);
+      }
+    }
+    await deps.insights.put(role.id, result);
   }
-  await deps.insights.put(role.id, result);
-  return result;
+  const answered = new Set(role.notes.map((note) => note.question.trim().toLowerCase()));
+  return { ...result, roleQuestions: result.roleQuestions.filter((q) => !answered.has(q.text.trim().toLowerCase())) };
 }

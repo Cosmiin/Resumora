@@ -91,9 +91,9 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, s
 
   return (
     <div className="cv-line cv-role" data-item={itemId} ref={root} role="group" aria-label={name}>
-      {score && <ScorePill roleId={itemId} state={score} onOpen={openRole} />}
       <div className="cv-item-head">
         {field("title", "edit.role.title", "edit.role.titlePlaceholder", "cv-item-title")}
+        {score && <ScorePill roleId={itemId} state={score} onOpen={openRole} />}
         <span className="cv-item-dates cv-role-dates">
           <ItemDate
             list={list}

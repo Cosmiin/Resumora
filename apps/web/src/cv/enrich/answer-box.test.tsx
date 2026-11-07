@@ -13,7 +13,7 @@ const rt = vi.hoisted(() => ({ openTranscription: vi.fn() }));
 vi.mock("./realtime.ts", () => rt);
 
 import { AnswerBox, type Via } from "./AnswerBox.tsx";
-import { useVoice } from "./useVoice.ts";
+import { latinOnly, useVoice } from "./useVoice.ts";
 
 const question: Question = {
   bulletId: "b1",
@@ -64,13 +64,13 @@ function setMediaDevices(value: unknown) {
 
 const box = () => screen.getByRole("textbox", { name: "Your answer" });
 const micButton = () => screen.queryByRole("button", { name: /Answer by speaking|Stop recording/ });
-const NOTICE = "Your voice goes to OpenAI to be turned into text. We don't keep the recording.";
 const STOPPED = "Voice stopped. Try again, or type or pick.";
 
 beforeEach(() => {
   vi.useFakeTimers();
   localStorage.clear();
   vi.clearAllMocks();
+  vi.stubGlobal("matchMedia", vi.fn((media: string) => ({ matches: false, media, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
   getUserMedia.mockResolvedValue(stream);
   setMediaDevices({ getUserMedia });
   api.createVoiceSession.mockResolvedValue({ clientSecret: "ek_test", expiresAt: "2026-11-05T10:00:00.000Z", model: "gpt-4o-mini-transcribe" });
@@ -80,7 +80,18 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   setMediaDevices(undefined);
+});
+
+describe("latinOnly", () => {
+  it.each([
+    ["Am lucrat cu ăâîșț, 50%.", "Am lucrat cu ăâîșț, 50%."],
+    ["어 Yeah 비 helping", "Yeah helping"],
+    ["어 비", ""],
+  ])("filters %s", (text, expected) => {
+    expect(latinOnly(text)).toBe(expected);
+  });
 });
 
 describe("AnswerBox: speaking", () => {
@@ -99,9 +110,10 @@ describe("AnswerBox: speaking", () => {
 
     act(() => t.emit({ type: "partial", itemId: "i1", text: "about forty" }));
     act(() => t.emit({ type: "partial", itemId: "i1", text: " a week" }));
-    const live = screen.getByText("about forty a week");
+    const live = document.querySelector(".answer-partial");
+    expect(live).toHaveTextContent("about forty a week");
     expect(live).toHaveClass("answer-partial");
-    expect(live.closest("[aria-live='polite']")).not.toBeNull();
+    expect(live?.closest("[aria-live='polite']")).not.toBeNull();
     expect(box()).toHaveValue("Customs papers");
 
     act(() => t.emit({ type: "final", itemId: "i1", text: "About forty a week." }));
@@ -162,7 +174,7 @@ describe("AnswerBox: speaking", () => {
     setMediaDevices(undefined);
     render(<Harness />);
     expect(micButton()).toBeNull();
-    expect(screen.queryByText(NOTICE)).toBeNull();
+    expect(screen.queryByText(/OpenAI/i)).toBeNull();
     const { result } = renderHook(() => useVoice({ locale: "en" }));
     expect(result.current.state).toBe("unavailable");
   });
@@ -253,32 +265,103 @@ describe("AnswerBox: speaking", () => {
     expect(api.createVoiceSession).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the privacy notice before the first recording only", async () => {
+  it("never shows provider copy before, during or after recording", async () => {
     fakeTransport();
     const first = render(<Harness />);
-    expect(screen.getByText(NOTICE)).toBeInTheDocument();
+    expect(screen.queryByText(/OpenAI/i)).toBeNull();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Answer by speaking" })); });
     await act(() => vi.advanceTimersByTimeAsync(3_000));
     screen.getByRole("button", { name: "Stop recording" });
-    expect(screen.queryByText(NOTICE)).toBeNull();
+    expect(screen.queryByText(/OpenAI/i)).toBeNull();
     first.unmount();
     render(<Harness />);
-    expect(screen.queryByText(NOTICE)).toBeNull();
+    expect(screen.queryByText(/OpenAI/i)).toBeNull();
   });
 
-  it("hides the privacy notice in every open box after the first recording", async () => {
-    fakeTransport();
-    render(
-      <>
-        <Harness />
-        <Harness />
-      </>,
-    );
-    expect(screen.getAllByText(NOTICE)).toHaveLength(2);
-    await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: "Answer by speaking" })[0] as HTMLElement); });
+  it.each([false, true])("fades new live words unless reduced motion is %s", async (reducedMotion) => {
+    vi.mocked(window.matchMedia).mockImplementation((media) => ({
+      matches: media === "(prefers-reduced-motion: reduce)" && reducedMotion,
+      media, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+    }));
+    const t = fakeTransport();
+    const { container } = render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Answer by speaking" }));
     await act(() => vi.advanceTimersByTimeAsync(3_000));
-    screen.getByRole("button", { name: "Stop recording" });
-    expect(screen.queryAllByText(NOTICE)).toHaveLength(0);
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "Yeah" }));
+    const first = container.querySelector(".answer-partial span");
+    act(() => t.emit({ type: "partial", itemId: "i1", text: " helping" }));
+    expect(container.querySelector(".answer-partial")).toHaveTextContent("Yeah helping");
+    if (reducedMotion) {
+      expect(container.querySelector(".voice-word-new")).toBeNull();
+    } else {
+      expect(screen.getByText("helping")).toHaveClass("voice-word-new");
+      expect(container.querySelector(".answer-partial span")).toBe(first);
+    }
+    act(() => t.emit({ type: "final", itemId: "i1", text: "Yeah helping." }));
+    expect(box()).toHaveValue("Yeah helping.");
+    expect(container.querySelector(".voice-word-new")).toBeNull();
+  });
+
+  it("fades only new words when overlapping transcript items grow or finish", async () => {
+    const t = fakeTransport();
+    const { container } = render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Answer by speaking" }));
+    await act(() => vi.advanceTimersByTimeAsync(3_000));
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "Checked" }));
+    act(() => t.emit({ type: "partial", itemId: "i2", text: "Daily" }));
+    const checked = screen.getByText("Checked");
+    const daily = screen.getByText("Daily");
+
+    act(() => t.emit({ type: "partial", itemId: "i1", text: " papers" }));
+    expect(container.querySelector(".answer-partial")).toHaveTextContent("Checked papers Daily");
+    expect(screen.getByText("Checked")).toBe(checked);
+    expect(screen.getByText("papers")).toHaveClass("voice-word-new");
+    expect(screen.getByText("papers")).not.toBe(daily);
+    expect(screen.getByText("Daily")).toBe(daily);
+
+    act(() => t.emit({ type: "final", itemId: "i1", text: "Checked papers." }));
+    expect(box()).toHaveValue("Checked papers.");
+    expect(screen.getByText("Daily")).toBe(daily);
+    expect(container.querySelector(".answer-partial")).toHaveTextContent(/^Daily$/);
+  });
+
+  it("filters live and final transcripts and ignores non-Latin-only deltas", async () => {
+    const t = fakeTransport();
+    const onChange = vi.fn();
+    const { container } = render(<Harness onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Answer by speaking" }));
+    await act(() => vi.advanceTimersByTimeAsync(3_000));
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "어 비" }));
+    expect(container.querySelector(".answer-partial")).toBeNull();
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "어 Yeah " }));
+    const word = screen.getByText("Yeah");
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "어 비" }));
+    expect(screen.getByText("Yeah")).toBe(word);
+    expect(container.querySelector(".answer-partial")).toHaveTextContent(/^Yeah$/);
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "help" }));
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "ing" }));
+    expect(container.querySelector(".answer-partial")).toHaveTextContent("Yeah helping");
+    act(() => t.emit({ type: "final", itemId: "i1", text: "어 Yeah 비 helping, 50%." }));
+    expect(box()).toHaveValue("Yeah helping, 50%.");
+    onChange.mockClear();
+    act(() => t.emit({ type: "final", itemId: "i2", text: "어 비" }));
+    expect(box()).toHaveValue("Yeah helping, 50%.");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it.each([" ", "어 비"])("keeps word boundaries across an invisible delta: %s", async (text) => {
+    const t = fakeTransport();
+    const { container } = render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Answer by speaking" }));
+    await act(() => vi.advanceTimersByTimeAsync(3_000));
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "Yeah" }));
+    const word = screen.getByText("Yeah");
+    act(() => t.emit({ type: "partial", itemId: "i1", text }));
+    expect(screen.getByText("Yeah")).toBe(word);
+    expect(container.querySelector(".answer-partial")).toHaveTextContent(/^Yeah$/);
+    act(() => t.emit({ type: "partial", itemId: "i1", text: "helping" }));
+    expect(container.querySelector(".answer-partial")).toHaveTextContent("Yeah helping");
   });
 
   it("still records when the browser refuses storage", async () => {
@@ -293,7 +376,7 @@ describe("AnswerBox: speaking", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Answer by speaking" })); });
     await act(() => vi.advanceTimersByTimeAsync(3_000));
     expect(screen.getByRole("button", { name: "Stop recording" })).toBeInTheDocument();
-    expect(screen.queryByText(NOTICE)).toBeNull(); // remembered for this page
+    expect(screen.queryByText(/OpenAI/i)).toBeNull();
   });
 });
 

@@ -98,7 +98,7 @@ describe("focus answers", () => {
   it("accepts either a detail request or a complete improvement", () => {
     const proposal = { proposal: { bulletId: "b1", text: "Handled orders" }, bulletBefore: 43, bulletAfter: 80,
       roleBefore: null, roleAfter: 80, cached: true };
-    expect(ImproveAnswerSchema.safeParse({ needsDetail: true }).success).toBe(true);
+    expect(ImproveAnswerSchema.safeParse({ needsDetail: true, nextQuestion: null }).success).toBe(true);
     expect(ImproveAnswerSchema.safeParse(proposal).success).toBe(true);
     expect(ImproveAnswerSchema.safeParse({ ...proposal, cached: false }).success).toBe(true);
     expect(ImproveAnswerSchema.safeParse({ ...proposal, cached: undefined }).success).toBe(false);
@@ -108,6 +108,9 @@ describe("focus answers", () => {
     expect(ImproveAnswerSchema.safeParse({ ...proposal, needsDetail: true }).success).toBe(false);
   });
 
+  it("defaults a missing next question to null for older API responses", () => {
+    expect(ImproveAnswerSchema.parse({ needsDetail: true })).toEqual({ needsDetail: true, nextQuestion: null });
+  });
   it("accepts up to four brain dump proposals with integer scores", () => {
     const answer = (count: number, score = 80) => ({
       proposals: Array.from({ length: count }, (_, i) => ({ id: `b${i}`, text: "Handled orders", score })),

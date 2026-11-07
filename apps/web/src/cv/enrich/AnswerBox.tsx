@@ -24,7 +24,6 @@ type Props = {
 };
 
 const SEP = ", ";
-const NOTICE_KEY = "resumora.voiceNoticeSeen";
 
 /** Where `option` sits in `value` as a whole ", "-bounded piece, or -1. Options may contain ", " themselves. */
 function findPiece(value: string, option: string): number {
@@ -61,31 +60,11 @@ function appendSpoken(value: string, text: string, options: string[]): string {
 
 const addVia = (via: Via[], how: Via): Via[] => (via.includes(how) ? via : [...via, how]);
 
-// The privacy notice shows until the first recording, in every box on the page at once.
-let seenThisPage = false;
-const noticeListeners = new Set<() => void>();
-
-function noticeSeen(): boolean {
-  try {
-    return localStorage.getItem(NOTICE_KEY) === "1";
-  } catch {
-    return seenThisPage; // private mode or blocked storage: remember for this page only
-  }
-}
-
-function markNoticeSeen() {
-  seenThisPage = true;
-  try {
-    localStorage.setItem(NOTICE_KEY, "1");
-  } catch {
-    // blocked storage: `seenThisPage` covers this page
-  }
-  noticeListeners.forEach((l) => l());
-}
-
-function onNoticeChange(listener: () => void) {
-  noticeListeners.add(listener);
-  return () => void noticeListeners.delete(listener);
+const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+function onMotionChange(listener: () => void) {
+  const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  query?.addEventListener("change", listener);
+  return () => query?.removeEventListener("change", listener);
 }
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -102,7 +81,7 @@ const MicIcon = (
 export function AnswerBox({ question, value, via, onChange, locale = "en", maxSeconds = VOICE.maxSeconds, placeholder, plain = false, readOnly = false, onBusyChange }: Props) {
   const voice = useVoice({ locale, maxSeconds });
   const field = useRef<HTMLTextAreaElement>(null);
-  const seen = useSyncExternalStore(onNoticeChange, noticeSeen);
+  const reduceMotion = useSyncExternalStore(onMotionChange, reducedMotion);
   // spoken pieces can arrive faster than re-renders, so they build on the latest text
   const latest = useRef({ value, via, onChange, options: question.options });
   useEffect(() => {
@@ -139,7 +118,6 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
   const onMic = () => {
     if (recording || countingDown) return voice.stop();
     if (state !== "idle") return;
-    if (!seen) markNoticeSeen();
     voice.start();
   };
 
@@ -220,7 +198,11 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
       {state === "stopping" && <span className="answer-rec is-finishing">{t("enrich.voice.finishing")}</span>}
       {micShown && (
         <div className="answer-live" aria-live="polite" lang={locale}>
-          {voice.partial && <span className="answer-partial">{voice.partial}</span>}
+          {voice.partial && <span className="answer-partial">
+            {voice.partialWords.map((word, i) => (
+              <span key={word.key} className={reduceMotion ? undefined : "voice-word-new"}>{i > 0 ? " " : ""}{word.text}</span>
+            ))}
+          </span>}
         </div>
       )}
       {message && (
@@ -228,7 +210,6 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
           {message}
         </p>
       )}
-      {micShown && !seen && <p className="voice-note">{t("enrich.voice.notice")}</p>}
       {question.options.length > 0 && <p className="fine">{t("enrich.answer.optionsHint")}</p>}
     </div>
   );
