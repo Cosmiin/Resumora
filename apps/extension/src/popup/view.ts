@@ -5,8 +5,7 @@ import type { PopupState, SaveResult } from "../messages";
 
 export type View =
   | { kind: "signedOut"; state: PopupState; message: string | null; error: string | null }
-  | { kind: "ready"; state: PopupState }
-  | { kind: "saving"; where: string }
+  | { kind: "capture"; where: string; busy: boolean }
   | SaveResult;
 
 export type ViewActions = {
@@ -84,17 +83,22 @@ export function renderView(root: HTMLElement, view: View, actions: ViewActions):
       }
       break;
     }
-    case "ready":
-      add("h2", copy.readyTitle);
-      add("p", copy.readyText);
-      break;
-    case "saving": {
-      const spinner = add("span", "");
-      spinner.className = "spinner";
-      spinner.setAttribute("role", "status");
-      spinner.setAttribute("aria-label", copy.saving);
-      add("h2", copy.saving);
+    case "capture": {
+      add("h2", copy.captureTitle);
       add("p", view.where);
+      const capture = add("button", view.busy ? copy.capturing : copy.capture);
+      capture.disabled = view.busy;
+      capture.setAttribute("aria-busy", String(view.busy));
+      if (view.busy) {
+        const spinner = doc.createElement("span");
+        spinner.className = "spinner";
+        spinner.setAttribute("aria-hidden", "true");
+        capture.prepend(spinner);
+      }
+      capture.addEventListener("click", () => {
+        capture.disabled = true;
+        actions.retry();
+      });
       break;
     }
     case "saved":

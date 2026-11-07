@@ -41,7 +41,9 @@ export async function startPopup(
   const badge = doc.getElementById("environment-badge")!;
   let state: PopupState | undefined;
   let version = 0;
-  const send = (request: Request) => chromeApi.runtime.sendMessage(request);
+  let pendingStateVersion: number | null = null;
+  let where = "";
+  const send = async (request: Request) => chromeApi.runtime.sendMessage(request);
   const show = (view: View) => {
     const current = isPopupState(state) ? state : undefined;
     badge.textContent = current?.environments.find((env) => env.id === current.env)?.label ?? "";
@@ -70,26 +72,36 @@ export async function startPopup(
     }
     renderView(root, view, actions);
   };
-  const showState = () => {
+  const showState = async () => {
+    const current = ++version;
     if (!isPopupState(state)) { fail(); return; }
-    show(state.email ? { kind: "ready", state }
-      : { kind: "signedOut", state, message: null, error: null });
+    if (!state.email) {
+      show({ kind: "signedOut", state, message: null, error: null });
+      return;
+    }
+    try {
+      const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
+      if (current !== version) return;
+      where = "";
+      try {
+        const url = new URL(tab?.url ?? "");
+        if (url.protocol === "http:" || url.protocol === "https:") where = url.host + url.pathname;
+      } catch { /* Pages without a valid URL cannot be captured. */ }
+      show(where ? { kind: "capture", where, busy: false } : { kind: "cantRead" });
+    } catch {
+      if (current === version) fail();
+    }
   };
   const fail = () => show({ kind: "error", message: copy.somethingWrong, requestId: null });
   const save = async () => {
+    if (pendingStateVersion !== null) return;
     const current = ++version;
-    show({ kind: "saving", where: "" });
-    void chromeApi.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-      if (current !== version) return;
-      let where = "";
-      try {
-        const url = new URL(tab?.url ?? "");
-        where = url.host + url.pathname;
-      } catch { /* Pages without a URL have no location to display. */ }
-      show({ kind: "saving", where });
-    }).catch(() => {});
+    show({ kind: "capture", where, busy: true });
     try {
-      const result = await send({ type: "saveActiveTab" });
+      const [result] = await Promise.all([
+        send({ type: "saveActiveTab" }).catch(() => undefined),
+        new Promise((resolve) => setTimeout(resolve, 500)),
+      ]);
       if (current !== version) return;
       ++version;
       if (!isSaveResult(result)) { fail(); return; }
@@ -104,28 +116,34 @@ export async function startPopup(
   };
   const changeState = async (request: Request) => {
     const current = ++version;
+    pendingStateVersion = current;
     try {
       const next = await send(request);
       if (current !== version) return;
       if (!isPopupState(next)) { fail(); return; }
       state = next;
-      showState();
+      await showState();
     } catch {
       if (current === version) fail();
+    } finally {
+      if (pendingStateVersion === current) pendingStateVersion = null;
     }
   };
   const actions: ViewActions = {
     signIn: async (email, password) => {
       const current = ++version;
+      pendingStateVersion = current;
       try {
         const reply = await send({ type: "signIn", email, password });
         if (current !== version) return;
         if (!isSignInReply(reply)) { fail(); return; }
-        if (reply.ok) { state = reply.state; showState(); }
+        if (reply.ok) { state = reply.state; await showState(); }
         else if (isPopupState(state)) show({ kind: "signedOut", state, message: null, error: reply.message });
         else fail();
       } catch {
         if (current === version) fail();
+      } finally {
+        if (pendingStateVersion === current) pendingStateVersion = null;
       }
     },
     setEnvironment: (env) => { void changeState({ type: "setEnvironment", env }); },
@@ -137,8 +155,7 @@ export async function startPopup(
     const initial = await send({ type: "getState" });
     if (!isPopupState(initial)) { fail(); return; }
     state = initial;
-    if (state.email) await save();
-    else showState();
+    await showState();
   } catch { fail(); }
 }
 

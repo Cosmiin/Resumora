@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderView, type View, type ViewActions } from "./view";
 import type { PopupState, Request, SaveResult } from "../messages";
 
@@ -27,8 +27,10 @@ describe("popup views", () => {
     [{ kind: "cantRead" }, "Resumora can't read this kind of page.", null, null],
     [{ kind: "error", message: "Something went wrong. Try again.", requestId: null }, "Not saved",
       "Something went wrong. Try again.", "Try again"],
-    [{ kind: "saving", where: "jobs.example.test/job/1" }, "Saving this job…", "jobs.example.test/job/1", null],
-    [{ kind: "ready", state }, "You're signed in", "Open a job ad and click the Resumora icon to save it.", null],
+    [{ kind: "capture", where: "jobs.example.test/job/1", busy: false },
+      "Capture this job", "jobs.example.test/job/1", "Capture"],
+    [{ kind: "capture", where: "jobs.example.test/job/1", busy: true },
+      "Capture this job", "jobs.example.test/job/1", "Capturing…"],
   ])("renders $kind with its exact copy and action", (view, title, text, button) => {
     renderView(root, view, actions);
     expect(root.querySelector("h2")?.textContent).toBe(title);
@@ -36,11 +38,10 @@ describe("popup views", () => {
     expect(root.querySelectorAll("button")).toHaveLength(button ? 1 : 0);
     expect(root.querySelector("button")?.textContent ?? null).toBe(button);
     expect(root.textContent).not.toMatch(/Error:|\bat \w+.*:\d+/);
-    if (view.kind === "saving") expect(root.querySelector('[role="status"]')).not.toBeNull();
     root.querySelector("button")?.click();
     if ("openUrl" in view) expect(actions.openTab).toHaveBeenCalledExactlyOnceWith(view.openUrl);
     if ("pasteUrl" in view) expect(actions.openTab).toHaveBeenCalledExactlyOnceWith(view.pasteUrl);
-    if (view.kind === "error") expect(actions.retry).toHaveBeenCalledTimes(1);
+    if (view.kind === "error" || (view.kind === "capture" && !view.busy)) expect(actions.retry).toHaveBeenCalledTimes(1);
   });
 
   it.each([null, "abc-123"])("shows the request id only when present (%s)", (requestId) => {
@@ -101,7 +102,7 @@ describe("popup views", () => {
   });
 });
 
-async function popup(signedIn = true) {
+async function popup(signedIn = true, url = "https://www.linkedin.com/jobs/view/123/") {
   document.body.innerHTML = '<header><span id="environment-badge"></span></header><main></main><footer></footer>';
   const signedInState = { ...state, email: "user@example.test" };
   const sendMessage = vi.fn(async (request: Request): Promise<unknown> => {
@@ -114,7 +115,7 @@ async function popup(signedIn = true) {
   const chromeApi = {
     runtime: { sendMessage },
     tabs: {
-      query: vi.fn(async () => [{ url: "https://jobs.example.test/job/1?secret=value#fragment" }]),
+      query: vi.fn(async () => [{ url }]),
       create: vi.fn(async () => ({})),
     },
   };
@@ -126,6 +127,8 @@ async function popup(signedIn = true) {
   chromeApi.tabs.create.mockClear();
   return { chromeApi, sendMessage, start: () => startPopup(chromeApi, document) };
 }
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("popup interactions", () => {
   it("retries getState after startup fails and then shows the sign-in form", async () => {
@@ -140,7 +143,6 @@ describe("popup interactions", () => {
     await vi.waitFor(() => expect(document.querySelector("main h2")?.textContent).toBe("Sign in to Resumora"));
     expect(document.querySelector("form")).not.toBeNull();
     expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["getState"]);
-    vi.unstubAllGlobals();
   });
 
   it.each(["error reply", "undefined reply", "rejected request"])(
@@ -154,12 +156,12 @@ describe("popup interactions", () => {
       expect(document.querySelector("main p")?.textContent).toBe("Something went wrong. Try again.");
       expect(document.getElementById("environment-badge")?.textContent).toBe("");
       expect(document.querySelector("footer")?.textContent).toBe("");
-      vi.unstubAllGlobals();
     },
   );
 
   it.each(["signOut", "setEnvironment", "signIn", "saveActiveTab"] as const)(
     "preserves the current environment after an invalid %s reply", async (request) => {
+      vi.useFakeTimers();
       const p = await popup(request !== "signIn");
       await p.start();
       p.sendMessage.mockResolvedValue(undefined);
@@ -170,55 +172,179 @@ describe("popup interactions", () => {
         select.dispatchEvent(new Event("change"));
       }
       if (request === "signIn") document.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
-      if (request === "saveActiveTab") {
-        p.sendMessage.mockImplementation(async (message) => message.type === "getState"
-          ? { ...state, email: "user@example.test" } : { kind: "unknown" });
-        await p.start();
-      }
-      await vi.waitFor(() => expect(document.querySelector("main h2")?.textContent).toBe("Not saved"));
+      if (request === "saveActiveTab") document.querySelector<HTMLButtonElement>("main button")!.click();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(document.querySelector("main h2")?.textContent).toBe("Not saved");
       expect(document.querySelector("main p")?.textContent).toBe("Something went wrong. Try again.");
       expect(document.getElementById("environment-badge")?.textContent).toBe("Local");
       if (request === "signIn") expect(document.querySelector("footer")?.textContent).toBe("");
       else expect(document.querySelector("footer")?.textContent).toContain("user@example.test");
-      vi.unstubAllGlobals();
     },
   );
 
-  it("opens signed in by saving, then opens the result in a tab", async () => {
-    const p = await popup();
+  it.each([
+    ["https://www.linkedin.com/jobs/view/123/", "www.linkedin.com/jobs/view/123/"],
+    ["http://jobs.example.test/job/1?secret=value#fragment", "jobs.example.test/job/1"],
+    ["chrome://extensions/", null], ["file:///job.html", null], ["", null],
+  ])("opens %s without saving", async (url, where) => {
+    const p = await popup(true, url);
     await p.start();
-    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["getState", "saveActiveTab"]);
+    expect(p.chromeApi.tabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
+    expect(document.querySelector("main h2")?.textContent).toBe(
+      where ? "Capture this job" : "Resumora can't read this kind of page.");
+    expect(document.querySelector("main p")?.textContent ?? null).toBe(where);
+    const button = document.querySelector<HTMLButtonElement>("main button");
+    if (where) { expect(button?.textContent).toBe("Capture"); expect(button?.disabled).toBe(false); }
+    else expect(button).toBeNull();
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["getState"]);
     expect(document.getElementById("environment-badge")?.textContent).toBe("Local");
     expect(document.querySelector("footer")?.textContent).toContain("user@example.test");
-    document.querySelector<HTMLButtonElement>("main button")!.click();
-    expect(p.chromeApi.tabs.create).toHaveBeenCalledWith({ url: "https://resumora.test/jobs/id" });
-    vi.unstubAllGlobals();
   });
 
-  it("shows the host and path while saving and retries after an error", async () => {
+  it.each([50, 800])("keeps capture busy until both 500 ms and a %i ms reply", async (replyTime) => {
+    vi.useFakeTimers();
+    const p = await popup();
+    p.sendMessage.mockImplementation(() => new Promise((resolve) => {
+      setTimeout(() => resolve({ kind: "saved", openUrl: "https://resumora.test/jobs/id" }), replyTime);
+    }));
+    const button = document.querySelector<HTMLButtonElement>("main button")!;
+    button.click();
+    const busy = document.querySelector<HTMLButtonElement>("main button")!;
+    expect(busy.disabled).toBe(true);
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    expect(busy.querySelector(".spinner")).not.toBeNull();
+    expect(busy.textContent).toBe("Capturing…");
+    expect(document.querySelector("main p")?.textContent).toBe("www.linkedin.com/jobs/view/123/");
+    busy.click(); button.click();
+    expect(p.sendMessage).toHaveBeenCalledExactlyOnceWith({ type: "saveActiveTab" });
+    await vi.advanceTimersByTimeAsync(499);
+    expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
+    await vi.advanceTimersByTimeAsync(1);
+    if (replyTime > 500) {
+      expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
+      await vi.advanceTimersByTimeAsync(replyTime - 500);
+    }
+    expect(document.querySelector("main h2")?.textContent).toBe("Saved");
+    expect(document.querySelector("main button")?.textContent).toBe("Open in Resumora");
+    document.querySelector<HTMLButtonElement>("main button")!.click();
+    expect(p.chromeApi.tabs.create).toHaveBeenCalledExactlyOnceWith({ url: "https://resumora.test/jobs/id" });
+  });
+
+  it.each(["error", "invalid", "rejected"])("retries capture after an %s response", async (failure) => {
+    vi.useFakeTimers();
+    const p = await popup();
+    if (failure === "rejected") p.sendMessage.mockRejectedValueOnce(new Error("Private detail"));
+    else p.sendMessage.mockResolvedValueOnce(failure === "error"
+      ? { kind: "error", message: "Try again later.", requestId: "id" } : { kind: "unknown" });
+    document.querySelector<HTMLButtonElement>("main button")!.click();
+    await vi.advanceTimersByTimeAsync(499);
+    expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(document.querySelector("main h2")?.textContent).toBe("Not saved");
+    expect(document.querySelector("main button")?.textContent).toBe("Try again");
+    expect(document.querySelector("main p")?.textContent).toBe(
+      failure === "error" ? "Try again later." : "Something went wrong. Try again.");
+    document.querySelector<HTMLButtonElement>("main button")!.click();
+    expect(document.querySelector<HTMLButtonElement>("main button")?.disabled).toBe(true);
+    expect(document.querySelector("main button")?.getAttribute("aria-busy")).toBe("true");
+    expect(document.querySelector("main button .spinner")).not.toBeNull();
+    expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["saveActiveTab", "saveActiveTab"]);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(document.querySelector("main h2")?.textContent).toBe("Saved");
+  });
+
+  it("ignores Capture until a pending environment switch is applied", async () => {
+    vi.useFakeTimers();
+    const p = await popup();
+    const hosted: PopupState = {
+      ...state, env: "hosted", email: "hosted@example.test",
+      environments: state.environments.map((env) => ({ ...env, configured: true })),
+    };
+    p.sendMessage.mockResolvedValueOnce({ ...hosted, env: "local", email: "user@example.test" });
+    await p.start();
+    p.sendMessage.mockClear();
+    let finish!: (next: PopupState) => void;
+    p.sendMessage.mockReturnValueOnce(new Promise<PopupState>((resolve) => { finish = resolve; }));
+    const select = document.querySelector<HTMLSelectElement>("footer select")!;
+    select.value = "hosted";
+    select.dispatchEvent(new Event("change"));
+    document.querySelector<HTMLButtonElement>("main button")!.click();
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["setEnvironment"]);
+    finish(hosted);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.getElementById("environment-badge")?.textContent).toBe("Hosted");
+    expect(document.querySelector("footer")?.textContent).toContain("hosted@example.test");
+    expect(document.querySelector("main h2")?.textContent).toBe("Capture this job");
+    expect(document.querySelector<HTMLButtonElement>("main button")?.disabled).toBe(false);
+    document.querySelector<HTMLButtonElement>("main button")!.click();
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["setEnvironment", "saveActiveTab"]);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(document.querySelector("main h2")?.textContent).toBe("Saved");
+    expect(document.getElementById("environment-badge")?.textContent).toBe("Hosted");
+  });
+  it("captures after switching environments while an older sign-in is still pending", async () => {
+    vi.useFakeTimers();
+    const p = await popup(false);
+    const hosted: PopupState = {
+      ...state, env: "hosted", email: "hosted@example.test",
+      environments: state.environments.map((env) => ({ ...env, configured: true })),
+    };
+    p.sendMessage.mockResolvedValueOnce({ ...hosted, env: "local", email: null });
+    await p.start();
+    p.sendMessage.mockClear();
+    let finish!: () => void;
+    p.sendMessage.mockImplementationOnce(() => new Promise((resolve) => {
+      finish = () => resolve({ ok: true, state: { ...state, email: "late@example.test" } });
+    }));
+    document.querySelector<HTMLInputElement>('input[type="email"]')!.value = "late@example.test";
+    document.querySelector<HTMLInputElement>('input[type="password"]')!.value = "test-password";
+    document.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    p.sendMessage.mockResolvedValueOnce(hosted);
+    const select = document.querySelector<HTMLSelectElement>("main select")!;
+    select.value = "hosted";
+    select.dispatchEvent(new Event("change"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.getElementById("environment-badge")?.textContent).toBe("Hosted");
+    expect(document.querySelector("footer")?.textContent).toContain("hosted@example.test");
+    document.querySelector<HTMLButtonElement>("main button")!.click();
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual([
+      "signIn", "setEnvironment", "saveActiveTab",
+    ]);
+    await vi.advanceTimersByTimeAsync(499);
+    expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(document.querySelector("main h2")?.textContent).toBe("Saved");
+    const displayed = document.body.innerHTML;
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.body.innerHTML).toBe(displayed);
+    expect(p.sendMessage.mock.calls.filter(([request]) => request.type === "saveActiveTab")).toHaveLength(1);
+  });
+  it("ignores a capture reply after signing out", async () => {
+    vi.useFakeTimers();
     const p = await popup();
     let finish!: (result: SaveResult) => void;
-    p.sendMessage.mockImplementation(async (request) => request.type === "getState"
-      ? { ...state, email: "user@example.test" }
-      : new Promise<SaveResult>((resolve) => { finish = resolve; }));
-    const pending = p.start();
-    await vi.waitFor(() => expect(document.querySelector("main p")?.textContent).toBe("jobs.example.test/job/1"));
-    finish({ kind: "error", message: "Try again later.", requestId: "id" });
-    await pending;
-    p.sendMessage.mockResolvedValue({ kind: "saved", openUrl: "https://resumora.test/jobs/id" });
+    p.sendMessage.mockImplementation(async (request) => request.type === "signOut"
+      ? state : new Promise<SaveResult>((resolve) => { finish = resolve; }));
     document.querySelector<HTMLButtonElement>("main button")!.click();
-    await vi.waitFor(() => expect(document.querySelector("main h2")?.textContent).toBe("Saved"));
-    expect(p.sendMessage).toHaveBeenLastCalledWith({ type: "saveActiveTab" });
-    vi.unstubAllGlobals();
+    document.querySelector<HTMLButtonElement>("footer button")!.click();
+    await vi.advanceTimersByTimeAsync(500);
+    finish({ kind: "saved", openUrl: "https://resumora.test/jobs/id" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.querySelector("main h2")?.textContent).toBe("Sign in to Resumora");
   });
 
-  it("signs in to Ready without saving, switches environments, and signs out", async () => {
-    const p = await popup(false);
+  it.each([
+    ["https://jobs.example.test/job/1", "Capture this job"],
+    ["chrome://extensions/", "Resumora can't read this kind of page."],
+  ])("signs in on %s without saving, switches environments, and signs out", async (url, title) => {
+    const p = await popup(false, url);
     await p.start();
     document.querySelector<HTMLInputElement>('input[type="email"]')!.value = "user@example.test";
     document.querySelector<HTMLInputElement>('input[type="password"]')!.value = "test-password";
     document.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
-    await vi.waitFor(() => expect(document.querySelector("h2")?.textContent).toBe("You're signed in"));
+    await vi.waitFor(() => expect(document.querySelector("h2")?.textContent).toBe(title));
     expect(p.sendMessage.mock.calls.some(([request]) => request.type === "saveActiveTab")).toBe(false);
     const select = document.querySelector("footer select") as HTMLSelectElement;
     select.value = "hosted";
@@ -227,23 +353,24 @@ describe("popup interactions", () => {
     expect(document.querySelector("h2")?.textContent).toBe("Sign in to Resumora");
     p.sendMessage.mockResolvedValue({ ok: true, state: { ...state, env: "hosted", email: "hosted@example.test" } });
     document.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
-    await vi.waitFor(() => expect(document.querySelector("h2")?.textContent).toBe("You're signed in"));
+    await vi.waitFor(() => expect(document.querySelector("h2")?.textContent).toBe(title));
     p.sendMessage.mockResolvedValue({ ...state, env: "hosted" });
     document.querySelector<HTMLButtonElement>("footer button")!.click();
     await vi.waitFor(() => expect(document.querySelector("h2")?.textContent).toBe("Sign in to Resumora"));
     expect(document.querySelector("footer")?.textContent).toBe("");
-    vi.unstubAllGlobals();
   });
 
   it("shows expired sign-in results as the form with its message", async () => {
+    vi.useFakeTimers();
     const p = await popup();
     p.sendMessage.mockImplementation(async (request) => request.type === "getState"
       ? { ...state, email: "user@example.test" }
       : { kind: "signedOut", message: "Your sign-in expired. Sign in again." });
     await p.start();
+    document.querySelector<HTMLButtonElement>("main button")!.click();
+    await vi.advanceTimersByTimeAsync(500);
     expect(document.querySelector("h2")?.textContent).toBe("Sign in to Resumora");
     expect(document.querySelector("main p")?.textContent).toBe("Your sign-in expired. Sign in again.");
     expect(document.querySelector("footer")?.textContent).toBe("");
-    vi.unstubAllGlobals();
   });
 });
