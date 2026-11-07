@@ -24,7 +24,7 @@ export const jobsEn = {
   "jobs.dialog.extTitle": "Save jobs with the Resumora extension",
   "jobs.dialog.extStep1": "Install the Resumora extension for Chrome.",
   "jobs.dialog.extStep2": "Sign in with your Resumora account.",
-  "jobs.dialog.extStep3": "Click the Resumora icon on any job ad, LinkedIn included.",
+  "jobs.dialog.extStep3": "Click the Resumora icon on any job ad, LinkedIn included, then click Capture.",
   "jobs.dialog.installToggle": "How to install (dev)",
   "jobs.dialog.install1": "Run npm run build -w apps/extension.",
   "jobs.dialog.install2": "Open chrome://extensions and turn on Developer mode.",

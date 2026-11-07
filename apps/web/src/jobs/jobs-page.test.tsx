@@ -268,7 +268,7 @@ describe("Add job dialog", () => {
     expect(within(dialog).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       "Install the Resumora extension for Chrome.",
       "Sign in with your Resumora account.",
-      "Click the Resumora icon on any job ad, LinkedIn included.",
+      "Click the Resumora icon on any job ad, LinkedIn included, then click Capture.",
     ]);
     expect(within(dialog).queryByText("Soon")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Soon a link alone/)).not.toBeInTheDocument();
