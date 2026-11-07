@@ -14,10 +14,11 @@ export async function postJob(deps: {
   body: CreateJobBody;
   timeoutMs?: number;
 }): Promise<ApiOutcome> {
+  const { fetch: send } = deps;
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const request = async (): Promise<ApiOutcome> => {
-    const response = await deps.fetch(`${deps.apiUrl.replace(/\/+$/, "")}/v1/jobs`, {
+    const response = await send(`${deps.apiUrl.replace(/\/+$/, "")}/v1/jobs`, {
       method: "POST",
       headers: { Authorization: `Bearer ${deps.token}`, "Content-Type": "application/json" },
       body: JSON.stringify(deps.body),

@@ -7,6 +7,14 @@ const errorBody = { error: { code: "job_limit", message: "Daily limit", requestI
 afterEach(() => vi.useRealTimers());
 
 describe("postJob", () => {
+  it("saves with a fetch that requires a plain function call", async () => {
+    const fetch = function (this: unknown) {
+      if (this !== undefined) throw new TypeError("Illegal invocation");
+      return Promise.resolve(new Response(JSON.stringify({ id: "j1" }), { status: 202 }));
+    };
+    expect(await postJob({ ...deps, fetch })).toEqual({ kind: "saved", id: "j1" });
+  });
+
   it.each<[number, unknown, unknown]>([
     [202, { id: "job-id" }, { kind: "saved", id: "job-id" }],
     [200, { id: "job-id", existing: true }, { kind: "existing", id: "job-id" }],
