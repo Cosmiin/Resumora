@@ -47,6 +47,14 @@ button { padding: 8px 12px; cursor: pointer; }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 main > button, form > button { width: 100%; }
 a, small { display: block; margin: 12px 0; }
+.link-button {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1d4ed8;
+  text-decoration: underline;
+}
 small { overflow-wrap: anywhere; color: #475569; }
 [role="alert"] { color: #b91c1c; }
 .spinner {

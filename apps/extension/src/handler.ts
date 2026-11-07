@@ -37,6 +37,8 @@ export function createHandler(deps: {
         if (!deps.environments[req.env].configured) return state(env);
         await setEnvId(deps.storage, req.env);
         return state(req.env);
+      case "checkActiveTab":
+        return deps.saver.checkActiveTab();
       case "saveActiveTab":
         return deps.saver.saveActiveTab();
     }

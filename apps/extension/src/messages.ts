@@ -5,6 +5,7 @@ export type Request =
   | { type: "signIn"; email: string; password: string }
   | { type: "signOut" }
   | { type: "setEnvironment"; env: EnvId }
+  | { type: "checkActiveTab" }
   | { type: "saveActiveTab" };
 
 export interface PopupState {
@@ -16,6 +17,12 @@ export interface PopupState {
 export type SignInReply =
   | { ok: true; state: PopupState }
   | { ok: false; message: string };
+
+export type CheckResult =
+  | { kind: "capture" }
+  | { kind: "notJob" }
+  | { kind: "couldntRead"; pasteUrl: string }
+  | { kind: "cantRead" };
 
 export type SaveResult =
   | { kind: "saved"; openUrl: string }

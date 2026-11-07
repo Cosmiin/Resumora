@@ -3,7 +3,8 @@ import { postJob } from "./api";
 import type { Auth } from "./auth";
 import { copy } from "./copy";
 import type { EnvConfig } from "./environments";
-import type { SaveResult } from "./messages";
+import { looksLikeJob } from "./job-check";
+import type { CheckResult, SaveResult } from "./messages";
 import type { ReaderResult } from "./readers";
 
 export function createSaver(deps: {
@@ -12,7 +13,7 @@ export function createSaver(deps: {
   auth: Pick<Auth, "accessToken" | "refresh" | "signOut">;
   fetch: typeof fetch;
   environment(): Promise<EnvConfig>;
-}): { saveActiveTab(): Promise<SaveResult> } {
+}): { checkActiveTab(): Promise<CheckResult>; saveActiveTab(): Promise<SaveResult> } {
   const running = new Map<string, Promise<SaveResult>>();
   const error = (message: string, requestId: string | null = null): SaveResult => ({
     kind: "error", message, requestId,
@@ -72,6 +73,22 @@ export function createSaver(deps: {
     }
   };
   return {
+    async checkActiveTab() {
+      try {
+        const tab = await deps.activeTab();
+        if (!tab?.url || !["http:", "https:"].includes(new URL(tab.url).protocol)) {
+          return { kind: "cantRead" };
+        }
+        const read = await deps.runReader(tab.id);
+        if (read.pageText.trim().length < 200) {
+          const env = await deps.environment();
+          return { kind: "couldntRead", pasteUrl: env.webUrl + "/jobs?add=" + encodeURIComponent(read.url) };
+        }
+        return { kind: looksLikeJob(read) ? "capture" : "notJob" };
+      } catch {
+        return { kind: "cantRead" };
+      }
+    },
     async saveActiveTab() {
       try {
         const tab = await deps.activeTab();

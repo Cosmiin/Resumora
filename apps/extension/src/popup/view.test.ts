@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderView, type View, type ViewActions } from "./view";
-import type { PopupState, Request, SaveResult } from "../messages";
+import type { CheckResult, PopupState, Request, SaveResult } from "../messages";
 
 const state: PopupState = {
   env: "local", email: null,
@@ -24,6 +24,8 @@ describe("popup views", () => {
       "You saved this job earlier. Nothing new was added.", "Open it"],
     [{ kind: "couldntRead", pasteUrl: "https://resumora.test/jobs?add=url" }, "Couldn't read this ad",
       "The page shows too little text. It may need a sign-in, or it isn't a job ad.", "Paste it in Resumora"],
+    [{ kind: "notJob" }, "This doesn't look like a job ad",
+      "Resumora can only read job ads. If this is one, you can still capture it.", "Capture anyway"],
     [{ kind: "cantRead" }, "Resumora can't read this kind of page.", null, null],
     [{ kind: "error", message: "Something went wrong. Try again.", requestId: null }, "Not saved",
       "Something went wrong. Try again.", "Try again"],
@@ -41,7 +43,8 @@ describe("popup views", () => {
     root.querySelector("button")?.click();
     if ("openUrl" in view) expect(actions.openTab).toHaveBeenCalledExactlyOnceWith(view.openUrl);
     if ("pasteUrl" in view) expect(actions.openTab).toHaveBeenCalledExactlyOnceWith(view.pasteUrl);
-    if (view.kind === "error" || (view.kind === "capture" && !view.busy)) expect(actions.retry).toHaveBeenCalledTimes(1);
+    if (view.kind === "notJob") expect(root.querySelector("button")?.className).toBe("link-button");
+    if (view.kind === "notJob" || view.kind === "error" || (view.kind === "capture" && !view.busy)) expect(actions.retry).toHaveBeenCalledTimes(1);
   });
 
   it.each([null, "abc-123"])("shows the request id only when present (%s)", (requestId) => {
@@ -102,13 +105,14 @@ describe("popup views", () => {
   });
 });
 
-async function popup(signedIn = true, url = "https://www.linkedin.com/jobs/view/123/") {
+async function popup(signedIn = true, url = "https://www.linkedin.com/jobs/view/123/", check: CheckResult = { kind: "capture" }) {
   document.body.innerHTML = '<header><span id="environment-badge"></span></header><main></main><footer></footer>';
   const signedInState = { ...state, email: "user@example.test" };
   const sendMessage = vi.fn(async (request: Request): Promise<unknown> => {
     if (request.type === "getState") return signedIn ? signedInState : state;
     if (request.type === "signIn") return { ok: true, state: signedInState };
     if (request.type === "signOut") return state;
+    if (request.type === "checkActiveTab") return check;
     if (request.type === "setEnvironment") return { ...state, env: "hosted" };
     return { kind: "saved", openUrl: "https://resumora.test/jobs/id" };
   });
@@ -131,6 +135,109 @@ async function popup(signedIn = true, url = "https://www.linkedin.com/jobs/view/
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("popup interactions", () => {
+  it("shows Checking first, then the page to capture", async () => {
+    const p = await popup();
+    let finish!: (result: CheckResult) => void;
+    p.sendMessage.mockResolvedValueOnce({ ...state, email: "user@example.test" })
+      .mockReturnValueOnce(new Promise<CheckResult>((resolve) => { finish = resolve; }));
+    const opening = p.start();
+    await vi.waitFor(() => expect(document.querySelector("main p")?.textContent).toBe("Checking this page…"));
+    expect(document.querySelector("main .spinner")).not.toBeNull();
+    expect(document.querySelector("main button")).toBeNull();
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["getState", "checkActiveTab"]);
+    finish({ kind: "capture" });
+    await opening;
+    expect(document.querySelector("main h2")?.textContent).toBe("Capture this job");
+    expect(document.querySelector("main p")?.textContent).toBe("www.linkedin.com/jobs/view/123/");
+  });
+
+  it("warns about a non-job page and captures only after Capture anyway", async () => {
+    vi.useFakeTimers();
+    const p = await popup(true, "https://example.com/", { kind: "notJob" });
+    expect(document.querySelector("main h2")?.textContent).toBe("This doesn't look like a job ad");
+    expect(document.querySelector("main p")?.textContent).toBe(
+      "Resumora can only read job ads. If this is one, you can still capture it.");
+    const button = document.querySelector<HTMLButtonElement>("main button")!;
+    expect(button.textContent).toBe("Capture anyway");
+    expect(button.className).toBe("link-button");
+    expect(p.sendMessage).not.toHaveBeenCalled();
+    button.click();
+    expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
+    expect(document.querySelector("main button .spinner")).not.toBeNull();
+    expect(document.querySelector<HTMLButtonElement>("main button")?.disabled).toBe(true);
+    button.click();
+    expect(p.sendMessage).toHaveBeenCalledExactlyOnceWith({ type: "saveActiveTab" });
+    await vi.advanceTimersByTimeAsync(499);
+    expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(document.querySelector("main h2")?.textContent).toBe("Saved");
+  });
+
+  it.each<CheckResult>([
+    { kind: "couldntRead", pasteUrl: "https://resumora.test/jobs?add=url" }, { kind: "cantRead" },
+  ])("shows the check's $kind result without saving", async (check) => {
+    const p = await popup(true, "https://example.com/", check);
+    expect(document.querySelector("main h2")?.textContent).toBe(check.kind === "couldntRead"
+      ? "Couldn't read this ad" : "Resumora can't read this kind of page.");
+    if (check.kind === "couldntRead") {
+      expect(document.querySelector("main button")?.textContent).toBe("Paste it in Resumora");
+      document.querySelector<HTMLButtonElement>("main button")!.click();
+      expect(p.chromeApi.tabs.create).toHaveBeenCalledExactlyOnceWith({ url: check.pasteUrl });
+    }
+    expect(p.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, { kind: "unknown" }, { kind: "couldntRead" }, "rejected"])(
+    "shows a safe error for an invalid check reply %j", async (reply) => {
+      const p = await popup();
+      p.sendMessage.mockResolvedValueOnce({ ...state, email: "user@example.test" });
+      if (reply === "rejected") p.sendMessage.mockRejectedValueOnce(new Error("Private detail"));
+      else p.sendMessage.mockResolvedValueOnce(reply);
+      await p.start();
+      expect(document.querySelector("main h2")?.textContent).toBe("Not saved");
+      expect(document.querySelector("main p")?.textContent).toBe("Something went wrong. Try again.");
+    },
+  );
+
+  it("retries a rejected page check without saving", async () => {
+    const p = await popup();
+    p.sendMessage.mockResolvedValueOnce({ ...state, email: "user@example.test" })
+      .mockRejectedValueOnce(new Error("Private detail"));
+    await p.start();
+    expect(document.querySelector("main h2")?.textContent).toBe("Not saved");
+    expect(document.querySelector("main button")?.textContent).toBe("Try again");
+    let finish!: (result: CheckResult) => void;
+    p.sendMessage.mockReturnValueOnce(new Promise<CheckResult>((resolve) => { finish = resolve; }));
+    document.querySelector<HTMLButtonElement>("main button")!.click();
+    await vi.waitFor(() => expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual([
+      "getState", "checkActiveTab", "checkActiveTab",
+    ]));
+    expect(document.querySelector("main p")?.textContent).toBe("Checking this page…");
+    expect(document.querySelector("main .spinner")).not.toBeNull();
+    finish({ kind: "notJob" });
+    await vi.waitFor(() => expect(document.querySelector("main h2")?.textContent).toBe("This doesn't look like a job ad"));
+    expect(document.querySelector("main button")?.textContent).toBe("Capture anyway");
+    expect(p.sendMessage.mock.calls.some(([request]) => request.type === "saveActiveTab")).toBe(false);
+  });
+
+  it("ignores a late check reply after switching environments", async () => {
+    const p = await popup();
+    let finish!: (result: CheckResult) => void;
+    p.sendMessage.mockResolvedValueOnce({ ...state, email: "user@example.test" })
+      .mockReturnValueOnce(new Promise<CheckResult>((resolve) => { finish = resolve; }));
+    const opening = p.start();
+    await vi.waitFor(() => expect(document.querySelector("main p")?.textContent).toBe("Checking this page…"));
+    const select = document.querySelector<HTMLSelectElement>("footer select")!;
+    select.value = "hosted";
+    select.dispatchEvent(new Event("change"));
+    await vi.waitFor(() => expect(document.getElementById("environment-badge")?.textContent).toBe("Hosted"));
+    const displayed = document.body.innerHTML;
+    finish({ kind: "notJob" });
+    await opening;
+    expect(document.body.innerHTML).toBe(displayed);
+    expect(document.querySelector("main h2")?.textContent).toBe("Sign in to Resumora");
+  });
+
   it("retries getState after startup fails and then shows the sign-in form", async () => {
     const p = await popup(false);
     p.sendMessage.mockRejectedValueOnce(new Error("Private detail"));
@@ -196,7 +303,7 @@ describe("popup interactions", () => {
     const button = document.querySelector<HTMLButtonElement>("main button");
     if (where) { expect(button?.textContent).toBe("Capture"); expect(button?.disabled).toBe(false); }
     else expect(button).toBeNull();
-    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["getState"]);
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(where ? ["getState", "checkActiveTab"] : ["getState"]);
     expect(document.getElementById("environment-badge")?.textContent).toBe("Local");
     expect(document.querySelector("footer")?.textContent).toContain("user@example.test");
   });
@@ -278,7 +385,7 @@ describe("popup interactions", () => {
     expect(document.querySelector("main h2")?.textContent).toBe("Capture this job");
     expect(document.querySelector<HTMLButtonElement>("main button")?.disabled).toBe(false);
     document.querySelector<HTMLButtonElement>("main button")!.click();
-    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["setEnvironment", "saveActiveTab"]);
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual(["setEnvironment", "checkActiveTab", "saveActiveTab"]);
     await vi.advanceTimersByTimeAsync(500);
     expect(document.querySelector("main h2")?.textContent).toBe("Saved");
     expect(document.getElementById("environment-badge")?.textContent).toBe("Hosted");
@@ -309,7 +416,7 @@ describe("popup interactions", () => {
     expect(document.querySelector("footer")?.textContent).toContain("hosted@example.test");
     document.querySelector<HTMLButtonElement>("main button")!.click();
     expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual([
-      "signIn", "setEnvironment", "saveActiveTab",
+      "signIn", "setEnvironment", "checkActiveTab", "saveActiveTab",
     ]);
     await vi.advanceTimersByTimeAsync(499);
     expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
@@ -351,7 +458,7 @@ describe("popup interactions", () => {
     select.dispatchEvent(new Event("change"));
     await vi.waitFor(() => expect(document.getElementById("environment-badge")?.textContent).toBe("Hosted"));
     expect(document.querySelector("h2")?.textContent).toBe("Sign in to Resumora");
-    p.sendMessage.mockResolvedValue({ ok: true, state: { ...state, env: "hosted", email: "hosted@example.test" } });
+    p.sendMessage.mockResolvedValueOnce({ ok: true, state: { ...state, env: "hosted", email: "hosted@example.test" } });
     document.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
     await vi.waitFor(() => expect(document.querySelector("h2")?.textContent).toBe(title));
     p.sendMessage.mockResolvedValue({ ...state, env: "hosted" });
@@ -365,7 +472,8 @@ describe("popup interactions", () => {
     const p = await popup();
     p.sendMessage.mockImplementation(async (request) => request.type === "getState"
       ? { ...state, email: "user@example.test" }
-      : { kind: "signedOut", message: "Your sign-in expired. Sign in again." });
+      : request.type === "checkActiveTab" ? { kind: "capture" }
+        : { kind: "signedOut", message: "Your sign-in expired. Sign in again." });
     await p.start();
     document.querySelector<HTMLButtonElement>("main button")!.click();
     await vi.advanceTimersByTimeAsync(500);

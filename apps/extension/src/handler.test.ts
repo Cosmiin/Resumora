@@ -19,7 +19,7 @@ function setup(hostedConfigured = false) {
     accessToken: vi.fn<Auth["accessToken"]>(async () => null),
     refresh: vi.fn<Auth["refresh"]>(async () => null),
   };
-  const saver = { saveActiveTab: vi.fn().mockResolvedValue({ kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/id" }) };
+  const saver = { checkActiveTab: vi.fn().mockResolvedValue({ kind: "capture" }), saveActiveTab: vi.fn().mockResolvedValue({ kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/id" }) };
   return { storage, auth, emails, saver, handler: createHandler({ storage, auth, environments, saver }) };
 }
 
@@ -83,6 +83,13 @@ describe("popup message handler", () => {
     expect(await handler({ type: "signOut" })).toMatchObject({ env: "hosted", email: null });
     expect(auth.signOut).toHaveBeenCalledWith("hosted");
     expect(emails.get("local")).toBe("local@example.test");
+  });
+
+  it("returns the saver's result for checking without saving", async () => {
+    const { handler, saver } = setup();
+    expect(await handler({ type: "checkActiveTab" })).toEqual({ kind: "capture" });
+    expect(saver.checkActiveTab).toHaveBeenCalledExactlyOnceWith();
+    expect(saver.saveActiveTab).not.toHaveBeenCalled();
   });
 
   it("returns the saver's result for saving", async () => {

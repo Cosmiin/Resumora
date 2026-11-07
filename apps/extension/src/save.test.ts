@@ -24,6 +24,45 @@ function setup(envId: EnvId = "local") {
 }
 const expired = { kind: "signedOut", message: "Your sign-in expired. Sign in again." };
 
+describe("checkActiveTab", () => {
+  it.each(["chrome://extensions/", "file:///cv.pdf", "not a URL", ""])("cannot read %s", async (url) => {
+    const s = setup();
+    s.activeTab.mockResolvedValue({ id: 7, url });
+    expect(await s.checkActiveTab()).toEqual({ kind: "cantRead" });
+    expect(s.runReader).not.toHaveBeenCalled();
+    expect(s.fetch).not.toHaveBeenCalled();
+    expect(s.auth.accessToken).not.toHaveBeenCalled();
+  });
+
+  it("cannot read when the reader fails", async () => {
+    const s = setup();
+    s.runReader.mockRejectedValue(new Error("Chrome denied access"));
+    expect(await s.checkActiveTab()).toEqual({ kind: "cantRead" });
+    expect(s.fetch).not.toHaveBeenCalled();
+    expect(s.auth.accessToken).not.toHaveBeenCalled();
+  });
+
+  it.each(["local", "hosted"] as const)("offers the same paste URL as saving in %s", async (env) => {
+    const s = setup(env);
+    s.read.pageText = "  " + "x".repeat(199) + "  ";
+    expect(await s.checkActiveTab()).toEqual(await s.saveActiveTab());
+    expect(await s.checkActiveTab()).toEqual(s.couldntRead);
+    expect(s.fetch).not.toHaveBeenCalled();
+    expect(s.auth.accessToken).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("checks a long page with JobPosting=%s without auth or API calls", async (job) => {
+    const s = setup();
+    s.read.url = "https://example.com/";
+    s.read.pageText = ("This domain is for use in documentation examples without needing permission. "
+      + "هذا النطاق مخصص للأمثلة. 此域名用于文档中的示例。 ").repeat(10);
+    s.read.jsonLd = job ? [{ "@type": "JobPosting" }] : [];
+    expect(await s.checkActiveTab()).toEqual({ kind: job ? "capture" : "notJob" });
+    for (const method of Object.values(s.auth)) expect(method).not.toHaveBeenCalled();
+    expect(s.fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("saveActiveTab", () => {
   it.each(["chrome://extensions", "file:///cv.pdf", "not a URL", ""])("cannot read %s", async (url) => {
     const s = setup();

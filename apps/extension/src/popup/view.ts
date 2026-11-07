@@ -5,6 +5,8 @@ import type { PopupState, SaveResult } from "../messages";
 
 export type View =
   | { kind: "signedOut"; state: PopupState; message: string | null; error: string | null }
+  | { kind: "checking" }
+  | { kind: "notJob" }
   | { kind: "capture"; where: string; busy: boolean }
   | SaveResult;
 
@@ -81,6 +83,26 @@ export function renderView(root: HTMLElement, view: View, actions: ViewActions):
           actions.openTab(url);
         });
       }
+      break;
+    }
+    case "checking": {
+      const status = add("p", copy.checking);
+      status.setAttribute("role", "status");
+      const spinner = doc.createElement("span");
+      spinner.className = "spinner";
+      spinner.setAttribute("aria-hidden", "true");
+      status.prepend(spinner);
+      break;
+    }
+    case "notJob": {
+      add("h2", copy.notJobTitle);
+      add("p", copy.notJobText);
+      const capture = add("button", copy.captureAnyway);
+      capture.className = "link-button";
+      capture.addEventListener("click", () => {
+        capture.disabled = true;
+        actions.retry();
+      });
       break;
     }
     case "capture": {

@@ -1,6 +1,6 @@
 import { copy } from "../copy";
 import type { EnvId } from "../environments";
-import type { PopupState, Request, SaveResult, SignInReply } from "../messages";
+import type { CheckResult, PopupState, Request, SaveResult, SignInReply } from "../messages";
 import { renderView, type View, type ViewActions } from "./view";
 import "./popup.css";
 
@@ -27,6 +27,12 @@ function isSignInReply(reply: unknown): reply is SignInReply {
       : "message" in reply && typeof reply.message === "string");
 }
 
+function isCheckResult(reply: unknown): reply is CheckResult {
+  if (!reply || typeof reply !== "object" || !("kind" in reply)) return false;
+  return reply.kind === "capture" || reply.kind === "notJob" || reply.kind === "cantRead"
+    || (reply.kind === "couldntRead" && "pasteUrl" in reply && typeof reply.pasteUrl === "string");
+}
+
 function isSaveResult(reply: unknown): reply is SaveResult {
   return !!reply && typeof reply === "object" && "kind" in reply && typeof reply.kind === "string"
     && ["saved", "existing", "couldntRead", "cantRead", "signedOut", "error"].includes(reply.kind);
@@ -42,6 +48,7 @@ export async function startPopup(
   let state: PopupState | undefined;
   let version = 0;
   let pendingStateVersion: number | null = null;
+  let retryCheck = false;
   let where = "";
   const send = async (request: Request) => chromeApi.runtime.sendMessage(request);
   const show = (view: View) => {
@@ -79,6 +86,7 @@ export async function startPopup(
       show({ kind: "signedOut", state, message: null, error: null });
       return;
     }
+    retryCheck = true;
     try {
       const [tab] = await chromeApi.tabs.query({ active: true, currentWindow: true });
       if (current !== version) return;
@@ -87,7 +95,13 @@ export async function startPopup(
         const url = new URL(tab?.url ?? "");
         if (url.protocol === "http:" || url.protocol === "https:") where = url.host + url.pathname;
       } catch { /* Pages without a valid URL cannot be captured. */ }
-      show(where ? { kind: "capture", where, busy: false } : { kind: "cantRead" });
+      if (!where) { show({ kind: "cantRead" }); return; }
+      show({ kind: "checking" });
+      const result = await send({ type: "checkActiveTab" });
+      if (current !== version) return;
+      if (!isCheckResult(result)) { fail(); return; }
+      retryCheck = false;
+      show(result.kind === "capture" ? { kind: "capture", where, busy: false } : result);
     } catch {
       if (current === version) fail();
     }
@@ -149,7 +163,10 @@ export async function startPopup(
     setEnvironment: (env) => { void changeState({ type: "setEnvironment", env }); },
     signOut: () => { void changeState({ type: "signOut" }); },
     openTab: (url) => { void chromeApi.tabs.create({ url }).catch(fail); },
-    retry: () => { void (isPopupState(state) ? save() : startPopup(chromeApi, doc)); },
+    retry: () => {
+      if (pendingStateVersion !== null) return;
+      void (isPopupState(state) ? (retryCheck ? showState() : save()) : startPopup(chromeApi, doc));
+    },
   };
   try {
     const initial = await send({ type: "getState" });
