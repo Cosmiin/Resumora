@@ -48,14 +48,14 @@ function buildQueue(role: Experience | undefined, result: RoleResult | undefined
 const questionKey = (text: string) => text.trim().replace(/\s+/g, " ").toLowerCase();
 function bulletStep(
   role: Experience | undefined, queue: string[], position: number, result: RoleResult | undefined,
-  shown: Map<string, Set<string>>, completed: Set<string>, next?: { bulletId: string; question: Question | null },
+  counts: Map<string, number>, asked: Set<string>, completed: Set<string>, next?: { bulletId: string; question: Question | null },
 ): Pick<View, "step" | "position"> {
   while (queue[position]) {
     const bulletId = queue[position]!;
-    const asked = shown.get(bulletId) ?? new Set<string>();
+    const count = counts.get(bulletId) ?? 0;
     const followUp = next?.bulletId === bulletId;
     const question = followUp ? next.question : result?.questions.find((q) => q.bulletId === bulletId) ?? null;
-    if (!role?.bullets.some((b) => b.id === bulletId) || completed.has(bulletId) || asked.size >= 3
+    if (!role?.bullets.some((b) => b.id === bulletId) || completed.has(bulletId) || count >= 3
       || (followUp && !question) || (question && asked.has(questionKey(question.text)))) {
       completed.add(bulletId);
       position++;
@@ -63,18 +63,21 @@ function bulletStep(
     }
     if (!question) return { position, step: { kind: "working", bulletId } };
     asked.add(questionKey(question.text));
-    shown.set(bulletId, asked);
-    return { position, step: { kind: followUp ? "needsDetail" : "question", bulletId, question, asked: asked.size } };
+    counts.set(bulletId, count + 1);
+    return { position, step: { kind: followUp ? "needsDetail" : "question", bulletId, question, asked: count + 1 } };
   }
   return { position, step: { kind: "roleDone", score: result?.score ?? null } };
 }
 function firstStep(
   role: Experience | undefined, result: RoleResult | undefined, queue: string[],
-  shown: Map<string, Set<string>>, completed: Set<string>,
+  counts: Map<string, number>, asked: Set<string>, completed: Set<string>,
 ): Pick<View, "step" | "position"> {
-  return result?.roleQuestions.length ? { position: 0, step: { kind: "role", index: 0 } }
-    : role && role.bullets.length <= 1 ? { position: 0, step: { kind: "brainDump" } }
-    : bulletStep(role, queue, 0, result, shown, completed);
+  if (result?.roleQuestions.length) {
+    asked.add(questionKey(result.roleQuestions[0]!.text));
+    return { position: 0, step: { kind: "role", index: 0 } };
+  }
+  return role && role.bullets.length <= 1 ? { position: 0, step: { kind: "brainDump" } }
+    : bulletStep(role, queue, 0, result, counts, asked, completed);
 }
 
 /** Owns one open focus session; every content change goes through the editor's reducer. */
@@ -87,22 +90,25 @@ export function useFocusSession(opts: Options): {
   addSelected(ids: string[]): void; next(): void; retry(): void; close(): void; freeTalk(): void;
 } {
   const [initial] = useState(() => {
-    const shown = new Map<string, Set<string>>();
+    const counts = new Map<string, number>();
     const completed = new Set<string>();
     const role = opts.cv.experience.find((r) => r.id === opts.roleId);
-    const result = opts.scores.get(opts.roleId)?.result;
+    const asked = new Set(role?.notes.map((note) => questionKey(note.question)));
+    const stored = opts.scores.get(opts.roleId)?.result;
+    const result = stored && { ...stored, roleQuestions: stored.roleQuestions.filter((q, i, questions) =>
+      !asked.has(questionKey(q.text)) && questions.findIndex((other) => questionKey(other.text) === questionKey(q.text)) === i) };
     const queue = buildQueue(role, result, opts);
     const fresh = role && result?.fingerprint === fingerprint(role, opts.cv.locale);
-    const start: Pick<View, "step" | "position"> = fresh ? firstStep(role, result, queue, shown, completed)
+    const start: Pick<View, "step" | "position"> = fresh ? firstStep(role, result, queue, counts, asked, completed)
       : { position: 0, step: { kind: "scoring", source: "opening" } };
-    return { shown, completed, view: { queue, busy: !fresh, ...start } };
+    return { counts, asked, completed, result, view: { queue, busy: !fresh, ...start } };
   });
   const [view, setView] = useState<View>(initial.view);
   const current = useRef(opts);
   const session = useRef({
     view, alive: true, closed: false, notesChanged: false, lastCelebrated: null as number | null,
-    result: opts.scores.get(opts.roleId)?.result, openingStarted: false, roleAnswered: false,
-    shown: initial.shown, completed: initial.completed,
+    result: initial.result, openingStarted: false, roleAnswered: false,
+    counts: initial.counts, asked: initial.asked, completed: initial.completed,
     rerun: new Set<string>(), returnPosition: 0,
     returnStep: null as Extract<FocusStep, { kind: "role" | "question" | "needsDetail" }> | null,
     lastCall: undefined as { bulletId: string | null; source?: "answers" } | undefined,
@@ -143,7 +149,7 @@ export function useFocusSession(opts: Options): {
     const result = entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)
       ? entry.result : session.current.result;
     for (const id of queue.slice(0, position)) s.completed.add(id);
-    update({ queue, busy: false, ...bulletStep(role, queue, position, result, s.shown, s.completed, next) });
+    update({ queue, busy: false, ...bulletStep(role, queue, position, result, s.counts, s.asked, s.completed, next) });
   }, [update]);
 
   const run = useCallback(async (bulletId: string | null, source?: "answers") => {
@@ -220,9 +226,11 @@ export function useFocusSession(opts: Options): {
       if (role && result?.fingerprint !== fingerprint(role, o.cv.locale)) result = undefined;
       const entry = o.scores.get(o.roleId);
       if (entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)) result = entry.result;
+      if (result) result = { ...result, roleQuestions: result.roleQuestions.filter((q, i, questions) =>
+        !s.asked.has(questionKey(q.text)) && questions.findIndex((other) => questionKey(other.text) === questionKey(q.text)) === i) };
       s.result = result ?? s.result;
       const queue = buildQueue(role, result, o);
-      update({ busy: false, queue, ...firstStep(role, result, queue, s.shown, s.completed) });
+      update({ busy: false, queue, ...firstStep(role, result, queue, s.counts, s.asked, s.completed) });
     };
     void open();
   }, [view.step, update]);
@@ -271,8 +279,13 @@ export function useFocusSession(opts: Options): {
     if (!available()) return;
     const step = s.view.step;
     if (step.kind === "role") {
-      if (step.index + 1 < (s.result?.roleQuestions.length ?? 0)) update({ step: { kind: "role", index: step.index + 1 } });
-      else {
+      const questions = s.result?.roleQuestions ?? [];
+      let index = step.index + 1;
+      while (questions[index] && s.asked.has(questionKey(questions[index]!.text))) index++;
+      if (questions[index]) {
+        s.asked.add(questionKey(questions[index]!.text));
+        update({ step: { kind: "role", index } });
+      } else {
         const role = current.current.cv.experience.find((r) => r.id === current.current.roleId);
         if (role && role.bullets.length <= 1) {
           if (s.roleAnswered) void run(null, "answers");

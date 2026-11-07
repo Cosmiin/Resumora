@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BRAIN_DUMP_QUESTION, emptyCv, fingerprint, notesHash,
@@ -8,6 +8,7 @@ import { ApiClientError } from "../../lib/api-error.ts";
 import { cvReducer } from "../edit/cvReducer.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 import { useFocusSession } from "./useFocusSession.ts";
+import { FocusMode } from "./FocusMode.tsx";
 
 const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
@@ -28,7 +29,7 @@ function score(r: Experience, value: number | null = 40): RoleResult {
       issue: "specificity", tip: null, question: "Which tools?",
     })),
     roleQuestions: [],
-    questions: r.bullets.map((b) => ({ bulletId: b.id, text: "Which tools?", options: [], kind: "detail" })),
+    questions: r.bullets.map((b, i) => ({ bulletId: b.id, text: i === 0 ? "Which tools?" : `Which tools for tool ${i}?`, options: [], kind: "detail" })),
   };
 }
 const proposal = {
@@ -87,6 +88,78 @@ describe("useFocusSession", () => {
     api.scoreRole.mockRejectedValue(new Error("unavailable"));
   });
   afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
+
+  it.each([false, true])("filters saved role answers before asking and saving the next question (score on open: %s)", async (onOpen) => {
+    const r = role();
+    r.notes = [{ id: "n", question: "  WHO  did you REPORT to? ", answer: "The CEO", via: ["type"], askedAt: "2026-11-07T00:00:00Z" }];
+    const result = { ...score(r), roleQuestions: [...roleQuestions, { ...roleQuestions[1]!, id: "rq3", text: " WHO did you WORK with? " }] };
+    api.scoreRole.mockResolvedValue(result);
+    const h = mount({ scores: onOpen ? new Map() : new Map([["r", { state: "ready", result }]]) }, r);
+    await settle();
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    expect(h.result.current.roleQuestions).toEqual([roleQuestions[1]]);
+    const ui = render(<FocusMode target={{ roleId: "r", mode: "improve" }} {...h.opts()} />);
+    await settle();
+    expect(screen.getByText("About this role · 1 of 1")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: roleQuestions[1]!.text })).toBeInTheDocument();
+    ui.unmount();
+    await submit(h, "Finance");
+    expect(h.opts().cv.experience[0]!.notes[1]).toMatchObject({ question: roleQuestions[1]!.text, answer: "Finance" });
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b0" });
+  });
+  it.each([0, 1, 3])("skips previously answered role questions with %i bullets", async (count) => {
+    const r = role(count);
+    r.notes = roleQuestions.map((q) => ({ id: q.id, question: q.text.toUpperCase(), answer: "Saved answer", via: ["type"], askedAt: "2026-11-07T00:00:00Z" }));
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions } }]]) }, r);
+    await settle();
+    expect(h.result.current.roleQuestions).toEqual([]);
+    expect(h.result.current.step.kind).toBe(count <= 1 ? "brainDump" : "question");
+    expect(api.brainDump).not.toHaveBeenCalled();
+    expect(api.improveBullet).not.toHaveBeenCalled();
+  });
+  it("skips answered role questions when scoring an empty role on open", async () => {
+    const r = role(0);
+    r.notes = roleQuestions.map((q) => ({ id: q.id, question: q.text, answer: "Saved answer", via: ["type"], askedAt: "2026-11-07T00:00:00Z" }));
+    api.scoreRole.mockResolvedValue({ ...score(r), roleQuestions });
+    const h = mount({ scores: new Map() }, r);
+    await settle();
+    expect(h.result.current.roleQuestions).toEqual([]);
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+    expect(api.brainDump).not.toHaveBeenCalled();
+  });
+  it("moves on when a follow-up repeats a skipped role question", async () => {
+    const r = role();
+    api.improveBullet.mockResolvedValue({ needsDetail: true, nextQuestion: { text: " WHO  DID YOU REPORT TO? ", options: [] } });
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions } }]]) }, r);
+    act(() => h.result.current.skip());
+    act(() => h.result.current.skip());
+    await submit(h);
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1", asked: 1 });
+  });
+  it("skips a bullet whose stored question repeats an earlier bullet question", () => {
+    const r = role(4);
+    const result = score(r);
+    result.questions[3]!.text = " WHICH  tools? ";
+    const h = mount({ scores: new Map([["r", { state: "ready", result }]]) }, r);
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    expect(h.result.current.position).toBe(2);
+    expect(api.improveBullet).not.toHaveBeenCalled();
+  });
+  it("shows a skipped role question again in a new session", () => {
+    const r = role();
+    const scores: Options["scores"] = new Map([["r", { state: "ready", result: { ...score(r), roleQuestions } }]]);
+    const first = mount({ scores }, r);
+    act(() => first.result.current.skip());
+    expect(first.result.current.step).toEqual({ kind: "role", index: 1 });
+    act(() => first.result.current.close());
+    const saved = first.opts().cv.experience[0]!;
+    first.unmount();
+    const second = mount({ scores }, saved);
+    expect(second.result.current.step).toEqual({ kind: "role", index: 0 });
+    expect(second.result.current.roleQuestions[0]).toEqual(roleQuestions[0]);
+    expect(saved.notes).toEqual([]);
+  });
 
   it("saves role answers before bullet questions without calling AI", async () => {
     const r = role();
@@ -279,7 +352,7 @@ describe("useFocusSession", () => {
     if (fingerprint) background.fingerprint = fingerprint;
     h.update({ scores: new Map([["r", { state, result: background }]]) });
     act(() => h.result.current.next());
-    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1", question: { text: "Which tools?" } });
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1", question: { text: "Which tools for tool 1?" } });
   });
   it("prefers ready matching background questions when the opening score returns", async () => {
     const r = role();
