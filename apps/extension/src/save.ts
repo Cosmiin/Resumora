@@ -85,7 +85,7 @@ export function createSaver(deps: {
           return { kind: "cantRead" };
         }
         const env = await deps.environment();
-        if (running.has(`${env.id}:${tab.id}`)) return { kind: "capturing" };
+        if (running.has(`${env.id}:${tab.id}:${tab.url}`)) return { kind: "capturing" };
         const read = await deps.runReader(tab.id);
         if (read.pageText.trim().length < 200) {
           return { kind: "couldntRead", pasteUrl: env.webUrl + "/jobs?add=" + encodeURIComponent(read.url) };
@@ -102,7 +102,7 @@ export function createSaver(deps: {
           return { kind: "cantRead" };
         }
         const env = await deps.environment();
-        const key = `${env.id}:${tab.id}`;
+        const key = `${env.id}:${tab.id}:${tab.url}`;
         return running.get(key) ?? lastResults.get(key) ?? error(copy.somethingWrong);
       } catch {
         return { kind: "cantRead" };
@@ -115,7 +115,7 @@ export function createSaver(deps: {
           return { kind: "cantRead" };
         }
         const env = await deps.environment();
-        const key = `${env.id}:${tab.id}`;
+        const key = `${env.id}:${tab.id}:${tab.url}`;
         const current = running.get(key);
         if (current) return current;
         lastResults.delete(key);

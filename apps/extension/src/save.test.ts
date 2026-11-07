@@ -43,6 +43,39 @@ describe("checkActiveTab", () => {
     expect(s.runReader).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    ["https://jobs.example.test/a", "https://jobs.example.test/b"],
+    ["https://www.linkedin.com/jobs/search/?currentJobId=123", "https://www.linkedin.com/jobs/search/?currentJobId=456"],
+  ])("checks the new page while %s is still saving", async (urlA, urlB) => {
+    const s = setup();
+    s.activeTab.mockResolvedValue({ id: 1, url: urlA });
+    s.read.jsonLd = [{ "@type": "JobPosting" }];
+    let finish!: (response: Response) => void;
+    s.fetch.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const saving = s.saveActiveTab();
+    await vi.waitFor(() => expect(s.fetch).toHaveBeenCalledTimes(1));
+    try {
+      s.activeTab.mockResolvedValue({ id: 1, url: urlB });
+      expect(await s.checkActiveTab()).toEqual({ kind: "capture" });
+      expect(s.runReader).toHaveBeenCalledTimes(2);
+      s.runReader.mockClear();
+      s.fetch.mockClear();
+      let joined: unknown;
+      const joining = s.joinCapture().then((result) => { joined = result; });
+      const error = { kind: "error", message: "Something went wrong. Try again.", requestId: null };
+      await vi.waitFor(() => expect(joined).toEqual(error));
+      await joining;
+      finish(Response.json({ id: "job-id" }, { status: 202 }));
+      await saving;
+      expect(await s.joinCapture()).toEqual(error);
+      expect(s.runReader).not.toHaveBeenCalled();
+      expect(s.fetch).not.toHaveBeenCalled();
+    } finally {
+      finish(Response.json({ id: "job-id" }, { status: 202 }));
+      await saving;
+    }
+  });
+
   it.each(["chrome://extensions/", "file:///cv.pdf", "not a URL", ""])("cannot read %s", async (url) => {
     const s = setup();
     s.activeTab.mockResolvedValue({ id: 7, url });
@@ -240,6 +273,25 @@ describe("saveActiveTab", () => {
     s.fetch.mockRejectedValue(new Error("Private details"));
     expect(await s.saveActiveTab()).toEqual({ kind: "error", message, requestId: null });
     expect(s.auth.signOut).not.toHaveBeenCalled();
+  });
+
+  it("starts separate saves when only the LinkedIn job query changes in the same tab", async () => {
+    const s = setup();
+    s.activeTab.mockResolvedValue({ id: 1, url: "https://www.linkedin.com/jobs/search/?currentJobId=123" });
+    let finish!: (response: Response) => void;
+    s.fetch.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const first = s.saveActiveTab();
+    await vi.waitFor(() => expect(s.fetch).toHaveBeenCalledTimes(1));
+    s.activeTab.mockResolvedValue({ id: 1, url: "https://www.linkedin.com/jobs/search/?currentJobId=456" });
+    const second = s.saveActiveTab();
+    try {
+      await vi.waitFor(() => expect(s.fetch).toHaveBeenCalledTimes(2));
+      expect(await second).toEqual({ kind: "saved", openUrl: s.env.webUrl + "/jobs/job-id" });
+      expect(s.runReader).toHaveBeenCalledTimes(2);
+    } finally {
+      finish(Response.json({ id: "job-id" }, { status: 202 }));
+      await Promise.all([first, second]);
+    }
   });
 
   it("starts a separate save after switching environments on the same tab", async () => {
