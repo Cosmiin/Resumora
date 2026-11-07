@@ -87,3 +87,13 @@ commit: f81b453 · codex: build 01a1b59c, review 01a1b5a0 (pass) · fix rounds: 
 
 ## Whole-branch review 7 (base 7dde331) — fix, 1 finding (not fixed yet)
 codex: review 01a1b5a1 · open: save.ts:117 — switching Local→Hosted in the milliseconds between clicking Capture and the tab lookup sends that capture to Hosted (environment read after activeTab()). Present since Task 4; very unlikely; Hosted not configured in this build. Awaiting the user's call: fix now or list as known in the PR.
+
+## Task 14: Extension — the environment is fixed when Capture is clicked — done
+commit: 1efb6f7 · codex: build 01a1b5b8, review 01a1b5bc (pass) · fix rounds: 0 · from whole-branch review 7. 1355 tests.
+
+## Task 15: Web — the Add a job dialog's step 3 mentions Capture — done
+commit: 24b4496 · codex: build 01a1b5bc, review 01a1b5bf (pass) · fix rounds: 0
+
+## Whole-branch review 8 (base 7dde331) — fix, 1 finding (listed as known in the PR, not fixed)
+codex: review 01a1b5c0 · open: save.ts:88 — signing out and into a different account while a capture is pending, then reopening the popup, joins the previous account's capture and shows "Saved" (the capture key has no account identity). Needs two accounts and a sign-out within about a second. Stopped the review loop here (each round found a rarer case); reported to the user.
+PR: https://github.com/Cosmiin/Resumora/pull/37

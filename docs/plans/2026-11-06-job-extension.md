@@ -423,6 +423,47 @@ size: 50
 
 ---
 
+## Task 14: Extension — the environment is fixed when Capture is clicked (from whole-branch review 7)
+
+---
+files: [apps/extension/src/save.ts, apps/extension/src/save.test.ts]
+new_files: []
+deps: false
+size: 40
+---
+
+**Goal:** `saveActiveTab`, `checkActiveTab` and `joinCapture` await `deps.activeTab()` first and only then `deps.environment()`. If the user switches Local → Hosted while the tab lookup is pending, a capture started on Local is sent to Hosted with the Hosted session.
+
+- In all three methods, read `deps.environment()` **before** `deps.activeTab()`, and use that environment for the key and the save. Nothing else changes.
+
+**Acceptance tests (`save.test.ts`):**
+- `activeTab()` returns a deferred promise; the environment starts as `local`; call `saveActiveTab()`; switch the environment mock to `hosted`; resolve the tab → the request goes to the Local API URL with the Local token, and the Hosted token is never requested.
+- The same ordering for `checkActiveTab()`: the `couldntRead` paste URL uses the Local web URL.
+- All other tests pass.
+
+**Out of scope:** everything else.
+
+---
+
+## Task 15: Web — the Add a job dialog's step 3 mentions Capture
+
+---
+files: [apps/web/src/i18n/en-jobs.ts, apps/web/src/jobs/jobs-page.test.tsx]
+new_files: []
+deps: false
+size: 6
+---
+
+**Goal:** since Task 9 the extension popup opens on a **Capture** button, but the dialog's third step still reads "Click the Resumora icon on any job ad, LinkedIn included."
+
+- Change `jobs.dialog.extStep3` to "Click the Resumora icon on any job ad, LinkedIn included, then click Capture." and update the expected text in `jobs-page.test.tsx`. Nothing else changes.
+
+**Acceptance tests:** the existing dialog test expects the new text and passes; all other tests pass.
+
+**Out of scope:** everything else.
+
+---
+
 ## After the build: manual checklist in Chrome (Claude with the user)
 
 Not a Codex task. Claude runs it with the user through Claude in Chrome (the user's own Chrome), local first, then hosted. **The user does the steps only a person can:** loading the unpacked extension, clicking the toolbar icon (no tool can click it, and `activeTab` only grants access after that click), and typing their password into the popup. Claude prepares each page, tells the user exactly what to click, reads what the popup shows from the user's report or a screenshot, and checks the web side (the job in `/jobs`, its status reaching ready) in Chrome.

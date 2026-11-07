@@ -68,7 +68,7 @@ Rules:
 
 ### Web app: Add a job dialog
 
-- Top: a box "Save jobs with the Resumora extension" with three steps (install the extension, sign in with your Resumora account, click the Resumora icon on any job ad, LinkedIn included) and a **How to install (dev)** toggle that shows the load-unpacked steps inline.
+- Top: a box "Save jobs with the Resumora extension" with three steps (install the extension, sign in with your Resumora account, click the Resumora icon on any job ad, LinkedIn included, then **Capture**) and a **How to install (dev)** toggle that shows the load-unpacked steps inline.
 - Below: **Or paste it yourself**, collapsed by default, holding the current form (link + description, same validation: valid `http(s)` link, at least 200 characters).
 - Opened from `/jobs?add=<url>`: the dialog opens with the paste section expanded, the link filled in, and focus in the description field. The `add` parameter is removed from the address after opening, so a reload doesn't reopen it.
 - The line "Soon a link alone will be enough: Resumora will read the page for you." is removed.
