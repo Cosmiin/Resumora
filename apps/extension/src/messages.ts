@@ -20,6 +20,7 @@ export type SignInReply =
 
 export type CheckResult =
   | { kind: "capture" }
+  | { kind: "capturing" }
   | { kind: "notJob" }
   | { kind: "couldntRead"; pasteUrl: string }
   | { kind: "cantRead" };

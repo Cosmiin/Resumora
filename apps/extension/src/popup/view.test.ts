@@ -135,6 +135,35 @@ async function popup(signedIn = true, url = "https://www.linkedin.com/jobs/view/
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("popup interactions", () => {
+  it("joins a running capture and shows Saved after at least 500 ms", async () => {
+    vi.useFakeTimers();
+    const p = await popup();
+    let finish!: (result: SaveResult) => void;
+    p.sendMessage.mockResolvedValueOnce({ ...state, email: "user@example.test" })
+      .mockResolvedValueOnce({ kind: "capturing" })
+      .mockReturnValueOnce(new Promise<SaveResult>((resolve) => { finish = resolve; }));
+    const opening = p.start();
+    await vi.advanceTimersByTimeAsync(0);
+    const busy = document.querySelector<HTMLButtonElement>("main button")!;
+    expect(busy?.disabled).toBe(true);
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    expect(busy.querySelector(".spinner")).not.toBeNull();
+    expect(busy.textContent).toBe("Capturing…");
+    expect(document.querySelector("main p")?.textContent).toBe("www.linkedin.com/jobs/view/123/");
+    busy.click();
+    expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual([
+      "getState", "checkActiveTab", "saveActiveTab",
+    ]);
+    finish({ kind: "saved", openUrl: "https://resumora.test/jobs/id" });
+    await vi.advanceTimersByTimeAsync(499);
+    expect(document.querySelector("main button")?.textContent).toBe("Capturing…");
+    await vi.advanceTimersByTimeAsync(1);
+    await opening;
+    expect(document.querySelector("main h2")?.textContent).toBe("Saved");
+    expect(document.querySelector("main button")?.textContent).toBe("Open in Resumora");
+    expect(p.sendMessage.mock.calls.filter(([request]) => request.type === "saveActiveTab")).toHaveLength(1);
+  });
+
   it("shows Checking first, then the page to capture", async () => {
     const p = await popup();
     let finish!: (result: CheckResult) => void;

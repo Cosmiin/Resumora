@@ -79,9 +79,10 @@ export function createSaver(deps: {
         if (!tab?.url || !["http:", "https:"].includes(new URL(tab.url).protocol)) {
           return { kind: "cantRead" };
         }
+        const env = await deps.environment();
+        if (running.has(`${env.id}:${tab.id}`)) return { kind: "capturing" };
         const read = await deps.runReader(tab.id);
         if (read.pageText.trim().length < 200) {
-          const env = await deps.environment();
           return { kind: "couldntRead", pasteUrl: env.webUrl + "/jobs?add=" + encodeURIComponent(read.url) };
         }
         return { kind: looksLikeJob(read) ? "capture" : "notJob" };

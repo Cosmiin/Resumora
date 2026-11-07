@@ -29,7 +29,7 @@ function isSignInReply(reply: unknown): reply is SignInReply {
 
 function isCheckResult(reply: unknown): reply is CheckResult {
   if (!reply || typeof reply !== "object" || !("kind" in reply)) return false;
-  return reply.kind === "capture" || reply.kind === "notJob" || reply.kind === "cantRead"
+  return reply.kind === "capture" || reply.kind === "capturing" || reply.kind === "notJob" || reply.kind === "cantRead"
     || (reply.kind === "couldntRead" && "pasteUrl" in reply && typeof reply.pasteUrl === "string");
 }
 
@@ -101,6 +101,7 @@ export async function startPopup(
       if (current !== version) return;
       if (!isCheckResult(result)) { fail(); return; }
       retryCheck = false;
+      if (result.kind === "capturing") { void save(); return; }
       show(result.kind === "capture" ? { kind: "capture", where, busy: false } : result);
     } catch {
       if (current === version) fail();
@@ -108,7 +109,6 @@ export async function startPopup(
   };
   const fail = () => show({ kind: "error", message: copy.somethingWrong, requestId: null });
   const save = async () => {
-    if (pendingStateVersion !== null) return;
     const current = ++version;
     show({ kind: "capture", where, busy: true });
     try {

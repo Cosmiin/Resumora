@@ -25,6 +25,24 @@ function setup(envId: EnvId = "local") {
 const expired = { kind: "signedOut", message: "Your sign-in expired. Sign in again." };
 
 describe("checkActiveTab", () => {
+  it.each(["local", "hosted"] as const)("reports a running capture in %s without reading again", async (env) => {
+    const s = setup(env);
+    s.read.jsonLd = [{ "@type": "JobPosting" }];
+    let finish!: (response: Response) => void;
+    s.fetch.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const saving = s.saveActiveTab();
+    await vi.waitFor(() => expect(s.fetch).toHaveBeenCalledTimes(1));
+    try {
+      expect(await s.checkActiveTab()).toEqual({ kind: "capturing" });
+      expect(s.runReader).toHaveBeenCalledTimes(1);
+    } finally {
+      finish(Response.json({ id: "job-id" }, { status: 202 }));
+      await saving;
+    }
+    expect(await s.checkActiveTab()).toEqual({ kind: "capture" });
+    expect(s.runReader).toHaveBeenCalledTimes(2);
+  });
+
   it.each(["chrome://extensions/", "file:///cv.pdf", "not a URL", ""])("cannot read %s", async (url) => {
     const s = setup();
     s.activeTab.mockResolvedValue({ id: 7, url });
