@@ -27,9 +27,10 @@ function renderJobs(path = "/jobs") {
   </QueryClientProvider>);
   return router;
 }
-async function openDialog() {
+async function openDialog(paste = true) {
   const opener = (await screen.findAllByRole("button", { name: "+ Add job" }))[0]!;
   await userEvent.click(opener);
+  if (paste) await userEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
   return opener;
 }
 function fillDialog(url = "https://example.com/jobs/2", text = "x".repeat(200)) {
@@ -154,6 +155,7 @@ describe("jobs list", () => {
     const buttons = screen.getAllByRole("button", { name: "+ Add job" });
     expect(buttons).toHaveLength(2);
     await userEvent.click(buttons[1]!);
+    await userEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(buttons[1]).toHaveFocus();
   });
@@ -246,6 +248,7 @@ describe("jobs polling", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
     expect(listJobs).toHaveBeenCalledTimes(calls);
     fireEvent.click(screen.getByRole("button", { name: "+ Add job" }));
+    fireEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
     fillDialog();
     vi.mocked(createJob).mockResolvedValue({ id: "new", existing: false });
     await act(async () => { fireEvent.submit(screen.getByRole("button", { name: "Add job" }).closest("form")!); });
@@ -258,6 +261,84 @@ describe("jobs polling", () => {
 });
 
 describe("Add job dialog", () => {
+  it("leads with the extension guide and toggles the development install steps", async () => {
+    renderJobs(); await openDialog(false);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Save jobs with the Resumora extension")).toBeVisible();
+    expect(within(dialog).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Install the Resumora extension for Chrome.",
+      "Sign in with your Resumora account.",
+      "Click the Resumora icon on any job ad, LinkedIn included, then click Capture.",
+    ]);
+    expect(within(dialog).queryByText("Soon")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Soon a link alone/)).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "How to install (dev)" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const steps = document.getElementById(toggle.getAttribute("aria-controls")!);
+    expect(steps).toBeVisible();
+    expect(within(steps!).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      "Run npm run build -w apps/extension.",
+      "Open chrome://extensions and turn on Developer mode.",
+      "Click Load unpacked and choose the apps/extension/dist folder.",
+      "Pin the Resumora icon to the toolbar.",
+    ]);
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(3);
+  });
+
+  it("starts with the paste form collapsed and keeps fields when toggled", async () => {
+    renderJobs(); await openDialog(false);
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+    expect(screen.queryByLabelText("Link to the job ad")).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Or paste it yourself" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBeVisible();
+    expect(screen.getByLabelText("Link to the job ad")).toHaveFocus();
+    fillDialog();
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveFocus();
+    expect(screen.queryByLabelText("Link to the job ad")).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(screen.getByLabelText("Job description")).toHaveValue("x".repeat(200));
+  });
+
+  it.each(["https://example.com/job/1", "http://example.com/job/1"])("opens ready to paste for add=%s", async (url) => {
+    const router = renderJobs("/jobs?keep=one&add=" + encodeURIComponent(url) + "&keep=two");
+    expect(await screen.findByRole("dialog", { name: "Add a job" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Or paste it yourself" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("Link to the job ad")).toHaveValue(url);
+    expect(screen.getByLabelText("Job description")).toHaveFocus();
+    expect(router.state.location.search).toBe("?keep=one&keep=two");
+    expect(router.state.historyAction).toBe("REPLACE");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "+ Add job" })).toHaveFocus();
+    await openDialog();
+    expect(screen.getByLabelText("Link to the job ad")).toHaveValue("");
+  });
+
+  it.each(["not-a-link", "ftp://x", ""])("removes invalid add=%s without opening", async (value) => {
+    const router = renderJobs("/jobs?keep=one&add=" + encodeURIComponent(value));
+    await screen.findByRole("link", { name: /Engineer/ });
+    await waitFor(() => expect(router.state.location.search).toBe("?keep=one"));
+    expect(router.state.historyAction).toBe("REPLACE");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("opens ready to paste when an add link arrives while the dialog is open", async () => {
+    const router = renderJobs(); await openDialog(false);
+    await act(async () => { await router.navigate("/jobs?add=https%3A%2F%2Fexample.com%2Fjob%2F1"); });
+    expect(screen.getByRole("button", { name: "Or paste it yourself" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("Link to the job ad")).toHaveValue("https://example.com/job/1");
+    expect(screen.getByLabelText("Job description")).toHaveFocus();
+    expect(router.state.location.search).toBe("");
+  });
+
   it("focuses the link, makes the page inert, traps focus and returns it on Escape", async () => {
     renderJobs();
     const opener = await openDialog();
@@ -302,6 +383,7 @@ describe("Add job dialog", () => {
     expect(await screen.findByText("Reading job…")).toBeInTheDocument();
     expect(opener).toHaveFocus();
     await userEvent.click(opener);
+    await userEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
     expect(screen.getByLabelText("Link to the job ad")).toHaveValue("");
     expect(screen.getByLabelText("Job description")).toHaveValue("");
   });
@@ -328,6 +410,7 @@ describe("Add job dialog", () => {
     vi.mocked(createJob).mockResolvedValue({ id: "one", existing: false });
     renderJobs(); await screen.findByText("No jobs yet");
     await userEvent.click(screen.getAllByRole("button", { name: "+ Add job" })[1]!);
+    await userEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
     fillDialog(); await submit();
     await screen.findByRole("link", { name: /Engineer/ });
     expect(screen.getByRole("button", { name: "+ Add job" })).toHaveFocus();

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate } from "react-router";
+import { Navigate, useLocation } from "react-router";
 import { supabase } from "../lib/supabase.ts";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
@@ -22,6 +22,7 @@ const submits: Record<Mode, MessageKey> = {
 
 export function LoginPage() {
   const { session } = useAuth();
+  const location = useLocation();
   const [mode, setMode] = useState<Mode>("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +30,13 @@ export function LoginPage() {
   const [error, setError] = useState<MessageKey | null>(null);
   const [notice, setNotice] = useState<MessageKey | null>(null);
 
-  if (session) return <Navigate to="/cv" replace />;
+  const from = location.state?.from;
+  const destination = typeof from?.pathname === "string"
+    && from.pathname.startsWith("/") && !from.pathname.startsWith("//")
+    ? from.pathname + (typeof from.search === "string" ? from.search : "")
+    : "/cv";
+
+  if (session) return <Navigate to={destination} replace />;
 
   function switchTo(next: Mode) {
     setMode(next);

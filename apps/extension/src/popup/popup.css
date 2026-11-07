@@ -1,0 +1,73 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1e293b;
+  background: #ffffff;
+}
+
+body {
+  width: 320px;
+  margin: 0;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+#environment-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  font-size: 12px;
+}
+
+main {
+  min-height: 48px;
+  padding: 16px;
+}
+
+footer {
+  padding: 0 16px 16px;
+}
+
+h2 { margin: 0 0 12px; font-size: 18px; }
+p { line-height: 1.5; overflow-wrap: anywhere; }
+label { display: block; margin: 12px 0; font-size: 14px; }
+input, select, button { box-sizing: border-box; font: inherit; }
+input, select { display: block; width: 100%; margin-top: 6px; padding: 8px; }
+button { padding: 8px 12px; cursor: pointer; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+main > button, form > button { width: 100%; }
+a, small { display: block; margin: 12px 0; }
+.link-button {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+small { overflow-wrap: anywhere; color: #475569; }
+[role="alert"] { color: #b91c1c; }
+.spinner {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #334155;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

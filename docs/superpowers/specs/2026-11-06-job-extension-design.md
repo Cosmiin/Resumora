@@ -16,7 +16,7 @@ The goal is a **reliable** first version: every click ends in a clear result (sa
 | Ways to add a job | Paste a link (server fetches it) or extension | **Extension**, with the paste form (link + description) as a fallback | Server fetch fails on the sites that matter most; the extension doesn't |
 | Server fetch (phase 2) | `fetch-page.ts`, `needs_text`, `PUT /text`, retry | **Not built now.** A link is still required with pasted text | Out of scope; may come back later as its own spec |
 | Extension sign-in | Hand-off from the web app (`/connect-extension`) | **Email and password in the extension popup**, through Supabase | The user's choice: simplest, no extra web page or messaging |
-| Saving | Popup with a **Save job** button | **One click on the icon saves** | Fewer steps |
+| Saving | Popup with a **Save job** button | **The popup opens on a Capture button** (changed 2026-11-07 after the first Chrome test; it first saved on open) | Saving on open gave no sense of cause and effect; the user wanted an explicit action and visible loading |
 | Selected text | 200+ selected characters replace the page text | **Ignored.** The reader always picks the text | The user's choice: one predictable behavior |
 | Calling the API | CORS allows `chrome-extension://<id>`, pinned extension key | **Host permissions for Resumora's own API origins only**; the background script's requests are not subject to CORS | No API change or redeploy needed, for local or hosted |
 | Environments | One build-time config | **A Local / Hosted switch** in the popup | Test locally, then try it on the real account |
@@ -47,7 +47,10 @@ The popup always shows the environment badge (**Local** / **Hosted**) in its hea
 | State | When | Shows |
 |---|---|---|
 | Signed out | No session for the chosen environment | Email, password, **Sign in**; a **Connect to** select (Local / Hosted); links "Create an account" and "Forgot password" that open the web app |
-| Saving | Click on a page while signed in | Spinner, "Saving this job…", the page's host and path |
+| Checking | Popup opened (or sign-in finished) on an `http(s)` page while signed in | Small spinner, "Checking this page…" (the page is read and checked in the extension; no API call) |
+| Ready to capture | The check finds a job ad | "Capture this job", the page's host and path, a **Capture** button |
+| Not a job ad | The page has 200+ characters but the check finds no sign of a job ad (added 2026-11-07) | "This doesn't look like a job ad", "Resumora can only read job ads. If this is one, you can still capture it.", a small **Capture anyway** link-style button that runs the normal capture |
+| Capturing | **Capture** clicked | The button disabled, with a spinner and "Capturing…" inside it, for at least 500 ms |
 | Saved | API returned `202` | "Saved", "Resumora is reading the ad. Title and requirements appear in a few seconds.", **Open in Resumora** |
 | Already saved | API returned `existing: true` | "Already in Resumora", "You saved this job earlier. Nothing new was added.", **Open it** |
 | Couldn't read | The reader found under 200 characters | "Couldn't read this ad", "The page shows too little text. It may need a sign-in, or it isn't a job ad.", **Paste it in Resumora** |
@@ -55,16 +58,17 @@ The popup always shows the environment badge (**Local** / **Hosted**) in its hea
 | Not saved | Any API or network error | "Not saved", the message for the error (see Errors), **Try again** |
 
 Rules:
-- **One click saves.** Opening the popup while signed in starts the save at once. There is no Save button.
+- **Capture is explicit.** Opening the popup while signed in never saves by itself. On `http(s)` pages it first checks the page, then shows **Capture**, **Not a job ad**, **Couldn't read** (under 200 characters) or **Can't read this page** (script injection fails); any other page shows "Can't read this page" at once.
+- **The job check** (in the extension, instant, free) passes a page if any of: JSON-LD with `@type` `JobPosting`; a known job-site host; or at least two job signals (job words in English or Romanian, or a job-like URL path). It is a guess, so **Capture anyway** stays available; the server's own "not a job posting" check remains the backstop.
 - **Couldn't read** never calls the API, so it doesn't use one of the 30 daily runs.
 - **Open in Resumora / Open it** opens `<web>/jobs/<id>` in a new tab. **Paste it in Resumora** opens `<web>/jobs?add=<encoded url>`.
-- **Try again** repeats the whole save (read the page again, then send).
+- **Try again** repeats whatever failed: after a failed save it repeats the whole save (read the page again, then send); after a failed page check it repeats only the check and never saves.
 - Switching the environment shows that environment's state (signed in or not); sessions are kept separately.
-- Signing in does not save automatically; the user clicks the icon again on the job page. This keeps sign-in and saving as separate, predictable steps.
+- Signing in does not save automatically; it runs the same page check as opening the popup (Capture, Not a job ad, Couldn't read or Can't read this page), and the user clicks **Capture** or **Capture anyway**.
 
 ### Web app: Add a job dialog
 
-- Top: a box "Save jobs with the Resumora extension" with three steps (install the extension, sign in with your Resumora account, click the Resumora icon on any job ad, LinkedIn included) and a **How to install (dev)** toggle that shows the load-unpacked steps inline.
+- Top: a box "Save jobs with the Resumora extension" with three steps (install the extension, sign in with your Resumora account, click the Resumora icon on any job ad, LinkedIn included, then **Capture**) and a **How to install (dev)** toggle that shows the load-unpacked steps inline.
 - Below: **Or paste it yourself**, collapsed by default, holding the current form (link + description, same validation: valid `http(s)` link, at least 200 characters).
 - Opened from `/jobs?add=<url>`: the dialog opens with the paste section expanded, the link filled in, and focus in the description field. The `add` parameter is removed from the address after opening, so a reload doesn't reopen it.
 - The line "Soon a link alone will be enough: Resumora will read the page for you." is removed.
@@ -185,7 +189,7 @@ HTML fixtures are saved job pages trimmed to the parts the readers use. Every pe
 3. Click the icon on a LinkedIn job page (signed in to LinkedIn) → Saved; the job appears in `/jobs` and becomes ready.
 4. Same LinkedIn job from the search results pane → Already saved.
 5. A Greenhouse or Lever job and a company career page → Saved, then ready.
-6. A page with almost no text → Couldn't read; **Paste it in Resumora** opens the dialog with the link filled in.
+6. `https://example.com` → "This doesn't look like a job ad" on open, with **Capture anyway**; a page with under 200 characters → Couldn't read on open; **Paste it in Resumora** opens the dialog with the link filled in.
 7. `chrome://extensions` → Can't read this page.
 8. Stop the local API, click → "Can't reach Resumora. Is the app running?"
 9. Switch to **Hosted** → Signed out (separate session); sign in, save one job, check it in the hosted app.
