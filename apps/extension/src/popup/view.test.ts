@@ -152,7 +152,7 @@ describe("popup interactions", () => {
     expect(document.querySelector("main p")?.textContent).toBe("www.linkedin.com/jobs/view/123/");
     busy.click();
     expect(p.sendMessage.mock.calls.map(([request]) => request.type)).toEqual([
-      "getState", "checkActiveTab", "saveActiveTab",
+      "getState", "checkActiveTab", "joinCapture",
     ]);
     finish({ kind: "saved", openUrl: "https://resumora.test/jobs/id" });
     await vi.advanceTimersByTimeAsync(499);
@@ -161,7 +161,8 @@ describe("popup interactions", () => {
     await opening;
     expect(document.querySelector("main h2")?.textContent).toBe("Saved");
     expect(document.querySelector("main button")?.textContent).toBe("Open in Resumora");
-    expect(p.sendMessage.mock.calls.filter(([request]) => request.type === "saveActiveTab")).toHaveLength(1);
+    expect(p.sendMessage).toHaveBeenCalledWith({ type: "joinCapture" });
+    expect(p.sendMessage.mock.calls.some(([request]) => request.type === "saveActiveTab")).toBe(false);
   });
 
   it("shows Checking first, then the page to capture", async () => {

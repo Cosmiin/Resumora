@@ -6,6 +6,7 @@ export type Request =
   | { type: "signOut" }
   | { type: "setEnvironment"; env: EnvId }
   | { type: "checkActiveTab" }
+  | { type: "joinCapture" }
   | { type: "saveActiveTab" };
 
 export interface PopupState {

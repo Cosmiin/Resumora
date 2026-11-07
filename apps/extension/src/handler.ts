@@ -39,6 +39,8 @@ export function createHandler(deps: {
         return state(req.env);
       case "checkActiveTab":
         return deps.saver.checkActiveTab();
+      case "joinCapture":
+        return deps.saver.joinCapture();
       case "saveActiveTab":
         return deps.saver.saveActiveTab();
     }

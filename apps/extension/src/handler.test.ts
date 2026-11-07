@@ -19,7 +19,11 @@ function setup(hostedConfigured = false) {
     accessToken: vi.fn<Auth["accessToken"]>(async () => null),
     refresh: vi.fn<Auth["refresh"]>(async () => null),
   };
-  const saver = { checkActiveTab: vi.fn().mockResolvedValue({ kind: "capture" }), saveActiveTab: vi.fn().mockResolvedValue({ kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/id" }) };
+  const saver = {
+    joinCapture: vi.fn().mockResolvedValue({ kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/id" }),
+    checkActiveTab: vi.fn().mockResolvedValue({ kind: "capture" }),
+    saveActiveTab: vi.fn().mockResolvedValue({ kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/id" }),
+  };
   return { storage, auth, emails, saver, handler: createHandler({ storage, auth, environments, saver }) };
 }
 
@@ -90,6 +94,16 @@ describe("popup message handler", () => {
     expect(await handler({ type: "checkActiveTab" })).toEqual({ kind: "capture" });
     expect(saver.checkActiveTab).toHaveBeenCalledExactlyOnceWith();
     expect(saver.saveActiveTab).not.toHaveBeenCalled();
+  });
+
+  it("returns the saver's result for joining without starting a save", async () => {
+    const { handler, saver } = setup();
+    expect(await handler({ type: "joinCapture" })).toEqual({
+      kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/id",
+    });
+    expect(saver.joinCapture).toHaveBeenCalledExactlyOnceWith();
+    expect(saver.saveActiveTab).not.toHaveBeenCalled();
+    expect(saver.checkActiveTab).not.toHaveBeenCalled();
   });
 
   it("returns the saver's result for saving", async () => {

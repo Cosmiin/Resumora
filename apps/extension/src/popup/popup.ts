@@ -101,19 +101,19 @@ export async function startPopup(
       if (current !== version) return;
       if (!isCheckResult(result)) { fail(); return; }
       retryCheck = false;
-      if (result.kind === "capturing") { void save(); return; }
+      if (result.kind === "capturing") { void save("joinCapture"); return; }
       show(result.kind === "capture" ? { kind: "capture", where, busy: false } : result);
     } catch {
       if (current === version) fail();
     }
   };
   const fail = () => show({ kind: "error", message: copy.somethingWrong, requestId: null });
-  const save = async () => {
+  const save = async (type: "saveActiveTab" | "joinCapture" = "saveActiveTab") => {
     const current = ++version;
     show({ kind: "capture", where, busy: true });
     try {
       const [result] = await Promise.all([
-        send({ type: "saveActiveTab" }).catch(() => undefined),
+        send({ type }).catch(() => undefined),
         new Promise((resolve) => setTimeout(resolve, 500)),
       ]);
       if (current !== version) return;

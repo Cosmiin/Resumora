@@ -13,8 +13,13 @@ export function createSaver(deps: {
   auth: Pick<Auth, "accessToken" | "refresh" | "signOut">;
   fetch: typeof fetch;
   environment(): Promise<EnvConfig>;
-}): { checkActiveTab(): Promise<CheckResult>; saveActiveTab(): Promise<SaveResult> } {
+}): {
+  checkActiveTab(): Promise<CheckResult>;
+  joinCapture(): Promise<SaveResult>;
+  saveActiveTab(): Promise<SaveResult>;
+} {
   const running = new Map<string, Promise<SaveResult>>();
+  const lastResults = new Map<string, SaveResult>();
   const error = (message: string, requestId: string | null = null): SaveResult => ({
     kind: "error", message, requestId,
   });
@@ -90,6 +95,19 @@ export function createSaver(deps: {
         return { kind: "cantRead" };
       }
     },
+    async joinCapture() {
+      try {
+        const tab = await deps.activeTab();
+        if (!tab?.url || !["http:", "https:"].includes(new URL(tab.url).protocol)) {
+          return { kind: "cantRead" };
+        }
+        const env = await deps.environment();
+        const key = `${env.id}:${tab.id}`;
+        return running.get(key) ?? lastResults.get(key) ?? error(copy.somethingWrong);
+      } catch {
+        return { kind: "cantRead" };
+      }
+    },
     async saveActiveTab() {
       try {
         const tab = await deps.activeTab();
@@ -100,8 +118,13 @@ export function createSaver(deps: {
         const key = `${env.id}:${tab.id}`;
         const current = running.get(key);
         if (current) return current;
+        lastResults.delete(key);
         const promise = save(tab.id, env).catch(() => error(copy.somethingWrong))
-          .finally(() => { running.delete(key); });
+          .then((result) => {
+            running.delete(key);
+            lastResults.set(key, result);
+            return result;
+          });
         running.set(key, promise);
         return promise;
       } catch {

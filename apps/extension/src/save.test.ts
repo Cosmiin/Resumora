@@ -81,6 +81,37 @@ describe("checkActiveTab", () => {
   });
 });
 
+describe("joinCapture", () => {
+  it.each(["local", "hosted"] as const)("joins a pending or completed save in %s without saving again", async (env) => {
+    const s = setup(env);
+    let finish!: (response: Response) => void;
+    s.fetch.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const saving = s.saveActiveTab();
+    await vi.waitFor(() => expect(s.fetch).toHaveBeenCalledTimes(1));
+    expect(await s.checkActiveTab()).toEqual({ kind: "capturing" });
+    for (const method of Object.values(s.auth)) method.mockClear();
+    const joining = s.joinCapture();
+    finish(Response.json({ id: "job-id" }, { status: 202 }));
+    const result = await saving;
+    expect(result).toEqual({ kind: "saved", openUrl: s.env.webUrl + "/jobs/job-id" });
+    expect(await joining).toBe(result);
+    expect(await s.joinCapture()).toBe(result);
+    expect(s.fetch).toHaveBeenCalledTimes(1);
+    expect(s.runReader).toHaveBeenCalledTimes(1);
+    for (const method of Object.values(s.auth)) expect(method).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when the tab has never been saved without reading or posting", async () => {
+    const s = setup();
+    expect(await s.joinCapture()).toEqual({
+      kind: "error", message: "Something went wrong. Try again.", requestId: null,
+    });
+    expect(s.runReader).not.toHaveBeenCalled();
+    expect(s.fetch).not.toHaveBeenCalled();
+    for (const method of Object.values(s.auth)) expect(method).not.toHaveBeenCalled();
+  });
+});
+
 describe("saveActiveTab", () => {
   it.each(["chrome://extensions", "file:///cv.pdf", "not a URL", ""])("cannot read %s", async (url) => {
     const s = setup();
