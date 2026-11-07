@@ -17,14 +17,32 @@ function setup(envId: EnvId = "local") {
     signOut: vi.fn<Auth["signOut"]>().mockResolvedValue(undefined),
   };
   const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => Response.json({ id: "job-id" }, { status: 202 }));
-  const saver = createSaver({ activeTab, runReader, auth, fetch, environment: async () => env });
+  const environment = vi.fn(async () => env);
+  const saver = createSaver({ activeTab, runReader, auth, fetch, environment });
   const sent = () => JSON.parse(fetch.mock.calls[0]![1]?.body as string);
   const couldntRead = { kind: "couldntRead", pasteUrl: `${env.webUrl}/jobs?add=${encodeURIComponent(read.url)}` };
-  return { ...saver, activeTab, runReader, auth, fetch, env, read, sent, couldntRead };
+  return { ...saver, activeTab, runReader, auth, fetch, environment, env, read, sent, couldntRead };
 }
 const expired = { kind: "signedOut", message: "Your sign-in expired. Sign in again." };
 
 describe("checkActiveTab", () => {
+  it("keeps the Local paste URL when the environment changes during tab lookup", async () => {
+    const s = setup();
+    s.read.pageText = "short";
+    let finish!: (tab: { id: number; url: string }) => void;
+    s.activeTab.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const checking = s.checkActiveTab();
+    await vi.waitFor(() => expect(s.activeTab).toHaveBeenCalledTimes(1));
+    s.environment.mockResolvedValue(setup("hosted").env);
+    finish({ id: 7, url: s.read.url });
+    expect(await checking).toEqual({
+      kind: "couldntRead",
+      pasteUrl: "http://127.0.0.1:5173/jobs?add=https%3A%2F%2Fjobs.example.test%2Fad%3Ftitle%3Da%26b%3Dc",
+    });
+    expect(s.fetch).not.toHaveBeenCalled();
+    expect(s.auth.accessToken).not.toHaveBeenCalled();
+  });
+
   it.each(["local", "hosted"] as const)("reports a running capture in %s without reading again", async (env) => {
     const s = setup(env);
     s.read.jsonLd = [{ "@type": "JobPosting" }];
@@ -115,6 +133,21 @@ describe("checkActiveTab", () => {
 });
 
 describe("joinCapture", () => {
+  it("joins the Local result when the environment changes during tab lookup", async () => {
+    const s = setup();
+    const saved = await s.saveActiveTab();
+    s.activeTab.mockClear();
+    let finish!: (tab: { id: number; url: string }) => void;
+    s.activeTab.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const joining = s.joinCapture();
+    await vi.waitFor(() => expect(s.activeTab).toHaveBeenCalledTimes(1));
+    s.environment.mockResolvedValue(setup("hosted").env);
+    finish({ id: 7, url: s.read.url });
+    expect(await joining).toBe(saved);
+    expect(s.fetch).toHaveBeenCalledTimes(1);
+    expect(s.runReader).toHaveBeenCalledTimes(1);
+  });
+
   it.each(["local", "hosted"] as const)("joins a pending or completed save in %s without saving again", async (env) => {
     const s = setup(env);
     let finish!: (response: Response) => void;
@@ -146,6 +179,23 @@ describe("joinCapture", () => {
 });
 
 describe("saveActiveTab", () => {
+  it("uses the Local API and token when the environment changes during tab lookup", async () => {
+    const s = setup();
+    s.auth.accessToken.mockImplementation(async (env) => ({ token: env + "-token" }));
+    let finish!: (tab: { id: number; url: string }) => void;
+    s.activeTab.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const saving = s.saveActiveTab();
+    await vi.waitFor(() => expect(s.activeTab).toHaveBeenCalledTimes(1));
+    s.environment.mockResolvedValue(setup("hosted").env);
+    finish({ id: 7, url: s.read.url });
+    expect(await saving).toEqual({ kind: "saved", openUrl: "http://127.0.0.1:5173/jobs/job-id" });
+    expect(s.fetch).toHaveBeenCalledTimes(1);
+    expect(s.fetch.mock.calls[0]![0]).toBe("http://127.0.0.1:8788/v1/jobs");
+    expect(new Headers(s.fetch.mock.calls[0]![1]?.headers).get("Authorization")).toBe("Bearer local-token");
+    expect(s.auth.accessToken).toHaveBeenCalledExactlyOnceWith("local");
+    expect(s.auth.accessToken).not.toHaveBeenCalledWith("hosted");
+  });
+
   it.each(["chrome://extensions", "file:///cv.pdf", "not a URL", ""])("cannot read %s", async (url) => {
     const s = setup();
     s.activeTab.mockResolvedValue({ id: 7, url });

@@ -80,11 +80,11 @@ export function createSaver(deps: {
   return {
     async checkActiveTab() {
       try {
+        const env = await deps.environment();
         const tab = await deps.activeTab();
         if (!tab?.url || !["http:", "https:"].includes(new URL(tab.url).protocol)) {
           return { kind: "cantRead" };
         }
-        const env = await deps.environment();
         if (running.has(`${env.id}:${tab.id}:${tab.url}`)) return { kind: "capturing" };
         const read = await deps.runReader(tab.id);
         if (read.pageText.trim().length < 200) {
@@ -97,11 +97,11 @@ export function createSaver(deps: {
     },
     async joinCapture() {
       try {
+        const env = await deps.environment();
         const tab = await deps.activeTab();
         if (!tab?.url || !["http:", "https:"].includes(new URL(tab.url).protocol)) {
           return { kind: "cantRead" };
         }
-        const env = await deps.environment();
         const key = `${env.id}:${tab.id}:${tab.url}`;
         return running.get(key) ?? lastResults.get(key) ?? error(copy.somethingWrong);
       } catch {
@@ -110,11 +110,11 @@ export function createSaver(deps: {
     },
     async saveActiveTab() {
       try {
+        const env = await deps.environment();
         const tab = await deps.activeTab();
         if (!tab?.url || !["http:", "https:"].includes(new URL(tab.url).protocol)) {
           return { kind: "cantRead" };
         }
-        const env = await deps.environment();
         const key = `${env.id}:${tab.id}:${tab.url}`;
         const current = running.get(key);
         if (current) return current;
