@@ -3,6 +3,8 @@ import { emptyCv, type JobExtraction, type TailoredCv } from "@resumora/shared";
 
 const pdf = vi.hoisted(() => ({ buildCvPdf: vi.fn(), buildLetterPdf: vi.fn() }));
 vi.mock("./pdf.tsx", () => pdf);
+const docx = vi.hoisted(() => ({ buildCvDocx: vi.fn(), buildLetterDocx: vi.fn() }));
+vi.mock("./docx.ts", () => docx);
 const download = vi.hoisted(() => vi.fn());
 vi.mock("../lib/supabase.ts", () => ({ supabase: { storage: { from: () => ({ download }) } } }));
 
@@ -21,6 +23,8 @@ beforeEach(() => {
   clicked = [];
   pdf.buildCvPdf.mockResolvedValue(new Blob(["cv"]));
   pdf.buildLetterPdf.mockResolvedValue(new Blob(["letter"]));
+  docx.buildCvDocx.mockResolvedValue(new Blob(["cv"]));
+  docx.buildLetterDocx.mockResolvedValue(new Blob(["letter"]));
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:file");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
@@ -64,6 +68,19 @@ describe("exportFile", () => {
       "ro",
     );
     expect(clicked[0]!.download).toBe("Stefan_Ionescu_Bolt_Senior_Backend_Engineer_Cover_letter.pdf");
+  });
+
+  it("downloads Word files from the docx builders with the same inputs", async () => {
+    const date = new Date("2026-11-08T12:00:00Z");
+    await exportFile("cv", "docx", { cv, job, template: "compact" });
+    expect(docx.buildCvDocx).toHaveBeenCalledWith(content, "compact", undefined);
+    await exportFile("letter", "docx", { cv, job, template: "classic", date });
+    expect(docx.buildLetterDocx.mock.lastCall![0].paragraphs).toEqual(["First paragraph.", "Second\nparagraph."]);
+    expect(docx.buildLetterDocx.mock.lastCall![2]).toBe("ro");
+    expect(clicked.map((c) => c.download)).toEqual([
+      "Stefan_Ionescu_Bolt_Senior_Backend_Engineer.docx", "Stefan_Ionescu_Bolt_Senior_Backend_Engineer_Cover_letter.docx",
+    ]);
+    expect(pdf.buildCvPdf).not.toHaveBeenCalled();
   });
 
   it("refuses a letter export when there is no letter", async () => {

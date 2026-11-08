@@ -6,7 +6,7 @@ import type { ExportPhoto, LetterDocxInput, LetterHeader } from "./docx.ts";
 import { exportFileName } from "./file-name.ts";
 
 export type ExportKind = "cv" | "letter";
-export type ExportFormat = "pdf";
+export type ExportFormat = "pdf" | "docx";
 export type ExportInput = { cv: TailoredCv; job: JobExtraction | null; template: TemplateId; date?: Date };
 
 type ItemReview = { kept?: boolean; inferred?: boolean; reviewed?: boolean; text?: string };
@@ -72,11 +72,11 @@ export async function exportFile(kind: ExportKind, format: ExportFormat, input: 
   const role = input.job?.title ?? "";
   if (kind === "letter") {
     const { letter, header } = letterParts(input);
-    const { buildLetterPdf } = await import("./pdf.tsx");
-    save(await buildLetterPdf(letter, header, input.cv.language), exportFileName(name, company, `${role} Cover letter`, format));
+    const build = format === "pdf" ? (await import("./pdf.tsx")).buildLetterPdf : (await import("./docx.ts")).buildLetterDocx;
+    save(await build(letter, header, input.cv.language), exportFileName(name, company, `${role} Cover letter`, format));
     return;
   }
   const photo = await photoFor(input);
-  const { buildCvPdf } = await import("./pdf.tsx");
-  save(await buildCvPdf(input.cv.content, input.template, photo), exportFileName(name, company, role, format));
+  const build = format === "pdf" ? (await import("./pdf.tsx")).buildCvPdf : (await import("./docx.ts")).buildCvDocx;
+  save(await build(input.cv.content, input.template, photo), exportFileName(name, company, role, format));
 }

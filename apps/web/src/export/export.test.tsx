@@ -46,6 +46,8 @@ describe("ExportMenu", () => {
     expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Led a team of 6 engineers", "Kafka"]);
     await userEvent.click(screen.getByRole("button", { name: "CV as PDF" }));
     await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "pdf", { cv, job, template: "modern" }));
+    await userEvent.click(screen.getByRole("button", { name: "CV as Word" }));
+    await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "docx", { cv, job, template: "modern" }));
   });
 
   it("disables the letter until one is written and shows a failed export", async () => {
@@ -53,6 +55,7 @@ describe("ExportMenu", () => {
     render(<ExportMenu load={async () => cv} job={job} template="classic" />);
     await userEvent.click(screen.getByRole("button", { name: "Export ▾" }));
     expect(await screen.findByRole("button", { name: "Cover letter as PDF" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cover letter as Word" })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "CV as PDF" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't export");
   });

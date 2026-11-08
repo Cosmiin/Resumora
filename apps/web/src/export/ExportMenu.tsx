@@ -11,9 +11,11 @@ type Props = {
   template: TemplateId;
 };
 
-const CHOICES: { kind: ExportKind; format: ExportFormat; label: "export.cvPdf" | "export.letterPdf" }[] = [
+const CHOICES: { kind: ExportKind; format: ExportFormat; label: "export.cvPdf" | "export.cvDocx" | "export.letterPdf" | "export.letterDocx" }[] = [
   { kind: "cv", format: "pdf", label: "export.cvPdf" },
+  { kind: "cv", format: "docx", label: "export.cvDocx" },
   { kind: "letter", format: "pdf", label: "export.letterPdf" },
+  { kind: "letter", format: "docx", label: "export.letterDocx" },
 ];
 
 /** Export ▾: warns about inferred items still unreviewed (export is allowed anyway), then downloads the file. */
