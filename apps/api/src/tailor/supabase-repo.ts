@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { MatchScoreSchema, type MatchScore } from "@resumora/shared";
+import { MatchScoreSchema, TailorRunSchema, type MatchScore, type TailorRun } from "@resumora/shared";
 import { storedCv } from "../cv/supabase-repo.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { TailorRepo } from "./repo.ts";
@@ -31,7 +31,50 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const { capped, ...parts } = data.parts;
       return MatchScoreSchema.parse({ ...data, parts, capped });
     },
+    async findTailoredCvId(jobId, language) {
+      const { data, error } = await db.from("tailored_cvs").select("id").eq("job_id", jobId).eq("language", language).maybeSingle();
+      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
+      return data?.id ?? null;
+    },
+    async createTailoredCv(input) {
+      const { data, error } = await db.from("tailored_cvs").insert({
+        user_id: user.id, job_id: input.jobId, language: input.language, content: input.content,
+        base_snapshot: input.content, base_snapshot_at: input.baseSnapshotAt, tone: input.tone, instruction: input.instruction,
+      }).select("id").single();
+      if (error?.code === "23505") return "exists";
+      if (error) throw new Error(`tailored_cvs insert failed: ${error.message}`);
+      return data.id;
+    },
+    async latestRun(tailoredCvId) {
+      const { data, error } = await db.from("tailor_runs").select(RUN_COLUMNS).eq("tailored_cv_id", tailoredCvId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (error) throw new Error(`tailor_runs select failed: ${error.message}`);
+      return data ? toRun(data) : null;
+    },
+    async createRun(input) {
+      const { data, error } = await db.from("tailor_runs").insert({
+        user_id: user.id, job_id: input.jobId, tailored_cv_id: input.tailoredCvId, kind: input.kind,
+        sections: input.sections, status: "running", current_section: input.currentSection,
+      }).select(RUN_COLUMNS).single();
+      if (error) throw new Error(`tailor_runs insert failed: ${error.message}`);
+      return toRun(data);
+    },
+    async getRun(id) {
+      const { data, error } = await db.from("tailor_runs").select(RUN_COLUMNS).eq("id", id).maybeSingle();
+      if (error) throw new Error(`tailor_runs select failed: ${error.message}`);
+      return data ? toRun(data) : null;
+    },
   };
+}
+
+const RUN_COLUMNS = "id, user_id, job_id, tailored_cv_id, kind, sections, status, current_section, questions, answers, proposals, error_code, created_at, updated_at";
+
+function toRun(row: Record<string, unknown>): TailorRun {
+  return TailorRunSchema.parse({
+    id: row.id, userId: row.user_id, jobId: row.job_id, tailoredCvId: row.tailored_cv_id, kind: row.kind,
+    sections: row.sections, status: row.status, currentSection: row.current_section, questions: row.questions,
+    answers: row.answers, proposals: row.proposals, errorCode: row.error_code, createdAt: row.created_at, updatedAt: row.updated_at,
+  });
 }
 
 /** Queue-only access to a job owner's current Base CV and base score. */
