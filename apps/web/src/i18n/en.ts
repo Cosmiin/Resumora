@@ -127,6 +127,10 @@ export const en = {
   "import.cancel": "Cancel",
 
 
+  "cv.template.classic": "Classic",
+  "cv.template.modern": "Modern",
+  "cv.template.compact": "Compact",
+
   "cv.page.label": "CV page",
   "cv.page.technical": "Technical",
   "cv.page.professional": "Professional",

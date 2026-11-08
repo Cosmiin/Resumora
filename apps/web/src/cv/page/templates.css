@@ -1,0 +1,60 @@
+.cv-page.cv-template-classic {
+  font-family: var(--font-document);
+}
+
+.cv-template-classic .cv-name,
+.cv-template-classic .cv-section-label {
+  font-family: inherit;
+}
+
+.cv-template-classic .cv-name,
+.cv-template-classic .cv-titles,
+.cv-template-classic .cv-section-label,
+.cv-template-classic .cv-item-title {
+  color: var(--text-document);
+}
+
+.cv-page.cv-template-modern {
+  font-family: var(--font-sans);
+}
+
+.cv-template-modern .cv-name {
+  font-family: inherit;
+  color: var(--text-accent);
+}
+
+.cv-template-modern .cv-section-label {
+  color: var(--text-accent);
+  border-block-end: 1px solid var(--border-subtle);
+  padding-block-end: 4px;
+}
+
+.cv-page.cv-template-compact {
+  font-family: var(--font-sans);
+  line-height: 1.35;
+}
+
+.cv-template-compact .cv-name {
+  font-family: inherit;
+  font-size: 28px;
+}
+
+.cv-template-compact .cv-header {
+  margin-block-end: 12px;
+}
+
+.cv-template-compact .cv-section {
+  margin-block-start: 10px;
+}
+
+.cv-template-compact .cv-block {
+  padding-block: 3px;
+}
+
+.cv-template-compact .cv-bullets {
+  margin-block-start: 2px;
+}
+
+.cv-template-compact .cv-skill-row {
+  margin-block: 2px;
+}
