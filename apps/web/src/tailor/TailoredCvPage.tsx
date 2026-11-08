@@ -11,7 +11,7 @@ import { AppShell } from "../layout/AppShell.tsx";
 import { Editor, type CvSource } from "../cv/Editor.tsx";
 import { getScores } from "./tailor-api.ts";
 import { getTailored, listTailored, retailor, saveTailored } from "./tailored-api.ts";
-import { TailorToolbar, type TailoredTab } from "./TailorToolbar.tsx";
+import { LanguageMenu, TailorToolbar, type TailoredTab } from "./TailorToolbar.tsx";
 import "../styles/tailor.css";
 
 type ItemReview = { kept?: boolean; inferred?: boolean; reviewed?: boolean };
@@ -103,7 +103,7 @@ export function TailoredCvPage() {
   const toolbar = (
     <>
       <TailorToolbar tab={tab} onTab={setTab} base={scores.data?.base ?? null} latest={cv.score ?? scores.data?.tailored ?? null}>
-        <button type="button" className="secondary" aria-disabled="true" title={t("tailored.soon")}>{t("tailored.language")}</button>
+        <LanguageMenu key={cv.id} jobId={jobId} current={{ id: cv.id, language: cv.language }} />
         <button type="button" className="secondary" onClick={openDialog}>{t("tailored.retailor")}</button>
       </TailorToolbar>
       {jobChanged && (

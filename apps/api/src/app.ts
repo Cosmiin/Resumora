@@ -111,6 +111,8 @@ export function createApp(deps: AppDeps) {
         if (!deps.tailorRepo) throw new Error("Tailor repository is not configured");
         return deps.tailorRepo(c.get("user"));
       },
+      modelFor: (c) => deps.model(c.get("user")),
+      now: deps.now ?? (() => new Date()),
     }),
   );
 

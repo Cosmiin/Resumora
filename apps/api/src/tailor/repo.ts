@@ -42,6 +42,11 @@ export interface TailorRepo {
   saveTailoredContent(id: string, expectedVersion: number, content: CvContent): Promise<SaveResult | null>;
   /** false when gone. Doesn't bump the version (the template isn't part of the edited content). */
   setTemplate(id: string, template: TailoredCv["template"]): Promise<boolean>;
+  /**
+   * Creates the job's copy in `language`, or refreshes it (version + 1, review and score cleared).
+   * "language_taken" when the job's CV in that language is an original, not a translation.
+   */
+  saveTranslation(input: NewTranslation): Promise<string | "language_taken">;
   /** Newest run of any status for the tailored CV. */
   latestRun(tailoredCvId: string): Promise<TailorRun | null>;
   createRun(input: NewRun): Promise<TailorRun>;
@@ -51,7 +56,12 @@ export interface TailorRepo {
 }
 
 export type Review = Record<string, unknown>;
-export type TailoredCvSummary = Pick<TailoredCv, "id" | "language" | "translatedFrom" | "updatedAt">;
+export type NewTranslation = Pick<TailoredCv, "jobId" | "language" | "content" | "coverLetter" | "template" | "tone" | "instruction"> & {
+  translatedFrom: string;
+  /** Also the copy's base snapshot time: its "original wording" is the translation itself. */
+  at: string;
+};
+export type TailoredCvSummary =Pick<TailoredCv, "id" | "language" | "translatedFrom" | "updatedAt">;
 export type StoredTailoredCv = { id: string; jobId: string; content: CvContent; review: Review | null; version: number };
 
 export type RunChanges = Partial<Pick<TailorRun, "questions" | "answers" | "proposals" | "status" | "currentSection" | "errorCode">>;

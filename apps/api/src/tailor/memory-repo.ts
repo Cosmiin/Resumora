@@ -49,6 +49,20 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       Object.assign(cv, { content: structuredClone(content), version: cv.version + 1, updatedAt: new Date().toISOString() });
       return { ok: true, version: cv.version, updatedAt: cv.updatedAt };
     },
+    async saveTranslation(input) {
+      const fields = { translatedFrom: input.translatedFrom, content: structuredClone(input.content), baseSnapshot: structuredClone(input.content),
+        baseSnapshotAt: input.at, coverLetter: structuredClone(input.coverLetter), template: input.template, tone: input.tone,
+        instruction: input.instruction, review: null, score: null, updatedAt: input.at };
+      const existing = [...docs.cvs.values()].find((cv) => cv.jobId === input.jobId && cv.language === input.language);
+      if (existing) {
+        if (existing.userId !== userId || existing.translatedFrom === null) return "language_taken";
+        Object.assign(existing, fields, { version: existing.version + 1 });
+        return existing.id;
+      }
+      const id = crypto.randomUUID();
+      docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, ...fields, version: 1, createdAt: input.at });
+      return id;
+    },
     async setTemplate(id, template) {
       const cv = docs.cvs.get(id);
       if (!cv || cv.userId !== userId) return false;

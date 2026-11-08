@@ -7,6 +7,8 @@ import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import type { TailorRepo } from "./repo.ts";
 import { RetailorBodySchema, startRetailor } from "./retailor.ts";
+import { TranslateBodySchema, translateTailored } from "./translate.ts";
+import type { ModelDeps } from "../ai/call-model.ts";
 import { jobNotFound } from "./start.ts";
 
 const SaveBody = z.object({ content: CvContentSchema, expectedVersion: z.number().int().min(1) });
@@ -15,7 +17,12 @@ const isUuid = (id: string) => z.uuid().safeParse(id).success;
 const notFound = () => new ApiError(404, "not_found", "This tailored CV no longer exists.");
 
 /** Mounted at /v1: GET /jobs/:id/tailored, and GET/PUT/PATCH /tailored/:id. RLS keeps other users' rows invisible (404). */
-export function tailoredRoutes(deps: { jobsFor(c: Context<AppEnv>): JobRepo; tailorFor(c: Context<AppEnv>): TailorRepo }) {
+export function tailoredRoutes(deps: {
+  jobsFor(c: Context<AppEnv>): JobRepo;
+  tailorFor(c: Context<AppEnv>): TailorRepo;
+  modelFor(c: Context<AppEnv>): ModelDeps;
+  now(): Date;
+}) {
   const app = new Hono<AppEnv>();
   const id = (c: Context<AppEnv>) => {
     const value = c.req.param("id") ?? "";
@@ -56,6 +63,15 @@ export function tailoredRoutes(deps: { jobsFor(c: Context<AppEnv>): JobRepo; tai
     const started = await startRetailor({ jobs: deps.jobsFor(c), tailor: deps.tailorFor(c) }, tailoredId, sections);
     if (!started) throw notFound();
     return c.json(started);
+  });
+
+  app.post("/tailored/:id/translate", async (c) => {
+    const tailoredId = id(c);
+    const { language } = TranslateBodySchema.parse(await c.req.json().catch(() => ({})));
+    const result = await translateTailored({ model: deps.modelFor(c), tailor: deps.tailorFor(c), now: deps.now },
+      { userId: c.get("user").id, id: tailoredId, language });
+    if (!result) throw notFound();
+    return c.json(result);
   });
 
   return app;

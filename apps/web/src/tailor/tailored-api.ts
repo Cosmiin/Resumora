@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   SaveResponseSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema,
-  type CvContent, type SaveResponse, type TailoredCv, type TailorRun, type TailorSection,
+  type CvContent, type SaveResponse, type TailoredCv, type TailorLanguage, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { apiFetch } from "../lib/api.ts";
 
@@ -27,4 +27,11 @@ export function saveTailored(id: string, content: CvContent, version: number): P
 /** A run over only the picked sections; the tailoring flow continues it. */
 export function retailor(id: string, sections: TailorSection[]): Promise<{ run: TailorRun }> {
   return apiFetch(`${tailored(id)}/retailor`, { method: "POST", json: { sections }, schema: z.object({ run: TailorRunSchema }) });
+}
+
+/** Creates or refreshes the job's copy in `language`; `flagged` counts texts kept in the source wording. */
+export function translate(id: string, language: TailorLanguage): Promise<{ tailoredCvId: string; flagged: number }> {
+  return apiFetch(`${tailored(id)}/translate`, {
+    method: "POST", json: { language }, schema: z.object({ tailoredCvId: z.string(), flagged: z.number() }),
+  });
 }

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { MatchScoreSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun } from "@resumora/shared";
 import { storedCv } from "../cv/supabase-repo.ts";
+import { ApiError } from "../errors.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { TailorRepo } from "./repo.ts";
 
@@ -91,6 +92,34 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const current = await db.from("tailored_cvs").select("version, updated_at").eq("id", id).maybeSingle();
       if (current.error) throw new Error(`tailored_cvs select failed: ${current.error.message}`);
       return current.data ? { ok: false, version: current.data.version, updatedAt: current.data.updated_at } : null;
+    },
+    async saveTranslation(input) {
+      const fields = {
+        translated_from: input.translatedFrom, content: input.content, base_snapshot: input.content, base_snapshot_at: input.at,
+        cover_letter: input.coverLetter, template: input.template, tone: input.tone, instruction: input.instruction,
+        review: null, score: null, updated_at: input.at,
+      };
+      // Two tries: a copy created by a concurrent call between the read and the insert is refreshed instead.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const found = await db.from("tailored_cvs").select("id, translated_from, version")
+          .eq("job_id", input.jobId).eq("language", input.language).maybeSingle();
+        if (found.error) throw new Error(`tailored_cvs select failed: ${found.error.message}`);
+        if (found.data) {
+          if (found.data.translated_from === null) return "language_taken";
+          const { data, error } = await db.from("tailored_cvs").update({ ...fields, version: found.data.version + 1 })
+            .eq("id", found.data.id).eq("version", found.data.version).select("id");
+          if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
+          if (data.length > 0) return found.data.id;
+          continue;
+        }
+        const { data, error } = await db.from("tailored_cvs").insert({
+          user_id: user.id, job_id: input.jobId, language: input.language, ...fields, created_at: input.at,
+        }).select("id").single();
+        if (error?.code === "23505") continue;
+        if (error) throw new Error(`tailored_cvs insert failed: ${error.message}`);
+        return data.id;
+      }
+      throw new ApiError(409, "version_conflict", "This copy was changed at the same moment. Try again.");
     },
     async setTemplate(id, template) {
       const { data, error } = await db.from("tailored_cvs").update({ template, updated_at: new Date().toISOString() })
