@@ -46,7 +46,7 @@ export async function runLayoutPass(
   let reply: z.infer<typeof LayoutReplySchema>;
   try {
     reply = await callModel(deps.model, {
-      userId: input.userId, task: "tailor_layout", tier: "strong", schema: LayoutReplySchema, system: layoutSystemPrompt,
+      userId: input.userId, task: "tailor_section", tier: "strong", schema: LayoutReplySchema, system: layoutSystemPrompt,
       user: JSON.stringify({ order, headline, job: { title: input.job.title, requirements: input.job.requirements }, cv: { ...cv, layout: undefined } }),
       maxOutputTokens: 2000,
     });

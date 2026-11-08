@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  CvContentSchema, NoteSchema, newId,
+  CvContentSchema, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId,
   type CvContent, type Job, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -40,7 +40,9 @@ function apply(cv: CvContent, p: Proposal): void {
   }
   if (p.itemId === "headline") cv.basics.titles = [p.text, ...cv.basics.titles.slice(1)];
   else if (p.itemId === "summary") cv.basics.summary = p.text;
-  else if (p.itemId === "new-skill") cv.technicalSkills.push({ id: newId(), name: p.text });
+  else if (p.itemId === "new-skill") {
+    if (cv.technicalSkills.length < MAX_ITEMS) cv.technicalSkills.push({ id: newId(), name: p.text });
+  }
   else {
     for (const role of cv.experience) {
       if (role.id === p.itemId) return void ((role as Record<string, unknown>)[p.field] = p.text);
@@ -84,7 +86,7 @@ export async function acceptSection(
       keep = question ? flags.get(question.id) : undefined;
       if (keep && question) {
         notes.push({ roleId: question.roleId, note: NoteSchema.parse({
-          id: newId(), question: question.text, answer: p.text, via: ["pick"], askedAt: deps.now().toISOString(), jobId: run.jobId,
+          id: newId(), question: question.text.slice(0, MAX_TEXT), answer: p.text.slice(0, MAX_LONG_TEXT), via: ["pick"], askedAt: deps.now().toISOString(), jobId: run.jobId,
         }) });
       }
     } else {

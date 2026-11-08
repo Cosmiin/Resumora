@@ -163,6 +163,8 @@ describe("accept section", () => {
     const proposals = (await layout.json() as { proposals: Proposal[] }).proposals;
     expect(proposals.map((p) => p.itemId)).toEqual(["layout", "headline"]);
     expect(JSON.stringify(model.requests.at(-1))).not.toContain("Ana Pop");
+    // Logged under a task the ai_calls allow-list knows.
+    expect(model.logged.at(-1)?.task).toBe("tailor_section");
 
     const done = await accept(runId, "layout");
     expect(done.status).toBe(200);
@@ -178,6 +180,29 @@ describe("accept section", () => {
     replies.push({ order: ["experience"], headline: "Payroll Director" });
     const proposals = (await (await post(`/v1/tailor-runs/${runId}/sections/layout/run`)).json() as { proposals: Proposal[] }).proposals;
     expect(proposals).toEqual([]);
+  });
+
+  it("adds no new skill past the skills cap", async () => {
+    const full = Array.from({ length: 40 }, (_, i) => ({ id: `s${i}`, name: `Skill ${i}` }));
+    await cv.save({ ...base, technicalSkills: full }, 1);
+    const runId = await start();
+    await accept(runId, "experience");
+    await run(runId, "skills", { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true });
+    expect((await accept(runId, "skills")).status).toBe(200);
+    expect(tailored().content.technicalSkills).toHaveLength(40);
+  });
+
+  it("saves a confirmed flag on a long description as a note within the note limits", async () => {
+    const long = `Ran payroll for 40 staff. ${"Kept every pay run on time. ".repeat(80)}`.trim();
+    const flagged = { itemId: role.id, field: "description", text: `${long} Cut errors by 30%.`, inferred: false };
+    const runId = await start();
+    replies.push({ proposals: [flagged] }, { results: [] });
+    await run(runId, "experience", flagged);
+    const [flag] = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
+    const res = await accept(runId, "experience", { flags: [{ questionId: flag!.id, confirmed: true }] });
+    expect(res.status).toBe(200);
+    const [note] = (await cv.get()).content.experience[0]!.notes;
+    expect(note!.question.length).toBeLessThanOrEqual(2000);
   });
 
   it("refuses a section that isn't current with 409", async () => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyCv, type CvContent, type JobExtraction, type Proposal, type TailorQuestion } from "@resumora/shared";
+import { emptyCv, type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorSection } from "@resumora/shared";
 import { createApp, type AppDeps } from "../src/app.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
 import type { CvRepo } from "../src/cv/repo.ts";
@@ -57,8 +57,10 @@ beforeEach(async () => {
 const post = (path: string, body: unknown = {}) => app.request(path, {
   method: "POST", headers: { authorization: "Bearer token-a", "content-type": "application/json" }, body: JSON.stringify(body),
 });
-async function runSection(section = "experience") {
+/** Starts a run, moves it to `current` (as accepting the earlier sections would), then runs `section`. */
+async function runSection(section = "experience", current: TailorSection = section as TailorSection) {
   const start = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal", instruction: "Keep it short" })).json() as { run: { id: string } };
+  await memoryTailorRepo("user-a", new Map(), docs).updateRun(start.run.id, { currentSection: current });
   const res = await post(`/v1/tailor-runs/${start.run.id}/sections/${section}/run`);
   return { res, runId: start.run.id };
 }
@@ -145,7 +147,18 @@ describe("section pass", () => {
     expect(body.proposals.map((p) => [p.itemId, p.text, p.flags])).toEqual([["new-skill", "Kubernetes", []], ["s1", "Microsoft Excel", []]]);
     expect(JSON.stringify(model.requests[0])).toContain("Ran payroll for 40 staff");
     // The layout step has its own pass (Task 15) and runs only once it is the current section.
-    expect((await runSection("layout")).res.status).toBe(409);
+    expect((await runSection("layout", "experience")).res.status).toBe(409);
+  });
+
+  it("refuses a section that isn't the current step, and a finished run, without calling the model", async () => {
+    expect((await runSection("summary", "experience")).res.status).toBe(409);
+    const { runId } = await runSection("experience", "skills");
+    const repo = memoryTailorRepo("user-a", new Map(), docs);
+    expect((await repo.getRun(runId))!.currentSection).toBe("skills");
+    await repo.updateRun(runId, { status: "done", currentSection: null });
+    expect((await post(`/v1/tailor-runs/${runId}/sections/experience/run`)).status).toBe(409);
+    expect((await repo.getRun(runId))!.status).toBe("done");
+    expect(model.requests).toHaveLength(0);
   });
 
   it("gives the summary the roles as context", async () => {

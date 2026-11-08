@@ -68,6 +68,10 @@ export async function runSectionPass(
 ): Promise<{ proposals: Proposal[]; questions: TailorQuestion[] }> {
   const { section, run } = input;
   if (section === "layout") throw new ApiError(400, "invalid_content", "The layout step has its own route.");
+  // Like accept: only the current step of an open run, so a stale tab can't reopen or rewind it.
+  if (run.status === "done" || run.currentSection !== section) {
+    throw new ApiError(409, "section_not_current", "This section isn't the current step.");
+  }
   const contentSection: Exclude<TailorSection, "layout"> = section;
   const steering = run.tailoredCvId ? await deps.tailor.getSteering(run.tailoredCvId) : null;
   if (!steering) throw new ApiError(404, "job_not_found", "This job was deleted.");
