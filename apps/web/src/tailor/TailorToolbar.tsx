@@ -17,7 +17,7 @@ type Props = {
   latest: MatchScore | null;
   template: TemplateId;
   onTemplate(template: TemplateId): void;
-  /** Actions after Template (Language, Re-tailor); Export stays a placeholder until its task. */
+  /** Actions after Template (Language, Re-tailor, Export). */
   children?: ReactNode;
 };
 
@@ -112,7 +112,6 @@ export function TailorToolbar({ tab, onTab, base, latest, template, onTemplate, 
         </select>
       </label>
       {children}
-      <button type="button" className="secondary" aria-disabled="true" title={t("tailored.soon")}>{t("tailored.export")}</button>
     </div>
   );
 }

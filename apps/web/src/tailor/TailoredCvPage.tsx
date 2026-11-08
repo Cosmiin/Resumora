@@ -14,6 +14,7 @@ import { getScores } from "./tailor-api.ts";
 import { getTailored, listTailored, retailor, saveTailored, setTemplate } from "./tailored-api.ts";
 import type { TemplateId } from "../cv/page/templates.ts";
 import { LanguageMenu, TailorToolbar, type TailoredTab } from "./TailorToolbar.tsx";
+import { ExportMenu } from "../export/ExportMenu.tsx";
 import "../styles/tailor.css";
 
 type ItemReview = { kept?: boolean; inferred?: boolean; reviewed?: boolean };
@@ -137,6 +138,7 @@ export function TailoredCvPage() {
         template={template} onTemplate={(next) => pickTemplate(cv.id, cv.template, next)}>
         <LanguageMenu key={cv.id} jobId={jobId} current={{ id: cv.id, language: cv.language }} />
         <button type="button" className="secondary" onClick={openDialog}>{t("tailored.retailor")}</button>
+        <ExportMenu load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template} />
       </TailorToolbar>
       {templateError && <p role="alert" className="form-error">{t("tailored.templateError")}</p>}
       {jobChanged && (

@@ -110,4 +110,10 @@ export const tailorEn = {
   "tailored.lang.error": "Couldn't translate. Try again",
   "tailored.jobChanged": "The job changed.",
   "tailored.jobChangedAction": "Re-tailor?",
+  "export.cvPdf": "CV as PDF",
+  "export.letterPdf": "Cover letter as PDF",
+  "export.unreviewed": "Not reviewed yet: {count}. The AI inferred these items; check them, or export anyway.",
+  "export.working": "Preparing the file…",
+  "export.error": "Couldn't export. Try again",
+  "export.loadError": "Couldn't load the CV to export. Try again",
 } as const;
