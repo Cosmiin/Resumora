@@ -42,6 +42,8 @@ export interface TailorRepo {
   saveTailoredContent(id: string, expectedVersion: number, content: CvContent): Promise<SaveResult | null>;
   /** false when gone. Doesn't bump the version (the template isn't part of the edited content). */
   setTemplate(id: string, template: TailoredCv["template"]): Promise<boolean>;
+  /** Replaces the cover letter (not versioned, like the template). false when gone. */
+  setCoverLetter(id: string, letter: NonNullable<TailoredCv["coverLetter"]>): Promise<boolean>;
   /**
    * Creates the job's copy in `language`, or refreshes it (version + 1, review and score cleared).
    * "language_taken" when the job's CV in that language is an original, not a translation.

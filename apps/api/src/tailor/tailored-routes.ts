@@ -8,6 +8,7 @@ import type { JobRepo } from "../jobs/repo.ts";
 import type { TailorRepo } from "./repo.ts";
 import { RetailorBodySchema, startRetailor } from "./retailor.ts";
 import { TranslateBodySchema, translateTailored } from "./translate.ts";
+import { editCoverLetter, LetterBodySchema, LetterEditSchema, writeCoverLetter } from "./letter.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
 import { jobNotFound } from "./start.ts";
 
@@ -72,6 +73,23 @@ export function tailoredRoutes(deps: {
       { userId: c.get("user").id, id: tailoredId, language });
     if (!result) throw notFound();
     return c.json(result);
+  });
+
+  app.post("/tailored/:id/cover-letter", async (c) => {
+    const tailoredId = id(c);
+    const body = LetterBodySchema.parse(await c.req.json().catch(() => ({})));
+    const result = await writeCoverLetter({ model: deps.modelFor(c), tailor: deps.tailorFor(c), jobs: deps.jobsFor(c), now: deps.now },
+      { userId: c.get("user").id, id: tailoredId, ...body });
+    if (!result) throw notFound();
+    return c.json(result);
+  });
+
+  app.put("/tailored/:id/cover-letter", async (c) => {
+    const tailoredId = id(c);
+    const edit = LetterEditSchema.parse(await c.req.json().catch(() => ({})));
+    const coverLetter = await editCoverLetter(deps.tailorFor(c), tailoredId, edit);
+    if (!coverLetter) throw notFound();
+    return c.json({ coverLetter });
   });
 
   return app;
