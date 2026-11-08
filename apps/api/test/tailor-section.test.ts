@@ -205,4 +205,25 @@ describe("section pass", () => {
     expect(system).toContain("itemId = the bullet's id, field \\\"text\\\"");
     expect(system).toContain("field \\\"description\\\"");
   });
+
+  it("names the flagged item in its question and shows only details that add something", async () => {
+    const claim = "Ran payroll for 40 staff and won the team award";
+    replies = [proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] },
+      proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] }];
+    let body = await (await runSection()).res.json() as { questions: TailorQuestion[] };
+    expect(body.questions[0]).toMatchObject({ itemId: bullet.id,
+      text: `Please check the bullet in Payroll Specialist at Acme Payroll: "Cut payroll errors by 30% for 40 staff". A number that isn't in your CV, notes or answers.` });
+    replies = [proposals(reword(claim)), { results: [{ itemId: bullet.id, claims: [claim] }] },
+      proposals(reword(claim)), { results: [{ itemId: bullet.id, claims: [claim, "won the team award"] }] }];
+    body = await (await runSection()).res.json() as { questions: TailorQuestion[] };
+    expect(body.questions[0]!.text).toBe(`Please check the bullet in Payroll Specialist at Acme Payroll: "${claim}". Not supported by your CV: "won the team award".`);
+  });
+
+  it("names a language level and a skill in flag questions", async () => {
+    await cv.save({ ...base, languages: [{ id: "l1", name: "English", level: "B2" }] }, 1);
+    replies = [proposals({ itemId: "l1", field: "level", text: "C2 (2024)", inferred: false }), { results: [] },
+      proposals({ itemId: "l1", field: "level", text: "C2 (2024)", inferred: false }), { results: [] }];
+    const body = await (await runSection("languages")).res.json() as { questions: TailorQuestion[] };
+    expect(body.questions[0]!.text.startsWith('Please check the English level: "C2 (2024)".')).toBe(true);
+  });
 });

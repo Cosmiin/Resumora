@@ -61,6 +61,38 @@ export function texts(value: unknown): string[] {
   return [];
 }
 
+/** What the flagged item is, in words: "the bullet in Engineer at Acme", "the English level", "the summary". */
+function itemName(cv: CvContent, section: TailorSection, p: Proposal): string {
+  const at = (role: CvContent["experience"][number]) => [role.title, role.company].filter((part) => part.trim()).join(" at ");
+  if (section === "experience") {
+    const role = cv.experience.find((r) => r.id === p.itemId || r.bullets.some((b) => b.id === p.itemId));
+    if (!role) return "item";
+    if (role.id !== p.itemId) return `bullet in ${at(role)}`;
+    return `${p.field === "description" ? "description" : p.field} of ${at(role)}`;
+  }
+  if (section === "skills") {
+    const skill = [...cv.technicalSkills, ...cv.professionalSkills].find((s) => s.id === p.itemId);
+    return skill ? `skill "${skill.name}"` : "new skill";
+  }
+  if (section === "summary") return "summary";
+  if (section === "achievements") return `achievement "${cv.awards.find((a) => a.id === p.itemId)?.name ?? ""}"`;
+  const language = cv.languages.find((l) => l.id === p.itemId);
+  return language ? (p.field === "level" ? `${language.name} level` : `language "${language.name}"`) : "language";
+}
+
+const plain = (text: string) => text.trim().toLowerCase().replace(/[s.]+/g, " ").trim();
+
+/** The flag question: names the item, quotes the proposal, and adds each check's detail only when it isn't the proposal again. */
+function flagText(cv: CvContent, section: TailorSection, p: Proposal): string {
+  const details = [...new Set(p.flags.flatMap((flag) => {
+    if (plain(flag.detail) === plain(p.text) || !flag.detail.trim()) return [];
+    if (flag.rule === "tool") return [`Not in your CV, notes or answers: ${flag.detail}.`];
+    if (flag.rule === "achievement") return [`Not supported by your CV: "${flag.detail}".`];
+    return [/[.!?]$/.test(flag.detail) ? flag.detail : `${flag.detail}.`];
+  }))];
+  return [`Please check the ${itemName(cv, section, p)}: "${p.text}".`, ...details].join(" ");
+}
+
 /** Proposes one section, checks each proposal, retries flagged ones once, and stores the result on the run. */
 export async function runSectionPass(
   deps: { model: ModelDeps; tailor: TailorRepo; log?: LogFn },
@@ -138,8 +170,10 @@ export async function runSectionPass(
 
   const questions: TailorQuestion[] = proposals.filter((p) => p.flags.length > 0).map((p) => ({
     id: newId(), section, roleId: items.get(p.itemId)!.roleId, kind: "flag",
-    text: `Please check: "${p.text}" (${p.flags.map((flag) => flag.detail).join("; ")})`,
+    text: flagText(cv, section, p),
     options: ["Keep it", "Use original wording"], reason: p.flags.map((flag) => flag.rule).join(", "),
+    // Accept and the web find a proposal's flag question by this key (new skills share the id "new-skill").
+    itemId: p.itemId === "new-skill" ? `new-skill:${p.text}` : p.itemId,
   }));
   await deps.tailor.updateRun(run.id, {
     status: "waiting_user", currentSection: section,
