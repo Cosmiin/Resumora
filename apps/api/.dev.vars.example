@@ -11,3 +11,7 @@ OPENROUTER_API_KEY=
 OPENROUTER_MODEL=google/gemini-3.1-flash-lite
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.4-mini
+
+# Optional strong-tier models; empty values use the default models above.
+OPENROUTER_MODEL_STRONG=
+OPENAI_MODEL_STRONG=

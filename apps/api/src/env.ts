@@ -8,8 +8,10 @@ export type Env = {
   APP_ORIGIN: string;
   OPENROUTER_API_KEY: string;
   OPENROUTER_MODEL: string;
+  OPENROUTER_MODEL_STRONG?: string;
   OPENAI_API_KEY: string;
   OPENAI_MODEL: string;
+  OPENAI_MODEL_STRONG?: string;
   /** Queue of imports to process (Cloudflare Queues; simulated locally by wrangler dev). */
   IMPORTS: Queue<{ importId: string; userId: string }>;
   JOBS: Queue<JobMessage>;

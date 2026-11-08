@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Env } from "../env.ts";
 
 /** An OpenAI-compatible chat-completions provider. */
-export type Provider = { name: "openrouter" | "openai"; url: string; apiKey: string; model: string };
+export type Provider = { name: "openrouter" | "openai"; url: string; apiKey: string; model: string; strongModel?: string };
 
 /** One row of `ai_calls`. Never contains prompt or CV text. */
 export type AiCallLog = {
@@ -37,6 +37,7 @@ export type ModelRequest<S extends z.ZodType> = {
   system: string;
   user: string | UserPart[];
   maxOutputTokens: number;
+  tier?: "cheap" | "strong";
   /** Overrides ModelDeps.timeoutMs for slow tasks such as a full CV extraction. */
   timeoutMs?: number;
 };
@@ -73,11 +74,17 @@ class AttemptError extends Error {
 }
 
 export function providersFromEnv(
-  env: Pick<Env, "OPENROUTER_API_KEY" | "OPENROUTER_MODEL" | "OPENAI_API_KEY" | "OPENAI_MODEL">,
+  env: Pick<Env, "OPENROUTER_API_KEY" | "OPENROUTER_MODEL" | "OPENROUTER_MODEL_STRONG" | "OPENAI_API_KEY" | "OPENAI_MODEL" | "OPENAI_MODEL_STRONG">,
 ): Provider[] {
   const all: Provider[] = [
-    { name: "openrouter", url: "https://openrouter.ai/api/v1", apiKey: env.OPENROUTER_API_KEY, model: env.OPENROUTER_MODEL },
-    { name: "openai", url: "https://api.openai.com/v1", apiKey: env.OPENAI_API_KEY, model: env.OPENAI_MODEL },
+    {
+      name: "openrouter", url: "https://openrouter.ai/api/v1", apiKey: env.OPENROUTER_API_KEY, model: env.OPENROUTER_MODEL,
+      ...(env.OPENROUTER_MODEL_STRONG ? { strongModel: env.OPENROUTER_MODEL_STRONG } : {}),
+    },
+    {
+      name: "openai", url: "https://api.openai.com/v1", apiKey: env.OPENAI_API_KEY, model: env.OPENAI_MODEL,
+      ...(env.OPENAI_MODEL_STRONG ? { strongModel: env.OPENAI_MODEL_STRONG } : {}),
+    },
   ];
   return all.filter((p) => p.apiKey && p.model);
 }
@@ -142,7 +149,8 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
 
   const hasFile = Array.isArray(req.user) && req.user.some((p) => p.type === "pdf");
   let rejectedBy = 0;
-  for (const provider of deps.providers) {
+  for (const configured of deps.providers) {
+    const provider = req.tier === "strong" && configured.strongModel ? { ...configured, model: configured.strongModel } : configured;
     for (let attempt = 1; attempt <= ATTEMPTS_PER_PROVIDER; attempt++) {
       const started = Date.now();
       const log = (entry: Partial<AiCallLog> & Pick<AiCallLog, "status">) =>
