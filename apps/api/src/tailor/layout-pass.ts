@@ -12,7 +12,7 @@ const LayoutReplySchema = z.object({ order: z.array(z.string()), headline: z.str
 const layoutSystemPrompt = [
   "You finish tailoring a CV to a job. Return JSON with two fields.",
   "order: every section key from `order`, each exactly once, most relevant to the job first.",
-  "headline: the CV's headline moved closer to the job title, using only words that already appear in the CV.",
+  "headline: a short job-title headline aimed at the job (at most 8 words, not a sentence, no full stop), using only words that already appear in the CV.",
   "Never add an employer, job title, seniority or skill the CV doesn't have. If nothing fits, return the current headline.",
 ].join("\n");
 
@@ -62,7 +62,9 @@ export async function runLayoutPass(
   }
   const text = reply.headline.trim().replace(/\s+/g, " ");
   const known = cvWords(cv);
-  if (text && text.length <= MAX_TEXT && text !== headline && words(text).every((word) => known.has(word))) {
+  // A headline is a job title, not a sentence: too long or ending like one, and the existing title stays.
+  const short = text.length <= Math.min(MAX_TEXT, 80) && text.split(" ").length <= 8 && !/[.!?;]$/.test(text);
+  if (text && short && text !== headline && words(text).every((word) => known.has(word))) {
     proposals.push({ itemId: "headline", field: "title", text, inferred: false, flags: [] });
   }
 

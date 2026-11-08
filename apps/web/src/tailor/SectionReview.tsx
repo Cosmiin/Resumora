@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Proposal, TailorQuestion, TailorSection } from "@resumora/shared";
+import { CATEGORY, type Proposal, type SectionKey, type TailorQuestion, type TailorSection } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { AcceptBody } from "./tailor-api.ts";
 
@@ -7,6 +7,11 @@ import type { AcceptBody } from "./tailor-api.ts";
 export const reviewKey = (p: Proposal) => (p.itemId === "new-skill" ? `new-skill:${p.text}` : p.itemId);
 /** The flag question the API wrote for a flagged proposal quotes its text. */
 export const flagFor = (p: Proposal, flags: TailorQuestion[]) => flags.find((q) => q.text.startsWith(`Please check: "${p.text}"`));
+
+/** The layout step's order is stored as section keys; show it with the editor's section names. */
+const shown = (p: Proposal) => p.itemId === "layout" && p.field === "order"
+  ? p.text.split(",").map((key) => CATEGORY[key as SectionKey]?.label.en ?? key).join(" → ")
+  : p.text;
 
 type Props = {
   section: TailorSection;
@@ -48,14 +53,14 @@ export function SectionReview({ section, proposals, flags, confirmed, busy, onAc
         const key = reviewKey(p);
         const kept = flagged(p) ? confirmedFlag(p) : keep[key] ?? true;
         return <li key={`${key}:${p.field}:${i}`} className={[p.inferred ? "is-inferred" : "is-changed", kept ? "" : "is-reverted"].join(" ").trim()}>
-          <span className="tailor-item-text">{p.text}</span>
+          <span className="tailor-item-text">{shown(p)}</span>
           {p.inferred && <span className="tailor-tag">{t("tailor.review.inferred")}</span>}
           {flagged(p) ? <span className="tailor-tag">{t(kept ? "tailor.review.flagged" : "tailor.review.reverted")}</span>
             : <span className="tailor-item-actions">
               <button type="button" className="secondary" aria-pressed={p.inferred ? keep[key] === true : kept}
-                aria-label={t("tailor.review.keepNamed", { text: p.text })} onClick={() => set(p, true)}>{t("tailor.review.keep")}</button>
+                aria-label={t("tailor.review.keepNamed", { text: shown(p) })} onClick={() => set(p, true)}>{t("tailor.review.keep")}</button>
               <button type="button" className="secondary" aria-pressed={p.inferred ? keep[key] === false : !kept}
-                aria-label={t(p.inferred ? "tailor.review.removeNamed" : "tailor.review.revertNamed", { text: p.text })}
+                aria-label={t(p.inferred ? "tailor.review.removeNamed" : "tailor.review.revertNamed", { text: shown(p) })}
                 onClick={() => set(p, false)}>{t(p.inferred ? "tailor.review.remove" : "tailor.review.revert")}</button>
             </span>}
         </li>;

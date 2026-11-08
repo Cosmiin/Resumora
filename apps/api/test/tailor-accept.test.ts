@@ -182,6 +182,15 @@ describe("accept section", () => {
     expect(proposals).toEqual([]);
   });
 
+  it("drops a headline that is a sentence or too long, keeping the existing title, and asks for a short one", async () => {
+    const runId = await start();
+    for (const section of ["experience", "skills", "summary", "achievements", "languages"]) await accept(runId, section);
+    replies.push({ order: [...base.layout.order], headline: "Payroll specialist, ran payroll for 40 staff, filed taxes." });
+    const proposals = (await (await post(`/v1/tailor-runs/${runId}/sections/layout/run`)).json() as { proposals: Proposal[] }).proposals;
+    expect(proposals).toEqual([]);
+    expect(JSON.stringify(model.requests.at(-1))).toContain("at most 8 words");
+  });
+
   it("adds no new skill past the skills cap", async () => {
     const full = Array.from({ length: 40 }, (_, i) => ({ id: `s${i}`, name: `Skill ${i}` }));
     await cv.save({ ...base, technicalSkills: full }, 1);
