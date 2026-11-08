@@ -28,4 +28,15 @@ describe("CV header", () => {
     expect(cv.basics.fullName).toBe("");
     expect(original).toEqual(before);
   });
+
+  it("never passes the photo to the AI copy, and restores it afterwards", () => {
+    const original = emptyCv();
+    original.basics.photo = { path: "user-1/photo.jpg", x: 50, y: 40, zoom: 1.5 };
+    const before = structuredClone(original);
+    const { cv, header } = stripHeader(original);
+    expect("photo" in cv.basics).toBe(false);
+    expect(JSON.stringify(cv)).not.toContain("user-1/photo.jpg");
+    expect(restoreHeader(cv, header).basics.photo).toEqual(before.basics.photo);
+    expect(original).toEqual(before);
+  });
 });
