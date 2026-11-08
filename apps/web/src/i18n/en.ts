@@ -1,5 +1,6 @@
 import { enrichSectionsEn } from "./en-enrich.ts";
 import { jobsEn } from "./en-jobs.ts";
+import { tailorEn } from "./en-tailor.ts";
 
 /** All UI copy. Romanian gets its own file with the same keys later. */
 export const en = {
@@ -411,6 +412,7 @@ export const en = {
   "enrich.card.standOutHint": "Clear! Add results to stand out.",
   ...enrichSectionsEn,
   ...jobsEn,
+  ...tailorEn,
 } as const;
 
 export type MessageKey = keyof typeof en;

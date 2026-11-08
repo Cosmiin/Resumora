@@ -88,7 +88,8 @@ describe("job endpoints", () => {
     await memoryTailorRepo("user-a", scores).saveScore(id, "tailored", "cv-a", score);
     const res = await request(id);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ base: score, tailored: null });
+    // Score 2 is the newest tailored score of any of the job's tailored CVs (Task 16, R13).
+    expect(await res.json()).toEqual({ base: score, tailored: score });
     await error(await request(id, "token-b"), 404, "not_found");
     await error(await request(crypto.randomUUID()), 404, "not_found");
     await error(await request("invalid"), 404, "not_found");

@@ -85,8 +85,9 @@ export function jobRoutes(deps: {
   app.get("/:id/score", async (c) => {
     const id = c.req.param("id");
     if (!isUuid(id) || !(await deps.repoFor(c).get(id))) throw notFound();
-    const base = await deps.tailorRepoFor(c).getScore(id, "base");
-    return c.json({ base, tailored: null });
+    const tailor = deps.tailorRepoFor(c);
+    const [base, tailored] = await Promise.all([tailor.getScore(id, "base"), tailor.getScore(id, "tailored")]);
+    return c.json({ base, tailored });
   });
 
   app.patch("/:id", async (c) => {
