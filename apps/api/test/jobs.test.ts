@@ -100,7 +100,7 @@ describe("job endpoints", () => {
     const userThoughts = "x".repeat(2000);
     const res = await patch(id, 1, extracted, { userThoughts, applicationStatus: "applied" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ userThoughts, applicationStatus: "applied", version: 2 });
+    expect(await res.json()).toMatchObject({ userThoughts, applicationStatus: "applied", version: 2, editedByUser: false });
     expect(await (await get(id)).json()).toMatchObject({ userThoughts, applicationStatus: "applied" });
     expect((await patch(id, 2)).status).toBe(200);
     expect(await (await get(id)).json()).toMatchObject({ userThoughts, applicationStatus: "applied" });

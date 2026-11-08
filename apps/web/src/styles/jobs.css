@@ -106,7 +106,7 @@
 }
 
 /* Individual job, following the approved job-view mockup. */
-.job-page { max-width: 860px; display: grid; gap: var(--space-5); }
+.job-page { max-width: 1100px; display: grid; gap: var(--space-5); }
 .job-page .crumb { justify-self: start; }
 .job-page a { color: var(--text-accent); text-underline-offset: 2px; }
 .job-page .view-head { display: flex; gap: var(--space-4); align-items: flex-start; flex-wrap: wrap; }
@@ -169,4 +169,45 @@
   .job-page .req-edit > .x { grid-column: 3; grid-row: 1; }
   .job-page .reqs { grid-template-columns: minmax(0, 1fr); }
   .job-page .job-panel { padding: var(--space-5); }
+}
+
+/* Job detail A: the score stays alongside the ad on desktop and comes first on phones. */
+.job-detail-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: var(--space-6); align-items: start; }
+.job-match-column { grid-column: 2; grid-row: 1; min-width: 0; }
+.job-detail-main { grid-column: 1; grid-row: 1; display: grid; gap: var(--space-5); min-width: 0; }
+.job-score, .job-thoughts { padding: var(--space-5); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface-card); overflow-wrap: anywhere; }
+.job-score h2 { margin: 0 0 var(--space-4); font: var(--type-section-title); }
+.job-score-total { display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center; }
+.job-score-total > strong { font-size: 36px; color: var(--text-strong); }
+.job-score-total small { font-size: var(--text-sm); font-weight: var(--weight-regular); color: var(--text-muted); }
+.job-match-band { border-radius: var(--radius-pill); padding: var(--space-1) var(--space-3); background: var(--status-neutral-bg); color: var(--status-neutral-fg); }
+.job-match-band.is-excellent, .job-match-band.is-strong { background: var(--pine-100); color: var(--pine-800); }
+.job-match-band.is-fair { background: var(--marigold-100); color: var(--marigold-800); }
+.job-match-band.is-low { background: var(--status-bad-bg); color: var(--status-bad-fg); }
+.job-score-requirements { display: grid; gap: var(--space-4); padding: 0; list-style: none; }
+.job-score-requirements li { display: flex; gap: var(--space-3); }
+.job-match-symbol { flex: none; font-weight: var(--weight-bold); }
+.job-match-met .job-match-symbol { color: var(--text-accent); }
+.job-match-missing .job-match-symbol { color: var(--status-bad-fg); }
+.job-score-points { display: grid; gap: var(--space-3); font-size: var(--text-sm); }
+.job-score-points > div { display: flex; gap: var(--space-3); justify-content: space-between; }
+.job-score-points dd { margin: 0; white-space: nowrap; }
+.job-application-status, .job-thoughts { display: grid; gap: var(--space-2); font-size: var(--text-sm); }
+.job-application-status select, .job-thoughts textarea { width: 100%; min-width: 0; padding: var(--space-3); font: inherit; color: var(--text-body); border: 1px solid var(--border-field); border-radius: var(--radius-field); background: var(--surface-card); }
+.job-thoughts label { font-weight: var(--weight-semibold); }
+.job-thoughts-field { position: relative; }
+.job-thoughts textarea { display: block; padding-right: 54px; resize: vertical; }
+.job-thoughts-mic { position: absolute; right: var(--space-2); bottom: var(--space-2); width: 40px; height: 40px; padding: var(--space-2); }
+.job-thoughts-mic svg { width: 18px; height: 18px; }
+.job-thoughts-mic[aria-pressed="true"] { color: var(--status-bad-fg); background: var(--status-bad-bg); }
+.job-delete [role="dialog"] { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.job-delete [role="dialog"] p { flex-basis: 100%; }
+@media (max-width: 699px) {
+  .job-detail-columns { grid-template-columns: minmax(0, 1fr); }
+  .job-match-column, .job-detail-main { grid-column: auto; grid-row: auto; }
+  .job-page:has(.tailor) { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+  .job-page .tailor { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; border-radius: 0; padding: var(--space-3) var(--space-5) calc(var(--space-3) + env(safe-area-inset-bottom)); box-shadow: var(--shadow-raised); }
+  .job-page .tailor > div { min-width: 0; }
+  .job-page .tailor > div > span { display: none; }
+  .job-page .tailor > button { flex-shrink: 0; }
 }

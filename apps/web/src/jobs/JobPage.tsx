@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
-import type { Job, JobListPage } from "@resumora/shared";
+import type { Job, JobListPage, JobPatch } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ApiClientError } from "../lib/api.ts";
 import { t } from "../i18n/t.ts";
-import { deleteJob, getJob } from "./jobs-api.ts";
+import { deleteJob, getJob, getJobScore, patchJob } from "./jobs-api.ts";
 import { JobAd } from "./JobAd.tsx";
 import { JobSummary } from "./JobSummary.tsx";
 import { JobEditForm } from "./JobEditForm.tsx";
+import { JobScoreCard } from "./JobScoreCard.tsx";
+import { JobThoughts } from "./JobThoughts.tsx";
+import { TailorGate } from "./TailorGate.tsx";
 
 export function JobPage() {
   const userId = useAuth().session?.user.id ?? "anonymous";
@@ -26,12 +29,23 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const [editing, setEditing] = useState(false);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tailorGate, setTailorGate] = useState(false);
+  const [tailorReason, setTailorReason] = useState<string | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [pendingSaves, setPendingSaves] = useState(0);
+  const [thoughtsBusy, setThoughtsBusy] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const detailsSave = useRef<Promise<unknown>>(Promise.resolve());
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ["job", userId, id], queryFn: () => getJob(id), gcTime: 0,
     refetchInterval: (q) => !pollStopped && Date.now() < pollUntil
       && (q.state.data?.status === "queued" || q.state.data?.status === "processing") ? 3000 : false,
+  });
+  const score = useQuery({
+    queryKey: ["job-score", userId, id], queryFn: () => getJobScore(id), gcTime: 0,
+    enabled: query.data?.status === "ready",
   });
   useEffect(() => {
     const timer = setTimeout(() => setPollStopped(true), Math.max(0, pollUntil - Date.now()));
@@ -53,7 +67,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
       setDeleting(false);
     }
   }
-  async function saved(updated: Job) {
+  async function cacheJob(updated: Job) {
     await queryClient.cancelQueries({ queryKey: ["jobs", userId], exact: true });
     await queryClient.cancelQueries({ queryKey: ["job", userId, id], exact: true });
     queryClient.setQueryData(["job", userId, id], updated);
@@ -61,8 +75,31 @@ function JobView({ id, userId }: { id: string; userId: string }) {
       ...data, pages: data.pages.map((page) => ({ ...page, items: page.items.map((row) => row.id === id
         ? { ...row, title: updated.title, company: updated.company, location: updated.location } : row) })),
     }));
+  }
+  async function saved(updated: Job) {
+    await cacheJob(updated);
     setEditing(false);
     setTab("summary");
+  }
+  function saveDetails(changes: Pick<JobPatch, "userThoughts" | "applicationStatus">): Promise<Job> {
+    setPendingSaves((count) => count + 1);
+    const pending = detailsSave.current.catch(() => undefined).then(async () => {
+      const current = queryClient.getQueryData<Job>(["job", userId, id]);
+      if (!current?.extracted) throw new Error(t("jobs.error.wrong_status"));
+      const updated = await patchJob(id, current.version, current.extracted, changes);
+      await cacheJob(updated);
+      return updated;
+    }).finally(() => setPendingSaves((count) => count - 1));
+    detailsSave.current = pending;
+    return pending;
+  }
+  async function changeStatus(applicationStatus: Job["applicationStatus"]) {
+    setStatusSaving(true);
+    setStatusError(null);
+    try { await saveDetails({ applicationStatus }); }
+    catch (cause) { setStatusError(t(cause instanceof ApiClientError && cause.code === "version_conflict"
+      ? "jobs.error.version_conflict" : "jobs.error.generic")); }
+    finally { setStatusSaving(false); }
   }
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -77,11 +114,22 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const busy = job?.status === "queued" || job?.status === "processing";
   const original = job && <a href={job.url} target="_blank" rel="noopener noreferrer">{t("job.original")}</a>;
   const deletion = <div className="job-delete">
-    {confirmDelete ? <>
-      <span className="jobs-note">{t("job.deleteConfirm")}</span>
+    {confirmDelete ? <div role="dialog" aria-label={t("job.deleteConfirm")}>
+      <p className="jobs-note">{t("job.deleteConfirm")}</p>
+      {query.data?.status === "ready" && (!score.isSuccess || score.data.tailored != null) && <p className="jobs-note">{t("job.deleteTailored")}</p>}
       <button type="button" className="secondary danger" disabled={deleting} onClick={() => void remove()}>{t("job.delete")}</button>
       <button type="button" className="secondary" disabled={deleting} onClick={() => { setConfirmDelete(false); setDeleteError(null); }}>{t("job.deleteCancel")}</button>
-    </> : <button type="button" className="secondary danger" onClick={() => setConfirmDelete(true)}>{t("job.delete")}</button>}
+    </div> : <button type="button" className="secondary danger" onClick={() => setConfirmDelete(true)}>{t("job.delete")}</button>}
+  </div>;
+  const tailor = job && !editing && <div className="tailor">
+    <div><strong>{t("job.tailor.title")}</strong><span>{t("job.tailor.text")}</span>
+      {tailorReason && <p role="status" className="jobs-note">{tailorReason}</p>}</div>
+    <button type="button" onClick={() => {
+      if (job.status !== "ready") {
+        setTailorReason(t(job.status === "failed" ? "job.tailor.failed"
+          : job.status === "needs_text" ? "job.tailor.needsText" : "job.tailor.notReady"));
+      } else { setTailorReason(null); setTailorGate(true); }
+    }}>{t("job.tailor.button")}</button>
   </div>;
   const applyByText = extracted?.applyBy
     ? new Date(`${extracted.applyBy}T00:00:00Z`).toLocaleDateString("en-GB", {
@@ -104,12 +152,12 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         <h1 className="vtitle">{t("job.reading.title")}</h1>
         <p className="jobs-note">{t("job.reading.text")}</p>
         {pollStopped && <p className="jobs-note" role="status">{t("jobs.stillReading")}</p>}
-        {original}
+        {original}{tailor}
       </div> : job?.status === "failed" ? <div className="waiting">
         <span className="job-badge job-badge-failed">{t("jobs.badge.failed")}</span>
         <h1 className="vtitle">{t(job.errorCode === "not_a_job" ? "jobs.error.not_a_job" : "jobs.error.ai_failed")}</h1>
         <p className="jobs-note">{t(job.errorCode === "not_a_job" ? "job.failed.notAJob" : "job.failed.other")}</p>
-        {original}{deletion}
+        {original}{deletion}{tailor}
       </div> : extracted && editing ? <JobEditForm id={id} version={job.version} extracted={extracted}
         onSaved={saved} onCancel={() => setEditing(false)} onReload={async () => {
           const result = await query.refetch();
@@ -118,7 +166,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         }} /> : extracted ? <>
         <div className="view-head">
           <div><h1 className="vtitle">{job.title}</h1><div className="vsub">{[job.company, job.location].filter(Boolean).join(" · ")}</div></div>
-          <div className="job-actions"><button type="button" className="secondary" onClick={() => setEditing(true)}>{t("job.edit")}</button>{deletion}</div>
+          <div className="job-actions"><button type="button" className="secondary" disabled={pendingSaves > 0 || thoughtsBusy} onClick={() => setEditing(true)}>{t("job.edit")}</button>{deletion}</div>
         </div>
         <div className="facts">
           {extracted.workMode !== "unknown" && <span className="fact">{t(`job.workMode.${extracted.workMode}`)}</span>}
@@ -127,22 +175,42 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           {salaryText !== null && <span className="fact">{salaryText}</span>}
           {applyByText && <span className="fact">{t("job.applyBy", { date: applyByText })}</span>}
         </div>
-        <div className="tailor">
-          <div><strong>{t("job.tailor.title")} <span className="job-soon">{t("jobs.soon")}</span></strong><span>{t("job.tailor.text")}</span></div>
-          <button type="button" disabled>{t("job.tailor.button")}</button>
+        <div className="job-detail-columns">
+          <aside className="job-match-column">
+            {score.data?.base ? <JobScoreCard score={score.data.base} requirements={extracted.requirements} />
+              : <div className="job-score"><p className="jobs-note">{t(score.isPending ? "app.loading"
+                : score.isError ? "job.score.loadError" : "job.score.pending")}</p>
+                <button type="button" className="secondary" onClick={() => void score.refetch()}>{t("jobs.retry")}</button></div>}
+          </aside>
+          <div className="job-detail-main">
+            <label className="job-application-status">{t("job.status.title")}
+              <select value={job.applicationStatus} disabled={statusSaving}
+                onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>
+                {(["saved", "tailored", "applied", "interview", "offer", "rejected"] as const).map((status) =>
+                  <option value={status} key={status}>{t(`job.status.${status}`)}</option>)}
+              </select>
+            </label>
+            {statusError && <p role="alert" className="jobs-field-error">{statusError}</p>}
+            <JobThoughts value={job.userThoughts} onBusyChange={setThoughtsBusy} onSave={(userThoughts) => saveDetails({ userThoughts })} />
+            <div className="tabs" role="tablist" aria-label={t("job.tabs")}>
+              {(["ad", "summary"] as const).map((value, index) => <button type="button" role="tab" key={value}
+                id={`job-tab-${value}`} aria-controls="job-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1}
+                ref={(element) => { tabRefs.current[index] = element; }} onClick={() => setTab(value)} onKeyDown={(event) => moveTab(event, index)}>
+                {t(value === "ad" ? "job.tab.ad" : "job.tab.summary")}
+              </button>)}
+            </div>
+            <div className="job-panel" role="tabpanel" id="job-panel" aria-labelledby={`job-tab-${tab}`} tabIndex={0}>
+              {tab === "ad" ? <JobAd rawText={job.rawText} requirements={extracted.requirements} /> : <JobSummary extracted={extracted} />}
+            </div>
+          </div>
         </div>
-        <div className="tabs" role="tablist" aria-label={t("job.tabs")}>
-          {(["ad", "summary"] as const).map((value, index) => <button type="button" role="tab" key={value}
-            id={`job-tab-${value}`} aria-controls="job-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1}
-            ref={(element) => { tabRefs.current[index] = element; }} onClick={() => setTab(value)} onKeyDown={(event) => moveTab(event, index)}>
-            {t(value === "ad" ? "job.tab.ad" : "job.tab.summary")}
-          </button>)}
-        </div>
-        <div className="job-panel" role="tabpanel" id="job-panel" aria-labelledby={`job-tab-${tab}`} tabIndex={0}>
-          {tab === "ad" ? <JobAd rawText={job.rawText} requirements={extracted.requirements} /> : <JobSummary extracted={extracted} />}
-        </div>
+        {tailor}
         <footer className="foot">{original}<span>{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</span></footer>
-      </> : null}
+      </> : job?.status === "needs_text" ? <div className="waiting">
+        <p>{t("job.tailor.needsText")}</p>{original}{deletion}{tailor}
+      </div> : null}
+      {tailorGate && <TailorGate onTailor={() => void navigate(`/jobs/${encodeURIComponent(id)}/tailor`)}
+        onEnrich={() => void navigate("/cv")} onClose={() => setTailorGate(false)} />}
       {deleteError && <p role="alert" className="jobs-field-error">{deleteError}</p>}
     </main>
   </AppShell>;

@@ -78,7 +78,10 @@ export function memoryJobs(opts: { now?: () => Date }) {
         ...(fields.userThoughts !== undefined ? { userThoughts: fields.userThoughts } : {}),
         ...(fields.applicationStatus !== undefined ? { applicationStatus: fields.applicationStatus } : {}),
         extracted: structuredClone(extracted), title: extracted.title, company: extracted.company,
-        location: extracted.location, editedByUser: true, version: row.version + 1, updatedAt: now().toISOString(),
+        location: extracted.location,
+        // Thoughts and status saves resend the current extraction; only extraction edits count as user edits.
+        ...(fields.userThoughts === undefined && fields.applicationStatus === undefined ? { editedByUser: true } : {}),
+        version: row.version + 1, updatedAt: now().toISOString(),
       });
       return "ok";
     },
