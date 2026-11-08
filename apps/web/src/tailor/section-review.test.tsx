@@ -20,3 +20,16 @@ describe("SectionReview", () => {
     expect(flagFor({ ...proposal, itemId: "b2" }, [question])).toBeUndefined();
   });
 });
+
+describe("RetailorDialog", () => {
+  it("ticks a section by clicking its label text", async () => {
+    const { RetailorDialog } = await import("./RetailorDialog.tsx");
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const onStart = vi.fn();
+    render(<RetailorDialog busy={false} error={false} onStart={onStart} onClose={vi.fn()} />);
+    await userEvent.click(screen.getByText("Summary"));
+    expect(screen.getByRole("checkbox", { name: "Summary" })).toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: "Re-tailor" }));
+    expect(onStart).toHaveBeenCalledWith(["summary"]);
+  });
+});
