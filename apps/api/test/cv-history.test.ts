@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CvResponseSchema, ErrorBodySchema, emptyCv, newId, type CvContent, type Note } from "@resumora/shared";
+import { CvResponseSchema, ErrorBodySchema, MAX_CV_BYTES, emptyCv, newId, type CvContent, type Note } from "@resumora/shared";
 import { createApp } from "../src/app.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
 import type { CvRepo } from "../src/cv/repo.ts";
@@ -61,6 +61,35 @@ describe("history restore keeps newer notes", () => {
     expect(history).toHaveLength(2);
     expect(history[0]!.reason).toBe("restore");
     expect((await repo.getHistory(history[0]!.id))!.content).toEqual(current);
+  });
+
+  it("rejects a restore whose next PUT body is oversized without changing its content or version", async () => {
+    const older: CvContent = {
+      ...emptyCv(),
+      custom: Array.from({ length: 40 }, () => ({ id: newId(), title: "Older text", details: "é".repeat(3000) })),
+      experience: [{
+        id: newId(), company: "Acme", title: "Engineer", location: "", startDate: "2020-01",
+        endDate: "", current: true, description: "Older role text", bullets: [], notes: [],
+      }],
+    };
+    const current: CvContent = {
+      ...older, custom: [],
+      experience: [{ ...older.experience[0]!, notes: Array.from({ length: 4 }, () => ({
+        id: newId(), question: "What did you do?", answer: "a".repeat(4000),
+        via: ["type"], askedAt: "2026-11-08T10:00:00Z",
+      })) }],
+    };
+    const merged = { ...older, experience: current.experience };
+    older.basics.summary = "a".repeat(MAX_CV_BYTES - new TextEncoder().encode(JSON.stringify(merged)).length);
+    expect(new TextEncoder().encode(JSON.stringify(merged)).length).toBe(MAX_CV_BYTES);
+    expect((await send("PUT", "/v1/cv", { content: older, version: 0 })).status).toBe(200);
+    expect((await send("PUT", "/v1/cv", { content: current, version: 1 })).status).toBe(200);
+    const [item] = await repo.listHistory();
+    const before = await repo.get();
+    const response = await send("POST", `/v1/cv/history/${item!.id}/restore`, { version: before.version });
+    expect(response.status).toBe(413);
+    expect(ErrorBodySchema.parse(await response.json()).error.code).toBe("content_too_large");
+    expect(await repo.get()).toEqual(before);
   });
 
   it("leaves newer content and history unchanged when the version is stale", async () => {

@@ -62,6 +62,7 @@ export function cvRoutes(repoFor: (c: Context<AppEnv>) => CvRepo) {
     if (!found) throw new ApiError(404, "not_found", "That version no longer exists.");
     const current = await repo.get();
     const content = CvContentSchema.parse(mergeNewerNotes(found.content, current.content));
+    if (new TextEncoder().encode(JSON.stringify({ content, version: current.version + 1 })).length > MAX_CV_BYTES) throw tooLarge();
     const result = await repo.restore(id, version, content);
     if (!result) throw new ApiError(404, "not_found", "That version no longer exists.");
     if (result.ok) return c.json({ content, version: result.version, updatedAt: result.updatedAt });
