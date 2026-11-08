@@ -211,7 +211,7 @@ describe("section pass", () => {
     replies = [proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] },
       proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] }];
     let body = await (await runSection()).res.json() as { questions: TailorQuestion[] };
-    expect(body.questions[0]).toMatchObject({ itemId: bullet.id,
+    expect(body.questions[0]).toMatchObject({ itemId: `${bullet.id}|text`,
       text: `Please check the bullet in Payroll Specialist at Acme Payroll: "Cut payroll errors by 30% for 40 staff". A number that isn't in your CV, notes or answers.` });
     replies = [proposals(reword(claim)), { results: [{ itemId: bullet.id, claims: [claim] }] },
       proposals(reword(claim)), { results: [{ itemId: bullet.id, claims: [claim, "won the team award"] }] }];

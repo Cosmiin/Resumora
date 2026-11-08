@@ -80,7 +80,7 @@ function itemName(cv: CvContent, section: TailorSection, p: Proposal): string {
   return language ? (p.field === "level" ? `${language.name} level` : `language "${language.name}"`) : "language";
 }
 
-const plain = (text: string) => text.trim().toLowerCase().replace(/[s.]+/g, " ").trim();
+const plain = (text: string) => text.trim().toLowerCase().replace(/[\s.]+/g, " ").trim();
 
 /** The flag question: names the item, quotes the proposal, and adds each check's detail only when it isn't the proposal again. */
 function flagText(cv: CvContent, section: TailorSection, p: Proposal): string {
@@ -173,7 +173,8 @@ export async function runSectionPass(
     text: flagText(cv, section, p),
     options: ["Keep it", "Use original wording"], reason: p.flags.map((flag) => flag.rule).join(", "),
     // Accept and the web find a proposal's flag question by this key (new skills share the id "new-skill").
-    itemId: p.itemId === "new-skill" ? `new-skill:${p.text}` : p.itemId,
+    // One role can have several flagged fields (title, company…), so the key names the field too.
+    itemId: `${p.itemId === "new-skill" ? `new-skill:${p.text}` : p.itemId}|${p.field}`,
   }));
   await deps.tailor.updateRun(run.id, {
     status: "waiting_user", currentSection: section,

@@ -7,7 +7,7 @@ import type { AcceptBody } from "./tailor-api.ts";
 export const reviewKey = (p: Proposal) => (p.itemId === "new-skill" ? `new-skill:${p.text}` : p.itemId);
 /** The flag question the API wrote for a flagged proposal: by its key (older runs: by the quoted text). */
 export const flagFor = (p: Proposal, flags: TailorQuestion[]) =>
-  flags.find((q) => q.itemId ? q.itemId === reviewKey(p) : q.text.startsWith(`Please check: "${p.text}"`));
+  flags.find((q) => q.itemId ? q.itemId === `${reviewKey(p)}|${p.field}` : q.text.startsWith(`Please check: "${p.text}"`));
 
 /** The layout step's order is stored as section keys; show it with the editor's section names. */
 const shown = (p: Proposal) => p.itemId === "layout" && p.field === "order"

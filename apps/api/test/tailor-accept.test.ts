@@ -108,6 +108,23 @@ describe("accept section", () => {
     expect(model.logged.at(-1)?.task).toBe("tailor_score");
   });
 
+  it("keeps each flagged field of one role apart: a confirmed title and a rejected company", async () => {
+    const title = reword(role.id, "Payroll Lead", { field: "title" });
+    const company = reword(role.id, "Beta Payroll", { field: "company" });
+    const runId = await start();
+    replies.push({ proposals: [title, company] }, { results: [] });
+    await run(runId, "experience", title, company);
+    const flags = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
+    expect(flags).toHaveLength(2);
+    expect(new Set(flags.map((q) => q.itemId)).size).toBe(2);
+    const byField = (field: string) => flags.find((q) => q.text.includes(field === "title" ? "Payroll Lead" : "Beta Payroll"))!;
+    const res = await accept(runId, "experience", { flags: [
+      { questionId: byField("title").id, confirmed: true }, { questionId: byField("company").id, confirmed: false },
+    ] });
+    expect(res.status).toBe(200);
+    expect(tailored().content.experience[0]).toMatchObject({ title: "Payroll Lead", company: role.company });
+  });
+
   it("reverts a rejected flag and keeps a confirmed one as a job note", async () => {
     const flagged = reword(first.id, "Cut payroll errors by 30% for 40 staff");
     const runId = await start();

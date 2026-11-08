@@ -15,9 +15,11 @@ describe("SectionReview", () => {
   it("finds a flag question by its item key, whatever its wording", () => {
     const proposal = { itemId: "b1", field: "text", text: "Cut errors by 30%", inferred: false, flags: [{ rule: "number" as const, detail: "x" }] };
     const question = { id: "q1", section: "experience" as const, roleId: "r1", kind: "flag" as const, options: ["Keep it", "Use original wording"],
-      reason: "number", itemId: "b1", text: 'Please check the bullet in Dev at Acme: "Cut errors by 30%".' };
+      reason: "number", itemId: "b1|text", text: 'Please check the bullet in Dev at Acme: "Cut errors by 30%".' };
     expect(flagFor(proposal, [question])).toBe(question);
     expect(flagFor({ ...proposal, itemId: "b2" }, [question])).toBeUndefined();
+    // Two flagged fields of one item have their own questions.
+    expect(flagFor({ ...proposal, field: "title" }, [question])).toBeUndefined();
   });
 });
 

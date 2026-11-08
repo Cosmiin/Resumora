@@ -29,7 +29,7 @@ export const reviewKey = (p: Pick<Proposal, "itemId" | "text">) => (p.itemId ===
 /** The flag question the section pass wrote for a flagged proposal: by its key (older runs: by the quoted text). */
 const flagQuestionFor = (run: TailorRun, section: TailorSection, p: Proposal) =>
   (run.questions ?? []).find((q) => q.kind === "flag" && q.section === section
-    && (q.itemId ? q.itemId === reviewKey(p) : q.text.startsWith(`Please check: "${p.text}"`)));
+    && (q.itemId ? q.itemId === `${reviewKey(p)}|${p.field}` : q.text.startsWith(`Please check: "${p.text}"`)));
 export const LAYOUT_ITEMS = ["layout", "headline"];
 
 function apply(cv: CvContent, p: Proposal): void {
