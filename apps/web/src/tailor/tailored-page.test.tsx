@@ -77,6 +77,15 @@ describe("TailoredCvPage", () => {
     expect(cvApi.getCv).not.toHaveBeenCalled();
   });
 
+  it("marks a skill the tailoring added (its review key is new-skill:<name>)", async () => {
+    tailoredApi.getTailored.mockResolvedValue({ ...tailored,
+      content: { ...content, technicalSkills: [{ id: "s1", name: "Excel" }, { id: "s9", name: "Payroll" }] },
+      review: { skills: { "new-skill:Payroll": { kept: true, inferred: true, reviewed: false, text: "Payroll" } } } });
+    renderPage();
+    expect(await screen.findByText("Payroll")).toHaveClass("cv-mark-inferred");
+    expect(screen.getByText("Excel")).not.toHaveClass("cv-mark-inferred");
+  });
+
   it("has no enrichment tools or History", async () => {
     renderPage();
     await editView();

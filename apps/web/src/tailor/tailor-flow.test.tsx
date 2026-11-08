@@ -85,6 +85,7 @@ describe("tailoring flow", () => {
       decisions: [], inferred: [{ itemId: "new-skill:Gusto", keep: false }], flags: [{ questionId: "f1", confirmed: true }],
     });
     await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/one/cv"));
+    expect(router.state.location.search).toBe("?cv=cv1");
   });
 
   it("Skip all goes straight to the run", async () => {

@@ -17,15 +17,20 @@ import "../styles/tailor.css";
 type ItemReview = { kept?: boolean; inferred?: boolean; reviewed?: boolean };
 
 /** Green = a kept tailoring change; amber = a kept inferred item nobody has reviewed yet. */
-export function reviewMarks(review: TailoredCv["review"]) {
+export function reviewMarks(review: TailoredCv["review"], content: TailoredCv["content"] | null) {
   const highlights = new Set<string>();
   const inferred = new Set<string>();
+  // An added skill is reviewed as "new-skill:<name>" (accept gives it a fresh id): find it by name.
+  const skillIds = new Map([...(content?.technicalSkills ?? []), ...(content?.professionalSkills ?? [])]
+    .map((skill) => [skill.name.trim().toLowerCase(), skill.id]));
   for (const items of Object.values(review ?? {})) {
     if (!items || typeof items !== "object") continue;
     for (const [key, item] of Object.entries(items as Record<string, ItemReview>)) {
       if (!item?.kept) continue;
-      highlights.add(key);
-      if (item.inferred && !item.reviewed) inferred.add(key);
+      const id = key.startsWith("new-skill:") ? skillIds.get(key.slice("new-skill:".length).trim().toLowerCase()) : key;
+      if (!id) continue;
+      highlights.add(id);
+      if (item.inferred && !item.reviewed) inferred.add(id);
     }
   }
   return { highlights, inferred };
@@ -62,7 +67,8 @@ export function TailoredCvPage() {
     load: async () => asResponse(await getTailored(tailoredId)),
     save: (content, version) => saveTailored(tailoredId, content, version),
   } : null, [tailoredId]);
-  const marks = useMemo(() => reviewMarks(cv?.review ?? null), [cv?.review]);
+  // Marks follow the review as loaded; the content only maps added skills to their chips.
+  const marks = useMemo(() => reviewMarks(cv?.review ?? null, cv?.content ?? null), [cv?.review, cv?.content]);
   const job = useQuery({ queryKey: ["job", userId, jobId], queryFn: () => getJob(jobId) });
   const navigate = useNavigate();
   const [dialog, setDialog] = useState(false);
