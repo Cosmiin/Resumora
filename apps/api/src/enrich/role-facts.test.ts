@@ -78,6 +78,13 @@ describe("POST /v1/enrich/role-facts", () => {
     expect(messages[1]!.content).toContain(`<previous_facts>\n${JSON.stringify(role.facts.items)}\n</previous_facts>`);
   });
 
+  it("keeps numbers from previous facts and drops numbers absent from both sources", async () => {
+    role.facts = { items: ["Managed payroll for 120 staff."], fromNotes: "old-hash", updatedAt: "2026-11-04T00:00:00Z" };
+    await save();
+    model = fakeModel(() => ({ facts: ["Managed payroll for 120 staff.", "Managed payroll for 888 staff."] }));
+    expect((await result()).facts).toEqual(["Managed payroll for 120 staff."]);
+  });
+
   it("drops numbers from outside note answers and facts longer than 160 characters", async () => {
     model = fakeModel(() => ({ facts: [
       "Payroll for 999 people.", "Payroll for 40 staff.", "Payroll for 888 staff.", "Payroll for 75 staff.", "a".repeat(160), "b".repeat(161),
