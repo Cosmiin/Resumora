@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(57);
+select plan(74);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -208,6 +208,64 @@ select is_empty($$ select * from public.tailored_cvs $$, 'deleting a job deletes
 select is_empty($$ select * from public.tailor_runs $$, 'deleting a job deletes all its tailoring runs');
 select is_empty($$ select * from public.match_scores $$, 'deleting a job deletes its base and tailored scores');
 
+-- Job answers update only the caller's CV, with no history snapshot.
+select throws_ok($$ select public.add_job_notes('role-1', '[]') $$,
+  'P0002', 'role_not_found', 'a missing CV reports role_not_found');
+set local request.jwt.claims to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+insert into public.base_cvs (user_id, content, version, updated_at) values
+  (auth.uid(), '{"experience":[{"id":"role-1","notes":[]}]}', 1, '2000-01-01Z');
+set local request.jwt.claims to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+insert into public.base_cvs (user_id, content, version, updated_at)
+select auth.uid(), jsonb_build_object('experience', jsonb_build_array(
+  jsonb_build_object('id', 'role-1', 'title', 'Engineer', 'notes',
+    '[{"id":"enrichment","question":"Q","answer":"Keep me","via":["type"],"askedAt":"2025-01-01T00:00:00Z"}]'::jsonb ||
+    jsonb_agg(jsonb_build_object('id', 'job-' || i, 'jobId', 'aaaaaaaa-0000-4000-8000-000000000001',
+      'question', 'Q', 'answer', 'Answer ' || i, 'via', jsonb_build_array('type'),
+      'askedAt', '2026-01-' || lpad(i::text, 2, '0') || 'T00:00:00Z') order by i desc)),
+  jsonb_build_object('id', 'role-2', 'notes', '[]'::jsonb)),
+  'volunteering', '[{"id":"volunteer-1","notes":[]}]'::jsonb), 7, '2000-01-01Z'
+from generate_series(1, 25) as i;
+select results_eq(
+  $$ select * from public.add_job_notes('role-1',
+    '[{"id":"job-26","jobId":"aaaaaaaa-0000-4000-8000-000000000001","question":"Q","answer":"New answer","via":["voice"],"askedAt":"2026-02-01T00:00:00Z"}]') $$,
+  $$ values (8, now()) $$, 'adding job answers returns version +1 and the new timestamp');
+select results_eq($$ select version, updated_at from public.base_cvs $$,
+  $$ values (8, now()) $$, 'the returned version and timestamp are saved');
+select is((select count(*)::int from public.base_cvs,
+  jsonb_array_elements(content #> '{experience,0,notes}') as note where note ? 'jobId'),
+  25, 'only 25 job answers remain');
+select is_empty($$ select note from public.base_cvs,
+  jsonb_array_elements(content #> '{experience,0,notes}') as note where note ->> 'id' = 'job-1' $$,
+  'the oldest job answer is removed even when stored last');
+select is((select content #> '{experience,0,notes,0}' from public.base_cvs),
+  '{"id":"enrichment","question":"Q","answer":"Keep me","via":["type"],"askedAt":"2025-01-01T00:00:00Z"}'::jsonb,
+  'older enrichment notes are preserved');
+select is((select content #> '{experience,0,notes,25}' from public.base_cvs),
+  '{"id":"job-26","jobId":"aaaaaaaa-0000-4000-8000-000000000001","question":"Q","answer":"New answer","via":["voice"],"askedAt":"2026-02-01T00:00:00Z"}'::jsonb,
+  'the new answer is appended unchanged');
+select is((select content #- '{experience,0,notes}' from public.base_cvs),
+  '{"experience":[{"id":"role-1","title":"Engineer"},{"id":"role-2","notes":[]}],"volunteering":[{"id":"volunteer-1","notes":[]}]}'::jsonb,
+  'role text and other roles are unchanged');
+select is_empty($$ select * from public.base_cv_versions $$, 'job answers create no history snapshot');
+select throws_ok($$ select public.add_job_notes('missing-role', '[]') $$,
+  'P0002', 'role_not_found', 'a missing role reports role_not_found');
+select is((select version from public.base_cvs), 8, 'a missing role does not bump the version');
+select results_eq(
+  $$ select version from public.add_job_notes('volunteer-1',
+    '[{"id":"volunteer-note","jobId":"aaaaaaaa-0000-4000-8000-000000000001","question":"Q","answer":"A","via":["type"],"askedAt":"2026-02-01T00:00:00Z"}]') $$,
+  $$ values (9) $$, 'volunteering roles accept job answers and bump the version');
+select is((select content #>> '{volunteering,0,notes,0,id}' from public.base_cvs),
+  'volunteer-note', 'the volunteering answer is saved');
+set local request.jwt.claims to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select results_eq($$ select content, version, updated_at from public.base_cvs $$,
+  $$ values ('{"experience":[{"id":"role-1","notes":[]}]}'::jsonb, 1, '2000-01-01Z'::timestamptz) $$,
+  'another user with the same role id has unchanged content, version and timestamp');
+select throws_ok($$ select public.add_job_notes('role-2', '[]') $$,
+  'P0002', 'role_not_found', 'another user cannot add answers to the caller''s other role');
+set local request.jwt.claims to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select results_eq($$ select version, content #> '{experience,1,notes}' from public.base_cvs $$,
+  $$ values (9, '[]'::jsonb) $$, 'another user cannot change the original CV');
+
 set local role anon;
 set local request.jwt.claims to '{"role":"anon"}';
 select throws_ok($$ select * from public.tailored_cvs $$, '42501', null,
@@ -216,6 +274,9 @@ select throws_ok($$ select * from public.tailor_runs $$, '42501', null,
   'a signed-out visitor cannot read tailoring runs');
 select throws_ok($$ select * from public.match_scores $$, '42501', null,
   'a signed-out visitor cannot read scores');
+
+select throws_ok($$ select public.add_job_notes('role-1', '[]') $$, '42501', null,
+  'a signed-out visitor cannot add job answers');
 
 select * from finish();
 rollback;

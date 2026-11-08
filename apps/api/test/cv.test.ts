@@ -180,6 +180,9 @@ describe("old v1 CVs", () => {
       async save() {
         throw new Error("not used");
       },
+      async addJobNotes() {
+        throw new Error("not used");
+      },
       async listHistory() {
         return [];
       },

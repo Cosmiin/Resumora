@@ -1,4 +1,4 @@
-import { emptyCv, type CvContent, type HistoryItem } from "@resumora/shared";
+import { MAX_JOB_NOTES, emptyCv, type CvContent, type HistoryItem } from "@resumora/shared";
 import { HISTORY_LIMIT, SNAPSHOT_INTERVAL_MS, type CvRepo, type SaveResult } from "./repo.ts";
 
 type Snapshot = HistoryItem & { content: CvContent };
@@ -34,6 +34,20 @@ export function memoryCvRepo(opts: { now?: () => Date } = {}): CvRepo {
     },
     async save(content, expectedVersion) {
       return write(structuredClone(content), expectedVersion, "autosave");
+    },
+    async addJobNotes(roleId, notes) {
+      if (!row) throw new Error("role_not_found");
+      const content = structuredClone(row.content);
+      const role = [...content.experience, ...content.volunteering].find((item) => item.id === roleId);
+      if (!role) throw new Error("role_not_found");
+      const all = [...role.notes, ...structuredClone(notes)];
+      const newest = new Set(all.map((note, index) => ({ note, index }))
+        .filter(({ note }) => note.jobId !== undefined)
+        .sort((a, b) => Date.parse(b.note.askedAt) - Date.parse(a.note.askedAt) || b.index - a.index)
+        .slice(0, MAX_JOB_NOTES).map(({ note }) => note));
+      role.notes = all.filter((note) => note.jobId === undefined || newest.has(note));
+      row = { content, version: row.version + 1, updatedAt: now().toISOString() };
+      return { version: row.version, updatedAt: row.updatedAt };
     },
     async listHistory() {
       return history.map(({ id, reason, createdAt }) => ({ id, reason, createdAt }));

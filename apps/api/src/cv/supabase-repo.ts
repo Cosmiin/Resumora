@@ -52,6 +52,15 @@ export function supabaseCvRepo(env: SupabaseEnv, user: AuthUser): CvRepo {
       return toSaveResult(data as SaveRow[]);
     },
 
+    async addJobNotes(roleId, notes) {
+      const { data, error } = await db.rpc("add_job_notes", { p_role_id: roleId, p_notes: notes });
+      if (error?.code === "P0002") throw new Error("role_not_found");
+      if (error) throw new Error(`add_job_notes failed: ${error.message}`);
+      const row = (data as { version: number; updated_at: string }[] | null)?.[0];
+      if (!row) throw new Error("add_job_notes returned no row");
+      return { version: row.version, updatedAt: row.updated_at };
+    },
+
     async listHistory() {
       const { data, error } = await db
         .from("base_cv_versions")
