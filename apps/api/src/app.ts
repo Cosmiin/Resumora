@@ -86,6 +86,8 @@ export function createApp(deps: AppDeps) {
         if (!deps.tailorRepo) throw new Error("Score repository is not configured");
         return deps.tailorRepo(c.get("user"));
       },
+      cvFor: (c) => deps.cvRepo(c.get("user")),
+      modelFor: (c) => deps.model(c.get("user")),
       queue: deps.jobQueue, now: deps.now ?? (() => new Date()),
     }),
   );
@@ -100,6 +102,7 @@ export function createApp(deps: AppDeps) {
       },
       modelFor: (c) => deps.model(c.get("user")),
       now: deps.now ?? (() => new Date()),
+      log: deps.log,
     }),
   );
 

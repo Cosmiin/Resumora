@@ -7,7 +7,7 @@ import { emptyCv, type Experience, type Job, type JobListPage, type MatchScore }
 
 const auth = vi.hoisted(() => ({ getSession: vi.fn(), onAuthStateChange: vi.fn(), signOut: vi.fn() }));
 vi.mock("../lib/supabase.ts", () => ({ supabase: { auth } }));
-vi.mock("./jobs-api.ts", () => ({ getJob: vi.fn(), getJobScore: vi.fn(), patchJob: vi.fn(), deleteJob: vi.fn(), listJobs: vi.fn(), createJob: vi.fn() }));
+vi.mock("./jobs-api.ts", () => ({ getJob: vi.fn(), getJobScore: vi.fn(), scoreJob: vi.fn(), patchJob: vi.fn(), deleteJob: vi.fn(), listJobs: vi.fn(), createJob: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
 vi.mock("../cv/enrich/useRoleScores.ts", () => ({ useRoleScores: vi.fn() }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
@@ -17,7 +17,7 @@ import { useVoice } from "../cv/enrich/useVoice.ts";
 import { AuthProvider } from "../auth/AuthProvider.tsx";
 import { routes } from "../router.tsx";
 import { ApiClientError } from "../lib/api.ts";
-import { deleteJob, getJob, getJobScore, listJobs, patchJob } from "./jobs-api.ts";
+import { deleteJob, getJob, getJobScore, listJobs, patchJob, scoreJob } from "./jobs-api.ts";
 import { JobThoughts } from "./JobThoughts.tsx";
 
 const job: Job = {
@@ -179,6 +179,19 @@ describe("job page", () => {
       await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     }
   });
+  it("computes a missing Score 1 when Try again is clicked, and says so when that fails", async () => {
+    vi.mocked(scoreJob).mockRejectedValueOnce(new Error("ai")).mockResolvedValueOnce({ base: match, tailored: null });
+    renderJob(); await ready();
+    const box = (await screen.findByText("Your match score isn't available yet.")).closest(".job-score") as HTMLElement;
+    await userEvent.click(within(box).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Couldn't work out your match score. Try again.")).toBeInTheDocument();
+    await userEvent.click(within(screen.getByText("Couldn't work out your match score. Try again.").closest(".job-score") as HTMLElement).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.queryByText("Couldn't work out your match score. Try again.")).toBeNull());
+    expect(scoreJob).toHaveBeenCalledWith("one");
+    expect(scoreJob).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Your match score isn't available yet.")).toBeNull();
+  });
+
   it.each([false, true])("warns about tailored CV deletion only when one exists: %s", async (tailored) => {
     vi.mocked(getJobScore).mockResolvedValue({ base: match, tailored: tailored ? match : null });
     renderJob(); await ready();

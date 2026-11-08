@@ -146,6 +146,7 @@ export const jobsEn = {
   "job.score.title": "Base CV match",
   "job.score.outOf": " / 100",
   "job.score.pending": "Your match score isn't available yet.",
+  "job.score.computeError": "Couldn't work out your match score. Try again.",
   "job.score.loadError": "Couldn't load your match score.",
   "job.score.notEnough": "This ad doesn't list enough to score",
   "job.score.band.excellent": "Excellent",

@@ -1,7 +1,10 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { CreateJobBodySchema, JobListQuerySchema, JobPatchBodySchema, findJobPosting, normalizeJobUrl } from "@resumora/shared";
+import type { ModelDeps } from "../ai/call-model.ts";
+import type { CvRepo } from "../cv/repo.ts";
 import type { TailorRepo } from "../tailor/repo.ts";
+import { scoreMatch } from "../tailor/score.ts";
 import type { AppEnv } from "../app.ts";
 import { ApiError } from "../errors.ts";
 import { JOBS_PER_DAY, decodeJobCursor, encodeJobCursor, type JobMessage, type JobRepo } from "./repo.ts";
@@ -16,6 +19,8 @@ const notFound = () => new ApiError(404, "not_found", "That job doesn't exist.")
 export function jobRoutes(deps: {
   repoFor(c: Context<AppEnv>): JobRepo;
   tailorRepoFor(c: Context<AppEnv>): TailorRepo;
+  cvFor(c: Context<AppEnv>): CvRepo;
+  modelFor(c: Context<AppEnv>): ModelDeps;
   queue: { send(message: JobMessage): Promise<void> };
   now(): Date;
 }) {
@@ -88,6 +93,23 @@ export function jobRoutes(deps: {
     const tailor = deps.tailorRepoFor(c);
     const [base, tailored] = await Promise.all([tailor.getScore(id, "base"), tailor.getScore(id, "tailored")]);
     return c.json({ base, tailored });
+  });
+
+  /** Score 1 for a ready job that has none yet (saved before scoring existed, or scoring failed once); never rescores. */
+  app.post("/:id/score", async (c) => {
+    const id = c.req.param("id");
+    const job = isUuid(id) ? await deps.repoFor(c).get(id) : null;
+    if (!job) throw notFound();
+    if (job.status !== "ready" || !job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
+    const tailor = deps.tailorRepoFor(c);
+    let base = await tailor.getScore(id, "base");
+    if (!base) {
+      base = await scoreMatch({ model: deps.modelFor(c) }, {
+        userId: c.get("user").id, cv: (await deps.cvFor(c).get()).content, job: job.extracted, keptInferred: new Set(),
+      });
+      await tailor.saveScore(id, "base", null, base);
+    }
+    return c.json({ base, tailored: await tailor.getScore(id, "tailored") });
   });
 
   app.patch("/:id", async (c) => {
