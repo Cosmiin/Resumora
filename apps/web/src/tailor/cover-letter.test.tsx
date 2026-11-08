@@ -8,7 +8,7 @@ vi.mock("./tailored-api.ts", () => tailoredApi);
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 import { useVoice } from "../cv/enrich/useVoice.ts";
 
-import { CoverLetterTab } from "./CoverLetterTab.tsx";
+import { CoverLetterTab, pickLetter } from "./CoverLetterTab.tsx";
 import { LetterPage } from "./LetterPage.tsx";
 
 const content: CvContent = {
@@ -78,6 +78,30 @@ describe("Cover letter tab", () => {
       { body: `${letter.body} More.`, hiringManager: "", whyCompany: "" }), { timeout: 3000 });
     expect(tailoredApi.saveLetter).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(onLetter).toHaveBeenCalled());
+  });
+});
+
+describe("pickLetter", () => {
+  const edited = { ...letter, body: "Edited." };
+  it("uses the letter written or edited since this row was loaded", () => {
+    expect(pickLetter(tailored(letter), { letter: edited, loadedAt: "2026-11-08T09:00:00Z" })).toEqual(edited);
+    expect(pickLetter(tailored(letter), undefined)).toEqual(letter);
+  });
+
+  it("drops it once the row was reloaded (a re-translation replaced the copy's letter)", () => {
+    expect(pickLetter(tailored(letter), { letter: edited, loadedAt: "2026-11-08T08:00:00Z" })).toEqual(letter);
+  });
+});
+
+describe("Cover letter tab while writing", () => {
+  it("locks the side fields until the letter comes back", async () => {
+    tailoredApi.writeLetter.mockReturnValue(new Promise(() => {}));
+    renderTab(letter);
+    await userEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+    await userEvent.click(screen.getByRole("button", { name: "Replace it" }));
+    expect(screen.getByLabelText("Hiring manager")).toBeDisabled();
+    expect(screen.getByLabelText("Why Globex?")).toBeDisabled();
+    expect(screen.getByLabelText("Letter text")).toBeDisabled();
   });
 });
 

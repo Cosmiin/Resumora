@@ -16,6 +16,13 @@ type Props = {
   today?: Date;
 };
 type Save = "idle" | "saving" | "saved" | "error";
+/** A letter written or edited on this page, tied to the loaded row it belongs to. */
+export type LetterOverride = { letter: CoverLetter; loadedAt: string };
+
+/** The override while the same row is shown; a reloaded row (e.g. after a re-translation) brings its own letter. */
+export function pickLetter(cv: TailoredCv, override: LetterOverride | undefined): CoverLetter | null {
+  return override && override.loadedAt === cv.updatedAt ? override.letter : cv.coverLetter;
+}
 
 /** The cover letter tab: the letter as a page on the left, its options on the right. */
 export function CoverLetterTab({ cv, job, letter, onLetter, today = new Date() }: Props) {
@@ -85,7 +92,7 @@ export function CoverLetterTab({ cv, job, letter, onLetter, today = new Date() }
   };
   const pageBody = letter
     ? <textarea className="letter-body" aria-label={t("letter.body")} value={body} maxLength={4000}
-        rows={Math.max(12, body.split("\n").length + 2)} onChange={(event) => edit(setBody)(event.target.value)} />
+        rows={Math.max(12, body.split("\n").length + 2)} disabled={writing === "busy"} onChange={(event) => edit(setBody)(event.target.value)} />
     : <p className="letter-empty">{t("letter.empty")}</p>;
 
   return (
@@ -95,13 +102,13 @@ export function CoverLetterTab({ cv, job, letter, onLetter, today = new Date() }
       <aside className="letter-side" aria-label={t("letter.side")}>
         <label htmlFor="letter-why">{company ? t("letter.why", { company }) : t("letter.whyAny")}</label>
         <div className="tailor-field">
-          <textarea id="letter-why" rows={3} maxLength={1000} value={whyCompany}
+          <textarea id="letter-why" rows={3} maxLength={1000} value={whyCompany} disabled={writing === "busy"}
             onChange={(event) => edit(setWhyCompany)(event.target.value)} />
-          {mic}
+          {writing !== "busy" && mic}
         </div>
         {partial && <p aria-live="polite">{partial}</p>}
         <label htmlFor="letter-manager">{t("letter.manager")}</label>
-        <input id="letter-manager" maxLength={120} value={hiringManager} onChange={(event) => edit(setHiringManager)(event.target.value)} />
+        <input id="letter-manager" maxLength={120} value={hiringManager} disabled={writing === "busy"} onChange={(event) => edit(setHiringManager)(event.target.value)} />
         {job?.userThoughts?.trim() && <p className="letter-thoughts">{t("letter.thoughts")}</p>}
         {!letter ? (
           <button type="button" className="primary" disabled={writing === "busy"} onClick={() => void write()}>
