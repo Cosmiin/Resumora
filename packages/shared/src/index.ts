@@ -17,3 +17,4 @@ export type { Flag } from "./flags.ts";
 export type { Flag as TailorFlag } from "./tailor.ts";
 export { QuestionSchema, type Question } from "./enrich.ts";
 export { QuestionSchema as TailorQuestionSchema, type Question as TailorQuestion } from "./tailor.ts";
+export { computeMatchScore, bandOf, type Seniority, type Band as MatchBand } from "./match-score.ts";
