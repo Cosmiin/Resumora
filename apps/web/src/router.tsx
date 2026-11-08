@@ -6,6 +6,7 @@ import { CvPage } from "./cv/CvPage.tsx";
 import { JobsPage } from "./jobs/JobsPage.tsx";
 import { JobPage } from "./jobs/JobPage.tsx";
 import { TailorFlow } from "./tailor/TailorFlow.tsx";
+import { TailoredCvPage } from "./tailor/TailoredCvPage.tsx";
 
 export const routes: RouteObject[] = [
   { path: "/login", element: <LoginPage /> },
@@ -18,6 +19,7 @@ export const routes: RouteObject[] = [
       { path: "/jobs", element: <JobsPage /> },
       { path: "/jobs/:id", element: <JobPage /> },
       { path: "/jobs/:id/tailor", element: <TailorFlow /> },
+      { path: "/jobs/:id/cv", element: <TailoredCvPage /> },
     ],
   },
   { path: "*", element: <Navigate to="/" replace /> },

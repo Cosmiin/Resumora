@@ -50,3 +50,14 @@
   .tailor-mode { padding: var(--space-6) var(--space-4) var(--space-10); }
   .tailor-card { padding: var(--space-5); }
 }
+
+/* Tailored CV (editor) */
+.tailored-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-block-end: var(--space-3); }
+.tailored-tabs { display: flex; gap: var(--space-1); }
+.tailored-tabs [aria-selected="true"] { border-color: var(--border-selected); background: var(--surface-selected); }
+.tailored-score { font-weight: 600; margin-inline-end: auto; }
+.tailored-view { margin-block-end: var(--space-3); }
+.tailored-letter { padding: var(--space-8); color: var(--text-muted); }
+.cv-mark-changed { background: var(--pine-50); box-shadow: inset 3px 0 0 var(--pine-400); }
+.cv-mark-inferred { background: var(--marigold-50); box-shadow: inset 3px 0 0 var(--marigold-500); }
+@media print { .cv-mark-changed, .cv-mark-inferred { background: none; box-shadow: none; } }
