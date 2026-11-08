@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CreateJobBodySchema, JobExtractionSchema, JobListItemSchema, JobListPageSchema, JobListQuerySchema, JobPatchBodySchema,
-  JobSchema, findJobPosting, normalizeJobUrl, type JobExtraction,
+  JobPatchSchema, JobSchema, findJobPosting, normalizeJobUrl, type JobExtraction,
 } from "./jobs.ts";
 
 const extraction: JobExtraction = {
@@ -126,6 +126,23 @@ describe("JobPatchBodySchema", () => {
   it.each([0, -1, 1.5])("rejects invalid version %s", (version) => {
     expect(JobPatchBodySchema.safeParse({ version, extracted: extraction }).success).toBe(false);
   });
+
+  it("accepts optional thoughts and all application statuses", () => {
+    for (const applicationStatus of ["saved", "tailored", "applied", "interview", "offer", "rejected"]) {
+      const patch = { version: 1, extracted: extraction, userThoughts: "x".repeat(2000), applicationStatus };
+      expect(JobPatchSchema.parse(patch)).toEqual(patch);
+      expect(JobPatchBodySchema.parse(patch)).toEqual(patch);
+    }
+    expect(JobPatchSchema.parse({ version: 1, extracted: extraction, userThoughts: null }).userThoughts).toBeNull();
+  });
+
+  it("rejects oversized thoughts and unknown application statuses", () => {
+    const patch = { version: 1, extracted: extraction };
+    for (const invalid of [{ userThoughts: "x".repeat(2001) }, { applicationStatus: "hired" }]) {
+      expect(JobPatchSchema.safeParse({ ...patch, ...invalid }).success).toBe(false);
+      expect(JobPatchBodySchema.safeParse({ ...patch, ...invalid }).success).toBe(false);
+    }
+  });
 });
 
 describe("JobListQuerySchema", () => {
@@ -155,6 +172,7 @@ describe("job response schemas", () => {
     expect(JobListItemSchema.safeParse(listItem).success).toBe(true);
     expect(JobSchema.safeParse({
       ...listItem, rawText: null, extracted: null, editedByUser: false, version: 1, updatedAt: listItem.createdAt,
+      userThoughts: null, applicationStatus: "saved",
     }).success).toBe(true);
   });
 
@@ -162,6 +180,7 @@ describe("job response schemas", () => {
     expect(JobSchema.safeParse({
       ...listItem, status: "ready", source: "extension", title: extraction.title,
       rawText: "Original job text", extracted: extraction, editedByUser: true, version: 2, updatedAt: listItem.createdAt,
+      userThoughts: "Interested in the team.", applicationStatus: "applied",
     }).success).toBe(true);
     for (const invalid of [{ status: "done" }, { source: "email" }, { errorCode: "unknown" }]) {
       expect(JobListItemSchema.safeParse({ ...listItem, ...invalid }).success).toBe(false);
@@ -171,7 +190,20 @@ describe("job response schemas", () => {
   it("requires rawText on full jobs", () => {
     expect(JobSchema.safeParse({
       ...listItem, extracted: null, editedByUser: false, version: 1, updatedAt: listItem.createdAt,
+      userThoughts: null, applicationStatus: "saved",
     }).success).toBe(false);
+  });
+
+  it("validates thoughts and application statuses on full jobs", () => {
+    const job = {
+      ...listItem, rawText: null, extracted: null, editedByUser: false, version: 1, updatedAt: listItem.createdAt,
+      userThoughts: "x".repeat(2000), applicationStatus: "saved",
+    };
+    for (const applicationStatus of ["saved", "tailored", "applied", "interview", "offer", "rejected"]) {
+      expect(JobSchema.parse({ ...job, applicationStatus })).toEqual({ ...job, applicationStatus });
+    }
+    expect(JobSchema.safeParse({ ...job, userThoughts: "x".repeat(2001) }).success).toBe(false);
+    expect(JobSchema.safeParse({ ...job, applicationStatus: "hired" }).success).toBe(false);
   });
 });
 

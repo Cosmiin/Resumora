@@ -17,6 +17,7 @@ const job: Job = {
   id: "one", title: "Engineer", company: "Acme", location: "London", status: "ready",
   errorCode: null, source: "link", url: "https://example.com/jobs/1", createdAt: "2026-11-05T10:00:00Z",
   updatedAt: "2026-11-05T10:00:00Z", version: 1, editedByUser: false,
+  userThoughts: null, applicationStatus: "saved",
   rawText: "We need Strong SQL skills.\nGerman is welcome.\n<b>Plain text</b>",
   extracted: {
     title: "Engineer", company: "Acme", location: "London", workMode: "hybrid", employmentType: "full_time",

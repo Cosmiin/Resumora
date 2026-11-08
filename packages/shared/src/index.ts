@@ -12,3 +12,8 @@ export * from "./enrich-checks.ts";
 export * from "./notes.ts";
 export * from "./enrich-stream.ts";
 export * from "./jobs.ts";
+export * from "./tailor.ts";
+export type { Flag } from "./flags.ts";
+export type { Flag as TailorFlag } from "./tailor.ts";
+export { QuestionSchema, type Question } from "./enrich.ts";
+export { QuestionSchema as TailorQuestionSchema, type Question as TailorQuestion } from "./tailor.ts";
