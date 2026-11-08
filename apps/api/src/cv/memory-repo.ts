@@ -42,10 +42,10 @@ export function memoryCvRepo(opts: { now?: () => Date } = {}): CvRepo {
       const found = history.find((s) => s.id === id);
       return found ? { content: structuredClone(found.content), createdAt: found.createdAt } : null;
     },
-    async restore(id, expectedVersion) {
+    async restore(id, expectedVersion, content) {
       const found = history.find((s) => s.id === id);
       if (!found) return null;
-      return write(structuredClone(found.content), expectedVersion, "restore");
+      return write(structuredClone(content), expectedVersion, "restore");
     },
     async snapshot(reason) {
       if (row) snapshot(row.content, reason);

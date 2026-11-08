@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { CvContentSchema, MAX_CV_BYTES } from "@resumora/shared";
+import { CvContentSchema, MAX_CV_BYTES, mergeNewerNotes } from "@resumora/shared";
 import type { AppEnv } from "../app.ts";
 import { ApiError, errorBody } from "../errors.ts";
 import type { CvRepo, SaveResult } from "./repo.ts";
@@ -56,8 +56,15 @@ export function cvRoutes(repoFor: (c: Context<AppEnv>) => CvRepo) {
 
   app.post("/history/:id/restore", async (c) => {
     const { version } = RestoreBody.parse(await readJson(c));
-    const result = await repoFor(c).restore(c.req.param("id"), version);
+    const repo = repoFor(c);
+    const id = c.req.param("id");
+    const found = await repo.getHistory(id);
+    if (!found) throw new ApiError(404, "not_found", "That version no longer exists.");
+    const current = await repo.get();
+    const content = CvContentSchema.parse(mergeNewerNotes(found.content, current.content));
+    const result = await repo.restore(id, version, content);
     if (!result) throw new ApiError(404, "not_found", "That version no longer exists.");
+    if (result.ok) return c.json({ content, version: result.version, updatedAt: result.updatedAt });
     return saveResponse(c, result);
   });
 

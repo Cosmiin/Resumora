@@ -2,7 +2,9 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(21);
+select plan(30);
+select is(to_regprocedure('public.restore_base_cv(uuid, integer)'), null::regprocedure,
+  'the old restore signature is removed');
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -44,7 +46,7 @@ select is((select count(*)::int from public.base_cv_versions), 2, 'a save 10+ mi
 
 select results_eq(
   $$ select version, conflict from public.restore_base_cv(
-       (select id from public.base_cv_versions order by created_at limit 1), 4) $$,
+       (select id from public.base_cv_versions order by created_at limit 1), 4, '{"n":1,"notes":["newer"]}') $$,
   $$ values (5, false) $$,
   'restore bumps the version');
 select is((select content->>'n' from public.base_cvs), '1', 'restore brings back the snapshot content');
@@ -52,15 +54,33 @@ select is(
   (select content->>'n' from public.base_cv_versions where reason = 'restore'),
   '4',
   'restore keeps the replaced content as a snapshot');
+select is((select count(*)::int from public.base_cv_versions), 3, 'restore adds exactly one snapshot');
+select is((select content->'notes' from public.base_cvs), '["newer"]'::jsonb,
+  'restore writes the supplied merged content');
 
 select results_eq(
   $$ select version, conflict from public.restore_base_cv(
-       (select id from public.base_cv_versions order by created_at limit 1), 4) $$,
+       (select id from public.base_cv_versions order by created_at limit 1), 4, '{"n":"stale"}') $$,
   $$ values (5, true) $$,
   'restore with a stale version reports a conflict');
+select is((select content->>'n' from public.base_cvs), '1', 'a conflicting restore changes no content');
+select is((select count(*)::int from public.base_cv_versions), 3, 'a conflicting restore adds no snapshot');
+
+select throws_ok(
+  $$ select * from public.restore_base_cv(
+       (select id from public.base_cv_versions order by created_at limit 1), 5, null) $$,
+  '22023', 'content must be a JSON object', 'restore rejects SQL null content');
+select throws_ok(
+  $$ select * from public.restore_base_cv(
+       (select id from public.base_cv_versions order by created_at limit 1), 5, 'null') $$,
+  '22023', 'content must be a JSON object', 'restore rejects JSON null content');
+select throws_ok(
+  $$ select * from public.restore_base_cv(
+       (select id from public.base_cv_versions order by created_at limit 1), 5, '[]') $$,
+  '22023', 'content must be a JSON object', 'restore rejects non-object content');
 
 select is_empty(
-  $$ select * from public.restore_base_cv(gen_random_uuid(), 5) $$,
+  $$ select * from public.restore_base_cv(gen_random_uuid(), 5, '{}') $$,
   'restore of an unknown snapshot returns nothing');
 
 reset role;
@@ -89,7 +109,7 @@ select results_eq(
   'B gets a CV of their own');
 select is((select count(*)::int from public.base_cvs), 1, 'B sees only their own CV');
 select is_empty(
-  $$ select * from public.restore_base_cv('44444444-4444-4444-4444-444444444444', 1) $$,
+  $$ select * from public.restore_base_cv('44444444-4444-4444-4444-444444444444', 1, '{}') $$,
   'B cannot restore A''s snapshot');
 
 select throws_ok(
@@ -101,6 +121,8 @@ select throws_ok(
 
 -- ── Anonymous ─────────────────────────────────────────────────────────────
 set local role anon;
+select throws_ok($$ select * from public.restore_base_cv(gen_random_uuid(), 0, '{}') $$,
+  '42501', null, 'anonymous requests cannot restore CVs');
 select throws_ok($$ select * from public.base_cvs $$, '42501', null, 'anonymous requests cannot read CVs');
 
 select * from finish();

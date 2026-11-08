@@ -132,7 +132,7 @@ describe.skipIf(!url)("supabaseCvRepo against local Supabase", () => {
     const [item] = await repo.listHistory();
     expect(item?.reason).toBe("autosave");
     expect((await repo.getHistory(item!.id))?.content.basics.fullName).toBe("First");
-    expect(await repo.restore(item!.id, 2)).toMatchObject({ ok: true, version: 3 });
+    expect(await repo.restore(item!.id, 2, cvNamed("First"))).toMatchObject({ ok: true, version: 3 });
     expect((await repo.get()).content.basics.fullName).toBe("First");
   });
 

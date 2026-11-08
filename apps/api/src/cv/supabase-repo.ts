@@ -74,10 +74,11 @@ export function supabaseCvRepo(env: SupabaseEnv, user: AuthUser): CvRepo {
       return data ? { content: storedCv(data.content), createdAt: data.created_at } : null;
     },
 
-    async restore(id, expectedVersion) {
+    async restore(id, expectedVersion, content) {
       const { data, error } = await db.rpc("restore_base_cv", {
         p_version_id: id,
         p_expected_version: expectedVersion,
+        p_content: content,
       });
       if (error) throw new Error(`restore_base_cv failed: ${error.message}`);
       const rows = data as SaveRow[];
