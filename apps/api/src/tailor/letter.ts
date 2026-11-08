@@ -4,10 +4,9 @@ import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import { checkProposal } from "./checks.ts";
-import { letterSystemPrompt, letterUserMessage } from "./letter-prompts.ts";
+import { letterSystemPrompt, letterUserMessage, letterVerifySystemPrompt } from "./letter-prompts.ts";
 import type { TailorRepo } from "./repo.ts";
 import { texts } from "./section-pass.ts";
-import { verifySystemPrompt } from "./section-prompts.ts";
 import { stripHeader } from "./strip-header.ts";
 
 const optional = (max: number) => z.string().trim().max(max).optional().transform((value) => value || null);
@@ -39,6 +38,10 @@ export async function writeCoverLetter(
   // The person's own words may back a number; the job's name, company and place may be named in prose.
   const sources = [...texts(cv), job.userThoughts ?? "", input.whyCompany ?? "", extracted.title, extracted.company ?? "",
     extracted.location ?? "", "I"];
+  // Facts the ad states (its countries, tools, years asked for) may be named as facts about the job: the number and
+  // name checks accept them, and the claim check gets them apart, so a claim about the candidate still needs the CV.
+  const jobText = [extracted.summary, ...extracted.responsibilities, ...extracted.requirements.map((r) => r.text), ...extracted.benefits]
+    .filter((text) => text?.trim());
 
   async function attempt(retry: { body: string; flags: TailorFlag[] } | null) {
     const { body } = await callModel(deps.model, {
@@ -49,12 +52,12 @@ export async function writeCoverLetter(
     const text = body.trim();
     if (!text || text.length > CoverLetterSchema.shape.body.maxLength!) throw new Error("bad letter");
     const verified = await callModel(deps.model, {
-      userId: input.userId, task: "tailor_verify", tier: "cheap", schema: VerifySchema, system: verifySystemPrompt,
-      user: JSON.stringify({ sources, proposals: [{ itemId: "letter", text, before: null }] }), maxOutputTokens: 2000,
+      userId: input.userId, task: "tailor_verify", tier: "cheap", schema: VerifySchema, system: letterVerifySystemPrompt,
+      user: JSON.stringify({ sources, job: jobText, proposals: [{ itemId: "letter", text, before: null }] }), maxOutputTokens: 2000,
     });
     // German capitalises every noun, so only the number check applies there (as for translations).
     const flags = [
-      ...checkProposal({ itemId: "letter", field: "body", text, inferred: doc!.language === "de", flags: [] }, { sources }),
+      ...checkProposal({ itemId: "letter", field: "body", text, inferred: doc!.language === "de", flags: [] }, { sources: [...sources, ...jobText] }),
       ...verified.results.flatMap((result) => result.claims).map((detail) => ({ rule: "achievement" as const, detail })),
     ];
     return { body: text, flags };

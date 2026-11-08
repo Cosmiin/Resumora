@@ -69,10 +69,10 @@ beforeEach(async () => {
 });
 
 const auth = (token = "token-a") => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
-async function tailored() {
+async function tailored(extraction: JobExtraction = job) {
   const jobId = crypto.randomUUID();
   await jobs.repoFor("user-a").create({ id: jobId, source: "link", url: `https://example.test/${jobId}`, urlNormalized: jobId, rawText: "x", jsonLd: null });
-  await jobs.admin.finish(jobId, job);
+  await jobs.admin.finish(jobId, extraction);
   const res = await app.request(`/v1/jobs/${jobId}/tailor`, { method: "POST", headers: auth(), body: JSON.stringify({ tone: "neutral" }) });
   const { tailoredCvId } = await res.json() as { tailoredCvId: string };
   return { jobId, id: tailoredCvId };
@@ -126,6 +126,27 @@ describe("POST /v1/tailored/:id/cover-letter", () => {
     expect(JSON.stringify(writerRequests()[1])).toContain("number");
     expect(flags.map((flag) => flag.rule)).toContain("number");
     expect(coverLetter.body).toBe(invented);
+  });
+
+  it("doesn't flag facts the job ad states, and checks claims about the candidate against the CV only", async () => {
+    const { id } = await tailored({ ...job, responsibilities: [...job.responsibilities, "Support our clients in Bulgaria and Hungary"],
+      requirements: [{ text: "3 years of SAP payroll", kind: "must", category: "skill" }] });
+    letters = [SAMPLE + "\n\nYour role covers clients in Bulgaria and Hungary and asks for 3 years of SAP payroll, which I would like to learn."];
+    const { flags } = await (await write(id)).json() as { flags: unknown[] };
+    expect(flags).toEqual([]);
+    expect(writerRequests()).toHaveLength(1);
+    const verify = model.requests.find((r) => (r.messages as { content: string }[])[0]!.content.startsWith("You check"))!;
+    const sent = JSON.parse((verify.messages as { content: string }[])[1]!.content) as { sources: string[]; job: string[] };
+    expect(sent.job.join(" ")).toContain("Bulgaria and Hungary");
+    expect(sent.sources.join(" ")).not.toContain("Bulgaria");
+    expect((verify.messages as { content: string }[])[0]!.content).toContain("about the candidate");
+  });
+
+  it("still flags an invented number about the candidate when the ad has other numbers", async () => {
+    const { id } = await tailored({ ...job, requirements: [{ text: "3 years of SAP payroll", kind: "must", category: "skill" }] });
+    letters = [SAMPLE.replace("40 staff", "70 staff"), SAMPLE.replace("40 staff", "70 staff")];
+    const { flags } = await (await write(id)).json() as { flags: { rule: string }[] };
+    expect(flags.map((flag) => flag.rule)).toContain("number");
   });
 
   it("keeps the retried letter when the retry fixes the flag", async () => {
