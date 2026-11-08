@@ -64,6 +64,18 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       if (error) throw new Error(`tailor_runs select failed: ${error.message}`);
       return data ? toRun(data) : null;
     },
+    async updateRun(id, changes) {
+      const columns: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (changes.questions !== undefined) columns.questions = changes.questions;
+      if (changes.answers !== undefined) columns.answers = changes.answers;
+      if (changes.proposals !== undefined) columns.proposals = changes.proposals;
+      if (changes.status !== undefined) columns.status = changes.status;
+      if (changes.currentSection !== undefined) columns.current_section = changes.currentSection;
+      if (changes.errorCode !== undefined) columns.error_code = changes.errorCode;
+      const { data, error } = await db.from("tailor_runs").update(columns).eq("id", id).select(RUN_COLUMNS).maybeSingle();
+      if (error) throw new Error(`tailor_runs update failed: ${error.message}`);
+      return data ? toRun(data) : null;
+    },
   };
 }
 

@@ -31,4 +31,8 @@ export interface TailorRepo {
   latestRun(tailoredCvId: string): Promise<TailorRun | null>;
   createRun(input: NewRun): Promise<TailorRun>;
   getRun(id: string): Promise<TailorRun | null>;
+  /** Replaces the given fields; null when the run is gone. */
+  updateRun(id: string, changes: RunChanges): Promise<TailorRun | null>;
 }
+
+export type RunChanges = Partial<Pick<TailorRun, "questions" | "answers" | "proposals" | "status" | "currentSection" | "errorCode">>;

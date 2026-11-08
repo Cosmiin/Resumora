@@ -43,6 +43,12 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     async getRun(id) {
       return ownRun(docs.runs.get(id));
     },
+    async updateRun(id, changes) {
+      const run = docs.runs.get(id);
+      if (!run || run.userId !== userId) return null;
+      Object.assign(run, structuredClone(changes), { updatedAt: new Date().toISOString() });
+      return structuredClone(run);
+    },
     async saveScore(jobId, target, tailoredCvId, score) {
       const key = JSON.stringify([userId, jobId, target, tailoredCvId]);
       store.delete(key);
