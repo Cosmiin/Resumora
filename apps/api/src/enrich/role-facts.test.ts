@@ -76,6 +76,7 @@ describe("POST /v1/enrich/role-facts", () => {
     await result();
     const messages = model.requests[0]!.messages as { content: string }[];
     expect(messages[1]!.content).toContain(`<previous_facts>\n${JSON.stringify(role.facts.items)}\n</previous_facts>`);
+    expect(messages[0]!.content).toContain("Keep previous facts unless a current answer contradicts them.");
   });
 
   it("keeps numbers from previous facts and drops numbers absent from both sources", async () => {
