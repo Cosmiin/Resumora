@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  SaveResponseSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema,
-  type CvContent, type SaveResponse, type TailoredCv, type TailorLanguage, type TailorRun, type TailorSection,
+  CoverLetterSchema, FlagSchema, SaveResponseSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema,
+  type CoverLetter, type CvContent, type SaveResponse, type TailoredCv, type TailorLanguage, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { apiFetch } from "../lib/api.ts";
 
@@ -34,4 +34,20 @@ export function translate(id: string, language: TailorLanguage): Promise<{ tailo
   return apiFetch(`${tailored(id)}/translate`, {
     method: "POST", json: { language }, schema: z.object({ tailoredCvId: z.string(), flagged: z.number() }),
   });
+}
+
+const LetterSchema = CoverLetterSchema;
+const FlagsSchema = z.array(FlagSchema);
+export type LetterFlags = z.infer<typeof FlagsSchema>;
+
+/** Writes (or rewrites) the cover letter; `flags` are the checks the body still fails. */
+export function writeLetter(id: string, input: { whyCompany: string; hiringManager: string }): Promise<{ coverLetter: CoverLetter; flags: LetterFlags }> {
+  return apiFetch(`${tailored(id)}/cover-letter`, {
+    method: "POST", json: input, schema: z.object({ coverLetter: LetterSchema, flags: FlagsSchema }),
+  });
+}
+
+/** Saves the person's edits to the letter (not versioned: the last save wins). */
+export function saveLetter(id: string, edit: { body: string; hiringManager: string; whyCompany: string }): Promise<{ coverLetter: CoverLetter }> {
+  return apiFetch(`${tailored(id)}/cover-letter`, { method: "PUT", json: edit, schema: z.object({ coverLetter: LetterSchema }) });
 }
