@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CvContentSchema, MAX_JOB_NOTES, MAX_NOTES, StoredCvSchema, emptyCv, type CvContent, type Experience, type Note } from "./index.ts";
-import { carryNotes, mergeNewerNotes } from "./notes.ts";
+import { carryNotes, mergeNewerNotes, onlyNotesDiffer } from "./notes.ts";
 
 function note(id: string, askedAt = "2026-01-01T00:00:00.000Z", answer = "A"): Note {
   return { id, question: "How many?", answer, via: ["type"], askedAt };
@@ -114,6 +114,32 @@ describe("carryNotes", () => {
     const snapshot = JSON.stringify(current);
     carryNotes(current, cvWith(role("new", "Acme", "Dev")));
     expect(JSON.stringify(current)).toBe(snapshot);
+  });
+});
+
+describe("onlyNotesDiffer", () => {
+  it("treats equal content as equal regardless of object key order", () => {
+    const a = cvWith(role("r1", "Acme", "Dev"));
+    const { title, ...rest } = a.experience[0]!;
+    expect(onlyNotesDiffer(a, cvWith({ title, ...rest }))).toBe(true);
+  });
+
+  it.each(["experience", "volunteering"] as const)("ignores notes and facts in %s without changing either CV", (section) => {
+    const a = { ...emptyCv(), [section]: [role("r1", "Acme", "Dev")] };
+    const facts = { items: ["Used SQL"], fromNotes: "hash", updatedAt: "2026-11-05T00:00:00Z" };
+    const b = { ...a, [section]: [{ ...a[section][0]!, notes: [note("n1")], facts }] };
+    const snapshot = JSON.stringify({ a, b });
+    expect(onlyNotesDiffer(a, b)).toBe(true);
+    expect(onlyNotesDiffer(b, a)).toBe(true);
+    expect(JSON.stringify({ a, b })).toBe(snapshot);
+    expect(onlyNotesDiffer(a, { ...b, [section]: [{ ...b[section][0]!, title: "Manager" }] })).toBe(false);
+    expect(onlyNotesDiffer(a, { ...b, [section]: [] })).toBe(false);
+  });
+
+  it("detects changes outside roles and changes to role order", () => {
+    const a = cvWith(role("r1", "Acme", "Dev"), role("r2", "Other", "Manager"));
+    expect(onlyNotesDiffer(a, { ...a, basics: { ...a.basics, fullName: "Ana" } })).toBe(false);
+    expect(onlyNotesDiffer(a, { ...a, experience: [...a.experience].reverse() })).toBe(false);
   });
 });
 

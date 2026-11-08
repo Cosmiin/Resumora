@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CvContentSchema, MAX_CV_BYTES, type CvContent, type CvResponse, type SaveResponse } from "@resumora/shared";
+import { CvContentSchema, MAX_CV_BYTES, mergeNewerNotes, onlyNotesDiffer, type CvContent, type CvResponse, type SaveResponse } from "@resumora/shared";
 import { ApiClientError } from "../lib/api-error.ts";
 import { setUnsavedChanges } from "./unsaved.ts";
 
@@ -20,7 +20,7 @@ type Options = {
  * - One save `delayMs` after the last change.
  * - At most one save in flight. Changes made during a save are saved right after it,
  *   using the version that save returned — so a tab never conflicts with itself.
- * - 409 → status "conflict"; autosave stops until the user picks loadLatest() or keepMine().
+ * - 409 → retry once if only notes or facts changed; otherwise pause until loadLatest() or keepMine().
  * - Content that can never be saved as-is (fails the schema, too large, or the server says
  *   400/413) → status "invalid" with a readable `problem`; not retried until the next edit.
  * - Any other failure → status "error", retried after 5 s.
@@ -59,7 +59,7 @@ export function useAutosave({ initial, save, load, delayMs = 1000 }: Options) {
       setStatus("saved");
       return;
     }
-    const sending = latest.current;
+    let sending = latest.current;
     const invalid = checkContent(sending, version.current);
     if (invalid) {
       setProblem(invalid);
@@ -69,7 +69,24 @@ export function useAutosave({ initial, save, load, delayMs = 1000 }: Options) {
     saving.current = true;
     setStatus("saving");
     try {
-      const res = await saveRef.current(sending, version.current);
+      let res: SaveResponse;
+      try {
+        res = await saveRef.current(sending, version.current);
+      } catch (err) {
+        if (!isConflict(err) || !lastSaved.current) throw err;
+        let fresh: CvResponse;
+        try {
+          fresh = await loadRef.current();
+        } catch {
+          throw err;
+        }
+        if (!onlyNotesDiffer(fresh.content, lastSaved.current)) throw err;
+        sending = mergeNewerNotes(latest.current, fresh.content);
+        latest.current = sending;
+        setContentState(sending);
+        version.current = fresh.version;
+        res = await saveRef.current(sending, version.current);
+      }
       version.current = res.version;
       lastSaved.current = sending;
       saving.current = false;

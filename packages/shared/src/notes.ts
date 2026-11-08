@@ -64,3 +64,18 @@ export function mergeNewerNotes(target: CvContent, current: CvContent): CvConten
   }
   return result;
 }
+
+/** Compares CV content while ignoring every role's notes and facts. */
+export function onlyNotesDiffer(a: CvContent, b: CvContent): boolean {
+  const comparable = (content: CvContent) => JSON.stringify({
+    ...content,
+    experience: content.experience.map((role) => ({ ...role, notes: undefined, facts: undefined })),
+    volunteering: content.volunteering.map((role) => ({ ...role, notes: undefined, facts: undefined })),
+  }, (_key, value: unknown) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)));
+    }
+    return value;
+  });
+  return comparable(a) === comparable(b);
+}

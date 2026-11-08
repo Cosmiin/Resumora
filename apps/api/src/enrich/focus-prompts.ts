@@ -93,5 +93,6 @@ export function roleFactsUserMessage(role: Experience): string {
     "<notes>",
     JSON.stringify(role.notes.map((n) => ({ question: n.question, answer: n.answer }))),
     "</notes>",
+    ...(role.facts ? ["<previous_facts>", JSON.stringify(role.facts.items), "</previous_facts>"] : []),
   ].join("\n");
 }
