@@ -10,7 +10,6 @@ export type StreamRequest = {
   system: string;
   user: string;
   maxOutputTokens: number;
-  tier?: "cheap" | "strong";
   /** Cancels the call, for example when the browser gives up on a rewrite. */
   signal?: AbortSignal;
 };
@@ -59,8 +58,7 @@ export async function* streamModel(deps: ModelDeps, req: StreamRequest): AsyncGe
   const firstMs = deps.timeoutMs ?? FIRST_CHUNK_TIMEOUT_MS;
   const gapMs = Math.min(GAP_TIMEOUT_MS, firstMs);
 
-  for (const configured of deps.providers) {
-    const provider = req.tier === "strong" && configured.strongModel ? { ...configured, model: configured.strongModel } : configured;
+  for (const provider of deps.providers) {
     if (req.signal?.aborted) return;
     const started = Date.now();
     let logged = false;
