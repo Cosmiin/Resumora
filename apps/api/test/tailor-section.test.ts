@@ -87,7 +87,7 @@ describe("section pass", () => {
     const run = await memoryTailorRepo("user-a", new Map(), docs).getRun(runId);
     expect(run).toMatchObject({ status: "waiting_user", currentSection: "experience", proposals: body.proposals });
     expect(run?.questions).toEqual(body.questions);
-    replies = [{ questions: Array.from({ length: 8 }, (_, i) => ({ roleId: null, text: `Q${i}?`, kind: "options", options: ["Yes"], reason: "Gap" })) }];
+    replies = [{ questions: Array.from({ length: 8 }, (_, i) => ({ roleId: null, text: `Q${i}?`, kind: "options", options: ["Yes"], reason: "Gap", gap: "r0" })) }];
     const asked = await (await post(`/v1/tailor-runs/${runId}/sections/skills/questions`)).json() as { questions: unknown[] };
     expect(asked.questions).toHaveLength(8);
   });

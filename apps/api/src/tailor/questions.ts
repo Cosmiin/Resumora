@@ -19,6 +19,7 @@ const ModelQuestionsSchema = z.object({
     kind: z.enum(["options", "confirm_inferred"]),
     options: z.array(z.string()),
     reason: z.string(),
+    gap: z.string(),
   })),
 });
 const NOTE_VIA: Record<Exclude<Answer["via"], "skip">, Note["via"][number]> = { option: "pick", typed: "type", voice: "voice" };
@@ -50,7 +51,21 @@ export async function askQuestions(
   const max = MAX_RUN_QUESTIONS - asked.filter((question) => question.kind !== "flag").length;
   if (max <= 0) return [];
   const score = await deps.tailor.getScore(input.run.jobId, "base");
-  const gaps = (score?.labels ?? []).filter((label) => label.status !== "met" || label.inferred);
+  // A gap answered in this run is done; one asked but skipped (or left) may come back once, not again.
+  const answers = new Map((input.run.answers ?? []).map((answer) => [answer.questionId, answer]));
+  const byGap = new Map<string, { asks: Set<string>; answered: boolean }>();
+  for (const question of asked) {
+    if (!question.gap) continue;
+    const entry = byGap.get(question.gap) ?? { asks: new Set<string>(), answered: false };
+    entry.asks.add(question.section);
+    const answer = answers.get(question.id);
+    if (answer && answer.via !== "skip" && answer.value?.trim()) entry.answered = true;
+    byGap.set(question.gap, entry);
+  }
+  const open = (ref: string) => { const entry = byGap.get(ref); return !entry || (!entry.answered && entry.asks.size < 2); };
+  const gaps = (score?.labels ?? []).filter((label) => (label.status !== "met" || label.inferred) && open(label.ref));
+  if (score && gaps.length === 0) return [];
+  const gapRefs = new Set(gaps.map((label) => label.ref));
   const answered = answeredForJob(input.cv, input.run);
   let reply: z.infer<typeof ModelQuestionsSchema>;
   try {
@@ -69,7 +84,7 @@ export async function askQuestions(
   const fresh: Question[] = [];
   for (const question of reply.questions) {
     const text = question.text.trim().slice(0, MAX_TEXT);
-    if (!text || seen.has(same(text)) || fresh.length >= max) continue;
+    if (!text || seen.has(same(text)) || fresh.length >= max || (score && !gapRefs.has(question.gap))) continue;
     seen.add(same(text));
     fresh.push({ ...question, text, id: newId(), section: input.section,
       roleId: question.roleId && roleIds.has(question.roleId) ? question.roleId : null });
