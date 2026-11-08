@@ -3,10 +3,13 @@ import { CATEGORY, normalizeLayout, type CvContent, type SectionKey } from "@res
 import { t } from "../../i18n/t.ts";
 import { newSectionBody } from "./NewSections.tsx";
 import { formatRange } from "./blocks.ts";
+import { getTemplate, type TemplateId } from "./templates.ts";
+import "./templates.css";
 
 type Props = {
   content: CvContent;
   showUnsorted?: boolean;
+  template?: TemplateId;
 };
 
 const joinParts = (parts: string[], sep = " · ") => parts.filter(Boolean).join(sep);
@@ -16,7 +19,7 @@ function Block({ children }: { children: ReactNode }) {
 }
 
 /** The CV as it will print: read-only (History preview and the import review). */
-export function CvDocument({ content: cv, showUnsorted }: Props) {
+export function CvDocument({ content: cv, showUnsorted, template = "classic" }: Props) {
   const itemTitle = (text: string, className = "cv-item-title") => <span className={className}>{text}</span>;
 
   const b = cv.basics;
@@ -184,7 +187,7 @@ export function CvDocument({ content: cv, showUnsorted }: Props) {
   };
 
   return (
-    <article className="cv-page" aria-label={t("cv.page.label")}>
+    <article className={`cv-page ${getTemplate(template).className}`} aria-label={t("cv.page.label")}>
       {hasBasics && (
         <header className="cv-header">
           <Block>
