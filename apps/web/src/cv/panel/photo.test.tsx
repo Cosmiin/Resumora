@@ -1,10 +1,11 @@
 import { useReducer } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { cvReducer } from "../edit/cvReducer.ts";
 import { HeaderEdit } from "../edit/sections/HeaderEdit.tsx";
+import { PhotoField } from "./PhotoField.tsx";
 
 const storage = vi.hoisted(() => ({ upload: vi.fn(), createSignedUrl: vi.fn(), remove: vi.fn(), from: vi.fn() }));
 vi.mock("../../lib/supabase.ts", () => ({ supabase: { storage: { from: storage.from } } }));
@@ -29,6 +30,56 @@ beforeEach(() => {
 });
 
 describe("CV photo", () => {
+  it("applies a replacement upload after dragging the existing photo", async () => {
+    let finishUpload!: () => void;
+    const pendingUpload = new Promise<{ error: null }>((resolve) => {
+      finishUpload = () => resolve({ error: null });
+    });
+    storage.upload.mockReturnValueOnce(pendingUpload);
+    vi.stubGlobal("PointerEvent", MouseEvent);
+    try {
+      render(<Field initial={initialPhoto} />);
+      await screen.findByRole("img");
+      await userEvent.upload(screen.getByLabelText("Choose a photo"),
+        new File(["photo"], "replacement.png", { type: "image/png" }));
+      const preview = screen.getByRole("group", { name: "Photo position" });
+      preview.setPointerCapture = vi.fn();
+      vi.spyOn(preview, "getBoundingClientRect").mockReturnValue({ width: 120, height: 120 } as DOMRect);
+      fireEvent.pointerDown(preview, { clientX: 60, clientY: 60 });
+      fireEvent.pointerMove(preview, { clientX: 90, clientY: 30 });
+      fireEvent.pointerUp(preview);
+      expect(contentPhoto()).toEqual({ ...initialPhoto, x: 25, y: 75 });
+      await act(async () => {
+        finishUpload();
+        await pendingUpload;
+      });
+      expect(contentPhoto()).toEqual({
+        path: expect.stringMatching(/^user-a\/[\w-]+\.png$/), x: 50, y: 50, zoom: 1,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not change content when an upload resolves after unmount", async () => {
+    let finishUpload!: () => void;
+    const pendingUpload = new Promise<{ error: null }>((resolve) => {
+      finishUpload = () => resolve({ error: null });
+    });
+    storage.upload.mockReturnValueOnce(pendingUpload);
+    const onChange = vi.fn();
+    const { unmount } = render(<PhotoField photo={null} onChange={onChange} />);
+    await userEvent.upload(screen.getByLabelText("Choose a photo"),
+      new File(["photo"], "portrait.jpg", { type: "image/jpeg" }));
+    expect(storage.upload).toHaveBeenCalledOnce();
+    unmount();
+    await act(async () => {
+      finishUpload();
+      await pendingUpload;
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("uploads, previews, zooms and removes a photo through the content", async () => {
     const user = userEvent.setup();
     render(<Field />);

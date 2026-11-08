@@ -19,6 +19,12 @@ export function PhotoField({ photo, onChange }: Props) {
   const drag = useRef<{ id: number; clientX: number; clientY: number; x: number; y: number } | null>(null);
   const path = photo?.path;
   const url = preview?.path === path ? preview?.url : undefined;
+  const currentPhoto = useRef<{ path: string | null } | null>(null);
+
+  useEffect(() => {
+    currentPhoto.current = { path: path ?? null };
+    return () => { currentPhoto.current = null; };
+  }, [path]);
 
   useEffect(() => {
     if (!path) return;
@@ -35,12 +41,15 @@ export function PhotoField({ photo, onChange }: Props) {
     if (!ext) { setError(t("cv.photo.unsupported")); return; }
     if (file.size > 2097152) { setError(t("cv.photo.tooLarge")); return; }
     if (!userId) { setError(t("cv.photo.uploadError")); return; }
+    const startingPath = path ?? null;
     setBusy(true);
     try {
       const path = `${userId}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage.from("cv-photos").upload(path, file, { contentType: file.type });
       if (error) throw error;
-      onChange({ path, x: 50, y: 50, zoom: 1 });
+      if (currentPhoto.current && currentPhoto.current.path === startingPath) {
+        onChange({ path, x: 50, y: 50, zoom: 1 });
+      }
     } catch {
       setError(t("cv.photo.uploadError"));
     } finally {
