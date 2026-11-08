@@ -82,6 +82,7 @@
 .retailor-sections { display: grid; gap: var(--space-2); border: 0; margin: 0; padding: 0; }
 .retailor-sections label { display: flex; align-items: center; gap: var(--space-2); }
 @media print { .tailored-redo { display: none; } }
+.tailored-template { display: inline-flex; align-items: center; gap: var(--space-2); }
 .tailored-menu { position: relative; }
 .tailored-menu-pop { position: absolute; inset-inline-end: 0; z-index: 5; min-width: 18rem; margin-block-start: var(--space-1);
   padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-card); }

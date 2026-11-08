@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { emptyCv, type CvContent, type MatchScore, type TailoredCv } from "@resumora/shared";
 
-const tailoredApi = vi.hoisted(() => ({ listTailored: vi.fn(), getTailored: vi.fn(), saveTailored: vi.fn() }));
+const tailoredApi = vi.hoisted(() => ({ listTailored: vi.fn(), getTailored: vi.fn(), saveTailored: vi.fn(), setTemplate: vi.fn() }));
 vi.mock("./tailored-api.ts", () => tailoredApi);
 const tailorApi = vi.hoisted(() => ({ getScores: vi.fn() }));
 vi.mock("./tailor-api.ts", () => tailorApi);
@@ -59,6 +59,7 @@ beforeEach(() => {
   tailoredApi.getTailored.mockResolvedValue(tailored);
   tailoredApi.saveTailored.mockResolvedValue({ version: 4, updatedAt: "2026-11-08T10:00:00Z" });
   tailorApi.getScores.mockResolvedValue({ base: score(62, "fair"), tailored: score(71, "strong") });
+  tailoredApi.setTemplate.mockImplementation(async (_id: string, template: string) => ({ template }));
 });
 
 const editView = async () => {
@@ -131,5 +132,36 @@ describe("TailoredCvPage", () => {
     expect(within(panel).getByText("Original summary.")).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: "Use original wording" }));
     expect(screen.getByRole("textbox", { name: "Summary" })).toHaveTextContent("Original summary.");
+  });
+
+  it("switches the template live and saves it through the PATCH", async () => {
+    renderPage();
+    const select = await screen.findByRole("combobox", { name: "Template" });
+    expect(select).toHaveValue("classic");
+    expect(screen.getByRole("article", { name: "CV page" })).toHaveClass("cv-template-classic");
+    await userEvent.selectOptions(select, "modern");
+    expect(screen.getByRole("article", { name: "CV page" })).toHaveClass("cv-template-modern");
+    expect(tailoredApi.setTemplate).toHaveBeenCalledWith("tc-1", "modern");
+    expect(tailoredApi.saveTailored).not.toHaveBeenCalled();
+  });
+
+  it("goes back to the last saved template when two quick picks both fail", async () => {
+    tailoredApi.setTemplate.mockRejectedValue(new Error("offline"));
+    renderPage();
+    const select = await screen.findByRole("combobox", { name: "Template" });
+    await userEvent.selectOptions(select, "modern");
+    await userEvent.selectOptions(select, "compact");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await waitFor(() => expect(tailoredApi.setTemplate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Template" })).toHaveValue("classic"));
+  });
+
+  it("goes back to the saved template when the PATCH fails", async () => {
+    tailoredApi.setTemplate.mockRejectedValue(new Error("offline"));
+    renderPage();
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Template" }), "compact");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't change the template");
+    expect(screen.getByRole("combobox", { name: "Template" })).toHaveValue("classic");
+    expect(screen.getByRole("article", { name: "CV page" })).toHaveClass("cv-template-classic");
   });
 });
