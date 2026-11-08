@@ -12,7 +12,11 @@ import { translateSystemPrompt, translateUserMessage } from "./translate-prompts
 export const TranslateBodySchema = z.object({ language: TailorLanguageSchema });
 const ReplySchema = z.object({ texts: z.array(z.object({ path: z.string(), text: z.string() })) });
 
-/** Never sent for translation: ids, dates, contact details, names, employers, settings and hidden role notes. */
+/**
+ * Never sent for translation: ids, dates, contact details, names, employers, settings and hidden role notes.
+ * A role's or school's location is translated; the header's own location (the person's city) is a contact detail
+ * and never goes to the AI.
+ */
 const KEEP = new Set(["id", "schemaVersion", "locale", "layout", "photo", "facts", "email", "phone", "website", "linkedin",
   "url", "startDate", "endDate", "date", "company", "fullName", "firstName", "lastName", "location", "generatedAt", "hiringManager"]);
 
@@ -27,7 +31,7 @@ function collect(value: unknown, path: string, into: Text[]): void {
   } else if (value && typeof value === "object") {
     for (const [key, entry] of Object.entries(value)) {
       // A role's notes (a list) are hidden answers; education's notes (a string) are printed text.
-      if (KEEP.has(key) || (key === "notes" && Array.isArray(entry))) continue;
+      if ((KEEP.has(key) && !(key === "location" && path !== "cv.basics")) || (key === "notes" && Array.isArray(entry))) continue;
       collect(entry, path ? `${path}.${key}` : key, into);
     }
   }

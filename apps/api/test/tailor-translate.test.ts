@@ -92,6 +92,16 @@ describe("POST /v1/tailored/:id/translate", () => {
     expect(sent).not.toContain("2020-01");
   });
 
+  it("translates role locations but never sends the header's own location", async () => {
+    await cvs["user-a"]!.save({ ...base, basics: { ...base.basics, location: "Bucharest Home" } }, 1);
+    const { id } = await original();
+    const { tailoredCvId } = await (await translate(id, "fr")).json() as { tailoredCvId: string };
+    const copy = docs.cvs.get(tailoredCvId)!;
+    expect(copy.content.experience[0]!.location).toBe("FR Cluj");
+    expect(copy.content.basics.location).toBe("Bucharest Home");
+    expect(JSON.stringify(model.requests.at(-1))).not.toContain("Bucharest Home");
+  });
+
   it("refreshes the same copy on a second call and never touches the original", async () => {
     const { id } = await original();
     const first = await (await translate(id, "fr")).json() as { tailoredCvId: string };

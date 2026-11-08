@@ -3,9 +3,8 @@ import { Document, Image, Page, pdf, StyleSheet, Text, View } from "@react-pdf/r
 import {
   CATEGORY, formatYearMonth, normalizeLayout, type CvContent, type SectionKey,
 } from "@resumora/shared";
-import { formatRange } from "../cv/page/blocks.ts";
+import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
-import { t } from "../i18n/t.ts";
 import type { ExportPhoto, LetterDocxInput, LetterHeader } from "./docx.ts";
 import { PDF_FONTS, registerPdfFonts } from "./pdf-fonts.ts";
 
@@ -71,8 +70,8 @@ export function buildCvPdf(
       [item.degree, item.field].filter(Boolean).join(", "), item.notes,
     )),
     skills: [
-      { label: t("cv.page.technical"), items: content.technicalSkills },
-      { label: t("cv.page.professional"), items: content.professionalSkills },
+      { label: SKILL_GROUPS[content.locale].technical, items: content.technicalSkills },
+      { label: SKILL_GROUPS[content.locale].professional, items: content.professionalSkills },
     ].filter((row) => row.items.length > 0).map((row) => (
       <Text key={row.label} style={styles.block}>
         <Text style={{ fontWeight: 700 }}>{row.label}: </Text>
