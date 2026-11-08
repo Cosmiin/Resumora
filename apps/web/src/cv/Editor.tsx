@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { emptyCv, type CvContent, type CvResponse, type SaveResponse } from "@resumora/shared";
+import { emptyCv, type CvContent, type CvResponse, type SaveResponse, type SectionKey } from "@resumora/shared";
 import type { TemplateId } from "./page/templates.ts";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
@@ -45,6 +45,8 @@ export type TailoredExtras = {
   inferred: ReadonlySet<string>;
   template?: TemplateId;
   toolbar: ReactNode;
+  /** A control next to each section heading in the changes view (↻). */
+  sectionAction?(key: SectionKey): ReactNode;
   /** When set, the stage shows this instead of the CV (the Cover letter tab); the editor stays mounted. */
   replacePage?: ReactNode;
 };
@@ -186,7 +188,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   const page = historyOpen ? (
     <CvDocument content={preview?.content ?? content} showUnsorted />
   ) : tailored && showChanges ? (
-    <CvDocument content={content} template={tailored.template} highlights={tailored.highlights} inferred={tailored.inferred} />
+    <CvDocument content={content} template={tailored.template} highlights={tailored.highlights} inferred={tailored.inferred} sectionAction={tailored.sectionAction} />
   ) : (
     <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} />
   );

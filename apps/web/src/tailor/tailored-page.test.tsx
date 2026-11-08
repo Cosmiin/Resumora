@@ -9,6 +9,7 @@ const tailoredApi = vi.hoisted(() => ({ listTailored: vi.fn(), getTailored: vi.f
 vi.mock("./tailored-api.ts", () => tailoredApi);
 const tailorApi = vi.hoisted(() => ({ getScores: vi.fn() }));
 vi.mock("./tailor-api.ts", () => tailorApi);
+vi.mock("../jobs/jobs-api.ts", () => ({ getJob: vi.fn(() => new Promise(() => {})) }));
 const cvApi = vi.hoisted(() => ({ getCv: vi.fn(), saveCv: vi.fn(), listHistory: vi.fn(), getHistoryItem: vi.fn(), restoreHistory: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => cvApi);
 const enrichApi = vi.hoisted(() => ({

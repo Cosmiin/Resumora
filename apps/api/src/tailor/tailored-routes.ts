@@ -6,6 +6,7 @@ import { readJson, saveResponse } from "../cv/routes.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import type { TailorRepo } from "./repo.ts";
+import { RetailorBodySchema, startRetailor } from "./retailor.ts";
 import { jobNotFound } from "./start.ts";
 
 const SaveBody = z.object({ content: CvContentSchema, expectedVersion: z.number().int().min(1) });
@@ -47,6 +48,14 @@ export function tailoredRoutes(deps: { jobsFor(c: Context<AppEnv>): JobRepo; tai
     const { template } = TemplateBody.parse(await c.req.json().catch(() => ({})));
     if (!(await deps.tailorFor(c).setTemplate(tailoredId, template))) throw notFound();
     return c.json({ template });
+  });
+
+  app.post("/tailored/:id/retailor", async (c) => {
+    const tailoredId = id(c);
+    const { sections } = RetailorBodySchema.parse(await c.req.json().catch(() => ({})));
+    const started = await startRetailor({ jobs: deps.jobsFor(c), tailor: deps.tailorFor(c) }, tailoredId, sections);
+    if (!started) throw notFound();
+    return c.json(started);
   });
 
   return app;

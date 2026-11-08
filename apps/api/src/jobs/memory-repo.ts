@@ -80,8 +80,9 @@ export function memoryJobs(opts: { now?: () => Date }) {
         extracted: structuredClone(extracted), title: extracted.title, company: extracted.company,
         location: extracted.location,
         // Thoughts and status saves resend the current extraction; only extraction edits count as user edits.
-        ...(fields.userThoughts === undefined && fields.applicationStatus === undefined ? { editedByUser: true } : {}),
-        version: row.version + 1, updatedAt: now().toISOString(),
+        // updatedAt follows extraction edits only: the Tailored CV's "job changed" notice compares it.
+        ...(fields.userThoughts === undefined && fields.applicationStatus === undefined ? { editedByUser: true, updatedAt: now().toISOString() } : {}),
+        version: row.version + 1,
       });
       return "ok";
     },

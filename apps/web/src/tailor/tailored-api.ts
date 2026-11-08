@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  SaveResponseSchema, TailoredCvSchema, TailorLanguageSchema,
-  type CvContent, type SaveResponse, type TailoredCv,
+  SaveResponseSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema,
+  type CvContent, type SaveResponse, type TailoredCv, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { apiFetch } from "../lib/api.ts";
 
@@ -22,4 +22,9 @@ export function getTailored(id: string): Promise<TailoredCv> {
 /** Same version check and 409 shape as the Base CV save. */
 export function saveTailored(id: string, content: CvContent, version: number): Promise<SaveResponse> {
   return apiFetch(tailored(id), { method: "PUT", json: { content, expectedVersion: version }, schema: SaveResponseSchema });
+}
+
+/** A run over only the picked sections; the tailoring flow continues it. */
+export function retailor(id: string, sections: TailorSection[]): Promise<{ run: TailorRun }> {
+  return apiFetch(`${tailored(id)}/retailor`, { method: "POST", json: { sections }, schema: z.object({ run: TailorRunSchema }) });
 }

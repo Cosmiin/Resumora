@@ -14,6 +14,8 @@ type Props = {
   /** Tailored CV: items the tailoring changed (green) and inferred items not yet reviewed (amber), by item id. */
   highlights?: ReadonlySet<string>;
   inferred?: ReadonlySet<string>;
+  /** Tailored CV: a control next to a section's heading (the ↻ re-tailor button). */
+  sectionAction?(key: SectionKey): ReactNode;
 };
 
 const joinParts = (parts: string[], sep = " · ") => parts.filter(Boolean).join(sep);
@@ -23,7 +25,7 @@ function Block({ children }: { children: ReactNode }) {
 }
 
 /** The CV as it will print: read-only (History preview and the import review). */
-export function CvDocument({ content: cv, showUnsorted, template = "classic", highlights, inferred }: Props) {
+export function CvDocument({ content: cv, showUnsorted, template = "classic", highlights, inferred, sectionAction }: Props) {
   const mark = (id: string, className: string) =>
     [className, inferred?.has(id) ? "cv-mark-inferred" : highlights?.has(id) ? "cv-mark-changed" : ""].filter(Boolean).join(" ");
   const itemTitle = (text: string, className = "cv-item-title") => <span className={className}>{text}</span>;
@@ -57,6 +59,7 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic", hi
     show ? (
       <section className="cv-section">
         <h2 className="cv-section-label">{heading(key)}</h2>
+        {sectionAction?.(key)}
         {children}
       </section>
     ) : null;

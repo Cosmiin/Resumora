@@ -23,7 +23,7 @@ type Phase =
 
 const CONTENT_SECTIONS = TAILOR_SECTIONS.filter((section) => section !== "layout").length;
 const storageKey = (jobId: string) => `resumora.tailorRun.${jobId}`;
-function remember(jobId: string, runId: string | null) {
+export function remember(jobId: string, runId: string | null) {
   try {
     if (runId) localStorage.setItem(storageKey(jobId), runId);
     else localStorage.removeItem(storageKey(jobId));

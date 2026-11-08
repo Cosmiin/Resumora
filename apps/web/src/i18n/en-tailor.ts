@@ -70,4 +70,11 @@ export const tailorEn = {
   "tailored.loadError": "Couldn't load your tailored CV.",
   "tailored.none": "This job has no tailored CV yet.",
   "tailored.toJob": "Back to the job",
+  "tailored.retailor.title": "Re-tailor sections",
+  "tailored.retailor.hint": "Only the sections you pick run again. The others keep their wording, your edits included.",
+  "tailored.retailor.cancel": "Cancel",
+  "tailored.retailor.start": "Re-tailor",
+  "tailored.retailor.section": "Re-tailor {section}",
+  "tailored.jobChanged": "The job changed.",
+  "tailored.jobChangedAction": "Re-tailor?",
 } as const;

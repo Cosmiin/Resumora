@@ -61,3 +61,9 @@
 .cv-mark-changed { background: var(--pine-50); box-shadow: inset 3px 0 0 var(--pine-400); }
 .cv-mark-inferred { background: var(--marigold-50); box-shadow: inset 3px 0 0 var(--marigold-500); }
 @media print { .cv-mark-changed, .cv-mark-inferred { background: none; box-shadow: none; } }
+.tailored-notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-block-end: var(--space-3);
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--marigold-50); }
+.tailored-redo { float: inline-end; margin-block-start: calc(-1 * var(--space-6)); }
+.retailor-sections { display: grid; gap: var(--space-2); border: 0; margin: 0; padding: 0; }
+.retailor-sections label { display: flex; align-items: center; gap: var(--space-2); }
+@media print { .tailored-redo { display: none; } }

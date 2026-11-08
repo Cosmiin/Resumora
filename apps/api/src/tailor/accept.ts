@@ -41,7 +41,10 @@ function apply(cv: CvContent, p: Proposal): void {
   if (p.itemId === "headline") cv.basics.titles = [p.text, ...cv.basics.titles.slice(1)];
   else if (p.itemId === "summary") cv.basics.summary = p.text;
   else if (p.itemId === "new-skill") {
-    if (cv.technicalSkills.length < MAX_ITEMS) cv.technicalSkills.push({ id: newId(), name: p.text });
+    // Section passes read the Base CV, so a re-tailor (or a retry) can propose a skill an earlier accept already added.
+    const name = p.text.trim().toLowerCase();
+    const known = [...cv.technicalSkills, ...cv.professionalSkills, ...cv.unclearSkills].some((s) => s.name.trim().toLowerCase() === name);
+    if (!known && cv.technicalSkills.length < MAX_ITEMS) cv.technicalSkills.push({ id: newId(), name: p.text });
   }
   else {
     for (const role of cv.experience) {
