@@ -7,6 +7,21 @@ const job = (company: string, bullets: string[] = []) => ({
   company, title: "PM", location: "", startDate: "2020-01", endDate: "", current: true, description: "", bullets,
 });
 
+describe("AI import drafts", () => {
+  it("keeps photos out of the empty draft", () => {
+    const draft = emptyDraft();
+    expect(draft.basics).not.toHaveProperty("photo");
+    expect(ImportDraftSchema.safeParse(draft).success).toBe(true);
+  });
+
+  it.each([null, { path: "user/photo.jpg", x: 50, y: 50, zoom: 1 }])(
+    "rejects model output containing a photo: %j", (photo) => {
+      const draft = emptyDraft();
+      expect(ImportDraftSchema.safeParse({ ...draft, basics: { ...draft.basics, photo } }).success).toBe(false);
+    },
+  );
+});
+
 describe("toCvContent", () => {
   it("returns v2 with the default layout", () => {
     const { content } = toCvContent(draftWith({ experience: [job("Acme")] }));

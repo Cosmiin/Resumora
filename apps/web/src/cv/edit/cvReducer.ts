@@ -31,7 +31,8 @@ export type { BulletOwner, ListKey } from "./lists.ts";
 type Basics = CvContent["basics"];
 
 export type CvAction =
-  | { type: "setBasics"; field: keyof Basics; value: string }
+  | { type: "setBasics"; field: Exclude<keyof Basics, "photo">; value: string }
+  | { type: "setBasics"; field: "photo"; value: NonNullable<Basics["photo"]> | null }
   | { type: "setTitles"; index: 0 | 1; value: string }
   | { type: "setItemField"; list: ListKey; itemId: string; field: string; value: string | boolean }
   | { type: "addItem"; list: ListKey; id: string }

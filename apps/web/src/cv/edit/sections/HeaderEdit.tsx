@@ -3,10 +3,11 @@ import type { CvContent } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { CvAction } from "../cvReducer.ts";
 import { PageField } from "../PageField.tsx";
+import { PhotoField } from "../../panel/PhotoField.tsx";
 
 type Basics = CvContent["basics"];
 type Dispatch = (a: CvAction) => void;
-type TextKey = Exclude<keyof Basics, "titles">;
+type TextKey = Exclude<keyof Basics, "titles" | "photo">;
 
 function BasicsField(p: {
   field: TextKey;
@@ -82,6 +83,7 @@ export function HeaderEdit({ basics, dispatch }: { basics: Basics; dispatch: Dis
           </Fragment>
         ))}
       </div>
+      <PhotoField photo={basics.photo} onChange={(photo) => dispatch({ type: "setBasics", field: "photo", value: photo })} />
     </header>
   );
 }

@@ -1,6 +1,6 @@
 export const TEMPLATES = [
-  { id: "classic", label: "cv.template.classic", className: "cv-template-classic", showsPhoto: false },
-  { id: "modern", label: "cv.template.modern", className: "cv-template-modern", showsPhoto: false },
+  { id: "classic", label: "cv.template.classic", className: "cv-template-classic", showsPhoto: true },
+  { id: "modern", label: "cv.template.modern", className: "cv-template-modern", showsPhoto: true },
   { id: "compact", label: "cv.template.compact", className: "cv-template-compact", showsPhoto: false },
 ] as const;
 
