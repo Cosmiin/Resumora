@@ -1,4 +1,5 @@
-import { MAX_JOB_NOTES, emptyCv, type CvContent, type HistoryItem } from "@resumora/shared";
+import { MAX_CV_BYTES, MAX_JOB_NOTES, emptyCv, type CvContent, type HistoryItem } from "@resumora/shared";
+import { ApiError } from "../errors.ts";
 import { HISTORY_LIMIT, SNAPSHOT_INTERVAL_MS, type CvRepo, type SaveResult } from "./repo.ts";
 
 type Snapshot = HistoryItem & { content: CvContent };
@@ -46,7 +47,11 @@ export function memoryCvRepo(opts: { now?: () => Date } = {}): CvRepo {
         .sort((a, b) => Date.parse(b.note.askedAt) - Date.parse(a.note.askedAt) || b.index - a.index)
         .slice(0, MAX_JOB_NOTES).map(({ note }) => note));
       role.notes = all.filter((note) => note.jobId === undefined || newest.has(note));
-      row = { content, version: row.version + 1, updatedAt: now().toISOString() };
+      const version = row.version + 1;
+      if (new TextEncoder().encode(JSON.stringify({ content, version })).length > MAX_CV_BYTES) {
+        throw new ApiError(413, "content_too_large", "This CV is too large to save (limit 256 KB).");
+      }
+      row = { content, version, updatedAt: now().toISOString() };
       return { version: row.version, updatedAt: row.updatedAt };
     },
     async listHistory() {

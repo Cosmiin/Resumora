@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(74);
+select plan(77);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -265,6 +265,25 @@ select throws_ok($$ select public.add_job_notes('role-2', '[]') $$,
 set local request.jwt.claims to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 select results_eq($$ select version, content #> '{experience,1,notes}' from public.base_cvs $$,
   $$ values (9, '[]'::jsonb) $$, 'another user cannot change the original CV');
+
+-- Refuse valid notes when their UTF-8 bytes would make the next autosave too large.
+update public.base_cvs set content = jsonb_build_object(
+  'experience', '[{"id":"role-1","notes":[]}]'::jsonb,
+  'projects', (select jsonb_agg(jsonb_build_object(
+    'id', 'project-' || i, 'name', '', 'description', repeat(chr(233), 4000), 'url', ''))
+    from generate_series(1, 32) as i));
+select ok((select octet_length(jsonb_build_object('content', content, 'version', version)::text) <= 262144
+  from public.base_cvs), 'the CV fits before adding notes');
+create temporary table cv_before_notes as select content, version, updated_at from public.base_cvs;
+select throws_ok(
+  $$ select public.add_job_notes('role-1', (select jsonb_agg(jsonb_build_object(
+    'id', 'large-note-' || i, 'jobId', 'aaaaaaaa-0000-4000-8000-000000000001',
+    'question', 'Q', 'answer', repeat(chr(233), 2000), 'via', jsonb_build_array('type'),
+    'askedAt', '2026-02-01T00:00:00Z')) from generate_series(1, 2) as i)) $$,
+  '54000', 'content_too_large', 'notes exceeding the CV byte limit are rejected');
+select results_eq($$ select content, version, updated_at from public.base_cvs $$,
+  $$ select content, version, updated_at from cv_before_notes $$,
+  'oversized notes leave content, version and timestamp unchanged');
 
 set local role anon;
 set local request.jwt.claims to '{"role":"anon"}';

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, MAX_JOB_NOTES, MAX_NOTES, emptyCv, type Experience, type Note } from "@resumora/shared";
+import { CvContentSchema, MAX_CV_BYTES, MAX_JOB_NOTES, MAX_NOTES, emptyCv, type Experience, type Note } from "@resumora/shared";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
+import { ApiError } from "../src/errors.ts";
 
 const jobId = "aaaaaaaa-0000-4000-8000-000000000001";
 const note = (i: number): Note => ({
@@ -61,6 +62,31 @@ describe("notes-only job answers", () => {
     expect((await repo.get()).content.volunteering[0]!.notes).toEqual(notes.slice(3));
     expect((await repo.get()).version).toBe(2);
     expect(await repo.listHistory()).toEqual([]);
+  });
+
+  it("refuses notes that would exceed the CV byte limit and leaves the CV unchanged", async () => {
+    const repo = memoryCvRepo();
+    const content = {
+      ...emptyCv(), experience: [role()],
+      projects: Array.from({ length: 32 }, (_, i) => ({
+        id: "project-" + i, name: "", description: "\u00e9".repeat(4000), url: "",
+      })),
+    };
+    const notes = [note(1), note(2)].map((item) => ({ ...item, answer: "\u00e9".repeat(2000) }));
+    const enlarged = { ...content, experience: [role("role-1", notes)] };
+    expect(CvContentSchema.safeParse(content).success).toBe(true);
+    expect(CvContentSchema.safeParse(enlarged).success).toBe(true);
+    expect(new TextEncoder().encode(JSON.stringify({ content, version: 1 })).length).toBeLessThanOrEqual(MAX_CV_BYTES);
+    expect(new TextEncoder().encode(JSON.stringify({ content: enlarged, version: 2 })).length).toBeGreaterThan(MAX_CV_BYTES);
+    await repo.save(content, 0);
+    const before = await repo.get();
+
+    const result = repo.addJobNotes("role-1", notes);
+    await expect(result).rejects.toMatchObject({
+      status: 413, code: "content_too_large",
+    });
+    await expect(result).rejects.toBeInstanceOf(ApiError);
+    expect(await repo.get()).toEqual(before);
   });
 
   it("rejects a missing role or CV and leaves another user's CV untouched", async () => {

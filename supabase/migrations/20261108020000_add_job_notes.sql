@@ -38,8 +38,14 @@ begin
     ) ranked
     where not (note ? 'jobId') or note_rank <= 25;
 
+  v_row.content := jsonb_set(v_row.content, array[v_section, v_index::text, 'notes'], v_notes);
+  -- Match MAX_CV_BYTES for the next autosave body, including its version.
+  if octet_length(jsonb_build_object('content', v_row.content, 'version', v_row.version + 1)::text) > 262144 then
+    raise exception 'content_too_large' using errcode = '54000';
+  end if;
+
   update public.base_cvs b
-    set content = jsonb_set(v_row.content, array[v_section, v_index::text, 'notes'], v_notes),
+    set content = v_row.content,
         version = b.version + 1, updated_at = now()
     where b.user_id = auth.uid()
     returning * into v_row;

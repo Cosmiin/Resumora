@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { HistoryItemSchema, StoredCvSchema, emptyCv, type CvContent } from "@resumora/shared";
 import type { AuthUser, SupabaseEnv } from "../env.ts";
 import type { CvRepo, SaveResult } from "./repo.ts";
+import { ApiError } from "../errors.ts";
 
 type SaveRow = { version: number; updated_at: string; conflict: boolean };
 
@@ -55,6 +56,9 @@ export function supabaseCvRepo(env: SupabaseEnv, user: AuthUser): CvRepo {
     async addJobNotes(roleId, notes) {
       const { data, error } = await db.rpc("add_job_notes", { p_role_id: roleId, p_notes: notes });
       if (error?.code === "P0002") throw new Error("role_not_found");
+      if (error?.code === "54000" && error.message === "content_too_large") {
+        throw new ApiError(413, "content_too_large", "This CV is too large to save (limit 256 KB).");
+      }
       if (error) throw new Error(`add_job_notes failed: ${error.message}`);
       const row = (data as { version: number; updated_at: string }[] | null)?.[0];
       if (!row) throw new Error("add_job_notes returned no row");
