@@ -69,12 +69,14 @@ export function memoryJobs(opts: { now?: () => Date }) {
         version: row.version, updatedAt: row.updatedAt,
       };
     },
-    async patch(id, expectedVersion, extracted) {
+    async patch(id, expectedVersion, extracted, fields = {}) {
       const row = rows.get(id);
       if (!row || row.userId !== userId) return "not_found";
       if (row.status !== "ready") return "wrong_status";
       if (row.version !== expectedVersion) return "conflict";
       Object.assign(row, {
+        ...(fields.userThoughts !== undefined ? { userThoughts: fields.userThoughts } : {}),
+        ...(fields.applicationStatus !== undefined ? { applicationStatus: fields.applicationStatus } : {}),
         extracted: structuredClone(extracted), title: extracted.title, company: extracted.company,
         location: extracted.location, editedByUser: true, version: row.version + 1, updatedAt: now().toISOString(),
       });

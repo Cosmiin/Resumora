@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { CreateJobBodySchema, JobListQuerySchema, JobPatchBodySchema, findJobPosting, normalizeJobUrl } from "@resumora/shared";
+import type { TailorRepo } from "../tailor/repo.ts";
 import type { AppEnv } from "../app.ts";
 import { ApiError } from "../errors.ts";
 import { JOBS_PER_DAY, decodeJobCursor, encodeJobCursor, type JobMessage, type JobRepo } from "./repo.ts";
@@ -14,6 +15,7 @@ const notFound = () => new ApiError(404, "not_found", "That job doesn't exist.")
 
 export function jobRoutes(deps: {
   repoFor(c: Context<AppEnv>): JobRepo;
+  tailorRepoFor(c: Context<AppEnv>): TailorRepo;
   queue: { send(message: JobMessage): Promise<void> };
   now(): Date;
 }) {
@@ -80,11 +82,18 @@ export function jobRoutes(deps: {
     return c.json(found);
   });
 
+  app.get("/:id/score", async (c) => {
+    const id = c.req.param("id");
+    if (!isUuid(id) || !(await deps.repoFor(c).get(id))) throw notFound();
+    const base = await deps.tailorRepoFor(c).getScore(id, "base");
+    return c.json({ base, tailored: null });
+  });
+
   app.patch("/:id", async (c) => {
     const id = c.req.param("id");
-    const { version, extracted } = JobPatchBodySchema.parse(await c.req.json().catch(() => ({})));
+    const { version, extracted, ...fields } = JobPatchBodySchema.parse(await c.req.json().catch(() => ({})));
     const repo = deps.repoFor(c);
-    const result = isUuid(id) ? await repo.patch(id, version, extracted) : "not_found";
+    const result = isUuid(id) ? await repo.patch(id, version, extracted, fields) : "not_found";
     if (result === "not_found") throw notFound();
     if (result === "conflict") throw new ApiError(409, "version_conflict", "This job changed elsewhere. Reload to see the latest.");
     if (result === "wrong_status") throw new ApiError(409, "wrong_status", "This job can't be changed right now.");

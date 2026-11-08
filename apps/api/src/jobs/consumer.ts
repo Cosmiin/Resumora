@@ -1,5 +1,7 @@
+import type { CvContent, MatchScore } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { LogFn } from "../errors.ts";
+import { scoreMatch } from "../tailor/score.ts";
 import { processJob } from "./process.ts";
 import type { JobAdmin, JobMessage } from "./repo.ts";
 
@@ -7,7 +9,14 @@ import type { JobAdmin, JobMessage } from "./repo.ts";
 const MAX_ATTEMPTS = 3;
 
 export async function handleJobMessage(
-  deps: { admin: JobAdmin; model: ModelDeps; log: LogFn },
+  deps: {
+    admin: JobAdmin; model: ModelDeps; log: LogFn;
+    baseCv(userId: string): Promise<CvContent | null>;
+    tailorRepo(userId: string): {
+      getScore(jobId: string): Promise<MatchScore | null>;
+      saveScore(jobId: string, score: MatchScore): Promise<void>;
+    };
+  },
   msg: Pick<Message<JobMessage>, "body" | "attempts" | "ack" | "retry">,
 ): Promise<void> {
   const { admin } = deps;
@@ -19,6 +28,22 @@ export async function handleJobMessage(
     const result = await processJob({ model: deps.model }, work);
     if (result.ok) {
       await admin.finish(work.id, result.extracted);
+      try {
+        const scores = deps.tailorRepo(work.userId);
+        if (!(await scores.getScore(work.id))) {
+          const cv = await deps.baseCv(work.userId);
+          if (cv) {
+            const score = await scoreMatch({ model: deps.model }, {
+              userId: work.userId, cv, job: result.extracted, keptInferred: new Set(),
+            });
+            await scores.saveScore(work.id, score);
+          } else {
+            deps.log({ msg: "job score skipped: no base CV", jobId: work.id });
+          }
+        }
+      } catch {
+        deps.log({ msg: "job score failed", jobId: work.id });
+      }
     } else {
       await admin.fail(work.id, result.code);
     }

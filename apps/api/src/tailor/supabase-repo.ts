@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { MatchScoreSchema } from "@resumora/shared";
-import type { AuthUser, SupabaseEnv } from "../env.ts";
+import { MatchScoreSchema, type MatchScore } from "@resumora/shared";
+import { storedCv } from "../cv/supabase-repo.ts";
+import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { TailorRepo } from "./repo.ts";
 
 /** Queries as the signed-in user so row-level security applies. */
@@ -29,6 +30,41 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       if (!data) return null;
       const { capped, ...parts } = data.parts;
       return MatchScoreSchema.parse({ ...data, parts, capped });
+    },
+  };
+}
+
+/** Queue-only access to a job owner's current Base CV and base score. */
+export function supabaseTailorAdmin(env: Pick<Env, "SUPABASE_URL" | "SUPABASE_SERVICE_ROLE_KEY">) {
+  const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return {
+    async baseCv(userId: string) {
+      const { data, error } = await db.from("base_cvs").select("content").eq("user_id", userId).maybeSingle();
+      if (error) throw new Error(`base_cvs select failed: ${error.message}`);
+      return data ? storedCv(data.content) : null;
+    },
+    tailorRepo(userId: string) {
+      return {
+        async getScore(jobId: string) {
+          const { data, error } = await db.from("match_scores").select("policy, labels, parts, total, band")
+            .eq("user_id", userId).eq("job_id", jobId).eq("target", "base").is("tailored_cv_id", null)
+            .order("created_at", { ascending: false }).limit(1).maybeSingle();
+          if (error) throw new Error(`match_scores select failed: ${error.message}`);
+          if (!data) return null;
+          const { capped, ...parts } = data.parts;
+          return MatchScoreSchema.parse({ ...data, parts, capped });
+        },
+        async saveScore(jobId: string, score: MatchScore) {
+          const { error } = await db.from("match_scores").insert({
+            user_id: userId, job_id: jobId, target: "base", tailored_cv_id: null,
+            policy: score.policy, labels: score.labels, parts: { ...score.parts, capped: score.capped },
+            total: score.total, band: score.band,
+          });
+          if (error) throw new Error(`match_scores insert failed: ${error.message}`);
+        },
+      };
     },
   };
 }

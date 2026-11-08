@@ -9,6 +9,7 @@ import { supabaseImportAdmin, supabaseImportRepo } from "./imports/supabase-repo
 import { handleJobMessage } from "./jobs/consumer.ts";
 import type { JobMessage } from "./jobs/repo.ts";
 import { supabaseJobAdmin, supabaseJobRepo } from "./jobs/supabase-repo.ts";
+import { supabaseTailorAdmin, supabaseTailorRepo } from "./tailor/supabase-repo.ts";
 import type { Env } from "./env.ts";
 import type { LogFn } from "./errors.ts";
 
@@ -39,6 +40,7 @@ function realDeps(env: Env): AppDeps {
     cvRepo: (user) => supabaseCvRepo(env, user),
     importRepo: (user) => supabaseImportRepo(env, user),
     jobRepo: (user) => supabaseJobRepo(env, user),
+    tailorRepo: (user) => supabaseTailorRepo(env, user),
     insightsRepo: (user) => supabaseInsightsRepo(env, user),
     model: (user) => ({
       providers: providersFromEnv(env),
@@ -71,7 +73,7 @@ export default {
       async jobs(msg) {
         const admin = supabaseJobAdmin(env);
         const model = { providers: providersFromEnv(env), fetch: (...args: Parameters<typeof fetch>) => fetch(...args), logCall: admin.logCall };
-        await handleJobMessage({ admin, model, log }, msg);
+        await handleJobMessage({ admin, model, log, ...supabaseTailorAdmin(env) }, msg);
       },
       async imports(msg) {
         const admin = supabaseImportAdmin(env);

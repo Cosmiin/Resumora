@@ -94,8 +94,10 @@ export function supabaseJobRepo(env: SupabaseEnv, user: AuthUser): JobRepo {
       if (!parsed.success) throw new Error(`stored job ${row.id} has an unexpected shape`);
       return parsed.data;
     },
-    async patch(id, expectedVersion, extracted) {
+    async patch(id, expectedVersion, extracted, fields = {}) {
       const { data, error } = await db.from("jobs").update({
+        ...(fields.userThoughts !== undefined ? { user_thoughts: fields.userThoughts } : {}),
+        ...(fields.applicationStatus !== undefined ? { application_status: fields.applicationStatus } : {}),
         extracted, title: extracted.title, company: extracted.company, location: extracted.location,
         edited_by_user: true, version: expectedVersion + 1, updated_at: new Date().toISOString(),
       }).eq("id", id).eq("version", expectedVersion).eq("status", "ready").select("id").maybeSingle();

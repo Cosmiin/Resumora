@@ -8,6 +8,7 @@ import type { ImportMessage, ImportRepo } from "./imports/repo.ts";
 import { importRoutes } from "./imports/routes.ts";
 import type { JobMessage, JobRepo } from "./jobs/repo.ts";
 import { jobRoutes } from "./jobs/routes.ts";
+import type { TailorRepo } from "./tailor/repo.ts";
 import type { ModelDeps } from "./ai/call-model.ts";
 import type { VoiceDeps } from "./ai/voice-session.ts";
 import type { InsightsRepo } from "./enrich/repo.ts";
@@ -21,6 +22,7 @@ export type AppDeps = {
   cvRepo(user: AuthUser): CvRepo;
   importRepo(user: AuthUser): ImportRepo;
   jobRepo(user: AuthUser): JobRepo;
+  tailorRepo?(user: AuthUser): TailorRepo;
   insightsRepo(user: AuthUser): InsightsRepo;
   /** Model access for request handlers, logging each call as this user. */
   model(user: AuthUser): ModelDeps;
@@ -76,7 +78,14 @@ export function createApp(deps: AppDeps) {
   app.route("/v1/enrich", enrichRoutes({ cvRepo: deps.cvRepo, insightsRepo: deps.insightsRepo, model: deps.model, voice: deps.voice }));
   app.route(
     "/v1/jobs",
-    jobRoutes({ repoFor: (c) => deps.jobRepo(c.get("user")), queue: deps.jobQueue, now: deps.now ?? (() => new Date()) }),
+    jobRoutes({
+      repoFor: (c) => deps.jobRepo(c.get("user")),
+      tailorRepoFor: (c) => {
+        if (!deps.tailorRepo) throw new Error("Score repository is not configured");
+        return deps.tailorRepo(c.get("user"));
+      },
+      queue: deps.jobQueue, now: deps.now ?? (() => new Date()),
+    }),
   );
 
   app.notFound((c) => c.json(errorBody("not_found", "Not found.", c.get("requestId")), 404));

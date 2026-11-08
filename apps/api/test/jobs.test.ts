@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { JobExtraction, JobListPage } from "@resumora/shared";
+import type { JobExtraction, JobListPage, MatchScore } from "@resumora/shared";
 import { createApp, type AppDeps } from "../src/app.ts";
 import { memoryJobs } from "../src/jobs/memory-repo.ts";
 import { JOBS_PER_DAY, type JobMessage } from "../src/jobs/repo.ts";
 
+import { memoryTailorRepo, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
+
+const score: MatchScore = {
+  policy: "match/1", total: 50, band: "fair", capped: false, labels: [],
+  parts: { requirements: null, keywords: null, seniority: { points: 0.5, max: 100 }, langEdu: null },
+};
+let scores: MemoryTailorStore;
 const ORIGIN = "http://127.0.0.1:5173";
 const USERS: Record<string, string> = { "token-a": "user-a", "token-b": "user-b" };
 const body = { url: "https://example.test/jobs/engineer", pageText: "a".repeat(200) };
@@ -22,12 +29,14 @@ beforeEach(() => {
   clock = new Date("2026-11-05T10:00:00Z");
   store = memoryJobs({ now: () => clock });
   sent = [];
+  scores = new Map();
   deps = {
     appOrigin: ORIGIN,
     verifyToken: async (token) => (USERS[token] ? { id: USERS[token], token } : null),
     cvRepo: () => { throw new Error("not used"); },
     importRepo: () => { throw new Error("not used"); },
     jobRepo: (user) => store.repoFor(user.id),
+    tailorRepo: (user) => memoryTailorRepo(user.id, scores),
     insightsRepo: () => { throw new Error("not used"); },
     model: () => { throw new Error("not used"); },
     queue: { send: async () => {} },
@@ -45,10 +54,10 @@ const post = (input: unknown = body, token = "token-a", headers: Record<string, 
   });
 const get = (id = "") =>
   app.request(`/v1/jobs${id ? `/${id}` : ""}`, { headers: { authorization: "Bearer token-a" } });
-const patch = (id: string, version = 1, value: unknown = extracted) =>
+const patch = (id: string, version = 1, value: unknown = extracted, fields: Record<string, unknown> = {}) =>
   app.request(`/v1/jobs/${id}`, {
     method: "PATCH", headers: { authorization: "Bearer token-a", "content-type": "application/json" },
-    body: JSON.stringify({ version, extracted: value }),
+    body: JSON.stringify({ version, extracted: value, ...fields }),
   });
 const remove = (id: string) =>
   app.request(`/v1/jobs/${id}`, { method: "DELETE", headers: { authorization: "Bearer token-a" } });
@@ -69,6 +78,43 @@ function jobFields(value: unknown) {
 }
 
 describe("job endpoints", () => {
+  it("returns the base score, null before scoring, and 404 for another user's job", async () => {
+    const id = await create();
+    const request = (jobId: string, token = "token-a") => app.request(`/v1/jobs/${jobId}/score`, { headers: { authorization: `Bearer ${token}` } });
+    const empty = await request(id);
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual({ base: null, tailored: null });
+    await memoryTailorRepo("user-a", scores).saveScore(id, "base", null, score);
+    await memoryTailorRepo("user-a", scores).saveScore(id, "tailored", "cv-a", score);
+    const res = await request(id);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ base: score, tailored: null });
+    await error(await request(id, "token-b"), 404, "not_found");
+    await error(await request(crypto.randomUUID()), 404, "not_found");
+    await error(await request("invalid"), 404, "not_found");
+  });
+
+  it("round-trips thoughts and application status, preserves omitted fields, and clears thoughts", async () => {
+    const id = await create();
+    await store.admin.finish(id, extracted);
+    const userThoughts = "x".repeat(2000);
+    const res = await patch(id, 1, extracted, { userThoughts, applicationStatus: "applied" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ userThoughts, applicationStatus: "applied", version: 2 });
+    expect(await (await get(id)).json()).toMatchObject({ userThoughts, applicationStatus: "applied" });
+    expect((await patch(id, 2)).status).toBe(200);
+    expect(await (await get(id)).json()).toMatchObject({ userThoughts, applicationStatus: "applied" });
+    expect((await patch(id, 3, extracted, { userThoughts: null })).status).toBe(200);
+    expect(await (await get(id)).json()).toMatchObject({ userThoughts: null, applicationStatus: "applied", version: 4 });
+  });
+
+  it("rejects thoughts over 2000 characters and invalid application statuses", async () => {
+    const id = await create();
+    await store.admin.finish(id, extracted);
+    await error(await patch(id, 1, extracted, { userThoughts: "x".repeat(2001) }), 400, "invalid_content");
+    await error(await patch(id, 1, extracted, { applicationStatus: "invalid" }), 400, "invalid_content");
+    expect(await (await get(id)).json()).toMatchObject({ userThoughts: null, applicationStatus: "saved", version: 1 });
+  });
   it("creates a queued extension job and sends one message", async () => {
     const res = await post();
     expect(res.status).toBe(202);

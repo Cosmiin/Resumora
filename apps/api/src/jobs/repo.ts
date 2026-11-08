@@ -1,4 +1,4 @@
-import type { Job, JobErrorCode, JobExtraction, JobListItem, JobSource } from "@resumora/shared";
+import type { Job, JobErrorCode, JobExtraction, JobListItem, JobPatchBody, JobSource } from "@resumora/shared";
 import type { AiCallLog } from "../ai/call-model.ts";
 
 export const JOBS_PER_DAY = 30;
@@ -38,7 +38,7 @@ export type JobRepo = {
   countRunsSince(iso: string): Promise<number>;
   list(page: { limit: number; after: JobCursor | null }): Promise<{ items: JobListItem[]; next: JobCursor | null }>;
   get(id: string): Promise<Job | null>;
-  patch(id: string, expectedVersion: number, extracted: JobExtraction): Promise<"ok" | "conflict" | "wrong_status" | "not_found">;
+  patch(id: string, expectedVersion: number, extracted: JobExtraction, fields?: Pick<JobPatchBody, "userThoughts" | "applicationStatus">): Promise<"ok" | "conflict" | "wrong_status" | "not_found">;
   remove(id: string): Promise<boolean>;
 };
 
