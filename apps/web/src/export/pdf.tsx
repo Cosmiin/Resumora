@@ -1,12 +1,12 @@
 ﻿import type { ReactElement, ReactNode } from "react";
-import { Document, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   CATEGORY, formatYearMonth, normalizeLayout, type CvContent, type SectionKey,
 } from "@resumora/shared";
 import { formatRange } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 import { t } from "../i18n/t.ts";
-import type { LetterDocxInput, LetterHeader } from "./docx.ts";
+import type { ExportPhoto, LetterDocxInput, LetterHeader } from "./docx.ts";
 import { PDF_FONTS, registerPdfFonts } from "./pdf-fonts.ts";
 
 const TEMPLATES = {
@@ -19,10 +19,12 @@ const join = (parts: string[]) => parts.filter(Boolean).join(" · ");
 export function buildCvPdf(
   content: CvContent,
   template: TemplateId | string | undefined,
+  photo?: ExportPhoto,
 ): Promise<Blob> {
   registerPdfFonts();
   const selectedTemplate = getTemplate(template);
-  // Task 26: showsPhoto draws nothing until the CV has a photo field.
+  const image = selectedTemplate.showsPhoto && content.basics.photo && photo && photo.type !== "webp"
+    ? new Blob([new Uint8Array(photo.data)], { type: `image/${photo.type}` }) : undefined;
   const theme = TEMPLATES[selectedTemplate.id];
   const styles = StyleSheet.create({
     page: { padding: 54, color: "#222222", fontFamily: theme.fontFamily, fontSize: theme.fontSize, lineHeight: theme.lineHeight },
@@ -100,8 +102,9 @@ export function buildCvPdf(
   return pdf(
     <Document title={b.fullName} language={content.locale}>
       <Page size="A4" style={styles.page}>
-        {b.fullName || titles || contact ? (
+        {b.fullName || titles || contact || image ? (
           <View style={styles.header}>
+            {image ? <Image src={image} style={{ width: 72, height: 72, objectFit: "contain" }} /> : null}
             {b.fullName ? <Text style={styles.name}>{b.fullName}</Text> : null}
             {titles ? paragraph(titles) : null}
             {contact ? <Text style={styles.contact}>{contact}</Text> : null}

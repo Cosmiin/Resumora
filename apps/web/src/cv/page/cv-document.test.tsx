@@ -1,10 +1,61 @@
-import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { sampleCv } from "../../test/sample-cv.ts";
 import { CvDocument } from "./CvDocument.tsx";
 import { RoleItem } from "../edit/sections/RoleItem.tsx";
 import type { RoleScoreState } from "../enrich/useRoleScores.ts";
+
+const photos = vi.hoisted(() => ({ sign: vi.fn(), from: vi.fn() }));
+vi.mock("../../lib/supabase.ts", () => ({ supabase: { storage: { from: photos.from } } }));
+
+beforeEach(() => {
+  photos.from.mockReset().mockReturnValue({ createSignedUrl: photos.sign });
+  photos.sign.mockReset().mockResolvedValue({ data: { signedUrl: "https://example.test/photo" }, error: null });
+});
+
+describe("CV document photos", () => {
+  const withPhoto = () => {
+    const cv = emptyCv();
+    cv.basics.photo = { path: "user-a/photo.jpg", x: 25, y: 75, zoom: 2 };
+    return cv;
+  };
+
+  it.each(["classic", "modern"] as const)("shows a signed photo and its crop for %s", async (template) => {
+    const { rerender } = render(<CvDocument content={withPhoto()} template={template} />);
+    const image = await screen.findByRole("img", { name: "CV photo" });
+    expect(image).toHaveAttribute("src", "https://example.test/photo");
+    expect(image).toHaveStyle({ objectPosition: "25% 75%", transform: "scale(2)" });
+    expect(image.closest("header")).not.toBeNull();
+    expect(photos.from).toHaveBeenCalledWith("cv-photos");
+    expect(photos.sign).toHaveBeenCalledWith("user-a/photo.jpg", 3600);
+    rerender(<CvDocument content={withPhoto()} template="compact" />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("does not request photos when the template disables them or the CV has none", () => {
+    const { rerender } = render(<CvDocument content={withPhoto()} template="compact" />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(photos.sign).not.toHaveBeenCalled();
+    rerender(<CvDocument content={emptyCv()} template="modern" />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(photos.sign).not.toHaveBeenCalled();
+  });
+
+  it.each(["error", "rejection"])("renders no photo when signing returns an %s", async (failure) => {
+    if (failure === "error") photos.sign.mockResolvedValue({ data: null, error: { message: "missing" } });
+    else photos.sign.mockRejectedValue(new Error("offline"));
+    render(<CvDocument content={withPhoto()} template="modern" />);
+    await waitFor(() => expect(photos.sign).toHaveBeenCalled());
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("hides an image that fails to load", async () => {
+    render(<CvDocument content={withPhoto()} template="modern" />);
+    fireEvent.error(await screen.findByRole("img"));
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+});
 
 describe("CvDocument", () => {
   it("draws every filled section", () => {
