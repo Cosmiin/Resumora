@@ -5,7 +5,9 @@ import { SCORE_POLICY, type Experience, type Locale } from "@resumora/shared";
 // experience-level review, coverage, scope and documentLocale text, plus the impact grade.
 // Changing the wording or the weights bumps SCORE_POLICY in packages/shared.
 
-const LANGUAGE_NAME: Record<Locale, string> = { en: "English", ro: "Romanian" };
+const LANGUAGE_NAME: Record<Locale, string> = {
+  en: "English", ro: "Romanian", fr: "French", de: "German", es: "Spanish", it: "Italian",
+};
 
 /** The Codex language instruction (Appendix B), prefixed with the CV locale. */
 export function languageInstruction(locale: Locale): string {

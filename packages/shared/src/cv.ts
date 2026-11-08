@@ -12,6 +12,7 @@ export const MAX_LONG_TEXT = 4000;
 export const MAX_TITLES = 2;
 export const MAX_ACHIEVEMENTS = 10;
 export const MAX_NOTES = 25;
+export const MAX_JOB_NOTES = 25;
 
 const text = (max = MAX_TEXT) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -32,6 +33,7 @@ export const NoteSchema = z
     /** How the answer was given: a tapped option, typed words, or voice. */
     via: z.array(z.enum(["pick", "type", "voice"])).min(1).max(3),
     askedAt: z.iso.datetime(),
+    jobId: z.uuid().optional(),
   })
   .strict();
 
@@ -52,7 +54,12 @@ export const ExperienceSchema = z
     /** Short statement of the role's scope, kept word for word from the CV. */
     description: text(MAX_LONG_TEXT),
     bullets: z.array(BulletSchema).max(MAX_BULLETS),
-    notes: z.array(NoteSchema).max(MAX_NOTES).default([]),
+    notes: z.array(NoteSchema).max(MAX_NOTES + MAX_JOB_NOTES)
+      .refine((notes) => notes.filter((note) => note.jobId === undefined).length <= MAX_NOTES,
+        `At most ${MAX_NOTES} enrichment notes are allowed`)
+      .refine((notes) => notes.filter((note) => note.jobId !== undefined).length <= MAX_JOB_NOTES,
+        `At most ${MAX_JOB_NOTES} job notes are allowed`)
+      .default([]),
     facts: RoleFactsSchema.nullable().optional(),
   })
   .strict();
@@ -135,7 +142,7 @@ export function defaultLayout(): Layout {
 }
 
 const v1Shape = {
-  locale: z.enum(["en", "ro"]),
+  locale: z.enum(["ro", "en", "fr", "de", "es", "it"]),
   basics: BasicsSchema,
   experience: z.array(ExperienceSchema).max(MAX_ITEMS),
   education: z.array(EducationSchema).max(MAX_ITEMS),

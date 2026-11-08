@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, ExperienceSchema, MAX_NOTES, emptyCv, newId, type CvContent } from "./index.ts";
+import { CvContentSchema, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, emptyCv, newId, type CvContent } from "./index.ts";
 
 function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
   return {
@@ -22,6 +22,30 @@ function withExperience(items: CvContent["experience"]): CvContent {
 }
 
 describe("CvContentSchema", () => {
+  it("accepts all six CV locales and rejects unsupported locales", () => {
+    for (const locale of ["ro", "en", "fr", "de", "es", "it"]) {
+      expect(CvContentSchema.safeParse({ ...emptyCv(), locale }).success).toBe(true);
+    }
+    expect(CvContentSchema.safeParse({ ...emptyCv(), locale: "nl" }).success).toBe(false);
+  });
+
+  it("accepts an optional UUID job id on notes", () => {
+    const note = { id: "n1", question: "Q", answer: "A", via: ["type"], askedAt: "2026-11-05T00:00:00Z" };
+    expect(NoteSchema.safeParse(note).success).toBe(true);
+    expect(NoteSchema.safeParse({ ...note, jobId: newId() }).success).toBe(true);
+    expect(NoteSchema.safeParse({ ...note, jobId: "invalid" }).success).toBe(false);
+  });
+
+  it("validates enrichment and job note limits separately", () => {
+    const notes = Array.from({ length: MAX_NOTES }, (_, i) => ({
+      id: `n${i}`, question: "Q", answer: "A", via: ["type"], askedAt: "2026-11-05T00:00:00Z",
+    }));
+    const jobNotes = Array.from({ length: MAX_JOB_NOTES }, (_, i) => ({ ...notes[0]!, id: `j${i}`, jobId: newId() }));
+    expect(MAX_JOB_NOTES).toBe(25);
+    expect(ExperienceSchema.safeParse({ ...experience(), notes: [...notes, ...jobNotes] }).success).toBe(true);
+    expect(ExperienceSchema.safeParse({ ...experience(), notes: [...jobNotes, { ...jobNotes[0], id: "extra" }] }).success).toBe(false);
+  });
+
   it("accepts missing facts without adding a default", () => {
     expect(ExperienceSchema.parse(experience()).facts).toBeUndefined();
   });

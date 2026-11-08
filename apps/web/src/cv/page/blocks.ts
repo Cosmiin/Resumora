@@ -1,7 +1,9 @@
 import type { Locale } from "@resumora/shared";
 
 /** "Present" follows the CV's language, not the interface language. */
-export const PRESENT: Record<Locale, string> = { en: "Present", ro: "prezent" };
+export const PRESENT: Record<Locale, string> = {
+  en: "Present", ro: "prezent", fr: "aujourd'hui", de: "heute", es: "actualidad", it: "oggi",
+};
 
 function formatDate(value: string, locale: Locale): string {
   const m = /^(\d{4})-(\d{2})$/.exec(value);

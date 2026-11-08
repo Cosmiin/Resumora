@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { CATEGORIES, CATEGORY, SECTION_KEYS } from "./index.ts";
 
 describe("categories", () => {
-  it("every category has an English and a Romanian label", () => {
+  it("every category has a non-empty label in all six locales", () => {
     for (const c of CATEGORIES) {
-      expect(c.label.en.length).toBeGreaterThan(0);
-      expect(c.label.ro.length).toBeGreaterThan(0);
+      for (const locale of ["ro", "en", "fr", "de", "es", "it"] as const) {
+        expect(c.label[locale].trim().length).toBeGreaterThan(0);
+      }
     }
   });
 
