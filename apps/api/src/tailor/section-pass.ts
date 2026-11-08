@@ -17,7 +17,7 @@ const ModelProposalsSchema = z.object({
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
 
 /** The items a section's proposals may point at, keyed by stable item id, with the fields that may change. */
-function sectionItems(cv: CvContent, section: TailorSection): Map<string, Item> {
+export function sectionItems(cv: CvContent, section: TailorSection): Map<string, Item> {
   const items = new Map<string, Item>();
   if (section === "experience") {
     for (const role of cv.experience) {

@@ -144,7 +144,8 @@ describe("section pass", () => {
     const body = await (await runSection("skills")).res.json() as { proposals: Proposal[] };
     expect(body.proposals.map((p) => [p.itemId, p.text, p.flags])).toEqual([["new-skill", "Kubernetes", []], ["s1", "Microsoft Excel", []]]);
     expect(JSON.stringify(model.requests[0])).toContain("Ran payroll for 40 staff");
-    expect((await runSection("layout")).res.status).toBe(400);
+    // The layout step has its own pass (Task 15) and runs only once it is the current section.
+    expect((await runSection("layout")).res.status).toBe(409);
   });
 
   it("gives the summary the roles as context", async () => {

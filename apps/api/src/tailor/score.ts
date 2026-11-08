@@ -19,7 +19,8 @@ function cvText(value: unknown): string[] {
 
 export async function scoreMatch(
   deps: { model: ModelDeps },
-  input: { userId: string; cv: CvContent; job: JobExtraction; keptInferred: Set<string> },
+  /** keptInferredTexts: texts of inferred items the user kept; an inferred label quoting one counts in full. */
+  input: { userId: string; cv: CvContent; job: JobExtraction; keptInferred: Set<string>; keptInferredTexts?: string[] },
 ): Promise<MatchScore> {
   const { cv } = stripHeader(input.cv);
   try {
@@ -54,7 +55,11 @@ export async function scoreMatch(
     const checked = labels.map((label) => label.status === "missing" || !label.evidence?.trim() || !text.some((value) => value.includes(label.evidence ?? ""))
       ? { ...label, status: "missing" as const, evidence: null, inferred: false }
       : label);
-    return computeMatchScore({ job: input.job, labels: checked, cvSeniority, keptInferred: input.keptInferred });
+    const kept = new Set(input.keptInferred);
+    for (const label of checked) {
+      if (label.inferred && label.evidence && input.keptInferredTexts?.some((t) => t.includes(label.evidence!))) kept.add(label.ref);
+    }
+    return computeMatchScore({ job: input.job, labels: checked, cvSeniority, keptInferred: kept });
   } catch {
     throw new ApiError(502, "ai_failed", "The AI could not score this CV. Try again.");
   }

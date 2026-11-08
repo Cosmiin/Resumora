@@ -51,6 +51,19 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       if (error) throw new Error(`tailored_cvs insert failed: ${error.message}`);
       return data.id;
     },
+    async getTailoredCv(id) {
+      const { data, error } = await db.from("tailored_cvs").select("id, job_id, content, review, version").eq("id", id).maybeSingle();
+      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
+      return data ? { id: data.id, jobId: data.job_id, content: storedCv(data.content), review: data.review, version: data.version } : null;
+    },
+    async saveTailoredCv(id, expectedVersion, changes) {
+      const { data, error } = await db.from("tailored_cvs").update({
+        content: changes.content, review: changes.review, score: changes.score,
+        version: expectedVersion + 1, updated_at: new Date().toISOString(),
+      }).eq("id", id).eq("version", expectedVersion).select("id");
+      if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
+      return data.length > 0 ? "ok" : "conflict";
+    },
     async latestRun(tailoredCvId) {
       const { data, error } = await db.from("tailor_runs").select(RUN_COLUMNS).eq("tailored_cv_id", tailoredCvId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();

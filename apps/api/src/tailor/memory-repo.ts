@@ -3,7 +3,7 @@ import type { ScoreTarget, TailorRepo } from "./repo.ts";
 
 export type MemoryTailorDocs = {
   cvs: Map<string, Pick<TailoredCv, "id" | "userId" | "jobId" | "language" | "content" | "baseSnapshot" | "baseSnapshotAt"
-    | "tone" | "instruction">>;
+    | "tone" | "instruction" | "review" | "score" | "version">>;
   runs: Map<string, TailorRun>;
 };
 export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map() });
@@ -30,8 +30,20 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       if ([...docs.cvs.values()].some((cv) => cv.jobId === input.jobId && cv.language === input.language)) return "exists";
       const id = crypto.randomUUID();
       docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, content: structuredClone(input.content),
-        baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, tone: input.tone, instruction: input.instruction });
+        baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, tone: input.tone, instruction: input.instruction,
+        review: null, score: null, version: 1 });
       return id;
+    },
+    async getTailoredCv(id) {
+      const cv = docs.cvs.get(id);
+      return cv && cv.userId === userId
+        ? structuredClone({ id: cv.id, jobId: cv.jobId, content: cv.content, review: cv.review, version: cv.version }) : null;
+    },
+    async saveTailoredCv(id, expectedVersion, changes) {
+      const cv = docs.cvs.get(id);
+      if (!cv || cv.userId !== userId || cv.version !== expectedVersion) return "conflict";
+      Object.assign(cv, structuredClone(changes), { version: cv.version + 1 });
+      return "ok";
     },
     async latestRun(tailoredCvId) {
       return ownRun([...docs.runs.values()].reverse().find((run) => run.tailoredCvId === tailoredCvId && run.userId === userId));

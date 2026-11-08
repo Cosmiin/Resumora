@@ -6,6 +6,8 @@ import type { AppEnv } from "../app.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
+import { AcceptBodySchema, acceptSection } from "./accept.ts";
+import { runLayoutPass } from "./layout-pass.ts";
 import { askQuestions, MAX_RUN_QUESTIONS, saveAnswers } from "./questions.ts";
 import type { TailorRepo } from "./repo.ts";
 import { runSectionPass } from "./section-pass.ts";
@@ -62,9 +64,22 @@ export function tailorRoutes(deps: {
     const section = TailorSectionSchema.parse(c.req.param("section"));
     const { run, job } = await runWithJob(c);
     if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
+    if (section === "layout") {
+      return c.json(await runLayoutPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, { userId: c.get("user").id, run, job: job.extracted }));
+    }
     return c.json(await runSectionPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
       userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section,
     }));
+  });
+
+  app.post("/tailor-runs/:id/sections/:section/accept", async (c) => {
+    const section = TailorSectionSchema.parse(c.req.param("section"));
+    const body = AcceptBodySchema.parse(await c.req.json().catch(() => ({})));
+    const { run, job } = await runWithJob(c);
+    return c.json(await acceptSection(
+      { model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), jobs: deps.jobsFor(c), now: deps.now },
+      { userId: c.get("user").id, run, job, section, body },
+    ));
   });
 
   app.post("/tailor-runs/:id/answers", async (c) => {
