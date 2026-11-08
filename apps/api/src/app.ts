@@ -10,6 +10,7 @@ import type { JobMessage, JobRepo } from "./jobs/repo.ts";
 import { jobRoutes } from "./jobs/routes.ts";
 import type { TailorRepo } from "./tailor/repo.ts";
 import { tailorRoutes } from "./tailor/routes.ts";
+import { tailoredRoutes } from "./tailor/tailored-routes.ts";
 import type { ModelDeps } from "./ai/call-model.ts";
 import type { VoiceDeps } from "./ai/voice-session.ts";
 import type { InsightsRepo } from "./enrich/repo.ts";
@@ -99,6 +100,17 @@ export function createApp(deps: AppDeps) {
       },
       modelFor: (c) => deps.model(c.get("user")),
       now: deps.now ?? (() => new Date()),
+    }),
+  );
+
+  app.route(
+    "/v1",
+    tailoredRoutes({
+      jobsFor: (c) => deps.jobRepo(c.get("user")),
+      tailorFor: (c) => {
+        if (!deps.tailorRepo) throw new Error("Tailor repository is not configured");
+        return deps.tailorRepo(c.get("user"));
+      },
     }),
   );
 

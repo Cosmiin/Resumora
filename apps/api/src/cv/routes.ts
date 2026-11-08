@@ -9,7 +9,7 @@ const SaveBody = z.object({ content: CvContentSchema, version: z.number().int().
 const RestoreBody = z.object({ version: z.number().int().nonnegative() });
 
 /** Reads a JSON body, enforcing the size limit before parsing. */
-async function readJson(c: Context<AppEnv>): Promise<unknown> {
+export async function readJson(c: Context<AppEnv>): Promise<unknown> {
   const declared = Number(c.req.header("content-length") ?? 0);
   if (declared > MAX_CV_BYTES) throw tooLarge();
   const text = await c.req.text();

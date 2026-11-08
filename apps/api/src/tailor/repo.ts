@@ -1,4 +1,5 @@
-import type { CvContent, MatchScore, TailorLanguage, TailorRun, TailorSection, Tone } from "@resumora/shared";
+import type { CvContent, MatchScore, TailoredCv, TailorLanguage, TailorRun, TailorSection, Tone } from "@resumora/shared";
+import type { SaveResult } from "../cv/repo.ts";
 
 export type ScoreTarget = "base" | "tailored";
 
@@ -33,6 +34,14 @@ export interface TailorRepo {
   getTailoredCv(id: string): Promise<StoredTailoredCv | null>;
   /** Saves when the version still matches, then bumps it. */
   saveTailoredCv(id: string, expectedVersion: number, changes: { content: CvContent; review: Review; score: MatchScore }): Promise<"ok" | "conflict">;
+  /** The job's tailored CVs (all languages), oldest first. */
+  listTailoredCvs(jobId: string): Promise<TailoredCvSummary[]>;
+  /** The whole row, for the editor; null when gone. */
+  readTailoredCv(id: string): Promise<TailoredCv | null>;
+  /** An editor save: content only, with the version check. null when gone. */
+  saveTailoredContent(id: string, expectedVersion: number, content: CvContent): Promise<SaveResult | null>;
+  /** false when gone. Doesn't bump the version (the template isn't part of the edited content). */
+  setTemplate(id: string, template: TailoredCv["template"]): Promise<boolean>;
   /** Newest run of any status for the tailored CV. */
   latestRun(tailoredCvId: string): Promise<TailorRun | null>;
   createRun(input: NewRun): Promise<TailorRun>;
@@ -42,6 +51,7 @@ export interface TailorRepo {
 }
 
 export type Review = Record<string, unknown>;
+export type TailoredCvSummary = Pick<TailoredCv, "id" | "language" | "translatedFrom" | "updatedAt">;
 export type StoredTailoredCv = { id: string; jobId: string; content: CvContent; review: Review | null; version: number };
 
 export type RunChanges = Partial<Pick<TailorRun, "questions" | "answers" | "proposals" | "status" | "currentSection" | "errorCode">>;

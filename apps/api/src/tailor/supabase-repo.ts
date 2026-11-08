@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { MatchScoreSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun } from "@resumora/shared";
+import { MatchScoreSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun } from "@resumora/shared";
 import { storedCv } from "../cv/supabase-repo.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { TailorRepo } from "./repo.ts";
@@ -64,6 +64,40 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
       return data.length > 0 ? "ok" : "conflict";
     },
+    async listTailoredCvs(jobId) {
+      const { data, error } = await db.from("tailored_cvs").select("id, language, translated_from, updated_at")
+        .eq("job_id", jobId).order("created_at", { ascending: true });
+      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
+      return data.map((row) => ({ id: row.id, language: TailorLanguageSchema.parse(row.language),
+        translatedFrom: row.translated_from, updatedAt: row.updated_at }));
+    },
+    async readTailoredCv(id) {
+      const { data, error } = await db.from("tailored_cvs").select(TAILORED_COLUMNS).eq("id", id).maybeSingle();
+      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
+      if (!data) return null;
+      return TailoredCvSchema.parse({
+        id: data.id, userId: data.user_id, jobId: data.job_id, language: data.language, translatedFrom: data.translated_from,
+        content: storedCv(data.content), baseSnapshot: storedCv(data.base_snapshot), baseSnapshotAt: data.base_snapshot_at,
+        template: data.template, tone: data.tone, instruction: data.instruction, review: data.review, score: data.score,
+        coverLetter: data.cover_letter, version: data.version, createdAt: data.created_at, updatedAt: data.updated_at,
+      });
+    },
+    async saveTailoredContent(id, expectedVersion, content) {
+      const updatedAt = new Date().toISOString();
+      const { data, error } = await db.from("tailored_cvs").update({ content, version: expectedVersion + 1, updated_at: updatedAt })
+        .eq("id", id).eq("version", expectedVersion).select("version, updated_at");
+      if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
+      if (data[0]) return { ok: true, version: data[0].version, updatedAt: data[0].updated_at };
+      const current = await db.from("tailored_cvs").select("version, updated_at").eq("id", id).maybeSingle();
+      if (current.error) throw new Error(`tailored_cvs select failed: ${current.error.message}`);
+      return current.data ? { ok: false, version: current.data.version, updatedAt: current.data.updated_at } : null;
+    },
+    async setTemplate(id, template) {
+      const { data, error } = await db.from("tailored_cvs").update({ template, updated_at: new Date().toISOString() })
+        .eq("id", id).select("id");
+      if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
+      return data.length > 0;
+    },
     async latestRun(tailoredCvId) {
       const { data, error } = await db.from("tailor_runs").select(RUN_COLUMNS).eq("tailored_cv_id", tailoredCvId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -98,7 +132,8 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
   };
 }
 
-const RUN_COLUMNS = "id, user_id, job_id, tailored_cv_id, kind, sections, status, current_section, questions, answers, proposals, error_code, created_at, updated_at";
+const TAILORED_COLUMNS = "id, user_id, job_id, language, translated_from, content, base_snapshot, base_snapshot_at, template, tone, instruction, review, score, cover_letter, version, created_at, updated_at";
+const RUN_COLUMNS ="id, user_id, job_id, tailored_cv_id, kind, sections, status, current_section, questions, answers, proposals, error_code, created_at, updated_at";
 
 function toRun(row: Record<string, unknown>): TailorRun {
   return TailorRunSchema.parse({
