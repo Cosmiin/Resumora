@@ -24,3 +24,39 @@ open: if a later task streams with the strong tier, add `tier` to `StreamRequest
 
 ## Cost
 codex tokens: 2489472 across 6 Codex sessions (Task 8 1124799, Task 23a 1034817, branch reviews 1 and 2 194806 + 135050), not counting the passing branch review that admits this file (its count is in `tools/codex-log.jsonl` and the side session's final message) · Claude context: ≈80k (estimate) · guard denials: 2 (both shell commands whose text named apps/; no work-around used)
+
+---
+
+session: Tailoring S2 · Side · Tasks 24a, 25a, 24b (side session started by Tailoring 00, local_eddc9931-19f5-40f7-ba00-9eb4021eaa78)
+
+## Rulings (Tailoring S2)
+- Task 24 is split: **24a** is `exportFileName` only and **24b** the pure PDF builders. `ExportMenu.tsx`, `print.css`, `exportPdf(kind)`, the toolbar button, the unreviewed-items warning and `export.test.tsx` stay with the rest of Task 24, after Parts 4–5. (Tailoring S2)
+- Task 24a: empty parts are skipped and runs of `_` collapse, so `R&D / QA` gives `RD_QA`; all parts empty gives `CV.<ext>`. (Tailoring S2)
+- Task 25 is split: **25a** is the builders only; the ExportMenu entry and the download with `exportFileName(..., "docx")` stay with the rest of Task 25. (Tailoring S2)
+- Task 25a: `docx` pinned at 9.15.2, the version the API workspace already had (9.15.3 was 2 days old). `jszip` 3.10.2 is a web devDependency for the unzip test. (Tailoring S2)
+- Task 25a: the letter input is a local type in `export/docx.ts`, `LetterDocxInput = { greeting?, paragraphs: string[], signOff? }` plus `LetterHeader = { name, contact?, company?, role?, date? }`. Task 21 adapts its letter shape to it; `pdf.tsx` imports the same types. (Tailoring S2)
+- Tasks 25a and 24b: no photo field exists yet (Task 26), so a template with `showsPhoto` draws nothing in both builders. (Tailoring S2)
+- Task 24b, PDF library (picked by Tailoring 00 from a Codex scout): `@react-pdf/renderer` 4.9.0 (MIT), real `<Text>` and A4 page flow. It reads neither WOFF2 nor variable fonts, so the PDF uses static `.woff` files: `@fontsource/newsreader` 5.3.0, `@fontsource/instrument-sans` 5.3.0, `@fontsource/source-serif-4` 5.3.1, regular and bold. Romanian `ș ț ă î â` are in Fontsource's latin-ext files: each font is registered as a latin and a latin-ext family and styles use react-pdf's array `fontFamily` fallback. Classic = Source Serif 4, Modern and Compact = Instrument Sans, the letter = Newsreader. `unpdf` 2.1.0 (already used by the API) is a web devDependency to extract text in the test. (Tailoring S2)
+- Task 24b: react-pdf adds 55 transitive packages (~520 lockfile lines), so the brief's size limit was raised to cover them. One of them, `@swc/helpers`, resolved to 0.5.24 (published 4 days earlier); the lockfile holds it at 0.5.23, with the integrity checked against the registry. (Tailoring S2)
+
+## Task 24a: Export file name — done (Tailoring S2)
+commit: 4fc7e7f · codex: build 01a1bb90-d2a6-76a0-88fe-776abf70d31c, review 01a1bb95-32f6-7973-94eb-209d94b3cb1c · codex tokens: 630112 · fix rounds: 0 · guard denials: 0
+open: the menu and download use it with Task 24's remaining scope.
+
+## Task 25a: DOCX builders (no menu) — done (Tailoring S2)
+commit: 224bf63 · codex: build 01a1bb97-3fb7-7ab2-a950-78ce5c40c883, review 01a1bb9e-720d-7301-b861-7bb55f37813e · codex tokens: 951860 · fix rounds: 0 · guard denials: 1 (commit message text named the API folder; reworded)
+open: ExportMenu entry and download (Task 25 remainder); the photo (Task 26).
+
+## Task 24b: PDF builders with @react-pdf/renderer (no menu) — done (Tailoring S2)
+commit: fb0d4ba · codex: build 01a1bba1-9fff-7133-905e-19444d64c4b9, review 01a1bbac-50c2-7123-828a-7417a486b24d · codex tokens: 1763450 · fix rounds: 1 (size limit from the lockfile, plus the `@swc/helpers` pin) · guard denials: 0
+open: `exportPdf(kind)`, ExportMenu, `print.css` and the warning (Task 24 remainder); the photo (Task 26); a manual check that the PDF fonts load in the built app (the tests read the `.woff` files from `node_modules`).
+
+## Open (Tailoring S2)
+- Task 24 remainder: `ExportMenu.tsx`, `print.css`, `exportPdf(kind)` calling `buildCvPdf`/`buildLetterPdf` and saving with `exportFileName`, the unreviewed-items warning and `export.test.tsx`.
+- Task 25 remainder: the DOCX entry in the menu, saving with `exportFileName(..., "docx")`.
+- Task 21: produce `LetterDocxInput` + `LetterHeader` for both builders.
+- Task 26: draw the photo in `docx.ts` and `pdf.tsx` when `showsPhoto`.
+- Under full-suite load two editor tests timed out once inside a Codex build run; every official `-Test` run passed.
+
+## Cost (Tailoring S2)
+codex tokens: 3345422 across 6 Codex sessions (24a 630112, 25a 951860, 24b 1763450), not counting the whole-branch review that admits this file · Claude context: ≈60k (estimate) · guard denials: 1
