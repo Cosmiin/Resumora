@@ -8,6 +8,7 @@ import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import { askQuestions, MAX_RUN_QUESTIONS, saveAnswers } from "./questions.ts";
 import type { TailorRepo } from "./repo.ts";
+import { runSectionPass } from "./section-pass.ts";
 import { jobNotFound, startTailoring } from "./start.ts";
 
 const StartBodySchema = z.object({ tone: ToneSchema.default("neutral"), instruction: z.string().max(500).optional() });
@@ -55,6 +56,15 @@ export function tailorRoutes(deps: {
       userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section,
     });
     return c.json({ questions });
+  });
+
+  app.post("/tailor-runs/:id/sections/:section/run", async (c) => {
+    const section = TailorSectionSchema.parse(c.req.param("section"));
+    const { run, job } = await runWithJob(c);
+    if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
+    return c.json(await runSectionPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
+      userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section,
+    }));
   });
 
   app.post("/tailor-runs/:id/answers", async (c) => {

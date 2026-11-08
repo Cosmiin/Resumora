@@ -34,7 +34,7 @@ export function newestRole(roles: Experience[]): Experience | undefined {
 function answeredForJob(cv: CvContent, run: TailorRun) {
   const notes = [...cv.experience, ...cv.volunteering].flatMap((role) => role.notes)
     .filter((note) => note.jobId === run.jobId).map(({ question, answer }) => ({ question, answer }));
-  const asked = new Map((run.questions ?? []).map((question) => [question.id, question.text]));
+  const asked = new Map((run.questions ?? []).filter((question) => question.kind !== "flag").map((question) => [question.id, question.text]));
   const answers = (run.answers ?? []).flatMap((answer) => answer.value && asked.has(answer.questionId)
     ? [{ question: asked.get(answer.questionId)!, answer: answer.value }] : []);
   return [...notes, ...answers];
@@ -46,7 +46,8 @@ export async function askQuestions(
   input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection },
 ): Promise<Question[]> {
   const asked = input.run.questions ?? [];
-  const max = MAX_RUN_QUESTIONS - asked.length;
+  // Flag questions from the section checks are not job questions and do not count toward the cap.
+  const max = MAX_RUN_QUESTIONS - asked.filter((question) => question.kind !== "flag").length;
   if (max <= 0) return [];
   const score = await deps.tailor.getScore(input.run.jobId, "base");
   const gaps = (score?.labels ?? []).filter((label) => label.status !== "met" || label.inferred);
@@ -96,6 +97,8 @@ export async function saveAnswers(
     const before = stored.get(answer.questionId);
     if (answer.via === "skip" || !answer.value?.trim() || (before?.value === answer.value && before.via === answer.via)) continue;
     const question = questions.get(answer.questionId)!;
+    // A flag answer is about the tailored wording, not a fact about the person: no note.
+    if (question.kind === "flag") continue;
     const roleId = question.roleId && roleIds.has(question.roleId) ? question.roleId : fallback;
     if (!roleId) continue;
     const note = NoteSchema.parse({ id: newId(), question: question.text, answer: answer.value.trim(), via: [NOTE_VIA[answer.via]],

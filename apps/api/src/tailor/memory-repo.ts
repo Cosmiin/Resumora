@@ -22,6 +22,10 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     async findTailoredCvId(jobId, language) {
       return [...docs.cvs.values()].find((cv) => cv.userId === userId && cv.jobId === jobId && cv.language === language)?.id ?? null;
     },
+    async getSteering(tailoredCvId) {
+      const cv = docs.cvs.get(tailoredCvId);
+      return cv && cv.userId === userId ? { language: cv.language, tone: cv.tone, instruction: cv.instruction } : null;
+    },
     async createTailoredCv(input) {
       if ([...docs.cvs.values()].some((cv) => cv.jobId === input.jobId && cv.language === input.language)) return "exists";
       const id = crypto.randomUUID();

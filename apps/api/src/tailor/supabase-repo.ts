@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { MatchScoreSchema, TailorRunSchema, type MatchScore, type TailorRun } from "@resumora/shared";
+import { MatchScoreSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun } from "@resumora/shared";
 import { storedCv } from "../cv/supabase-repo.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { TailorRepo } from "./repo.ts";
@@ -35,6 +35,12 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const { data, error } = await db.from("tailored_cvs").select("id").eq("job_id", jobId).eq("language", language).maybeSingle();
       if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
       return data?.id ?? null;
+    },
+    async getSteering(tailoredCvId) {
+      const { data, error } = await db.from("tailored_cvs").select("language, tone, instruction").eq("id", tailoredCvId).maybeSingle();
+      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
+      return data ? { language: TailorLanguageSchema.parse(data.language), tone: ToneSchema.nullable().parse(data.tone),
+        instruction: data.instruction as string | null } : null;
     },
     async createTailoredCv(input) {
       const { data, error } = await db.from("tailored_cvs").insert({

@@ -25,6 +25,8 @@ export interface TailorRepo {
   /** Latest score for the target, optionally restricted to a tailored CV. */
   getScore(jobId: string, target: ScoreTarget, tailoredCvId?: string): Promise<MatchScore | null>;
   findTailoredCvId(jobId: string, language: TailorLanguage): Promise<string | null>;
+  /** The steering a section pass needs. */
+  getSteering(tailoredCvId: string): Promise<{ language: TailorLanguage; tone: Tone | null; instruction: string | null } | null>;
   /** Content is also stored as the base snapshot. "exists" when the job already has one in this language. */
   createTailoredCv(input: NewTailoredCv): Promise<string | "exists">;
   /** Newest run of any status for the tailored CV. */
