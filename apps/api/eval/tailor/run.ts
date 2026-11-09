@@ -53,7 +53,7 @@ function cvTexts(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(cvTexts);
   if (value && typeof value === "object") {
     return Object.entries(value)
-      .filter(([key]) => !["id", "layout", "schemaVersion", "locale", "photo"].includes(key) && !key.endsWith("Id"))
+      .filter(([key]) => !["id", "layout", "schemaVersion", "locale", "photo", "enrichedAt"].includes(key) && !key.endsWith("Id"))
       .flatMap(([, entry]) => cvTexts(entry));
   }
   return [];

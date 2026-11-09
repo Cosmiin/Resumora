@@ -240,3 +240,13 @@
 }
 .fm-skills-notice > span { flex: 1; }
 .fm-skills-undo { flex: none; padding: 6px 12px; border: 0; border-radius: 8px; background: var(--marigold-500); color: var(--pine-800); font: inherit; font-weight: var(--weight-semibold); cursor: pointer; }
+
+/* 6B: the end of the path */
+.fm-end { grid-column: 1 / -1; }
+.fm-end-average { margin: 0 0 var(--space-5); font-size: var(--text-lead, 1.15rem); color: var(--text-strong); }
+.fm-end-rows { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; gap: var(--space-2); max-width: 520px; }
+.fm-end-rows li {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg); background: var(--surface-card); border: 1px solid var(--border-subtle);
+}
+.fm-end-score { font-weight: var(--weight-semibold); color: var(--status-good-fg); white-space: nowrap; }

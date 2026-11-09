@@ -22,7 +22,7 @@ function cvWords(value: unknown, into = new Set<string>()): Set<string> {
   if (typeof value === "string") for (const word of words(value)) into.add(word);
   else if (value && typeof value === "object") {
     for (const [key, entry] of Object.entries(value)) {
-      if (!["id", "layout", "schemaVersion", "locale", "photo"].includes(key) && !key.endsWith("Id")) cvWords(entry, into);
+      if (!["id", "layout", "schemaVersion", "locale", "photo", "enrichedAt"].includes(key) && !key.endsWith("Id")) cvWords(entry, into);
     }
   }
   return into;

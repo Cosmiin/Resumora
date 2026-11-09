@@ -39,7 +39,7 @@ export function PathStart({ roles, scores, onStart, onNotNow }: Props) {
           <ul className="fm-path-roles">
             {roles.map((r) => (
               <li key={r.id}>
-                <span>{[roleName(r, "experience"), r.company.trim()].filter(Boolean).join(" · ")}</span>
+                <span>{[r.title.trim(), r.company.trim()].filter(Boolean).join(" · ") || roleName(r, "experience")}</span>
                 <span className="fm-tag is-low">{scoreText(scores.get(r.id))}</span>
               </li>
             ))}

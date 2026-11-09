@@ -175,6 +175,8 @@ export const CvContentSchema = z
     publications: z.array(PublicationSchema).max(MAX_ITEMS),
     interests: z.array(InterestSchema).max(MAX_ITEMS),
     layout: LayoutSchema,
+    /** Set when the guided path ended with an average role score of 80 or more. Never cleared by later edits. */
+    enrichedAt: z.string().datetime({ offset: true }).nullable().default(null),
   })
   .strict();
 
@@ -227,5 +229,6 @@ export function emptyCv(locale: Locale = "en"): CvContent {
     publications: [],
     interests: [],
     layout: defaultLayout(),
+    enrichedAt: null,
   };
 }

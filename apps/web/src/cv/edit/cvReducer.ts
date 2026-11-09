@@ -66,7 +66,9 @@ export type CvAction =
   | { type: "addAchievements"; texts: string[] }
   /** Skills the guided path found in the roles (5A), added in one go with ids the caller keeps for Undo. */
   | { type: "addSkills"; skills: { id: string; name: string; group: SkillGroup }[] }
-  | { type: "removeSkills"; ids: string[] };
+  | { type: "removeSkills"; ids: string[] }
+  /** The guided path ended at an average of 80 or more. Once set, it stays. */
+  | { type: "markEnriched"; at: string };
 
 /**
  * Sections the CV has (or the user just added), in layout order, hidden ones included.
@@ -311,6 +313,8 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (!SKILL_GROUPS.some((g) => cv[g].some((s) => gone.has(s.id)))) return cv;
       return SKILL_GROUPS.reduce((next, g) => ({ ...next, [g]: next[g].filter((s) => !gone.has(s.id)) }), cv);
     }
+    case "markEnriched":
+      return cv.enrichedAt ? cv : { ...cv, enrichedAt: action.at };
     case "addAchievements": {
       const room = MAX_ACHIEVEMENTS - cv.achievements.length;
       if (!action.texts.length || room <= 0) return cv;

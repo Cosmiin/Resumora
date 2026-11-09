@@ -6,6 +6,9 @@ import type { CvAction } from "../edit/cvReducer.ts";
 import { AchievementsPick } from "./AchievementsPick.tsx";
 import { getSkillSuggestions, suggestAchievements } from "./enrich-api.ts";
 import { SkillsNotice } from "./SkillsNotice.tsx";
+import { ENRICHED_AVERAGE, EnrichedScreen, type RoleRow } from "./EnrichedScreen.tsx";
+import { roleName } from "../edit/sections/RoleItem.tsx";
+import { useNavigate } from "react-router";
 import { FocusMode } from "./FocusMode.tsx";
 import { PathStart } from "./PathStart.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
@@ -24,7 +27,7 @@ export function belowTarget(s: RoleScoreState | undefined): boolean {
   return !(s?.state === "ready" && s.result?.score != null && s.result.score >= ENRICHED_AT);
 }
 
-type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "achievements" } | { kind: "skills" } | { kind: "end" };
+type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "achievements" } | { kind: "skills" } | { kind: "end" } | { kind: "improve"; roleId: string };
 
 /** The top bar across the whole path: where you are, and one segment per stop. */
 export function PathBar({ label, at, total }: { label: string; at: number; total: number }) {
@@ -52,6 +55,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   const afterRoles = () => setStage({ kind: "achievements" });
   // 5A: the skills the path added, so Undo removes exactly those.
   const [skills, setSkills] = useState<{ ids: string[]; names: string[]; undone: boolean }>({ ids: [], names: [], undone: false });
+  // 6B: each role's score when the path opened, and how many Key achievements it added.
+  const [before] = useState(() => new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))])));
+  const [achievementsAdded, setAchievementsAdded] = useState(0);
 
   if (stage.kind === "start") {
     return <PathStart roles={roles} scores={scores} onNotNow={onClose}
@@ -82,6 +88,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
       <PathScreen bar={<PathBar label={t("enrich.path.achievements")} at={stops.length} total={total} />} onClose={onClose}>
         <AchievementsStop cv={cv} waitForSave={waitForSave} onDone={(texts) => {
           if (texts.length) dispatch({ type: "addAchievements", texts });
+          setAchievementsAdded(texts.length);
           setStage({ kind: "skills" });
         }} />
       </PathScreen>
@@ -98,17 +105,67 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
       </PathScreen>
     );
   }
+  if (stage.kind === "improve") {
+    return (
+      <FocusMode key={`improve:${stage.roleId}`} target={{ roleId: stage.roleId, mode: "improve" }} cv={cv} dispatch={dispatch} scores={scores}
+        waitForSave={waitForSave} onClose={onClose} next={{ label: t("enrich.focus.continue"), onNext: () => setStage({ kind: "end" }) }} />
+    );
+  }
   const notice = <SkillsNotice names={skills.names} undone={skills.undone} onUndo={() => {
     dispatch({ type: "removeSkills", ids: skills.ids });
     setSkills((s) => ({ ...s, undone: true }));
   }} />;
   return (
     <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={total} total={total} />} onClose={onClose}>
-      {notice}
-      <div className="fm-foot">
-        <button type="button" className="fm-btn" onClick={onClose}>{t("enrich.focus.done.back")}</button>
-      </div>
+      <EndStop cv={cv} scores={scores} before={before} stops={stops} achievementsAdded={achievementsAdded}
+        skillsAdded={skills.undone ? 0 : skills.names.length} notice={notice} dispatch={dispatch} onClose={onClose}
+        onImprove={(roleId) => setStage({ kind: "improve", roleId })} />
     </PathScreen>
+  );
+}
+
+/** The average of every role score in "Your roles" (roles with a score), rounded; null when none has one. */
+export function averageScore(scores: ReadonlyMap<string, number | null>): number | null {
+  const known = [...scores.values()].filter((n): n is number => n !== null);
+  return known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length) : null;
+}
+const scoreOf = (s: RoleScoreState | undefined) => (s && s.state !== "none" ? (s.result?.score ?? null) : null);
+
+/** 6B: waits for the last scores, then "Your CV is enriched" (saved once) or "Almost there". */
+function EndStop({ cv, scores, before, stops, achievementsAdded, skillsAdded, notice, dispatch, onClose, onImprove }: {
+  cv: CvContent; scores: ReadonlyMap<string, RoleScoreState>; before: ReadonlyMap<string, number | null>; stops: string[];
+  achievementsAdded: number; skillsAdded: number; notice: ReactNode; dispatch(a: CvAction): void; onClose(): void; onImprove(roleId: string): void;
+}) {
+  const navigate = useNavigate();
+  // A role still being scored (or waiting for it) would give a wrong average: wait for it.
+  const settled = cv.experience.every((r) => !["scoring", "previous"].includes(scores.get(r.id)?.state ?? ""));
+  const now = new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))]));
+  const average = averageScore(now) ?? 0;
+  const enriched = settled && average >= ENRICHED_AVERAGE;
+  useEffect(() => {
+    if (enriched) dispatch({ type: "markEnriched", at: new Date().toISOString() });
+  }, [enriched, dispatch]);
+  if (!settled) {
+    return (
+      <div className="fm-working" role="status">
+        <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
+        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.end.checking")}</h2>
+      </div>
+    );
+  }
+  const rows: RoleRow[] = cv.experience.map((r) => ({
+    roleId: r.id, label: [r.title.trim(), r.company.trim()].filter(Boolean).join(" · ") || roleName(r, "experience"),
+    before: before.get(r.id) ?? null, after: now.get(r.id) ?? null, visited: stops.includes(r.id),
+  }));
+  const lowest = rows.filter((r) => r.after !== null).sort((a, b) => a.after! - b.after!)[0] ?? null;
+  return (
+    <EnrichedScreen start={averageScore(before)} average={average} rows={rows} achievementsAdded={achievementsAdded} skillsAdded={skillsAdded}
+      notice={notice} lowest={lowest ? { ...lowest, label: roleName(cv.experience.find((r) => r.id === lowest.roleId)!, "experience") } : null}
+      onBack={onClose} onFinish={onClose} onImprove={onImprove}
+      onFindJob={() => {
+        onClose();
+        void navigate("/jobs");
+      }} />
   );
 }
 

@@ -166,7 +166,7 @@ describe("toCvContent", () => {
 describe("ImportResultSchema", () => {
   it("upgrades a stored v1 result", () => {
     const v1: Record<string, unknown> = { ...emptyCv(), schemaVersion: 1 };
-    for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests"]) delete v1[key];
+    for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests", "enrichedAt"]) delete v1[key];
     const parsed = ImportResultSchema.parse({ content: v1, warnings: ["check dates"] });
     expect(parsed.content.schemaVersion).toBe(2);
     expect(parsed.content.layout).toEqual(defaultLayout());

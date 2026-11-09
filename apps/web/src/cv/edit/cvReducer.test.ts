@@ -406,3 +406,14 @@ describe("addSkills / removeSkills", () => {
     expect(cvReducer(undone, { type: "removeSkills", ids: ["s1"] })).toBe(undone);
   });
 });
+
+describe("markEnriched", () => {
+  it("sets enrichedAt once, and later edits keep it", () => {
+    const cv = withRole(["Did it"]);
+    const marked = cvReducer(cv, { type: "markEnriched", at: "2026-11-09T12:00:00.000Z" });
+    expect(marked.enrichedAt).toBe("2026-11-09T12:00:00.000Z");
+    expect(cvReducer(marked, { type: "markEnriched", at: "2026-12-01T00:00:00.000Z" })).toBe(marked);
+    const edited = cvReducer(marked, { type: "setBullet", owner, bulletId: "e1-b1", text: "Did it better" });
+    expect(edited.enrichedAt).toBe("2026-11-09T12:00:00.000Z");
+  });
+});

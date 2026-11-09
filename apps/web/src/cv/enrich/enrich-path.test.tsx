@@ -2,6 +2,7 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
@@ -39,7 +40,7 @@ const ready = (score: number): RoleScoreState => ({
 const cv: CvContent = { ...emptyCv(), experience: [role("a", "Analyst"), role("b", "Buyer"), role("c", "Clerk"), role("d", "Driver")] };
 
 function Host({ scores, onClose = () => {}, dispatch = () => {} }: { scores: Map<string, RoleScoreState>; onClose?(): void; dispatch?(a: unknown): void }) {
-  return <EnrichPath cv={cv} dispatch={dispatch} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} />;
+  return <MemoryRouter><EnrichPath cv={cv} dispatch={dispatch} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} /></MemoryRouter>;
 }
 
 describe("the guided path (1A)", () => {
@@ -105,7 +106,7 @@ describe("the guided path (1A)", () => {
         </>
       );
     }
-    render(<Live />);
+    render(<MemoryRouter><Live /></MemoryRouter>);
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer →" }));
     await userEvent.click(screen.getByRole("button", { name: "rescore" }));
     expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
@@ -194,7 +195,52 @@ describe("skills added automatically (5A)", () => {
     else api.getSkillSuggestions.mockRejectedValue(new Error("down"));
     const dispatch = await toTheEnd();
     expect(await screen.findByRole("button", { name: "Back to my CV" })).toBeInTheDocument();
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(dispatch.mock.calls.filter(([a]) => a.type === "addSkills" || a.type === "removeSkills")).toEqual([]);
     expect(screen.queryByText(/from your roles/)).toBeNull();
+  });
+});
+
+describe("the end of the path (6B)", () => {
+  const start = new Map<string, RoleScoreState>([["a", ready(90)], ["b", ready(61)], ["c", ready(70)], ["d", ready(80)]]);
+  async function finish(after: Map<string, RoleScoreState>, dispatch = vi.fn()) {
+    api.suggestAchievements.mockResolvedValue({ suggestions: [{ text: "Cut supplier costs by 10%", roleId: "b" }] });
+    api.getSkillSuggestions.mockResolvedValue({ suggestions: [{ name: "SAP", group: "technicalSkills", evidence: "SAP" }], sort: [] });
+    const view = render(<Host scores={start} dispatch={dispatch} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next role →" }));
+    view.rerender(<Host scores={new Map([...after].map(([k, v]) => [k, k === "c" ? { state: "scoring" as const, result: v.result } : v]))} dispatch={dispatch} />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(await screen.findByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: "Add 1 achievement" }));
+    expect(await screen.findByText("Checking your scores…")).toBeInTheDocument();
+    expect(dispatch.mock.calls.some(([a]) => a.type === "markEnriched")).toBe(false);
+    view.rerender(<Host scores={after} dispatch={dispatch} />);
+    return dispatch;
+  }
+
+  it("average 84: saves the CV as enriched and shows the report card", async () => {
+    const dispatch = await finish(new Map([["a", ready(90)], ["b", ready(82)], ["c", ready(84)], ["d", ready(80)]]));
+    expect(await screen.findByRole("heading", { name: "Your CV is enriched" })).toBeInTheDocument();
+    expect(dispatch).toHaveBeenCalledWith({ type: "markEnriched", at: expect.any(String) });
+    expect(screen.getByText("Average role score 75 → 84")).toBeInTheDocument();
+    const rows = screen.getAllByRole("listitem").map((li) => li.textContent);
+    expect(rows).toEqual(["Analyst · Analyst Co90", "Buyer · Buyer Co61 → 82", "Clerk · Clerk Co70 → 84", "Driver · Driver Co80",
+      "Key achievements · 1 added", "Skills · 1 added"]);
+    expect(screen.getByText("Added 1 skill from your roles: SAP")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Find a job →" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to my CV" })).toBeInTheDocument();
+  });
+
+  it("average 76: Almost there, not saved as enriched, names the lowest role; Improve opens it and comes back", async () => {
+    const dispatch = await finish(new Map([["a", ready(90)], ["b", ready(66)], ["c", ready(68)], ["d", ready(80)]]));
+    expect(await screen.findByRole("heading", { name: "Almost there" })).toBeInTheDocument();
+    expect(dispatch.mock.calls.some(([a]) => a.type === "markEnriched")).toBe(false);
+    expect(screen.getByText("76")).toBeInTheDocument();
+    expect(screen.getByText("Buyer is at 66. One more pass would get you over 80.")).toBeInTheDocument();
+    expect(screen.getByText("Added 1 skill from your roles: SAP")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Improve the Buyer role" }));
+    expect(screen.getByText("Session for b")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    expect(await screen.findByRole("heading", { name: "Almost there" })).toBeInTheDocument();
   });
 });

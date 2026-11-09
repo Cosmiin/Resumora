@@ -11,7 +11,7 @@ function cvText(value: unknown): string[] {
   if (typeof value === "string") return [value];
   if (value && typeof value === "object") {
     return Object.entries(value)
-      .filter(([key]) => !["layout", "schemaVersion", "locale", "id"].includes(key) && !key.endsWith("Id"))
+      .filter(([key]) => !["layout", "schemaVersion", "locale", "id", "enrichedAt"].includes(key) && !key.endsWith("Id"))
       .flatMap(([, entry]) => cvText(entry));
   }
   return [];

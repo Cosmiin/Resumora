@@ -71,3 +71,10 @@ session: r2-enrich (session 7) · builder: claude
 commit: see git log (base fe516e5) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 48% → 49%
 ruling: reducer actions `addSkills` (ids given by the caller, so Undo removes exactly those) and `removeSkills`. Keys are `enrich.skills.notice*` (`enrich.skills.added` already exists).
 open: (low, not changed) the bar counts the server's suggestions; the server already drops repeats and skills the lists have, so it only overstates if a skills list is full (40).
+
+## Task 9: "Your CV is enriched" (6B report card) and "Almost there" — done
+session: r2-enrich (session 7) · builder: claude
+commit: see git log (base cd624ef) · reviews: 1 (agents) · fix rounds: 0 (three low findings fixed before commit: end-screen styles; a role without a title no longer reads "Acme · Acme"; `enrichedAt` is left out of the texts tailoring's AI steps read) · guard denials: 0 · weekly 49% → 50%
+ruling: `enrichedAt` (ISO date or null, default null; no migration, the content is JSON). `imports.ts` sets it to null; old v1 test fixtures drop it. The end waits while any role is still being scored ("Checking your scores…"). The tailoring text walkers (`apps/api/src/tailor/translate.ts`, `score.ts`, `section-pass.ts`, `layout-pass.ts`, `eval/tailor/run.ts`) skip `enrichedAt` like `layout` and `locale` — one word each, in session 5's API area.
+note (for the owner): an import that replaces the whole CV, or restoring an older version from History, brings back that version's `enrichedAt` (an import starts as not enriched). Ordinary edits never clear it.
+open: none

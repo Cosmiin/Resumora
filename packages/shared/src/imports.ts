@@ -242,6 +242,7 @@ export function toCvContent(draft: ImportDraft): ImportResult {
     })),
     interests: list(draft.interests.map((n) => n.trim()).filter(Boolean), "interests").map((name) => ({ id: newId(), name: clip(name, "interests") })),
     layout: defaultLayout(),
+    enrichedAt: null,
   };
 
   const known = new Set<string>(SECTION_KEYS);
