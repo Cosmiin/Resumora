@@ -1,4 +1,4 @@
-import type { CvContent, CvResponse, HistoryItem } from "@resumora/shared";
+import type { CvContent, CvResponse, HistoryItem, Note } from "@resumora/shared";
 
 /** Keep at most this many history snapshots per user. */
 export const HISTORY_LIMIT = 50;
@@ -13,11 +13,13 @@ export interface CvRepo {
   /** Returns an empty CV with version 0 when the user has none yet. */
   get(): Promise<CvResponse>;
   save(content: CvContent, expectedVersion: number): Promise<SaveResult>;
+  /** Appends job answers without a history snapshot. Throws role_not_found for a missing role. */
+  addJobNotes(roleId: string, notes: Note[]): Promise<{ version: number; updatedAt: string }>;
   /** Newest first. */
   listHistory(): Promise<HistoryItem[]>;
   getHistory(id: string): Promise<{ content: CvContent; createdAt: string } | null>;
   /** null when the history id does not exist (for this user). */
-  restore(id: string, expectedVersion: number): Promise<SaveResult | null>;
+  restore(id: string, expectedVersion: number, content: CvContent): Promise<SaveResult | null>;
   /** Copies the current saved CV into History (same 50-item limit). Does nothing when the user has no saved CV. */
   snapshot(reason: "ai"): Promise<void>;
 }

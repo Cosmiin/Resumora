@@ -39,6 +39,7 @@ export function memoryJobs(opts: { now?: () => Date }) {
       rows.set(input.id, {
         ...structuredClone(input), userId, status: "queued", errorCode: null, attempts: 0,
         title: null, company: null, location: null, extracted: null, editedByUser: false,
+        userThoughts: null, applicationStatus: "saved",
         version: 1, createdAt, updatedAt: createdAt,
       });
       runs.push({ userId, jobId: input.id, createdAt });
@@ -64,6 +65,7 @@ export function memoryJobs(opts: { now?: () => Date }) {
       if (!row || row.userId !== userId) return null;
       return {
         ...toListItem(row), rawText: row.rawText, extracted: structuredClone(row.extracted), editedByUser: row.editedByUser,
+        userThoughts: row.userThoughts, applicationStatus: row.applicationStatus,
         version: row.version, updatedAt: row.updatedAt,
       };
     },

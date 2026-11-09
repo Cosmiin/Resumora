@@ -43,6 +43,8 @@ const job: Job = {
   rawText: "The original job description.",
   extracted,
   editedByUser: false,
+  userThoughts: null,
+  applicationStatus: "saved",
   version: 1,
   updatedAt: item.createdAt,
 };

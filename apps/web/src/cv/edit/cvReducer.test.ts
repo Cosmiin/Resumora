@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_BULLETS, MAX_NOTES, emptyCv, notesHash, type CvContent, type Experience } from "@resumora/shared";
+import { MAX_BULLETS, MAX_JOB_NOTES, MAX_NOTES, emptyCv, notesHash, type CvContent, type Experience } from "@resumora/shared";
 import { cvReducer, sectionsOnCv } from "./cvReducer.ts";
 
 function role(id: string, bullets: string[], extra: Partial<Experience> = {}): Experience {
@@ -261,6 +261,17 @@ describe("setNote", () => {
     expect(added.experience[0]!.notes).toEqual([note("first")]);
     const replaced = cvReducer(added, { type: "setNote", roleId: "e1", note: note("second") });
     expect(replaced.experience[0]!.notes).toEqual([note("second")]);
+  });
+
+  it.each(["enrichment", "job"] as const)("adding an answer preserves all notes of the other kind: %s", (kind) => {
+    const jobId = "00000000-0000-4000-8000-000000000001";
+    const full = Array.from({ length: kind === "enrichment" ? MAX_JOB_NOTES : MAX_NOTES }, (_, i) => ({
+      ...note("existing"), id: `n${i}`, ...(kind === "enrichment" ? { jobId } : {}),
+    }));
+    const fresh = { ...note("latest"), id: "new", ...(kind === "job" ? { jobId } : {}) };
+    const cv = withRole(["x"], { notes: full });
+    const notes = cvReducer(cv, { type: "setNote", roleId: "e1", note: fresh }).experience[0]!.notes;
+    expect(notes).toEqual([...full, fresh]);
   });
 
   it("when the role is full, the oldest note makes room for the new one", () => {

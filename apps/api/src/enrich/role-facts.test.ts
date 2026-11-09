@@ -70,6 +70,22 @@ describe("POST /v1/enrich/role-facts", () => {
     expect(model.requests).toHaveLength(1);
   });
 
+  it("includes previous facts in the user message", async () => {
+    role.facts = { items: ["Used Sage for payroll."], fromNotes: "old-hash", updatedAt: "2026-11-04T00:00:00Z" };
+    await save();
+    await result();
+    const messages = model.requests[0]!.messages as { content: string }[];
+    expect(messages[1]!.content).toContain(`<previous_facts>\n${JSON.stringify(role.facts.items)}\n</previous_facts>`);
+    expect(messages[0]!.content).toContain("Keep previous facts unless a current answer contradicts them.");
+  });
+
+  it("keeps numbers from previous facts and drops numbers absent from both sources", async () => {
+    role.facts = { items: ["Managed payroll for 120 staff."], fromNotes: "old-hash", updatedAt: "2026-11-04T00:00:00Z" };
+    await save();
+    model = fakeModel(() => ({ facts: ["Managed payroll for 120 staff.", "Managed payroll for 888 staff."] }));
+    expect((await result()).facts).toEqual(["Managed payroll for 120 staff."]);
+  });
+
   it("drops numbers from outside note answers and facts longer than 160 characters", async () => {
     model = fakeModel(() => ({ facts: [
       "Payroll for 999 people.", "Payroll for 40 staff.", "Payroll for 888 staff.", "Payroll for 75 staff.", "a".repeat(160), "b".repeat(161),
@@ -135,6 +151,7 @@ describe("POST /v1/enrich/role-facts", () => {
     for (const text of ["CV locale: ro", "160", "8", "untrusted", "only what the person said"])
       expect(messages[0]!.content).toContain(text);
     for (const n of role.notes) expect(messages[1]!.content).toContain(n.answer);
+    expect(messages[1]!.content).not.toContain("<previous_facts>");
     expect(messages[1]!.content).not.toContain(role.description);
     expect(messages[1]!.content).not.toContain(role.bullets[0]!.text);
   });

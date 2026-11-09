@@ -2,6 +2,7 @@ import {
   MAX_ACHIEVEMENTS,
   MAX_BULLETS,
   MAX_ITEMS,
+  MAX_JOB_NOTES,
   MAX_NOTES,
   MAX_TITLES,
   SKILL_GROUPS,
@@ -275,10 +276,12 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (!role) return cv;
       const exists = role.notes.some((n) => n.id === action.note.id);
       let kept = role.notes;
-      if (!exists && kept.length >= MAX_NOTES) {
-        // Full: the newest answers win, so the oldest notes make room (as when notes are carried over).
-        const oldestFirst = [...kept].sort((a, b) => (a.askedAt < b.askedAt ? -1 : a.askedAt > b.askedAt ? 1 : 0));
-        const drop = new Set(oldestFirst.slice(0, kept.length - MAX_NOTES + 1));
+      const sameKind = kept.filter((n) => (n.jobId === undefined) === (action.note.jobId === undefined));
+      const limit = action.note.jobId === undefined ? MAX_NOTES : MAX_JOB_NOTES;
+      if (!exists && sameKind.length >= limit) {
+        // Full: the oldest notes of the same kind make room for the new answer.
+        const oldestFirst = [...sameKind].sort((a, b) => (a.askedAt < b.askedAt ? -1 : a.askedAt > b.askedAt ? 1 : 0));
+        const drop = new Set(oldestFirst.slice(0, sameKind.length - limit + 1));
         kept = kept.filter((n) => !drop.has(n));
       }
       const notes = exists ? kept.map((n) => (n.id === action.note.id ? action.note : n)) : [...kept, action.note];

@@ -35,6 +35,8 @@ export type JobSource = z.infer<typeof JobSourceSchema>;
 export const JobErrorCodeSchema = z.enum(["fetch_blocked", "page_empty", "not_a_job", "ai_failed"]);
 export type JobErrorCode = z.infer<typeof JobErrorCodeSchema>;
 
+const applicationStatus = z.enum(["saved", "tailored", "applied", "interview", "offer", "rejected"]);
+
 export const CreateJobBodySchema = z.object({
   url: z.url({ protocol: /^https?$/ }).max(2048),
   pageText: z.string().trim().min(200).max(60000).optional(),
@@ -45,8 +47,12 @@ export type CreateJobBody = z.infer<typeof CreateJobBodySchema>;
 export const JobPatchBodySchema = z.object({
   version: z.number().int().min(1),
   extracted: JobExtractionSchema.extend({ title: z.string().trim().min(1) }),
+  userThoughts: z.string().max(2000).nullable().optional(),
+  applicationStatus: applicationStatus.optional(),
 });
 export type JobPatchBody = z.infer<typeof JobPatchBodySchema>;
+export const JobPatchSchema = JobPatchBodySchema;
+export type JobPatch = z.infer<typeof JobPatchSchema>;
 
 export const JobListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -77,6 +83,8 @@ export const JobSchema = JobListItemSchema.extend({
   rawText: z.string().nullable(),
   extracted: JobExtractionSchema.nullable(),
   editedByUser: z.boolean(),
+  userThoughts: z.string().max(2000).nullable(),
+  applicationStatus,
   version: z.number().int().min(1),
   updatedAt: z.string(),
 });

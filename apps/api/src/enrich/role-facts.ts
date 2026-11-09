@@ -23,7 +23,7 @@ export async function roleFacts(deps: ScoreDeps, input: { roleId: string }): Pro
       user: roleFactsUserMessage(role),
       maxOutputTokens: 1200,
     });
-    const sources = role.notes.map((n) => n.answer);
+    const sources = [...role.notes.map((n) => n.answer), ...(role.facts?.items ?? [])];
     const facts = answer.facts.filter((fact) => fact.length <= 160 && !hasUnknownNumber(fact, sources));
     return { facts, fromNotes };
   } catch (err) {

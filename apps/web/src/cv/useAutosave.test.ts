@@ -6,14 +6,18 @@ import { useAutosave } from "./useAutosave.ts";
 
 const named = (fullName: string): CvContent => ({ ...emptyCv(), basics: { ...emptyCv().basics, fullName } });
 const initial: CvResponse = { content: named(""), version: 1, updatedAt: "2026-11-04T10:00:00Z" };
+const initialWithRole: CvResponse = { ...initial, content: { ...initial.content, experience: [{
+  id: "r1", company: "Acme", title: "Dev", location: "", startDate: "2020-01", endDate: "",
+  current: true, description: "", bullets: [], notes: [],
+}] } };
 const saved = (version: number) => ({ version, updatedAt: "2026-11-04T10:01:00Z" });
 const conflictError = (version: number) =>
   new ApiClientError(409, "version_conflict", "Saved elsewhere", {
     current: { version, updatedAt: "2026-11-04T10:02:00Z" },
   });
 
-function setup(save: Mock<Save>, load: Mock<Load> = vi.fn<Load>()) {
-  return renderHook(() => useAutosave({ initial, save, load }));
+function setup(save: Mock<Save>, load: Mock<Load> = vi.fn<Load>(), initialCv = initial) {
+  return renderHook(() => useAutosave({ initial: initialCv, save, load }));
 }
 
 type Save = (content: CvContent, version: number) => Promise<{ version: number; updatedAt: string }>;
@@ -92,14 +96,53 @@ describe("useAutosave", () => {
     expect(result.current.status).toBe("saved");
   });
 
-  it("conflict pauses autosave until the user chooses", async () => {
+  it.each(["notes", "facts"] as const)("silently merges a server %s change and keeps local text", async (change) => {
+    const role = initialWithRole.content.experience[0]!;
+    const serverRole = change === "notes"
+      ? { ...role, notes: [{ id: "n1", question: "Tools?", answer: "SQL", via: ["type" as const], askedAt: "2026-11-05T00:00:00Z" }] }
+      : { ...role, facts: { items: ["Used SQL"], fromNotes: "hash", updatedAt: "2026-11-05T00:00:00Z" } };
+    const serverContent = { ...initialWithRole.content, experience: [serverRole] };
+    const load = vi.fn<Load>().mockResolvedValue({ ...initialWithRole, content: serverContent, version: 5 });
+    const save = vi.fn<Save>().mockResolvedValueOnce(saved(2)).mockRejectedValueOnce(conflictError(5)).mockResolvedValue(saved(6));
+    const { result } = setup(save, load, initialWithRole);
+    act(() => result.current.setContent((c) => ({ ...c, basics: { ...c.basics, fullName: "First edit" } })));
+    await advance(1000);
+    serverContent.basics = result.current.content.basics; // the server changed only notes or facts since our last save
+    act(() => result.current.setContent((c) => ({ ...c, basics: { ...c.basics, fullName: "Mine" } })));
+    await advance(1000);
+    const merged = { ...serverContent, basics: { ...serverContent.basics, fullName: "Mine" } };
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(3);
+    expect(save).toHaveBeenLastCalledWith(merged, 5);
+    expect(result.current.content).toEqual(merged);
+    expect(result.current.status).toBe("saved");
+    expect(result.current.conflict).toBeNull();
+    expect(result.current.currentVersion()).toBe(6);
+  });
+
+  it("pauses after a second conflict instead of retrying again", async () => {
+    const load = vi.fn<Load>().mockResolvedValue({ ...initial, version: 5 });
+    const save = vi.fn<Save>().mockRejectedValueOnce(conflictError(5)).mockRejectedValue(conflictError(6));
+    const { result } = setup(save, load);
+    act(() => result.current.setContent(named("Mine")));
+    await advance(6000);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe("conflict");
+    expect(result.current.conflict?.version).toBe(6);
+    expect(result.current.content.basics.fullName).toBe("Mine");
+  });
+
+  it("a server text conflict pauses autosave until the user chooses", async () => {
     const save = vi.fn<Save>().mockRejectedValueOnce(conflictError(5)).mockResolvedValue(saved(6));
-    const { result } = setup(save);
+    const load = vi.fn<Load>().mockResolvedValue({ ...initial, content: named("From other tab"), version: 5 });
+    const { result } = setup(save, load);
 
     act(() => result.current.setContent(named("Mine")));
     await advance(1000);
     expect(result.current.status).toBe("conflict");
     expect(result.current.conflict?.version).toBe(5);
+    expect(load).toHaveBeenCalledTimes(1);
 
     act(() => result.current.setContent(named("Mine, edited")));
     await advance(5000);

@@ -7,7 +7,7 @@
  *   { "expires_after": { "anchor": "created_at", "seconds": 10 },
  *     "session": { "type": "transcription",
  *       "audio": { "input": {
- *         "transcription": { "model": "gpt-4o-mini-transcribe", "language": "en" | "ro" },
+ *         "transcription": { "model": "gpt-4o-mini-transcribe", "language": "en" | "ro" | "fr" | "de" | "es" | "it" },
  *         "turn_detection": { "type": "server_vad" } } } } }
  *   Answer: { value: "ek_...", expires_at: <unix seconds>, session: {...} }. Use the top-level
  *   expires_at (session.expires_at is 0). The old /v1/realtime/transcription_sessions returns 404.
@@ -25,7 +25,7 @@
  *                conversation.item.input_audio_transcription.completed (final text in `transcript`)
  * Audio: PCM16 mono 24 kHz little-endian, base64, sent as { type: "input_audio_buffer.append", audio }.
  */
-import { VOICE } from "@resumora/shared";
+import { VOICE, type Locale } from "@resumora/shared";
 import type { AiCallLog } from "./call-model.ts";
 
 export const VOICE_TASK = "enrich_voice";
@@ -55,7 +55,7 @@ export class VoiceUnavailableError extends Error {
  */
 export async function createVoiceSession(
   deps: VoiceDeps,
-  { userId, locale }: { userId: string; locale: "en" | "ro" },
+  { userId, locale }: { userId: string; locale: Locale },
 ): Promise<VoiceSession> {
   const started = Date.now();
   try {
