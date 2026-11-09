@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { JobExtraction } from "@resumora/shared";
 import type { ModelDeps } from "../src/ai/call-model.ts";
 import { processJob } from "../src/jobs/process.ts";
-import { buildJobUserPrompt } from "../src/jobs/prompts.ts";
+import { buildJobUserPrompt, JOB_PROMPT_VERSION, jobExtractPrompt } from "../src/jobs/prompts.ts";
 
 const extracted: JobExtraction = {
   title: "Engineer", company: "Example", location: null, workMode: "remote",
@@ -50,7 +50,61 @@ describe("job user prompt", () => {
   });
 });
 
+function promptLine(prefix: string): string {
+  return jobExtractPrompt.split("\n").find((line) => line.startsWith(prefix)) ?? "";
+}
+
+describe("job extract prompt (job.v2)", () => {
+  it("is version job.v2", () => {
+    expect(JOB_PROMPT_VERSION).toBe("job.v2");
+  });
+
+  it("keeps every earlier rule", () => {
+    for (const rule of [
+      "Never invent a company, salary, date or requirement.",
+      "Keep the posting's original language.",
+      "A requirement is must unless the page marks it optional",
+      "One requirement per item; split lists that mix several.",
+      "Ignore page chrome",
+      "Set isJobPosting: false",
+    ]) expect(jobExtractPrompt).toContain(rule);
+  });
+
+  it("limits the summary to two sentences on the company and the role's purpose", () => {
+    expect(jobExtractPrompt).toContain("summary: at most two sentences");
+    expect(jobExtractPrompt).toContain("what the company is or does, and what the role is for");
+    expect(jobExtractPrompt).toContain("No benefits, no hype, no requirements");
+  });
+
+  it("asks for short requirements that keep the ad's exact keywords, without duplicates", () => {
+    expect(jobExtractPrompt).toContain("requirements: one requirement per item, a short line (aim for under 10 words)");
+    expect(jobExtractPrompt).toContain("keep the ad's exact terms for tools, methods, degrees and languages");
+    expect(jobExtractPrompt).toContain("BPMN");
+    expect(jobExtractPrompt).toContain("Power BI");
+    expect(jobExtractPrompt).toContain("Fluent English");
+    expect(promptLine("requirements:")).toContain("No duplicates");
+  });
+
+  it("asks for short verb-first duties that don't repeat requirements", () => {
+    expect(jobExtractPrompt).toContain("responsibilities: short phrases starting with a verb");
+    expect(promptLine("responsibilities:")).toContain("no duplicates");
+    expect(promptLine("responsibilities:")).toContain("nothing already listed as a requirement");
+  });
+
+  it("asks for short benefits without duplicates", () => {
+    expect(promptLine("benefits:")).toContain(`short phrases ("Private medical care"), no duplicates`);
+  });
+});
+
 describe("job extraction", () => {
+  it("sends the job.v2 prompt as the system message and still validates the schema", async () => {
+    const { model, fetch } = fakeModel();
+    expect(await processJob({ model }, work)).toEqual({ ok: true, extracted });
+    const request = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
+    expect(request.messages[0].content).toBe(jobExtractPrompt);
+  });
+
+
   it("returns a valid extraction with the job task and output limit", async () => {
     const { model, fetch, logCall } = fakeModel();
     const now = () => new Date("2026-11-06T12:00:00Z");
