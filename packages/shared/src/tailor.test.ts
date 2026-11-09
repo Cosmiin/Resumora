@@ -3,7 +3,7 @@ import { emptyCv } from "./cv.ts";
 import {
   AnswerSchema, CoverLetterSchema, FlagSchema, MatchLabelSchema, MatchScoreSchema,
   ProposalSchema, TailorQuestionSchema as QuestionSchema, TAILOR_SECTIONS, TailoredCvSchema, TailorLanguageSchema,
-  TailorRunSchema, TailorSectionSchema, ToneSchema,
+  SteeringSchema, TailorRunSchema, TailorSectionSchema, ToneSchema,
 } from "./index.ts";
 
 const generatedAt = "2026-11-08T10:00:00Z";
@@ -104,5 +104,46 @@ describe("tailoring schemas", () => {
     ]) {
       expect(TailoredCvSchema.safeParse({ ...tailoredCv, ...invalid }).success).toBe(false);
     }
+  });
+});
+
+describe("tailoring round 2 schemas", () => {
+  it("still parses an old run without roleOrder or currentRoleId", () => {
+    const parsed = TailorRunSchema.parse(run);
+    expect(parsed.roleOrder).toBeUndefined();
+    expect(TailorRunSchema.safeParse({ ...run, roleOrder: ["role1", "role2"], currentRoleId: "role1" }).success).toBe(true);
+    expect(TailorRunSchema.safeParse({ ...run, currentRoleId: null }).success).toBe(true);
+  });
+
+  it("accepts the seven tones and rejects bold", () => {
+    for (const tone of ["formal", "neutral", "confident", "concise", "warm", "technical", "executive"]) {
+      expect(ToneSchema.safeParse(tone).success).toBe(true);
+    }
+    expect(ToneSchema.safeParse("bold").success).toBe(false);
+  });
+
+  it("accepts steering with every field optional and caps the instruction at 500 characters", () => {
+    expect(SteeringSchema.safeParse({}).success).toBe(true);
+    expect(SteeringSchema.safeParse({
+      tone: "warm", draws: ["work", "step_up"], fit: "mostly", focusRoleIds: ["role1"], instruction: "x".repeat(500),
+    }).success).toBe(true);
+    expect(SteeringSchema.safeParse({ fit: null }).success).toBe(true);
+    expect(SteeringSchema.safeParse({ instruction: "x".repeat(501) }).success).toBe(false);
+    expect(SteeringSchema.safeParse({ draws: ["money"] }).success).toBe(false);
+    expect(SteeringSchema.safeParse({ fit: "perfect" }).success).toBe(false);
+  });
+
+  it("accepts a skill question with no role, and a role question that points at one bullet", () => {
+    expect(QuestionSchema.safeParse({ ...question, section: "skills", kind: "skill", roleId: null }).success).toBe(true);
+    expect(QuestionSchema.safeParse({ ...question, bulletId: "b1" }).success).toBe(true);
+  });
+
+  it("accepts answers with the roles a skill was used in, and proposals with guesses", () => {
+    expect(AnswerSchema.safeParse({ ...answer, roleIds: ["role1", "role2"] }).success).toBe(true);
+    expect(ProposalSchema.safeParse({
+      ...proposal, inferred: true, reason: "From your Hamburg role.",
+      guesses: [{ text: "cross-border teams", reason: "Roles in Hamburg and Bucharest." }],
+    }).success).toBe(true);
+    expect(ProposalSchema.safeParse({ ...proposal, guesses: [{ text: "x" }] }).success).toBe(false);
   });
 });
