@@ -26,6 +26,7 @@ import {
   withItems,
   type BulletOwner,
   type ListKey,
+  type LineList,
   type RoleList,
 } from "./lists.ts";
 
@@ -61,6 +62,8 @@ export type CvAction =
   | { type: "addCustomSection"; id: string; title: string }
   | { type: "replaceBullet"; roleId: string; bulletId: string; text: string }
   | { type: "addBullets"; roleId: string; texts: string[] }
+  /** Lines picked for a course, award, publication or interest in the guided path (3B). */
+  | { type: "addLines"; list: LineList; itemId: string; texts: string[] }
   | { type: "setFacts"; roleId: string; facts: RoleFacts | null }
   | { type: "setNote"; roleId: string; note: Note }
   | { type: "setCurrent"; list: RoleList; itemId: string; current: boolean }
@@ -280,6 +283,13 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (!bullets || !action.texts.length || bullets.length >= MAX_BULLETS) return cv;
       const added = action.texts.slice(0, MAX_BULLETS - bullets.length).map((text) => ({ id: newId(), text }));
       return withBullets(cv, owner, [...bullets, ...added]);
+    }
+    case "addLines": {
+      const owner = { list: action.list, itemId: action.itemId };
+      const lines = getBullets(cv, owner);
+      if (!lines || !action.texts.length || lines.length >= MAX_BULLETS) return cv;
+      const added = action.texts.slice(0, MAX_BULLETS - lines.length).map((text) => ({ id: newId(), text }));
+      return withBullets(cv, owner, [...lines, ...added]);
     }
     case "setFacts": {
       const list = roleListOf(cv, action.roleId);

@@ -9,7 +9,7 @@ import { SkillsNotice } from "./SkillsNotice.tsx";
 import { ENRICHED_AVERAGE, EnrichedScreen, type RoleRow } from "./EnrichedScreen.tsx";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { useNavigate } from "react-router";
-import { FocusMode } from "./FocusMode.tsx";
+import { FocusMode, LightStop } from "./FocusMode.tsx";
 import { PathStart } from "./PathStart.tsx";
 import type { LineList } from "../edit/lists.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
@@ -38,7 +38,7 @@ export function lightStops(cv: CvContent): { section: LineList; itemId: string }
 
 const OF_KEY = { role: "enrich.path.roleOf", project: "enrich.path.projectOf", volunteering: "enrich.path.volunteeringOf" } as const satisfies Record<ScoredKind, string>;
 
-type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "achievements" } | { kind: "skills" } | { kind: "end" } | { kind: "improve"; roleId: string };
+type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "light"; index: number } | { kind: "achievements" } | { kind: "skills" } | { kind: "end" } | { kind: "improve"; roleId: string };
 
 /** The top bar across the whole path: where you are, and one segment per stop. */
 export function PathBar({ label, at, total }: { label: string; at: number; total: number }) {
@@ -53,8 +53,9 @@ export function PathBar({ label, at, total }: { label: string; at: number; total
 }
 
 /**
- * 1A: one guided path through the CV. The roles below 80 (fixed when the path opens, in CV order), each in its
- * own focus session, then Key achievements, Skills and the end. ✕ closes it; opening it again starts from the
+ * 1A: one guided path through the CV. The roles, projects and volunteering below 80 (fixed when the path opens,
+ * in CV order), each in its own focus session, then one stop per lighter item with no lines yet (3B), then Key
+ * achievements, Skills and the end. ✕ closes it; opening it again starts from the
  * roles still below 80, so finished roles drop out by themselves.
  */
 export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props) {
@@ -62,16 +63,17 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   // loading, e.g. from "/cv?enrich=1") and fixed when the path starts.
   // Roles, then projects, then volunteering (CV order within each), each below 80.
   const below = scoredItems(cv).filter(({ item }) => belowTarget(scores.get(item.id))).map(({ item }) => item.id);
-  const [fixed, setFixed] = useState<{ stops: string[]; before: Map<string, number | null> } | null>(null);
+  const light = lightStops(cv);
+  const [fixed, setFixed] = useState<{ stops: string[]; lights: typeof light; before: Map<string, number | null> } | null>(null);
   const stops = fixed?.stops ?? below;
+  const lights = fixed?.lights ?? light;
   const before = fixed?.before ?? new Map<string, number | null>();
   const [stage, setStage] = useState<Stage>({ kind: "start" });
-  // Roles, then Key achievements and Skills.
-  const total = stops.length + 2;
+  // Scored items, lighter items, then Key achievements and Skills.
+  const total = stops.length + lights.length + 2;
   const items = stops.map((id) => findScored(cv, id)).filter((p) => p !== undefined);
-  const light = lightStops(cv);
   const quick = LIGHT_SECTIONS.map((section) => ({ section, count: light.filter((l) => l.section === section).length })).filter((q) => q.count > 0);
-  const afterRoles = () => setStage({ kind: "achievements" });
+  const afterRoles = () => setStage(lights.length ? { kind: "light", index: 0 } : { kind: "achievements" });
   // 5A: the skills the path added, so Undo removes exactly those.
   const [skills, setSkills] = useState<{ ids: string[]; names: string[]; undone: boolean }>({ ids: [], names: [], undone: false });
   // 6B: how many Key achievements the path added.
@@ -80,9 +82,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   if (stage.kind === "start") {
     return <PathStart items={items} quick={quick} scores={scores} onNotNow={onClose}
       onStart={() => {
-        setFixed({ stops: below, before: new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))])) });
+        setFixed({ stops: below, lights: light, before: new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))])) });
         if (below.length) setStage({ kind: "role", index: 0 });
-        else afterRoles();
+        else setStage(light.length ? { kind: "light", index: 0 } : { kind: "achievements" });
       }} />;
   }
   if (stage.kind === "role") {
@@ -108,9 +110,20 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
       />
     );
   }
+  if (stage.kind === "light") {
+    const stop = lights[stage.index]!;
+    const ofSection = lights.filter((l) => l.section === stop.section);
+    const onNext = () => setStage(stage.index + 1 < lights.length ? { kind: "light", index: stage.index + 1 } : { kind: "achievements" });
+    return (
+      <LightStop key={`${stop.section}:${stop.itemId}`} section={stop.section} itemId={stop.itemId} cv={cv} dispatch={dispatch} waitForSave={waitForSave}
+        onClose={onClose} onNext={onNext}
+        topBar={<PathBar label={t("enrich.path.lightOf", { section: t(`enrich.path.section.${stop.section}`), n: ofSection.indexOf(stop) + 1, total: ofSection.length })}
+          at={stops.length + stage.index} total={total} />} />
+    );
+  }
   if (stage.kind === "achievements") {
     return (
-      <PathScreen bar={<PathBar label={t("enrich.path.achievements")} at={stops.length} total={total} />} onClose={onClose}>
+      <PathScreen bar={<PathBar label={t("enrich.path.achievements")} at={stops.length + lights.length} total={total} />} onClose={onClose}>
         <AchievementsStop cv={cv} waitForSave={waitForSave} onDone={(texts) => {
           if (texts.length) dispatch({ type: "addAchievements", texts });
           setAchievementsAdded(texts.length);
@@ -121,7 +134,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   }
   if (stage.kind === "skills") {
     return (
-      <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={stops.length + 1} total={total} />} onClose={onClose}>
+      <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={stops.length + lights.length + 1} total={total} />} onClose={onClose}>
         <SkillsStop waitForSave={waitForSave} onDone={(added) => {
           if (added.length) dispatch({ type: "addSkills", skills: added });
           setSkills({ ids: added.map((s) => s.id), names: added.map((s) => s.name), undone: false });

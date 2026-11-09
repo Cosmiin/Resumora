@@ -1,6 +1,9 @@
 import { z } from "zod";
 import {
   BrainDumpAnswerSchema,
+  ItemLinesAnswerSchema,
+  type ItemLinesAnswer,
+  type ItemLinesBody,
   ImproveAnswerSchema,
   RewriteEventSchemas,
   AchievementsAnswerSchema,
@@ -154,4 +157,9 @@ export function getSkillSuggestions(): Promise<SkillsAnswer> {
 /** Key achievements suggestions (4A) from the saved CV's roles: up to 5, each naming its role. */
 export function suggestAchievements(): Promise<AchievementsAnswer> {
   return apiFetch("/v1/enrich/achievements", { method: "POST", json: {}, schema: AchievementsAnswerSchema });
+}
+
+/** Suggested lines for one saved course, award, publication or interest (3B); none means skip the picks. */
+export function itemLines(input: ItemLinesBody): Promise<ItemLinesAnswer> {
+  return apiFetch("/v1/enrich/item-lines", { method: "POST", json: input, schema: ItemLinesAnswerSchema });
 }

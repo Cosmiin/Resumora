@@ -221,6 +221,7 @@
 .fm-path-segments i.is-on { background: var(--pine-600); }
 .focus-mode.fm-path { grid-template-columns: minmax(0, 720px); }
 .fm-path-start { grid-column: 1 / -1; width: 100%; max-width: 720px; box-sizing: border-box; padding: var(--space-12) var(--space-11) var(--space-10); overflow-y: auto; }
+.fm-path-quick { margin: 0 0 var(--space-4); font-size: var(--text-sm); color: var(--text-muted); }
 .fm-path-roles { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; gap: var(--space-3); }
 .fm-path-roles li {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) var(--space-5);

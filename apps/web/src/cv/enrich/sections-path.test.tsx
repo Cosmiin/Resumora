@@ -110,7 +110,8 @@ describe("path start (1A)", () => {
     expect(screen.getByText("Volunteering 1 of 1")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
     expect(screen.queryByTestId("focus")).toBeNull();
-    expect(screen.getAllByText("Key achievements").length).toBeGreaterThan(0);
+    // Then the lighter items with no lines yet (Task 7).
+    expect(screen.getByText("Courses & training · 1 of 2")).toBeInTheDocument();
   });
 
   it("✕ and reopen start at the first item still below 80, roles or not", async () => {
