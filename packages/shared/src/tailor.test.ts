@@ -59,7 +59,7 @@ describe("tailoring schemas", () => {
     for (const tone of ["formal", "neutral", "confident"]) {
       expect(ToneSchema.safeParse(tone).success).toBe(true);
     }
-    expect(TAILOR_SECTIONS).toEqual(["experience", "projects", "skills", "summary", "achievements", "languages", "layout"]);
+    expect(TAILOR_SECTIONS).toEqual(["experience", "projects", "skills", "summary", "achievements", "courses", "publications", "interests", "languages", "layout"]);
     for (const section of TAILOR_SECTIONS) expect(TailorSectionSchema.safeParse(section).success).toBe(true);
   });
 

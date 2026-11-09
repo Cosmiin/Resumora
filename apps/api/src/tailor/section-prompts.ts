@@ -1,5 +1,11 @@
 import type { JobExtraction, Proposal, TailorLanguage, TailorSection } from "@resumora/shared";
 
+/** Final touches for awards, courses, publications and interests: lines reworded, most relevant first, unrelated ones hidden. */
+const LIGHT_RULES = `Each line under an item is its own item: itemId = the line's id, field "text". Reword lines with the job's keywords inside natural sentences.
+Never change an item's name, provider, issuer, publisher, link or date, and never add a line.
+Order: when the order should change, return one proposal with itemId "order", field "order", text = every item id of the section once, comma-separated, most relevant to the job first.
+Hide: for an item with no link to the job, return itemId "hide:" followed by the item's id, field "hidden", text = one short line saying why it isn't relevant to this job. Never hide an item that relates to the job.`;
+
 const SECTION_RULES: Record<Exclude<TailorSection, "layout">, string> = {
   experience: `Reorder each role's bullets so the most relevant come first (return proposals in that order).
 Reword bullets with the job's exact keywords inside natural sentences. Condense old or less relevant roles to 1-2 short bullets' worth of wording.
@@ -16,7 +22,11 @@ A skill name is a short label of at most 3 words, never a phrase or sentence.
 For each new skill set reason to one short line saying where the CV shows it, naming the role as "Title · Company" when it comes from one (for example "Shown in: Business Analyst · Emedi"). Set reason to null for reworded skills that aren't guesses.`,
   summary: `Rewrite the summary for this job so it describes the CV's experience and skills. Return one proposal with itemId "summary" and field "summary".
 Under guesses, list each phrase of it that is a reasonable inference rather than stated: its exact text as written in the summary, and a reason naming its basis. Set guesses to [] when nothing is guessed.`,
-  achievements: "Reorder and reword only, most relevant first. Never add an achievement or outcome.",
+  achievements: `Reword only. Never add an achievement or outcome. Editable fields: an award's own wording is itemId = its id, field "name" or "description".
+${LIGHT_RULES}`,
+  courses: `These are courses and training. ${LIGHT_RULES}`,
+  publications: `These are publications. ${LIGHT_RULES}`,
+  interests: `These are personal interests. ${LIGHT_RULES}`,
   languages: "Reorder and reword only, most relevant first. Never change a language's level upward.",
 };
 

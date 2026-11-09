@@ -21,7 +21,9 @@ export const SteeringSchema = z.object({
 });
 export type Steering = z.infer<typeof SteeringSchema>;
 
-export const TAILOR_SECTIONS = ["experience", "projects", "skills", "summary", "achievements", "languages", "layout"] as const;
+export const TAILOR_SECTIONS = [
+  "experience", "projects", "skills", "summary", "achievements", "courses", "publications", "interests", "languages", "layout",
+] as const;
 export const TailorSectionSchema = z.enum(TAILOR_SECTIONS);
 export type TailorSection = z.infer<typeof TailorSectionSchema>;
 
@@ -42,9 +44,16 @@ export function stepOf(cv: Scored, id: string): RoleSection | null {
   const found = findScored(cv, id);
   return !found ? null : found.kind === "role" ? "experience" : "projects";
 }
-/** The steps a run over this CV covers, in order: Projects & volunteering only when the CV has some. */
-export function runSections(cv: Scored, picked: readonly TailorSection[] = TAILOR_SECTIONS): TailorSection[] {
-  return TAILOR_SECTIONS.filter((section) => picked.includes(section) && (section !== "projects" || stepItems(cv, section).length > 0));
+/** Final touches for the lighter sections (Awards are "achievements"): reworded, reordered, unrelated items hidden. */
+export type LightTailorSection = "courses" | "publications" | "interests";
+export const isLightTailorSection = (section: TailorSection | null | undefined): section is LightTailorSection =>
+  section === "courses" || section === "publications" || section === "interests";
+
+type Listed = Scored & Pick<CvContent, LightTailorSection>;
+/** The steps a run over this CV covers, in order: Projects & volunteering, Courses, Publications and Interests only when the CV has some. */
+export function runSections(cv: Listed, picked: readonly TailorSection[] = TAILOR_SECTIONS): TailorSection[] {
+  return TAILOR_SECTIONS.filter((section) => picked.includes(section)
+    && (section === "projects" ? stepItems(cv, section).length > 0 : isLightTailorSection(section) ? cv[section].length > 0 : true));
 }
 /** One item order for a run's role steps (roles, then projects, then volunteering) and the item it starts on. */
 export function runItems(cv: Scored, sections: readonly TailorSection[]): { roleOrder: string[]; currentRoleId: string | null } {

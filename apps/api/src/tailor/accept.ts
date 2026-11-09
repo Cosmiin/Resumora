@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  applyGuesses, CvContentSchema, findScored, isRoleSection, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId, scoredItems, stepOrder,
+  applyGuesses, CvContentSchema, findScored, isLightTailorSection, isRoleSection, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId, scoredItems, stepOrder, withoutHidden,
   type CvContent, type Job, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -10,7 +10,7 @@ import type { JobRepo } from "../jobs/repo.ts";
 import { newestRole } from "./questions.ts";
 import type { Review, TailorRepo } from "./repo.ts";
 import { scoreMatch } from "./score.ts";
-import { currentRole, sectionItems } from "./section-pass.ts";
+import { currentRole, lightList, sectionItems } from "./section-pass.ts";
 import { jobNotFound } from "./start.ts";
 
 /** `text`: a summary guess's edited wording (its item id is "summary#<n>"). */
@@ -35,7 +35,27 @@ const flagQuestionFor = (run: TailorRun, section: TailorSection, p: Proposal) =>
     && (q.itemId ? q.itemId === `${reviewKey(p)}|${p.field}` : q.text.startsWith(`Please check: "${p.text}"`)));
 export const LAYOUT_ITEMS = ["layout", "headline"];
 
-function apply(cv: CvContent, p: Proposal): void {
+function apply(cv: CvContent, p: Proposal, section: TailorSection): void {
+  if (section === "achievements" || isLightTailorSection(section)) {
+    const list = lightList(cv, section);
+    // "Most relevant first": a new order of every item, each once; anything else is ignored.
+    if (p.itemId === "order") {
+      const ids = p.text.split(",").map((id) => id.trim());
+      const byId = new Map(list.map((item) => [item.id, item]));
+      if (ids.length === list.length && new Set(ids).size === ids.length && ids.every((id) => byId.has(id))) {
+        list.splice(0, list.length, ...ids.map((id) => byId.get(id)!));
+      }
+      return;
+    }
+    // "Hide for this job?": hidden on this tailored CV only (the editor can show it again).
+    if (p.itemId.startsWith("hide:")) {
+      const item = list.find((i) => i.id === p.itemId.slice("hide:".length));
+      if (item) item.hidden = true;
+      return;
+    }
+    const line = list.flatMap((item) => item.bullets ?? []).find((l) => l.id === p.itemId);
+    if (line) return void (line.text = p.text);
+  }
   if (p.itemId === "layout") {
     const order = p.text.split(",") as SectionKey[];
     const current = new Set(cv.layout.order);
@@ -88,6 +108,18 @@ export async function acceptSection(
       if (baseRole && at >= 0) list[at] = structuredClone(baseRole);
     }
   }
+  if (section === "achievements" || isLightTailorSection(section)) {
+    // Each accept of a lighter section decides its order and hiding again: start from the Base order with nothing
+    // hidden as in the Base CV, so "Keep the original" on a re-tailor restores both.
+    const baseList = lightList((await deps.cv.get()).content, section);
+    const at = new Map(baseList.map((item, i) => [item.id, i]));
+    const list = lightList(content, section);
+    list.sort((a, b) => (at.get(a.id) ?? at.size) - (at.get(b.id) ?? at.size));
+    for (const item of list) {
+      if (baseList[at.get(item.id) ?? -1]?.hidden) item.hidden = true;
+      else delete item.hidden;
+    }
+  }
   const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));
   const inferred = new Map(body.inferred.map((d) => [d.itemId, d.keep]));
@@ -124,7 +156,7 @@ export async function acceptSection(
     // A guess keeps its reason, which the guided review shows.
     state[key] = { kept: keep ?? !p.flags.length, inferred: p.inferred, reviewed: keep !== undefined, text: applied.text,
       ...(p.inferred && p.reason ? { reason: p.reason } : {}) };
-    if (keep ?? !p.flags.length) apply(content, applied);
+    if (keep ?? !p.flags.length) apply(content, applied, section);
   }
   const parsed = CvContentSchema.safeParse(content);
   if (!parsed.success) throw new ApiError(502, "ai_failed", `Couldn't tailor ${section}. Try again.`);
@@ -136,7 +168,8 @@ export async function acceptSection(
   const keptInferredTexts = Object.values(review).flatMap((items) => Object.values(items as Record<string, ItemReview>))
     .filter((item) => item.inferred && item.kept).map((item) => item.text);
   const score = await scoreMatch({ model: deps.model }, {
-    userId: input.userId, cv: parsed.data, job: input.job.extracted, keptInferred: new Set(), keptInferredTexts,
+    // Items hidden for this job are not on the CV the recruiter sees, so they do not count.
+    userId: input.userId, cv: withoutHidden(parsed.data), job: input.job.extracted, keptInferred: new Set(), keptInferredTexts,
   });
   if (await deps.tailor.saveTailoredCv(doc.id, doc.version, { content: parsed.data, review, score }) === "conflict") {
     throw new ApiError(409, "version_conflict", "This tailored CV was saved somewhere else first.");

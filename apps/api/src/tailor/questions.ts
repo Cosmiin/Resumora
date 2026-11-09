@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  findScored, isRoleSection, MAX_TEXT, NoteSchema, newId, scoredItems, stepItems,
+  findScored, isLightTailorSection, isRoleSection, MAX_TEXT, NoteSchema, newId, scoredItems, stepItems,
   type Answer, type CvContent, type Experience, type JobExtraction, type Note, type TailorQuestion as Question, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
@@ -66,6 +66,8 @@ export async function askQuestions(
   deps: { model: ModelDeps; tailor: TailorRepo },
   input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection; roleId?: string },
 ): Promise<Question[]> {
+  // The lighter sections' Final touches ask nothing: they are reworded, reordered and offered for hiding only.
+  if (isLightTailorSection(input.section)) return [];
   const roleId = currentRole(input.run, input.section, input.roleId);
   const role = roleId ? stepItems(input.cv, input.section).find((r) => r.id === roleId) : undefined;
   // A CV without roles has nothing to ask in Experience.
