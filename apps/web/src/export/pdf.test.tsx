@@ -2,9 +2,10 @@
 import { createRequire } from "node:module";
 import { Font } from "@react-pdf/renderer";
 import { CvContentSchema, emptyCv, ExperienceSchema, type CvContent } from "@resumora/shared";
-import { extractText } from "unpdf";
+import { extractText, getDocumentProxy } from "unpdf";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { buildCvPdf, buildLetterPdf } from "./pdf.tsx";
+import { fitSteps } from "./fit.ts";
+import { buildCvPdf, buildLetterPdf, fitCvPdf } from "./pdf.tsx";
 
 const require = createRequire(import.meta.url);
 
@@ -58,6 +59,46 @@ function fixture(): CvContent {
   }];
   content.layout.titles = { experience: "Career history", education: "Academic background" };
   return CvContentSchema.parse(content);
+}
+
+
+/** A tailored CV of `roles` roles with `bullets` two-line bullets each, plus the usual short sections. */
+function longCv(roles: number, bullets: number): CvContent {
+  const content = fixture();
+  content.basics.titles = ["Business Analyst", "Process Automation & BI"];
+  content.basics.summary = "Business analyst with ten years in process automation and business intelligence. Turns business needs into clear requirements, automated workflows and dashboards that teams use.";
+  content.experience = Array.from({ length: roles }, (_, index) => ExperienceSchema.parse({
+    id: `job-${index}`, title: `Analyst role ${index}`, company: "Example Bank", location: "Bucharest",
+    startDate: "2020-01", endDate: "2021-12", current: false, description: "Bank operations and reporting.",
+    bullets: Array.from({ length: bullets }, (_, bullet) => ({
+      id: `b-${index}-${bullet}`,
+      text: `Mapped and automated finance processes across operations teams, cutting manual effort by ${bullet + 1}0% and improving reporting accuracy (${index}).`,
+    })),
+  }));
+  content.technicalSkills = ["Power BI", "SQL", "Python", "Power Automate", "UiPath", "BPMN", "Jira"].map((name, i) => ({ id: `t${i}`, name }));
+  content.languages = [{ id: "l1", name: "English", level: "C2" }, { id: "l2", name: "Romanian", level: "Native" }];
+  return CvContentSchema.parse(content);
+}
+
+const PNG = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAOSURBVBhXY/jPwABC/wEP+QP98+IdQAAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+
+/** Pairs of text runs drawn over each other on the same page (each run boxed from its baseline up by its height). */
+async function overlaps(blob: Blob): Promise<string[]> {
+  const doc = await getDocumentProxy(new Uint8Array(await blob.arrayBuffer()));
+  const found: string[] = [];
+  for (let number = 1; number <= doc.numPages; number++) {
+    const { items } = await (await doc.getPage(number)).getTextContent();
+    const boxes = items.flatMap((item) => ("str" in item && item.str.trim() ? [{
+      text: item.str, x0: item.transform[4] as number, x1: (item.transform[4] as number) + item.width,
+      y0: item.transform[5] as number, y1: (item.transform[5] as number) + item.height,
+    }] : []));
+    boxes.forEach((a, i) => boxes.slice(i + 1).forEach((b) => {
+      const across = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+      const down = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
+      if (across > 1 && down > 0.5) found.push(`page ${number}: "${a.text}" / "${b.text}"`);
+    }));
+  }
+  return found;
 }
 
 async function readPdf(blob: Blob) {
@@ -190,6 +231,41 @@ describe("buildCvPdf", () => {
       expect(text).toContain(job.title);
       for (const bullet of job.bullets) expect(text).toContain(bullet.text);
     }
+  });
+
+  it.each([
+    ["classic", false], ["classic", true], ["modern", false], ["modern", true], ["compact", false],
+  ] as const)("draws no text over other text for %s (photo: %s), header included", async (template, withPhoto) => {
+    const content = longCv(6, 4);
+    if (withPhoto) content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1 };
+    const blob = await buildCvPdf(content, template, withPhoto ? { data: PNG, type: "png" } : undefined);
+    expect(await overlaps(blob)).toEqual([]);
+  });
+});
+
+describe("fitCvPdf", () => {
+  it("exports a CV that already fits exactly as the template, untightened", async () => {
+    const fitted = await fitCvPdf(fixture(), "classic");
+    expect(fitted).toMatchObject({ step: fitSteps("classic")[0], pages: 1, fits: true });
+    expect((await readPdf(fitted.blob)).totalPages).toBe(1);
+  });
+
+  it.each([["classic", 6], ["modern", 6], ["compact", 7]] as const)("fits a 3-page %s CV (%s roles) onto 2 pages by tightening", async (template, roles) => {
+    const content = longCv(roles, 5);
+    expect((await readPdf(await buildCvPdf(content, template))).totalPages).toBe(3);
+    const fitted = await fitCvPdf(content, template);
+    expect(fitted.fits).toBe(true);
+    expect(fitted.step.tight).toBe(true);
+    expect(fitted.pages).toBe(2);
+    expect((await readPdf(fitted.blob)).totalPages).toBe(2);
+    expect(await overlaps(fitted.blob)).toEqual([]);
+  });
+
+  it.each([["classic", 10], ["compact", 9.5]] as const)("stops at the %s minimum of %spt and reports a very long CV that still won't fit", async (template, minimum) => {
+    const fitted = await fitCvPdf(longCv(14, 6), template);
+    expect(fitted).toMatchObject({ step: { tight: true, fontSize: minimum }, fits: false });
+    expect(fitted.pages).toBeGreaterThan(2);
+    expect((await readPdf(fitted.blob)).totalPages).toBe(fitted.pages);
   });
 });
 

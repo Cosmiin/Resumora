@@ -6,19 +6,28 @@ import {
 import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 import type { ExportPhoto, LetterDocxInput, LetterHeader } from "./docx.ts";
+import { fitSteps, fitToPages, pdfPageCount, type FitStep } from "./fit.ts";
 import { PDF_FONTS, registerPdfFonts } from "./pdf-fonts.ts";
 
 const TEMPLATES = {
-  classic: { fontFamily: PDF_FONTS.serif, fontSize: 11, lineHeight: 1.45, gap: 5, sectionGap: 12, accent: "#222222" },
-  modern: { fontFamily: PDF_FONTS.sans, fontSize: 11, lineHeight: 1.45, gap: 5, sectionGap: 12, accent: "#17695d" },
-  compact: { fontFamily: PDF_FONTS.sans, fontSize: 10, lineHeight: 1.35, gap: 3, sectionGap: 8, accent: "#222222" },
+  classic: { fontFamily: PDF_FONTS.serif, lineHeight: 1.45, gap: 5, sectionGap: 12, accent: "#222222" },
+  modern: { fontFamily: PDF_FONTS.sans, lineHeight: 1.45, gap: 5, sectionGap: 12, accent: "#17695d" },
+  compact: { fontFamily: PDF_FONTS.sans, lineHeight: 1.35, gap: 3, sectionGap: 8, accent: "#222222" },
 };
+/** The tighter spacing the 2-page fit tries before it makes the text smaller. */
+const TIGHT = {
+  classic: { lineHeight: 1.3, gap: 3, sectionGap: 8 },
+  modern: { lineHeight: 1.3, gap: 3, sectionGap: 8 },
+  compact: { lineHeight: 1.25, gap: 2, sectionGap: 6 },
+};
+const MAX_PAGES = 2;
 const join = (parts: string[]) => parts.filter(Boolean).join(" · ");
 
 export function buildCvPdf(
   cv: CvContent,
   template: TemplateId | string | undefined,
   photo?: ExportPhoto,
+  step: FitStep = fitSteps(template)[0]!,
 ): Promise<Blob> {
   // Hidden courses, awards, publications and interests are left out of the export.
   const content = withoutHidden(cv);
@@ -26,11 +35,12 @@ export function buildCvPdf(
   const selectedTemplate = getTemplate(template);
   const image = selectedTemplate.showsPhoto && content.basics.photo && photo && photo.type !== "webp"
     ? new Blob([new Uint8Array(photo.data)], { type: `image/${photo.type}` }) : undefined;
-  const theme = TEMPLATES[selectedTemplate.id];
+  const theme = { ...TEMPLATES[selectedTemplate.id], ...(step.tight ? TIGHT[selectedTemplate.id] : {}), fontSize: step.fontSize };
   const styles = StyleSheet.create({
-    page: { padding: 54, color: "#222222", fontFamily: theme.fontFamily, fontSize: theme.fontSize, lineHeight: theme.lineHeight },
-    header: { marginBottom: 12 },
-    name: { fontSize: theme.fontSize + 12, fontWeight: 700, color: theme.accent },
+    page: { padding: step.tight ? 40 : 54, color: "#222222", fontFamily: theme.fontFamily, fontSize: theme.fontSize, lineHeight: theme.lineHeight },
+    header: { marginBottom: step.tight ? 8 : 12 },
+    // react-pdf turns the page's line height into points at body size, so the large name needs its own (C7: it overlapped the next line).
+    name: { fontSize: theme.fontSize + 12, lineHeight: 1.2, fontWeight: 700, color: theme.accent },
     contact: { fontSize: theme.fontSize - 1 },
     section: { marginTop: theme.sectionGap },
     heading: { fontSize: theme.fontSize + 1, fontWeight: 700, color: theme.accent, marginBottom: theme.gap },
@@ -129,6 +139,22 @@ export function buildCvPdf(
       </Page>
     </Document>,
   ).toBlob();
+}
+
+/**
+ * The CV PDF fitted to 2 pages (owner's rule): the template as is, then tighter spacing, then a slightly smaller font.
+ * When even the smallest step is longer, that smallest version comes back with `fits: false`.
+ */
+export async function fitCvPdf(
+  content: CvContent,
+  template: TemplateId | string | undefined,
+  photo?: ExportPhoto,
+): Promise<{ blob: Blob; step: FitStep; pages: number; fits: boolean }> {
+  const fitted = await fitToPages(fitSteps(template), async (step) => {
+    const blob = await buildCvPdf(content, template, photo, step);
+    return { result: blob, pages: pdfPageCount(new Uint8Array(await blob.arrayBuffer())) };
+  }, MAX_PAGES);
+  return { blob: fitted.result, step: fitted.step, pages: fitted.pages, fits: fitted.fits };
 }
 
 export function buildLetterPdf(

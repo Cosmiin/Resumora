@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyCv, type JobExtraction, type TailoredCv } from "@resumora/shared";
 
-const pdf = vi.hoisted(() => ({ buildCvPdf: vi.fn(), buildLetterPdf: vi.fn() }));
+const pdf = vi.hoisted(() => ({ fitCvPdf: vi.fn(), buildLetterPdf: vi.fn() }));
 vi.mock("./pdf.tsx", () => pdf);
 const docx = vi.hoisted(() => ({ buildCvDocx: vi.fn(), buildLetterDocx: vi.fn() }));
 vi.mock("./docx.ts", () => docx);
@@ -21,7 +21,7 @@ let clicked: { href: string; download: string }[];
 beforeEach(() => {
   vi.resetAllMocks();
   clicked = [];
-  pdf.buildCvPdf.mockResolvedValue(new Blob(["cv"]));
+  pdf.fitCvPdf.mockResolvedValue({ blob: new Blob(["cv"]), step: { tight: false, fontSize: 11 }, pages: 1, fits: true });
   pdf.buildLetterPdf.mockResolvedValue(new Blob(["letter"]));
   docx.buildCvDocx.mockResolvedValue(new Blob(["cv"]));
   docx.buildLetterDocx.mockResolvedValue(new Blob(["letter"]));
@@ -35,8 +35,8 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("exportFile", () => {
   it("downloads the CV PDF under the export file name, with no photo when the CV has none", async () => {
-    await exportFile("cv", "pdf", { cv, job, template: "modern" });
-    expect(pdf.buildCvPdf).toHaveBeenCalledWith(content, "modern", undefined);
+    await expect(exportFile("cv", "pdf", { cv, job, template: "modern" })).resolves.toEqual({ pages: 1, fits: true });
+    expect(pdf.fitCvPdf).toHaveBeenCalledWith(content, "modern", undefined);
     expect(clicked).toEqual([{ href: "blob:file", download: "Stefan_Ionescu_Bolt_Senior_Backend_Engineer.pdf" }]);
     expect(download).not.toHaveBeenCalled();
   });
@@ -45,9 +45,9 @@ describe("exportFile", () => {
     const withPhoto = { ...cv, content: { ...content, basics: { ...content.basics, photo: { path: "user-a/p.png", x: 50, y: 50, zoom: 1 } } } };
     download.mockResolvedValue({ data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }), error: null });
     await exportFile("cv", "pdf", { cv: withPhoto, job, template: "classic" });
-    expect(pdf.buildCvPdf.mock.lastCall![2]).toEqual({ data: new Uint8Array([1, 2, 3]), type: "png" });
+    expect(pdf.fitCvPdf.mock.lastCall![2]).toEqual({ data: new Uint8Array([1, 2, 3]), type: "png" });
     await exportFile("cv", "pdf", { cv: withPhoto, job, template: "compact" });
-    expect(pdf.buildCvPdf.mock.lastCall![2]).toBeUndefined();
+    expect(pdf.fitCvPdf.mock.lastCall![2]).toBeUndefined();
     expect(download).toHaveBeenCalledTimes(1);
   });
 
@@ -55,7 +55,7 @@ describe("exportFile", () => {
     const withPhoto = { ...cv, content: { ...content, basics: { ...content.basics, photo: { path: "user-a/p.png", x: 50, y: 50, zoom: 1 } } } };
     download.mockResolvedValue({ data: null, error: new Error("gone") });
     await exportFile("cv", "pdf", { cv: withPhoto, job, template: "classic" });
-    expect(pdf.buildCvPdf.mock.lastCall![2]).toBeUndefined();
+    expect(pdf.fitCvPdf.mock.lastCall![2]).toBeUndefined();
     expect(clicked).toHaveLength(1);
   });
 
@@ -72,15 +72,17 @@ describe("exportFile", () => {
 
   it("downloads Word files from the docx builders with the same inputs", async () => {
     const date = new Date("2026-11-08T12:00:00Z");
-    await exportFile("cv", "docx", { cv, job, template: "compact" });
-    expect(docx.buildCvDocx).toHaveBeenCalledWith(content, "compact", undefined);
+    const step = { tight: true, fontSize: 9.5 };
+    pdf.fitCvPdf.mockResolvedValue({ blob: new Blob(["measured"]), step, pages: 3, fits: false });
+    await expect(exportFile("cv", "docx", { cv, job, template: "compact" })).resolves.toEqual({ pages: 3, fits: false });
+    expect(pdf.fitCvPdf).toHaveBeenCalledWith(content, "compact", undefined);
+    expect(docx.buildCvDocx).toHaveBeenCalledWith(content, "compact", undefined, step);
     await exportFile("letter", "docx", { cv, job, template: "classic", date });
     expect(docx.buildLetterDocx.mock.lastCall![0].paragraphs).toEqual(["First paragraph.", "Second\nparagraph."]);
     expect(docx.buildLetterDocx.mock.lastCall![2]).toBe("ro");
     expect(clicked.map((c) => c.download)).toEqual([
       "Stefan_Ionescu_Bolt_Senior_Backend_Engineer.docx", "Stefan_Ionescu_Bolt_Senior_Backend_Engineer_Cover_letter.docx",
     ]);
-    expect(pdf.buildCvPdf).not.toHaveBeenCalled();
   });
 
   it("refuses a letter export when there is no letter", async () => {

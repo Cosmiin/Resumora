@@ -4,6 +4,7 @@ import {
 import { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun, type IParagraphOptions } from "docx";
 import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
+import { fitSteps, type FitStep } from "./fit.ts";
 
 export type LetterDocxInput = { greeting?: string; paragraphs: string[]; signOff?: string };
 export type ExportPhoto = { data: Uint8Array; type: "jpeg" | "png" | "webp" };
@@ -20,10 +21,15 @@ const STYLES = {
   modern: { font: "Arial", size: 22, space: 120, line: 276, accent: "2563EB" },
   compact: { font: "Arial", size: 20, space: 70, line: 240, accent: "222222" },
 };
-const PAGE = {
-  size: { width: 11906, height: 16838 },
-  margin: { top: 1134, right: 1134, bottom: 1134, left: 1134 },
+/** The PDF fit's tighter spacing in Word units (twips; line in 240ths). Word lays out itself, so this is best effort. */
+const TIGHT = {
+  classic: { space: 80, line: 248 },
+  modern: { space: 80, line: 248 },
+  compact: { space: 50, line: 216 },
 };
+const margin = (twips: number) => ({ top: twips, right: twips, bottom: twips, left: twips });
+const PAGE = { size: { width: 11906, height: 16838 }, margin: margin(1134) };
+const TIGHT_PAGE = { ...PAGE, margin: margin(794) };
 const join = (parts: string[]) => parts.filter(Boolean).join(" · ");
 
 function paragraph(text: string, options: IParagraphOptions = {}) {
@@ -34,7 +40,7 @@ function paragraph(text: string, options: IParagraphOptions = {}) {
   });
 }
 
-function pack(children: Paragraph[], style = STYLES.classic): Promise<Blob> {
+function pack(children: Paragraph[], style = STYLES.classic, page = PAGE): Promise<Blob> {
   return Packer.toBlob(new Document({
     styles: {
       default: {
@@ -49,7 +55,7 @@ function pack(children: Paragraph[], style = STYLES.classic): Promise<Blob> {
         },
       },
     },
-    sections: [{ properties: { page: PAGE }, children }],
+    sections: [{ properties: { page }, children }],
   }));
 }
 
@@ -57,6 +63,7 @@ export function buildCvDocx(
   cv: CvContent,
   template: TemplateId | string | undefined,
   photo?: ExportPhoto,
+  step: FitStep = fitSteps(template)[0]!,
 ): Promise<Blob> {
   // Hidden courses, awards, publications and interests are left out of the export.
   const content = withoutHidden(cv);
@@ -146,7 +153,10 @@ export function buildCvDocx(
     if (key !== "other") children.push(heading(layout.titles[key]?.trim() || CATEGORY[key].label[content.locale]));
     children.push(...sections[key]);
   }
-  return pack(children, STYLES[selectedTemplate.id]);
+  const style = {
+    ...STYLES[selectedTemplate.id], ...(step.tight ? TIGHT[selectedTemplate.id] : {}), size: Math.round(step.fontSize * 2),
+  };
+  return pack(children, style, step.tight ? TIGHT_PAGE : PAGE);
 }
 
 export function buildLetterDocx(

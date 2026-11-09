@@ -27,6 +27,7 @@ export function ExportMenu({ load, job, template, startOpen = false, onReview }:
   const [open, setOpen] = useState(false);
   const [row, setRow] = useState<TailoredCv | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "busy" | "loadError" | "error">("idle");
+  const [tooLong, setTooLong] = useState<number | null>(null);
 
   async function toggle() {
     if (open) { setOpen(false); return; }
@@ -44,8 +45,10 @@ export function ExportMenu({ load, job, template, startOpen = false, onReview }:
   async function run(kind: ExportKind, format: ExportFormat) {
     if (!row || state === "busy") return;
     setState("busy");
+    setTooLong(null);
     try {
-      await exportFile(kind, format, { cv: row, job, template });
+      const result = await exportFile(kind, format, { cv: row, job, template });
+      if (result && !result.fits) setTooLong(result.pages);
       setState("idle");
     } catch {
       setState("error");
@@ -84,6 +87,7 @@ export function ExportMenu({ load, job, template, startOpen = false, onReview }:
                 ))}
               </div>
               {state === "busy" && <p role="status">{t("export.working")}</p>}
+              {tooLong !== null && <p role="status" className="export-warning">{t("export.tooLong", { pages: tooLong })}</p>}
               {state === "error" && <p role="alert" className="form-error">{t("export.error")}</p>}
             </>
           )}
