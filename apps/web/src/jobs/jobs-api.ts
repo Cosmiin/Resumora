@@ -31,6 +31,13 @@ export function getJobScore(id: string) {
   });
 }
 
+/** Computes Score 1 when the job has none yet (never rescores). */
+export function scoreJob(id: string) {
+  return apiFetch(`/v1/jobs/${encodeURIComponent(id)}/score`, {
+    method: "POST", schema: z.object({ base: MatchScoreSchema.nullable(), tailored: MatchScoreSchema.nullable() }),
+  });
+}
+
 export function patchJob(
   id: string, version: number, extracted: JobExtraction,
   changes: Pick<JobPatch, "userThoughts" | "applicationStatus"> = {},

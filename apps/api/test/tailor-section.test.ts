@@ -27,6 +27,7 @@ let docs: MemoryTailorDocs;
 let cv: CvRepo;
 let app: ReturnType<typeof createApp>;
 let jobId: string;
+let log: ReturnType<typeof vi.fn<(entry: Record<string, unknown>) => void>>;
 
 beforeEach(async () => {
   replies = [];
@@ -35,6 +36,7 @@ beforeEach(async () => {
   docs = memoryTailorDocs();
   cv = memoryCvRepo();
   await cv.save(base, 0);
+  log = vi.fn<(entry: Record<string, unknown>) => void>();
   const deps: AppDeps = {
     appOrigin: "http://127.0.0.1:5173",
     verifyToken: async (token) => (token === "token-a" ? { id: "user-a", token } : null),
@@ -46,7 +48,7 @@ beforeEach(async () => {
     model: () => model.deps,
     queue: { send: async () => {} },
     jobQueue: { send: async () => {} },
-    log: vi.fn(),
+    log,
   };
   app = createApp(deps);
   jobId = crypto.randomUUID();
@@ -175,5 +177,32 @@ describe("section pass", () => {
       proposals(reword("Cut payroll errors by 30% for 40 staff", { itemId: id })), { results: [] }];
     const body = await (await runSection()).res.json() as { proposals: Proposal[] };
     expect(body.proposals[0]?.flags.map((f) => f.rule)).toEqual(["number"]);
+  });
+
+  it("keeps a summary rewrite the model returned under field \"text\" (the item has one editable field)", async () => {
+    replies = [proposals({ itemId: "summary", field: "text", text: "Payroll specialist for 40 staff", inferred: false }), { results: [] }];
+    const body = await (await runSection("summary")).res.json() as { proposals: Proposal[] };
+    expect(body.proposals).toEqual([{ itemId: "summary", field: "summary", text: "Payroll specialist for 40 staff", inferred: false, flags: [] }]);
+    expect(model.logged.map((call) => call.task)).toEqual(["tailor_section", "tailor_verify"]);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("maps a bullet's other field name to its text, drops a role-level bullets blob, and logs the drop without CV text", async () => {
+    replies = [proposals(
+      reword("Ran accurate payroll for 40 staff", { field: "bullet" }),
+      { itemId: role.id, field: "bullets", text: "Ran payroll for 40 staff; filed taxes", inferred: false },
+    ), { results: [] }];
+    const body = await (await runSection()).res.json() as { proposals: Proposal[] };
+    expect(body.proposals).toEqual([{ itemId: bullet.id, field: "text", text: "Ran accurate payroll for 40 staff", inferred: false, flags: [] }]);
+    expect(log).toHaveBeenCalledWith({ msg: "tailor proposals dropped", section: "experience", count: 1, dropped: [{ itemId: role.id, field: "bullets" }] });
+    expect(JSON.stringify(log.mock.calls)).not.toContain("filed taxes");
+  });
+
+  it("tells the model the exact item ids and fields it may edit", async () => {
+    replies = [proposals()];
+    await runSection();
+    const system = JSON.stringify(model.requests[0]);
+    expect(system).toContain("itemId = the bullet's id, field \\\"text\\\"");
+    expect(system).toContain("field \\\"description\\\"");
   });
 });

@@ -5,6 +5,9 @@ import { memoryJobs } from "../src/jobs/memory-repo.ts";
 import { JOBS_PER_DAY, type JobMessage } from "../src/jobs/repo.ts";
 
 import { memoryTailorRepo, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
+import { fakeModel } from "../src/tailor/fake-model.ts";
+import { memoryCvRepo } from "../src/cv/memory-repo.ts";
+import { emptyCv } from "@resumora/shared";
 
 const score: MatchScore = {
   policy: "match/1", total: 50, band: "fair", capped: false, labels: [],
@@ -93,6 +96,37 @@ describe("job endpoints", () => {
     await error(await request(id, "token-b"), 404, "not_found");
     await error(await request(crypto.randomUUID()), 404, "not_found");
     await error(await request("invalid"), 404, "not_found");
+  });
+
+  it("computes a missing Score 1 on request, once, and refuses jobs that aren't ready", async () => {
+    const model = fakeModel(() => ({ labels: [], cvSeniority: "mid" }));
+    const cv = memoryCvRepo();
+    await cv.save(emptyCv("en"), 0);
+    app = createApp({ ...deps, cvRepo: () => cv, model: () => model.deps });
+    const score1 = (jobId: string, token = "token-a") => app.request(`/v1/jobs/${jobId}/score`, { method: "POST", headers: { authorization: `Bearer ${token}` } });
+    const id = await create();
+    await error(await score1(id), 409, "job_not_ready");
+    await store.admin.finish(id, extracted);
+    await error(await score1(id, "token-b"), 404, "not_found");
+    const res = await score1(id);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { base: MatchScore; tailored: null };
+    expect(body).toMatchObject({ base: { policy: "match/1" }, tailored: null });
+    expect(await memoryTailorRepo("user-a", scores).getScore(id, "base")).toEqual(body.base);
+    expect(model.logged.map((call) => call.task)).toEqual(["tailor_score"]);
+    expect((await score1(id)).status).toBe(200);
+    expect(model.logged).toHaveLength(1);
+  });
+
+  it("answers 502 when computing Score 1 fails, and saves nothing", async () => {
+    const model = fakeModel(() => ({}), 500);
+    const cv = memoryCvRepo();
+    await cv.save(emptyCv("en"), 0);
+    app = createApp({ ...deps, cvRepo: () => cv, model: () => model.deps });
+    const id = await create();
+    await store.admin.finish(id, extracted);
+    await error(await app.request(`/v1/jobs/${id}/score`, { method: "POST", headers: { authorization: "Bearer token-a" } }), 502, "ai_failed");
+    expect(await memoryTailorRepo("user-a", scores).getScore(id, "base")).toBeNull();
   });
 
   it("round-trips thoughts and application status, preserves omitted fields, and clears thoughts", async () => {

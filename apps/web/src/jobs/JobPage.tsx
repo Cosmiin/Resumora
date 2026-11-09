@@ -6,7 +6,7 @@ import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ApiClientError } from "../lib/api.ts";
 import { t } from "../i18n/t.ts";
-import { deleteJob, getJob, getJobScore, patchJob } from "./jobs-api.ts";
+import { deleteJob, getJob, getJobScore, patchJob, scoreJob } from "./jobs-api.ts";
 import { JobAd } from "./JobAd.tsx";
 import { JobSummary } from "./JobSummary.tsx";
 import { JobEditForm } from "./JobEditForm.tsx";
@@ -47,6 +47,18 @@ function JobView({ id, userId }: { id: string; userId: string }) {
     queryKey: ["job-score", userId, id], queryFn: () => getJobScore(id), gcTime: 0,
     enabled: query.data?.status === "ready",
   });
+  const [scoring, setScoring] = useState<"idle" | "busy" | "failed">("idle");
+  /** Try again: a ready job with no Score 1 (saved before scoring, or scoring failed once) gets one computed now. */
+  async function retryScore() {
+    if (!score.isSuccess || score.data.base) { void score.refetch(); return; }
+    setScoring("busy");
+    try {
+      queryClient.setQueryData(["job-score", userId, id], await scoreJob(id));
+      setScoring("idle");
+    } catch {
+      setScoring("failed");
+    }
+  }
   useEffect(() => {
     const timer = setTimeout(() => setPollStopped(true), Math.max(0, pollUntil - Date.now()));
     return () => clearTimeout(timer);
@@ -178,9 +190,9 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         <div className="job-detail-columns">
           <aside className="job-match-column">
             {score.data?.base ? <JobScoreCard score={score.data.base} requirements={extracted.requirements} />
-              : <div className="job-score"><p className="jobs-note">{t(score.isPending ? "app.loading"
-                : score.isError ? "job.score.loadError" : "job.score.pending")}</p>
-                <button type="button" className="secondary" onClick={() => void score.refetch()}>{t("jobs.retry")}</button></div>}
+              : <div className="job-score"><p className="jobs-note">{t(score.isPending || scoring === "busy" ? "app.loading"
+                : score.isError ? "job.score.loadError" : scoring === "failed" ? "job.score.computeError" : "job.score.pending")}</p>
+                <button type="button" className="secondary" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button></div>}
           </aside>
           <div className="job-detail-main">
             <label className="job-application-status">{t("job.status.title")}

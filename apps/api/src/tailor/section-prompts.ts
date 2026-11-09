@@ -3,10 +3,11 @@ import type { JobExtraction, Proposal, TailorLanguage, TailorSection, Tone } fro
 const SECTION_RULES: Record<Exclude<TailorSection, "layout">, string> = {
   experience: `Reorder each role's bullets so the most relevant come first (return proposals in that order).
 Reword bullets with the job's exact keywords inside natural sentences. Condense old or less relevant roles to 1-2 short bullets' worth of wording.
-Never remove a role, a bullet's facts, or change company, title or dates.`,
+Never remove a role, a bullet's facts, or change company, title or dates.
+Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; a role's own wording is itemId = the role's id, field "description". Never return a role's bullets as one field.`,
   skills: `Reword skill names toward the job's exact keywords, most relevant first (return proposals in that order).
 You may add job-relevant skills the CV, notes or answers support, as itemId "new-skill", field "name", with inferred true.`,
-  summary: "Rewrite the summary for this job so it describes the CV's experience and skills. Field \"summary\", itemId \"summary\".",
+  summary: "Rewrite the summary for this job so it describes the CV's experience and skills. Return one proposal with itemId \"summary\" and field \"summary\".",
   achievements: "Reorder and reword only, most relevant first. Never add an achievement or outcome.",
   languages: "Reorder and reword only, most relevant first. Never change a language's level upward.",
 };

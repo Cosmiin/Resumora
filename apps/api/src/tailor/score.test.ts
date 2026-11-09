@@ -94,6 +94,20 @@ describe("scoreMatch", () => {
     expect((await scoreMatch({ model: model.deps }, work)).total).toBe(100);
   });
 
+  it("accepts evidence quoted from several CV values joined with \" | \", only when every part is in the CV", async () => {
+    const work = input();
+    work.job = { ...job, requirements: [{ text: "Fluent English and Romanian", kind: "must", category: "language" }] };
+    work.cv.languages = [{ id: "l1", name: "Romanian", level: "Native" }, { id: "l2", name: "English", level: "C1" }];
+    const reply = (evidence: string) => () => ({ labels: [label("r0", { evidence }), label("k:SQL")], cvSeniority: "unknown" });
+    const both = await scoreMatch({ model: fakeModel(reply("Romanian | English")).deps }, work);
+    expect(both.labels[0]).toMatchObject({ status: "met", evidence: "Romanian | English" });
+    const invented = await scoreMatch({ model: fakeModel(reply("Romanian | German")).deps }, work);
+    expect(invented.labels[0]).toMatchObject({ status: "missing", evidence: null });
+    const model = fakeModel(reply("Romanian"));
+    await scoreMatch({ model: model.deps }, work);
+    expect(JSON.stringify(model.requests[0])).toContain(' | ');
+  });
+
   it("awards no points for missing labels even if the model marks them inferred", async () => {
     const model = fakeModel(() => ({ ...answer(), labels: answer().labels.map((label) => ({ ...label, status: "missing", evidence: null, inferred: true })) }));
     expect(await scoreMatch({ model: model.deps }, input())).toMatchObject({ total: 0, capped: true });

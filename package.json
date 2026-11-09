@@ -11,6 +11,7 @@
     "eval:import": "npm run eval:import -w apps/api",
     "eval:enrich": "npm run eval:enrich -w apps/api",
     "eval:jobs": "npm run eval:jobs -w apps/api",
+    "eval:tailor": "npm run eval:tailor -w apps/api",
     "lint": "eslint .",
     "build": "npm run build --workspaces --if-present",
     "db:start": "supabase start",

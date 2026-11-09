@@ -52,12 +52,15 @@ export async function scoreMatch(
     }
 
     const text = cvText(cv);
-    const checked = labels.map((label) => label.status === "missing" || !label.evidence?.trim() || !text.some((value) => value.includes(label.evidence ?? ""))
+    // One requirement can need several CV values ("English and Romanian"): each " | " part must be quoted from the CV.
+    const parts = (evidence: string) => evidence.split(" | ").map((part) => part.trim());
+    const quoted = (evidence: string) => parts(evidence).every((part) => part && text.some((value) => value.includes(part)));
+    const checked = labels.map((label) => label.status === "missing" || !label.evidence?.trim() || !quoted(label.evidence)
       ? { ...label, status: "missing" as const, evidence: null, inferred: false }
       : label);
     const kept = new Set(input.keptInferred);
     for (const label of checked) {
-      if (label.inferred && label.evidence && input.keptInferredTexts?.some((t) => t.includes(label.evidence!))) kept.add(label.ref);
+      if (label.inferred && label.evidence && parts(label.evidence).some((part) => input.keptInferredTexts?.some((t) => t.includes(part)))) kept.add(label.ref);
     }
     return computeMatchScore({ job: input.job, labels: checked, cvSeniority, keptInferred: kept });
   } catch {

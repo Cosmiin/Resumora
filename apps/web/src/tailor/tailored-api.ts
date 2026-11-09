@@ -4,6 +4,7 @@ import {
   type CoverLetter, type CvContent, type SaveResponse, type TailoredCv, type TailorLanguage, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { apiFetch } from "../lib/api.ts";
+import type { TemplateId } from "../cv/page/templates.ts";
 
 const tailored = (id: string) => `/v1/tailored/${encodeURIComponent(id)}`;
 const SummarySchema = z.object({ id: z.string(), language: TailorLanguageSchema, translatedFrom: z.string().nullable(), updatedAt: z.string() });
@@ -50,4 +51,9 @@ export function writeLetter(id: string, input: { whyCompany: string; hiringManag
 /** Saves the person's edits to the letter (not versioned: the last save wins). */
 export function saveLetter(id: string, edit: { body: string; hiringManager: string; whyCompany: string }): Promise<{ coverLetter: CoverLetter }> {
   return apiFetch(`${tailored(id)}/cover-letter`, { method: "PUT", json: edit, schema: z.object({ coverLetter: LetterSchema }) });
+}
+
+/** Saves the picked template (not versioned: an open editor keeps its version). */
+export function setTemplate(id: string, template: TemplateId): Promise<{ template: TemplateId }> {
+  return apiFetch(tailored(id), { method: "PATCH", json: { template }, schema: z.object({ template: TailoredCvSchema.shape.template }) });
 }

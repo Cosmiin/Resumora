@@ -4,7 +4,7 @@ import {
   type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
-import { ApiError } from "../errors.ts";
+import { ApiError, type LogFn } from "../errors.ts";
 import { checkProposal } from "./checks.ts";
 import type { TailorRepo } from "./repo.ts";
 import { sectionSystemPrompt, sectionUserMessage, verifySystemPrompt } from "./section-prompts.ts";
@@ -63,7 +63,7 @@ export function texts(value: unknown): string[] {
 
 /** Proposes one section, checks each proposal, retries flagged ones once, and stores the result on the run. */
 export async function runSectionPass(
-  deps: { model: ModelDeps; tailor: TailorRepo },
+  deps: { model: ModelDeps; tailor: TailorRepo; log?: LogFn },
   input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection },
 ): Promise<{ proposals: Proposal[]; questions: TailorQuestion[] }> {
   const { section, run } = input;
@@ -90,9 +90,18 @@ export async function runSectionPass(
       section, items: sectionData(cv, section, run.jobId), job: input.job, language: steering!.language,
       tone: steering!.tone ?? "neutral", instruction: steering!.instruction, answers, retry,
     }));
-    // Unknown item ids or fields are dropped; items without a proposal keep the Base CV wording.
-    return reply.proposals.filter((p) => items.get(p.itemId)?.fields[p.field] !== undefined && p.text.trim())
-      .map((p) => ({ ...p, text: p.text.trim(), flags: [] }));
+    // An item with one editable field (a bullet's text, the summary) takes any field name; other unknown item ids
+    // or fields are dropped and logged (ids and fields only); items without a proposal keep the Base CV wording.
+    const kept: Proposal[] = [];
+    const dropped: { itemId: string; field: string }[] = [];
+    for (const p of reply.proposals) {
+      const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
+      const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
+      if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [] });
+      else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
+    }
+    if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });
+    return kept;
   }
   async function check(proposals: Proposal[]): Promise<Proposal[]> {
     if (proposals.length === 0) return [];

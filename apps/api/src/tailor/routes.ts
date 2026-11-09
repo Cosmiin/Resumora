@@ -4,7 +4,7 @@ import { AnswerSchema, TailorSectionSchema, ToneSchema } from "@resumora/shared"
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { AppEnv } from "../app.ts";
 import type { CvRepo } from "../cv/repo.ts";
-import { ApiError } from "../errors.ts";
+import { ApiError, type LogFn } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import { AcceptBodySchema, acceptSection } from "./accept.ts";
 import { runLayoutPass } from "./layout-pass.ts";
@@ -24,6 +24,7 @@ export function tailorRoutes(deps: {
   tailorFor(c: Context<AppEnv>): TailorRepo;
   modelFor(c: Context<AppEnv>): ModelDeps;
   now(): Date;
+  log?: LogFn;
 }) {
   const app = new Hono<AppEnv>();
 
@@ -67,7 +68,7 @@ export function tailorRoutes(deps: {
     if (section === "layout") {
       return c.json(await runLayoutPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, { userId: c.get("user").id, run, job: job.extracted }));
     }
-    return c.json(await runSectionPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
+    return c.json(await runSectionPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c), log: deps.log }, {
       userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section,
     }));
   });

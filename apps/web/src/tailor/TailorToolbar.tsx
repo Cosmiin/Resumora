@@ -5,6 +5,7 @@ import { TailorLanguageSchema, type MatchScore, type TailorLanguage } from "@res
 import { listTailored, translate } from "./tailored-api.ts";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
+import { getTemplate, TEMPLATES, type TemplateId } from "../cv/page/templates.ts";
 
 export type TailoredTab = "cv" | "letter";
 
@@ -14,7 +15,9 @@ type Props = {
   /** Score 1 (Base CV) and this tailored CV's Score 2. */
   base: MatchScore | null;
   latest: MatchScore | null;
-  /** Actions later tasks fill in (Re-tailor, Language); the rest stay placeholders until their tasks. */
+  template: TemplateId;
+  onTemplate(template: TemplateId): void;
+  /** Actions after Template (Language, Re-tailor, Export). */
   children?: ReactNode;
 };
 
@@ -86,7 +89,7 @@ export function LanguageMenu({ jobId, current }: { jobId: string; current: { id:
 const total =(score: MatchScore | null) => (score?.total ?? null) === null ? "—" : String(score!.total);
 
 /** Tabs CV | Cover letter, the score lift and the tailored CV's actions. */
-export function TailorToolbar({ tab, onTab, base, latest, children }: Props) {
+export function TailorToolbar({ tab, onTab, base, latest, template, onTemplate, children }: Props) {
   const band = latest?.band ?? base?.band;
   return (
     <div className="tailored-bar">
@@ -102,9 +105,13 @@ export function TailorToolbar({ tab, onTab, base, latest, children }: Props) {
           {t("tailored.score", { base: total(base), latest: total(latest ?? base), band: t(`job.score.band.${band}` as MessageKey) })}
         </span>
       )}
-      <button type="button" className="secondary" aria-disabled="true" title={t("tailored.soon")}>{t("tailored.template")}</button>
+      <label className="tailored-template">
+        <span>{t("tailored.template")}</span>
+        <select value={template} onChange={(event) => onTemplate(getTemplate(event.target.value).id)}>
+          {TEMPLATES.map((item) => <option key={item.id} value={item.id}>{t(item.label)}</option>)}
+        </select>
+      </label>
       {children}
-      <button type="button" className="secondary" aria-disabled="true" title={t("tailored.soon")}>{t("tailored.export")}</button>
     </div>
   );
 }

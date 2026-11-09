@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { SectionKey, TailoredCv, TailorSection } from "@resumora/shared";
@@ -11,8 +11,10 @@ import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { Editor, type CvSource } from "../cv/Editor.tsx";
 import { getScores } from "./tailor-api.ts";
-import { getTailored, listTailored, retailor, saveTailored } from "./tailored-api.ts";
+import { getTailored, listTailored, retailor, saveTailored, setTemplate } from "./tailored-api.ts";
+import type { TemplateId } from "../cv/page/templates.ts";
 import { LanguageMenu, TailorToolbar, type TailoredTab } from "./TailorToolbar.tsx";
+import { ExportMenu } from "../export/ExportMenu.tsx";
 import "../styles/tailor.css";
 
 type ItemReview = { kept?: boolean; inferred?: boolean; reviewed?: boolean };
@@ -76,6 +78,26 @@ export function TailoredCvPage() {
   const navigate = useNavigate();
   const [dialog, setDialog] = useState(false);
   const [retailoring, setRetailoring] = useState<{ busy: boolean; error: boolean }>({ busy: false, error: false });
+  // Templates picked since each copy's row was loaded; saves run one at a time, so the newest pick lands last.
+  const [templates, setTemplates] = useState<Record<string, TemplateId>>({});
+  const [templateError, setTemplateError] = useState(false);
+  const templateSaves = useRef<Promise<unknown>>(Promise.resolve());
+  const templatePick = useRef(0);
+  const savedTemplates = useRef<Record<string, TemplateId>>({});
+
+  /** Switches the page at once and saves the pick; a failed newest save goes back to the last template the server took. */
+  function pickTemplate(id: string, loaded: TemplateId, next: TemplateId) {
+    const pick = ++templatePick.current;
+    setTemplateError(false);
+    setTemplates((all) => ({ ...all, [id]: next }));
+    const save = templateSaves.current.then(() => setTemplate(id, next)).then(() => { savedTemplates.current[id] = next; });
+    templateSaves.current = save.catch(() => {});
+    save.catch(() => {
+      if (pick !== templatePick.current) return;
+      setTemplates((all) => ({ ...all, [id]: savedTemplates.current[id] ?? loaded }));
+      setTemplateError(true);
+    });
+  }
 
   /** Starts a run over the picked sections and hands it to the tailoring flow, which resumes the remembered run. */
   async function startRetailor(sections: TailorSection[]) {
@@ -108,13 +130,17 @@ export function TailoredCvPage() {
 
   // updatedAt moves only on the user's own extraction edits (thoughts and status saves leave it).
   const jobChanged = !!job.data?.editedByUser && Date.parse(job.data.updatedAt) > Date.parse(cv.createdAt);
+  const template = templates[cv.id] ?? cv.template;
   const openDialog = () => { setRetailoring({ busy: false, error: false }); setDialog(true); };
   const toolbar = (
     <>
-      <TailorToolbar tab={tab} onTab={setTab} base={scores.data?.base ?? null} latest={cv.score ?? scores.data?.tailored ?? null}>
+      <TailorToolbar tab={tab} onTab={setTab} base={scores.data?.base ?? null} latest={cv.score ?? scores.data?.tailored ?? null}
+        template={template} onTemplate={(next) => pickTemplate(cv.id, cv.template, next)}>
         <LanguageMenu key={cv.id} jobId={jobId} current={{ id: cv.id, language: cv.language }} />
         <button type="button" className="secondary" onClick={openDialog}>{t("tailored.retailor")}</button>
+        <ExportMenu load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template} />
       </TailorToolbar>
+      {templateError && <p role="alert" className="form-error">{t("tailored.templateError")}</p>}
       {jobChanged && (
         <p className="tailored-notice" role="status">
           <span>{t("tailored.jobChanged")}</span>{" "}
@@ -145,7 +171,7 @@ export function TailoredCvPage() {
         original: cv.baseSnapshot,
         highlights: marks.highlights,
         inferred: marks.inferred,
-        template: cv.template,
+        template,
         toolbar,
         sectionAction,
         replacePage: tab === "letter" ? <CoverLetterTab key={cv.id} cv={cv} job={job.data}
