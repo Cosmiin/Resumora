@@ -66,7 +66,7 @@ export const en = {
   "cv.photo.choose": "Choose a photo",
   "cv.photo.uploading": "Uploading photo...",
   "cv.photo.unsupported": "Choose a JPEG, PNG or WebP photo.",
-  "cv.photo.tooLarge": "This photo is too large. The limit is 2 MB.",
+  "cv.photo.shrinkError": "Couldn't make this photo small enough. Please try another photo.",
   "cv.photo.uploadError": "Couldn't upload this photo. Please try again.",
   "cv.photo.alt": "CV photo",
   "cv.photo.position": "Photo position",
