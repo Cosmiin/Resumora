@@ -131,6 +131,7 @@ export const tailorEn = {
   "export.letterDocx": "Cover letter as Word",
   "export.unreviewed": "Not reviewed yet: {count}. The AI inferred these items; check them, or export anyway.",
   "export.working": "Preparing the file…",
+  "export.tooLong": "Your CV is still {pages} pages at the smallest text size. Shorten it to fit 2 pages.",
   "export.error": "Couldn't export. Try again",
   "export.loadError": "Couldn't load the CV to export. Try again",
 } as const;

@@ -28,7 +28,7 @@ const cv: TailoredCv = {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  files.exportFile.mockResolvedValue(undefined);
+  files.exportFile.mockResolvedValue({ pages: 2, fits: true });
 });
 
 describe("ExportMenu", () => {
@@ -48,6 +48,16 @@ describe("ExportMenu", () => {
     await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "pdf", { cv, job, template: "modern" }));
     await userEvent.click(screen.getByRole("button", { name: "CV as Word" }));
     await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "docx", { cv, job, template: "modern" }));
+  });
+
+  it("warns after a CV export that still runs past 2 pages at the smallest size, and clears it on a CV that fits", async () => {
+    files.exportFile.mockResolvedValueOnce({ pages: 3, fits: false });
+    render(<ExportMenu load={async () => cv} job={job} template="classic" />);
+    await userEvent.click(screen.getByRole("button", { name: "Export ▾" }));
+    await userEvent.click(await screen.findByRole("button", { name: "CV as PDF" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Your CV is still 3 pages at the smallest text size. Shorten it to fit 2 pages.");
+    await userEvent.click(screen.getByRole("button", { name: "CV as Word" }));
+    await waitFor(() => expect(screen.queryByText(/still 3 pages/)).toBeNull());
   });
 
   it("disables the letter until one is written and shows a failed export", async () => {
