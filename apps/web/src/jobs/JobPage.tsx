@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
 import type { Job, JobListPage, JobPatch } from "@resumora/shared";
@@ -7,10 +7,9 @@ import { AppShell } from "../layout/AppShell.tsx";
 import { ApiClientError } from "../lib/api.ts";
 import { t } from "../i18n/t.ts";
 import { deleteJob, getJob, getJobScore, patchJob, scoreJob } from "./jobs-api.ts";
-import { JobAd } from "./JobAd.tsx";
 import { JobSummary } from "./JobSummary.tsx";
 import { JobEditForm } from "./JobEditForm.tsx";
-import { JobScoreCard } from "./JobScoreCard.tsx";
+import { RequirementList } from "./RequirementList.tsx";
 import { JobThoughts } from "./JobThoughts.tsx";
 import { TailorGate } from "./TailorGate.tsx";
 import { getRun } from "../tailor/tailor-api.ts";
@@ -27,9 +26,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const navigate = useNavigate();
   const [pollUntil] = useState(() => Date.now() + 120_000);
   const [pollStopped, setPollStopped] = useState(false);
-  const [tab, setTab] = useState<"ad" | "summary">("ad");
   const [editing, setEditing] = useState(false);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tailorGate, setTailorGate] = useState(false);
   const [tailorReason, setTailorReason] = useState<string | null>(null);
@@ -102,7 +99,6 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   async function saved(updated: Job) {
     await cacheJob(updated);
     setEditing(false);
-    setTab("summary");
   }
   function saveDetails(changes: Pick<JobPatch, "userThoughts" | "applicationStatus">): Promise<Job> {
     setPendingSaves((count) => count + 1);
@@ -124,14 +120,6 @@ function JobView({ id, userId }: { id: string; userId: string }) {
       ? "jobs.error.version_conflict" : "jobs.error.generic")); }
     finally { setStatusSaving(false); }
   }
-  function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    event.preventDefault();
-    const next = (index + (event.key === "ArrowRight" ? 1 : -1) + 2) % 2;
-    setTab(next === 0 ? "ad" : "summary");
-    tabRefs.current[next]?.focus();
-  }
-
   const job = query.data;
   const extracted = job?.extracted;
   const busy = job?.status === "queued" || job?.status === "processing";
@@ -216,35 +204,21 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           {salaryText !== null && <span className="fact">{salaryText}</span>}
           {applyByText && <span className="fact">{t("job.applyBy", { date: applyByText })}</span>}
         </div>
-        <div className="job-detail-columns">
-          <aside className="job-match-column">
-            {score.data?.base ? <JobScoreCard score={score.data.base} requirements={extracted.requirements} />
-              : <div className="job-score"><p className="jobs-note">{t(score.isPending || scoring === "busy" ? "app.loading"
-                : score.isError ? "job.score.loadError" : scoring === "failed" ? "job.score.computeError" : "job.score.pending")}</p>
-                <button type="button" className="secondary" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button></div>}
-          </aside>
-          <div className="job-detail-main">
-            <label className="job-application-status">{t("job.status.title")}
-              <select value={job.applicationStatus} disabled={statusSaving}
-                onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>
-                {(["saved", "tailored", "applied", "interview", "offer", "rejected"] as const).map((status) =>
-                  <option value={status} key={status}>{t(`job.status.${status}`)}</option>)}
-              </select>
-            </label>
-            {statusError && <p role="alert" className="jobs-field-error">{statusError}</p>}
-            <JobThoughts value={job.userThoughts} onBusyChange={setThoughtsBusy} onSave={(userThoughts) => saveDetails({ userThoughts })} />
-            <div className="tabs" role="tablist" aria-label={t("job.tabs")}>
-              {(["ad", "summary"] as const).map((value, index) => <button type="button" role="tab" key={value}
-                id={`job-tab-${value}`} aria-controls="job-panel" aria-selected={tab === value} tabIndex={tab === value ? 0 : -1}
-                ref={(element) => { tabRefs.current[index] = element; }} onClick={() => setTab(value)} onKeyDown={(event) => moveTab(event, index)}>
-                {t(value === "ad" ? "job.tab.ad" : "job.tab.summary")}
-              </button>)}
-            </div>
-            <div className="job-panel" role="tabpanel" id="job-panel" aria-labelledby={`job-tab-${tab}`} tabIndex={0}>
-              {tab === "ad" ? <JobAd rawText={job.rawText} requirements={extracted.requirements} /> : <JobSummary extracted={extracted} />}
-            </div>
-          </div>
-        </div>
+        {extracted.summary.trim() && <section className="sec"><h2>{t("job.inShort")}</h2><p>{extracted.summary}</p></section>}
+        <RequirementList requirements={extracted.requirements} score={score.data?.base ?? null}
+          state={<div className="job-score"><p className="jobs-note">{t(score.isPending || scoring === "busy" ? "app.loading"
+            : score.isError ? "job.score.loadError" : scoring === "failed" ? "job.score.computeError" : "job.score.pending")}</p>
+            <button type="button" className="secondary" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button></div>} />
+        <JobSummary extracted={extracted} rawText={job.rawText} salaryStated={salaryText !== null} />
+        <label className="job-application-status">{t("job.status.title")}
+          <select value={job.applicationStatus} disabled={statusSaving}
+            onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>
+            {(["saved", "tailored", "applied", "interview", "offer", "rejected"] as const).map((status) =>
+              <option value={status} key={status}>{t(`job.status.${status}`)}</option>)}
+          </select>
+        </label>
+        {statusError && <p role="alert" className="jobs-field-error">{statusError}</p>}
+        <JobThoughts value={job.userThoughts} onBusyChange={setThoughtsBusy} onSave={(userThoughts) => saveDetails({ userThoughts })} />
         {!tailorOnTop && tailor}
         <footer className="foot">{original}<span>{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</span></footer>
       </> : job?.status === "needs_text" ? <div className="waiting">

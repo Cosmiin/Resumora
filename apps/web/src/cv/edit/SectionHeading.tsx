@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import { CATEGORY, type CvContent, type SectionKey } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "./cvReducer.ts";
@@ -10,16 +10,18 @@ type Props = {
   title: string;
   locale: CvContent["locale"];
   dispatch(a: CvAction): void;
+  /** Tailored CV: controls shown on the heading's row (the section menu, ↻). */
+  after?: ReactNode;
 };
 
 /** A section heading typed on the page. Cleared, it falls back to the standard name. */
-export function SectionHeading({ sectionKey, title, locale, dispatch }: Props) {
+export function SectionHeading({ sectionKey, title, locale, dispatch, after }: Props) {
   const standard = CATEGORY[sectionKey].label[locale];
   const onChange = useCallback(
     (value: string) => dispatch({ type: "setSectionTitle", key: sectionKey, value }),
     [dispatch, sectionKey],
   );
-  return (
+  const heading = (
     <h2 className="cv-section-heading">
       <PageField
         className="cv-label"
@@ -31,4 +33,5 @@ export function SectionHeading({ sectionKey, title, locale, dispatch }: Props) {
       />
     </h2>
   );
+  return after ? <div className="cv-section-head">{heading}{after}</div> : heading;
 }

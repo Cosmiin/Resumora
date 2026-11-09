@@ -198,3 +198,34 @@ describe("buildLetterDocx", () => {
     expect(xml).not.toContain("undefined");
   });
 });
+
+describe("buildCvDocx fit step", () => {
+  async function parts(blob: Blob) {
+    const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(blob);
+    });
+    const zip = await JSZip.loadAsync(bytes);
+    const styles = await zip.file("word/styles.xml")!.async("string");
+    return { document: await zip.file("word/document.xml")!.async("string"), styles: styles.match(/<w:docDefaults>[\s\S]*?<\/w:docDefaults>/)![0] };
+  }
+
+  it("keeps today's sizes and margins without a step or with the template's own first step", async () => {
+    for (const blob of [await buildCvDocx(fixture(), "classic"), await buildCvDocx(fixture(), "classic", undefined, { tight: false, fontSize: 11 })]) {
+      const { document, styles } = await parts(blob);
+      expect(document).toMatch(/<w:pgMar[^>]*w:top="1134"/);
+      expect(styles).toMatch(/<w:docDefaults>[\s\S]*<w:sz w:val="22"\/>/);
+      expect(styles).toMatch(/<w:docDefaults>[\s\S]*w:line="276"/);
+    }
+  });
+
+  it("uses the PDF's tighter margins, line spacing and smaller font for a tight step", async () => {
+    const { document, styles } = await parts(await buildCvDocx(fixture(), "classic", undefined, { tight: true, fontSize: 10 }));
+    expect(document).toMatch(/<w:pgMar[^>]*w:top="794"/);
+    expect(styles).toMatch(/<w:docDefaults>[\s\S]*<w:sz w:val="20"\/>/);
+    expect(styles).toMatch(/<w:docDefaults>[\s\S]*w:line="248"/);
+    expect(styles).toMatch(/<w:docDefaults>[\s\S]*w:after="80"/);
+  });
+});

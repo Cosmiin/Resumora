@@ -113,6 +113,23 @@ describe("POST /v1/jobs/:id/tailor", () => {
     expect(docs.cvs.size).toBe(0);
   });
 
+  it("stores the full steering, and keeps tone and instruction in their columns", async () => {
+    const jobId = await readyJob();
+    const steering = { tone: "technical", draws: ["work", "company"], fit: "stretch", focusRoleIds: ["r1"], instruction: "Stress SQL" };
+    const body = await (await start(jobId, steering)).json() as { tailoredCvId: string };
+    expect(docs.steering.get(body.tailoredCvId)).toEqual(steering);
+    expect(docs.cvs.get(body.tailoredCvId)).toMatchObject({ tone: "technical", instruction: "Stress SQL" });
+  });
+
+  it("still takes the old tone and instruction body, and an empty one", async () => {
+    const old = await (await start(await readyJob(), { tone: "formal", instruction: "Short" })).json() as { tailoredCvId: string };
+    expect(docs.steering.get(old.tailoredCvId)).toEqual({ tone: "formal", instruction: "Short" });
+    const empty = await start(await readyJob(), {});
+    expect(empty.status).toBe(200);
+    const id = ((await empty.json()) as { tailoredCvId: string }).tailoredCvId;
+    expect(docs.cvs.get(id)).toMatchObject({ tone: "neutral", instruction: null });
+  });
+
   it("rejects a bad tone or an instruction over 500 characters", async () => {
     const jobId = await readyJob();
     await expectError(await start(jobId, { tone: "angry" }), 400, "invalid_content");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyCv, missingCategories, newId } from "./index.ts";
+import { emptyCv, isSectionShown, missingCategories, newId, shownEmptyFlags, type SectionKey } from "./index.ts";
 
 describe("missingCategories", () => {
   it("an empty CV flags name, email and the five missing sections, then languages as a tip", () => {
@@ -50,5 +50,60 @@ describe("missingCategories", () => {
     expect(missingCategories(cv).map((f) => f.key)).toContain("achievements");
     cv.achievements = [{ id: newId(), text: "Won it" }];
     expect(missingCategories(cv).map((f) => f.key)).not.toContain("achievements");
+  });
+});
+
+describe("tailored CV: shown sections and Needs attention", () => {
+  const none = new Set<SectionKey>();
+  function filled() {
+    const cv = emptyCv();
+    cv.basics.fullName = "Ana Pop";
+    cv.basics.email = "ana@example.com";
+    cv.basics.summary = "Analyst.";
+    return cv;
+  }
+
+  it("hides an empty section until it is opened, and always hides a hidden one", () => {
+    const cv = filled();
+    cv.achievements = [{ id: "a1", text: "" }, { id: "a2", text: " " }];
+    expect(isSectionShown(cv, "summary", none)).toBe(true);
+    expect(isSectionShown(cv, "achievements", none)).toBe(false);
+    expect(isSectionShown(cv, "achievements", new Set<SectionKey>(["achievements"]))).toBe(true);
+    cv.layout.hidden = ["summary", "achievements"];
+    expect(isSectionShown(cv, "summary", none)).toBe(false);
+    expect(isSectionShown(cv, "achievements", new Set<SectionKey>(["achievements"]))).toBe(false);
+  });
+
+  it("flags no auto-hidden empty section, so Needs attention can be clear", () => {
+    const cv = filled();
+    cv.achievements = [{ id: "a1", text: "" }];
+    expect(shownEmptyFlags(cv, none)).toEqual([]);
+  });
+
+  it("flags every shown empty section, including ones without a category flag", () => {
+    const cv = filled();
+    cv.achievements = [{ id: "a1", text: "" }];
+    const opened = new Set<SectionKey>(["achievements", "certifications"]);
+    expect(shownEmptyFlags(cv, opened)).toEqual([
+      { key: "achievements", level: "missing" },
+      { key: "certifications", level: "missing" },
+    ]);
+  });
+
+  it("flags a shown section emptied while editing, keeps a category's own level, and skips hidden ones", () => {
+    const cv = filled();
+    cv.basics.summary = "";
+    const opened = new Set<SectionKey>(["summary", "languages", "education"]);
+    cv.layout.hidden = ["education"];
+    expect(shownEmptyFlags(cv, opened)).toEqual([
+      { key: "summary", level: "missing" },
+      { key: "languages", level: "tip" },
+    ]);
+  });
+
+  it("still flags a missing name or email first", () => {
+    const cv = filled();
+    cv.basics.email = "";
+    expect(shownEmptyFlags(cv, none)).toEqual([{ key: "header", level: "missing", field: "email" }]);
   });
 });

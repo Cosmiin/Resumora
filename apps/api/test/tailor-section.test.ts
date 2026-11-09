@@ -63,33 +63,35 @@ const post = (path: string, body: unknown = {}) => app.request(path, {
 async function runSection(section = "experience", current: TailorSection = section as TailorSection) {
   const start = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal", instruction: "Keep it short" })).json() as { run: { id: string } };
   await memoryTailorRepo("user-a", new Map(), docs).updateRun(start.run.id, { currentSection: current });
-  const res = await post(`/v1/tailor-runs/${start.run.id}/sections/${section}/run`);
+  const res = await post(`/v1/tailor-runs/${start.run.id}/sections/${section}/run`, await roleOf(start.run.id));
   return { res, runId: start.run.id };
 }
-const proposals = (...items: ModelProposal[]) => ({ proposals: items });
+/** The run's current role, which the web sends with every Experience step. */
+const roleOf = async (runId: string) => ({ roleId: (await memoryTailorRepo("user-a", new Map(), docs).getRun(runId))!.currentRoleId });
+// The real (strict) model always returns every field: reason is null when unused.
+const proposals = (...items: ModelProposal[]) => ({ proposals: items.map((item) => ({ reason: null, guesses: null, ...item })) });
 const reword = (text: string, over: Partial<ModelProposal> = {}): ModelProposal =>
   ({ itemId: bullet.id, field: "text", text, inferred: false, ...over });
 
 describe("section pass", () => {
-  it("uses the strong tier, retries a flagged proposal once, then returns the flag as a question", async () => {
+  it("uses the strong tier, retries a flagged proposal once, then drops it: no flag question, counted in removed", async () => {
     replies = [proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] },
       proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] }];
     const { res, runId } = await runSection();
     expect(res.status).toBe(200);
-    const body = await res.json() as { proposals: Proposal[]; questions: TailorQuestion[] };
+    const body = await res.json() as { proposals: Proposal[]; questions: TailorQuestion[]; removed: number };
     expect(model.logged.map((call) => call.task)).toEqual(["tailor_section", "tailor_verify", "tailor_section", "tailor_verify"]);
     expect(JSON.stringify(model.requests[0])).toContain("Keep it short");
     expect(JSON.stringify(model.requests[0])).not.toContain("Ana Pop");
     expect(JSON.stringify(model.requests[0])).not.toContain("ana@example.test");
     expect(JSON.stringify(model.requests[2])).toContain("30");
-    expect(body.proposals).toEqual([expect.objectContaining({ itemId: bullet.id, flags: [expect.objectContaining({ rule: "number" })] })]);
-    expect(body.questions).toEqual([expect.objectContaining({ kind: "flag", section: "experience", roleId: role.id })]);
+    expect(body).toEqual({ proposals: [], questions: [], removed: 1 });
     const run = await memoryTailorRepo("user-a", new Map(), docs).getRun(runId);
-    expect(run).toMatchObject({ status: "waiting_user", currentSection: "experience", proposals: body.proposals });
-    expect(run?.questions).toEqual(body.questions);
-    replies = [{ questions: Array.from({ length: 8 }, (_, i) => ({ roleId: null, text: `Q${i}?`, kind: "options", options: ["Yes"], reason: "Gap", gap: "r0" })) }];
+    expect(run).toMatchObject({ status: "waiting_user", currentSection: "experience", proposals: [] });
+    expect(run?.questions ?? []).toEqual([]);
+    replies = [{ questions: Array.from({ length: 8 }, (_, i) => ({ roleId: null, bulletId: null, skill: null, text: `Q${i}?`, kind: "options", options: ["Yes"], reason: "Gap", gap: "r0" })) }];
     const asked = await (await post(`/v1/tailor-runs/${runId}/sections/skills/questions`)).json() as { questions: unknown[] };
-    expect(asked.questions).toHaveLength(8);
+    expect(asked.questions).toHaveLength(5);
   });
 
   it("keeps a proposal that passes on retry and drops unknown item ids (Review focus 5)", async () => {
@@ -110,22 +112,6 @@ describe("section pass", () => {
     expect(body.proposals.map((p) => p.itemId)).toEqual([first!.id, second!.id]);
   });
 
-  it("replaces a section's old flag questions on a rerun and never uses flag answers as sources", async () => {
-    const flagged = proposals(reword("Cut payroll errors by 30% for 40 staff"));
-    replies = [flagged, { results: [] }, flagged, { results: [] }];
-    const { runId } = await runSection();
-    const repo = memoryTailorRepo("user-a", new Map(), docs);
-    const [flag] = (await repo.getRun(runId))!.questions!;
-    await post(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: flag!.id, value: "Keep it", via: "option" }] });
-    replies = [flagged, { results: [] }, flagged, { results: [] }];
-    const again = await (await post(`/v1/tailor-runs/${runId}/sections/experience/run`)).json() as { proposals: Proposal[] };
-    expect(again.proposals[0]?.flags.map((f) => f.rule)).toEqual(["number"]);
-    expect(JSON.stringify(model.requests[4])).toContain(String.raw`\"answers\":[]`);
-    const questions = (await repo.getRun(runId))!.questions!;
-    expect(questions.filter((q) => q.kind === "flag")).toHaveLength(1);
-    expect(questions[0]!.id).not.toBe(flag!.id);
-  });
-
   it("does not retry when nothing is flagged, and an unknown id alone gives no proposals", async () => {
     replies = [proposals(reword("Invented", { itemId: "ghost" })), { results: [] }];
     const body = await (await runSection()).res.json() as { proposals: Proposal[] };
@@ -133,20 +119,20 @@ describe("section pass", () => {
     expect(model.requests).toHaveLength(1);
   });
 
-  it("flags a new outcome claim found by the verifier", async () => {
+  it("drops a new outcome claim found by the verifier", async () => {
     replies = [proposals(reword("Ran payroll for 40 staff and won the team award")),
       { results: [{ itemId: bullet.id, claims: ["won the team award"] }] },
       proposals(reword("Ran payroll for 40 staff and won the team award")),
       { results: [{ itemId: bullet.id, claims: ["won the team award"] }] }];
-    const body = await (await runSection()).res.json() as { proposals: Proposal[] };
-    expect(body.proposals[0]?.flags).toEqual([{ rule: "achievement", detail: "won the team award" }]);
+    const body = await (await runSection()).res.json() as { proposals: Proposal[]; removed: number };
+    expect(body).toMatchObject({ proposals: [], removed: 1 });
   });
 
-  it("accepts a tagged inferred new skill and rejects the layout section here", async () => {
-    replies = [proposals({ itemId: "new-skill", field: "name", text: "Kubernetes", inferred: true, reason: null } as unknown as ModelProposal,
-      { itemId: "s1", field: "name", text: "Microsoft Excel", inferred: false, reason: null } as unknown as ModelProposal)];
+  it("keeps a backed inferred new skill and rejects the layout section here", async () => {
+    replies = [proposals({ itemId: "new-skill", field: "name", text: "Payroll", inferred: true, reason: "Shown in: Payroll Specialist · Acme Payroll" } as ModelProposal,
+      { itemId: "s1", field: "name", text: "Microsoft Excel", inferred: false, reason: null, guesses: null } as unknown as ModelProposal)];
     const body = await (await runSection("skills")).res.json() as { proposals: Proposal[] };
-    expect(body.proposals.map((p) => [p.itemId, p.text, p.flags])).toEqual([["new-skill", "Kubernetes", []], ["s1", "Microsoft Excel", []]]);
+    expect(body.proposals.map((p) => [p.itemId, p.text, p.flags])).toEqual([["new-skill", "Payroll", []], ["s1", "Microsoft Excel", []]]);
     expect(JSON.stringify(model.requests[0])).toContain("Ran payroll for 40 staff");
     // The layout step has its own pass (Task 15) and runs only once it is the current section.
     expect((await runSection("layout", "experience")).res.status).toBe(409);
@@ -182,13 +168,26 @@ describe("section pass", () => {
     expect(JSON.stringify(model.requests[0])).toContain("Ran payroll for 40 staff");
   });
 
+  it("keeps the summary's guesses that are exact spans of its text, each with its reason; the guesses carry the inference", async () => {
+    const text = "Payroll lead who works across borders and runs payroll for 40 staff.";
+    replies = [proposals({ itemId: "summary", field: "summary", text, inferred: true, guesses: [
+      { text: "works across borders", reason: "From your roles in Hamburg and Bucharest." },
+      { text: "speaks German", reason: "Not in the text." },
+      { text: "across borders and", reason: "Overlaps the first guess." },
+    ] }), { results: [] }];
+    const body = await (await runSection("summary")).res.json() as { proposals: Proposal[] };
+    expect(body.proposals).toEqual([{ itemId: "summary", field: "summary", text, inferred: false, flags: [],
+      guesses: [{ text: "works across borders", reason: "From your roles in Hamburg and Bucharest." }] }]);
+    expect(String((model.requests[0]!.messages as Array<{ content: string }>)[0]!.content)).toContain("guesses");
+  });
+
   it("never treats digits inside item ids as known numbers", async () => {
     const id = "00000000-0000-4000-8000-000000000030";
     await cv.save({ ...base, experience: [{ ...role, bullets: [{ id, text: "Ran payroll for 40 staff" }]}] }, 1);
     replies = [proposals(reword("Cut payroll errors by 30% for 40 staff", { itemId: id })), { results: [] },
       proposals(reword("Cut payroll errors by 30% for 40 staff", { itemId: id })), { results: [] }];
-    const body = await (await runSection()).res.json() as { proposals: Proposal[] };
-    expect(body.proposals[0]?.flags.map((f) => f.rule)).toEqual(["number"]);
+    const body = await (await runSection()).res.json() as { proposals: Proposal[]; removed: number };
+    expect(body).toMatchObject({ proposals: [], removed: 1 });
   });
 
   it("keeps a summary rewrite the model returned under field \"text\" (the item has one editable field)", async () => {
@@ -218,24 +217,46 @@ describe("section pass", () => {
     expect(system).toContain("field \\\"description\\\"");
   });
 
-  it("names the flagged item in its question and shows only details that add something", async () => {
-    const claim = "Ran payroll for 40 staff and won the team award";
-    replies = [proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] },
-      proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] }];
-    let body = await (await runSection()).res.json() as { questions: TailorQuestion[] };
-    expect(body.questions[0]).toMatchObject({ itemId: `${bullet.id}|text`,
-      text: `Please check the bullet in Payroll Specialist at Acme Payroll: "Cut payroll errors by 30% for 40 staff". A number that isn't in your CV, notes or answers.` });
-    replies = [proposals(reword(claim)), { results: [{ itemId: bullet.id, claims: [claim] }] },
-      proposals(reword(claim)), { results: [{ itemId: bullet.id, claims: [claim, "won the team award"] }] }];
-    body = await (await runSection()).res.json() as { questions: TailorQuestion[] };
-    expect(body.questions[0]!.text).toBe(`Please check the bullet in Payroll Specialist at Acme Payroll: "${claim}". Not supported by your CV: "won the team award".`);
+  it("drops a proposal adding a tool no source mentions, whether or not it is marked inferred", async () => {
+    for (const inferred of [false, true]) {
+      const powerBi = reword("Ran payroll reporting for 40 staff in Power BI", { inferred, reason: inferred ? "Ran payroll for 40 staff" : null } as Partial<ModelProposal>);
+      replies = [proposals(powerBi), { results: [] }, proposals(powerBi), { results: [] }];
+      const body = await (await runSection()).res.json() as { proposals: Proposal[]; removed: number };
+      expect(body).toMatchObject({ proposals: [], removed: 1 });
+    }
   });
 
-  it("names a language level and a skill in flag questions", async () => {
-    await cv.save({ ...base, languages: [{ id: "l1", name: "English", level: "B2" }] }, 1);
-    replies = [proposals({ itemId: "l1", field: "level", text: "C2 (2024)", inferred: false }), { results: [] },
-      proposals({ itemId: "l1", field: "level", text: "C2 (2024)", inferred: false }), { results: [] }];
-    const body = await (await runSection("languages")).res.json() as { questions: TailorQuestion[] };
-    expect(body.questions[0]!.text.startsWith('Please check the English level: "C2 (2024)".')).toBe(true);
+  it("drops a guess without a reason and keeps a guess whose reason names its basis", async () => {
+    const bare = reword("Led payroll for 40 staff", { inferred: true });
+    replies = [proposals(bare), { results: [] }, proposals(bare), { results: [] }];
+    expect(await (await runSection()).res.json()).toMatchObject({ proposals: [], removed: 1 });
+    const based = reword("Led payroll for 40 staff", { inferred: true, reason: "Ran payroll for 40 staff" });
+    replies = [proposals(based), { results: [] }];
+    const body = await (await runSection()).res.json() as { proposals: Proposal[]; removed: number };
+    expect(body.removed).toBe(0);
+    expect(body.proposals).toEqual([expect.objectContaining({ text: "Led payroll for 40 staff", inferred: true, reason: "Ran payroll for 40 staff", flags: [] })]);
+  });
+
+  it("states the truth rule in the section prompt", async () => {
+    replies = [proposals()];
+    await runSection();
+    const system = JSON.stringify(model.requests[0]);
+    expect(system).toContain("Never invent numbers, tools, employers, titles, dates or outcomes");
+    expect(system).toContain("never guess");
+    expect(system).toContain("reason");
+  });
+
+  it("counts a flagged proposal the retry leaves out as removed", async () => {
+    replies = [proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] }, proposals(), { results: [] }];
+    expect(await (await runSection()).res.json()).toMatchObject({ proposals: [], removed: 1 });
+  });
+
+  it("counts a dropped claim when a clean proposal shares its item (two new skills)", async () => {
+    const clean = { itemId: "new-skill", field: "name", text: "Payroll", inferred: true, reason: "Shown in: Payroll Specialist" };
+    const guessed = { itemId: "new-skill", field: "name", text: "Power BI", inferred: true, reason: "Reports" };
+    replies = [proposals(clean, guessed), { results: [] }, proposals(clean, guessed), { results: [] }];
+    const body = await (await runSection("skills")).res.json() as { proposals: { text: string }[]; removed: number };
+    expect(body.proposals.map((p) => p.text)).toEqual(["Payroll"]);
+    expect(body.removed).toBe(1);
   });
 });

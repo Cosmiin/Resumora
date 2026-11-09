@@ -16,6 +16,9 @@
 .tailor-steps li { padding: var(--space-1) var(--space-3); border-radius: var(--radius-pill); font-size: var(--text-sm); color: var(--text-muted); background: var(--surface-sunken); }
 .tailor-steps li.is-done { color: var(--pine-700); background: var(--pine-50); }
 .tailor-steps li.is-current { color: var(--text-strong); background: var(--surface-card); box-shadow: var(--shadow-raised); }
+.tailor-step-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.tailor-back-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.tailor-back-answer { display: grid; gap: var(--space-2); }
 .tailor-score { font-weight: var(--weight-semibold); color: var(--text-accent); }
 
 .tailor-main { display: grid; gap: var(--space-5); }
@@ -29,6 +32,21 @@
 .tailor-pill.is-on { border-color: var(--border-selected); background: var(--surface-selected); color: var(--text-strong); }
 .tailor-field { position: relative; }
 .tailor-field textarea { width: 100%; padding-inline-end: 3rem; }
+
+/* Round 2 steering (SteerC1, SteerC2): tone cards, then the fixed optional questions. */
+.tailor-tones { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
+.tailor-tone {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; text-align: start; cursor: pointer;
+  border: 1px solid var(--sage-200); border-radius: 14px; background: var(--surface-card); color: var(--text-strong); font: inherit;
+}
+.tailor-tone b { font-size: 15px; }
+.tailor-tone span { font-family: var(--font-document); font-size: 13.5px; line-height: 1.45; color: var(--text-body); }
+.tailor-tone.is-on { border-color: var(--border-selected); box-shadow: inset 0 0 0 1px var(--border-selected); background: var(--surface-selected); }
+.tailor-tones-note { align-self: end; padding: 6px 4px; }
+.tailor-steer-aside { font-family: var(--font-sans); font-size: 17px; color: var(--sage-600); }
+.tailor-steer-qs { display: grid; gap: 18px; }
+.tailor-steer-q { margin: 0 0 7px; font-size: 15px; font-weight: var(--weight-semibold); }
+.tailor-steer-q span { font-weight: var(--weight-regular); color: var(--sage-600); font-size: 13px; }
 
 .tailor-items { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .tailor-items li {
@@ -66,6 +84,25 @@
 .tailor-group { display: grid; gap: var(--space-2); }
 .tailor-group h3 { margin: 0; font-size: var(--text-eyebrow); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 .tailor-explain { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); line-height: var(--leading-snug); }
+
+/* RevC: the role as in the CV, green new words, marigold guesses, one Original / New switch. */
+.tailor-switch { display: inline-flex; justify-self: start; padding: 3px; border-radius: var(--radius-pill); background: var(--surface-sunken); }
+.tailor-switch button { padding: var(--space-1) var(--space-4); border: 0; border-radius: var(--radius-pill); background: none; color: var(--text-muted); font: inherit; cursor: pointer; }
+.tailor-switch button[aria-pressed="true"] { background: var(--surface-card); color: var(--text-strong); box-shadow: var(--shadow-raised); }
+.tailor-doc { display: grid; gap: var(--space-2); font-family: var(--font-document); line-height: var(--leading-snug); color: var(--text-body); }
+.tailor-doc p { margin: 0; }
+.tailor-doc ul { display: grid; gap: var(--space-2); margin: 0; padding-inline-start: var(--space-5); }
+.tailor-new { background: var(--pine-100); color: inherit; border-radius: 3px; }
+.tailor-guess { background: var(--marigold-50); color: inherit; box-shadow: inset 0 -2px 0 var(--marigold-500); }
+.tailor-guess-tag { position: relative; padding: 1px 8px; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: var(--text-xs); background: var(--marigold-50); color: var(--text-strong); cursor: help; }
+.tailor-tip { display: none; margin-inline-start: var(--space-2); font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-muted); }
+.tailor-guess-tag:hover + .tailor-tip, .tailor-guess-tag:focus + .tailor-tip { display: inline; }
+
+/* Role done and Tailoring done: enrichment's fm-moment inside a card. */
+.tailor-moment { position: relative; min-height: 24rem; overflow: hidden; }
+/* The done screen: the moment sits in the card's flow, with what is now met and the next steps under it. */
+.tailor-moment.has-more { min-height: 0; }
+.tailor-moment.has-more .fm-moment { position: relative; inset: auto; background: none; }
 
 @media (max-width: 760px) {
   .tailor-mode { padding: var(--space-6) var(--space-4) var(--space-10); }
@@ -119,3 +156,23 @@
 .export-warning p { margin: 0 0 var(--space-1); }
 .export-warning ul { display: block; padding-inline-start: var(--space-4); list-style: disc; }
 .export-choices { display: grid; gap: var(--space-2); }
+/* FinalA: the tick for a final touch with nothing to change, and a moved section in the new order. */
+.tailor-tick { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--text-muted); }
+.tailor-doc li.is-moved { font-weight: 600; }
+/* DoneA: what is now met, the guesses still to check, and the next steps under the celebration. */
+.tailor-done { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+.tailor-done h3 { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.tailor-done ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
+.tailor-done-check { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; padding: var(--space-3); border-radius: var(--radius-md); background: var(--marigold-50); }
+.tailor-done-check p { margin: 0; }
+.tailor-done-next { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+/* GuideA: the guided review dims the page and glows the guess in place, with a small card above it. */
+/* The card stays on top while the page scrolls under it, so the CV keeps its full width (flex, not grid: a sticky grid item can only move within its own row). */
+.guide { display: flex; flex-direction: column; gap: var(--space-4); }
+.guide-card { order: -1; z-index: 3; }
+.guide-page .cv-page :not(.cv-mark-focus, .cv-mark-focus *) { color: var(--text-muted); }
+.guide-page .cv-mark-focus { scroll-margin-top: 14rem; color: var(--text-strong); background: var(--marigold-50); box-shadow: 0 0 0 3px var(--marigold-500); border-radius: 3px; }
+.guide-card { position: sticky; top: var(--space-4); display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); background: var(--surface-card); box-shadow: var(--shadow-page); }
+.guide-card p { margin: 0; }
+.guide-count { font-size: var(--text-sm); color: var(--text-muted); }
+.guide-done { font-weight: 600; }

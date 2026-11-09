@@ -23,10 +23,11 @@ describe("checkProposal", () => {
     expect(rules(proposal("Acme Payroll", { itemId: "role", field: "company" }))).toEqual([]);
   });
 
-  it("flags an untagged tool that is not in the sources and passes it when tagged inferred", () => {
+  it("flags a tool that is not in the sources, whether or not it is marked inferred", () => {
     expect(rules(proposal("Deployed the payroll service on Kubernetes"))).toEqual(["tool"]);
     expect(checkProposal(proposal("Deployed the payroll service on Kubernetes"), ctx)[0]?.detail).toContain("Kubernetes");
-    expect(rules(proposal("Deployed the payroll service on Kubernetes", { inferred: true }))).toEqual([]);
+    expect(rules(proposal("Deployed the payroll service on Kubernetes", { inferred: true, reason: "Ran payroll" }))).toEqual(["tool"]);
+    expect(rules(proposal("Built Power BI reports for staff", { inferred: true, reason: "Ran payroll" }))).toEqual(["tool"]);
     expect(rules(proposal("Moved payroll data to PostgreSQL with Docker"))).toEqual([]);
     expect(rules(proposal("Ran AWS Lambda jobs for payroll"))).toEqual(["tool"]);
   });
@@ -35,9 +36,17 @@ describe("checkProposal", () => {
     expect(rules(proposal("Streamlined payroll. Reduced manual steps for staff."))).toEqual([]);
   });
 
-  it("flags an untagged one-word skill name that isn't in the sources", () => {
+  it("flags a one-word skill name that isn't in the sources", () => {
     expect(rules(proposal("Kubernetes", { itemId: "new-skill", field: "name" }))).toEqual(["tool"]);
+    expect(rules(proposal("Kubernetes", { itemId: "new-skill", field: "name", inferred: true, reason: "Used Docker" }))).toEqual(["tool"]);
     expect(rules(proposal("Docker", { itemId: "s1", field: "name" }))).toEqual([]);
+  });
+
+  it("flags a guess without a reason that names its basis", () => {
+    expect(rules(proposal("Led payroll for staff", { inferred: true }))).toEqual(["guess"]);
+    expect(rules(proposal("Led payroll for staff", { inferred: true, reason: "  " }))).toEqual(["guess"]);
+    expect(rules(proposal("Led payroll for staff", { inferred: true, reason: "Answer: I led four people" }))).toEqual([]);
+    expect(rules(proposal("Led payroll for staff"))).toEqual([]);
   });
 
   it("does not flag abbreviations or ordinals as tools", () => {

@@ -1,11 +1,10 @@
 import { z } from "zod";
 import {
-  CoverLetterSchema, CvContentSchema, MAX_CV_BYTES, TailorLanguageSchema,
+  CoverLetterSchema, CvContentSchema, MAX_CV_BYTES, TailorLanguageSchema, hasUnknownNumber,
   type CoverLetter, type CvContent, type TailorLanguage,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
-import { checkProposal } from "./checks.ts";
 import type { TailorRepo } from "./repo.ts";
 import { translateSystemPrompt, translateUserMessage } from "./translate-prompts.ts";
 
@@ -80,8 +79,8 @@ export async function translateTailored(
   for (const { path, text } of reply.texts) {
     const before = original.get(path);
     if (before === undefined || !text.trim()) continue;
-    const flags = checkProposal({ itemId: path, field: "text", text, inferred: true, flags: [] }, { sources: [before] });
-    if (flags.length > 0) { flagged++; continue; }
+    // A translation changes every word, so only numbers are checked against the source text.
+    if (hasUnknownNumber(text, [before])) { flagged++; continue; }
     setAt(result, path, text);
   }
   const content = CvContentSchema.safeParse({ ...(result.cv as CvContent), locale: input.language });

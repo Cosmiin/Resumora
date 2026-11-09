@@ -208,6 +208,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       waitForSave={waitForSave}
       original={tailored?.original}
       onEnrich={isTailored ? undefined : () => setPathOpen(true)}
+      tailored={isTailored}
     />
   );
 
@@ -216,7 +217,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   ) : tailored && showChanges ? (
     <CvDocument content={content} template={tailored.template} highlights={tailored.highlights} inferred={tailored.inferred} sectionAction={tailored.sectionAction} />
   ) : (
-    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} template={tailored?.template} sectionAction={tailored?.sectionAction} />
+    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} template={tailored?.template} sectionAction={tailored?.sectionAction} tailored={isTailored} />
   );
 
   return (

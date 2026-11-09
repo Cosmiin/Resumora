@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { CATEGORY, type CvContent, type Proposal, type SectionKey, type TailorQuestion, type TailorSection } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
-import { RoleHeading, roleOf } from "./RolePanel.tsx";
+import { roleOf } from "./RolePanel.tsx";
+import { SkillsReview } from "./SkillsReview.tsx";
+import { SummaryReview } from "./SummaryReview.tsx";
+import { FINAL_SECTIONS, LayoutReview, type FinalSection } from "./LayoutReview.tsx";
 import type { AcceptBody } from "./tailor-api.ts";
 
 /** Same keys as the API: new skills share the id "new-skill", so they are told apart by their text. */
@@ -43,12 +46,13 @@ type Props = {
   onAccept(body: AcceptBody): void;
   /** The Base CV the proposals were made from: roles, before texts. Null while loading or if it failed. */
   cv?: CvContent | null;
+  /** Proposals the API dropped because the CV, notes and answers don't back them up. */
+  removed?: number;
 };
 
-export function SectionReview({ section, proposals, flags, confirmed, busy, onAccept, cv = null }: Props) {
+export function SectionReview({ section, proposals, flags, confirmed, busy, onAccept, cv = null, removed = 0 }: Props) {
   // Changed items start kept; inferred items start undecided (kept, but listed as unreviewed at export).
   const [keep, setKeep] = useState<Record<string, boolean>>({});
-  const [page, setPage] = useState(0);
   const flagged = (p: Proposal) => p.flags.length > 0;
   const confirmedFlag = (p: Proposal) => {
     const question = flagFor(p, flags);
@@ -94,45 +98,25 @@ export function SectionReview({ section, proposals, flags, confirmed, busy, onAc
         </span>}
     </li>;
   };
-  const group = (id: string, title: string, items: Proposal[]) => items.length > 0 && <section className="tailor-group" aria-labelledby={id}>
-    <h3 id={id}>{title}</h3>
-    <ul className="tailor-items">{items.map((p, i) => item(p, i))}</ul>
-  </section>;
-
-  // F4: Experience is reviewed one role at a time, in CV order; changes the CV can't place come last.
-  const roles = cv && section === "experience" ? [
-    ...cv.experience.map((role) => ({ role, items: proposals.filter((p) => roleOf(cv, p.itemId)?.id === role.id) })),
-    { role: null, items: proposals.filter((p) => !roleOf(cv, p.itemId)) },
-  ].filter((entry) => entry.items.length > 0) : [];
-  const current = roles[Math.min(page, roles.length - 1)];
-  const last = roles.length === 0 || page >= roles.length - 1;
-
+  // SkillsA2: the Skills step reviews its changes 5 at a time.
+  if (section === "skills") return <SkillsReview proposals={proposals} cv={cv} busy={busy} onAccept={onAccept} removed={removed} />;
+  // SumA: the summary in place, each guessed phrase its own Keep / Edit / Remove.
+  // FinalA: Achievements, Languages, Order and headline, one short screen each.
+  if (FINAL_SECTIONS.includes(section) && cv) {
+    return <LayoutReview section={section as FinalSection} proposals={proposals} cv={cv} busy={busy} onAccept={onAccept} removed={removed} />;
+  }
+  if (section === "summary" && cv) return <SummaryReview proposals={proposals} before={cv.basics.summary} busy={busy} onAccept={onAccept} removed={removed} />;
   let body: React.ReactNode;
   if (proposals.length === 0) body = <p>{t("tailor.review.none")}</p>;
-  else if (current) {
-    body = <>
-      <p className="tailor-eyebrow">{t("tailor.review.rolePage", { n: page + 1, total: roles.length })}</p>
-      {current.role ? <RoleHeading role={current.role} locale={cv!.locale} /> : <h3>{t("tailor.review.otherChanges")}</h3>}
-      <ul className="tailor-items">{current.items.map((p, i) => item(p, i, partName(cv!, p)))}</ul>
-    </>;
-  } else if (section === "skills") {
-    body = <>
-      <p className="tailor-explain">{t("tailor.review.skillsExplain")}</p>
-      {group("tailor-reworded", t("tailor.review.reworded"), proposals.filter((p) => p.itemId !== "new-skill"))}
-      {group("tailor-added", t("tailor.review.added"), proposals.filter((p) => p.itemId === "new-skill"))}
-    </>;
-  } else body = <ul className="tailor-items">{proposals.map((p, i) => item(p, i))}</ul>;
+  else body = <ul className="tailor-items">{proposals.map((p, i) => item(p, i, cv && section === "experience" ? partName(cv, p) : undefined))}</ul>;
 
   return <section className="tailor-card" aria-labelledby="tailor-review-title">
     <h2 id="tailor-review-title">{t("tailor.review.title", { section: t(`tailor.section.${section}`) })}</h2>
     {body}
+    {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
     <div className="tailor-actions">
-      {page > 0 && current && <button type="button" className="secondary" onClick={() => setPage(page - 1)}>
-        <span aria-hidden="true">← </span>{t("tailor.review.prevRole")}</button>}
-      {!last && <button type="button" className="primary" onClick={() => setPage(page + 1)}>
-        {t("tailor.review.nextRole")}<span aria-hidden="true"> →</span></button>}
-      {last && proposals.some((p) => !flagged(p)) && <button type="button" className="secondary" onClick={revertAll}>{t("tailor.review.revertAll")}</button>}
-      {last && <button type="button" className="primary" disabled={busy} onClick={accept}>{t(busy ? "tailor.review.saving" : "tailor.review.accept")}</button>}
+      {proposals.some((p) => !flagged(p)) && <button type="button" className="secondary" onClick={revertAll}>{t("tailor.review.revertAll")}</button>}
+      <button type="button" className="primary" disabled={busy} onClick={accept}>{t(busy ? "tailor.review.saving" : "tailor.review.accept")}</button>
     </div>
   </section>;
 }

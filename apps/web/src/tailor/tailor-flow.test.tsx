@@ -6,22 +6,24 @@ import { TAILOR_SECTIONS, type MatchScore, type TailorQuestion, type TailorRun }
 
 vi.mock("./tailor-api.ts", () => ({
   startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(),
-  runSection: vi.fn(), acceptSection: vi.fn(), getScores: vi.fn(),
+  runSection: vi.fn(), acceptSection: vi.fn(), getScores: vi.fn(), getToneExamples: vi.fn(),
 }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
+vi.mock("./tailored-api.ts", () => ({ getTailored: vi.fn() }));
+import { getTailored } from "./tailored-api.ts";
 import { emptyCv } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { useVoice } from "../cv/enrich/useVoice.ts";
 import { ApiClientError } from "../lib/api.ts";
-import { acceptSection, askQuestions, getRun, getScores, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
+import { acceptSection, askQuestions, getRun, getScores, getToneExamples, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
 import { TailorFlow } from "./TailorFlow.tsx";
 
 const at = "2026-11-08T10:00:00Z";
 const makeRun = (over: Partial<TailorRun> = {}): TailorRun => ({
   id: "run1", userId: "u1", jobId: "one", tailoredCvId: "cv1", kind: "tailor", sections: [...TAILOR_SECTIONS],
   status: "running", currentSection: "experience", questions: null, answers: null, proposals: null, errorCode: null,
-  createdAt: at, updatedAt: at, ...over,
+  roleOrder: ["r1"], currentRoleId: "r1", createdAt: at, updatedAt: at, ...over,
 });
 const score = (total: number): MatchScore => ({ policy: "match/1", total, band: "fair", capped: false, labels: [],
   parts: { requirements: null, keywords: null, seniority: null, langEdu: null } });
@@ -50,6 +52,8 @@ beforeEach(() => {
   vi.mocked(askQuestions).mockResolvedValue([]);
   vi.mocked(runSection).mockResolvedValue({ proposals: [], questions: [] });
   vi.mocked(getCv).mockRejectedValue(new Error("offline"));
+  vi.mocked(getToneExamples).mockRejectedValue(new Error("offline"));
+  vi.mocked(getTailored).mockRejectedValue(new Error("offline"));
 });
 
 describe("tailoring flow", () => {
@@ -67,57 +71,80 @@ describe("tailoring flow", () => {
     expect(screen.getByRole("heading", { name: "Question q1?" })).toBeInTheDocument();
   });
 
-  it("steers, answers, reviews and accepts two sections, then opens the tailored CV", async () => {
+  it("steers, answers, reviews and accepts two sections, then the done screen opens the tailored CV", async () => {
     const user = userEvent.setup();
     vi.mocked(askQuestions).mockResolvedValueOnce([question("q1")]).mockResolvedValueOnce([]);
     vi.mocked(runSection)
       .mockResolvedValueOnce({ proposals: [{ itemId: "b1", field: "text", text: "Ran payroll accurately", inferred: false, flags: [] }], questions: [] })
-      .mockResolvedValueOnce({
-        proposals: [
-          { itemId: "new-skill", field: "name", text: "Gusto", inferred: true, flags: [] },
-          { itemId: "s1", field: "name", text: "Excel 365", inferred: false, flags: [{ rule: "number", detail: "365" }] },
-        ],
-        questions: [question("f1", { kind: "flag", section: "skills", text: "Please check: \"Excel 365\" (365)", options: ["Keep it", "Use original wording"] })],
-      });
+      .mockResolvedValueOnce({ proposals: [{ itemId: "new-skill", field: "name", text: "Gusto", inferred: true, flags: [], reason: "Shown in: Payroll · Beta" }], questions: [] });
     vi.mocked(acceptSection)
       .mockResolvedValueOnce({ run: makeRun({ currentSection: "skills" }), score: score(71) })
       .mockResolvedValueOnce({ run: makeRun({ status: "done", currentSection: null }), score: score(78) });
     const router = renderFlow();
 
-    await user.click(await screen.findByRole("button", { name: "Confident" }));
-    await user.type(screen.getByRole("textbox", { name: "Anything to focus on?" }), "Lead with payroll");
-    await user.click(screen.getByRole("button", { name: "Start · 5 sections" }));
-    expect(startTailoring).toHaveBeenCalledWith("one", { tone: "confident", instruction: "Lead with payroll" });
+    await user.click(await screen.findByRole("button", { name: /^Confident/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.type(screen.getByRole("textbox"), "Lead with payroll");
+    await user.click(screen.getByRole("button", { name: "Start tailoring" }));
+    expect(startTailoring).toHaveBeenCalledWith("one", { tone: "confident", draws: [], fit: null, focusRoleIds: [], instruction: "Lead with payroll" });
 
+    expect(askQuestions).toHaveBeenCalledWith("run1", "experience", "r1");
     await user.click(await screen.findByRole("button", { name: "Yes, daily" }));
+    expect(sendAnswers).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Next" }));
     expect(sendAnswers).toHaveBeenCalledWith("run1", [{ questionId: "q1", value: "Yes, daily", via: "option" }]);
+    expect(runSection).toHaveBeenCalledWith("run1", "experience", "r1");
     expect(await screen.findByText("Ran payroll accurately")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Accept section" }));
-    expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [] });
+    expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [], roleId: "r1" });
 
-    await user.click(await screen.findByRole("button", { name: "Keep it" }));
     expect(await screen.findByText("Gusto")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Remove Gusto" }));
-    await user.click(screen.getByRole("button", { name: "Accept section" }));
+    await user.click(screen.getByRole("button", { name: "Save skills" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "skills", {
-      decisions: [], inferred: [{ itemId: "new-skill:Gusto", keep: false }], flags: [{ questionId: "f1", confirmed: true }],
+      decisions: [], inferred: [{ itemId: "new-skill:Gusto", keep: false }], flags: [],
     });
+    expect(await screen.findByRole("heading", { name: "Tailoring done 🎉" })).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "View your tailored CV" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/one/cv"));
     expect(router.state.location.search).toBe("?cv=cv1");
   });
 
-  it("Skip all goes straight to the run", async () => {
+  it("Back shows the earlier answer selected; the role's answers are sent together after its last question", async () => {
     const user = userEvent.setup();
     localStorage.setItem("resumora.tailorRun.one", "run1");
     vi.mocked(getRun).mockResolvedValue(makeRun());
-    vi.mocked(askQuestions).mockResolvedValueOnce([question("q1"), question("q2")]);
+    vi.mocked(askQuestions).mockResolvedValueOnce([question("q1", { roleId: "r1" }), question("q2", { roleId: "r1" })]);
     renderFlow();
-    await user.click(await screen.findByRole("button", { name: "Skip all" }));
+    await user.click(await screen.findByRole("button", { name: "Yes, daily" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("heading", { name: "Question q2?" })).toBeInTheDocument();
+    expect(screen.getByText("Role 1 of 1 · Question 2 of 2")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("heading", { name: "Question q1?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Yes, daily" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Skip" }));
+    expect(sendAnswers).toHaveBeenCalledTimes(1);
     expect(sendAnswers).toHaveBeenCalledWith("run1", [
-      { questionId: "q1", value: null, via: "skip" }, { questionId: "q2", value: null, via: "skip" },
+      { questionId: "q1", value: "Yes, daily", via: "option" }, { questionId: "q2", value: null, via: "skip" },
     ]);
-    await waitFor(() => expect(runSection).toHaveBeenCalledWith("run1", "experience"));
-    expect(screen.queryByText("Question q2?")).toBeNull();
+    await waitFor(() => expect(runSection).toHaveBeenCalledWith("run1", "experience", "r1"));
+  });
+
+  it("goes through Experience role by role, then on to Skills", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun({ roleOrder: ["r1", "r2"], currentRoleId: "r1" }));
+    vi.mocked(acceptSection)
+      .mockResolvedValueOnce({ run: makeRun({ roleOrder: ["r1", "r2"], currentRoleId: "r2", status: "running" }), score: score(66) })
+      .mockResolvedValueOnce({ run: makeRun({ roleOrder: ["r1", "r2"], currentRoleId: null, currentSection: "skills" }), score: score(70) });
+    renderFlow();
+    await user.click(await screen.findByRole("button", { name: "Accept section" }));
+    await waitFor(() => expect(askQuestions).toHaveBeenCalledWith("run1", "experience", "r2"));
+    await user.click(await screen.findByRole("button", { name: "Accept section" }));
+    expect(acceptSection).toHaveBeenLastCalledWith("run1", "experience", { decisions: [], inferred: [], flags: [], roleId: "r2" });
+    await waitFor(() => expect(askQuestions).toHaveBeenLastCalledWith("run1", "skills", undefined));
   });
 
   it("updates the score in the step bar after an accept", async () => {
@@ -135,7 +162,7 @@ describe("tailoring flow", () => {
     localStorage.setItem("resumora.tailorRun.one", "run1");
     vi.mocked(getRun).mockResolvedValue(makeRun({ currentSection: "skills" }));
     renderFlow();
-    await waitFor(() => expect(askQuestions).toHaveBeenCalledWith("run1", "skills"));
+    await waitFor(() => expect(askQuestions).toHaveBeenCalledWith("run1", "skills", undefined));
     expect(screen.getByRole("listitem", { current: "step" }).textContent).toContain("Skills");
     expect(screen.queryByRole("button", { name: /Start/ })).toBeNull();
     expect(startTailoring).not.toHaveBeenCalled();

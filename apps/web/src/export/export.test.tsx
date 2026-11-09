@@ -28,7 +28,7 @@ const cv: TailoredCv = {
 
 beforeEach(() => {
   vi.resetAllMocks();
-  files.exportFile.mockResolvedValue(undefined);
+  files.exportFile.mockResolvedValue({ pages: 2, fits: true });
 });
 
 describe("ExportMenu", () => {
@@ -37,17 +37,27 @@ describe("ExportMenu", () => {
     expect(unreviewedItems(null)).toEqual([]);
   });
 
-  it("warns about 2 unreviewed items and still exports the PDF", async () => {
+  it("warns about 2 AI guesses not checked yet and still exports the PDF", async () => {
     const load = vi.fn(async () => cv);
     render(<ExportMenu load={load} job={job} template="modern" />);
     await userEvent.click(screen.getByRole("button", { name: "Export ▾" }));
     const warning = await screen.findByRole("note");
-    expect(warning).toHaveTextContent("Not reviewed yet: 2");
-    expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Led a team of 6 engineers", "Kafka"]);
+    expect(warning).toHaveTextContent("2 AI guesses not checked yet");
+    expect(warning).toHaveTextContent("Or export anyway:");
     await userEvent.click(screen.getByRole("button", { name: "CV as PDF" }));
     await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "pdf", { cv, job, template: "modern" }));
     await userEvent.click(screen.getByRole("button", { name: "CV as Word" }));
     await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "docx", { cv, job, template: "modern" }));
+  });
+
+  it("warns after a CV export that still runs past 2 pages at the smallest size, and clears it on a CV that fits", async () => {
+    files.exportFile.mockResolvedValueOnce({ pages: 3, fits: false });
+    render(<ExportMenu load={async () => cv} job={job} template="classic" />);
+    await userEvent.click(screen.getByRole("button", { name: "Export ▾" }));
+    await userEvent.click(await screen.findByRole("button", { name: "CV as PDF" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Your CV is still 3 pages at the smallest text size. Shorten it to fit 2 pages.");
+    await userEvent.click(screen.getByRole("button", { name: "CV as Word" }));
+    await waitFor(() => expect(screen.queryByText(/still 3 pages/)).toBeNull());
   });
 
   it("disables the letter until one is written and shows a failed export", async () => {

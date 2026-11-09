@@ -77,15 +77,18 @@ async function start(): Promise<string> {
   const body = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal" })).json() as { run: { id: string } };
   return body.run.id;
 }
+/** Experience steps name the run's current role, as the web does. */
+const roleOf = async (runId: string, section: string) =>
+  section === "experience" ? { roleId: (await memoryTailorRepo("user-a", scores, docs).getRun(runId))!.currentRoleId } : {};
 async function run(runId: string, section: string, ...items: ModelProposal[]) {
   // The real (strict) model always returns every field: skills proposals carry reason, null when unused.
-  replies.push({ proposals: section === "skills" ? items.map((item) => ({ reason: null, ...item })) : items }, { results: [] });
-  const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`);
+  replies.push({ proposals: items.map((item) => ({ reason: null, guesses: null, ...item })) }, { results: [] });
+  const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`, await roleOf(runId, section));
   expect(res.status).toBe(200);
 }
-async function accept(runId: string, section: string, body: unknown = {}, score: unknown = scoreReply()) {
+async function accept(runId: string, section: string, body: Record<string, unknown> = {}, score: unknown = scoreReply()) {
   replies.push(score);
-  return post(`/v1/tailor-runs/${runId}/sections/${section}/accept`, body);
+  return post(`/v1/tailor-runs/${runId}/sections/${section}/accept`, { ...await roleOf(runId, section), ...body });
 }
 
 const call = (method: string, path: string, body: unknown = {}, token = "token-a") => app.request(path, {
@@ -121,7 +124,7 @@ describe("re-tailor", () => {
     const runId = await start();
     await run(runId, "experience");
     expect((await accept(runId, "experience")).status).toBe(200);
-    const added = { itemId: "new-skill", field: "name", text: "Payroll", inferred: true };
+    const added = { itemId: "new-skill", field: "name", text: "Payroll", inferred: true, reason: "Shown in: Team Lead · Acme Payroll" };
     await run(runId, "skills", added);
     expect((await accept(runId, "skills", { inferred: [{ itemId: "new-skill:Payroll", keep: true }] })).status).toBe(200);
     expect(tailored().content.technicalSkills.map((s) => s.name)).toEqual(["Excel", "Payroll"]);
@@ -153,15 +156,16 @@ describe("re-tailor", () => {
       labels: [{ ref: "r0", kind: "requirement", status: "missing", evidence: null, inferred: false }],
     } as unknown as MatchScore);
     const runId = await start();
-    const ask = { roleId: role.id, text: "How many staff did you pay?", kind: "options", options: ["10", "40"], reason: "Gap", gap: "r0" };
+    const ask = { roleId: role.id, bulletId: null, skill: null, text: "How many staff did you pay?", kind: "options", options: ["10", "40"], reason: "Gap", gap: "r0" };
     replies.push({ questions: [ask] });
-    const asked = await (await post(`/v1/tailor-runs/${runId}/sections/experience/questions`)).json() as { questions: { id: string }[] };
+    const asked = await (await post(`/v1/tailor-runs/${runId}/sections/experience/questions`, { roleId: role.id })).json() as { questions: { id: string }[] };
     expect(asked.questions).toHaveLength(1);
     expect((await post(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: asked.questions[0]!.id, value: "40", via: "option" }] })).status).toBe(200);
 
     const { run: again } = await (await retailor(tailored().id, ["experience"])).json() as { run: TailorRun };
     replies.push({ questions: [ask, { ...ask, text: "Which payroll tool did you use?" }] });
-    const second = await (await post(`/v1/tailor-runs/${again.id}/sections/experience/questions`)).json() as { questions: { text: string }[] };
+    expect(again).toMatchObject({ roleOrder: [role.id], currentRoleId: role.id });
+    const second = await (await post(`/v1/tailor-runs/${again.id}/sections/experience/questions`, { roleId: role.id })).json() as { questions: { text: string }[] };
     expect(second.questions.map((q) => q.text)).toEqual(["Which payroll tool did you use?"]);
   });
 });

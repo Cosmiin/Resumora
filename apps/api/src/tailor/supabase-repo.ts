@@ -1,9 +1,15 @@
+import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { MatchScoreSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun } from "@resumora/shared";
+import {
+  MatchScoreSchema, SteeringSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun,
+} from "@resumora/shared";
 import { storedCv } from "../cv/supabase-repo.ts";
 import { ApiError } from "../errors.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { TailorRepo } from "./repo.ts";
+import { withColumns } from "./steering.ts";
+
+const ToneExamplesSchema = z.object({ bullet: z.string(), examples: z.record(ToneSchema, z.string()) });
 
 /** Queries as the signed-in user so row-level security applies. */
 export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo {
@@ -38,15 +44,27 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       return data?.id ?? null;
     },
     async getSteering(tailoredCvId) {
-      const { data, error } = await db.from("tailored_cvs").select("language, tone, instruction").eq("id", tailoredCvId).maybeSingle();
+      const { data, error } = await db.from("tailored_cvs").select("language, tone, instruction, steering").eq("id", tailoredCvId).maybeSingle();
       if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
-      return data ? { language: TailorLanguageSchema.parse(data.language), tone: ToneSchema.nullable().parse(data.tone),
-        instruction: data.instruction as string | null } : null;
+      if (!data) return null;
+      const tone = ToneSchema.nullable().parse(data.tone);
+      const instruction = data.instruction as string | null;
+      const stored = SteeringSchema.safeParse(data.steering);
+      return { language: TailorLanguageSchema.parse(data.language), tone, instruction,
+        steering: withColumns(stored.success ? stored.data : {}, tone, instruction) };
+    },
+    async setSteering(tailoredCvId, steering) {
+      const { data, error } = await db.from("tailored_cvs")
+        .update({ tone: steering.tone ?? "neutral", instruction: steering.instruction ?? null, steering })
+        .eq("id", tailoredCvId).select("id");
+      if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
+      return (data ?? []).length > 0;
     },
     async createTailoredCv(input) {
       const { data, error } = await db.from("tailored_cvs").insert({
         user_id: user.id, job_id: input.jobId, language: input.language, content: input.content,
         base_snapshot: input.content, base_snapshot_at: input.baseSnapshotAt, tone: input.tone, instruction: input.instruction,
+        steering: input.steering,
       }).select("id").single();
       if (error?.code === "23505") return "exists";
       if (error) throw new Error(`tailored_cvs insert failed: ${error.message}`);
@@ -143,6 +161,7 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const { data, error } = await db.from("tailor_runs").insert({
         user_id: user.id, job_id: input.jobId, tailored_cv_id: input.tailoredCvId, kind: input.kind,
         sections: input.sections, status: "running", current_section: input.currentSection,
+        role_order: input.roleOrder ?? [], current_role_id: input.roleOrder?.[0] ?? null,
       }).select(RUN_COLUMNS).single();
       if (error) throw new Error(`tailor_runs insert failed: ${error.message}`);
       return toRun(data);
@@ -159,22 +178,34 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       if (changes.proposals !== undefined) columns.proposals = changes.proposals;
       if (changes.status !== undefined) columns.status = changes.status;
       if (changes.currentSection !== undefined) columns.current_section = changes.currentSection;
+      if (changes.currentRoleId !== undefined) columns.current_role_id = changes.currentRoleId;
       if (changes.errorCode !== undefined) columns.error_code = changes.errorCode;
       const { data, error } = await db.from("tailor_runs").update(columns).eq("id", id).select(RUN_COLUMNS).maybeSingle();
       if (error) throw new Error(`tailor_runs update failed: ${error.message}`);
       return data ? toRun(data) : null;
     },
+    async getToneExamples(jobId) {
+      const { data, error } = await db.from("jobs").select("tone_examples").eq("id", jobId).maybeSingle();
+      if (error) throw new Error(`jobs select failed: ${error.message}`);
+      const parsed = ToneExamplesSchema.safeParse(data?.tone_examples);
+      return parsed.success ? parsed.data : null;
+    },
+    async saveToneExamples(jobId, examples) {
+      const { error } = await db.from("jobs").update({ tone_examples: examples }).eq("id", jobId);
+      if (error) throw new Error(`jobs update failed: ${error.message}`);
+    },
   };
 }
 
 const TAILORED_COLUMNS = "id, user_id, job_id, language, translated_from, content, base_snapshot, base_snapshot_at, template, tone, instruction, review, score, cover_letter, version, created_at, updated_at";
-const RUN_COLUMNS ="id, user_id, job_id, tailored_cv_id, kind, sections, status, current_section, questions, answers, proposals, error_code, created_at, updated_at";
+const RUN_COLUMNS ="id, user_id, job_id, tailored_cv_id, kind, sections, status, current_section, role_order, current_role_id, questions, answers, proposals, error_code, created_at, updated_at";
 
 function toRun(row: Record<string, unknown>): TailorRun {
   return TailorRunSchema.parse({
     id: row.id, userId: row.user_id, jobId: row.job_id, tailoredCvId: row.tailored_cv_id, kind: row.kind,
     sections: row.sections, status: row.status, currentSection: row.current_section, questions: row.questions,
-    answers: row.answers, proposals: row.proposals, errorCode: row.error_code, createdAt: row.created_at, updatedAt: row.updated_at,
+    answers: row.answers, proposals: row.proposals, errorCode: row.error_code,
+    roleOrder: row.role_order ?? [], currentRoleId: row.current_role_id ?? null, createdAt: row.created_at, updatedAt: row.updated_at,
   });
 }
 
