@@ -68,7 +68,7 @@ const post = (path: string, body: unknown = {}) => app.request(path, {
 const reword = (itemId: string, text: string): ModelProposal => ({ itemId, field: "text", text, inferred: false });
 const tailored = () => [...docs.cvs.values()][0]!;
 const getRun = async (id: string) => (await memoryTailorRepo("user-a", scores, docs).getRun(id))!;
-const proposals = (...items: ModelProposal[]) => replies.push({ proposals: items.map((item) => ({ reason: null, ...item })) }, { results: [] });
+const proposals = (...items: ModelProposal[]) => replies.push({ proposals: items.map((item) => ({ reason: null, guesses: null, ...item })) }, { results: [] });
 
 async function start(): Promise<string> {
   const body = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal" })).json() as { run: { id: string } };

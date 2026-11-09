@@ -9,7 +9,8 @@ Editable fields: each bullet is its own item, itemId = the bullet's id, field "t
 You may add job-relevant skills the CV, notes or answers support, as itemId "new-skill", field "name", with inferred true.
 A skill name is a short label of at most 3 words, never a phrase or sentence.
 For each new skill set reason to one short line saying where the CV shows it, naming the role as "Title · Company" when it comes from one (for example "Shown in: Business Analyst · Emedi"). Set reason to null for reworded skills that aren't guesses.`,
-  summary: "Rewrite the summary for this job so it describes the CV's experience and skills. Return one proposal with itemId \"summary\" and field \"summary\".",
+  summary: `Rewrite the summary for this job so it describes the CV's experience and skills. Return one proposal with itemId "summary" and field "summary".
+Under guesses, list each phrase of it that is a reasonable inference rather than stated: its exact text as written in the summary, and a reason naming its basis. Set guesses to [] when nothing is guessed.`,
   achievements: "Reorder and reword only, most relevant first. Never add an achievement or outcome.",
   languages: "Reorder and reword only, most relevant first. Never change a language's level upward.",
 };
@@ -22,6 +23,7 @@ Use only facts from the CV, its notes, facts and the answers. Never invent numbe
 Never write a claim those sources don't support. Rewording true things favourably is fine.
 Set inferred to true for any skill or wording that is a reasonable inference rather than stated. A guess needs a real basis in that text:
 set reason to one short line naming it (the bullet, note or answer it comes from). Set reason to null when inferred is false.
+Set guesses to null, except in the summary.
 Tools, numbers, employers, titles, dates and outcomes: never guess them, even as an inference.
 Write in the requested language and in the tone given under "steering". Follow the rest of the steering when it doesn't break these rules.
 ${SECTION_RULES[section]}`;

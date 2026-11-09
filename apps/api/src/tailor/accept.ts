@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  CvContentSchema, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId,
+  applyGuesses, CvContentSchema, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId,
   type CvContent, type Job, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -13,7 +13,8 @@ import { scoreMatch } from "./score.ts";
 import { currentRole, sectionItems } from "./section-pass.ts";
 import { jobNotFound } from "./start.ts";
 
-const Choice = z.object({ itemId: z.string(), keep: z.boolean() });
+/** `text`: a summary guess's edited wording (its item id is "summary#<n>"). */
+const Choice = z.object({ itemId: z.string(), keep: z.boolean(), text: z.string().trim().min(1).max(MAX_TEXT).optional() });
 export const AcceptBodySchema = z.object({
   decisions: z.array(Choice).max(500).default([]),
   inferred: z.array(Choice).max(500).default([]),
@@ -24,7 +25,7 @@ export const AcceptBodySchema = z.object({
 export type AcceptBody = z.infer<typeof AcceptBodySchema>;
 
 /** Per-item review state, stored under the section in `tailored_cvs.review`. */
-export type ItemReview = { kept: boolean; inferred: boolean; reviewed: boolean; text: string };
+export type ItemReview = { kept: boolean; inferred: boolean; reviewed: boolean; text: string; reason?: string };
 
 /** New skills share the item id "new-skill", so each is addressed by its text. */
 export const reviewKey = (p: Pick<Proposal, "itemId" | "text">) => (p.itemId === "new-skill" ? `new-skill:${p.text}` : p.itemId);
@@ -88,6 +89,7 @@ export async function acceptSection(
   const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));
   const inferred = new Map(body.inferred.map((d) => [d.itemId, d.keep]));
+  const guessChoices = new Map(body.inferred.map((d) => [d.itemId, d.text === undefined ? { keep: d.keep } : { keep: d.keep, text: d.text }]));
   const flags = new Map(body.flags.map((f) => [f.questionId, f.confirmed]));
   const state: Record<string, ItemReview> = {};
   const notes: { roleId: string | null; note: Note }[] = [];
@@ -106,8 +108,19 @@ export async function acceptSection(
     } else {
       keep = p.inferred ? inferred.get(key) ?? decisions.get(key) : decisions.get(key);
     }
-    state[key] = { kept: keep ?? !p.flags.length, inferred: p.inferred, reviewed: keep !== undefined, text: p.text };
-    if (keep ?? !p.flags.length) apply(content, p);
+    let applied = p;
+    if (p.guesses?.length && (keep ?? true)) {
+      // Each summary guess is its own item: removed, edited, or left undecided (kept, unreviewed).
+      const choices = p.guesses.map((_, i) => guessChoices.get(`${key}#${i}`));
+      applied = { ...p, text: applyGuesses(p.text, p.guesses, choices) };
+      p.guesses.forEach((guess, i) => {
+        const choice = choices[i];
+        state[`${key}#${i}`] = { kept: choice?.keep ?? true, inferred: true, reviewed: choice !== undefined,
+          text: choice?.keep && choice.text !== undefined ? choice.text : guess.text, reason: guess.reason };
+      });
+    }
+    state[key] = { kept: keep ?? !p.flags.length, inferred: p.inferred, reviewed: keep !== undefined, text: applied.text };
+    if (keep ?? !p.flags.length) apply(content, applied);
   }
   const parsed = CvContentSchema.safeParse(content);
   if (!parsed.success) throw new ApiError(502, "ai_failed", `Couldn't tailor ${section}. Try again.`);

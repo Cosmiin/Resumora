@@ -94,6 +94,43 @@ export const ProposalSchema = z.object({
   guesses: z.array(z.object({ text: z.string(), reason: z.string() })).optional(),
 });
 export type Proposal = z.infer<typeof ProposalSchema>;
+export type Guess = NonNullable<Proposal["guesses"]>[number];
+
+/**
+ * Where each guess sits in the text, in text order: its first occurrence that doesn't overlap an earlier
+ * guess. A guess not found verbatim is left out. Placing the result again gives the same spans.
+ */
+export function placeGuesses(text: string, guesses: Guess[]): Array<Guess & { start: number; end: number }> {
+  const placed: Array<Guess & { start: number; end: number }> = [];
+  for (const guess of guesses) {
+    if (!guess.text) continue;
+    for (let at = text.indexOf(guess.text); at >= 0; at = text.indexOf(guess.text, at + 1)) {
+      const end = at + guess.text.length;
+      if (placed.every((p) => end <= p.start || at >= p.end)) { placed.push({ ...guess, start: at, end }); break; }
+    }
+  }
+  return placed.sort((a, b) => a.start - b.start);
+}
+
+/** One guess's answer: Keep (optionally with the edited text) or Remove. Undecided guesses stay as they are. */
+export type GuessChoice = { keep: boolean; text?: string };
+
+/** The text after its placed guesses are decided: a removed one is cut out, an edited one takes the typed text. */
+export function applyGuesses(text: string, guesses: Guess[], choices: Array<GuessChoice | undefined>): string {
+  const spans = placeGuesses(text, guesses);
+  let out = text;
+  // From the last guess back, so the earlier positions stay valid.
+  for (let i = spans.length - 1; i >= 0; i--) {
+    const span = spans[i]!;
+    const choice = choices[i];
+    if (!choice) continue;
+    if (choice.keep) { out = out.slice(0, span.start) + (choice.text ?? span.text) + out.slice(span.end); continue; }
+    const left = out.slice(0, span.start).replace(/\s+$/, "");
+    const right = out.slice(span.end).replace(/^\s+/, "");
+    out = left && right && !/^[,.;:!?]/.test(right) ? `${left} ${right}` : left + right;
+  }
+  return out;
+}
 
 export const CoverLetterSchema = z.object({
   body: z.string().max(4000),
