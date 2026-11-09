@@ -98,6 +98,15 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
     });
   }, [focusPage]);
 
+  // Old imports copied "Company · Location" into role descriptions: empty those once, when the base CV opens.
+  // It autosaves like any edit, so the old text stays in version history.
+  const cleaned = useRef(false);
+  useEffect(() => {
+    if (cleaned.current || isTailored) return;
+    cleaned.current = true;
+    dispatch({ type: "clearCopiedDescriptions" });
+  }, [dispatch, isTailored]);
+
   // When the import screen closes (cancel, applied or conflict), focus goes back to Import CV.
   // This runs after render, once the top bar is no longer inert and can take focus.
   useEffect(() => {

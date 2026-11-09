@@ -6,6 +6,7 @@ import {
   MAX_NOTES,
   MAX_TITLES,
   SKILL_GROUPS,
+  isCopiedDescription,
   isSectionEmpty,
   newId,
   normalizeLayout,
@@ -58,7 +59,9 @@ export type CvAction =
   | { type: "addBullets"; roleId: string; texts: string[] }
   | { type: "setFacts"; roleId: string; facts: RoleFacts | null }
   | { type: "setNote"; roleId: string; note: Note }
-  | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean };
+  | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean }
+  /** Empties role descriptions that only repeat the company and/or location (old imports). */
+  | { type: "clearCopiedDescriptions" };
 
 /**
  * Sections the CV has (or the user just added), in layout order, hidden ones included.
@@ -295,6 +298,10 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const endDate = action.current ? "" : item.endDate;
       if (item.current === action.current && item.endDate === endDate) return cv;
       return { ...cv, [action.list]: items.map((r) => (r === item ? { ...r, current: action.current, endDate } : r)) };
+    }
+    case "clearCopiedDescriptions": {
+      if (!cv.experience.some(isCopiedDescription)) return cv;
+      return { ...cv, experience: cv.experience.map((r) => (isCopiedDescription(r) ? { ...r, description: "" } : r)) };
     }
   }
 }

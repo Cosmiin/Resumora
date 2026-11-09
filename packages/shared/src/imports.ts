@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCopiedDescription } from "./role-description.ts";
 import {
   CvContentSchema,
   MAX_BULLETS,
@@ -160,7 +161,7 @@ export function toCvContent(draft: ImportDraft): ImportResult {
         startDate: date(e.startDate, label),
         endDate: e.current ? "" : date(e.endDate, label),
         current: e.current,
-        description: clip(e.description, label, MAX_LONG_TEXT),
+        description: isCopiedDescription(e) ? "" : clip(e.description, label, MAX_LONG_TEXT),
         bullets: e.bullets.slice(0, MAX_BULLETS).map((text) => ({ id: newId(), text: clip(text, label) })),
         notes: [],
       };

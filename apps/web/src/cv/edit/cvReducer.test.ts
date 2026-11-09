@@ -368,3 +368,17 @@ describe("focus actions", () => {
     expect(cvReducer(cleared, { type: "setFacts", roleId: "e1", facts: null })).toBe(cleared);
   });
 });
+
+describe("clearCopiedDescriptions", () => {
+  const at = (description: string, id: string) => role(id, ["Did it"], { company: "Kreditech", location: "Hamburg, Germany", description });
+  it("empties only the descriptions that repeat the company and/or location", () => {
+    const cv = { ...emptyCv(), experience: [at("Kreditech · Hamburg, Germany", "a"), at("Kreditech is a fintech", "b"), at("Hamburg", "c")] };
+    const next = cvReducer(cv, { type: "clearCopiedDescriptions" });
+    expect(next.experience.map((r) => r.description)).toEqual(["", "Kreditech is a fintech", ""]);
+    expect(next.experience[1]).toBe(cv.experience[1]);
+  });
+  it("returns the same CV when there is nothing to clear", () => {
+    const cv = { ...emptyCv(), experience: [at("Kreditech is a fintech", "b")] };
+    expect(cvReducer(cv, { type: "clearCopiedDescriptions" })).toBe(cv);
+  });
+});

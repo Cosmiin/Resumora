@@ -93,6 +93,27 @@ describe("CV editor", () => {
     });
   });
 
+  describe("descriptions copied from the company and location", () => {
+    const job = (id: string, description: string) => ({
+      id, company: "Kreditech", title: "Developer", location: "Hamburg, Germany", startDate: "2020-01", endDate: "",
+      current: true, description, bullets: [], notes: [],
+    });
+    it("are emptied once when the CV opens, in one save, and real ones stay", async () => {
+      withCv({ experience: [job("a", "Kreditech · Hamburg, Germany"), job("b", "Kreditech is a fintech"), job("c", "KREDITECH | Hamburg")] });
+      renderPage();
+      await waitFor(() => expect(api.saveCv).toHaveBeenCalled(), { timeout: 4000 });
+      expect(api.saveCv).toHaveBeenCalledTimes(1);
+      expect(api.saveCv.mock.lastCall![0].experience.map((e: { description: string }) => e.description)).toEqual(["", "Kreditech is a fintech", ""]);
+    });
+    it("a CV without copies opens without a save", async () => {
+      withCv({ experience: [job("b", "Kreditech is a fintech")] });
+      renderPage();
+      await screen.findByText("Saved");
+      await new Promise((done) => setTimeout(done, 1500));
+      expect(api.saveCv).not.toHaveBeenCalled();
+    });
+  });
+
   it("typing on the page autosaves", async () => {
     const user = userEvent.setup();
     withCv({ basics });

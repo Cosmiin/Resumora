@@ -32,6 +32,13 @@ describe("toCvContent", () => {
     }
   });
 
+  it("drops a description that only repeats the company and location, and keeps a real one", () => {
+    const copied = { ...job("Kreditech"), location: "Hamburg, Germany", description: "Kreditech · Hamburg, Germany" };
+    const real = { ...job("Kreditech"), location: "Hamburg, Germany", description: "Kreditech is a fintech in Hamburg" };
+    const { content } = toCvContent(draftWith({ experience: [copied, real] }));
+    expect(content.experience.map((e) => e.description)).toEqual(["", "Kreditech is a fintech in Hamburg"]);
+  });
+
   it("assigns ids", () => {
     const { content } = toCvContent(
       draftWith({ experience: [job("Acme", ["Did a thing"])], technicalSkills: ["SQL"], custom: [{ title: "Awards", details: "Best PM 2021" }] }),
