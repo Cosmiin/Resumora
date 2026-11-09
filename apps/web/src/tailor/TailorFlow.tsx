@@ -1,45 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { TAILOR_SECTIONS, type Answer, type CvContent, type Proposal, type Steering, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
+import { TAILOR_SECTIONS, type Answer, type CvContent, type JobExtraction, type MatchScore, type Proposal, type Steering, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
+import { getJob } from "../jobs/jobs-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard, type Draft } from "./QuestionCard.tsx";
+import { keptChanges, keptTexts, newlyMet, roleDone } from "./role-done.ts";
 import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
 import { SteeringStep } from "./SteeringStep.tsx";
+import { TailorMoment } from "./TailorMoment.tsx";
+import { remember, remembered, type Phase } from "./flow-phase.ts";
 import * as api from "./tailor-api.ts";
 import { FinishedRoles, roleName, YourAnswers } from "./YourAnswers.tsx";
 import "../styles/tailor.css";
 
-type Phase =
-  | { kind: "loading" }
-  /** `resume`: changing the steering of a started run; going back returns there. */
-  | { kind: "steer"; busy: boolean; resume?: Phase }
-  | { kind: "confirm"; steering: Steering; busy: boolean; resume: Phase }
-  /** Going back (BackA): a finished step, a finished role's answers, a redone role's review. */
-  | { kind: "back"; section: TailorSection; resume: Phase }
-  | { kind: "role"; roleId: string; busy: boolean; resume: Phase }
-  | { kind: "redo"; roleId: string; proposals: Proposal[]; removed?: number; busy: boolean; resume: Phase }
-  | { kind: "asking" }
-  /** Answers stay here, one per question (undefined = not reached yet), until the step's last question. */
-  | { kind: "questions"; questions: TailorQuestion[]; index: number; answers: (Draft | undefined)[] }
-  | { kind: "working" }
-  | { kind: "review"; proposals: Proposal[]; busy: boolean; removed?: number }
-  | { kind: "error"; message: string; retry(): void }
-  | { kind: "deleted" };
-
-const storageKey = (jobId: string) => `resumora.tailorRun.${jobId}`;
-export function remember(jobId: string, runId: string | null) {
-  try {
-    if (runId) localStorage.setItem(storageKey(jobId), runId);
-    else localStorage.removeItem(storageKey(jobId));
-  } catch { /* storage is a convenience: the start route returns the job's open run anyway */ }
-}
-export function remembered(jobId: string): string | null {
-  try { return localStorage.getItem(storageKey(jobId)); } catch { return null; }
-}
+export { remember, remembered } from "./flow-phase.ts";
 
 /** `/jobs/:id/tailor`: steering, then each section's questions, run and review (Experience role by role), full screen. */
 export function TailorFlow() {
@@ -56,6 +34,9 @@ export function TailorFlow() {
   // The stored steering, read when the Tone and questions screens open on a started run.
   const [steering, setSteering] = useState<Steering | undefined>(undefined);
   const runRef = useRef<TailorRun | null>(null);
+  // The newest score with its labels (base, then each accept's), and the job: for the role done line.
+  const scoreRef = useRef<MatchScore | null>(null);
+  const [job, setJob] = useState<JobExtraction | null>(null);
   const started = useRef(false);
   const section = run?.currentSection ?? null;
 
@@ -109,8 +90,16 @@ export function TailorFlow() {
     try {
       const roleId = roleArg(at);
       const result = await api.acceptSection(runRef.current!.id, at, roleId ? { ...body, roleId } : body);
+      const before = scoreRef.current;
+      scoreRef.current = result.score;
       setLatest(result.score.total);
-      enter(result.run);
+      const role = roleId ? cv?.experience.find((r) => r.id === roleId) : undefined;
+      if (!role || phase.kind !== "review") return enter(result.run);
+      const kept = keptChanges(phase.proposals, body);
+      track(result.run);
+      setPhase({ kind: "roleDone", from: latest ?? base, to: result.score.total, next: result.run, ...roleDone({
+        names: newlyMet(before, result.score, keptTexts(role, kept), job), company: job?.company ?? null, changed: kept.length > 0,
+        from: latest ?? base, to: result.score.total, next: result.run, roles: cv?.experience ?? [] }) });
     } catch (cause) {
       setPhase((current) => current.kind === "review" ? { ...current, busy: false } : current);
       if (cause instanceof ApiClientError && cause.code === "job_not_found") fail(cause, at, () => {});
@@ -134,6 +123,7 @@ export function TailorFlow() {
     setPhase({ ...review, busy: true });
     try {
       const result = await api.acceptRole(runRef.current!.id, roleId, body);
+      scoreRef.current = result.score;
       setLatest(result.score.total);
       track(result.run);
       setPhase(review.resume);
@@ -185,11 +175,13 @@ export function TailorFlow() {
     if (started.current) return;
     started.current = true;
     api.getScores(jobId).then((scores) => {
+      scoreRef.current = scores.tailored ?? scores.base;
       setBase(scores.base?.total ?? null);
       setLatest((value) => value ?? scores.tailored?.total ?? null);
     }, () => {});
     // Without it the screens fall back to the plain list; the run itself doesn't need it.
     getCv().then((response) => setCv(response.content), () => {});
+    getJob(jobId).then((found) => setJob(found.extracted ?? null), () => {});
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -243,7 +235,10 @@ export function TailorFlow() {
       : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
         busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
   }
-  else if (phase.kind === "deleted") {
+  else if (phase.kind === "roleDone") {
+    const done = phase;
+    body = <TailorMoment from={done.from} to={done.to} title={done.title} line={done.line} button={done.button} onNext={() => enter(done.next)} />;
+  } else if (phase.kind === "deleted") {
     body = <section className="tailor-card" role="alert"><h2>{t("tailor.error.deleted")}</h2>
       <Link to="/jobs">{t("tailor.error.toJobs")}</Link></section>;
   } else if (phase.kind === "error") {

@@ -98,6 +98,9 @@
 .tailor-tip { display: none; margin-inline-start: var(--space-2); font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-muted); }
 .tailor-guess-tag:hover + .tailor-tip, .tailor-guess-tag:focus + .tailor-tip { display: inline; }
 
+/* Role done and Tailoring done: enrichment's fm-moment inside a card. */
+.tailor-moment { position: relative; min-height: 24rem; overflow: hidden; }
+
 @media (max-width: 760px) {
   .tailor-mode { padding: var(--space-6) var(--space-4) var(--space-10); }
   .tailor-card { padding: var(--space-5); }
