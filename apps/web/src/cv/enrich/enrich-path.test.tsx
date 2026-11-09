@@ -222,7 +222,7 @@ describe("the end of the path (6B)", () => {
     const dispatch = await finish(new Map([["a", ready(90)], ["b", ready(82)], ["c", ready(84)], ["d", ready(80)]]));
     expect(await screen.findByRole("heading", { name: "Your CV is enriched" })).toBeInTheDocument();
     expect(dispatch).toHaveBeenCalledWith({ type: "markEnriched", at: expect.any(String) });
-    expect(screen.getByText("Average role score 75 → 84")).toBeInTheDocument();
+    expect(screen.getByText("Average score 75 → 84")).toBeInTheDocument();
     const rows = screen.getAllByRole("listitem").map((li) => li.textContent);
     expect(rows).toEqual(["Analyst · Analyst Co90", "Buyer · Buyer Co61 → 82", "Clerk · Clerk Co70 → 84", "Driver · Driver Co80",
       "Key achievements · 1 added", "Skills · 1 added"]);

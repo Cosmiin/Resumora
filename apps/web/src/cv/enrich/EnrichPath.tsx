@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { LIGHT_SECTIONS, findScored, newId, scoredItems, type CvContent, type ScoredKind, type SkillGroup } from "@resumora/shared";
+import { LIGHT_SECTIONS, findScored, newId, scoredItems, type CvContent, type LightSection, type ScoredKind, type SkillGroup } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { AchievementsPick } from "./AchievementsPick.tsx";
@@ -11,7 +11,7 @@ import { roleName } from "../edit/sections/RoleItem.tsx";
 import { useNavigate } from "react-router";
 import { FocusMode, LightStop } from "./FocusMode.tsx";
 import { PathStart } from "./PathStart.tsx";
-import type { LineList } from "../edit/lists.ts";
+import { SCORED_LIST, type LineList } from "../edit/lists.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 type Props = {
@@ -82,7 +82,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   if (stage.kind === "start") {
     return <PathStart items={items} quick={quick} scores={scores} onNotNow={onClose}
       onStart={() => {
-        setFixed({ stops: below, lights: light, before: new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))])) });
+        setFixed({ stops: below, lights: light, before: new Map(scoredItems(cv).map(({ item }) => [item.id, scoreOf(scores.get(item.id))])) });
         if (below.length) setStage({ kind: "role", index: 0 });
         else setStage(light.length ? { kind: "light", index: 0 } : { kind: "achievements" });
       }} />;
@@ -155,14 +155,14 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   }} />;
   return (
     <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={total} total={total} />} onClose={onClose}>
-      <EndStop cv={cv} scores={scores} waitForSave={waitForSave} before={before} stops={stops} achievementsAdded={achievementsAdded}
+      <EndStop cv={cv} scores={scores} waitForSave={waitForSave} before={before} stops={stops} lights={lights} achievementsAdded={achievementsAdded}
         skillsAdded={skills.undone ? 0 : skills.names.length} notice={notice} dispatch={dispatch} onClose={onClose}
         onImprove={(roleId) => setStage({ kind: "improve", roleId })} />
     </PathScreen>
   );
 }
 
-/** The average of every role score in "Your roles" (roles with a score), rounded; null when none has one. */
+/** The average of every score given (roles, projects and volunteering with a score), rounded; null when none has one. */
 export function averageScore(scores: ReadonlyMap<string, number | null>): number | null {
   const known = [...scores.values()].filter((n): n is number => n !== null);
   return known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length) : null;
@@ -170,14 +170,16 @@ export function averageScore(scores: ReadonlyMap<string, number | null>): number
 const scoreOf = (s: RoleScoreState | undefined) => (s && s.state !== "none" ? (s.result?.score ?? null) : null);
 
 /** 6B: waits for the last scores, then "Your CV is enriched" (saved once) or "Almost there". */
-function EndStop({ cv, scores, waitForSave, before, stops, achievementsAdded, skillsAdded, notice, dispatch, onClose, onImprove }: {
+function EndStop({ cv, scores, waitForSave, before, stops, lights, achievementsAdded, skillsAdded, notice, dispatch, onClose, onImprove }: {
   cv: CvContent; scores: ReadonlyMap<string, RoleScoreState>; waitForSave(): Promise<void>; before: ReadonlyMap<string, number | null>; stops: string[];
-  achievementsAdded: number; skillsAdded: number; notice: ReactNode; dispatch(a: CvAction): void; onClose(): void; onImprove(roleId: string): void;
+  lights: { section: LightSection; itemId: string }[]; achievementsAdded: number; skillsAdded: number; notice: ReactNode; dispatch(a: CvAction): void; onClose(): void; onImprove(roleId: string): void;
 }) {
   const navigate = useNavigate();
-  // A role still being scored (or waiting for it) would give a wrong average: wait for it.
-  const settled = cv.experience.every((r) => !["scoring", "previous"].includes(scores.get(r.id)?.state ?? ""));
-  const now = new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))]));
+  // Q1: every scored item counts (projects and volunteering only when the CV has them). One still being scored
+  // (or waiting for it) would give a wrong average: wait for it.
+  const scored = scoredItems(cv);
+  const settled = scored.every(({ item }) => !["scoring", "previous"].includes(scores.get(item.id)?.state ?? ""));
+  const now = new Map(scored.map(({ item }) => [item.id, scoreOf(scores.get(item.id))]));
   const average = averageScore(now) ?? 0;
   const enriched = settled && average >= ENRICHED_AVERAGE;
   useEffect(() => {
@@ -191,14 +193,22 @@ function EndStop({ cv, scores, waitForSave, before, stops, achievementsAdded, sk
       </div>
     );
   }
-  const rows: RoleRow[] = cv.experience.map((r) => ({
-    roleId: r.id, label: [r.title.trim(), r.company.trim()].filter(Boolean).join(" · ") || roleName(r, "experience"),
+  const rows: RoleRow[] = scored.map(({ item: r, kind }) => ({
+    roleId: r.id, kind, label: [r.title.trim(), r.company.trim()].filter(Boolean).join(" · ") || roleName(r, SCORED_LIST[kind]),
     before: before.get(r.id) ?? null, after: now.get(r.id) ?? null, visited: stops.includes(r.id),
   }));
   const lowest = rows.filter((r) => r.after !== null).sort((a, b) => a.after! - b.after!)[0] ?? null;
+  // The lighter items the path visited had no lines, so their lines now are the ones it added.
+  const also = LIGHT_SECTIONS.map((section) => ({
+    section,
+    n: lights.filter((l) => l.section === section).reduce((sum, l) => {
+      const found = (cv[section] as { id: string; bullets?: { text: string }[] }[]).find((i) => i.id === l.itemId);
+      return sum + (found?.bullets ?? []).filter((b) => b.text.trim() !== "").length;
+    }, 0),
+  })).filter((a) => a.n > 0);
   return (
-    <EnrichedScreen start={averageScore(before)} average={average} rows={rows} achievementsAdded={achievementsAdded} skillsAdded={skillsAdded}
-      notice={notice} lowest={lowest ? { ...lowest, label: roleName(cv.experience.find((r) => r.id === lowest.roleId)!, "experience") } : null}
+    <EnrichedScreen start={averageScore(before)} average={average} rows={rows} also={also} achievementsAdded={achievementsAdded} skillsAdded={skillsAdded}
+      notice={notice} lowest={lowest ? { ...lowest, label: roleName(findScored(cv, lowest.roleId)!.item, SCORED_LIST[lowest.kind]) } : null}
       onBack={onClose} onFinish={onClose} onImprove={onImprove}
       onFindJob={() => void (async () => {
         // Leaving /cv drops a save still waiting: "enriched" and the added skills must be saved first.
