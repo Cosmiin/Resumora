@@ -173,6 +173,19 @@ describe("PATCH /v1/tailored/:id/review (guided review)", () => {
     expect(kept.review!.skills).toMatchObject({ "new-skill:BPMN": { kept: true, reviewed: true, text: "BPMN" } });
   });
 
+  it("Remove leaves a skill the Base CV already has; an edit that makes the CV too long is 400 and saves nothing", async () => {
+    const { id, version } = await seeded();
+    const stored = docs.cvs.get(id)!;
+    stored.baseSnapshot = { ...stored.baseSnapshot, technicalSkills: [{ id: "00000000-0000-4000-8000-0000000000c2", name: "bpmn" }] };
+    const kept = await row(await review(id, { section: "skills", key: "new-skill:BPMN", action: "remove", version }));
+    expect(kept.content.technicalSkills.map((s) => s.name)).toEqual(["BPMN"]);
+    expect(kept.review!.skills).toMatchObject({ "new-skill:BPMN": { kept: false, reviewed: true } });
+    docs.cvs.get(id)!.content.basics.summary = `${"x".repeat(3990)} who works abroad`;
+    const long = await review(id, { section: "summary", key: "summary#0", action: "edit", text: "y".repeat(1500), version: kept.version });
+    await expectError(long, 400, "invalid_content");
+    expect(docs.cvs.get(id)!.version).toBe(kept.version);
+  });
+
   it("a stale version is 409 version_conflict and changes nothing; an unknown item is 404; another user's CV is 404", async () => {
     const { id, version } = await seeded();
     await expectError(await review(id, { section: "experience", key: bullet, action: "remove", version: version + 1 }), 409, "version_conflict");

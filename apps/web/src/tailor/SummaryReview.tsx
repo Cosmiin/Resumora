@@ -70,18 +70,25 @@ export function SummaryReview({ proposals, before, busy, onAccept, removed = 0 }
   const [choices, setChoices] = useState<Record<number, GuessChoice>>({});
   const proposal = proposals.find((p) => p.itemId === "summary" && p.flags.length === 0);
   const spans = proposal ? placeGuesses(proposal.text, proposal.guesses ?? []) : [];
+  // Guessed as a whole, without exact phrases: marked as one guess, left for the guided review.
+  const whole = !!proposal?.inferred && spans.length === 0;
 
   function use() {
     if (!proposal) return onAccept({ decisions: [], inferred: [], flags: [] });
     const inferred = Object.entries(choices).sort(([a], [b]) => Number(a) - Number(b))
       .map(([i, choice]) => ({ itemId: `summary#${i}`, ...choice }));
-    onAccept({ decisions: [{ itemId: "summary", keep: true }], inferred, flags: [] });
+    // A summary guessed as a whole (no exact phrases) is sent as neither, so it stays kept and unreviewed.
+    onAccept({ decisions: proposal.inferred ? [] : [{ itemId: "summary", keep: true }], inferred, flags: [] });
   }
 
   return <section className="tailor-card" aria-labelledby="tailor-summary-title">
     <h2 id="tailor-summary-title">{t("tailor.summaryReview.title")}</h2>
     {proposal ? <>
-      <div className="tailor-doc"><Paragraph before={before} text={proposal.text} spans={spans} choices={choices} /></div>
+      <div className="tailor-doc">{whole
+        ? <p><mark className="tailor-guess">{proposal.text}</mark></p>
+        : <Paragraph before={before} text={proposal.text} spans={spans} choices={choices} />}</div>
+      {whole && proposal.reason && <p className="tailor-reason">
+        {t("tailor.summaryReview.guessLine", { reason: proposal.reason.replace(/[.\s]+$/, "") })}</p>}
       {spans.length > 0 && <ul className="tailor-items">
         {spans.map((span, i) => <GuessItem key={i} span={span} choice={choices[i]}
           onChoose={(choice) => setChoices((state) => ({ ...state, [i]: choice }))} />)}

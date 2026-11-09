@@ -68,8 +68,9 @@ export function TailoredCvPage() {
   const [tab, setTab] = useState<TailoredTab>(search.get("tab") === "letter" ? "letter" : "cv");
   // GuideA: the guided review of the AI guesses (?review=1 from the done screen, or the Export menu's Review).
   const [guiding, setGuiding] = useState(search.get("review") === "1");
-  // Bumped by the guided review's Export: remounts the menu open.
-  const [exportOpen, setExportOpen] = useState(0);
+  // The Export menu opens on arrival (?export=1) or from the guided review's Export, never after Review or Stop.
+  const [openExport, setOpenExport] = useState(search.get("export") === "1");
+  const [exportKey, setExportKey] = useState(0);
   // Letters written or edited since each copy's row was loaded (switching tabs doesn't refetch the row).
   const [letters, setLetters] = useState<Record<string, LetterOverride>>({});
   const cv = doc.data ?? null;
@@ -145,8 +146,8 @@ export function TailoredCvPage() {
         template={template} onTemplate={(next) => pickTemplate(cv.id, cv.template, next)}>
         <LanguageMenu key={cv.id} jobId={jobId} current={{ id: cv.id, language: cv.language }} />
         <button type="button" className="secondary" onClick={openDialog}>{t("tailored.retailor")}</button>
-        <ExportMenu key={exportOpen} load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template}
-          startOpen={exportOpen > 0 || search.get("export") === "1"} onReview={() => { setTab("cv"); setGuiding(true); }} />
+        <ExportMenu key={exportKey} load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template}
+          startOpen={openExport} onReview={() => { setOpenExport(false); setTab("cv"); setGuiding(true); }} />
       </TailorToolbar>
       {templateError && <p role="alert" className="form-error">{t("tailored.templateError")}</p>}
       {jobChanged && (
@@ -162,7 +163,8 @@ export function TailoredCvPage() {
   // The guided review saved its own versions: reload the row, and the editor starts again from it.
   const closeGuide = (exporting: boolean) => {
     setGuiding(false);
-    if (exporting) setExportOpen((n) => n + 1);
+    setOpenExport(exporting);
+    if (exporting) setExportKey((n) => n + 1);
     void doc.refetch();
   };
   const sectionAction = (key: SectionKey) => {

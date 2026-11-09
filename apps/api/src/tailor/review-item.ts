@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { applyGuesses, MAX_TEXT, type CvContent, type TailoredCv } from "@resumora/shared";
+import { applyGuesses, CvContentSchema, MAX_TEXT, type CvContent, type TailoredCv } from "@resumora/shared";
 import { ApiError } from "../errors.ts";
 import type { ItemReview } from "./accept.ts";
 import type { TailorRepo } from "./repo.ts";
@@ -56,7 +56,9 @@ export async function reviewItem(tailor: TailorRepo, id: string, body: ReviewIte
     const lists = [content.technicalSkills, content.professionalSkills];
     const skill = lists.flatMap((list) => list).find((s) => s.name.trim().toLowerCase() === name);
     if (body.action !== "keep" && !skill) throw changed();
-    if (body.action === "remove") for (const list of lists) list.splice(0, list.length, ...list.filter((s) => s !== skill));
+    // A skill the Base CV already has isn't new: Remove leaves it in place.
+    const inBase = [...doc.baseSnapshot.technicalSkills, ...doc.baseSnapshot.professionalSkills].some((s) => s.name.trim().toLowerCase() === name);
+    if (body.action === "remove" && !inBase) for (const list of lists) list.splice(0, list.length, ...list.filter((s) => s !== skill));
     if (body.action === "edit") skill!.name = text;
   } else if (body.key === "summary") {
     if (body.action !== "keep") content.basics.summary = keep ? text : doc.baseSnapshot.basics.summary;
@@ -77,6 +79,9 @@ export async function reviewItem(tailor: TailorRepo, id: string, body: ReviewIte
     section[`new-skill:${text}`] = next;
   } else section[body.key] = next;
 
-  if (await tailor.saveTailoredCv(doc.id, doc.version, { content, review, score: doc.score }) === "conflict") throw conflict();
+  // Same limits as the editor's save (an edited phrase can make the summary too long).
+  const parsed = CvContentSchema.safeParse(content);
+  if (!parsed.success) throw new ApiError(400, "invalid_content", "This text is too long for the CV.");
+  if (await tailor.saveTailoredCv(doc.id, doc.version, { content: parsed.data, review, score: doc.score }) === "conflict") throw conflict();
   return tailor.readTailoredCv(doc.id);
 }

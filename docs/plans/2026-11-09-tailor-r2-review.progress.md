@@ -49,3 +49,11 @@ open: rulings — `TailorMoment.tsx` gains an optional button and a children slo
 session: tailor-r2 Part B (block 2) · builder: claude
 commit: see git log (base 448f263) · reviews: 2 (agents) · fix rounds: 1 (high: `section`/`key` from the request could reach `Object.prototype`; now own entries only, tested; low: a 409 `item_changed` no longer shows as "saved elsewhere") · guard denials: 0 · weekly 50% → 50%
 open: rulings — `accept.ts` keeps each guess's `reason`; `CvDocument.tsx` gains a `focus` prop (the glow); the guided review replaces the page through the editor's `replacePage` slot, and on close the page reloads the row and the editor (keyed by id and version) starts from it; Edit on an id item changes the field whose value is the reviewed text; a new skill's review key follows its edited name. The Export warning's item list is gone (count + Review N items + "Or export anyway:"); `export/export.test.tsx` updated. No new AI task, no migration. **For the owner:** new route `PATCH /v1/tailored/:id/review` (RLS-scoped like the other tailored routes). `ExportMenu.tsx` will need a small merge with PR #46.
+
+## End of Part B: whole-branch review (Opus high, base 01cbc9a)
+reviews: 1 whole-branch + 1 fix-only (Opus) · findings: 1 medium, 3 low, all fixed:
+- medium: a summary the AI marked as a guess with no exact phrases was saved as reviewed; it now shows marked with its reason and stays kept and unreviewed (counts in Still to check / export / guided review).
+- low: the review PATCH now checks the saved CV against the schema (400 `invalid_content`), so an edited phrase can't make the summary too long to load.
+- low: Remove on a "new" skill the Base CV already has leaves it in place.
+- low: with `?export=1`, the Export menu no longer reopens after the guided review closes.
+open: no regression test for the last fix (low, from the fix review). A second whole-branch review isn't needed: the fixes touch no shared type, schema, migration, RLS or auth.
