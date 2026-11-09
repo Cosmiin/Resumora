@@ -10,7 +10,7 @@ import { useFocusAfterRender } from "../useFocusAfterRender.ts";
 import { AddButton } from "./AddButton.tsx";
 import { RemoveButton } from "./RemoveButton.tsx";
 
-export type SimpleList = "languages" | "certifications" | "projects" | "awards" | "courses" | "publications";
+export type SimpleList = "languages" | "certifications" | "awards" | "courses" | "publications";
 
 type Spec = { field: string; label: MessageKey; placeholder?: MessageKey };
 
@@ -34,11 +34,6 @@ const CONFIG: Record<SimpleList, Config> = {
     main: { field: "name", label: "edit.list.certifications.name" },
     details: [{ field: "issuer", label: "edit.list.certifications.issuer", placeholder: ISSUER }],
     date: { field: "date", label: "edit.list.certifications.date", placeholder: DATE },
-  },
-  projects: {
-    main: { field: "name", label: "edit.list.projects.name" },
-    details: [{ field: "url", label: "edit.list.projects.url", placeholder: LINK }],
-    description: { field: "description", label: "edit.list.projects.description", placeholder: DESCRIPTION },
   },
   awards: {
     main: { field: "name", label: "edit.list.awards.name" },

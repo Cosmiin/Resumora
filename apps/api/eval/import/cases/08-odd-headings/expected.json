@@ -63,13 +63,33 @@
     "certifications": [],
     "projects": [
       {
-        "name": "Potluck",
-        "description": "A free app for planning shared dinners, used by about 800 people.",
+        "company": "",
+        "title": "Potluck",
+        "location": "",
+        "startDate": "",
+        "endDate": "",
+        "current": false,
+        "description": "",
+        "bullets": [
+          {
+            "text": "A free app for planning shared dinners, used by about 800 people."
+          }
+        ],
         "url": "potluck.example.com"
       },
       {
-        "name": "Tidemark",
-        "description": "An open-source tool that checks websites for broken links.",
+        "company": "",
+        "title": "Tidemark",
+        "location": "",
+        "startDate": "",
+        "endDate": "",
+        "current": false,
+        "description": "",
+        "bullets": [
+          {
+            "text": "An open-source tool that checks websites for broken links."
+          }
+        ],
         "url": "github.com/nadia-example/tidemark"
       }
     ],

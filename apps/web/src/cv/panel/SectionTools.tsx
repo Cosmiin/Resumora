@@ -1,7 +1,7 @@
 import { CATEGORY, normalizeLayout, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction, ListKey } from "../edit/cvReducer.ts";
-import { getItems } from "../edit/lists.ts";
+import { getItems, type RoleList } from "../edit/lists.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
 import { useOpenFocus } from "../enrich/focus-context.ts";
@@ -36,7 +36,7 @@ function Eye() {
 }
 
 /** Role tools: "I work here now" and Remove role. */
-function RoleBox({ cv, dispatch, list, itemId, onFocusPage }: Pick<Props, "cv" | "dispatch" | "onFocusPage"> & { list: "experience" | "volunteering"; itemId: string }) {
+function RoleBox({ cv, dispatch, list, itemId, onFocusPage }: Pick<Props, "cv" | "dispatch" | "onFocusPage"> & { list: RoleList; itemId: string }) {
   const item = cv[list].find((r) => r.id === itemId);
   if (!item) return null;
   const title = item.title || item.company ? roleName(item, list) : t("panel.tools.thisRole");
@@ -129,7 +129,7 @@ function originalWording(cv: CvContent, original: CvContent, { key, itemId }: No
       restore.push({ type: "setItemField", list, itemId, field, value });
     }
   }
-  if ((list === "experience" || list === "volunteering") && Array.isArray(before.bullets) && Array.isArray(now.bullets)) {
+  if ((list === "experience" || list === "volunteering" || list === "projects") && Array.isArray(before.bullets) && Array.isArray(now.bullets)) {
     const current = new Map((now.bullets as { id: string; text: string }[]).map((b) => [b.id, b.text]));
     for (const bullet of before.bullets as { id: string; text: string }[]) {
       if (current.has(bullet.id) && current.get(bullet.id) !== bullet.text) {
@@ -199,7 +199,7 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores,
       {!tailored && key === "experience" && itemId && (
         <RoleEnrich key={itemId} cv={cv} roleId={itemId} scores={scores} onRetry={onRetry} />
       )}
-      {(key === "experience" || key === "volunteering") && itemId && (
+      {(key === "experience" || key === "volunteering" || key === "projects") && itemId && (
         <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onFocusPage={onFocusPage} />
       )}
       {!tailored && key === "summary" && <SummaryTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}

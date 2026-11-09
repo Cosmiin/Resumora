@@ -50,11 +50,12 @@ export function buildCvPdf(
       {details.filter(Boolean).map((line, index) => <Text key={index}>{line}</Text>)}
     </View>
   );
-  const roles = (items: CvContent["experience"]) => items.map((job) => (
+  // A project is a role with a link, shown after the organisation.
+  const roles = (items: (CvContent["experience"][number] & { url?: string })[]) => items.map((job) => (
     <View key={job.id} style={styles.block}>
       {entry(
         job.id, job.title, formatRange(job.startDate, job.endDate, job.current, content.locale),
-        join([job.company, job.location]), job.description,
+        join([job.company, job.location, job.url ?? ""]), job.description,
       )}
       {job.bullets.map(bullet)}
     </View>
@@ -82,7 +83,7 @@ export function buildCvPdf(
     certifications: content.certifications.map((item) => entry(
       item.id, item.name, formatRange(item.date, "", false, content.locale), item.issuer,
     )),
-    projects: content.projects.map((item) => entry(item.id, item.name, "", item.url, item.description)),
+    projects: roles(content.projects),
     volunteering: roles(content.volunteering),
     awards: content.awards.map((item) => entry(item.id, item.name, date(item.date), item.issuer, item.description)),
     courses: content.courses.map((item) => entry(item.id, item.name, date(item.date), item.provider)),

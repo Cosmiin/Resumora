@@ -25,6 +25,7 @@ import {
   withItems,
   type BulletOwner,
   type ListKey,
+  type RoleList,
 } from "./lists.ts";
 
 export type { BulletOwner, ListKey } from "./lists.ts";
@@ -59,7 +60,7 @@ export type CvAction =
   | { type: "addBullets"; roleId: string; texts: string[] }
   | { type: "setFacts"; roleId: string; facts: RoleFacts | null }
   | { type: "setNote"; roleId: string; note: Note }
-  | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean }
+  | { type: "setCurrent"; list: RoleList; itemId: string; current: boolean }
   /** Empties role descriptions that only repeat the company and/or location (old imports). */
   | { type: "clearCopiedDescriptions" }
   /** Key achievements picked in the guided path (4A), added in one go. */

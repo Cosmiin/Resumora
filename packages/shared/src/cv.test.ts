@@ -211,3 +211,43 @@ describe("enrichedAt (J2)", () => {
     expect(CvContentSchema.safeParse({ ...emptyCv(), enrichedAt: "yesterday" }).success).toBe(false);
   });
 });
+
+describe("projects take the role shape", () => {
+  const legacy = { id: "pr1", name: "Budget forecast", description: "Built a Python script. It predicts spend within 5%!\nUsed pandas.", url: "github.com/x" };
+
+  it("reads an old project into the role shape, one bullet per sentence", () => {
+    const cv = CvContentSchema.parse({ ...emptyCv(), projects: [legacy] });
+    expect(cv.projects[0]).toEqual({
+      id: "pr1", title: "Budget forecast", company: "", location: "", startDate: "", endDate: "", current: false,
+      description: "",
+      bullets: [
+        { id: "pr1-b1", text: "Built a Python script." },
+        { id: "pr1-b2", text: "It predicts spend within 5%!" },
+        { id: "pr1-b3", text: "Used pandas." },
+      ],
+      notes: [], url: "github.com/x",
+    });
+  });
+
+  it("gives the same bullet ids each time the same stored project is read", () => {
+    const a = CvContentSchema.parse({ ...emptyCv(), projects: [legacy] });
+    const b = StoredCvSchema.parse({ ...emptyCv(), projects: [legacy] });
+    expect(b.projects[0]!.bullets.map((x) => x.id)).toEqual(a.projects[0]!.bullets.map((x) => x.id));
+  });
+
+  it("an old project with no paragraph has no bullets", () => {
+    const cv = CvContentSchema.parse({ ...emptyCv(), projects: [{ ...legacy, description: "  " }] });
+    expect(cv.projects[0]!.bullets).toEqual([]);
+  });
+
+  it("keeps a new-shape project as it is", () => {
+    const project = { ...experience({ title: "Forecast", company: "Personal project", bullets: [{ id: "b1", text: "Did it" }] }), url: "x.io" };
+    const cv = CvContentSchema.parse({ ...emptyCv(), projects: [project] });
+    expect(cv.projects[0]).toEqual(project);
+  });
+
+  it("rejects a new-shape project with an unknown field", () => {
+    const project = { ...experience(), url: "", extra: 1 };
+    expect(CvContentSchema.safeParse({ ...emptyCv(), projects: [project] }).success).toBe(false);
+  });
+});

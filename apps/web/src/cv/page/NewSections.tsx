@@ -36,15 +36,17 @@ export function newSectionBody(
         ),
       };
     case "volunteering":
+    case "projects":
       return {
-        show: cv.volunteering.length > 0,
-        body: cv.volunteering.map((v) => (
+        show: cv[key].length > 0,
+        body: cv[key].map((v) => (
           <div className="cv-block" key={v.id}>
             <span className="cv-item-head">
               <span className="cv-item-title">{v.title}</span>
               <span className="cv-item-dates">{roleRange(v.startDate, v.endDate, v.current)}</span>
             </span>
             {(v.company || v.location) && <span className="cv-item-sub">{joinParts([v.company, v.location])}</span>}
+            {"url" in v && v.url && <span className="cv-item-sub">{v.url}</span>}
             {v.description && <span className="cv-text">{v.description}</span>}
             {v.bullets.length > 0 && (
               <ul className="cv-bullets">

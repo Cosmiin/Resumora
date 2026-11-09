@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import { newId, type Experience, type Locale } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { CvAction } from "../cvReducer.ts";
+import type { RoleList } from "../lists.ts";
 import { useFocusAfterRender } from "../useFocusAfterRender.ts";
 import { AddButton } from "./AddButton.tsx";
 import { DragList } from "../DragList.tsx";
@@ -9,7 +10,7 @@ import { RoleItem, roleName } from "./RoleItem.tsx";
 import type { RoleScoreState } from "../../enrich/useRoleScores.ts";
 
 type Props = {
-  list: "experience" | "volunteering";
+  list: RoleList;
   items: Experience[];
   locale: Locale;
   /** Scores by role id; only experience roles have them. */
@@ -19,7 +20,7 @@ type Props = {
   dispatch(a: CvAction): void;
 };
 
-/** Experience or volunteering: every role typed in place. */
+/** Experience, volunteering or projects: every item typed in place, in the role shape. */
 export function RolesEdit({ list, items, locale, dispatch, scores, toolsRoleId }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
@@ -35,7 +36,7 @@ export function RolesEdit({ list, items, locale, dispatch, scores, toolsRoleId }
       <DragList items={items} onMove={move} label={label}>
         {(role) => <RoleItem role={role} list={list} locale={locale} dispatch={dispatch} score={scores?.get(role.id)} toolsOpen={role.id === toolsRoleId} />}
       </DragList>
-      <AddButton label={t("edit.add.role")} onClick={add} />
+      <AddButton label={t(list === "projects" ? "edit.add.project" : "edit.add.role")} onClick={add} />
     </div>
   );
 }

@@ -69,7 +69,7 @@ describe("notes-only job answers", () => {
     const content = {
       ...emptyCv(), experience: [role()],
       projects: Array.from({ length: 32 }, (_, i) => ({
-        id: "project-" + i, name: "", description: "\u00e9".repeat(4000), url: "",
+        id: "project-" + i, title: "", company: "", location: "", startDate: "", endDate: "", current: false, description: "é".repeat(4000), bullets: [], notes: [], url: "",
       })),
     };
     const notes = [note(1), note(2)].map((item) => ({ ...item, answer: "\u00e9".repeat(2000) }));

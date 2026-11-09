@@ -118,7 +118,7 @@ describe("EditablePage", () => {
     const cv: CvContent = {
       ...emptyCv(),
       certifications: [{ id: "c1", name: "AWS", issuer: "Amazon", date: "2021-03" }],
-      projects: [{ id: "p1", name: "Site", description: "Built it", url: "site.dev" }],
+      projects: [{ id: "p1", title: "Site", company: "", location: "", startDate: "", endDate: "", current: false, description: "Built it", bullets: [], notes: [], url: "site.dev" }],
       awards: [{ id: "a1", name: "Prize", issuer: "Org", date: "2020-05", description: "For work" }],
       courses: [{ id: "k1", name: "Course", provider: "School", date: "2019-01" }],
       publications: [{ id: "u1", title: "Paper", publisher: "Journal", date: "2018-02", url: "paper.org" }],
@@ -127,7 +127,7 @@ describe("EditablePage", () => {
     const checks: [string, string, (c: CvContent) => string, string][] = [
       ["Certification", "AWS", (c) => c.certifications[0]!.name, "!"],
       ["Certification issuer", "Amazon", (c) => c.certifications[0]!.issuer, "!"],
-      ["Project", "Site", (c) => c.projects[0]!.name, "!"],
+      ["Project name", "Site", (c) => c.projects[0]!.title, "!"],
       ["Project description", "Built it", (c) => c.projects[0]!.description, "!"],
       ["Project link", "site.dev", (c) => c.projects[0]!.url, "!"],
       ["Award", "Prize", (c) => c.awards[0]!.name, "!"],
@@ -148,6 +148,23 @@ describe("EditablePage", () => {
     for (const label of ["Certification date", "Award date", "Course date", "Publication date"]) {
       expect(screen.getByRole("textbox", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("a project shows like a short role under Projects, with editable bullets", async () => {
+    const project = {
+      id: "p1", title: "Forecast", company: "Personal project", location: "", startDate: "2023", endDate: "", current: false,
+      description: "", notes: [], url: "github.com/x",
+      bullets: [{ id: "b1", text: "Built a script" }, { id: "b2", text: "Saved 2 hours" }],
+    };
+    const cv: CvContent = { ...emptyCv(), projects: [project], layout: { ...emptyCv().layout, order: ["projects", ...emptyCv().layout.order.filter((k) => k !== "projects")] } };
+    render(<Harness initial={cv} />);
+    expect(screen.getByRole("textbox", { name: "Project name" })).toHaveValue("Forecast");
+    expect(screen.getByRole("textbox", { name: "Project link" })).toHaveValue("github.com/x");
+    const second = screen.getByRole("textbox", { name: "Bullet 2 of Forecast" });
+    expect(second).toHaveValue("Saved 2 hours");
+    await userEvent.type(second, "!");
+    expect(state().projects[0]!.bullets[1]!.text).toBe("Saved 2 hours!");
+    expect(screen.queryByRole("textbox", { name: "Role title" })).not.toBeInTheDocument();
   });
 
   it('a typed date "03/2021" is saved as 2021-03', async () => {

@@ -13,8 +13,11 @@ export type ListKey =
   | "interests"
   | "custom";
 
+/** Lists whose items have the role shape (title, organisation, dates, bullets). */
+export type RoleList = "experience" | "volunteering" | "projects";
+
 export type BulletOwner =
-  | { list: "experience" | "volunteering"; itemId: string }
+  | { list: RoleList; itemId: string }
   | { list: "achievements" };
 
 export type Item = { id: string } & Record<string, unknown>;
@@ -24,6 +27,7 @@ export function emptyItem(list: ListKey, id: string): Item {
   switch (list) {
     case "experience":
     case "volunteering":
+    case "projects":
       return {
         id,
         company: "",
@@ -35,6 +39,7 @@ export function emptyItem(list: ListKey, id: string): Item {
         description: "",
         bullets: [{ id: `${id}-b1`, text: "" }],
         notes: [],
+        ...(list === "projects" ? { url: "" } : {}),
       };
     case "education":
       return { id, school: "", degree: "", field: "", startDate: "", endDate: "", notes: "" };
@@ -42,8 +47,6 @@ export function emptyItem(list: ListKey, id: string): Item {
       return { id, name: "", level: "" };
     case "certifications":
       return { id, name: "", issuer: "", date: "" };
-    case "projects":
-      return { id, name: "", description: "", url: "" };
     case "awards":
       return { id, name: "", issuer: "", date: "", description: "" };
     case "courses":

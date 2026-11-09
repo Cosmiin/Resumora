@@ -30,7 +30,9 @@ export const sectionRenderers: Partial<Record<SectionKey, SectionRenderer>> = {
   skills: SkillsEdit,
   languages: simple("languages"),
   certifications: simple("certifications"),
-  projects: simple("projects"),
+  projects: function Projects({ cv, dispatch }) {
+    return <RolesEdit list="projects" items={cv.projects} locale={cv.locale} dispatch={dispatch} />;
+  },
   awards: simple("awards"),
   courses: simple("courses"),
   publications: simple("publications"),
@@ -49,6 +51,7 @@ export function firstFieldKey(key: SectionKey, id: string): string | null {
       return `bullet-${id}`;
     case "experience":
     case "volunteering":
+    case "projects":
       return `${key}-${id}-title`;
     case "education":
       return `education-${id}-degree`;
@@ -58,7 +61,6 @@ export function firstFieldKey(key: SectionKey, id: string): string | null {
       return `custom-${id}-title`;
     case "languages":
     case "certifications":
-    case "projects":
     case "awards":
     case "courses":
       return `${key}-${id}-name`;

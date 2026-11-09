@@ -91,9 +91,33 @@ export const LanguageSchema = z.object({ id, name: text(), level: text() }).stri
 export const CertificationSchema = z
   .object({ id, name: text(), issuer: text(), date: YearMonthSchema })
   .strict();
-export const ProjectSchema = z
-  .object({ id, name: text(), description: text(MAX_LONG_TEXT), url: text() })
-  .strict();
+/** A paragraph as bullets, one per sentence; a sentence longer than a bullet allows is cut into pieces. */
+function sentences(paragraph: string): string[] {
+  const parts = paragraph.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  return parts.flatMap((s) => (s.length <= MAX_TEXT ? [s] : s.match(new RegExp(`[\\s\\S]{1,${MAX_TEXT}}`, "g")) ?? []));
+}
+
+/**
+ * Projects used to be { name, description, url }. A stored one in that shape is read in the role shape,
+ * its paragraph split into bullets. Bullet ids come from the project id, so every read gives the same ones.
+ */
+function legacyProject(value: unknown): unknown {
+  if (!value || typeof value !== "object" || !("name" in value) || "title" in value) return value;
+  const old = value as { id?: unknown; name?: unknown; description?: unknown; url?: unknown };
+  const projectId = typeof old.id === "string" ? old.id : "";
+  const lines = sentences(typeof old.description === "string" ? old.description : "");
+  const kept = lines.length > MAX_BULLETS ? [...lines.slice(0, MAX_BULLETS - 1), lines.slice(MAX_BULLETS - 1).join(" ").slice(0, MAX_TEXT)] : lines;
+  return {
+    id: old.id, title: old.name, company: "", location: "", startDate: "", endDate: "", current: false,
+    description: "",
+    bullets: kept.map((text, i) => ({ id: `${projectId}-b${i + 1}`, text })),
+    notes: [],
+    url: typeof old.url === "string" ? old.url : "",
+  };
+}
+
+/** A project has the role shape (title = the project's name, company = organisation or context) plus its link. */
+export const ProjectSchema = z.preprocess(legacyProject, ExperienceSchema.extend({ url: text() }).strict());
 /** A section that fits nowhere else, keeping the CV's own heading. */
 export const CustomSectionSchema = z
   .object({ id, title: text(), details: text(MAX_LONG_TEXT) })
@@ -184,6 +208,7 @@ export type CvContent = z.infer<typeof CvContentSchema>;
 export type CvContentV1 = z.infer<typeof CvContentV1Schema>;
 export type Note = z.infer<typeof NoteSchema>;
 export type Experience = z.infer<typeof ExperienceSchema>;
+export type Project = z.infer<typeof ProjectSchema>;
 export type Skill = z.infer<typeof SkillSchema>;
 export type Bullet = z.infer<typeof BulletSchema>;
 export type Award = z.infer<typeof AwardSchema>;

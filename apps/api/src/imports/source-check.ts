@@ -37,8 +37,9 @@ function linesToCheck(c: CvContent): string[] {
   c.languages.forEach((l) => add(l.name));
   c.certifications.forEach((x) => add(x.name));
   for (const p of c.projects) {
-    add(p.name);
+    add(p.title);
     add(p.description);
+    p.bullets.forEach((b) => add(b.text));
   }
   c.awards.forEach((a) => add(a.name));
   c.courses.forEach((x) => add(x.name));

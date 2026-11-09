@@ -52,7 +52,8 @@ SKILLS: three groups, classified by the meaning of each item, never by the CV's 
 - Never put the same item in two groups. Never invent skills or qualities from job titles or responsibilities.
 
 OTHER SECTIONS
-- languages: spoken languages with their level as written. certifications: name, issuer, date. projects: name, description, url.
+- languages: spoken languages with their level as written. certifications: name, issuer, date.
+- projects: one entry per project, in the same shape as an experience entry: title = the project's name, company = the organisation or context it was for (for example "Personal project" or a company name; empty if not written), location, dates and current as written, description = an introduction line only if the CV has one, bullets = the project's points or sentences word for word, plus url (empty if none).
 - Preserve all certifications and optional categories.
 - custom: any section that fits nowhere else (driving licence, references, availability…), with its original heading as title and its complete content as details.
 

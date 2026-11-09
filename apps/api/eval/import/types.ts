@@ -10,6 +10,8 @@ export type Role = {
   company: string; title: string; location: string; startDate: string; endDate: string;
   current: boolean; description: string; bullets: { text: string }[];
 };
+/** A project has the role shape plus its link (title = the project's name). */
+export type Project = Role & { url: string };
 export type Content = {
   schemaVersion: 2;
   locale: "en" | "ro";
@@ -24,7 +26,7 @@ export type Content = {
   unclearSkills: { name: string }[];
   languages: { name: string; level: string }[];
   certifications: { name: string; issuer: string; date: string }[];
-  projects: { name: string; description: string; url: string }[];
+  projects: Project[];
   custom: { title: string; details: string }[];
   achievements: { text: string }[];
   volunteering: Role[];
@@ -122,4 +124,9 @@ export function expectedFlags(c: Content, sections: Section[]): Flag[] {
   ];
   for (const [key, level] of rules) if (!has.has(key)) flags.push({ key, level });
   return flags;
+}
+
+/** A project as printed: a name, a link and a one-paragraph description, read back as one bullet per sentence. */
+export function project(name: string, url: string, sentences: string[]): Project {
+  return { ...role("", name, "", "", "", "", sentences), url };
 }

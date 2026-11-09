@@ -100,9 +100,10 @@ export function buildCvDocx(
   const bullet = (text: string) => paragraph(text, { bullet: { level: 0 } });
   const heading = (text: string) => paragraph(text, { heading: HeadingLevel.HEADING_1 });
   const date = (value: string) => formatYearMonth(value, content.locale);
-  const roles = (items: CvContent["experience"]) => items.flatMap((job) => [
+  // A project is a role with a link, shown after the organisation.
+  const roles = (items: (CvContent["experience"][number] & { url?: string })[]) => items.flatMap((job) => [
     ...entry(
-      job.title, join([job.company, job.location]),
+      job.title, join([job.company, job.location, job.url ?? ""]),
       formatRange(job.startDate, job.endDate, job.current, content.locale), job.description,
     ),
     ...job.bullets.map((item) => bullet(item.text)),
@@ -123,7 +124,7 @@ export function buildCvDocx(
       paragraph(`${row.label}: ${row.items.map((item) => item.name).join(", ")}`)),
     languages: content.languages.flatMap((item) => entry(item.name, item.level)),
     certifications: content.certifications.flatMap((item) => entry(item.name, date(item.date), item.issuer)),
-    projects: content.projects.flatMap((item) => entry(item.name, item.url, item.description)),
+    projects: roles(content.projects),
     volunteering: roles(content.volunteering),
     awards: content.awards.flatMap((item) => entry(item.name, date(item.date), item.issuer, item.description)),
     courses: content.courses.flatMap((item) => entry(item.name, date(item.date), item.provider)),

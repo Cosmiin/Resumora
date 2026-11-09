@@ -28,7 +28,7 @@ describe("moveOtherTo", () => {
 
   it("shortens a line longer than a name field so the CV stays valid", () => {
     const out = moveOtherTo(withCustom("x".repeat(MAX_TEXT + 1)), "c1", "projects");
-    expect(out.projects[0]!.name).toHaveLength(MAX_TEXT);
+    expect(out.projects[0]!.title).toHaveLength(MAX_TEXT);
     expect(CvContentSchema.safeParse(out).success).toBe(true);
   });
 

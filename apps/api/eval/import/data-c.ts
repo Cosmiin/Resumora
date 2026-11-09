@@ -1,4 +1,4 @@
-import { cv, role, type Case } from "./types.ts";
+import { cv, project, role, type Case } from "./types.ts";
 
 export const case11: Case = {
   id: "11-docx-tables",
@@ -125,8 +125,8 @@ export const case12: Case = {
         { name: "Certified Humanitarian Professional", issuer: "CHS Alliance", date: "2019-10" },
       ],
       projects: [
-        { name: "Mobile Data Collection Rollout", description: "Introduced tablets and an offline reporting app to 160 clinics, replacing paper registers.", url: "" },
-        { name: "Community Health Worker Handbook", description: "Wrote and field-tested a plain-language handbook now used in three countries.", url: "helixhealth.example.com/handbook" },
+        project("Mobile Data Collection Rollout", "", ["Introduced tablets and an offline reporting app to 160 clinics, replacing paper registers."]),
+        project("Community Health Worker Handbook", "helixhealth.example.com/handbook", ["Wrote and field-tested a plain-language handbook now used in three countries."]),
       ],
       volunteering: [
         role("Leeds Food Bank", "Trustee", "Leeds, United Kingdom", "2014-01", "2019-12", "Served on the board of a food bank supporting 1,500 households a year.", [
