@@ -1,4 +1,4 @@
-import { MAX_JOB_NOTES, MAX_NOTES, type CvContent, type Note } from "./cv.ts";
+import { MAX_JOB_NOTES, MAX_NOTES, type CvContent, type Experience, type Note } from "./cv.ts";
 
 function key(company: string, title: string): string {
   const clean = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -49,19 +49,21 @@ export function carryNotes(current: CvContent, incoming: CvContent): CvContent {
 /** Restores notes and newer facts from the current CV when applying a saved version. */
 export function mergeNewerNotes(target: CvContent, current: CvContent): CvContent {
   const result = { ...target };
-  const currentRoles = new Map(
-    [...current.experience, ...current.volunteering].map((role) => [role.id, role]),
+  // Roles, projects and volunteering all carry notes and facts.
+  const currentRoles = new Map<string, Experience>(
+    [...current.experience, ...current.projects, ...current.volunteering].map((role) => [role.id, role]),
   );
-  for (const section of ["experience", "volunteering"] as const) {
-    result[section] = target[section].map((role) => {
-      const latest = currentRoles.get(role.id);
-      if (!latest) return role;
-      const facts = latest.facts && (!role.facts ||
-        Date.parse(latest.facts.updatedAt) > Date.parse(role.facts.updatedAt))
-        ? latest.facts : role.facts;
-      return { ...role, notes: merge(role.notes, latest.notes), facts };
-    });
-  }
+  const withNewer = <T extends Experience>(list: T[]): T[] => list.map((role) => {
+    const latest = currentRoles.get(role.id);
+    if (!latest) return role;
+    const facts = latest.facts && (!role.facts ||
+      Date.parse(latest.facts.updatedAt) > Date.parse(role.facts.updatedAt))
+      ? latest.facts : role.facts;
+    return { ...role, notes: merge(role.notes, latest.notes), facts };
+  });
+  result.experience = withNewer(target.experience);
+  result.projects = withNewer(target.projects);
+  result.volunteering = withNewer(target.volunteering);
   return result;
 }
 
@@ -71,6 +73,7 @@ export function onlyNotesDiffer(a: CvContent, b: CvContent): boolean {
     ...content,
     experience: content.experience.map((role) => ({ ...role, notes: undefined, facts: undefined })),
     volunteering: content.volunteering.map((role) => ({ ...role, notes: undefined, facts: undefined })),
+    projects: content.projects.map((role) => ({ ...role, notes: undefined, facts: undefined })),
   }, (_key, value: unknown) => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
       return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)));

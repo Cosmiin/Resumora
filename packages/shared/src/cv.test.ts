@@ -215,6 +215,13 @@ describe("enrichedAt (J2)", () => {
 describe("projects take the role shape", () => {
   const legacy = { id: "pr1", name: "Budget forecast", description: "Built a Python script. It predicts spend within 5%!\nUsed pandas.", url: "github.com/x" };
 
+  it("keeps job answers saved onto an old-shape project (E6 whole-branch review)", () => {
+    const answer = { id: "n1", question: "What did it check?", answer: "Tax codes", via: ["type"], askedAt: "2026-11-09T10:00:00Z", jobId: "00000000-0000-4000-8000-000000000001" };
+    const cv = CvContentSchema.parse({ ...emptyCv(), projects: [{ ...legacy, notes: [answer] }] });
+    expect(cv.projects[0]!.notes).toEqual([answer]);
+    expect(CvContentSchema.parse({ ...emptyCv(), projects: [legacy] }).projects[0]!.notes).toEqual([]);
+  });
+
   it("reads an old project into the role shape, one bullet per sentence", () => {
     const cv = CvContentSchema.parse({ ...emptyCv(), projects: [legacy] });
     expect(cv.projects[0]).toEqual({

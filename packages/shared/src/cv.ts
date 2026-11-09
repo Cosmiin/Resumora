@@ -103,7 +103,7 @@ function sentences(paragraph: string): string[] {
  */
 function legacyProject(value: unknown): unknown {
   if (!value || typeof value !== "object" || !("name" in value) || "title" in value) return value;
-  const old = value as { id?: unknown; name?: unknown; description?: unknown; url?: unknown };
+  const old = value as { id?: unknown; name?: unknown; description?: unknown; url?: unknown; notes?: unknown };
   const projectId = typeof old.id === "string" ? old.id : "";
   const lines = sentences(typeof old.description === "string" ? old.description : "");
   const kept = lines.length > MAX_BULLETS ? [...lines.slice(0, MAX_BULLETS - 1), lines.slice(MAX_BULLETS - 1).join(" ").slice(0, MAX_TEXT)] : lines;
@@ -111,7 +111,8 @@ function legacyProject(value: unknown): unknown {
     id: old.id, title: old.name, company: "", location: "", startDate: "", endDate: "", current: false,
     description: "",
     bullets: kept.map((text, i) => ({ id: `${projectId}-b${i + 1}`, text })),
-    notes: [],
+    // Job answers saved onto a project before it was saved in the new shape stay with it.
+    notes: Array.isArray(old.notes) ? old.notes : [],
     url: typeof old.url === "string" ? old.url : "",
   };
 }
