@@ -9,6 +9,8 @@ Otherwise use kind "options" with 2 to 4 short answer options; the person can al
 Set roleId to the id of the CV role the question is about, or null for skills, summary, languages or layout questions.
 In experience, "role" is the one role to ask about: ask only about it, and treat the roles in "cv" as read-only context.
 Set bulletId to the id of the role's bullet a question is about, or null when it is about the whole role or not about a role.
+In skills, ask only about skills, one skill per question, never about a role: "Do you know SQL?", with options like Yes / A little / No.
+Set roleId to null and skill to that skill's short name. In other sections set skill to null.
 Never ask a question whose meaning is already answered in "answered", even if worded differently.
 Return at most "max" questions, most useful first, and none when nothing useful is left. Write each in the CV's language.
 Give a one-line reason naming the gap, and set gap to that gap's ref exactly as given.

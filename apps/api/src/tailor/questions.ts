@@ -21,6 +21,8 @@ const ModelQuestionsSchema = z.object({
   questions: z.array(z.object({
     roleId: z.string().nullable(),
     bulletId: z.string().nullable(),
+    /** Skills questions: the one skill asked about. */
+    skill: z.string().nullable(),
     text: z.string(),
     kind: z.enum(["options", "confirm_inferred"]),
     options: z.array(z.string()),
@@ -112,12 +114,16 @@ export async function askQuestions(
   const seen = new Set([...answered.map((item) => same(item.question)),
     ...asked.filter((question) => !role || inRole(question)).map((question) => same(question.text))]);
   const fresh: Question[] = [];
-  for (const { roleId: named, bulletId, ...question } of reply.questions) {
+  const skills = input.section === "skills";
+  for (const { roleId: named, bulletId, skill, ...question } of reply.questions) {
     const text = question.text.trim().slice(0, MAX_TEXT);
+    // Skills asks about skills only: a question tied to a role belongs to Experience.
+    if (skills && named) continue;
     if (!text || seen.has(same(text)) || fresh.length >= max || (score && !gapRefs.has(question.gap))) continue;
     seen.add(same(text));
     const onBullet = role && bulletId && role.bullets.some((bullet) => bullet.id === bulletId) ? { bulletId } : {};
-    fresh.push({ ...question, text, id: newId(), section: input.section, ...onBullet,
+    const aboutSkill = skills ? { kind: "skill" as const, ...(skill?.trim() ? { skill: skill.trim().slice(0, MAX_TEXT) } : {}) } : {};
+    fresh.push({ ...question, text, id: newId(), section: input.section, ...onBullet, ...aboutSkill,
       roleId: role ? role.id : named && roleIds.has(named) ? named : null });
   }
   if (fresh.length > 0) await deps.tailor.updateRun(input.run.id, { questions: [...asked, ...fresh] });
@@ -145,11 +151,16 @@ export async function saveAnswers(
     const question = questions.get(answer.questionId)!;
     // A flag answer is about the tailored wording, not a fact about the person: no note.
     if (question.kind === "flag") continue;
-    const roleId = question.roleId && roleIds.has(question.roleId) ? question.roleId : fallback;
-    if (!roleId) continue;
-    const note = NoteSchema.parse({ id: newId(), question: question.text, answer: answer.value.trim(), via: [NOTE_VIA[answer.via]],
-      askedAt: deps.now().toISOString(), jobId: run.jobId });
-    byRole.set(roleId, [...(byRole.get(roleId) ?? []), note]);
+    // A confirmed skill goes on every role it was used in ("Used SQL (Yes)"); other answers on their question's role.
+    const usedIn = question.kind === "skill" ? (answer.roleIds ?? []).filter((id) => roleIds.has(id)) : [];
+    const own = question.roleId && roleIds.has(question.roleId) ? question.roleId : fallback;
+    const targets = usedIn.length > 0 ? [...new Set(usedIn)] : own ? [own] : [];
+    const text = usedIn.length > 0 && question.skill ? `Used ${question.skill} (${answer.value.trim()})` : answer.value.trim();
+    for (const roleId of targets) {
+      const note = NoteSchema.parse({ id: newId(), question: question.text, answer: text, via: [NOTE_VIA[answer.via]],
+        askedAt: deps.now().toISOString(), jobId: run.jobId });
+      byRole.set(roleId, [...(byRole.get(roleId) ?? []), note]);
+    }
   }
   for (const [roleId, notes] of byRole) await deps.cv.addJobNotes(roleId, notes);
   for (const answer of answers) stored.set(answer.questionId, answer);

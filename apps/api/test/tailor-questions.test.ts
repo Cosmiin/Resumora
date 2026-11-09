@@ -28,9 +28,9 @@ const newest = roleWith(["Led 3 people"], { startDate: "2021-01", endDate: "", c
 // CV order: the newest role first, so it is the first current role.
 const base: CvContent = { ...emptyCv("en"), experience: [newest, older] };
 
-type ModelQuestion = Omit<Question, "id" | "section" | "gap" | "bulletId"> & { gap: string; bulletId: string | null };
+type ModelQuestion = Omit<Question, "id" | "section" | "gap" | "bulletId" | "skill"> & { gap: string; bulletId: string | null; skill: string | null };
 const ask = (text: string, over: Partial<ModelQuestion> = {}): ModelQuestion =>
-  ({ roleId: newest.id, bulletId: null, text, kind: "options", options: ["Yes", "No"], reason: "Gap", gap: "r0", ...over });
+  ({ roleId: newest.id, bulletId: null, skill: null, text, kind: "options", options: ["Yes", "No"], reason: "Gap", gap: "r0", ...over });
 
 let replies: ModelQuestion[][];
 let model: ReturnType<typeof fakeModel>;
@@ -151,7 +151,7 @@ describe("job questions", () => {
     const [first] = await questions(runId, "experience");
     expect(first).toMatchObject({ gap: "r0" });
     await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: first!.id, value: "Three", via: "typed" }] });
-    replies = [[ask("What size were your Kubernetes clusters?"), ask("Did you lead the team?", { gap: "r1" }), ask("Off-topic?", { gap: "r9" })]];
+    replies = [[ask("What size were your Kubernetes clusters?", { roleId: null }), ask("Did you lead the team?", { gap: "r1", roleId: null }), ask("Off-topic?", { gap: "r9", roleId: null })]];
     const second = await questions(runId, "skills");
     expect(second.map((q) => q.text)).toEqual(["Did you lead the team?"]);
     expect(JSON.stringify(JSON.parse(String((model.requests[1]!.messages as { content: string }[])[1]!.content)).gaps)).not.toContain("Kubernetes");
@@ -167,7 +167,7 @@ describe("job questions", () => {
       call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: question.id, value: null, via: "skip" }] });
     replies = [[ask("Kubernetes?")]];
     await skip((await questions(runId, "experience"))[0]!);
-    replies = [[ask("Kubernetes, any at all?")]];
+    replies = [[ask("Kubernetes, any at all?", { roleId: null })]];
     const again = await questions(runId, "skills");
     expect(again.map((q) => q.text)).toEqual(["Kubernetes, any at all?"]);
     await skip(again[0]!);
@@ -239,5 +239,44 @@ describe("answers", () => {
     const res = await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: "unknown", value: "x", via: "typed" }] });
     expect(res.status).toBe(400);
     expect(await jobNotes()).toEqual([]);
+  });
+});
+
+describe("skills questions", () => {
+  const skillAsk = (skill: string, over: Partial<ModelQuestion> = {}) =>
+    ask(`Do you know ${skill}?`, { roleId: null, skill, options: ["Yes", "A little", "No"], ...over });
+
+  it("asks one skill per question with no role, and drops a question the model ties to a role", async () => {
+    const runId = await startRun();
+    replies = [[skillAsk("SQL"), skillAsk("Kubernetes", { roleId: newest.id }), skillAsk("Docker", { gap: "r1" })]];
+    const got = await questions(runId, "skills");
+    expect(got.map((q) => [q.text, q.kind, q.roleId, q.skill])).toEqual([
+      ["Do you know SQL?", "skill", null, "SQL"], ["Do you know Docker?", "skill", null, "Docker"],
+    ]);
+    const system = JSON.stringify(model.requests[0]);
+    expect(system).toContain("Do you know");
+    expect(system).toContain("skill");
+  });
+
+  it("adds a note to every role a confirmed skill was used in", async () => {
+    const runId = await startRun();
+    replies = [[skillAsk("SQL")]];
+    const [sql] = await questions(runId, "skills");
+    const res = await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: sql!.id, value: "Yes", via: "option", roleIds: [newest.id, older.id] }] });
+    expect(res.status).toBe(200);
+    const notes = await jobNotes();
+    expect(notes).toHaveLength(2);
+    expect(notes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ roleId: newest.id, question: "Do you know SQL?", answer: "Used SQL (Yes)", jobId }),
+      expect.objectContaining({ roleId: older.id, question: "Do you know SQL?", answer: "Used SQL (Yes)", jobId }),
+    ]));
+  });
+
+  it("ignores role ids that aren't the person's roles", async () => {
+    const runId = await startRun();
+    replies = [[skillAsk("SQL")]];
+    const [sql] = await questions(runId, "skills");
+    await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: sql!.id, value: "A little", via: "option", roleIds: ["ghost", older.id] }] });
+    expect(await jobNotes()).toEqual([expect.objectContaining({ roleId: older.id, answer: "Used SQL (A little)" })]);
   });
 });

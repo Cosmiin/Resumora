@@ -104,6 +104,16 @@ export async function runSectionPass(
   const answers = (run.answers ?? []).flatMap((answer) => answer.value && asked.has(answer.questionId)
     ? [{ question: asked.get(answer.questionId)!, answer: answer.value }] : []);
   const sources = [...texts(cv), ...answers.flatMap((answer) => [answer.question, answer.answer])];
+  // A confirmed skill names the roles it was used in: "Used in: Title · Company, Title · Company".
+  const usedIn = new Map<string, string>();
+  for (const answer of run.answers ?? []) {
+    const question = (run.questions ?? []).find((q) => q.id === answer.questionId);
+    const roles = (answer.roleIds ?? []).flatMap((id) => cv.experience.filter((role) => role.id === id))
+      .map((role) => [role.title, role.company].filter((part) => part.trim()).join(" · "));
+    if (question?.kind === "skill" && question.skill && answer.via !== "skip" && roles.length > 0) {
+      usedIn.set(question.skill.trim().toLowerCase(), `Used in: ${roles.join(", ")}`);
+    }
+  }
   const call = <S extends z.ZodType>(task: "tailor_section" | "tailor_verify", tier: "strong" | "cheap", schema: S, system: string, user: string) =>
     callModel(deps.model, { userId: input.userId, task, tier, schema, system, user, maxOutputTokens: 12000 });
 
@@ -120,7 +130,8 @@ export async function runSectionPass(
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
       // A guess or a new skill keeps the reason naming its basis; a plain rewording has none.
-      const why = (p.inferred || p.itemId === "new-skill") && reason?.trim() ? { reason: reason.trim() } : {};
+      const used = p.itemId === "new-skill" ? usedIn.get(p.text.trim().toLowerCase()) : undefined;
+      const why = used ? { reason: used } : (p.inferred || p.itemId === "new-skill") && reason?.trim() ? { reason: reason.trim() } : {};
       if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why });
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }

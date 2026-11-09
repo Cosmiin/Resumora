@@ -61,6 +61,8 @@ export const QuestionSchema = z.object({
   itemId: z.string().optional(),
   /** The bullet a role question points at; absent = the whole role. */
   bulletId: z.string().optional(),
+  /** A Skills question's one skill ("SQL"): its answer becomes "Used SQL" on the roles picked. */
+  skill: z.string().optional(),
 });
 export type Question = z.infer<typeof QuestionSchema>;
 

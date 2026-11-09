@@ -27,3 +27,13 @@ A5 Experience role by role → A6 truth rule → A7 Skills questions → A8 ques
 session: tailor-r2 Part A (session 5, second block) · builder: claude
 commit: 15827fe (base 43c3fe6) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 44% → (see A6)
 open: rulings — `repo.ts`, `memory-repo.ts`, `supabase-repo.ts` map `role_order`/`current_role_id`; `retailor.ts` sets the role order; `eval/tailor/run.ts` loops roles. Skills cap 5, other sections share 8. Low (not fixed): a run started before this change has an empty role order, so its Experience step proposes nothing. The web still calls Experience without `roleId` until A8 (the web flow is broken against the real API between A5 and A8).
+
+## Task A6: The truth rule in prompts and checks — done
+session: tailor-r2 Part A (session 5, second block) · builder: claude
+commit: see git log (base 15827fe) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0 · weekly 45% → 46%
+open: rulings — shared `FlagSchema` gains rule `guess`; `translate.ts` and `letter.ts` (German) now call the number check directly (they relied on `inferred: true` skipping the tool check); web `tailor-api.ts`, `TailorFlow.tsx`, `SectionReview.tsx`, `en-tailor.ts` carry the `removed` line; accept tests for flag questions replaced by one "never writes a flagged proposal" test. The `flags` phase in TailorFlow is now unused (A8 removes it). Low (not fixed): `removed` can undercount when two proposals share one item id (new skills) and the retry keeps one.
+
+## Task A7: Skills asks skill questions only, and the role it was used in — done
+session: tailor-r2 Part A (session 5, second block) · builder: claude
+commit: see git log (base bdaccaf) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 46% → 47%
+open: rulings — shared `QuestionSchema` gains `skill`; the "Used in: Title · Company" reason is set in `section-pass.ts` from the stored answer (not left to the model); `tailor-accept`, `tailor-section`, `tailor-retailor` tests updated. Low (not fixed): a volunteering role in `roleIds` gets the note but isn't named in the reason; a resubmit with the same value but new `roleIds` adds no notes (A9's redo replaces answers).

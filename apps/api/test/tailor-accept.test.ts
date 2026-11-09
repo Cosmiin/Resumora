@@ -255,4 +255,15 @@ describe("experience role by role", () => {
     expect(tailored().version).toBe(1);
     expect((await repo().getRun(runId))!.currentRoleId).toBe(roleA.id);
   });
+
+  it("names every role a confirmed skill was used in as a new skill's reason", async () => {
+    const runId = await start();
+    const question = { id: "q-sql", section: "skills" as const, roleId: null, text: "Do you know SQL?", kind: "skill" as const,
+      options: ["Yes", "A little", "No"], reason: "Gap", skill: "SQL" };
+    await repo().updateRun(runId, { currentSection: "skills", currentRoleId: null, questions: [question],
+      answers: [{ questionId: "q-sql", value: "Yes", via: "option", roleIds: [roleA.id, roleB.id] }] });
+    await run(runId, "skills", { itemId: "new-skill", field: "name", text: "SQL", inferred: true, reason: "Shown in: Clerk · Epsilon" });
+    const proposals = (await repo().getRun(runId))!.proposals!;
+    expect(proposals).toEqual([expect.objectContaining({ itemId: "new-skill", text: "SQL", reason: "Used in: Payroll Lead · Gamma, Payroll Officer · Delta", flags: [] })]);
+  });
 });
