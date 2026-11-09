@@ -137,6 +137,13 @@ describe("scoreMatch", () => {
     ])("leaves the AI's label for %s", async (_, text, level) => {
       expect(await run(text, [{ name: "English", level }])).toMatchObject({ status: "missing", evidence: null });
     });
+
+    it("applies only to language requirements, not a skill that also names a language", async () => {
+      const work = { ...input(), job: { ...job, requirements: [{ text: "Advanced English and Excel skills", kind: "must" as const, category: "skill" as const }] } };
+      work.cv.languages = [{ id: "l0", name: "English", level: "C2" }];
+      const score = await scoreMatch({ model: fakeModel(missing).deps }, work);
+      expect(score.labels[0]).toMatchObject({ status: "missing", evidence: null });
+    });
   });
 
   it("tells the AI that clear work evidence is a full match and inferred is only for real guesses", async () => {

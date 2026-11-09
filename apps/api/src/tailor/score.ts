@@ -78,7 +78,9 @@ export async function scoreMatch(
     const parts = (evidence: string) => evidence.split(" | ").map((part) => part.trim());
     const quoted = (evidence: string) => parts(evidence).every((part) => part && text.some((value) => value.includes(part)));
     const checked = labels.map((label) => {
-      const fluent = label.kind === "requirement" ? fluentEvidence(input.job.requirements[Number(label.ref.slice(1))]!.text, cv.languages) : null;
+      // Only language requirements: "Advanced English and Excel skills" also needs Excel, which the rule can't check.
+      const requirement = label.kind === "requirement" ? input.job.requirements[Number(label.ref.slice(1))]! : null;
+      const fluent = requirement?.category === "language" ? fluentEvidence(requirement.text, cv.languages) : null;
       if (fluent) return { ...label, status: "met" as const, evidence: fluent, inferred: false };
       return label.status === "missing" || !label.evidence?.trim() || !quoted(label.evidence)
         ? { ...label, status: "missing" as const, evidence: null, inferred: false }
