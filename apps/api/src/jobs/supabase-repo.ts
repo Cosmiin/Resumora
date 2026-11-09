@@ -101,7 +101,8 @@ export function supabaseJobRepo(env: SupabaseEnv, user: AuthUser): JobRepo {
         ...(fields.userThoughts !== undefined ? { user_thoughts: fields.userThoughts } : {}),
         ...(fields.applicationStatus !== undefined ? { application_status: fields.applicationStatus } : {}),
         extracted, title: extracted.title, company: extracted.company, location: extracted.location,
-        ...(extractionEdit ? { edited_by_user: true } : {}), version: expectedVersion + 1, updated_at: new Date().toISOString(),
+        // updated_at follows extraction edits only: the Tailored CV's "job changed" notice compares it.
+        ...(extractionEdit ? { edited_by_user: true, updated_at: new Date().toISOString() } : {}), version: expectedVersion + 1,
       }).eq("id", id).eq("version", expectedVersion).eq("status", "ready").select("id").maybeSingle();
       if (error) throw new Error(`jobs update failed: ${error.message}`);
       if (data) return "ok";

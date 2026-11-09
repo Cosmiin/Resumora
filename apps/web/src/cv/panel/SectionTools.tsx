@@ -1,6 +1,7 @@
 import { CATEGORY, normalizeLayout, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
-import type { CvAction } from "../edit/cvReducer.ts";
+import type { CvAction, ListKey } from "../edit/cvReducer.ts";
+import { getItems } from "../edit/lists.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
 import { useOpenFocus } from "../enrich/focus-context.ts";
@@ -21,6 +22,8 @@ type Props = {
   onRetry?(roleId: string): void;
   /** Resolves once autosave has saved the latest edits (the rewrite reads the saved CV). */
   waitForSave?(): Promise<void>;
+  /** Tailored CV only (see HelperPanel). */
+  original?: CvContent;
 };
 
 function Eye() {
@@ -105,9 +108,56 @@ function ToSortBox({ cv, dispatch }: Pick<Props, "cv" | "dispatch">) {
   );
 }
 
+const LISTS: readonly string[] = ["experience", "volunteering", "education", "languages", "certifications", "projects", "awards", "courses", "publications", "custom"];
+
+/** The Base wording of the focused item (or the summary) where it differs, and the edits that bring it back. */
+function originalWording(cv: CvContent, original: CvContent, { key, itemId }: NonNullable<PanelFocus>): { was: string[]; restore: CvAction[] } {
+  if (key === "summary") {
+    const before = original.basics.summary;
+    return before !== cv.basics.summary ? { was: [before], restore: [{ type: "setSummary", value: before }] } : { was: [], restore: [] };
+  }
+  const was: string[] = [];
+  const restore: CvAction[] = [];
+  if (!itemId || !LISTS.includes(key)) return { was, restore };
+  const list = key as ListKey;
+  const now = getItems(cv, list).find((i) => i.id === itemId);
+  const before = getItems(original, list).find((i) => i.id === itemId);
+  if (!now || !before) return { was, restore };
+  for (const [field, value] of Object.entries(before)) {
+    if (typeof value === "string" && field !== "id" && value !== now[field]) {
+      if (value) was.push(value);
+      restore.push({ type: "setItemField", list, itemId, field, value });
+    }
+  }
+  if ((list === "experience" || list === "volunteering") && Array.isArray(before.bullets) && Array.isArray(now.bullets)) {
+    const current = new Map((now.bullets as { id: string; text: string }[]).map((b) => [b.id, b.text]));
+    for (const bullet of before.bullets as { id: string; text: string }[]) {
+      if (current.has(bullet.id) && current.get(bullet.id) !== bullet.text) {
+        was.push(bullet.text);
+        restore.push({ type: "setBullet", owner: { list, itemId }, bulletId: bullet.id, text: bullet.text });
+      }
+    }
+  }
+  return { was, restore };
+}
+
+/** Tailored CV: "Was: …" and Use original wording for the focused item. */
+function OriginalBox({ cv, original, focus, dispatch }: Pick<Props, "cv" | "dispatch" | "focus"> & { original: CvContent }) {
+  const { was, restore } = originalWording(cv, original, focus);
+  if (restore.length === 0) return null;
+  return (
+    <div className="box tailored-original">
+      <p className="box-title">{t("tailored.was")}</p>
+      {was.map((text, i) => <p key={i} className="fine">{text}</p>)}
+      <button type="button" className="btn" onClick={() => restore.forEach(dispatch)}>{t("tailored.useOriginal")}</button>
+    </div>
+  );
+}
+
 /** The tools for the part of the CV the cursor is in. */
-export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores, onRetry, waitForSave = savedNow }: Props) {
+export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores, onRetry, waitForSave = savedNow, original }: Props) {
   const { key, itemId } = focus;
+  const tailored = original !== undefined;
   const layout = normalizeLayout(cv.layout);
   const standard = CATEGORY[key].label[cv.locale];
   const sectionKey = key === "header" ? null : key;
@@ -145,14 +195,15 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores,
           </button>
         </p>
       )}
-      {key === "experience" && itemId && (
+      {original && <OriginalBox cv={cv} original={original} focus={focus} dispatch={dispatch} />}
+      {!tailored && key === "experience" && itemId && (
         <RoleEnrich key={itemId} cv={cv} roleId={itemId} scores={scores} onRetry={onRetry} />
       )}
       {(key === "experience" || key === "volunteering") && itemId && (
         <RoleBox cv={cv} dispatch={dispatch} list={key} itemId={itemId} onFocusPage={onFocusPage} />
       )}
-      {key === "summary" && <SummaryTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
-      {key === "skills" && <SkillsTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
+      {!tailored && key === "summary" && <SummaryTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
+      {!tailored && key === "skills" && <SkillsTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
       {key === "skills" && <ToSortBox cv={cv} dispatch={dispatch} />}
       <div>
         <p className="p-sub">{t("panel.tools.tips")}</p>
@@ -162,7 +213,7 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores,
           ))}
         </ul>
       </div>
-      {ai.length > 0 && (
+      {!tailored && ai.length > 0 && (
         <div>
           <p className="p-sub">{t("panel.ai.title")}</p>
           <div className="ai">

@@ -11,6 +11,11 @@ type Props = {
   content: CvContent;
   showUnsorted?: boolean;
   template?: TemplateId;
+  /** Tailored CV: items the tailoring changed (green) and inferred items not yet reviewed (amber), by item id. */
+  highlights?: ReadonlySet<string>;
+  inferred?: ReadonlySet<string>;
+  /** Tailored CV: a control next to a section's heading (the ↻ re-tailor button). */
+  sectionAction?(key: SectionKey): ReactNode;
 };
 
 const joinParts = (parts: string[], sep = " · ") => parts.filter(Boolean).join(sep);
@@ -20,7 +25,9 @@ function Block({ children }: { children: ReactNode }) {
 }
 
 /** The CV as it will print: read-only (History preview and the import review). */
-export function CvDocument({ content: cv, showUnsorted, template = "classic" }: Props) {
+export function CvDocument({ content: cv, showUnsorted, template = "classic", highlights, inferred, sectionAction }: Props) {
+  const mark = (id: string, className: string) =>
+    [className, inferred?.has(id) ? "cv-mark-inferred" : highlights?.has(id) ? "cv-mark-changed" : ""].filter(Boolean).join(" ");
   const itemTitle = (text: string, className = "cv-item-title") => <span className={className}>{text}</span>;
 
   const b = cv.basics;
@@ -52,6 +59,7 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic" }: 
     show ? (
       <section className="cv-section">
         <h2 className="cv-section-label">{heading(key)}</h2>
+        {sectionAction?.(key)}
         {children}
       </section>
     ) : null;
@@ -70,7 +78,7 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic" }: 
         "summary",
         !!b.summary,
         <Block>
-          <span className="cv-text">{b.summary}</span>
+          <span className={mark("summary", "cv-text")}>{b.summary}</span>
         </Block>,
     ),
 
@@ -88,11 +96,11 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic" }: 
               {(job.company || job.location) && (
                 <span className="cv-item-sub">{joinParts([job.company, job.location])}</span>
               )}
-              {job.description && <span className="cv-text">{job.description}</span>}
+              {job.description && <span className={mark(job.id, "cv-text")}>{job.description}</span>}
               {job.bullets.length > 0 && (
                 <ul className="cv-bullets">
                   {job.bullets.map((bullet) => (
-                    <li key={bullet.id}>{bullet.text}</li>
+                    <li key={bullet.id} className={mark(bullet.id, "") || undefined}>{bullet.text}</li>
                   ))}
                 </ul>
               )}
@@ -128,7 +136,7 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic" }: 
               <span className="cv-skill-label">{row.label}</span>
               <span className="cv-chips">
                 {row.items.map((skill) => (
-                  <span key={skill.id} className={row.sort ? "cv-chip cv-chip-sort" : "cv-chip"}>
+                  <span key={skill.id} className={mark(skill.id, row.sort ? "cv-chip cv-chip-sort" : "cv-chip")}>
                     {skill.name}
                   </span>
                 ))}
@@ -144,7 +152,7 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic" }: 
         <div className="cv-inline-items">
           {cv.languages.map((lang) => (
             <Block key={lang.id}>
-              {itemTitle(lang.name)}
+              {itemTitle(lang.name, mark(lang.id, "cv-item-title"))}
               {lang.level && <span className="cv-item-sub"> {lang.level}</span>}
             </Block>
           ))}

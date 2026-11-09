@@ -2,8 +2,7 @@ import type { CvContent, MatchScore, TailorRun, TailoredCv } from "@resumora/sha
 import type { ScoreTarget, TailorRepo } from "./repo.ts";
 
 export type MemoryTailorDocs = {
-  cvs: Map<string, Pick<TailoredCv, "id" | "userId" | "jobId" | "language" | "content" | "baseSnapshot" | "baseSnapshotAt"
-    | "tone" | "instruction" | "review" | "score" | "version">>;
+  cvs: Map<string, TailoredCv>;
   runs: Map<string, TailorRun>;
 };
 export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map() });
@@ -29,10 +28,46 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     async createTailoredCv(input) {
       if ([...docs.cvs.values()].some((cv) => cv.jobId === input.jobId && cv.language === input.language)) return "exists";
       const id = crypto.randomUUID();
-      docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, content: structuredClone(input.content),
-        baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, tone: input.tone, instruction: input.instruction,
-        review: null, score: null, version: 1 });
+      const now = new Date().toISOString();
+      docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, translatedFrom: null, content: structuredClone(input.content),
+        baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, template: "classic", tone: input.tone,
+        instruction: input.instruction, review: null, score: null, coverLetter: null, version: 1, createdAt: now, updatedAt: now });
       return id;
+    },
+    async listTailoredCvs(jobId) {
+      return [...docs.cvs.values()].filter((cv) => cv.userId === userId && cv.jobId === jobId)
+        .map(({ id, language, translatedFrom, updatedAt }) => ({ id, language, translatedFrom, updatedAt }));
+    },
+    async readTailoredCv(id) {
+      const cv = docs.cvs.get(id);
+      return cv && cv.userId === userId ? structuredClone(cv) : null;
+    },
+    async saveTailoredContent(id, expectedVersion, content) {
+      const cv = docs.cvs.get(id);
+      if (!cv || cv.userId !== userId) return null;
+      if (cv.version !== expectedVersion) return { ok: false, version: cv.version, updatedAt: cv.updatedAt };
+      Object.assign(cv, { content: structuredClone(content), version: cv.version + 1, updatedAt: new Date().toISOString() });
+      return { ok: true, version: cv.version, updatedAt: cv.updatedAt };
+    },
+    async saveTranslation(input) {
+      const fields = { translatedFrom: input.translatedFrom, content: structuredClone(input.content), baseSnapshot: structuredClone(input.content),
+        baseSnapshotAt: input.at, coverLetter: structuredClone(input.coverLetter), template: input.template, tone: input.tone,
+        instruction: input.instruction, review: null, score: null, updatedAt: input.at };
+      const existing = [...docs.cvs.values()].find((cv) => cv.jobId === input.jobId && cv.language === input.language);
+      if (existing) {
+        if (existing.userId !== userId || existing.translatedFrom === null) return "language_taken";
+        Object.assign(existing, fields, { version: existing.version + 1 });
+        return existing.id;
+      }
+      const id = crypto.randomUUID();
+      docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, ...fields, version: 1, createdAt: input.at });
+      return id;
+    },
+    async setTemplate(id, template) {
+      const cv = docs.cvs.get(id);
+      if (!cv || cv.userId !== userId) return false;
+      Object.assign(cv, { template, updatedAt: new Date().toISOString() });
+      return true;
     },
     async getTailoredCv(id) {
       const cv = docs.cvs.get(id);
@@ -42,7 +77,7 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     async saveTailoredCv(id, expectedVersion, changes) {
       const cv = docs.cvs.get(id);
       if (!cv || cv.userId !== userId || cv.version !== expectedVersion) return "conflict";
-      Object.assign(cv, structuredClone(changes), { version: cv.version + 1 });
+      Object.assign(cv, structuredClone(changes), { version: cv.version + 1, updatedAt: new Date().toISOString() });
       return "ok";
     },
     async latestRun(tailoredCvId) {

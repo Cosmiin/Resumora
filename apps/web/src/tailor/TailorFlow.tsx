@@ -23,7 +23,7 @@ type Phase =
 
 const CONTENT_SECTIONS = TAILOR_SECTIONS.filter((section) => section !== "layout").length;
 const storageKey = (jobId: string) => `resumora.tailorRun.${jobId}`;
-function remember(jobId: string, runId: string | null) {
+export function remember(jobId: string, runId: string | null) {
   try {
     if (runId) localStorage.setItem(storageKey(jobId), runId);
     else localStorage.removeItem(storageKey(jobId));
@@ -51,7 +51,12 @@ export function TailorFlow() {
     const ai = cause instanceof ApiClientError && cause.code === "ai_failed" && at;
     setPhase({ kind: "error", retry, message: ai ? t("tailor.error.ai", { section: t(`tailor.section.${at}`) }) : t("tailor.error.generic") });
   }
-  function finish() { remember(jobId, null); void navigate(`/jobs/${encodeURIComponent(jobId)}/cv`); }
+  /** Opens the document this run tailored (a translated copy too, not only the job's original). */
+  function finish() {
+    remember(jobId, null);
+    const doc = runRef.current?.tailoredCvId;
+    void navigate(`/jobs/${encodeURIComponent(jobId)}/cv${doc ? `?cv=${encodeURIComponent(doc)}` : ""}`);
+  }
 
   /** Continues the run where it stands: a section with a finished pass goes back to its run, otherwise to its questions. */
   function enter(next: TailorRun) {

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { CvContent, CvResponse, SaveResponse } from "@resumora/shared";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { emptyCv, type CvContent, type CvResponse, type SaveResponse, type SectionKey } from "@resumora/shared";
+import type { TemplateId } from "./page/templates.ts";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
 import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
@@ -32,8 +33,29 @@ const statusLabel: Record<SaveStatus, MessageKey> = {
   invalid: "cv.status.invalid",
 };
 
-export function Editor({ initial }: { initial: CvResponse }) {
-  const autosave = useAutosave({ initial, save: saveCv, load: getCv });
+export type CvSource = { load(): Promise<CvResponse>; save(content: CvContent, version: number): Promise<SaveResponse> };
+const baseSource: CvSource = { load: () => getCv(), save: (content, version) => saveCv(content, version) };
+/** Tailored mode keeps the role scorer away from the copy: it scores Base CV roles. */
+const NO_ROLES = emptyCv();
+
+/** What the Tailored CV adds: the Base wording, the review marks, its toolbar, and the letter tab's body. */
+export type TailoredExtras = {
+  original: CvContent;
+  highlights: ReadonlySet<string>;
+  inferred: ReadonlySet<string>;
+  template?: TemplateId;
+  toolbar: ReactNode;
+  /** A control next to each section heading in the changes view (↻). */
+  sectionAction?(key: SectionKey): ReactNode;
+  /** When set, the stage shows this instead of the CV (the Cover letter tab); the editor stays mounted. */
+  replacePage?: ReactNode;
+};
+
+type EditorProps = { initial: CvResponse; source?: CvSource; mode?: "base" | "tailored"; tailored?: TailoredExtras };
+
+export function Editor({ initial, source = baseSource, mode = "base", tailored }: EditorProps) {
+  const isTailored = mode === "tailored";
+  const autosave = useAutosave({ initial, save: source.save, load: source.load });
   const { content, setContent, status, conflict, loadLatest, keepMine } = autosave;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [restoreFailed, setRestoreFailed] = useState(false);
@@ -59,7 +81,10 @@ export function Editor({ initial }: { initial: CvResponse }) {
     [setContent, markEdited],
   );
   const focusPage = useCallback(() => pageRef.current?.focus(), []);
-  const { scores, retry } = useRoleScores({ cv: content, status });
+  const roleScores = useRoleScores({ cv: isTailored ? NO_ROLES : content, status });
+  const scores = isTailored ? undefined : roleScores.scores;
+  const retry = roleScores.retry;
+  const [showChanges, setShowChanges] = useState(true);
   const phone = useMediaQuery("(max-width: 899px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
@@ -132,10 +157,14 @@ export function Editor({ initial }: { initial: CvResponse }) {
       <span className={`save-status save-status-${status}`} aria-live="polite">
         {t(statusLabel[status])}
       </span>
-      <ImportButton ref={importButton} onStarted={setImportId} />
-      <button ref={historyButton} type="button" className="secondary" onClick={openHistory}>
-        {t("history.open")}
-      </button>
+      {!isTailored && (
+        <>
+          <ImportButton ref={importButton} onStarted={setImportId} />
+          <button ref={historyButton} type="button" className="secondary" onClick={openHistory}>
+            {t("history.open")}
+          </button>
+        </>
+      )}
     </>
   );
 
@@ -152,7 +181,16 @@ export function Editor({ initial }: { initial: CvResponse }) {
       scores={scores}
       onRetry={retry}
       waitForSave={waitForSave}
+      original={tailored?.original}
     />
+  );
+
+  const page = historyOpen ? (
+    <CvDocument content={preview?.content ?? content} showUnsorted />
+  ) : tailored && showChanges ? (
+    <CvDocument content={content} template={tailored.template} highlights={tailored.highlights} inferred={tailored.inferred} sectionAction={tailored.sectionAction} />
+  ) : (
+    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} />
   );
 
   return (
@@ -160,7 +198,8 @@ export function Editor({ initial }: { initial: CvResponse }) {
       <main className="editor">
       {/* While an import is open the whole workspace is inert. While history is open only the page is,
           so a restore can't race the user's typing; the history panel stays usable. */}
-      <FocusOpenProvider value={setFocusTarget}>
+      {/* No focus mode on a tailored CV: without the opener, the ✨ bullet and role buttons render nothing. */}
+      <FocusOpenProvider value={isTailored ? null : setFocusTarget}>
       <div className="editor-workspace" inert={importId !== null || focusTarget !== null}>
         <div className="stage" ref={pageRef} tabIndex={-1} onFocus={() => setSheet("peek")}>
           {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
@@ -170,13 +209,16 @@ export function Editor({ initial }: { initial: CvResponse }) {
               {t("history.previewing", { when: whenLabel(preview.createdAt) })}
             </p>
           )}
-          <div className="editor-page" inert={dialogOpen}>
-            {historyOpen ? (
-              <CvDocument content={preview?.content ?? content} showUnsorted />
-            ) : (
-              <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} />
-            )}
-          </div>
+          {tailored?.toolbar}
+          {tailored && !tailored.replacePage && (
+            <button type="button" className="secondary tailored-view" onClick={() => {
+              clearFocus();
+              setShowChanges((v) => !v);
+            }}>
+              {t(showChanges ? "tailored.editText" : "tailored.showChanges")}
+            </button>
+          )}
+          {tailored?.replacePage ?? <div className="editor-page" inert={dialogOpen}>{page}</div>}
         </div>
         {historyOpen ? (
           <HistoryPanel
@@ -194,13 +236,13 @@ export function Editor({ initial }: { initial: CvResponse }) {
         )}
       </div>
       </FocusOpenProvider>
-      {focusTarget && !historyOpen && (
+      {focusTarget && !historyOpen && !isTailored && (
         <FocusMode
           key={`${focusTarget.roleId}:${focusTarget.bulletId ?? ""}:${focusTarget.mode}`}
           target={focusTarget}
           cv={content}
           dispatch={dispatch}
-          scores={scores}
+          scores={roleScores.scores}
           waitForSave={waitForSave}
           onClose={closeFocus}
         />
