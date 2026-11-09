@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { AnswerSchema, TailorSectionSchema, ToneSchema } from "@resumora/shared";
+import { AnswerSchema, SteeringSchema, TailorSectionSchema } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { AppEnv } from "../app.ts";
 import type { CvRepo } from "../cv/repo.ts";
@@ -13,7 +13,6 @@ import type { TailorRepo } from "./repo.ts";
 import { runSectionPass } from "./section-pass.ts";
 import { jobNotFound, startTailoring } from "./start.ts";
 
-const StartBodySchema = z.object({ tone: ToneSchema.default("neutral"), instruction: z.string().max(500).optional() });
 const AnswersBodySchema = z.object({ answers: z.array(AnswerSchema).min(1).max(MAX_RUN_QUESTIONS) });
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
 
@@ -30,11 +29,12 @@ export function tailorRoutes(deps: {
 
   app.post("/jobs/:id/tailor", async (c) => {
     const id = c.req.param("id");
-    const body = StartBodySchema.parse(await c.req.json().catch(() => ({})));
+    // The full steering (round 2); the old { tone, instruction } body is a subset of it.
+    const { instruction, ...steering } = SteeringSchema.parse(await c.req.json().catch(() => ({})));
     if (!isUuid(id)) throw jobNotFound();
     const result = await startTailoring(
       { jobs: deps.jobsFor(c), cv: deps.cvFor(c), tailor: deps.tailorFor(c), now: deps.now },
-      id, { tone: body.tone, instruction: body.instruction?.trim() || null },
+      id, { ...steering, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) },
     );
     return c.json(result);
   });

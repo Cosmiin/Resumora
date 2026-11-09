@@ -1,4 +1,4 @@
-import { TAILOR_SECTIONS, type TailorLanguage, type TailorRun, type Tone } from "@resumora/shared";
+import { TAILOR_SECTIONS, type Steering, type TailorLanguage, type TailorRun } from "@resumora/shared";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
@@ -16,7 +16,7 @@ export type StartResult = { run: TailorRun; tailoredCvId: string; language: Tail
 export async function startTailoring(
   deps: { jobs: JobRepo; cv: CvRepo; tailor: TailorRepo; now(): Date },
   jobId: string,
-  input: { tone: Tone; instruction: string | null },
+  steering: Steering,
 ): Promise<StartResult> {
   const job = await deps.jobs.get(jobId);
   if (!job) throw jobNotFound();
@@ -28,7 +28,8 @@ export async function startTailoring(
   let tailoredCvId = await deps.tailor.findTailoredCvId(jobId, language);
   if (!tailoredCvId) {
     const created = await deps.tailor.createTailoredCv({
-      jobId, language, content: base, baseSnapshotAt: deps.now().toISOString(), tone: input.tone, instruction: input.instruction,
+      jobId, language, content: base, baseSnapshotAt: deps.now().toISOString(),
+      tone: steering.tone ?? "neutral", instruction: steering.instruction ?? null, steering,
     });
     if (created !== "exists") {
       const run = await deps.tailor.createRun({ jobId, tailoredCvId: created, kind: "tailor", sections: [...TAILOR_SECTIONS], currentSection: "experience" });

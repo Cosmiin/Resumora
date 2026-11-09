@@ -1,11 +1,14 @@
-import type { CvContent, MatchScore, TailorRun, TailoredCv } from "@resumora/shared";
+import type { CvContent, MatchScore, Steering, TailorRun, TailoredCv } from "@resumora/shared";
 import type { ScoreTarget, TailorRepo } from "./repo.ts";
+import { withColumns } from "./steering.ts";
 
 export type MemoryTailorDocs = {
   cvs: Map<string, TailoredCv>;
   runs: Map<string, TailorRun>;
+  /** tailored_cvs.steering, by tailored CV id. */
+  steering: Map<string, Steering>;
 };
-export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map() });
+export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map(), steering: new Map() });
 
 export type MemoryTailorStore = Map<string, {
   userId: string;
@@ -23,7 +26,8 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     },
     async getSteering(tailoredCvId) {
       const cv = docs.cvs.get(tailoredCvId);
-      return cv && cv.userId === userId ? { language: cv.language, tone: cv.tone, instruction: cv.instruction } : null;
+      return cv && cv.userId === userId ? { language: cv.language, tone: cv.tone, instruction: cv.instruction,
+        steering: withColumns(structuredClone(docs.steering.get(tailoredCvId) ?? {}), cv.tone, cv.instruction) } : null;
     },
     async createTailoredCv(input) {
       if ([...docs.cvs.values()].some((cv) => cv.jobId === input.jobId && cv.language === input.language)) return "exists";
@@ -32,6 +36,7 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, translatedFrom: null, content: structuredClone(input.content),
         baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, template: "classic", tone: input.tone,
         instruction: input.instruction, review: null, score: null, coverLetter: null, version: 1, createdAt: now, updatedAt: now });
+      docs.steering.set(id, structuredClone(input.steering));
       return id;
     },
     async listTailoredCvs(jobId) {

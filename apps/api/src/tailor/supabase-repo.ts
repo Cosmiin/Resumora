@@ -1,9 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
-import { MatchScoreSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun } from "@resumora/shared";
+import {
+  MatchScoreSchema, SteeringSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun,
+} from "@resumora/shared";
 import { storedCv } from "../cv/supabase-repo.ts";
 import { ApiError } from "../errors.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { TailorRepo } from "./repo.ts";
+import { withColumns } from "./steering.ts";
 
 /** Queries as the signed-in user so row-level security applies. */
 export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo {
@@ -38,15 +41,20 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       return data?.id ?? null;
     },
     async getSteering(tailoredCvId) {
-      const { data, error } = await db.from("tailored_cvs").select("language, tone, instruction").eq("id", tailoredCvId).maybeSingle();
+      const { data, error } = await db.from("tailored_cvs").select("language, tone, instruction, steering").eq("id", tailoredCvId).maybeSingle();
       if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
-      return data ? { language: TailorLanguageSchema.parse(data.language), tone: ToneSchema.nullable().parse(data.tone),
-        instruction: data.instruction as string | null } : null;
+      if (!data) return null;
+      const tone = ToneSchema.nullable().parse(data.tone);
+      const instruction = data.instruction as string | null;
+      const stored = SteeringSchema.safeParse(data.steering);
+      return { language: TailorLanguageSchema.parse(data.language), tone, instruction,
+        steering: withColumns(stored.success ? stored.data : {}, tone, instruction) };
     },
     async createTailoredCv(input) {
       const { data, error } = await db.from("tailored_cvs").insert({
         user_id: user.id, job_id: input.jobId, language: input.language, content: input.content,
         base_snapshot: input.content, base_snapshot_at: input.baseSnapshotAt, tone: input.tone, instruction: input.instruction,
+        steering: input.steering,
       }).select("id").single();
       if (error?.code === "23505") return "exists";
       if (error) throw new Error(`tailored_cvs insert failed: ${error.message}`);

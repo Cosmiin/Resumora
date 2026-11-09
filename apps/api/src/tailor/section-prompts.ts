@@ -1,4 +1,4 @@
-import type { JobExtraction, Proposal, TailorLanguage, TailorSection, Tone } from "@resumora/shared";
+import type { JobExtraction, Proposal, TailorLanguage, TailorSection } from "@resumora/shared";
 
 const SECTION_RULES: Record<Exclude<TailorSection, "layout">, string> = {
   experience: `Reorder each role's bullets so the most relevant come first (return proposals in that order).
@@ -20,7 +20,7 @@ Return proposals keyed by the existing item ids and the field to change; leave o
 When items has "edit" and "context", propose changes only for the items under "edit"; "context" is read-only evidence.
 Use only facts from the CV, its notes, facts and the answers. Never invent numbers, tools, employers, titles, dates or outcomes.
 Set inferred to true for any skill or wording that is a reasonable inference rather than stated.
-Write in the requested language and tone, and follow the person's instruction when it doesn't break these rules.
+Write in the requested language and in the tone given under "steering". Follow the rest of the steering when it doesn't break these rules.
 ${SECTION_RULES[section]}`;
 }
 
@@ -29,13 +29,13 @@ export function sectionUserMessage(input: {
   items: unknown;
   job: JobExtraction;
   language: TailorLanguage;
-  tone: Tone;
-  instruction: string | null;
+  /** The steering block from steeringText: tone, draws, fit, focus roles and the quoted instruction. */
+  steering: string;
   answers: Array<{ question: string; answer: string }>;
   retry: Proposal[];
 }): string {
   return JSON.stringify({
-    section: input.section, language: input.language, tone: input.tone, instruction: input.instruction,
+    section: input.section, language: input.language, steering: input.steering,
     items: input.items,
     job: { title: input.job.title, summary: input.job.summary, requirements: input.job.requirements, responsibilities: input.job.responsibilities },
     answers: input.answers,

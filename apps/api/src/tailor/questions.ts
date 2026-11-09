@@ -8,6 +8,7 @@ import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import { questionSystemPrompt, questionUserMessage } from "./question-prompts.ts";
 import type { TailorRepo } from "./repo.ts";
+import { steeringText } from "./steering.ts";
 import { stripHeader } from "./strip-header.ts";
 
 export const MAX_RUN_QUESTIONS = 8;
@@ -67,12 +68,15 @@ export async function askQuestions(
   if (score && gaps.length === 0) return [];
   const gapRefs = new Set(gaps.map((label) => label.ref));
   const answered = answeredForJob(input.cv, input.run);
+  const cv = stripHeader(input.cv).cv;
+  const stored = input.run.tailoredCvId ? await deps.tailor.getSteering(input.run.tailoredCvId) : null;
+  const steering = steeringText(stored?.steering ?? {}, cv);
   let reply: z.infer<typeof ModelQuestionsSchema>;
   try {
     reply = await callModel(deps.model, {
       userId: input.userId, task: "tailor_questions", tier: "cheap", schema: ModelQuestionsSchema,
       system: questionSystemPrompt,
-      user: questionUserMessage({ section: input.section, cv: stripHeader(input.cv).cv, job: input.job, gaps, answered, max }),
+      user: questionUserMessage({ section: input.section, cv, job: input.job, gaps, answered, max, steering }),
       maxOutputTokens: 4000,
     });
   } catch {

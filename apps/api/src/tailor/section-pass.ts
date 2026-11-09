@@ -8,6 +8,7 @@ import { ApiError, type LogFn } from "../errors.ts";
 import { checkProposal } from "./checks.ts";
 import type { TailorRepo } from "./repo.ts";
 import { sectionSystemPrompt, sectionUserMessage, verifySystemPrompt } from "./section-prompts.ts";
+import { steeringText } from "./steering.ts";
 import { stripHeader } from "./strip-header.ts";
 
 type Item = { fields: Record<string, string>; roleId: string | null };
@@ -128,7 +129,7 @@ export async function runSectionPass(
     const reply: { proposals: (z.infer<typeof ModelProposalsSchema>["proposals"][number] & { reason?: string | null })[] } =
       await call("tailor_section", "strong", schema, sectionSystemPrompt(contentSection), sectionUserMessage({
       section, items: sectionData(cv, section, run.jobId), job: input.job, language: steering!.language,
-      tone: steering!.tone ?? "neutral", instruction: steering!.instruction, answers, retry,
+      steering: steeringText(steering!.steering, cv), answers, retry,
     }));
     // An item with one editable field (a bullet's text, the summary) takes any field name; other unknown item ids
     // or fields are dropped and logged (ids and fields only); items without a proposal keep the Base CV wording.

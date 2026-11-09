@@ -8,7 +8,8 @@ Otherwise use kind "options" with 2 to 4 short answer options; the person can al
 Set roleId to the id of the CV role the question is about, or null for skills, summary, languages or layout questions.
 Never ask a question whose meaning is already answered in "answered", even if worded differently.
 Return at most "max" questions, most useful first, and none when nothing useful is left. Write each in the CV's language.
-Give a one-line reason naming the gap, and set gap to that gap's ref exactly as given.`;
+Give a one-line reason naming the gap, and set gap to that gap's ref exactly as given.
+Use "steering" (the person's tone, what draws them, how well they think they fit, the roles to lean on) to choose which questions matter most.`;
 
 export function questionUserMessage(input: {
   section: TailorSection;
@@ -17,11 +18,14 @@ export function questionUserMessage(input: {
   gaps: MatchLabel[];
   answered: Array<{ question: string; answer: string }>;
   max: number;
+  /** The steering block from steeringText. */
+  steering: string;
 }): string {
   const requirement = (ref: string) => input.job.requirements[Number(ref.slice(1))];
   return JSON.stringify({
     section: input.section,
     max: input.max,
+    steering: input.steering,
     gaps: input.gaps.map((label) => label.kind === "requirement"
       ? { ref: label.ref, ...requirement(label.ref), status: label.status, inferred: label.inferred, evidence: label.evidence }
       : { ref: label.ref, keyword: label.ref.slice(2), status: label.status, inferred: label.inferred, evidence: label.evidence }),

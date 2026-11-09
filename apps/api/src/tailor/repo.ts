@@ -1,4 +1,4 @@
-import type { CvContent, MatchScore, TailoredCv, TailorLanguage, TailorRun, TailorSection, Tone } from "@resumora/shared";
+import type { CvContent, MatchScore, Steering, TailoredCv, TailorLanguage, TailorRun, TailorSection, Tone } from "@resumora/shared";
 import type { SaveResult } from "../cv/repo.ts";
 
 export type ScoreTarget = "base" | "tailored";
@@ -10,6 +10,7 @@ export type NewTailoredCv = {
   baseSnapshotAt: string;
   tone: Tone;
   instruction: string | null;
+  steering: Steering;
 };
 
 export type NewRun = {
@@ -26,8 +27,8 @@ export interface TailorRepo {
   /** Latest score for the target, optionally restricted to a tailored CV. */
   getScore(jobId: string, target: ScoreTarget, tailoredCvId?: string): Promise<MatchScore | null>;
   findTailoredCvId(jobId: string, language: TailorLanguage): Promise<string | null>;
-  /** The steering a section pass needs. */
-  getSteering(tailoredCvId: string): Promise<{ language: TailorLanguage; tone: Tone | null; instruction: string | null } | null>;
+  /** The steering every tailoring step needs; `steering` already carries the tone and instruction columns. */
+  getSteering(tailoredCvId: string): Promise<{ language: TailorLanguage; tone: Tone | null; instruction: string | null; steering: Steering } | null>;
   /** Content is also stored as the base snapshot. "exists" when the job already has one in this language. */
   createTailoredCv(input: NewTailoredCv): Promise<string | "exists">;
   /** The tailored CV's content, review state and version; null when gone. */

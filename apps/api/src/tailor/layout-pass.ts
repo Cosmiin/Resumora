@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { MAX_TEXT, type JobExtraction, type Proposal, type TailorRun } from "@resumora/shared";
+import { MAX_TEXT, type CvContent, type JobExtraction, type Proposal, type TailorRun } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
 import { LAYOUT_ITEMS } from "./accept.ts";
 import type { TailorRepo } from "./repo.ts";
+import { steeringText } from "./steering.ts";
 import { stripHeader } from "./strip-header.ts";
 import { jobNotFound } from "./start.ts";
 
@@ -14,7 +15,15 @@ const layoutSystemPrompt = [
   "order: every section key from `order`, each exactly once, most relevant to the job first.",
   "headline: a short job-title headline aimed at the job (at most 8 words, not a sentence, no full stop), using only words that already appear in the CV.",
   "Never add an employer, job title, seniority or skill the CV doesn't have. If nothing fits, return the current headline.",
+  "Let `steering` (the person's tone, what draws them and the roles to lean on) guide the order and headline when it doesn't break these rules.",
 ].join("\n");
+
+export function layoutUserMessage(input: { order: string[]; headline: string; job: JobExtraction; cv: CvContent; steering: string }): string {
+  return JSON.stringify({
+    order: input.order, headline: input.headline, steering: input.steering,
+    job: { title: input.job.title, requirements: input.job.requirements }, cv: { ...input.cv, layout: undefined },
+  });
+}
 
 const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}+#.]+/gu)?.map((w) => w.replace(/\.+$/, "")).filter(Boolean) ?? [];
 
@@ -42,12 +51,13 @@ export async function runLayoutPass(
   const cv = stripHeader(doc.content).cv;
   const order = cv.layout.order;
   const headline = cv.basics.titles[0] ?? "";
+  const stored = await deps.tailor.getSteering(doc.id);
 
   let reply: z.infer<typeof LayoutReplySchema>;
   try {
     reply = await callModel(deps.model, {
       userId: input.userId, task: "tailor_section", tier: "strong", schema: LayoutReplySchema, system: layoutSystemPrompt,
-      user: JSON.stringify({ order, headline, job: { title: input.job.title, requirements: input.job.requirements }, cv: { ...cv, layout: undefined } }),
+      user: layoutUserMessage({ order, headline, job: input.job, cv, steering: steeringText(stored?.steering ?? {}, cv) }),
       maxOutputTokens: 2000,
     });
   } catch {
