@@ -127,6 +127,12 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
       return data.length > 0;
     },
+    async setCoverLetter(id, letter) {
+      const { data, error } = await db.from("tailored_cvs").update({ cover_letter: letter, updated_at: new Date().toISOString() })
+        .eq("id", id).select("id");
+      if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
+      return data.length > 0;
+    },
     async latestRun(tailoredCvId) {
       const { data, error } = await db.from("tailor_runs").select(RUN_COLUMNS).eq("tailored_cv_id", tailoredCvId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();

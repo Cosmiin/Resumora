@@ -57,7 +57,22 @@
 .tailored-tabs [aria-selected="true"] { border-color: var(--border-selected); background: var(--surface-selected); }
 .tailored-score { font-weight: 600; margin-inline-end: auto; }
 .tailored-view { margin-block-end: var(--space-3); }
-.tailored-letter { padding: var(--space-8); color: var(--text-muted); }
+.letter-tab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(14rem, 18rem); gap: var(--space-5); align-items: start; }
+@media (max-width: 52rem) { .letter-tab { grid-template-columns: minmax(0, 1fr); } }
+.letter-page { display: grid; gap: var(--space-3); padding: var(--space-8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-card); }
+.letter-page p { margin: 0; }
+.letter-name { font-size: 1.25rem; font-weight: 600; }
+.letter-head { display: grid; gap: var(--space-1); margin-block-end: var(--space-3); }
+.letter-re { font-weight: 600; }
+.letter-body { width: 100%; font: inherit; line-height: 1.5; resize: vertical; }
+.letter-empty { color: var(--text-muted); }
+.letter-close { margin-block-start: var(--space-3) !important; }
+.letter-side { display: grid; gap: var(--space-2); }
+.letter-thoughts, .letter-saved { color: var(--text-muted); }
+.letter-confirm { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.letter-flags { padding: var(--space-3); border-radius: var(--radius-md); background: var(--marigold-50); }
+.letter-flags ul { margin: 0; padding-inline-start: var(--space-4); }
+@media print { .letter-side { display: none; } .letter-page { border: 0; padding: 0; } }
 .cv-mark-changed { background: var(--pine-50); box-shadow: inset 3px 0 0 var(--pine-400); }
 .cv-mark-inferred { background: var(--marigold-50); box-shadow: inset 3px 0 0 var(--marigold-500); }
 @media print { .cv-mark-changed, .cv-mark-inferred { background: none; box-shadow: none; } }

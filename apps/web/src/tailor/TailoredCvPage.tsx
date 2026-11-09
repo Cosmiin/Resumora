@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { SectionKey, TailoredCv, TailorSection } from "@resumora/shared";
+import { CoverLetterTab, pickLetter, type LetterOverride } from "./CoverLetterTab.tsx";
 import { getJob } from "../jobs/jobs-api.ts";
 import { RetailorDialog } from "./RetailorDialog.tsx";
 import { remember } from "./TailorFlow.tsx";
@@ -61,6 +62,8 @@ export function TailoredCvPage() {
   });
   const scores = useQuery({ queryKey: ["tailored-scores", userId, jobId], queryFn: () => getScores(jobId) });
   const [tab, setTab] = useState<TailoredTab>("cv");
+  // Letters written or edited since each copy's row was loaded (switching tabs doesn't refetch the row).
+  const [letters, setLetters] = useState<Record<string, LetterOverride>>({});
   const cv = doc.data ?? null;
   const tailoredId = cv?.id;
   const source = useMemo<CvSource | null>(() => tailoredId ? {
@@ -145,7 +148,9 @@ export function TailoredCvPage() {
         template: cv.template,
         toolbar,
         sectionAction,
-        replacePage: tab === "letter" ? <p className="tailored-letter">{t("tailored.letterSoon")}</p> : undefined,
+        replacePage: tab === "letter" ? <CoverLetterTab key={cv.id} cv={cv} job={job.data}
+          letter={pickLetter(cv, letters[cv.id])}
+          onLetter={(letter) => setLetters((all) => ({ ...all, [cv.id]: { letter, loadedAt: cv.updatedAt } }))} /> : undefined,
       }}
     />
   );

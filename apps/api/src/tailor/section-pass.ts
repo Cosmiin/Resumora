@@ -52,7 +52,7 @@ function sectionData(cv: CvContent, section: TailorSection, jobId: string): unkn
 }
 
 /** Written CV text only: ids, layout and metadata would add digits that look like known numbers. */
-function texts(value: unknown): string[] {
+export function texts(value: unknown): string[] {
   if (typeof value === "string") return [value];
   if (value && typeof value === "object") {
     return Object.entries(value).filter(([key]) => !["id", "layout", "schemaVersion", "locale", "photo", "askedAt", "updatedAt", "fromNotes"]

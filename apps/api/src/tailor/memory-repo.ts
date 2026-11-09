@@ -69,6 +69,12 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       Object.assign(cv, { template, updatedAt: new Date().toISOString() });
       return true;
     },
+    async setCoverLetter(id, letter) {
+      const cv = docs.cvs.get(id);
+      if (!cv || cv.userId !== userId) return false;
+      Object.assign(cv, { coverLetter: structuredClone(letter), updatedAt: new Date().toISOString() });
+      return true;
+    },
     async getTailoredCv(id) {
       const cv = docs.cvs.get(id);
       return cv && cv.userId === userId
