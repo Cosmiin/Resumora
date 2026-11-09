@@ -127,7 +127,7 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
         />
         {micShown && <MicButton voice={voice} startLabel={t("enrich.voice.start")} stopLabel={t("enrich.voice.stop")} />}
       </div>
-      <VoiceStatus voice={voice} locale={locale} maxSeconds={maxSeconds} />
+      <VoiceStatus voice={voice} locale={locale} maxSeconds={maxSeconds} showWords={micShown} />
       {message && (
         <p className="answer-voice-msg" role="status">
           {message}

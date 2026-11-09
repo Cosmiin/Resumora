@@ -61,7 +61,8 @@ export function MicButton({ voice, startLabel, stopLabel, onPress, onMouseDown }
 }
 
 /** Under the text box: 3-2-1, "Start talking" and the recording bar, "finishing", and the words so far. */
-export function VoiceStatus({ voice, locale = "en", maxSeconds = VOICE.maxSeconds }: { voice: Voice; locale?: Locale; maxSeconds?: number }) {
+export function VoiceStatus({ voice, locale = "en", maxSeconds = VOICE.maxSeconds, showWords = micAvailable(voice) }:
+  { voice: Voice; locale?: Locale; maxSeconds?: number; /** The live words area; by default only while the mic can be used. */ showWords?: boolean }) {
   const reduceMotion = useSyncExternalStore(onMotionChange, reducedMotion);
   const { state } = voice;
   const left = maxSeconds - voice.seconds;
@@ -100,7 +101,7 @@ export function VoiceStatus({ voice, locale = "en", maxSeconds = VOICE.maxSecond
         </div>
       )}
       {state === "stopping" && <span className="answer-rec is-finishing">{t("enrich.voice.finishing")}</span>}
-      {micAvailable(voice) && (
+      {showWords && (
         <div className="answer-live" aria-live="polite" lang={locale}>
           {voice.partial && <span className="answer-partial">
             {voice.partialWords.map((word, i) => (
