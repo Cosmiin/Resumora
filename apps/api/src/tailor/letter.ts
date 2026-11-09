@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CoverLetterSchema, type CoverLetter, type TailorFlag } from "@resumora/shared";
+import { CoverLetterSchema, hasUnknownNumber, type CoverLetter, type TailorFlag } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
@@ -56,8 +56,12 @@ export async function writeCoverLetter(
       user: JSON.stringify({ sources, job: jobText, proposals: [{ itemId: "letter", text, before: null }] }), maxOutputTokens: 2000,
     });
     // German capitalises every noun, so only the number check applies there (as for translations).
+    const known = [...sources, ...jobText];
+    const checked: TailorFlag[] = doc!.language === "de"
+      ? hasUnknownNumber(text, known) ? [{ rule: "number", detail: "A number that isn't in your CV, notes or answers" }] : []
+      : checkProposal({ itemId: "letter", field: "body", text, inferred: false, flags: [] }, { sources: known });
     const flags = [
-      ...checkProposal({ itemId: "letter", field: "body", text, inferred: doc!.language === "de", flags: [] }, { sources: [...sources, ...jobText] }),
+      ...checked,
       ...verified.results.flatMap((result) => result.claims).map((detail) => ({ rule: "achievement" as const, detail })),
     ];
     return { body: text, flags };

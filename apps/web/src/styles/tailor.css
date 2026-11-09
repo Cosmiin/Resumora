@@ -16,6 +16,9 @@
 .tailor-steps li { padding: var(--space-1) var(--space-3); border-radius: var(--radius-pill); font-size: var(--text-sm); color: var(--text-muted); background: var(--surface-sunken); }
 .tailor-steps li.is-done { color: var(--pine-700); background: var(--pine-50); }
 .tailor-steps li.is-current { color: var(--text-strong); background: var(--surface-card); box-shadow: var(--shadow-raised); }
+.tailor-step-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.tailor-back-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.tailor-back-answer { display: grid; gap: var(--space-2); }
 .tailor-score { font-weight: var(--weight-semibold); color: var(--text-accent); }
 
 .tailor-main { display: grid; gap: var(--space-5); }
@@ -29,6 +32,21 @@
 .tailor-pill.is-on { border-color: var(--border-selected); background: var(--surface-selected); color: var(--text-strong); }
 .tailor-field { position: relative; }
 .tailor-field textarea { width: 100%; padding-inline-end: 3rem; }
+
+/* Round 2 steering (SteerC1, SteerC2): tone cards, then the fixed optional questions. */
+.tailor-tones { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
+.tailor-tone {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; text-align: start; cursor: pointer;
+  border: 1px solid var(--sage-200); border-radius: 14px; background: var(--surface-card); color: var(--text-strong); font: inherit;
+}
+.tailor-tone b { font-size: 15px; }
+.tailor-tone span { font-family: var(--font-document); font-size: 13.5px; line-height: 1.45; color: var(--text-body); }
+.tailor-tone.is-on { border-color: var(--border-selected); box-shadow: inset 0 0 0 1px var(--border-selected); background: var(--surface-selected); }
+.tailor-tones-note { align-self: end; padding: 6px 4px; }
+.tailor-steer-aside { font-family: var(--font-sans); font-size: 17px; color: var(--sage-600); }
+.tailor-steer-qs { display: grid; gap: 18px; }
+.tailor-steer-q { margin: 0 0 7px; font-size: 15px; font-weight: var(--weight-semibold); }
+.tailor-steer-q span { font-weight: var(--weight-regular); color: var(--sage-600); font-size: 13px; }
 
 .tailor-items { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .tailor-items li {

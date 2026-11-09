@@ -1,59 +1,70 @@
 import { useState } from "react";
 import type { Answer, Locale, TailorQuestion } from "@resumora/shared";
+import { AnswerBox, type Via } from "../cv/enrich/AnswerBox.tsx";
 import { t } from "../i18n/t.ts";
-import { RolePanel, type Role } from "./RolePanel.tsx";
-import { useDictation } from "./SteeringStep.tsx";
+import { RolePanel, roleMeta, type Role } from "./RolePanel.tsx";
+
+export type Draft = Omit<Answer, "questionId">;
 
 type Props = {
   question: TailorQuestion;
-  n: number;
-  total: number;
-  /** Flag cards have their own two options and no typing, skipping or Skip all. */
-  onAnswer(answer: Omit<Answer, "questionId">): void;
-  onSkipAll?(): void;
-  /** The role the question is about, shown on the left (F3). */
+  /** "Role 1 of 3 · Question 2 of 2", or "Question 2 of 5". */
+  progress: string;
+  /** The answer given before (after Back), shown selected. */
+  initial?: Draft;
+  /** Next: the answer, kept in the browser until the step's last question. */
+  onNext(answer: Draft): void;
+  onSkip(): void;
+  /** Absent on the first question. */
+  onBack?(): void;
+  /** Experience: the role the question is about, shown on the left. */
   role?: Role;
+  /** Skills: the person's roles, to say where a confirmed skill was used. */
+  roles?: Role[];
   locale?: Locale;
 };
 
+export const VIA: Record<Answer["via"], Via[]> = { option: ["pick"], typed: ["type"], voice: ["voice"], skip: [] };
+/** Spoken words win, then typed ones; a pick alone is an option. */
+export const answerVia = (via: Via[]): Answer["via"] => (via.includes("voice") ? "voice" : via.includes("type") ? "typed" : "option");
+
+/** One question in the enrichment style: a choice only selects; Next, Back and Skip move. */
 export function QuestionCard({ role, locale = "en", ...props }: Props) {
-  if (!role) return <Question {...props} />;
+  if (!role || props.question.section !== "experience") return <Question {...props} locale={locale} />;
   return <div className="tailor-split">
-    <RolePanel role={role} locale={locale} />
-    <Question {...props} />
+    <RolePanel role={role} locale={locale} bulletId={props.question.bulletId} />
+    <Question {...props} locale={locale} />
   </div>;
 }
 
-function Question({ question, n, total, onAnswer, onSkipAll }: Omit<Props, "role" | "locale">) {
-  const [typed, setTyped] = useState("");
-  const [via, setVia] = useState<"typed" | "voice">("typed");
-  const { mic, status } = useDictation((words) => {
-    setVia("voice");
-    setTyped((text) => [text.trimEnd(), words].filter(Boolean).join(" "));
-  });
-  const flag = question.kind === "flag";
-  return <section className={flag ? "tailor-card is-flag" : "tailor-card"} aria-labelledby={`q-${question.id}`}>
-    <p className="tailor-eyebrow">{flag ? t("tailor.flag.eyebrow") : t("tailor.question.progress", { n, total })}</p>
+function Question({ question, progress, initial, onNext, onSkip, onBack, roles = [], locale }: Omit<Props, "role">) {
+  const [value, setValue] = useState(initial?.value ?? "");
+  const [via, setVia] = useState<Via[]>(initial ? VIA[initial.via] : []);
+  const [roleIds, setRoleIds] = useState<string[]>(initial?.roleIds ?? []);
+  const answer = value.trim();
+  // A skill is confirmed by any answer except the last option ("No").
+  const confirmed = question.kind === "skill" && answer !== "" && answer !== question.options.at(-1);
+  const toggle = (id: string) => setRoleIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  const next = () => {
+    const picked = confirmed ? roles.map((r) => r.id).filter((id) => roleIds.includes(id)) : [];
+    onNext({ value: answer, via: answerVia(via), ...(picked.length > 0 ? { roleIds: picked } : {}) });
+  };
+
+  return <section className="tailor-card" aria-labelledby={`q-${question.id}`}>
+    <p className="tailor-eyebrow">{progress}</p>
     <h2 id={`q-${question.id}`}>{question.text}</h2>
-    <div className="tailor-options">
-      {question.options.map((option) => <button key={option} type="button" className="secondary"
-        onClick={() => onAnswer({ value: option, via: "option" })}>{option}</button>)}
+    <AnswerBox question={{ bulletId: question.bulletId ?? question.id, text: question.text, options: question.options, kind: "detail" }} value={value} via={via}
+      locale={locale} onChange={(text, how) => { setValue(text); setVia(how); }} />
+    {confirmed && roles.length > 0 && <div className="answer-opts" role="group" aria-label={t("tailor.question.usedIn")}>
+      <p className="tailor-eyebrow">{t("tailor.question.usedIn")}</p>
+      {roles.map((r) => <button key={r.id} type="button" className="answer-opt" aria-pressed={roleIds.includes(r.id)} onClick={() => toggle(r.id)}>
+        {[r.title.trim() || t("tailor.role.untitled"), roleMeta(r, locale ?? "en")].filter(Boolean).join(" · ")}
+      </button>)}
+    </div>}
+    <div className="fm-foot">
+      {onBack && <button type="button" className="fm-ghost" onClick={onBack}>{t("tailor.question.back")}</button>}
+      <button type="button" className="fm-ghost" onClick={onSkip}>{t("tailor.question.skip")}</button>
+      <button type="button" className="fm-btn" disabled={!answer} onClick={next}>{t("tailor.question.next")}</button>
     </div>
-    {!flag && <>
-      <label htmlFor={`typed-${question.id}`}>{t("tailor.question.typed")}</label>
-      <div className="tailor-field">
-        <textarea id={`typed-${question.id}`} rows={2} maxLength={2000} value={typed}
-          onChange={(event) => { setTyped(event.target.value); if (!event.target.value) setVia("typed"); }} />
-        {mic}
-      </div>
-      {status}
-      <div className="tailor-actions">
-        <button type="button" className="primary" disabled={!typed.trim()} onClick={() => onAnswer({ value: typed.trim(), via })}>
-          {t("tailor.question.send")}
-        </button>
-        <button type="button" className="secondary" onClick={() => onAnswer({ value: null, via: "skip" })}>{t("tailor.question.skip")}</button>
-        {onSkipAll && <button type="button" className="link" onClick={onSkipAll}>{t("tailor.question.skipAll")}</button>}
-      </div>
-    </>}
   </section>;
 }

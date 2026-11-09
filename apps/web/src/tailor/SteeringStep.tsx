@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Tone } from "@resumora/shared";
+import { STEERING_DRAWS, STEERING_FITS, type Question, type Steering, type Tone } from "@resumora/shared";
+import { AnswerBox } from "../cv/enrich/AnswerBox.tsx";
 import { useVoice } from "../cv/enrich/useVoice.ts";
 import { MicButton, micAvailable, VoiceStatus } from "../cv/enrich/VoiceControls.tsx";
 import { t } from "../i18n/t.ts";
+import { ToneStep } from "./ToneStep.tsx";
 
-const TONES: Tone[] = ["formal", "neutral", "confident"];
 const MAX = 500;
 
 /**
@@ -20,29 +21,69 @@ export function useDictation(append: (words: string) => void) {
   return { mic, status: <VoiceStatus voice={voice} /> };
 }
 
-type Props = { sections: number; busy: boolean; onStart(steering: { tone: Tone; instruction: string }): void };
+export type SteeringRole = { id: string; title: string; company: string };
+type Props = {
+  jobId: string; roles: SteeringRole[]; busy: boolean; onStart(steering: Steering): void;
+  /** Changing a started run: the screens start from these choices, the button says Save changes, and Back returns. */
+  initial?: Steering; startLabel?: string; onCancel?(): void;
+};
 
-export function SteeringStep({ sections, busy, onStart }: Props) {
-  const [tone, setTone] = useState<Tone>("neutral");
-  const [instruction, setInstruction] = useState("");
-  const { mic, status } = useDictation((words) => setInstruction((text) => [text.trimEnd(), words].filter(Boolean).join(" ").slice(0, MAX)));
-  return <section className="tailor-card">
-    <h2>{t("tailor.steer.title")}</h2>
-    <div className="tailor-pills" role="group" aria-label={t("tailor.steer.tone")}>
-      {TONES.map((value) => <button key={value} type="button" aria-pressed={tone === value}
-        className={tone === value ? "tailor-pill is-on" : "tailor-pill"} onClick={() => setTone(value)}>
-        {t(`tailor.tone.${value}`)}
-      </button>)}
+// The free-text box is the enrichment answer box with no option chips.
+const FREE_TEXT: Question = { bulletId: "steering", text: "", options: [], kind: "detail" };
+const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
+
+/** Steering (SteerC1, SteerC2): the tone, then the fixed optional questions. Nothing is sent until Start tailoring. */
+export function SteeringStep({ jobId, roles, busy, onStart, initial, startLabel, onCancel }: Props) {
+  const [screen, setScreen] = useState<"tone" | "questions">("tone");
+  const [tone, setTone] = useState<Tone>(initial?.tone ?? "neutral");
+  const [draws, setDraws] = useState<NonNullable<Steering["draws"]>>(initial?.draws ?? []);
+  const [fit, setFit] = useState<Steering["fit"]>(initial?.fit ?? null);
+  const [focus, setFocus] = useState<string[]>(initial?.focusRoleIds ?? []);
+  const [instruction, setInstruction] = useState(initial?.instruction ?? "");
+  const [via, setVia] = useState<Parameters<typeof AnswerBox>[0]["via"]>([]);
+
+  if (screen === "tone") return <ToneStep jobId={jobId} tone={tone} onTone={setTone} onNext={() => setScreen("questions")} />;
+
+  const chip = (key: string, label: string, on: boolean, pick: () => void) =>
+    <button key={key} type="button" className="answer-opt" aria-pressed={on} onClick={pick}>{label}</button>;
+  const start = () => onStart({
+    tone, draws, fit, focusRoleIds: roles.filter((role) => focus.includes(role.id)).map((role) => role.id),
+    ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+  });
+
+  return <section className="tailor-steer">
+    <div className="fm-steps" aria-hidden="true"><i className="is-done" /><i className="is-on" /></div>
+    <h2 className="fm-q">{t("tailor.steer.questions")} <span className="tailor-steer-aside">{t("tailor.steer.optional")}</span></h2>
+    <div className="tailor-steer-qs">
+      <div>
+        <p className="tailor-steer-q" id="steer-draws">{t("tailor.steer.draws")} <span>{t("tailor.steer.pickAny")}</span></p>
+        <div className="answer-opts" role="group" aria-labelledby="steer-draws">
+          {STEERING_DRAWS.map((draw) => chip(draw, t(`tailor.steer.draw.${draw}`), draws.includes(draw), () => setDraws(toggle(draws, draw))))}
+        </div>
+      </div>
+      <div>
+        <p className="tailor-steer-q" id="steer-fit">{t("tailor.steer.fit")} <span>{t("tailor.steer.pickOne")}</span></p>
+        <div className="answer-opts" role="group" aria-labelledby="steer-fit">
+          {STEERING_FITS.map((value) => chip(value, t(`tailor.steer.fit.${value}`), fit === value, () => setFit(fit === value ? null : value)))}
+        </div>
+      </div>
+      {roles.length > 0 && <div>
+        <p className="tailor-steer-q" id="steer-focus">{t("tailor.steer.focus")} <span>{t("tailor.steer.yourRoles")}</span></p>
+        <div className="answer-opts" role="group" aria-label={t("tailor.steer.focus")}>
+          {roles.map((role) => chip(role.id, [role.title, role.company].filter(Boolean).join(" · "), focus.includes(role.id),
+            () => setFocus(toggle(focus, role.id))))}
+        </div>
+      </div>}
+      <div>
+        <p className="tailor-steer-q">{t("tailor.steer.instruction")}</p>
+        <AnswerBox question={FREE_TEXT} value={instruction} via={via} plain readOnly={busy} placeholder={t("tailor.steer.placeholder")}
+          onChange={(value, how) => { setInstruction(value.slice(0, MAX)); setVia(how); }} />
+      </div>
     </div>
-    <label htmlFor="tailor-instruction">{t("tailor.steer.instruction")}</label>
-    <div className="tailor-field">
-      <textarea id="tailor-instruction" rows={3} maxLength={MAX} value={instruction} placeholder={t("tailor.steer.placeholder")}
-        onChange={(event) => setInstruction(event.target.value)} />
-      {mic}
+    <div className="fm-foot">
+      <button type="button" className="fm-ghost" onClick={() => setScreen("tone")}>{t("tailor.steer.backTone", { tone: t(`tailor.tone.${tone}`) })}</button>
+      {onCancel && <button type="button" className="fm-ghost" onClick={onCancel}>{t("tailor.back.resume")}</button>}
+      <button type="button" className="fm-btn" disabled={busy} onClick={start}>{startLabel ?? t("tailor.steer.start")}</button>
     </div>
-    {status}
-    <button type="button" className="primary" disabled={busy} onClick={() => onStart({ tone, instruction: instruction.trim() })}>
-      {t("tailor.steer.start", { n: sections })}
-    </button>
   </section>;
 }

@@ -78,15 +78,18 @@ async function start(): Promise<string> {
   const body = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal" })).json() as { run: { id: string } };
   return body.run.id;
 }
+/** Experience steps name the run's current role, as the web does. */
+const roleOf = async (runId: string, section: string) =>
+  section === "experience" ? { roleId: (await repo().getRun(runId))!.currentRoleId } : {};
 async function run(runId: string, section: string, ...items: ModelProposal[]) {
-  // The real (strict) model always returns every field: skills proposals carry reason, null when unused.
-  replies.push({ proposals: section === "skills" ? items.map((item) => ({ reason: null, ...item })) : items }, { results: [] });
-  const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`);
+  // The real (strict) model always returns every field: proposals carry reason, null when unused.
+  replies.push({ proposals: items.map((item) => ({ reason: null, ...item })) }, { results: [] });
+  const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`, await roleOf(runId, section));
   expect(res.status).toBe(200);
 }
-async function accept(runId: string, section: string, body: unknown = {}, score: unknown = scoreReply()) {
+async function accept(runId: string, section: string, body: Record<string, unknown> = {}, score: unknown = scoreReply()) {
   replies.push(score);
-  return post(`/v1/tailor-runs/${runId}/sections/${section}/accept`, body);
+  return post(`/v1/tailor-runs/${runId}/sections/${section}/accept`, { ...await roleOf(runId, section), ...body });
 }
 
 describe("accept section", () => {
@@ -109,57 +112,27 @@ describe("accept section", () => {
     expect(model.logged.at(-1)?.task).toBe("tailor_score");
   });
 
-  it("keeps each flagged field of one role apart: a confirmed title and a rejected company", async () => {
+  it("never writes a flagged proposal: the item keeps its Base wording and no flag question exists", async () => {
+    const runId = await start();
     const title = reword(role.id, "Payroll Lead", { field: "title" });
-    const company = reword(role.id, "Beta Payroll", { field: "company" });
-    const runId = await start();
-    replies.push({ proposals: [title, company] }, { results: [] });
-    await run(runId, "experience", title, company);
-    const flags = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
-    expect(flags).toHaveLength(2);
-    expect(new Set(flags.map((q) => q.itemId)).size).toBe(2);
-    const byField = (field: string) => flags.find((q) => q.text.includes(field === "title" ? "Payroll Lead" : "Beta Payroll"))!;
-    const res = await accept(runId, "experience", { flags: [
-      { questionId: byField("title").id, confirmed: true }, { questionId: byField("company").id, confirmed: false },
-    ] });
+    const claim = reword(first.id, "Cut payroll errors by 30% for 40 staff");
+    replies.push({ proposals: [title, claim].map((p) => ({ reason: null, ...p })) }, { results: [] });
+    await run(runId, "experience", title, claim);
+    expect((await repo().getRun(runId))!.questions ?? []).toEqual([]);
+    const res = await accept(runId, "experience", { decisions: [{ itemId: first.id, keep: true }, { itemId: role.id, keep: true }] });
     expect(res.status).toBe(200);
-    expect(tailored().content.experience[0]).toMatchObject({ title: "Payroll Lead", company: role.company });
-  });
-
-  it("reverts a rejected flag and keeps a confirmed one as a job note", async () => {
-    const flagged = reword(first.id, "Cut payroll errors by 30% for 40 staff");
-    const runId = await start();
-    replies.push({ proposals: [flagged] }, { results: [] });
-    await run(runId, "experience", flagged);
-    const [flag] = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
-    const rejected = await accept(runId, "experience", { decisions: [{ itemId: first.id, keep: true }], flags: [{ questionId: flag!.id, confirmed: false }] });
-    expect(rejected.status).toBe(200);
-    expect(tailored().content.experience[0]!.bullets[0]!.text).toBe("Ran payroll for 40 staff");
+    expect(tailored().content.experience[0]).toMatchObject({ title: role.title, bullets: role.bullets });
     expect((await cv.get()).content.experience[0]!.notes).toEqual([]);
-
-    // A fresh job with the same proposal, this time confirmed.
-    docs.cvs.clear();
-    docs.runs.clear();
-    const again = await start();
-    replies.push({ proposals: [flagged] }, { results: [] });
-    await run(again, "experience", flagged);
-    const [flag2] = (await repo().getRun(again))!.questions!.filter((q) => q.kind === "flag");
-    const confirmed = await accept(again, "experience", { flags: [{ questionId: flag2!.id, confirmed: true }] });
-    expect(confirmed.status).toBe(200);
-    expect(tailored().content.experience[0]!.bullets[0]!.text).toBe("Cut payroll errors by 30% for 40 staff");
-    expect((await cv.get()).content.experience[0]!.notes).toEqual([
-      expect.objectContaining({ jobId, answer: "Cut payroll errors by 30% for 40 staff" }),
-    ]);
   });
 
   it("counts a kept inferred skill in Score 2 and leaves a removed one out", async () => {
     const runId = await start();
     await accept(runId, "experience");
     await run(runId, "skills",
-      { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true },
-      { itemId: "new-skill", field: "name", text: "Gusto", inferred: true });
+      { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true, reason: "Shown in: Team Lead · Acme Payroll" },
+      { itemId: "new-skill", field: "name", text: "Tax filing", inferred: true, reason: "Shown in: Team Lead · Acme Payroll" });
     const res = await accept(runId, "skills", {
-      inferred: [{ itemId: "new-skill:Payroll software", keep: true }, { itemId: "new-skill:Gusto", keep: false }],
+      inferred: [{ itemId: "new-skill:Payroll software", keep: true }, { itemId: "new-skill:Tax filing", keep: false }],
     }, scoreReply("Payroll software", true));
     const body = await res.json() as { score: MatchScore };
     expect(tailored().content.technicalSkills.map((s) => s.name)).toEqual(["Excel", "Payroll software"]);
@@ -214,22 +187,9 @@ describe("accept section", () => {
     await cv.save({ ...base, technicalSkills: full }, 1);
     const runId = await start();
     await accept(runId, "experience");
-    await run(runId, "skills", { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true });
+    await run(runId, "skills", { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true, reason: "Shown in: Team Lead · Acme Payroll" });
     expect((await accept(runId, "skills")).status).toBe(200);
     expect(tailored().content.technicalSkills).toHaveLength(40);
-  });
-
-  it("saves a confirmed flag on a long description as a note within the note limits", async () => {
-    const long = `Ran payroll for 40 staff. ${"Kept every pay run on time. ".repeat(80)}`.trim();
-    const flagged = { itemId: role.id, field: "description", text: `${long} Cut errors by 30%.`, inferred: false };
-    const runId = await start();
-    replies.push({ proposals: [flagged] }, { results: [] });
-    await run(runId, "experience", flagged);
-    const [flag] = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
-    const res = await accept(runId, "experience", { flags: [{ questionId: flag!.id, confirmed: true }] });
-    expect(res.status).toBe(200);
-    const [note] = (await cv.get()).content.experience[0]!.notes;
-    expect(note!.question.length).toBeLessThanOrEqual(2000);
   });
 
   it("refuses a section that isn't current with 409", async () => {
@@ -238,5 +198,72 @@ describe("accept section", () => {
     expect(res.status).toBe(409);
     expect(tailored().version).toBe(1);
     expect(await repo().getScore(jobId, "tailored")).toBeNull();
+  });
+});
+
+describe("experience role by role", () => {
+  const roleA = roleWith(["Ran payroll for 40 staff"], { title: "Payroll Lead", company: "Gamma", startDate: "2022-01", current: true, endDate: "" });
+  const roleB = roleWith(["Filed taxes"], { title: "Payroll Officer", company: "Delta", startDate: "2019-01", endDate: "2021-12" });
+  const roleC = roleWith(["Kept records"], { title: "Clerk", company: "Epsilon", startDate: "2016-01", endDate: "2018-12" });
+  const three: CvContent = { ...base, experience: [roleA, roleB, roleC] };
+  const sentEdit = () => {
+    const body = JSON.parse(String((model.requests.at(-2)!.messages as { content: string }[])[1]!.content)) as {
+      items: { edit: { id: string }[]; context: { roles: { id: string }[] } };
+    };
+    return { edit: body.items.edit.map((r) => r.id), context: body.items.context.roles.map((r) => r.id) };
+  };
+
+  beforeEach(async () => { await cv.save(three, 1); });
+
+  it("runs 3 roles in CV order, one run and accept each, with a score after every role, then Skills", async () => {
+    const runId = await start();
+    expect(await repo().getRun(runId)).toMatchObject({ roleOrder: [roleA.id, roleB.id, roleC.id], currentRoleId: roleA.id });
+    for (const [i, current] of [roleA, roleB, roleC].entries()) {
+      const bullet = current.bullets[0]!;
+      await run(runId, "experience", reword(bullet.id, `${bullet.text} on time`));
+      expect(sentEdit()).toEqual({ edit: [current.id], context: [roleA, roleB, roleC].filter((r) => r !== current).map((r) => r.id) });
+      const scored = model.logged.filter((call) => call.task === "tailor_score").length;
+      const res = await accept(runId, "experience", { decisions: [{ itemId: bullet.id, keep: true }] });
+      expect(res.status).toBe(200);
+      expect(model.logged.filter((call) => call.task === "tailor_score")).toHaveLength(scored + 1);
+      const next = (await res.json() as { run: TailorRun }).run;
+      if (i < 2) expect(next).toMatchObject({ currentSection: "experience", currentRoleId: [roleB, roleC][i]!.id });
+      else expect(next).toMatchObject({ currentSection: "skills", currentRoleId: null });
+    }
+    const doc = tailored();
+    expect(doc.content.experience.map((r) => r.bullets[0]!.text)).toEqual(["Ran payroll for 40 staff on time", "Filed taxes on time", "Kept records on time"]);
+    expect(Object.keys(doc.review!.experience as object)).toEqual([roleA.bullets[0]!.id, roleB.bullets[0]!.id, roleC.bullets[0]!.id]);
+  });
+
+  it("accepts a role with nothing to change and moves on", async () => {
+    const runId = await start();
+    await run(runId, "experience");
+    const res = await accept(runId, "experience");
+    expect(res.status).toBe(200);
+    expect((await res.json() as { run: TailorRun }).run).toMatchObject({ currentSection: "experience", currentRoleId: roleB.id });
+  });
+
+  it("refuses a role that isn't current with 409 role_not_current", async () => {
+    const runId = await start();
+    const runRes = await post(`/v1/tailor-runs/${runId}/sections/experience/run`, { roleId: roleB.id });
+    expect(runRes.status).toBe(409);
+    expect(await runRes.json()).toMatchObject({ error: { code: "role_not_current" } });
+    const res = await accept(runId, "experience", { roleId: roleB.id });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: { code: "role_not_current" } });
+    expect(await post(`/v1/tailor-runs/${runId}/sections/experience/accept`, {})).toMatchObject({ status: 409 });
+    expect(tailored().version).toBe(1);
+    expect((await repo().getRun(runId))!.currentRoleId).toBe(roleA.id);
+  });
+
+  it("names every role a confirmed skill was used in as a new skill's reason", async () => {
+    const runId = await start();
+    const question = { id: "q-sql", section: "skills" as const, roleId: null, text: "Do you know SQL?", kind: "skill" as const,
+      options: ["Yes", "A little", "No"], reason: "Gap", skill: "SQL" };
+    await repo().updateRun(runId, { currentSection: "skills", currentRoleId: null, questions: [question],
+      answers: [{ questionId: "q-sql", value: "Yes", via: "option", roleIds: [roleA.id, roleB.id] }] });
+    await run(runId, "skills", { itemId: "new-skill", field: "name", text: "SQL", inferred: true, reason: "Shown in: Clerk · Epsilon" });
+    const proposals = (await repo().getRun(runId))!.proposals!;
+    expect(proposals).toEqual([expect.objectContaining({ itemId: "new-skill", text: "SQL", reason: "Used in: Payroll Lead · Gamma, Payroll Officer · Delta", flags: [] })]);
   });
 });

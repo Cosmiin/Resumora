@@ -4,8 +4,22 @@ import { CvContentSchema } from "./cv.ts";
 export const TailorLanguageSchema = z.enum(["ro", "en", "fr", "de", "es", "it"]);
 export type TailorLanguage = z.infer<typeof TailorLanguageSchema>;
 
-export const ToneSchema = z.enum(["formal", "neutral", "confident"]);
+export const TONES = ["formal", "neutral", "confident", "concise", "warm", "technical", "executive"] as const;
+export const ToneSchema = z.enum(TONES);
 export type Tone = z.infer<typeof ToneSchema>;
+
+export const STEERING_DRAWS = ["work", "company", "step_up", "location_pay", "other"] as const;
+export const STEERING_FITS = ["very_well", "mostly", "stretch"] as const;
+
+/** The user's steering answers (round 2): every field optional. */
+export const SteeringSchema = z.object({
+  tone: ToneSchema.optional(),
+  draws: z.array(z.enum(STEERING_DRAWS)).optional(),
+  fit: z.enum(STEERING_FITS).nullable().optional(),
+  focusRoleIds: z.array(z.string()).optional(),
+  instruction: z.string().max(500).optional(),
+});
+export type Steering = z.infer<typeof SteeringSchema>;
 
 export const TAILOR_SECTIONS = ["experience", "skills", "summary", "achievements", "languages", "layout"] as const;
 export const TailorSectionSchema = z.enum(TAILOR_SECTIONS);
@@ -38,13 +52,17 @@ export const QuestionSchema = z.object({
   section: TailorSectionSchema,
   roleId: z.string().nullable(),
   text: z.string(),
-  kind: z.enum(["options", "confirm_inferred", "flag"]),
+  kind: z.enum(["options", "confirm_inferred", "flag", "skill"]),
   options: z.array(z.string()),
   reason: z.string(),
   /** The Score 1 gap a job question is about ("r0", "k:SQL"), so a topic isn't asked again in other words. */
   gap: z.string().optional(),
   /** A flag question's proposal key (its item id, or "new-skill:<text>"). */
   itemId: z.string().optional(),
+  /** The bullet a role question points at; absent = the whole role. */
+  bulletId: z.string().optional(),
+  /** A Skills question's one skill ("SQL"): its answer becomes "Used SQL" on the roles picked. */
+  skill: z.string().optional(),
 });
 export type Question = z.infer<typeof QuestionSchema>;
 
@@ -52,11 +70,14 @@ export const AnswerSchema = z.object({
   questionId: z.string(),
   value: z.string().nullable(),
   via: z.enum(["option", "typed", "voice", "skip"]),
+  /** The roles a confirmed skill was used in. */
+  roleIds: z.array(z.string()).optional(),
 });
 export type Answer = z.infer<typeof AnswerSchema>;
 
 export const FlagSchema = z.object({
-  rule: z.enum(["number", "entity", "tool", "achievement"]),
+  /** "guess": an inferred change without a reason naming its basis. */
+  rule: z.enum(["number", "entity", "tool", "achievement", "guess"]),
   detail: z.string(),
 });
 export type Flag = z.infer<typeof FlagSchema>;
@@ -67,8 +88,10 @@ export const ProposalSchema = z.object({
   text: z.string(),
   inferred: z.boolean(),
   flags: z.array(FlagSchema),
-  /** A suggested new skill's short reason: where the CV shows it. */
+  /** Where the CV shows it: a new skill's reason, or why the AI guessed an inferred change. */
   reason: z.string().optional(),
+  /** Guessed spans inside a summary, each with why the AI guessed it. */
+  guesses: z.array(z.object({ text: z.string(), reason: z.string() })).optional(),
 });
 export type Proposal = z.infer<typeof ProposalSchema>;
 
@@ -93,6 +116,9 @@ export const TailorRunSchema = z.object({
   answers: z.array(AnswerSchema).nullable(),
   proposals: z.array(ProposalSchema).nullable(),
   errorCode: z.string().nullable(),
+  /** Experience roles in CV order, tailored one at a time. */
+  roleOrder: z.array(z.string()).optional(),
+  currentRoleId: z.string().nullable().optional(),
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
 });

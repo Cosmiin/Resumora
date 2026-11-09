@@ -1,4 +1,4 @@
-import { TAILOR_SECTIONS, type TailorLanguage, type TailorRun, type Tone } from "@resumora/shared";
+import { TAILOR_SECTIONS, type Steering, type TailorLanguage, type TailorRun } from "@resumora/shared";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
@@ -16,7 +16,7 @@ export type StartResult = { run: TailorRun; tailoredCvId: string; language: Tail
 export async function startTailoring(
   deps: { jobs: JobRepo; cv: CvRepo; tailor: TailorRepo; now(): Date },
   jobId: string,
-  input: { tone: Tone; instruction: string | null },
+  steering: Steering,
 ): Promise<StartResult> {
   const job = await deps.jobs.get(jobId);
   if (!job) throw jobNotFound();
@@ -25,19 +25,23 @@ export async function startTailoring(
   const adText = [job.extracted.summary, ...job.extracted.responsibilities].filter(Boolean).join("\n");
   const language = detectAdLanguage(adText) ?? base.locale;
 
+  // Experience is tailored one role at a time, every role in CV order.
+  const roleOrder = base.experience.map((role) => role.id);
+
   let tailoredCvId = await deps.tailor.findTailoredCvId(jobId, language);
   if (!tailoredCvId) {
     const created = await deps.tailor.createTailoredCv({
-      jobId, language, content: base, baseSnapshotAt: deps.now().toISOString(), tone: input.tone, instruction: input.instruction,
+      jobId, language, content: base, baseSnapshotAt: deps.now().toISOString(),
+      tone: steering.tone ?? "neutral", instruction: steering.instruction ?? null, steering,
     });
     if (created !== "exists") {
-      const run = await deps.tailor.createRun({ jobId, tailoredCvId: created, kind: "tailor", sections: [...TAILOR_SECTIONS], currentSection: "experience" });
+      const run = await deps.tailor.createRun({ jobId, tailoredCvId: created, kind: "tailor", sections: [...TAILOR_SECTIONS], currentSection: "experience", roleOrder });
       return { run, tailoredCvId: created, language };
     }
     tailoredCvId = await deps.tailor.findTailoredCvId(jobId, language);
     if (!tailoredCvId) throw new Error("tailored CV vanished after a duplicate insert");
   }
   const run = await deps.tailor.latestRun(tailoredCvId)
-    ?? await deps.tailor.createRun({ jobId, tailoredCvId, kind: "tailor", sections: [...TAILOR_SECTIONS], currentSection: "experience" });
+    ?? await deps.tailor.createRun({ jobId, tailoredCvId, kind: "tailor", sections: [...TAILOR_SECTIONS], currentSection: "experience", roleOrder });
   return { run, tailoredCvId, language };
 }

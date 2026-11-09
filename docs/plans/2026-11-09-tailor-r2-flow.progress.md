@@ -1,0 +1,59 @@
+# Tailoring round 2 · Part A progress (session 5, `rebuild/tailor-r2-flow`)
+
+## Task A1: Shared schemas for steering, per-role runs and guesses — done
+session: tailor-r2 Part A · builder: claude
+commit: 7d505dd (base 9c5728d) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 43% → 43%
+open: ruling — 4 tone labels added to `apps/web/src/i18n/en-tailor.ts` (the existing steering screen lists every tone).
+
+## Task A2: Migration: steering answers and role order — done
+session: tailor-r2 Part A · builder: claude
+commit: see git log (base 7d505dd) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 43% → 43%
+open: migration (owner): new columns only, no RLS change. Owner steps went into a new tracked file `docs/superpowers/plans/2026-11-09-tailor-r2-db-steps.md` because the named db-steps file is uncommitted in the main folder. Applied locally with `npx supabase migration up`; `npm run db:test` passes (222).
+
+## Task A3: Steering reaches every step — done
+session: tailor-r2 Part A · builder: claude
+commit: see git log (base 58aac53) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 43% → (next block)
+open: rulings — `repo.ts`, `questions.ts`, `section-pass.ts` edited for wiring; the section prompt now sends one steering block instead of separate tone/instruction fields.
+
+## Task A4: Steering screens (SteerC1, SteerC2) — done
+session: tailor-r2 Part A · builder: claude
+commit: see git log (base 667b146) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 43% → 44%
+open: rulings — tone cache through two new TailorRepo methods; TailorFlow passes jobId and roles; `tailor-flow.test.tsx` and `cv/enrich/voice-look.test.tsx` updated to the new screens (the second one sits in session 7's folder: expect a tiny merge there).
+
+## Next (fresh session, per claude-build's 4-task rule)
+A5 Experience role by role → A6 truth rule → A7 Skills questions → A8 question screen → A9 going back. Then whole-branch review (Opus high), draft PR to `rebuild/tailor-r2-bugs`.
+
+## Task A5: Experience runs role by role — done
+session: tailor-r2 Part A (session 5, second block) · builder: claude
+commit: 15827fe (base 43c3fe6) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 44% → (see A6)
+open: rulings — `repo.ts`, `memory-repo.ts`, `supabase-repo.ts` map `role_order`/`current_role_id`; `retailor.ts` sets the role order; `eval/tailor/run.ts` loops roles. Skills cap 5, other sections share 8. Low (not fixed): a run started before this change has an empty role order, so its Experience step proposes nothing. The web still calls Experience without `roleId` until A8 (the web flow is broken against the real API between A5 and A8).
+
+## Task A6: The truth rule in prompts and checks — done
+session: tailor-r2 Part A (session 5, second block) · builder: claude
+commit: see git log (base 15827fe) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0 · weekly 45% → 46%
+open: rulings — shared `FlagSchema` gains rule `guess`; `translate.ts` and `letter.ts` (German) now call the number check directly (they relied on `inferred: true` skipping the tool check); web `tailor-api.ts`, `TailorFlow.tsx`, `SectionReview.tsx`, `en-tailor.ts` carry the `removed` line; accept tests for flag questions replaced by one "never writes a flagged proposal" test. The `flags` phase in TailorFlow is now unused (A8 removes it). Low (not fixed): `removed` can undercount when two proposals share one item id (new skills) and the retry keeps one.
+
+## Task A7: Skills asks skill questions only, and the role it was used in — done
+session: tailor-r2 Part A (session 5, second block) · builder: claude
+commit: see git log (base bdaccaf) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 46% → 47%
+open: rulings — shared `QuestionSchema` gains `skill`; the "Used in: Title · Company" reason is set in `section-pass.ts` from the stored answer (not left to the model); `tailor-accept`, `tailor-section`, `tailor-retailor` tests updated. Low (not fixed): a volunteering role in `roleIds` gets the note but isn't named in the reason; a resubmit with the same value but new `roleIds` adds no notes (A9's redo replaces answers).
+
+## Task A8: Question screen like enrichment (ExpQA, SkillsA1) — done
+session: tailor-r2 Part A (session 5, second block) · builder: claude
+commit: see git log (base 7d527c4) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 46% → 47%
+open: rulings — `RolePanel` imports `styles/focus.css` for the `fm-*` bullet glow and pill (no new styles); "Skip all" and the flag step are gone (design: Next / Back / Skip only; A6 removed flag questions); unused copy removed. Quirk (not fixed): a skill answer that starts with "No" but has typed words counts as confirmed and shows the role row. StepBar unchanged (A9 makes finished steps links).
+
+## Next (fresh session, per claude-build's 4-task rule)
+A9 Going back (BackA) and changing steering → whole-branch review (Opus high, base `9c5728d`) → push and draft PR to `rebuild/tailor-r2-bugs`. Between A5 and A8 the web was out of step with the API; after A8 it is in step again, so a browser check now makes sense.
+
+## Task A9: Going back (BackA) and changing steering — done
+session: tailor-r2 Part A (session 5, third block) · builder: claude
+commit: 8f8887a (base 05b7930) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0 · weekly 47% → 48%
+open: rulings — `section-pass.ts` split into `runSectionPass` + `passProposals` (redo reuses the checks without moving the run); `accept.ts` gains `redo` (finished role, starts from its Base wording, run not moved); `repo.ts`/`memory-repo.ts`/`supabase-repo.ts` gain `setSteering`, and `saveTailoredCv` takes a null score; `QuestionCard.tsx` exports its via helpers; `SteeringStep.tsx`, `tailor-api.ts`, `en-tailor.ts`, `tailor.css` carry the screens. Routes: `POST /tailor-runs/:id/roles/:roleId/redo`, `POST …/roles/:roleId/accept`, `GET|POST /tailor-runs/:id/steering`. A steering change resets the tailored CV to the Base wording with an empty review (Score 1 until re-accepted) and always runs every step, even from a one-section re-tailor (review fix). Finished non-Experience steps open their answers read-only (no redo route for them in the brief).
+
+## Part A end: whole-branch review — done
+session: tailor-r2 Part A (session 5, third block) · builder: claude
+commit: 3450846 (fix) · reviews: 1 whole-branch (Opus high, base 9c5728d) + 1 fix-only (Opus high, base 01a1beb) · fix rounds: 1 · guard denials: 0 · weekly 47% → 48% (this block)
+Findings: medium — `removed` undercounted when a flagged proposal shares its item id with clean ones (two new skills); fixed with a test. Open (low, not fixed): runs created before the A2 migration have an empty role order, so Experience proposes nothing for them (start a fresh job); a clean proposal the retry leaves out on a flagged item now counts in `removed`.
+Cost (Part A, all three blocks): weekly 43% → 48%; review agents 10; guard denials 0; this block's context ~27%.
+Browser check (owner's Chrome, local stack restarted from this worktree): steering (7 tone cards from the person's bullet, then the questions), Experience role by role ("Role 1 of 7"), going back to role 1 from the step bar, editing its answer, Update this role, accept, back on role 2's same question; Tone and questions opens on the stored choices, Save changes shows the confirm box, Redo everything starts a new run at role 1. Seen: after the role 1 redo the score showed 69 (Base) instead of 90; a steering redo may ask a role new questions (never the same one twice).

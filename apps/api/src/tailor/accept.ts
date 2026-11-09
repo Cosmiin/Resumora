@@ -10,7 +10,7 @@ import type { JobRepo } from "../jobs/repo.ts";
 import { newestRole } from "./questions.ts";
 import type { Review, TailorRepo } from "./repo.ts";
 import { scoreMatch } from "./score.ts";
-import { sectionItems } from "./section-pass.ts";
+import { currentRole, sectionItems } from "./section-pass.ts";
 import { jobNotFound } from "./start.ts";
 
 const Choice = z.object({ itemId: z.string(), keep: z.boolean() });
@@ -18,6 +18,8 @@ export const AcceptBodySchema = z.object({
   decisions: z.array(Choice).max(500).default([]),
   inferred: z.array(Choice).max(500).default([]),
   flags: z.array(z.object({ questionId: z.string(), confirmed: z.boolean() })).max(100).default([]),
+  /** Experience: the role being accepted (must be the run's current role). */
+  roleId: z.string().optional(),
 });
 export type AcceptBody = z.infer<typeof AcceptBodySchema>;
 
@@ -64,21 +66,29 @@ function apply(cv: CvContent, p: Proposal): void {
  */
 export async function acceptSection(
   deps: { model: ModelDeps; tailor: TailorRepo; cv: CvRepo; jobs: JobRepo; now(): Date },
-  input: { userId: string; run: TailorRun; job: Job; section: TailorSection; body: AcceptBody },
+  input: { userId: string; run: TailorRun; job: Job; section: TailorSection; body: AcceptBody; redo?: boolean },
 ): Promise<{ run: TailorRun; score: MatchScore }> {
   const { run, section, body } = input;
-  if (run.status === "done" || run.currentSection !== section) {
+  // A redo accepts a finished role (checked by the caller) and leaves the run where it is.
+  if (!input.redo && (run.status === "done" || run.currentSection !== section)) {
     throw new ApiError(409, "section_not_current", "This section isn't the current step.");
   }
+  const roleId = input.redo ? body.roleId ?? null : currentRole(run, section, body.roleId);
   if (!input.job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
   const doc = run.tailoredCvId ? await deps.tailor.getTailoredCv(run.tailoredCvId) : null;
   if (!doc) throw jobNotFound();
 
-  const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(doc.content, section).keys());
+  const content = structuredClone(doc.content);
+  if (input.redo && roleId) {
+    // The redone proposals replace the role's earlier ones: start again from its Base wording.
+    const baseRole = (await deps.cv.get()).content.experience.find((role) => role.id === roleId);
+    const at = content.experience.findIndex((role) => role.id === roleId);
+    if (baseRole && at >= 0) content.experience[at] = structuredClone(baseRole);
+  }
+  const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));
   const inferred = new Map(body.inferred.map((d) => [d.itemId, d.keep]));
   const flags = new Map(body.flags.map((f) => [f.questionId, f.confirmed]));
-  const content = structuredClone(doc.content);
   const state: Record<string, ItemReview> = {};
   const notes: { roleId: string | null; note: Note }[] = [];
   for (const p of (run.proposals ?? []).filter((proposal) => ids.has(proposal.itemId))) {
@@ -102,7 +112,10 @@ export async function acceptSection(
   const parsed = CvContentSchema.safeParse(content);
   if (!parsed.success) throw new ApiError(502, "ai_failed", `Couldn't tailor ${section}. Try again.`);
 
-  const review: Review = { ...(doc.review ?? {}), [section]: state };
+  // A role's accept replaces only that role's items; the other roles keep their review.
+  const others = roleId ? Object.fromEntries(Object.entries((doc.review?.[section] ?? {}) as Record<string, ItemReview>)
+    .filter(([key]) => !ids.has(key))) : {};
+  const review: Review = { ...(doc.review ?? {}), [section]: { ...others, ...state } };
   const keptInferredTexts = Object.values(review).flatMap((items) => Object.values(items as Record<string, ItemReview>))
     .filter((item) => item.inferred && item.kept).map((item) => item.text);
   const score = await scoreMatch({ model: deps.model }, {
@@ -125,8 +138,13 @@ export async function acceptSection(
     for (const [roleId, list] of byRole) await deps.cv.addJobNotes(roleId, list);
   }
 
-  const next = run.sections[run.sections.indexOf(section) + 1] ?? null;
-  const updated = await deps.tailor.updateRun(run.id, { currentSection: next, status: next ? "running" : "done" });
+  if (input.redo) return { run, score };
+  // The next role in CV order, then the next section after the last role.
+  const nextRole = roleId ? run.roleOrder![run.roleOrder!.indexOf(roleId) + 1] ?? null : null;
+  const next = nextRole ? section : run.sections[run.sections.indexOf(section) + 1] ?? null;
+  const updated = await deps.tailor.updateRun(run.id, {
+    currentSection: next, status: next ? "running" : "done", ...(roleId ? { currentRoleId: nextRole } : {}),
+  });
   if (!updated) throw jobNotFound();
   if (!next) await markTailored(deps.jobs, run.jobId);
   return { run: updated, score };

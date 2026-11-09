@@ -1,11 +1,16 @@
-import type { CvContent, MatchScore, TailorRun, TailoredCv } from "@resumora/shared";
-import type { ScoreTarget, TailorRepo } from "./repo.ts";
+import type { CvContent, MatchScore, Steering, TailorRun, TailoredCv } from "@resumora/shared";
+import type { ScoreTarget, TailorRepo, ToneExamples } from "./repo.ts";
+import { withColumns } from "./steering.ts";
 
 export type MemoryTailorDocs = {
   cvs: Map<string, TailoredCv>;
   runs: Map<string, TailorRun>;
+  /** tailored_cvs.steering, by tailored CV id. */
+  steering: Map<string, Steering>;
+  /** jobs.tone_examples, by job id. */
+  toneExamples: Map<string, ToneExamples>;
 };
-export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map() });
+export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map(), steering: new Map(), toneExamples: new Map() });
 
 export type MemoryTailorStore = Map<string, {
   userId: string;
@@ -23,7 +28,15 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     },
     async getSteering(tailoredCvId) {
       const cv = docs.cvs.get(tailoredCvId);
-      return cv && cv.userId === userId ? { language: cv.language, tone: cv.tone, instruction: cv.instruction } : null;
+      return cv && cv.userId === userId ? { language: cv.language, tone: cv.tone, instruction: cv.instruction,
+        steering: withColumns(structuredClone(docs.steering.get(tailoredCvId) ?? {}), cv.tone, cv.instruction) } : null;
+    },
+    async setSteering(tailoredCvId, steering) {
+      const cv = docs.cvs.get(tailoredCvId);
+      if (!cv || cv.userId !== userId) return false;
+      Object.assign(cv, { tone: steering.tone ?? "neutral", instruction: steering.instruction ?? null });
+      docs.steering.set(tailoredCvId, structuredClone(steering));
+      return true;
     },
     async createTailoredCv(input) {
       if ([...docs.cvs.values()].some((cv) => cv.jobId === input.jobId && cv.language === input.language)) return "exists";
@@ -32,6 +45,7 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, translatedFrom: null, content: structuredClone(input.content),
         baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, template: "classic", tone: input.tone,
         instruction: input.instruction, review: null, score: null, coverLetter: null, version: 1, createdAt: now, updatedAt: now });
+      docs.steering.set(id, structuredClone(input.steering));
       return id;
     },
     async listTailoredCvs(jobId) {
@@ -93,7 +107,8 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       const now = new Date().toISOString();
       const run: TailorRun = { id: crypto.randomUUID(), userId, jobId: input.jobId, tailoredCvId: input.tailoredCvId,
         kind: input.kind, sections: [...input.sections], status: "running", currentSection: input.currentSection,
-        questions: null, answers: null, proposals: null, errorCode: null, createdAt: now, updatedAt: now };
+        questions: null, answers: null, proposals: null, errorCode: null,
+        roleOrder: [...(input.roleOrder ?? [])], currentRoleId: input.roleOrder?.[0] ?? null, createdAt: now, updatedAt: now };
       docs.runs.set(run.id, run);
       return structuredClone(run);
     },
@@ -105,6 +120,13 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       if (!run || run.userId !== userId) return null;
       Object.assign(run, structuredClone(changes), { updatedAt: new Date().toISOString() });
       return structuredClone(run);
+    },
+    async getToneExamples(jobId) {
+      const cached = docs.toneExamples.get(jobId);
+      return cached ? structuredClone(cached) : null;
+    },
+    async saveToneExamples(jobId, examples) {
+      docs.toneExamples.set(jobId, structuredClone(examples));
     },
     async saveScore(jobId, target, tailoredCvId, score) {
       const key = JSON.stringify([userId, jobId, target, tailoredCvId]);

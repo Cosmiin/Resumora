@@ -43,9 +43,11 @@ type Props = {
   onAccept(body: AcceptBody): void;
   /** The Base CV the proposals were made from: roles, before texts. Null while loading or if it failed. */
   cv?: CvContent | null;
+  /** Proposals the API dropped because the CV, notes and answers don't back them up. */
+  removed?: number;
 };
 
-export function SectionReview({ section, proposals, flags, confirmed, busy, onAccept, cv = null }: Props) {
+export function SectionReview({ section, proposals, flags, confirmed, busy, onAccept, cv = null, removed = 0 }: Props) {
   // Changed items start kept; inferred items start undecided (kept, but listed as unreviewed at export).
   const [keep, setKeep] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(0);
@@ -126,6 +128,7 @@ export function SectionReview({ section, proposals, flags, confirmed, busy, onAc
   return <section className="tailor-card" aria-labelledby="tailor-review-title">
     <h2 id="tailor-review-title">{t("tailor.review.title", { section: t(`tailor.section.${section}`) })}</h2>
     {body}
+    {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
     <div className="tailor-actions">
       {page > 0 && current && <button type="button" className="secondary" onClick={() => setPage(page - 1)}>
         <span aria-hidden="true">← </span>{t("tailor.review.prevRole")}</button>}
