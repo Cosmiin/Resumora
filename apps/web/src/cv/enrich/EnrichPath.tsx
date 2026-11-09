@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { findScored, newId, scoredItems, type CvContent, type ScoredKind, type SkillGroup } from "@resumora/shared";
+import { LIGHT_SECTIONS, findScored, newId, scoredItems, type CvContent, type ScoredKind, type SkillGroup } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { AchievementsPick } from "./AchievementsPick.tsx";
@@ -28,8 +28,6 @@ export function belowTarget(s: RoleScoreState | undefined): boolean {
   return !(s?.state === "ready" && s.result?.score != null && s.result.score >= ENRICHED_AT);
 }
 
-/** The lighter sections the quick pass visits, in this order. */
-export const LIGHT_SECTIONS = ["courses", "awards", "publications", "interests"] as const satisfies readonly LineList[];
 
 /** Q3: the lighter items the path visits are the ones with no lines yet, section by section. */
 export function lightStops(cv: CvContent): { section: LineList; itemId: string }[] {

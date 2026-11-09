@@ -302,3 +302,19 @@ export const AchievementsAnswerSchema = z.object({
   suggestions: z.array(z.object({ text: z.string().min(1).max(2000), roleId: z.string().min(1).max(64) }).strict()).max(5),
 }).strict();
 export type AchievementsAnswer = z.infer<typeof AchievementsAnswerSchema>;
+
+/** The lighter sections that get suggested lines (3B): no score, no questions. */
+export const LIGHT_SECTIONS = ["courses", "awards", "publications", "interests"] as const;
+export type LightSection = (typeof LIGHT_SECTIONS)[number];
+
+/** POST /v1/enrich/item-lines: the user's "Tell us about ‹item›" answer for one saved lighter item. */
+export const ItemLinesBodySchema = z.object({
+  section: z.enum(LIGHT_SECTIONS),
+  itemId: z.string().min(1).max(64),
+  text: z.string().trim().min(1).max(MAX_LONG_TEXT),
+}).strict();
+export type ItemLinesBody = z.infer<typeof ItemLinesBodySchema>;
+
+/** Suggested short lines for that item, from its own fields and the answer only. Empty: skip the picks. */
+export const ItemLinesAnswerSchema = z.object({ lines: z.array(z.string().min(1).max(200)).max(4) }).strict();
+export type ItemLinesAnswer = z.infer<typeof ItemLinesAnswerSchema>;

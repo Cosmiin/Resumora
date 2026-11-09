@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
-import { RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
+import { ItemLinesBodySchema, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
 import { z } from "zod";
 import type { AppEnv } from "../app.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -15,6 +15,7 @@ import { improveBullet } from "./improve.ts";
 import { brainDump } from "./brain-dump.ts";
 import { roleFacts } from "./role-facts.ts";
 import { roleDescription } from "./role-description.ts";
+import { itemLines } from "./item-lines.ts";
 import { suggestAchievements } from "./achievements.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
@@ -121,6 +122,23 @@ export function enrichRoutes(deps: {
     } catch (err) {
       if (err instanceof ApiError && err.status >= 500) {
         console.error(JSON.stringify({ msg: "role description failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/item-lines", async (c) => {
+    const body = ItemLinesBodySchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a section, an itemId and some text.");
+    const user = c.get("user");
+    try {
+      return c.json(await itemLines(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "item lines failed", code: err.code, requestId: c.get("requestId") }));
       }
       throw err;
     }
