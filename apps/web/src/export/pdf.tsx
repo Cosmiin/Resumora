@@ -1,7 +1,7 @@
 ﻿import type { ReactElement, ReactNode } from "react";
 import { Document, Image, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
-  CATEGORY, formatYearMonth, normalizeLayout, type CvContent, type SectionKey,
+  CATEGORY, formatYearMonth, normalizeLayout, withoutHidden, type CvContent, type SectionKey,
 } from "@resumora/shared";
 import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
@@ -16,10 +16,12 @@ const TEMPLATES = {
 const join = (parts: string[]) => parts.filter(Boolean).join(" · ");
 
 export function buildCvPdf(
-  content: CvContent,
+  cv: CvContent,
   template: TemplateId | string | undefined,
   photo?: ExportPhoto,
 ): Promise<Blob> {
+  // Hidden courses, awards, publications and interests are left out of the export.
+  const content = withoutHidden(cv);
   registerPdfFonts();
   const selectedTemplate = getTemplate(template);
   const image = selectedTemplate.showsPhoto && content.basics.photo && photo && photo.type !== "webp"

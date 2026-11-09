@@ -184,6 +184,23 @@ describe("EditablePage", () => {
     expect(state().interests[0]!.bullets![0]!.text).toBe("Half marathons!");
   });
 
+  it("a hidden course or interest stays in the editor and Show on CV brings it back; a course can be hidden (E6 Task 10a)", async () => {
+    const cv: CvContent = {
+      ...emptyCv(),
+      courses: [{ id: "k1", name: "Pottery class", provider: "", date: "", hidden: true }, { id: "k2", name: "SQL basics", provider: "", date: "" }],
+      interests: [{ id: "i1", name: "Knitting", hidden: true }],
+    };
+    render(<Harness initial={cv} />);
+    const pottery = screen.getByRole("group", { name: "Pottery class" });
+    expect(pottery).toHaveClass("is-hidden");
+    await userEvent.click(within(pottery).getByRole("button", { name: "Show Pottery class on CV" }));
+    expect(state().courses[0]!.hidden).toBeUndefined();
+    await userEvent.click(within(screen.getByRole("group", { name: "SQL basics" })).getByRole("button", { name: "Hide SQL basics on CV" }));
+    expect(state().courses[1]!.hidden).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Show Knitting on CV" }));
+    expect(state().interests[0]!.hidden).toBeUndefined();
+  });
+
   it('a typed date "03/2021" is saved as 2021-03', async () => {
     const cv: CvContent = { ...emptyCv(), certifications: [{ id: "c1", name: "AWS", issuer: "", date: "" }] };
     render(<Harness initial={cv} />);

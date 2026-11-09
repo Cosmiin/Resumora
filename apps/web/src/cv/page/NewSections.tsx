@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatYearMonth, type CvContent, type SectionKey } from "@resumora/shared";
+import { formatYearMonth, withoutHidden, type CvContent, type SectionKey } from "@resumora/shared";
 
 const joinParts = (parts: string[], sep = " · ") => parts.filter(Boolean).join(sep);
 
@@ -30,6 +30,8 @@ export function newSectionBody(
   cv: CvContent,
   roleRange: (start: string, end: string, current: boolean) => string,
 ): { show: boolean; body: ReactNode } {
+  // Hidden courses, awards, publications and interests are left out of the page.
+  cv = withoutHidden(cv);
   const date = (value: string) => formatYearMonth(value, cv.locale);
   switch (key) {
     case "achievements":

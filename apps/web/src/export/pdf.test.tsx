@@ -79,6 +79,16 @@ describe("buildCvPdf", () => {
     expect(new TextDecoder().decode(await blob.arrayBuffer())).toMatch(/\/Subtype\s*\/Image\b/);
   });
 
+  it("leaves out a hidden course and a section whose items are all hidden (E6 Task 10a)", async () => {
+    const content = fixture();
+    content.courses = [{ id: "c1", name: "SQL basics", provider: "", date: "" }, { id: "c2", name: "Pottery class", provider: "", date: "", hidden: true }];
+    content.interests = [{ id: "i1", name: "Knitting", hidden: true }];
+    const { text } = await readPdf(await buildCvPdf(content, "classic"));
+    expect(text).toContain("SQL basics");
+    expect(text).not.toContain("Pottery class");
+    expect(text).not.toContain("Knitting");
+  });
+
   it.each(["compact", "no bytes", "no photo", "webp"])("omits the image for %s", async (scenario) => {
     const content = fixture();
     if (scenario !== "no photo") content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1 };

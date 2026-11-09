@@ -150,14 +150,16 @@ const sectionKey = z.enum(SECTION_KEYS as unknown as [SectionKey, ...SectionKey[
 
 /** Short lines under a course, award, publication or interest (suggested by enrichment, or typed). Absent = none. */
 const lines = z.array(BulletSchema).max(MAX_BULLETS).optional();
+/** Hidden on this CV: kept in the data, left out of the page and the exports. Absent = shown. */
+const hidden = z.boolean().optional();
 export const AwardSchema = z
-  .object({ id, name: text(), issuer: text(), date: YearMonthSchema, description: text(MAX_LONG_TEXT), bullets: lines })
+  .object({ id, name: text(), issuer: text(), date: YearMonthSchema, description: text(MAX_LONG_TEXT), bullets: lines, hidden })
   .strict();
-export const CourseSchema = z.object({ id, name: text(), provider: text(), date: YearMonthSchema, bullets: lines }).strict();
+export const CourseSchema = z.object({ id, name: text(), provider: text(), date: YearMonthSchema, bullets: lines, hidden }).strict();
 export const PublicationSchema = z
-  .object({ id, title: text(), publisher: text(), date: YearMonthSchema, url: text(), bullets: lines })
+  .object({ id, title: text(), publisher: text(), date: YearMonthSchema, url: text(), bullets: lines, hidden })
   .strict();
-export const InterestSchema = z.object({ id, name: text(), bullets: lines }).strict();
+export const InterestSchema = z.object({ id, name: text(), bullets: lines, hidden }).strict();
 
 /** Section order, hidden sections and custom headings of a CV. */
 export const LayoutSchema = z
@@ -274,4 +276,12 @@ export function scoredItems(cv: Pick<CvContent, "experience" | "projects" | "vol
 
 export function findScored(cv: Pick<CvContent, "experience" | "projects" | "volunteering">, id: string): { item: Experience; kind: ScoredKind } | undefined {
   return scoredItems(cv).find(({ item }) => item.id === id);
+}
+
+/** The CV as shown on the page and in the exports: hidden courses, awards, publications and interests left out. */
+export function withoutHidden(cv: CvContent): CvContent {
+  const shown = <T extends { hidden?: boolean }>(items: T[]) => (items.some((item) => item.hidden) ? items.filter((item) => !item.hidden) : items);
+  const courses = shown(cv.courses), awards = shown(cv.awards), publications = shown(cv.publications), interests = shown(cv.interests);
+  if (courses === cv.courses && awards === cv.awards && publications === cv.publications && interests === cv.interests) return cv;
+  return { ...cv, courses, awards, publications, interests };
 }

@@ -96,6 +96,16 @@ describe("buildCvDocx", () => {
     expect(xml).not.toContain("Private answer");
   });
 
+  it("leaves out a hidden course and a section whose items are all hidden (E6 Task 10a)", async () => {
+    const content = fixture();
+    content.courses = [{ id: "c1", name: "SQL basics", provider: "", date: "" }, { id: "c2", name: "Pottery class", provider: "", date: "", hidden: true }];
+    content.interests = [{ id: "i1", name: "Knitting", hidden: true }];
+    const xml = await documentXml(await buildCvDocx(content, "modern"));
+    expect(xml).toContain("SQL basics");
+    expect(xml).not.toContain("Pottery class");
+    expect(xml).not.toContain("Knitting");
+  });
+
   it("omits a hidden section's heading and text", async () => {
     const content = fixture();
     content.layout.hidden = ["education"];

@@ -64,6 +64,8 @@ export type CvAction =
   | { type: "addBullets"; roleId: string; texts: string[] }
   /** Lines picked for a course, award, publication or interest in the guided path (3B). */
   | { type: "addLines"; list: LineList; itemId: string; texts: string[] }
+  /** Hides a course, award, publication or interest on this CV (kept in the data), or shows it again. */
+  | { type: "setItemHidden"; list: LineList; itemId: string; hidden: boolean }
   | { type: "setFacts"; roleId: string; facts: RoleFacts | null }
   | { type: "setNote"; roleId: string; note: Note }
   | { type: "setCurrent"; list: RoleList; itemId: string; current: boolean }
@@ -290,6 +292,14 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (!lines || !action.texts.length || lines.length >= MAX_BULLETS) return cv;
       const added = action.texts.slice(0, MAX_BULLETS - lines.length).map((text) => ({ id: newId(), text }));
       return withBullets(cv, owner, [...lines, ...added]);
+    }
+    case "setItemHidden": {
+      const items = getItems(cv, action.list);
+      const item = items.find((i) => i.id === action.itemId);
+      if (!item || !!item.hidden === action.hidden) return cv;
+      // Shown again = the field goes, so the item reads as before it was hidden.
+      const { hidden: _, ...rest } = item;
+      return withItems(cv, action.list, items.map((i) => (i === item ? (action.hidden ? { ...rest, hidden: true } : rest) : i)));
     }
     case "setFacts": {
       const list = roleListOf(cv, action.roleId);

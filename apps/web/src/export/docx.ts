@@ -1,5 +1,5 @@
 import {
-  CATEGORY, formatYearMonth, normalizeLayout, type CvContent, type SectionKey,
+  CATEGORY, formatYearMonth, normalizeLayout, withoutHidden, type CvContent, type SectionKey,
 } from "@resumora/shared";
 import { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun, type IParagraphOptions } from "docx";
 import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
@@ -54,10 +54,12 @@ function pack(children: Paragraph[], style = STYLES.classic): Promise<Blob> {
 }
 
 export function buildCvDocx(
-  content: CvContent,
+  cv: CvContent,
   template: TemplateId | string | undefined,
   photo?: ExportPhoto,
 ): Promise<Blob> {
+  // Hidden courses, awards, publications and interests are left out of the export.
+  const content = withoutHidden(cv);
   const selectedTemplate = getTemplate(template);
   const b = content.basics;
   const children: Paragraph[] = [];

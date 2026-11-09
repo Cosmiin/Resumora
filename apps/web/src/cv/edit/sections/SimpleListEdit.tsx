@@ -82,6 +82,11 @@ const ListRow = memo(function ListRow({
     () => dispatch({ type: "removeItem", list, itemId: item.id }),
     [dispatch, list, item.id],
   );
+  const hidden = item.hidden === true;
+  const toggleHidden = useCallback(
+    () => { if (hasLines(list)) dispatch({ type: "setItemHidden", list, itemId: item.id, hidden: !hidden }); },
+    [dispatch, list, item.id, hidden],
+  );
   const field = (spec: Spec, className?: string, multiline?: boolean) => (
     <ItemField
       list={list}
@@ -97,7 +102,7 @@ const ListRow = memo(function ListRow({
     />
   );
   return (
-    <div className="cv-line" data-item={item.id} role="group" aria-label={mainText || t(main.label)}>
+    <div className={hidden ? "cv-line is-hidden" : "cv-line"} data-item={item.id} role="group" aria-label={mainText || t(main.label)}>
       <div className="cv-item-head">
         {field(main, "cv-item-title")}
         {date && (
@@ -113,6 +118,12 @@ const ListRow = memo(function ListRow({
               dispatch={dispatch}
             />
           </span>
+        )}
+        {hasLines(list) && (
+          <button type="button" className="cv-hide" onClick={toggleHidden}
+            aria-label={t(hidden ? "edit.item.showNamed" : "edit.item.hideNamed", { name: mainText || t(main.label) })}>
+            {t(hidden ? "edit.item.show" : "edit.item.hide")}
+          </button>
         )}
         <RemoveButton name={mainText || t(main.label)} onClick={remove} />
       </div>

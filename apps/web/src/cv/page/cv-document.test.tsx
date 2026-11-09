@@ -153,6 +153,21 @@ describe("CvDocument", () => {
     expect(screen.getByText("Chess", { exact: false })).toBeInTheDocument();
   });
 
+  it("leaves out hidden items, and a section whose items are all hidden (E6 Task 10a)", () => {
+    render(
+      <CvDocument
+        content={sampleCv({
+          courses: [{ id: "k1", name: "SQL basics", provider: "", date: "" }, { id: "k2", name: "Pottery class", provider: "", date: "", hidden: true }],
+          interests: [{ id: "i1", name: "Knitting", hidden: true }],
+        })}
+      />,
+    );
+    expect(screen.getByText("SQL basics")).toBeInTheDocument();
+    expect(screen.queryByText("Pottery class")).not.toBeInTheDocument();
+    expect(screen.queryByText("Knitting", { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Interests" })).not.toBeInTheDocument();
+  });
+
   it("key achievements and interests render", () => {
     render(
       <CvDocument
