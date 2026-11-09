@@ -22,20 +22,24 @@ export function useDictation(append: (words: string) => void) {
 }
 
 export type SteeringRole = { id: string; title: string; company: string };
-type Props = { jobId: string; roles: SteeringRole[]; busy: boolean; onStart(steering: Steering): void };
+type Props = {
+  jobId: string; roles: SteeringRole[]; busy: boolean; onStart(steering: Steering): void;
+  /** Changing a started run: the screens start from these choices, the button says Save changes, and Back returns. */
+  initial?: Steering; startLabel?: string; onCancel?(): void;
+};
 
 // The free-text box is the enrichment answer box with no option chips.
 const FREE_TEXT: Question = { bulletId: "steering", text: "", options: [], kind: "detail" };
 const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
 
 /** Steering (SteerC1, SteerC2): the tone, then the fixed optional questions. Nothing is sent until Start tailoring. */
-export function SteeringStep({ jobId, roles, busy, onStart }: Props) {
+export function SteeringStep({ jobId, roles, busy, onStart, initial, startLabel, onCancel }: Props) {
   const [screen, setScreen] = useState<"tone" | "questions">("tone");
-  const [tone, setTone] = useState<Tone>("neutral");
-  const [draws, setDraws] = useState<NonNullable<Steering["draws"]>>([]);
-  const [fit, setFit] = useState<Steering["fit"]>(null);
-  const [focus, setFocus] = useState<string[]>([]);
-  const [instruction, setInstruction] = useState("");
+  const [tone, setTone] = useState<Tone>(initial?.tone ?? "neutral");
+  const [draws, setDraws] = useState<NonNullable<Steering["draws"]>>(initial?.draws ?? []);
+  const [fit, setFit] = useState<Steering["fit"]>(initial?.fit ?? null);
+  const [focus, setFocus] = useState<string[]>(initial?.focusRoleIds ?? []);
+  const [instruction, setInstruction] = useState(initial?.instruction ?? "");
   const [via, setVia] = useState<Parameters<typeof AnswerBox>[0]["via"]>([]);
 
   if (screen === "tone") return <ToneStep jobId={jobId} tone={tone} onTone={setTone} onNext={() => setScreen("questions")} />;
@@ -78,7 +82,8 @@ export function SteeringStep({ jobId, roles, busy, onStart }: Props) {
     </div>
     <div className="fm-foot">
       <button type="button" className="fm-ghost" onClick={() => setScreen("tone")}>{t("tailor.steer.backTone", { tone: t(`tailor.tone.${tone}`) })}</button>
-      <button type="button" className="fm-btn" disabled={busy} onClick={start}>{t("tailor.steer.start")}</button>
+      {onCancel && <button type="button" className="fm-ghost" onClick={onCancel}>{t("tailor.back.resume")}</button>}
+      <button type="button" className="fm-btn" disabled={busy} onClick={start}>{startLabel ?? t("tailor.steer.start")}</button>
     </div>
   </section>;
 }

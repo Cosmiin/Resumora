@@ -9,11 +9,18 @@ import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
 import { SteeringStep } from "./SteeringStep.tsx";
 import * as api from "./tailor-api.ts";
+import { FinishedRoles, roleName, YourAnswers } from "./YourAnswers.tsx";
 import "../styles/tailor.css";
 
 type Phase =
   | { kind: "loading" }
-  | { kind: "steer"; busy: boolean }
+  /** `resume`: changing the steering of a started run; going back returns there. */
+  | { kind: "steer"; busy: boolean; resume?: Phase }
+  | { kind: "confirm"; steering: Steering; busy: boolean; resume: Phase }
+  /** Going back (BackA): a finished step, a finished role's answers, a redone role's review. */
+  | { kind: "back"; section: TailorSection; resume: Phase }
+  | { kind: "role"; roleId: string; busy: boolean; resume: Phase }
+  | { kind: "redo"; roleId: string; proposals: Proposal[]; removed?: number; busy: boolean; resume: Phase }
   | { kind: "asking" }
   /** Answers stay here, one per question (undefined = not reached yet), until the step's last question. */
   | { kind: "questions"; questions: TailorQuestion[]; index: number; answers: (Draft | undefined)[] }
@@ -45,6 +52,8 @@ export function TailorFlow() {
   const [cv, setCv] = useState<CvContent | null>(null);
   // Questions may also be about a volunteering role (same shape as a job).
   const roleFor = (question: TailorQuestion) => [...cv?.experience ?? [], ...cv?.volunteering ?? []].find((role) => role.id === question.roleId);
+  // The stored steering, read when the Tone and questions screens open on a started run.
+  const [steering, setSteering] = useState<Steering | undefined>(undefined);
   const runRef = useRef<TailorRun | null>(null);
   const started = useRef(false);
   const section = run?.currentSection ?? null;
@@ -110,8 +119,44 @@ export function TailorFlow() {
       }
     }
   }
+  /** A finished role's new answers: its proposals come back for review; the run stays where it was. */
+  async function redo(roleId: string, answers: Answer[], resume: Phase) {
+    setPhase({ kind: "role", roleId, busy: true, resume });
+    try {
+      const { proposals, removed } = await api.redoRole(runRef.current!.id, roleId, answers);
+      setPhase({ kind: "redo", roleId, proposals, removed, busy: false, resume });
+    } catch (cause) { fail(cause, "experience", () => setPhase({ kind: "role", roleId, busy: false, resume })); }
+  }
+  async function acceptRedo(roleId: string, body: api.AcceptBody, review: Extract<Phase, { kind: "redo" }>) {
+    setPhase({ ...review, busy: true });
+    try {
+      const result = await api.acceptRole(runRef.current!.id, roleId, body);
+      setLatest(result.score.total);
+      track(result.run);
+      setPhase(review.resume);
+    } catch (cause) { fail(cause, "experience", () => setPhase({ ...review, busy: false })); }
+  }
+  /** The Tone and questions screens of a started run, from its stored steering (never from defaults). */
+  async function openSteer(resume: Phase) {
+    setPhase({ kind: "loading" });
+    try {
+      setSteering(await api.getSteering(runRef.current!.id));
+      setPhase({ kind: "steer", busy: false, resume });
+    } catch (cause) { fail(cause, null, () => setPhase(resume)); }
+  }
+  /** Changing the steering redoes every step with the stored answers, in a new run. */
+  async function restart(steering: Steering, confirm: Extract<Phase, { kind: "confirm" }>) {
+    setPhase({ ...confirm, busy: true });
+    try {
+      const { run: created } = await api.changeSteering(runRef.current!.id, steering);
+      setSteering(steering);
+      remember(jobId, created.id);
+      enter(created);
+    } catch (cause) { fail(cause, null, () => setPhase({ ...confirm, busy: false })); }
+  }
   async function start(steering: Steering) {
     setPhase({ kind: "steer", busy: true });
+    setSteering(steering);
     try {
       const { run: created } = await api.startTailoring(jobId, steering);
       remember(jobId, created.id);
@@ -137,10 +182,52 @@ export function TailorFlow() {
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Roles already accepted: all of them once Experience is behind the run, else the ones before the current role.
+  const order = run?.roleOrder ?? [];
+  const pastExperience = !!run && (run.status === "done" || !section || run.sections.indexOf(section) > run.sections.indexOf("experience"));
+  const doneRoles = pastExperience ? order
+    : section === "experience" && run?.currentRoleId && order.includes(run.currentRoleId) ? order.slice(0, order.indexOf(run.currentRoleId)) : [];
+  // Going back opens only from a question or a review, so nothing in flight comes back over it.
+  const settled = phase.kind === "questions" || phase.kind === "review";
+  const reached = run && section ? run.sections.indexOf(section) : run?.sections.length ?? 0;
+  const open = settled && run ? run.sections.filter((s, i) => (s === "experience" ? doneRoles.length > 0 : i < reached)) : [];
+  const stepQuestions = (s: TailorSection, roleId?: string) => (run?.questions ?? [])
+    .filter((q) => q.section === s && q.kind !== "flag" && (!roleId || q.roleId === roleId));
+  const locale = cv?.locale ?? "en";
+
   let body: React.ReactNode;
   if (phase.kind === "loading") body = <p role="status">{t("tailor.loading")}</p>;
   else if (phase.kind === "steer") {
-    body = <SteeringStep jobId={jobId} roles={cv?.experience ?? []} busy={phase.busy} onStart={(s) => void start(s)} />;
+    const { resume } = phase;
+    body = <SteeringStep jobId={jobId} roles={cv?.experience ?? []} busy={phase.busy} initial={resume ? steering : undefined}
+      startLabel={resume ? t("tailor.steer.save") : undefined} onCancel={resume ? () => setPhase(resume) : undefined}
+      onStart={(s) => (resume ? setPhase({ kind: "confirm", steering: s, busy: false, resume }) : void start(s))} />;
+  } else if (phase.kind === "confirm") {
+    body = <section className="tailor-card" role="alertdialog" aria-labelledby="steer-confirm" aria-describedby="steer-confirm-text">
+      <h2 id="steer-confirm">{t("tailor.steer.confirm.title")}</h2>
+      <p id="steer-confirm-text">{t("tailor.steer.confirm.text")}</p>
+      <div className="fm-foot">
+        <button type="button" className="fm-ghost" disabled={phase.busy} onClick={() => setPhase(phase.resume)}>{t("tailor.steer.confirm.cancel")}</button>
+        <button type="button" className="fm-btn" disabled={phase.busy} onClick={() => void restart(phase.steering, phase)}>{t("tailor.steer.confirm.redo")}</button>
+      </div>
+    </section>;
+  } else if (phase.kind === "back") {
+    const { resume } = phase;
+    body = phase.section === "experience"
+      ? <FinishedRoles roles={(cv?.experience ?? []).filter((r) => doneRoles.includes(r.id))} locale={locale}
+        onPick={(roleId) => setPhase({ kind: "role", roleId, busy: false, resume })} onClose={() => setPhase(resume)} />
+      : <YourAnswers key={phase.section} title={t(`tailor.section.${phase.section}`)} questions={stepQuestions(phase.section)}
+        answers={run?.answers ?? []} busy={false} locale={locale} onClose={() => setPhase(resume)} />;
+  } else if (phase.kind === "role") {
+    const { roleId, resume } = phase;
+    const role = cv?.experience.find((r) => r.id === roleId);
+    body = <YourAnswers key={roleId} title={role ? roleName(role, locale) : t("tailor.role.untitled")} questions={stepQuestions("experience", roleId)}
+      answers={run?.answers ?? []} busy={phase.busy} locale={locale}
+      onUpdate={(answers) => void redo(roleId, answers, resume)} onClose={() => setPhase(resume)} />;
+  } else if (phase.kind === "redo") {
+    const review = phase;
+    body = <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
+      busy={review.busy} onAccept={(accepted) => void acceptRedo(review.roleId, accepted, review)} cv={cv} removed={review.removed} />;
   }
   else if (phase.kind === "deleted") {
     body = <section className="tailor-card" role="alert"><h2>{t("tailor.error.deleted")}</h2>
@@ -179,7 +266,9 @@ export function TailorFlow() {
       <p className="tailor-eyebrow">{t("tailor.eyebrow")}</p>
       <Link to={`/jobs/${encodeURIComponent(jobId)}`}>{t("tailor.back")}</Link>
     </header>
-    {run && <StepBar sections={run.sections} current={section} base={base} latest={latest} />}
+    {run && <StepBar sections={run.sections} current={section} base={base} latest={latest} open={open}
+      onOpen={(s) => setPhase({ kind: "back", section: s, resume: phase })}
+      onSteer={settled ? () => void openSteer(phase) : undefined} />}
     {!run && base !== null && <StepBar sections={[...TAILOR_SECTIONS]} current={null} base={base} latest={latest} />}
     <main className="tailor-main">{body}</main>
   </div>;

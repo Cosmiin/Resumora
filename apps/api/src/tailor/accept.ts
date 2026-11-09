@@ -66,22 +66,29 @@ function apply(cv: CvContent, p: Proposal): void {
  */
 export async function acceptSection(
   deps: { model: ModelDeps; tailor: TailorRepo; cv: CvRepo; jobs: JobRepo; now(): Date },
-  input: { userId: string; run: TailorRun; job: Job; section: TailorSection; body: AcceptBody },
+  input: { userId: string; run: TailorRun; job: Job; section: TailorSection; body: AcceptBody; redo?: boolean },
 ): Promise<{ run: TailorRun; score: MatchScore }> {
   const { run, section, body } = input;
-  if (run.status === "done" || run.currentSection !== section) {
+  // A redo accepts a finished role (checked by the caller) and leaves the run where it is.
+  if (!input.redo && (run.status === "done" || run.currentSection !== section)) {
     throw new ApiError(409, "section_not_current", "This section isn't the current step.");
   }
-  const roleId = currentRole(run, section, body.roleId);
+  const roleId = input.redo ? body.roleId ?? null : currentRole(run, section, body.roleId);
   if (!input.job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
   const doc = run.tailoredCvId ? await deps.tailor.getTailoredCv(run.tailoredCvId) : null;
   if (!doc) throw jobNotFound();
 
-  const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(doc.content, section, roleId).keys());
+  const content = structuredClone(doc.content);
+  if (input.redo && roleId) {
+    // The redone proposals replace the role's earlier ones: start again from its Base wording.
+    const baseRole = (await deps.cv.get()).content.experience.find((role) => role.id === roleId);
+    const at = content.experience.findIndex((role) => role.id === roleId);
+    if (baseRole && at >= 0) content.experience[at] = structuredClone(baseRole);
+  }
+  const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));
   const inferred = new Map(body.inferred.map((d) => [d.itemId, d.keep]));
   const flags = new Map(body.flags.map((f) => [f.questionId, f.confirmed]));
-  const content = structuredClone(doc.content);
   const state: Record<string, ItemReview> = {};
   const notes: { roleId: string | null; note: Note }[] = [];
   for (const p of (run.proposals ?? []).filter((proposal) => ids.has(proposal.itemId))) {
@@ -131,6 +138,7 @@ export async function acceptSection(
     for (const [roleId, list] of byRole) await deps.cv.addJobNotes(roleId, list);
   }
 
+  if (input.redo) return { run, score };
   // The next role in CV order, then the next section after the last role.
   const nextRole = roleId ? run.roleOrder![run.roleOrder!.indexOf(roleId) + 1] ?? null : null;
   const next = nextRole ? section : run.sections[run.sections.indexOf(section) + 1] ?? null;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  MatchScoreSchema, ProposalSchema, TailorLanguageSchema, TailorQuestionSchema, TailorRunSchema, ToneSchema,
+  MatchScoreSchema, ProposalSchema, SteeringSchema, TailorLanguageSchema, TailorQuestionSchema, TailorRunSchema, ToneSchema,
   type Answer, type MatchScore, type Proposal, type Steering, type TailorQuestion, type TailorRun, type TailorSection, type Tone,
 } from "@resumora/shared";
 import { apiFetch } from "../lib/api.ts";
@@ -67,4 +67,28 @@ export function getToneExamples(jobId: string): Promise<{ bullet: string | null;
     method: "POST", json: {},
     schema: z.object({ bullet: z.string().nullable(), examples: z.record(ToneSchema, z.string()).nullable() }),
   });
+}
+
+/** Going back (BackA): new answers for a finished role; its proposals come back for review. */
+export function redoRole(id: string, roleId: string, answers: Answer[]): Promise<{ proposals: Proposal[]; removed?: number }> {
+  return apiFetch(`${run(id)}/roles/${encodeURIComponent(roleId)}/redo`, {
+    method: "POST", json: { answers }, schema: z.object({ proposals: z.array(ProposalSchema), removed: z.number().int().min(0).default(0) }),
+  });
+}
+
+/** Accepts a redone role; the run stays on its current step. */
+export function acceptRole(id: string, roleId: string, body: AcceptBody): Promise<{ run: TailorRun; score: MatchScore }> {
+  return apiFetch(`${run(id)}/roles/${encodeURIComponent(roleId)}/accept`, {
+    method: "POST", json: body, schema: z.object({ run: TailorRunSchema, score: MatchScoreSchema }),
+  });
+}
+
+/** New steering redoes every step with the stored answers, in a new run. */
+export function changeSteering(id: string, steering: Steering): Promise<{ run: TailorRun }> {
+  return apiFetch(`${run(id)}/steering`, { method: "POST", json: steering, schema: z.object({ run: TailorRunSchema }) });
+}
+
+/** The run's stored steering, to start the Tone and questions screens from it. */
+export async function getSteering(id: string): Promise<Steering> {
+  return (await apiFetch(`${run(id)}/steering`, { schema: z.object({ steering: SteeringSchema }) })).steering;
 }

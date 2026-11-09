@@ -31,12 +31,14 @@ export interface TailorRepo {
   findTailoredCvId(jobId: string, language: TailorLanguage): Promise<string | null>;
   /** The steering every tailoring step needs; `steering` already carries the tone and instruction columns. */
   getSteering(tailoredCvId: string): Promise<{ language: TailorLanguage; tone: Tone | null; instruction: string | null; steering: Steering } | null>;
+  /** Replaces the steering (and its tone and instruction columns). false when gone. */
+  setSteering(tailoredCvId: string, steering: Steering): Promise<boolean>;
   /** Content is also stored as the base snapshot. "exists" when the job already has one in this language. */
   createTailoredCv(input: NewTailoredCv): Promise<string | "exists">;
   /** The tailored CV's content, review state and version; null when gone. */
   getTailoredCv(id: string): Promise<StoredTailoredCv | null>;
   /** Saves when the version still matches, then bumps it. */
-  saveTailoredCv(id: string, expectedVersion: number, changes: { content: CvContent; review: Review; score: MatchScore }): Promise<"ok" | "conflict">;
+  saveTailoredCv(id: string, expectedVersion: number, changes: { content: CvContent; review: Review; score: MatchScore | null }): Promise<"ok" | "conflict">;
   /** The job's tailored CVs (all languages), oldest first. */
   listTailoredCvs(jobId: string): Promise<TailoredCvSummary[]>;
   /** The whole row, for the editor; null when gone. */

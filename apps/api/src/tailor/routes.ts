@@ -9,7 +9,9 @@ import type { JobRepo } from "../jobs/repo.ts";
 import { AcceptBodySchema, acceptSection } from "./accept.ts";
 import { runLayoutPass } from "./layout-pass.ts";
 import { askQuestions, MAX_RUN_QUESTIONS, saveAnswers } from "./questions.ts";
+import { finishedRole, RedoBodySchema, redoRole } from "./redo.ts";
 import type { TailorRepo } from "./repo.ts";
+import { restartWithSteering } from "./retailor.ts";
 import { runSectionPass } from "./section-pass.ts";
 import { jobNotFound, startTailoring } from "./start.ts";
 import { toneExamples } from "./tone-examples.ts";
@@ -96,6 +98,43 @@ export function tailorRoutes(deps: {
       { model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), jobs: deps.jobsFor(c), now: deps.now },
       { userId: c.get("user").id, run, job, section, body },
     ));
+  });
+
+  /** Going back (BackA): new answers for a finished role, and its proposals made again for review. */
+  app.post("/tailor-runs/:id/roles/:roleId/redo", async (c) => {
+    const { answers } = RedoBodySchema.parse(await c.req.json().catch(() => ({})));
+    const { run, job } = await runWithJob(c);
+    if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
+    return c.json(await redoRole({ model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), now: deps.now, log: deps.log }, {
+      userId: c.get("user").id, run, job: job.extracted, roleId: c.req.param("roleId"), answers,
+    }));
+  });
+
+  /** Accepts a redone role; the run stays on its current step. */
+  app.post("/tailor-runs/:id/roles/:roleId/accept", async (c) => {
+    const body = AcceptBodySchema.parse(await c.req.json().catch(() => ({})));
+    const { run, job } = await runWithJob(c);
+    const roleId = finishedRole(run, c.req.param("roleId"));
+    return c.json(await acceptSection(
+      { model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), jobs: deps.jobsFor(c), now: deps.now },
+      { userId: c.get("user").id, run, job, section: "experience", body: { ...body, roleId }, redo: true },
+    ));
+  });
+
+  /** The stored steering, so the Tone and questions screens start from it when changed. */
+  app.get("/tailor-runs/:id/steering", async (c) => {
+    const { run } = await runWithJob(c);
+    const stored = run.tailoredCvId ? await deps.tailorFor(c).getSteering(run.tailoredCvId) : null;
+    if (!stored) throw jobNotFound();
+    return c.json({ steering: stored.steering });
+  });
+
+  /** Changing the steering redoes every step with the stored answers. */
+  app.post("/tailor-runs/:id/steering", async (c) => {
+    const { instruction, ...steering } = SteeringSchema.parse(await c.req.json().catch(() => ({})));
+    const { run } = await runWithJob(c);
+    return c.json(await restartWithSteering({ tailor: deps.tailorFor(c), cv: deps.cvFor(c) }, run,
+      { ...steering, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) }));
   });
 
   app.post("/tailor-runs/:id/answers", async (c) => {

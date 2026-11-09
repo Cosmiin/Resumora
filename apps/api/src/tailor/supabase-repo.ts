@@ -53,6 +53,13 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       return { language: TailorLanguageSchema.parse(data.language), tone, instruction,
         steering: withColumns(stored.success ? stored.data : {}, tone, instruction) };
     },
+    async setSteering(tailoredCvId, steering) {
+      const { data, error } = await db.from("tailored_cvs")
+        .update({ tone: steering.tone ?? "neutral", instruction: steering.instruction ?? null, steering })
+        .eq("id", tailoredCvId).select("id");
+      if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
+      return (data ?? []).length > 0;
+    },
     async createTailoredCv(input) {
       const { data, error } = await db.from("tailored_cvs").insert({
         user_id: user.id, job_id: input.jobId, language: input.language, content: input.content,

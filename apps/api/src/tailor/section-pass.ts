@@ -94,7 +94,26 @@ export async function runSectionPass(
     throw new ApiError(409, "section_not_current", "This section isn't the current step.");
   }
   const roleId = currentRole(run, section, input.roleId);
-  const contentSection: Exclude<TailorSection, "layout"> = section;
+  const { proposals: kept, items, removed } = await passProposals(deps, { ...input, section, roleId });
+  await deps.tailor.updateRun(run.id, {
+    status: "waiting_user", currentSection: section,
+    proposals: [...(run.proposals ?? []).filter((p) => !items.has(p.itemId)), ...kept],
+    // Flag questions from older runs of this section (or role) go: nothing asks to keep a flagged proposal now.
+    questions: (run.questions ?? []).filter((q) => q.kind !== "flag" || q.section !== section || (roleId !== null && q.roleId !== roleId)),
+  });
+  return { proposals: kept, questions: [], removed };
+}
+
+/**
+ * One section's proposals (with a role, one Experience role), checked and retried, without touching the run.
+ * A role redo uses it for a finished role.
+ */
+export async function passProposals(
+  deps: { model: ModelDeps; tailor: TailorRepo; log?: LogFn },
+  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: Exclude<TailorSection, "layout">; roleId: string | null },
+): Promise<{ proposals: Proposal[]; items: Map<string, Item>; removed: number }> {
+  const { section, run, roleId } = input;
+  const contentSection = section;
   const steering = run.tailoredCvId ? await deps.tailor.getSteering(run.tailoredCvId) : null;
   if (!steering) throw new ApiError(404, "job_not_found", "This job was deleted.");
   const cv = stripHeader(input.cv).cv;
@@ -177,11 +196,5 @@ export async function runSectionPass(
   const kept = proposals.filter((p) => p.flags.length === 0);
   // Every flagged claim that didn't come back clean from the retry, including ones the retry left out.
   const removed = Math.max(0, firstFlagged - kept.filter((p) => flagged.has(p.itemId)).length);
-  await deps.tailor.updateRun(run.id, {
-    status: "waiting_user", currentSection: section,
-    proposals: [...(run.proposals ?? []).filter((p) => !items.has(p.itemId)), ...kept],
-    // Flag questions from older runs of this section (or role) go: nothing asks to keep a flagged proposal now.
-    questions: (run.questions ?? []).filter((q) => q.kind !== "flag" || q.section !== section || (roleId !== null && q.roleId !== roleId)),
-  });
-  return { proposals: kept, questions: [], removed };
+  return { proposals: kept, items, removed };
 }

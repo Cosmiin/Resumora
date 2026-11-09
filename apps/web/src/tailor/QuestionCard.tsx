@@ -24,9 +24,9 @@ type Props = {
   locale?: Locale;
 };
 
-const VIA: Record<Answer["via"], Via[]> = { option: ["pick"], typed: ["type"], voice: ["voice"], skip: [] };
+export const VIA: Record<Answer["via"], Via[]> = { option: ["pick"], typed: ["type"], voice: ["voice"], skip: [] };
 /** Spoken words win, then typed ones; a pick alone is an option. */
-const answerVia = (via: Via[]): Answer["via"] => (via.includes("voice") ? "voice" : via.includes("type") ? "typed" : "option");
+export const answerVia = (via: Via[]): Answer["via"] => (via.includes("voice") ? "voice" : via.includes("type") ? "typed" : "option");
 
 /** One question in the enrichment style: a choice only selects; Next, Back and Skip move. */
 export function QuestionCard({ role, locale = "en", ...props }: Props) {

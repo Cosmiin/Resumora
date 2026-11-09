@@ -3,6 +3,7 @@ export const tailorEn = {
   "tailor.back": "Back to the job",
   "tailor.loading": "Loading…",
   "tailor.steps": "Tailoring steps",
+  "tailor.steps.steering": "Tone and questions",
   "tailor.score": "Score {base}",
   "tailor.scoreUp": "Score {base}→{latest}",
   "tailor.section.experience": "Experience",
@@ -51,6 +52,11 @@ export const tailorEn = {
   "tailor.steer.placeholder": "For example: I want to move from consulting into an in-house BI role.",
   "tailor.steer.backTone": "← Tone: {tone}",
   "tailor.steer.start": "Start tailoring",
+  "tailor.steer.save": "Save changes",
+  "tailor.steer.confirm.title": "Redo every step?",
+  "tailor.steer.confirm.text": "Your answers stay. Every step is tailored again with the new tone and answers, and the changes you accepted so far are replaced.",
+  "tailor.steer.confirm.cancel": "Cancel",
+  "tailor.steer.confirm.redo": "Redo everything",
   "tailor.voice.start": "Talk instead of typing",
   "tailor.voice.stop": "Stop recording",
 
@@ -95,6 +101,13 @@ export const tailorEn = {
   "tailor.role.eyebrow": "You're tailoring this role",
   "tailor.role.untitled": "Untitled role",
   "tailor.role.whole": "About the whole role",
+
+  "tailor.back.roles": "Finished roles",
+  "tailor.back.answers": "Your answers",
+  "tailor.back.none": "No questions were asked here.",
+  "tailor.back.skipped": "Skipped",
+  "tailor.back.update": "Update this role",
+  "tailor.back.resume": "Back to where you were",
 
   "tailor.error.ai": "Couldn't tailor {section}. Try again",
   "tailor.error.generic": "Something went wrong. Try again",
