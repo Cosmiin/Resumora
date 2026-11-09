@@ -45,3 +45,8 @@ open: rulings — `RolePanel` imports `styles/focus.css` for the `fm-*` bullet g
 
 ## Next (fresh session, per claude-build's 4-task rule)
 A9 Going back (BackA) and changing steering → whole-branch review (Opus high, base `9c5728d`) → push and draft PR to `rebuild/tailor-r2-bugs`. Between A5 and A8 the web was out of step with the API; after A8 it is in step again, so a browser check now makes sense.
+
+## Task A9: Going back (BackA) and changing steering — done
+session: tailor-r2 Part A (session 5, third block) · builder: claude
+commit: 8f8887a (base 05b7930) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0 · weekly 47% → 48%
+open: rulings — `section-pass.ts` split into `runSectionPass` + `passProposals` (redo reuses the checks without moving the run); `accept.ts` gains `redo` (finished role, starts from its Base wording, run not moved); `repo.ts`/`memory-repo.ts`/`supabase-repo.ts` gain `setSteering`, and `saveTailoredCv` takes a null score; `QuestionCard.tsx` exports its via helpers; `SteeringStep.tsx`, `tailor-api.ts`, `en-tailor.ts`, `tailor.css` carry the screens. Routes: `POST /tailor-runs/:id/roles/:roleId/redo`, `POST …/roles/:roleId/accept`, `GET|POST /tailor-runs/:id/steering`. A steering change resets the tailored CV to the Base wording with an empty review (Score 1 until re-accepted) and always runs every step, even from a one-section re-tailor (review fix). Finished non-Experience steps open their answers read-only (no redo route for them in the brief).
