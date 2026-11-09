@@ -4,6 +4,7 @@ import { t } from "../i18n/t.ts";
 import { roleOf } from "./RolePanel.tsx";
 import { SkillsReview } from "./SkillsReview.tsx";
 import { SummaryReview } from "./SummaryReview.tsx";
+import { FINAL_SECTIONS, LayoutReview, type FinalSection } from "./LayoutReview.tsx";
 import type { AcceptBody } from "./tailor-api.ts";
 
 /** Same keys as the API: new skills share the id "new-skill", so they are told apart by their text. */
@@ -100,6 +101,10 @@ export function SectionReview({ section, proposals, flags, confirmed, busy, onAc
   // SkillsA2: the Skills step reviews its changes 5 at a time.
   if (section === "skills") return <SkillsReview proposals={proposals} cv={cv} busy={busy} onAccept={onAccept} removed={removed} />;
   // SumA: the summary in place, each guessed phrase its own Keep / Edit / Remove.
+  // FinalA: Achievements, Languages, Order and headline, one short screen each.
+  if (FINAL_SECTIONS.includes(section) && cv) {
+    return <LayoutReview section={section as FinalSection} proposals={proposals} cv={cv} busy={busy} onAccept={onAccept} removed={removed} />;
+  }
   if (section === "summary" && cv) return <SummaryReview proposals={proposals} before={cv.basics.summary} busy={busy} onAccept={onAccept} removed={removed} />;
   let body: React.ReactNode;
   if (proposals.length === 0) body = <p>{t("tailor.review.none")}</p>;

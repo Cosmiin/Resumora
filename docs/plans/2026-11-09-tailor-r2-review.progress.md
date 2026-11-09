@@ -29,3 +29,13 @@ Notes for B5–B8:
 - B8: `accept.ts` must also store each guess's `reason` in `review` for the guided review.
 - B7: the score labels and job are already loaded in TailorFlow (`scoreRef`, `job`) for "Now met"; TailorFlow is at ~287 lines, so the done screen goes in its own file.
 - Full suite under load: 0–2 flaky `cv/editor.test.tsx` "rapid typing" failures; they pass alone.
+
+## Task B5: Summary check in place (SumA) — done
+session: tailor-r2 Part B (block 2) · builder: claude
+commit: 4bdbadd (base 2ca7768) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 49% → 49%
+open: rulings — outside the file list: `packages/shared/src/tailor.ts` (`placeGuesses` / `applyGuesses`, used by both API and web so the `summary#<n>` indexes match), `accept.ts` (a decision may carry `text`; each guess becomes its own review item `summary#<n>` with its `reason`; the summary item itself is no longer inferred when it has guesses), `tailor-api.ts` (AcceptBody `text?`), and `guesses: null` added to the strict model replies in the API tests and `eval/tailor/run.ts`. A guess not found verbatim, or overlapping an earlier one, is dropped. "Use my original summary" sends at once (no guesses stored).
+
+## Task B6: Final touches one per screen (FinalA) — done
+session: tailor-r2 Part B (block 2) · builder: claude
+commit: see git log (base 4bdbadd) · reviews: 2 (agents) · fix rounds: 1 (an empty final touch's auto-accept now has its own step `pass()` with its own Retry; the tick shows only once saved) · guard denials: 0 · weekly 49% → 49%
+open: rulings — `LayoutReview.tsx` holds all three final-touch screens (Achievements, Languages, Order and headline); copy in `en-tailor.ts`, two CSS lines in `tailor.css`. TailorFlow is at ~306 lines until B7 moves code out.

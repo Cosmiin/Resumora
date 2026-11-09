@@ -12,6 +12,7 @@ import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
 import { SteeringStep } from "./SteeringStep.tsx";
 import { TailorMoment } from "./TailorMoment.tsx";
+import { FINAL_SECTIONS } from "./LayoutReview.tsx";
 import { remember, remembered, type Phase } from "./flow-phase.ts";
 import * as api from "./tailor-api.ts";
 import { FinishedRoles, roleName, YourAnswers } from "./YourAnswers.tsx";
@@ -38,6 +39,8 @@ export function TailorFlow() {
   const scoreRef = useRef<MatchScore | null>(null);
   const [job, setJob] = useState<JobExtraction | null>(null);
   const started = useRef(false);
+  // FinalA: final touches with nothing to change, accepted on their own; the next screen shows a tick for each.
+  const [ticks, setTicks] = useState<TailorSection[]>([]);
   const section = run?.currentSection ?? null;
 
   function track(next: TailorRun) { runRef.current = next; setRun(next); }
@@ -82,8 +85,20 @@ export function TailorFlow() {
     setPhase({ kind: "working" });
     try {
       const { proposals, removed } = await api.runSection(runRef.current!.id, at, roleArg(at));
+      if (proposals.length === 0 && FINAL_SECTIONS.includes(at)) return void pass(at);
       setPhase({ kind: "review", proposals, busy: false, removed });
     } catch (cause) { fail(cause, at, () => void work(at)); }
+  }
+  /** FinalA: a final touch with nothing to change is accepted on its own; once saved, the next screen shows its tick. */
+  async function pass(at: TailorSection) {
+    setPhase({ kind: "working" });
+    try {
+      const result = await api.acceptSection(runRef.current!.id, at, { decisions: [], inferred: [], flags: [] });
+      scoreRef.current = result.score;
+      setLatest(result.score.total);
+      setTicks((list) => (list.includes(at) ? list : [...list, at]));
+      enter(result.run);
+    } catch (cause) { fail(cause, at, () => void pass(at)); }
   }
   async function accept(at: TailorSection, body: api.AcceptBody) {
     setPhase((current) => current.kind === "review" ? { ...current, busy: true } : current);
@@ -270,7 +285,7 @@ export function TailorFlow() {
       busy={review.busy} onAccept={(accepted) => void accept(section, accepted)} onAnswers={() => void openAnswers(review)} removed={review.removed} />;
   } else {
     body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={[]}
-      confirmed={[]} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} cv={cv} removed={phase.removed} />;
+      confirmed={[]} busy={phase.busy} onAccept={(accepted) => { setTicks([]); void accept(section, accepted); }} cv={cv} removed={phase.removed} />;
   }
   const wide = phase.kind === "questions" && section === "experience" && !!roleFor(phase.questions[phase.index]!);
 
@@ -283,6 +298,9 @@ export function TailorFlow() {
       onOpen={(s) => setPhase({ kind: "back", section: s, resume: phase })}
       onSteer={settled ? () => void openSteer(phase) : undefined} />}
     {!run && base !== null && <StepBar sections={[...TAILOR_SECTIONS]} current={null} base={base} latest={latest} />}
-    <main className="tailor-main">{body}</main>
+    <main className="tailor-main">
+      {ticks.map((s) => <p key={s} className="tailor-tick">{t("tailor.final.nothing", { section: t(`tailor.section.${s}`) })}</p>)}
+      {body}
+    </main>
   </div>;
 }
