@@ -8,7 +8,7 @@ Otherwise use kind "options" with 2 to 4 short answer options; the person can al
 Set roleId to the id of the CV role the question is about, or null for skills, summary, languages or layout questions.
 Never ask a question whose meaning is already answered in "answered", even if worded differently.
 Return at most "max" questions, most useful first, and none when nothing useful is left. Write each in the CV's language.
-Give a one-line reason naming the gap.`;
+Give a one-line reason naming the gap, and set gap to that gap's ref exactly as given.`;
 
 export function questionUserMessage(input: {
   section: TailorSection;
@@ -23,8 +23,8 @@ export function questionUserMessage(input: {
     section: input.section,
     max: input.max,
     gaps: input.gaps.map((label) => label.kind === "requirement"
-      ? { ...requirement(label.ref), status: label.status, inferred: label.inferred, evidence: label.evidence }
-      : { keyword: label.ref.slice(2), status: label.status, inferred: label.inferred, evidence: label.evidence }),
+      ? { ref: label.ref, ...requirement(label.ref), status: label.status, inferred: label.inferred, evidence: label.evidence }
+      : { ref: label.ref, keyword: label.ref.slice(2), status: label.status, inferred: label.inferred, evidence: label.evidence }),
     answered: input.answered,
     cv: { ...input.cv, layout: undefined },
     job: { title: input.job.title, summary: input.job.summary, responsibilities: input.job.responsibilities },

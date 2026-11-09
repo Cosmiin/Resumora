@@ -87,7 +87,7 @@ describe("section pass", () => {
     const run = await memoryTailorRepo("user-a", new Map(), docs).getRun(runId);
     expect(run).toMatchObject({ status: "waiting_user", currentSection: "experience", proposals: body.proposals });
     expect(run?.questions).toEqual(body.questions);
-    replies = [{ questions: Array.from({ length: 8 }, (_, i) => ({ roleId: null, text: `Q${i}?`, kind: "options", options: ["Yes"], reason: "Gap" })) }];
+    replies = [{ questions: Array.from({ length: 8 }, (_, i) => ({ roleId: null, text: `Q${i}?`, kind: "options", options: ["Yes"], reason: "Gap", gap: "r0" })) }];
     const asked = await (await post(`/v1/tailor-runs/${runId}/sections/skills/questions`)).json() as { questions: unknown[] };
     expect(asked.questions).toHaveLength(8);
   });
@@ -204,5 +204,26 @@ describe("section pass", () => {
     const system = JSON.stringify(model.requests[0]);
     expect(system).toContain("itemId = the bullet's id, field \\\"text\\\"");
     expect(system).toContain("field \\\"description\\\"");
+  });
+
+  it("names the flagged item in its question and shows only details that add something", async () => {
+    const claim = "Ran payroll for 40 staff and won the team award";
+    replies = [proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] },
+      proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] }];
+    let body = await (await runSection()).res.json() as { questions: TailorQuestion[] };
+    expect(body.questions[0]).toMatchObject({ itemId: `${bullet.id}|text`,
+      text: `Please check the bullet in Payroll Specialist at Acme Payroll: "Cut payroll errors by 30% for 40 staff". A number that isn't in your CV, notes or answers.` });
+    replies = [proposals(reword(claim)), { results: [{ itemId: bullet.id, claims: [claim] }] },
+      proposals(reword(claim)), { results: [{ itemId: bullet.id, claims: [claim, "won the team award"] }] }];
+    body = await (await runSection()).res.json() as { questions: TailorQuestion[] };
+    expect(body.questions[0]!.text).toBe(`Please check the bullet in Payroll Specialist at Acme Payroll: "${claim}". Not supported by your CV: "won the team award".`);
+  });
+
+  it("names a language level and a skill in flag questions", async () => {
+    await cv.save({ ...base, languages: [{ id: "l1", name: "English", level: "B2" }] }, 1);
+    replies = [proposals({ itemId: "l1", field: "level", text: "C2 (2024)", inferred: false }), { results: [] },
+      proposals({ itemId: "l1", field: "level", text: "C2 (2024)", inferred: false }), { results: [] }];
+    const body = await (await runSection("languages")).res.json() as { questions: TailorQuestion[] };
+    expect(body.questions[0]!.text.startsWith('Please check the English level: "C2 (2024)".')).toBe(true);
   });
 });

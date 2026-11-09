@@ -27,9 +27,9 @@ const older = roleWith(["Ran payroll"], { startDate: "2018-01", endDate: "2020-0
 const newest = roleWith(["Led 3 people"], { startDate: "2021-01", endDate: "", current: true });
 const base: CvContent = { ...emptyCv("en"), experience: [older, newest] };
 
-type ModelQuestion = Omit<Question, "id" | "section">;
+type ModelQuestion = Omit<Question, "id" | "section" | "gap"> & { gap: string };
 const ask = (text: string, over: Partial<ModelQuestion> = {}): ModelQuestion =>
-  ({ roleId: newest.id, text, kind: "options", options: ["Yes", "No"], reason: "Gap", ...over });
+  ({ roleId: newest.id, text, kind: "options", options: ["Yes", "No"], reason: "Gap", gap: "r0", ...over });
 
 let replies: ModelQuestion[][];
 let model: ReturnType<typeof fakeModel>;
@@ -105,6 +105,36 @@ describe("job questions", () => {
       ask("Ghost role?", { roleId: "nope" })]];
     const got = await questions(runId, "experience");
     expect(got.map((q) => [q.kind, q.roleId])).toEqual([["confirm_inferred", newest.id], ["options", null]]);
+  });
+
+  it("never asks about a gap again once it was answered in the run, however the question is worded", async () => {
+    const runId = await startRun();
+    replies = [[ask("How many clusters did you run on Kubernetes?")]];
+    const [first] = await questions(runId, "experience");
+    expect(first).toMatchObject({ gap: "r0" });
+    await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: first!.id, value: "Three", via: "typed" }] });
+    replies = [[ask("What size were your Kubernetes clusters?"), ask("Did you lead the team?", { gap: "r1" }), ask("Off-topic?", { gap: "r9" })]];
+    const second = await questions(runId, "skills");
+    expect(second.map((q) => q.text)).toEqual(["Did you lead the team?"]);
+    expect(JSON.stringify(JSON.parse(String((model.requests[1]!.messages as { content: string }[])[1]!.content)).gaps)).not.toContain("Kubernetes");
+    await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: second[0]!.id, value: "Yes", via: "option" }] });
+    // Every gap is answered: no model call at all.
+    expect(await questions(runId, "summary")).toEqual([]);
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it("lets a skipped gap come back once, not repeatedly", async () => {
+    const runId = await startRun();
+    const skip = async (question: Question) =>
+      call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: question.id, value: null, via: "skip" }] });
+    replies = [[ask("Kubernetes?")]];
+    await skip((await questions(runId, "experience"))[0]!);
+    replies = [[ask("Kubernetes, any at all?")]];
+    const again = await questions(runId, "skills");
+    expect(again.map((q) => q.text)).toEqual(["Kubernetes, any at all?"]);
+    await skip(again[0]!);
+    replies = [[ask("Kubernetes, really none?"), ask("Lead?", { gap: "r1" })]];
+    expect((await questions(runId, "summary")).map((q) => q.text)).toEqual(["Lead?"]);
   });
 
   it("does not ask again what was already answered for this job in an earlier run", async () => {

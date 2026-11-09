@@ -152,7 +152,7 @@ describe("re-tailor", () => {
       labels: [{ ref: "r0", kind: "requirement", status: "missing", evidence: null, inferred: false }],
     } as unknown as MatchScore);
     const runId = await start();
-    const ask = { roleId: role.id, text: "How many staff did you pay?", kind: "options", options: ["10", "40"], reason: "Gap" };
+    const ask = { roleId: role.id, text: "How many staff did you pay?", kind: "options", options: ["10", "40"], reason: "Gap", gap: "r0" };
     replies.push({ questions: [ask] });
     const asked = await (await post(`/v1/tailor-runs/${runId}/sections/experience/questions`)).json() as { questions: { id: string }[] };
     expect(asked.questions).toHaveLength(1);

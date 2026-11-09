@@ -41,6 +41,10 @@ export const QuestionSchema = z.object({
   kind: z.enum(["options", "confirm_inferred", "flag"]),
   options: z.array(z.string()),
   reason: z.string(),
+  /** The Score 1 gap a job question is about ("r0", "k:SQL"), so a topic isn't asked again in other words. */
+  gap: z.string().optional(),
+  /** A flag question's proposal key (its item id, or "new-skill:<text>"). */
+  itemId: z.string().optional(),
 });
 export type Question = z.infer<typeof QuestionSchema>;
 

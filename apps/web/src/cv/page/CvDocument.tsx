@@ -3,7 +3,7 @@ import { CATEGORY, normalizeLayout, type CvContent, type SectionKey } from "@res
 import { t } from "../../i18n/t.ts";
 import { supabase } from "../../lib/supabase.ts";
 import { newSectionBody } from "./NewSections.tsx";
-import { formatRange } from "./blocks.ts";
+import { formatRange, SKILL_GROUPS } from "./blocks.ts";
 import { getTemplate, type TemplateId } from "./templates.ts";
 import "./templates.css";
 
@@ -48,8 +48,8 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic", hi
   const hasBasics = !!(b.fullName || titles || contact || photoUrl);
 
   const skillRows = [
-    { key: "technical", label: t("cv.page.technical"), items: cv.technicalSkills, sort: false },
-    { key: "professional", label: t("cv.page.professional"), items: cv.professionalSkills, sort: false },
+    { key: "technical", label: SKILL_GROUPS[cv.locale].technical, items: cv.technicalSkills, sort: false },
+    { key: "professional", label: SKILL_GROUPS[cv.locale].professional, items: cv.professionalSkills, sort: false },
     ...(showUnsorted ? [{ key: "sort", label: t("cv.page.toSort"), items: cv.unclearSkills, sort: true }] : []),
   ].filter((row) => row.items.length > 0);
 

@@ -202,4 +202,11 @@ describe("CV role score", () => {
     const { container } = renderRole();
     expect(container.querySelector(".cv-role > .score-pill")).toBeNull();
   });
+
+  it("names the skill groups in the CV's language, not the interface's", () => {
+    render(<CvDocument content={{ ...sampleCv(), locale: "ro" }} />);
+    expect(screen.getByText("Tehnice")).toBeInTheDocument();
+    expect(screen.getByText("Profesionale")).toBeInTheDocument();
+    expect(screen.queryByText("Technical")).toBeNull();
+  });
 });

@@ -5,6 +5,16 @@ export const PRESENT: Record<Locale, string> = {
   en: "Present", ro: "prezent", fr: "aujourd'hui", de: "heute", es: "actualidad", it: "oggi",
 };
 
+/** The skill group headings follow the CV's language too (a translated copy must not keep English ones). */
+export const SKILL_GROUPS: Record<Locale, { technical: string; professional: string }> = {
+  en: { technical: "Technical", professional: "Professional" },
+  ro: { technical: "Tehnice", professional: "Profesionale" },
+  fr: { technical: "Techniques", professional: "Professionnelles" },
+  de: { technical: "Fachlich", professional: "Beruflich" },
+  es: { technical: "Técnicas", professional: "Profesionales" },
+  it: { technical: "Tecniche", professional: "Professionali" },
+};
+
 function formatDate(value: string, locale: Locale): string {
   const m = /^(\d{4})-(\d{2})$/.exec(value);
   if (!m) return value;

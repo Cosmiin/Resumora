@@ -108,6 +108,23 @@ describe("accept section", () => {
     expect(model.logged.at(-1)?.task).toBe("tailor_score");
   });
 
+  it("keeps each flagged field of one role apart: a confirmed title and a rejected company", async () => {
+    const title = reword(role.id, "Payroll Lead", { field: "title" });
+    const company = reword(role.id, "Beta Payroll", { field: "company" });
+    const runId = await start();
+    replies.push({ proposals: [title, company] }, { results: [] });
+    await run(runId, "experience", title, company);
+    const flags = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
+    expect(flags).toHaveLength(2);
+    expect(new Set(flags.map((q) => q.itemId)).size).toBe(2);
+    const byField = (field: string) => flags.find((q) => q.text.includes(field === "title" ? "Payroll Lead" : "Beta Payroll"))!;
+    const res = await accept(runId, "experience", { flags: [
+      { questionId: byField("title").id, confirmed: true }, { questionId: byField("company").id, confirmed: false },
+    ] });
+    expect(res.status).toBe(200);
+    expect(tailored().content.experience[0]).toMatchObject({ title: "Payroll Lead", company: role.company });
+  });
+
   it("reverts a rejected flag and keeps a confirmed one as a job note", async () => {
     const flagged = reword(first.id, "Cut payroll errors by 30% for 40 staff");
     const runId = await start();
@@ -180,6 +197,15 @@ describe("accept section", () => {
     replies.push({ order: ["experience"], headline: "Payroll Director" });
     const proposals = (await (await post(`/v1/tailor-runs/${runId}/sections/layout/run`)).json() as { proposals: Proposal[] }).proposals;
     expect(proposals).toEqual([]);
+  });
+
+  it("drops a headline that is a sentence or too long, keeping the existing title, and asks for a short one", async () => {
+    const runId = await start();
+    for (const section of ["experience", "skills", "summary", "achievements", "languages"]) await accept(runId, section);
+    replies.push({ order: [...base.layout.order], headline: "Payroll specialist, ran payroll for 40 staff, filed taxes." });
+    const proposals = (await (await post(`/v1/tailor-runs/${runId}/sections/layout/run`)).json() as { proposals: Proposal[] }).proposals;
+    expect(proposals).toEqual([]);
+    expect(JSON.stringify(model.requests.at(-1))).toContain("at most 8 words");
   });
 
   it("adds no new skill past the skills cap", async () => {

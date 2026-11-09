@@ -26,9 +26,10 @@ export type ItemReview = { kept: boolean; inferred: boolean; reviewed: boolean; 
 
 /** New skills share the item id "new-skill", so each is addressed by its text. */
 export const reviewKey = (p: Pick<Proposal, "itemId" | "text">) => (p.itemId === "new-skill" ? `new-skill:${p.text}` : p.itemId);
-/** The flag question the section pass wrote for a flagged proposal quotes its text. */
+/** The flag question the section pass wrote for a flagged proposal: by its key (older runs: by the quoted text). */
 const flagQuestionFor = (run: TailorRun, section: TailorSection, p: Proposal) =>
-  (run.questions ?? []).find((q) => q.kind === "flag" && q.section === section && q.text.startsWith(`Please check: "${p.text}"`));
+  (run.questions ?? []).find((q) => q.kind === "flag" && q.section === section
+    && (q.itemId ? q.itemId === `${reviewKey(p)}|${p.field}` : q.text.startsWith(`Please check: "${p.text}"`)));
 export const LAYOUT_ITEMS = ["layout", "headline"];
 
 function apply(cv: CvContent, p: Proposal): void {
