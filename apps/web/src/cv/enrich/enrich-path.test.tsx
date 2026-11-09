@@ -244,3 +244,30 @@ describe("the end of the path (6B)", () => {
     expect(await screen.findByRole("heading", { name: "Almost there" })).toBeInTheDocument();
   });
 });
+
+describe("whole-branch review fixes", () => {
+  it("opened before the stored scores arrive (from /cv?enrich=1), it still skips roles at 80 or more", async () => {
+    const loading = new Map<string, RoleScoreState>([["a", { state: "scoring" }], ["b", { state: "scoring" }], ["c", { state: "scoring" }], ["d", { state: "scoring" }]]);
+    const view = render(<Host scores={loading} />);
+    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(85)], ["d", ready(80)]])} />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer →" }));
+    expect(screen.getByText("Role 1 of 1")).toBeInTheDocument();
+  });
+
+  it("Find a job waits for the save before leaving the CV", async () => {
+    api.suggestAchievements.mockResolvedValue({ suggestions: [] });
+    api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
+    let saved!: () => void;
+    const waitForSave = vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
+      .mockReturnValueOnce(new Promise<void>((done) => { saved = done; }));
+    const onClose = vi.fn();
+    const allDone = new Map([["a", ready(90)], ["b", ready(85)], ["c", ready(80)], ["d", ready(99)]]);
+    render(<MemoryRouter><EnrichPath cv={cv} dispatch={() => {}} scores={allDone} waitForSave={waitForSave} onClose={onClose} /></MemoryRouter>);
+    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Find a job →" }));
+    expect(onClose).not.toHaveBeenCalled();
+    saved();
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+});

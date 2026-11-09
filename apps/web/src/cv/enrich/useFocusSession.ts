@@ -162,7 +162,7 @@ export function useFocusSession(opts: Options): {
   const current = useRef(opts);
   const session = useRef({
     view, alive: true, closed: false, notesChanged: false, lastCelebrated: null as number | null,
-    result: initial.result, openingStarted: false, roleAnswered: false, boxAnswered: false, described: initial.describing,
+    result: initial.result, openingStarted: false, roleAnswered: false, boxAnswered: false, thinFlow: false, described: initial.describing,
     counts: initial.counts, asked: initial.asked, completed: initial.completed,
     rerun: new Set<string>(), returnPosition: 0,
     returnStep: null as Extract<FocusStep, { kind: "role" | "question" | "needsDetail" }> | null,
@@ -362,12 +362,14 @@ export function useFocusSession(opts: Options): {
   const finishRoleQuestions = () => {
     const s = session.current;
     const role = current.current.cv.experience.find((r) => r.id === current.current.roleId);
-    if (isThin(role, s.result) && (s.boxAnswered || s.roleAnswered)) void run(null, "answers");
+    // A session that opened on the box stays a thin role's session, even if the re-score after the box says otherwise.
+    if ((s.thinFlow || isThin(role, s.result)) && (s.boxAnswered || s.roleAnswered)) void run(null, "answers");
     else go(0);
   };
   /** After a thin role's box (answered or skipped): its role questions first. */
   const afterBox = () => {
     const s = session.current;
+    s.thinFlow = true;
     const questions = s.result?.roleQuestions ?? [];
     const index = questions.findIndex((q) => !s.asked.has(questionKey(q.text)));
     if (index < 0) { finishRoleQuestions(); return; }

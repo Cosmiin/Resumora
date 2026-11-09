@@ -47,7 +47,12 @@ export function PathBar({ label, at, total }: { label: string; at: number; total
  * roles still below 80, so finished roles drop out by themselves.
  */
 export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props) {
-  const [stops] = useState(() => cv.experience.filter((r) => belowTarget(scores.get(r.id))).map((r) => r.id));
+  // The roles below 80 and each role's score are read live on the start screen (stored scores may still be
+  // loading, e.g. from "/cv?enrich=1") and fixed when the path starts.
+  const below = cv.experience.filter((r) => belowTarget(scores.get(r.id))).map((r) => r.id);
+  const [fixed, setFixed] = useState<{ stops: string[]; before: Map<string, number | null> } | null>(null);
+  const stops = fixed?.stops ?? below;
+  const before = fixed?.before ?? new Map<string, number | null>();
   const [stage, setStage] = useState<Stage>({ kind: "start" });
   // Roles, then Key achievements and Skills.
   const total = stops.length + 2;
@@ -55,13 +60,16 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   const afterRoles = () => setStage({ kind: "achievements" });
   // 5A: the skills the path added, so Undo removes exactly those.
   const [skills, setSkills] = useState<{ ids: string[]; names: string[]; undone: boolean }>({ ids: [], names: [], undone: false });
-  // 6B: each role's score when the path opened, and how many Key achievements it added.
-  const [before] = useState(() => new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))])));
+  // 6B: how many Key achievements the path added.
   const [achievementsAdded, setAchievementsAdded] = useState(0);
 
   if (stage.kind === "start") {
     return <PathStart roles={roles} scores={scores} onNotNow={onClose}
-      onStart={() => (stops.length ? setStage({ kind: "role", index: 0 }) : afterRoles())} />;
+      onStart={() => {
+        setFixed({ stops: below, before: new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))])) });
+        if (below.length) setStage({ kind: "role", index: 0 });
+        else afterRoles();
+      }} />;
   }
   if (stage.kind === "role") {
     const roleId = stops[stage.index]!;
@@ -117,7 +125,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   }} />;
   return (
     <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={total} total={total} />} onClose={onClose}>
-      <EndStop cv={cv} scores={scores} before={before} stops={stops} achievementsAdded={achievementsAdded}
+      <EndStop cv={cv} scores={scores} waitForSave={waitForSave} before={before} stops={stops} achievementsAdded={achievementsAdded}
         skillsAdded={skills.undone ? 0 : skills.names.length} notice={notice} dispatch={dispatch} onClose={onClose}
         onImprove={(roleId) => setStage({ kind: "improve", roleId })} />
     </PathScreen>
@@ -132,8 +140,8 @@ export function averageScore(scores: ReadonlyMap<string, number | null>): number
 const scoreOf = (s: RoleScoreState | undefined) => (s && s.state !== "none" ? (s.result?.score ?? null) : null);
 
 /** 6B: waits for the last scores, then "Your CV is enriched" (saved once) or "Almost there". */
-function EndStop({ cv, scores, before, stops, achievementsAdded, skillsAdded, notice, dispatch, onClose, onImprove }: {
-  cv: CvContent; scores: ReadonlyMap<string, RoleScoreState>; before: ReadonlyMap<string, number | null>; stops: string[];
+function EndStop({ cv, scores, waitForSave, before, stops, achievementsAdded, skillsAdded, notice, dispatch, onClose, onImprove }: {
+  cv: CvContent; scores: ReadonlyMap<string, RoleScoreState>; waitForSave(): Promise<void>; before: ReadonlyMap<string, number | null>; stops: string[];
   achievementsAdded: number; skillsAdded: number; notice: ReactNode; dispatch(a: CvAction): void; onClose(): void; onImprove(roleId: string): void;
 }) {
   const navigate = useNavigate();
@@ -162,10 +170,12 @@ function EndStop({ cv, scores, before, stops, achievementsAdded, skillsAdded, no
     <EnrichedScreen start={averageScore(before)} average={average} rows={rows} achievementsAdded={achievementsAdded} skillsAdded={skillsAdded}
       notice={notice} lowest={lowest ? { ...lowest, label: roleName(cv.experience.find((r) => r.id === lowest.roleId)!, "experience") } : null}
       onBack={onClose} onFinish={onClose} onImprove={onImprove}
-      onFindJob={() => {
+      onFindJob={() => void (async () => {
+        // Leaving /cv drops a save still waiting: "enriched" and the added skills must be saved first.
+        await waitForSave().catch(() => undefined);
         onClose();
         void navigate("/jobs");
-      }} />
+      })()} />
   );
 }
 

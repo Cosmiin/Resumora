@@ -981,3 +981,22 @@ describe("the role description step (3B)", () => {
     expect(h.result.current.step.kind).toBe("roleDone");
   });
 });
+
+describe("a role the AI called thin, after the box (review fix)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    api.brainDump.mockResolvedValue({ proposals: [{ id: "p", text: "Built weekly reports", score: 80 }], roleBefore: 40, roleAfterAll: 70 });
+    api.roleDescription.mockResolvedValue({ text: "", keywords: [] });
+  });
+  afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
+  it("still turns the box into bullets when the re-score after it no longer says thin", async () => {
+    const r = role(3);
+    api.scoreRole.mockResolvedValue({ ...score(r), roleQuestions: [], thin: false });
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), thin: true } }]]) }, r);
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+    await submit(h, "I ran the reporting for the whole region");
+    await settle();
+    expect(api.brainDump).toHaveBeenCalledWith(expect.objectContaining({ source: "answers" }));
+    expect(h.result.current.step.kind).toBe("dumpPick");
+  });
+});

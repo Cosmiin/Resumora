@@ -84,3 +84,13 @@ session: r2-enrich (session 7) · builder: claude
 commit: see git log (base c6ce496) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 50% → 51%
 ruling: the gate's texts are new keys in `i18n/en-jobs.ts` (shared with session 8; the old `job.gate.text` key is left unused). The old checks (scores not ready, facts, average < 60, `WEAK_AVG`) are gone.
 open: none
+
+## Whole-branch review (Opus, high) — fixed
+Review 1 (base 9c5728d): verdict fix, 2 medium + 1 low, all fixed:
+- From `/cv?enrich=1` the path fixed its stops before the stored scores loaded, so it visited roles already at 80+ and lost the start scores. Now the start screen reads the roles live; stops and start scores are fixed when Start is pressed.
+- A role the AI called thin (2+ bullets) whose re-score after the box said not thin skipped the pick step. A session that opened on the box now keeps the thin flow.
+- "Find a job →" could leave /cv before the "enriched" mark was saved. It now waits for the save.
+Fix-only review (Opus, base f088016): pass. Open (low): the regression test for the first fix checks the stops, not the start average on the end screen.
+
+## Cost
+weekly 43% at the start → 48% at the end (the per-task "weekly" figures above were estimates; the app's meter read 47% after Task 10). Review agents: 17 (13 Sonnet, 4 Opus). Guard denials this session: 0. Claude context used: about 55%.
