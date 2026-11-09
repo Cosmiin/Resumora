@@ -10,6 +10,8 @@ vi.mock("./tailor-api.ts", () => ({
 }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
+vi.mock("./tailored-api.ts", () => ({ getTailored: vi.fn() }));
+import { getTailored } from "./tailored-api.ts";
 import { emptyCv } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { useVoice } from "../cv/enrich/useVoice.ts";
@@ -51,6 +53,7 @@ beforeEach(() => {
   vi.mocked(runSection).mockResolvedValue({ proposals: [], questions: [] });
   vi.mocked(getCv).mockRejectedValue(new Error("offline"));
   vi.mocked(getToneExamples).mockRejectedValue(new Error("offline"));
+  vi.mocked(getTailored).mockRejectedValue(new Error("offline"));
 });
 
 describe("tailoring flow", () => {
@@ -68,7 +71,7 @@ describe("tailoring flow", () => {
     expect(screen.getByRole("heading", { name: "Question q1?" })).toBeInTheDocument();
   });
 
-  it("steers, answers, reviews and accepts two sections, then opens the tailored CV", async () => {
+  it("steers, answers, reviews and accepts two sections, then the done screen opens the tailored CV", async () => {
     const user = userEvent.setup();
     vi.mocked(askQuestions).mockResolvedValueOnce([question("q1")]).mockResolvedValueOnce([]);
     vi.mocked(runSection)
@@ -97,10 +100,12 @@ describe("tailoring flow", () => {
 
     expect(await screen.findByText("Gusto")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Remove Gusto" }));
-    await user.click(screen.getByRole("button", { name: "Accept section" }));
+    await user.click(screen.getByRole("button", { name: "Save skills" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "skills", {
       decisions: [], inferred: [{ itemId: "new-skill:Gusto", keep: false }], flags: [],
     });
+    expect(await screen.findByRole("heading", { name: "Tailoring done 🎉" })).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "View your tailored CV" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/one/cv"));
     expect(router.state.location.search).toBe("?cv=cv1");
   });

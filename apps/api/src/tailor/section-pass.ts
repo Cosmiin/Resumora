@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
+  placeGuesses, type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError, type LogFn } from "../errors.ts";
@@ -18,6 +18,7 @@ type Item = { fields: Record<string, string>; roleId: string | null };
 const ModelProposalsSchema = z.object({
   proposals: z.array(z.object({
     itemId: z.string(), field: z.string(), text: z.string(), inferred: z.boolean(), reason: z.string().nullable(),
+    guesses: z.array(z.object({ text: z.string(), reason: z.string() })).nullable(),
   })),
 });
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
@@ -145,13 +146,17 @@ export async function passProposals(
     // or fields are dropped and logged (ids and fields only); items without a proposal keep the Base CV wording.
     const kept: Proposal[] = [];
     const dropped: { itemId: string; field: string }[] = [];
-    for (const { reason, ...p } of reply.proposals) {
+    for (const { reason, guesses, ...p } of reply.proposals) {
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
       // A guess or a new skill keeps the reason naming its basis; a plain rewording has none.
       const used = p.itemId === "new-skill" ? usedIn.get(p.text.trim().toLowerCase()) : undefined;
       const why = used ? { reason: used } : (p.inferred || p.itemId === "new-skill") && reason?.trim() ? { reason: reason.trim() } : {};
-      if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why });
+      // The summary's guesses are exact spans of its text, each its own item; they carry the inference.
+      const spans = p.itemId === "summary" ? placeGuesses(p.text.trim(), (guesses ?? []).map((g) => ({ text: g.text, reason: g.reason.trim() })))
+        .map((g) => ({ text: g.text, reason: g.reason })) : [];
+      const guessed = spans.length > 0 ? { inferred: false, guesses: spans } : {};
+      if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why, ...guessed });
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });

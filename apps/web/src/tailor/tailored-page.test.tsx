@@ -40,11 +40,11 @@ const tailored: TailoredCv = {
   score: null, coverLetter: null, version: 3, createdAt: "2026-11-08T09:00:00Z", updatedAt: "2026-11-08T09:30:00Z",
 };
 
-function renderPage() {
+function renderPage(entry = "/jobs/job-1/cv") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/jobs/job-1/cv"]}>
+      <MemoryRouter initialEntries={[entry]}>
         <Routes><Route path="/jobs/:id/cv" element={<TailoredCvPage />} /></Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -72,6 +72,12 @@ const editView = async () => {
 };
 
 describe("TailoredCvPage", () => {
+  it("opens on the Cover letter tab with ?tab=letter, and with the Export menu open with ?export=1 (from the done screen)", async () => {
+    renderPage("/jobs/job-1/cv?cv=tc-1&tab=letter&export=1");
+    expect(await screen.findByRole("tab", { name: "Cover letter" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Export ▾" })).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("opens editable by clicking, like the base CV, with Show changes as an option", async () => {
     renderPage();
     expect(await screen.findByRole("textbox", { name: "Summary" })).toHaveTextContent("Tailored summary.");

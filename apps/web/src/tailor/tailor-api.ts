@@ -9,7 +9,8 @@ const run = (id: string) => `/v1/tailor-runs/${encodeURIComponent(id)}`;
 
 export type AcceptBody = {
   decisions: { itemId: string; keep: boolean }[];
-  inferred: { itemId: string; keep: boolean }[];
+  /** A summary guess ("summary#<n>") may carry its edited `text`. */
+  inferred: { itemId: string; keep: boolean; text?: string }[];
   flags: { questionId: string; confirmed: boolean }[];
   /** Experience: the role being accepted (the run's current role). */
   roleId?: string;

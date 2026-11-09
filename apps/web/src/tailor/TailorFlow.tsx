@@ -1,49 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
-import { TAILOR_SECTIONS, type Answer, type CvContent, type Proposal, type Steering, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
+import { Link, useParams } from "react-router";
+import { TAILOR_SECTIONS, type Answer, type CvContent, type JobExtraction, type MatchScore, type Steering, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
+import { getJob } from "../jobs/jobs-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard, type Draft } from "./QuestionCard.tsx";
+import { keptChanges, keptTexts, newlyMet, roleDone } from "./role-done.ts";
+import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
-import { SteeringStep } from "./SteeringStep.tsx";
+import { SteerConfirm, SteeringStep } from "./SteeringStep.tsx";
+import { TailorMoment } from "./TailorMoment.tsx";
+import { DoneScreen } from "./DoneScreen.tsx";
+import { FINAL_SECTIONS } from "./LayoutReview.tsx";
+import { remember, remembered, type Phase } from "./flow-phase.ts";
 import * as api from "./tailor-api.ts";
 import { FinishedRoles, roleName, YourAnswers } from "./YourAnswers.tsx";
 import "../styles/tailor.css";
 
-type Phase =
-  | { kind: "loading" }
-  /** `resume`: changing the steering of a started run; going back returns there. */
-  | { kind: "steer"; busy: boolean; resume?: Phase }
-  | { kind: "confirm"; steering: Steering; busy: boolean; resume: Phase }
-  /** Going back (BackA): a finished step, a finished role's answers, a redone role's review. */
-  | { kind: "back"; section: TailorSection; resume: Phase }
-  | { kind: "role"; roleId: string; busy: boolean; resume: Phase }
-  | { kind: "redo"; roleId: string; proposals: Proposal[]; removed?: number; busy: boolean; resume: Phase }
-  | { kind: "asking" }
-  /** Answers stay here, one per question (undefined = not reached yet), until the step's last question. */
-  | { kind: "questions"; questions: TailorQuestion[]; index: number; answers: (Draft | undefined)[] }
-  | { kind: "working" }
-  | { kind: "review"; proposals: Proposal[]; busy: boolean; removed?: number }
-  | { kind: "error"; message: string; retry(): void }
-  | { kind: "deleted" };
-
-const storageKey = (jobId: string) => `resumora.tailorRun.${jobId}`;
-export function remember(jobId: string, runId: string | null) {
-  try {
-    if (runId) localStorage.setItem(storageKey(jobId), runId);
-    else localStorage.removeItem(storageKey(jobId));
-  } catch { /* storage is a convenience: the start route returns the job's open run anyway */ }
-}
-export function remembered(jobId: string): string | null {
-  try { return localStorage.getItem(storageKey(jobId)); } catch { return null; }
-}
+export { remember, remembered } from "./flow-phase.ts";
 
 /** `/jobs/:id/tailor`: steering, then each section's questions, run and review (Experience role by role), full screen. */
 export function TailorFlow() {
   const jobId = useParams().id ?? "";
-  const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [run, setRun] = useState<TailorRun | null>(null);
   const [base, setBase] = useState<number | null>(null);
@@ -55,7 +35,13 @@ export function TailorFlow() {
   // The stored steering, read when the Tone and questions screens open on a started run.
   const [steering, setSteering] = useState<Steering | undefined>(undefined);
   const runRef = useRef<TailorRun | null>(null);
+  // The newest score with its labels (base, then each accept's), and the job: for the role done line.
+  const scoreRef = useRef<MatchScore | null>(null);
+  const baseRef = useRef<MatchScore | null>(null);
+  const [job, setJob] = useState<JobExtraction | null>(null);
   const started = useRef(false);
+  // FinalA: final touches with nothing to change, accepted on their own; the next screen shows a tick for each.
+  const [ticks, setTicks] = useState<TailorSection[]>([]);
   const section = run?.currentSection ?? null;
 
   function track(next: TailorRun) { runRef.current = next; setRun(next); }
@@ -66,12 +52,8 @@ export function TailorFlow() {
     const ai = cause instanceof ApiClientError && cause.code === "ai_failed" && at;
     setPhase({ kind: "error", retry, message: ai ? t("tailor.error.ai", { section: t(`tailor.section.${at}`) }) : t("tailor.error.generic") });
   }
-  /** Opens the document this run tailored (a translated copy too, not only the job's original). */
-  function finish() {
-    remember(jobId, null);
-    const doc = runRef.current?.tailoredCvId;
-    void navigate(`/jobs/${encodeURIComponent(jobId)}/cv${doc ? `?cv=${encodeURIComponent(doc)}` : ""}`);
-  }
+  /** After the last step: the done screen, for the document this run tailored (a translated copy too). */
+  function finish() { remember(jobId, null); setPhase({ kind: "done" }); }
 
   /** Continues the run where it stands: a section with a finished pass goes back to its run, otherwise to its questions. */
   function enter(next: TailorRun) {
@@ -100,16 +82,36 @@ export function TailorFlow() {
     setPhase({ kind: "working" });
     try {
       const { proposals, removed } = await api.runSection(runRef.current!.id, at, roleArg(at));
+      if (proposals.length === 0 && FINAL_SECTIONS.includes(at)) return void pass(at);
       setPhase({ kind: "review", proposals, busy: false, removed });
     } catch (cause) { fail(cause, at, () => void work(at)); }
+  }
+  /** FinalA: a final touch with nothing to change is accepted on its own; once saved, the next screen shows its tick. */
+  async function pass(at: TailorSection) {
+    setPhase({ kind: "working" });
+    try {
+      const result = await api.acceptSection(runRef.current!.id, at, { decisions: [], inferred: [], flags: [] });
+      scoreRef.current = result.score;
+      setLatest(result.score.total);
+      setTicks((list) => (list.includes(at) ? list : [...list, at]));
+      enter(result.run);
+    } catch (cause) { fail(cause, at, () => void pass(at)); }
   }
   async function accept(at: TailorSection, body: api.AcceptBody) {
     setPhase((current) => current.kind === "review" ? { ...current, busy: true } : current);
     try {
       const roleId = roleArg(at);
       const result = await api.acceptSection(runRef.current!.id, at, roleId ? { ...body, roleId } : body);
+      const before = scoreRef.current;
+      scoreRef.current = result.score;
       setLatest(result.score.total);
-      enter(result.run);
+      const role = roleId ? cv?.experience.find((r) => r.id === roleId) : undefined;
+      if (!role || phase.kind !== "review") return enter(result.run);
+      const kept = keptChanges(phase.proposals, body);
+      track(result.run);
+      setPhase({ kind: "roleDone", from: latest ?? base, to: result.score.total, next: result.run, ...roleDone({
+        names: newlyMet(before, result.score, keptTexts(role, kept), job), company: job?.company ?? null, changed: kept.length > 0,
+        from: latest ?? base, to: result.score.total, next: result.run, roles: cv?.experience ?? [] }) });
     } catch (cause) {
       setPhase((current) => current.kind === "review" ? { ...current, busy: false } : current);
       if (cause instanceof ApiClientError && cause.code === "job_not_found") fail(cause, at, () => {});
@@ -124,17 +126,28 @@ export function TailorFlow() {
     setPhase({ kind: "role", roleId, busy: true, resume });
     try {
       const { proposals, removed } = await api.redoRole(runRef.current!.id, roleId, answers);
-      setPhase({ kind: "redo", roleId, proposals, removed, busy: false, resume });
+      // The role under review goes back to its own review, whose accept moves the run on.
+      const current = runRef.current?.currentSection === "experience" && runRef.current.currentRoleId === roleId;
+      setPhase(current ? { kind: "review", proposals, removed, busy: false } : { kind: "redo", roleId, proposals, removed, busy: false, resume });
     } catch (cause) { fail(cause, "experience", () => setPhase({ kind: "role", roleId, busy: false, resume })); }
   }
   async function acceptRedo(roleId: string, body: api.AcceptBody, review: Extract<Phase, { kind: "redo" }>) {
     setPhase({ ...review, busy: true });
     try {
       const result = await api.acceptRole(runRef.current!.id, roleId, body);
+      scoreRef.current = result.score;
       setLatest(result.score.total);
       track(result.run);
       setPhase(review.resume);
     } catch (cause) { fail(cause, "experience", () => setPhase({ ...review, busy: false })); }
+  }
+  /** "← My answers" on the role under review: its answers, read fresh from the run. */
+  async function openAnswers(review: Phase) {
+    setPhase({ kind: "loading" });
+    try {
+      track(await api.getRun(runRef.current!.id));
+      setPhase({ kind: "role", roleId: runRef.current!.currentRoleId!, busy: false, resume: review });
+    } catch (cause) { fail(cause, "experience", () => setPhase(review)); }
   }
   /** The Tone and questions screens of a started run, from its stored steering (never from defaults). */
   async function openSteer(resume: Phase) {
@@ -174,11 +187,14 @@ export function TailorFlow() {
     if (started.current) return;
     started.current = true;
     api.getScores(jobId).then((scores) => {
+      scoreRef.current = scores.tailored ?? scores.base;
+      baseRef.current = scores.base;
       setBase(scores.base?.total ?? null);
       setLatest((value) => value ?? scores.tailored?.total ?? null);
     }, () => {});
     // Without it the screens fall back to the plain list; the run itself doesn't need it.
     getCv().then((response) => setCv(response.content), () => {});
+    getJob(jobId).then((found) => setJob(found.extracted ?? null), () => {});
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -203,14 +219,7 @@ export function TailorFlow() {
       startLabel={resume ? t("tailor.steer.save") : undefined} onCancel={resume ? () => setPhase(resume) : undefined}
       onStart={(s) => (resume ? setPhase({ kind: "confirm", steering: s, busy: false, resume }) : void start(s))} />;
   } else if (phase.kind === "confirm") {
-    body = <section className="tailor-card" role="alertdialog" aria-labelledby="steer-confirm" aria-describedby="steer-confirm-text">
-      <h2 id="steer-confirm">{t("tailor.steer.confirm.title")}</h2>
-      <p id="steer-confirm-text">{t("tailor.steer.confirm.text")}</p>
-      <div className="fm-foot">
-        <button type="button" className="fm-ghost" disabled={phase.busy} onClick={() => setPhase(phase.resume)}>{t("tailor.steer.confirm.cancel")}</button>
-        <button type="button" className="fm-btn" disabled={phase.busy} onClick={() => void restart(phase.steering, phase)}>{t("tailor.steer.confirm.redo")}</button>
-      </div>
-    </section>;
+    body = <SteerConfirm busy={phase.busy} onCancel={() => setPhase(phase.resume)} onRedo={() => void restart(phase.steering, phase)} />;
   } else if (phase.kind === "back") {
     const { resume } = phase;
     body = phase.section === "experience"
@@ -226,10 +235,18 @@ export function TailorFlow() {
       onUpdate={(answers) => void redo(roleId, answers, resume)} onClose={() => setPhase(resume)} />;
   } else if (phase.kind === "redo") {
     const review = phase;
-    body = <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
-      busy={review.busy} onAccept={(accepted) => void acceptRedo(review.roleId, accepted, review)} cv={cv} removed={review.removed} />;
+    const role = cv?.experience.find((r) => r.id === review.roleId);
+    const onAccept = (accepted: api.AcceptBody) => void acceptRedo(review.roleId, accepted, review);
+    body = role ? <RoleReview key={`redo-${role.id}`} role={role} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} />
+      : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
+        busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
   }
-  else if (phase.kind === "deleted") {
+  else if (phase.kind === "roleDone") {
+    const done = phase;
+    body = <TailorMoment from={done.from} to={done.to} title={done.title} line={done.line} button={done.button} onNext={() => enter(done.next)} />;
+  } else if (phase.kind === "done") {
+    body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job} />;
+  } else if (phase.kind === "deleted") {
     body = <section className="tailor-card" role="alert"><h2>{t("tailor.error.deleted")}</h2>
       <Link to="/jobs">{t("tailor.error.toJobs")}</Link></section>;
   } else if (phase.kind === "error") {
@@ -255,9 +272,13 @@ export function TailorFlow() {
       onNext={answerWith} onSkip={() => answerWith({ value: null, via: "skip" })}
       onBack={phase.index > 0 ? () => setPhase({ ...phase, index: phase.index - 1 }) : undefined}
       role={roleFor(question)} roles={cv?.experience ?? []} locale={cv?.locale} />;
+  } else if (section === "experience" && cv?.experience.some((r) => r.id === run?.currentRoleId)) {
+    const review = phase;
+    body = <RoleReview key={run!.currentRoleId!} role={cv.experience.find((r) => r.id === run!.currentRoleId)!} proposals={review.proposals} locale={locale}
+      busy={review.busy} onAccept={(accepted) => void accept(section, accepted)} onAnswers={() => void openAnswers(review)} removed={review.removed} />;
   } else {
     body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={[]}
-      confirmed={[]} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} cv={cv} removed={phase.removed} />;
+      confirmed={[]} busy={phase.busy} onAccept={(accepted) => { setTicks([]); void accept(section, accepted); }} cv={cv} removed={phase.removed} />;
   }
   const wide = phase.kind === "questions" && section === "experience" && !!roleFor(phase.questions[phase.index]!);
 
@@ -270,6 +291,9 @@ export function TailorFlow() {
       onOpen={(s) => setPhase({ kind: "back", section: s, resume: phase })}
       onSteer={settled ? () => void openSteer(phase) : undefined} />}
     {!run && base !== null && <StepBar sections={[...TAILOR_SECTIONS]} current={null} base={base} latest={latest} />}
-    <main className="tailor-main">{body}</main>
+    <main className="tailor-main">
+      {ticks.map((s) => <p key={s} className="tailor-tick">{t("tailor.final.nothing", { section: t(`tailor.section.${s}`) })}</p>)}
+      {body}
+    </main>
   </div>;
 }

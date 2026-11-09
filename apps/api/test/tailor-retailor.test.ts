@@ -82,7 +82,7 @@ const roleOf = async (runId: string, section: string) =>
   section === "experience" ? { roleId: (await memoryTailorRepo("user-a", scores, docs).getRun(runId))!.currentRoleId } : {};
 async function run(runId: string, section: string, ...items: ModelProposal[]) {
   // The real (strict) model always returns every field: skills proposals carry reason, null when unused.
-  replies.push({ proposals: items.map((item) => ({ reason: null, ...item })) }, { results: [] });
+  replies.push({ proposals: items.map((item) => ({ reason: null, guesses: null, ...item })) }, { results: [] });
   const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`, await roleOf(runId, section));
   expect(res.status).toBe(200);
 }

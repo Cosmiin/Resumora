@@ -68,7 +68,7 @@ const post = (path: string, body: unknown = {}) => app.request(path, {
 const reword = (itemId: string, text: string): ModelProposal => ({ itemId, field: "text", text, inferred: false });
 const tailored = () => [...docs.cvs.values()][0]!;
 const getRun = async (id: string) => (await memoryTailorRepo("user-a", scores, docs).getRun(id))!;
-const proposals = (...items: ModelProposal[]) => replies.push({ proposals: items.map((item) => ({ reason: null, ...item })) }, { results: [] });
+const proposals = (...items: ModelProposal[]) => replies.push({ proposals: items.map((item) => ({ reason: null, guesses: null, ...item })) }, { results: [] });
 
 async function start(): Promise<string> {
   const body = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal" })).json() as { run: { id: string } };
@@ -127,6 +127,30 @@ describe("going back to a finished role", () => {
     const res = await post(`/v1/tailor-runs/${runId}/roles/${one.id}/redo`, { answers: [{ questionId: "other", value: "x", via: "typed" }] });
     expect(res.status).toBe(400);
     expect(asked).toBeTruthy();
+  });
+
+  it("redoes the role under review (its pass is done, not yet accepted), replacing its notes; the run stays on that role", async () => {
+    const runId = await start();
+    replies.push({ questions: [{ roleId: one.id, bulletId: null, skill: null, text: "How often?", kind: "options", options: [], reason: "Gap", gap: "r0" }] });
+    const asked = (await (await post(`/v1/tailor-runs/${runId}/sections/experience/questions`, { roleId: one.id })).json() as { questions: { id: string }[] }).questions[0]!.id;
+    await post(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: asked, value: "Weekly", via: "typed" }] });
+    proposals(reword(one.bullets[0]!.id, "Ran payroll every week"));
+    expect((await post(`/v1/tailor-runs/${runId}/sections/experience/run`, { roleId: one.id })).status).toBe(200);
+
+    proposals(reword(one.bullets[0]!.id, "Ran payroll every day"));
+    const res = await post(`/v1/tailor-runs/${runId}/roles/${one.id}/redo`, { answers: [{ questionId: asked, value: "Daily", via: "typed" }] });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { proposals: Proposal[] }).proposals.map((p) => p.text)).toEqual(["Ran payroll every day"]);
+    const notes = (await cv.get()).content.experience[0]!.notes.filter((note) => note.jobId === jobId);
+    expect(notes.map((note) => note.answer)).toEqual(["Daily"]);
+    expect(await getRun(runId)).toMatchObject({ currentSection: "experience", currentRoleId: one.id });
+
+    replies.push(scoreReply);
+    expect((await post(`/v1/tailor-runs/${runId}/sections/experience/accept`, { roleId: one.id, decisions: [{ itemId: one.bullets[0]!.id, keep: true }] })).status).toBe(200);
+    expect(tailored().content.experience[0]!.bullets[0]!.text).toBe("Ran payroll every day");
+    expect((await getRun(runId)).currentRoleId).toBe(two.id);
+    // The role-accept route still refuses the role under review.
+    expect((await post(`/v1/tailor-runs/${runId}/roles/${two.id}/accept`, {})).status).toBe(409);
   });
 });
 

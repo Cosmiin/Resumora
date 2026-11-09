@@ -83,7 +83,7 @@ const roleOf = async (runId: string, section: string) =>
   section === "experience" ? { roleId: (await repo().getRun(runId))!.currentRoleId } : {};
 async function run(runId: string, section: string, ...items: ModelProposal[]) {
   // The real (strict) model always returns every field: proposals carry reason, null when unused.
-  replies.push({ proposals: items.map((item) => ({ reason: null, ...item })) }, { results: [] });
+  replies.push({ proposals: items.map((item) => ({ reason: null, guesses: null, ...item })) }, { results: [] });
   const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`, await roleOf(runId, section));
   expect(res.status).toBe(200);
 }
@@ -116,7 +116,7 @@ describe("accept section", () => {
     const runId = await start();
     const title = reword(role.id, "Payroll Lead", { field: "title" });
     const claim = reword(first.id, "Cut payroll errors by 30% for 40 staff");
-    replies.push({ proposals: [title, claim].map((p) => ({ reason: null, ...p })) }, { results: [] });
+    replies.push({ proposals: [title, claim].map((p) => ({ reason: null, guesses: null, ...p })) }, { results: [] });
     await run(runId, "experience", title, claim);
     expect((await repo().getRun(runId))!.questions ?? []).toEqual([]);
     const res = await accept(runId, "experience", { decisions: [{ itemId: first.id, keep: true }, { itemId: role.id, keep: true }] });
@@ -138,7 +138,39 @@ describe("accept section", () => {
     expect(tailored().content.technicalSkills.map((s) => s.name)).toEqual(["Excel", "Payroll software"]);
     // 1 = full credit; an inferred label without a kept item would get 0.5.
     expect(body.score.parts.requirements).toMatchObject({ points: 1 });
-    expect(tailored().review).toMatchObject({ skills: { "new-skill:Payroll software": { kept: true, inferred: true } } });
+    expect(tailored().review).toMatchObject({ skills: { "new-skill:Payroll software": { kept: true, inferred: true, reason: "Shown in: Team Lead · Acme Payroll" } } });
+  });
+
+  it("applies each summary guess on its own: removed, edited or left undecided (kept, unreviewed), one review item each", async () => {
+    const runId = await start();
+    for (const section of ["experience", "skills"]) await accept(runId, section);
+    const text = "Payroll lead who works across borders and coaches new staff daily.";
+    await run(runId, "summary", { itemId: "summary", field: "summary", text, inferred: false, guesses: [
+      { text: "works across borders", reason: "Roles in Hamburg and Bucharest." },
+      { text: "coaches new staff", reason: "You trained the team." },
+      { text: "daily", reason: "Your notes." },
+    ] });
+    const res = await accept(runId, "summary", { decisions: [{ itemId: "summary", keep: true }],
+      inferred: [{ itemId: "summary#0", keep: false }, { itemId: "summary#1", keep: true, text: "trains new staff" }] });
+    expect(res.status).toBe(200);
+    const doc = tailored();
+    expect(doc.content.basics.summary).toBe("Payroll lead who and trains new staff daily.");
+    expect(doc.review!.summary).toEqual({
+      summary: { kept: true, inferred: false, reviewed: true, text: "Payroll lead who and trains new staff daily." },
+      "summary#0": { kept: false, inferred: true, reviewed: true, text: "works across borders", reason: "Roles in Hamburg and Bucharest." },
+      "summary#1": { kept: true, inferred: true, reviewed: true, text: "trains new staff", reason: "You trained the team." },
+      "summary#2": { kept: true, inferred: true, reviewed: false, text: "daily", reason: "Your notes." },
+    });
+  });
+
+  it("\"Use my original summary\" keeps the Base summary and stores no guesses", async () => {
+    const runId = await start();
+    for (const section of ["experience", "skills"]) await accept(runId, section);
+    await run(runId, "summary", { itemId: "summary", field: "summary", text: "Lead who works across borders.", inferred: false,
+      guesses: [{ text: "works across borders", reason: "Roles abroad." }] });
+    expect((await accept(runId, "summary", { decisions: [{ itemId: "summary", keep: false }] })).status).toBe(200);
+    expect(tailored().content.basics.summary).toBe(base.basics.summary);
+    expect(Object.keys(tailored().review!.summary as object)).toEqual(["summary"]);
   });
 
   it("runs the layout step after Languages, then ends done with the job tailored", async () => {

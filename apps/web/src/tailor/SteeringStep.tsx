@@ -87,3 +87,15 @@ export function SteeringStep({ jobId, roles, busy, onStart, initial, startLabel,
     </div>
   </section>;
 }
+
+/** Changing the steering of a started run: it redoes every step, so it asks first. */
+export function SteerConfirm({ busy, onCancel, onRedo }: { busy: boolean; onCancel(): void; onRedo(): void }) {
+  return <section className="tailor-card" role="alertdialog" aria-labelledby="steer-confirm" aria-describedby="steer-confirm-text">
+    <h2 id="steer-confirm">{t("tailor.steer.confirm.title")}</h2>
+    <p id="steer-confirm-text">{t("tailor.steer.confirm.text")}</p>
+    <div className="fm-foot">
+      <button type="button" className="fm-ghost" disabled={busy} onClick={onCancel}>{t("tailor.steer.confirm.cancel")}</button>
+      <button type="button" className="fm-btn" disabled={busy} onClick={onRedo}>{t("tailor.steer.confirm.redo")}</button>
+    </div>
+  </section>;
+}

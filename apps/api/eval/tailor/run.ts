@@ -281,11 +281,11 @@ export function fakeTailorModel(calls: AiCallLog[]): ModelDeps {
       input.items.context.roles.filter((other) => other.startDate > role.startDate).length >= 2;
     // A tempting guess the truth rule must stop: "reporting for clients" becomes a named tool.
     const guessed = input.items.edit.flatMap((role) => role.bullets).filter((bullet) => /reporting for clients/i.test(bullet.text))
-      .map((bullet) => ({ itemId: bullet.id, field: "text", text: "Built Power BI reporting for clients", inferred: true, reason: bullet.text }));
+      .map((bullet) => ({ itemId: bullet.id, field: "text", text: "Built Power BI reporting for clients", inferred: true, reason: bullet.text, guesses: null }));
     return {
       proposals: [...guessed, ...input.items.edit.filter(older).flatMap((role) => [
-        { itemId: role.id, field: "description", text: firstWords(role.description, 6), inferred: false, reason: null },
-        ...role.bullets.map((bullet) => ({ itemId: bullet.id, field: "text", text: firstWords(bullet.text, 6), inferred: false, reason: null })),
+        { itemId: role.id, field: "description", text: firstWords(role.description, 6), inferred: false, reason: null, guesses: null },
+        ...role.bullets.map((bullet) => ({ itemId: bullet.id, field: "text", text: firstWords(bullet.text, 6), inferred: false, reason: null, guesses: null })),
       ].filter((proposal) => proposal.text))],
     };
   };

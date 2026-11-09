@@ -69,7 +69,7 @@ async function runSection(section = "experience", current: TailorSection = secti
 /** The run's current role, which the web sends with every Experience step. */
 const roleOf = async (runId: string) => ({ roleId: (await memoryTailorRepo("user-a", new Map(), docs).getRun(runId))!.currentRoleId });
 // The real (strict) model always returns every field: reason is null when unused.
-const proposals = (...items: ModelProposal[]) => ({ proposals: items.map((item) => ({ reason: null, ...item })) });
+const proposals = (...items: ModelProposal[]) => ({ proposals: items.map((item) => ({ reason: null, guesses: null, ...item })) });
 const reword = (text: string, over: Partial<ModelProposal> = {}): ModelProposal =>
   ({ itemId: bullet.id, field: "text", text, inferred: false, ...over });
 
@@ -130,7 +130,7 @@ describe("section pass", () => {
 
   it("keeps a backed inferred new skill and rejects the layout section here", async () => {
     replies = [proposals({ itemId: "new-skill", field: "name", text: "Payroll", inferred: true, reason: "Shown in: Payroll Specialist · Acme Payroll" } as ModelProposal,
-      { itemId: "s1", field: "name", text: "Microsoft Excel", inferred: false, reason: null } as unknown as ModelProposal)];
+      { itemId: "s1", field: "name", text: "Microsoft Excel", inferred: false, reason: null, guesses: null } as unknown as ModelProposal)];
     const body = await (await runSection("skills")).res.json() as { proposals: Proposal[] };
     expect(body.proposals.map((p) => [p.itemId, p.text, p.flags])).toEqual([["new-skill", "Payroll", []], ["s1", "Microsoft Excel", []]]);
     expect(JSON.stringify(model.requests[0])).toContain("Ran payroll for 40 staff");
@@ -166,6 +166,19 @@ describe("section pass", () => {
     const body = await (await runSection("summary")).res.json() as { proposals: Proposal[] };
     expect(body.proposals[0]?.flags).toEqual([]);
     expect(JSON.stringify(model.requests[0])).toContain("Ran payroll for 40 staff");
+  });
+
+  it("keeps the summary's guesses that are exact spans of its text, each with its reason; the guesses carry the inference", async () => {
+    const text = "Payroll lead who works across borders and runs payroll for 40 staff.";
+    replies = [proposals({ itemId: "summary", field: "summary", text, inferred: true, guesses: [
+      { text: "works across borders", reason: "From your roles in Hamburg and Bucharest." },
+      { text: "speaks German", reason: "Not in the text." },
+      { text: "across borders and", reason: "Overlaps the first guess." },
+    ] }), { results: [] }];
+    const body = await (await runSection("summary")).res.json() as { proposals: Proposal[] };
+    expect(body.proposals).toEqual([{ itemId: "summary", field: "summary", text, inferred: false, flags: [],
+      guesses: [{ text: "works across borders", reason: "From your roles in Hamburg and Bucharest." }] }]);
+    expect(String((model.requests[0]!.messages as Array<{ content: string }>)[0]!.content)).toContain("guesses");
   });
 
   it("never treats digits inside item ids as known numbers", async () => {
