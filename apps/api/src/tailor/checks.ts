@@ -30,7 +30,16 @@ function toolNames(text: string, nameField: boolean): string[] {
   }));
 }
 
-/** Code checks for one proposal: invented numbers, changed employer/title/dates, untagged unknown tools. */
+/** Tool-like names in `text` that none of the sources has (a guess never makes a tool up). */
+export function unknownTools(text: string, sources: string[], nameField = false): string[] {
+  const known = new Set(sources.flatMap((source) => [...source.matchAll(TOKEN)].map((match) => match[0].toLowerCase())));
+  return [...new Set(toolNames(text, nameField).filter((word) => !known.has(word.toLowerCase())))];
+}
+
+/**
+ * Code checks for one proposal (the truth rule): invented numbers, changed employer/title/dates, tools no source
+ * has (inferred or not), and a guess without a reason naming its basis.
+ */
 export function checkProposal(proposal: Proposal, ctx: CheckContext): Flag[] {
   const field = proposal.field as EntityField;
   if ((ENTITY_FIELDS as readonly string[]).includes(field)) {
@@ -40,10 +49,8 @@ export function checkProposal(proposal: Proposal, ctx: CheckContext): Flag[] {
   }
   const flags: Flag[] = [];
   if (hasUnknownNumber(proposal.text, ctx.sources)) flags.push({ rule: "number", detail: "A number that isn't in your CV, notes or answers" });
-  if (!proposal.inferred) {
-    const known = new Set(ctx.sources.flatMap((source) => [...source.matchAll(TOKEN)].map((match) => match[0].toLowerCase())));
-    const unknown = [...new Set(toolNames(proposal.text, proposal.field === "name").filter((word) => !known.has(word.toLowerCase())))];
-    if (unknown.length > 0) flags.push({ rule: "tool", detail: unknown.join(", ") });
-  }
+  const unknown = unknownTools(proposal.text, ctx.sources, proposal.field === "name");
+  if (unknown.length > 0) flags.push({ rule: "tool", detail: unknown.join(", ") });
+  if (proposal.inferred && !proposal.reason?.trim()) flags.push({ rule: "guess", detail: "A guess without a reason" });
   return flags;
 }

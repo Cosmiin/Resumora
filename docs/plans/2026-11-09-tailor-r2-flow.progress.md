@@ -22,3 +22,8 @@ open: rulings — tone cache through two new TailorRepo methods; TailorFlow pass
 
 ## Next (fresh session, per claude-build's 4-task rule)
 A5 Experience role by role → A6 truth rule → A7 Skills questions → A8 question screen → A9 going back. Then whole-branch review (Opus high), draft PR to `rebuild/tailor-r2-bugs`.
+
+## Task A5: Experience runs role by role — done
+session: tailor-r2 Part A (session 5, second block) · builder: claude
+commit: 15827fe (base 43c3fe6) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 44% → (see A6)
+open: rulings — `repo.ts`, `memory-repo.ts`, `supabase-repo.ts` map `role_order`/`current_role_id`; `retailor.ts` sets the role order; `eval/tailor/run.ts` loops roles. Skills cap 5, other sections share 8. Low (not fixed): a run started before this change has an empty role order, so its Experience step proposes nothing. The web still calls Experience without `roleId` until A8 (the web flow is broken against the real API between A5 and A8).

@@ -35,9 +35,11 @@ export async function sendAnswers(id: string, answers: Answer[]): Promise<void> 
   await apiFetch(`${run(id)}/answers`, { method: "POST", json: { answers }, schema: z.object({ ok: z.literal(true) }) });
 }
 
-export function runSection(id: string, section: TailorSection): Promise<{ proposals: Proposal[]; questions: TailorQuestion[] }> {
+/** `removed`: proposals the API left out because the CV, notes and answers don't back them up. */
+export function runSection(id: string, section: TailorSection): Promise<{ proposals: Proposal[]; questions: TailorQuestion[]; removed?: number }> {
   return apiFetch(`${run(id)}/sections/${section}/run`, {
-    method: "POST", json: {}, schema: z.object({ proposals: z.array(ProposalSchema), questions: z.array(TailorQuestionSchema) }),
+    method: "POST", json: {},
+    schema: z.object({ proposals: z.array(ProposalSchema), questions: z.array(TailorQuestionSchema), removed: z.number().int().min(0).default(0) }),
   });
 }
 

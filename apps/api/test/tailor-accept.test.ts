@@ -82,8 +82,8 @@ async function start(): Promise<string> {
 const roleOf = async (runId: string, section: string) =>
   section === "experience" ? { roleId: (await repo().getRun(runId))!.currentRoleId } : {};
 async function run(runId: string, section: string, ...items: ModelProposal[]) {
-  // The real (strict) model always returns every field: skills proposals carry reason, null when unused.
-  replies.push({ proposals: section === "skills" ? items.map((item) => ({ reason: null, ...item })) : items }, { results: [] });
+  // The real (strict) model always returns every field: proposals carry reason, null when unused.
+  replies.push({ proposals: items.map((item) => ({ reason: null, ...item })) }, { results: [] });
   const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`, await roleOf(runId, section));
   expect(res.status).toBe(200);
 }
@@ -112,57 +112,27 @@ describe("accept section", () => {
     expect(model.logged.at(-1)?.task).toBe("tailor_score");
   });
 
-  it("keeps each flagged field of one role apart: a confirmed title and a rejected company", async () => {
+  it("never writes a flagged proposal: the item keeps its Base wording and no flag question exists", async () => {
+    const runId = await start();
     const title = reword(role.id, "Payroll Lead", { field: "title" });
-    const company = reword(role.id, "Beta Payroll", { field: "company" });
-    const runId = await start();
-    replies.push({ proposals: [title, company] }, { results: [] });
-    await run(runId, "experience", title, company);
-    const flags = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
-    expect(flags).toHaveLength(2);
-    expect(new Set(flags.map((q) => q.itemId)).size).toBe(2);
-    const byField = (field: string) => flags.find((q) => q.text.includes(field === "title" ? "Payroll Lead" : "Beta Payroll"))!;
-    const res = await accept(runId, "experience", { flags: [
-      { questionId: byField("title").id, confirmed: true }, { questionId: byField("company").id, confirmed: false },
-    ] });
+    const claim = reword(first.id, "Cut payroll errors by 30% for 40 staff");
+    replies.push({ proposals: [title, claim].map((p) => ({ reason: null, ...p })) }, { results: [] });
+    await run(runId, "experience", title, claim);
+    expect((await repo().getRun(runId))!.questions ?? []).toEqual([]);
+    const res = await accept(runId, "experience", { decisions: [{ itemId: first.id, keep: true }, { itemId: role.id, keep: true }] });
     expect(res.status).toBe(200);
-    expect(tailored().content.experience[0]).toMatchObject({ title: "Payroll Lead", company: role.company });
-  });
-
-  it("reverts a rejected flag and keeps a confirmed one as a job note", async () => {
-    const flagged = reword(first.id, "Cut payroll errors by 30% for 40 staff");
-    const runId = await start();
-    replies.push({ proposals: [flagged] }, { results: [] });
-    await run(runId, "experience", flagged);
-    const [flag] = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
-    const rejected = await accept(runId, "experience", { decisions: [{ itemId: first.id, keep: true }], flags: [{ questionId: flag!.id, confirmed: false }] });
-    expect(rejected.status).toBe(200);
-    expect(tailored().content.experience[0]!.bullets[0]!.text).toBe("Ran payroll for 40 staff");
+    expect(tailored().content.experience[0]).toMatchObject({ title: role.title, bullets: role.bullets });
     expect((await cv.get()).content.experience[0]!.notes).toEqual([]);
-
-    // A fresh job with the same proposal, this time confirmed.
-    docs.cvs.clear();
-    docs.runs.clear();
-    const again = await start();
-    replies.push({ proposals: [flagged] }, { results: [] });
-    await run(again, "experience", flagged);
-    const [flag2] = (await repo().getRun(again))!.questions!.filter((q) => q.kind === "flag");
-    const confirmed = await accept(again, "experience", { flags: [{ questionId: flag2!.id, confirmed: true }] });
-    expect(confirmed.status).toBe(200);
-    expect(tailored().content.experience[0]!.bullets[0]!.text).toBe("Cut payroll errors by 30% for 40 staff");
-    expect((await cv.get()).content.experience[0]!.notes).toEqual([
-      expect.objectContaining({ jobId, answer: "Cut payroll errors by 30% for 40 staff" }),
-    ]);
   });
 
   it("counts a kept inferred skill in Score 2 and leaves a removed one out", async () => {
     const runId = await start();
     await accept(runId, "experience");
     await run(runId, "skills",
-      { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true },
-      { itemId: "new-skill", field: "name", text: "Gusto", inferred: true });
+      { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true, reason: "Shown in: Team Lead · Acme Payroll" },
+      { itemId: "new-skill", field: "name", text: "Tax filing", inferred: true, reason: "Shown in: Team Lead · Acme Payroll" });
     const res = await accept(runId, "skills", {
-      inferred: [{ itemId: "new-skill:Payroll software", keep: true }, { itemId: "new-skill:Gusto", keep: false }],
+      inferred: [{ itemId: "new-skill:Payroll software", keep: true }, { itemId: "new-skill:Tax filing", keep: false }],
     }, scoreReply("Payroll software", true));
     const body = await res.json() as { score: MatchScore };
     expect(tailored().content.technicalSkills.map((s) => s.name)).toEqual(["Excel", "Payroll software"]);
@@ -217,22 +187,9 @@ describe("accept section", () => {
     await cv.save({ ...base, technicalSkills: full }, 1);
     const runId = await start();
     await accept(runId, "experience");
-    await run(runId, "skills", { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true });
+    await run(runId, "skills", { itemId: "new-skill", field: "name", text: "Payroll software", inferred: true, reason: "Shown in: Team Lead · Acme Payroll" });
     expect((await accept(runId, "skills")).status).toBe(200);
     expect(tailored().content.technicalSkills).toHaveLength(40);
-  });
-
-  it("saves a confirmed flag on a long description as a note within the note limits", async () => {
-    const long = `Ran payroll for 40 staff. ${"Kept every pay run on time. ".repeat(80)}`.trim();
-    const flagged = { itemId: role.id, field: "description", text: `${long} Cut errors by 30%.`, inferred: false };
-    const runId = await start();
-    replies.push({ proposals: [flagged] }, { results: [] });
-    await run(runId, "experience", flagged);
-    const [flag] = (await repo().getRun(runId))!.questions!.filter((q) => q.kind === "flag");
-    const res = await accept(runId, "experience", { flags: [{ questionId: flag!.id, confirmed: true }] });
-    expect(res.status).toBe(200);
-    const [note] = (await cv.get()).content.experience[0]!.notes;
-    expect(note!.question.length).toBeLessThanOrEqual(2000);
   });
 
   it("refuses a section that isn't current with 409", async () => {

@@ -12,6 +12,15 @@ describe("SectionReview", () => {
     expect(screen.queryByText("summary,experience,skills")).toBeNull();
   });
 
+  it("says in one small line how many claims were left out, and nothing when none were", () => {
+    const { rerender } = render(<SectionReview section="summary" flags={[]} confirmed={[]} busy={false} onAccept={vi.fn()} proposals={[]} removed={1} />);
+    expect(screen.getByText("We left out 1 claim your CV doesn't back up.")).toBeInTheDocument();
+    rerender(<SectionReview section="summary" flags={[]} confirmed={[]} busy={false} onAccept={vi.fn()} proposals={[]} removed={2} />);
+    expect(screen.getByText("We left out 2 claims your CV doesn't back up.")).toBeInTheDocument();
+    rerender(<SectionReview section="summary" flags={[]} confirmed={[]} busy={false} onAccept={vi.fn()} proposals={[]} />);
+    expect(screen.queryByText(/We left out/)).toBeNull();
+  });
+
   it("finds a flag question by its item key, whatever its wording", () => {
     const proposal = { itemId: "b1", field: "text", text: "Cut errors by 30%", inferred: false, flags: [{ rule: "number" as const, detail: "x" }] };
     const question = { id: "q1", section: "experience" as const, roleId: "r1", kind: "flag" as const, options: ["Keep it", "Use original wording"],

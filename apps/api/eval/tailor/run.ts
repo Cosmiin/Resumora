@@ -11,6 +11,7 @@ import {
 import type { AiCallLog, ModelDeps, Provider } from "../../src/ai/call-model.ts";
 import { createApp, type AppDeps } from "../../src/app.ts";
 import { memoryCvRepo } from "../../src/cv/memory-repo.ts";
+import { unknownTools } from "../../src/tailor/checks.ts";
 import { memoryJobs } from "../../src/jobs/memory-repo.ts";
 import { memoryTailorDocs, memoryTailorRepo } from "../../src/tailor/memory-repo.ts";
 import { scoreMatch } from "../../src/tailor/score.ts";
@@ -59,14 +60,18 @@ function cvTexts(value: unknown): string[] {
   return [];
 }
 
-/** Invented facts: a number in the tailored CV that neither the Base CV nor the job has, or an employer the Base CV doesn't have. */
+/**
+ * Invented facts: a number in the tailored CV that neither the Base CV nor the job has, an employer the Base CV
+ * doesn't have, or a tool name the Base CV doesn't have (the job naming a tool is no basis for claiming it).
+ */
 export function inventedFacts(base: CvContent, job: JobExtraction, tailored: CvContent): string[] {
   const sources = [...cvTexts(base), ...cvTexts(job)];
   const numbers = cvTexts(tailored).filter((text) => hasUnknownNumber(text, sources)).map((text) => `number: ${text}`);
   const employers = new Set(base.experience.map((role) => role.company.trim().toLowerCase()));
   const newEmployers = tailored.experience.filter((role) => role.company.trim() && !employers.has(role.company.trim().toLowerCase()))
     .map((role) => `employer: ${role.company}`);
-  return [...numbers, ...newEmployers];
+  const tools = [...new Set(cvTexts(tailored).flatMap((text) => unknownTools(text, cvTexts(base))))].map((tool) => `tool: ${tool}`);
+  return [...numbers, ...newEmployers, ...tools];
 }
 
 /** Share of keyword labels found in the CV (met or partial), in percent. */
@@ -274,11 +279,14 @@ export function fakeTailorModel(calls: AiCallLog[]): ModelDeps {
     if (input.section !== "experience") return { proposals: [] };
     const older = (role: CvContent["experience"][number]) =>
       input.items.context.roles.filter((other) => other.startDate > role.startDate).length >= 2;
+    // A tempting guess the truth rule must stop: "reporting for clients" becomes a named tool.
+    const guessed = input.items.edit.flatMap((role) => role.bullets).filter((bullet) => /reporting for clients/i.test(bullet.text))
+      .map((bullet) => ({ itemId: bullet.id, field: "text", text: "Built Power BI reporting for clients", inferred: true, reason: bullet.text }));
     return {
-      proposals: input.items.edit.filter(older).flatMap((role) => [
-        { itemId: role.id, field: "description", text: firstWords(role.description, 6), inferred: false },
-        ...role.bullets.map((bullet) => ({ itemId: bullet.id, field: "text", text: firstWords(bullet.text, 6), inferred: false })),
-      ].filter((proposal) => proposal.text)),
+      proposals: [...guessed, ...input.items.edit.filter(older).flatMap((role) => [
+        { itemId: role.id, field: "description", text: firstWords(role.description, 6), inferred: false, reason: null },
+        ...role.bullets.map((bullet) => ({ itemId: bullet.id, field: "text", text: firstWords(bullet.text, 6), inferred: false, reason: null })),
+      ].filter((proposal) => proposal.text))],
     };
   };
   return {

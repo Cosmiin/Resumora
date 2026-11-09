@@ -149,6 +149,17 @@ describe("POST /v1/tailored/:id/cover-letter", () => {
     expect(flags.map((flag) => flag.rule)).toContain("number");
   });
 
+  it("checks only numbers in a German letter, where every noun is capitalised", async () => {
+    const { id } = await tailored({ ...job,
+      summary: "Wir suchen eine Fachkraft für die Gehaltsabrechnung, die mit unseren Kunden und dem Team zusammenarbeitet.",
+      responsibilities: ["Sie betreuen die monatliche Abrechnung und die Kommunikation mit den Kunden."] });
+    expect(docs.cvs.get(id)!.language).toBe("de");
+    letters = [`${SAMPLE}\n\nIch freue mich auf die Zusammenarbeit mit Ihrem Team und Ihren Kunden.`];
+    const { flags } = await (await write(id)).json() as { flags: unknown[] };
+    expect(flags).toEqual([]);
+    expect(writerRequests()).toHaveLength(1);
+  });
+
   it("keeps the retried letter when the retry fixes the flag", async () => {
     const { id } = await tailored();
     letters = [SAMPLE.replace("40 staff", "400 staff"), SAMPLE];

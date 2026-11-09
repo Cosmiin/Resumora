@@ -98,6 +98,7 @@ describe("job questions", () => {
     expect(model.logged[0]).toMatchObject({ task: "tailor_questions", userId: "user-a" });
     const sent = JSON.stringify(model.requests[0]);
     expect(sent).toContain("Kubernetes");
+    expect(sent).toContain("ask for it instead of guessing");
     expect(sent).toContain("experience");
     expect(await questions(runId, "skills")).toHaveLength(5);
     expect(await questions(runId, "summary")).toHaveLength(3);

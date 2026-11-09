@@ -65,6 +65,8 @@ export const tailorEn = {
 
   "tailor.review.title": "Review {section}",
   "tailor.review.none": "Nothing to change here. Your CV already fits.",
+  "tailor.review.removedOne": "We left out 1 claim your CV doesn't back up.",
+  "tailor.review.removedMany": "We left out {n} claims your CV doesn't back up.",
   "tailor.review.keep": "Keep",
   "tailor.review.revert": "Revert",
   "tailor.review.keepNamed": "Keep {text}",

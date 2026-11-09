@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  newId,
   type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
@@ -12,11 +11,11 @@ import { steeringText } from "./steering.ts";
 import { stripHeader } from "./strip-header.ts";
 
 type Item = { fields: Record<string, string>; roleId: string | null };
+/**
+ * Every proposal carries a reason: where the CV shows a guess or a new skill, null otherwise.
+ * No `default`: strict structured output rejects it.
+ */
 const ModelProposalsSchema = z.object({
-  proposals: z.array(z.object({ itemId: z.string(), field: z.string(), text: z.string(), inferred: z.boolean() })),
-});
-/** Skills also return a reason (null except for a suggested new skill). No `default`: strict structured output rejects it. */
-const SkillProposalsSchema = z.object({
   proposals: z.array(z.object({
     itemId: z.string(), field: z.string(), text: z.string(), inferred: z.boolean(), reason: z.string().nullable(),
   })),
@@ -79,43 +78,15 @@ export function texts(value: unknown): string[] {
   return [];
 }
 
-/** What the flagged item is, in words: "the bullet in Engineer at Acme", "the English level", "the summary". */
-function itemName(cv: CvContent, section: TailorSection, p: Proposal): string {
-  const at = (role: CvContent["experience"][number]) => [role.title, role.company].filter((part) => part.trim()).join(" at ");
-  if (section === "experience") {
-    const role = cv.experience.find((r) => r.id === p.itemId || r.bullets.some((b) => b.id === p.itemId));
-    if (!role) return "item";
-    if (role.id !== p.itemId) return `bullet in ${at(role)}`;
-    return `${p.field === "description" ? "description" : p.field} of ${at(role)}`;
-  }
-  if (section === "skills") {
-    const skill = [...cv.technicalSkills, ...cv.professionalSkills].find((s) => s.id === p.itemId);
-    return skill ? `skill "${skill.name}"` : "new skill";
-  }
-  if (section === "summary") return "summary";
-  if (section === "achievements") return `achievement "${cv.awards.find((a) => a.id === p.itemId)?.name ?? ""}"`;
-  const language = cv.languages.find((l) => l.id === p.itemId);
-  return language ? (p.field === "level" ? `${language.name} level` : `language "${language.name}"`) : "language";
-}
-
-const plain = (text: string) => text.trim().toLowerCase().replace(/[\s.]+/g, " ").trim();
-
-/** The flag question: names the item, quotes the proposal, and adds each check's detail only when it isn't the proposal again. */
-function flagText(cv: CvContent, section: TailorSection, p: Proposal): string {
-  const details = [...new Set(p.flags.flatMap((flag) => {
-    if (plain(flag.detail) === plain(p.text) || !flag.detail.trim()) return [];
-    if (flag.rule === "tool") return [`Not in your CV, notes or answers: ${flag.detail}.`];
-    if (flag.rule === "achievement") return [`Not supported by your CV: "${flag.detail}".`];
-    return [/[.!?]$/.test(flag.detail) ? flag.detail : `${flag.detail}.`];
-  }))];
-  return [`Please check the ${itemName(cv, section, p)}: "${p.text}".`, ...details].join(" ");
-}
-
-/** Proposes one section, checks each proposal, retries flagged ones once, and stores the result on the run. */
+/**
+ * Proposes one section, checks each proposal, retries flagged ones once, and stores the result on the run.
+ * The truth rule: a proposal still flagged after the retry is dropped (its item keeps the Base wording) and
+ * only counted in `removed`; the person is never asked to accept it. `questions` stays empty.
+ */
 export async function runSectionPass(
   deps: { model: ModelDeps; tailor: TailorRepo; log?: LogFn },
   input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection; roleId?: string },
-): Promise<{ proposals: Proposal[]; questions: TailorQuestion[] }> {
+): Promise<{ proposals: Proposal[]; questions: TailorQuestion[]; removed: number }> {
   const { section, run } = input;
   if (section === "layout") throw new ApiError(400, "invalid_content", "The layout step has its own route.");
   // Like accept: only the current step of an open run, so a stale tab can't reopen or rewind it.
@@ -137,9 +108,7 @@ export async function runSectionPass(
     callModel(deps.model, { userId: input.userId, task, tier, schema, system, user, maxOutputTokens: 12000 });
 
   async function propose(retry: Proposal[]): Promise<Proposal[]> {
-    const schema = section === "skills" ? SkillProposalsSchema : ModelProposalsSchema;
-    const reply: { proposals: (z.infer<typeof ModelProposalsSchema>["proposals"][number] & { reason?: string | null })[] } =
-      await call("tailor_section", "strong", schema, sectionSystemPrompt(contentSection), sectionUserMessage({
+    const reply = await call("tailor_section", "strong", ModelProposalsSchema, sectionSystemPrompt(contentSection), sectionUserMessage({
       section, items: sectionData(cv, section, run.jobId, roleId), job: input.job, language: steering!.language,
       steering: steeringText(steering!.steering, cv), answers, retry,
     }));
@@ -150,7 +119,8 @@ export async function runSectionPass(
     for (const { reason, ...p } of reply.proposals) {
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
-      const why = p.itemId === "new-skill" && reason?.trim() ? { reason: reason.trim() } : {};
+      // A guess or a new skill keeps the reason naming its basis; a plain rewording has none.
+      const why = (p.inferred || p.itemId === "new-skill") && reason?.trim() ? { reason: reason.trim() } : {};
       if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why });
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
@@ -171,9 +141,12 @@ export async function runSectionPass(
   }
 
   let proposals: Proposal[];
+  let flagged = new Set<string>();
+  let firstFlagged = 0;
   try {
     proposals = await check(await propose([]));
-    const flagged = new Set(proposals.filter((p) => p.flags.length > 0).map((p) => p.itemId));
+    firstFlagged = proposals.filter((p) => p.flags.length > 0).length;
+    flagged = new Set(proposals.filter((p) => p.flags.length > 0).map((p) => p.itemId));
     if (flagged.size > 0) {
       const retried = await check((await propose(proposals.filter((p) => flagged.has(p.itemId)))).filter((p) => flagged.has(p.itemId)));
       // Retried items go back where the model first ranked them.
@@ -190,19 +163,14 @@ export async function runSectionPass(
     throw new ApiError(502, "ai_failed", `Couldn't tailor ${section}. Try again.`);
   }
 
-  const questions: TailorQuestion[] = proposals.filter((p) => p.flags.length > 0).map((p) => ({
-    id: newId(), section, roleId: items.get(p.itemId)!.roleId, kind: "flag",
-    text: flagText(cv, section, p),
-    options: ["Keep it", "Use original wording"], reason: p.flags.map((flag) => flag.rule).join(", "),
-    // Accept and the web find a proposal's flag question by this key (new skills share the id "new-skill").
-    // One role can have several flagged fields (title, company…), so the key names the field too.
-    itemId: `${p.itemId === "new-skill" ? `new-skill:${p.text}` : p.itemId}|${p.field}`,
-  }));
+  const kept = proposals.filter((p) => p.flags.length === 0);
+  // Every flagged claim that didn't come back clean from the retry, including ones the retry left out.
+  const removed = Math.max(0, firstFlagged - kept.filter((p) => flagged.has(p.itemId)).length);
   await deps.tailor.updateRun(run.id, {
     status: "waiting_user", currentSection: section,
-    proposals: [...(run.proposals ?? []).filter((p) => !items.has(p.itemId)), ...proposals],
-    // A rerun replaces this section's (or this role's) earlier flag questions.
-    questions: [...(run.questions ?? []).filter((q) => q.kind !== "flag" || q.section !== section || (roleId !== null && q.roleId !== roleId)), ...questions],
+    proposals: [...(run.proposals ?? []).filter((p) => !items.has(p.itemId)), ...kept],
+    // Flag questions from older runs of this section (or role) go: nothing asks to keep a flagged proposal now.
+    questions: (run.questions ?? []).filter((q) => q.kind !== "flag" || q.section !== section || (roleId !== null && q.roleId !== roleId)),
   });
-  return { proposals, questions };
+  return { proposals: kept, questions: [], removed };
 }

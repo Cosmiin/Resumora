@@ -82,7 +82,7 @@ const roleOf = async (runId: string, section: string) =>
   section === "experience" ? { roleId: (await memoryTailorRepo("user-a", scores, docs).getRun(runId))!.currentRoleId } : {};
 async function run(runId: string, section: string, ...items: ModelProposal[]) {
   // The real (strict) model always returns every field: skills proposals carry reason, null when unused.
-  replies.push({ proposals: section === "skills" ? items.map((item) => ({ reason: null, ...item })) : items }, { results: [] });
+  replies.push({ proposals: items.map((item) => ({ reason: null, ...item })) }, { results: [] });
   const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`, await roleOf(runId, section));
   expect(res.status).toBe(200);
 }
@@ -124,7 +124,7 @@ describe("re-tailor", () => {
     const runId = await start();
     await run(runId, "experience");
     expect((await accept(runId, "experience")).status).toBe(200);
-    const added = { itemId: "new-skill", field: "name", text: "Payroll", inferred: true };
+    const added = { itemId: "new-skill", field: "name", text: "Payroll", inferred: true, reason: "Shown in: Team Lead · Acme Payroll" };
     await run(runId, "skills", added);
     expect((await accept(runId, "skills", { inferred: [{ itemId: "new-skill:Payroll", keep: true }] })).status).toBe(200);
     expect(tailored().content.technicalSkills.map((s) => s.name)).toEqual(["Excel", "Payroll"]);

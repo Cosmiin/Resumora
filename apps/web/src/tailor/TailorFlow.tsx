@@ -18,7 +18,7 @@ type Phase =
   | { kind: "questions"; questions: TailorQuestion[]; index: number; answers: Answer[] }
   | { kind: "working" }
   | { kind: "flags"; proposals: Proposal[]; flags: TailorQuestion[]; index: number; confirmed: api.AcceptBody["flags"] }
-  | { kind: "review"; proposals: Proposal[]; flags: TailorQuestion[]; confirmed: api.AcceptBody["flags"]; busy: boolean }
+  | { kind: "review"; proposals: Proposal[]; flags: TailorQuestion[]; confirmed: api.AcceptBody["flags"]; busy: boolean; removed?: number }
   | { kind: "error"; message: string; retry(): void }
   | { kind: "deleted" };
 
@@ -88,10 +88,10 @@ export function TailorFlow() {
   async function work(at: TailorSection) {
     setPhase({ kind: "working" });
     try {
-      const { proposals, questions } = await api.runSection(runRef.current!.id, at);
+      const { proposals, questions, removed } = await api.runSection(runRef.current!.id, at);
       const flags = questions.filter((question) => question.kind === "flag");
       setPhase(flags.length > 0 ? { kind: "flags", proposals, flags, index: 0, confirmed: [] }
-        : { kind: "review", proposals, flags: [], confirmed: [], busy: false });
+        : { kind: "review", proposals, flags: [], confirmed: [], busy: false, removed });
     } catch (cause) { fail(cause, at, () => void work(at)); }
   }
   async function accept(at: TailorSection, body: api.AcceptBody) {
@@ -172,7 +172,7 @@ export function TailorFlow() {
     }} />;
   } else {
     body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={phase.flags}
-      confirmed={phase.confirmed} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} cv={cv} />;
+      confirmed={phase.confirmed} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} cv={cv} removed={phase.removed} />;
   }
   const wide = (phase.kind === "questions" && !!roleFor(phase.questions[phase.index]!))
     || (phase.kind === "flags" && !!roleFor(phase.flags[phase.index]!));
