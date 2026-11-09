@@ -30,7 +30,7 @@ export function remember(jobId: string, runId: string | null) {
     else localStorage.removeItem(storageKey(jobId));
   } catch { /* storage is a convenience: the start route returns the job's open run anyway */ }
 }
-function remembered(jobId: string): string | null {
+export function remembered(jobId: string): string | null {
   try { return localStorage.getItem(storageKey(jobId)); } catch { return null; }
 }
 

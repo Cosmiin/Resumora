@@ -13,6 +13,8 @@ import { JobEditForm } from "./JobEditForm.tsx";
 import { JobScoreCard } from "./JobScoreCard.tsx";
 import { JobThoughts } from "./JobThoughts.tsx";
 import { TailorGate } from "./TailorGate.tsx";
+import { getRun } from "../tailor/tailor-api.ts";
+import { remembered } from "../tailor/TailorFlow.tsx";
 
 export function JobPage() {
   const userId = useAuth().session?.user.id ?? "anonymous";
@@ -46,6 +48,15 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const score = useQuery({
     queryKey: ["job-score", userId, id], queryFn: () => getJobScore(id), gcTime: 0,
     enabled: query.data?.status === "ready",
+  });
+  // An unfinished tailoring run this browser remembers (the flow forgets it when the run is done).
+  const openRun = useQuery({
+    queryKey: ["job-tailor-run", userId, id], gcTime: 0,
+    queryFn: async () => {
+      const stored = remembered(id);
+      const run = stored ? await getRun(stored).catch(() => null) : null;
+      return run && run.status !== "done" && run.currentSection ? run : null;
+    },
   });
   const [scoring, setScoring] = useState<"idle" | "busy" | "failed">("idle");
   /** Try again: a ready job with no Score 1 (saved before scoring, or scoring failed once) gets one computed now. */
@@ -133,7 +144,22 @@ function JobView({ id, userId }: { id: string; userId: string }) {
       <button type="button" className="secondary" disabled={deleting} onClick={() => { setConfirmDelete(false); setDeleteError(null); }}>{t("job.deleteCancel")}</button>
     </div> : <button type="button" className="secondary danger" onClick={() => setConfirmDelete(true)}>{t("job.delete")}</button>}
   </div>;
-  const tailor = job && !editing && <div className="tailor">
+  const jobPath = `/jobs/${encodeURIComponent(id)}`;
+  const run = openRun.data;
+  const tailored = score.data?.tailored;
+  const tailor = !job || editing ? null : run ? <div className="tailor">
+    <div><strong>{t("job.tailor.inProgress")}</strong>
+      <span>{t("job.tailor.step", { n: run.sections.indexOf(run.currentSection!) + 1, total: run.sections.length,
+        section: t(`tailor.section.${run.currentSection!}`) })}</span></div>
+    <Link className="tailor-link" to={`${jobPath}/tailor`}>{t("job.tailor.continue")}</Link>
+  </div> : tailored ? <div className="tailor">
+    <div><strong>{t("job.tailor.ready")}</strong>
+      {tailored.total !== null && <span>{t("job.tailor.lift", { base: score.data?.base?.total ?? "—", latest: tailored.total })}</span>}</div>
+    <div className="tailor-links">
+      <Link className="tailor-link" to={`${jobPath}/cv`}>{t("job.tailor.open")}</Link>
+      <Link className="tailor-link secondary" to={`${jobPath}/cv?retailor=1`}>{t("job.tailor.again")}</Link>
+    </div>
+  </div> : <div className="tailor">
     <div><strong>{t("job.tailor.title")}</strong><span>{t("job.tailor.text")}</span>
       {tailorReason && <p role="status" className="jobs-note">{tailorReason}</p>}</div>
     <button type="button" onClick={() => {

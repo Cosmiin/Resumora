@@ -29,11 +29,11 @@ const tailored: TailoredCv = {
 };
 const job = (over: Partial<Job>) => ({ id: "job-1", editedByUser: false, updatedAt: "2026-11-08T08:00:00Z", ...over }) as Job;
 
-function renderPage() {
+function renderPage(path = "/jobs/job-1/cv") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/jobs/job-1/cv"]}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/jobs/:id/cv" element={<TailoredCvPage />} />
           <Route path="/jobs/:id/tailor" element={<p>Tailor flow</p>} />
@@ -54,6 +54,11 @@ beforeEach(() => {
 });
 
 describe("re-tailor", () => {
+  it("opens with the dialog already open when reached through Tailor again (?retailor=1)", async () => {
+    renderPage("/jobs/job-1/cv?retailor=1");
+    expect(await screen.findByRole("dialog", { name: "Re-tailor sections" })).toBeInTheDocument();
+  });
+
   it("picks sections in the dialog and opens the tailoring flow on the new run", async () => {
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "Re-tailor…" }));
