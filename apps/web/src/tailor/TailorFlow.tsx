@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { TAILOR_SECTIONS, type Answer, type CvContent, type Proposal, type TailorQuestion, type TailorRun, type TailorSection, type Tone } from "@resumora/shared";
+import { TAILOR_SECTIONS, type Answer, type CvContent, type Proposal, type Steering, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
@@ -22,7 +22,6 @@ type Phase =
   | { kind: "error"; message: string; retry(): void }
   | { kind: "deleted" };
 
-const CONTENT_SECTIONS = TAILOR_SECTIONS.filter((section) => section !== "layout").length;
 const storageKey = (jobId: string) => `resumora.tailorRun.${jobId}`;
 export function remember(jobId: string, runId: string | null) {
   try {
@@ -110,7 +109,7 @@ export function TailorFlow() {
       }
     }
   }
-  async function start(steering: { tone: Tone; instruction: string }) {
+  async function start(steering: Steering) {
     setPhase({ kind: "steer", busy: true });
     try {
       const { run: created } = await api.startTailoring(jobId, steering);
@@ -139,7 +138,9 @@ export function TailorFlow() {
 
   let body: React.ReactNode;
   if (phase.kind === "loading") body = <p role="status">{t("tailor.loading")}</p>;
-  else if (phase.kind === "steer") body = <SteeringStep sections={CONTENT_SECTIONS} busy={phase.busy} onStart={(s) => void start(s)} />;
+  else if (phase.kind === "steer") {
+    body = <SteeringStep jobId={jobId} roles={cv?.experience ?? []} busy={phase.busy} onStart={(s) => void start(s)} />;
+  }
   else if (phase.kind === "deleted") {
     body = <section className="tailor-card" role="alert"><h2>{t("tailor.error.deleted")}</h2>
       <Link to="/jobs">{t("tailor.error.toJobs")}</Link></section>;

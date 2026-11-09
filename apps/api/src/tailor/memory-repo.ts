@@ -1,5 +1,5 @@
 import type { CvContent, MatchScore, Steering, TailorRun, TailoredCv } from "@resumora/shared";
-import type { ScoreTarget, TailorRepo } from "./repo.ts";
+import type { ScoreTarget, TailorRepo, ToneExamples } from "./repo.ts";
 import { withColumns } from "./steering.ts";
 
 export type MemoryTailorDocs = {
@@ -7,8 +7,10 @@ export type MemoryTailorDocs = {
   runs: Map<string, TailorRun>;
   /** tailored_cvs.steering, by tailored CV id. */
   steering: Map<string, Steering>;
+  /** jobs.tone_examples, by job id. */
+  toneExamples: Map<string, ToneExamples>;
 };
-export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map(), steering: new Map() });
+export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map(), steering: new Map(), toneExamples: new Map() });
 
 export type MemoryTailorStore = Map<string, {
   userId: string;
@@ -110,6 +112,13 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       if (!run || run.userId !== userId) return null;
       Object.assign(run, structuredClone(changes), { updatedAt: new Date().toISOString() });
       return structuredClone(run);
+    },
+    async getToneExamples(jobId) {
+      const cached = docs.toneExamples.get(jobId);
+      return cached ? structuredClone(cached) : null;
+    },
+    async saveToneExamples(jobId, examples) {
+      docs.toneExamples.set(jobId, structuredClone(examples));
     },
     async saveScore(jobId, target, tailoredCvId, score) {
       const key = JSON.stringify([userId, jobId, target, tailoredCvId]);

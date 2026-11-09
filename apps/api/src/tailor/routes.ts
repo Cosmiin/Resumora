@@ -12,6 +12,7 @@ import { askQuestions, MAX_RUN_QUESTIONS, saveAnswers } from "./questions.ts";
 import type { TailorRepo } from "./repo.ts";
 import { runSectionPass } from "./section-pass.ts";
 import { jobNotFound, startTailoring } from "./start.ts";
+import { toneExamples } from "./tone-examples.ts";
 
 const AnswersBodySchema = z.object({ answers: z.array(AnswerSchema).min(1).max(MAX_RUN_QUESTIONS) });
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
@@ -37,6 +38,15 @@ export function tailorRoutes(deps: {
       id, { ...steering, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) },
     );
     return c.json(result);
+  });
+
+  /** The steering screen's tone cards: one of the person's bullets in each tone (cached on the job). */
+  app.post("/jobs/:id/tone-examples", async (c) => {
+    const id = c.req.param("id");
+    const job = isUuid(id) ? await deps.jobsFor(c).get(id) : null;
+    if (!job) throw jobNotFound();
+    return c.json(await toneExamples({ model: deps.modelFor(c), tailor: deps.tailorFor(c) },
+      { userId: c.get("user").id, jobId: id, cv: (await deps.cvFor(c).get()).content }));
   });
 
   /** The run with its job; a missing run or a deleted job is 404 job_not_found. */

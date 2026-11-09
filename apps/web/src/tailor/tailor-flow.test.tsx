@@ -6,7 +6,7 @@ import { TAILOR_SECTIONS, type MatchScore, type TailorQuestion, type TailorRun }
 
 vi.mock("./tailor-api.ts", () => ({
   startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(),
-  runSection: vi.fn(), acceptSection: vi.fn(), getScores: vi.fn(),
+  runSection: vi.fn(), acceptSection: vi.fn(), getScores: vi.fn(), getToneExamples: vi.fn(),
 }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
@@ -14,7 +14,7 @@ import { emptyCv } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { useVoice } from "../cv/enrich/useVoice.ts";
 import { ApiClientError } from "../lib/api.ts";
-import { acceptSection, askQuestions, getRun, getScores, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
+import { acceptSection, askQuestions, getRun, getScores, getToneExamples, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
 import { TailorFlow } from "./TailorFlow.tsx";
 
 const at = "2026-11-08T10:00:00Z";
@@ -50,6 +50,7 @@ beforeEach(() => {
   vi.mocked(askQuestions).mockResolvedValue([]);
   vi.mocked(runSection).mockResolvedValue({ proposals: [], questions: [] });
   vi.mocked(getCv).mockRejectedValue(new Error("offline"));
+  vi.mocked(getToneExamples).mockRejectedValue(new Error("offline"));
 });
 
 describe("tailoring flow", () => {
@@ -84,10 +85,11 @@ describe("tailoring flow", () => {
       .mockResolvedValueOnce({ run: makeRun({ status: "done", currentSection: null }), score: score(78) });
     const router = renderFlow();
 
-    await user.click(await screen.findByRole("button", { name: "Confident" }));
-    await user.type(screen.getByRole("textbox", { name: "Anything to focus on?" }), "Lead with payroll");
-    await user.click(screen.getByRole("button", { name: "Start · 5 sections" }));
-    expect(startTailoring).toHaveBeenCalledWith("one", { tone: "confident", instruction: "Lead with payroll" });
+    await user.click(await screen.findByRole("button", { name: /^Confident/ }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.type(screen.getByRole("textbox"), "Lead with payroll");
+    await user.click(screen.getByRole("button", { name: "Start tailoring" }));
+    expect(startTailoring).toHaveBeenCalledWith("one", { tone: "confident", draws: [], fit: null, focusRoleIds: [], instruction: "Lead with payroll" });
 
     await user.click(await screen.findByRole("button", { name: "Yes, daily" }));
     expect(sendAnswers).toHaveBeenCalledWith("run1", [{ questionId: "q1", value: "Yes, daily", via: "option" }]);

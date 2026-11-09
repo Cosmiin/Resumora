@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import {
   MatchScoreSchema, SteeringSchema, TailoredCvSchema, TailorLanguageSchema, TailorRunSchema, ToneSchema, type MatchScore, type TailorRun,
@@ -7,6 +8,8 @@ import { ApiError } from "../errors.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
 import type { TailorRepo } from "./repo.ts";
 import { withColumns } from "./steering.ts";
+
+const ToneExamplesSchema = z.object({ bullet: z.string(), examples: z.record(ToneSchema, z.string()) });
 
 /** Queries as the signed-in user so row-level security applies. */
 export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo {
@@ -171,6 +174,16 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const { data, error } = await db.from("tailor_runs").update(columns).eq("id", id).select(RUN_COLUMNS).maybeSingle();
       if (error) throw new Error(`tailor_runs update failed: ${error.message}`);
       return data ? toRun(data) : null;
+    },
+    async getToneExamples(jobId) {
+      const { data, error } = await db.from("jobs").select("tone_examples").eq("id", jobId).maybeSingle();
+      if (error) throw new Error(`jobs select failed: ${error.message}`);
+      const parsed = ToneExamplesSchema.safeParse(data?.tone_examples);
+      return parsed.success ? parsed.data : null;
+    },
+    async saveToneExamples(jobId, examples) {
+      const { error } = await db.from("jobs").update({ tone_examples: examples }).eq("id", jobId);
+      if (error) throw new Error(`jobs update failed: ${error.message}`);
     },
   };
 }

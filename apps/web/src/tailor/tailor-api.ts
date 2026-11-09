@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  MatchScoreSchema, ProposalSchema, TailorLanguageSchema, TailorQuestionSchema, TailorRunSchema,
-  type Answer, type MatchScore, type Proposal, type TailorQuestion, type TailorRun, type TailorSection, type Tone,
+  MatchScoreSchema, ProposalSchema, TailorLanguageSchema, TailorQuestionSchema, TailorRunSchema, ToneSchema,
+  type Answer, type MatchScore, type Proposal, type Steering, type TailorQuestion, type TailorRun, type TailorSection, type Tone,
 } from "@resumora/shared";
 import { apiFetch } from "../lib/api.ts";
 
@@ -13,7 +13,7 @@ export type AcceptBody = {
   flags: { questionId: string; confirmed: boolean }[];
 };
 
-export function startTailoring(jobId: string, steering: { tone: Tone; instruction: string }): Promise<{ run: TailorRun }> {
+export function startTailoring(jobId: string, steering: Steering): Promise<{ run: TailorRun }> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(jobId)}/tailor`, {
     method: "POST", json: steering,
     schema: z.object({ run: TailorRunSchema, tailoredCvId: z.string(), language: TailorLanguageSchema }),
@@ -51,5 +51,13 @@ export function acceptSection(id: string, section: TailorSection, body: AcceptBo
 export function getScores(jobId: string): Promise<{ base: MatchScore | null; tailored: MatchScore | null }> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(jobId)}/score`, {
     schema: z.object({ base: MatchScoreSchema.nullable(), tailored: MatchScoreSchema.nullable() }),
+  });
+}
+
+/** One of the person's own bullets in each tone, for the tone cards; examples is null when the CV has no bullet. */
+export function getToneExamples(jobId: string): Promise<{ bullet: string | null; examples: Record<Tone, string> | null }> {
+  return apiFetch(`/v1/jobs/${encodeURIComponent(jobId)}/tone-examples`, {
+    method: "POST", json: {},
+    schema: z.object({ bullet: z.string().nullable(), examples: z.record(ToneSchema, z.string()).nullable() }),
   });
 }

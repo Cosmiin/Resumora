@@ -56,6 +56,9 @@ export interface TailorRepo {
   getRun(id: string): Promise<TailorRun | null>;
   /** Replaces the given fields; null when the run is gone. */
   updateRun(id: string, changes: RunChanges): Promise<TailorRun | null>;
+  /** The job's cached tone examples (jobs.tone_examples); null when none. */
+  getToneExamples(jobId: string): Promise<ToneExamples | null>;
+  saveToneExamples(jobId: string, examples: ToneExamples): Promise<void>;
 }
 
 export type Review = Record<string, unknown>;
@@ -68,3 +71,6 @@ export type TailoredCvSummary =Pick<TailoredCv, "id" | "language" | "translatedF
 export type StoredTailoredCv = { id: string; jobId: string; content: CvContent; review: Review | null; version: number };
 
 export type RunChanges = Partial<Pick<TailorRun, "questions" | "answers" | "proposals" | "status" | "currentSection" | "errorCode">>;
+
+/** One of the person's bullets rewritten in each tone, for the steering screen. */
+export type ToneExamples = { bullet: string; examples: Record<Tone, string> };

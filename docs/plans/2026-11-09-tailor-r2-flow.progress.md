@@ -14,3 +14,11 @@ open: migration (owner): new columns only, no RLS change. Owner steps went into 
 session: tailor-r2 Part A · builder: claude
 commit: see git log (base 58aac53) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 43% → (next block)
 open: rulings — `repo.ts`, `questions.ts`, `section-pass.ts` edited for wiring; the section prompt now sends one steering block instead of separate tone/instruction fields.
+
+## Task A4: Steering screens (SteerC1, SteerC2) — done
+session: tailor-r2 Part A · builder: claude
+commit: see git log (base 667b146) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 43% → 44%
+open: rulings — tone cache through two new TailorRepo methods; TailorFlow passes jobId and roles; `tailor-flow.test.tsx` and `cv/enrich/voice-look.test.tsx` updated to the new screens (the second one sits in session 7's folder: expect a tiny merge there).
+
+## Next (fresh session, per claude-build's 4-task rule)
+A5 Experience role by role → A6 truth rule → A7 Skills questions → A8 question screen → A9 going back. Then whole-branch review (Opus high), draft PR to `rebuild/tailor-r2-bugs`.
