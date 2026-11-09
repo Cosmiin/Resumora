@@ -11,6 +11,8 @@ type Props = {
   template: TemplateId;
   /** Opens the menu on arrival (the done screen's Export link). */
   startOpen?: boolean;
+  /** Opens the guided review of the AI guesses not checked yet (ExportWarn). */
+  onReview?(): void;
 };
 
 const CHOICES: { kind: ExportKind; format: ExportFormat; label: "export.cvPdf" | "export.cvDocx" | "export.letterPdf" | "export.letterDocx" }[] = [
@@ -21,7 +23,7 @@ const CHOICES: { kind: ExportKind; format: ExportFormat; label: "export.cvPdf" |
 ];
 
 /** Export ▾: warns about inferred items still unreviewed (export is allowed anyway), then downloads the file. */
-export function ExportMenu({ load, job, template, startOpen = false }: Props) {
+export function ExportMenu({ load, job, template, startOpen = false, onReview }: Props) {
   const [open, setOpen] = useState(false);
   const [row, setRow] = useState<TailoredCv | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "busy" | "loadError" | "error">("idle");
@@ -69,8 +71,10 @@ export function ExportMenu({ load, job, template, startOpen = false }: Props) {
             <>
               {unreviewed.length > 0 && (
                 <div role="note" className="export-warning">
-                  <p>{t("export.unreviewed", { count: unreviewed.length })}</p>
-                  <ul>{unreviewed.map((text, index) => <li key={index}>{text}</li>)}</ul>
+                  <p>{t(unreviewed.length === 1 ? "export.guessesOne" : "export.guessesMany", { count: unreviewed.length })}</p>
+                  {onReview && <button type="button" className="btn" onClick={() => { setOpen(false); onReview(); }}>
+                    {t(unreviewed.length === 1 ? "export.reviewOne" : "export.reviewMany", { count: unreviewed.length })}</button>}
+                  <p>{t("export.anyway")}</p>
                 </div>
               )}
               <div className="export-choices">

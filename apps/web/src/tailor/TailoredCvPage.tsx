@@ -15,6 +15,7 @@ import { getTailored, listTailored, retailor, saveTailored, setTemplate } from "
 import type { TemplateId } from "../cv/page/templates.ts";
 import { LanguageMenu, TailorToolbar, type TailoredTab } from "./TailorToolbar.tsx";
 import { ExportMenu } from "../export/ExportMenu.tsx";
+import { GuidedReview } from "./GuidedReview.tsx";
 import "../styles/tailor.css";
 
 type ItemReview = { kept?: boolean; inferred?: boolean; reviewed?: boolean };
@@ -65,6 +66,10 @@ export function TailoredCvPage() {
   const scores = useQuery({ queryKey: ["tailored-scores", userId, jobId], queryFn: () => getScores(jobId) });
   // The done screen's links: ?tab=letter opens the cover letter, ?export=1 the Export menu.
   const [tab, setTab] = useState<TailoredTab>(search.get("tab") === "letter" ? "letter" : "cv");
+  // GuideA: the guided review of the AI guesses (?review=1 from the done screen, or the Export menu's Review).
+  const [guiding, setGuiding] = useState(search.get("review") === "1");
+  // Bumped by the guided review's Export: remounts the menu open.
+  const [exportOpen, setExportOpen] = useState(0);
   // Letters written or edited since each copy's row was loaded (switching tabs doesn't refetch the row).
   const [letters, setLetters] = useState<Record<string, LetterOverride>>({});
   const cv = doc.data ?? null;
@@ -140,7 +145,8 @@ export function TailoredCvPage() {
         template={template} onTemplate={(next) => pickTemplate(cv.id, cv.template, next)}>
         <LanguageMenu key={cv.id} jobId={jobId} current={{ id: cv.id, language: cv.language }} />
         <button type="button" className="secondary" onClick={openDialog}>{t("tailored.retailor")}</button>
-        <ExportMenu load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template} startOpen={search.get("export") === "1"} />
+        <ExportMenu key={exportOpen} load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template}
+          startOpen={exportOpen > 0 || search.get("export") === "1"} onReview={() => { setTab("cv"); setGuiding(true); }} />
       </TailorToolbar>
       {templateError && <p role="alert" className="form-error">{t("tailored.templateError")}</p>}
       {jobChanged && (
@@ -153,6 +159,12 @@ export function TailoredCvPage() {
         onStart={(sections) => void startRetailor(sections)} onClose={() => setDialog(false)} />}
     </>
   );
+  // The guided review saved its own versions: reload the row, and the editor starts again from it.
+  const closeGuide = (exporting: boolean) => {
+    setGuiding(false);
+    if (exporting) setExportOpen((n) => n + 1);
+    void doc.refetch();
+  };
   const sectionAction = (key: SectionKey) => {
     const section = TAILOR_SECTION_OF[key];
     if (!section) return null;
@@ -165,7 +177,7 @@ export function TailoredCvPage() {
 
   return (
     <Editor
-      key={cv.id}
+      key={`${cv.id}:${cv.version}`}
       initial={asResponse(cv)}
       source={source}
       mode="tailored"
@@ -176,7 +188,8 @@ export function TailoredCvPage() {
         template,
         toolbar,
         sectionAction,
-        replacePage: tab === "letter" ? <CoverLetterTab key={cv.id} cv={cv} job={job.data}
+        replacePage: guiding ? <GuidedReview key={cv.id} load={() => getTailored(cv.id)} template={template}
+          onClose={() => closeGuide(false)} onExport={() => closeGuide(true)} /> : tab === "letter" ? <CoverLetterTab key={cv.id} cv={cv} job={job.data}
           letter={pickLetter(cv, letters[cv.id])}
           onLetter={(letter) => setLetters((all) => ({ ...all, [cv.id]: { letter, loadedAt: cv.updatedAt } }))} /> : undefined,
       }}

@@ -121,3 +121,68 @@ describe("tailored CV read and save", () => {
     expect(docs.cvs.get(id)).toMatchObject({ version: 1 });
   });
 });
+
+describe("PATCH /v1/tailored/:id/review (guided review)", () => {
+  const role = { id: "00000000-0000-4000-8000-0000000000a1", company: "Beta", title: "Payroll Lead", location: "", startDate: "2020-01",
+    endDate: "", current: true, description: "", bullets: [{ id: "00000000-0000-4000-8000-0000000000b1", text: "Moved payroll" }], notes: [] };
+  const bullet = role.bullets[0]!.id;
+  const guess = (text: string) => ({ kept: true, inferred: true, reviewed: false, text, reason: "From your notes." });
+  async function seeded() {
+    const { id } = await tailoredCv();
+    const row = docs.cvs.get(id)!;
+    row.baseSnapshot = { ...base, basics: { ...base.basics, summary: "Payroll lead." }, experience: [role] };
+    row.content = { ...base, basics: { ...base.basics, summary: "Payroll lead who works abroad." },
+      experience: [{ ...role, bullets: [{ id: bullet, text: "Led the payroll migration" }] }],
+      technicalSkills: [{ id: "00000000-0000-4000-8000-0000000000c1", name: "BPMN" }] };
+    row.review = { summary: { "summary#0": guess("who works abroad") }, experience: { [bullet]: guess("Led the payroll migration") },
+      skills: { "new-skill:BPMN": guess("BPMN") } };
+    return { id, version: row.version };
+  }
+  const review = (id: string, body: unknown, token = "token-a") =>
+    app.request(`/v1/tailored/${id}/review`, { method: "PATCH", headers: auth(token), body: JSON.stringify(body) });
+  const row = async (res: Response) => TailoredCvSchema.parse(await res.json());
+
+  it("Remove restores the Base wording and marks the item reviewed, keeping its reason", async () => {
+    const { id, version } = await seeded();
+    const res = await review(id, { section: "experience", key: bullet, action: "remove", version });
+    expect(res.status).toBe(200);
+    const cv = await row(res);
+    expect(cv.content.experience[0]!.bullets[0]!.text).toBe("Moved payroll");
+    expect(cv.review!.experience).toEqual({ [bullet]: { kept: false, inferred: true, reviewed: true, text: "Led the payroll migration", reason: "From your notes." } });
+    expect(cv.version).toBe(version + 1);
+  });
+
+  it("Remove cuts a guessed summary phrase and drops a new skill", async () => {
+    const { id, version } = await seeded();
+    const first = await row(await review(id, { section: "summary", key: "summary#0", action: "remove", version }));
+    expect(first.content.basics.summary).toBe("Payroll lead.");
+    const second = await row(await review(id, { section: "skills", key: "new-skill:BPMN", action: "remove", version: first.version }));
+    expect(second.content.technicalSkills).toEqual([]);
+    expect(second.review!.skills).toMatchObject({ "new-skill:BPMN": { kept: false, reviewed: true } });
+  });
+
+  it("Edit saves the typed text and marks it reviewed; Keep only marks it reviewed", async () => {
+    const { id, version } = await seeded();
+    const edited = await row(await review(id, { section: "experience", key: bullet, action: "edit", text: "Led the payroll move", version }));
+    expect(edited.content.experience[0]!.bullets[0]!.text).toBe("Led the payroll move");
+    expect(edited.review!.experience).toMatchObject({ [bullet]: { kept: true, reviewed: true, text: "Led the payroll move" } });
+    const summary = await row(await review(id, { section: "summary", key: "summary#0", action: "edit", text: "who led teams abroad", version: edited.version }));
+    expect(summary.content.basics.summary).toBe("Payroll lead who led teams abroad.");
+    const kept = await row(await review(id, { section: "skills", key: "new-skill:BPMN", action: "keep", version: summary.version }));
+    expect(kept.content.technicalSkills.map((s) => s.name)).toEqual(["BPMN"]);
+    expect(kept.review!.skills).toMatchObject({ "new-skill:BPMN": { kept: true, reviewed: true, text: "BPMN" } });
+  });
+
+  it("a stale version is 409 version_conflict and changes nothing; an unknown item is 404; another user's CV is 404", async () => {
+    const { id, version } = await seeded();
+    await expectError(await review(id, { section: "experience", key: bullet, action: "remove", version: version + 1 }), 409, "version_conflict");
+    expect(docs.cvs.get(id)!.content.experience[0]!.bullets[0]!.text).toBe("Led the payroll migration");
+    await expectError(await review(id, { section: "experience", key: "nope", action: "keep", version }), 404, "not_found");
+    // Never the prototype: an inherited name is not an item.
+    await expectError(await review(id, { section: "__proto__", key: "toString", action: "keep", version }), 404, "not_found");
+    await expectError(await review(id, { section: "summary", key: "constructor", action: "keep", version }), 404, "not_found");
+    expect(typeof Object.prototype.toString).toBe("function");
+    await expectError(await review(id, { section: "experience", key: bullet, action: "keep", version }, "token-b"), 404, "not_found");
+    expect((await review(id, { section: "experience", key: bullet, action: "edit", version })).status).toBe(400);
+  });
+});

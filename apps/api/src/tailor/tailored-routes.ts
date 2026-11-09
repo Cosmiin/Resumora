@@ -11,6 +11,7 @@ import { TranslateBodySchema, translateTailored } from "./translate.ts";
 import { editCoverLetter, LetterBodySchema, LetterEditSchema, writeCoverLetter } from "./letter.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
 import { jobNotFound } from "./start.ts";
+import { reviewItem, ReviewItemBodySchema } from "./review-item.ts";
 
 const SaveBody = z.object({ content: CvContentSchema, expectedVersion: z.number().int().min(1) });
 const TemplateBody = z.object({ template: TailoredCvSchema.shape.template });
@@ -56,6 +57,15 @@ export function tailoredRoutes(deps: {
     const { template } = TemplateBody.parse(await c.req.json().catch(() => ({})));
     if (!(await deps.tailorFor(c).setTemplate(tailoredId, template))) throw notFound();
     return c.json({ template });
+  });
+
+  // The guided review's decision on one AI guess (GuideA).
+  app.patch("/tailored/:id/review", async (c) => {
+    const tailoredId = id(c);
+    const body = ReviewItemBodySchema.parse(await c.req.json().catch(() => ({})));
+    const cv = await reviewItem(deps.tailorFor(c), tailoredId, body);
+    if (!cv) throw notFound();
+    return c.json(cv);
   });
 
   app.post("/tailored/:id/retailor", async (c) => {

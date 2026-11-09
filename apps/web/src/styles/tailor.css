@@ -163,3 +163,12 @@
 .tailor-done-check { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; padding: var(--space-3); border-radius: var(--radius-md); background: var(--marigold-50); }
 .tailor-done-check p { margin: 0; }
 .tailor-done-next { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+/* GuideA: the guided review dims the page and glows the guess in place, with a small card beside it. */
+.guide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: var(--space-4); align-items: start; }
+.guide-page .cv-page :not(.cv-mark-focus, .cv-mark-focus *) { color: var(--text-muted); }
+.guide-page .cv-mark-focus { color: var(--text-strong); background: var(--marigold-50); box-shadow: 0 0 0 3px var(--marigold-500); border-radius: 3px; }
+.guide-card { position: sticky; top: var(--space-4); display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); background: var(--surface-card); box-shadow: var(--shadow-page); }
+.guide-card p { margin: 0; }
+.guide-count { font-size: var(--text-sm); color: var(--text-muted); }
+.guide-done { font-weight: 600; }
+@media (max-width: 760px) { .guide { grid-template-columns: 1fr; } .guide-card { position: sticky; bottom: var(--space-3); top: auto; } }
