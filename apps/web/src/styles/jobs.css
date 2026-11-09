@@ -121,6 +121,13 @@
 .job-page .tailor > div { flex: 1; min-width: min(200px, 100%); }
 .job-page .tailor strong { display: block; }
 .job-page .tailor > div > span { font-size: var(--text-xs); color: var(--text-muted); }
+/* Open tailored CV / Tailor again / Continue: links that look like the page's buttons. */
+.job-page .tailor > .tailor-links { flex: 0 0 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.job-page .tailor-link {
+  display: inline-block; border: 1px solid var(--pine-600); border-radius: 8px; padding: 0.55rem 1rem;
+  background: var(--pine-600); color: var(--white); text-decoration: none;
+}
+.job-page .tailor-link.secondary { background: var(--white); color: var(--pine-700); }
 .job-page .job-soon { font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: .05em; text-transform: uppercase; color: var(--marigold-800); background: var(--marigold-100); padding: 1px var(--space-2); border-radius: var(--radius-pill); }
 .job-page .tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--border-subtle); }
 .job-page .tabs button { font: inherit; font-size: var(--text-body); background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; box-shadow: none; padding: var(--space-2) var(--space-5); color: var(--text-muted); cursor: pointer; }

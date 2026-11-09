@@ -46,9 +46,34 @@
 .tailor-item-actions { display: flex; gap: var(--space-2); }
 .tailor-item-actions [aria-pressed="true"] { border-color: var(--border-selected); background: var(--surface-selected); }
 
+/* F3: the role a question is about, on the left; the question on the right. */
+.tailor-mode.is-wide { grid-template-columns: minmax(0, 1080px); }
+.tailor-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--space-5); align-items: start; }
+.tailor-role {
+  display: grid; gap: var(--space-3); padding: var(--space-6); border-radius: var(--radius-card);
+  background: var(--pine-50); border-inline-start: 4px solid var(--pine-400);
+}
+.tailor-role-head h3 { margin: 0; font-family: var(--font-display); font-size: var(--text-h3); font-weight: var(--weight-semibold); line-height: var(--leading-tight); }
+.tailor-role-head p { margin: var(--space-1) 0 0; color: var(--text-muted); }
+.tailor-role-text { margin: 0; line-height: var(--leading-snug); }
+.tailor-role-bullets { display: grid; gap: var(--space-2); margin: 0; padding-inline-start: var(--space-5); line-height: var(--leading-snug); }
+
+/* F4/F5: before → after, part labels, skill groups and reasons. */
+.tailor-item-text p { margin: 0; }
+.tailor-item-text { display: grid; gap: var(--space-1); }
+.tailor-item-label { font-size: var(--text-xs); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.tailor-before del { color: var(--text-muted); }
+.tailor-before .tailor-tag, .tailor-after .tailor-tag { display: inline-block; min-width: 3.5rem; }
+.tailor-reason { font-size: var(--text-sm); color: var(--text-muted); }
+.tailor-group { display: grid; gap: var(--space-2); }
+.tailor-group h3 { margin: 0; font-size: var(--text-eyebrow); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.tailor-explain { margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-sunken); line-height: var(--leading-snug); }
+
 @media (max-width: 760px) {
   .tailor-mode { padding: var(--space-6) var(--space-4) var(--space-10); }
   .tailor-card { padding: var(--space-5); }
+  .tailor-split { grid-template-columns: minmax(0, 1fr); }
+  .tailor-role { padding: var(--space-5); }
 }
 
 /* Tailored CV (editor) */

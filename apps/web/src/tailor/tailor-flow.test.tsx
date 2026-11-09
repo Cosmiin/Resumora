@@ -9,6 +9,9 @@ vi.mock("./tailor-api.ts", () => ({
   runSection: vi.fn(), acceptSection: vi.fn(), getScores: vi.fn(),
 }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
+vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
+import { emptyCv } from "@resumora/shared";
+import { getCv } from "../cv/cv-api.ts";
 import { useVoice } from "../cv/enrich/useVoice.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { acceptSection, askQuestions, getRun, getScores, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
@@ -46,9 +49,24 @@ beforeEach(() => {
   vi.mocked(sendAnswers).mockResolvedValue(undefined);
   vi.mocked(askQuestions).mockResolvedValue([]);
   vi.mocked(runSection).mockResolvedValue({ proposals: [], questions: [] });
+  vi.mocked(getCv).mockRejectedValue(new Error("offline"));
 });
 
 describe("tailoring flow", () => {
+  it("shows the role a question is about, from the Base CV (F3)", async () => {
+    const cv = { ...emptyCv("en"), experience: [{ id: "r1", company: "Emedi", title: "Business Analyst", location: "", startDate: "2021-03",
+      endDate: "", current: true, description: "Owns reporting.", bullets: [{ id: "b1", text: "Made weekly reports" }], notes: [] }] };
+    vi.mocked(getCv).mockResolvedValue({ content: cv, version: 1, updatedAt: at });
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun());
+    vi.mocked(askQuestions).mockResolvedValue([question("q1", { roleId: "r1" })]);
+    renderFlow();
+    const panel = await screen.findByRole("complementary", { name: "The role this is about" });
+    expect(panel).toHaveTextContent("Business Analyst");
+    expect(panel).toHaveTextContent("Made weekly reports");
+    expect(screen.getByRole("heading", { name: "Question q1?" })).toBeInTheDocument();
+  });
+
   it("steers, answers, reviews and accepts two sections, then opens the tailored CV", async () => {
     const user = userEvent.setup();
     vi.mocked(askQuestions).mockResolvedValueOnce([question("q1")]).mockResolvedValueOnce([]);

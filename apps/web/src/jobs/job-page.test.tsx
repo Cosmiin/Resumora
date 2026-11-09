@@ -9,6 +9,8 @@ const auth = vi.hoisted(() => ({ getSession: vi.fn(), onAuthStateChange: vi.fn()
 vi.mock("../lib/supabase.ts", () => ({ supabase: { auth } }));
 vi.mock("./jobs-api.ts", () => ({ getJob: vi.fn(), getJobScore: vi.fn(), scoreJob: vi.fn(), patchJob: vi.fn(), deleteJob: vi.fn(), listJobs: vi.fn(), createJob: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
+vi.mock("../tailor/tailor-api.ts", async (original) => ({ ...(await original<object>()), getRun: vi.fn() }));
+import { getRun } from "../tailor/tailor-api.ts";
 vi.mock("../cv/enrich/useRoleScores.ts", () => ({ useRoleScores: vi.fn() }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 import { getCv } from "../cv/cv-api.ts";
@@ -190,6 +192,45 @@ describe("job page", () => {
     expect(scoreJob).toHaveBeenCalledWith("one");
     expect(scoreJob).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("Your match score isn't available yet.")).toBeNull();
+  });
+
+  describe("reopening a tailored CV", () => {
+    const box = async () => (await screen.findByText(/Tailored CV ready|Tailoring in progress/)).closest(".tailor") as HTMLElement;
+
+    it("offers Open tailored CV and Tailor again once a tailored CV exists", async () => {
+      vi.mocked(getJobScore).mockResolvedValue({ base: { ...match, total: 62, band: "fair" }, tailored: { ...match, total: 78 } });
+      renderJob(); await ready();
+      const tailor = await box();
+      expect(tailor).toHaveTextContent("62 → 78");
+      expect(within(tailor).getByRole("link", { name: "Open tailored CV" })).toHaveAttribute("href", "/jobs/one/cv");
+      expect(within(tailor).getByRole("link", { name: "Tailor again" })).toHaveAttribute("href", "/jobs/one/cv?retailor=1");
+      expect(within(tailor).queryByRole("button", { name: "Tailor my CV" })).toBeNull();
+    });
+
+    it("offers Continue for an unfinished run, at the step it stopped", async () => {
+      localStorage.setItem("resumora.tailorRun.one", "run1");
+      vi.mocked(getRun).mockResolvedValue({ id: "run1", userId: "u1", jobId: "one", tailoredCvId: "cv1", kind: "tailor",
+        sections: ["experience", "skills", "summary", "achievements", "languages", "layout"], status: "waiting_user",
+        currentSection: "summary", questions: null, answers: null, proposals: null, errorCode: null,
+        createdAt: job.createdAt, updatedAt: job.updatedAt });
+      vi.mocked(getJobScore).mockResolvedValue({ base: match, tailored: match });
+      const { router } = renderJob(); await ready();
+      const tailor = await box();
+      expect(tailor).toHaveTextContent("Step 3 of 6 · Summary");
+      expect(getRun).toHaveBeenCalledWith("run1");
+      await userEvent.click(within(tailor).getByRole("link", { name: "Continue" }));
+      expect(router.state.location.pathname).toBe("/jobs/one/tailor");
+      localStorage.clear();
+    });
+
+    it("keeps the Tailor button when nothing was tailored, or the remembered run is finished or gone", async () => {
+      localStorage.setItem("resumora.tailorRun.one", "gone");
+      vi.mocked(getRun).mockRejectedValue(new ApiClientError(404, "not_found", "Gone"));
+      renderJob(); await ready();
+      expect(await screen.findByRole("button", { name: "Tailor my CV" })).toBeInTheDocument();
+      expect(screen.queryByText(/Tailoring in progress/)).toBeNull();
+      localStorage.clear();
+    });
   });
 
   it.each([false, true])("warns about tailored CV deletion only when one exists: %s", async (tailored) => {

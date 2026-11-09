@@ -17,6 +17,25 @@ function cvText(value: unknown): string[] {
   return [];
 }
 
+const FLUENT_NEED = /\b(fluent|advanced)\b/i;
+const FLUENT_LEVEL = /\b(c1|c2|native|fluent|advanced)\b/i;
+/** So a requirement naming a language the CV lacks ("Fluent English and German") is not met by English alone. */
+const COMMON_LANGUAGES = ["English", "Romanian", "French", "German", "Spanish", "Italian", "Portuguese", "Dutch", "Polish",
+  "Russian", "Ukrainian", "Hungarian", "Czech", "Slovak", "Bulgarian", "Greek", "Turkish", "Arabic", "Hebrew", "Chinese",
+  "Mandarin", "Cantonese", "Japanese", "Korean", "Hindi", "Swedish", "Norwegian", "Danish", "Finnish", "Serbian", "Croatian"];
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const names = (text: string, name: string) => new RegExp(`(^|[^\\p{L}])${escape(name)}([^\\p{L}]|$)`, "iu").test(text);
+/** Owner's rule: C1/C2, Native, Fluent or Advanced meets a fluent/advanced requirement for every language it names. */
+function fluentEvidence(requirement: string, languages: CvContent["languages"]): string | null {
+  if (!FLUENT_NEED.test(requirement)) return null;
+  const fluent = languages.filter((language) => language.name.trim() && FLUENT_LEVEL.test(language.level) && names(requirement, language.name.trim()));
+  if (fluent.length === 0) return null;
+  const covered = (name: string) => fluent.some((language) => language.name.trim().toLowerCase() === name.toLowerCase());
+  const others = [...COMMON_LANGUAGES, ...languages.map((language) => language.name.trim()).filter(Boolean)];
+  if (others.some((name) => names(requirement, name) && !covered(name))) return null;
+  return fluent.map((language) => `${language.name.trim()} | ${language.level.trim()}`).join(" | ");
+}
+
 export async function scoreMatch(
   deps: { model: ModelDeps },
   /** keptInferredTexts: texts of inferred items the user kept; an inferred label quoting one counts in full. */
@@ -24,7 +43,7 @@ export async function scoreMatch(
 ): Promise<MatchScore> {
   const { cv } = stripHeader(input.cv);
   try {
-    const { labels, cvSeniority } = await callModel(deps.model, {
+    const { labels: reply, cvSeniority } = await callModel(deps.model, {
       userId: input.userId,
       task: "tailor_score",
       tier: "cheap",
@@ -35,19 +54,22 @@ export async function scoreMatch(
     });
     const refs = new Set<string>();
     const requirements = new Set(input.job.requirements.map((_, index) => `r${index}`));
-    const keywordSources = [...input.job.requirements.map((requirement) => requirement.text), ...input.job.responsibilities];
-    for (const label of labels) {
+    const keywordSources = [...input.job.requirements.map((requirement) => requirement.text), ...input.job.responsibilities]
+      .map((source) => source.toLowerCase());
+    // A bad requirement ref fails the score; a bad or repeated keyword (e.g. one taken from the job title) is only dropped.
+    const labels = reply.filter((label) => {
       const key = label.ref.toLowerCase();
-      const term = label.ref.slice(2);
-      const valid = label.kind === "requirement"
-        ? requirements.has(label.ref)
-        : label.ref.startsWith("k:") && term.trim().length > 0
-          && keywordSources.some((source) => source.includes(term));
-      if (!valid || refs.has(key)) throw new Error("Invalid match label refs");
+      if (label.kind === "requirement") {
+        if (!requirements.has(label.ref) || refs.has(key)) throw new Error("Invalid requirement label refs");
+      } else {
+        const term = key.slice(2).trim();
+        if (!key.startsWith("k:") || !term || refs.has(key) || !keywordSources.some((source) => source.includes(term))) return false;
+      }
       refs.add(key);
-    }
+      return true;
+    });
     if (![...requirements].every((ref) => refs.has(ref))) throw new Error("Missing requirement labels");
-    if (keywordSources.some((source) => source.trim()) && !labels.some((label) => label.kind === "keyword")) {
+    if (keywordSources.some((source) => source.trim()) && !reply.some((label) => label.kind === "keyword")) {
       throw new Error("Missing keyword labels");
     }
 
@@ -55,9 +77,15 @@ export async function scoreMatch(
     // One requirement can need several CV values ("English and Romanian"): each " | " part must be quoted from the CV.
     const parts = (evidence: string) => evidence.split(" | ").map((part) => part.trim());
     const quoted = (evidence: string) => parts(evidence).every((part) => part && text.some((value) => value.includes(part)));
-    const checked = labels.map((label) => label.status === "missing" || !label.evidence?.trim() || !quoted(label.evidence)
-      ? { ...label, status: "missing" as const, evidence: null, inferred: false }
-      : label);
+    const checked = labels.map((label) => {
+      // Only language requirements: "Advanced English and Excel skills" also needs Excel, which the rule can't check.
+      const requirement = label.kind === "requirement" ? input.job.requirements[Number(label.ref.slice(1))]! : null;
+      const fluent = requirement?.category === "language" ? fluentEvidence(requirement.text, cv.languages) : null;
+      if (fluent) return { ...label, status: "met" as const, evidence: fluent, inferred: false };
+      return label.status === "missing" || !label.evidence?.trim() || !quoted(label.evidence)
+        ? { ...label, status: "missing" as const, evidence: null, inferred: false }
+        : label;
+    });
     const kept = new Set(input.keptInferred);
     for (const label of checked) {
       if (label.inferred && label.evidence && parts(label.evidence).some((part) => input.keptInferredTexts?.some((t) => t.includes(part)))) kept.add(label.ref);

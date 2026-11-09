@@ -67,6 +67,8 @@ export const ProposalSchema = z.object({
   text: z.string(),
   inferred: z.boolean(),
   flags: z.array(FlagSchema),
+  /** A suggested new skill's short reason: where the CV shows it. */
+  reason: z.string().optional(),
 });
 export type Proposal = z.infer<typeof ProposalSchema>;
 

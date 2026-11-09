@@ -76,7 +76,8 @@ export function TailoredCvPage() {
   const marks = useMemo(() => reviewMarks(cv?.review ?? null, cv?.content ?? null), [cv?.review, cv?.content]);
   const job = useQuery({ queryKey: ["job", userId, jobId], queryFn: () => getJob(jobId) });
   const navigate = useNavigate();
-  const [dialog, setDialog] = useState(false);
+  // "Tailor again" on the job page opens this page with the Re-tailor dialog already open.
+  const [dialog, setDialog] = useState(search.get("retailor") === "1");
   const [retailoring, setRetailoring] = useState<{ busy: boolean; error: boolean }>({ busy: false, error: false });
   // Templates picked since each copy's row was loaded; saves run one at a time, so the newest pick lands last.
   const [templates, setTemplates] = useState<Record<string, TemplateId>>({});

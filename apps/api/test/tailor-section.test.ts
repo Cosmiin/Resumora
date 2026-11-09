@@ -143,13 +143,25 @@ describe("section pass", () => {
   });
 
   it("accepts a tagged inferred new skill and rejects the layout section here", async () => {
-    replies = [proposals({ itemId: "new-skill", field: "name", text: "Kubernetes", inferred: true },
-      { itemId: "s1", field: "name", text: "Microsoft Excel", inferred: false })];
+    replies = [proposals({ itemId: "new-skill", field: "name", text: "Kubernetes", inferred: true, reason: null } as unknown as ModelProposal,
+      { itemId: "s1", field: "name", text: "Microsoft Excel", inferred: false, reason: null } as unknown as ModelProposal)];
     const body = await (await runSection("skills")).res.json() as { proposals: Proposal[] };
     expect(body.proposals.map((p) => [p.itemId, p.text, p.flags])).toEqual([["new-skill", "Kubernetes", []], ["s1", "Microsoft Excel", []]]);
     expect(JSON.stringify(model.requests[0])).toContain("Ran payroll for 40 staff");
     // The layout step has its own pass (Task 15) and runs only once it is the current section.
     expect((await runSection("layout", "experience")).res.status).toBe(409);
+  });
+
+  it("keeps a short reason on suggested new skills only, and asks for short skill names", async () => {
+    replies = [proposals({ itemId: "new-skill", field: "name", text: "Payroll", inferred: true, reason: "Shown in: Payroll Officer · Acme" } as ModelProposal,
+      { itemId: "s1", field: "name", text: "Microsoft Excel", inferred: false, reason: "Reworded to the job's words" } as ModelProposal)];
+    const body = await (await runSection("skills")).res.json() as { proposals: Proposal[] };
+    expect(body.proposals[0]).toMatchObject({ itemId: "new-skill", reason: "Shown in: Payroll Officer · Acme" });
+    expect(body.proposals[1]).not.toHaveProperty("reason");
+    const system = JSON.stringify(model.requests[0]);
+    expect(system).toContain("at most 3 words");
+    expect(system).toContain("reason");
+    expect(system).not.toContain("\"default\"");
   });
 
   it("refuses a section that isn't the current step, and a finished run, without calling the model", async () => {

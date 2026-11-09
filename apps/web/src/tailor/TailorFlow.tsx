@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { TAILOR_SECTIONS, type Answer, type Proposal, type TailorQuestion, type TailorRun, type TailorSection, type Tone } from "@resumora/shared";
+import { TAILOR_SECTIONS, type Answer, type CvContent, type Proposal, type TailorQuestion, type TailorRun, type TailorSection, type Tone } from "@resumora/shared";
+import { getCv } from "../cv/cv-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard } from "./QuestionCard.tsx";
@@ -29,7 +30,7 @@ export function remember(jobId: string, runId: string | null) {
     else localStorage.removeItem(storageKey(jobId));
   } catch { /* storage is a convenience: the start route returns the job's open run anyway */ }
 }
-function remembered(jobId: string): string | null {
+export function remembered(jobId: string): string | null {
   try { return localStorage.getItem(storageKey(jobId)); } catch { return null; }
 }
 
@@ -41,6 +42,10 @@ export function TailorFlow() {
   const [run, setRun] = useState<TailorRun | null>(null);
   const [base, setBase] = useState<number | null>(null);
   const [latest, setLatest] = useState<number | null>(null);
+  // The Base CV the questions and proposals are made from: shows each role and the wording a change replaces.
+  const [cv, setCv] = useState<CvContent | null>(null);
+  // Questions may also be about a volunteering role (same shape as a job).
+  const roleFor = (question: TailorQuestion) => [...cv?.experience ?? [], ...cv?.volunteering ?? []].find((role) => role.id === question.roleId);
   const runRef = useRef<TailorRun | null>(null);
   const started = useRef(false);
   const section = run?.currentSection ?? null;
@@ -127,6 +132,8 @@ export function TailorFlow() {
       setBase(scores.base?.total ?? null);
       setLatest((value) => value ?? scores.tailored?.total ?? null);
     }, () => {});
+    // Without it the screens fall back to the plain list; the run itself doesn't need it.
+    getCv().then((response) => setCv(response.content), () => {});
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -153,20 +160,23 @@ export function TailorFlow() {
     const skipAll = () => void submit(section, [...phase.answers,
       ...phase.questions.slice(phase.index).map((q) => ({ questionId: q.id, value: null, via: "skip" as const }))]);
     body = <QuestionCard key={question.id} question={question} n={phase.index + 1} total={phase.questions.length}
-      onAnswer={answerWith} onSkipAll={skipAll} />;
+      onAnswer={answerWith} onSkipAll={skipAll} role={roleFor(question)} locale={cv?.locale} />;
   } else if (phase.kind === "flags") {
     const question = phase.flags[phase.index]!;
-    body = <QuestionCard key={question.id} question={question} n={phase.index + 1} total={phase.flags.length} onAnswer={(answer) => {
+    body = <QuestionCard key={question.id} question={question} n={phase.index + 1} total={phase.flags.length}
+      role={roleFor(question)} locale={cv?.locale} onAnswer={(answer) => {
       const confirmed = [...phase.confirmed, { questionId: question.id, confirmed: answer.value === question.options[0] }];
       setPhase(phase.index + 1 < phase.flags.length ? { ...phase, index: phase.index + 1, confirmed }
         : { kind: "review", proposals: phase.proposals, flags: phase.flags, confirmed, busy: false });
     }} />;
   } else {
     body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={phase.flags}
-      confirmed={phase.confirmed} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} />;
+      confirmed={phase.confirmed} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} cv={cv} />;
   }
+  const wide = (phase.kind === "questions" && !!roleFor(phase.questions[phase.index]!))
+    || (phase.kind === "flags" && !!roleFor(phase.flags[phase.index]!));
 
-  return <div className="tailor-mode">
+  return <div className={wide ? "tailor-mode is-wide" : "tailor-mode"}>
     <header className="tailor-head">
       <p className="tailor-eyebrow">{t("tailor.eyebrow")}</p>
       <Link to={`/jobs/${encodeURIComponent(jobId)}`}>{t("tailor.back")}</Link>

@@ -96,7 +96,7 @@ describe("scoreMatch", () => {
 
   it("accepts evidence quoted from several CV values joined with \" | \", only when every part is in the CV", async () => {
     const work = input();
-    work.job = { ...job, requirements: [{ text: "Fluent English and Romanian", kind: "must", category: "language" }] };
+    work.job = { ...job, requirements: [{ text: "English and Romanian", kind: "must", category: "language" }] };
     work.cv.languages = [{ id: "l1", name: "Romanian", level: "Native" }, { id: "l2", name: "English", level: "C1" }];
     const reply = (evidence: string) => () => ({ labels: [label("r0", { evidence }), label("k:SQL")], cvSeniority: "unknown" });
     const both = await scoreMatch({ model: fakeModel(reply("Romanian | English")).deps }, work);
@@ -106,6 +106,53 @@ describe("scoreMatch", () => {
     const model = fakeModel(reply("Romanian"));
     await scoreMatch({ model: model.deps }, work);
     expect(JSON.stringify(model.requests[0])).toContain(' | ');
+  });
+
+  describe("fluent or advanced language requirements", () => {
+    const languageJob = (text: string): JobExtraction => ({ ...job, requirements: [{ text, kind: "must", category: "language" }] });
+    const missing = () => ({ labels: [label("r0", { status: "missing", evidence: null }), label("k:SQL")], cvSeniority: "unknown" });
+    const run = async (text: string, languages: { name: string; level: string }[], reply = missing) => {
+      const work = { ...input(), job: languageJob(text) };
+      work.cv.languages = languages.map((language, i) => ({ id: `l${i}`, ...language }));
+      return (await scoreMatch({ model: fakeModel(reply).deps }, work)).labels[0];
+    };
+
+    it.each(["C2", "C1", "Native", "Fluent", "Advanced", "c1 (advanced)"])("counts English at %s as met, whatever the AI said", async (level) => {
+      expect(await run("Fluent English, both spoken and written (advanced level).", [{ name: "English", level }]))
+        .toEqual({ ref: "r0", kind: "requirement", status: "met", evidence: `English | ${level}`, inferred: false });
+    });
+
+    it("needs every language the requirement names", async () => {
+      const text = "Fluent English and Romanian";
+      expect(await run(text, [{ name: "English", level: "C2" }])).toMatchObject({ status: "missing" });
+      expect(await run(text, [{ name: "English", level: "C2" }, { name: "Romanian", level: "B1" }])).toMatchObject({ status: "missing" });
+      expect(await run(text, [{ name: "English", level: "C2" }, { name: "Romanian", level: "Native" }]))
+        .toMatchObject({ status: "met", evidence: "English | C2 | Romanian | Native" });
+    });
+
+    it.each([
+      ["a lower level", "Fluent English", "B2"],
+      ["a requirement that is not fluent or advanced", "Basic English", "C2"],
+      ["a language the requirement does not name", "Fluent German", "C2"],
+    ])("leaves the AI's label for %s", async (_, text, level) => {
+      expect(await run(text, [{ name: "English", level }])).toMatchObject({ status: "missing", evidence: null });
+    });
+
+    it("applies only to language requirements, not a skill that also names a language", async () => {
+      const work = { ...input(), job: { ...job, requirements: [{ text: "Advanced English and Excel skills", kind: "must" as const, category: "skill" as const }] } };
+      work.cv.languages = [{ id: "l0", name: "English", level: "C2" }];
+      const score = await scoreMatch({ model: fakeModel(missing).deps }, work);
+      expect(score.labels[0]).toMatchObject({ status: "missing", evidence: null });
+    });
+  });
+
+  it("tells the AI that clear work evidence is a full match and inferred is only for real guesses", async () => {
+    const model = fakeModel(answer);
+    await scoreMatch({ model: model.deps }, input());
+    const system = (model.requests[0]?.messages as { role: string; content: string }[]).find((m) => m.role === "system")!.content;
+    expect(system).toContain("high confidence");
+    expect(system).toContain("label it met with inferred false");
+    expect(system).toContain("inferred to true only for a real guess");
   });
 
   it("awards no points for missing labels even if the model marks them inferred", async () => {
@@ -121,10 +168,26 @@ describe("scoreMatch", () => {
     expect((await scoreMatch({ model: model.deps }, work)).total).toBe(100);
   });
 
+  it("drops invalid and duplicate keyword labels instead of failing, and matches keyword terms case-insensitively", async () => {
+    const work = input();
+    work.job = { ...job, title: "Business Analyst, Process Automation", responsibilities: ["Use SQL", "Drive process automation"] };
+    const model = fakeModel(() => ({
+      ...answer(),
+      labels: [label(), label("k:Process Automation"), label("k:Insurance"), label("k:SQL"), label("k:sql"), label("k:TypeScript")],
+    }));
+    const score = await scoreMatch({ model: model.deps }, work);
+    expect(score.labels.map((item) => item.ref)).toEqual(["r0", "k:Process Automation", "k:SQL", "k:TypeScript"]);
+  });
+
+  it("scores on requirements alone when every keyword label is dropped", async () => {
+    const model = fakeModel(() => ({ ...answer(), labels: [label(), label("k:insurance")] }));
+    const score = await scoreMatch({ model: model.deps }, input());
+    expect(score.labels.map((item) => item.ref)).toEqual(["r0"]);
+  });
+
   it.each([
-    [], [label(), label()], [label("r9")], [label(), label("k:insurance")],
-    [label(), label("k:SQL"), label("k:SQL")],
-  ])("rejects incomplete, duplicate or unrelated labels: %j", async (...labels) => {
+    [], [label(), label()], [label("r9")], [label(), label("r9"), label("k:SQL")],
+  ])("rejects missing, duplicate or unknown requirement labels: %j", async (...labels) => {
     const model = fakeModel(() => ({ ...answer(), labels }));
     await expect(scoreMatch({ model: model.deps }, input())).rejects.toMatchObject({ code: "ai_failed" });
   });
