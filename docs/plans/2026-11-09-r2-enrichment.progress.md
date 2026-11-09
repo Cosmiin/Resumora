@@ -53,3 +53,9 @@ commit: see git log (base 05d8e1a) · reviews: 2 (agents) · fix rounds: 1 · gu
 ruling: the answer is `{ text, keywords }` (keywords: ATS terms the model used, kept only when they appear in the text, for the "Helps ATS with" chips). The prompt lives in `role-description.ts`.
 **database (for the owner):** new migration `supabase/migrations/20261109210000_enrich_r2_ai_tasks.sql`: `log_ai_call` accepts `enrich_role_description` and `enrich_achievements` (Task 7). Without it the calls work but are never logged in `ai_calls`. Same body, security and grants as before; it keeps `tailor_tone_examples` from session 5's `20261109200000_tailor_r2.sql`, so whichever runs last keeps every name. Applied to the LOCAL database only (session 5's migration file was copied in for the CLI check and removed again; history not repaired). `supabase test db`: 209 pass. The hosted database is untouched.
 open: when merging, session 5's branch and this one both redefine `log_ai_call`; a later migration on either branch must keep all names.
+
+## Task 6: The guided path and its start screen (1A) — done
+session: r2-enrich (session 7) · builder: claude
+commit: see git log (base b8eaefa) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 46% → 47%
+ruling: `HelperPanel.tsx` passes `onEnrich` to `Overview`; the editor tests for the button and `?enrich=1` are in `editor.test.tsx`. Below 80 = anything but a ready score ≥ 80. The Key achievements stop is a placeholder until Task 7.
+open: none

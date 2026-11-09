@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { fingerprint, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
@@ -22,6 +22,10 @@ type Props = {
   scores: Map<string, RoleScoreState>;
   waitForSave(): Promise<void>;
   onClose(): void;
+  /** The guided path's bar ("Role n of N" and its segments), across the top. */
+  topBar?: ReactNode;
+  /** In the guided path, "That's all for this role" moves on ("Next role →") instead of going back to the CV. */
+  next?: { label: string; onNext(): void };
 };
 
 const FOCUSABLE = 'button:not(:disabled), textarea:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
@@ -29,8 +33,19 @@ const DUMP_KINDS = new Set<FocusStep["kind"]>(["brainDump", "dumpWorking", "dump
 const SELF_FOCUSING = new Set<FocusStep["kind"]>(["proposal", "celebrate"]);
 
 /** Full-screen focus mode: the role on the left, one step at a time on the right. */
-export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }: Props) {
-  const session = useFocusSession({ cv, roleId: target.roleId, bulletId: target.bulletId, mode: target.mode, scores, dispatch, waitForSave, onClose });
+export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, topBar, next }: Props) {
+  // The session always closes the same way (saving the role's facts); only where it goes next differs.
+  const moving = useRef(false);
+  const leave = useRef({ onClose, next });
+  useEffect(() => {
+    leave.current = { onClose, next };
+  });
+  const [finish] = useState(() => () => {
+    const { onClose: close, next: then } = leave.current;
+    if (moving.current && then) then.onNext();
+    else close();
+  });
+  const session = useFocusSession({ cv, roleId: target.roleId, bulletId: target.bulletId, mode: target.mode, scores, dispatch, waitForSave, onClose: finish });
   const { step, queue, position, busy } = session;
   const root = useRef<HTMLDivElement>(null);
   const right = useRef<HTMLDivElement>(null);
@@ -136,11 +151,12 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
   return createPortal(
     <div
       ref={root}
-      className="focus-mode"
+      className={topBar ? "focus-mode has-path" : "focus-mode"}
       role="dialog"
       aria-modal="true"
       aria-label={t("enrich.focus.dialog", { role: name })}
     >
+      {topBar}
       <aside className="fm-left">
         <p className="fm-eyebrow">{t("enrich.focus.yourRole")}</p>
         <p className="fm-role">{name}</p>
@@ -291,8 +307,11 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
               <b>{step.score ?? "–"}</b>
               <span className="fm-eyebrow">{t("enrich.focus.roleScore")}</span>
             </p>
-            <button type="button" className="fm-btn" onClick={() => session.close()}>
-              {t("enrich.focus.done.back")}
+            <button type="button" className="fm-btn" onClick={() => {
+              moving.current = true;
+              session.close();
+            }}>
+              {next ? next.label : t("enrich.focus.done.back")}
             </button>
           </div>
         )}

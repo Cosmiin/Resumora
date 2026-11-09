@@ -425,3 +425,21 @@ describe("the role description step (3B) on screen", () => {
     expect(await screen.findByRole("heading", { name: "That's all for this role" })).toBeInTheDocument();
   });
 });
+
+describe("focus mode inside the guided path", () => {
+  it("shows the path bar, and at the end of the role the button moves on after saving the role's facts", async () => {
+    const onNext = vi.fn();
+    const onClose = vi.fn();
+    const done = { ...result, questions: [], bullets: [grade("b1", 100), grade("b2", 100), grade("b3", 100)] };
+    function Path() {
+      const [state, dispatch] = useReducer(cvReducer, cv);
+      return <FocusMode target={{ roleId: "r1", mode: "improve" }} cv={state} dispatch={dispatch} scores={new Map([["r1", { state: "ready", result: done }]])}
+        waitForSave={() => Promise.resolve()} onClose={onClose} topBar={<p>Role 1 of 2</p>} next={{ label: "Next role →", onNext }} />;
+    }
+    render(<Path />);
+    expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Next role →" }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});

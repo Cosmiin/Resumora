@@ -35,11 +35,11 @@ import { CvPage } from "./CvPage.tsx";
 import * as roleScores from "./enrich/useRoleScores.ts";
 import * as helperPanel from "./panel/HelperPanel.tsx";
 
-function renderPage() {
+function renderPage(url = "/cv") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <CvPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -111,6 +111,22 @@ describe("CV editor", () => {
       await screen.findByText("Saved");
       await new Promise((done) => setTimeout(done, 1500));
       expect(api.saveCv).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("the guided path (1A)", () => {
+    it("Enrich my CV opens its start screen", async () => {
+      withCv({ basics });
+      renderPage();
+      await userEvent.click(await screen.findByRole("button", { name: "Enrich my CV" }));
+      expect(screen.getByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Not now" }));
+      expect(screen.queryByRole("dialog", { name: "Enrich your CV" })).toBeNull();
+    });
+    it("/cv?enrich=1 opens it on arrival", async () => {
+      withCv({ basics });
+      renderPage("/cv?enrich=1");
+      expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
     });
   });
 

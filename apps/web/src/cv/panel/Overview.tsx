@@ -16,6 +16,8 @@ type Props = {
   opened: ReadonlySet<SectionKey>;
   onOpen(key: SectionKey): void;
   scores?: ReadonlyMap<string, RoleScoreState>;
+  /** Base CV only: opens the guided enrichment path (1A). */
+  onEnrich?(): void;
 };
 
 const CUSTOM = "custom";
@@ -30,7 +32,7 @@ function Eye({ on }: { on: boolean }) {
 }
 
 /** The panel's home view: what is missing, the sections on the CV (order, hide) and a way to add more. */
-export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores }: Props) {
+export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, onEnrich }: Props) {
   const layout = normalizeLayout(cv.layout);
   const nameOf = (key: SectionKey) => layout.titles[key] || CATEGORY[key].label[cv.locale];
   const saved = sectionsOnCv(cv);
@@ -63,6 +65,9 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores }:
 
   return (
     <div className="panel-overview">
+      {onEnrich && (
+        <button type="button" className="btn primary enrich-open" onClick={onEnrich}>{t("enrich.path.open")}</button>
+      )}
       <div>
         <h3 className="p-h">{t("panel.overview.title")}</h3>
         <p className="fine">{t("panel.overview.hint")}</p>
