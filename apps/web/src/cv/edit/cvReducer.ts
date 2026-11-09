@@ -298,7 +298,8 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const item = items.find((i) => i.id === action.itemId);
       if (!item || !!item.hidden === action.hidden) return cv;
       // Shown again = the field goes, so the item reads as before it was hidden.
-      const { hidden: _, ...rest } = item;
+      const rest = { ...item };
+      delete rest.hidden;
       return withItems(cv, action.list, items.map((i) => (i === item ? (action.hidden ? { ...rest, hidden: true } : rest) : i)));
     }
     case "setFacts": {

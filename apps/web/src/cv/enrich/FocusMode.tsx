@@ -79,7 +79,7 @@ export function useFocusFrame(root: RefObject<HTMLDivElement | null>, onClose: (
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [root]);
 }
 
 /** Full-screen focus mode: the role on the left, one step at a time on the right. */
