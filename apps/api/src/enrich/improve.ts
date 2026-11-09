@@ -1,4 +1,4 @@
-import { fingerprint, isAllowedOption, mergeGrades, repeatKey, type ImproveAnswer } from "@resumora/shared";
+import { findScored, fingerprint, isAllowedOption, mergeGrades, repeatKey, type ImproveAnswer } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
@@ -16,7 +16,7 @@ export async function improveBullet(
   input: { roleId: string; bulletId: string; fingerprint: string },
 ): Promise<ImproveAnswer> {
   const { content } = await deps.cv.get();
-  const role = content.experience.find((r) => r.id === input.roleId);
+  const role = findScored(content, input.roleId)?.item;
   if (!role || fingerprint(role, content.locale) !== input.fingerprint) {
     throw new ApiError(409, "not_saved", "Your latest changes aren't saved yet. Try again in a moment.");
   }

@@ -3,7 +3,9 @@ import {
   ModelScoreSchema,
   SCORE_POLICY,
   buildRoleResult,
+  findScored,
   fingerprint,
+  scoredItems,
   type Experience,
   type Locale,
   type ModelBullet,
@@ -57,11 +59,13 @@ export async function scoreRole(
   input: { roleId: string; fingerprint: string; fresh?: boolean },
 ): Promise<RoleResult> {
   const { content } = await deps.cv.get();
-  const present = new Set(content.experience.map((r) => r.id));
+  // Roles, projects and volunteering are all scored; a cached row for anything else is stale.
+  const present = new Set(scoredItems(content).map(({ item }) => item.id));
   const stale = (await deps.insights.list()).filter((r) => !present.has(r.roleId)).map((r) => r.roleId);
   await deps.insights.remove(stale);
 
-  const role = content.experience.find((r) => r.id === input.roleId);
+  const found = findScored(content, input.roleId);
+  const role = found?.item;
   if (!role || fingerprint(role, content.locale) !== input.fingerprint) throw notSaved();
 
   const cached = await deps.insights.get(role.id);
@@ -79,7 +83,7 @@ export async function scoreRole(
           task: "enrich_score",
           schema: ModelScoreSchema,
           system: scoreSystemPrompt(content.locale),
-          user: scoreUserMessage(role),
+          user: scoreUserMessage(role, undefined, found!.kind),
           maxOutputTokens: Math.min(4000, 600 + 180 * role.bullets.length),
         });
         result = buildRoleResult(role, answer, input.fingerprint);

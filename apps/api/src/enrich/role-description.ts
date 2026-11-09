@@ -1,8 +1,8 @@
-import { MAX_LONG_TEXT, fingerprint, type Experience, type Locale, type RoleDescriptionAnswer } from "@resumora/shared";
+import { MAX_LONG_TEXT, findScored, fingerprint, type Experience, type ScoredKind, type Locale, type RoleDescriptionAnswer } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
-import { languageInstruction } from "./prompts.ts";
+import { kindNote, languageInstruction } from "./prompts.ts";
 import { squash } from "./rewrite.ts";
 import { aiError, type ScoreDeps } from "./score.ts";
 
@@ -38,8 +38,9 @@ keywords: up to 8 of the ATS terms you used, each copied exactly from your text.
 Return only JSON matching the supplied schema: { "text": string, "keywords": string[] }.`;
 }
 
-export function roleDescriptionUserMessage(role: Experience): string {
+export function roleDescriptionUserMessage(role: Experience, kind: ScoredKind = "role"): string {
   return [
+    ...(kind === "project" ? ["This is a project: the first sentence says what the project was and who it was for, the second what it was for."] : kindNote(kind)),
     "<role>",
     JSON.stringify({ title: role.title, company: role.company, location: role.location, start: role.startDate,
       end: role.current ? "present" : role.endDate, bullets: role.bullets.map((b) => b.text) }),
@@ -53,7 +54,8 @@ export function roleDescriptionUserMessage(role: Experience): string {
 /** Proposes a role description; one retry when the answer breaks a rule, then empty (the step is skipped). */
 export async function roleDescription(deps: ScoreDeps, input: { roleId: string; fingerprint: string }): Promise<RoleDescriptionAnswer> {
   const { content } = await deps.cv.get();
-  const role = content.experience.find((r) => r.id === input.roleId);
+  const found = findScored(content, input.roleId);
+  const role = found?.item;
   if (!role || fingerprint(role, content.locale) !== input.fingerprint) {
     throw new ApiError(409, "not_saved", "Your latest changes aren't saved yet. Try again in a moment.");
   }
@@ -64,7 +66,7 @@ export async function roleDescription(deps: ScoreDeps, input: { roleId: string; 
         task: "enrich_role_description",
         schema: ModelSchema,
         system: roleDescriptionSystemPrompt(content.locale),
-        user: roleDescriptionUserMessage(role),
+        user: roleDescriptionUserMessage(role, found!.kind),
         maxOutputTokens: 400,
       });
       const text = squash(answer.text);

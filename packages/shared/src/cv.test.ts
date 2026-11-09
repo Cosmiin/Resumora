@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, type CvContent } from "./index.ts";
+import { CvContentSchema, findScored, scoredItems, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, type CvContent } from "./index.ts";
 
 function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
   return {
@@ -267,5 +267,19 @@ describe("lines under the lighter items", () => {
   it("keeps the lines of a course", () => {
     const course = { id: "c1", name: "Power BI", provider: "Microsoft", date: "2025", bullets: [{ id: "l1", text: "Built dashboards" }] };
     expect(CvContentSchema.parse({ ...emptyCv(), courses: [course] }).courses[0]).toEqual(course);
+  });
+});
+
+describe("scoredItems", () => {
+  it("lists roles, then projects, then volunteering, each with its kind", () => {
+    const cv = {
+      ...emptyCv(),
+      experience: [experience({ id: "r1" })],
+      projects: [{ ...experience({ id: "p1" }), url: "" }],
+      volunteering: [experience({ id: "v1" })],
+    };
+    expect(scoredItems(cv).map(({ item, kind }) => [item.id, kind])).toEqual([["r1", "role"], ["p1", "project"], ["v1", "volunteering"]]);
+    expect(findScored(cv, "p1")?.kind).toBe("project");
+    expect(findScored(cv, "nope")).toBeUndefined();
   });
 });

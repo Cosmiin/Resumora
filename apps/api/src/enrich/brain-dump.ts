@@ -1,4 +1,4 @@
-import { BRAIN_DUMP_QUESTION, MAX_BULLETS, SCORE_POLICY, fingerprint, mergeGrades, repeatKey, type BrainDumpAnswer } from "@resumora/shared";
+import { BRAIN_DUMP_QUESTION, MAX_BULLETS, SCORE_POLICY, findScored, fingerprint, mergeGrades, repeatKey, type BrainDumpAnswer } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
@@ -13,7 +13,8 @@ export async function brainDump(
   input: { roleId: string; fingerprint: string; source?: "ramble" | "answers" },
 ): Promise<BrainDumpAnswer> {
   const { content } = await deps.cv.get();
-  const role = content.experience.find((r) => r.id === input.roleId);
+  const found = findScored(content, input.roleId);
+  const role = found?.item;
   if (!role || fingerprint(role, content.locale) !== input.fingerprint) {
     throw new ApiError(409, "not_saved", "Your latest changes aren't saved yet. Try again in a moment.");
   }
@@ -45,7 +46,7 @@ export async function brainDump(
       task: "enrich_brain_dump",
       schema: BrainDumpSchema,
       system: brainDumpSystemPrompt(content.locale),
-      user: brainDumpUserMessage(role, details, source),
+      user: brainDumpUserMessage(role, details, source, found!.kind),
       maxOutputTokens: 1200,
     });
     const seen = new Set(role.bullets.map((b) => repeatKey(b.text)));

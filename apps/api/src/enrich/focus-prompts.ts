@@ -1,5 +1,5 @@
-import { MAX_BULLETS, type Experience, type Locale } from "@resumora/shared";
-import { languageInstruction } from "./prompts.ts";
+import { MAX_BULLETS, type Experience, type Locale, type ScoredKind } from "@resumora/shared";
+import { kindNote, languageInstruction } from "./prompts.ts";
 
 export function improveBulletSystemPrompt(locale: Locale): string {
   return `${languageInstruction(locale)}
@@ -63,8 +63,9 @@ Return only JSON matching the supplied schema: { "bullets": string[] }.
 Return fewer bullets, or an empty array, if the supplied input does not support more.`;
 }
 
-export function brainDumpUserMessage(role: Experience, details: string, source: "ramble" | "answers" = "ramble"): string {
+export function brainDumpUserMessage(role: Experience, details: string, source: "ramble" | "answers" = "ramble", kind: ScoredKind = "role"): string {
   return [
+    ...kindNote(kind),
     `Write up to ${Math.min(4, MAX_BULLETS - role.bullets.length)} new bullets.`,
     "<experience>",
     `Role title (context only): ${JSON.stringify(role.title)}`,

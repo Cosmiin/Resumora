@@ -259,3 +259,19 @@ export function emptyCv(locale: Locale = "en"): CvContent {
     enrichedAt: null,
   };
 }
+
+/** What a scored item is: a role, a project or a volunteering role. Each gets the role steps. */
+export type ScoredKind = "role" | "project" | "volunteering";
+
+/** Every item that is scored and enriched like a role, in CV order: roles, then projects, then volunteering. */
+export function scoredItems(cv: Pick<CvContent, "experience" | "projects" | "volunteering">): { item: Experience; kind: ScoredKind }[] {
+  return [
+    ...cv.experience.map((item) => ({ item, kind: "role" as const })),
+    ...cv.projects.map((item) => ({ item, kind: "project" as const })),
+    ...cv.volunteering.map((item) => ({ item, kind: "volunteering" as const })),
+  ];
+}
+
+export function findScored(cv: Pick<CvContent, "experience" | "projects" | "volunteering">, id: string): { item: Experience; kind: ScoredKind } | undefined {
+  return scoredItems(cv).find(({ item }) => item.id === id);
+}

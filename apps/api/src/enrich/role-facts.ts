@@ -1,4 +1,4 @@
-import { notesHash, hasUnknownNumber, type RoleFactsAnswer } from "@resumora/shared";
+import { findScored, notesHash, hasUnknownNumber, type RoleFactsAnswer } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
@@ -9,7 +9,7 @@ const RoleFactsSchema = z.object({ facts: z.array(z.string()).max(8) });
 
 export async function roleFacts(deps: ScoreDeps, input: { roleId: string }): Promise<RoleFactsAnswer> {
   const { content } = await deps.cv.get();
-  const role = content.experience.find((r) => r.id === input.roleId);
+  const role = findScored(content, input.roleId)?.item;
   if (!role) throw new ApiError(404, "role_not_found", "This role is no longer in your CV.");
   const fromNotes = notesHash(role.notes);
   if (!role.notes.length) return { facts: [], fromNotes };

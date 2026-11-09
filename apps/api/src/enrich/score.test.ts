@@ -376,3 +376,44 @@ describe("score prompt", () => {
     expect(scoreSystemPrompt("en")).toContain("every supplied bullet id exactly once");
   });
 });
+
+describe("projects and volunteering are scored like roles", () => {
+  const project = () => ({ ...roleWith(["Built a Python forecast script."], { title: "Budget forecast", company: "Personal project" }), url: "" });
+
+  it("scores a project and a volunteering item, saying which kind each is", async () => {
+    const p = project();
+    const v = roleWith(["Mentored 12 students."], { title: "Mentor", company: "Junior Achievement" });
+    content = { ...emptyCv("en"), projects: [p], volunteering: [v] };
+    await cv.save(content, (await cv.get()).version);
+    const model = fakeModel(() => allSpecific(p));
+    const result = await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: p.id, fingerprint: fingerprint(p, "en") });
+    expect(result.score).toBeGreaterThan(0);
+    const sent = JSON.stringify(model.requests[0]?.messages);
+    expect(sent).toContain("This is a project");
+    expect(sent).toContain("what the project was");
+    const model2 = fakeModel(() => allSpecific(v));
+    await scoreRole({ cv, insights, model: model2.deps, userId: "user-1" }, { roleId: v.id, fingerprint: fingerprint(v, "en") });
+    expect(JSON.stringify(model2.requests[0]?.messages)).toContain("This is a volunteering role");
+  });
+
+  it("a role's message names no kind", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    const model = fakeModel(() => allSpecific(role));
+    await run(model, role);
+    expect(JSON.stringify(model.requests[0]?.messages)).not.toContain("This is a");
+  });
+
+  it("removes a deleted project's cached score and keeps the others", async () => {
+    const p = project();
+    const role = roleWith(["Prepared payroll files."]);
+    await insights.put(p.id, buildRoleResult(p, allSpecific(p), fingerprint(p, "en")));
+    content = { ...emptyCv("en"), experience: [role], projects: [p] };
+    await cv.save(content, (await cv.get()).version);
+    await run(fakeModel(() => allSpecific(role)), role);
+    expect(await insights.get(p.id)).not.toBeNull();
+    await save(role);
+    await run(fakeModel(() => allSpecific(role)), role);
+    expect(await insights.get(p.id)).toBeNull();
+  });
+});

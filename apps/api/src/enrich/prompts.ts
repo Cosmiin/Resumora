@@ -1,4 +1,4 @@
-import { SCORE_POLICY, type Experience, type Locale } from "@resumora/shared";
+import { SCORE_POLICY, type Experience, type Locale, type ScoredKind } from "@resumora/shared";
 
 // Prompts for enrichment. The score prompt is built from the Codex assessment prompt
 // (docs/superpowers/specs/reference/codex-experience-scoring.md, Appendix C), minus its
@@ -251,10 +251,26 @@ export function scoreSystemPrompt(locale: Locale): string {
   return `${languageInstruction(locale)}\n\n${SCORE_BODY}\n\n(policy ${SCORE_POLICY})`;
 }
 
+/**
+ * How to read a project or a volunteering role, which get the same steps as a role. Nothing for a role,
+ * so a role's messages stay exactly as they were.
+ */
+export function kindNote(kind: ScoredKind): string[] {
+  if (kind === "project") {
+    return ["This is a project, not a job. The role title is the project's name and the company is the organisation or context it was for. "
+      + "For topic company, ask what the project was (what it does or produced, and who it was for); for topic purpose, what it was for and the person's part in it."];
+  }
+  if (kind === "volunteering") {
+    return ["This is a volunteering role. The company is the organisation: for topic company, ask what the organisation does."];
+  }
+  return [];
+}
+
 /** The role as the model sees it: context for the title and description, bullets to grade. No company, no dates. */
-export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes">, gradeOnly?: readonly string[]): string {
+export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes">, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));
   return [
+    ...kindNote(kind),
     "<experience>",
     `Role title (context only, not graded): ${JSON.stringify(role.title)}`,
     `Role description (context only, not graded): ${JSON.stringify(role.description)}`,
