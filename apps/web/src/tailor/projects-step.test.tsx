@@ -80,6 +80,24 @@ describe("Projects & volunteering step", () => {
   });
 });
 
+describe("a project with nothing to change (browser check)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getScores).mockResolvedValue({ base: score(82), tailored: null });
+    vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv("en"), experience: [analyst], projects: [checker], volunteering: [mentor] }, version: 1, updatedAt: at });
+    vi.mocked(getJob).mockResolvedValue({ extracted: { company: "DSV", requirements: [] } } as never);
+    vi.mocked(getRun).mockResolvedValue(run({ status: "waiting_user" }));
+    vi.mocked(runSection).mockResolvedValue({ proposals: [], questions: [] });
+  });
+
+  it("says so in project words", async () => {
+    open();
+    expect(await screen.findByText("Nothing to change in this project ✓")).toBeInTheDocument();
+  });
+});
+
 describe("roleDone for projects and volunteering", () => {
   const items = [analyst, checker, mentor];
 

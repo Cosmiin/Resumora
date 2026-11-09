@@ -245,7 +245,7 @@ export function TailorFlow() {
     const review = phase;
     const role = scoredOf(review.roleId)?.item;
     const onAccept = (accepted: api.AcceptBody) => void acceptRedo(review.roleId, accepted, review);
-    body = role ? <RoleReview key={`redo-${role.id}`} role={role} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} />
+    body = role ? <RoleReview key={`redo-${role.id}`} role={role} kind={scoredOf(review.roleId)?.kind} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} />
       : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
         busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
   }
@@ -286,7 +286,7 @@ export function TailorFlow() {
       role={roleFor(question)} kind={scoredOf(question.roleId)?.kind} roles={cv?.experience ?? []} locale={cv?.locale} />;
   } else if (isRoleSection(section) && scoredOf(run?.currentRoleId)) {
     const review = phase;
-    body = <RoleReview key={run!.currentRoleId!} role={scoredOf(run!.currentRoleId)!.item} proposals={review.proposals} locale={locale}
+    body = <RoleReview key={run!.currentRoleId!} role={scoredOf(run!.currentRoleId)!.item} kind={scoredOf(run!.currentRoleId)!.kind} proposals={review.proposals} locale={locale}
       busy={review.busy} onAccept={(accepted) => void accept(section, accepted)} onAnswers={() => void openAnswers(review)} removed={review.removed} />;
   } else {
     body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={[]}

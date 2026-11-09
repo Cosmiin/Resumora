@@ -109,16 +109,10 @@ export async function acceptSection(
     }
   }
   if (section === "achievements" || isLightTailorSection(section)) {
-    // Each accept of a lighter section decides its order and hiding again: start from the Base order with nothing
-    // hidden as in the Base CV, so "Keep the original" on a re-tailor restores both.
-    const baseList = lightList((await deps.cv.get()).content, section);
-    const at = new Map(baseList.map((item, i) => [item.id, i]));
+    // The pass proposed changes on the Base items, so each accept of a lighter section starts again from them: items
+    // added to the Base CV since the first tailoring appear, and "Keep the original" restores wording, order and hiding.
     const list = lightList(content, section);
-    list.sort((a, b) => (at.get(a.id) ?? at.size) - (at.get(b.id) ?? at.size));
-    for (const item of list) {
-      if (baseList[at.get(item.id) ?? -1]?.hidden) item.hidden = true;
-      else delete item.hidden;
-    }
+    list.splice(0, list.length, ...structuredClone(lightList((await deps.cv.get()).content, section)));
   }
   const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));

@@ -5,6 +5,7 @@ import type { AppEnv } from "../app.ts";
 import { readJson, saveResponse } from "../cv/routes.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
+import type { CvRepo } from "../cv/repo.ts";
 import type { TailorRepo } from "./repo.ts";
 import { RetailorBodySchema, startRetailor } from "./retailor.ts";
 import { TranslateBodySchema, translateTailored } from "./translate.ts";
@@ -21,6 +22,7 @@ const notFound = () => new ApiError(404, "not_found", "This tailored CV no longe
 /** Mounted at /v1: GET /jobs/:id/tailored, and GET/PUT/PATCH /tailored/:id. RLS keeps other users' rows invisible (404). */
 export function tailoredRoutes(deps: {
   jobsFor(c: Context<AppEnv>): JobRepo;
+  cvFor(c: Context<AppEnv>): CvRepo;
   tailorFor(c: Context<AppEnv>): TailorRepo;
   modelFor(c: Context<AppEnv>): ModelDeps;
   now(): Date;
@@ -71,7 +73,7 @@ export function tailoredRoutes(deps: {
   app.post("/tailored/:id/retailor", async (c) => {
     const tailoredId = id(c);
     const { sections } = RetailorBodySchema.parse(await c.req.json().catch(() => ({})));
-    const started = await startRetailor({ jobs: deps.jobsFor(c), tailor: deps.tailorFor(c) }, tailoredId, sections);
+    const started = await startRetailor({ jobs: deps.jobsFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c) }, tailoredId, sections);
     if (!started) throw notFound();
     return c.json(started);
   });

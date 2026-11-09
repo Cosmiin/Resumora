@@ -14,7 +14,7 @@ export const RetailorBodySchema = z.object({ sections: z.array(TailorSectionSche
  * null when the tailored CV is gone.
  */
 export async function startRetailor(
-  deps: { jobs: JobRepo; tailor: TailorRepo },
+  deps: { jobs: JobRepo; tailor: TailorRepo; cv: CvRepo },
   tailoredCvId: string,
   picked: z.infer<typeof RetailorBodySchema>["sections"],
 ): Promise<{ run: TailorRun } | null> {
@@ -23,7 +23,10 @@ export async function startRetailor(
   const job = await deps.jobs.get(doc.jobId);
   if (!job) throw jobNotFound();
   if (job.status !== "ready" || !job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
-  const sections = runSections(doc.content, picked);
+  // The lighter sections are reworded from the Base CV and rebuilt from it on accept, so items added to the Base CV
+  // since the first tailoring count (a course added later still gets its step).
+  const base = (await deps.cv.get()).content;
+  const sections = runSections({ ...doc.content, courses: base.courses, publications: base.publications, interests: base.interests }, picked);
   if (sections.length === 0) throw new ApiError(400, "invalid_content", "This CV has nothing to tailor in those steps.");
   const run = await deps.tailor.createRun({
     jobId: doc.jobId, tailoredCvId, kind: sections.length === 1 ? "section" : "retailor", sections, currentSection: sections[0]!,

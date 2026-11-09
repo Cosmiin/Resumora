@@ -144,6 +144,8 @@ export const tailorEn = {
   "tailor.roleReview.useNew": "Use the new version",
   "tailor.roleReview.continue": "Continue",
   "tailor.roleReview.nothing": "Nothing to change in this role ✓",
+  "tailor.roleReview.nothing.project": "Nothing to change in this project ✓",
+  "tailor.roleReview.nothing.volunteering": "Nothing to change in this volunteering role ✓",
   "tailor.roleReview.answers": "My answers",
   "tailor.skills.batch": "Batch {n} of {total}",
   "tailor.skills.undo": "Undo",

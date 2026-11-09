@@ -106,6 +106,19 @@ describe("lighter sections in Final touches", () => {
     expect((await start()).run.sections).not.toContain("courses");
   });
 
+  it("re-tailoring reaches a course added to the Base CV after the first tailoring (browser check)", async () => {
+    await setup({ ...base, courses: [], interests: [] });
+    const { tailoredCvId } = await start();
+    await cv.save({ ...(await cv.get()).content, courses: [excel] }, (await cv.get()).version);
+    const res = await post(`/v1/tailored/${tailoredCvId}/retailor`, { sections: ["projects", "courses"] });
+    expect(res.status).toBe(200);
+    const { run } = (await res.json()) as { run: TailorRun };
+    expect(run.sections).toEqual(["courses"]);
+    const { proposals } = await runWith(run.id, "courses", line("c1-l1", "Pivot tables for payroll accuracy checks"));
+    await accept(run.id, "courses", proposals.map((p) => ({ itemId: p.itemId, keep: true })));
+    expect(tailored().content.courses.map((c) => c.bullets?.[0]?.text)).toEqual(["Pivot tables for payroll accuracy checks"]);
+  });
+
   it("rewords a course's line and puts the most relevant course first, on the tailored CV only", async () => {
     const run = await only("courses");
     const { proposals } = await runWith(run.id, "courses", order("c2", "c1"), line("c1-l1", "Pivot tables for payroll accuracy checks"));
