@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
+import { AchievementsPick } from "./AchievementsPick.tsx";
+import { suggestAchievements } from "./enrich-api.ts";
 import { FocusMode } from "./FocusMode.tsx";
 import { PathStart } from "./PathStart.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
@@ -21,7 +23,7 @@ export function belowTarget(s: RoleScoreState | undefined): boolean {
   return !(s?.state === "ready" && s.result?.score != null && s.result.score >= ENRICHED_AT);
 }
 
-type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "achievements" };
+type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "achievements" } | { kind: "end" };
 
 /** The top bar across the whole path: where you are, and one segment per stop. */
 export function PathBar({ label, at, total }: { label: string; at: number; total: number }) {
@@ -72,15 +74,76 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
       />
     );
   }
+  if (stage.kind === "achievements") {
+    return (
+      <PathScreen bar={<PathBar label={t("enrich.path.achievements")} at={stops.length} total={total} />} onClose={onClose}>
+        <AchievementsStop cv={cv} waitForSave={waitForSave} onDone={(texts) => {
+          if (texts.length) dispatch({ type: "addAchievements", texts });
+          setStage({ kind: "end" });
+        }} />
+      </PathScreen>
+    );
+  }
+  return (
+    <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={stops.length + 1} total={total} />} onClose={onClose}>
+      <div className="fm-foot">
+        <button type="button" className="fm-btn" onClick={onClose}>{t("enrich.focus.done.back")}</button>
+      </div>
+    </PathScreen>
+  );
+}
+
+/** A full-screen step of the path that isn't a role: the path bar, then one thing in the middle. Esc and ✕ close. */
+function PathScreen({ bar, onClose, children }: { bar: ReactNode; onClose(): void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return createPortal(
     <div className="focus-mode fm-path" role="dialog" aria-modal="true" aria-label={t("enrich.path.dialog")}>
-      <PathBar label={t("enrich.path.achievements")} at={stops.length} total={total} />
+      {bar}
       <section className="fm-path-start">
-        <div className="fm-foot">
-          <button type="button" className="fm-btn" onClick={onClose}>{t("enrich.focus.done.back")}</button>
-        </div>
+        <button type="button" className="fm-close" onClick={onClose}>
+          <span aria-hidden="true">✕</span> {t("enrich.focus.close")}
+        </button>
+        {children}
       </section>
     </div>,
     document.body,
   );
+}
+
+/** 4A: asks for suggestions from the saved CV; none (or a failure) moves straight on. */
+function AchievementsStop({ cv, waitForSave, onDone }: { cv: CvContent; waitForSave(): Promise<void>; onDone(texts: string[]): void }) {
+  const [suggestions, setSuggestions] = useState<{ id: string; text: string; roleId: string }[] | null>(null);
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      let found: { text: string; roleId: string }[] = [];
+      try {
+        await waitForSave();
+        found = (await suggestAchievements()).suggestions;
+      } catch { /* No suggestions this time: the step is skipped. */ }
+      if (!alive) return;
+      if (!found.length) done.current([]);
+      else setSuggestions(found.map((s, i) => ({ ...s, id: String(i) })));
+    })();
+    return () => { alive = false; };
+  }, [waitForSave]);
+  if (!suggestions) {
+    return (
+      <div className="fm-working" role="status">
+        <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
+        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.achievements.loading")}</h2>
+      </div>
+    );
+  }
+  return <AchievementsPick suggestions={suggestions} roles={cv.experience} onDone={(texts) => done.current(texts)} />;
 }

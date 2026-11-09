@@ -15,6 +15,7 @@ import { improveBullet } from "./improve.ts";
 import { brainDump } from "./brain-dump.ts";
 import { roleFacts } from "./role-facts.ts";
 import { roleDescription } from "./role-description.ts";
+import { suggestAchievements } from "./achievements.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
 import { checkSummary, rewriteEvents } from "./rewrite.ts";
@@ -91,6 +92,18 @@ export function enrichRoutes(deps: {
     } catch (err) {
       if (err instanceof ApiError && err.status >= 500) {
         console.error(JSON.stringify({ msg: "brain dump failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/achievements", async (c) => {
+    const user = c.get("user");
+    try {
+      return c.json(await suggestAchievements({ cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id }));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "achievements failed", code: err.code, requestId: c.get("requestId") }));
       }
       throw err;
     }

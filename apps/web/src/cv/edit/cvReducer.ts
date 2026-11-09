@@ -61,7 +61,9 @@ export type CvAction =
   | { type: "setNote"; roleId: string; note: Note }
   | { type: "setCurrent"; list: "experience" | "volunteering"; itemId: string; current: boolean }
   /** Empties role descriptions that only repeat the company and/or location (old imports). */
-  | { type: "clearCopiedDescriptions" };
+  | { type: "clearCopiedDescriptions" }
+  /** Key achievements picked in the guided path (4A), added in one go. */
+  | { type: "addAchievements"; texts: string[] };
 
 /**
  * Sections the CV has (or the user just added), in layout order, hidden ones included.
@@ -298,6 +300,11 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const endDate = action.current ? "" : item.endDate;
       if (item.current === action.current && item.endDate === endDate) return cv;
       return { ...cv, [action.list]: items.map((r) => (r === item ? { ...r, current: action.current, endDate } : r)) };
+    }
+    case "addAchievements": {
+      const room = MAX_ACHIEVEMENTS - cv.achievements.length;
+      if (!action.texts.length || room <= 0) return cv;
+      return { ...cv, achievements: [...cv.achievements, ...action.texts.slice(0, room).map((text) => ({ id: newId(), text }))] };
     }
     case "clearCopiedDescriptions": {
       if (!cv.experience.some(isCopiedDescription)) return cv;

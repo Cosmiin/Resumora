@@ -296,3 +296,9 @@ export const RoleDescriptionAnswerSchema = z.object({
   keywords: z.array(z.string().max(60)).max(8),
 }).strict();
 export type RoleDescriptionAnswer = z.infer<typeof RoleDescriptionAnswerSchema>;
+
+/** Key achievements suggestions (4A): 3–5 when the roles give enough, each from one role. */
+export const AchievementsAnswerSchema = z.object({
+  suggestions: z.array(z.object({ text: z.string().min(1).max(2000), roleId: z.string().min(1).max(64) }).strict()).max(5),
+}).strict();
+export type AchievementsAnswer = z.infer<typeof AchievementsAnswerSchema>;

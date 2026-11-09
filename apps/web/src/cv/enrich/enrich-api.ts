@@ -3,12 +3,14 @@ import {
   BrainDumpAnswerSchema,
   ImproveAnswerSchema,
   RewriteEventSchemas,
+  AchievementsAnswerSchema,
   RoleDescriptionAnswerSchema,
   RoleFactsAnswerSchema,
   RoleResultSchema,
   type BrainDumpAnswer,
   type ImproveAnswer,
   type RewriteEvent,
+  type AchievementsAnswer,
   type RoleDescriptionAnswer,
   type RoleFactsAnswer,
   type RoleResult,
@@ -147,4 +149,9 @@ export type SkillsAnswer = z.infer<typeof SkillsAnswerSchema>;
  */
 export function getSkillSuggestions(): Promise<SkillsAnswer> {
   return apiFetch("/v1/enrich/skills", { method: "POST", json: {}, schema: SkillsAnswerSchema });
+}
+
+/** Key achievements suggestions (4A) from the saved CV's roles: up to 5, each naming its role. */
+export function suggestAchievements(): Promise<AchievementsAnswer> {
+  return apiFetch("/v1/enrich/achievements", { method: "POST", json: {}, schema: AchievementsAnswerSchema });
 }

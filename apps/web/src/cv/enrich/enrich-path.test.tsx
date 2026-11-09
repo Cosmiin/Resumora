@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
@@ -18,7 +18,14 @@ vi.mock("./FocusMode.tsx", () => ({
     </div>
   ),
 }));
+const api = vi.hoisted(() => ({ suggestAchievements: vi.fn() }));
+vi.mock("./enrich-api.ts", () => api);
 import { EnrichPath } from "./EnrichPath.tsx";
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  api.suggestAchievements.mockReturnValue(new Promise(() => {}));
+});
 
 const role = (id: string, title: string): Experience => ({
   id, company: `${title} Co`, title, location: "", startDate: "2020-01", endDate: "", current: true,
@@ -30,8 +37,8 @@ const ready = (score: number): RoleScoreState => ({
 });
 const cv: CvContent = { ...emptyCv(), experience: [role("a", "Analyst"), role("b", "Buyer"), role("c", "Clerk"), role("d", "Driver")] };
 
-function Host({ scores, onClose = () => {} }: { scores: Map<string, RoleScoreState>; onClose?(): void }) {
-  return <EnrichPath cv={cv} dispatch={() => {}} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} />;
+function Host({ scores, onClose = () => {}, dispatch = () => {} }: { scores: Map<string, RoleScoreState>; onClose?(): void; dispatch?(a: unknown): void }) {
+  return <EnrichPath cv={cv} dispatch={dispatch} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} />;
 }
 
 describe("the guided path (1A)", () => {
@@ -101,5 +108,60 @@ describe("the guided path (1A)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer →" }));
     await userEvent.click(screen.getByRole("button", { name: "rescore" }));
     expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
+  });
+});
+
+describe("Key achievements (4A)", () => {
+  const allDone = new Map([["a", ready(90)], ["b", ready(85)], ["c", ready(80)], ["d", ready(99)]]);
+  const suggestions = [
+    { text: "Cut supplier costs by 10%", roleId: "b" },
+    { text: "Cleared a 3-month backlog", roleId: "c" },
+    { text: "Planned routes for 20 drivers", roleId: "d" },
+  ];
+  async function open(dispatch = vi.fn()) {
+    render(<Host scores={allDone} dispatch={dispatch} />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await screen.findByRole("heading", { name: "Which of these are true and you're proud of?" });
+    return dispatch;
+  }
+
+  it("shows the suggestions as cards, none ticked, each naming its role", async () => {
+    api.suggestAchievements.mockResolvedValue({ suggestions });
+    await open();
+    expect(screen.getByText("Almost done")).toBeInTheDocument();
+    expect(screen.getByText("They open your CV, right under the summary.")).toBeInTheDocument();
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes).toHaveLength(3);
+    for (const box of boxes) expect(box).not.toBeChecked();
+    expect(screen.getByText("From Buyer · Buyer Co")).toBeInTheDocument();
+    expect(screen.getByText("From Driver · Driver Co")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add 0 achievements" })).toBeDisabled();
+  });
+
+  it("Add 2 achievements adds exactly those two in one action", async () => {
+    api.suggestAchievements.mockResolvedValue({ suggestions });
+    const dispatch = await open();
+    await userEvent.click(screen.getByRole("checkbox", { name: /Cut supplier costs/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Planned routes/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Add 2 achievements" }));
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({ type: "addAchievements", texts: ["Cut supplier costs by 10%", "Planned routes for 20 drivers"] });
+    expect(screen.queryByRole("heading", { name: "Which of these are true and you're proud of?" })).toBeNull();
+  });
+
+  it("None of these adds nothing and moves on", async () => {
+    api.suggestAchievements.mockResolvedValue({ suggestions });
+    const dispatch = await open();
+    await userEvent.click(screen.getByRole("button", { name: "None of these" }));
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "Which of these are true and you're proud of?" })).toBeNull();
+  });
+
+  it.each(["empty", "failed"])("an %s answer skips the step", async (how) => {
+    if (how === "empty") api.suggestAchievements.mockResolvedValue({ suggestions: [] });
+    else api.suggestAchievements.mockRejectedValue(new Error("down"));
+    render(<Host scores={allDone} />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    expect(await screen.findByText("Skills")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Which of these are true and you're proud of?" })).toBeNull();
   });
 });

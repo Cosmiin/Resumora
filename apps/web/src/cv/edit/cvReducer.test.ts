@@ -382,3 +382,12 @@ describe("clearCopiedDescriptions", () => {
     expect(cvReducer(cv, { type: "clearCopiedDescriptions" })).toBe(cv);
   });
 });
+
+describe("addAchievements", () => {
+  it("adds the picked texts in one action, after the ones already there", () => {
+    const cv = { ...emptyCv(), achievements: [{ id: "a1", text: "Old one" }] };
+    const next = cvReducer(cv, { type: "addAchievements", texts: ["New one", "Another"] });
+    expect(next.achievements.map((a) => a.text)).toEqual(["Old one", "New one", "Another"]);
+    expect(cvReducer(cv, { type: "addAchievements", texts: [] })).toBe(cv);
+  });
+});

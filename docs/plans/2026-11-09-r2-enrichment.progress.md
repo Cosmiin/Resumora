@@ -59,3 +59,9 @@ session: r2-enrich (session 7) · builder: claude
 commit: see git log (base b8eaefa) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 46% → 47%
 ruling: `HelperPanel.tsx` passes `onEnrich` to `Overview`; the editor tests for the button and `?enrich=1` are in `editor.test.tsx`. Below 80 = anything but a ready score ≥ 80. The Key achievements stop is a placeholder until Task 7.
 open: none
+
+## Task 7: Key achievements as pick cards (4A) — done
+session: r2-enrich (session 7) · builder: claude
+commit: see git log (base 695a638) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 47% → 48%
+ruling: the pick screen is its own `AchievementsPick.tsx` with the `fm-pick` look (BrainDumpStep.tsx unchanged). The server keeps at most 5 suggestions that name a real role, use only numbers from that role, and don't repeat an existing achievement.
+open: none
