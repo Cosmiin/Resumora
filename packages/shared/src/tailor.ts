@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CvContentSchema } from "./cv.ts";
+import { CvContentSchema, findScored, type CvContent, type Experience } from "./cv.ts";
 
 export const TailorLanguageSchema = z.enum(["ro", "en", "fr", "de", "es", "it"]);
 export type TailorLanguage = z.infer<typeof TailorLanguageSchema>;
@@ -21,9 +21,42 @@ export const SteeringSchema = z.object({
 });
 export type Steering = z.infer<typeof SteeringSchema>;
 
-export const TAILOR_SECTIONS = ["experience", "skills", "summary", "achievements", "languages", "layout"] as const;
+export const TAILOR_SECTIONS = ["experience", "projects", "skills", "summary", "achievements", "languages", "layout"] as const;
 export const TailorSectionSchema = z.enum(TAILOR_SECTIONS);
 export type TailorSection = z.infer<typeof TailorSectionSchema>;
+
+/** Steps tailored item by item, like roles: Experience, and Projects & volunteering. */
+export type RoleSection = "experience" | "projects";
+export const isRoleSection = (section: TailorSection | null | undefined): section is RoleSection =>
+  section === "experience" || section === "projects";
+
+type Scored = Pick<CvContent, "experience" | "projects" | "volunteering">;
+/** A role step's items in CV order: the roles, or the projects then the volunteering roles. */
+export function stepItems(cv: Scored, section: TailorSection): Experience[] {
+  if (section === "experience") return cv.experience;
+  if (section === "projects") return [...cv.projects, ...cv.volunteering];
+  return [];
+}
+/** The role step an item belongs to (projects and volunteering share one), or null when it isn't in the CV. */
+export function stepOf(cv: Scored, id: string): RoleSection | null {
+  const found = findScored(cv, id);
+  return !found ? null : found.kind === "role" ? "experience" : "projects";
+}
+/** The steps a run over this CV covers, in order: Projects & volunteering only when the CV has some. */
+export function runSections(cv: Scored, picked: readonly TailorSection[] = TAILOR_SECTIONS): TailorSection[] {
+  return TAILOR_SECTIONS.filter((section) => picked.includes(section) && (section !== "projects" || stepItems(cv, section).length > 0));
+}
+/** One item order for a run's role steps (roles, then projects, then volunteering) and the item it starts on. */
+export function runItems(cv: Scored, sections: readonly TailorSection[]): { roleOrder: string[]; currentRoleId: string | null } {
+  const roleOrder = sections.filter(isRoleSection).flatMap((section) => stepItems(cv, section).map((item) => item.id));
+  const first = sections[0];
+  return { roleOrder, currentRoleId: isRoleSection(first) ? stepItems(cv, first)[0]?.id ?? null : null };
+}
+/** A role step's own order: the run's item order, kept to the items of that step still in the CV. */
+export function stepOrder(run: Pick<TailorRun, "roleOrder">, cv: Scored, section: TailorSection): string[] {
+  const ids = new Set(stepItems(cv, section).map((item) => item.id));
+  return (run.roleOrder ?? []).filter((id) => ids.has(id));
+}
 
 export const MatchLabelSchema = z.object({
   ref: z.string(),

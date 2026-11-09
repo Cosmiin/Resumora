@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AnswerSchema, NoteSchema, newId, type Answer, type JobExtraction, type Proposal, type TailorRun } from "@resumora/shared";
+import { AnswerSchema, findScored, isRoleSection, NoteSchema, newId, stepOf, type Answer, type JobExtraction, type Proposal, type TailorRun } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError, type LogFn } from "../errors.ts";
@@ -10,13 +10,17 @@ import { passProposals } from "./section-pass.ts";
 export const RedoBodySchema = z.object({ answers: z.array(AnswerSchema).max(MAX_ROLE_QUESTIONS) });
 const NOTE_VIA = { option: "pick", typed: "type", voice: "voice" } as const;
 
-/** A role the run has already accepted: before the current role, or Experience is behind it. 409 otherwise. */
+/**
+ * An item the run has already accepted: before the current item in the run's one item order (roles, then projects
+ * and volunteering), or every role step is behind the run. 409 otherwise.
+ */
 export function finishedRole(run: TailorRun, roleId: string): string {
   const order = run.roleOrder ?? [];
   const at = order.indexOf(roleId);
-  const pastExperience = run.status === "done" || !run.currentSection
-    || run.sections.indexOf(run.currentSection) > run.sections.indexOf("experience");
-  const done = at >= 0 && (pastExperience || (run.currentSection === "experience" && at < order.indexOf(run.currentRoleId ?? "")));
+  const lastRoleStep = Math.max(...run.sections.map((section, i) => (isRoleSection(section) ? i : -1)));
+  const pastRoleSteps = run.status === "done" || !run.currentSection || run.sections.indexOf(run.currentSection) > lastRoleStep;
+  const current = isRoleSection(run.currentSection) ? order.indexOf(run.currentRoleId ?? "") : -1;
+  const done = at >= 0 && (pastRoleSteps || at < current);
   if (!done) throw new ApiError(409, "role_not_done", "This role isn't finished yet.");
   return roleId;
 }
@@ -31,16 +35,16 @@ export async function redoRole(
 ): Promise<{ proposals: Proposal[]; removed: number }> {
   const { run, roleId, answers } = input;
   // The role under review (its pass is done, not yet accepted) can be redone too: "← My answers" on its review.
-  const underReview = run.status === "waiting_user" && run.currentSection === "experience" && run.currentRoleId === roleId;
+  const underReview = run.status === "waiting_user" && isRoleSection(run.currentSection) && run.currentRoleId === roleId;
   if (!underReview) finishedRole(run, roleId);
-  const questions = new Map((run.questions ?? []).filter((q) => q.section === "experience" && q.roleId === roleId && q.kind !== "flag")
+  const questions = new Map((run.questions ?? []).filter((q) => isRoleSection(q.section) && q.roleId === roleId && q.kind !== "flag")
     .map((q) => [q.id, q]));
   if (answers.some((answer) => !questions.has(answer.questionId))) {
     throw new ApiError(400, "invalid_content", "That question isn't about this role.");
   }
 
   const { content, version } = await deps.cv.get();
-  const role = content.experience.find((r) => r.id === roleId);
+  const role = findScored(content, roleId)?.item;
   if (!role) throw new ApiError(404, "role_not_found", "This role is no longer in your CV.");
   const redone = new Set(answers.map((answer) => questions.get(answer.questionId)!.text));
   role.notes = [
@@ -58,7 +62,7 @@ export async function redoRole(
   });
   if (!withAnswers) throw new ApiError(404, "job_not_found", "This job was deleted.");
   const { proposals, items, removed } = await passProposals(deps, {
-    userId: input.userId, run: withAnswers, job: input.job, cv: content, section: "experience", roleId,
+    userId: input.userId, run: withAnswers, job: input.job, cv: content, section: stepOf(content, roleId)!, roleId,
   });
   await deps.tailor.updateRun(run.id, { proposals: [...(withAnswers.proposals ?? []).filter((p) => !items.has(p.itemId)), ...proposals] });
   return { proposals, removed };

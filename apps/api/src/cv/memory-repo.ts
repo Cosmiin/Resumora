@@ -39,7 +39,8 @@ export function memoryCvRepo(opts: { now?: () => Date } = {}): CvRepo {
     async addJobNotes(roleId, notes) {
       if (!row) throw new Error("role_not_found");
       const content = structuredClone(row.content);
-      const role = [...content.experience, ...content.volunteering].find((item) => item.id === roleId);
+      // Same sections as the add_job_notes function: roles, projects and volunteering.
+      const role = [...content.experience, ...content.projects, ...content.volunteering].find((item) => item.id === roleId);
       if (!role) throw new Error("role_not_found");
       const all = [...role.notes, ...structuredClone(notes)];
       const newest = new Set(all.map((note, index) => ({ note, index }))

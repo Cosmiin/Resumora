@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  applyGuesses, CvContentSchema, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId,
+  applyGuesses, CvContentSchema, findScored, isRoleSection, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId, scoredItems, stepOrder,
   type CvContent, type Job, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -51,7 +51,7 @@ function apply(cv: CvContent, p: Proposal): void {
     if (!known && cv.technicalSkills.length < MAX_ITEMS) cv.technicalSkills.push({ id: newId(), name: p.text });
   }
   else {
-    for (const role of cv.experience) {
+    for (const { item: role } of scoredItems(cv)) {
       if (role.id === p.itemId) return void ((role as Record<string, unknown>)[p.field] = p.text);
       const bullet = role.bullets.find((b) => b.id === p.itemId);
       if (bullet) return void (bullet.text = p.text);
@@ -82,9 +82,11 @@ export async function acceptSection(
   const content = structuredClone(doc.content);
   if (input.redo && roleId) {
     // The redone proposals replace the role's earlier ones: start again from its Base wording.
-    const baseRole = (await deps.cv.get()).content.experience.find((role) => role.id === roleId);
-    const at = content.experience.findIndex((role) => role.id === roleId);
-    if (baseRole && at >= 0) content.experience[at] = structuredClone(baseRole);
+    const baseRole = findScored((await deps.cv.get()).content, roleId)?.item;
+    for (const list of [content.experience, content.projects, content.volunteering] as CvContent["experience"][]) {
+      const at = list.findIndex((role) => role.id === roleId);
+      if (baseRole && at >= 0) list[at] = structuredClone(baseRole);
+    }
   }
   const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));
@@ -143,7 +145,7 @@ export async function acceptSection(
 
   if (notes.length > 0) {
     const base = (await deps.cv.get()).content;
-    const roleIds = new Set([...base.experience, ...base.volunteering].map((role) => role.id));
+    const roleIds = new Set(scoredItems(base).map(({ item }) => item.id));
     const fallback = newestRole(base.experience)?.id;
     const byRole = new Map<string, Note[]>();
     for (const { roleId, note } of notes) {
@@ -154,11 +156,13 @@ export async function acceptSection(
   }
 
   if (input.redo) return { run, score };
-  // The next role in CV order, then the next section after the last role.
-  const nextRole = roleId ? run.roleOrder![run.roleOrder!.indexOf(roleId) + 1] ?? null : null;
+  // The step's next item in CV order, then the next section after its last item (a role step starts on its first item).
+  const order = roleId ? stepOrder(run, parsed.data, section) : [];
+  const nextRole = roleId ? order[order.indexOf(roleId) + 1] ?? null : null;
   const next = nextRole ? section : run.sections[run.sections.indexOf(section) + 1] ?? null;
+  const currentRoleId = nextRole ?? (isRoleSection(next) ? stepOrder(run, parsed.data, next)[0] ?? null : null);
   const updated = await deps.tailor.updateRun(run.id, {
-    currentSection: next, status: next ? "running" : "done", ...(roleId ? { currentRoleId: nextRole } : {}),
+    currentSection: next, status: next ? "running" : "done", ...(roleId || isRoleSection(next) ? { currentRoleId } : {}),
   });
   if (!updated) throw jobNotFound();
   if (!next) await markTailored(deps.jobs, run.jobId);

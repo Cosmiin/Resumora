@@ -42,7 +42,7 @@ export function reviewMarks(review: TailoredCv["review"], content: TailoredCv["c
 
 /** The page section each tailoring section rewrites ("achievements" in tailoring are the CV's awards). */
 const TAILOR_SECTION_OF: Partial<Record<SectionKey, TailorSection>> = {
-  experience: "experience", skills: "skills", summary: "summary", awards: "achievements", languages: "languages",
+  experience: "experience", projects: "projects", volunteering: "projects", skills: "skills", summary: "summary", awards: "achievements", languages: "languages",
 };
 
 const asResponse =(cv: TailoredCv) => ({ content: cv.content, version: cv.version, updatedAt: cv.updatedAt });

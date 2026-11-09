@@ -152,6 +152,23 @@ describe("PATCH /v1/tailored/:id/review (guided review)", () => {
     expect(cv.version).toBe(version + 1);
   });
 
+  it("Remove and Edit work on a guessed project bullet too (E6 Task 9)", async () => {
+    const { id, version } = await seeded();
+    const project = { ...role, id: "00000000-0000-4000-8000-0000000000a2", title: "Payroll checker", company: "Personal project", url: "",
+      bullets: [{ id: "00000000-0000-4000-8000-0000000000b2", text: "Built a checker" }] };
+    const line = project.bullets[0]!.id;
+    const doc = docs.cvs.get(id)!;
+    doc.baseSnapshot = { ...doc.baseSnapshot, projects: [project] };
+    doc.content = { ...doc.content, projects: [{ ...project, bullets: [{ id: line, text: "Built a payroll accuracy checker" }] }] };
+    doc.review = { ...doc.review, projects: { [line]: guess("Built a payroll accuracy checker") } };
+    const edited = await review(id, { section: "projects", key: line, action: "edit", text: "Built a payroll checker in Excel", version });
+    expect(edited.status).toBe(200);
+    const after = await row(edited);
+    expect(after.content.projects[0]!.bullets[0]!.text).toBe("Built a payroll checker in Excel");
+    const removed = await row(await review(id, { section: "projects", key: line, action: "remove", version: after.version }));
+    expect(removed.content.projects[0]!.bullets[0]!.text).toBe("Built a checker");
+  });
+
   it("Remove cuts a guessed summary phrase and drops a new skill", async () => {
     const { id, version } = await seeded();
     const first = await row(await review(id, { section: "summary", key: "summary#0", action: "remove", version }));

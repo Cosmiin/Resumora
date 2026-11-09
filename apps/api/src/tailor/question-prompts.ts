@@ -8,6 +8,7 @@ For a gap marked inferred, ask a "confirm_inferred" question: "We think you know
 Otherwise use kind "options" with 2 to 4 short answer options; the person can also type or speak instead.
 Set roleId to the id of the CV role the question is about, or null for skills, summary, languages or layout questions.
 In experience, "role" is the one role to ask about: ask only about it, and treat the roles in "cv" as read-only context.
+In projects, "role" is one project or volunteering role (its "kind" says which): ask only about it, in words that fit a project or volunteering, and set roleId to its id.
 Set bulletId to the id of the role's bullet a question is about, or null when it is about the whole role or not about a role.
 In skills, ask only about skills, one skill per question, never about a role: "Do you know SQL?", with options like Yes / A little / No.
 Set roleId to null and skill to that skill's short name. In other sections set skill to null.

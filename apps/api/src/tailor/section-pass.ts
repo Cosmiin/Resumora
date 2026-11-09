@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  placeGuesses, type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
+  isRoleSection, placeGuesses, scoredItems, stepItems, type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError, type LogFn } from "../errors.ts";
@@ -23,21 +23,24 @@ const ModelProposalsSchema = z.object({
 });
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
 
-/** Experience goes role by role: each step names the run's current role, any other is 409 role_not_current. */
+/**
+ * Experience and Projects & volunteering go item by item: each step names the run's current item,
+ * any other is 409 role_not_current.
+ */
 export function currentRole(run: TailorRun, section: TailorSection, roleId: string | undefined): string | null {
-  if (section !== "experience" || !run.roleOrder?.length) return null;
+  if (!isRoleSection(section) || !run.currentRoleId) return null;
   if (!roleId || roleId !== run.currentRoleId) throw new ApiError(409, "role_not_current", "This role isn't the current step.");
   return roleId;
 }
 
 /**
  * The items a section's proposals may point at, keyed by stable item id, with the fields that may change.
- * With a role, Experience has only that role's items.
+ * With an item, a role step (Experience, Projects & volunteering) has only that item's fields and bullets.
  */
 export function sectionItems(cv: CvContent, section: TailorSection, roleId: string | null = null): Map<string, Item> {
   const items = new Map<string, Item>();
-  if (section === "experience") {
-    for (const role of cv.experience.filter((r) => !roleId || r.id === roleId)) {
+  if (isRoleSection(section)) {
+    for (const role of stepItems(cv, section).filter((r) => !roleId || r.id === roleId)) {
       const { company, title, startDate, endDate, description } = role;
       items.set(role.id, { fields: { description, company, title, startDate, endDate }, roleId: role.id });
       for (const bullet of role.bullets) items.set(bullet.id, { fields: { text: bullet.text }, roleId: role.id });
@@ -63,6 +66,12 @@ function sectionData(cv: CvContent, section: TailorSection, jobId: string, roleI
   const roles = cv.experience.map((role) => ({ ...role, notes: role.notes.filter((note) => note.jobId === undefined || note.jobId === jobId) }));
   // One role to edit; the other roles are read-only context.
   if (section === "experience") return { edit: roles.filter((role) => role.id === roleId), context: { roles: roles.filter((role) => role.id !== roleId) } };
+  if (section === "projects") {
+    // One project or volunteering role to edit, with its kind; the roles and the other items are read-only context.
+    const items = scoredItems(cv).filter(({ kind }) => kind !== "role")
+      .map(({ item, kind }) => ({ kind, ...item, notes: item.notes.filter((note) => note.jobId === undefined || note.jobId === jobId) }));
+    return { edit: items.filter((item) => item.id === roleId), context: { roles, projectsAndVolunteering: items.filter((item) => item.id !== roleId) } };
+  }
   const skills = { technicalSkills: cv.technicalSkills, professionalSkills: cv.professionalSkills };
   if (section === "skills") return { edit: skills, context: { roles } };
   if (section === "summary") return { edit: { summary: cv.basics.summary, titles: cv.basics.titles }, context: { roles, skills } };

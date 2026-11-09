@@ -19,8 +19,10 @@ export type NewRun = {
   kind: TailorRun["kind"];
   sections: TailorSection[];
   currentSection: TailorSection | null;
-  /** Experience role ids in CV order; the first becomes the current role. */
+  /** Item ids of the role steps in CV order (roles, then projects, then volunteering). */
   roleOrder?: string[];
+  /** The item the run starts on; absent = the first of roleOrder. */
+  currentRoleId?: string | null;
 };
 
 /** Match scores, tailored CVs and tailor runs belonging to the signed-in user. */

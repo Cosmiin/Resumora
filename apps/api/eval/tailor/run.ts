@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { z } from "zod";
 import {
-  CvContentSchema, hasUnknownNumber, JobExtractionSchema, TAILOR_SECTIONS, type CvContent, type JobExtraction, type MatchScore,
+  CvContentSchema, hasUnknownNumber, isRoleSection, JobExtractionSchema, type CvContent, type JobExtraction, type MatchScore, type TailorSection,
 } from "@resumora/shared";
 import type { AiCallLog, ModelDeps, Provider } from "../../src/ai/call-model.ts";
 import { createApp, type AppDeps } from "../../src/app.ts";
@@ -178,13 +178,13 @@ export async function runPair(pair: Pair, model: (calls: AiCallLog[]) => ModelDe
     const jobId = crypto.randomUUID();
     await jobs.repoFor(userId).create({ id: jobId, source: "link", url: "https://example.test/job", urlNormalized: jobId, rawText: "eval", jsonLd: null });
     await jobs.admin.finish(jobId, pair.job);
-    const start = await post(`/v1/jobs/${jobId}/tailor`, { tone: "neutral" }) as { run: { id: string; currentRoleId?: string | null } };
+    const start = await post(`/v1/jobs/${jobId}/tailor`, { tone: "neutral" }) as { run: { id: string; sections: TailorSection[]; currentRoleId?: string | null } };
     let score2: MatchScore | null = null;
     let roleId = start.run.currentRoleId ?? null;
-    for (const section of TAILOR_SECTIONS) {
-      // Experience goes role by role, in CV order; every other section is one step.
+    for (const section of start.run.sections) {
+      // Experience and Projects & volunteering go item by item, in CV order; every other section is one step.
       do {
-        const body = section === "experience" && roleId ? { roleId } : {};
+        const body = isRoleSection(section) && roleId ? { roleId } : {};
         await post(`/v1/tailor-runs/${start.run.id}/sections/${section}/run`, body);
         // No decisions: proposals are kept, flagged ones fall back to the Base wording, inferred ones stay unreviewed.
         const accepted = await post(`/v1/tailor-runs/${start.run.id}/sections/${section}/accept`, body) as {
@@ -193,7 +193,7 @@ export async function runPair(pair: Pair, model: (calls: AiCallLog[]) => ModelDe
         score2 = accepted.score;
         roleId = accepted.run.currentRoleId ?? null;
         if (accepted.run.currentSection !== section) break;
-      } while (section === "experience");
+      } while (isRoleSection(section));
     }
     const tailored = [...docs.cvs.values()][0]!.content;
     row.score2 = score2?.total ?? null;

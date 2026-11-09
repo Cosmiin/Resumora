@@ -1,4 +1,5 @@
-import type { CvContent, Locale } from "@resumora/shared";
+import type { CvContent, Locale, ScoredKind } from "@resumora/shared";
+import { kindKey } from "./role-done.ts";
 import { formatRange } from "../cv/page/blocks.ts";
 import { t } from "../i18n/t.ts";
 import "../styles/focus.css";
@@ -24,12 +25,12 @@ export function RoleHeading({ role, locale }: { role: Role; locale: Locale }) {
  * The role a question is about, as in enrichment: its current wording, with the bullet the question points at
  * glowing (marigold edge), or "About the whole role" when it points at none.
  */
-export function RolePanel({ role, locale, bulletId }: { role: Role; locale: Locale; bulletId?: string }) {
+export function RolePanel({ role, locale, bulletId, kind }: { role: Role; locale: Locale; bulletId?: string; kind?: ScoredKind }) {
   const pointed = role.bullets.some((bullet) => bullet.id === bulletId);
   return <aside className="tailor-role" aria-label={t("tailor.role.label")}>
-    <p className="tailor-eyebrow">{t("tailor.role.eyebrow")}</p>
+    <p className="tailor-eyebrow">{t(`tailor.role.eyebrow${kindKey(kind)}`)}</p>
     <RoleHeading role={role} locale={locale} />
-    {!pointed && <p><span className="fm-tag">{t("tailor.role.whole")}</span></p>}
+    {!pointed && <p><span className="fm-tag">{t(`tailor.role.whole${kindKey(kind)}`)}</span></p>}
     {role.description.trim() && <p className="tailor-role-text">{role.description}</p>}
     {role.bullets.length > 0 && <ul className="fm-bullets">
       {role.bullets.map((bullet) => <li key={bullet.id} className={bullet.id === bulletId ? "fm-bullet is-current" : "fm-bullet"}

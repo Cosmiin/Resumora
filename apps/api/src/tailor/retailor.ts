@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TAILOR_SECTIONS, TailorSectionSchema, type Steering, type TailorRun } from "@resumora/shared";
+import { runItems, runSections, TAILOR_SECTIONS, TailorSectionSchema, type Steering, type TailorRun } from "@resumora/shared";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
@@ -23,10 +23,11 @@ export async function startRetailor(
   const job = await deps.jobs.get(doc.jobId);
   if (!job) throw jobNotFound();
   if (job.status !== "ready" || !job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
-  const sections = TAILOR_SECTIONS.filter((section) => picked.includes(section));
+  const sections = runSections(doc.content, picked);
+  if (sections.length === 0) throw new ApiError(400, "invalid_content", "This CV has nothing to tailor in those steps.");
   const run = await deps.tailor.createRun({
     jobId: doc.jobId, tailoredCvId, kind: sections.length === 1 ? "section" : "retailor", sections, currentSection: sections[0]!,
-    roleOrder: sections.includes("experience") ? doc.content.experience.map((role) => role.id) : [],
+    ...runItems(doc.content, sections),
   });
   return { run };
 }
@@ -52,10 +53,10 @@ export async function restartWithSteering(
   // Stored only once the reset went through, so a conflict leaves the old steering with the old wording.
   if (!(await deps.tailor.setSteering(doc.id, steering))) throw jobNotFound();
   // Every step, whatever the old run covered: a re-tailor of one section would otherwise leave the rest at Base.
-  const sections = [...TAILOR_SECTIONS];
+  const sections = runSections(base);
   const created = await deps.tailor.createRun({
     jobId: run.jobId, tailoredCvId: doc.id, kind: "retailor", sections, currentSection: sections[0]!,
-    roleOrder: sections.includes("experience") ? base.experience.map((role) => role.id) : [],
+    ...runItems(base, sections),
   });
   // Flag questions belonged to the old proposals; the person's own answers carry over.
   const questions = (run.questions ?? []).filter((question) => question.kind !== "flag");

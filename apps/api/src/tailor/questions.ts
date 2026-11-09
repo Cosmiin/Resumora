@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  MAX_TEXT, NoteSchema, newId,
+  findScored, isRoleSection, MAX_TEXT, NoteSchema, newId, scoredItems, stepItems,
   type Answer, type CvContent, type Experience, type JobExtraction, type Note, type TailorQuestion as Question, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
@@ -39,9 +39,17 @@ export function newestRole(roles: Experience[]): Experience | undefined {
     || (b.endDate || b.startDate).localeCompare(a.endDate || a.startDate) || b.startDate.localeCompare(a.startDate))[0];
 }
 
+/** A role step's question context: the item to ask about (with its kind), and the CV without it as read-only context. */
+function aboutItem(cv: CvContent, id: string) {
+  const found = findScored(cv, id)!;
+  const without = <T extends { id: string }>(list: T[]) => list.filter((item) => item.id !== id);
+  return { role: { kind: found.kind, ...found.item },
+    cv: { ...cv, experience: without(cv.experience), projects: without(cv.projects), volunteering: without(cv.volunteering) } };
+}
+
 /** Everything already answered for this job (or, with a role, for that role): its job notes on the CV and this run's answers. */
 function answeredForJob(cv: CvContent, run: TailorRun, roleId: string | null) {
-  const notes = [...cv.experience, ...cv.volunteering].filter((role) => !roleId || role.id === roleId).flatMap((role) => role.notes)
+  const notes = scoredItems(cv).map(({ item }) => item).filter((role) => !roleId || role.id === roleId).flatMap((role) => role.notes)
     .filter((note) => note.jobId === run.jobId).map(({ question, answer }) => ({ question, answer }));
   const asked = new Map((run.questions ?? []).filter((question) => question.kind !== "flag" && (!roleId || question.roleId === roleId))
     .map((question) => [question.id, question.text]));
@@ -59,14 +67,14 @@ export async function askQuestions(
   input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection; roleId?: string },
 ): Promise<Question[]> {
   const roleId = currentRole(input.run, input.section, input.roleId);
-  const role = roleId ? input.cv.experience.find((r) => r.id === roleId) : undefined;
+  const role = roleId ? stepItems(input.cv, input.section).find((r) => r.id === roleId) : undefined;
   // A CV without roles has nothing to ask in Experience.
-  if (input.section === "experience" && !role) return [];
+  if (isRoleSection(input.section) && !role) return [];
   const asked = input.run.questions ?? [];
   // Flag questions from the section checks are not job questions and do not count toward the caps.
   const jobQuestions = asked.filter((question) => question.kind !== "flag");
-  const inRole = (question: Question) => question.section === "experience" && question.roleId === roleId;
-  const runLeft = MAX_RUN_QUESTIONS - jobQuestions.filter((question) => question.section !== "experience").length;
+  const inRole = (question: Question) => question.section === input.section && question.roleId === roleId;
+  const runLeft = MAX_RUN_QUESTIONS - jobQuestions.filter((question) => !isRoleSection(question.section)).length;
   const max = role ? MAX_ROLE_QUESTIONS - jobQuestions.filter(inRole).length
     : input.section === "skills" ? Math.min(runLeft, MAX_SKILL_QUESTIONS - jobQuestions.filter((question) => question.section === "skills").length)
     : runLeft;
@@ -101,7 +109,7 @@ export async function askQuestions(
       // Experience: the role to ask about, the other roles as read-only context.
       user: questionUserMessage({
         section: input.section, job: input.job, gaps, answered, max, steering,
-        ...(role ? { role: cv.experience.find((r) => r.id === role.id), cv: { ...cv, experience: cv.experience.filter((r) => r.id !== role.id) } } : { cv }),
+        ...(role ? aboutItem(cv, role.id) : { cv }),
       }),
       maxOutputTokens: 4000,
     });
@@ -109,7 +117,7 @@ export async function askQuestions(
     throw new ApiError(502, "ai_failed", `Couldn't tailor ${input.section}. Try again.`);
   }
 
-  const roleIds = new Set([...input.cv.experience, ...input.cv.volunteering].map((role) => role.id));
+  const roleIds = new Set(scoredItems(input.cv).map(({ item }) => item.id));
   // A question that fits two roles is asked once in each, so only this role's questions count as asked.
   const seen = new Set([...answered.map((item) => same(item.question)),
     ...asked.filter((question) => !role || inRole(question)).map((question) => same(question.text))]);
@@ -142,7 +150,7 @@ export async function saveAnswers(
   }
   const stored = new Map((run.answers ?? []).map((answer) => [answer.questionId, answer]));
   const content = (await deps.cv.get()).content;
-  const roleIds = new Set([...content.experience, ...content.volunteering].map((role) => role.id));
+  const roleIds = new Set(scoredItems(content).map(({ item }) => item.id));
   const fallback = newestRole(content.experience)?.id;
   const byRole = new Map<string, Note[]>();
   for (const answer of answers) {

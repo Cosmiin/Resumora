@@ -5,6 +5,11 @@ const SECTION_RULES: Record<Exclude<TailorSection, "layout">, string> = {
 Reword bullets with the job's exact keywords inside natural sentences. Condense old or less relevant roles to 1-2 short bullets' worth of wording.
 Never remove a role, a bullet's facts, or change company, title or dates.
 Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; a role's own wording is itemId = the role's id, field "description". Never return a role's bullets as one field.`,
+  projects: `The item under "edit" is a project or a volunteering role (its "kind" says which). Tailor it like a role.
+Reorder its bullets so the most relevant come first (return proposals in that order).
+Reword bullets with the job's exact keywords inside natural sentences.
+Never remove the item or a bullet's facts, and never change its name (title), organisation (company), dates or link.
+Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; the item's own wording is itemId = its id, field "description". Never return its bullets as one field.`,
   skills: `Reword skill names toward the job's exact keywords, most relevant first (return proposals in that order).
 You may add job-relevant skills the CV, notes or answers support, as itemId "new-skill", field "name", with inferred true.
 A skill name is a short label of at most 3 words, never a phrase or sentence.
