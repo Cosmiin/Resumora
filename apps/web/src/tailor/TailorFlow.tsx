@@ -5,6 +5,7 @@ import { getCv } from "../cv/cv-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard, type Draft } from "./QuestionCard.tsx";
+import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
 import { SteeringStep } from "./SteeringStep.tsx";
@@ -124,7 +125,9 @@ export function TailorFlow() {
     setPhase({ kind: "role", roleId, busy: true, resume });
     try {
       const { proposals, removed } = await api.redoRole(runRef.current!.id, roleId, answers);
-      setPhase({ kind: "redo", roleId, proposals, removed, busy: false, resume });
+      // The role under review goes back to its own review, whose accept moves the run on.
+      const current = runRef.current?.currentSection === "experience" && runRef.current.currentRoleId === roleId;
+      setPhase(current ? { kind: "review", proposals, removed, busy: false } : { kind: "redo", roleId, proposals, removed, busy: false, resume });
     } catch (cause) { fail(cause, "experience", () => setPhase({ kind: "role", roleId, busy: false, resume })); }
   }
   async function acceptRedo(roleId: string, body: api.AcceptBody, review: Extract<Phase, { kind: "redo" }>) {
@@ -135,6 +138,14 @@ export function TailorFlow() {
       track(result.run);
       setPhase(review.resume);
     } catch (cause) { fail(cause, "experience", () => setPhase({ ...review, busy: false })); }
+  }
+  /** "← My answers" on the role under review: its answers, read fresh from the run. */
+  async function openAnswers(review: Phase) {
+    setPhase({ kind: "loading" });
+    try {
+      track(await api.getRun(runRef.current!.id));
+      setPhase({ kind: "role", roleId: runRef.current!.currentRoleId!, busy: false, resume: review });
+    } catch (cause) { fail(cause, "experience", () => setPhase(review)); }
   }
   /** The Tone and questions screens of a started run, from its stored steering (never from defaults). */
   async function openSteer(resume: Phase) {
@@ -226,8 +237,11 @@ export function TailorFlow() {
       onUpdate={(answers) => void redo(roleId, answers, resume)} onClose={() => setPhase(resume)} />;
   } else if (phase.kind === "redo") {
     const review = phase;
-    body = <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
-      busy={review.busy} onAccept={(accepted) => void acceptRedo(review.roleId, accepted, review)} cv={cv} removed={review.removed} />;
+    const role = cv?.experience.find((r) => r.id === review.roleId);
+    const onAccept = (accepted: api.AcceptBody) => void acceptRedo(review.roleId, accepted, review);
+    body = role ? <RoleReview key={`redo-${role.id}`} role={role} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} />
+      : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
+        busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
   }
   else if (phase.kind === "deleted") {
     body = <section className="tailor-card" role="alert"><h2>{t("tailor.error.deleted")}</h2>
@@ -255,6 +269,10 @@ export function TailorFlow() {
       onNext={answerWith} onSkip={() => answerWith({ value: null, via: "skip" })}
       onBack={phase.index > 0 ? () => setPhase({ ...phase, index: phase.index - 1 }) : undefined}
       role={roleFor(question)} roles={cv?.experience ?? []} locale={cv?.locale} />;
+  } else if (section === "experience" && cv?.experience.some((r) => r.id === run?.currentRoleId)) {
+    const review = phase;
+    body = <RoleReview key={run!.currentRoleId!} role={cv.experience.find((r) => r.id === run!.currentRoleId)!} proposals={review.proposals} locale={locale}
+      busy={review.busy} onAccept={(accepted) => void accept(section, accepted)} onAnswers={() => void openAnswers(review)} removed={review.removed} />;
   } else {
     body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={[]}
       confirmed={[]} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} cv={cv} removed={phase.removed} />;

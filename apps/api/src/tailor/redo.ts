@@ -30,7 +30,9 @@ export async function redoRole(
   input: { userId: string; run: TailorRun; job: JobExtraction; roleId: string; answers: Answer[] },
 ): Promise<{ proposals: Proposal[]; removed: number }> {
   const { run, roleId, answers } = input;
-  finishedRole(run, roleId);
+  // The role under review (its pass is done, not yet accepted) can be redone too: "← My answers" on its review.
+  const underReview = run.status === "waiting_user" && run.currentSection === "experience" && run.currentRoleId === roleId;
+  if (!underReview) finishedRole(run, roleId);
   const questions = new Map((run.questions ?? []).filter((q) => q.section === "experience" && q.roleId === roleId && q.kind !== "flag")
     .map((q) => [q.id, q]));
   if (answers.some((answer) => !questions.has(answer.questionId))) {

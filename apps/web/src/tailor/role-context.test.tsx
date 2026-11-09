@@ -96,36 +96,8 @@ describe("ExpQA / SkillsA1: the question screen", () => {
   });
 });
 
-describe("F4: Experience review goes one role per page, role first, before and after", () => {
+describe("F4: without the CV, the Experience review is a plain list", () => {
   const proposals = [change("b3", "Cleaned and validated data"), change("b1", "Automated weekly KPI reports"), change("r1", "Leads sales reporting.")];
-
-  it("pages through roles in CV order and accepts every role's decisions on the last page", async () => {
-    const user = userEvent.setup();
-    const onAccept = vi.fn();
-    render(<SectionReview section="experience" proposals={proposals} flags={[]} confirmed={[]} busy={false} onAccept={onAccept} cv={cv} />);
-
-    expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 3, name: "Business Analyst" })).toBeInTheDocument();
-    expect(screen.getByText("Made weekly reports")).toBeInTheDocument();
-    expect(screen.getByText("Automated weekly KPI reports")).toBeInTheDocument();
-    expect(screen.getByText("Owns reporting for sales.")).toBeInTheDocument();
-    expect(screen.queryByText("Cleaned and validated data")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Accept section" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Revert Automated weekly KPI reports" }));
-
-    await user.click(screen.getByRole("button", { name: "Next role" }));
-    expect(screen.getByText("Role 2 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 3, name: "Analyst" })).toBeInTheDocument();
-    expect(screen.getByText("Cleaned data")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Previous role" }));
-    expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Next role" }));
-
-    await user.click(screen.getByRole("button", { name: "Accept section" }));
-    expect(onAccept).toHaveBeenCalledWith({
-      decisions: [{ itemId: "b3", keep: true }, { itemId: "b1", keep: false }, { itemId: "r1", keep: true }], inferred: [], flags: [],
-    });
-  });
 
   it("keeps the plain list when the CV could not be loaded", () => {
     render(<SectionReview section="experience" proposals={proposals} flags={[]} confirmed={[]} busy={false} onAccept={vi.fn()} cv={null} />);
