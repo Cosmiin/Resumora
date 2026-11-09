@@ -180,8 +180,8 @@ describe("POST /v1/enrich/brain-dump", () => {
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_brain_dump", "enrich_score"]);
   });
 
-  it.each([{ notes: [] }, { notes: [note()] }])("requires role answers for source answers: %j", async ({ notes }) => {
-    role.notes = notes;
+  it("requires role answers for source answers", async () => {
+    role.notes = [];
     await save();
     const snapshot = vi.spyOn(cv, "snapshot");
     const res = await post({ ...input(), source: "answers" });
@@ -191,23 +191,24 @@ describe("POST /v1/enrich/brain-dump", () => {
     expect(model.requests).toHaveLength(0);
   });
 
-  it("uses only the newest ten non-ramble answers in newest-first order", async () => {
+  it("uses the newest ten answers, the box included, in newest-first order", async () => {
     role.notes = [
       ...Array.from({ length: 12 }, (_, i) => ({
         ...note("Answer " + i, new Date(Date.UTC(2026, 10, 5, i)).toISOString()), question: "Question " + i,
       })),
-      note("Excluded ramble", "2026-11-06T12:00:00.000Z"),
+      note("Included ramble", "2026-11-06T12:00:00.000Z"),
     ];
     await save();
     const res = await post({ ...input(), source: "answers" });
     expect(res.status).toBe(200);
     const messages = model.requests[0]!.messages as { content: string }[];
     const user = messages[1]!.content;
-    expect(user).not.toContain("Excluded ramble");
-    expect(user).not.toContain("Q: Question 0 A:");
+    expect(user).toContain("A: Included ramble");
     expect(user).not.toContain("Q: Question 1 A:");
-    for (let i = 2; i < 12; i++) expect(user).toContain("Q: Question " + i + " A: Answer " + i);
-    expect(user.indexOf("Q: Question 11 A:")).toBeLessThan(user.indexOf("Q: Question 2 A:"));
+    expect(user).not.toContain("Q: Question 2 A:");
+    for (let i = 3; i < 12; i++) expect(user).toContain("Q: Question " + i + " A: Answer " + i);
+    expect(user.indexOf("A: Included ramble")).toBeLessThan(user.indexOf("Q: Question 11 A:"));
+    expect(user.indexOf("Q: Question 11 A:")).toBeLessThan(user.indexOf("Q: Question 3 A:"));
   });
   it("requires a ramble", async () => {
     const snapshot = vi.spyOn(cv, "snapshot");

@@ -11,11 +11,15 @@ type Props = {
   onSubmit(text: string, via: Via[]): void;
   onSkip(): void;
   onFreeTalk(): void;
+  /** The earlier answer, when Back returned here. */
+  initial?: string;
+  /** Shown (bottom left) when there is an earlier step. */
+  onBack?(): void;
 };
 
 /** One question about the current bullet; the answer turns into a proposal right away. */
-export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, onSkip, onFreeTalk }: Props) {
-  const [value, setValue] = useState("");
+export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, onSkip, onFreeTalk, initial = "", onBack }: Props) {
+  const [value, setValue] = useState(initial);
   const [via, setVia] = useState<Via[]>([]);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const options = question.options.filter((o) => o.length <= 60 && isAllowedOption(o)).slice(0, 4);
@@ -41,6 +45,7 @@ export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, on
         {t("enrich.focus.freeTalk")}
       </button>
       <div className="fm-foot">
+        <BackButton onBack={onBack} busy={busy} />
         <button type="button" className="fm-ghost" onClick={onSkip} disabled={busy}>
           {t("enrich.focus.skip")}
         </button>
@@ -54,5 +59,15 @@ export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, on
         </button>
       </div>
     </>
+  );
+}
+
+/** "← Back", bottom left, on every step that has an earlier one. */
+export function BackButton({ onBack, busy }: { onBack?(): void; busy: boolean }) {
+  if (!onBack) return null;
+  return (
+    <button type="button" className="fm-ghost fm-back" onClick={onBack} disabled={busy}>
+      {t("enrich.focus.back")}
+    </button>
   );
 }

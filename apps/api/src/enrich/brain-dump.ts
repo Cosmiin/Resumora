@@ -18,8 +18,8 @@ export async function brainDump(
     throw new ApiError(409, "not_saved", "Your latest changes aren't saved yet. Try again in a moment.");
   }
   const source = input.source ?? "ramble";
-  const notes = role.notes.filter((n) => source === "answers"
-    ? n.question !== BRAIN_DUMP_QUESTION : n.question === BRAIN_DUMP_QUESTION)
+  // answers: every role answer, the "Tell us about…" box included (a thin role's pick step uses both).
+  const notes = role.notes.filter((n) => source === "answers" || n.question === BRAIN_DUMP_QUESTION)
     .sort((a, b) => Date.parse(b.askedAt) - Date.parse(a.askedAt));
   if (!notes.length) {
     if (source === "answers") throw new ApiError(400, "no_answers", "Save answers for this role first.");

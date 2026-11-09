@@ -100,7 +100,7 @@ describe("useFocusSession", () => {
     expect(h.result.current.roleQuestions).toEqual([roleQuestions[1]]);
     const ui = render(<FocusMode target={{ roleId: "r", mode: "improve" }} {...h.opts()} />);
     await settle();
-    expect(screen.getByText("About this role · 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("Question 1 of 1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: roleQuestions[1]!.text })).toBeInTheDocument();
     ui.unmount();
     await submit(h, "Finance");
@@ -186,6 +186,7 @@ describe("useFocusSession", () => {
   it.each([0, 1])("creates bullet proposals from role answers for %i bullets", async (count) => {
     const r = role(count);
     const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions } }]]) }, r);
+    act(() => h.result.current.skip()); // the box comes first on a thin role
     await submit(h, "The CEO");
     act(() => h.result.current.skip());
     await settle();
@@ -194,21 +195,23 @@ describe("useFocusSession", () => {
     act(() => h.result.current.addSelected(["p"]));
     expect(h.opts().cv.experience[0]!.bullets).toHaveLength(count + 1);
   });
-  it.each([0, 1])("opens free talk after skipping every role question for %i bullets", (count) => {
+  it.each([0, 1])("opens on the box, then the role questions, for %i bullets", (count) => {
     const r = role(count);
     const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions } }]]) }, r);
-    act(() => h.result.current.skip());
-    act(() => h.result.current.skip());
     expect(h.result.current.step.kind).toBe("brainDump");
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
     expect(api.brainDump).not.toHaveBeenCalled();
   });
-  it("scores an empty role once on open, then asks its role questions", async () => {
+  it("scores an empty role once on open, then opens on the box and asks its role questions after it", async () => {
     const r = role(0);
     api.scoreRole.mockResolvedValue({ ...score(r), roleQuestions });
     const h = mount({ scores: new Map([["r", { state: "none" }]]) }, r);
     expect(h.result.current.busy).toBe(true);
     await settle();
     expect(api.scoreRole).toHaveBeenCalledExactlyOnceWith("r", fingerprint(r, "en"));
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+    act(() => h.result.current.skip());
     expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
     h.update({ scores: new Map([["r", { state: "none" }]]) });
     expect(api.scoreRole).toHaveBeenCalledTimes(1);
@@ -552,13 +555,13 @@ describe("useFocusSession", () => {
     expect(api.improveBullet).toHaveBeenCalledTimes(2);
     expect(api.improveBullet.mock.calls[1]![0].fingerprint).toBe(fingerprint(cv.experience[0]!, "en"));
   });
-  it("stores brain dumps with the shared question and shows dumpEmpty for no proposals", async () => {
+  it("stores the box answer with the shared question; no new bullets from it goes on to the bullet questions", async () => {
     api.brainDump.mockResolvedValue({ proposals: [], roleBefore: null, roleAfterAll: null });
     const h = mount({}, role(1));
     await submit(h, "Built reports every week");
+    await settle();
     expect(h.dispatch.mock.calls[0]![0]).toMatchObject({ type: "setNote", note: { question: BRAIN_DUMP_QUESTION } });
-    expect(h.result.current.step).toEqual({ kind: "dumpEmpty" });
-    act(() => h.result.current.next());
+    expect(api.brainDump).toHaveBeenCalledWith(expect.objectContaining({ source: "answers" }));
     expect(h.result.current.step.kind).toBe("question");
   });
   it("skipping a failed free talk returns to the same bullet question", async () => {
@@ -787,5 +790,140 @@ describe("useFocusSession", () => {
     h.update({ scores: new Map<string, RoleScoreState>() });
     expect(h.opts().onClose).toHaveBeenCalledTimes(1);
     expect(api.roleFacts).not.toHaveBeenCalled();
+  });
+});
+
+describe("steps never disappear, thin roles and Back (E1)", () => {
+  const withQuestions = (r: Experience, qs = roleQuestions) => new Map([["r", { state: "ready" as const, result: { ...score(r), roleQuestions: qs } }]]);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    api.brainDump.mockResolvedValue({ proposals: [{ id: "p", text: "Built weekly reports", score: 80 }], roleBefore: 40, roleAfterAll: 70 });
+    api.roleFacts.mockResolvedValue({ facts: [], fromNotes: notesHash([]) });
+    api.scoreRole.mockRejectedValue(new Error("unavailable"));
+  });
+  afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
+
+  it("(a) a one-bullet role keeps the box on screen when a fresh score with role questions arrives", async () => {
+    const r = role(1);
+    const h = mount({}, r);
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+    h.update({ scores: withQuestions(r) });
+    h.update({ scores: new Map([["r", { state: "ready", result: { ...score(r, 90), roleQuestions } }]]) });
+    await settle();
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+  });
+
+  it("(b) a thin role opens on the box, re-asks the AI after it, then asks the role questions, then the pick step", async () => {
+    const r = role(1);
+    api.scoreRole.mockResolvedValue({ ...score(r), roleQuestions: [roleQuestions[1]!] });
+    const h = mount({ scores: withQuestions(r) }, r);
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+    await submit(h, "I ran dispatch for a fintech");
+    expect(api.scoreRole).toHaveBeenCalledExactlyOnceWith("r", fingerprint(r, "en"), true);
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    expect(h.result.current.roleQuestions).toEqual([roleQuestions[1]]);
+    await submit(h, "Finance");
+    expect(api.brainDump).toHaveBeenCalledExactlyOnceWith({ roleId: "r", fingerprint: fingerprint(r, "en"), source: "answers" });
+    expect(h.result.current.step.kind).toBe("dumpPick");
+  });
+
+  it("a role the AI calls thin opens on the box even with three bullets", () => {
+    const r = role(3);
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions, thin: true } }]]) }, r);
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+  });
+
+  it("skipping the box goes to the stored role questions; skipping everything goes to the bullets without AI calls", () => {
+    const r = role(1);
+    const h = mount({ scores: withQuestions(r) }, r);
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    act(() => h.result.current.skip());
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b0" });
+    expect(api.brainDump).not.toHaveBeenCalled();
+    expect(api.scoreRole).not.toHaveBeenCalled();
+  });
+
+  it("(c) Back shows the earlier answer, and sending it again updates that note", async () => {
+    const r = role();
+    const h = mount({ scores: withQuestions(r) }, r);
+    expect(h.result.current.canBack).toBe(false);
+    await submit(h, "The CEO");
+    expect(h.result.current.step).toEqual({ kind: "role", index: 1 });
+    expect(h.result.current.canBack).toBe(true);
+    act(() => h.result.current.back());
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    expect(h.result.current.prefill).toBe("The CEO");
+    expect(h.result.current.canBack).toBe(false);
+    const id = h.opts().cv.experience[0]!.notes[0]!.id;
+    await submit(h, "The owner");
+    expect(h.opts().cv.experience[0]!.notes).toEqual([expect.objectContaining({ id, question: roleQuestions[0]!.text, answer: "The owner" })]);
+    expect(h.result.current.step).toEqual({ kind: "role", index: 1 });
+    expect(h.result.current.prefill).toBeNull();
+  });
+
+  it("Back from the pick step shows the box with its text, and Skip there returns to the pick step", async () => {
+    const r = role(1);
+    const h = mount({}, r);
+    await submit(h, "I ran dispatch");
+    await settle();
+    expect(h.result.current.step.kind).toBe("dumpPick");
+    expect(h.result.current.canBack).toBe(true);
+    act(() => h.result.current.back());
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+    expect(h.result.current.prefill).toBe("I ran dispatch");
+    act(() => h.result.current.skip());
+    expect(h.result.current.step.kind).toBe("dumpPick");
+    expect(api.brainDump).toHaveBeenCalledTimes(1);
+  });
+
+  it("(d) a score crossing 80 mid-session changes no step", async () => {
+    const r = role();
+    const h = mount({ scores: withQuestions(r) }, r);
+    await submit(h, "The CEO");
+    h.update({ scores: new Map([["r", { state: "ready", result: { ...score(r, 85), roleQuestions: [] } }]]) });
+    await settle();
+    expect(h.result.current.step).toEqual({ kind: "role", index: 1 });
+  });
+
+  it("(e) the E1 case: after the role questions the answers become bullets behind a plain working screen, never the box", async () => {
+    const r = role(1);
+    const gate = deferred();
+    api.brainDump.mockImplementation(async () => {
+      await gate.promise;
+      return { proposals: [{ id: "p", text: "Built weekly reports", score: 80 }], roleBefore: 40, roleAfterAll: 70 };
+    });
+    const h = mount({ scores: withQuestions(r) }, r);
+    act(() => h.result.current.skip());
+    await submit(h, "The CEO");
+    act(() => h.result.current.skip());
+    await settle();
+    expect(h.result.current.step).toEqual({ kind: "dumpWorking", source: "answers" });
+    await act(async () => gate.resolve());
+    expect(h.result.current.step.kind).toBe("dumpPick");
+  });
+});
+
+describe("Back edge cases", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    api.brainDump.mockResolvedValue({ proposals: [{ id: "p", text: "Built weekly reports", score: 80 }], roleBefore: 40, roleAfterAll: 70 });
+    api.roleFacts.mockResolvedValue({ facts: [], fromNotes: notesHash([]) });
+    api.scoreRole.mockRejectedValue(new Error("unavailable"));
+  });
+  afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
+  it("a box first answered after Back still becomes bullets at the end of the role questions", async () => {
+    const r = role(1);
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions } }]]) }, r);
+    act(() => h.result.current.skip());
+    act(() => h.result.current.back());
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+    await submit(h, "I ran dispatch");
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    act(() => h.result.current.skip());
+    act(() => h.result.current.skip());
+    await settle();
+    expect(api.brainDump).toHaveBeenCalledWith(expect.objectContaining({ source: "answers" }));
   });
 });

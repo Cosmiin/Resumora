@@ -88,7 +88,12 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  const stepKey = `${step.kind}:${"bulletId" in step ? step.bulletId : ""}:${"index" in step ? step.index : "asked" in step ? step.asked : ""}`;
+  const stepKey = `${step.kind}:${"bulletId" in step ? step.bulletId : ""}:${"index" in step ? step.index : "asked" in step ? step.asked : ""}:${session.revisit ?? ""}`;
+  // Back to the box: its earlier text comes back into it.
+  const { revisit, prefill } = session;
+  useEffect(() => {
+    if (revisit !== null && step.kind === "brainDump") setDump({ value: prefill ?? "", via: [] });
+  }, [revisit, prefill, step.kind]);
   useEffect(() => {
     if (SELF_FOCUSING.has(step.kind)) return;
     const frame = requestAnimationFrame(() => {
@@ -111,13 +116,21 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
   const grades = new Map(result?.bullets.map((b) => [b.id, b.score]));
   const scoreOf = (id: string) => (fresh ? grades.get(id) : (accepted.get(id) ?? grades.get(id)));
   const currentId = "bulletId" in step ? step.bulletId : step.kind === "celebrate" || step.kind === "role" ? undefined : queue[position];
-  const dumping = DUMP_KINDS.has(step.kind) || (step.kind === "scoring" && step.source === "dump");
+  // Turning role answers into bullets is a plain working screen, not the box (E1).
+  const answersWorking = step.kind === "dumpWorking" && step.source === "answers";
+  const dumping = (DUMP_KINDS.has(step.kind) && !answersWorking) || (step.kind === "scoring" && step.source === "dump");
   const dates = formatRange(role.startDate, role.endDate, role.current, cv.locale);
 
   const proposalText = step.kind === "proposal" ? role.bullets.find((b) => b.id === step.bulletId)?.text ?? "" : "";
-  const inQueue = !dumping && step.kind !== "roleDone" && step.kind !== "role"
-    && !(step.kind === "scoring" && step.source === "opening") && queue.length > 0;
+  const inQueue = !dumping && !answersWorking && step.kind !== "roleDone" && step.kind !== "role"
+    && !(step.kind === "scoring" && (step.source === "opening" || step.source === "box")) && queue.length > 0;
   const asking = step.kind === "question" && step.question !== null;
+  // 2B: one dot per step of the role (done / shown / to come) on steps that ask something.
+  const askingStep = step.kind === "role" || step.kind === "brainDump" || step.kind === "question" || step.kind === "needsDetail"
+    || step.kind === "dumpPick" || step.kind === "dumpEmpty";
+  const back = session.canBack ? session.back : undefined;
+  const roleQuestion = step.kind === "role" ? session.roleQuestions[step.index] : undefined;
+  const topic = roleQuestion && roleQuestion.topic !== "other" ? t(`enrich.focus.topic.${roleQuestion.topic}`) : null;
 
   return createPortal(
     <div
@@ -163,27 +176,41 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
         <button type="button" className="fm-close" onClick={() => session.close()}>
           <span aria-hidden="true">✕</span> {t("enrich.focus.close")}
         </button>
+        {askingStep && (
+          <div className="fm-steps" aria-hidden="true">
+            {Array.from({ length: session.dots.total }, (_, i) => (
+              <i key={i} className={i < session.dots.done ? "is-done" : i === session.dots.done ? "is-on" : undefined} />
+            ))}
+          </div>
+        )}
         {inQueue && (
           <>
-            <div className="fm-steps" aria-hidden="true">
-              {queue.map((id, i) => (
-                <i key={id} className={i < position ? "is-done" : i === position ? "is-on" : undefined} />
-              ))}
-            </div>
-            <p className="fm-eyebrow">
-              {t(asking ? "enrich.focus.questionOf" : "enrich.focus.progress", { n: Math.min(position + 1, queue.length), total: queue.length })}
-            </p>
+            {!askingStep && (
+              <div className="fm-steps" aria-hidden="true">
+                {queue.map((id, i) => (
+                  <i key={id} className={i < position ? "is-done" : i === position ? "is-on" : undefined} />
+                ))}
+              </div>
+            )}
+            {session.revisit === null && (
+              <p className="fm-eyebrow">
+                {t(asking ? "enrich.focus.questionOf" : "enrich.focus.progress", { n: Math.min(position + 1, queue.length), total: queue.length })}
+              </p>
+            )}
           </>
         )}
-        {step.kind === "role" && (
+        {step.kind === "role" && roleQuestion && (
           <>
-            <p className="fm-eyebrow">{t("enrich.focus.roleEyebrow", { n: step.index + 1, total: session.roleQuestions.length })}</p>
-            <QuestionStep key={stepKey} question={session.roleQuestions[step.index]!} needsDetail={false}
+            <p className="fm-eyebrow">
+              {[t("enrich.focus.questionOf", { n: step.index + 1, total: session.roleQuestions.length }), topic].filter(Boolean).join(" · ")}
+            </p>
+            <QuestionStep key={stepKey} question={roleQuestion} needsDetail={false} initial={session.prefill ?? ""} onBack={back}
               locale={cv.locale} busy={busy} onSubmit={session.submitAnswer} onSkip={session.skip} onFreeTalk={session.freeTalk} />
           </>
         )}
 
-        {(step.kind === "brainDump" || step.kind === "dumpWorking" || step.kind === "dumpEmpty") && (
+        {answersWorking && <Working text={t("enrich.focus.dump.working")} />}
+        {(step.kind === "brainDump" || (step.kind === "dumpWorking" && !answersWorking) || step.kind === "dumpEmpty") && (
           <BrainDumpStep
             roleId={role.id}
             title={role.title}
@@ -195,18 +222,23 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
             working={step.kind === "dumpWorking"}
             empty={step.kind === "dumpEmpty"}
             busy={busy}
+            boxFirst={session.boxFirst}
             onSubmit={session.submitAnswer}
             onSkip={session.skip}
+            onBack={back}
           />
         )}
         {step.kind === "dumpPick" && (
-          <DumpPickStep proposals={step.proposals} roleAfterAll={step.roleAfterAll} busy={busy} onAdd={session.addSelected} />
+          <DumpPickStep proposals={step.proposals} roleAfterAll={step.roleAfterAll} busy={busy} onAdd={session.addSelected} onBack={back} />
         )}
-        {step.kind === "scoring" && <Working text={t(step.source === "dump" ? "enrich.focus.dump.scoring" : step.source === "opening" ? "enrich.focus.loading" : "enrich.focus.scoring")} />}
+        {step.kind === "scoring" && <Working text={t(step.source === "dump" ? "enrich.focus.dump.scoring" : step.source === "opening" ? "enrich.focus.loading"
+          : step.source === "box" ? "enrich.focus.box.scoring" : "enrich.focus.scoring")} />}
         {(step.kind === "question" || step.kind === "needsDetail") && (
           <QuestionStep
             key={stepKey}
             question={step.question}
+            initial={session.prefill ?? ""}
+            onBack={back}
             needsDetail={step.kind === "needsDetail"}
             locale={cv.locale}
             busy={busy}

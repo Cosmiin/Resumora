@@ -248,7 +248,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       </FocusOpenProvider>
       {focusTarget && !historyOpen && !isTailored && (
         <FocusMode
-          key={`${focusTarget.roleId}:${focusTarget.bulletId ?? ""}:${focusTarget.mode}`}
+          key={`${focusTarget.roleId}:${focusTarget.bulletId ?? ""}`}
           target={focusTarget}
           cv={content}
           dispatch={dispatch}

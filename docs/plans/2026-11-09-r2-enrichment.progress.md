@@ -37,3 +37,12 @@ commit: see git log (base 3921670) · reviews: 2 (agents) · fix rounds: 1 (one 
 ruling: also holds the owner's `fresh` flag on `POST /v1/enrich/score` (routes.ts, routes.test.ts, web `scoreRole`). Old RoleResult fixtures in 7 web test files gained `thin: false` / `topic: "other"`. The "Question n of N · Tools" eyebrow moves to Task 2 (FocusMode).
 note: `score/4` changes every role's fingerprint, so every stored role is re-scored once when its CV opens (as the plan intends).
 open: none
+
+## Task 2: Steps never disappear, and Back (2B) — done
+session: r2-enrich (session 7) · builder: claude
+commit: see git log (base 8e87db3) · reviews: 1 (agents) · fix rounds: 0 (two low findings fixed before commit: a first answer given after Back counts toward the answers→bullets step; the bullet eyebrow is hidden on a revisited step) · guard denials: 0 · weekly 44% → 45%
+ruling: `apps/api/src/enrich/brain-dump.ts` (+ test): `source: "answers"` now reads every role note, the box included, so the thin role's pick step is built "from the box and the answers". `QuestionStep` exports a small `BackButton` used by the three step components.
+built: thin role = box first → (box answered: AI re-asked with `fresh`) → role questions → answers→bullets behind a plain working screen → pick → bullet questions. The history of shown text steps drives Back (re-send updates the same note and returns to the latest step) and the dots row. The `FocusMode` key in `Editor.tsx` no longer includes the mode.
+note: `dumpEmpty` is no longer reachable (a thin box goes on to questions or bullets; a free-talk ramble with nothing new returns to its question). Left in place.
+tests: the editor's "rapid typing" tests time out at 5 s in full web runs on this machine today; they pass alone, and the base branch (r2-bugs) times out the same way in a full run.
+open: none
