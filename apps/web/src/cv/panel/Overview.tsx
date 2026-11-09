@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CATEGORY, SECTION_KEYS, missingCategories, newId, normalizeLayout, scoredItems, type CvContent, type SectionKey } from "@resumora/shared";
+import { CATEGORY, SECTION_KEYS, missingCategories, newId, normalizeLayout, scoredItems, shownEmptyFlags, type CvContent, type SectionKey } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { sectionsOnCv, type CvAction } from "../edit/cvReducer.ts";
 import { DragList } from "../edit/DragList.tsx";
@@ -18,6 +18,8 @@ type Props = {
   scores?: ReadonlyMap<string, RoleScoreState>;
   /** Base CV only: opens the guided enrichment path (1A). */
   onEnrich?(): void;
+  /** Tailored CV: Needs attention lists every shown section that is empty; auto-hidden empty ones don't count. */
+  tailored?: boolean;
 };
 
 const CUSTOM = "custom";
@@ -32,13 +34,14 @@ function Eye({ on }: { on: boolean }) {
 }
 
 /** The panel's home view: what is missing, the sections on the CV (order, hide) and a way to add more. */
-export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, onEnrich }: Props) {
+export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, onEnrich, tailored = false }: Props) {
   const layout = normalizeLayout(cv.layout);
   const nameOf = (key: SectionKey) => layout.titles[key] || CATEGORY[key].label[cv.locale];
   const saved = sectionsOnCv(cv);
   const present = layout.order.filter((k) => saved.includes(k) || opened.has(k));
   const addable = SECTION_KEYS.filter((k) => k !== "other" && !present.includes(k));
-  const flags = missingCategories(cv).filter((f) => f.key === "header" || !opened.has(f.key));
+  const flags = tailored ? shownEmptyFlags(cv, opened)
+    : missingCategories(cv).filter((f) => f.key === "header" || !opened.has(f.key));
   const [choice, setChoice] = useState<string>(CUSTOM);
   const chosen = choice === CUSTOM || addable.some((k) => k === choice) ? choice : (addable[0] ?? CUSTOM);
 

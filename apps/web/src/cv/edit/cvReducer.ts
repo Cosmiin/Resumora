@@ -6,6 +6,7 @@ import {
   MAX_NOTES,
   MAX_TITLES,
   SKILL_GROUPS,
+  emptyCv,
   isCopiedDescription,
   isSectionEmpty,
   newId,
@@ -57,6 +58,10 @@ export type CvAction =
   | { type: "setSummary"; value: string }
   | { type: "setSectionTitle"; key: SectionKey; value: string }
   | { type: "toggleHidden"; key: SectionKey }
+  /** Tailored CV: empty the section and hide it, in one step. */
+  | { type: "deleteSection"; key: SectionKey }
+  /** Undo of deleteSection: the section's content and visibility as they were in `from`. */
+  | { type: "restoreSection"; key: SectionKey; from: CvContent }
   | { type: "moveSection"; from: number; to: number }
   | { type: "addSection"; key: SectionKey; id: string }
   | { type: "addCustomSection"; id: string; title: string }
@@ -129,6 +134,25 @@ function addSection(cv: CvContent, key: SectionKey, id: string): CvContent {
     default:
       return unhide(addItem(cv, key, id), key);
   }
+}
+
+/** `to` with section `key`'s content taken from `from` (an empty CV empties it). */
+function withSectionContent(to: CvContent, from: CvContent, key: SectionKey): CvContent {
+  switch (key) {
+    case "summary":
+      return { ...to, basics: { ...to.basics, summary: from.basics.summary } };
+    case "skills":
+      return { ...to, technicalSkills: from.technicalSkills, professionalSkills: from.professionalSkills, unclearSkills: from.unclearSkills };
+    case "other":
+      return { ...to, custom: from.custom };
+    default:
+      return { ...to, [key]: from[key] };
+  }
+}
+
+function withHidden(cv: CvContent, key: SectionKey, hide: boolean): CvContent {
+  const others = cv.layout.hidden.filter((k) => k !== key);
+  return setLayout(cv, { ...cv.layout, hidden: hide ? [...others, key] : others });
 }
 
 function moveSection(cv: CvContent, from: number, to: number): CvContent {
@@ -262,6 +286,10 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
         : [...cv.layout.hidden, action.key];
       return setLayout(cv, { ...cv.layout, hidden });
     }
+    case "deleteSection":
+      return withHidden(withSectionContent(cv, { ...emptyCv(), locale: cv.locale }, action.key), action.key, true);
+    case "restoreSection":
+      return withHidden(withSectionContent(cv, action.from, action.key), action.key, action.from.layout.hidden.includes(action.key));
     case "moveSection":
       return moveSection(cv, action.from, action.to);
     case "addSection":

@@ -160,8 +160,28 @@
 .cv-role .cv-item-head > .cv-role-dates { margin-inline-start: auto; }
 .cv-role .score-pill { position: static; flex: none; margin: 0; }
 
+/* Tailored CV (9B): the section menu on each heading, the hidden line and the Undo bar under the page. */
+.cv-section-head { display: flex; align-items: center; gap: var(--space-2); }
+.cv-section-head > .cv-section-heading { flex: 1; min-width: 0; }
+.cv-section-head > .tailored-redo { float: none; margin: 0; }
+.section-menu { position: relative; flex: none; }
+.section-menu-button { font: inherit; font-size: 15px; line-height: 1; letter-spacing: 1px; padding: 2px 8px; border: 1px solid transparent; border-radius: var(--radius-md); background: none; box-shadow: none; color: var(--text-muted); cursor: pointer; opacity: .55; }
+.cv-section:hover .section-menu-button, .cv-section:focus-within .section-menu-button, .section-menu-button[aria-expanded="true"] { opacity: 1; border-color: var(--border-subtle); background: var(--surface-card); }
+.section-menu-list { position: absolute; inset-inline-end: 0; top: calc(100% + 4px); z-index: 30; min-width: 190px; display: grid; padding: 4px; background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-raised); }
+.section-menu-list button { font: inherit; font-size: 14px; text-align: start; padding: 8px 10px; border: 0; border-radius: 6px; background: none; box-shadow: none; color: var(--text-body); cursor: pointer; }
+.section-menu-list button:hover, .section-menu-list button:focus-visible { background: var(--pine-50); }
+.section-menu-list button.danger { color: var(--status-bad-fg); }
+.hidden-sections { margin-block-start: var(--space-4); font-size: 14px; color: var(--text-muted); }
+.hidden-sections p { margin: 0; }
+.hidden-sections ul { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-2); max-width: 420px; }
+.hidden-sections li { display: flex; align-items: center; gap: var(--space-2); padding: 6px 10px; border: 1px dashed var(--border-field); border-radius: var(--radius-md); }
+.hidden-sections li > span { flex: 1; color: var(--text-body); }
+.hidden-sections small { font-size: 12px; }
+.section-toast { position: sticky; bottom: var(--space-4); width: fit-content; margin: var(--space-4) auto 0; padding: 10px 16px; border-radius: var(--radius-md); background: var(--pine-800); color: var(--white); box-shadow: var(--shadow-raised); font-size: 14px; }
+.section-toast .link { color: var(--marigold-200); }
+
 @media print {
-  .no-print { display: none !important; }
+  .no-print, .section-menu, .hidden-sections, .section-toast { display: none !important; }
 }
 
 /* E6 Task 10a: an item hidden on this CV stays in the editor, dimmed, with a switch to show it again. */
