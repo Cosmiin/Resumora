@@ -4,7 +4,7 @@ import { TAILOR_SECTIONS, type Answer, type CvContent, type Proposal, type Steer
 import { getCv } from "../cv/cv-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
-import { QuestionCard } from "./QuestionCard.tsx";
+import { QuestionCard, type Draft } from "./QuestionCard.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
 import { SteeringStep } from "./SteeringStep.tsx";
@@ -15,10 +15,10 @@ type Phase =
   | { kind: "loading" }
   | { kind: "steer"; busy: boolean }
   | { kind: "asking" }
-  | { kind: "questions"; questions: TailorQuestion[]; index: number; answers: Answer[] }
+  /** Answers stay here, one per question (undefined = not reached yet), until the step's last question. */
+  | { kind: "questions"; questions: TailorQuestion[]; index: number; answers: (Draft | undefined)[] }
   | { kind: "working" }
-  | { kind: "flags"; proposals: Proposal[]; flags: TailorQuestion[]; index: number; confirmed: api.AcceptBody["flags"] }
-  | { kind: "review"; proposals: Proposal[]; flags: TailorQuestion[]; confirmed: api.AcceptBody["flags"]; busy: boolean; removed?: number }
+  | { kind: "review"; proposals: Proposal[]; busy: boolean; removed?: number }
   | { kind: "error"; message: string; retry(): void }
   | { kind: "deleted" };
 
@@ -33,7 +33,7 @@ export function remembered(jobId: string): string | null {
   try { return localStorage.getItem(storageKey(jobId)); } catch { return null; }
 }
 
-/** `/jobs/:id/tailor`: steering, then each section's questions, run, flag checks and review, one column, full screen. */
+/** `/jobs/:id/tailor`: steering, then each section's questions, run and review (Experience role by role), full screen. */
 export function TailorFlow() {
   const jobId = useParams().id ?? "";
   const navigate = useNavigate();
@@ -50,6 +50,8 @@ export function TailorFlow() {
   const section = run?.currentSection ?? null;
 
   function track(next: TailorRun) { runRef.current = next; setRun(next); }
+  /** Experience steps name the run's current role. */
+  const roleArg = (at: TailorSection) => (at === "experience" ? runRef.current?.currentRoleId ?? undefined : undefined);
   function fail(cause: unknown, at: TailorSection | null, retry: () => void) {
     if (cause instanceof ApiClientError && cause.code === "job_not_found") { remember(jobId, null); setPhase({ kind: "deleted" }); return; }
     const ai = cause instanceof ApiClientError && cause.code === "ai_failed" && at;
@@ -73,9 +75,9 @@ export function TailorFlow() {
   async function ask(at: TailorSection) {
     setPhase({ kind: "asking" });
     try {
-      const questions = await api.askQuestions(runRef.current!.id, at);
+      const questions = await api.askQuestions(runRef.current!.id, at, roleArg(at));
       if (questions.length === 0) return void work(at);
-      setPhase({ kind: "questions", questions, index: 0, answers: [] });
+      setPhase({ kind: "questions", questions, index: 0, answers: questions.map(() => undefined) });
     } catch (cause) { fail(cause, at, () => void ask(at)); }
   }
   async function submit(at: TailorSection, answers: Answer[]) {
@@ -88,16 +90,15 @@ export function TailorFlow() {
   async function work(at: TailorSection) {
     setPhase({ kind: "working" });
     try {
-      const { proposals, questions, removed } = await api.runSection(runRef.current!.id, at);
-      const flags = questions.filter((question) => question.kind === "flag");
-      setPhase(flags.length > 0 ? { kind: "flags", proposals, flags, index: 0, confirmed: [] }
-        : { kind: "review", proposals, flags: [], confirmed: [], busy: false, removed });
+      const { proposals, removed } = await api.runSection(runRef.current!.id, at, roleArg(at));
+      setPhase({ kind: "review", proposals, busy: false, removed });
     } catch (cause) { fail(cause, at, () => void work(at)); }
   }
   async function accept(at: TailorSection, body: api.AcceptBody) {
     setPhase((current) => current.kind === "review" ? { ...current, busy: true } : current);
     try {
-      const result = await api.acceptSection(runRef.current!.id, at, body);
+      const roleId = roleArg(at);
+      const result = await api.acceptSection(runRef.current!.id, at, roleId ? { ...body, roleId } : body);
       setLatest(result.score.total);
       enter(result.run);
     } catch (cause) {
@@ -153,29 +154,25 @@ export function TailorFlow() {
       {t(phase.kind === "asking" ? "tailor.asking" : "tailor.working", { section: t(`tailor.section.${section}`) })}</p>;
   } else if (phase.kind === "questions") {
     const question = phase.questions[phase.index]!;
-    const answerWith = (answer: Omit<Answer, "questionId">) => {
-      const answers = [...phase.answers, { ...answer, questionId: question.id }];
-      if (phase.index + 1 < phase.questions.length) setPhase({ ...phase, index: phase.index + 1, answers });
-      else void submit(section, answers);
+    // Next or Skip stores the answer; after the last question the step's answers go together.
+    const answerWith = (answer: Draft) => {
+      const answers = phase.answers.map((given, i) => (i === phase.index ? answer : given));
+      if (phase.index + 1 < phase.questions.length) return setPhase({ ...phase, index: phase.index + 1, answers });
+      void submit(section, phase.questions.map((q, i): Answer => ({ ...(answers[i] ?? { value: null, via: "skip" }), questionId: q.id })));
     };
-    const skipAll = () => void submit(section, [...phase.answers,
-      ...phase.questions.slice(phase.index).map((q) => ({ questionId: q.id, value: null, via: "skip" as const }))]);
-    body = <QuestionCard key={question.id} question={question} n={phase.index + 1} total={phase.questions.length}
-      onAnswer={answerWith} onSkipAll={skipAll} role={roleFor(question)} locale={cv?.locale} />;
-  } else if (phase.kind === "flags") {
-    const question = phase.flags[phase.index]!;
-    body = <QuestionCard key={question.id} question={question} n={phase.index + 1} total={phase.flags.length}
-      role={roleFor(question)} locale={cv?.locale} onAnswer={(answer) => {
-      const confirmed = [...phase.confirmed, { questionId: question.id, confirmed: answer.value === question.options[0] }];
-      setPhase(phase.index + 1 < phase.flags.length ? { ...phase, index: phase.index + 1, confirmed }
-        : { kind: "review", proposals: phase.proposals, flags: phase.flags, confirmed, busy: false });
-    }} />;
+    const order = run?.roleOrder ?? [];
+    const progress = section === "experience" && run?.currentRoleId && order.includes(run.currentRoleId)
+      ? t("tailor.question.roleProgress", { role: order.indexOf(run.currentRoleId) + 1, roles: order.length, n: phase.index + 1, total: phase.questions.length })
+      : t("tailor.question.progress", { n: phase.index + 1, total: phase.questions.length });
+    body = <QuestionCard key={question.id} question={question} progress={progress} initial={phase.answers[phase.index]}
+      onNext={answerWith} onSkip={() => answerWith({ value: null, via: "skip" })}
+      onBack={phase.index > 0 ? () => setPhase({ ...phase, index: phase.index - 1 }) : undefined}
+      role={roleFor(question)} roles={cv?.experience ?? []} locale={cv?.locale} />;
   } else {
-    body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={phase.flags}
-      confirmed={phase.confirmed} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} cv={cv} removed={phase.removed} />;
+    body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={[]}
+      confirmed={[]} busy={phase.busy} onAccept={(accepted) => void accept(section, accepted)} cv={cv} removed={phase.removed} />;
   }
-  const wide = (phase.kind === "questions" && !!roleFor(phase.questions[phase.index]!))
-    || (phase.kind === "flags" && !!roleFor(phase.flags[phase.index]!));
+  const wide = phase.kind === "questions" && section === "experience" && !!roleFor(phase.questions[phase.index]!);
 
   return <div className={wide ? "tailor-mode is-wide" : "tailor-mode"}>
     <header className="tailor-head">

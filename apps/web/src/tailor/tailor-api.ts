@@ -11,7 +11,12 @@ export type AcceptBody = {
   decisions: { itemId: string; keep: boolean }[];
   inferred: { itemId: string; keep: boolean }[];
   flags: { questionId: string; confirmed: boolean }[];
+  /** Experience: the role being accepted (the run's current role). */
+  roleId?: string;
 };
+
+/** Experience steps name the run's current role; other sections send none. */
+const roleBody = (roleId?: string) => (roleId ? { roleId } : {});
 
 export function startTailoring(jobId: string, steering: Steering): Promise<{ run: TailorRun }> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(jobId)}/tailor`, {
@@ -24,9 +29,9 @@ export function getRun(id: string): Promise<TailorRun> {
   return apiFetch(run(id), { schema: TailorRunSchema });
 }
 
-export async function askQuestions(id: string, section: TailorSection): Promise<TailorQuestion[]> {
+export async function askQuestions(id: string, section: TailorSection, roleId?: string): Promise<TailorQuestion[]> {
   const body = await apiFetch(`${run(id)}/sections/${section}/questions`, {
-    method: "POST", json: {}, schema: z.object({ questions: z.array(TailorQuestionSchema) }),
+    method: "POST", json: roleBody(roleId), schema: z.object({ questions: z.array(TailorQuestionSchema) }),
   });
   return body.questions;
 }
@@ -36,9 +41,9 @@ export async function sendAnswers(id: string, answers: Answer[]): Promise<void> 
 }
 
 /** `removed`: proposals the API left out because the CV, notes and answers don't back them up. */
-export function runSection(id: string, section: TailorSection): Promise<{ proposals: Proposal[]; questions: TailorQuestion[]; removed?: number }> {
+export function runSection(id: string, section: TailorSection, roleId?: string): Promise<{ proposals: Proposal[]; questions: TailorQuestion[]; removed?: number }> {
   return apiFetch(`${run(id)}/sections/${section}/run`, {
-    method: "POST", json: {},
+    method: "POST", json: roleBody(roleId),
     schema: z.object({ proposals: z.array(ProposalSchema), questions: z.array(TailorQuestionSchema), removed: z.number().int().min(0).default(0) }),
   });
 }

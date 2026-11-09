@@ -23,23 +23,76 @@ const cv: CvContent = {
 const change = (itemId: string, text: string, over: Partial<Proposal> = {}): Proposal =>
   ({ itemId, field: itemId.startsWith("r") ? "description" : "text", text, inferred: false, flags: [], ...over });
 
-describe("F3: a question shows the role it is about", () => {
+describe("ExpQA / SkillsA1: the question screen", () => {
   const question: TailorQuestion = { id: "q1", section: "experience", roleId: "r1", text: "Did you automate any reporting?",
     kind: "options", options: ["Yes", "No"], reason: "Gap" };
+  const skill: TailorQuestion = { id: "q2", section: "skills", roleId: null, text: "Do you know SQL?", kind: "skill",
+    options: ["Yes", "A little", "No"], reason: "Gap", skill: "SQL" };
+  const card = (over: Partial<React.ComponentProps<typeof QuestionCard>> = {}) =>
+    render(<QuestionCard question={question} progress="Role 1 of 2 · Question 1 of 2" onNext={vi.fn()} onSkip={vi.fn()}
+      role={cv.experience[0]} locale="en" {...over} />);
 
   it("shows the role's title, company, dates, description and bullets beside the question", () => {
-    render(<QuestionCard question={question} n={1} total={2} onAnswer={vi.fn()} role={cv.experience[0]} locale="en" />);
+    card();
     const panel = screen.getByRole("complementary", { name: "The role this is about" });
     expect(within(panel).getByText("Business Analyst")).toBeInTheDocument();
     expect(within(panel).getByText(/Emedi · Mar 2021 – Present/)).toBeInTheDocument();
     expect(within(panel).getByText("Owns reporting for sales.")).toBeInTheDocument();
     expect(within(panel).getByText("Made weekly reports")).toBeInTheDocument();
+    expect(within(panel).getByText("About the whole role")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Did you automate any reporting?" })).toBeInTheDocument();
+    expect(screen.getByText("Role 1 of 2 · Question 1 of 2")).toBeInTheDocument();
   });
 
-  it("shows no role panel for a question without a role", () => {
-    render(<QuestionCard question={{ ...question, roleId: null }} n={1} total={2} onAnswer={vi.fn()} locale="en" />);
+  it("highlights the bullet a question points at", () => {
+    card({ question: { ...question, bulletId: "b2" } });
+    const panel = screen.getByRole("complementary", { name: "The role this is about" });
+    expect(within(panel).getByText("Ran workshops").closest("li")).toHaveAttribute("aria-current", "true");
+    expect(within(panel).getByText("Made weekly reports").closest("li")).not.toHaveAttribute("aria-current");
+    expect(within(panel).queryByText("About the whole role")).toBeNull();
+  });
+
+  it("keeps the question on screen when a choice is tapped; Next sends it", async () => {
+    const user = userEvent.setup();
+    const onNext = vi.fn();
+    card({ onNext });
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Yes" }));
+    expect(screen.getByRole("button", { name: "Yes" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "Did you automate any reporting?" })).toBeInTheDocument();
+    expect(onNext).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(onNext).toHaveBeenCalledWith({ value: "Yes", via: "option" });
+  });
+
+  it("shows an earlier answer selected, and offers Back and Skip", async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+    const onSkip = vi.fn();
+    card({ initial: { value: "No", via: "option" }, onBack, onSkip });
+    expect(screen.getByRole("button", { name: "No" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(onBack).toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Skip" }));
+    expect(onSkip).toHaveBeenCalled();
+  });
+
+  it("never shows a role panel for a Skills question, and asks which role a confirmed skill was used in", async () => {
+    const user = userEvent.setup();
+    const onNext = vi.fn();
+    card({ question: skill, role: undefined, roles: cv.experience, onNext, progress: "Question 1 of 1" });
     expect(screen.queryByRole("complementary")).toBeNull();
+    expect(screen.queryByText("In which role did you use it?")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "No" }));
+    expect(screen.queryByText("In which role did you use it?")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "No" }));
+    await user.click(screen.getByRole("button", { name: "A little" }));
+    const roles = screen.getByRole("group", { name: "In which role did you use it?" });
+    await user.click(within(roles).getByRole("button", { name: /Business Analyst/ }));
+    await user.click(within(roles).getByRole("button", { name: /^Analyst/ }));
+    expect(within(roles).getByRole("button", { name: /^Analyst/ })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(onNext).toHaveBeenCalledWith({ value: "A little", via: "option", roleIds: ["r1", "r2"] });
   });
 });
 

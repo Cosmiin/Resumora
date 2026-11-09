@@ -37,3 +37,11 @@ open: rulings — shared `FlagSchema` gains rule `guess`; `translate.ts` and `le
 session: tailor-r2 Part A (session 5, second block) · builder: claude
 commit: see git log (base bdaccaf) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 46% → 47%
 open: rulings — shared `QuestionSchema` gains `skill`; the "Used in: Title · Company" reason is set in `section-pass.ts` from the stored answer (not left to the model); `tailor-accept`, `tailor-section`, `tailor-retailor` tests updated. Low (not fixed): a volunteering role in `roleIds` gets the note but isn't named in the reason; a resubmit with the same value but new `roleIds` adds no notes (A9's redo replaces answers).
+
+## Task A8: Question screen like enrichment (ExpQA, SkillsA1) — done
+session: tailor-r2 Part A (session 5, second block) · builder: claude
+commit: see git log (base 7d527c4) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 46% → 47%
+open: rulings — `RolePanel` imports `styles/focus.css` for the `fm-*` bullet glow and pill (no new styles); "Skip all" and the flag step are gone (design: Next / Back / Skip only; A6 removed flag questions); unused copy removed. Quirk (not fixed): a skill answer that starts with "No" but has typed words counts as confirmed and shows the role row. StepBar unchanged (A9 makes finished steps links).
+
+## Next (fresh session, per claude-build's 4-task rule)
+A9 Going back (BackA) and changing steering → whole-branch review (Opus high, base `9c5728d`) → push and draft PR to `rebuild/tailor-r2-bugs`. Between A5 and A8 the web was out of step with the API; after A8 it is in step again, so a browser check now makes sense.

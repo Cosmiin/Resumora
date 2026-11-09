@@ -55,11 +55,11 @@ export const tailorEn = {
   "tailor.voice.stop": "Stop recording",
 
   "tailor.question.progress": "Question {n} of {total}",
-  "tailor.question.typed": "Or type your answer",
-  "tailor.question.send": "Send",
   "tailor.question.skip": "Skip",
-  "tailor.question.skipAll": "Skip all",
-  "tailor.flag.eyebrow": "Please check this change",
+  "tailor.question.next": "Next",
+  "tailor.question.back": "Back",
+  "tailor.question.roleProgress": "Role {role} of {roles} · Question {n} of {total}",
+  "tailor.question.usedIn": "In which role did you use it?",
   "tailor.working": "Tailoring {section}…",
   "tailor.asking": "Looking for gaps in {section}…",
 
@@ -94,6 +94,7 @@ export const tailorEn = {
   "tailor.role.label": "The role this is about",
   "tailor.role.eyebrow": "You're tailoring this role",
   "tailor.role.untitled": "Untitled role",
+  "tailor.role.whole": "About the whole role",
 
   "tailor.error.ai": "Couldn't tailor {section}. Try again",
   "tailor.error.generic": "Something went wrong. Try again",
