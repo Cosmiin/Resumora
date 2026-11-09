@@ -9,7 +9,8 @@ Return exactly one keyword label per distinct term, with ref "k:<term>". Copy th
 For each label use met, partial, or missing. Evidence for met or partial must be a nonempty, exact, verbatim substring of a single written CV text value. When one requirement needs several CV values (for example two languages), quote each and join the quotes with " | ".
 A CV language at CEFR C1 or C2, Native, Fluent or Advanced meets a fluent or advanced requirement for that language: label it met and quote the language name and its level joined with " | " (for example "English | C2").
 Use missing with null evidence when the CV does not support the match. Never invent a quote or use job text as evidence.
-Set inferred to true only for a supported inference rather than an explicitly stated qualification.`;
+When the CV's work clearly shows a requirement with high confidence (for example its roles describe doing it), label it met with inferred false, even if the CV doesn't name it in the job's words.
+Set inferred to true only for a real guess: a low-confidence inference the CV doesn't clearly show.`;
 
 export function scoreUserMessage(cv: CvContent, job: JobExtraction): string {
   return JSON.stringify({

@@ -139,6 +139,15 @@ describe("scoreMatch", () => {
     });
   });
 
+  it("tells the AI that clear work evidence is a full match and inferred is only for real guesses", async () => {
+    const model = fakeModel(answer);
+    await scoreMatch({ model: model.deps }, input());
+    const system = (model.requests[0]?.messages as { role: string; content: string }[]).find((m) => m.role === "system")!.content;
+    expect(system).toContain("high confidence");
+    expect(system).toContain("label it met with inferred false");
+    expect(system).toContain("inferred to true only for a real guess");
+  });
+
   it("awards no points for missing labels even if the model marks them inferred", async () => {
     const model = fakeModel(() => ({ ...answer(), labels: answer().labels.map((label) => ({ ...label, status: "missing", evidence: null, inferred: true })) }));
     expect(await scoreMatch({ model: model.deps }, input())).toMatchObject({ total: 0, capped: true });
