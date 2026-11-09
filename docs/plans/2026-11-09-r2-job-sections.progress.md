@@ -24,3 +24,22 @@ Confirmed cause (the lead in `flags.ts` was not it: `missingCategories` does fla
 2. `apps/web/src/cv/edit/EditablePage.tsx:45-47` — every section on the page is added to `opened` ("added this visit").
 3. `apps/web/src/cv/panel/Overview.tsx:38` — flags for sections in `opened` are dropped, so the Key achievements flag disappears, and `Overview.tsx:73` prints "Nothing missing".
 The same path hides the flag of any section that is on the page and then emptied while editing.
+
+## Task 4: Section menu, auto-hidden empty sections, and Needs attention (9B) — done
+session: session 8 (job page and sections) · builder: claude
+commit: 3e0ec8d (base 580ed98) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 44% → 44%
+rulings:
+- `HelperPanel.tsx` (outside the file list) passes a `tailored` flag from Editor to Overview; nothing else changed there.
+- Undo uses a second reducer action, `restoreSection`, that puts back the section's content and hidden state from the delete-time snapshot.
+- "Auto-hidden" = an empty section the page would otherwise show (a category with a missing/tip flag, which used to show the dashed "missing" box, or a section holding only blank entries), plus every section the user hid. Empty sections never on the CV (e.g. Publications) are not listed; they stay under "Add section".
+- A shown empty section whose category has no flag level (e.g. Certifications) gets a "Missing" flag on the tailored panel.
+- The tailored page no longer shows dashed "missing" boxes; those sections are auto-hidden and listed in the hidden line.
+- The Undo bar stays until Undo or the next delete (no timer was asked for).
+- Checked on the local database in the owner's Chrome: the DSV tailored CV now hides its blank Key achievements and shows "1 section hidden (1 empty)".
+open: none
+
+## End of part
+whole-branch review: 1 (Opus, high), base 9c5728d — Verdict: pass, no findings.
+cost: weekly 43% → 45% · review agents: 5 (4 Sonnet per task incl. 1 re-review, 1 Opus whole-branch) · guard-log lines naming this worktree: 0
+0 · Claude context used: ~28% of 1M.
+open: the 3–6 typing tests in `apps/web/src/cv/editor.test.tsx` time out in the full parallel run while other sessions load the machine; they pass alone (14/14). Not caused by this branch.
