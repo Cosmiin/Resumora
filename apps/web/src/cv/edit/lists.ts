@@ -1,4 +1,4 @@
-import type { CvContent } from "@resumora/shared";
+import { findScored, type CvContent, type ScoredKind } from "@resumora/shared";
 
 export type ListKey =
   | "experience"
@@ -15,6 +15,15 @@ export type ListKey =
 
 /** Lists whose items have the role shape (title, organisation, dates, bullets). */
 export type RoleList = "experience" | "volunteering" | "projects";
+
+/** The list each scored kind lives in. */
+export const SCORED_LIST = { role: "experience", project: "projects", volunteering: "volunteering" } as const satisfies Record<ScoredKind, RoleList>;
+
+/** Which role-shaped list holds this id (roles, projects or volunteering), if any. */
+export function roleListOf(cv: CvContent, id: string): RoleList | undefined {
+  const found = findScored(cv, id);
+  return found && SCORED_LIST[found.kind];
+}
 
 /** Lists whose items can have short lines under them. */
 export type LineList = "courses" | "awards" | "publications" | "interests";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CATEGORY, SECTION_KEYS, missingCategories, newId, normalizeLayout, type CvContent, type SectionKey } from "@resumora/shared";
+import { CATEGORY, SECTION_KEYS, missingCategories, newId, normalizeLayout, scoredItems, type CvContent, type SectionKey } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { sectionsOnCv, type CvAction } from "../edit/cvReducer.ts";
 import { DragList } from "../edit/DragList.tsx";
@@ -103,7 +103,7 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, o
       </div>
 
       {scores && (
-        <RoleScoreList roles={cv.experience} scores={scores} onOpen={(id) => onFocusField(`experience-${id}-title`)} />
+        <RoleScoreList items={scoredItems(cv)} scores={scores} onOpen={(id, list) => onFocusField(`${list}-${id}-title`)} />
       )}
 
       <div>

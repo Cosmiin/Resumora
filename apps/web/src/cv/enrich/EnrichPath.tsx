@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { newId, type CvContent, type SkillGroup } from "@resumora/shared";
+import { findScored, newId, scoredItems, type CvContent, type ScoredKind, type SkillGroup } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { AchievementsPick } from "./AchievementsPick.tsx";
@@ -11,6 +11,7 @@ import { roleName } from "../edit/sections/RoleItem.tsx";
 import { useNavigate } from "react-router";
 import { FocusMode } from "./FocusMode.tsx";
 import { PathStart } from "./PathStart.tsx";
+import type { LineList } from "../edit/lists.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 type Props = {
@@ -26,6 +27,18 @@ export const ENRICHED_AT = 80;
 export function belowTarget(s: RoleScoreState | undefined): boolean {
   return !(s?.state === "ready" && s.result?.score != null && s.result.score >= ENRICHED_AT);
 }
+
+/** The lighter sections the quick pass visits, in this order. */
+export const LIGHT_SECTIONS = ["courses", "awards", "publications", "interests"] as const satisfies readonly LineList[];
+
+/** Q3: the lighter items the path visits are the ones with no lines yet, section by section. */
+export function lightStops(cv: CvContent): { section: LineList; itemId: string }[] {
+  return LIGHT_SECTIONS.flatMap((section) => (cv[section] as { id: string; bullets?: { text: string }[] }[])
+    .filter((item) => !(item.bullets ?? []).some((b) => b.text.trim() !== ""))
+    .map((item) => ({ section, itemId: item.id })));
+}
+
+const OF_KEY = { role: "enrich.path.roleOf", project: "enrich.path.projectOf", volunteering: "enrich.path.volunteeringOf" } as const satisfies Record<ScoredKind, string>;
 
 type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "achievements" } | { kind: "skills" } | { kind: "end" } | { kind: "improve"; roleId: string };
 
@@ -49,14 +62,17 @@ export function PathBar({ label, at, total }: { label: string; at: number; total
 export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props) {
   // The roles below 80 and each role's score are read live on the start screen (stored scores may still be
   // loading, e.g. from "/cv?enrich=1") and fixed when the path starts.
-  const below = cv.experience.filter((r) => belowTarget(scores.get(r.id))).map((r) => r.id);
+  // Roles, then projects, then volunteering (CV order within each), each below 80.
+  const below = scoredItems(cv).filter(({ item }) => belowTarget(scores.get(item.id))).map(({ item }) => item.id);
   const [fixed, setFixed] = useState<{ stops: string[]; before: Map<string, number | null> } | null>(null);
   const stops = fixed?.stops ?? below;
   const before = fixed?.before ?? new Map<string, number | null>();
   const [stage, setStage] = useState<Stage>({ kind: "start" });
   // Roles, then Key achievements and Skills.
   const total = stops.length + 2;
-  const roles = stops.map((id) => cv.experience.find((r) => r.id === id)).filter((r) => r !== undefined);
+  const items = stops.map((id) => findScored(cv, id)).filter((p) => p !== undefined);
+  const light = lightStops(cv);
+  const quick = LIGHT_SECTIONS.map((section) => ({ section, count: light.filter((l) => l.section === section).length })).filter((q) => q.count > 0);
   const afterRoles = () => setStage({ kind: "achievements" });
   // 5A: the skills the path added, so Undo removes exactly those.
   const [skills, setSkills] = useState<{ ids: string[]; names: string[]; undone: boolean }>({ ids: [], names: [], undone: false });
@@ -64,7 +80,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   const [achievementsAdded, setAchievementsAdded] = useState(0);
 
   if (stage.kind === "start") {
-    return <PathStart roles={roles} scores={scores} onNotNow={onClose}
+    return <PathStart items={items} quick={quick} scores={scores} onNotNow={onClose}
       onStart={() => {
         setFixed({ stops: below, before: new Map(cv.experience.map((r) => [r.id, scoreOf(scores.get(r.id))])) });
         if (below.length) setStage({ kind: "role", index: 0 });
@@ -74,6 +90,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   if (stage.kind === "role") {
     const roleId = stops[stage.index]!;
     const last = stage.index === stops.length - 1;
+    const kind = findScored(cv, roleId)?.kind ?? "role";
+    const ofKind = stops.filter((id) => findScored(cv, id)?.kind === kind);
+    const nextKind = last ? null : findScored(cv, stops[stage.index + 1]!)?.kind;
     return (
       <FocusMode
         key={roleId}
@@ -83,9 +102,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
         scores={scores}
         waitForSave={waitForSave}
         onClose={onClose}
-        topBar={<PathBar label={t("enrich.path.roleOf", { n: stage.index + 1, total: stops.length })} at={stage.index} total={total} />}
+        topBar={<PathBar label={t(OF_KEY[kind], { n: ofKind.indexOf(roleId) + 1, total: ofKind.length })} at={stage.index} total={total} />}
         next={{
-          label: t(last ? "enrich.focus.continue" : "enrich.path.nextRole"),
+          label: t(last ? "enrich.focus.continue" : nextKind === "role" ? "enrich.path.nextRole" : "enrich.path.next"),
           onNext: () => (last ? afterRoles() : setStage({ kind: "role", index: stage.index + 1 })),
         }}
       />

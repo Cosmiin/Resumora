@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  BRAIN_DUMP_QUESTION, MAX_LONG_TEXT, fingerprint, newId, notesHash,
+  BRAIN_DUMP_QUESTION, MAX_LONG_TEXT, findScored, fingerprint, newId, notesHash,
   type CvContent, type Experience, type Question, type RoleResult,
 } from "@resumora/shared";
 import { ApiClientError } from "../../lib/api-error.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
+import { roleListOf } from "../edit/lists.ts";
 import type { Via } from "./AnswerBox.tsx";
 import { brainDump, improveBullet, roleDescription, roleFacts, scoreRole } from "./enrich-api.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
@@ -144,7 +145,7 @@ export function useFocusSession(opts: Options): {
   const [initial] = useState(() => {
     const counts = new Map<string, number>();
     const completed = new Set<string>();
-    const role = opts.cv.experience.find((r) => r.id === opts.roleId);
+    const role = findScored(opts.cv, opts.roleId)?.item;
     const asked = new Set(role?.notes.map((note) => questionKey(note.question)));
     const stored = opts.scores.get(opts.roleId)?.result;
     const result = stored && unasked(stored, asked);
@@ -193,7 +194,7 @@ export function useFocusSession(opts: Options): {
   const go = useCallback((position: number, queue = session.current.view.queue, next?: { bulletId: string; question: Question | null }) => {
     const s = session.current;
     const o = current.current;
-    const role = o.cv.experience.find((r) => r.id === o.roleId);
+    const role = findScored(o.cv, o.roleId)?.item;
     const resume = s.returnStep;
     s.returnStep = null;
     if (resume?.kind === "role") {
@@ -227,7 +228,7 @@ export function useFocusSession(opts: Options): {
       if (!s.alive || s.closed) return;
       for (let retry = 0; retry < 2; retry++) {
         const o = current.current;
-        const role = o.cv.experience.find((r) => r.id === o.roleId);
+        const role = findScored(o.cv, o.roleId)?.item;
         if (!role) return;
         const print = fingerprint(role, o.cv.locale);
         saving = false;
@@ -283,7 +284,7 @@ export function useFocusSession(opts: Options): {
         await current.current.waitForSave();
         if (!s.alive || s.closed) return;
         const o = current.current;
-        const role = o.cv.experience.find((r) => r.id === o.roleId);
+        const role = findScored(o.cv, o.roleId)?.item;
         if (role) answer = await roleDescription({ roleId: o.roleId, fingerprint: fingerprint(role, o.cv.locale) });
       } catch { /* No description this time: the step is skipped. */ }
       if (!s.alive || s.closed || s.view.step.kind !== "describing") return;
@@ -302,12 +303,12 @@ export function useFocusSession(opts: Options): {
         await current.current.waitForSave();
         if (!s.alive || s.closed) return;
         const o = current.current;
-        const role = o.cv.experience.find((r) => r.id === o.roleId);
+        const role = findScored(o.cv, o.roleId)?.item;
         if (role) result = await scoreRole(o.roleId, fingerprint(role, o.cv.locale));
       } catch { /* No role questions: continue with bullets or free talk. */ }
       if (!s.alive || s.closed) return;
       const o = current.current;
-      const role = o.cv.experience.find((r) => r.id === o.roleId);
+      const role = findScored(o.cv, o.roleId)?.item;
       if (role && result?.fingerprint !== fingerprint(role, o.cv.locale)) result = undefined;
       const entry = o.scores.get(o.roleId);
       if (entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)) result = entry.result;
@@ -323,7 +324,7 @@ export function useFocusSession(opts: Options): {
     const s = session.current;
     if (s.closed || s.view.step.kind !== "scoring" || selfScored(s.view.step.source)) return;
     const o = current.current;
-    const role = o.cv.experience.find((r) => r.id === o.roleId);
+    const role = findScored(o.cv, o.roleId)?.item;
     const dumping = s.view.step.source === "dump";
     const queue = dumping ? buildQueue(role, fresh ?? o.scores.get(o.roleId)?.result, o).filter((id) => !s.completed.has(id)) : s.view.queue;
     const position = dumping ? 0 : s.view.position + 1;
@@ -343,7 +344,7 @@ export function useFocusSession(opts: Options): {
   useEffect(() => {
     if (view.step.kind !== "scoring" || selfScored(view.step.source)) return;
     const o =current.current;
-    const role = o.cv.experience.find((r) => r.id === o.roleId);
+    const role = findScored(o.cv, o.roleId)?.item;
     const entry = o.scores.get(o.roleId);
     if (role && entry?.state === "ready" && entry.result
       && entry.result.fingerprint !== session.current.scorePrint
@@ -351,7 +352,7 @@ export function useFocusSession(opts: Options): {
   }, [opts.cv, opts.roleId, opts.scores, view.step, finishScoring]);
   useEffect(() => {
     const o = current.current;
-    if (!o.cv.experience.some((r) => r.id === o.roleId) && !session.current.closed) {
+    if (!findScored(o.cv, o.roleId) && !session.current.closed) {
       session.current.closed = true;
       o.onClose();
     }
@@ -361,7 +362,7 @@ export function useFocusSession(opts: Options): {
   /** End of the role questions: a thin role's answers become bullets (pick step); otherwise on to the bullets. */
   const finishRoleQuestions = () => {
     const s = session.current;
-    const role = current.current.cv.experience.find((r) => r.id === current.current.roleId);
+    const role = findScored(current.current.cv, current.current.roleId)?.item;
     // A session that opened on the box stays a thin role's session, even if the re-score after the box says otherwise.
     if ((s.thinFlow || isThin(role, s.result)) && (s.boxAnswered || s.roleAnswered)) void run(null, "answers");
     else go(0);
@@ -384,10 +385,10 @@ export function useFocusSession(opts: Options): {
       await current.current.waitForSave();
       if (!s.alive || s.closed) return;
       const o = current.current;
-      const role = o.cv.experience.find((r) => r.id === o.roleId);
+      const role = findScored(o.cv, o.roleId)?.item;
       if (role) {
         const fresh = await scoreRole(o.roleId, fingerprint(role, o.cv.locale), true);
-        const now = current.current.cv.experience.find((r) => r.id === o.roleId);
+        const now = findScored(current.current.cv, o.roleId)?.item;
         if (now && fresh.fingerprint === fingerprint(now, current.current.cv.locale)) s.result = unasked(fresh, s.asked);
       }
     } catch { /* The stored role questions stay. */ }
@@ -420,7 +421,7 @@ export function useFocusSession(opts: Options): {
   let step: FocusStep = shown?.step ?? view.step;
   if (step.kind === "roleDone") {
     const entry = opts.scores.get(opts.roleId);
-    const role = opts.cv.experience.find((r) => r.id === opts.roleId);
+    const role = findScored(opts.cv, opts.roleId)?.item;
     const result = entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, opts.cv.locale)
       ? entry.result : session.current.result ?? entry?.result;
     step = { kind: "roleDone", score: role && result
@@ -491,7 +492,8 @@ export function useFocusSession(opts: Options): {
       const value = text.trim().slice(0, MAX_LONG_TEXT);
       if (!available() || s.view.step.kind !== "description" || !value) return;
       const o = current.current;
-      o.dispatch({ type: "setItemField", list: "experience", itemId: o.roleId, field: "description", value });
+      const list = roleListOf(o.cv, o.roleId);
+      if (list) o.dispatch({ type: "setItemField", list, itemId: o.roleId, field: "description", value });
       update({ step: { kind: "roleDone", score: null } });
     },
     useProposal: () => {
@@ -500,7 +502,7 @@ export function useFocusSession(opts: Options): {
       const step = s.view.step;
       if (step.kind !== "proposal") return;
       const o = current.current;
-      const role = o.cv.experience.find((r) => r.id === o.roleId);
+      const role = findScored(o.cv, o.roleId)?.item;
       const bullet = role?.bullets.find((b) => b.id === step.bulletId);
       if (!bullet) { go(s.view.position + 1); return; }
       if (bullet.text !== s.callText) {
@@ -528,7 +530,7 @@ export function useFocusSession(opts: Options): {
       const texts = s.view.step.proposals.filter((p) => ids.includes(p.id)).map((p) => p.text);
       if (!texts.length) { go(s.returnPosition); return; }
       const o = current.current;
-      const role = o.cv.experience.find((r) => r.id === o.roleId);
+      const role = findScored(o.cv, o.roleId)?.item;
       if (!role) return;
       s.scorePrint = fingerprint(role, o.cv.locale);
       update({ busy: true, step: { kind: "scoring", source: "dump" } });
@@ -556,7 +558,7 @@ export function useFocusSession(opts: Options): {
       s.closed = true;
       // role-facts reads the saved notes, so it waits for the last answer to be saved.
       if (s.notesChanged) void o.waitForSave().then(() => roleFacts(o.roleId)).then(({ facts, fromNotes }) => {
-        const role = current.current.cv.experience.find((r) => r.id === o.roleId);
+        const role = findScored(current.current.cv, o.roleId)?.item;
         if (role && notesHash(role.notes) === fromNotes) o.dispatch({
           type: "setFacts", roleId: o.roleId, facts: { items: facts, fromNotes, updatedAt: new Date().toISOString() },
         });

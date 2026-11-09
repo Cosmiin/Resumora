@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { fingerprint, type CvContent } from "@resumora/shared";
+import { findScored, fingerprint, type CvContent } from "@resumora/shared";
+import { SCORED_LIST } from "../edit/lists.ts";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
@@ -121,9 +122,11 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     return () => cancelAnimationFrame(frame);
   }, [stepKey, step.kind]);
 
-  const role = cv.experience.find((r) => r.id === target.roleId);
+  const found = findScored(cv, target.roleId);
+  const role = found?.item;
   if (!role) return null;
-  const name = roleName(role, "experience");
+  const kind = found!.kind;
+  const name = roleName(role, SCORED_LIST[kind]);
   const entry = scores.get(role.id);
   const result = entry?.state === "ready" && entry.result?.fingerprint === fingerprint(role, cv.locale)
     ? entry.result : session.result ?? entry?.result;
@@ -158,7 +161,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     >
       {topBar}
       <aside className="fm-left">
-        <p className="fm-eyebrow">{t("enrich.focus.yourRole")}</p>
+        <p className="fm-eyebrow">{t(`enrich.focus.your.${kind}`)}</p>
         <p className="fm-role">{name}</p>
         <p className="fm-role-meta">{[role.company, dates].filter(Boolean).join(" · ")}</p>
         <ul className="fm-bullets">
@@ -185,7 +188,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
         </ul>
         <p className="fm-score">
           <b>{roleScore ?? "–"}</b>
-          <span className="fm-eyebrow">{roleScore === null ? t("enrich.focus.noScore") : t("enrich.focus.roleScore")}</span>
+          <span className="fm-eyebrow">{roleScore === null ? t("enrich.focus.noScore") : t(`enrich.focus.score.${kind}`)}</span>
         </p>
       </aside>
 
@@ -305,7 +308,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
             <h2 className="fm-q is-big" id="fm-step-title" tabIndex={-1}>{t("enrich.focus.done.title")}</h2>
             <p className="fm-done-score">
               <b>{step.score ?? "–"}</b>
-              <span className="fm-eyebrow">{t("enrich.focus.roleScore")}</span>
+              <span className="fm-eyebrow">{t(`enrich.focus.score.${kind}`)}</span>
             </p>
             <button type="button" className="fm-btn" onClick={() => {
               moving.current = true;

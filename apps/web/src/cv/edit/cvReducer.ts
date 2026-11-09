@@ -21,6 +21,7 @@ import {
   emptyItem,
   getBullets,
   getItems,
+  roleListOf,
   withBullets,
   withItems,
   type BulletOwner,
@@ -29,6 +30,8 @@ import {
 } from "./lists.ts";
 
 export type { BulletOwner, ListKey } from "./lists.ts";
+
+const ROLE_LISTS = ["experience", "projects", "volunteering"] as const satisfies readonly RoleList[];
 
 type Basics = CvContent["basics"];
 
@@ -264,28 +267,35 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const custom = next.custom.map((c) => (c.id === action.id ? { ...c, title: action.title } : c));
       return unhide({ ...next, custom }, "other");
     }
-    case "replaceBullet":
-      return bulletAction(cv, { type: "setBullet", owner: { list: "experience", itemId: action.roleId }, bulletId: action.bulletId, text: action.text });
+    case "replaceBullet": {
+      const list = roleListOf(cv, action.roleId);
+      if (!list) return cv;
+      return bulletAction(cv, { type: "setBullet", owner: { list, itemId: action.roleId }, bulletId: action.bulletId, text: action.text });
+    }
     case "addBullets": {
-      const owner = { list: "experience", itemId: action.roleId } as const;
+      const list = roleListOf(cv, action.roleId);
+      if (!list) return cv;
+      const owner = { list, itemId: action.roleId };
       const bullets = getBullets(cv, owner);
       if (!bullets || !action.texts.length || bullets.length >= MAX_BULLETS) return cv;
       const added = action.texts.slice(0, MAX_BULLETS - bullets.length).map((text) => ({ id: newId(), text }));
       return withBullets(cv, owner, [...bullets, ...added]);
     }
     case "setFacts": {
-      const role = cv.experience.find((r) => r.id === action.roleId);
-      if (!role) return cv;
+      const list = roleListOf(cv, action.roleId);
+      const role = list && cv[list].find((r) => r.id === action.roleId);
+      if (!list || !role) return cv;
       const before = role.facts ?? null;
       const facts = action.facts;
       if (facts && notesHash(role.notes) !== facts.fromNotes) return cv;
       if (before === facts || (before && facts && before.fromNotes === facts.fromNotes && before.updatedAt === facts.updatedAt
         && before.items.length === facts.items.length && before.items.every((item, i) => item === facts.items[i]))) return cv;
-      return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, facts } : r)) };
+      return { ...cv, [list]: cv[list].map((r) => (r === role ? { ...r, facts } : r)) };
     }
     case "setNote": {
-      const role = cv.experience.find((r) => r.id === action.roleId);
-      if (!role) return cv;
+      const list = roleListOf(cv, action.roleId);
+      const role = list && cv[list].find((r) => r.id === action.roleId);
+      if (!list || !role) return cv;
       const exists = role.notes.some((n) => n.id === action.note.id);
       let kept = role.notes;
       const sameKind = kept.filter((n) => (n.jobId === undefined) === (action.note.jobId === undefined));
@@ -297,7 +307,7 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
         kept = kept.filter((n) => !drop.has(n));
       }
       const notes = exists ? kept.map((n) => (n.id === action.note.id ? action.note : n)) : [...kept, action.note];
-      return { ...cv, experience: cv.experience.map((r) => (r === role ? { ...r, notes } : r)) };
+      return { ...cv, [list]: cv[list].map((r) => (r === role ? { ...r, notes } : r)) };
     }
     case "setCurrent": {
       const items = cv[action.list];
@@ -322,8 +332,9 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       return { ...cv, achievements: [...cv.achievements, ...action.texts.slice(0, room).map((text) => ({ id: newId(), text }))] };
     }
     case "clearCopiedDescriptions": {
-      if (!cv.experience.some(isCopiedDescription)) return cv;
-      return { ...cv, experience: cv.experience.map((r) => (isCopiedDescription(r) ? { ...r, description: "" } : r)) };
+      const lists = ROLE_LISTS.filter((l) => cv[l].some(isCopiedDescription));
+      if (!lists.length) return cv;
+      return lists.reduce((next, l) => ({ ...next, [l]: next[l].map((r) => (isCopiedDescription(r) ? { ...r, description: "" } : r)) }), cv);
     }
   }
 }

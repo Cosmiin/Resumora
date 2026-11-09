@@ -273,7 +273,7 @@ describe("job page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
     await userEvent.click(await screen.findByRole("button", { name: "Enrich first" }));
     expect(router.state.location.pathname).toBe("/cv");
-    expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one step at a time" })).toBeInTheDocument();
   });
   it("with no scores yet the dialog says Not scored yet", async () => {
     vi.mocked(useRoleScores).mockReturnValue({ scores: new Map([["role", { state: "scoring" as const }]]), retry: vi.fn() });

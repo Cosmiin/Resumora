@@ -119,14 +119,14 @@ describe("CV editor", () => {
       withCv({ basics });
       renderPage();
       await userEvent.click(await screen.findByRole("button", { name: "Enrich my CV" }));
-      expect(screen.getByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Let's make your CV stronger, one step at a time" })).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "Not now" }));
       expect(screen.queryByRole("dialog", { name: "Enrich your CV" })).toBeNull();
     });
     it("/cv?enrich=1 opens it on arrival", async () => {
       withCv({ basics });
       renderPage("/cv?enrich=1");
-      expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one step at a time" })).toBeInTheDocument();
     });
   });
 

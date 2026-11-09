@@ -48,8 +48,8 @@ describe("the guided path (1A)", () => {
 
   it("lists only roles below 80 (still scoring counts), in CV order, and starts with the first role's title", () => {
     render(<Host scores={scores} />);
-    expect(screen.getByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
-    expect(screen.getByText("About 3 minutes per role")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Let's make your CV stronger, one step at a time" })).toBeInTheDocument();
+    expect(screen.getByText("About 3 minutes per role · 1 per section")).toBeInTheDocument();
     const rows = screen.getAllByRole("listitem").map((li) => li.textContent);
     expect(rows).toHaveLength(2);
     expect(rows[0]).toContain("Buyer");

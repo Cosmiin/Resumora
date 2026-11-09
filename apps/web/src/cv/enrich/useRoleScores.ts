@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fingerprint, type CvContent, type Experience, type Locale, type RoleResult } from "@resumora/shared";
+import { fingerprint, scoredItems, type CvContent, type Experience, type Locale, type RoleResult } from "@resumora/shared";
 import { ApiClientError } from "../../lib/api-error.ts";
 import type { SaveStatus } from "../useAutosave.ts";
 import { getScores, scoreRole } from "./enrich-api.ts";
@@ -39,7 +39,9 @@ export function useRoleScores({ cv, status }: Props): {
   scores: Map<string, RoleScoreState>;
   retry(roleId: string): void;
 } {
-  const { experience, locale } = cv;
+  const { locale } = cv;
+  // Roles, projects and volunteering are all scored, in that order (one list, kept stable between renders).
+  const experience = useMemo(() => scoredItems(cv).map((s) => s.item), [cv.experience, cv.projects, cv.volunteering]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loaded, setLoaded] = useState(false);
   const [results, setResults] = useState<ReadonlyMap<string, RoleResult>>(new Map());
   const [inFlight, setInFlight] = useState<{ roleId: string; fingerprint: string } | null>(null);
