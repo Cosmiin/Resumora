@@ -8,6 +8,8 @@ import { exportFileName } from "./file-name.ts";
 export type ExportKind = "cv" | "letter";
 export type ExportFormat = "pdf" | "docx";
 export type ExportInput = { cv: TailoredCv; job: JobExtraction | null; template: TemplateId; date?: Date };
+/** How long the exported CV is after fitting; `fits` is false when even the smallest text left it over 2 pages. */
+export type ExportResult = { pages: number; fits: boolean };
 
 type ItemReview = { kept?: boolean; inferred?: boolean; reviewed?: boolean; text?: string };
 
@@ -65,8 +67,11 @@ function save(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-/** Builds the file in the browser and downloads it. The builders load on first use (they're large). */
-export async function exportFile(kind: ExportKind, format: ExportFormat, input: ExportInput): Promise<void> {
+/**
+ * Builds the file in the browser and downloads it. The builders load on first use (they're large).
+ * A CV is fitted to 2 pages through the PDF; the Word file reuses the step the PDF needed.
+ */
+export async function exportFile(kind: ExportKind, format: ExportFormat, input: ExportInput): Promise<ExportResult | undefined> {
   const name = input.cv.content.basics.fullName;
   const company = input.job?.company ?? "";
   const role = input.job?.title ?? "";
@@ -74,9 +79,13 @@ export async function exportFile(kind: ExportKind, format: ExportFormat, input: 
     const { letter, header } = letterParts(input);
     const build = format === "pdf" ? (await import("./pdf.tsx")).buildLetterPdf : (await import("./docx.ts")).buildLetterDocx;
     save(await build(letter, header, input.cv.language), exportFileName(name, company, `${role} Cover letter`, format));
-    return;
+    return undefined;
   }
   const photo = await photoFor(input);
-  const build = format === "pdf" ? (await import("./pdf.tsx")).buildCvPdf : (await import("./docx.ts")).buildCvDocx;
-  save(await build(input.cv.content, input.template, photo), exportFileName(name, company, role, format));
+  const fitted = await (await import("./pdf.tsx")).fitCvPdf(input.cv.content, input.template, photo);
+  const blob = format === "pdf"
+    ? fitted.blob
+    : await (await import("./docx.ts")).buildCvDocx(input.cv.content, input.template, photo, fitted.step);
+  save(blob, exportFileName(name, company, role, format));
+  return { pages: fitted.pages, fits: fitted.fits };
 }
