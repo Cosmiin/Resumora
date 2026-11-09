@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCopiedDescription } from "./role-description.ts";
 import {
   CvContentSchema,
   MAX_BULLETS,
@@ -54,7 +55,7 @@ export const ImportDraftSchema = z
     unclearSkills: z.array(s),
     languages: z.array(z.object({ name: s, level: s }).strict()),
     certifications: z.array(z.object({ name: s, issuer: s, date: s }).strict()),
-    projects: z.array(z.object({ name: s, description: s, url: s }).strict()),
+    projects: z.array(jobShape.extend({ url: s }).strict()),
     custom: z.array(z.object({ title: s, details: s }).strict()),
     awards: z.array(z.object({ name: s, issuer: s, date: s, description: s }).strict()),
     courses: z.array(z.object({ name: s, provider: s, date: s }).strict()),
@@ -160,7 +161,7 @@ export function toCvContent(draft: ImportDraft): ImportResult {
         startDate: date(e.startDate, label),
         endDate: e.current ? "" : date(e.endDate, label),
         current: e.current,
-        description: clip(e.description, label, MAX_LONG_TEXT),
+        description: isCopiedDescription(e) ? "" : clip(e.description, label, MAX_LONG_TEXT),
         bullets: e.bullets.slice(0, MAX_BULLETS).map((text) => ({ id: newId(), text: clip(text, label) })),
         notes: [],
       };
@@ -206,12 +207,8 @@ export function toCvContent(draft: ImportDraft): ImportResult {
       issuer: clip(c.issuer, "certifications"),
       date: date(c.date, "certifications"),
     })),
-    projects: list(draft.projects, "projects").map((p) => ({
-      id: newId(),
-      name: clip(p.name, "projects"),
-      description: clip(p.description, "projects", MAX_LONG_TEXT),
-      url: clip(p.url, "projects"),
-    })),
+    // A project has the role shape, plus its link (same order as the draft, so the index matches).
+    projects: jobs(draft.projects, "projects", "a project").map((p, i) => ({ ...p, url: clip(draft.projects[i]!.url, "projects") })),
     custom: list(draft.custom, "other sections").map((c) => ({
       id: newId(),
       title: clip(c.title, "other sections"),
@@ -241,6 +238,7 @@ export function toCvContent(draft: ImportDraft): ImportResult {
     })),
     interests: list(draft.interests.map((n) => n.trim()).filter(Boolean), "interests").map((name) => ({ id: newId(), name: clip(name, "interests") })),
     layout: defaultLayout(),
+    enrichedAt: null,
   };
 
   const known = new Set<string>(SECTION_KEYS);

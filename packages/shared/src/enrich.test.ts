@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   EnrichParseError,
   MAX_QUESTIONS,
+  MAX_ROLE_QUESTIONS,
   ModelScoreSchema,
   RoleResultSchema,
   SCORE_POLICY,
@@ -59,11 +60,11 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
   };
 }
 
-const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [] });
+const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/3", () => {
-    expect(SCORE_POLICY).toBe("score/3");
+  it("uses policy score/4", () => {
+    expect(SCORE_POLICY).toBe("score/4");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -111,25 +112,37 @@ describe("buildRoleResult", () => {
       roleId: "r1", policy: "score/2", fingerprint: "old", score: null,
       bullets: [], nextStep: null, questions: [],
     };
-    expect(RoleResultSchema.parse(stored)).toEqual({ ...stored, roleQuestions: [] });
+    expect(RoleResultSchema.parse(stored)).toEqual({ ...stored, roleQuestions: [], thin: false });
   });
 
-  it("keeps at most three role questions, with ids and allowed options", () => {
-    const roleQuestions = [
-      { text: "Did anyone report to you?", options: ["No", "Managed 37 people", "20+"] },
-      { text: "Which tools did you use?", options: ["Excel", "SAP", "Workday"] },
-      { text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"] },
-      { text: "Who did you work with?", options: ["Finance", "HR", "Vendors"] },
-    ];
+  it("keeps up to eight role questions with their topics, ids and allowed options, and rejects nine", () => {
+    const topics = ["company", "purpose", "tools", "other", "other", "other", "other", "other"] as const;
+    const roleQuestions = topics.map((topic, i) => ({ text: `Question ${i + 1}?`, options: ["No", "Managed 37 people", "20+"], topic }));
+    expect(MAX_ROLE_QUESTIONS).toBe(8);
     const result = buildRoleResult(role([]), { ...model([]), roleQuestions }, "fp");
-    expect(result.roleQuestions).toEqual([
-      { id: "rq1", text: "Did anyone report to you?", options: ["No", "20+"], kind: "role" },
-      { id: "rq2", ...roleQuestions[1], kind: "role" },
-      { id: "rq3", ...roleQuestions[2], kind: "role" },
-    ]);
+    expect(result.roleQuestions).toHaveLength(8);
+    expect(result.roleQuestions[0]).toEqual({ id: "rq1", text: "Question 1?", options: ["No", "20+"], kind: "role", topic: "company" });
+    expect(result.roleQuestions.map((q) => q.topic)).toEqual(topics);
     expect(RoleResultSchema.parse(result)).toEqual(result);
-    expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions }).success).toBe(false);
-    expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions: roleQuestions.slice(0, 3) }).success).toBe(true);
+    expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions }).success).toBe(true);
+    const nine = [...roleQuestions, { text: "Question 9?", options: [], topic: "other" }];
+    expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions: nine }).success).toBe(false);
+    expect(RoleResultSchema.safeParse({ ...result, roleQuestions: [...result.roleQuestions, { ...result.roleQuestions[0]!, id: "rq9" }] }).success).toBe(false);
+  });
+
+  it("reads a stored role question without a topic as other", () => {
+    const stored = { roleId: "r1", policy: "score/3", fingerprint: "old", score: null, bullets: [], nextStep: null, questions: [],
+      roleQuestions: [{ id: "rq1", text: "Who did you report to?", options: [], kind: "role" }] };
+    expect(RoleResultSchema.parse(stored).roleQuestions[0]!.topic).toBe("other");
+  });
+
+  it("marks a role thin with one bullet or fewer, or when the model says so; stored results without it read as false", () => {
+    expect(buildRoleResult(role([]), model([]), "fp").thin).toBe(true);
+    expect(buildRoleResult(role(["a1"]), model([mb("b1")]), "fp").thin).toBe(true);
+    expect(buildRoleResult(role(["a1", "a2"]), model([mb("b1"), mb("b2")]), "fp").thin).toBe(false);
+    expect(buildRoleResult(role(["a1", "a2"]), { ...model([mb("b1"), mb("b2")]), thin: true }, "fp").thin).toBe(true);
+    const stored = { roleId: "r1", policy: "score/3", fingerprint: "old", score: null, bullets: [], nextStep: null, questions: [] };
+    expect(RoleResultSchema.parse(stored).thin).toBe(false);
   });
 
   it("builds bullet-only grade results without role questions", () => {
@@ -302,10 +315,10 @@ describe("mergeGrades role questions", () => {
   it("preserves stored role questions and their ids when a bullet is re-graded", () => {
     const r = role(["Prepared payroll files"]);
     const stored = buildRoleResult(r, model([mb("b1")]), "old");
-    stored.roleQuestions = [{ id: "rq2", text: "Who did you report to?", options: ["The CEO", "The owner"], kind: "role" }];
+    stored.roleQuestions = [{ id: "rq2", text: "Who did you report to?", options: ["The CEO", "The owner"], kind: "role", topic: "other" }];
     const result = mergeGrades(r, stored, [mb("b1", { impact: "missing", issue: "impact" })], "new");
     expect(result.roleQuestions).toEqual([
-      { id: "rq2", text: "Who did you report to?", options: ["The CEO", "The owner"], kind: "role" },
+      { id: "rq2", text: "Who did you report to?", options: ["The CEO", "The owner"], kind: "role", topic: "other" },
     ]);
     expect(result.score).toBe(80);
     expect(result.fingerprint).toBe("new");

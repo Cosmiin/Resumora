@@ -1,4 +1,4 @@
-import type { JobExtraction, MatchScore, Proposal, TailorRun } from "@resumora/shared";
+import type { JobExtraction, MatchScore, Proposal, ScoredKind, TailorRun } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { Role } from "./RolePanel.tsx";
 import type { AcceptBody } from "./tailor-api.ts";
@@ -40,18 +40,30 @@ export function keptChanges(proposals: Proposal[], body: AcceptBody): Proposal[]
 export const keptTexts = (role: Role, kept: Proposal[]): string[] =>
   [role.title, role.description, ...role.bullets.map((bullet) => bullet.text), ...kept.map((p) => p.text)];
 
-type Input = { names: string[]; company: string | null; changed: boolean; from: number | null; to: number | null; next: TailorRun; roles: Role[] };
+/** The labels' suffix for an item's kind: roles keep the plain keys. */
+export const kindKey = (kind: ScoredKind | undefined) => (kind === "project" || kind === "volunteering" ? `.${kind}` as const : "" as const);
+const stepOfKind = (kind: ScoredKind | undefined) => (kind === "project" || kind === "volunteering" ? "projects" : "experience");
 
-/** The words of the role done moment: title, the line under the score, and the button to the next role or step. */
-export function roleDone({ names, company, changed, from, to, next, roles }: Input): { title: string; line: string | null; button: string } {
-  const title = !changed ? t("tailor.roleDone.nothing")
-    : from !== null && to !== null && to > from ? t("tailor.roleDone.up", { from }) : t("tailor.roleDone.done");
+type Input = {
+  names: string[]; company: string | null; changed: boolean; from: number | null; to: number | null; next: TailorRun;
+  /** Every item of the role steps; `kind` names the next one's button (absent = a role). */
+  roles: Array<Role & { kind?: ScoredKind }>;
+  /** The kind of the item just done (absent = a role). */
+  kind?: ScoredKind;
+};
+
+/** The words of the item done moment: title, the line under the score, and the button to the next item or step. */
+export function roleDone({ names, company, changed, from, to, next, roles, kind }: Input): { title: string; line: string | null; button: string } {
+  const own = kindKey(kind);
+  const title = !changed ? t(`tailor.roleDone.nothing${own}`)
+    : from !== null && to !== null && to > from ? t("tailor.roleDone.up", { from }) : t(`tailor.roleDone.done${own}`);
   const who = company?.trim() || t("tailor.roleDone.theJob");
   const line = !changed || names.length === 0 ? null
-    : names.length === 1 ? t("tailor.roleDone.showsOne", { a: names[0]!, company: who })
-      : t("tailor.roleDone.showsTwo", { a: names[0]!, b: names[1]!, company: who });
-  const nextRole = next.currentSection === "experience" ? roles.find((role) => role.id === next.currentRoleId) : undefined;
-  const button = nextRole ? t("tailor.roleDone.nextRole", { title: nextRole.title.trim() || t("tailor.role.untitled") })
+    : names.length === 1 ? t(`tailor.roleDone.showsOne${own}`, { a: names[0]!, company: who })
+      : t(`tailor.roleDone.showsTwo${own}`, { a: names[0]!, b: names[1]!, company: who });
+  // The next item of the same step; moving to another step names the step.
+  const nextRole = next.currentSection === stepOfKind(kind) ? roles.find((role) => role.id === next.currentRoleId) : undefined;
+  const button = nextRole ? t(`tailor.roleDone.nextRole${kindKey(nextRole.kind)}`, { title: nextRole.title.trim() || t("tailor.role.untitled") })
     : next.currentSection ? t("tailor.roleDone.onTo", { section: t(`tailor.section.${next.currentSection}`) }) : t("tailor.roleDone.finish");
   return { title, line, button };
 }

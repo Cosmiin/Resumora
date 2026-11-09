@@ -55,7 +55,7 @@ function bodyHtml(sec: Section, c: Content): string {
       return c.certifications.map((x) => item(x.name, join([x.issuer, fmtDate(x.date, l)]))).join("");
     case "projects":
       return c.projects
-        .map((p) => item(p.name, esc(p.url), p.description ? `<p>${esc(p.description)}</p>` : ""))
+        .map((p) => item(p.title, esc(p.url), p.bullets.length ? `<p>${esc(p.bullets.map((b) => b.text).join(" "))}</p>` : ""))
         .join("");
     case "awards":
       return c.awards

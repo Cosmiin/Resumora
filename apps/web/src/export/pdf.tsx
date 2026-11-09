@@ -1,7 +1,7 @@
 ﻿import type { ReactElement, ReactNode } from "react";
 import { Document, Image, Page, pdf, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
-  CATEGORY, formatYearMonth, normalizeLayout, type CvContent, type SectionKey,
+  CATEGORY, formatYearMonth, normalizeLayout, withoutHidden, type CvContent, type SectionKey,
 } from "@resumora/shared";
 import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
@@ -24,11 +24,13 @@ const MAX_PAGES = 2;
 const join = (parts: string[]) => parts.filter(Boolean).join(" · ");
 
 export function buildCvPdf(
-  content: CvContent,
+  cv: CvContent,
   template: TemplateId | string | undefined,
   photo?: ExportPhoto,
   step: FitStep = fitSteps(template)[0]!,
 ): Promise<Blob> {
+  // Hidden courses, awards, publications and interests are left out of the export.
+  const content = withoutHidden(cv);
   registerPdfFonts();
   const selectedTemplate = getTemplate(template);
   const image = selectedTemplate.showsPhoto && content.basics.photo && photo && photo.type !== "webp"
@@ -60,11 +62,17 @@ export function buildCvPdf(
       {details.filter(Boolean).map((line, index) => <Text key={index}>{line}</Text>)}
     </View>
   );
-  const roles = (items: CvContent["experience"]) => items.map((job) => (
+  // Lines under a course, award, publication or interest; blank ones are left out.
+  const lined = (id: string, item: ReactElement, lines: { id: string; text: string }[] = []) => {
+    const shown = lines.filter((line) => line.text.trim());
+    return shown.length ? <View key={id}>{item}{shown.map(bullet)}</View> : item;
+  };
+  // A project is a role with a link, shown after the organisation.
+  const roles = (items: (CvContent["experience"][number] & { url?: string })[]) => items.map((job) => (
     <View key={job.id} style={styles.block}>
       {entry(
         job.id, job.title, formatRange(job.startDate, job.endDate, job.current, content.locale),
-        join([job.company, job.location]), job.description,
+        join([job.company, job.location, job.url ?? ""]), job.description,
       )}
       {job.bullets.map(bullet)}
     </View>
@@ -92,12 +100,15 @@ export function buildCvPdf(
     certifications: content.certifications.map((item) => entry(
       item.id, item.name, formatRange(item.date, "", false, content.locale), item.issuer,
     )),
-    projects: content.projects.map((item) => entry(item.id, item.name, "", item.url, item.description)),
+    projects: roles(content.projects),
     volunteering: roles(content.volunteering),
-    awards: content.awards.map((item) => entry(item.id, item.name, date(item.date), item.issuer, item.description)),
-    courses: content.courses.map((item) => entry(item.id, item.name, date(item.date), item.provider)),
-    publications: content.publications.map((item) => entry(item.id, item.title, date(item.date), join([item.publisher, item.url]))),
-    interests: content.interests.length ? [paragraph(join(content.interests.map((item) => item.name)))] : [],
+    awards: content.awards.map((item) => lined(item.id, entry(item.id, item.name, date(item.date), item.issuer, item.description), item.bullets)),
+    courses: content.courses.map((item) => lined(item.id, entry(item.id, item.name, date(item.date), item.provider), item.bullets)),
+    publications: content.publications.map((item) => lined(item.id, entry(item.id, item.title, date(item.date), join([item.publisher, item.url])), item.bullets)),
+    // Interests stay one line, unless some have lines: then each is its own entry.
+    interests: content.interests.some((item) => item.bullets?.some((line) => line.text.trim()))
+      ? content.interests.map((item) => lined(item.id, entry(item.id, item.name, ""), item.bullets))
+      : content.interests.length ? [paragraph(join(content.interests.map((item) => item.name)))] : [],
     other: content.custom.map((item) => (
       <View key={item.id} style={styles.section}>
         {heading(item.title)}

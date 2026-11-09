@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { AnswerSchema, SteeringSchema, TailorSectionSchema } from "@resumora/shared";
+import { AnswerSchema, stepOf, SteeringSchema, TailorSectionSchema } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { AppEnv } from "../app.ts";
 import type { CvRepo } from "../cv/repo.ts";
@@ -117,7 +117,7 @@ export function tailorRoutes(deps: {
     const roleId = finishedRole(run, c.req.param("roleId"));
     return c.json(await acceptSection(
       { model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), jobs: deps.jobsFor(c), now: deps.now },
-      { userId: c.get("user").id, run, job, section: "experience", body: { ...body, roleId }, redo: true },
+      { userId: c.get("user").id, run, job, section: stepOf((await deps.cvFor(c).get()).content, roleId) ?? "experience", body: { ...body, roleId }, redo: true },
     ));
   });
 

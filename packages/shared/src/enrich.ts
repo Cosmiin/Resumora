@@ -1,13 +1,19 @@
 import { z } from "zod";
-import type { Experience, Locale } from "./cv.ts";
+import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/3";
+export const SCORE_POLICY = "score/4";
 
 export const WEIGHTS = { contribution: 35, clarity: 25, specificity: 20, impact: 20 } as const;
 
 export const MAX_QUESTIONS = 20;
-export const MAX_ROLE_QUESTIONS = 3;
+/** Company, purpose and tools, plus at most 5 more. */
+export const MAX_ROLE_QUESTIONS = 8;
+
+/** What a role question is about. The first three are always covered unless the CV or notes already say it. */
+export const ROLE_TOPICS = ["company", "purpose", "tools", "other"] as const;
+export const RoleTopicSchema = z.enum(ROLE_TOPICS);
+export type RoleTopic = z.infer<typeof RoleTopicSchema>;
 
 export const GradeSchema = z.enum(["missing", "partial", "specific"]);
 export type Grade = z.infer<typeof GradeSchema>;
@@ -44,7 +50,10 @@ export const ModelScoreSchema = z
     roleQuestions: z.array(z.object({
       text: z.string().max(240),
       options: z.array(z.string().max(60)).max(4),
+      topic: RoleTopicSchema.default("other"),
     }).strict()).max(MAX_ROLE_QUESTIONS).default([]),
+    /** Too little information to infer plausible skills or achievements. */
+    thin: z.boolean().default(false),
   })
   .strict();
 export type ModelScore = z.infer<typeof ModelScoreSchema>;
@@ -64,7 +73,7 @@ export const QuestionSchema = z
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const RoleQuestionSchema = z
-  .object({ id, text: z.string(), options: z.array(z.string().max(60)).max(4), kind: z.literal("role") })
+  .object({ id, text: z.string(), options: z.array(z.string().max(60)).max(4), kind: z.literal("role"), topic: RoleTopicSchema.default("other") })
   .strict();
 export type RoleQuestion = z.infer<typeof RoleQuestionSchema>;
 
@@ -92,6 +101,8 @@ export const RoleResultSchema = z
     nextStep: z.object({ bulletId: id, issue: IssueSchema, tip: z.string().nullable() }).strict().nullable(),
     questions: z.array(QuestionSchema).max(MAX_QUESTIONS),
     roleQuestions: z.array(RoleQuestionSchema).max(MAX_ROLE_QUESTIONS).default([]),
+    /** One bullet or fewer, or too little to infer skills or achievements: focus mode opens with "Tell us about…". */
+    thin: z.boolean().default(false),
   })
   .strict();
 export type RoleResult = z.infer<typeof RoleResultSchema>;
@@ -228,9 +239,10 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
     bullets.length === 0 ? null : Math.round(bullets.reduce((sum, b) => sum + b.score, 0) / bullets.length);
 
   const roleQuestions: RoleQuestion[] = (model.roleQuestions ?? []).slice(0, MAX_ROLE_QUESTIONS).map((q, i) => ({
-    id: `rq${i + 1}`, text: q.text, options: q.options.filter(isAllowedOption), kind: "role",
+    id: `rq${i + 1}`, text: q.text, options: q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
   }));
-  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions };
+  const thin = role.bullets.length <= 1 || model.thin === true;
+  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions, thin };
 }
 
 /** Small synchronous 53-bit string hash (cyrb53), so the browser and the worker agree. */
@@ -274,3 +286,35 @@ export function clearCount(result: Pick<RoleResult, "bullets">): { clear: number
 
 /** Voice answers: at most 60 s per recording, 20 sessions per user per day. */
 export const VOICE = { maxSeconds: 60, perDay: 20, model: "gpt-4o-mini-transcribe" } as const;
+
+/**
+ * The role description proposed as the last step of a role (3B): at most two sentences, what the company
+ * does and what the role was for, never a bullet. `keywords` are the ATS terms it uses. Empty text: skip the step.
+ */
+export const RoleDescriptionAnswerSchema = z.object({
+  text: z.string().max(MAX_LONG_TEXT),
+  keywords: z.array(z.string().max(60)).max(8),
+}).strict();
+export type RoleDescriptionAnswer = z.infer<typeof RoleDescriptionAnswerSchema>;
+
+/** Key achievements suggestions (4A): 3–5 when the roles give enough, each from one role. */
+export const AchievementsAnswerSchema = z.object({
+  suggestions: z.array(z.object({ text: z.string().min(1).max(2000), roleId: z.string().min(1).max(64) }).strict()).max(5),
+}).strict();
+export type AchievementsAnswer = z.infer<typeof AchievementsAnswerSchema>;
+
+/** The lighter sections that get suggested lines (3B): no score, no questions. */
+export const LIGHT_SECTIONS = ["courses", "awards", "publications", "interests"] as const;
+export type LightSection = (typeof LIGHT_SECTIONS)[number];
+
+/** POST /v1/enrich/item-lines: the user's "Tell us about ‹item›" answer for one saved lighter item. */
+export const ItemLinesBodySchema = z.object({
+  section: z.enum(LIGHT_SECTIONS),
+  itemId: z.string().min(1).max(64),
+  text: z.string().trim().min(1).max(MAX_LONG_TEXT),
+}).strict();
+export type ItemLinesBody = z.infer<typeof ItemLinesBodySchema>;
+
+/** Suggested short lines for that item, from its own fields and the answer only. Empty: skip the picks. */
+export const ItemLinesAnswerSchema = z.object({ lines: z.array(z.string().min(1).max(200)).max(4) }).strict();
+export type ItemLinesAnswer = z.infer<typeof ItemLinesAnswerSchema>;

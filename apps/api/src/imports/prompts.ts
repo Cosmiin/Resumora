@@ -52,7 +52,8 @@ SKILLS: three groups, classified by the meaning of each item, never by the CV's 
 - Never put the same item in two groups. Never invent skills or qualities from job titles or responsibilities.
 
 OTHER SECTIONS
-- languages: spoken languages with their level as written. certifications: name, issuer, date. projects: name, description, url.
+- languages: spoken languages with their level as written. certifications: name, issuer, date.
+- projects: one entry per project, in the same shape as an experience entry: title = the project's name, company = the organisation or context it was for (for example "Personal project" or a company name; empty if not written), location, dates and current as written, description = an introduction line only if the CV has one, bullets = the project's points or sentences word for word, plus url (empty if none).
 - Preserve all certifications and optional categories.
 - custom: any section that fits nowhere else (driving licence, references, availability…), with its original heading as title and its complete content as details.
 
@@ -74,6 +75,7 @@ const categoryRules = [
   "achievements holds only a section the CV itself presents as achievements or highlights. A result listed under a role stays in that role's bullets; never copy role bullets into achievements. Without such a section, achievements stays empty.",
   "A skill is technical only when it names a tool, software, language, platform or technology. A method, practice or activity (for example wireframing, budgeting, quality control, scheduling) is a professional skill, even in a technical field.",
   "When a role's lines carry no list markers (text from a Word file), the line right after the role's dates that states its scope or responsibility is experience.description; the lines after it are bullets.",
+  "A line near the role's dates that only names the company and/or the location (for example \"Kreditech · Hamburg, Germany\") is not a description: those go to company and location only. experience.description is only a real introduction or context paragraph about the role or company; otherwise leave it empty.",
 ].join("\n- ");
 
 /** The owner's v2 rules plus the category list generated from `CATEGORIES`. */

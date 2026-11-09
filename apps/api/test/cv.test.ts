@@ -163,7 +163,7 @@ describe("history", () => {
 /** A v1 CV as an old database row holds it: no new lists, no layout. */
 function storedV1(fullName: string): Record<string, unknown> {
   const v1: Record<string, unknown> = { ...cvNamed(fullName), schemaVersion: 1 };
-  for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests"]) delete v1[key];
+  for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests", "enrichedAt"]) delete v1[key];
   v1.experience = [
     { id: newId(), company: "Acme", title: "PM", location: "", startDate: "2020-01", endDate: "", current: true, description: "", bullets: [{ id: newId(), text: "Shipped it" }] },
   ];

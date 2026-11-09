@@ -1,13 +1,20 @@
 import { z } from "zod";
 import {
   BrainDumpAnswerSchema,
+  ItemLinesAnswerSchema,
+  type ItemLinesAnswer,
+  type ItemLinesBody,
   ImproveAnswerSchema,
   RewriteEventSchemas,
+  AchievementsAnswerSchema,
+  RoleDescriptionAnswerSchema,
   RoleFactsAnswerSchema,
   RoleResultSchema,
   type BrainDumpAnswer,
   type ImproveAnswer,
   type RewriteEvent,
+  type AchievementsAnswer,
+  type RoleDescriptionAnswer,
   type RoleFactsAnswer,
   type RoleResult,
 } from "@resumora/shared";
@@ -20,9 +27,12 @@ export async function getScores(): Promise<RoleResult[]> {
   return (await apiFetch("/v1/enrich/scores", { schema: ScoresSchema })).items;
 }
 
-/** Scores one role of the saved CV. 409 `not_saved`: the role isn't saved yet, or its text has moved on. */
-export function scoreRole(roleId: string, fingerprint: string): Promise<RoleResult> {
-  return apiFetch("/v1/enrich/score", { method: "POST", json: { roleId, fingerprint }, schema: RoleResultSchema });
+/**
+ * Scores one role of the saved CV. 409 `not_saved`: the role isn't saved yet, or its text has moved on.
+ * fresh: ask the AI again with the notes in view (after "Tell us about…"), instead of the stored result.
+ */
+export function scoreRole(roleId: string, fingerprint: string, fresh?: boolean): Promise<RoleResult> {
+  return apiFetch("/v1/enrich/score", { method: "POST", json: fresh ? { roleId, fingerprint, fresh } : { roleId, fingerprint }, schema: RoleResultSchema });
 }
 
 export function improveBullet(input: { roleId: string; bulletId: string; fingerprint: string }): Promise<ImproveAnswer> {
@@ -35,6 +45,11 @@ export function brainDump(input: { roleId: string; fingerprint: string; source?:
 
 export function roleFacts(roleId: string): Promise<RoleFactsAnswer> {
   return apiFetch("/v1/enrich/role-facts", { method: "POST", json: { roleId }, schema: RoleFactsAnswerSchema });
+}
+
+/** A two-sentence introduction for the role (3B); empty text means skip the step. */
+export function roleDescription(input: { roleId: string; fingerprint: string }): Promise<RoleDescriptionAnswer> {
+  return apiFetch("/v1/enrich/role-description", { method: "POST", json: input, schema: RoleDescriptionAnswerSchema });
 }
 
 const VoiceSessionSchema = z.object({ clientSecret: z.string().min(1), expiresAt: z.string(), model: z.string() });
@@ -137,4 +152,14 @@ export type SkillsAnswer = z.infer<typeof SkillsAnswerSchema>;
  */
 export function getSkillSuggestions(): Promise<SkillsAnswer> {
   return apiFetch("/v1/enrich/skills", { method: "POST", json: {}, schema: SkillsAnswerSchema });
+}
+
+/** Key achievements suggestions (4A) from the saved CV's roles: up to 5, each naming its role. */
+export function suggestAchievements(): Promise<AchievementsAnswer> {
+  return apiFetch("/v1/enrich/achievements", { method: "POST", json: {}, schema: AchievementsAnswerSchema });
+}
+
+/** Suggested lines for one saved course, award, publication or interest (3B); none means skip the picks. */
+export function itemLines(input: ItemLinesBody): Promise<ItemLinesAnswer> {
+  return apiFetch("/v1/enrich/item-lines", { method: "POST", json: input, schema: ItemLinesAnswerSchema });
 }

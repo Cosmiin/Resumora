@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CATEGORY, SECTION_KEYS, missingCategories, newId, normalizeLayout, shownEmptyFlags, type CvContent, type SectionKey } from "@resumora/shared";
+import { CATEGORY, SECTION_KEYS, missingCategories, newId, normalizeLayout, scoredItems, shownEmptyFlags, type CvContent, type SectionKey } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { sectionsOnCv, type CvAction } from "../edit/cvReducer.ts";
 import { DragList } from "../edit/DragList.tsx";
@@ -16,6 +16,8 @@ type Props = {
   opened: ReadonlySet<SectionKey>;
   onOpen(key: SectionKey): void;
   scores?: ReadonlyMap<string, RoleScoreState>;
+  /** Base CV only: opens the guided enrichment path (1A). */
+  onEnrich?(): void;
   /** Tailored CV: Needs attention lists every shown section that is empty; auto-hidden empty ones don't count. */
   tailored?: boolean;
 };
@@ -32,7 +34,7 @@ function Eye({ on }: { on: boolean }) {
 }
 
 /** The panel's home view: what is missing, the sections on the CV (order, hide) and a way to add more. */
-export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, tailored = false }: Props) {
+export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, onEnrich, tailored = false }: Props) {
   const layout = normalizeLayout(cv.layout);
   const nameOf = (key: SectionKey) => layout.titles[key] || CATEGORY[key].label[cv.locale];
   const saved = sectionsOnCv(cv);
@@ -66,6 +68,9 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, t
 
   return (
     <div className="panel-overview">
+      {onEnrich && (
+        <button type="button" className="btn primary enrich-open" onClick={onEnrich}>{t("enrich.path.open")}</button>
+      )}
       <div>
         <h3 className="p-h">{t("panel.overview.title")}</h3>
         <p className="fine">{t("panel.overview.hint")}</p>
@@ -101,7 +106,7 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, t
       </div>
 
       {scores && (
-        <RoleScoreList roles={cv.experience} scores={scores} onOpen={(id) => onFocusField(`experience-${id}-title`)} />
+        <RoleScoreList items={scoredItems(cv)} scores={scores} onOpen={(id, list) => onFocusField(`${list}-${id}-title`)} />
       )}
 
       <div>

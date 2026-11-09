@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { applyGuesses, CvContentSchema, MAX_TEXT, type CvContent, type TailoredCv } from "@resumora/shared";
+import { applyGuesses, CvContentSchema, MAX_TEXT, scoredItems, type CvContent, type TailoredCv } from "@resumora/shared";
 import { ApiError } from "../errors.ts";
 import type { ItemReview } from "./accept.ts";
 import type { TailorRepo } from "./repo.ts";
@@ -15,10 +15,12 @@ export type ReviewItemBody = z.infer<typeof ReviewItemBodySchema>;
 
 const changed = () => new ApiError(409, "item_changed", "This item changed since it was tailored. Reload and try again.");
 
-/** Items with a stable id and their text fields: roles, bullets, skills, awards, languages. */
+/** Items with a stable id and their text fields: roles, projects and volunteering with their bullets, skills, awards, languages. */
 function itemsOf(cv: CvContent): Array<Record<string, unknown> & { id: string }> {
-  return [...cv.experience, ...cv.experience.flatMap((role) => role.bullets), ...cv.technicalSkills, ...cv.professionalSkills,
-    ...cv.awards, ...cv.languages] as Array<Record<string, unknown> & { id: string }>;
+  const roles = scoredItems(cv).map(({ item }) => item);
+  const lined = [...cv.awards, ...cv.courses, ...cv.publications, ...cv.interests].flatMap((item) => item.bullets ?? []);
+  return [...roles, ...roles.flatMap((role) => role.bullets), ...cv.technicalSkills, ...cv.professionalSkills,
+    ...cv.awards, ...cv.languages, ...lined] as Array<Record<string, unknown> & { id: string }>;
 }
 /** The text field of an item whose value is the reviewed text (the field the tailoring wrote). */
 function fieldOf(item: Record<string, unknown>, text: string): string | undefined {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, type CvContent } from "./index.ts";
+import { CvContentSchema, findScored, scoredItems, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, type CvContent } from "./index.ts";
 
 function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
   return {
@@ -42,7 +42,7 @@ describe("CvContentSchema", () => {
     delete cv.basics.photo;
     const stored = schemaVersion === 1
       ? Object.fromEntries(Object.entries({ ...cv, schemaVersion }).filter(([key]) =>
-        !["achievements", "volunteering", "awards", "courses", "publications", "interests", "layout"].includes(key)))
+        !["achievements", "volunteering", "awards", "courses", "publications", "interests", "layout", "enrichedAt"].includes(key)))
       : cv;
     expect(StoredCvSchema.parse(stored).basics.photo).toBeNull();
   });
@@ -196,5 +196,97 @@ describe("newId", () => {
     const bullets = (n: number) => Array.from({ length: n }, (_, i) => ({ id: "b" + i, text: "x" }));
     expect(CvContentSchema.safeParse({ ...emptyCv(), achievements: bullets(10) }).success).toBe(true);
     expect(CvContentSchema.safeParse({ ...emptyCv(), achievements: bullets(11) }).success).toBe(false);
+  });
+});
+
+describe("enrichedAt (J2)", () => {
+  it("old CVs without it parse as not enriched", () => {
+    const old: Record<string, unknown> = { ...emptyCv() };
+    delete old.enrichedAt;
+    expect(CvContentSchema.parse(old).enrichedAt).toBeNull();
+    expect(emptyCv().enrichedAt).toBeNull();
+  });
+  it("accepts an ISO date and rejects anything else", () => {
+    expect(CvContentSchema.parse({ ...emptyCv(), enrichedAt: "2026-11-09T12:00:00.000Z" }).enrichedAt).toBe("2026-11-09T12:00:00.000Z");
+    expect(CvContentSchema.safeParse({ ...emptyCv(), enrichedAt: "yesterday" }).success).toBe(false);
+  });
+});
+
+describe("projects take the role shape", () => {
+  const legacy = { id: "pr1", name: "Budget forecast", description: "Built a Python script. It predicts spend within 5%!\nUsed pandas.", url: "github.com/x" };
+
+  it("keeps job answers saved onto an old-shape project (E6 whole-branch review)", () => {
+    const answer = { id: "n1", question: "What did it check?", answer: "Tax codes", via: ["type"], askedAt: "2026-11-09T10:00:00Z", jobId: "00000000-0000-4000-8000-000000000001" };
+    const cv = CvContentSchema.parse({ ...emptyCv(), projects: [{ ...legacy, notes: [answer] }] });
+    expect(cv.projects[0]!.notes).toEqual([answer]);
+    expect(CvContentSchema.parse({ ...emptyCv(), projects: [legacy] }).projects[0]!.notes).toEqual([]);
+  });
+
+  it("reads an old project into the role shape, one bullet per sentence", () => {
+    const cv = CvContentSchema.parse({ ...emptyCv(), projects: [legacy] });
+    expect(cv.projects[0]).toEqual({
+      id: "pr1", title: "Budget forecast", company: "", location: "", startDate: "", endDate: "", current: false,
+      description: "",
+      bullets: [
+        { id: "pr1-b1", text: "Built a Python script." },
+        { id: "pr1-b2", text: "It predicts spend within 5%!" },
+        { id: "pr1-b3", text: "Used pandas." },
+      ],
+      notes: [], url: "github.com/x",
+    });
+  });
+
+  it("gives the same bullet ids each time the same stored project is read", () => {
+    const a = CvContentSchema.parse({ ...emptyCv(), projects: [legacy] });
+    const b = StoredCvSchema.parse({ ...emptyCv(), projects: [legacy] });
+    expect(b.projects[0]!.bullets.map((x) => x.id)).toEqual(a.projects[0]!.bullets.map((x) => x.id));
+  });
+
+  it("an old project with no paragraph has no bullets", () => {
+    const cv = CvContentSchema.parse({ ...emptyCv(), projects: [{ ...legacy, description: "  " }] });
+    expect(cv.projects[0]!.bullets).toEqual([]);
+  });
+
+  it("keeps a new-shape project as it is", () => {
+    const project = { ...experience({ title: "Forecast", company: "Personal project", bullets: [{ id: "b1", text: "Did it" }] }), url: "x.io" };
+    const cv = CvContentSchema.parse({ ...emptyCv(), projects: [project] });
+    expect(cv.projects[0]).toEqual(project);
+  });
+
+  it("rejects a new-shape project with an unknown field", () => {
+    const project = { ...experience(), url: "", extra: 1 };
+    expect(CvContentSchema.safeParse({ ...emptyCv(), projects: [project] }).success).toBe(false);
+  });
+});
+
+describe("lines under the lighter items", () => {
+  it("old courses, awards, publications and interests parse with no lines", () => {
+    const cv = CvContentSchema.parse({
+      ...emptyCv(),
+      courses: [{ id: "c1", name: "Power BI", provider: "Microsoft", date: "2025" }],
+      awards: [{ id: "a1", name: "Top performer", issuer: "PMI", date: "2019", description: "" }],
+      publications: [{ id: "p1", title: "Paper", publisher: "Journal", date: "2020", url: "" }],
+      interests: [{ id: "i1", name: "Running" }],
+    });
+    for (const item of [cv.courses[0]!, cv.awards[0]!, cv.publications[0]!, cv.interests[0]!]) expect(item.bullets ?? []).toEqual([]);
+  });
+
+  it("keeps the lines of a course", () => {
+    const course = { id: "c1", name: "Power BI", provider: "Microsoft", date: "2025", bullets: [{ id: "l1", text: "Built dashboards" }] };
+    expect(CvContentSchema.parse({ ...emptyCv(), courses: [course] }).courses[0]).toEqual(course);
+  });
+});
+
+describe("scoredItems", () => {
+  it("lists roles, then projects, then volunteering, each with its kind", () => {
+    const cv = {
+      ...emptyCv(),
+      experience: [experience({ id: "r1" })],
+      projects: [{ ...experience({ id: "p1" }), url: "" }],
+      volunteering: [experience({ id: "v1" })],
+    };
+    expect(scoredItems(cv).map(({ item, kind }) => [item.id, kind])).toEqual([["r1", "role"], ["p1", "project"], ["v1", "volunteering"]]);
+    expect(findScored(cv, "p1")?.kind).toBe("project");
+    expect(findScored(cv, "nope")).toBeUndefined();
   });
 });

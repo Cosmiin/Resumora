@@ -84,7 +84,7 @@ export function sampleCv(overrides: Partial<CvContent> = {}): CvContent {
     ],
     certifications: [{ id: "cert-1", name: "Certified Scrum Product Owner", issuer: "Scrum Alliance", date: "2020-05" }],
     projects: [
-      { id: "proj-1", name: "Open-source invoice templates", description: "A set of invoice layouts.", url: "github.com/ana/invoices" },
+      { id: "proj-1", title: "Open-source invoice templates", company: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets: [{ id: "proj-1-b1", text: "A set of invoice layouts." }], notes: [], url: "github.com/ana/invoices" },
     ],
     custom: [{ id: "cust-1", title: "Volunteering", details: "Mentor at a local coding club." }],
     ...overrides,

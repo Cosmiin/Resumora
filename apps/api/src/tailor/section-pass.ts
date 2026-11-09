@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  placeGuesses, type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
+  isLightTailorSection, isRoleSection, placeGuesses, scoredItems, stepItems, type CvContent, type LightTailorSection, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError, type LogFn } from "../errors.ts";
@@ -23,21 +23,24 @@ const ModelProposalsSchema = z.object({
 });
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
 
-/** Experience goes role by role: each step names the run's current role, any other is 409 role_not_current. */
+/**
+ * Experience and Projects & volunteering go item by item: each step names the run's current item,
+ * any other is 409 role_not_current.
+ */
 export function currentRole(run: TailorRun, section: TailorSection, roleId: string | undefined): string | null {
-  if (section !== "experience" || !run.roleOrder?.length) return null;
+  if (!isRoleSection(section) || !run.currentRoleId) return null;
   if (!roleId || roleId !== run.currentRoleId) throw new ApiError(409, "role_not_current", "This role isn't the current step.");
   return roleId;
 }
 
 /**
  * The items a section's proposals may point at, keyed by stable item id, with the fields that may change.
- * With a role, Experience has only that role's items.
+ * With an item, a role step (Experience, Projects & volunteering) has only that item's fields and bullets.
  */
 export function sectionItems(cv: CvContent, section: TailorSection, roleId: string | null = null): Map<string, Item> {
   const items = new Map<string, Item>();
-  if (section === "experience") {
-    for (const role of cv.experience.filter((r) => !roleId || r.id === roleId)) {
+  if (isRoleSection(section)) {
+    for (const role of stepItems(cv, section).filter((r) => !roleId || r.id === roleId)) {
       const { company, title, startDate, endDate, description } = role;
       items.set(role.id, { fields: { description, company, title, startDate, endDate }, roleId: role.id });
       for (const bullet of role.bullets) items.set(bullet.id, { fields: { text: bullet.text }, roleId: role.id });
@@ -47,8 +50,17 @@ export function sectionItems(cv: CvContent, section: TailorSection, roleId: stri
     items.set("new-skill", { fields: { name: "" }, roleId: null });
   } else if (section === "summary") {
     items.set("summary", { fields: { summary: cv.basics.summary }, roleId: null });
-  } else if (section === "achievements") {
-    for (const award of cv.awards) items.set(award.id, { fields: { name: award.name, description: award.description }, roleId: null });
+  } else if (section === "achievements" || isLightTailorSection(section)) {
+    // Awards reword their name and description; every lighter item's lines are their own items. Each item can be
+    // hidden for this job ("hide:<id>"), and the section can be put in a new order ("order": every id, comma-joined).
+    const list = lightList(cv, section);
+    for (const item of list) {
+      const award = section === "achievements" ? cv.awards.find((a) => a.id === item.id) : undefined;
+      if (award) items.set(award.id, { fields: { name: award.name, description: award.description }, roleId: null });
+      for (const line of item.bullets ?? []) items.set(line.id, { fields: { text: line.text }, roleId: null });
+      items.set(`hide:${item.id}`, { fields: { hidden: "" }, roleId: null });
+    }
+    if (list.length > 1) items.set("order", { fields: { order: list.map((item) => item.id).join(",") }, roleId: null });
   } else if (section === "languages") {
     for (const language of cv.languages) items.set(language.id, { fields: { name: language.name, level: language.level }, roleId: null });
   }
@@ -63,17 +75,30 @@ function sectionData(cv: CvContent, section: TailorSection, jobId: string, roleI
   const roles = cv.experience.map((role) => ({ ...role, notes: role.notes.filter((note) => note.jobId === undefined || note.jobId === jobId) }));
   // One role to edit; the other roles are read-only context.
   if (section === "experience") return { edit: roles.filter((role) => role.id === roleId), context: { roles: roles.filter((role) => role.id !== roleId) } };
+  if (section === "projects") {
+    // One project or volunteering role to edit, with its kind; the roles and the other items are read-only context.
+    const items = scoredItems(cv).filter(({ kind }) => kind !== "role")
+      .map(({ item, kind }) => ({ kind, ...item, notes: item.notes.filter((note) => note.jobId === undefined || note.jobId === jobId) }));
+    return { edit: items.filter((item) => item.id === roleId), context: { roles, projectsAndVolunteering: items.filter((item) => item.id !== roleId) } };
+  }
   const skills = { technicalSkills: cv.technicalSkills, professionalSkills: cv.professionalSkills };
   if (section === "skills") return { edit: skills, context: { roles } };
   if (section === "summary") return { edit: { summary: cv.basics.summary, titles: cv.basics.titles }, context: { roles, skills } };
-  return section === "achievements" ? cv.awards : cv.languages;
+  return section === "achievements" || isLightTailorSection(section) ? lightList(cv, section) : cv.languages;
 }
+
+/** The list a Final touches step of the lighter sections works on (Achievements are the CV's awards). */
+export function lightList(cv: CvContent, section: "achievements" | LightTailorSection): Array<{ id: string; bullets?: { id: string; text: string }[]; hidden?: boolean }> {
+  return section === "achievements" ? cv.awards : cv[section];
+}
+/** A hide or an order is not CV text: nothing in it is a claim, so the truth checks skip it. */
+export const notText = (p: Pick<Proposal, "field">) => p.field === "hidden" || p.field === "order";
 
 /** Written CV text only: ids, layout and metadata would add digits that look like known numbers. */
 export function texts(value: unknown): string[] {
   if (typeof value === "string") return [value];
   if (value && typeof value === "object") {
-    return Object.entries(value).filter(([key]) => !["id", "layout", "schemaVersion", "locale", "photo", "askedAt", "updatedAt", "fromNotes"]
+    return Object.entries(value).filter(([key]) => !["id", "layout", "schemaVersion", "locale", "photo", "askedAt", "updatedAt", "fromNotes", "enrichedAt"]
       .includes(key) && !key.endsWith("Id")).flatMap(([, entry]) => texts(entry));
   }
   return [];
@@ -156,18 +181,25 @@ export async function passProposals(
       const spans = p.itemId === "summary" ? placeGuesses(p.text.trim(), (guesses ?? []).map((g) => ({ text: g.text, reason: g.reason.trim() })))
         .map((g) => ({ text: g.text, reason: g.reason })) : [];
       const guessed = spans.length > 0 ? { inferred: false, guesses: spans } : {};
-      if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why, ...guessed });
+      // An order that changes nothing is no change, so a section with nothing else passes with a tick.
+      const same = (a: string) => a.split(",").map((id) => id.trim()).join(",");
+      if (p.itemId === "order" && field && same(p.text) === same(items.get("order")!.fields.order ?? "")) continue;
+      // A hide or an order is never a guess: it names no fact, and the person decides it on the screen.
+      if (field && p.text.trim() && notText({ field })) kept.push({ ...p, field, text: p.text.trim(), inferred: false, flags: [] });
+      else if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why, ...guessed });
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });
     return kept;
   }
-  async function check(proposals: Proposal[]): Promise<Proposal[]> {
-    if (proposals.length === 0) return [];
+  async function check(all: Proposal[]): Promise<Proposal[]> {
+    const proposals = all.filter((p) => !notText(p));
+    if (proposals.length === 0) return all.map((p) => ({ ...p, flags: [] }));
     const verified = await call("tailor_verify", "cheap", VerifySchema, verifySystemPrompt, JSON.stringify({
       sources, proposals: proposals.map((p) => ({ itemId: p.itemId, text: p.text, before: items.get(p.itemId)?.fields[p.field] })),
     }));
-    return proposals.map((p) => {
+    return all.map((p) => {
+      if (notText(p)) return { ...p, flags: [] };
       const fields = items.get(p.itemId)!.fields;
       const original = "company" in fields ? fields : undefined;
       const claims = verified.results.filter((result) => result.itemId === p.itemId).flatMap((result) => result.claims);

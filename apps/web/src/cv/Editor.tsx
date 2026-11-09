@@ -23,6 +23,8 @@ import { useMediaQuery } from "../hooks/useMediaQuery.ts";
 import { useRoleScores } from "./enrich/useRoleScores.ts";
 import { FocusOpenProvider, type FocusTarget } from "./enrich/focus-context.ts";
 import { FocusMode } from "./enrich/FocusMode.tsx";
+import { EnrichPath } from "./enrich/EnrichPath.tsx";
+import { useSearchParams } from "react-router";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
   saved: "cv.status.saved",
@@ -89,6 +91,19 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   const phone = useMediaQuery("(max-width: 899px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
+  // 1A: the guided path. "/cv?enrich=1" (Enrich first, from a job) opens it too; the parameter is then removed.
+  const [params, setParams] = useSearchParams();
+  const [pathOpen, setPathOpen] = useState(() => !isTailored && params.get("enrich") === "1");
+  useEffect(() => {
+    if (params.has("enrich")) setParams((p) => { p.delete("enrich"); return p; }, { replace: true });
+  }, [params, setParams]);
+  const closePath = useCallback(() => {
+    setPathOpen(false);
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body) focusPage();
+    });
+  }, [focusPage]);
+  const covered = focusTarget !== null || pathOpen;
   // Focus mode hands focus back to its opener; if the opener is gone by then (the score card's
   // button disappears at 100), the page takes it, so keyboard focus is never left on <body>.
   const closeFocus = useCallback(() => {
@@ -97,6 +112,15 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       if (document.activeElement === document.body) focusPage();
     });
   }, [focusPage]);
+
+  // Old imports copied "Company · Location" into role descriptions: empty those once, when the base CV opens.
+  // It autosaves like any edit, so the old text stays in version history.
+  const cleaned = useRef(false);
+  useEffect(() => {
+    if (cleaned.current || isTailored) return;
+    cleaned.current = true;
+    dispatch({ type: "clearCopiedDescriptions" });
+  }, [dispatch, isTailored]);
 
   // When the import screen closes (cancel, applied or conflict), focus goes back to Import CV.
   // This runs after render, once the top bar is no longer inert and can take focus.
@@ -183,6 +207,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       onRetry={retry}
       waitForSave={waitForSave}
       original={tailored?.original}
+      onEnrich={isTailored ? undefined : () => setPathOpen(true)}
       tailored={isTailored}
     />
   );
@@ -196,13 +221,13 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   );
 
   return (
-    <AppShell actions={actions} inert={importId !== null || focusTarget !== null}>
+    <AppShell actions={actions} inert={importId !== null || covered}>
       <main className="editor">
       {/* While an import is open the whole workspace is inert. While history is open only the page is,
           so a restore can't race the user's typing; the history panel stays usable. */}
       {/* No focus mode on a tailored CV: without the opener, the ✨ bullet and role buttons render nothing. */}
       <FocusOpenProvider value={isTailored ? null : setFocusTarget}>
-      <div className="editor-workspace" inert={importId !== null || focusTarget !== null}>
+      <div className="editor-workspace" inert={importId !== null || covered}>
         <div className="stage" ref={pageRef} tabIndex={-1} onFocus={() => setSheet("peek")}>
           {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
           {notices}
@@ -238,9 +263,12 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
         )}
       </div>
       </FocusOpenProvider>
+      {pathOpen && !focusTarget && !historyOpen && !isTailored && (
+        <EnrichPath cv={content} dispatch={dispatch} scores={roleScores.scores} waitForSave={waitForSave} onClose={closePath} />
+      )}
       {focusTarget && !historyOpen && !isTailored && (
         <FocusMode
-          key={`${focusTarget.roleId}:${focusTarget.bulletId ?? ""}:${focusTarget.mode}`}
+          key={`${focusTarget.roleId}:${focusTarget.bulletId ?? ""}`}
           target={focusTarget}
           cv={content}
           dispatch={dispatch}

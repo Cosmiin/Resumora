@@ -161,7 +161,7 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const { data, error } = await db.from("tailor_runs").insert({
         user_id: user.id, job_id: input.jobId, tailored_cv_id: input.tailoredCvId, kind: input.kind,
         sections: input.sections, status: "running", current_section: input.currentSection,
-        role_order: input.roleOrder ?? [], current_role_id: input.roleOrder?.[0] ?? null,
+        role_order: input.roleOrder ?? [], current_role_id: input.currentRoleId !== undefined ? input.currentRoleId : input.roleOrder?.[0] ?? null,
       }).select(RUN_COLUMNS).single();
       if (error) throw new Error(`tailor_runs insert failed: ${error.message}`);
       return toRun(data);

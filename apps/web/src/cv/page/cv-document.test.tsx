@@ -140,6 +140,34 @@ describe("CvDocument", () => {
     expect(screen.getByRole("heading", { name: "Experiență profesională" })).toBeInTheDocument();
   });
 
+  it("shows the lines under a course and under an interest", () => {
+    render(
+      <CvDocument
+        content={sampleCv({
+          courses: [{ id: "k1", name: "Power BI Data Analyst", provider: "Microsoft Learn", date: "2025", bullets: [{ id: "l1", text: "Built the monthly dashboards" }, { id: "l2", text: "DAX measures" }] }],
+          interests: [{ id: "i1", name: "Running", bullets: [{ id: "l3", text: "3 half marathons since 2022" }] }, { id: "i2", name: "Chess" }],
+        })}
+      />,
+    );
+    for (const text of ["Built the monthly dashboards", "DAX measures", "3 half marathons since 2022"]) expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.getByText("Chess", { exact: false })).toBeInTheDocument();
+  });
+
+  it("leaves out hidden items, and a section whose items are all hidden (E6 Task 10a)", () => {
+    render(
+      <CvDocument
+        content={sampleCv({
+          courses: [{ id: "k1", name: "SQL basics", provider: "", date: "" }, { id: "k2", name: "Pottery class", provider: "", date: "", hidden: true }],
+          interests: [{ id: "i1", name: "Knitting", hidden: true }],
+        })}
+      />,
+    );
+    expect(screen.getByText("SQL basics")).toBeInTheDocument();
+    expect(screen.queryByText("Pottery class")).not.toBeInTheDocument();
+    expect(screen.queryByText("Knitting", { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Interests" })).not.toBeInTheDocument();
+  });
+
   it("key achievements and interests render", () => {
     render(
       <CvDocument
@@ -178,7 +206,7 @@ describe("CV role score", () => {
       state: "ready",
       result: {
         roleId: role.id, policy: "score/2", fingerprint: "current", score: 84,
-        bullets: [], nextStep: null, questions: [], roleQuestions: [],
+        bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false,
       },
     };
     return render(<RoleItem role={role} list="experience" locale="en" dispatch={() => {}} score={score} />);

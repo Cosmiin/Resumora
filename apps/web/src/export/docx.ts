@@ -1,5 +1,5 @@
 import {
-  CATEGORY, formatYearMonth, normalizeLayout, type CvContent, type SectionKey,
+  CATEGORY, formatYearMonth, normalizeLayout, withoutHidden, type CvContent, type SectionKey,
 } from "@resumora/shared";
 import { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun, type IParagraphOptions } from "docx";
 import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
@@ -60,11 +60,13 @@ function pack(children: Paragraph[], style = STYLES.classic, page = PAGE): Promi
 }
 
 export function buildCvDocx(
-  content: CvContent,
+  cv: CvContent,
   template: TemplateId | string | undefined,
   photo?: ExportPhoto,
   step: FitStep = fitSteps(template)[0]!,
 ): Promise<Blob> {
+  // Hidden courses, awards, publications and interests are left out of the export.
+  const content = withoutHidden(cv);
   const selectedTemplate = getTemplate(template);
   const b = content.basics;
   const children: Paragraph[] = [];
@@ -105,11 +107,14 @@ export function buildCvDocx(
     paragraph(title), ...details.filter(Boolean).map((line) => paragraph(line)),
   ];
   const bullet = (text: string) => paragraph(text, { bullet: { level: 0 } });
+  // Lines under a course, award, publication or interest; blank ones are left out.
+  const lines = (items: { text: string }[] = []) => items.filter((line) => line.text.trim()).map((line) => bullet(line.text));
   const heading = (text: string) => paragraph(text, { heading: HeadingLevel.HEADING_1 });
   const date = (value: string) => formatYearMonth(value, content.locale);
-  const roles = (items: CvContent["experience"]) => items.flatMap((job) => [
+  // A project is a role with a link, shown after the organisation.
+  const roles = (items: (CvContent["experience"][number] & { url?: string })[]) => items.flatMap((job) => [
     ...entry(
-      job.title, join([job.company, job.location]),
+      job.title, join([job.company, job.location, job.url ?? ""]),
       formatRange(job.startDate, job.endDate, job.current, content.locale), job.description,
     ),
     ...job.bullets.map((item) => bullet(item.text)),
@@ -130,12 +135,15 @@ export function buildCvDocx(
       paragraph(`${row.label}: ${row.items.map((item) => item.name).join(", ")}`)),
     languages: content.languages.flatMap((item) => entry(item.name, item.level)),
     certifications: content.certifications.flatMap((item) => entry(item.name, date(item.date), item.issuer)),
-    projects: content.projects.flatMap((item) => entry(item.name, item.url, item.description)),
+    projects: roles(content.projects),
     volunteering: roles(content.volunteering),
-    awards: content.awards.flatMap((item) => entry(item.name, date(item.date), item.issuer, item.description)),
-    courses: content.courses.flatMap((item) => entry(item.name, date(item.date), item.provider)),
-    publications: content.publications.flatMap((item) => entry(item.title, date(item.date), join([item.publisher, item.url]))),
-    interests: content.interests.length ? [paragraph(join(content.interests.map((item) => item.name)))] : [],
+    awards: content.awards.flatMap((item) => [...entry(item.name, date(item.date), item.issuer, item.description), ...lines(item.bullets)]),
+    courses: content.courses.flatMap((item) => [...entry(item.name, date(item.date), item.provider), ...lines(item.bullets)]),
+    publications: content.publications.flatMap((item) => [...entry(item.title, date(item.date), join([item.publisher, item.url])), ...lines(item.bullets)]),
+    // Interests stay one line, unless some have lines: then each is its own entry.
+    interests: content.interests.some((item) => lines(item.bullets).length)
+      ? content.interests.flatMap((item) => [...entry(item.name), ...lines(item.bullets)])
+      : content.interests.length ? [paragraph(join(content.interests.map((item) => item.name)))] : [],
     other: content.custom.flatMap((item) => [heading(item.title), ...(item.details ? [paragraph(item.details)] : [])]),
   };
 

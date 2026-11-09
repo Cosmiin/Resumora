@@ -183,3 +183,9 @@
 @media print {
   .no-print, .section-menu, .hidden-sections, .section-toast { display: none !important; }
 }
+
+/* E6 Task 10a: an item hidden on this CV stays in the editor, dimmed, with a switch to show it again. */
+.cv-line.is-hidden > :not(.cv-item-head), .cv-line.is-hidden .cv-item-head > :not(.cv-hide) { opacity: 0.45; }
+.cv-hide { border: 0; background: none; color: var(--sage-500); cursor: pointer; font: inherit; font-size: 0.85em; padding: 0 4px; white-space: nowrap; }
+.cv-hide:focus-visible { outline: 2px solid var(--pine-600); }
+.cv-hidden-list { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 0.9em; color: var(--sage-500); }

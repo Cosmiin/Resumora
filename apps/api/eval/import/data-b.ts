@@ -1,4 +1,4 @@
-import { cv, role, type Case } from "./types.ts";
+import { cv, project, role, type Case } from "./types.ts";
 
 export const case05: Case = {
   id: "05-layout-tables",
@@ -181,8 +181,8 @@ export const case08: Case = {
         ]),
       ],
       projects: [
-        { name: "Potluck", description: "A free app for planning shared dinners, used by about 800 people.", url: "potluck.example.com" },
-        { name: "Tidemark", description: "An open-source tool that checks websites for broken links.", url: "github.com/nadia-example/tidemark" },
+        project("Potluck", "potluck.example.com", ["A free app for planning shared dinners, used by about 800 people."]),
+        project("Tidemark", "github.com/nadia-example/tidemark", ["An open-source tool that checks websites for broken links."]),
       ],
       education: [
         { school: "University of Oradea", degree: "Bachelor's degree", field: "Computer Science", startDate: "2014", endDate: "2018", notes: "" },

@@ -120,6 +120,16 @@ describe("buildCvPdf", () => {
     expect(new TextDecoder().decode(await blob.arrayBuffer())).toMatch(/\/Subtype\s*\/Image\b/);
   });
 
+  it("leaves out a hidden course and a section whose items are all hidden (E6 Task 10a)", async () => {
+    const content = fixture();
+    content.courses = [{ id: "c1", name: "SQL basics", provider: "", date: "" }, { id: "c2", name: "Pottery class", provider: "", date: "", hidden: true }];
+    content.interests = [{ id: "i1", name: "Knitting", hidden: true }];
+    const { text } = await readPdf(await buildCvPdf(content, "classic"));
+    expect(text).toContain("SQL basics");
+    expect(text).not.toContain("Pottery class");
+    expect(text).not.toContain("Knitting");
+  });
+
   it.each(["compact", "no bytes", "no photo", "webp"])("omits the image for %s", async (scenario) => {
     const content = fixture();
     if (scenario !== "no photo") content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1 };
@@ -176,21 +186,21 @@ describe("buildCvPdf", () => {
     content.unclearSkills = [{ id: "u", name: "Unsorted skill" }];
     content.languages = [{ id: "l", name: "Romanian", level: "Native" }];
     content.certifications = [{ id: "c", name: "Cloud certification", issuer: "Cloud Institute", date: "2024" }];
-    content.projects = [{ id: "p", name: "Public project", url: "https://project.example.com", description: "Open source toolkit." }];
+    content.projects = [{ id: "p", title: "Public project", company: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets: [{ id: "p-b1", text: "Open source toolkit." }, { id: "p-b2", text: "Used by 40 teams." }], notes: [], url: "https://project.example.com" }];
     content.volunteering = [{ ...content.experience[1]!, id: "v", title: "Volunteer mentor" }];
     content.awards = [{ id: "a", name: "Community award", issuer: "Local council", date: "2025", description: "Recognised for mentoring." }];
-    content.courses = [{ id: "c", name: "Architecture course", provider: "Learning Institute", date: "2023" }];
+    content.courses = [{ id: "c", name: "Architecture course", provider: "Learning Institute", date: "2023", bullets: [{ id: "cl1", text: "Event-driven design" }, { id: "cl2", text: "Cost modelling" }] }];
     content.publications = [{ id: "p", title: "Engineering article", publisher: "Tech Journal", date: "2024", url: "https://article.example.com" }];
-    content.interests = [{ id: "i", name: "Hiking" }];
+    content.interests = [{ id: "i", name: "Hiking", bullets: [{ id: "il1", text: "Crossed the Fagaras ridge" }] }, { id: "i2", name: "Chess" }];
     content.custom = [{ id: "o", title: "Community involvement", details: "Organised local meetups." }];
     const { text } = await readPdf(await buildCvPdf(CvContentSchema.parse(content), "compact"));
     for (const value of [
       "Experienced engineer building useful products.", "Example University", "BSc, Computer Science",
       "Graduated with distinction.", "Won ten customers.", "Technical: TypeScript",
       "Professional: Team leadership", "Romanian", "Native", "Cloud certification", "Cloud Institute",
-      "Public project", "https://project.example.com", "Open source toolkit.", "Volunteer mentor",
+      "Public project", "https://project.example.com", "Open source toolkit.", "Used by 40 teams.", "Volunteer mentor",
       "Community award", "Local council", "Recognised for mentoring.", "Architecture course",
-      "Learning Institute", "Engineering article", "Tech Journal", "https://article.example.com",
+      "Learning Institute", "Event-driven design", "Cost modelling", "Crossed the Fagaras ridge", "Chess", "Engineering article", "Tech Journal", "https://article.example.com",
       "Hiking", "Community involvement", "Organised local meetups.",
     ]) expect(text).toContain(value);
     expect(text).not.toContain("Unsorted skill");

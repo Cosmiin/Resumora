@@ -178,17 +178,7 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic", hi
         }),
     ),
 
-    projects: section(
-        "projects",
-        cv.projects.length > 0,
-        cv.projects.map((p) => (
-          <Block key={p.id}>
-            {itemTitle(p.name)}
-            {p.url && <span className="cv-item-sub">{p.url}</span>}
-            {p.description && <span className="cv-text">{p.description}</span>}
-          </Block>
-        )),
-    ),
+    projects: newSection("projects"),
 
     volunteering: newSection("volunteering"),
     awards: newSection("awards"),

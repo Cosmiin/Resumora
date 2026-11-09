@@ -1,8 +1,9 @@
 import { useId, useState } from "react";
-import type { Locale, Proposal } from "@resumora/shared";
+import type { Locale, Proposal, ScoredKind } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { diffWords } from "./diff-words.ts";
 import { RoleHeading, type Role } from "./RolePanel.tsx";
+import { kindKey } from "./role-done.ts";
 import type { AcceptBody } from "./tailor-api.ts";
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   onAccept(body: AcceptBody): void;
   /** Opens this role's answers (going back); absent where there is nowhere to go back to. */
   onAnswers?(): void;
+  /** The item's kind (a project or volunteering role says so); absent = a role. */
+  kind?: ScoredKind;
   /** Proposals the API dropped because the CV, notes and answers don't back them up. */
   removed?: number;
 };
@@ -39,7 +42,7 @@ function NewText({ before, proposal }: { before: string; proposal: Proposal }) {
  * RevC: one role as it will look in the CV, with an Original / New switch for the whole role.
  * Keep the original reverts every change; Use the new version keeps them all and leaves guesses for the guided review.
  */
-export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers, removed = 0 }: Props) {
+export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers, removed = 0, kind }: Props) {
   const [view, setView] = useState<"new" | "original">("new");
   const changes = proposals.filter((p) => p.flags.length === 0);
   const find = (itemId: string, field: string) => changes.find((p) => p.itemId === itemId && p.field === field);
@@ -65,7 +68,7 @@ export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers,
         {role.bullets.map((bullet) => <li key={bullet.id}>{text(bullet.text, find(bullet.id, "text"))}</li>)}
       </ul>}
     </div>
-    {changes.length === 0 && <p>{t("tailor.roleReview.nothing")}</p>}
+    {changes.length === 0 && <p>{t(`tailor.roleReview.nothing${kindKey(kind)}`)}</p>}
     {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
     <div className="fm-foot">
       {onAnswers && <button type="button" className="fm-ghost" onClick={onAnswers}><span aria-hidden="true">← </span>{t("tailor.roleReview.answers")}</button>}

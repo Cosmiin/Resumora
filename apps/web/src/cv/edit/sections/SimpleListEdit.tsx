@@ -1,8 +1,10 @@
 import { Fragment, memo, useCallback, useRef } from "react";
-import { MAX_LONG_TEXT, newId, type Locale } from "@resumora/shared";
+import { MAX_LONG_TEXT, newId, type Bullet, type Locale } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { MessageKey } from "../../../i18n/en.ts";
 import type { CvAction } from "../cvReducer.ts";
+import { BulletList } from "../BulletList.tsx";
+import type { LineList } from "../lists.ts";
 import { DragList } from "../DragList.tsx";
 import { ItemDate } from "../ItemDate.tsx";
 import { ItemField } from "../ItemField.tsx";
@@ -10,7 +12,7 @@ import { useFocusAfterRender } from "../useFocusAfterRender.ts";
 import { AddButton } from "./AddButton.tsx";
 import { RemoveButton } from "./RemoveButton.tsx";
 
-export type SimpleList = "languages" | "certifications" | "projects" | "awards" | "courses" | "publications";
+export type SimpleList = "languages" | "certifications" | "awards" | "courses" | "publications";
 
 type Spec = { field: string; label: MessageKey; placeholder?: MessageKey };
 
@@ -35,11 +37,6 @@ const CONFIG: Record<SimpleList, Config> = {
     details: [{ field: "issuer", label: "edit.list.certifications.issuer", placeholder: ISSUER }],
     date: { field: "date", label: "edit.list.certifications.date", placeholder: DATE },
   },
-  projects: {
-    main: { field: "name", label: "edit.list.projects.name" },
-    details: [{ field: "url", label: "edit.list.projects.url", placeholder: LINK }],
-    description: { field: "description", label: "edit.list.projects.description", placeholder: DESCRIPTION },
-  },
   awards: {
     main: { field: "name", label: "edit.list.awards.name" },
     details: [{ field: "issuer", label: "edit.list.awards.issuer", placeholder: ISSUER }],
@@ -62,6 +59,9 @@ const CONFIG: Record<SimpleList, Config> = {
 };
 
 type Row = { id: string } & Record<string, unknown>;
+
+/** Courses, awards and publications can have short lines under them (from enrichment). */
+const hasLines = (list: SimpleList): list is SimpleList & LineList => list === "courses" || list === "awards" || list === "publications";
 type Dispatch = (a: CvAction) => void;
 
 const ListRow = memo(function ListRow({
@@ -82,6 +82,11 @@ const ListRow = memo(function ListRow({
     () => dispatch({ type: "removeItem", list, itemId: item.id }),
     [dispatch, list, item.id],
   );
+  const hidden = item.hidden === true;
+  const toggleHidden = useCallback(
+    () => { if (hasLines(list)) dispatch({ type: "setItemHidden", list, itemId: item.id, hidden: !hidden }); },
+    [dispatch, list, item.id, hidden],
+  );
   const field = (spec: Spec, className?: string, multiline?: boolean) => (
     <ItemField
       list={list}
@@ -97,7 +102,7 @@ const ListRow = memo(function ListRow({
     />
   );
   return (
-    <div className="cv-line" data-item={item.id} role="group" aria-label={mainText || t(main.label)}>
+    <div className={hidden ? "cv-line is-hidden" : "cv-line"} data-item={item.id} role="group" aria-label={mainText || t(main.label)}>
       <div className="cv-item-head">
         {field(main, "cv-item-title")}
         {date && (
@@ -114,6 +119,12 @@ const ListRow = memo(function ListRow({
             />
           </span>
         )}
+        {hasLines(list) && (
+          <button type="button" className="cv-hide" onClick={toggleHidden}
+            aria-label={t(hidden ? "edit.item.showNamed" : "edit.item.hideNamed", { name: mainText || t(main.label) })}>
+            {t(hidden ? "edit.item.show" : "edit.item.hide")}
+          </button>
+        )}
         <RemoveButton name={mainText || t(main.label)} onClick={remove} />
       </div>
       <div className="cv-item-details">
@@ -129,6 +140,9 @@ const ListRow = memo(function ListRow({
         ))}
       </div>
       {description && field(description, undefined, true)}
+      {hasLines(list) && Array.isArray(item.bullets) && item.bullets.length > 0 && (
+        <BulletList owner={{ list, itemId: item.id }} bullets={item.bullets as Bullet[]} dispatch={dispatch} ownerName={mainText || t(main.label)} />
+      )}
     </div>
   );
 });

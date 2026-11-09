@@ -118,7 +118,7 @@ describe("EditablePage", () => {
     const cv: CvContent = {
       ...emptyCv(),
       certifications: [{ id: "c1", name: "AWS", issuer: "Amazon", date: "2021-03" }],
-      projects: [{ id: "p1", name: "Site", description: "Built it", url: "site.dev" }],
+      projects: [{ id: "p1", title: "Site", company: "", location: "", startDate: "", endDate: "", current: false, description: "Built it", bullets: [], notes: [], url: "site.dev" }],
       awards: [{ id: "a1", name: "Prize", issuer: "Org", date: "2020-05", description: "For work" }],
       courses: [{ id: "k1", name: "Course", provider: "School", date: "2019-01" }],
       publications: [{ id: "u1", title: "Paper", publisher: "Journal", date: "2018-02", url: "paper.org" }],
@@ -127,7 +127,7 @@ describe("EditablePage", () => {
     const checks: [string, string, (c: CvContent) => string, string][] = [
       ["Certification", "AWS", (c) => c.certifications[0]!.name, "!"],
       ["Certification issuer", "Amazon", (c) => c.certifications[0]!.issuer, "!"],
-      ["Project", "Site", (c) => c.projects[0]!.name, "!"],
+      ["Project name", "Site", (c) => c.projects[0]!.title, "!"],
       ["Project description", "Built it", (c) => c.projects[0]!.description, "!"],
       ["Project link", "site.dev", (c) => c.projects[0]!.url, "!"],
       ["Award", "Prize", (c) => c.awards[0]!.name, "!"],
@@ -148,6 +148,57 @@ describe("EditablePage", () => {
     for (const label of ["Certification date", "Award date", "Course date", "Publication date"]) {
       expect(screen.getByRole("textbox", { name: label })).toBeInTheDocument();
     }
+  });
+
+  it("a project shows like a short role under Projects, with editable bullets", async () => {
+    const project = {
+      id: "p1", title: "Forecast", company: "Personal project", location: "", startDate: "2023", endDate: "", current: false,
+      description: "", notes: [], url: "github.com/x",
+      bullets: [{ id: "b1", text: "Built a script" }, { id: "b2", text: "Saved 2 hours" }],
+    };
+    const cv: CvContent = { ...emptyCv(), projects: [project], layout: { ...emptyCv().layout, order: ["projects", ...emptyCv().layout.order.filter((k) => k !== "projects")] } };
+    render(<Harness initial={cv} />);
+    expect(screen.getByRole("textbox", { name: "Project name" })).toHaveValue("Forecast");
+    expect(screen.getByRole("textbox", { name: "Project link" })).toHaveValue("github.com/x");
+    const second = screen.getByRole("textbox", { name: "Bullet 2 of Forecast" });
+    expect(second).toHaveValue("Saved 2 hours");
+    await userEvent.type(second, "!");
+    expect(state().projects[0]!.bullets[1]!.text).toBe("Saved 2 hours!");
+    expect(screen.queryByRole("textbox", { name: "Role title" })).not.toBeInTheDocument();
+  });
+
+  it("lines under a course and an interest can be edited and deleted", async () => {
+    const cv: CvContent = {
+      ...emptyCv(),
+      courses: [{ id: "k1", name: "Power BI", provider: "Microsoft", date: "2025", bullets: [{ id: "l1", text: "Dashboards" }, { id: "l2", text: "DAX" }] }],
+      interests: [{ id: "i1", name: "Running", bullets: [{ id: "l3", text: "Half marathons" }] }],
+    };
+    render(<Harness initial={cv} />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Bullet 1 of Power BI" }), "!");
+    expect(state().courses[0]!.bullets![0]!.text).toBe("Dashboards!");
+    const second = screen.getByRole("textbox", { name: "Bullet 2 of Power BI" });
+    await userEvent.clear(second);
+    await userEvent.type(second, "{Backspace}");
+    expect(state().courses[0]!.bullets!.map((b) => b.text)).toEqual(["Dashboards!"]);
+    await userEvent.type(screen.getByRole("textbox", { name: "Bullet 1 of Running" }), "!");
+    expect(state().interests[0]!.bullets![0]!.text).toBe("Half marathons!");
+  });
+
+  it("a hidden course or interest stays in the editor and Show on CV brings it back; a course can be hidden (E6 Task 10a)", async () => {
+    const cv: CvContent = {
+      ...emptyCv(),
+      courses: [{ id: "k1", name: "Pottery class", provider: "", date: "", hidden: true }, { id: "k2", name: "SQL basics", provider: "", date: "" }],
+      interests: [{ id: "i1", name: "Knitting", hidden: true }],
+    };
+    render(<Harness initial={cv} />);
+    const pottery = screen.getByRole("group", { name: "Pottery class" });
+    expect(pottery).toHaveClass("is-hidden");
+    await userEvent.click(within(pottery).getByRole("button", { name: "Show Pottery class on CV" }));
+    expect(state().courses[0]!.hidden).toBeUndefined();
+    await userEvent.click(within(screen.getByRole("group", { name: "SQL basics" })).getByRole("button", { name: "Hide SQL basics on CV" }));
+    expect(state().courses[1]!.hidden).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "Show Knitting on CV" }));
+    expect(state().interests[0]!.hidden).toBeUndefined();
   });
 
   it('a typed date "03/2021" is saved as 2021-03', async () => {

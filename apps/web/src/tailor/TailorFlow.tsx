@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { TAILOR_SECTIONS, type Answer, type CvContent, type JobExtraction, type MatchScore, type Steering, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
+import { findScored, isRoleSection, scoredItems, stepItems, stepOf, stepOrder, TAILOR_SECTIONS, type Answer, type CvContent, type JobExtraction, type MatchScore, type Steering, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { getJob } from "../jobs/jobs-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard, type Draft } from "./QuestionCard.tsx";
-import { keptChanges, keptTexts, newlyMet, roleDone } from "./role-done.ts";
+import { keptChanges, keptTexts, kindKey, newlyMet, roleDone } from "./role-done.ts";
 import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
@@ -30,8 +30,9 @@ export function TailorFlow() {
   const [latest, setLatest] = useState<number | null>(null);
   // The Base CV the questions and proposals are made from: shows each role and the wording a change replaces.
   const [cv, setCv] = useState<CvContent | null>(null);
-  // Questions may also be about a volunteering role (same shape as a job).
-  const roleFor = (question: TailorQuestion) => [...cv?.experience ?? [], ...cv?.volunteering ?? []].find((role) => role.id === question.roleId);
+  // Questions may be about a role, a project or a volunteering role (same shape as a job).
+  const scoredOf = (id: string | null | undefined) => (cv && id ? findScored(cv, id) : undefined);
+  const roleFor = (question: TailorQuestion) => scoredOf(question.roleId)?.item;
   // The stored steering, read when the Tone and questions screens open on a started run.
   const [steering, setSteering] = useState<Steering | undefined>(undefined);
   const runRef = useRef<TailorRun | null>(null);
@@ -45,8 +46,8 @@ export function TailorFlow() {
   const section = run?.currentSection ?? null;
 
   function track(next: TailorRun) { runRef.current = next; setRun(next); }
-  /** Experience steps name the run's current role. */
-  const roleArg = (at: TailorSection) => (at === "experience" ? runRef.current?.currentRoleId ?? undefined : undefined);
+  /** Experience and Projects & volunteering steps name the run's current item. */
+  const roleArg = (at: TailorSection) => (isRoleSection(at) ? runRef.current?.currentRoleId ?? undefined : undefined);
   function fail(cause: unknown, at: TailorSection | null, retry: () => void) {
     if (cause instanceof ApiClientError && cause.code === "job_not_found") { remember(jobId, null); setPhase({ kind: "deleted" }); return; }
     const ai = cause instanceof ApiClientError && cause.code === "ai_failed" && at;
@@ -105,13 +106,14 @@ export function TailorFlow() {
       const before = scoreRef.current;
       scoreRef.current = result.score;
       setLatest(result.score.total);
-      const role = roleId ? cv?.experience.find((r) => r.id === roleId) : undefined;
-      if (!role || phase.kind !== "review") return enter(result.run);
+      const done = scoredOf(roleId);
+      if (!done || phase.kind !== "review") return enter(result.run);
       const kept = keptChanges(phase.proposals, body);
       track(result.run);
       setPhase({ kind: "roleDone", from: latest ?? base, to: result.score.total, next: result.run, ...roleDone({
-        names: newlyMet(before, result.score, keptTexts(role, kept), job), company: job?.company ?? null, changed: kept.length > 0,
-        from: latest ?? base, to: result.score.total, next: result.run, roles: cv?.experience ?? [] }) });
+        names: newlyMet(before, result.score, keptTexts(done.item, kept), job), company: job?.company ?? null, changed: kept.length > 0,
+        from: latest ?? base, to: result.score.total, next: result.run, kind: done.kind,
+        roles: cv ? scoredItems(cv).map(({ item, kind }) => ({ ...item, kind })) : [] }) });
     } catch (cause) {
       setPhase((current) => current.kind === "review" ? { ...current, busy: false } : current);
       if (cause instanceof ApiClientError && cause.code === "job_not_found") fail(cause, at, () => {});
@@ -127,7 +129,7 @@ export function TailorFlow() {
     try {
       const { proposals, removed } = await api.redoRole(runRef.current!.id, roleId, answers);
       // The role under review goes back to its own review, whose accept moves the run on.
-      const current = runRef.current?.currentSection === "experience" && runRef.current.currentRoleId === roleId;
+      const current = isRoleSection(runRef.current?.currentSection) && runRef.current?.currentRoleId === roleId;
       setPhase(current ? { kind: "review", proposals, removed, busy: false } : { kind: "redo", roleId, proposals, removed, busy: false, resume });
     } catch (cause) { fail(cause, "experience", () => setPhase({ kind: "role", roleId, busy: false, resume })); }
   }
@@ -198,15 +200,20 @@ export function TailorFlow() {
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Roles already accepted: all of them once Experience is behind the run, else the ones before the current role.
+  // Items already accepted (roles, then projects and volunteering, in one order): all of them once the role steps are
+  // behind the run, else the ones before the current item.
   const order = run?.roleOrder ?? [];
-  const pastExperience = !!run && (run.status === "done" || !section || run.sections.indexOf(section) > run.sections.indexOf("experience"));
-  const doneRoles = pastExperience ? order
-    : section === "experience" && run?.currentRoleId && order.includes(run.currentRoleId) ? order.slice(0, order.indexOf(run.currentRoleId)) : [];
+  const lastRoleStep = run ? Math.max(...run.sections.map((s, i) => (isRoleSection(s) ? i : -1))) : -1;
+  const pastRoleSteps = !!run && (run.status === "done" || !section || run.sections.indexOf(section) > lastRoleStep);
+  const doneRoles = pastRoleSteps ? order
+    : isRoleSection(section) && run?.currentRoleId && order.includes(run.currentRoleId) ? order.slice(0, order.indexOf(run.currentRoleId)) : [];
+  const doneIn = (s: TailorSection) => (cv ? stepItems(cv, s).filter((item) => doneRoles.includes(item.id)) : []);
   // Going back opens only from a question or a review, so nothing in flight comes back over it.
   const settled = phase.kind === "questions" || phase.kind === "review";
   const reached = run && section ? run.sections.indexOf(section) : run?.sections.length ?? 0;
-  const open = settled && run ? run.sections.filter((s, i) => (s === "experience" ? doneRoles.length > 0 : i < reached)) : [];
+  // Without the CV loaded, finished roles still open Experience (as before projects were tailored).
+  const anyDone = (s: TailorSection) => (cv ? doneIn(s).length > 0 : s === "experience" && doneRoles.length > 0);
+  const open = settled && run ? run.sections.filter((s, i) => (isRoleSection(s) ? anyDone(s) : i < reached)) : [];
   const stepQuestions = (s: TailorSection, roleId?: string) => (run?.questions ?? [])
     .filter((q) => q.section === s && q.kind !== "flag" && (!roleId || q.roleId === roleId));
   const locale = cv?.locale ?? "en";
@@ -222,22 +229,23 @@ export function TailorFlow() {
     body = <SteerConfirm busy={phase.busy} onCancel={() => setPhase(phase.resume)} onRedo={() => void restart(phase.steering, phase)} />;
   } else if (phase.kind === "back") {
     const { resume } = phase;
-    body = phase.section === "experience"
-      ? <FinishedRoles roles={(cv?.experience ?? []).filter((r) => doneRoles.includes(r.id))} locale={locale}
+    body = isRoleSection(phase.section)
+      ? <FinishedRoles roles={doneIn(phase.section)} locale={locale}
         onPick={(roleId) => setPhase({ kind: "role", roleId, busy: false, resume })} onClose={() => setPhase(resume)} />
       : <YourAnswers key={phase.section} title={t(`tailor.section.${phase.section}`)} questions={stepQuestions(phase.section)}
         answers={run?.answers ?? []} busy={false} locale={locale} onClose={() => setPhase(resume)} />;
   } else if (phase.kind === "role") {
     const { roleId, resume } = phase;
-    const role = cv?.experience.find((r) => r.id === roleId);
-    body = <YourAnswers key={roleId} title={role ? roleName(role, locale) : t("tailor.role.untitled")} questions={stepQuestions("experience", roleId)}
+    const role = scoredOf(roleId)?.item;
+    body = <YourAnswers key={roleId} title={role ? roleName(role, locale) : t("tailor.role.untitled")}
+      questions={stepQuestions((cv && stepOf(cv, roleId)) || "experience", roleId)}
       answers={run?.answers ?? []} busy={phase.busy} locale={locale}
       onUpdate={(answers) => void redo(roleId, answers, resume)} onClose={() => setPhase(resume)} />;
   } else if (phase.kind === "redo") {
     const review = phase;
-    const role = cv?.experience.find((r) => r.id === review.roleId);
+    const role = scoredOf(review.roleId)?.item;
     const onAccept = (accepted: api.AcceptBody) => void acceptRedo(review.roleId, accepted, review);
-    body = role ? <RoleReview key={`redo-${role.id}`} role={role} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} />
+    body = role ? <RoleReview key={`redo-${role.id}`} role={role} kind={scoredOf(review.roleId)?.kind} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} />
       : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
         busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
   }
@@ -264,23 +272,27 @@ export function TailorFlow() {
       if (phase.index + 1 < phase.questions.length) return setPhase({ ...phase, index: phase.index + 1, answers });
       void submit(section, phase.questions.map((q, i): Answer => ({ ...(answers[i] ?? { value: null, via: "skip" }), questionId: q.id })));
     };
-    const order = run?.roleOrder ?? [];
-    const progress = section === "experience" && run?.currentRoleId && order.includes(run.currentRoleId)
-      ? t("tailor.question.roleProgress", { role: order.indexOf(run.currentRoleId) + 1, roles: order.length, n: phase.index + 1, total: phase.questions.length })
+    // "Project 1 of 2 · Question 1 of 3": the current item among the step's items of its kind (roles: every role).
+    const current = scoredOf(run?.currentRoleId);
+    const kindOrder = !run || !isRoleSection(section) ? [] : cv && current
+      ? stepOrder(run, cv, section).filter((id) => scoredOf(id)?.kind === current.kind) : section === "experience" ? run.roleOrder ?? [] : [];
+    const progress = run?.currentRoleId && kindOrder.includes(run.currentRoleId)
+      ? t(`tailor.question.roleProgress${kindKey(current?.kind)}`, { role: kindOrder.indexOf(run.currentRoleId) + 1, roles: kindOrder.length,
+        n: phase.index + 1, total: phase.questions.length })
       : t("tailor.question.progress", { n: phase.index + 1, total: phase.questions.length });
     body = <QuestionCard key={question.id} question={question} progress={progress} initial={phase.answers[phase.index]}
       onNext={answerWith} onSkip={() => answerWith({ value: null, via: "skip" })}
       onBack={phase.index > 0 ? () => setPhase({ ...phase, index: phase.index - 1 }) : undefined}
-      role={roleFor(question)} roles={cv?.experience ?? []} locale={cv?.locale} />;
-  } else if (section === "experience" && cv?.experience.some((r) => r.id === run?.currentRoleId)) {
+      role={roleFor(question)} kind={scoredOf(question.roleId)?.kind} roles={cv?.experience ?? []} locale={cv?.locale} />;
+  } else if (isRoleSection(section) && scoredOf(run?.currentRoleId)) {
     const review = phase;
-    body = <RoleReview key={run!.currentRoleId!} role={cv.experience.find((r) => r.id === run!.currentRoleId)!} proposals={review.proposals} locale={locale}
+    body = <RoleReview key={run!.currentRoleId!} role={scoredOf(run!.currentRoleId)!.item} kind={scoredOf(run!.currentRoleId)!.kind} proposals={review.proposals} locale={locale}
       busy={review.busy} onAccept={(accepted) => void accept(section, accepted)} onAnswers={() => void openAnswers(review)} removed={review.removed} />;
   } else {
     body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={[]}
       confirmed={[]} busy={phase.busy} onAccept={(accepted) => { setTicks([]); void accept(section, accepted); }} cv={cv} removed={phase.removed} />;
   }
-  const wide = phase.kind === "questions" && section === "experience" && !!roleFor(phase.questions[phase.index]!);
+  const wide = phase.kind === "questions" && isRoleSection(section) && !!roleFor(phase.questions[phase.index]!);
 
   return <div className={wide ? "tailor-mode is-wide" : "tailor-mode"}>
     <header className="tailor-head">

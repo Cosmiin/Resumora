@@ -1,4 +1,4 @@
-import { SCORE_POLICY, type Experience, type Locale } from "@resumora/shared";
+import { SCORE_POLICY, type Experience, type Locale, type ScoredKind } from "@resumora/shared";
 
 // Prompts for enrichment. The score prompt is built from the Codex assessment prompt
 // (docs/superpowers/specs/reference/codex-experience-scoring.md, Appendix C), minus its
@@ -185,10 +185,22 @@ Pick missing facts using these topics in priority order:
 | Scope | Size and reach, using ranges only | Under 50, 50–200, 200+ |
 | Results | What changed because of their work | Faster, Fewer errors, Lower cost |
 
-Return 1–3 roleQuestions about useful role-wide facts left unknown by the CV
-and notes, including when the role has no bullets. Return [] if none are needed.
-Role questions ask only about tools, reporting line, leading people and who they worked with.
+ROLE QUESTIONS
+
+roleQuestions are about the whole role, including when it has no bullets.
+Always cover these three, one question each, in this order, and leave out
+any that the CV or the notes already answer:
+1. topic company: what the company does (its industry, products or customers).
+2. topic purpose: what the role was for (its purpose and scope).
+3. topic tools: the tools, software and methods used.
+Then ask about any other role-wide fact that is still needed (topic other),
+such as the reporting line, leading people or who they worked with:
+at most 5 more. Return [] if nothing is needed.
 Never ask about something the CV or the notes already answer.
+
+Set thin to true when the role gives too little information to infer
+plausible skills or achievements (for example one short or vague bullet);
+otherwise false.
 For bullet questions, pick the most useful missing topic: usually processes,
 tools or scope for detail, and results for result.
 
@@ -239,10 +251,26 @@ export function scoreSystemPrompt(locale: Locale): string {
   return `${languageInstruction(locale)}\n\n${SCORE_BODY}\n\n(policy ${SCORE_POLICY})`;
 }
 
+/**
+ * How to read a project or a volunteering role, which get the same steps as a role. Nothing for a role,
+ * so a role's messages stay exactly as they were.
+ */
+export function kindNote(kind: ScoredKind): string[] {
+  if (kind === "project") {
+    return ["This is a project, not a job. The role title is the project's name and the company is the organisation or context it was for. "
+      + "For topic company, ask what the project was (what it does or produced, and who it was for); for topic purpose, what it was for and the person's part in it."];
+  }
+  if (kind === "volunteering") {
+    return ["This is a volunteering role. The company is the organisation: for topic company, ask what the organisation does."];
+  }
+  return [];
+}
+
 /** The role as the model sees it: context for the title and description, bullets to grade. No company, no dates. */
-export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes">, gradeOnly?: readonly string[]): string {
+export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes">, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));
   return [
+    ...kindNote(kind),
     "<experience>",
     `Role title (context only, not graded): ${JSON.stringify(role.title)}`,
     `Role description (context only, not graded): ${JSON.stringify(role.description)}`,

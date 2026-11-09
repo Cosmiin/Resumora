@@ -41,7 +41,7 @@ export function moveOtherTo(cv: CvContent, customId: string, target: MoveTarget)
       next.languages = [...cv.languages, ...names.map((name) => ({ id: newId(), name, level: "" }))];
       break;
     case "projects":
-      next.projects = [...cv.projects, ...names.map((name) => ({ id: newId(), name, description: "", url: "" }))];
+      next.projects = [...cv.projects, ...names.map((title) => ({ id: newId(), title, company: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets: [], notes: [], url: "" }))];
       break;
   }
   return next;

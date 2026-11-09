@@ -124,7 +124,7 @@ describe("onlyNotesDiffer", () => {
     expect(onlyNotesDiffer(a, cvWith({ title, ...rest }))).toBe(true);
   });
 
-  it.each(["experience", "volunteering"] as const)("ignores notes and facts in %s without changing either CV", (section) => {
+  it.each(["experience", "projects", "volunteering"] as const)("ignores notes and facts in %s without changing either CV", (section) => {
     const a = { ...emptyCv(), [section]: [role("r1", "Acme", "Dev")] };
     const facts = { items: ["Used SQL"], fromNotes: "hash", updatedAt: "2026-11-05T00:00:00Z" };
     const b = { ...a, [section]: [{ ...a[section][0]!, notes: [note("n1")], facts }] };
@@ -169,7 +169,7 @@ describe("mergeNewerNotes", () => {
     expect(result.experience[0]!.notes).toEqual([...notes.slice(1), ...jobs.slice(1), added, addedJob]);
   });
 
-  it.each(["experience", "volunteering"] as const)("merges notes and newer facts for %s roles", (section) => {
+  it.each(["experience", "projects", "volunteering"] as const)("merges notes and newer facts for %s roles", (section) => {
     const savedFacts = { items: ["Old fact"], fromNotes: "saved-hash", updatedAt: "2026-01-01T00:00:00Z" };
     const newerFacts = { items: ["New fact"], fromNotes: "current-hash", updatedAt: "2026-02-01T00:00:00Z" };
     const target = { ...emptyCv(), [section]: [{ ...role("r1", "Acme", "Dev"), facts: savedFacts }] };

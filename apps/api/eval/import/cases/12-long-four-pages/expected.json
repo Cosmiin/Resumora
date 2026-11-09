@@ -199,13 +199,33 @@
     ],
     "projects": [
       {
-        "name": "Mobile Data Collection Rollout",
-        "description": "Introduced tablets and an offline reporting app to 160 clinics, replacing paper registers.",
+        "company": "",
+        "title": "Mobile Data Collection Rollout",
+        "location": "",
+        "startDate": "",
+        "endDate": "",
+        "current": false,
+        "description": "",
+        "bullets": [
+          {
+            "text": "Introduced tablets and an offline reporting app to 160 clinics, replacing paper registers."
+          }
+        ],
         "url": ""
       },
       {
-        "name": "Community Health Worker Handbook",
-        "description": "Wrote and field-tested a plain-language handbook now used in three countries.",
+        "company": "",
+        "title": "Community Health Worker Handbook",
+        "location": "",
+        "startDate": "",
+        "endDate": "",
+        "current": false,
+        "description": "",
+        "bullets": [
+          {
+            "text": "Wrote and field-tested a plain-language handbook now used in three countries."
+          }
+        ],
         "url": "helixhealth.example.com/handbook"
       }
     ],

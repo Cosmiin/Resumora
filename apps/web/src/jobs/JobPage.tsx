@@ -225,7 +225,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         <p>{t("job.tailor.needsText")}</p>{original}{deletion}{tailor}
       </div> : null}
       {tailorGate && <TailorGate onTailor={() => void navigate(`/jobs/${encodeURIComponent(id)}/tailor`)}
-        onEnrich={() => void navigate("/cv")} onClose={() => setTailorGate(false)} />}
+        onEnrich={() => void navigate("/cv?enrich=1")} onClose={() => setTailorGate(false)} />}
       {deleteError && <p role="alert" className="jobs-field-error">{deleteError}</p>}
     </main>
   </AppShell>;

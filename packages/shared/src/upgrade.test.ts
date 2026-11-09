@@ -50,7 +50,7 @@ function v1Cv(): CvContentV1 {
     unclearSkills: [{ id: "u1", name: "Stuff" }],
     languages: [{ id: "l1", name: "English", level: "C1" }],
     certifications: [{ id: "c1", name: "AWS", issuer: "Amazon", date: "2022-05" }],
-    projects: [{ id: "pr1", name: "Site", description: "d", url: "x.ro" }],
+    projects: [{ id: "pr1", title: "Site", company: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets: [{ id: "pr1-b1", text: "d" }], notes: [], url: "x.ro" }],
     custom: [{ id: "cu1", title: "Hobbies", details: "Chess" }],
   };
 }
@@ -100,5 +100,13 @@ describe("normalizeLayout", () => {
     const out = normalizeLayout(layout);
     expect(out.hidden).toEqual(["skills"]);
     expect(out.titles).toEqual({ summary: "About me" });
+  });
+});
+
+describe("upgradeCv and enrichedAt", () => {
+  it("a v1 CV upgrades as not enriched", () => {
+    const v1 = { ...emptyCv(), schemaVersion: 1 as const };
+    for (const k of ["achievements", "volunteering", "awards", "courses", "publications", "interests", "layout", "enrichedAt"] as const) delete (v1 as Record<string, unknown>)[k];
+    expect(StoredCvSchema.parse(v1).enrichedAt).toBeNull();
   });
 });

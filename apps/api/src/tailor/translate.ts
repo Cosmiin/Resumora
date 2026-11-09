@@ -17,7 +17,7 @@ const ReplySchema = z.object({ texts: z.array(z.object({ path: z.string(), text:
  * and never goes to the AI.
  */
 const KEEP = new Set(["id", "schemaVersion", "locale", "layout", "photo", "facts", "email", "phone", "website", "linkedin",
-  "url", "startDate", "endDate", "date", "company", "fullName", "firstName", "lastName", "location", "generatedAt", "hiringManager"]);
+  "url", "startDate", "endDate", "date", "company", "fullName", "firstName", "lastName", "location", "generatedAt", "hiringManager", "enrichedAt"]);
 
 type Text = { path: string; text: string };
 

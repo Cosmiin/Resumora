@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
-import { formatYearMonth, type CvContent, type SectionKey } from "@resumora/shared";
+import { formatYearMonth, withoutHidden, type CvContent, type SectionKey } from "@resumora/shared";
 
 const joinParts = (parts: string[], sep = " · ") => parts.filter(Boolean).join(sep);
 
-function Item({ title, date, sub, text }: { title: string; date?: string; sub?: string; text?: string }) {
+type Line = { id: string; text: string };
+
+function Item({ title, date, sub, text, lines = [] }: { title: string; date?: string; sub?: string; text?: string; lines?: Line[] }) {
+  const shown = lines.filter((line) => line.text.trim());
   return (
     <div className="cv-block">
       <span className="cv-item-head">
@@ -12,6 +15,11 @@ function Item({ title, date, sub, text }: { title: string; date?: string; sub?: 
       </span>
       {sub && <span className="cv-item-sub">{sub}</span>}
       {text && <span className="cv-text">{text}</span>}
+      {shown.length > 0 && (
+        <ul className="cv-bullets">
+          {shown.map((line) => <li key={line.id}>{line.text}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
@@ -22,6 +30,8 @@ export function newSectionBody(
   cv: CvContent,
   roleRange: (start: string, end: string, current: boolean) => string,
 ): { show: boolean; body: ReactNode } {
+  // Hidden courses, awards, publications and interests are left out of the page.
+  cv = withoutHidden(cv);
   const date = (value: string) => formatYearMonth(value, cv.locale);
   switch (key) {
     case "achievements":
@@ -36,15 +46,17 @@ export function newSectionBody(
         ),
       };
     case "volunteering":
+    case "projects":
       return {
-        show: cv.volunteering.length > 0,
-        body: cv.volunteering.map((v) => (
+        show: cv[key].length > 0,
+        body: cv[key].map((v) => (
           <div className="cv-block" key={v.id}>
             <span className="cv-item-head">
               <span className="cv-item-title">{v.title}</span>
               <span className="cv-item-dates">{roleRange(v.startDate, v.endDate, v.current)}</span>
             </span>
             {(v.company || v.location) && <span className="cv-item-sub">{joinParts([v.company, v.location])}</span>}
+            {"url" in v && v.url && <span className="cv-item-sub">{v.url}</span>}
             {v.description && <span className="cv-text">{v.description}</span>}
             {v.bullets.length > 0 && (
               <ul className="cv-bullets">
@@ -60,25 +72,28 @@ export function newSectionBody(
       return {
         show: cv.awards.length > 0,
         body: cv.awards.map((a) => (
-          <Item key={a.id} title={a.name} date={date(a.date)} sub={a.issuer} text={a.description} />
+          <Item key={a.id} title={a.name} date={date(a.date)} sub={a.issuer} text={a.description} lines={a.bullets} />
         )),
       };
     case "courses":
       return {
         show: cv.courses.length > 0,
-        body: cv.courses.map((c) => <Item key={c.id} title={c.name} date={date(c.date)} sub={c.provider} />),
+        body: cv.courses.map((c) => <Item key={c.id} title={c.name} date={date(c.date)} sub={c.provider} lines={c.bullets} />),
       };
     case "publications":
       return {
         show: cv.publications.length > 0,
         body: cv.publications.map((p) => (
-          <Item key={p.id} title={p.title} date={date(p.date)} sub={joinParts([p.publisher, p.url])} />
+          <Item key={p.id} title={p.title} date={date(p.date)} sub={joinParts([p.publisher, p.url])} lines={p.bullets} />
         )),
       };
     case "interests":
       return {
         show: cv.interests.length > 0,
-        body: <span className="cv-text">{cv.interests.map((i) => i.name).join(" · ")}</span>,
+        // One line, unless some interests have lines: then each is its own item.
+        body: cv.interests.some((i) => i.bullets?.some((line) => line.text.trim()))
+          ? cv.interests.map((i) => <Item key={i.id} title={i.name} lines={i.bullets} />)
+          : <span className="cv-text">{cv.interests.map((i) => i.name).join(" · ")}</span>,
       };
     default:
       return { show: false, body: null };

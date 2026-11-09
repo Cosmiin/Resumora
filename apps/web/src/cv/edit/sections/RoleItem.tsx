@@ -5,6 +5,7 @@ import type { MessageKey } from "../../../i18n/en.ts";
 import { PRESENT } from "../../page/blocks.ts";
 import { BulletList, type WeakMark } from "../BulletList.tsx";
 import type { CvAction } from "../cvReducer.ts";
+import type { RoleList } from "../lists.ts";
 import { DateField } from "../DateField.tsx";
 import { ItemDate } from "../ItemDate.tsx";
 import { ItemField } from "../ItemField.tsx";
@@ -17,8 +18,9 @@ import { focusField } from "../focus.ts";
 import { issueTip } from "../../enrich/tips.ts";
 
 type Props = {
-  role: Experience;
-  list: "experience" | "volunteering";
+  /** A project also has a link. */
+  role: Experience & { url?: string };
+  list: RoleList;
   locale: Locale;
   /** This role's score; left out where roles are not scored. */
   score?: RoleScoreState;
@@ -29,8 +31,17 @@ type Props = {
 
 type TextField = "title" | "company" | "location" | "description";
 
+/** Labels that differ for a project: its name, and the organisation or context it was for. */
+const PROJECT_LABELS: Partial<Record<MessageKey, MessageKey>> = {
+  "edit.role.title": "edit.project.title",
+  "edit.role.titlePlaceholder": "edit.project.title",
+  "edit.role.company": "edit.project.company",
+  "edit.role.description": "edit.project.description",
+  "edit.role.descriptionPlaceholder": "edit.project.descriptionPlaceholder",
+};
+
 /** What a role is called: its title, else its company, else "<Section> role". */
-export function roleName(role: Experience, list: "experience" | "volunteering"): string {
+export function roleName(role: Experience, list: RoleList): string {
   return role.title || role.company || t(`edit.role.untitled.${list}`);
 }
 
@@ -74,14 +85,15 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, s
     if (root.current) focusField(root.current, `${list}-${itemId}-title`);
   }, [list, itemId]);
 
-  const field = (f: TextField, label: MessageKey, placeholder: MessageKey, className?: string, multiline?: boolean) => (
+  const word = (key: MessageKey) => t(list === "projects" ? (PROJECT_LABELS[key] ?? key) : key);
+  const field = (f: TextField | "url", label: MessageKey, placeholder: MessageKey, className?: string, multiline?: boolean) => (
     <ItemField
       list={list}
       itemId={itemId}
       field={f}
-      value={role[f]}
-      label={t(label)}
-      placeholder={t(placeholder)}
+      value={role[f] ?? ""}
+      label={word(label)}
+      placeholder={word(placeholder)}
       className={className}
       multiline={multiline}
       maxLength={multiline ? MAX_LONG_TEXT : undefined}
@@ -137,6 +149,7 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, s
         </span>
         {field("location", "edit.role.location", "edit.role.locationPlaceholder", "cv-item-sub")}
       </div>
+      {list === "projects" && <div className="cv-item-details">{field("url", "edit.project.url", "edit.project.urlPlaceholder", "cv-item-sub")}</div>}
       <div className={role.description ? "cv-role-desc" : "cv-role-desc is-empty"}>
         {field("description", "edit.role.description", "edit.role.descriptionPlaceholder", undefined, true)}
       </div>

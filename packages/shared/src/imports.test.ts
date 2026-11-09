@@ -32,6 +32,25 @@ describe("toCvContent", () => {
     }
   });
 
+  it("drops a description that only repeats the company and location, and keeps a real one", () => {
+    const copied = { ...job("Kreditech"), location: "Hamburg, Germany", description: "Kreditech · Hamburg, Germany" };
+    const real = { ...job("Kreditech"), location: "Hamburg, Germany", description: "Kreditech is a fintech in Hamburg" };
+    const { content } = toCvContent(draftWith({ experience: [copied, real] }));
+    expect(content.experience.map((e) => e.description)).toEqual(["", "Kreditech is a fintech in Hamburg"]);
+  });
+
+  it("imports a project in the role shape, with its bullets and link", () => {
+    const project = { ...job("Personal project", ["Built a forecast script", "Saved 2 hours a month"]), title: "Budget forecast", url: "github.com/x" };
+    const { content } = toCvContent(draftWith({ projects: [project] }));
+    const p = content.projects[0]!;
+    expect(p.title).toBe("Budget forecast");
+    expect(p.company).toBe("Personal project");
+    expect(p.url).toBe("github.com/x");
+    expect(p.bullets.map((b) => b.text)).toEqual(["Built a forecast script", "Saved 2 hours a month"]);
+    expect(p.bullets.every((b) => b.id.length > 0)).toBe(true);
+    expect(CvContentSchema.safeParse(content).success).toBe(true);
+  });
+
   it("assigns ids", () => {
     const { content } = toCvContent(
       draftWith({ experience: [job("Acme", ["Did a thing"])], technicalSkills: ["SQL"], custom: [{ title: "Awards", details: "Best PM 2021" }] }),
@@ -159,7 +178,7 @@ describe("toCvContent", () => {
 describe("ImportResultSchema", () => {
   it("upgrades a stored v1 result", () => {
     const v1: Record<string, unknown> = { ...emptyCv(), schemaVersion: 1 };
-    for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests"]) delete v1[key];
+    for (const key of ["layout", "achievements", "volunteering", "awards", "courses", "publications", "interests", "enrichedAt"]) delete v1[key];
     const parsed = ImportResultSchema.parse({ content: v1, warnings: ["check dates"] });
     expect(parsed.content.schemaVersion).toBe(2);
     expect(parsed.content.layout).toEqual(defaultLayout());

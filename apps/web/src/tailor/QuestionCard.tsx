@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Answer, Locale, TailorQuestion } from "@resumora/shared";
+import { isRoleSection, type Answer, type Locale, type ScoredKind, type TailorQuestion } from "@resumora/shared";
 import { AnswerBox, type Via } from "../cv/enrich/AnswerBox.tsx";
 import { t } from "../i18n/t.ts";
 import { RolePanel, roleMeta, type Role } from "./RolePanel.tsx";
@@ -17,8 +17,9 @@ type Props = {
   onSkip(): void;
   /** Absent on the first question. */
   onBack?(): void;
-  /** Experience: the role the question is about, shown on the left. */
+  /** Experience, Projects & volunteering: the item the question is about, shown on the left, and its kind. */
   role?: Role;
+  kind?: ScoredKind;
   /** Skills: the person's roles, to say where a confirmed skill was used. */
   roles?: Role[];
   locale?: Locale;
@@ -29,15 +30,15 @@ export const VIA: Record<Answer["via"], Via[]> = { option: ["pick"], typed: ["ty
 export const answerVia = (via: Via[]): Answer["via"] => (via.includes("voice") ? "voice" : via.includes("type") ? "typed" : "option");
 
 /** One question in the enrichment style: a choice only selects; Next, Back and Skip move. */
-export function QuestionCard({ role, locale = "en", ...props }: Props) {
-  if (!role || props.question.section !== "experience") return <Question {...props} locale={locale} />;
+export function QuestionCard({ role, kind, locale = "en", ...props }: Props) {
+  if (!role || !isRoleSection(props.question.section)) return <Question {...props} locale={locale} />;
   return <div className="tailor-split">
-    <RolePanel role={role} locale={locale} bulletId={props.question.bulletId} />
+    <RolePanel role={role} locale={locale} bulletId={props.question.bulletId} kind={kind} />
     <Question {...props} locale={locale} />
   </div>;
 }
 
-function Question({ question, progress, initial, onNext, onSkip, onBack, roles = [], locale }: Omit<Props, "role">) {
+function Question({ question, progress, initial, onNext, onSkip, onBack, roles = [], locale }: Omit<Props, "role" | "kind">) {
   const [value, setValue] = useState(initial?.value ?? "");
   const [via, setVia] = useState<Via[]>(initial ? VIA[initial.via] : []);
   const [roleIds, setRoleIds] = useState<string[]>(initial?.roleIds ?? []);

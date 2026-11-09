@@ -1,4 +1,4 @@
-import { TAILOR_SECTIONS, type Steering, type TailorLanguage, type TailorRun } from "@resumora/shared";
+import { runItems, runSections, type Steering, type TailorLanguage, type TailorRun } from "@resumora/shared";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
@@ -25,8 +25,9 @@ export async function startTailoring(
   const adText = [job.extracted.summary, ...job.extracted.responsibilities].filter(Boolean).join("\n");
   const language = detectAdLanguage(adText) ?? base.locale;
 
-  // Experience is tailored one role at a time, every role in CV order.
-  const roleOrder = base.experience.map((role) => role.id);
+  // Experience, then Projects & volunteering, one item at a time in CV order (the step only when the CV has some).
+  const sections = runSections(base);
+  const items = runItems(base, sections);
 
   let tailoredCvId = await deps.tailor.findTailoredCvId(jobId, language);
   if (!tailoredCvId) {
@@ -35,13 +36,13 @@ export async function startTailoring(
       tone: steering.tone ?? "neutral", instruction: steering.instruction ?? null, steering,
     });
     if (created !== "exists") {
-      const run = await deps.tailor.createRun({ jobId, tailoredCvId: created, kind: "tailor", sections: [...TAILOR_SECTIONS], currentSection: "experience", roleOrder });
+      const run = await deps.tailor.createRun({ jobId, tailoredCvId: created, kind: "tailor", sections, currentSection: sections[0]!, ...items });
       return { run, tailoredCvId: created, language };
     }
     tailoredCvId = await deps.tailor.findTailoredCvId(jobId, language);
     if (!tailoredCvId) throw new Error("tailored CV vanished after a duplicate insert");
   }
   const run = await deps.tailor.latestRun(tailoredCvId)
-    ?? await deps.tailor.createRun({ jobId, tailoredCvId, kind: "tailor", sections: [...TAILOR_SECTIONS], currentSection: "experience", roleOrder });
+    ?? await deps.tailor.createRun({ jobId, tailoredCvId, kind: "tailor", sections, currentSection: sections[0]!, ...items });
   return { run, tailoredCvId, language };
 }

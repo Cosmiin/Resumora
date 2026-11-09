@@ -91,9 +91,34 @@ export const LanguageSchema = z.object({ id, name: text(), level: text() }).stri
 export const CertificationSchema = z
   .object({ id, name: text(), issuer: text(), date: YearMonthSchema })
   .strict();
-export const ProjectSchema = z
-  .object({ id, name: text(), description: text(MAX_LONG_TEXT), url: text() })
-  .strict();
+/** A paragraph as bullets, one per sentence; a sentence longer than a bullet allows is cut into pieces. */
+function sentences(paragraph: string): string[] {
+  const parts = paragraph.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  return parts.flatMap((s) => (s.length <= MAX_TEXT ? [s] : s.match(new RegExp(`[\\s\\S]{1,${MAX_TEXT}}`, "g")) ?? []));
+}
+
+/**
+ * Projects used to be { name, description, url }. A stored one in that shape is read in the role shape,
+ * its paragraph split into bullets. Bullet ids come from the project id, so every read gives the same ones.
+ */
+function legacyProject(value: unknown): unknown {
+  if (!value || typeof value !== "object" || !("name" in value) || "title" in value) return value;
+  const old = value as { id?: unknown; name?: unknown; description?: unknown; url?: unknown; notes?: unknown };
+  const projectId = typeof old.id === "string" ? old.id : "";
+  const lines = sentences(typeof old.description === "string" ? old.description : "");
+  const kept = lines.length > MAX_BULLETS ? [...lines.slice(0, MAX_BULLETS - 1), lines.slice(MAX_BULLETS - 1).join(" ").slice(0, MAX_TEXT)] : lines;
+  return {
+    id: old.id, title: old.name, company: "", location: "", startDate: "", endDate: "", current: false,
+    description: "",
+    bullets: kept.map((text, i) => ({ id: `${projectId}-b${i + 1}`, text })),
+    // Job answers saved onto a project before it was saved in the new shape stay with it.
+    notes: Array.isArray(old.notes) ? old.notes : [],
+    url: typeof old.url === "string" ? old.url : "",
+  };
+}
+
+/** A project has the role shape (title = the project's name, company = organisation or context) plus its link. */
+export const ProjectSchema = z.preprocess(legacyProject, ExperienceSchema.extend({ url: text() }).strict());
 /** A section that fits nowhere else, keeping the CV's own heading. */
 export const CustomSectionSchema = z
   .object({ id, title: text(), details: text(MAX_LONG_TEXT) })
@@ -124,14 +149,18 @@ export const BasicsSchema = z
 
 const sectionKey = z.enum(SECTION_KEYS as unknown as [SectionKey, ...SectionKey[]]);
 
+/** Short lines under a course, award, publication or interest (suggested by enrichment, or typed). Absent = none. */
+const lines = z.array(BulletSchema).max(MAX_BULLETS).optional();
+/** Hidden on this CV: kept in the data, left out of the page and the exports. Absent = shown. */
+const hidden = z.boolean().optional();
 export const AwardSchema = z
-  .object({ id, name: text(), issuer: text(), date: YearMonthSchema, description: text(MAX_LONG_TEXT) })
+  .object({ id, name: text(), issuer: text(), date: YearMonthSchema, description: text(MAX_LONG_TEXT), bullets: lines, hidden })
   .strict();
-export const CourseSchema = z.object({ id, name: text(), provider: text(), date: YearMonthSchema }).strict();
+export const CourseSchema = z.object({ id, name: text(), provider: text(), date: YearMonthSchema, bullets: lines, hidden }).strict();
 export const PublicationSchema = z
-  .object({ id, title: text(), publisher: text(), date: YearMonthSchema, url: text() })
+  .object({ id, title: text(), publisher: text(), date: YearMonthSchema, url: text(), bullets: lines, hidden })
   .strict();
-export const InterestSchema = z.object({ id, name: text() }).strict();
+export const InterestSchema = z.object({ id, name: text(), bullets: lines, hidden }).strict();
 
 /** Section order, hidden sections and custom headings of a CV. */
 export const LayoutSchema = z
@@ -175,6 +204,8 @@ export const CvContentSchema = z
     publications: z.array(PublicationSchema).max(MAX_ITEMS),
     interests: z.array(InterestSchema).max(MAX_ITEMS),
     layout: LayoutSchema,
+    /** Set when the guided path ended with an average role score of 80 or more. Never cleared by later edits. */
+    enrichedAt: z.string().datetime({ offset: true }).nullable().default(null),
   })
   .strict();
 
@@ -182,6 +213,7 @@ export type CvContent = z.infer<typeof CvContentSchema>;
 export type CvContentV1 = z.infer<typeof CvContentV1Schema>;
 export type Note = z.infer<typeof NoteSchema>;
 export type Experience = z.infer<typeof ExperienceSchema>;
+export type Project = z.infer<typeof ProjectSchema>;
 export type Skill = z.infer<typeof SkillSchema>;
 export type Bullet = z.infer<typeof BulletSchema>;
 export type Award = z.infer<typeof AwardSchema>;
@@ -227,5 +259,30 @@ export function emptyCv(locale: Locale = "en"): CvContent {
     publications: [],
     interests: [],
     layout: defaultLayout(),
+    enrichedAt: null,
   };
+}
+
+/** What a scored item is: a role, a project or a volunteering role. Each gets the role steps. */
+export type ScoredKind = "role" | "project" | "volunteering";
+
+/** Every item that is scored and enriched like a role, in CV order: roles, then projects, then volunteering. */
+export function scoredItems(cv: Pick<CvContent, "experience" | "projects" | "volunteering">): { item: Experience; kind: ScoredKind }[] {
+  return [
+    ...cv.experience.map((item) => ({ item, kind: "role" as const })),
+    ...cv.projects.map((item) => ({ item, kind: "project" as const })),
+    ...cv.volunteering.map((item) => ({ item, kind: "volunteering" as const })),
+  ];
+}
+
+export function findScored(cv: Pick<CvContent, "experience" | "projects" | "volunteering">, id: string): { item: Experience; kind: ScoredKind } | undefined {
+  return scoredItems(cv).find(({ item }) => item.id === id);
+}
+
+/** The CV as shown on the page and in the exports: hidden courses, awards, publications and interests left out. */
+export function withoutHidden(cv: CvContent): CvContent {
+  const shown = <T extends { hidden?: boolean }>(items: T[]) => (items.some((item) => item.hidden) ? items.filter((item) => !item.hidden) : items);
+  const courses = shown(cv.courses), awards = shown(cv.awards), publications = shown(cv.publications), interests = shown(cv.interests);
+  if (courses === cv.courses && awards === cv.awards && publications === cv.publications && interests === cv.interests) return cv;
+  return { ...cv, courses, awards, publications, interests };
 }

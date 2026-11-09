@@ -110,6 +110,7 @@ export function createApp(deps: AppDeps) {
     "/v1",
     tailoredRoutes({
       jobsFor: (c) => deps.jobRepo(c.get("user")),
+      cvFor: (c) => deps.cvRepo(c.get("user")),
       tailorFor: (c) => {
         if (!deps.tailorRepo) throw new Error("Tailor repository is not configured");
         return deps.tailorRepo(c.get("user"));

@@ -37,7 +37,7 @@ export function allSpecific(role: Experience, change: (b: ModelScore["bullets"][
     change(answer, i);
     return answer;
   });
-  return { bullets, nextStepId: null, roleQuestions: [] };
+  return { bullets, nextStepId: null, roleQuestions: [], thin: false };
 }
 
 /** ModelDeps whose only provider answers with `answer()` (or fails with `status`), and records every request body. */

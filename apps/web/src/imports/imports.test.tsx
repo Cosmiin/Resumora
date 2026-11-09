@@ -152,7 +152,7 @@ describe("CV import", () => {
       experience: imported.experience,
       languages: [{ id: "l1", name: "English", level: "C1" }],
       certifications: [{ id: "k1", name: "PSM I", issuer: "Scrum.org", date: "2022" }],
-      projects: [{ id: "p1", name: "Billing", url: "", description: "" }],
+      projects: [{ id: "p1", title: "Billing", company: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets: [], notes: [], url: "" }],
       custom: [{ id: "c1", title: "Volunteering", details: "" }, { id: "c2", title: "", details: "" }],
     };
     importsApi.getImport.mockResolvedValue(imp("ready", { result: { content, warnings: [], sourceHeadings: [], unsourcedLines: [], isScan: false } }));
