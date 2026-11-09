@@ -54,7 +54,7 @@ beforeEach(() => {
 describe("edit job summary", () => {
   it("prefills all fields and saves a Must requirement as Nice with updated summary counts", async () => {
     renderJob(); await edit();
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /What they ask for/ })).not.toBeInTheDocument();
     for (const [name, value] of Object.entries({
       "Job title": "Engineer", Company: "Acme", Location: "London", "Work mode": "hybrid", Type: "full_time",
       Seniority: "senior", Summary: "Build useful tools.", Currency: "RON", Per: "month", "Apply by": "2026-12-01",
@@ -75,9 +75,8 @@ describe("edit job summary", () => {
     expect(patchJob).toHaveBeenCalledWith("one", 1, { ...extracted,
       requirements: [{ text: "SQL", kind: "nice", category: "skill" }, extracted.requirements[1]],
     });
-    expect(await screen.findByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "Must have (0)" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Nice to have (2)" })).toBeInTheDocument();
+    const list = await screen.findByRole("list", { name: /What they ask for · 2/ });
+    expect(within(list).getAllByText("Nice")).toHaveLength(2);
     expect(screen.getByText("Summary edited by you")).toBeInTheDocument();
   });
 
@@ -224,7 +223,7 @@ describe("edit job summary", () => {
     expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
     await act(async () => { finish({ ...job, editedByUser: true, version: 2 }); });
-    expect(await screen.findByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("heading", { name: /What they ask for/ })).toBeInTheDocument();
   });
 
   it.each([
@@ -243,7 +242,7 @@ describe("edit job summary", () => {
     expect(screen.getByLabelText("Job title")).toHaveValue("Unsaved title");
     expect(screen.getByLabelText("Company")).toHaveValue("Unsaved company");
     expect(screen.getByLabelText("Requirement 1")).toHaveValue("Unsaved requirement");
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /What they ask for/ })).not.toBeInTheDocument();
     vi.mocked(getJob).mockResolvedValue({ ...job, title: "Latest title", version: 3,
       extracted: { ...extracted, title: "Latest title" } });
     await userEvent.click(screen.getByRole("button", { name: "Reload" }));
@@ -270,7 +269,7 @@ describe("edit job summary", () => {
   it("cancels without saving and discards changes when reopened", async () => {
     renderJob(); await edit(); change("Job title", "Unsaved title");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(screen.getByRole("tablist")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: /What they ask for/ })).toBeInTheDocument());
     expect(patchJob).not.toHaveBeenCalled();
     await edit(); expect(screen.getByLabelText("Job title")).toHaveValue("Engineer");
   });
