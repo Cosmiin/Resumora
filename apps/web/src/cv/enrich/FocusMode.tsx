@@ -8,6 +8,7 @@ import { formatRange } from "../page/blocks.ts";
 import type { Via } from "./AnswerBox.tsx";
 import { BrainDumpStep, DumpPickStep } from "./BrainDumpStep.tsx";
 import { CelebrateMoment } from "./CelebrateMoment.tsx";
+import { DescriptionStep } from "./DescriptionStep.tsx";
 import type { FocusTarget } from "./focus-context.ts";
 import { ProposalStep } from "./ProposalStep.tsx";
 import { QuestionStep } from "./QuestionStep.tsx";
@@ -122,7 +123,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
   const dates = formatRange(role.startDate, role.endDate, role.current, cv.locale);
 
   const proposalText = step.kind === "proposal" ? role.bullets.find((b) => b.id === step.bulletId)?.text ?? "" : "";
-  const inQueue = !dumping && !answersWorking && step.kind !== "roleDone" && step.kind !== "role"
+  const inQueue = !dumping && !answersWorking && step.kind !== "roleDone" && step.kind !== "role" && step.kind !== "describing" && step.kind !== "description"
     && !(step.kind === "scoring" && (step.source === "opening" || step.source === "box")) && queue.length > 0;
   const asking = step.kind === "question" && step.question !== null;
   // 2B: one dot per step of the role (done / shown / to come) on steps that ask something.
@@ -248,6 +249,10 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose }
           />
         )}
         {step.kind === "working" && <Working text={t("enrich.focus.working")} />}
+        {step.kind === "describing" && <Working text={t("enrich.focus.describe.working")} />}
+        {step.kind === "description" && (
+          <DescriptionStep key={step.text} text={step.text} keywords={step.keywords} busy={busy} onUse={session.useDescription} onSkip={session.skip} />
+        )}
         {step.kind === "proposal" && (
           <ProposalStep
             key={stepKey}

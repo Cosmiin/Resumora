@@ -46,3 +46,10 @@ built: thin role = box first → (box answered: AI re-asked with `fresh`) → ro
 note: `dumpEmpty` is no longer reachable (a thin box goes on to questions or bullets; a free-talk ramble with nothing new returns to its question). Left in place.
 tests: the editor's "rapid typing" tests time out at 5 s in full web runs on this machine today; they pass alone, and the base branch (r2-bugs) times out the same way in a full run.
 open: none
+
+## Task 5: The role description step (3B) — done
+session: r2-enrich (session 7) · builder: claude
+commit: see git log (base 05d8e1a) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0 · weekly 45% → 46%
+ruling: the answer is `{ text, keywords }` (keywords: ATS terms the model used, kept only when they appear in the text, for the "Helps ATS with" chips). The prompt lives in `role-description.ts`.
+**database (for the owner):** new migration `supabase/migrations/20261109210000_enrich_r2_ai_tasks.sql`: `log_ai_call` accepts `enrich_role_description` and `enrich_achievements` (Task 7). Without it the calls work but are never logged in `ai_calls`. Same body, security and grants as before; it keeps `tailor_tone_examples` from session 5's `20261109200000_tailor_r2.sql`, so whichever runs last keeps every name. Applied to the LOCAL database only (session 5's migration file was copied in for the CLI check and removed again; history not repaired). `supabase test db`: 209 pass. The hosted database is untouched.
+open: when merging, session 5's branch and this one both redefine `log_ai_call`; a later migration on either branch must keep all names.

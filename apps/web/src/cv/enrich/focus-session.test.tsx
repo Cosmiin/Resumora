@@ -10,7 +10,7 @@ import type { RoleScoreState } from "./useRoleScores.ts";
 import { useFocusSession } from "./useFocusSession.ts";
 import { FocusMode } from "./FocusMode.tsx";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn() }));
+const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn(), roleDescription: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 function role(count = 3): Experience {
@@ -86,6 +86,7 @@ describe("useFocusSession", () => {
     });
     api.roleFacts.mockResolvedValue({ facts: ["Used Python"], fromNotes: notesHash([]) });
     api.scoreRole.mockRejectedValue(new Error("unavailable"));
+    api.roleDescription.mockResolvedValue({ text: "", keywords: [] });
   });
   afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
 
@@ -174,10 +175,11 @@ describe("useFocusSession", () => {
     expect(api.brainDump).not.toHaveBeenCalled();
     expect(api.scoreRole).not.toHaveBeenCalled();
   });
-  it("skips all role and bullet questions without AI calls", () => {
+  it("skips all role and bullet questions without AI calls", async () => {
     const r = role();
     const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions } }]]) }, r);
     for (let i = 0; i < 4; i++) act(() => h.result.current.skip());
+    await settle();
     expect(h.result.current.step.kind).toBe("roleDone");
     expect(api.improveBullet).not.toHaveBeenCalled();
     expect(api.brainDump).not.toHaveBeenCalled();
@@ -222,6 +224,7 @@ describe("useFocusSession", () => {
     const h = mount({ scores: new Map() }, r);
     await settle();
     for (let i = 0; i < 4; i++) act(() => h.result.current.skip());
+    await settle();
     expect(h.result.current.step).toEqual({ kind: "roleDone", score: 60 });
   });
   it.each([0, 1, 3])("falls back to the role's queue when opening score fails: %i bullets", async (count) => {
@@ -423,6 +426,7 @@ describe("useFocusSession", () => {
     expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
     expect(h.dispatch.mock.calls.filter(([a]) => a.type === "replaceBullet")).toHaveLength(0);
     act(() => h.result.current.skip());
+    await settle();
     expect(h.result.current.step).toEqual({ kind: "roleDone", score: 40 });
   });
   it("roleDone keeps the last celebrated score until fresh ready scores arrive", async () => {
@@ -432,6 +436,7 @@ describe("useFocusSession", () => {
     await submit(h);
     act(() => h.result.current.useProposal());
     act(() => h.result.current.next());
+    await settle();
     expect(h.result.current.step).toEqual({ kind: "roleDone", score: 70 });
     const old = score(role());
     h.update({ scores: new Map([["r", { state: "scoring", result: old }]]) });
@@ -592,6 +597,7 @@ describe("useFocusSession", () => {
     expect(h.result.current.busy).toBe(false);
     act(() => h.result.current.next());
     expect(h.result.current.queue).toEqual([]);
+    await settle();
     expect(h.result.current.step).toEqual({ kind: "roleDone", score: 75 });
   });
   it("continues after 15 seconds without a fresh score", async () => {
@@ -800,6 +806,7 @@ describe("steps never disappear, thin roles and Back (E1)", () => {
     api.brainDump.mockResolvedValue({ proposals: [{ id: "p", text: "Built weekly reports", score: 80 }], roleBefore: 40, roleAfterAll: 70 });
     api.roleFacts.mockResolvedValue({ facts: [], fromNotes: notesHash([]) });
     api.scoreRole.mockRejectedValue(new Error("unavailable"));
+    api.roleDescription.mockResolvedValue({ text: "", keywords: [] });
   });
   afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
 
@@ -911,6 +918,7 @@ describe("Back edge cases", () => {
     api.brainDump.mockResolvedValue({ proposals: [{ id: "p", text: "Built weekly reports", score: 80 }], roleBefore: 40, roleAfterAll: 70 });
     api.roleFacts.mockResolvedValue({ facts: [], fromNotes: notesHash([]) });
     api.scoreRole.mockRejectedValue(new Error("unavailable"));
+    api.roleDescription.mockResolvedValue({ text: "", keywords: [] });
   });
   afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
   it("a box first answered after Back still becomes bullets at the end of the role questions", async () => {
@@ -925,5 +933,51 @@ describe("Back edge cases", () => {
     act(() => h.result.current.skip());
     await settle();
     expect(api.brainDump).toHaveBeenCalledWith(expect.objectContaining({ source: "answers" }));
+  });
+});
+
+describe("the role description step (3B)", () => {
+  const proposed = { text: "Company runs logistics for retailers. The role kept deliveries on time.", keywords: ["logistics"] };
+  beforeEach(() => {
+    vi.useFakeTimers();
+    api.scoreRole.mockRejectedValue(new Error("unavailable"));
+    api.roleDescription.mockResolvedValue(proposed);
+  });
+  afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
+  async function toTheEnd() {
+    const r = role();
+    const h = mount({}, r);
+    act(() => h.result.current.skip());
+    expect(h.result.current.step.kind).toBe("question");
+    expect(api.roleDescription).not.toHaveBeenCalled();
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toEqual({ kind: "describing" });
+    await settle();
+    return h;
+  }
+  it("shows after the last bullet step, then Use it sets the description and ends the role", async () => {
+    const h = await toTheEnd();
+    expect(api.roleDescription).toHaveBeenCalledExactlyOnceWith({ roleId: "r", fingerprint: fingerprint(role(), "en") });
+    expect(h.result.current.step).toEqual({ kind: "description", ...proposed });
+    act(() => h.result.current.useDescription(proposed.text));
+    expect(h.opts().cv.experience[0]!.description).toBe(proposed.text);
+    expect(h.result.current.step.kind).toBe("roleDone");
+  });
+  it("Use it with edited text saves the edit", async () => {
+    const h = await toTheEnd();
+    act(() => h.result.current.useDescription("  A logistics firm. The role planned routes.  "));
+    expect(h.opts().cv.experience[0]!.description).toBe("A logistics firm. The role planned routes.");
+  });
+  it("Skip leaves the description as it is", async () => {
+    const h = await toTheEnd();
+    act(() => h.result.current.skip());
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.result.current.step.kind).toBe("roleDone");
+  });
+  it.each(["empty", "failed"])("an %s answer skips the step", async (how) => {
+    if (how === "empty") api.roleDescription.mockResolvedValue({ text: "", keywords: [] });
+    else api.roleDescription.mockRejectedValue(new Error("down"));
+    const h = await toTheEnd();
+    expect(h.result.current.step.kind).toBe("roleDone");
   });
 });

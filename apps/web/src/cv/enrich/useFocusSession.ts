@@ -6,7 +6,7 @@ import {
 import { ApiClientError } from "../../lib/api-error.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import type { Via } from "./AnswerBox.tsx";
-import { brainDump, improveBullet, roleFacts, scoreRole } from "./enrich-api.ts";
+import { brainDump, improveBullet, roleDescription, roleFacts, scoreRole } from "./enrich-api.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 export type FocusMode = "improve" | "standOut";
@@ -25,6 +25,9 @@ export type FocusStep =
   | { kind: "needsDetail"; bulletId: string; question: Question; asked: number }
   | { kind: "failed"; bulletId: string | null; reason: "unavailable" | "saving" }
   | { kind: "celebrate"; from: number | null; to: number; next: "queue" | "done" }
+  /** 3B: the last thing for each role, a proposed two-sentence description (Use it / Edit / Skip). */
+  | { kind: "describing" }
+  | { kind: "description"; text: string; keywords: string[] }
   | { kind: "roleDone"; score: number | null };
 
 type Options = {
@@ -134,6 +137,8 @@ export function useFocusSession(opts: Options): {
   boxFirst: boolean;
   submitAnswer(text: string, via: Via[]): void;
   skip(): void; useProposal(): void; keepMine(): void; back(): void;
+  /** 3B: set the role's description to this text (Use it, or Save after Edit), then "That's all". */
+  useDescription(text: string): void;
   addSelected(ids: string[]): void; next(): void; retry(): void; close(): void; freeTalk(): void;
 } {
   const [initial] = useState(() => {
@@ -148,13 +153,16 @@ export function useFocusSession(opts: Options): {
     const start: Pick<View, "step" | "position"> = fresh ? firstStep(role, result, queue, counts, asked, completed)
       : { position: 0, step: { kind: "scoring", source: "opening" } };
     const history: Entry[] = isText(start.step) ? [{ step: start.step, question: questionText(start.step, result) }] : [];
-    return { counts, asked, completed, result, view: { queue, busy: !fresh, history, revisit: null, ...start } };
+    // Nothing to ask: the role's description is still the last step.
+    const describing = start.step.kind === "roleDone";
+    if (describing) start.step = { kind: "describing" };
+    return { counts, asked, completed, result, describing, view: { queue, busy: !fresh || describing, history, revisit: null, ...start } };
   });
   const [view, setView] = useState<View>(initial.view);
   const current = useRef(opts);
   const session = useRef({
     view, alive: true, closed: false, notesChanged: false, lastCelebrated: null as number | null,
-    result: initial.result, openingStarted: false, roleAnswered: false, boxAnswered: false,
+    result: initial.result, openingStarted: false, roleAnswered: false, boxAnswered: false, described: initial.describing,
     counts: initial.counts, asked: initial.asked, completed: initial.completed,
     rerun: new Set<string>(), returnPosition: 0,
     returnStep: null as Extract<FocusStep, { kind: "role" | "question" | "needsDetail" }> | null,
@@ -170,6 +178,11 @@ export function useFocusSession(opts: Options): {
   const update = useCallback((patch: Partial<View>) => {
     const s = session.current;
     if (patch.step?.kind === "celebrate") s.lastCelebrated = patch.step.to;
+    // The role's description comes before "That's all for this role", once per session.
+    if (patch.step?.kind === "roleDone" && !s.described) {
+      s.described = true;
+      patch = { ...patch, busy: true, step: { kind: "describing" } };
+    }
     const step = patch.step;
     // A text step joins the history the first time it is shown (a paused step that comes back is the same object).
     const history = step && isText(step) && !(patch.history ?? s.view.history).some((e) => e.step === step)
@@ -258,6 +271,26 @@ export function useFocusSession(opts: Options): {
   useEffect(() => {
     if (view.step.kind === "working") void run(view.step.bulletId);
   }, [view.step, run]);
+
+  // 3B: ask for the role's description; nothing usable (or a failure) goes straight to "That's all".
+  useEffect(() => {
+    const s = session.current;
+    if (view.step.kind !== "describing") return;
+    const done = { kind: "roleDone", score: null } as const;
+    const describe = async () => {
+      let answer = { text: "", keywords: [] as string[] };
+      try {
+        await current.current.waitForSave();
+        if (!s.alive || s.closed) return;
+        const o = current.current;
+        const role = o.cv.experience.find((r) => r.id === o.roleId);
+        if (role) answer = await roleDescription({ roleId: o.roleId, fingerprint: fingerprint(role, o.cv.locale) });
+      } catch { /* No description this time: the step is skipped. */ }
+      if (!s.alive || s.closed || s.view.step.kind !== "describing") return;
+      update({ busy: false, step: answer.text ? { kind: "description", text: answer.text, keywords: answer.keywords } : done });
+    };
+    void describe();
+  }, [view.step, update]);
 
   useEffect(() => {
     const s = session.current;
@@ -376,6 +409,7 @@ export function useFocusSession(opts: Options): {
       } else finishRoleQuestions();
     } else if (step.kind === "celebrate") go(s.afterCelebrate);
     else if (step.kind === "brainDump" && !s.returnStep) afterBox();
+    else if (step.kind === "description") update({ step: { kind: "roleDone", score: null } });
     else if (step.kind === "brainDump" || step.kind === "dumpEmpty" || step.kind === "dumpPick"
       || (step.kind === "failed" && step.bulletId === null)) go(s.returnPosition);
     else if ("bulletId" in step) go(s.view.position + 1);
@@ -450,6 +484,14 @@ export function useFocusSession(opts: Options): {
     },
     skip: advance,
     keepMine() { if (session.current.view.step.kind === "proposal") advance(); },
+    useDescription(text) {
+      const s = session.current;
+      const value = text.trim().slice(0, MAX_LONG_TEXT);
+      if (!available() || s.view.step.kind !== "description" || !value) return;
+      const o = current.current;
+      o.dispatch({ type: "setItemField", list: "experience", itemId: o.roleId, field: "description", value });
+      update({ step: { kind: "roleDone", score: null } });
+    },
     useProposal: () => {
       if (!available()) return;
       const s = session.current;

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Experience, Locale } from "./cv.ts";
+import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
 export const SCORE_POLICY = "score/4";
@@ -286,3 +286,13 @@ export function clearCount(result: Pick<RoleResult, "bullets">): { clear: number
 
 /** Voice answers: at most 60 s per recording, 20 sessions per user per day. */
 export const VOICE = { maxSeconds: 60, perDay: 20, model: "gpt-4o-mini-transcribe" } as const;
+
+/**
+ * The role description proposed as the last step of a role (3B): at most two sentences, what the company
+ * does and what the role was for, never a bullet. `keywords` are the ATS terms it uses. Empty text: skip the step.
+ */
+export const RoleDescriptionAnswerSchema = z.object({
+  text: z.string().max(MAX_LONG_TEXT),
+  keywords: z.array(z.string().max(60)).max(8),
+}).strict();
+export type RoleDescriptionAnswer = z.infer<typeof RoleDescriptionAnswerSchema>;

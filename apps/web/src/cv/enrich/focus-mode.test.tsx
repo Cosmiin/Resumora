@@ -6,7 +6,7 @@ import { BRAIN_DUMP_QUESTION, emptyCv, fingerprint, type CvContent, type Experie
 import { en } from "../../i18n/en.ts";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn(), createVoiceSession: vi.fn() }));
+const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn(), roleDescription: vi.fn(), createVoiceSession: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 import { BulletList } from "../edit/BulletList.tsx";
@@ -73,6 +73,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   api.roleFacts.mockResolvedValue({ facts: [], fromNotes: "x" });
   api.scoreRole.mockRejectedValue(new Error("unavailable"));
+  api.roleDescription.mockResolvedValue({ text: "", keywords: [] });
   reducedMotion(false);
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -402,5 +403,25 @@ describe("the ✨ improve button", () => {
     expect(screen.queryByRole("button", { name: "Improve this bullet" })).toBeNull();
     render(<BulletList owner={{ list: "experience", itemId: "r1" }} bullets={bullets} dispatch={() => {}} ownerName="Dispatcher" />);
     expect(screen.queryByRole("button", { name: "Improve this bullet" })).toBeNull();
+  });
+});
+
+describe("the role description step (3B) on screen", () => {
+  it("shows the card with ATS chips; Edit turns it into a text box and Save sets the description", async () => {
+    api.roleDescription.mockResolvedValue({ text: "TransLog moves freight for retailers. The role kept regional deliveries on time.", keywords: ["freight", "deliveries"] });
+    const actions: CvAction[] = [];
+    render(<Harness roleResult={{ ...result, questions: [], bullets: [grade("b1", 100), grade("b2", 100), grade("b3", 100)] }} onAction={(a) => actions.push(a)} />);
+    expect(await screen.findByRole("heading", { name: "How should we introduce this role?" })).toBeInTheDocument();
+    expect(screen.getByText("Last thing for this role")).toBeInTheDocument();
+    expect(screen.getByText("TransLog moves freight for retailers. The role kept regional deliveries on time.")).toBeInTheDocument();
+    expect(screen.getByText("Helps ATS with:")).toBeInTheDocument();
+    expect(screen.getByText("freight")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const box = screen.getByLabelText("Role description");
+    await userEvent.clear(box);
+    await userEvent.type(box, "TransLog moves freight.");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(actions).toContainEqual({ type: "setItemField", list: "experience", itemId: "r1", field: "description", value: "TransLog moves freight." });
+    expect(await screen.findByRole("heading", { name: "That's all for this role" })).toBeInTheDocument();
   });
 });

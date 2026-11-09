@@ -14,6 +14,7 @@ import { scoreRole } from "./score.ts";
 import { improveBullet } from "./improve.ts";
 import { brainDump } from "./brain-dump.ts";
 import { roleFacts } from "./role-facts.ts";
+import { roleDescription } from "./role-description.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
 import { checkSummary, rewriteEvents } from "./rewrite.ts";
@@ -90,6 +91,23 @@ export function enrichRoutes(deps: {
     } catch (err) {
       if (err instanceof ApiError && err.status >= 500) {
         console.error(JSON.stringify({ msg: "brain dump failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/role-description", async (c) => {
+    const body = ScoreBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
+    const user = c.get("user");
+    try {
+      return c.json(await roleDescription(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "role description failed", code: err.code, requestId: c.get("requestId") }));
       }
       throw err;
     }

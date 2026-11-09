@@ -3,11 +3,13 @@ import {
   BrainDumpAnswerSchema,
   ImproveAnswerSchema,
   RewriteEventSchemas,
+  RoleDescriptionAnswerSchema,
   RoleFactsAnswerSchema,
   RoleResultSchema,
   type BrainDumpAnswer,
   type ImproveAnswer,
   type RewriteEvent,
+  type RoleDescriptionAnswer,
   type RoleFactsAnswer,
   type RoleResult,
 } from "@resumora/shared";
@@ -38,6 +40,11 @@ export function brainDump(input: { roleId: string; fingerprint: string; source?:
 
 export function roleFacts(roleId: string): Promise<RoleFactsAnswer> {
   return apiFetch("/v1/enrich/role-facts", { method: "POST", json: { roleId }, schema: RoleFactsAnswerSchema });
+}
+
+/** A two-sentence introduction for the role (3B); empty text means skip the step. */
+export function roleDescription(input: { roleId: string; fingerprint: string }): Promise<RoleDescriptionAnswer> {
+  return apiFetch("/v1/enrich/role-description", { method: "POST", json: input, schema: RoleDescriptionAnswerSchema });
 }
 
 const VoiceSessionSchema = z.object({ clientSecret: z.string().min(1), expiresAt: z.string(), model: z.string() });
