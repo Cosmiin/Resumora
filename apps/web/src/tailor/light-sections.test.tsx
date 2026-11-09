@@ -56,6 +56,13 @@ describe("lighter sections in Final touches", () => {
     ], inferred: [], flags: [] });
   });
 
+  it("leaves out a blank interest (browser check)", () => {
+    render(<SectionReview section="interests" proposals={[p("hide:i1", "hidden", "Not linked to payroll")]}
+      flags={[]} confirmed={[]} busy={false} onAccept={vi.fn()} cv={{ ...cv, interests: [{ id: "i0", name: " " }, ...cv.interests] }} />);
+    const items = within(screen.getByRole("list", { name: "Interests" })).getAllByRole("listitem");
+    expect(items.map((li) => li.dataset.item)).toEqual(["i1", "i2"]);
+  });
+
   it("Awards get the same hide row in their existing screen", () => {
     render(<SectionReview section="achievements" proposals={[p("hide:a1", "hidden", "Not about payroll")]}
       flags={[]} confirmed={[]} busy={false} onAccept={vi.fn()} cv={cv} />);

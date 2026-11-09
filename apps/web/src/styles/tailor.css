@@ -180,3 +180,4 @@
 /* E6 Task 10b (6C): an item offered for hiding on this tailored CV; dimmed while "Hide for this job?" is ticked. */
 .tailor-doc li.is-hidden > :not(.tailor-hide) { opacity: 0.5; }
 .tailor-hide { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; margin-block-start: 4px; font-size: 0.9em; }
+.tailor-hide input { width: auto; margin: 0; flex: none; }

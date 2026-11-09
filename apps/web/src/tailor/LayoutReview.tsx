@@ -89,7 +89,8 @@ function ListedBody({ section, changes, cv, hide, onHide }: {
   return <>
     {valid && <p className="tailor-item-label">{t("tailor.final.relevant")}</p>}
     <ul className="tailor-doc" aria-label={t(`tailor.section.${section}`)}>
-      {shown.map((item) => {
+      {/* A blank item (an empty interest left by the editor) shows nothing on the CV, so nothing here either. */}
+      {shown.filter((item) => item.fields.name?.trim() || item.lines.length > 0).map((item) => {
         const offer = find(`hide:${item.id}`, "hidden");
         const hidden = !!offer && hide[offer.itemId] !== false;
         return <li key={item.id} data-item={item.id} className={hidden ? "is-hidden" : undefined}>
