@@ -78,3 +78,9 @@ commit: see git log (base cd624ef) · reviews: 1 (agents) · fix rounds: 0 (thre
 ruling: `enrichedAt` (ISO date or null, default null; no migration, the content is JSON). `imports.ts` sets it to null; old v1 test fixtures drop it. The end waits while any role is still being scored ("Checking your scores…"). The tailoring text walkers (`apps/api/src/tailor/translate.ts`, `score.ts`, `section-pass.ts`, `layout-pass.ts`, `eval/tailor/run.ts`) skip `enrichedAt` like `layout` and `locale` — one word each, in session 5's API area.
 note (for the owner): an import that replaces the whole CV, or restoring an older version from History, brings back that version's `enrichedAt` (an import starts as not enriched). Ordinary edits never clear it.
 open: none
+
+## Task 10: "Before you tailor" only when not enriched (8A) — done
+session: r2-enrich (session 7) · builder: claude
+commit: see git log (base c6ce496) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 50% → 51%
+ruling: the gate's texts are new keys in `i18n/en-jobs.ts` (shared with session 8; the old `job.gate.text` key is left unused). The old checks (scores not ready, facts, average < 60, `WEAK_AVG`) are gone.
+open: none

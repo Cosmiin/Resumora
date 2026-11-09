@@ -189,4 +189,8 @@ export const jobsEn = {
   "job.gate.text": "Your Base CV could use more detail. Enrich it first for stronger tailoring, or continue with what you have.",
   "job.gate.enrich": "Enrich first",
   "job.gate.anyway": "Tailor anyway",
+  "job.gate.notEnriched": "Your CV isn't enriched yet. Tailoring works much better when your roles have more detail.",
+  "job.gate.average": "Average role score {n} · enriched at 80",
+  "job.gate.notScored": "Not scored yet",
+  "job.gate.meter": "Average role score",
 } as const;

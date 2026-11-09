@@ -215,3 +215,8 @@
   .job-page .tailor > div > span { display: none; }
   .job-page .tailor > button { flex-shrink: 0; }
 }
+
+/* 8A: the average against the 80 mark */
+.gate-meter { position: relative; height: 8px; margin: var(--space-4) 0 var(--space-2); border-radius: 4px; background: var(--sage-200); }
+.gate-meter i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--pine-600); }
+.gate-meter b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--marigold-500); }
