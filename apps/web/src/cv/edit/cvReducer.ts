@@ -63,7 +63,10 @@ export type CvAction =
   /** Empties role descriptions that only repeat the company and/or location (old imports). */
   | { type: "clearCopiedDescriptions" }
   /** Key achievements picked in the guided path (4A), added in one go. */
-  | { type: "addAchievements"; texts: string[] };
+  | { type: "addAchievements"; texts: string[] }
+  /** Skills the guided path found in the roles (5A), added in one go with ids the caller keeps for Undo. */
+  | { type: "addSkills"; skills: { id: string; name: string; group: SkillGroup }[] }
+  | { type: "removeSkills"; ids: string[] };
 
 /**
  * Sections the CV has (or the user just added), in layout order, hidden ones included.
@@ -128,13 +131,13 @@ function moveSection(cv: CvContent, from: number, to: number): CvContent {
   return setLayout(cv, { ...layout, order });
 }
 
-function addSkill(cv: CvContent, group: SkillGroup, raw: string): CvContent {
+function addSkill(cv: CvContent, group: SkillGroup, raw: string, id = newId()): CvContent {
   const name = raw.trim();
   if (name === "" || cv[group].length >= MAX_ITEMS) return cv;
   const lower = name.toLowerCase();
   const exists = SKILL_GROUPS.some((g) => cv[g].some((s) => s.name.trim().toLowerCase() === lower));
   if (exists) return cv;
-  return { ...cv, [group]: [...cv[group], { id: newId(), name }] };
+  return { ...cv, [group]: [...cv[group], { id, name }] };
 }
 
 function moveSkill(cv: CvContent, skillId: string, to: SkillGroup): CvContent {
@@ -300,6 +303,13 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       const endDate = action.current ? "" : item.endDate;
       if (item.current === action.current && item.endDate === endDate) return cv;
       return { ...cv, [action.list]: items.map((r) => (r === item ? { ...r, current: action.current, endDate } : r)) };
+    }
+    case "addSkills":
+      return action.skills.reduce((next, s) => addSkill(next, s.group, s.name, s.id), cv);
+    case "removeSkills": {
+      const gone = new Set(action.ids);
+      if (!SKILL_GROUPS.some((g) => cv[g].some((s) => gone.has(s.id)))) return cv;
+      return SKILL_GROUPS.reduce((next, g) => ({ ...next, [g]: next[g].filter((s) => !gone.has(s.id)) }), cv);
     }
     case "addAchievements": {
       const room = MAX_ACHIEVEMENTS - cv.achievements.length;

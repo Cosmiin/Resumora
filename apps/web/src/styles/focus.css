@@ -232,3 +232,11 @@
   .fm-path-start { padding: var(--space-6) 16px var(--space-9); }
 }
 .fm-pick-from { display: block; margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* 5A: the skills notice on the end screen */
+.fm-skills-notice {
+  display: flex; align-items: center; gap: var(--space-4); margin: 0 0 var(--space-6); padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg); background: var(--pine-800); color: var(--white); font-size: var(--text-sm); line-height: var(--leading-snug);
+}
+.fm-skills-notice > span { flex: 1; }
+.fm-skills-undo { flex: none; padding: 6px 12px; border: 0; border-radius: 8px; background: var(--marigold-500); color: var(--pine-800); font: inherit; font-weight: var(--weight-semibold); cursor: pointer; }

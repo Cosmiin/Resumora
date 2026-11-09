@@ -391,3 +391,18 @@ describe("addAchievements", () => {
     expect(cvReducer(cv, { type: "addAchievements", texts: [] })).toBe(cv);
   });
 });
+
+describe("addSkills / removeSkills", () => {
+  it("adds every new skill with the given ids, and removes exactly those, keeping the ones there before", () => {
+    const cv = { ...emptyCv(), technicalSkills: [{ id: "old", name: "Excel" }] };
+    const added = cvReducer(cv, { type: "addSkills", skills: [
+      { id: "s1", name: "SAP", group: "technicalSkills" }, { id: "s2", name: "Negotiation", group: "professionalSkills" }, { id: "s3", name: "excel", group: "technicalSkills" },
+    ] });
+    expect(added.technicalSkills).toEqual([{ id: "old", name: "Excel" }, { id: "s1", name: "SAP" }]);
+    expect(added.professionalSkills).toEqual([{ id: "s2", name: "Negotiation" }]);
+    const undone = cvReducer(added, { type: "removeSkills", ids: ["s1", "s2", "s3"] });
+    expect(undone.technicalSkills).toEqual([{ id: "old", name: "Excel" }]);
+    expect(undone.professionalSkills).toEqual([]);
+    expect(cvReducer(undone, { type: "removeSkills", ids: ["s1"] })).toBe(undone);
+  });
+});

@@ -18,13 +18,14 @@ vi.mock("./FocusMode.tsx", () => ({
     </div>
   ),
 }));
-const api = vi.hoisted(() => ({ suggestAchievements: vi.fn() }));
+const api = vi.hoisted(() => ({ suggestAchievements: vi.fn(), getSkillSuggestions: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 import { EnrichPath } from "./EnrichPath.tsx";
 
 beforeEach(() => {
   vi.resetAllMocks();
   api.suggestAchievements.mockReturnValue(new Promise(() => {}));
+  api.getSkillSuggestions.mockReturnValue(new Promise(() => {}));
 });
 
 const role = (id: string, title: string): Experience => ({
@@ -163,5 +164,37 @@ describe("Key achievements (4A)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
     expect(await screen.findByText("Skills")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Which of these are true and you're proud of?" })).toBeNull();
+  });
+});
+
+describe("skills added automatically (5A)", () => {
+  const allDone = new Map([["a", ready(90)], ["b", ready(85)], ["c", ready(80)], ["d", ready(99)]]);
+  async function toTheEnd(dispatch = vi.fn()) {
+    api.suggestAchievements.mockResolvedValue({ suggestions: [] });
+    render(<Host scores={allDone} dispatch={dispatch} />);
+    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    return dispatch;
+  }
+  it("adds every suggestion in one action when the end is reached, lists them, and Undo removes exactly those", async () => {
+    api.getSkillSuggestions.mockResolvedValue({ suggestions: [
+      { name: "SAP", group: "technicalSkills", evidence: "SAP" }, { name: "Negotiation", group: "professionalSkills", evidence: "negotiated" },
+    ], sort: [] });
+    const dispatch = await toTheEnd();
+    expect(await screen.findByText("Added 2 skills from your roles: SAP, Negotiation")).toBeInTheDocument();
+    const adds = dispatch.mock.calls.filter(([a]) => a.type === "addSkills");
+    expect(adds).toHaveLength(1);
+    const added = adds[0]![0].skills as { id: string; name: string; group: string }[];
+    expect(added.map((s) => [s.name, s.group])).toEqual([["SAP", "technicalSkills"], ["Negotiation", "professionalSkills"]]);
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(dispatch).toHaveBeenLastCalledWith({ type: "removeSkills", ids: added.map((s) => s.id) });
+    expect(screen.getByText("Skills removed")).toBeInTheDocument();
+  });
+  it.each(["empty", "failed"])("an %s answer adds nothing and shows no bar", async (how) => {
+    if (how === "empty") api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
+    else api.getSkillSuggestions.mockRejectedValue(new Error("down"));
+    const dispatch = await toTheEnd();
+    expect(await screen.findByRole("button", { name: "Back to my CV" })).toBeInTheDocument();
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(screen.queryByText(/from your roles/)).toBeNull();
   });
 });

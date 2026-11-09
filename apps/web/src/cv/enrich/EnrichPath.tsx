@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { CvContent } from "@resumora/shared";
+import { newId, type CvContent, type SkillGroup } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { AchievementsPick } from "./AchievementsPick.tsx";
-import { suggestAchievements } from "./enrich-api.ts";
+import { getSkillSuggestions, suggestAchievements } from "./enrich-api.ts";
+import { SkillsNotice } from "./SkillsNotice.tsx";
 import { FocusMode } from "./FocusMode.tsx";
 import { PathStart } from "./PathStart.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
@@ -23,7 +24,7 @@ export function belowTarget(s: RoleScoreState | undefined): boolean {
   return !(s?.state === "ready" && s.result?.score != null && s.result.score >= ENRICHED_AT);
 }
 
-type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "achievements" } | { kind: "end" };
+type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "achievements" } | { kind: "skills" } | { kind: "end" };
 
 /** The top bar across the whole path: where you are, and one segment per stop. */
 export function PathBar({ label, at, total }: { label: string; at: number; total: number }) {
@@ -49,6 +50,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   const total = stops.length + 2;
   const roles = stops.map((id) => cv.experience.find((r) => r.id === id)).filter((r) => r !== undefined);
   const afterRoles = () => setStage({ kind: "achievements" });
+  // 5A: the skills the path added, so Undo removes exactly those.
+  const [skills, setSkills] = useState<{ ids: string[]; names: string[]; undone: boolean }>({ ids: [], names: [], undone: false });
 
   if (stage.kind === "start") {
     return <PathStart roles={roles} scores={scores} onNotNow={onClose}
@@ -79,13 +82,29 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
       <PathScreen bar={<PathBar label={t("enrich.path.achievements")} at={stops.length} total={total} />} onClose={onClose}>
         <AchievementsStop cv={cv} waitForSave={waitForSave} onDone={(texts) => {
           if (texts.length) dispatch({ type: "addAchievements", texts });
+          setStage({ kind: "skills" });
+        }} />
+      </PathScreen>
+    );
+  }
+  if (stage.kind === "skills") {
+    return (
+      <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={stops.length + 1} total={total} />} onClose={onClose}>
+        <SkillsStop waitForSave={waitForSave} onDone={(added) => {
+          if (added.length) dispatch({ type: "addSkills", skills: added });
+          setSkills({ ids: added.map((s) => s.id), names: added.map((s) => s.name), undone: false });
           setStage({ kind: "end" });
         }} />
       </PathScreen>
     );
   }
+  const notice = <SkillsNotice names={skills.names} undone={skills.undone} onUndo={() => {
+    dispatch({ type: "removeSkills", ids: skills.ids });
+    setSkills((s) => ({ ...s, undone: true }));
+  }} />;
   return (
-    <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={stops.length + 1} total={total} />} onClose={onClose}>
+    <PathScreen bar={<PathBar label={t("enrich.path.skills")} at={total} total={total} />} onClose={onClose}>
+      {notice}
       <div className="fm-foot">
         <button type="button" className="fm-btn" onClick={onClose}>{t("enrich.focus.done.back")}</button>
       </div>
@@ -146,4 +165,30 @@ function AchievementsStop({ cv, waitForSave, onDone }: { cv: CvContent; waitForS
     );
   }
   return <AchievementsPick suggestions={suggestions} roles={cv.experience} onDone={(texts) => done.current(texts)} />;
+}
+
+/** 5A: adds every skill the roles show (no screen of its own); none, or a failure, adds nothing. */
+function SkillsStop({ waitForSave, onDone }: { waitForSave(): Promise<void>; onDone(added: { id: string; name: string; group: SkillGroup }[]): void }) {
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      let found: { id: string; name: string; group: SkillGroup }[] = [];
+      try {
+        await waitForSave();
+        found = (await getSkillSuggestions()).suggestions.map((s) => ({ id: newId(), name: s.name, group: s.group }));
+      } catch { /* Nothing added this time. */ }
+      if (alive) done.current(found);
+    })();
+    return () => { alive = false; };
+  }, [waitForSave]);
+  return (
+    <div className="fm-working" role="status">
+      <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
+      <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.skills.noticeWorking")}</h2>
+    </div>
+  );
 }

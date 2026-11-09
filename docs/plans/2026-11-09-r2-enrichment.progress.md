@@ -65,3 +65,9 @@ session: r2-enrich (session 7) · builder: claude
 commit: see git log (base 695a638) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 47% → 48%
 ruling: the pick screen is its own `AchievementsPick.tsx` with the `fm-pick` look (BrainDumpStep.tsx unchanged). The server keeps at most 5 suggestions that name a real role, use only numbers from that role, and don't repeat an existing achievement.
 open: none
+
+## Task 8: Skills added automatically, with a notice and Undo (5A) — done
+session: r2-enrich (session 7) · builder: claude
+commit: see git log (base fe516e5) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 48% → 49%
+ruling: reducer actions `addSkills` (ids given by the caller, so Undo removes exactly those) and `removeSkills`. Keys are `enrich.skills.notice*` (`enrich.skills.added` already exists).
+open: (low, not changed) the bar counts the server's suggestions; the server already drops repeats and skills the lists have, so it only overstates if a skills list is full (40).
