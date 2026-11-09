@@ -62,14 +62,30 @@ beforeEach(() => {
   tailoredApi.setTemplate.mockImplementation(async (_id: string, template: string) => ({ template }));
 });
 
+const changesView = async () => {
+  await userEvent.click(await screen.findByRole("button", { name: "Show changes" }));
+};
+/** The page as shown, in whichever view is open. */
+const cvPage = () => document.querySelector(".editor-page .cv-page");
 const editView = async () => {
-  await userEvent.click(await screen.findByRole("button", { name: "Edit text" }));
+  await screen.findByRole("textbox", { name: "Summary" });
 };
 
 describe("TailoredCvPage", () => {
+  it("opens editable by clicking, like the base CV, with Show changes as an option", async () => {
+    renderPage();
+    expect(await screen.findByRole("textbox", { name: "Summary" })).toHaveTextContent("Tailored summary.");
+    await changesView();
+    expect(screen.queryByRole("textbox", { name: "Summary" })).not.toBeInTheDocument();
+    expect(screen.getByText("Tailored summary.")).toHaveClass("cv-mark-changed");
+    await userEvent.click(screen.getByRole("button", { name: "Edit text" }));
+    expect(screen.getByRole("textbox", { name: "Summary" })).toBeInTheDocument();
+  });
+
   it("shows the score lift, tabs and toolbar, and highlights changed and inferred items", async () => {
     renderPage();
     expect(await screen.findByText("Score 62 → 71 · Strong")).toBeInTheDocument();
+    await changesView();
     expect(screen.getByRole("tab", { name: "CV", selected: true })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Cover letter" })).toBeInTheDocument();
     expect(screen.getByText("Tailored summary.")).toHaveClass("cv-mark-changed");
@@ -83,6 +99,7 @@ describe("TailoredCvPage", () => {
       content: { ...content, technicalSkills: [{ id: "s1", name: "Excel" }, { id: "s9", name: "Payroll" }] },
       review: { skills: { "new-skill:Payroll": { kept: true, inferred: true, reviewed: false, text: "Payroll" } } } });
     renderPage();
+    await changesView();
     expect(await screen.findByText("Payroll")).toHaveClass("cv-mark-inferred");
     expect(screen.getByText("Excel")).not.toHaveClass("cv-mark-inferred");
   });
@@ -138,9 +155,9 @@ describe("TailoredCvPage", () => {
     renderPage();
     const select = await screen.findByRole("combobox", { name: "Template" });
     expect(select).toHaveValue("classic");
-    expect(screen.getByRole("article", { name: "CV page" })).toHaveClass("cv-template-classic");
+    expect(cvPage()).toHaveClass("cv-template-classic");
     await userEvent.selectOptions(select, "modern");
-    expect(screen.getByRole("article", { name: "CV page" })).toHaveClass("cv-template-modern");
+    expect(cvPage()).toHaveClass("cv-template-modern");
     expect(tailoredApi.setTemplate).toHaveBeenCalledWith("tc-1", "modern");
     expect(tailoredApi.saveTailored).not.toHaveBeenCalled();
   });
@@ -162,6 +179,6 @@ describe("TailoredCvPage", () => {
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Template" }), "compact");
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't change the template");
     expect(screen.getByRole("combobox", { name: "Template" })).toHaveValue("classic");
-    expect(screen.getByRole("article", { name: "CV page" })).toHaveClass("cv-template-classic");
+    expect(cvPage()).toHaveClass("cv-template-classic");
   });
 });

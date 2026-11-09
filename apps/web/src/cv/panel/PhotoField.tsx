@@ -3,10 +3,13 @@ import type { CvContent } from "@resumora/shared";
 import { useAuth } from "../../auth/AuthProvider.tsx";
 import { t } from "../../i18n/t.ts";
 import { supabase } from "../../lib/supabase.ts";
+import { shrinkPhoto } from "./shrink-photo.ts";
 
 type Photo = NonNullable<CvContent["basics"]["photo"]>;
 type Props = { photo: Photo | null | undefined; onChange(photo: Photo | null): void };
 const extensions = new Map([["image/jpeg", "jpg"], ["image/png", "png"], ["image/webp", "webp"]]);
+/** The photo storage limit (2 MB, the cv-photos bucket); larger photos are shrunk to fit first. */
+const MAX_PHOTO_BYTES = 2097152;
 const percent = (n: number) => Math.max(0, Math.min(100, n));
 
 /** Private photo controls; only the storage path and crop settings enter the CV. */
@@ -37,15 +40,22 @@ export function PhotoField({ photo, onChange }: Props) {
 
   async function upload(file: File) {
     setError("");
-    const ext = extensions.get(file.type);
+    let ext = extensions.get(file.type);
     if (!ext) { setError(t("cv.photo.unsupported")); return; }
-    if (file.size > 2097152) { setError(t("cv.photo.tooLarge")); return; }
     if (!userId) { setError(t("cv.photo.uploadError")); return; }
     const startingPath = path ?? null;
     setBusy(true);
     try {
+      // Too large: only the shrunk JPEG is uploaded; the original never leaves the browser.
+      let body: Blob = file;
+      let type = file.type;
+      if (file.size > MAX_PHOTO_BYTES) {
+        const shrunk = await shrinkPhoto(file, MAX_PHOTO_BYTES);
+        if (!shrunk) { setError(t("cv.photo.shrinkError")); return; }
+        [body, type, ext] = [shrunk, "image/jpeg", "jpg"];
+      }
       const path = `${userId}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from("cv-photos").upload(path, file, { contentType: file.type });
+      const { error } = await supabase.storage.from("cv-photos").upload(path, body, { contentType: type });
       if (error) throw error;
       if (currentPhoto.current && currentPhoto.current.path === startingPath) {
         onChange({ path, x: 50, y: 50, zoom: 1 });

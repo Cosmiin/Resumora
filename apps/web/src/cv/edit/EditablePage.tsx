@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { missingCategories, newId, normalizeLayout, type CvContent, type SectionKey } from "@resumora/shared";
+import { getTemplate, type TemplateId } from "../page/templates.ts";
+import "../page/templates.css";
 import { sectionsOnCv, type CvAction } from "./cvReducer.ts";
 import { MissingBox } from "./MissingBox.tsx";
 import { SectionHeading } from "./SectionHeading.tsx";
@@ -16,10 +18,13 @@ type Props = {
   onOpen(key: SectionKey): void;
   scores?: ReadonlyMap<string, RoleScoreState>;
   toolsRoleId?: string;
+  /** Tailored CV: its chosen template's look, and a control next to each section heading (↻). */
+  template?: TemplateId;
+  sectionAction?(key: SectionKey): ReactNode;
 };
 
 /** The CV page where every piece of text is typed in place. */
-export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId }: Props) {
+export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId, template, sectionAction }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
 
@@ -43,7 +48,7 @@ export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId
   const flags = new Map(missingCategories(cv).filter((f) => f.key !== "header").map((f) => [f.key, f.level]));
 
   return (
-    <div className="cv-page cv-page-edit" ref={root} tabIndex={-1}>
+    <div className={template ? `cv-page cv-page-edit ${getTemplate(template).className}` : "cv-page cv-page-edit"} ref={root} tabIndex={-1}>
       <HeaderEdit basics={cv.basics} dispatch={dispatch} />
       {layout.order.map((key) => {
         const Body = sectionRenderers[key];
@@ -54,6 +59,7 @@ export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId
               {key !== "other" && (
                 <SectionHeading sectionKey={key} title={layout.titles[key] ?? ""} locale={cv.locale} dispatch={dispatch} />
               )}
+              {sectionAction?.(key)}
               <Body cv={cv} dispatch={dispatch} scores={scores} toolsRoleId={toolsRoleId} />
             </section>
           );

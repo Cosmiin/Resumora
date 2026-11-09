@@ -45,7 +45,7 @@ export type TailoredExtras = {
   inferred: ReadonlySet<string>;
   template?: TemplateId;
   toolbar: ReactNode;
-  /** A control next to each section heading in the changes view (↻). */
+  /** A control next to each section heading (↻), in both views. */
   sectionAction?(key: SectionKey): ReactNode;
   /** When set, the stage shows this instead of the CV (the Cover letter tab); the editor stays mounted. */
   replacePage?: ReactNode;
@@ -84,7 +84,8 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   const roleScores = useRoleScores({ cv: isTailored ? NO_ROLES : content, status });
   const scores = isTailored ? undefined : roleScores.scores;
   const retry = roleScores.retry;
-  const [showChanges, setShowChanges] = useState(true);
+  // A tailored CV opens editable by clicking, like the base CV; "Show changes" is the option.
+  const [showChanges, setShowChanges] = useState(false);
   const phone = useMediaQuery("(max-width: 899px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
@@ -190,7 +191,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   ) : tailored && showChanges ? (
     <CvDocument content={content} template={tailored.template} highlights={tailored.highlights} inferred={tailored.inferred} sectionAction={tailored.sectionAction} />
   ) : (
-    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} />
+    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} template={tailored?.template} sectionAction={tailored?.sectionAction} />
   );
 
   return (

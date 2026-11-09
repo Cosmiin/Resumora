@@ -29,8 +29,6 @@
 .tailor-pill.is-on { border-color: var(--border-selected); background: var(--surface-selected); color: var(--text-strong); }
 .tailor-field { position: relative; }
 .tailor-field textarea { width: 100%; padding-inline-end: 3rem; }
-.tailor-mic { position: absolute; inset-inline-end: var(--space-2); inset-block-end: var(--space-2); }
-.tailor-mic svg { width: 16px; height: 16px; }
 
 .tailor-items { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .tailor-items li {

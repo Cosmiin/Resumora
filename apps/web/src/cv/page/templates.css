@@ -58,3 +58,8 @@
 .cv-template-compact .cv-skill-row {
   margin-block: 2px;
 }
+
+/* The editable page (a tailored CV opens editable): its section headings are input.cv-label boxes. */
+.cv-page.cv-template-classic input.cv-label { font-family: inherit; color: var(--text-document); }
+.cv-page.cv-template-modern input.cv-label { color: var(--text-accent); }
+.cv-page.cv-template-modern .cv-section-heading { border-block-end: 1px solid var(--border-subtle); padding-block-end: 4px; margin-block-end: 4px; }

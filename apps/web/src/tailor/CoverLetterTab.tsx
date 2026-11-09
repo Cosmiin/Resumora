@@ -35,7 +35,7 @@ export function CoverLetterTab({ cv, job, letter, onLetter, today = new Date() }
   const [writing, setWriting] = useState<"idle" | "busy" | "error">("idle");
   const [confirming, setConfirming] = useState(false);
   const [save, setSave] = useState<Save>("idle");
-  const { mic, partial } = useDictation((words) => {
+  const { mic, status } = useDictation((words) => {
     setWhyCompany((text) => [text.trimEnd(), words].filter(Boolean).join(" ").slice(0, 1000));
     if (letter) schedule();
   });
@@ -106,7 +106,7 @@ export function CoverLetterTab({ cv, job, letter, onLetter, today = new Date() }
             onChange={(event) => edit(setWhyCompany)(event.target.value)} />
           {writing !== "busy" && mic}
         </div>
-        {partial && <p aria-live="polite">{partial}</p>}
+        {status}
         <label htmlFor="letter-manager">{t("letter.manager")}</label>
         <input id="letter-manager" maxLength={120} value={hiringManager} disabled={writing === "busy"} onChange={(event) => edit(setHiringManager)(event.target.value)} />
         {job?.userThoughts?.trim() && <p className="letter-thoughts">{t("letter.thoughts")}</p>}

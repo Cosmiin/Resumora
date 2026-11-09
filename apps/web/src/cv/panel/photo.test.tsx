@@ -10,6 +10,8 @@ import { PhotoField } from "./PhotoField.tsx";
 const storage = vi.hoisted(() => ({ upload: vi.fn(), createSignedUrl: vi.fn(), remove: vi.fn(), from: vi.fn() }));
 vi.mock("../../lib/supabase.ts", () => ({ supabase: { storage: { from: storage.from } } }));
 vi.mock("../../auth/AuthProvider.tsx", () => ({ useAuth: () => ({ session: { user: { id: "user-a" } } }) }));
+const shrink = vi.hoisted(() => ({ shrinkPhoto: vi.fn() }));
+vi.mock("./shrink-photo.ts", () => shrink);
 
 const initialPhoto = { path: "user-a/photo.jpg", x: 50, y: 50, zoom: 1 };
 function Field({ initial = null }: { initial?: CvContent["basics"]["photo"] }) {
@@ -109,7 +111,6 @@ describe("CV photo", () => {
 
   it.each([
     ["image/gif", 10, "Choose a JPEG, PNG or WebP photo."],
-    ["image/jpeg", 2097153, "This photo is too large. The limit is 2 MB."],
   ])("rejects %s of %i bytes before uploading", async (type, size, message) => {
     render(<Field />);
     const user = userEvent.setup({ applyAccept: false });
@@ -119,11 +120,35 @@ describe("CV photo", () => {
     expect(contentPhoto()).toBeNull();
   });
 
-  it("accepts a photo exactly 2 MB", async () => {
+  it("accepts a photo exactly 2 MB as it is", async () => {
     render(<Field />);
     await userEvent.upload(screen.getByLabelText("Choose a photo"),
       new File([new Uint8Array(2097152)], "portrait.png", { type: "image/png" }));
     await waitFor(() => expect(contentPhoto()).not.toBeNull());
+    expect(shrink.shrinkPhoto).not.toHaveBeenCalled();
+  });
+
+  it("shrinks a photo over 2 MB in the browser and uploads only the shrunk JPEG", async () => {
+    const small = new Blob([new Uint8Array(900_000)], { type: "image/jpeg" });
+    shrink.shrinkPhoto.mockResolvedValue(small);
+    render(<Field />);
+    const big = new File([new Uint8Array(2097153)], "portrait.png", { type: "image/png" });
+    await userEvent.upload(screen.getByLabelText("Choose a photo"), big);
+    await waitFor(() => expect(contentPhoto()?.path).toMatch(/^user-a\/[\w-]+\.jpg$/));
+    expect(shrink.shrinkPhoto).toHaveBeenCalledWith(big, 2097152);
+    expect(storage.upload).toHaveBeenCalledTimes(1);
+    expect(storage.upload).toHaveBeenCalledWith(expect.stringMatching(/\.jpg$/), small, { contentType: "image/jpeg" });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("says so, and uploads nothing, when a large photo can't be shrunk", async () => {
+    shrink.shrinkPhoto.mockResolvedValue(null);
+    render(<Field />);
+    await userEvent.upload(screen.getByLabelText("Choose a photo"),
+      new File([new Uint8Array(2097153)], "portrait.jpg", { type: "image/jpeg" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't make this photo small enough. Please try another photo.");
+    expect(storage.upload).not.toHaveBeenCalled();
+    expect(contentPhoto()).toBeNull();
   });
 
   it("keeps the previous photo when uploading fails", async () => {
