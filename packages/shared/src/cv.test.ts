@@ -251,3 +251,21 @@ describe("projects take the role shape", () => {
     expect(CvContentSchema.safeParse({ ...emptyCv(), projects: [project] }).success).toBe(false);
   });
 });
+
+describe("lines under the lighter items", () => {
+  it("old courses, awards, publications and interests parse with no lines", () => {
+    const cv = CvContentSchema.parse({
+      ...emptyCv(),
+      courses: [{ id: "c1", name: "Power BI", provider: "Microsoft", date: "2025" }],
+      awards: [{ id: "a1", name: "Top performer", issuer: "PMI", date: "2019", description: "" }],
+      publications: [{ id: "p1", title: "Paper", publisher: "Journal", date: "2020", url: "" }],
+      interests: [{ id: "i1", name: "Running" }],
+    });
+    for (const item of [cv.courses[0]!, cv.awards[0]!, cv.publications[0]!, cv.interests[0]!]) expect(item.bullets ?? []).toEqual([]);
+  });
+
+  it("keeps the lines of a course", () => {
+    const course = { id: "c1", name: "Power BI", provider: "Microsoft", date: "2025", bullets: [{ id: "l1", text: "Built dashboards" }] };
+    expect(CvContentSchema.parse({ ...emptyCv(), courses: [course] }).courses[0]).toEqual(course);
+  });
+});

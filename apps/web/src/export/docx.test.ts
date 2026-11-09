@@ -137,16 +137,16 @@ describe("buildCvDocx", () => {
     content.projects = [{ id: "p", title: "Public project", company: "", location: "", startDate: "", endDate: "", current: false, description: "", bullets: [{ id: "p-b1", text: "Open source toolkit." }, { id: "p-b2", text: "Used by 40 teams." }], notes: [], url: "https://project.example.com" }];
     content.volunteering = [{ ...content.experience[1]!, id: "v", title: "Volunteer mentor" }];
     content.awards = [{ id: "a", name: "Community award", issuer: "Local council", date: "2025", description: "Recognised for mentoring." }];
-    content.courses = [{ id: "c", name: "Architecture course", provider: "Learning Institute", date: "2023" }];
+    content.courses = [{ id: "c", name: "Architecture course", provider: "Learning Institute", date: "2023", bullets: [{ id: "cl1", text: "Event-driven design" }, { id: "cl2", text: "Cost modelling" }] }];
     content.publications = [{ id: "p", title: "Engineering article", publisher: "Tech Journal", date: "2024", url: "https://article.example.com" }];
-    content.interests = [{ id: "i", name: "Hiking" }];
+    content.interests = [{ id: "i", name: "Hiking", bullets: [{ id: "il1", text: "Crossed the Fagaras ridge" }] }, { id: "i2", name: "Chess" }];
     content.custom = [{ id: "o", title: "Community involvement", details: "Organised local meetups." }];
     const xml = await documentXml(await buildCvDocx(CvContentSchema.parse(content), "compact"));
     for (const text of [
       "Won ten customers.", "Technical: TypeScript", "Professional: Team leadership", "Romanian", "Native",
       "Cloud certification", "Cloud Institute", "Public project", "https://project.example.com",
       "Open source toolkit.", "Used by 40 teams.", "Volunteer mentor", "Community award", "Local council",
-      "Recognised for mentoring.", "Architecture course", "Learning Institute", "Engineering article",
+      "Recognised for mentoring.", "Architecture course", "Learning Institute", "Event-driven design", "Cost modelling", "Crossed the Fagaras ridge", "Chess", "Engineering article",
       "Tech Journal", "https://article.example.com", "Hiking", "Community involvement", "Organised local meetups.",
     ]) expect(xml).toContain(text);
     expect(xml).not.toContain("Unsorted skill");

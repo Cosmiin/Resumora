@@ -148,14 +148,16 @@ export const BasicsSchema = z
 
 const sectionKey = z.enum(SECTION_KEYS as unknown as [SectionKey, ...SectionKey[]]);
 
+/** Short lines under a course, award, publication or interest (suggested by enrichment, or typed). Absent = none. */
+const lines = z.array(BulletSchema).max(MAX_BULLETS).optional();
 export const AwardSchema = z
-  .object({ id, name: text(), issuer: text(), date: YearMonthSchema, description: text(MAX_LONG_TEXT) })
+  .object({ id, name: text(), issuer: text(), date: YearMonthSchema, description: text(MAX_LONG_TEXT), bullets: lines })
   .strict();
-export const CourseSchema = z.object({ id, name: text(), provider: text(), date: YearMonthSchema }).strict();
+export const CourseSchema = z.object({ id, name: text(), provider: text(), date: YearMonthSchema, bullets: lines }).strict();
 export const PublicationSchema = z
-  .object({ id, title: text(), publisher: text(), date: YearMonthSchema, url: text() })
+  .object({ id, title: text(), publisher: text(), date: YearMonthSchema, url: text(), bullets: lines })
   .strict();
-export const InterestSchema = z.object({ id, name: text() }).strict();
+export const InterestSchema = z.object({ id, name: text(), bullets: lines }).strict();
 
 /** Section order, hidden sections and custom headings of a CV. */
 export const LayoutSchema = z

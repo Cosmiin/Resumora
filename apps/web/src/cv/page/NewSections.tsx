@@ -3,7 +3,10 @@ import { formatYearMonth, type CvContent, type SectionKey } from "@resumora/shar
 
 const joinParts = (parts: string[], sep = " · ") => parts.filter(Boolean).join(sep);
 
-function Item({ title, date, sub, text }: { title: string; date?: string; sub?: string; text?: string }) {
+type Line = { id: string; text: string };
+
+function Item({ title, date, sub, text, lines = [] }: { title: string; date?: string; sub?: string; text?: string; lines?: Line[] }) {
+  const shown = lines.filter((line) => line.text.trim());
   return (
     <div className="cv-block">
       <span className="cv-item-head">
@@ -12,6 +15,11 @@ function Item({ title, date, sub, text }: { title: string; date?: string; sub?: 
       </span>
       {sub && <span className="cv-item-sub">{sub}</span>}
       {text && <span className="cv-text">{text}</span>}
+      {shown.length > 0 && (
+        <ul className="cv-bullets">
+          {shown.map((line) => <li key={line.id}>{line.text}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
@@ -62,25 +70,28 @@ export function newSectionBody(
       return {
         show: cv.awards.length > 0,
         body: cv.awards.map((a) => (
-          <Item key={a.id} title={a.name} date={date(a.date)} sub={a.issuer} text={a.description} />
+          <Item key={a.id} title={a.name} date={date(a.date)} sub={a.issuer} text={a.description} lines={a.bullets} />
         )),
       };
     case "courses":
       return {
         show: cv.courses.length > 0,
-        body: cv.courses.map((c) => <Item key={c.id} title={c.name} date={date(c.date)} sub={c.provider} />),
+        body: cv.courses.map((c) => <Item key={c.id} title={c.name} date={date(c.date)} sub={c.provider} lines={c.bullets} />),
       };
     case "publications":
       return {
         show: cv.publications.length > 0,
         body: cv.publications.map((p) => (
-          <Item key={p.id} title={p.title} date={date(p.date)} sub={joinParts([p.publisher, p.url])} />
+          <Item key={p.id} title={p.title} date={date(p.date)} sub={joinParts([p.publisher, p.url])} lines={p.bullets} />
         )),
       };
     case "interests":
       return {
         show: cv.interests.length > 0,
-        body: <span className="cv-text">{cv.interests.map((i) => i.name).join(" · ")}</span>,
+        // One line, unless some interests have lines: then each is its own item.
+        body: cv.interests.some((i) => i.bullets?.some((line) => line.text.trim()))
+          ? cv.interests.map((i) => <Item key={i.id} title={i.name} lines={i.bullets} />)
+          : <span className="cv-text">{cv.interests.map((i) => i.name).join(" · ")}</span>,
       };
     default:
       return { show: false, body: null };

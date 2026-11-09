@@ -167,6 +167,23 @@ describe("EditablePage", () => {
     expect(screen.queryByRole("textbox", { name: "Role title" })).not.toBeInTheDocument();
   });
 
+  it("lines under a course and an interest can be edited and deleted", async () => {
+    const cv: CvContent = {
+      ...emptyCv(),
+      courses: [{ id: "k1", name: "Power BI", provider: "Microsoft", date: "2025", bullets: [{ id: "l1", text: "Dashboards" }, { id: "l2", text: "DAX" }] }],
+      interests: [{ id: "i1", name: "Running", bullets: [{ id: "l3", text: "Half marathons" }] }],
+    };
+    render(<Harness initial={cv} />);
+    await userEvent.type(screen.getByRole("textbox", { name: "Bullet 1 of Power BI" }), "!");
+    expect(state().courses[0]!.bullets![0]!.text).toBe("Dashboards!");
+    const second = screen.getByRole("textbox", { name: "Bullet 2 of Power BI" });
+    await userEvent.clear(second);
+    await userEvent.type(second, "{Backspace}");
+    expect(state().courses[0]!.bullets!.map((b) => b.text)).toEqual(["Dashboards!"]);
+    await userEvent.type(screen.getByRole("textbox", { name: "Bullet 1 of Running" }), "!");
+    expect(state().interests[0]!.bullets![0]!.text).toBe("Half marathons!");
+  });
+
   it('a typed date "03/2021" is saved as 2021-03', async () => {
     const cv: CvContent = { ...emptyCv(), certifications: [{ id: "c1", name: "AWS", issuer: "", date: "" }] };
     render(<Harness initial={cv} />);

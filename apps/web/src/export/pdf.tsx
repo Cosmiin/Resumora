@@ -50,6 +50,11 @@ export function buildCvPdf(
       {details.filter(Boolean).map((line, index) => <Text key={index}>{line}</Text>)}
     </View>
   );
+  // Lines under a course, award, publication or interest; blank ones are left out.
+  const lined = (id: string, item: ReactElement, lines: { id: string; text: string }[] = []) => {
+    const shown = lines.filter((line) => line.text.trim());
+    return shown.length ? <View key={id}>{item}{shown.map(bullet)}</View> : item;
+  };
   // A project is a role with a link, shown after the organisation.
   const roles = (items: (CvContent["experience"][number] & { url?: string })[]) => items.map((job) => (
     <View key={job.id} style={styles.block}>
@@ -85,10 +90,13 @@ export function buildCvPdf(
     )),
     projects: roles(content.projects),
     volunteering: roles(content.volunteering),
-    awards: content.awards.map((item) => entry(item.id, item.name, date(item.date), item.issuer, item.description)),
-    courses: content.courses.map((item) => entry(item.id, item.name, date(item.date), item.provider)),
-    publications: content.publications.map((item) => entry(item.id, item.title, date(item.date), join([item.publisher, item.url]))),
-    interests: content.interests.length ? [paragraph(join(content.interests.map((item) => item.name)))] : [],
+    awards: content.awards.map((item) => lined(item.id, entry(item.id, item.name, date(item.date), item.issuer, item.description), item.bullets)),
+    courses: content.courses.map((item) => lined(item.id, entry(item.id, item.name, date(item.date), item.provider), item.bullets)),
+    publications: content.publications.map((item) => lined(item.id, entry(item.id, item.title, date(item.date), join([item.publisher, item.url])), item.bullets)),
+    // Interests stay one line, unless some have lines: then each is its own entry.
+    interests: content.interests.some((item) => item.bullets?.some((line) => line.text.trim()))
+      ? content.interests.map((item) => lined(item.id, entry(item.id, item.name, ""), item.bullets))
+      : content.interests.length ? [paragraph(join(content.interests.map((item) => item.name)))] : [],
     other: content.custom.map((item) => (
       <View key={item.id} style={styles.section}>
         {heading(item.title)}

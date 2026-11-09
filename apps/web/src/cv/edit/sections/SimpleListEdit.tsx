@@ -1,8 +1,10 @@
 import { Fragment, memo, useCallback, useRef } from "react";
-import { MAX_LONG_TEXT, newId, type Locale } from "@resumora/shared";
+import { MAX_LONG_TEXT, newId, type Bullet, type Locale } from "@resumora/shared";
 import { t } from "../../../i18n/t.ts";
 import type { MessageKey } from "../../../i18n/en.ts";
 import type { CvAction } from "../cvReducer.ts";
+import { BulletList } from "../BulletList.tsx";
+import type { LineList } from "../lists.ts";
 import { DragList } from "../DragList.tsx";
 import { ItemDate } from "../ItemDate.tsx";
 import { ItemField } from "../ItemField.tsx";
@@ -57,6 +59,9 @@ const CONFIG: Record<SimpleList, Config> = {
 };
 
 type Row = { id: string } & Record<string, unknown>;
+
+/** Courses, awards and publications can have short lines under them (from enrichment). */
+const hasLines = (list: SimpleList): list is SimpleList & LineList => list === "courses" || list === "awards" || list === "publications";
 type Dispatch = (a: CvAction) => void;
 
 const ListRow = memo(function ListRow({
@@ -124,6 +129,9 @@ const ListRow = memo(function ListRow({
         ))}
       </div>
       {description && field(description, undefined, true)}
+      {hasLines(list) && Array.isArray(item.bullets) && item.bullets.length > 0 && (
+        <BulletList owner={{ list, itemId: item.id }} bullets={item.bullets as Bullet[]} dispatch={dispatch} ownerName={mainText || t(main.label)} />
+      )}
     </div>
   );
 });

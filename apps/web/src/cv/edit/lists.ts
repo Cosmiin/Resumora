@@ -16,8 +16,11 @@ export type ListKey =
 /** Lists whose items have the role shape (title, organisation, dates, bullets). */
 export type RoleList = "experience" | "volunteering" | "projects";
 
+/** Lists whose items can have short lines under them. */
+export type LineList = "courses" | "awards" | "publications" | "interests";
+
 export type BulletOwner =
-  | { list: RoleList; itemId: string }
+  | { list: RoleList | LineList; itemId: string }
   | { list: "achievements" };
 
 export type Item = { id: string } & Record<string, unknown>;
@@ -73,11 +76,14 @@ type Bullets = { id: string; text: string }[];
 /** The bullets an owner holds, or undefined when the owner does not exist. */
 export function getBullets(cv: CvContent, owner: BulletOwner): Bullets | undefined {
   if (owner.list === "achievements") return cv.achievements;
-  return cv[owner.list].find((r) => r.id === owner.itemId)?.bullets;
+  const items: { id: string; bullets?: Bullets }[] = cv[owner.list];
+  const item = items.find((r) => r.id === owner.itemId);
+  return item ? (item.bullets ?? []) : undefined;
 }
 
 export function withBullets(cv: CvContent, owner: BulletOwner, bullets: Bullets): CvContent {
   if (owner.list === "achievements") return { ...cv, achievements: bullets };
   const { list, itemId } = owner;
-  return { ...cv, [list]: cv[list].map((r) => (r.id === itemId ? { ...r, bullets } : r)) } as CvContent;
+  const items: { id: string }[] = cv[list];
+  return { ...cv, [list]: items.map((r) => (r.id === itemId ? { ...r, bullets } : r)) } as CvContent;
 }

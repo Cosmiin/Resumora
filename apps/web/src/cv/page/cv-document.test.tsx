@@ -140,6 +140,19 @@ describe("CvDocument", () => {
     expect(screen.getByRole("heading", { name: "Experiență profesională" })).toBeInTheDocument();
   });
 
+  it("shows the lines under a course and under an interest", () => {
+    render(
+      <CvDocument
+        content={sampleCv({
+          courses: [{ id: "k1", name: "Power BI Data Analyst", provider: "Microsoft Learn", date: "2025", bullets: [{ id: "l1", text: "Built the monthly dashboards" }, { id: "l2", text: "DAX measures" }] }],
+          interests: [{ id: "i1", name: "Running", bullets: [{ id: "l3", text: "3 half marathons since 2022" }] }, { id: "i2", name: "Chess" }],
+        })}
+      />,
+    );
+    for (const text of ["Built the monthly dashboards", "DAX measures", "3 half marathons since 2022"]) expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.getByText("Chess", { exact: false })).toBeInTheDocument();
+  });
+
   it("key achievements and interests render", () => {
     render(
       <CvDocument

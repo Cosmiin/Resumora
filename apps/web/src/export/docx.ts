@@ -98,6 +98,8 @@ export function buildCvDocx(
     paragraph(title), ...details.filter(Boolean).map((line) => paragraph(line)),
   ];
   const bullet = (text: string) => paragraph(text, { bullet: { level: 0 } });
+  // Lines under a course, award, publication or interest; blank ones are left out.
+  const lines = (items: { text: string }[] = []) => items.filter((line) => line.text.trim()).map((line) => bullet(line.text));
   const heading = (text: string) => paragraph(text, { heading: HeadingLevel.HEADING_1 });
   const date = (value: string) => formatYearMonth(value, content.locale);
   // A project is a role with a link, shown after the organisation.
@@ -126,10 +128,13 @@ export function buildCvDocx(
     certifications: content.certifications.flatMap((item) => entry(item.name, date(item.date), item.issuer)),
     projects: roles(content.projects),
     volunteering: roles(content.volunteering),
-    awards: content.awards.flatMap((item) => entry(item.name, date(item.date), item.issuer, item.description)),
-    courses: content.courses.flatMap((item) => entry(item.name, date(item.date), item.provider)),
-    publications: content.publications.flatMap((item) => entry(item.title, date(item.date), join([item.publisher, item.url]))),
-    interests: content.interests.length ? [paragraph(join(content.interests.map((item) => item.name)))] : [],
+    awards: content.awards.flatMap((item) => [...entry(item.name, date(item.date), item.issuer, item.description), ...lines(item.bullets)]),
+    courses: content.courses.flatMap((item) => [...entry(item.name, date(item.date), item.provider), ...lines(item.bullets)]),
+    publications: content.publications.flatMap((item) => [...entry(item.title, date(item.date), join([item.publisher, item.url])), ...lines(item.bullets)]),
+    // Interests stay one line, unless some have lines: then each is its own entry.
+    interests: content.interests.some((item) => lines(item.bullets).length)
+      ? content.interests.flatMap((item) => [...entry(item.name), ...lines(item.bullets)])
+      : content.interests.length ? [paragraph(join(content.interests.map((item) => item.name)))] : [],
     other: content.custom.flatMap((item) => [heading(item.title), ...(item.details ? [paragraph(item.details)] : [])]),
   };
 
