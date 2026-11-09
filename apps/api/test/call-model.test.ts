@@ -230,6 +230,37 @@ describe("callModel file parts", () => {
   });
 });
 
+describe.each(["OPENROUTER", "OPENAI"] as const)("callModel model tier (%s)", (provider) => {
+  const env = {
+    OPENROUTER_API_KEY: provider === "OPENROUTER" ? "or-key" : "",
+    OPENROUTER_MODEL: "or-model",
+    OPENAI_API_KEY: provider === "OPENAI" ? "oa-key" : "",
+    OPENAI_MODEL: "oa-model",
+  };
+  const strongEnv = { ...env, OPENROUTER_MODEL_STRONG: "or-strong-model", OPENAI_MODEL_STRONG: "oa-strong-model" };
+
+  it("uses the strong model when tier is strong", async () => {
+    const { fetch, calls } = fakeFetch(ok({ answer: "yes" }));
+    const { d } = deps(fetch, { providers: providersFromEnv(strongEnv) });
+    await expect(callModel(d, { ...request, tier: "strong" })).resolves.toEqual({ answer: "yes" });
+    expect(calls[0]!.body.model).toBe(strongEnv[`${provider}_MODEL_STRONG`]);
+  });
+
+  it("falls back to the cheap model when the strong key is unset", async () => {
+    const { fetch, calls } = fakeFetch(ok({ answer: "yes" }));
+    const { d } = deps(fetch, { providers: providersFromEnv(env) });
+    await expect(callModel(d, { ...request, tier: "strong" })).resolves.toEqual({ answer: "yes" });
+    expect(calls[0]!.body.model).toBe(env[`${provider}_MODEL`]);
+  });
+
+  it("uses the cheap model when no tier is given", async () => {
+    const { fetch, calls } = fakeFetch(ok({ answer: "yes" }));
+    const { d } = deps(fetch, { providers: providersFromEnv(strongEnv) });
+    await expect(callModel(d, request)).resolves.toEqual({ answer: "yes" });
+    expect(calls[0]!.body.model).toBe(env[`${provider}_MODEL`]);
+  });
+});
+
 describe("providersFromEnv", () => {
   it("skips a provider whose key is empty", () => {
     const list = providersFromEnv({ OPENROUTER_API_KEY: "", OPENROUTER_MODEL: "m1", OPENAI_API_KEY: "k", OPENAI_MODEL: "m2" });
