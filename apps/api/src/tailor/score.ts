@@ -17,6 +17,25 @@ function cvText(value: unknown): string[] {
   return [];
 }
 
+const FLUENT_NEED = /\b(fluent|advanced)\b/i;
+const FLUENT_LEVEL = /\b(c1|c2|native|fluent|advanced)\b/i;
+/** So a requirement naming a language the CV lacks ("Fluent English and German") is not met by English alone. */
+const COMMON_LANGUAGES = ["English", "Romanian", "French", "German", "Spanish", "Italian", "Portuguese", "Dutch", "Polish",
+  "Russian", "Ukrainian", "Hungarian", "Czech", "Slovak", "Bulgarian", "Greek", "Turkish", "Arabic", "Hebrew", "Chinese",
+  "Mandarin", "Cantonese", "Japanese", "Korean", "Hindi", "Swedish", "Norwegian", "Danish", "Finnish", "Serbian", "Croatian"];
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const names = (text: string, name: string) => new RegExp(`(^|[^\\p{L}])${escape(name)}([^\\p{L}]|$)`, "iu").test(text);
+/** Owner's rule: C1/C2, Native, Fluent or Advanced meets a fluent/advanced requirement for every language it names. */
+function fluentEvidence(requirement: string, languages: CvContent["languages"]): string | null {
+  if (!FLUENT_NEED.test(requirement)) return null;
+  const fluent = languages.filter((language) => language.name.trim() && FLUENT_LEVEL.test(language.level) && names(requirement, language.name.trim()));
+  if (fluent.length === 0) return null;
+  const covered = (name: string) => fluent.some((language) => language.name.trim().toLowerCase() === name.toLowerCase());
+  const others = [...COMMON_LANGUAGES, ...languages.map((language) => language.name.trim()).filter(Boolean)];
+  if (others.some((name) => names(requirement, name) && !covered(name))) return null;
+  return fluent.map((language) => `${language.name.trim()} | ${language.level.trim()}`).join(" | ");
+}
+
 export async function scoreMatch(
   deps: { model: ModelDeps },
   /** keptInferredTexts: texts of inferred items the user kept; an inferred label quoting one counts in full. */
@@ -58,9 +77,13 @@ export async function scoreMatch(
     // One requirement can need several CV values ("English and Romanian"): each " | " part must be quoted from the CV.
     const parts = (evidence: string) => evidence.split(" | ").map((part) => part.trim());
     const quoted = (evidence: string) => parts(evidence).every((part) => part && text.some((value) => value.includes(part)));
-    const checked = labels.map((label) => label.status === "missing" || !label.evidence?.trim() || !quoted(label.evidence)
-      ? { ...label, status: "missing" as const, evidence: null, inferred: false }
-      : label);
+    const checked = labels.map((label) => {
+      const fluent = label.kind === "requirement" ? fluentEvidence(input.job.requirements[Number(label.ref.slice(1))]!.text, cv.languages) : null;
+      if (fluent) return { ...label, status: "met" as const, evidence: fluent, inferred: false };
+      return label.status === "missing" || !label.evidence?.trim() || !quoted(label.evidence)
+        ? { ...label, status: "missing" as const, evidence: null, inferred: false }
+        : label;
+    });
     const kept = new Set(input.keptInferred);
     for (const label of checked) {
       if (label.inferred && label.evidence && parts(label.evidence).some((part) => input.keptInferredTexts?.some((t) => t.includes(part)))) kept.add(label.ref);
