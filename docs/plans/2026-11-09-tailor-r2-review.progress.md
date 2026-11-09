@@ -16,3 +16,16 @@ open: rulings — "← My answers" on the role under review reuses A9's panel an
 session: tailor-r2 Part B · builder: claude
 commit: see git log (base 0b8c41e) · reviews: 1 (agents) · fix rounds: 0 (2 low findings fixed inline: no "now shows" line when a role changed nothing; a redo's score becomes the next role's "before") · guard denials: 0 · weekly 48% → 48%
 open: rulings — new `TailorMoment.tsx` copies enrichment's count-up and confetti with the `fm-moment` classes, because `CelebrateMoment` sits in the enrichment folder (off limits) and has fixed role-score copy; B7 reuses it. `flow-phase.ts` holds TailorFlow's Phase type and remember/remembered (re-exported) so TailorFlow stays under 300 lines. TailorFlow loads the job (`getJob`) to name requirements and the company. Full suite: 2 known flaky `cv/editor.test.tsx` "rapid typing" failures under load; they pass alone (14/14).
+
+## Task B4: Skills review in batches of 5 (SkillsA2) — done
+session: tailor-r2 Part B · builder: claude
+commit: see git log (base d826179) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 49% → 49%
+open: rulings — SectionReview hands the Skills step to SkillsReview; its old Skills groups and 3 copy keys are gone (`role-context.test.tsx` F5 test removed, `tailor-flow.test.tsx` clicks "Save skills"). A guess left undecided is sent in neither list (kept, unreviewed). Also removed one unused import in TailorFlow left by B3's split (lint). `.tailor-explain` / `.tailor-group` CSS is now unused (left in place).
+
+## Next (fresh session, per claude-build's 4-task rule)
+B5 Summary check (API `guesses` + SummaryReview; owner: each guessed phrase is its own item, counts separately) → B6 Final touches → B7 Done screen (reuse `TailorMoment.tsx`) → B8 Guided review (+ ExportMenu; expect a small merge with PR #46). Then the whole-branch review (Opus high, base `01cbc9a`), push, draft PR with base `rebuild/tailor-r2-flow`.
+Notes for B5–B8:
+- B5 needs accept changes outside its file list: an edited Summary text (Edit / Remove a phrase) and one review entry per guessed phrase, so "Still to check", the export warning and "AI guess N of M" all count phrases.
+- B8: `accept.ts` must also store each guess's `reason` in `review` for the guided review.
+- B7: the score labels and job are already loaded in TailorFlow (`scoreRef`, `job`) for "Now met"; TailorFlow is at ~287 lines, so the done screen goes in its own file.
+- Full suite under load: 0–2 flaky `cv/editor.test.tsx` "rapid typing" failures; they pass alone.

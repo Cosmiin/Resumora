@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CATEGORY, type CvContent, type Proposal, type SectionKey, type TailorQuestion, type TailorSection } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { roleOf } from "./RolePanel.tsx";
+import { SkillsReview } from "./SkillsReview.tsx";
 import type { AcceptBody } from "./tailor-api.ts";
 
 /** Same keys as the API: new skills share the id "new-skill", so they are told apart by their text. */
@@ -95,20 +96,11 @@ export function SectionReview({ section, proposals, flags, confirmed, busy, onAc
         </span>}
     </li>;
   };
-  const group = (id: string, title: string, items: Proposal[]) => items.length > 0 && <section className="tailor-group" aria-labelledby={id}>
-    <h3 id={id}>{title}</h3>
-    <ul className="tailor-items">{items.map((p, i) => item(p, i))}</ul>
-  </section>;
-
+  // SkillsA2: the Skills step reviews its changes 5 at a time.
+  if (section === "skills") return <SkillsReview proposals={proposals} cv={cv} busy={busy} onAccept={onAccept} removed={removed} />;
   let body: React.ReactNode;
   if (proposals.length === 0) body = <p>{t("tailor.review.none")}</p>;
-  else if (section === "skills") {
-    body = <>
-      <p className="tailor-explain">{t("tailor.review.skillsExplain")}</p>
-      {group("tailor-reworded", t("tailor.review.reworded"), proposals.filter((p) => p.itemId !== "new-skill"))}
-      {group("tailor-added", t("tailor.review.added"), proposals.filter((p) => p.itemId === "new-skill"))}
-    </>;
-  } else body = <ul className="tailor-items">{proposals.map((p, i) => item(p, i, cv && section === "experience" ? partName(cv, p) : undefined))}</ul>;
+  else body = <ul className="tailor-items">{proposals.map((p, i) => item(p, i, cv && section === "experience" ? partName(cv, p) : undefined))}</ul>;
 
   return <section className="tailor-card" aria-labelledby="tailor-review-title">
     <h2 id="tailor-review-title">{t("tailor.review.title", { section: t(`tailor.section.${section}`) })}</h2>

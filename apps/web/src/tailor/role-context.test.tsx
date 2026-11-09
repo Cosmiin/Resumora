@@ -106,18 +106,3 @@ describe("F4: without the CV, the Experience review is a plain list", () => {
   });
 });
 
-describe("F5: Skills review explains the step and shows why each new skill was suggested", () => {
-  it("shows the explanation, reworded skills old → new, and suggested new skills with their reason", () => {
-    render(<SectionReview section="skills" flags={[]} confirmed={[]} busy={false} onAccept={vi.fn()} cv={cv} proposals={[
-      { itemId: "s1", field: "name", text: "Power BI", inferred: false, flags: [] },
-      { itemId: "new-skill", field: "name", text: "Process mapping", inferred: true, flags: [], reason: "Shown in: Business Analyst · Emedi" },
-    ]} />);
-    expect(screen.getByText(/reword your skills to match the job's words/)).toBeInTheDocument();
-    const reworded = screen.getByRole("region", { name: "Reworded" });
-    expect(within(reworded).getByText("Excel reporting")).toBeInTheDocument();
-    expect(within(reworded).getByText("Power BI")).toBeInTheDocument();
-    const added = screen.getByRole("region", { name: "Suggested new" });
-    expect(within(added).getByText("Process mapping")).toBeInTheDocument();
-    expect(within(added).getByText("Shown in: Business Analyst · Emedi")).toBeInTheDocument();
-  });
-});
