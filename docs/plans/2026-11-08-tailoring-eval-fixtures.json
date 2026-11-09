@@ -1,0 +1,1012 @@
+[
+  {
+    "id": "en-backend-mid-match",
+    "description": "Matching mid-level backend application. Preserve the candidate's stated metrics and emphasize API development, PostgreSQL, testing, and production support.",
+    "locale": "en",
+    "cv": {
+      "schemaVersion": 2,
+      "locale": "en",
+      "basics": {
+        "fullName": "Evan Brindle",
+        "firstName": "Evan",
+        "lastName": "Brindle",
+        "titles": ["Backend Engineer"],
+        "email": "evan.brindle@example.com",
+        "phone": "",
+        "location": "Bristol, UK",
+        "website": "",
+        "linkedin": "",
+        "summary": "Backend engineer building TypeScript services and PostgreSQL-backed APIs for subscription software. Comfortable owning features through implementation, automated testing, deployment, and production support."
+      },
+      "experience": [
+        {
+          "id": "backend-role-1",
+          "company": "Mossquay Software",
+          "title": "Backend Engineer",
+          "location": "Bristol, UK",
+          "startDate": "2023-02",
+          "endDate": "",
+          "current": true,
+          "description": "Develop subscription billing and account-management services for a business software platform.",
+          "bullets": [
+            {
+              "id": "backend-b1",
+              "text": "Built TypeScript REST endpoints for subscription changes, including request validation, authorization checks, and integration tests."
+            },
+            {
+              "id": "backend-b2",
+              "text": "Reduced account-history API latency from 820 ms to 290 ms by rewriting PostgreSQL queries and adding indexes, measured in production request logs."
+            },
+            {
+              "id": "backend-b3",
+              "text": "Added idempotency checks to payment webhooks so repeated delivery did not create duplicate subscription updates."
+            },
+            {
+              "id": "backend-b4",
+              "text": "Participated in the on-call rotation, investigated failed background jobs, and documented recovery steps for support engineers."
+            }
+          ],
+          "notes": []
+        },
+        {
+          "id": "backend-role-2",
+          "company": "Cinderbrook Systems",
+          "title": "Junior Software Engineer",
+          "location": "Bath, UK",
+          "startDate": "2021-07",
+          "endDate": "2023-01",
+          "current": false,
+          "description": "Maintained internal order-processing applications.",
+          "bullets": [
+            {
+              "id": "backend-b5",
+              "text": "Implemented Node.js endpoints that validated supplier order files before importing them into PostgreSQL."
+            },
+            {
+              "id": "backend-b6",
+              "text": "Wrote regression tests for order cancellation and reviewed deployment failures with senior engineers."
+            }
+          ],
+          "notes": []
+        }
+      ],
+      "education": [
+        {
+          "id": "backend-edu-1",
+          "school": "Westmere Institute of Computing",
+          "degree": "BSc",
+          "field": "Computer Science",
+          "startDate": "2018",
+          "endDate": "2021",
+          "notes": ""
+        }
+      ],
+      "technicalSkills": [
+        { "id": "backend-ts1", "name": "TypeScript" },
+        { "id": "backend-ts2", "name": "Node.js" },
+        { "id": "backend-ts3", "name": "PostgreSQL" },
+        { "id": "backend-ts4", "name": "REST APIs" },
+        { "id": "backend-ts5", "name": "Docker" },
+        { "id": "backend-ts6", "name": "Git" }
+      ],
+      "professionalSkills": [
+        { "id": "backend-ps1", "name": "Production incident investigation" },
+        { "id": "backend-ps2", "name": "Code review" }
+      ],
+      "unclearSkills": [],
+      "languages": [
+        { "id": "backend-lang-1", "name": "English", "level": "Native" }
+      ],
+      "certifications": [],
+      "projects": [],
+      "custom": [],
+      "achievements": [],
+      "volunteering": [],
+      "awards": [],
+      "courses": [],
+      "publications": [],
+      "interests": [],
+      "layout": {
+        "order": ["summary", "achievements", "experience", "skills", "education", "languages", "certifications", "projects", "volunteering", "awards", "courses", "publications", "interests", "other"],
+        "hidden": [],
+        "titles": {}
+      }
+    },
+    "job": {
+      "title": "Backend Engineer",
+      "company": "Willowspoke Technologies",
+      "location": "Bristol, UK",
+      "workMode": "hybrid",
+      "employmentType": "full_time",
+      "seniority": "mid",
+      "salary": null,
+      "summary": "Build reliable subscription APIs with TypeScript, Node.js, and PostgreSQL alongside a small product engineering team.",
+      "responsibilities": [
+        "Develop and maintain REST APIs for account and billing workflows.",
+        "Optimize database queries and investigate production failures.",
+        "Write automated tests and participate in code review and on-call support."
+      ],
+      "requirements": [
+        { "text": "Commercial backend development experience using TypeScript and Node.js.", "kind": "must", "category": "skill" },
+        { "text": "Practical PostgreSQL query optimization experience.", "kind": "must", "category": "skill" },
+        { "text": "Experience testing APIs and supporting production services.", "kind": "must", "category": "experience" },
+        { "text": "Experience processing payment webhooks.", "kind": "nice", "category": "experience" }
+      ],
+      "benefits": ["Flexible working hours", "Learning budget"],
+      "applyBy": null,
+      "isJobPosting": true
+    }
+  },
+  {
+    "id": "ro-contabil-match",
+    "description": "CV și anunț în limba română. Păstrează diacriticele, responsabilitățile declarate și cifrele existente.",
+    "locale": "ro",
+    "cv": {
+      "schemaVersion": 2,
+      "locale": "ro",
+      "basics": {
+        "fullName": "Mălina Șerbănescu",
+        "firstName": "Mălina",
+        "lastName": "Șerbănescu",
+        "titles": ["Contabilă"],
+        "email": "malina.serbanescu@example.com",
+        "phone": "",
+        "location": "Brașov, România",
+        "website": "",
+        "linkedin": "",
+        "summary": "Contabilă cu experiență în evidența furnizorilor, reconcilierea conturilor și pregătirea situațiilor lunare. Lucrez atent cu documentele justificative și urmăresc rezolvarea diferențelor înainte de închiderea lunii."
+      },
+      "experience": [
+        {
+          "id": "ro-role-1",
+          "company": "Făgurel Evidențe SRL",
+          "title": "Contabilă",
+          "location": "Brașov, România",
+          "startDate": "2022-09",
+          "endDate": "",
+          "current": true,
+          "description": "Țin evidența contabilă pentru clienți din comerț și servicii, sub îndrumarea contabilului-șef.",
+          "bullets": [
+            {
+              "id": "ro-b1",
+              "text": "Înregistrez lunar aproximativ 180 de facturi de furnizori în SAGA și verific documentele justificative înainte de închiderea perioadei."
+            },
+            {
+              "id": "ro-b2",
+              "text": "Reconciliez extrasele bancare cu înregistrările contabile și clarific diferențele împreună cu persoanele responsabile de plăți."
+            },
+            {
+              "id": "ro-b3",
+              "text": "Pregătesc situații lunare pentru 12 clienți și transmit contabilului-șef documentele lipsă și explicațiile pentru soldurile neobișnuite."
+            },
+            {
+              "id": "ro-b4",
+              "text": "Am identificat facturi înregistrate de două ori prin compararea seriilor, numerelor și valorilor în Excel."
+            }
+          ],
+          "notes": []
+        },
+        {
+          "id": "ro-role-2",
+          "company": "Pârâul Verde Distribuție SRL",
+          "title": "Asistentă contabilitate",
+          "location": "Brașov, România",
+          "startDate": "2020-07",
+          "endDate": "2022-08",
+          "current": false,
+          "description": "Am sprijinit echipa financiară în organizarea documentelor și verificarea facturilor.",
+          "bullets": [
+            {
+              "id": "ro-b5",
+              "text": "Am verificat concordanța dintre facturi, avize și comenzile aprobate înainte de trimiterea documentelor către contabilitate."
+            },
+            {
+              "id": "ro-b6",
+              "text": "Am urmărit documentele lipsă și am cerut furnizorilor corectarea datelor de facturare greșite."
+            }
+          ],
+          "notes": []
+        }
+      ],
+      "education": [
+        {
+          "id": "ro-edu-1",
+          "school": "Institutul Universitar Poiana de Argint",
+          "degree": "Licență",
+          "field": "Contabilitate și informatică de gestiune",
+          "startDate": "2017",
+          "endDate": "2020",
+          "notes": ""
+        }
+      ],
+      "technicalSkills": [
+        { "id": "ro-ts1", "name": "SAGA" },
+        { "id": "ro-ts2", "name": "Excel" }
+      ],
+      "professionalSkills": [
+        { "id": "ro-ps1", "name": "Reconciliere bancară" },
+        { "id": "ro-ps2", "name": "Verificarea documentelor justificative" },
+        { "id": "ro-ps3", "name": "Pregătirea închiderii lunare" }
+      ],
+      "unclearSkills": [],
+      "languages": [
+        { "id": "ro-lang-1", "name": "Română", "level": "Limbă maternă" },
+        { "id": "ro-lang-2", "name": "Engleză", "level": "Intermediar" }
+      ],
+      "certifications": [],
+      "projects": [],
+      "custom": [],
+      "achievements": [],
+      "volunteering": [],
+      "awards": [],
+      "courses": [],
+      "publications": [],
+      "interests": [],
+      "layout": {
+        "order": ["summary", "achievements", "experience", "skills", "education", "languages", "certifications", "projects", "volunteering", "awards", "courses", "publications", "interests", "other"],
+        "hidden": [],
+        "titles": {
+          "summary": "Profil profesional",
+          "experience": "Experiență profesională",
+          "skills": "Competențe"
+        }
+      }
+    },
+    "job": {
+      "title": "Contabil",
+      "company": "Stejarul Albastru Consultanță SRL",
+      "location": "Brașov, România",
+      "workMode": "hybrid",
+      "employmentType": "full_time",
+      "seniority": "mid",
+      "salary": null,
+      "summary": "Căutăm un contabil care să țină evidența furnizorilor și să sprijine închiderea lunară pentru clienți din România.",
+      "responsibilities": [
+        "Înregistrează facturile și verifică documentele justificative.",
+        "Reconciliază conturile bancare și urmărește clarificarea diferențelor.",
+        "Pregătește situațiile lunare și colaborează cu contabilul-șef."
+      ],
+      "requirements": [
+        { "text": "Experiență practică în contabilitatea furnizorilor și reconciliere bancară.", "kind": "must", "category": "experience" },
+        { "text": "Cunoștințe de SAGA și Excel.", "kind": "must", "category": "skill" },
+        { "text": "Studii superioare economice.", "kind": "must", "category": "education" },
+        { "text": "Comunicare clară în limba română, în scris și verbal.", "kind": "must", "category": "language" }
+      ],
+      "benefits": ["Program flexibil", "Sprijin pentru formare profesională"],
+      "applyBy": null,
+      "isJobPosting": true
+    }
+  },
+  {
+    "id": "en-teacher-product-analyst-switch",
+    "description": "Teacher transitioning to product analytics with introductory SQL training and a personal analysis project. Distinguish transferable experience from commercial product analytics experience.",
+    "locale": "en",
+    "cv": {
+      "schemaVersion": 2,
+      "locale": "en",
+      "basics": {
+        "fullName": "Nora Fenwick",
+        "firstName": "Nora",
+        "lastName": "Fenwick",
+        "titles": ["Mathematics Teacher", "Aspiring Product Analyst"],
+        "email": "nora.fenwick@example.com",
+        "phone": "",
+        "location": "Leeds, UK",
+        "website": "",
+        "linkedin": "",
+        "summary": "Mathematics teacher moving into product analytics. Experienced in interpreting assessment data and explaining findings to nontechnical audiences. Recently completed introductory SQL training and an independent analysis of synthetic learning-app events."
+      },
+      "experience": [
+        {
+          "id": "switch-role-1",
+          "company": "Brackenlight Learning School",
+          "title": "Mathematics Teacher",
+          "location": "Leeds, UK",
+          "startDate": "2018-09",
+          "endDate": "",
+          "current": true,
+          "description": "Teach mathematics, review assessment results, and coordinate learning support with colleagues.",
+          "bullets": [
+            {
+              "id": "switch-b1",
+              "text": "Compared assessment results for 120 pupils in Excel to identify recurring misunderstandings and plan revision lessons."
+            },
+            {
+              "id": "switch-b2",
+              "text": "Built pivot-table summaries of topic-level performance and explained the findings at departmental planning meetings."
+            },
+            {
+              "id": "switch-b3",
+              "text": "Collected pupil feedback on homework instructions and revised the wording after reviewing repeated points of confusion."
+            },
+            {
+              "id": "switch-b4",
+              "text": "Coordinated lesson planning with teaching assistants and shared written progress updates with parents."
+            }
+          ],
+          "notes": []
+        }
+      ],
+      "education": [
+        {
+          "id": "switch-edu-1",
+          "school": "North Wrenfield University",
+          "degree": "BSc",
+          "field": "Mathematics",
+          "startDate": "2014",
+          "endDate": "2017",
+          "notes": ""
+        },
+        {
+          "id": "switch-edu-2",
+          "school": "North Wrenfield University",
+          "degree": "Postgraduate Certificate",
+          "field": "Secondary Education",
+          "startDate": "2017",
+          "endDate": "2018",
+          "notes": ""
+        }
+      ],
+      "technicalSkills": [
+        { "id": "switch-ts1", "name": "Excel pivot tables" },
+        { "id": "switch-ts2", "name": "SQL: joins, grouping, and common table expressions" },
+        { "id": "switch-ts3", "name": "SQLite" }
+      ],
+      "professionalSkills": [
+        { "id": "switch-ps1", "name": "Explaining quantitative findings" },
+        { "id": "switch-ps2", "name": "Assessment analysis" },
+        { "id": "switch-ps3", "name": "Gathering qualitative feedback" }
+      ],
+      "unclearSkills": [],
+      "languages": [
+        { "id": "switch-lang-1", "name": "English", "level": "Native" }
+      ],
+      "certifications": [],
+      "projects": [
+        {
+          "id": "switch-project-1",
+          "name": "Learning-app onboarding analysis",
+          "description": "Independent portfolio project using a synthetic event dataset, not a live product. Used SQLite to calculate onboarding completion by acquisition channel and weekly returning-user rates. Documented assumptions about missing events and wrote a short recommendation for investigating a tutorial drop-off. No experiment was run and no business impact was measured.",
+          "url": ""
+        }
+      ],
+      "custom": [],
+      "achievements": [],
+      "volunteering": [],
+      "awards": [],
+      "courses": [
+        {
+          "id": "switch-course-1",
+          "name": "SQL Foundations for Analysis",
+          "provider": "Lanternpath Learning Studio",
+          "date": "2026-08"
+        }
+      ],
+      "publications": [],
+      "interests": [],
+      "layout": {
+        "order": ["summary", "projects", "skills", "experience", "education", "courses", "achievements", "languages", "certifications", "volunteering", "awards", "publications", "interests", "other"],
+        "hidden": [],
+        "titles": {}
+      }
+    },
+    "job": {
+      "title": "Associate Product Analyst",
+      "company": "Pebbleorbit Learning",
+      "location": "Leeds, UK",
+      "workMode": "hybrid",
+      "employmentType": "full_time",
+      "seniority": "junior",
+      "salary": null,
+      "summary": "Support product decisions for a learning application through SQL analysis, clear reporting, and collaboration with product managers.",
+      "responsibilities": [
+        "Investigate onboarding funnels and returning-user behavior.",
+        "Write SQL queries and explain findings to product and design colleagues.",
+        "Help define event tracking and support experiment analysis with a senior analyst."
+      ],
+      "requirements": [
+        { "text": "Foundational SQL skills, including joins and aggregation.", "kind": "must", "category": "skill" },
+        { "text": "Ability to explain quantitative findings to nontechnical audiences.", "kind": "must", "category": "skill" },
+        { "text": "A portfolio project or practical experience analyzing user behavior.", "kind": "must", "category": "experience" },
+        { "text": "Commercial experience with event instrumentation and controlled experiments.", "kind": "nice", "category": "experience" }
+      ],
+      "benefits": ["Analyst mentorship", "Training budget"],
+      "applyBy": null,
+      "isJobPosting": true
+    }
+  },
+  {
+    "id": "en-engineering-manager-long-career",
+    "description": "Long CV spanning more than 18 years across 6 roles, with substantial text intended to exceed two pages. Prioritize management evidence while preserving employers, chronology, and stated scope.",
+    "locale": "en",
+    "cv": {
+      "schemaVersion": 2,
+      "locale": "en",
+      "basics": {
+        "fullName": "Mara Elloway",
+        "firstName": "Mara",
+        "lastName": "Elloway",
+        "titles": ["Engineering Manager"],
+        "email": "mara.elloway@example.com",
+        "phone": "",
+        "location": "Manchester, UK",
+        "website": "",
+        "linkedin": "",
+        "summary": "Engineering manager with a career spanning software delivery, technical leadership, platform development, and people management. I began by maintaining operational applications and gradually took responsibility for service design, incident response, technical mentoring, hiring, and team planning. My current work combines direct management of engineers with partnership across product, support, and security. I focus on making ownership clear, helping engineers make decisions, and matching delivery commitments to the maintenance work a team must sustain. I remain comfortable reviewing technical proposals and investigating service behavior, while leaving implementation decisions with the engineers responsible for the work."
+      },
+      "experience": [
+        {
+          "id": "manager-role-1",
+          "company": "Alderwake Platforms",
+          "title": "Engineering Manager",
+          "location": "Manchester, UK",
+          "startDate": "2022-01",
+          "endDate": "",
+          "current": true,
+          "description": "Manage the account-platform team responsible for customer identity, permissions, subscription configuration, and internal account tooling. Partner with product managers on priorities and with support leads on operational problems. The role includes hiring, performance reviews, incident coordination, and planning technical maintenance alongside customer-facing delivery.",
+          "bullets": [
+            {
+              "id": "manager-b01",
+              "text": "Manage 9 engineers through regular individual meetings, written development plans, and performance reviews that connect observed work with clear expectations for each role."
+            },
+            {
+              "id": "manager-b02",
+              "text": "Reworked quarterly planning with the product manager so engineers could surface dependencies, operational maintenance, and uncertain requirements before delivery dates were discussed with commercial stakeholders."
+            },
+            {
+              "id": "manager-b03",
+              "text": "Hired 4 engineers using structured interviews and a shared assessment rubric, then paired each new starter with a colleague responsible for practical onboarding support."
+            },
+            {
+              "id": "manager-b04",
+              "text": "Coordinated the response to an account-permissions incident, assigned investigation and communication responsibilities, and followed the review through to implemented authorization checks and updated recovery instructions."
+            },
+            {
+              "id": "manager-b05",
+              "text": "Supported a senior engineer in taking ownership of service design reviews by agreeing decision boundaries, reviewing early proposals together, and gathering feedback from collaborating teams."
+            },
+            {
+              "id": "manager-b06",
+              "text": "Reduced median account-provisioning time from 2 days to 4 hours, measured in support records, by sponsoring automated checks and agreeing exception handling with operations."
+            },
+            {
+              "id": "manager-b07",
+              "text": "Worked with security colleagues to turn an access-review finding into planned engineering tasks, including named owners, staged releases, and evidence that revoked permissions stopped granting access."
+            },
+            {
+              "id": "manager-b08",
+              "text": "Introduced written handovers for work crossing team boundaries, covering expected behavior, support contacts, known limitations, and the signals engineers should inspect after a release."
+            }
+          ],
+          "notes": []
+        },
+        {
+          "id": "manager-role-2",
+          "company": "Brambleharbor Software",
+          "title": "Engineering Team Lead",
+          "location": "Manchester, UK",
+          "startDate": "2019-01",
+          "endDate": "2021-12",
+          "current": false,
+          "description": "Led the team maintaining order orchestration for a wholesale software product. Combined direct management responsibilities with technical planning and service ownership. Worked with warehouse operations, customer support, and product management to schedule changes around trading periods and address recurring failures.",
+          "bullets": [
+            {
+              "id": "manager-b09",
+              "text": "Led 6 engineers and held responsibility for individual feedback, recruitment interviews, delivery planning, and communication of service risks to the engineering manager and product lead."
+            },
+            {
+              "id": "manager-b10",
+              "text": "Separated urgent warehouse incidents from planned feature work by establishing a support rotation and making the operational workload visible during planning discussions with product management."
+            },
+            {
+              "id": "manager-b11",
+              "text": "Guided the replacement of a fragile order-import component through staged releases, keeping the previous processing route available until operations had checked representative customer orders."
+            },
+            {
+              "id": "manager-b12",
+              "text": "Mentored engineers preparing for senior responsibilities by reviewing their technical proposals, observing stakeholder discussions, and giving specific feedback on decision making and follow-through."
+            },
+            {
+              "id": "manager-b13",
+              "text": "Reduced repeat order-import incidents from 14 to 5 per quarter, based on incident records, by prioritizing validation errors and clearer recovery controls for support staff."
+            },
+            {
+              "id": "manager-b14",
+              "text": "Partnered with a product designer to observe warehouse staff using exception screens, then translated the confusing steps into scoped changes that engineers could deliver incrementally."
+            },
+            {
+              "id": "manager-b15",
+              "text": "Documented ownership of shared services and negotiated maintenance responsibilities with neighboring teams when changes to catalog data affected order processing and warehouse allocation."
+            },
+            {
+              "id": "manager-b16",
+              "text": "Revised the team's release checklist after a failed deployment so database compatibility, support readiness, and recovery instructions were reviewed before changes reached customer environments."
+            }
+          ],
+          "notes": []
+        },
+        {
+          "id": "manager-role-3",
+          "company": "Copperfen Commerce",
+          "title": "Senior Backend Engineer",
+          "location": "Liverpool, UK",
+          "startDate": "2016-01",
+          "endDate": "2018-12",
+          "current": false,
+          "description": "Owned backend changes for supplier catalog ingestion and pricing services. Worked primarily in Java and PostgreSQL, with responsibility for design proposals, implementation, automated tests, and production investigation. Acted as a technical mentor without formal line-management responsibility.",
+          "bullets": [
+            {
+              "id": "manager-b17",
+              "text": "Designed supplier-file validation that reported actionable row errors to operations staff, allowing incorrect catalog entries to be corrected before they reached customer-facing product listings."
+            },
+            {
+              "id": "manager-b18",
+              "text": "Split a catalog refresh into restartable processing stages and documented how support engineers could identify the failed stage without rerunning work that had already completed."
+            },
+            {
+              "id": "manager-b19",
+              "text": "Reduced a nightly catalog-processing run from 95 minutes to 38 minutes by batching database writes and checking query plans against representative supplier data."
+            },
+            {
+              "id": "manager-b20",
+              "text": "Reviewed technical proposals from colleagues and asked authors to describe failure handling, data compatibility, and operational ownership before agreeing the scope of an implementation."
+            },
+            {
+              "id": "manager-b21",
+              "text": "Paired with junior engineers on production defects, showing how to form a hypothesis from logs, reproduce the behavior, and verify a fix with a regression test."
+            },
+            {
+              "id": "manager-b22",
+              "text": "Worked with commercial colleagues to clarify how supplier price corrections should affect existing customer quotes, then recorded the agreed behavior in examples used during acceptance testing."
+            },
+            {
+              "id": "manager-b23",
+              "text": "Added service dashboards covering processing failures and delayed imports, and wrote investigation notes that explained which symptoms required intervention from the on-call engineer."
+            },
+            {
+              "id": "manager-b24",
+              "text": "Prepared a migration plan for pricing history that included reconciliation queries, a staged rollout, and checks that historical customer quotes retained their original agreed amounts."
+            }
+          ],
+          "notes": []
+        },
+        {
+          "id": "manager-role-4",
+          "company": "Thistlemere Logistics",
+          "title": "Software Engineer",
+          "location": "Liverpool, UK",
+          "startDate": "2013-01",
+          "endDate": "2015-12",
+          "current": false,
+          "description": "Developed internal applications used by transport planners and depot staff. Responsibilities covered Java services, relational database changes, operational reports, and support for production releases. Regularly visited depot colleagues to understand how software behavior affected dispatch work.",
+          "bullets": [
+            {
+              "id": "manager-b25",
+              "text": "Implemented dispatch validation rules that identified missing delivery addresses before route assignment, using examples supplied by depot supervisors to define expected behavior and error messages."
+            },
+            {
+              "id": "manager-b26",
+              "text": "Replaced a manually assembled departure report with a scheduled database-backed export, retaining the column definitions and exception annotations that transport planners used during daily handover."
+            },
+            {
+              "id": "manager-b27",
+              "text": "Investigated slow route searches by reproducing planner queries against representative data, checking database execution plans, and reviewing index changes with the database administrator before release."
+            },
+            {
+              "id": "manager-b28",
+              "text": "Added integration tests for delivery-status transitions so corrections made by depot staff did not silently reopen completed jobs or discard the reason recorded for a failed delivery."
+            },
+            {
+              "id": "manager-b29",
+              "text": "Supported releases during quieter dispatch periods and checked application logs with operations colleagues afterward to confirm that route updates continued moving between the connected systems."
+            },
+            {
+              "id": "manager-b30",
+              "text": "Wrote support instructions for common import failures, including examples of invalid records and the steps an operator could take before asking an engineer to investigate."
+            },
+            {
+              "id": "manager-b31",
+              "text": "Worked with an experienced engineer to separate depot-specific configuration from application code, allowing support staff to review operating differences without tracing conditional logic across the service."
+            },
+            {
+              "id": "manager-b32",
+              "text": "Presented proposed screen changes to transport planners and revised the design when their feedback showed that the original interaction would interrupt time-sensitive dispatch work."
+            }
+          ],
+          "notes": []
+        },
+        {
+          "id": "manager-role-5",
+          "company": "Dunewick Applications",
+          "title": "Software Developer",
+          "location": "Chester, UK",
+          "startDate": "2010-01",
+          "endDate": "2012-12",
+          "current": false,
+          "description": "Maintained customer-service and stock-control applications for independent retailers. Worked from support reports and agreed change requests, implementing database updates and application fixes under review from senior developers. Participated in customer demonstrations and release preparation.",
+          "bullets": [
+            {
+              "id": "manager-b33",
+              "text": "Implemented stock-adjustment screens that required a reason for each correction and preserved the previous quantity, helping store staff understand changes when reviewing disputed inventory records."
+            },
+            {
+              "id": "manager-b34",
+              "text": "Reproduced customer-reported defects from support notes and requested missing examples when the report did not explain the affected product, account, or sequence of actions."
+            },
+            {
+              "id": "manager-b35",
+              "text": "Added regression tests around discount calculations after investigating a rounding defect, covering the combinations of tax treatment and returns that appeared in the original customer reports."
+            },
+            {
+              "id": "manager-b36",
+              "text": "Prepared database change scripts with checks for existing records and reviewed them with a senior developer before applying the release to a customer test environment."
+            },
+            {
+              "id": "manager-b37",
+              "text": "Demonstrated completed changes to support colleagues using realistic retail examples, explaining the expected behavior and collecting questions that needed clarification before the customer release."
+            },
+            {
+              "id": "manager-b38",
+              "text": "Maintained installation notes describing configuration settings, required database updates, and recovery steps so the support team could repeat the process across separately hosted customer environments."
+            },
+            {
+              "id": "manager-b39",
+              "text": "Worked with customer-service staff to simplify a returns workflow, removing repeated data entry while preserving the approval step required for refunds outside the store policy."
+            },
+            {
+              "id": "manager-b40",
+              "text": "Reviewed recurring support requests with the product owner and proposed small maintenance tasks when the same confusing behavior continued generating calls after individual customer issues were resolved."
+            }
+          ],
+          "notes": []
+        },
+        {
+          "id": "manager-role-6",
+          "company": "Hollowreed Digital",
+          "title": "Junior Developer",
+          "location": "Chester, UK",
+          "startDate": "2008-07",
+          "endDate": "2009-12",
+          "current": false,
+          "description": "Joined a small team building internal business applications after completing a computing degree. Delivered scoped fixes and reporting changes with supervision, learned the release process, and worked with testers to reproduce defects before making changes.",
+          "bullets": [
+            {
+              "id": "manager-b41",
+              "text": "Implemented form-validation fixes from agreed acceptance examples and checked the resulting messages with testers so users could identify the field that needed correction before resubmitting."
+            },
+            {
+              "id": "manager-b42",
+              "text": "Updated SQL reports when business users changed their reporting requirements, checking sample totals against existing exports and asking a senior developer to review unfamiliar joins."
+            },
+            {
+              "id": "manager-b43",
+              "text": "Investigated defects in a local environment using the steps supplied by testers, recorded what reproduced reliably, and kept the original example available while checking the proposed fix."
+            },
+            {
+              "id": "manager-b44",
+              "text": "Added automated tests for date filtering after fixing a report that omitted records at the end of a reporting period, using boundary examples agreed with the tester."
+            },
+            {
+              "id": "manager-b45",
+              "text": "Prepared release notes describing visible application changes and known limitations, then reviewed the wording with support colleagues who would answer questions from the business users."
+            },
+            {
+              "id": "manager-b46",
+              "text": "Paired with a senior developer during deployments to learn configuration checks, database update ordering, and the practical steps required to return to the previous application version."
+            },
+            {
+              "id": "manager-b47",
+              "text": "Kept task updates focused on completed behavior, unresolved questions, and review needs so the team lead could identify blocked work before preparing the next customer demonstration."
+            },
+            {
+              "id": "manager-b48",
+              "text": "Documented the setup steps that had caused difficulty during my own onboarding and tested the revised instructions when a new colleague joined the application maintenance team."
+            }
+          ],
+          "notes": []
+        }
+      ],
+      "education": [
+        {
+          "id": "manager-edu-1",
+          "school": "Redwillow University",
+          "degree": "BSc",
+          "field": "Computing",
+          "startDate": "2005",
+          "endDate": "2008",
+          "notes": "Final project explored validation and error reporting in business data imports."
+        }
+      ],
+      "technicalSkills": [
+        { "id": "manager-ts1", "name": "Java" },
+        { "id": "manager-ts2", "name": "TypeScript" },
+        { "id": "manager-ts3", "name": "PostgreSQL" },
+        { "id": "manager-ts4", "name": "Service design" },
+        { "id": "manager-ts5", "name": "Automated testing" },
+        { "id": "manager-ts6", "name": "Production monitoring" }
+      ],
+      "professionalSkills": [
+        { "id": "manager-ps1", "name": "People management" },
+        { "id": "manager-ps2", "name": "Hiring and interviewing" },
+        { "id": "manager-ps3", "name": "Performance feedback" },
+        { "id": "manager-ps4", "name": "Delivery planning" },
+        { "id": "manager-ps5", "name": "Incident coordination" },
+        { "id": "manager-ps6", "name": "Cross-functional collaboration" }
+      ],
+      "unclearSkills": [],
+      "languages": [
+        { "id": "manager-lang-1", "name": "English", "level": "Native" }
+      ],
+      "certifications": [],
+      "projects": [],
+      "custom": [],
+      "achievements": [],
+      "volunteering": [],
+      "awards": [],
+      "courses": [
+        {
+          "id": "manager-course-1",
+          "name": "Coaching Through Performance Conversations",
+          "provider": "Ashlantern Leadership Studio",
+          "date": "2023-05"
+        }
+      ],
+      "publications": [],
+      "interests": [],
+      "layout": {
+        "order": ["summary", "achievements", "experience", "skills", "education", "languages", "certifications", "projects", "volunteering", "awards", "courses", "publications", "interests", "other"],
+        "hidden": [],
+        "titles": {}
+      }
+    },
+    "job": {
+      "title": "Engineering Manager",
+      "company": "Rowancrest Cloud",
+      "location": "Manchester, UK",
+      "workMode": "hybrid",
+      "employmentType": "full_time",
+      "seniority": "lead",
+      "salary": null,
+      "summary": "Manage a backend product team, develop engineers, and partner with product leadership to deliver reliable services at a sustainable pace.",
+      "responsibilities": [
+        "Manage engineers through coaching, performance reviews, and career development.",
+        "Lead hiring and support effective onboarding.",
+        "Agree delivery priorities with product managers and communicate risks.",
+        "Support technical decisions and improve service ownership and incident response."
+      ],
+      "requirements": [
+        { "text": "Experience directly managing software engineers.", "kind": "must", "category": "experience" },
+        { "text": "Evidence of hiring, coaching, and giving performance feedback.", "kind": "must", "category": "experience" },
+        { "text": "Strong backend engineering background and practical understanding of production operations.", "kind": "must", "category": "experience" },
+        { "text": "Ability to negotiate priorities across engineering, product, and support.", "kind": "must", "category": "skill" },
+        { "text": "Experience with account platforms or subscription software.", "kind": "nice", "category": "experience" }
+      ],
+      "benefits": ["Flexible working hours", "Leadership development budget"],
+      "applyBy": null,
+      "isJobPosting": true
+    }
+  },
+  {
+    "id": "en-support-weak-cv",
+    "description": "Sparse, vague CV with no quantified achievements or stated leadership experience. Tailoring must not invent metrics, tools, coaching responsibilities, or management scope.",
+    "locale": "en",
+    "cv": {
+      "schemaVersion": 2,
+      "locale": "en",
+      "basics": {
+        "fullName": "Jules Reedvale",
+        "firstName": "Jules",
+        "lastName": "Reedvale",
+        "titles": ["Customer Service Assistant"],
+        "email": "jules.reedvale@example.com",
+        "phone": "",
+        "location": "Nottingham, UK",
+        "website": "",
+        "linkedin": "",
+        "summary": "Hardworking and friendly person looking for a new opportunity. Good with people and happy to help."
+      },
+      "experience": [
+        {
+          "id": "weak-role-1",
+          "company": "Wrenbasket Retail",
+          "title": "Customer Service Assistant",
+          "location": "Nottingham, UK",
+          "startDate": "2022",
+          "endDate": "",
+          "current": true,
+          "description": "General customer service work.",
+          "bullets": [
+            { "id": "weak-b1", "text": "Helped customers with problems." },
+            { "id": "weak-b2", "text": "Did admin and helped the team." }
+          ],
+          "notes": []
+        }
+      ],
+      "education": [],
+      "technicalSkills": [],
+      "professionalSkills": [
+        { "id": "weak-ps1", "name": "Customer service" }
+      ],
+      "unclearSkills": [
+        { "id": "weak-us1", "name": "Computer skills" },
+        { "id": "weak-us2", "name": "People person" }
+      ],
+      "languages": [
+        { "id": "weak-lang-1", "name": "English", "level": "Fluent" }
+      ],
+      "certifications": [],
+      "projects": [],
+      "custom": [],
+      "achievements": [],
+      "volunteering": [],
+      "awards": [],
+      "courses": [],
+      "publications": [],
+      "interests": [],
+      "layout": {
+        "order": ["summary", "achievements", "experience", "skills", "education", "languages", "certifications", "projects", "volunteering", "awards", "courses", "publications", "interests", "other"],
+        "hidden": [],
+        "titles": {}
+      }
+    },
+    "job": {
+      "title": "Customer Support Lead",
+      "company": "Hearthfin Services",
+      "location": "Nottingham, UK",
+      "workMode": "onsite",
+      "employmentType": "full_time",
+      "seniority": "lead",
+      "salary": null,
+      "summary": "Lead a customer support team, handle escalations, and improve the quality and consistency of customer responses.",
+      "responsibilities": [
+        "Coach support agents and review the quality of their customer conversations.",
+        "Manage escalations and coordinate daily queue coverage.",
+        "Track response times and customer satisfaction, reporting recurring problems to operations."
+      ],
+      "requirements": [
+        { "text": "Previous responsibility for leading or supervising a customer support team.", "kind": "must", "category": "experience" },
+        { "text": "Experience handling escalations and coaching colleagues.", "kind": "must", "category": "experience" },
+        { "text": "Experience using helpdesk software and support reporting.", "kind": "must", "category": "skill" },
+        { "text": "Clear written and spoken English.", "kind": "must", "category": "language" }
+      ],
+      "benefits": ["Paid training", "Employee assistance programme"],
+      "applyBy": null,
+      "isJobPosting": true
+    }
+  },
+  {
+    "id": "en-chef-data-engineer-mismatch",
+    "description": "Non-matching chef and data engineer pair. Preserve culinary experience without converting recipe preparation, stock rotation, or kitchen scheduling into data engineering qualifications.",
+    "locale": "en",
+    "cv": {
+      "schemaVersion": 2,
+      "locale": "en",
+      "basics": {
+        "fullName": "Tomas Briarcombe",
+        "firstName": "Tomas",
+        "lastName": "Briarcombe",
+        "titles": ["Sous Chef"],
+        "email": "tomas.briarcombe@example.com",
+        "phone": "",
+        "location": "Edinburgh, UK",
+        "website": "",
+        "linkedin": "",
+        "summary": "Sous chef experienced in seasonal menu preparation, kitchen coordination, food safety, and stock rotation. Enjoy helping kitchen colleagues prepare consistently and keep service organized."
+      },
+      "experience": [
+        {
+          "id": "chef-role-1",
+          "company": "The Copper Thistle Kitchen",
+          "title": "Sous Chef",
+          "location": "Edinburgh, UK",
+          "startDate": "2021-04",
+          "endDate": "",
+          "current": true,
+          "description": "Support the head chef with preparation, service coordination, ordering, and kitchen training.",
+          "bullets": [
+            {
+              "id": "chef-b1",
+              "text": "Coordinated preparation and service for a kitchen team of 5, assigning stations and checking readiness before evening service."
+            },
+            {
+              "id": "chef-b2",
+              "text": "Checked deliveries against supplier orders and rotated ingredients using dated labels to prevent older stock being overlooked."
+            },
+            {
+              "id": "chef-b3",
+              "text": "Maintained allergen information for seasonal dishes and checked ingredient substitutions with front-of-house colleagues before service."
+            },
+            {
+              "id": "chef-b4",
+              "text": "Trained new kitchen staff in knife safety, preparation standards, and cleaning procedures."
+            }
+          ],
+          "notes": []
+        },
+        {
+          "id": "chef-role-2",
+          "company": "Juniper Lantern Bistro",
+          "title": "Chef de Partie",
+          "location": "Edinburgh, UK",
+          "startDate": "2017-06",
+          "endDate": "2021-03",
+          "current": false,
+          "description": "Ran the vegetable and garnish section during lunch and dinner service.",
+          "bullets": [
+            {
+              "id": "chef-b5",
+              "text": "Prepared sauces, vegetables, and garnishes to the head chef's recipes and coordinated plating with the other kitchen sections."
+            },
+            {
+              "id": "chef-b6",
+              "text": "Recorded fridge temperatures and followed the kitchen's food storage and cleaning procedures."
+            }
+          ],
+          "notes": []
+        }
+      ],
+      "education": [
+        {
+          "id": "chef-edu-1",
+          "school": "Calderfern Culinary College",
+          "degree": "Diploma",
+          "field": "Professional Cookery",
+          "startDate": "2015",
+          "endDate": "2017",
+          "notes": ""
+        }
+      ],
+      "technicalSkills": [],
+      "professionalSkills": [
+        { "id": "chef-ps1", "name": "Food preparation" },
+        { "id": "chef-ps2", "name": "Kitchen service coordination" },
+        { "id": "chef-ps3", "name": "Allergen awareness" },
+        { "id": "chef-ps4", "name": "Stock rotation" },
+        { "id": "chef-ps5", "name": "Kitchen staff training" }
+      ],
+      "unclearSkills": [],
+      "languages": [
+        { "id": "chef-lang-1", "name": "English", "level": "Fluent" }
+      ],
+      "certifications": [],
+      "projects": [],
+      "custom": [],
+      "achievements": [],
+      "volunteering": [],
+      "awards": [],
+      "courses": [],
+      "publications": [],
+      "interests": [],
+      "layout": {
+        "order": ["summary", "achievements", "experience", "skills", "education", "languages", "certifications", "projects", "volunteering", "awards", "courses", "publications", "interests", "other"],
+        "hidden": [],
+        "titles": {}
+      }
+    },
+    "job": {
+      "title": "Data Engineer",
+      "company": "Larchorbit Analytics",
+      "location": "Edinburgh, UK",
+      "workMode": "remote",
+      "employmentType": "full_time",
+      "seniority": "mid",
+      "salary": null,
+      "summary": "Build and operate data pipelines that bring product and billing events into an analytical warehouse.",
+      "responsibilities": [
+        "Develop Python ingestion services and SQL transformations.",
+        "Maintain scheduled workflows and investigate failed data loads.",
+        "Define data quality checks and collaborate with analysts on warehouse models."
+      ],
+      "requirements": [
+        { "text": "Commercial experience developing data pipelines in Python.", "kind": "must", "category": "experience" },
+        { "text": "Strong SQL skills and experience with analytical data modeling.", "kind": "must", "category": "skill" },
+        { "text": "Experience with a cloud data warehouse and workflow orchestration.", "kind": "must", "category": "experience" },
+        { "text": "Experience using Git and automated tests for data transformations.", "kind": "must", "category": "skill" },
+        { "text": "Experience processing product event data.", "kind": "nice", "category": "experience" }
+      ],
+      "benefits": ["Remote working", "Technical learning budget"],
+      "applyBy": null,
+      "isJobPosting": true
+    }
+  }
+]

@@ -31,4 +31,14 @@ Design: `docs/superpowers/specs/2026-11-04-rebuild-design.md`. Current plan: `do
 - Test behaviour a user or API client can see (happy path + realistic failures). No tests for tooling or timing permutations.
 - Keep files focused (< ~300 lines). Prefer editing an existing module over adding a new layer.
 - Conventional commits, one-line subject: `feat(api): ...`, `fix(web): ...`.
-- Old implementation lives on `main` for reference only: `git show main:<path>`.
+
+## Architecture companion
+The owner doesn't write code and learns the architecture through the `/architecture` panel, which reads these files:
+- **Decision records** (`docs/decisions/NNNN-short-title.md`, format in `docs/superpowers/specs/2026-11-04-architecture-companion-design.md`): add one when you make an architectural choice (new table, route, service, changed security rule, new dependency with a structural role). Fill `affects` with real names (`table:x`, `route:/v1/x`, `file:path`). If it replaces one, set the old one's `status: replaced-by-NNNN`.
+- **Concept cards** (`docs/learning/concepts/<id>.md`) and **progress** (`docs/learning/progress.json`): when your work touches a concept, read its `seen` count and teach by it, then add 1 and set `lastSeen` (at most once per concept per day):
+  - 0 → write the card if missing; give the full explanation
+  - 1 → a one-sentence reminder plus where it appears this time
+  - 2 → a new angle: how it connects to a related card
+  - 3 → ask the card's check question; reveal the answer when asked
+  - 4 → tell them it's now learned ✓ and link the card from then on
+- Explain in plain words; jargon only when it's the concept being taught.
