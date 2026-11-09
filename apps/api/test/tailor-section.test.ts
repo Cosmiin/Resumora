@@ -237,4 +237,13 @@ describe("section pass", () => {
     replies = [proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] }, proposals(), { results: [] }];
     expect(await (await runSection()).res.json()).toMatchObject({ proposals: [], removed: 1 });
   });
+
+  it("counts a dropped claim when a clean proposal shares its item (two new skills)", async () => {
+    const clean = { itemId: "new-skill", field: "name", text: "Payroll", inferred: true, reason: "Shown in: Payroll Specialist" };
+    const guessed = { itemId: "new-skill", field: "name", text: "Power BI", inferred: true, reason: "Reports" };
+    replies = [proposals(clean, guessed), { results: [] }, proposals(clean, guessed), { results: [] }];
+    const body = await (await runSection("skills")).res.json() as { proposals: { text: string }[]; removed: number };
+    expect(body.proposals.map((p) => p.text)).toEqual(["Payroll"]);
+    expect(body.removed).toBe(1);
+  });
 });

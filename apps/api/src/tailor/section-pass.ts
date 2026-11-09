@@ -175,8 +175,9 @@ export async function passProposals(
   let firstFlagged = 0;
   try {
     proposals = await check(await propose([]));
-    firstFlagged = proposals.filter((p) => p.flags.length > 0).length;
     flagged = new Set(proposals.filter((p) => p.flags.length > 0).map((p) => p.itemId));
+    // Every proposal on a flagged item is retried (new skills share one item id), so count them all.
+    firstFlagged = proposals.filter((p) => flagged.has(p.itemId)).length;
     if (flagged.size > 0) {
       const retried = await check((await propose(proposals.filter((p) => flagged.has(p.itemId)))).filter((p) => flagged.has(p.itemId)));
       // Retried items go back where the model first ranked them.
@@ -194,7 +195,7 @@ export async function passProposals(
   }
 
   const kept = proposals.filter((p) => p.flags.length === 0);
-  // Every flagged claim that didn't come back clean from the retry, including ones the retry left out.
+  // Proposals on flagged items that didn't come back clean from the retry, including ones the retry left out.
   const removed = Math.max(0, firstFlagged - kept.filter((p) => flagged.has(p.itemId)).length);
   return { proposals: kept, items, removed };
 }
