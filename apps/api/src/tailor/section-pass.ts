@@ -14,6 +14,12 @@ type Item = { fields: Record<string, string>; roleId: string | null };
 const ModelProposalsSchema = z.object({
   proposals: z.array(z.object({ itemId: z.string(), field: z.string(), text: z.string(), inferred: z.boolean() })),
 });
+/** Skills also return a reason (null except for a suggested new skill). No `default`: strict structured output rejects it. */
+const SkillProposalsSchema = z.object({
+  proposals: z.array(z.object({
+    itemId: z.string(), field: z.string(), text: z.string(), inferred: z.boolean(), reason: z.string().nullable(),
+  })),
+});
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
 
 /** The items a section's proposals may point at, keyed by stable item id, with the fields that may change. */
@@ -118,7 +124,9 @@ export async function runSectionPass(
     callModel(deps.model, { userId: input.userId, task, tier, schema, system, user, maxOutputTokens: 12000 });
 
   async function propose(retry: Proposal[]): Promise<Proposal[]> {
-    const reply = await call("tailor_section", "strong", ModelProposalsSchema, sectionSystemPrompt(contentSection), sectionUserMessage({
+    const schema = section === "skills" ? SkillProposalsSchema : ModelProposalsSchema;
+    const reply: { proposals: (z.infer<typeof ModelProposalsSchema>["proposals"][number] & { reason?: string | null })[] } =
+      await call("tailor_section", "strong", schema, sectionSystemPrompt(contentSection), sectionUserMessage({
       section, items: sectionData(cv, section, run.jobId), job: input.job, language: steering!.language,
       tone: steering!.tone ?? "neutral", instruction: steering!.instruction, answers, retry,
     }));
@@ -126,10 +134,11 @@ export async function runSectionPass(
     // or fields are dropped and logged (ids and fields only); items without a proposal keep the Base CV wording.
     const kept: Proposal[] = [];
     const dropped: { itemId: string; field: string }[] = [];
-    for (const p of reply.proposals) {
+    for (const { reason, ...p } of reply.proposals) {
       const fields = Object.keys(items.get(p.itemId)?.fields ?? {});
       const field = fields.includes(p.field) ? p.field : fields.length === 1 ? fields[0]! : null;
-      if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [] });
+      const why = p.itemId === "new-skill" && reason?.trim() ? { reason: reason.trim() } : {};
+      if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why });
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });

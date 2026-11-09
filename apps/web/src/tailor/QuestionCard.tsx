@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { Answer, TailorQuestion } from "@resumora/shared";
+import type { Answer, Locale, TailorQuestion } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
+import { RolePanel, type Role } from "./RolePanel.tsx";
 import { useDictation } from "./SteeringStep.tsx";
 
 type Props = {
@@ -10,9 +11,20 @@ type Props = {
   /** Flag cards have their own two options and no typing, skipping or Skip all. */
   onAnswer(answer: Omit<Answer, "questionId">): void;
   onSkipAll?(): void;
+  /** The role the question is about, shown on the left (F3). */
+  role?: Role;
+  locale?: Locale;
 };
 
-export function QuestionCard({ question, n, total, onAnswer, onSkipAll }: Props) {
+export function QuestionCard({ role, locale = "en", ...props }: Props) {
+  if (!role) return <Question {...props} />;
+  return <div className="tailor-split">
+    <RolePanel role={role} locale={locale} />
+    <Question {...props} />
+  </div>;
+}
+
+function Question({ question, n, total, onAnswer, onSkipAll }: Omit<Props, "role" | "locale">) {
   const [typed, setTyped] = useState("");
   const [via, setVia] = useState<"typed" | "voice">("typed");
   const { mic, partial } = useDictation((words) => {

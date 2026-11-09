@@ -79,7 +79,8 @@ async function start(): Promise<string> {
   return body.run.id;
 }
 async function run(runId: string, section: string, ...items: ModelProposal[]) {
-  replies.push({ proposals: items }, { results: [] });
+  // The real (strict) model always returns every field: skills proposals carry reason, null when unused.
+  replies.push({ proposals: section === "skills" ? items.map((item) => ({ reason: null, ...item })) : items }, { results: [] });
   const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`);
   expect(res.status).toBe(200);
 }
