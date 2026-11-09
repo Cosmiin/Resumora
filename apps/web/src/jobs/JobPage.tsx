@@ -169,6 +169,8 @@ function JobView({ id, userId }: { id: string; userId: string }) {
       } else { setTailorReason(null); setTailorGate(true); }
     }}>{t("job.tailor.button")}</button>
   </div>;
+  // A tailored CV (or a run to continue) is shown at the top of the job page; the Tailor button stays below the ad.
+  const tailorOnTop = !!(run || tailored);
   const applyByText = extracted?.applyBy
     ? new Date(`${extracted.applyBy}T00:00:00Z`).toLocaleDateString("en-GB", {
       day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
@@ -206,6 +208,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           <div><h1 className="vtitle">{job.title}</h1><div className="vsub">{[job.company, job.location].filter(Boolean).join(" · ")}</div></div>
           <div className="job-actions"><button type="button" className="secondary" disabled={pendingSaves > 0 || thoughtsBusy} onClick={() => setEditing(true)}>{t("job.edit")}</button>{deletion}</div>
         </div>
+        {tailorOnTop && tailor}
         <div className="facts">
           {extracted.workMode !== "unknown" && <span className="fact">{t(`job.workMode.${extracted.workMode}`)}</span>}
           {extracted.employmentType !== "unknown" && <span className="fact">{t(`job.type.${extracted.employmentType}`)}</span>}
@@ -242,7 +245,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
             </div>
           </div>
         </div>
-        {tailor}
+        {!tailorOnTop && tailor}
         <footer className="foot">{original}<span>{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</span></footer>
       </> : job?.status === "needs_text" ? <div className="waiting">
         <p>{t("job.tailor.needsText")}</p>{original}{deletion}{tailor}

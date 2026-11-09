@@ -196,12 +196,19 @@ describe("job page", () => {
 
   describe("reopening a tailored CV", () => {
     const box = async () => (await screen.findByText(/Tailored CV ready|Tailoring in progress/)).closest(".tailor") as HTMLElement;
+    /** C5: the box sits at the top of the job page, above the score, the thoughts and the ad. */
+    const expectAtTop = (tailor: HTMLElement) => {
+      for (const below of [document.querySelector(".job-detail-columns")!, screen.getByRole("tablist")]) {
+        expect(tailor.compareDocumentPosition(below) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+    };
 
     it("offers Open tailored CV and Tailor again once a tailored CV exists", async () => {
       vi.mocked(getJobScore).mockResolvedValue({ base: { ...match, total: 62, band: "fair" }, tailored: { ...match, total: 78 } });
       renderJob(); await ready();
       const tailor = await box();
       expect(tailor).toHaveTextContent("62 → 78");
+      expectAtTop(tailor);
       expect(within(tailor).getByRole("link", { name: "Open tailored CV" })).toHaveAttribute("href", "/jobs/one/cv");
       expect(within(tailor).getByRole("link", { name: "Tailor again" })).toHaveAttribute("href", "/jobs/one/cv?retailor=1");
       expect(within(tailor).queryByRole("button", { name: "Tailor my CV" })).toBeNull();
@@ -217,6 +224,7 @@ describe("job page", () => {
       const { router } = renderJob(); await ready();
       const tailor = await box();
       expect(tailor).toHaveTextContent("Step 3 of 6 · Summary");
+      expectAtTop(tailor);
       expect(getRun).toHaveBeenCalledWith("run1");
       await userEvent.click(within(tailor).getByRole("link", { name: "Continue" }));
       expect(router.state.location.pathname).toBe("/jobs/one/tailor");
