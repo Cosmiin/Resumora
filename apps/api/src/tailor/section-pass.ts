@@ -23,11 +23,21 @@ const SkillProposalsSchema = z.object({
 });
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
 
-/** The items a section's proposals may point at, keyed by stable item id, with the fields that may change. */
-export function sectionItems(cv: CvContent, section: TailorSection): Map<string, Item> {
+/** Experience goes role by role: each step names the run's current role, any other is 409 role_not_current. */
+export function currentRole(run: TailorRun, section: TailorSection, roleId: string | undefined): string | null {
+  if (section !== "experience" || !run.roleOrder?.length) return null;
+  if (!roleId || roleId !== run.currentRoleId) throw new ApiError(409, "role_not_current", "This role isn't the current step.");
+  return roleId;
+}
+
+/**
+ * The items a section's proposals may point at, keyed by stable item id, with the fields that may change.
+ * With a role, Experience has only that role's items.
+ */
+export function sectionItems(cv: CvContent, section: TailorSection, roleId: string | null = null): Map<string, Item> {
   const items = new Map<string, Item>();
   if (section === "experience") {
-    for (const role of cv.experience) {
+    for (const role of cv.experience.filter((r) => !roleId || r.id === roleId)) {
       const { company, title, startDate, endDate, description } = role;
       items.set(role.id, { fields: { description, company, title, startDate, endDate }, roleId: role.id });
       for (const bullet of role.bullets) items.set(bullet.id, { fields: { text: bullet.text }, roleId: role.id });
@@ -49,9 +59,10 @@ export function sectionItems(cv: CvContent, section: TailorSection): Map<string,
  * What the model sees: the section's own items, plus the roles with their notes and facts as read-only
  * context, so skills and the summary can draw on the experience.
  */
-function sectionData(cv: CvContent, section: TailorSection, jobId: string): unknown {
+function sectionData(cv: CvContent, section: TailorSection, jobId: string, roleId: string | null): unknown {
   const roles = cv.experience.map((role) => ({ ...role, notes: role.notes.filter((note) => note.jobId === undefined || note.jobId === jobId) }));
-  if (section === "experience") return roles;
+  // One role to edit; the other roles are read-only context.
+  if (section === "experience") return { edit: roles.filter((role) => role.id === roleId), context: { roles: roles.filter((role) => role.id !== roleId) } };
   const skills = { technicalSkills: cv.technicalSkills, professionalSkills: cv.professionalSkills };
   if (section === "skills") return { edit: skills, context: { roles } };
   if (section === "summary") return { edit: { summary: cv.basics.summary, titles: cv.basics.titles }, context: { roles, skills } };
@@ -103,7 +114,7 @@ function flagText(cv: CvContent, section: TailorSection, p: Proposal): string {
 /** Proposes one section, checks each proposal, retries flagged ones once, and stores the result on the run. */
 export async function runSectionPass(
   deps: { model: ModelDeps; tailor: TailorRepo; log?: LogFn },
-  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection },
+  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection; roleId?: string },
 ): Promise<{ proposals: Proposal[]; questions: TailorQuestion[] }> {
   const { section, run } = input;
   if (section === "layout") throw new ApiError(400, "invalid_content", "The layout step has its own route.");
@@ -111,11 +122,12 @@ export async function runSectionPass(
   if (run.status === "done" || run.currentSection !== section) {
     throw new ApiError(409, "section_not_current", "This section isn't the current step.");
   }
+  const roleId = currentRole(run, section, input.roleId);
   const contentSection: Exclude<TailorSection, "layout"> = section;
   const steering = run.tailoredCvId ? await deps.tailor.getSteering(run.tailoredCvId) : null;
   if (!steering) throw new ApiError(404, "job_not_found", "This job was deleted.");
   const cv = stripHeader(input.cv).cv;
-  const items = sectionItems(cv, section);
+  const items = sectionItems(cv, section, roleId);
   // Flag questions quote the flagged proposal, so their answers are never a source.
   const asked = new Map((run.questions ?? []).filter((question) => question.kind !== "flag").map((question) => [question.id, question.text]));
   const answers = (run.answers ?? []).flatMap((answer) => answer.value && asked.has(answer.questionId)
@@ -128,7 +140,7 @@ export async function runSectionPass(
     const schema = section === "skills" ? SkillProposalsSchema : ModelProposalsSchema;
     const reply: { proposals: (z.infer<typeof ModelProposalsSchema>["proposals"][number] & { reason?: string | null })[] } =
       await call("tailor_section", "strong", schema, sectionSystemPrompt(contentSection), sectionUserMessage({
-      section, items: sectionData(cv, section, run.jobId), job: input.job, language: steering!.language,
+      section, items: sectionData(cv, section, run.jobId, roleId), job: input.job, language: steering!.language,
       steering: steeringText(steering!.steering, cv), answers, retry,
     }));
     // An item with one editable field (a bullet's text, the summary) takes any field name; other unknown item ids
@@ -189,8 +201,8 @@ export async function runSectionPass(
   await deps.tailor.updateRun(run.id, {
     status: "waiting_user", currentSection: section,
     proposals: [...(run.proposals ?? []).filter((p) => !items.has(p.itemId)), ...proposals],
-    // A rerun replaces this section's earlier flag questions.
-    questions: [...(run.questions ?? []).filter((q) => q.kind !== "flag" || q.section !== section), ...questions],
+    // A rerun replaces this section's (or this role's) earlier flag questions.
+    questions: [...(run.questions ?? []).filter((q) => q.kind !== "flag" || q.section !== section || (roleId !== null && q.roleId !== roleId)), ...questions],
   });
   return { proposals, questions };
 }

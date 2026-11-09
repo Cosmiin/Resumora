@@ -63,9 +63,11 @@ const post = (path: string, body: unknown = {}) => app.request(path, {
 async function runSection(section = "experience", current: TailorSection = section as TailorSection) {
   const start = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal", instruction: "Keep it short" })).json() as { run: { id: string } };
   await memoryTailorRepo("user-a", new Map(), docs).updateRun(start.run.id, { currentSection: current });
-  const res = await post(`/v1/tailor-runs/${start.run.id}/sections/${section}/run`);
+  const res = await post(`/v1/tailor-runs/${start.run.id}/sections/${section}/run`, await roleOf(start.run.id));
   return { res, runId: start.run.id };
 }
+/** The run's current role, which the web sends with every Experience step. */
+const roleOf = async (runId: string) => ({ roleId: (await memoryTailorRepo("user-a", new Map(), docs).getRun(runId))!.currentRoleId });
 const proposals = (...items: ModelProposal[]) => ({ proposals: items });
 const reword = (text: string, over: Partial<ModelProposal> = {}): ModelProposal =>
   ({ itemId: bullet.id, field: "text", text, inferred: false, ...over });
@@ -87,9 +89,9 @@ describe("section pass", () => {
     const run = await memoryTailorRepo("user-a", new Map(), docs).getRun(runId);
     expect(run).toMatchObject({ status: "waiting_user", currentSection: "experience", proposals: body.proposals });
     expect(run?.questions).toEqual(body.questions);
-    replies = [{ questions: Array.from({ length: 8 }, (_, i) => ({ roleId: null, text: `Q${i}?`, kind: "options", options: ["Yes"], reason: "Gap", gap: "r0" })) }];
+    replies = [{ questions: Array.from({ length: 8 }, (_, i) => ({ roleId: null, bulletId: null, text: `Q${i}?`, kind: "options", options: ["Yes"], reason: "Gap", gap: "r0" })) }];
     const asked = await (await post(`/v1/tailor-runs/${runId}/sections/skills/questions`)).json() as { questions: unknown[] };
-    expect(asked.questions).toHaveLength(8);
+    expect(asked.questions).toHaveLength(5);
   });
 
   it("keeps a proposal that passes on retry and drops unknown item ids (Review focus 5)", async () => {
@@ -118,7 +120,7 @@ describe("section pass", () => {
     const [flag] = (await repo.getRun(runId))!.questions!;
     await post(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: flag!.id, value: "Keep it", via: "option" }] });
     replies = [flagged, { results: [] }, flagged, { results: [] }];
-    const again = await (await post(`/v1/tailor-runs/${runId}/sections/experience/run`)).json() as { proposals: Proposal[] };
+    const again = await (await post(`/v1/tailor-runs/${runId}/sections/experience/run`, await roleOf(runId))).json() as { proposals: Proposal[] };
     expect(again.proposals[0]?.flags.map((f) => f.rule)).toEqual(["number"]);
     expect(JSON.stringify(model.requests[4])).toContain(String.raw`\"answers\":[]`);
     const questions = (await repo.getRun(runId))!.questions!;

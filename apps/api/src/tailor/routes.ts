@@ -16,6 +16,9 @@ import { toneExamples } from "./tone-examples.ts";
 
 const AnswersBodySchema = z.object({ answers: z.array(AnswerSchema).min(1).max(MAX_RUN_QUESTIONS) });
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
+/** Experience steps name the role they are about. */
+const RoleBodySchema = z.object({ roleId: z.string().optional() });
+const roleBody = async (c: Context<AppEnv>) => RoleBodySchema.parse(await c.req.json().catch(() => ({}))).roleId;
 
 /** Mounted at /v1: POST /jobs/:id/tailor, GET /tailor-runs/:id, and the run's questions and answers. */
 export function tailorRoutes(deps: {
@@ -63,23 +66,25 @@ export function tailorRoutes(deps: {
 
   app.post("/tailor-runs/:id/sections/:section/questions", async (c) => {
     const section = TailorSectionSchema.parse(c.req.param("section"));
+    const roleId = await roleBody(c);
     const { run, job } = await runWithJob(c);
     if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
     const questions = await askQuestions({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
-      userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section,
+      userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section, roleId,
     });
     return c.json({ questions });
   });
 
   app.post("/tailor-runs/:id/sections/:section/run", async (c) => {
     const section = TailorSectionSchema.parse(c.req.param("section"));
+    const roleId = await roleBody(c);
     const { run, job } = await runWithJob(c);
     if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
     if (section === "layout") {
       return c.json(await runLayoutPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, { userId: c.get("user").id, run, job: job.extracted }));
     }
     return c.json(await runSectionPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c), log: deps.log }, {
-      userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section,
+      userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section, roleId,
     }));
   });
 

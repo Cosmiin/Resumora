@@ -25,6 +25,7 @@ export async function startRetailor(
   const sections = TAILOR_SECTIONS.filter((section) => picked.includes(section));
   const run = await deps.tailor.createRun({
     jobId: doc.jobId, tailoredCvId, kind: sections.length === 1 ? "section" : "retailor", sections, currentSection: sections[0]!,
+    roleOrder: sections.includes("experience") ? doc.content.experience.map((role) => role.id) : [],
   });
   return { run };
 }

@@ -100,7 +100,8 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       const now = new Date().toISOString();
       const run: TailorRun = { id: crypto.randomUUID(), userId, jobId: input.jobId, tailoredCvId: input.tailoredCvId,
         kind: input.kind, sections: [...input.sections], status: "running", currentSection: input.currentSection,
-        questions: null, answers: null, proposals: null, errorCode: null, createdAt: now, updatedAt: now };
+        questions: null, answers: null, proposals: null, errorCode: null,
+        roleOrder: [...(input.roleOrder ?? [])], currentRoleId: input.roleOrder?.[0] ?? null, createdAt: now, updatedAt: now };
       docs.runs.set(run.id, run);
       return structuredClone(run);
     },

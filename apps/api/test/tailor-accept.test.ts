@@ -78,15 +78,18 @@ async function start(): Promise<string> {
   const body = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal" })).json() as { run: { id: string } };
   return body.run.id;
 }
+/** Experience steps name the run's current role, as the web does. */
+const roleOf = async (runId: string, section: string) =>
+  section === "experience" ? { roleId: (await repo().getRun(runId))!.currentRoleId } : {};
 async function run(runId: string, section: string, ...items: ModelProposal[]) {
   // The real (strict) model always returns every field: skills proposals carry reason, null when unused.
   replies.push({ proposals: section === "skills" ? items.map((item) => ({ reason: null, ...item })) : items }, { results: [] });
-  const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`);
+  const res = await post(`/v1/tailor-runs/${runId}/sections/${section}/run`, await roleOf(runId, section));
   expect(res.status).toBe(200);
 }
-async function accept(runId: string, section: string, body: unknown = {}, score: unknown = scoreReply()) {
+async function accept(runId: string, section: string, body: Record<string, unknown> = {}, score: unknown = scoreReply()) {
   replies.push(score);
-  return post(`/v1/tailor-runs/${runId}/sections/${section}/accept`, body);
+  return post(`/v1/tailor-runs/${runId}/sections/${section}/accept`, { ...await roleOf(runId, section), ...body });
 }
 
 describe("accept section", () => {
@@ -238,5 +241,61 @@ describe("accept section", () => {
     expect(res.status).toBe(409);
     expect(tailored().version).toBe(1);
     expect(await repo().getScore(jobId, "tailored")).toBeNull();
+  });
+});
+
+describe("experience role by role", () => {
+  const roleA = roleWith(["Ran payroll for 40 staff"], { title: "Payroll Lead", company: "Gamma", startDate: "2022-01", current: true, endDate: "" });
+  const roleB = roleWith(["Filed taxes"], { title: "Payroll Officer", company: "Delta", startDate: "2019-01", endDate: "2021-12" });
+  const roleC = roleWith(["Kept records"], { title: "Clerk", company: "Epsilon", startDate: "2016-01", endDate: "2018-12" });
+  const three: CvContent = { ...base, experience: [roleA, roleB, roleC] };
+  const sentEdit = () => {
+    const body = JSON.parse(String((model.requests.at(-2)!.messages as { content: string }[])[1]!.content)) as {
+      items: { edit: { id: string }[]; context: { roles: { id: string }[] } };
+    };
+    return { edit: body.items.edit.map((r) => r.id), context: body.items.context.roles.map((r) => r.id) };
+  };
+
+  beforeEach(async () => { await cv.save(three, 1); });
+
+  it("runs 3 roles in CV order, one run and accept each, with a score after every role, then Skills", async () => {
+    const runId = await start();
+    expect(await repo().getRun(runId)).toMatchObject({ roleOrder: [roleA.id, roleB.id, roleC.id], currentRoleId: roleA.id });
+    for (const [i, current] of [roleA, roleB, roleC].entries()) {
+      const bullet = current.bullets[0]!;
+      await run(runId, "experience", reword(bullet.id, `${bullet.text} on time`));
+      expect(sentEdit()).toEqual({ edit: [current.id], context: [roleA, roleB, roleC].filter((r) => r !== current).map((r) => r.id) });
+      const scored = model.logged.filter((call) => call.task === "tailor_score").length;
+      const res = await accept(runId, "experience", { decisions: [{ itemId: bullet.id, keep: true }] });
+      expect(res.status).toBe(200);
+      expect(model.logged.filter((call) => call.task === "tailor_score")).toHaveLength(scored + 1);
+      const next = (await res.json() as { run: TailorRun }).run;
+      if (i < 2) expect(next).toMatchObject({ currentSection: "experience", currentRoleId: [roleB, roleC][i]!.id });
+      else expect(next).toMatchObject({ currentSection: "skills", currentRoleId: null });
+    }
+    const doc = tailored();
+    expect(doc.content.experience.map((r) => r.bullets[0]!.text)).toEqual(["Ran payroll for 40 staff on time", "Filed taxes on time", "Kept records on time"]);
+    expect(Object.keys(doc.review!.experience as object)).toEqual([roleA.bullets[0]!.id, roleB.bullets[0]!.id, roleC.bullets[0]!.id]);
+  });
+
+  it("accepts a role with nothing to change and moves on", async () => {
+    const runId = await start();
+    await run(runId, "experience");
+    const res = await accept(runId, "experience");
+    expect(res.status).toBe(200);
+    expect((await res.json() as { run: TailorRun }).run).toMatchObject({ currentSection: "experience", currentRoleId: roleB.id });
+  });
+
+  it("refuses a role that isn't current with 409 role_not_current", async () => {
+    const runId = await start();
+    const runRes = await post(`/v1/tailor-runs/${runId}/sections/experience/run`, { roleId: roleB.id });
+    expect(runRes.status).toBe(409);
+    expect(await runRes.json()).toMatchObject({ error: { code: "role_not_current" } });
+    const res = await accept(runId, "experience", { roleId: roleB.id });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: { code: "role_not_current" } });
+    expect(await post(`/v1/tailor-runs/${runId}/sections/experience/accept`, {})).toMatchObject({ status: 409 });
+    expect(tailored().version).toBe(1);
+    expect((await repo().getRun(runId))!.currentRoleId).toBe(roleA.id);
   });
 });
