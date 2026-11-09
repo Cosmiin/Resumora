@@ -24,7 +24,7 @@ export async function scoreMatch(
 ): Promise<MatchScore> {
   const { cv } = stripHeader(input.cv);
   try {
-    const { labels, cvSeniority } = await callModel(deps.model, {
+    const { labels: reply, cvSeniority } = await callModel(deps.model, {
       userId: input.userId,
       task: "tailor_score",
       tier: "cheap",
@@ -35,19 +35,22 @@ export async function scoreMatch(
     });
     const refs = new Set<string>();
     const requirements = new Set(input.job.requirements.map((_, index) => `r${index}`));
-    const keywordSources = [...input.job.requirements.map((requirement) => requirement.text), ...input.job.responsibilities];
-    for (const label of labels) {
+    const keywordSources = [...input.job.requirements.map((requirement) => requirement.text), ...input.job.responsibilities]
+      .map((source) => source.toLowerCase());
+    // A bad requirement ref fails the score; a bad or repeated keyword (e.g. one taken from the job title) is only dropped.
+    const labels = reply.filter((label) => {
       const key = label.ref.toLowerCase();
-      const term = label.ref.slice(2);
-      const valid = label.kind === "requirement"
-        ? requirements.has(label.ref)
-        : label.ref.startsWith("k:") && term.trim().length > 0
-          && keywordSources.some((source) => source.includes(term));
-      if (!valid || refs.has(key)) throw new Error("Invalid match label refs");
+      if (label.kind === "requirement") {
+        if (!requirements.has(label.ref) || refs.has(key)) throw new Error("Invalid requirement label refs");
+      } else {
+        const term = key.slice(2).trim();
+        if (!key.startsWith("k:") || !term || refs.has(key) || !keywordSources.some((source) => source.includes(term))) return false;
+      }
       refs.add(key);
-    }
+      return true;
+    });
     if (![...requirements].every((ref) => refs.has(ref))) throw new Error("Missing requirement labels");
-    if (keywordSources.some((source) => source.trim()) && !labels.some((label) => label.kind === "keyword")) {
+    if (keywordSources.some((source) => source.trim()) && !reply.some((label) => label.kind === "keyword")) {
       throw new Error("Missing keyword labels");
     }
 

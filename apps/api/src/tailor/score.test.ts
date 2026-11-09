@@ -121,10 +121,26 @@ describe("scoreMatch", () => {
     expect((await scoreMatch({ model: model.deps }, work)).total).toBe(100);
   });
 
+  it("drops invalid and duplicate keyword labels instead of failing, and matches keyword terms case-insensitively", async () => {
+    const work = input();
+    work.job = { ...job, title: "Business Analyst, Process Automation", responsibilities: ["Use SQL", "Drive process automation"] };
+    const model = fakeModel(() => ({
+      ...answer(),
+      labels: [label(), label("k:Process Automation"), label("k:Insurance"), label("k:SQL"), label("k:sql"), label("k:TypeScript")],
+    }));
+    const score = await scoreMatch({ model: model.deps }, work);
+    expect(score.labels.map((item) => item.ref)).toEqual(["r0", "k:Process Automation", "k:SQL", "k:TypeScript"]);
+  });
+
+  it("scores on requirements alone when every keyword label is dropped", async () => {
+    const model = fakeModel(() => ({ ...answer(), labels: [label(), label("k:insurance")] }));
+    const score = await scoreMatch({ model: model.deps }, input());
+    expect(score.labels.map((item) => item.ref)).toEqual(["r0"]);
+  });
+
   it.each([
-    [], [label(), label()], [label("r9")], [label(), label("k:insurance")],
-    [label(), label("k:SQL"), label("k:SQL")],
-  ])("rejects incomplete, duplicate or unrelated labels: %j", async (...labels) => {
+    [], [label(), label()], [label("r9")], [label(), label("r9"), label("k:SQL")],
+  ])("rejects missing, duplicate or unknown requirement labels: %j", async (...labels) => {
     const model = fakeModel(() => ({ ...answer(), labels }));
     await expect(scoreMatch({ model: model.deps }, input())).rejects.toMatchObject({ code: "ai_failed" });
   });
