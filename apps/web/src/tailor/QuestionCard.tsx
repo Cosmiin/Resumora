@@ -27,7 +27,7 @@ export function QuestionCard({ role, locale = "en", ...props }: Props) {
 function Question({ question, n, total, onAnswer, onSkipAll }: Omit<Props, "role" | "locale">) {
   const [typed, setTyped] = useState("");
   const [via, setVia] = useState<"typed" | "voice">("typed");
-  const { mic, partial } = useDictation((words) => {
+  const { mic, status } = useDictation((words) => {
     setVia("voice");
     setTyped((text) => [text.trimEnd(), words].filter(Boolean).join(" "));
   });
@@ -46,7 +46,7 @@ function Question({ question, n, total, onAnswer, onSkipAll }: Omit<Props, "role
           onChange={(event) => { setTyped(event.target.value); if (!event.target.value) setVia("typed"); }} />
         {mic}
       </div>
-      {partial && <p aria-live="polite">{partial}</p>}
+      {status}
       <div className="tailor-actions">
         <button type="button" className="primary" disabled={!typed.trim()} onClick={() => onAnswer({ value: typed.trim(), via })}>
           {t("tailor.question.send")}

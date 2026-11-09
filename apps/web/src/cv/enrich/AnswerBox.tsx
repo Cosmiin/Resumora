@@ -1,7 +1,8 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef } from "react";
 import { VOICE, type Locale, type Note, type Question } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { useVoice } from "./useVoice.ts";
+import { MicButton, micAvailable, VoiceStatus } from "./VoiceControls.tsx";
 
 export type Via = Note["via"][number];
 
@@ -60,28 +61,10 @@ function appendSpoken(value: string, text: string, options: string[]): string {
 
 const addVia = (via: Via[], how: Via): Via[] => (via.includes(how) ? via : [...via, how]);
 
-const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-function onMotionChange(listener: () => void) {
-  const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-  query?.addEventListener("change", listener);
-  return () => query?.removeEventListener("change", listener);
-}
-
-const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
-const MicIcon = (
-  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <rect x="5.5" y="1" width="5" height="9" rx="2.5" />
-    <path d="M3 7.5a5 5 0 0 0 10 0" fill="none" stroke="currentColor" strokeWidth="1.4" />
-    <path d="M8 12.5V15" stroke="currentColor" strokeWidth="1.4" />
-  </svg>
-);
-
 /** One question's answer: pick option chips, type, or speak. It never saves on its own. */
 export function AnswerBox({ question, value, via, onChange, locale = "en", maxSeconds = VOICE.maxSeconds, placeholder, plain = false, readOnly = false, onBusyChange }: Props) {
   const voice = useVoice({ locale, maxSeconds });
   const field = useRef<HTMLTextAreaElement>(null);
-  const reduceMotion = useSyncExternalStore(onMotionChange, reducedMotion);
   // spoken pieces can arrive faster than re-renders, so they build on the latest text
   const latest = useRef({ value, via, onChange, options: question.options });
   useEffect(() => {
@@ -104,7 +87,7 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
   useEffect(() => {
     onBusyChange?.(busy);
   }, [busy, onBusyChange]);
-  const micShown = !readOnly && state !== "denied" && state !== "unavailable" && state !== "limit";
+  const micShown = !readOnly && micAvailable(voice);
   const message =
     state === "denied"
       ? t("enrich.voice.denied")
@@ -113,13 +96,6 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
         : state === "idle" && voice.interrupted
           ? t("enrich.voice.interrupted")
           : null;
-  const left = maxSeconds - voice.seconds;
-
-  const onMic = () => {
-    if (recording || countingDown) return voice.stop();
-    if (state !== "idle") return;
-    voice.start();
-  };
 
   return (
     <div className={plain ? "answer-box is-plain" : "answer-box"}>
@@ -149,62 +125,9 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
           readOnly={readOnly}
           onChange={(e) => onChange(e.target.value, addVia(via, "type"))}
         />
-        {micShown && (
-          <button
-            type="button"
-            className="mic"
-            aria-pressed={recording}
-            aria-label={t(recording || countingDown ? "enrich.voice.stop" : "enrich.voice.start")}
-            aria-busy={state === "asking" || state === "stopping"}
-            disabled={state === "asking" || state === "stopping"}
-            onClick={onMic}
-          >
-            {MicIcon}
-          </button>
-        )}
+        {micShown && <MicButton voice={voice} startLabel={t("enrich.voice.start")} stopLabel={t("enrich.voice.stop")} />}
       </div>
-      {countingDown && (
-        <div className="voice-cue">
-          {/* The live region stays put (so it is announced); the number inside is keyed so each 3 / 2 / 1 pops in. */}
-          <div className="voice-count" data-testid="voice-countdown" aria-live="polite">
-            <span key={voice.count}>{voice.count}</span>
-          </div>
-          <p className="voice-ready">
-            {voice.count === 1 && voice.connecting ? t("enrich.focus.voice.gettingReady") : t("enrich.focus.voice.getReady")}
-          </p>
-        </div>
-      )}
-      {recording && (
-        <div className="answer-rec">
-          {voice.seconds < 2 && (
-            <span className="voice-go">
-              <span className="voice-dot" aria-hidden="true" />
-              {t("enrich.focus.voice.go")}
-            </span>
-          )}
-          <div className="voice-bar">
-            <span className="voice-wave" aria-hidden="true">
-              {Array.from({ length: 12 }, (_, i) => (
-                <i key={i} style={{ animationDelay: `${(i * 0.37) % 1}s` }} />
-              ))}
-            </span>
-            <span className="voice-time">
-              {t("enrich.voice.listening", { time: clock(voice.seconds), max: clock(maxSeconds) })}
-            </span>
-            {left <= 10 && <span className="answer-countdown">{t("enrich.voice.endsIn", { n: left })}</span>}
-          </div>
-        </div>
-      )}
-      {state === "stopping" && <span className="answer-rec is-finishing">{t("enrich.voice.finishing")}</span>}
-      {micShown && (
-        <div className="answer-live" aria-live="polite" lang={locale}>
-          {voice.partial && <span className="answer-partial">
-            {voice.partialWords.map((word, i) => (
-              <span key={word.key} className={reduceMotion ? undefined : "voice-word-new"}>{i > 0 ? " " : ""}{word.text}</span>
-            ))}
-          </span>}
-        </div>
-      )}
+      <VoiceStatus voice={voice} locale={locale} maxSeconds={maxSeconds} />
       {message && (
         <p className="answer-voice-msg" role="status">
           {message}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVoice } from "../cv/enrich/useVoice.ts";
+import { MicButton, micAvailable, VoiceStatus } from "../cv/enrich/VoiceControls.tsx";
 import { ApiClientError } from "../lib/api.ts";
 import { t } from "../i18n/t.ts";
 
@@ -28,7 +29,7 @@ export function JobThoughts({ value, onSave, onBusyChange }: Props) {
   const counting = state === "countdown";
   const busy = recording || counting || state === "asking" || state === "stopping";
   useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
-  const micShown = state !== "denied" && state !== "unavailable" && state !== "limit";
+  const micShown = micAvailable(voice);
   const save = useCallback(async () => {
     if (inFlight.current !== null) {
       queued.current = latest.current === inFlight.current ? null : latest.current;
@@ -85,23 +86,11 @@ export function JobThoughts({ value, onSave, onBusyChange }: Props) {
         placeholder={t("job.thoughts.placeholder")} aria-describedby="job-thoughts-count"
         onChange={(event) => { latest.current = event.target.value.slice(0, 2000); setText(latest.current); }}
         onBlur={() => { if (busy) saveAfterVoice.current = true; else void save(); }} />
-      {micShown && <button type="button" className="secondary job-thoughts-mic" aria-pressed={recording}
-        aria-label={t(recording || counting ? "job.thoughts.voiceStop" : "job.thoughts.voiceStart")}
-        aria-busy={state === "asking" || state === "stopping"} disabled={state === "asking" || state === "stopping"}
-        onMouseDown={(event) => event.preventDefault()} onClick={() => {
-          field.current?.focus();
-          if (recording || counting) voice.stop();
-          else if (state === "idle") voice.start();
-        }}>
-        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="5.5" y="1" width="5" height="9" rx="2.5" />
-          <path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>
-      </button>}
+      {micShown && <MicButton voice={voice} startLabel={t("job.thoughts.voiceStart")} stopLabel={t("job.thoughts.voiceStop")}
+        onMouseDown={(event) => event.preventDefault()} onPress={() => field.current?.focus()} />}
     </div>
     <span id="job-thoughts-count" className="jobs-note">{t("job.thoughts.count", { n: text.length })}</span>
-    {busy && <p role="status" className="jobs-note">{t(counting ? "job.thoughts.voiceCountdown"
-      : recording ? "job.thoughts.voiceListening" : state === "asking" ? "job.thoughts.voiceConnecting" : "job.thoughts.voiceFinishing",
-    { n: voice.count ?? 0 })}</p>}
-    {voice.partial && <p aria-live="polite" lang="en">{voice.partial}</p>}
+    <VoiceStatus voice={voice} />
     {message && <p role="status" className="jobs-note">{message}</p>}
     {saving && <p role="status" className="jobs-note">{t("job.thoughts.saving")}</p>}
     {error && <p role="alert" className="jobs-field-error">{error}</p>}
