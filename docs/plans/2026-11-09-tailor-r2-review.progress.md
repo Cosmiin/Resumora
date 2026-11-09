@@ -39,3 +39,8 @@ open: rulings — outside the file list: `packages/shared/src/tailor.ts` (`place
 session: tailor-r2 Part B (block 2) · builder: claude
 commit: see git log (base 4bdbadd) · reviews: 2 (agents) · fix rounds: 1 (an empty final touch's auto-accept now has its own step `pass()` with its own Retry; the tick shows only once saved) · guard denials: 0 · weekly 49% → 49%
 open: rulings — `LayoutReview.tsx` holds all three final-touch screens (Achievements, Languages, Order and headline); copy in `en-tailor.ts`, two CSS lines in `tailor.css`. TailorFlow is at ~306 lines until B7 moves code out.
+
+## Task B7: "Tailoring done" screen (DoneA) — done
+session: tailor-r2 Part B (block 2) · builder: claude
+commit: see git log (base 11d00dd) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 49% → 49%
+open: rulings — `TailorMoment.tsx` gains an optional button and a children slot (the done screen sits under the count-up); `role-done.ts` exports `nameOf`; the steering confirm dialog moved to `SteeringStep.tsx` (`SteerConfirm`) so TailorFlow stays at ~299 lines; `TailoredCvPage.tsx` reads `?tab=letter` and `?export=1`, and `ExportMenu.tsx` takes `startOpen` (the done screen's Export and cover letter links). Now met counts requirement labels only (refs `r<n>`) whose base status was missing or partial. A run that is already done shows the done screen again on reload of the flow. `tailor-flow.test.tsx` now finishes through the done screen. Full suite under load: up to 9 timing failures in `cv/editor`, `jobs-page`, `editable-page` (files this task doesn't touch); each passes alone.

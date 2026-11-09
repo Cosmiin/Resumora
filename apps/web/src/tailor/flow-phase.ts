@@ -18,6 +18,8 @@ export type Phase =
   | { kind: "review"; proposals: Proposal[]; busy: boolean; removed?: number }
   /** After each role's accept (RoleDone): the score before → after, then the next role or step. */
   | { kind: "roleDone"; from: number | null; to: number | null; title: string; line: string | null; button: string; next: TailorRun }
+  /** DoneA: after the last step. */
+  | { kind: "done" }
   | { kind: "error"; message: string; retry(): void }
   | { kind: "deleted" };
 

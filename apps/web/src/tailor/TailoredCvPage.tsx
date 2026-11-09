@@ -63,7 +63,8 @@ export function TailoredCvPage() {
     gcTime: 0,
   });
   const scores = useQuery({ queryKey: ["tailored-scores", userId, jobId], queryFn: () => getScores(jobId) });
-  const [tab, setTab] = useState<TailoredTab>("cv");
+  // The done screen's links: ?tab=letter opens the cover letter, ?export=1 the Export menu.
+  const [tab, setTab] = useState<TailoredTab>(search.get("tab") === "letter" ? "letter" : "cv");
   // Letters written or edited since each copy's row was loaded (switching tabs doesn't refetch the row).
   const [letters, setLetters] = useState<Record<string, LetterOverride>>({});
   const cv = doc.data ?? null;
@@ -139,7 +140,7 @@ export function TailoredCvPage() {
         template={template} onTemplate={(next) => pickTemplate(cv.id, cv.template, next)}>
         <LanguageMenu key={cv.id} jobId={jobId} current={{ id: cv.id, language: cv.language }} />
         <button type="button" className="secondary" onClick={openDialog}>{t("tailored.retailor")}</button>
-        <ExportMenu load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template} />
+        <ExportMenu load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template} startOpen={search.get("export") === "1"} />
       </TailorToolbar>
       {templateError && <p role="alert" className="form-error">{t("tailored.templateError")}</p>}
       {jobChanged && (

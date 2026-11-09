@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { TAILOR_SECTIONS, type Answer, type CvContent, type JobExtraction, type MatchScore, type Steering, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { getJob } from "../jobs/jobs-api.ts";
@@ -10,8 +10,9 @@ import { keptChanges, keptTexts, newlyMet, roleDone } from "./role-done.ts";
 import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
-import { SteeringStep } from "./SteeringStep.tsx";
+import { SteerConfirm, SteeringStep } from "./SteeringStep.tsx";
 import { TailorMoment } from "./TailorMoment.tsx";
+import { DoneScreen } from "./DoneScreen.tsx";
 import { FINAL_SECTIONS } from "./LayoutReview.tsx";
 import { remember, remembered, type Phase } from "./flow-phase.ts";
 import * as api from "./tailor-api.ts";
@@ -23,7 +24,6 @@ export { remember, remembered } from "./flow-phase.ts";
 /** `/jobs/:id/tailor`: steering, then each section's questions, run and review (Experience role by role), full screen. */
 export function TailorFlow() {
   const jobId = useParams().id ?? "";
-  const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [run, setRun] = useState<TailorRun | null>(null);
   const [base, setBase] = useState<number | null>(null);
@@ -37,6 +37,7 @@ export function TailorFlow() {
   const runRef = useRef<TailorRun | null>(null);
   // The newest score with its labels (base, then each accept's), and the job: for the role done line.
   const scoreRef = useRef<MatchScore | null>(null);
+  const baseRef = useRef<MatchScore | null>(null);
   const [job, setJob] = useState<JobExtraction | null>(null);
   const started = useRef(false);
   // FinalA: final touches with nothing to change, accepted on their own; the next screen shows a tick for each.
@@ -51,12 +52,8 @@ export function TailorFlow() {
     const ai = cause instanceof ApiClientError && cause.code === "ai_failed" && at;
     setPhase({ kind: "error", retry, message: ai ? t("tailor.error.ai", { section: t(`tailor.section.${at}`) }) : t("tailor.error.generic") });
   }
-  /** Opens the document this run tailored (a translated copy too, not only the job's original). */
-  function finish() {
-    remember(jobId, null);
-    const doc = runRef.current?.tailoredCvId;
-    void navigate(`/jobs/${encodeURIComponent(jobId)}/cv${doc ? `?cv=${encodeURIComponent(doc)}` : ""}`);
-  }
+  /** After the last step: the done screen, for the document this run tailored (a translated copy too). */
+  function finish() { remember(jobId, null); setPhase({ kind: "done" }); }
 
   /** Continues the run where it stands: a section with a finished pass goes back to its run, otherwise to its questions. */
   function enter(next: TailorRun) {
@@ -191,6 +188,7 @@ export function TailorFlow() {
     started.current = true;
     api.getScores(jobId).then((scores) => {
       scoreRef.current = scores.tailored ?? scores.base;
+      baseRef.current = scores.base;
       setBase(scores.base?.total ?? null);
       setLatest((value) => value ?? scores.tailored?.total ?? null);
     }, () => {});
@@ -221,14 +219,7 @@ export function TailorFlow() {
       startLabel={resume ? t("tailor.steer.save") : undefined} onCancel={resume ? () => setPhase(resume) : undefined}
       onStart={(s) => (resume ? setPhase({ kind: "confirm", steering: s, busy: false, resume }) : void start(s))} />;
   } else if (phase.kind === "confirm") {
-    body = <section className="tailor-card" role="alertdialog" aria-labelledby="steer-confirm" aria-describedby="steer-confirm-text">
-      <h2 id="steer-confirm">{t("tailor.steer.confirm.title")}</h2>
-      <p id="steer-confirm-text">{t("tailor.steer.confirm.text")}</p>
-      <div className="fm-foot">
-        <button type="button" className="fm-ghost" disabled={phase.busy} onClick={() => setPhase(phase.resume)}>{t("tailor.steer.confirm.cancel")}</button>
-        <button type="button" className="fm-btn" disabled={phase.busy} onClick={() => void restart(phase.steering, phase)}>{t("tailor.steer.confirm.redo")}</button>
-      </div>
-    </section>;
+    body = <SteerConfirm busy={phase.busy} onCancel={() => setPhase(phase.resume)} onRedo={() => void restart(phase.steering, phase)} />;
   } else if (phase.kind === "back") {
     const { resume } = phase;
     body = phase.section === "experience"
@@ -253,6 +244,8 @@ export function TailorFlow() {
   else if (phase.kind === "roleDone") {
     const done = phase;
     body = <TailorMoment from={done.from} to={done.to} title={done.title} line={done.line} button={done.button} onNext={() => enter(done.next)} />;
+  } else if (phase.kind === "done") {
+    body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job} />;
   } else if (phase.kind === "deleted") {
     body = <section className="tailor-card" role="alert"><h2>{t("tailor.error.deleted")}</h2>
       <Link to="/jobs">{t("tailor.error.toJobs")}</Link></section>;

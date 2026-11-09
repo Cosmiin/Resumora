@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { JobExtraction, TailoredCv } from "@resumora/shared";
 import type { TemplateId } from "../cv/page/templates.ts";
 import { t } from "../i18n/t.ts";
@@ -9,6 +9,8 @@ type Props = {
   load(): Promise<TailoredCv>;
   job: JobExtraction | null;
   template: TemplateId;
+  /** Opens the menu on arrival (the done screen's Export link). */
+  startOpen?: boolean;
 };
 
 const CHOICES: { kind: ExportKind; format: ExportFormat; label: "export.cvPdf" | "export.cvDocx" | "export.letterPdf" | "export.letterDocx" }[] = [
@@ -19,7 +21,7 @@ const CHOICES: { kind: ExportKind; format: ExportFormat; label: "export.cvPdf" |
 ];
 
 /** Export ▾: warns about inferred items still unreviewed (export is allowed anyway), then downloads the file. */
-export function ExportMenu({ load, job, template }: Props) {
+export function ExportMenu({ load, job, template, startOpen = false }: Props) {
   const [open, setOpen] = useState(false);
   const [row, setRow] = useState<TailoredCv | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "busy" | "loadError" | "error">("idle");
@@ -47,6 +49,13 @@ export function ExportMenu({ load, job, template }: Props) {
       setState("error");
     }
   }
+
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!startOpen || opened.current) return;
+    opened.current = true;
+    void toggle();
+  }, [startOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unreviewed = row ? unreviewedItems(row.review) : [];
   return (

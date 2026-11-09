@@ -156,3 +156,10 @@
 /* FinalA: the tick for a final touch with nothing to change, and a moved section in the new order. */
 .tailor-tick { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--text-muted); }
 .tailor-doc li.is-moved { font-weight: 600; }
+/* DoneA: what is now met, the guesses still to check, and the next steps under the celebration. */
+.tailor-done { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+.tailor-done h3 { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.tailor-done ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
+.tailor-done-check { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; padding: var(--space-3); border-radius: var(--radius-md); background: var(--marigold-50); }
+.tailor-done-check p { margin: 0; }
+.tailor-done-next { display: flex; flex-wrap: wrap; gap: var(--space-4); }
