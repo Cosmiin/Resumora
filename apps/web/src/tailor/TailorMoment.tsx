@@ -34,7 +34,7 @@ export function TailorMoment({ from, to, title, line, button, onNext, children }
     return () => cancelAnimationFrame(frame);
   }, [start, to, still]);
 
-  return <section className="tailor-card tailor-moment">
+  return <section className={children ? "tailor-card tailor-moment has-more" : "tailor-card tailor-moment"}>
     <div className="fm-moment" role="status">
       <div className="fm-moment-body">
         {shown !== null && <div className="fm-moment-num" aria-hidden="true">{shown}</div>}

@@ -15,6 +15,7 @@ import { getJob } from "../jobs/jobs-api.ts";
 import { acceptSection, askQuestions, getRun, getScores, runSection } from "./tailor-api.ts";
 import { TailorFlow } from "./TailorFlow.tsx";
 import { SectionReview } from "./SectionReview.tsx";
+import { movedKeys } from "./LayoutReview.tsx";
 
 const at = "2026-11-08T10:00:00Z";
 const makeRun = (over: Partial<TailorRun> = {}): TailorRun => ({
@@ -41,6 +42,11 @@ beforeEach(() => {
 });
 
 describe("final touches (FinalA)", () => {
+  it("marks only the section that jumped, not every section it passed", () => {
+    expect([...movedKeys(["a", "b", "c", "d", "e"], ["d", "a", "b", "c", "e"])]).toEqual(["d"]);
+    expect(movedKeys(["a", "b"], ["a", "b"]).size).toBe(0);
+  });
+
   it("a section with 0 proposals makes one accept call and the next screen shows the tick", async () => {
     localStorage.setItem("resumora.tailorRun.one", "run1");
     vi.mocked(getRun).mockResolvedValue(makeRun());
@@ -98,7 +104,8 @@ describe("final touches (FinalA)", () => {
     expect(screen.getByText("Payroll Specialist").tagName).toBe("DEL");
     expect(screen.getByText("Payroll Lead")).toBeInTheDocument();
     const list = screen.getByRole("list", { name: "Section order" });
-    expect(within(list).getAllByText("moved")).toHaveLength(2);
+    // Two sections swapped: one of them moved.
+    expect(within(list).getAllByText("moved")).toHaveLength(1);
     await user.click(screen.getByRole("button", { name: "Undo both" }));
     expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "layout", keep: false }, { itemId: "headline", keep: false }], inferred: [], flags: [] });
   });

@@ -57,3 +57,11 @@ reviews: 1 whole-branch + 1 fix-only (Opus) · findings: 1 medium, 3 low, all fi
 - low: Remove on a "new" skill the Base CV already has leaves it in place.
 - low: with `?export=1`, the Export menu no longer reopens after the guided review closes.
 open: no regression test for the last fix (low, from the fix review). A second whole-branch review isn't needed: the fixes touch no shared type, schema, migration, RLS or auth.
+
+## Browser check (owner's Chrome, local stack) and its fixes
+Walked the whole flow on the owner's Business Analyst job: Experience role by role (role review, role done), Skills batch, Summary, Achievements auto-pass tick, Languages, Order and headline, the done screen, the guided review (Keep, Remove restoring the Base wording, Stop) and the Export warning (count 6 → 4). Fixed (reviewed by one fresh agent, then re-checked in Chrome):
+- the done screen's details showed faded behind the celebration overlay; the moment now sits in the card's flow there (role done keeps the overlay);
+- the guided review squeezed the CV beside its card; the card now sits above the page and stays on top while scrolling, with scroll room so the glowing item isn't hidden;
+- "moved" marked every section a jump passed; it now marks only the sections that moved (outside the longest unchanged order).
+Seen, not changed (not Part B code): the score stayed 69 through the whole run, so the done screen had no count-up and no "Now met"; one kept guess reads "increasing output by 400% … in Salesforce", worth a look against the truth rule (Part A checks). Mid-check, the steering was saved once from "Tone and questions" (not by me), which by design started a new run from role 1.
+Cost: weekly 49% → 52% for B5–B8 + reviews + check · review agents: 9 (6 Sonnet task reviews, 1 Opus whole-branch, 1 Opus fix-only, 1 Sonnet browser-fix) · guard denials: 0.
