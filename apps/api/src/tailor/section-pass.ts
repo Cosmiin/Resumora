@@ -73,7 +73,7 @@ function sectionData(cv: CvContent, section: TailorSection, jobId: string, roleI
 export function texts(value: unknown): string[] {
   if (typeof value === "string") return [value];
   if (value && typeof value === "object") {
-    return Object.entries(value).filter(([key]) => !["id", "layout", "schemaVersion", "locale", "photo", "askedAt", "updatedAt", "fromNotes"]
+    return Object.entries(value).filter(([key]) => !["id", "layout", "schemaVersion", "locale", "photo", "askedAt", "updatedAt", "fromNotes", "enrichedAt"]
       .includes(key) && !key.endsWith("Id")).flatMap(([, entry]) => texts(entry));
   }
   return [];

@@ -48,7 +48,7 @@ const role: Experience = { id: "role", company: "Acme", title: "Engineer", locat
 const match: MatchScore = { policy: "match/1", total: 80, band: "strong", capped: false, labels: [],
   parts: { requirements: null, keywords: null, seniority: null, langEdu: null } };
 const roleScores = (score: number) => ({ scores: new Map([["role", { state: "ready" as const,
-  result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [] } }]]), retry: vi.fn() });
+  result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } }]]), retry: vi.fn() });
 const ready = () => screen.findByRole("heading", { name: "Engineer", level: 1 });
 
 beforeEach(() => {
@@ -170,16 +170,13 @@ describe("job page", () => {
     expect(voice.stop).toHaveBeenCalled();
     await waitFor(() => expect(patchJob).toHaveBeenCalledWith("one", 1, job.extracted, { userThoughts: "Spoken thoughts" }));
   });
-  it("shows the gate for stale or loading role scores despite an earlier high score", async () => {
+  it("an enriched CV goes straight into tailoring, with no dialog", async () => {
+    vi.mocked(useRoleScores).mockReturnValue(roleScores(40));
+    vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv(), experience: [role], enrichedAt: "2026-11-09T12:00:00.000Z" }, version: 1, updatedAt: job.updatedAt });
     const { router } = renderJob(); await ready();
-    for (const state of ["previous", "scoring"] as const) {
-      vi.mocked(useRoleScores).mockReturnValue({ scores: new Map([["role", { state, result: roleScores(80).scores.get("role")!.result }]]), retry: vi.fn() });
-      await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
-      expect(await screen.findByRole("button", { name: "Enrich first" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Tailor anyway" })).toBeInTheDocument();
-      expect(router.state.location.pathname).toBe("/jobs/one");
-      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    }
+    await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/one/tailor"));
+    expect(screen.queryByRole("button", { name: "Enrich first" })).not.toBeInTheDocument();
   });
   it("computes a missing Score 1 when Try again is clicked, and says so when that fails", async () => {
     vi.mocked(scoreJob).mockRejectedValueOnce(new Error("ai")).mockResolvedValueOnce({ base: match, tailored: null });
@@ -258,12 +255,15 @@ describe("job page", () => {
       : status === "needs_text" ? "This job needs its description" : "This job isn't ready yet.");
     expect(getCv).not.toHaveBeenCalled();
   });
-  it.each(["score", "facts"])("shows the weak-CV gate for missing %s and allows tailoring anyway", async (reason) => {
-    if (reason === "score") vi.mocked(useRoleScores).mockReturnValue(roleScores(59));
-    else vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv(), experience: [{ ...role, facts: null }] }, version: 1, updatedAt: job.updatedAt });
+  it("a CV that isn't enriched shows Before you tailor with its average, even at 80 or more, and Tailor anyway tailors", async () => {
+    vi.mocked(useRoleScores).mockReturnValue(roleScores(84));
     const { router } = renderJob(); await ready();
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
-    expect(await screen.findByRole("button", { name: "Enrich first" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Before you tailor" })).toBeInTheDocument();
+    expect(screen.getByText("Your CV isn't enriched yet. Tailoring works much better when your roles have more detail.")).toBeInTheDocument();
+    expect(screen.getByText("Average role score 84 · enriched at 80")).toBeInTheDocument();
+    expect(screen.getByRole("meter", { name: "Average role score" })).toHaveAttribute("aria-valuenow", "84");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Tailor anyway" }));
     expect(router.state.location.pathname).toBe("/jobs/one/tailor");
   });
@@ -273,18 +273,13 @@ describe("job page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
     await userEvent.click(await screen.findByRole("button", { name: "Enrich first" }));
     expect(router.state.location.pathname).toBe("/cv");
+    expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
   });
-  it("uses the average and the newest role even when roles are out of order", async () => {
-    const scored = roleScores(80);
-    scored.scores.set("older", { state: "ready", result: { ...scored.scores.get("role")!.result, roleId: "older", score: 40 } });
-    vi.mocked(useRoleScores).mockReturnValue(scored);
-    vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv(), experience: [
-      { ...role, id: "older", current: false, startDate: "2020", endDate: "2022", facts: null }, role,
-    ] }, version: 1, updatedAt: job.updatedAt });
-    const { router } = renderJob(); await ready();
+  it("with no scores yet the dialog says Not scored yet", async () => {
+    vi.mocked(useRoleScores).mockReturnValue({ scores: new Map([["role", { state: "scoring" as const }]]), retry: vi.fn() });
+    renderJob(); await ready();
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/one/tailor"));
-    expect(screen.queryByRole("button", { name: "Tailor anyway" })).not.toBeInTheDocument();
+    expect(await screen.findByText("Not scored yet")).toBeInTheDocument();
   });
   it("saves thoughts on blur, refreshes the cached job and preserves the selected tab", async () => {
     const { client } = renderJob(); await ready();

@@ -16,6 +16,7 @@ export function upgradeCv(v1: CvContentV1): CvContent {
     publications: [],
     interests: [],
     layout: defaultLayout(),
+    enrichedAt: null,
   };
 }
 

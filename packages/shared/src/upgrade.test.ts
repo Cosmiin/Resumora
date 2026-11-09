@@ -102,3 +102,11 @@ describe("normalizeLayout", () => {
     expect(out.titles).toEqual({ summary: "About me" });
   });
 });
+
+describe("upgradeCv and enrichedAt", () => {
+  it("a v1 CV upgrades as not enriched", () => {
+    const v1 = { ...emptyCv(), schemaVersion: 1 as const };
+    for (const k of ["achievements", "volunteering", "awards", "courses", "publications", "interests", "layout", "enrichedAt"] as const) delete (v1 as Record<string, unknown>)[k];
+    expect(StoredCvSchema.parse(v1).enrichedAt).toBeNull();
+  });
+});

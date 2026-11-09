@@ -35,11 +35,11 @@ import { CvPage } from "./CvPage.tsx";
 import * as roleScores from "./enrich/useRoleScores.ts";
 import * as helperPanel from "./panel/HelperPanel.tsx";
 
-function renderPage() {
+function renderPage(url = "/cv") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <CvPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -90,6 +90,43 @@ describe("CV editor", () => {
 
       expect(screen.getByRole("textbox", { name: label })).toHaveValue(typed);
       expect(consoleError.mock.calls.flat().map(String).join("\n")).not.toContain("Maximum update depth");
+    });
+  });
+
+  describe("descriptions copied from the company and location", () => {
+    const job = (id: string, description: string) => ({
+      id, company: "Kreditech", title: "Developer", location: "Hamburg, Germany", startDate: "2020-01", endDate: "",
+      current: true, description, bullets: [], notes: [],
+    });
+    it("are emptied once when the CV opens, in one save, and real ones stay", async () => {
+      withCv({ experience: [job("a", "Kreditech · Hamburg, Germany"), job("b", "Kreditech is a fintech"), job("c", "KREDITECH | Hamburg")] });
+      renderPage();
+      await waitFor(() => expect(api.saveCv).toHaveBeenCalled(), { timeout: 4000 });
+      expect(api.saveCv).toHaveBeenCalledTimes(1);
+      expect(api.saveCv.mock.lastCall![0].experience.map((e: { description: string }) => e.description)).toEqual(["", "Kreditech is a fintech", ""]);
+    });
+    it("a CV without copies opens without a save", async () => {
+      withCv({ experience: [job("b", "Kreditech is a fintech")] });
+      renderPage();
+      await screen.findByText("Saved");
+      await new Promise((done) => setTimeout(done, 1500));
+      expect(api.saveCv).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("the guided path (1A)", () => {
+    it("Enrich my CV opens its start screen", async () => {
+      withCv({ basics });
+      renderPage();
+      await userEvent.click(await screen.findByRole("button", { name: "Enrich my CV" }));
+      expect(screen.getByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Not now" }));
+      expect(screen.queryByRole("dialog", { name: "Enrich your CV" })).toBeNull();
+    });
+    it("/cv?enrich=1 opens it on arrival", async () => {
+      withCv({ basics });
+      renderPage("/cv?enrich=1");
+      expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one role at a time" })).toBeInTheDocument();
     });
   });
 

@@ -42,7 +42,7 @@ describe("CvContentSchema", () => {
     delete cv.basics.photo;
     const stored = schemaVersion === 1
       ? Object.fromEntries(Object.entries({ ...cv, schemaVersion }).filter(([key]) =>
-        !["achievements", "volunteering", "awards", "courses", "publications", "interests", "layout"].includes(key)))
+        !["achievements", "volunteering", "awards", "courses", "publications", "interests", "layout", "enrichedAt"].includes(key)))
       : cv;
     expect(StoredCvSchema.parse(stored).basics.photo).toBeNull();
   });
@@ -196,5 +196,18 @@ describe("newId", () => {
     const bullets = (n: number) => Array.from({ length: n }, (_, i) => ({ id: "b" + i, text: "x" }));
     expect(CvContentSchema.safeParse({ ...emptyCv(), achievements: bullets(10) }).success).toBe(true);
     expect(CvContentSchema.safeParse({ ...emptyCv(), achievements: bullets(11) }).success).toBe(false);
+  });
+});
+
+describe("enrichedAt (J2)", () => {
+  it("old CVs without it parse as not enriched", () => {
+    const old: Record<string, unknown> = { ...emptyCv() };
+    delete old.enrichedAt;
+    expect(CvContentSchema.parse(old).enrichedAt).toBeNull();
+    expect(emptyCv().enrichedAt).toBeNull();
+  });
+  it("accepts an ISO date and rejects anything else", () => {
+    expect(CvContentSchema.parse({ ...emptyCv(), enrichedAt: "2026-11-09T12:00:00.000Z" }).enrichedAt).toBe("2026-11-09T12:00:00.000Z");
+    expect(CvContentSchema.safeParse({ ...emptyCv(), enrichedAt: "yesterday" }).success).toBe(false);
   });
 });

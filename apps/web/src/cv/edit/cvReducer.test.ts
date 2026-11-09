@@ -368,3 +368,52 @@ describe("focus actions", () => {
     expect(cvReducer(cleared, { type: "setFacts", roleId: "e1", facts: null })).toBe(cleared);
   });
 });
+
+describe("clearCopiedDescriptions", () => {
+  const at = (description: string, id: string) => role(id, ["Did it"], { company: "Kreditech", location: "Hamburg, Germany", description });
+  it("empties only the descriptions that repeat the company and/or location", () => {
+    const cv = { ...emptyCv(), experience: [at("Kreditech · Hamburg, Germany", "a"), at("Kreditech is a fintech", "b"), at("Hamburg", "c")] };
+    const next = cvReducer(cv, { type: "clearCopiedDescriptions" });
+    expect(next.experience.map((r) => r.description)).toEqual(["", "Kreditech is a fintech", ""]);
+    expect(next.experience[1]).toBe(cv.experience[1]);
+  });
+  it("returns the same CV when there is nothing to clear", () => {
+    const cv = { ...emptyCv(), experience: [at("Kreditech is a fintech", "b")] };
+    expect(cvReducer(cv, { type: "clearCopiedDescriptions" })).toBe(cv);
+  });
+});
+
+describe("addAchievements", () => {
+  it("adds the picked texts in one action, after the ones already there", () => {
+    const cv = { ...emptyCv(), achievements: [{ id: "a1", text: "Old one" }] };
+    const next = cvReducer(cv, { type: "addAchievements", texts: ["New one", "Another"] });
+    expect(next.achievements.map((a) => a.text)).toEqual(["Old one", "New one", "Another"]);
+    expect(cvReducer(cv, { type: "addAchievements", texts: [] })).toBe(cv);
+  });
+});
+
+describe("addSkills / removeSkills", () => {
+  it("adds every new skill with the given ids, and removes exactly those, keeping the ones there before", () => {
+    const cv = { ...emptyCv(), technicalSkills: [{ id: "old", name: "Excel" }] };
+    const added = cvReducer(cv, { type: "addSkills", skills: [
+      { id: "s1", name: "SAP", group: "technicalSkills" }, { id: "s2", name: "Negotiation", group: "professionalSkills" }, { id: "s3", name: "excel", group: "technicalSkills" },
+    ] });
+    expect(added.technicalSkills).toEqual([{ id: "old", name: "Excel" }, { id: "s1", name: "SAP" }]);
+    expect(added.professionalSkills).toEqual([{ id: "s2", name: "Negotiation" }]);
+    const undone = cvReducer(added, { type: "removeSkills", ids: ["s1", "s2", "s3"] });
+    expect(undone.technicalSkills).toEqual([{ id: "old", name: "Excel" }]);
+    expect(undone.professionalSkills).toEqual([]);
+    expect(cvReducer(undone, { type: "removeSkills", ids: ["s1"] })).toBe(undone);
+  });
+});
+
+describe("markEnriched", () => {
+  it("sets enrichedAt once, and later edits keep it", () => {
+    const cv = withRole(["Did it"]);
+    const marked = cvReducer(cv, { type: "markEnriched", at: "2026-11-09T12:00:00.000Z" });
+    expect(marked.enrichedAt).toBe("2026-11-09T12:00:00.000Z");
+    expect(cvReducer(marked, { type: "markEnriched", at: "2026-12-01T00:00:00.000Z" })).toBe(marked);
+    const edited = cvReducer(marked, { type: "setBullet", owner, bulletId: "e1-b1", text: "Did it better" });
+    expect(edited.enrichedAt).toBe("2026-11-09T12:00:00.000Z");
+  });
+});

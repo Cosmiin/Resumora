@@ -14,6 +14,8 @@ import { scoreRole } from "./score.ts";
 import { improveBullet } from "./improve.ts";
 import { brainDump } from "./brain-dump.ts";
 import { roleFacts } from "./role-facts.ts";
+import { roleDescription } from "./role-description.ts";
+import { suggestAchievements } from "./achievements.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
 import { checkSummary, rewriteEvents } from "./rewrite.ts";
@@ -23,6 +25,8 @@ const RoleBody = z.object({ roleId: z.string().min(1).max(64) });
 
 const ScoreBody = z.object({ roleId: z.string().min(1).max(64), fingerprint: z.string().min(1).max(64) });
 const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
+/** fresh: ask the model again with the notes in view, instead of returning the stored result. */
+const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional() });
 const BrainDumpBody = ScoreBody.extend({ source: z.enum(["ramble", "answers"]).default("ramble") });
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */
@@ -48,7 +52,7 @@ export function enrichRoutes(deps: {
   app.get("/scores", async (c) => c.json({ items: await deps.insightsRepo(c.get("user")).list() }));
 
   app.post("/score", async (c) => {
-    const body = ScoreBody.safeParse(await c.req.json().catch(() => null));
+    const body = ScoreRequestBody.safeParse(await c.req.json().catch(() => null));
     if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
     const user = c.get("user");
     const result = await scoreRole(
@@ -88,6 +92,35 @@ export function enrichRoutes(deps: {
     } catch (err) {
       if (err instanceof ApiError && err.status >= 500) {
         console.error(JSON.stringify({ msg: "brain dump failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/achievements", async (c) => {
+    const user = c.get("user");
+    try {
+      return c.json(await suggestAchievements({ cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id }));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "achievements failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/role-description", async (c) => {
+    const body = ScoreBody.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
+    const user = c.get("user");
+    try {
+      return c.json(await roleDescription(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "role description failed", code: err.code, requestId: c.get("requestId") }));
       }
       throw err;
     }

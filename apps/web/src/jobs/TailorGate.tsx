@@ -2,9 +2,9 @@ import { useEffect, useRef } from "react";
 import type { CvContent } from "@resumora/shared";
 import { useMyCv } from "../cv/CvPage.tsx";
 import { useRoleScores } from "../cv/enrich/useRoleScores.ts";
+import { ENRICHED_AT, averageScore } from "../cv/enrich/EnrichPath.tsx";
 import { t } from "../i18n/t.ts";
 
-export const WEAK_AVG = 60;
 type Props = { onTailor(): void; onEnrich(): void; onClose(): void };
 
 export function TailorGate(props: Props) {
@@ -39,24 +39,20 @@ export function TailorGate(props: Props) {
   </div>;
 }
 
+/** 8A: an enriched CV goes straight to tailoring; otherwise a short dialog with the average against 80. */
 function CheckCv({ cv, onTailor, onEnrich }: Props & { cv: CvContent }) {
+  const enriched = cv.enrichedAt !== null;
   const { scores } = useRoleScores({ cv, status: "saved" });
-  const newest = [...cv.experience].sort((a, b) => Number(b.current) - Number(a.current)
-    || (b.endDate || b.startDate).localeCompare(a.endDate || a.startDate) || b.startDate.localeCompare(a.startDate))[0];
-  const numbers = cv.experience.flatMap((role) => {
-    const score = scores.get(role.id)?.result?.score;
-    return typeof score === "number" ? [score] : [];
-  });
-  const missingFacts = !newest?.facts?.items.some((item) => item.trim());
-  const unknown = cv.experience.some((role) => {
-    const state = scores.get(role.id)?.state;
-    return state !== "ready" && state !== "none";
-  });
-  const weak = unknown || missingFacts || !numbers.length || numbers.reduce((sum, n) => sum + n, 0) / numbers.length < WEAK_AVG;
-  useEffect(() => { if (!weak) onTailor(); }, [weak, onTailor]);
-  if (!weak) return <p role="status">{t("job.gate.checking")}</p>;
+  useEffect(() => { if (enriched) onTailor(); }, [enriched, onTailor]);
+  if (enriched) return <p role="status">{t("job.gate.checking")}</p>;
+  const average = averageScore(new Map(cv.experience.map((role) => [role.id, scores.get(role.id)?.result?.score ?? null])));
   return <>
-    <p>{t("job.gate.text")}</p>
+    <p>{t("job.gate.notEnriched")}</p>
+    <div className="gate-meter" role="meter" aria-label={t("job.gate.meter")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={average ?? 0}>
+      <i style={{ width: `${average ?? 0}%` }} />
+      <b style={{ left: `${ENRICHED_AT}%` }} />
+    </div>
+    <p className="fine">{average === null ? t("job.gate.notScored") : t("job.gate.average", { n: average })}</p>
     <div className="jobs-dialog-actions">
       <button type="button" onClick={onEnrich}>{t("job.gate.enrich")}</button>
       <button type="button" className="secondary" onClick={onTailor}>{t("job.gate.anyway")}</button>

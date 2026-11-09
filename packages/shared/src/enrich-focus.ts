@@ -37,6 +37,7 @@ export function mergeGrades(
   return {
     ...buildRoleResult(role, { bullets, nextStepId: stored?.nextStep?.bulletId ?? null }, fingerprintValue),
     roleQuestions: stored?.roleQuestions ?? [],
+    thin: role.bullets.length <= 1 || (stored?.thin ?? false),
   };
 }
 

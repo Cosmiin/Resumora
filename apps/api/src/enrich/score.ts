@@ -53,7 +53,8 @@ const notSaved = () => new ApiError(409, "not_saved", "Your latest changes aren'
  */
 export async function scoreRole(
   deps: ScoreDeps,
-  input: { roleId: string; fingerprint: string },
+  /** fresh: skip the stored result and ask the model again, with the notes in view (after "Tell us about…"). */
+  input: { roleId: string; fingerprint: string; fresh?: boolean },
 ): Promise<RoleResult> {
   const { content } = await deps.cv.get();
   const present = new Set(content.experience.map((r) => r.id));
@@ -65,11 +66,11 @@ export async function scoreRole(
 
   const cached = await deps.insights.get(role.id);
   let result: RoleResult;
-  if (cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY) {
+  if (!input.fresh && cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY) {
     result = cached;
   } else {
     const pending = (await deps.insights.pending(role.id)).find((entry) => entry.fingerprint === input.fingerprint && entry.result.policy === SCORE_POLICY);
-    if (pending) {
+    if (pending && !input.fresh) {
       result = pending.result;
     } else {
       try {

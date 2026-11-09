@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BRAIN_DUMP_QUESTION, MAX_LONG_TEXT, type Locale, type Question } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { AnswerBox, type Via } from "./AnswerBox.tsx";
+import { BackButton } from "./QuestionStep.tsx";
 
 type DumpProps = {
   roleId: string;
@@ -18,10 +19,13 @@ type DumpProps = {
   onSubmit(text: string, via: Via[]): void;
   /** On to the role's own bullets (or the done step when it has none). */
   onSkip(): void;
+  /** A thin role's opening box: its questions come next, so the button says Continue. */
+  boxFirst?: boolean;
+  onBack?(): void;
 };
 
 /** "Tell us more": a ramble, typed or spoken, that becomes new bullets. */
-export function BrainDumpStep({ roleId, title, company, value, via, onChange, locale, working, empty, busy, onSubmit, onSkip }: DumpProps) {
+export function BrainDumpStep({ roleId, title, company, value, via, onChange, locale, working, empty, busy, onSubmit, onSkip, boxFirst = false, onBack }: DumpProps) {
   const [voiceBusy, setVoiceBusy] = useState(false);
   title = title.trim();
   company = company.trim();
@@ -60,6 +64,7 @@ export function BrainDumpStep({ roleId, title, company, value, via, onChange, lo
       {empty && !working && <p className="fm-note" role="status">{t("enrich.focus.dump.empty")}</p>}
       <p className="fm-fine">{t("enrich.focus.dump.micHint")}</p>
       <div className="fm-foot">
+        <BackButton onBack={onBack} busy={busy} />
         <button type="button" className="fm-ghost" onClick={onSkip} disabled={busy}>
           {t("enrich.focus.skip")}
         </button>
@@ -69,7 +74,7 @@ export function BrainDumpStep({ roleId, title, company, value, via, onChange, lo
           disabled={busy || voiceBusy || value.trim() === ""}
           onClick={() => onSubmit(value, via)}
         >
-          {working ? t("enrich.focus.dump.working") : t("enrich.focus.dump.submit")}
+          {working ? t("enrich.focus.dump.working") : t(boxFirst ? "enrich.focus.continue" : "enrich.focus.dump.submit")}
         </button>
       </div>
     </div>
@@ -81,10 +86,11 @@ type PickProps = {
   roleAfterAll: number | null;
   busy: boolean;
   onAdd(ids: string[]): void;
+  onBack?(): void;
 };
 
 /** The proposed bullets as checkable cards, all checked to start with. */
-export function DumpPickStep({ proposals, roleAfterAll, busy, onAdd }: PickProps) {
+export function DumpPickStep({ proposals, roleAfterAll, busy, onAdd, onBack }: PickProps) {
   const [picked, setPicked] = useState(() => new Set(proposals.map((p) => p.id)));
   const toggle = (id: string) =>
     setPicked((s) => {
@@ -110,6 +116,7 @@ export function DumpPickStep({ proposals, roleAfterAll, busy, onAdd }: PickProps
       </ul>
       {roleAfterAll !== null && <p className="fm-fine">{t("enrich.focus.dump.upTo", { n: roleAfterAll })}</p>}
       <div className="fm-foot">
+        <BackButton onBack={onBack} busy={busy} />
         <button type="button" className="fm-ghost" onClick={() => onAdd([])} disabled={busy}>
           {t("enrich.focus.dump.skipAll")}
         </button>

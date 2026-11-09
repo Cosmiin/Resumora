@@ -74,6 +74,7 @@ const categoryRules = [
   "achievements holds only a section the CV itself presents as achievements or highlights. A result listed under a role stays in that role's bullets; never copy role bullets into achievements. Without such a section, achievements stays empty.",
   "A skill is technical only when it names a tool, software, language, platform or technology. A method, practice or activity (for example wireframing, budgeting, quality control, scheduling) is a professional skill, even in a technical field.",
   "When a role's lines carry no list markers (text from a Word file), the line right after the role's dates that states its scope or responsibility is experience.description; the lines after it are bullets.",
+  "A line near the role's dates that only names the company and/or the location (for example \"Kreditech · Hamburg, Germany\") is not a description: those go to company and location only. experience.description is only a real introduction or context paragraph about the role or company; otherwise leave it empty.",
 ].join("\n- ");
 
 /** The owner's v2 rules plus the category list generated from `CATEGORIES`. */

@@ -80,7 +80,7 @@ const role = {
 const cv: CvContent = { ...emptyCv(), experience: [role], unclearSkills: [{ id: "u1", name: "Docker" }] };
 const score: RoleScoreState = {
   state: "ready",
-  result: { roleId: "r1", policy: "score/2", fingerprint: "x", score: 40, bullets: [], nextStep: null, questions: [], roleQuestions: [] } satisfies RoleResult,
+  result: { roleId: "r1", policy: "score/2", fingerprint: "x", score: 40, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } satisfies RoleResult,
 };
 const failedSave = () => Promise.reject(new SaveNotDoneError());
 
