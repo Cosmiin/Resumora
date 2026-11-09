@@ -57,6 +57,15 @@ describe("SummaryReview (SumA)", () => {
       inferred: [{ itemId: "summary#0", keep: true }, { itemId: "summary#1", keep: true, text: "trains new staff" }], flags: [] });
   });
 
+  it("a summary guessed as a whole (no exact phrases) is marked with its reason and sent as neither: kept, unreviewed", async () => {
+    const user = userEvent.setup();
+    const onAccept = review([{ itemId: "summary", field: "summary", inferred: true, flags: [], text: "Payroll lead abroad.", reason: "Your roles abroad." }]);
+    expect(document.querySelector("mark.tailor-guess")?.textContent).toBe("Payroll lead abroad.");
+    expect(screen.getByText("AI guess: Your roles abroad. True?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Use this summary" }));
+    expect(onAccept).toHaveBeenCalledWith({ decisions: [], inferred: [], flags: [] });
+  });
+
   it("\"Use my original summary\" sends keep: false", async () => {
     const user = userEvent.setup();
     const onAccept = review();

@@ -119,7 +119,9 @@ export async function acceptSection(
           text: choice?.keep && choice.text !== undefined ? choice.text : guess.text, reason: guess.reason };
       });
     }
-    state[key] = { kept: keep ?? !p.flags.length, inferred: p.inferred, reviewed: keep !== undefined, text: applied.text };
+    // A guess keeps its reason, which the guided review shows.
+    state[key] = { kept: keep ?? !p.flags.length, inferred: p.inferred, reviewed: keep !== undefined, text: applied.text,
+      ...(p.inferred && p.reason ? { reason: p.reason } : {}) };
     if (keep ?? !p.flags.length) apply(content, applied);
   }
   const parsed = CvContentSchema.safeParse(content);

@@ -100,6 +100,9 @@
 
 /* Role done and Tailoring done: enrichment's fm-moment inside a card. */
 .tailor-moment { position: relative; min-height: 24rem; overflow: hidden; }
+/* The done screen: the moment sits in the card's flow, with what is now met and the next steps under it. */
+.tailor-moment.has-more { min-height: 0; }
+.tailor-moment.has-more .fm-moment { position: relative; inset: auto; background: none; }
 
 @media (max-width: 760px) {
   .tailor-mode { padding: var(--space-6) var(--space-4) var(--space-10); }
@@ -156,3 +159,20 @@
 /* FinalA: the tick for a final touch with nothing to change, and a moved section in the new order. */
 .tailor-tick { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--text-muted); }
 .tailor-doc li.is-moved { font-weight: 600; }
+/* DoneA: what is now met, the guesses still to check, and the next steps under the celebration. */
+.tailor-done { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+.tailor-done h3 { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.tailor-done ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
+.tailor-done-check { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; padding: var(--space-3); border-radius: var(--radius-md); background: var(--marigold-50); }
+.tailor-done-check p { margin: 0; }
+.tailor-done-next { display: flex; flex-wrap: wrap; gap: var(--space-4); }
+/* GuideA: the guided review dims the page and glows the guess in place, with a small card above it. */
+/* The card stays on top while the page scrolls under it, so the CV keeps its full width (flex, not grid: a sticky grid item can only move within its own row). */
+.guide { display: flex; flex-direction: column; gap: var(--space-4); }
+.guide-card { order: -1; z-index: 3; }
+.guide-page .cv-page :not(.cv-mark-focus, .cv-mark-focus *) { color: var(--text-muted); }
+.guide-page .cv-mark-focus { scroll-margin-top: 14rem; color: var(--text-strong); background: var(--marigold-50); box-shadow: 0 0 0 3px var(--marigold-500); border-radius: 3px; }
+.guide-card { position: sticky; top: var(--space-4); display: grid; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius-md); background: var(--surface-card); box-shadow: var(--shadow-page); }
+.guide-card p { margin: 0; }
+.guide-count { font-size: var(--text-sm); color: var(--text-muted); }
+.guide-done { font-weight: 600; }

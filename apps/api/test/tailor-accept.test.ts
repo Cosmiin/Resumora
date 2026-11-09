@@ -138,7 +138,7 @@ describe("accept section", () => {
     expect(tailored().content.technicalSkills.map((s) => s.name)).toEqual(["Excel", "Payroll software"]);
     // 1 = full credit; an inferred label without a kept item would get 0.5.
     expect(body.score.parts.requirements).toMatchObject({ points: 1 });
-    expect(tailored().review).toMatchObject({ skills: { "new-skill:Payroll software": { kept: true, inferred: true } } });
+    expect(tailored().review).toMatchObject({ skills: { "new-skill:Payroll software": { kept: true, inferred: true, reason: "Shown in: Team Lead · Acme Payroll" } } });
   });
 
   it("applies each summary guess on its own: removed, edited or left undecided (kept, unreviewed), one review item each", async () => {

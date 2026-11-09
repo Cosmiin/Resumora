@@ -18,6 +18,24 @@ type Props = {
 
 const sectionName = (key: string) => CATEGORY[key as SectionKey]?.label.en ?? key;
 
+/** The sections that moved: those outside the longest run kept in the same relative order, so one jump marks one section. */
+export function movedKeys(old: string[], next: string[]): Set<string> {
+  const lcs = old.map(() => new Array<number>(next.length + 1).fill(0));
+  lcs.push(new Array<number>(next.length + 1).fill(0));
+  for (let i = old.length - 1; i >= 0; i--) {
+    for (let j = next.length - 1; j >= 0; j--) {
+      lcs[i]![j] = old[i] === next[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+    }
+  }
+  const stayed = new Set<string>();
+  for (let i = 0, j = 0; i < old.length && j < next.length;) {
+    if (old[i] === next[j]) { stayed.add(next[j]!); i++; j++; }
+    else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) i++;
+    else j++;
+  }
+  return new Set(next.filter((key) => !stayed.has(key)));
+}
+
 /** The new wording with the new words in green (B1); a guess stays marigold as a whole. */
 function NewText({ before, proposal }: { before: string; proposal: Proposal }) {
   if (proposal.inferred) return <mark className="tailor-guess">{proposal.text}</mark>;
@@ -38,16 +56,14 @@ function LayoutBody({ proposals, cv }: { proposals: Proposal[]; cv: CvContent })
   const headline = proposals.find((p) => p.itemId === "headline");
   const old = cv.layout.order as string[];
   const next = order ? order.text.split(",") : [];
+  const moved = movedKeys(old, next);
   return <div className="tailor-doc">
     {headline && <p><span className="tailor-item-label">{t("tailor.final.headline")}</span>{" "}
       {cv.basics.titles[0]?.trim() && <><del>{cv.basics.titles[0]}</del>{" → "}</>}<mark className="tailor-new">{headline.text}</mark></p>}
     {order && <>
       <p className="tailor-item-label">{t("tailor.final.order")}</p>
-      <ol aria-label={t("tailor.final.order")}>{next.map((key, i) => {
-        const moved = old.indexOf(key) !== i;
-        return <li key={key} className={moved ? "is-moved" : undefined}>{sectionName(key)}
-          {moved && <> <span className="tailor-tag">{t("tailor.final.moved")}</span></>}</li>;
-      })}</ol>
+      <ol aria-label={t("tailor.final.order")}>{next.map((key) => <li key={key} className={moved.has(key) ? "is-moved" : undefined}>{sectionName(key)}
+        {moved.has(key) && <> <span className="tailor-tag">{t("tailor.final.moved")}</span></>}</li>)}</ol>
     </>}
   </div>;
 }

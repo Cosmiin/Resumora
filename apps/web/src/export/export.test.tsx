@@ -37,13 +37,13 @@ describe("ExportMenu", () => {
     expect(unreviewedItems(null)).toEqual([]);
   });
 
-  it("warns about 2 unreviewed items and still exports the PDF", async () => {
+  it("warns about 2 AI guesses not checked yet and still exports the PDF", async () => {
     const load = vi.fn(async () => cv);
     render(<ExportMenu load={load} job={job} template="modern" />);
     await userEvent.click(screen.getByRole("button", { name: "Export ▾" }));
     const warning = await screen.findByRole("note");
-    expect(warning).toHaveTextContent("Not reviewed yet: 2");
-    expect(screen.getAllByRole("listitem").map((item) => item.textContent)).toEqual(["Led a team of 6 engineers", "Kafka"]);
+    expect(warning).toHaveTextContent("2 AI guesses not checked yet");
+    expect(warning).toHaveTextContent("Or export anyway:");
     await userEvent.click(screen.getByRole("button", { name: "CV as PDF" }));
     await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "pdf", { cv, job, template: "modern" }));
     await userEvent.click(screen.getByRole("button", { name: "CV as Word" }));

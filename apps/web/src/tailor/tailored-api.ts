@@ -25,6 +25,13 @@ export function saveTailored(id: string, content: CvContent, version: number): P
   return apiFetch(tailored(id), { method: "PUT", json: { content, expectedVersion: version }, schema: SaveResponseSchema });
 }
 
+export type ReviewDecision = { section: string; key: string; action: "keep" | "remove" | "edit"; text?: string; version: number };
+
+/** The guided review's decision on one AI guess; returns the saved row (409 version_conflict when stale). */
+export function reviewItem(id: string, body: ReviewDecision): Promise<TailoredCv> {
+  return apiFetch(`${tailored(id)}/review`, { method: "PATCH", json: body, schema: TailoredCvSchema });
+}
+
 /** A run over only the picked sections; the tailoring flow continues it. */
 export function retailor(id: string, sections: TailorSection[]): Promise<{ run: TailorRun }> {
   return apiFetch(`${tailored(id)}/retailor`, { method: "POST", json: { sections }, schema: z.object({ run: TailorRunSchema }) });

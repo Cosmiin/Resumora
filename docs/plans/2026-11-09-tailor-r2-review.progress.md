@@ -39,3 +39,29 @@ open: rulings — outside the file list: `packages/shared/src/tailor.ts` (`place
 session: tailor-r2 Part B (block 2) · builder: claude
 commit: see git log (base 4bdbadd) · reviews: 2 (agents) · fix rounds: 1 (an empty final touch's auto-accept now has its own step `pass()` with its own Retry; the tick shows only once saved) · guard denials: 0 · weekly 49% → 49%
 open: rulings — `LayoutReview.tsx` holds all three final-touch screens (Achievements, Languages, Order and headline); copy in `en-tailor.ts`, two CSS lines in `tailor.css`. TailorFlow is at ~306 lines until B7 moves code out.
+
+## Task B7: "Tailoring done" screen (DoneA) — done
+session: tailor-r2 Part B (block 2) · builder: claude
+commit: see git log (base 11d00dd) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 49% → 49%
+open: rulings — `TailorMoment.tsx` gains an optional button and a children slot (the done screen sits under the count-up); `role-done.ts` exports `nameOf`; the steering confirm dialog moved to `SteeringStep.tsx` (`SteerConfirm`) so TailorFlow stays at ~299 lines; `TailoredCvPage.tsx` reads `?tab=letter` and `?export=1`, and `ExportMenu.tsx` takes `startOpen` (the done screen's Export and cover letter links). Now met counts requirement labels only (refs `r<n>`) whose base status was missing or partial. A run that is already done shows the done screen again on reload of the flow. `tailor-flow.test.tsx` now finishes through the done screen. Full suite under load: up to 9 timing failures in `cv/editor`, `jobs-page`, `editable-page` (files this task doesn't touch); each passes alone.
+
+## Task B8: Guided review of AI guesses (GuideA, ExportWarn) — done
+session: tailor-r2 Part B (block 2) · builder: claude
+commit: see git log (base 448f263) · reviews: 2 (agents) · fix rounds: 1 (high: `section`/`key` from the request could reach `Object.prototype`; now own entries only, tested; low: a 409 `item_changed` no longer shows as "saved elsewhere") · guard denials: 0 · weekly 50% → 50%
+open: rulings — `accept.ts` keeps each guess's `reason`; `CvDocument.tsx` gains a `focus` prop (the glow); the guided review replaces the page through the editor's `replacePage` slot, and on close the page reloads the row and the editor (keyed by id and version) starts from it; Edit on an id item changes the field whose value is the reviewed text; a new skill's review key follows its edited name. The Export warning's item list is gone (count + Review N items + "Or export anyway:"); `export/export.test.tsx` updated. No new AI task, no migration. **For the owner:** new route `PATCH /v1/tailored/:id/review` (RLS-scoped like the other tailored routes). `ExportMenu.tsx` will need a small merge with PR #46.
+
+## End of Part B: whole-branch review (Opus high, base 01cbc9a)
+reviews: 1 whole-branch + 1 fix-only (Opus) · findings: 1 medium, 3 low, all fixed:
+- medium: a summary the AI marked as a guess with no exact phrases was saved as reviewed; it now shows marked with its reason and stays kept and unreviewed (counts in Still to check / export / guided review).
+- low: the review PATCH now checks the saved CV against the schema (400 `invalid_content`), so an edited phrase can't make the summary too long to load.
+- low: Remove on a "new" skill the Base CV already has leaves it in place.
+- low: with `?export=1`, the Export menu no longer reopens after the guided review closes.
+open: no regression test for the last fix (low, from the fix review). A second whole-branch review isn't needed: the fixes touch no shared type, schema, migration, RLS or auth.
+
+## Browser check (owner's Chrome, local stack) and its fixes
+Walked the whole flow on the owner's Business Analyst job: Experience role by role (role review, role done), Skills batch, Summary, Achievements auto-pass tick, Languages, Order and headline, the done screen, the guided review (Keep, Remove restoring the Base wording, Stop) and the Export warning (count 6 → 4). Fixed (reviewed by one fresh agent, then re-checked in Chrome):
+- the done screen's details showed faded behind the celebration overlay; the moment now sits in the card's flow there (role done keeps the overlay);
+- the guided review squeezed the CV beside its card; the card now sits above the page and stays on top while scrolling, with scroll room so the glowing item isn't hidden;
+- "moved" marked every section a jump passed; it now marks only the sections that moved (outside the longest unchanged order).
+Seen, not changed (not Part B code): the score stayed 69 through the whole run, so the done screen had no count-up and no "Now met"; one kept guess reads "increasing output by 400% … in Salesforce", worth a look against the truth rule (Part A checks). Mid-check, the steering was saved once from "Tone and questions" (not by me), which by design started a new run from role 1.
+Cost: weekly 49% → 52% for B5–B8 + reviews + check · review agents: 9 (6 Sonnet task reviews, 1 Opus whole-branch, 1 Opus fix-only, 1 Sonnet browser-fix) · guard denials: 0.

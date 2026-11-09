@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 const COUNT_MS = 1400;
 // Same burst as enrichment's CelebrateMoment (its copy is about one role's score, so it isn't reused as is).
@@ -9,10 +9,11 @@ const CONFETTI = [
 
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-type Props = { from: number | null; to: number | null; title: string; line?: string | null; button: string; onNext(): void };
+/** `children`: more content under the moment (the done screen); without `button` there is no button. */
+type Props = { from: number | null; to: number | null; title: string; line?: string | null; button?: string; onNext?(): void; children?: ReactNode };
 
 /** A tailoring celebration in the enrichment look: the job score counts up, confetti, one line, one button. */
-export function TailorMoment({ from, to, title, line, button, onNext }: Props) {
+export function TailorMoment({ from, to, title, line, button, onNext, children }: Props) {
   const still = useRef(reducedMotion()).current;
   const start = from ?? to ?? 0;
   const [shown, setShown] = useState(still || to === null ? to : start);
@@ -33,16 +34,17 @@ export function TailorMoment({ from, to, title, line, button, onNext }: Props) {
     return () => cancelAnimationFrame(frame);
   }, [start, to, still]);
 
-  return <section className="tailor-card tailor-moment">
+  return <section className={children ? "tailor-card tailor-moment has-more" : "tailor-card tailor-moment"}>
     <div className="fm-moment" role="status">
       <div className="fm-moment-body">
         {shown !== null && <div className="fm-moment-num" aria-hidden="true">{shown}</div>}
         <h2 className="fm-moment-title">{title}</h2>
         {line && <p className="fm-moment-line">{line}</p>}
-        <button ref={next} type="button" className="fm-btn" onClick={onNext}>{button}</button>
+        {button && <button ref={next} type="button" className="fm-btn" onClick={onNext}>{button}</button>}
       </div>
       {!still && to !== null && from !== null && to > from && CONFETTI.map(([color, x, y], i) => <span key={i} className="fm-confetti"
         style={{ background: `var(${color})`, "--x": `${x}px`, "--y": `${y}px` } as CSSProperties} />)}
     </div>
+    {children}
   </section>;
 }
