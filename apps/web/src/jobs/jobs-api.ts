@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  JobListPageSchema, JobSchema,
-  type Job, type JobExtraction, type JobListPage,
+  JobListPageSchema, JobSchema, MatchScoreSchema,
+  type Job, type JobExtraction, type JobListPage, type JobPatch,
 } from "@resumora/shared";
 import { ApiClientError, apiFetch, authedFetch, errorOf } from "../lib/api.ts";
 
@@ -25,9 +25,18 @@ export function createJob(url: string, pageText: string): Promise<{ id: string; 
   });
 }
 
-export function patchJob(id: string, version: number, extracted: JobExtraction): Promise<Job> {
+export function getJobScore(id: string) {
+  return apiFetch(`/v1/jobs/${encodeURIComponent(id)}/score`, {
+    schema: z.object({ base: MatchScoreSchema.nullable(), tailored: MatchScoreSchema.nullable() }),
+  });
+}
+
+export function patchJob(
+  id: string, version: number, extracted: JobExtraction,
+  changes: Pick<JobPatch, "userThoughts" | "applicationStatus"> = {},
+): Promise<Job> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(id)}`, {
-    method: "PATCH", json: { version, extracted }, schema: JobSchema,
+    method: "PATCH", json: { version, extracted, ...changes }, schema: JobSchema,
   });
 }
 

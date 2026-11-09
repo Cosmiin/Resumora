@@ -1,6 +1,7 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { CATEGORY, normalizeLayout, type CvContent, type SectionKey } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
+import { supabase } from "../../lib/supabase.ts";
 import { newSectionBody } from "./NewSections.tsx";
 import { formatRange } from "./blocks.ts";
 import { getTemplate, type TemplateId } from "./templates.ts";
@@ -23,9 +24,21 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic" }: 
   const itemTitle = (text: string, className = "cv-item-title") => <span className={className}>{text}</span>;
 
   const b = cv.basics;
+  const photo = getTemplate(template).showsPhoto ? b.photo : null;
+  const path = photo?.path;
+  const [signedPhoto, setSignedPhoto] = useState<{ path: string; url: string } | null>(null);
+  const photoUrl = path && signedPhoto?.path === path ? signedPhoto.url : null;
+  useEffect(() => {
+    if (!path) return;
+    let active = true;
+    supabase.storage.from("cv-photos").createSignedUrl(path, 3600).then(({ data, error }) => {
+      if (active) setSignedPhoto(!error && data ? { path, url: data.signedUrl } : null);
+    }).catch(() => { if (active) setSignedPhoto(null); });
+    return () => { active = false; };
+  }, [path]);
   const contact = joinParts([b.email, b.phone, b.location, b.website, b.linkedin]);
   const titles = joinParts(b.titles);
-  const hasBasics = !!(b.fullName || titles || contact);
+  const hasBasics = !!(b.fullName || titles || contact || photoUrl);
 
   const skillRows = [
     { key: "technical", label: t("cv.page.technical"), items: cv.technicalSkills, sort: false },
@@ -189,7 +202,14 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic" }: 
   return (
     <article className={`cv-page ${getTemplate(template).className}`} aria-label={t("cv.page.label")}>
       {hasBasics && (
-        <header className="cv-header">
+        <header className="cv-header" style={{ display: "flow-root" }}>
+          {photo && photoUrl && (
+            <div style={{ width: 96, height: 96, overflow: "hidden", float: "right", marginInlineStart: "var(--space-4)" }}>
+              <img src={photoUrl} alt={t("cv.photo.alt")} onError={() => setSignedPhoto(null)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${photo.x}% ${photo.y}%`,
+                  transform: `scale(${photo.zoom})`, transformOrigin: `${photo.x}% ${photo.y}%` }} />
+            </div>
+          )}
           <Block>
             {b.fullName && <span className="cv-name">{b.fullName}</span>}
             {titles && <span className="cv-titles">{titles}</span>}

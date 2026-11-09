@@ -68,6 +68,28 @@ async function readPdf(blob: Blob) {
 }
 
 describe("buildCvPdf", () => {
+  it.each([["classic", "png"], ["modern", "png"], ["classic", "jpeg"]] as const)("embeds the %s photo as %s", async (template, type) => {
+    const content = fixture();
+    content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1 };
+    const data = Uint8Array.from(atob(type === "png"
+      ? "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAOSURBVBhXY/jPwABC/wEP+QP98+IdQAAAAABJRU5ErkJggg=="
+      : "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD4H8Q/8h/Uv+vmX/0M0UUV/ptkP/Ipwn/XuH/pKPAzr/kZ4r/r5P8A9KZ//9k="), (c) => c.charCodeAt(0));
+    const blob = await buildCvPdf(content, template, { data, type });
+    await readPdf(blob);
+    expect(new TextDecoder().decode(await blob.arrayBuffer())).toMatch(/\/Subtype\s*\/Image\b/);
+  });
+
+  it.each(["compact", "no bytes", "no photo", "webp"])("omits the image for %s", async (scenario) => {
+    const content = fixture();
+    if (scenario !== "no photo") content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1 };
+    const photo = scenario === "no bytes" ? undefined : {
+      data: new Uint8Array(), type: scenario === "webp" ? "webp" as const : "png" as const,
+    };
+    const blob = await buildCvPdf(content, scenario === "compact" ? "compact" : "classic", photo);
+    await readPdf(blob);
+    expect(new TextDecoder().decode(await blob.arrayBuffer())).not.toMatch(/\/Subtype\s*\/Image\b/);
+  });
+
   it.each(["classic", "modern", "compact", "unknown-template", undefined])(
     "exports selectable Romanian text, the header, all roles and bullets for %s", async (template) => {
       const { text } = await readPdf(await buildCvPdf(fixture(), template));

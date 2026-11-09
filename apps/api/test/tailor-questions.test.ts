@@ -1,0 +1,171 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { emptyCv, type CvContent, type JobExtraction, type MatchScore, type TailorQuestion as Question } from "@resumora/shared";
+import { createApp, type AppDeps } from "../src/app.ts";
+import { memoryCvRepo } from "../src/cv/memory-repo.ts";
+import type { CvRepo } from "../src/cv/repo.ts";
+import { memoryJobs } from "../src/jobs/memory-repo.ts";
+import { roleWith } from "../src/enrich/fake-model.ts";
+import { fakeModel } from "../src/tailor/fake-model.ts";
+import { memoryTailorDocs, memoryTailorRepo, type MemoryTailorDocs, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
+
+const job: JobExtraction = {
+  title: "Engineer", company: "Acme", location: null, workMode: "remote", employmentType: "full_time",
+  seniority: "mid", salary: null, isJobPosting: true, applyBy: null, benefits: [],
+  summary: "We are looking for an engineer who will build the tools and work with our team.",
+  requirements: [{ text: "Kubernetes", kind: "must", category: "skill" }, { text: "Team lead", kind: "nice", category: "experience" }],
+  responsibilities: ["Run the platform"],
+};
+const score: MatchScore = {
+  policy: "match/1", total: 40, band: "low", capped: true,
+  parts: { requirements: null, keywords: null, seniority: null, langEdu: null },
+  labels: [
+    { ref: "r0", kind: "requirement", status: "missing", evidence: null, inferred: false },
+    { ref: "r1", kind: "requirement", status: "partial", evidence: "Led 3 people", inferred: true },
+  ],
+};
+const older = roleWith(["Ran payroll"], { startDate: "2018-01", endDate: "2020-01" });
+const newest = roleWith(["Led 3 people"], { startDate: "2021-01", endDate: "", current: true });
+const base: CvContent = { ...emptyCv("en"), experience: [older, newest] };
+
+type ModelQuestion = Omit<Question, "id" | "section">;
+const ask = (text: string, over: Partial<ModelQuestion> = {}): ModelQuestion =>
+  ({ roleId: newest.id, text, kind: "options", options: ["Yes", "No"], reason: "Gap", ...over });
+
+let replies: ModelQuestion[][];
+let model: ReturnType<typeof fakeModel>;
+let jobs: ReturnType<typeof memoryJobs>;
+let docs: MemoryTailorDocs;
+let scores: MemoryTailorStore;
+let cv: CvRepo;
+let app: ReturnType<typeof createApp>;
+let jobId: string;
+
+beforeEach(async () => {
+  replies = [];
+  model = fakeModel(() => ({ questions: replies.shift() ?? [] }));
+  jobs = memoryJobs({ now: () => new Date("2026-11-08T10:00:00Z") });
+  docs = memoryTailorDocs();
+  scores = new Map();
+  cv = memoryCvRepo();
+  await cv.save(base, 0);
+  const deps: AppDeps = {
+    appOrigin: "http://127.0.0.1:5173",
+    verifyToken: async (token) => (token === "token-a" ? { id: "user-a", token } : token === "token-b" ? { id: "user-b", token } : null),
+    cvRepo: () => cv,
+    importRepo: () => { throw new Error("not used"); },
+    jobRepo: (user) => jobs.repoFor(user.id),
+    tailorRepo: (user) => memoryTailorRepo(user.id, scores, docs),
+    insightsRepo: () => { throw new Error("not used"); },
+    model: () => model.deps,
+    queue: { send: async () => {} },
+    jobQueue: { send: async () => {} },
+    log: vi.fn(),
+  };
+  app = createApp(deps);
+  jobId = crypto.randomUUID();
+  await jobs.repoFor("user-a").create({ id: jobId, source: "link", url: "https://example.test/j", urlNormalized: "j", rawText: "x", jsonLd: null });
+  await jobs.admin.finish(jobId, job);
+  await memoryTailorRepo("user-a", scores).saveScore(jobId, "base", null, score);
+});
+
+const call = (path: string, body: unknown = {}, token = "token-a") => app.request(path, {
+  method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify(body),
+});
+async function startRun() {
+  const res = await call(`/v1/jobs/${jobId}/tailor`, { tone: "neutral" });
+  return (await res.json() as { run: { id: string } }).run.id;
+}
+const questions = async (runId: string, section: string) => {
+  const res = await call(`/v1/tailor-runs/${runId}/sections/${section}/questions`);
+  expect(res.status).toBe(200);
+  return (await res.json() as { questions: Question[] }).questions;
+};
+const jobNotes = async () => (await cv.get()).content.experience.flatMap((role) =>
+  role.notes.filter((note) => note.jobId === jobId).map((note) => ({ roleId: role.id, ...note })));
+
+describe("job questions", () => {
+  it("asks from the section's gaps with the cheap tier and stops at 8 across sections", async () => {
+    const runId = await startRun();
+    replies = [Array.from({ length: 6 }, (_, i) => ask(`Experience ${i}?`)), Array.from({ length: 6 }, (_, i) => ask(`Skill ${i}?`, { roleId: null }))];
+    const first = await questions(runId, "experience");
+    expect(first).toHaveLength(6);
+    expect(first[0]).toMatchObject({ section: "experience", roleId: newest.id, text: "Experience 0?", id: expect.any(String) });
+    expect(model.logged[0]).toMatchObject({ task: "tailor_questions", userId: "user-a" });
+    const sent = JSON.stringify(model.requests[0]);
+    expect(sent).toContain("Kubernetes");
+    expect(sent).toContain("experience");
+    expect(await questions(runId, "skills")).toHaveLength(2);
+    expect(await questions(runId, "summary")).toEqual([]);
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it("passes confirm_inferred questions through and drops unknown role ids", async () => {
+    const runId = await startRun();
+    replies = [[ask("We think you led a team because of 'Led 3 people'. Correct?", { kind: "confirm_inferred" }),
+      ask("Ghost role?", { roleId: "nope" })]];
+    const got = await questions(runId, "experience");
+    expect(got.map((q) => [q.kind, q.roleId])).toEqual([["confirm_inferred", newest.id], ["options", null]]);
+  });
+
+  it("does not ask again what was already answered for this job in an earlier run", async () => {
+    const runId = await startRun();
+    replies = [[ask("Have you used Kubernetes?")]];
+    const [asked] = await questions(runId, "experience");
+    expect((await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: asked!.id, value: "Yes, 2 years", via: "typed" }] })).status).toBe(200);
+    const later = await memoryTailorRepo("user-a", scores, docs).createRun({
+      jobId, tailoredCvId: (await memoryTailorRepo("user-a", scores, docs).getRun(runId))!.tailoredCvId!,
+      kind: "retailor", sections: ["experience"], currentSection: "experience",
+    });
+    replies = [[ask("  have you used kubernetes? "), ask("Which cloud did you run it on?")]];
+    const again = await questions(later.id, "experience");
+    expect(again.map((q) => q.text)).toEqual(["Which cloud did you run it on?"]);
+    expect(JSON.stringify(model.requests[1])).toContain("Yes, 2 years");
+  });
+
+  it("returns 404 job_not_found for another user's run", async () => {
+    const runId = await startRun();
+    const res = await call(`/v1/tailor-runs/${runId}/sections/experience/questions`, {}, "token-b");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: { code: "job_not_found" } });
+  });
+});
+
+describe("answers", () => {
+  it("stores answers in the run and saves job notes: skip none, voice and option mapped, skills on the newest role", async () => {
+    const runId = await startRun();
+    replies = [[ask("Kubernetes?", { roleId: older.id }), ask("Lead?"), ask("Docker?")]];
+    const [k, lead] = await questions(runId, "experience");
+    replies = [[ask("Terraform?", { roleId: null })]];
+    const [terraform] = await questions(runId, "skills");
+    const answers = [
+      { questionId: k!.id, value: "Yes", via: "option" },
+      { questionId: lead!.id, value: "I led four people", via: "voice" },
+      { questionId: terraform!.id, value: null, via: "skip" },
+    ];
+    const res = await call(`/v1/tailor-runs/${runId}/answers`, { answers });
+    expect(res.status).toBe(200);
+    const notes = await jobNotes();
+    expect(notes).toHaveLength(2);
+    expect(notes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ roleId: older.id, question: "Kubernetes?", answer: "Yes", via: ["pick"], jobId }),
+      expect.objectContaining({ roleId: newest.id, question: "Lead?", answer: "I led four people", via: ["voice"], jobId }),
+    ]));
+    const run = await (await app.request(`/v1/tailor-runs/${runId}`, { headers: { authorization: "Bearer token-a" } })).json() as { answers: unknown };
+    expect(run.answers).toEqual(answers);
+  });
+
+  it("puts a skills question's typed answer on the newest role", async () => {
+    const runId = await startRun();
+    replies = [[ask("Terraform?", { roleId: null })]];
+    const [terraform] = await questions(runId, "skills");
+    await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: terraform!.id, value: "Some", via: "typed" }] });
+    expect(await jobNotes()).toEqual([expect.objectContaining({ roleId: newest.id, via: ["type"] })]);
+  });
+
+  it("rejects an answer to a question the run never asked", async () => {
+    const runId = await startRun();
+    const res = await call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: "unknown", value: "x", via: "typed" }] });
+    expect(res.status).toBe(400);
+    expect(await jobNotes()).toEqual([]);
+  });
+});

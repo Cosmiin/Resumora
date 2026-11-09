@@ -1,12 +1,13 @@
 import {
   CATEGORY, formatYearMonth, normalizeLayout, type CvContent, type SectionKey,
 } from "@resumora/shared";
-import { Document, HeadingLevel, Packer, Paragraph, TextRun, type IParagraphOptions } from "docx";
+import { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun, type IParagraphOptions } from "docx";
 import { formatRange } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 import { t } from "../i18n/t.ts";
 
 export type LetterDocxInput = { greeting?: string; paragraphs: string[]; signOff?: string };
+export type ExportPhoto = { data: Uint8Array; type: "jpeg" | "png" | "webp" };
 export type LetterHeader = {
   name: string;
   contact?: string[];
@@ -56,14 +57,38 @@ function pack(children: Paragraph[], style = STYLES.classic): Promise<Blob> {
 export function buildCvDocx(
   content: CvContent,
   template: TemplateId | string | undefined,
+  photo?: ExportPhoto,
 ): Promise<Blob> {
   const selectedTemplate = getTemplate(template);
-  if (selectedTemplate.showsPhoto) {
-    // Task 26: no photo field exists yet, so nothing is drawn.
-  }
-
   const b = content.basics;
   const children: Paragraph[] = [];
+  if (selectedTemplate.showsPhoto && b.photo && photo && photo.type !== "webp") {
+    // Read the dimensions to fit the whole image within a 96 px square.
+    const bytes = new DataView(photo.data.buffer, photo.data.byteOffset, photo.data.byteLength);
+    let width = 96;
+    let height = 96;
+    if (photo.type === "png") {
+      width = bytes.getUint32(16);
+      height = bytes.getUint32(20);
+    } else {
+      for (let offset = 2; offset + 8 < bytes.byteLength;) {
+        const marker = bytes.getUint16(offset);
+        if (marker >= 0xffc0 && marker <= 0xffcf && ![0xffc4, 0xffc8, 0xffcc].includes(marker)) {
+          height = bytes.getUint16(offset + 5);
+          width = bytes.getUint16(offset + 7);
+          break;
+        }
+        const length = bytes.getUint16(offset + 2);
+        if (length < 2) break;
+        offset += length + 2;
+      }
+    }
+    const scale = 96 / Math.max(width, height);
+    children.push(new Paragraph({ children: [new ImageRun({
+      data: photo.data, type: photo.type === "jpeg" ? "jpg" : "png",
+      transformation: { width: width * scale, height: height * scale },
+    })] }));
+  }
   if (b.fullName) children.push(paragraph(b.fullName, { heading: HeadingLevel.TITLE }));
   const titles = join(b.titles);
   if (titles) children.push(paragraph(titles));

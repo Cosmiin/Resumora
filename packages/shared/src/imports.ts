@@ -68,6 +68,8 @@ export type ImportDraft = z.infer<typeof ImportDraftSchema>;
 
 export function emptyDraft(): ImportDraft {
   const { basics } = emptyCv();
+  // Photos belong to the saved CV, never the AI import draft.
+  delete basics.photo;
   return {
     detectedLocale: "en", warnings: [], basics,
     achievements: [], experience: [], volunteering: [], education: [], technicalSkills: [], professionalSkills: [], unclearSkills: [],

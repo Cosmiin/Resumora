@@ -5,6 +5,7 @@ import { RequireAuth } from "./auth/RequireAuth.tsx";
 import { CvPage } from "./cv/CvPage.tsx";
 import { JobsPage } from "./jobs/JobsPage.tsx";
 import { JobPage } from "./jobs/JobPage.tsx";
+import { TailorFlow } from "./tailor/TailorFlow.tsx";
 
 export const routes: RouteObject[] = [
   { path: "/login", element: <LoginPage /> },
@@ -16,6 +17,7 @@ export const routes: RouteObject[] = [
       { path: "/cv", element: <CvPage /> },
       { path: "/jobs", element: <JobsPage /> },
       { path: "/jobs/:id", element: <JobPage /> },
+      { path: "/jobs/:id/tailor", element: <TailorFlow /> },
     ],
   },
   { path: "*", element: <Navigate to="/" replace /> },

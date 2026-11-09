@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, emptyCv, newId, type CvContent } from "./index.ts";
+import { CvContentSchema, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, type CvContent } from "./index.ts";
 
 function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
   return {
@@ -22,6 +22,31 @@ function withExperience(items: CvContent["experience"]): CvContent {
 }
 
 describe("CvContentSchema", () => {
+  it.each([1, 3])("accepts photo zoom %i", (zoom) => {
+    const cv = emptyCv();
+    cv.basics.photo = { path: "user/photo.jpg", x: 0, y: 100, zoom };
+    expect(CvContentSchema.safeParse(cv).success).toBe(true);
+  });
+
+  it.each([
+    { zoom: 4 }, { zoom: 0.9 }, { x: -1 }, { y: 101 },
+    { path: "" }, { path: "x".repeat(301) },
+  ])("rejects invalid photo values: %j", (overrides) => {
+    const cv = emptyCv();
+    cv.basics.photo = { path: "user/photo.jpg", x: 50, y: 50, zoom: 1, ...overrides };
+    expect(CvContentSchema.safeParse(cv).success).toBe(false);
+  });
+
+  it.each([1, 2])("upgrades a stored v%i CV without a photo to null", (schemaVersion) => {
+    const cv = emptyCv();
+    delete cv.basics.photo;
+    const stored = schemaVersion === 1
+      ? Object.fromEntries(Object.entries({ ...cv, schemaVersion }).filter(([key]) =>
+        !["achievements", "volunteering", "awards", "courses", "publications", "interests", "layout"].includes(key)))
+      : cv;
+    expect(StoredCvSchema.parse(stored).basics.photo).toBeNull();
+  });
+
   it("accepts all six CV locales and rejects unsupported locales", () => {
     for (const locale of ["ro", "en", "fr", "de", "es", "it"]) {
       expect(CvContentSchema.safeParse({ ...emptyCv(), locale }).success).toBe(true);

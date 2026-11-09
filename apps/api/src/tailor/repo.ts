@@ -1,10 +1,47 @@
-import type { MatchScore } from "@resumora/shared";
+import type { CvContent, MatchScore, TailorLanguage, TailorRun, TailorSection, Tone } from "@resumora/shared";
 
 export type ScoreTarget = "base" | "tailored";
 
-/** Match scores belonging to the signed-in user. */
+export type NewTailoredCv = {
+  jobId: string;
+  language: TailorLanguage;
+  content: CvContent;
+  baseSnapshotAt: string;
+  tone: Tone;
+  instruction: string | null;
+};
+
+export type NewRun = {
+  jobId: string;
+  tailoredCvId: string;
+  kind: TailorRun["kind"];
+  sections: TailorSection[];
+  currentSection: TailorSection | null;
+};
+
+/** Match scores, tailored CVs and tailor runs belonging to the signed-in user. */
 export interface TailorRepo {
   saveScore(jobId: string, target: ScoreTarget, tailoredCvId: string | null, score: MatchScore): Promise<void>;
   /** Latest score for the target, optionally restricted to a tailored CV. */
   getScore(jobId: string, target: ScoreTarget, tailoredCvId?: string): Promise<MatchScore | null>;
+  findTailoredCvId(jobId: string, language: TailorLanguage): Promise<string | null>;
+  /** The steering a section pass needs. */
+  getSteering(tailoredCvId: string): Promise<{ language: TailorLanguage; tone: Tone | null; instruction: string | null } | null>;
+  /** Content is also stored as the base snapshot. "exists" when the job already has one in this language. */
+  createTailoredCv(input: NewTailoredCv): Promise<string | "exists">;
+  /** The tailored CV's content, review state and version; null when gone. */
+  getTailoredCv(id: string): Promise<StoredTailoredCv | null>;
+  /** Saves when the version still matches, then bumps it. */
+  saveTailoredCv(id: string, expectedVersion: number, changes: { content: CvContent; review: Review; score: MatchScore }): Promise<"ok" | "conflict">;
+  /** Newest run of any status for the tailored CV. */
+  latestRun(tailoredCvId: string): Promise<TailorRun | null>;
+  createRun(input: NewRun): Promise<TailorRun>;
+  getRun(id: string): Promise<TailorRun | null>;
+  /** Replaces the given fields; null when the run is gone. */
+  updateRun(id: string, changes: RunChanges): Promise<TailorRun | null>;
 }
+
+export type Review = Record<string, unknown>;
+export type StoredTailoredCv = { id: string; jobId: string; content: CvContent; review: Review | null; version: number };
+
+export type RunChanges = Partial<Pick<TailorRun, "questions" | "answers" | "proposals" | "status" | "currentSection" | "errorCode">>;

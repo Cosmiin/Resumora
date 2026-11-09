@@ -88,7 +88,8 @@ describe("job endpoints", () => {
     await memoryTailorRepo("user-a", scores).saveScore(id, "tailored", "cv-a", score);
     const res = await request(id);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ base: score, tailored: null });
+    // Score 2 is the newest tailored score of any of the job's tailored CVs (Task 16, R13).
+    expect(await res.json()).toEqual({ base: score, tailored: score });
     await error(await request(id, "token-b"), 404, "not_found");
     await error(await request(crypto.randomUUID()), 404, "not_found");
     await error(await request("invalid"), 404, "not_found");
@@ -100,7 +101,7 @@ describe("job endpoints", () => {
     const userThoughts = "x".repeat(2000);
     const res = await patch(id, 1, extracted, { userThoughts, applicationStatus: "applied" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ userThoughts, applicationStatus: "applied", version: 2 });
+    expect(await res.json()).toMatchObject({ userThoughts, applicationStatus: "applied", version: 2, editedByUser: false });
     expect(await (await get(id)).json()).toMatchObject({ userThoughts, applicationStatus: "applied" });
     expect((await patch(id, 2)).status).toBe(200);
     expect(await (await get(id)).json()).toMatchObject({ userThoughts, applicationStatus: "applied" });

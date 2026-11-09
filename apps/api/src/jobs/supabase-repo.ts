@@ -95,11 +95,13 @@ export function supabaseJobRepo(env: SupabaseEnv, user: AuthUser): JobRepo {
       return parsed.data;
     },
     async patch(id, expectedVersion, extracted, fields = {}) {
+      // Thoughts and status saves resend the current extraction; only extraction edits count as user edits.
+      const extractionEdit = fields.userThoughts === undefined && fields.applicationStatus === undefined;
       const { data, error } = await db.from("jobs").update({
         ...(fields.userThoughts !== undefined ? { user_thoughts: fields.userThoughts } : {}),
         ...(fields.applicationStatus !== undefined ? { application_status: fields.applicationStatus } : {}),
         extracted, title: extracted.title, company: extracted.company, location: extracted.location,
-        edited_by_user: true, version: expectedVersion + 1, updated_at: new Date().toISOString(),
+        ...(extractionEdit ? { edited_by_user: true } : {}), version: expectedVersion + 1, updated_at: new Date().toISOString(),
       }).eq("id", id).eq("version", expectedVersion).eq("status", "ready").select("id").maybeSingle();
       if (error) throw new Error(`jobs update failed: ${error.message}`);
       if (data) return "ok";

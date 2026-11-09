@@ -113,6 +113,12 @@ export const BasicsSchema = z
     website: text(),
     linkedin: text(),
     summary: text(MAX_LONG_TEXT),
+    photo: z.object({
+      path: z.string().min(1).max(300),
+      x: z.number().min(0).max(100),
+      y: z.number().min(0).max(100),
+      zoom: z.number().min(1).max(3),
+    }).strict().nullable().default(null).optional(),
   })
   .strict();
 
@@ -203,6 +209,7 @@ export function emptyCv(locale: Locale = "en"): CvContent {
       website: "",
       linkedin: "",
       summary: "",
+      photo: null,
     },
     experience: [],
     education: [],
