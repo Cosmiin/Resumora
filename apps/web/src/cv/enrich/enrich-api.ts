@@ -20,9 +20,12 @@ export async function getScores(): Promise<RoleResult[]> {
   return (await apiFetch("/v1/enrich/scores", { schema: ScoresSchema })).items;
 }
 
-/** Scores one role of the saved CV. 409 `not_saved`: the role isn't saved yet, or its text has moved on. */
-export function scoreRole(roleId: string, fingerprint: string): Promise<RoleResult> {
-  return apiFetch("/v1/enrich/score", { method: "POST", json: { roleId, fingerprint }, schema: RoleResultSchema });
+/**
+ * Scores one role of the saved CV. 409 `not_saved`: the role isn't saved yet, or its text has moved on.
+ * fresh: ask the AI again with the notes in view (after "Tell us about…"), instead of the stored result.
+ */
+export function scoreRole(roleId: string, fingerprint: string, fresh?: boolean): Promise<RoleResult> {
+  return apiFetch("/v1/enrich/score", { method: "POST", json: fresh ? { roleId, fingerprint, fresh } : { roleId, fingerprint }, schema: RoleResultSchema });
 }
 
 export function improveBullet(input: { roleId: string; bulletId: string; fingerprint: string }): Promise<ImproveAnswer> {

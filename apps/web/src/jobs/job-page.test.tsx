@@ -48,7 +48,7 @@ const role: Experience = { id: "role", company: "Acme", title: "Engineer", locat
 const match: MatchScore = { policy: "match/1", total: 80, band: "strong", capped: false, labels: [],
   parts: { requirements: null, keywords: null, seniority: null, langEdu: null } };
 const roleScores = (score: number) => ({ scores: new Map([["role", { state: "ready" as const,
-  result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [] } }]]), retry: vi.fn() });
+  result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } }]]), retry: vi.fn() });
 const ready = () => screen.findByRole("heading", { name: "Engineer", level: 1 });
 
 beforeEach(() => {

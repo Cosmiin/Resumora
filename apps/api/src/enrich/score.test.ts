@@ -63,13 +63,41 @@ describe("scoreRole", () => {
     const model = fakeModel(() => answer);
     const result = await run(model, role);
     expect(result.roleQuestions).toEqual([
-      { id: "rq2", text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"], kind: "role" },
+      { id: "rq2", text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"], kind: "role", topic: "other" },
     ]);
     expect(result.fingerprint).toBe(stored.fingerprint);
     role.notes.push({ id: "n2", question: "who did you report to?", answer: "The CEO", via: ["type"], askedAt: "2026-11-06T00:01:00Z" });
     await save(role);
     expect((await run(model, role)).roleQuestions).toEqual([]);
     expect(model.requests).toHaveLength(source === "fresh" ? 1 : 0);
+  });
+
+  it("re-scores a row stored under the old policy once", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    const stored = buildRoleResult(role, allSpecific(role), fp(role));
+    await insights.put(role.id, { ...stored, policy: "score/3" });
+    const model = fakeModel(() => allSpecific(role));
+    expect((await run(model, role)).policy).toBe(SCORE_POLICY);
+    await run(model, role);
+    expect(model.requests).toHaveLength(1);
+  });
+
+  it("the prompt always covers company, purpose and tools, skips what the CV or notes answer, and allows at most 5 more", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    role.notes.push({ id: "n1", question: "What does the company do?", answer: "Acme runs payroll for small firms", via: ["type"], askedAt: "2026-11-06T00:00:00Z" });
+    await save(role);
+    const model = fakeModel(() => ({ ...allSpecific(role), thin: true,
+      roleQuestions: [{ text: "What was the role for?", options: ["Payroll", "HR", "Finance"], topic: "purpose" }] }));
+    const result = await run(model, role);
+    const sent = JSON.stringify(model.requests[0]?.messages);
+    expect(sent).toContain("what the company does");
+    expect(sent).toContain("what the role was for");
+    expect(sent).toContain("tools");
+    expect(sent).toContain("at most 5 more");
+    expect(sent).toContain("Acme runs payroll for small firms");
+    expect(result.roleQuestions.map((q) => q.topic)).toEqual(["purpose"]);
+    expect(result.thin).toBe(true);
   });
 
   it("asks the model once for a missing row and stores the result", async () => {
@@ -142,7 +170,7 @@ describe("scoreRole", () => {
     await insights.put(role.id, RoleResultSchema.parse(stored));
     const model = fakeModel(() => allSpecific(role));
     const result = await run(model, role);
-    expect(result.policy).toBe("score/3");
+    expect(result.policy).toBe(SCORE_POLICY);
     expect(await run(model, role)).toEqual(result);
     expect(model.requests).toHaveLength(1);
   });
@@ -178,7 +206,7 @@ describe("scoreRole", () => {
       score: null, bullets: [], nextStep: null, questions: [],
       roleQuestions: [
         { id: "rq1", text: "Which tools did you use?", options: ["Excel", "SAP", "Workday"], kind: "role" },
-        { id: "rq2", text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"], kind: "role" },
+        { id: "rq2", text: "Who did you report to?", options: ["The CEO", "A department head", "The owner"], kind: "role", topic: "other" },
       ],
     });
     expect(model.requests).toHaveLength(1);
@@ -288,7 +316,7 @@ describe("gradeBullets", () => {
 });
 
 describe("score prompt", () => {
-  it("prioritizes the seven topics and limits role questions to the first four", () => {
+  it("prioritizes the seven topics, and role questions cover company, purpose and tools, then at most 5 more", () => {
     const prompt = scoreSystemPrompt("en");
     const topics = ["| Tools |", "| Reporting line |", "| Leading people |", "| Who they worked with |", "| Processes |", "| Scope |", "| Results |"];
     let previous = -1;
@@ -297,7 +325,10 @@ describe("score prompt", () => {
       expect(position).toBeGreaterThan(previous);
       previous = position;
     }
-    expect(prompt).toContain("Role questions ask only about tools, reporting line, leading people and who they worked with.");
+    const fixed = ["topic company: what the company does", "topic purpose: what the role was for", "topic tools: the tools"].map((s) => prompt.indexOf(s));
+    expect(fixed.every((at, i) => at > (fixed[i - 1] ?? -1))).toBe(true);
+    expect(prompt).toContain("at most 5 more");
+    expect(prompt).not.toContain("Role questions ask only about");
   });
 
   it("requires options for every question and avoids facts already answered", () => {

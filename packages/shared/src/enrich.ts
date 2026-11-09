@@ -2,12 +2,18 @@ import { z } from "zod";
 import type { Experience, Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/3";
+export const SCORE_POLICY = "score/4";
 
 export const WEIGHTS = { contribution: 35, clarity: 25, specificity: 20, impact: 20 } as const;
 
 export const MAX_QUESTIONS = 20;
-export const MAX_ROLE_QUESTIONS = 3;
+/** Company, purpose and tools, plus at most 5 more. */
+export const MAX_ROLE_QUESTIONS = 8;
+
+/** What a role question is about. The first three are always covered unless the CV or notes already say it. */
+export const ROLE_TOPICS = ["company", "purpose", "tools", "other"] as const;
+export const RoleTopicSchema = z.enum(ROLE_TOPICS);
+export type RoleTopic = z.infer<typeof RoleTopicSchema>;
 
 export const GradeSchema = z.enum(["missing", "partial", "specific"]);
 export type Grade = z.infer<typeof GradeSchema>;
@@ -44,7 +50,10 @@ export const ModelScoreSchema = z
     roleQuestions: z.array(z.object({
       text: z.string().max(240),
       options: z.array(z.string().max(60)).max(4),
+      topic: RoleTopicSchema.default("other"),
     }).strict()).max(MAX_ROLE_QUESTIONS).default([]),
+    /** Too little information to infer plausible skills or achievements. */
+    thin: z.boolean().default(false),
   })
   .strict();
 export type ModelScore = z.infer<typeof ModelScoreSchema>;
@@ -64,7 +73,7 @@ export const QuestionSchema = z
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const RoleQuestionSchema = z
-  .object({ id, text: z.string(), options: z.array(z.string().max(60)).max(4), kind: z.literal("role") })
+  .object({ id, text: z.string(), options: z.array(z.string().max(60)).max(4), kind: z.literal("role"), topic: RoleTopicSchema.default("other") })
   .strict();
 export type RoleQuestion = z.infer<typeof RoleQuestionSchema>;
 
@@ -92,6 +101,8 @@ export const RoleResultSchema = z
     nextStep: z.object({ bulletId: id, issue: IssueSchema, tip: z.string().nullable() }).strict().nullable(),
     questions: z.array(QuestionSchema).max(MAX_QUESTIONS),
     roleQuestions: z.array(RoleQuestionSchema).max(MAX_ROLE_QUESTIONS).default([]),
+    /** One bullet or fewer, or too little to infer skills or achievements: focus mode opens with "Tell us about…". */
+    thin: z.boolean().default(false),
   })
   .strict();
 export type RoleResult = z.infer<typeof RoleResultSchema>;
@@ -228,9 +239,10 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
     bullets.length === 0 ? null : Math.round(bullets.reduce((sum, b) => sum + b.score, 0) / bullets.length);
 
   const roleQuestions: RoleQuestion[] = (model.roleQuestions ?? []).slice(0, MAX_ROLE_QUESTIONS).map((q, i) => ({
-    id: `rq${i + 1}`, text: q.text, options: q.options.filter(isAllowedOption), kind: "role",
+    id: `rq${i + 1}`, text: q.text, options: q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
   }));
-  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions };
+  const thin = role.bullets.length <= 1 || model.thin === true;
+  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions, thin };
 }
 
 /** Small synchronous 53-bit string hash (cyrb53), so the browser and the worker agree. */

@@ -30,3 +30,10 @@ session: r2-enrich (session 7) · builder: claude
 commit: see git log (base 9c5728d) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0 · weekly 43% → 44%
 ruling: the Editor-open test is in `apps/web/src/cv/editor.test.tsx` and the reducer test in `apps/web/src/cv/edit/cvReducer.test.ts` (test files not in the brief's list). The import's `jobs()` helper is shared by experience and volunteering, so a volunteering "Organisation · Location" copy is dropped on import too; the clean-up on open touches experience only.
 open: none
+
+## Task 3: Role questions about company, purpose and tools, plus the thin flag — done
+session: r2-enrich (session 7) · builder: claude
+commit: see git log (base 3921670) · reviews: 2 (agents) · fix rounds: 1 (one stale test expectation) · guard denials: 0 · weekly 44% → 44%
+ruling: also holds the owner's `fresh` flag on `POST /v1/enrich/score` (routes.ts, routes.test.ts, web `scoreRole`). Old RoleResult fixtures in 7 web test files gained `thin: false` / `topic: "other"`. The "Question n of N · Tools" eyebrow moves to Task 2 (FocusMode).
+note: `score/4` changes every role's fingerprint, so every stored role is re-scored once when its CV opens (as the plan intends).
+open: none

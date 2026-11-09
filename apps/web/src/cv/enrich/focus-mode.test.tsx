@@ -39,7 +39,7 @@ const result: RoleResult = {
   roleId: "r1", policy: "score/2", fingerprint: fingerprint(role, "en"), score: 52,
   bullets: [grade("b1", 43), grade("b2", 56), grade("b3", 58)],
   nextStep: null,
-  roleQuestions: [],
+  roleQuestions: [], thin: false,
   questions: [{ bulletId: "b1", text: "Roughly how many drivers did you plan for each day?", options: ["Under 10", "10–50"], kind: "detail" }],
 };
 const proposal = { proposal: { bulletId: "b1", text: "Planned daily routes for 10–50 regional drivers." }, bulletBefore: 43, bulletAfter: 80, roleBefore: 52, roleAfter: 71, cached: true };
@@ -88,8 +88,8 @@ describe("focus mode", () => {
   it("opens on role questions, saves answers without rewriting, then shows the first bullet", async () => {
     const actions: CvAction[] = [];
     const roleQuestions: RoleResult["roleQuestions"] = [
-      { id: "rq1", text: "Who did you report to?", options: ["The CEO", "The owner", "A team lead"], kind: "role" },
-      { id: "rq2", text: "Who did you work with?", options: ["Finance", "Customers", "Vendors"], kind: "role" },
+      { id: "rq1", text: "Who did you report to?", options: ["The CEO", "The owner", "A team lead"], kind: "role", topic: "other" },
+      { id: "rq2", text: "Who did you work with?", options: ["Finance", "Customers", "Vendors"], kind: "role", topic: "other" },
     ];
     render(<Harness roleResult={{ ...result, roleQuestions }} onAction={(a) => actions.push(a)} />);
     expect(screen.getByText("About this role · 1 of 2")).toBeInTheDocument();
@@ -293,8 +293,8 @@ describe("focus mode edge cases", () => {
 describe("free talk", () => {
   const link = "Questions not specific enough? Describe what you did there in your own words.";
   const roleQuestions: RoleResult["roleQuestions"] = [
-    { id: "rq1", text: "Who did you report to?", options: ["The CEO", "The owner", "A team lead"], kind: "role" },
-    { id: "rq2", text: "Who did you work with?", options: ["Finance", "Customers", "Vendors"], kind: "role" },
+    { id: "rq1", text: "Who did you report to?", options: ["The CEO", "The owner", "A team lead"], kind: "role", topic: "other" },
+    { id: "rq2", text: "Who did you work with?", options: ["Finance", "Customers", "Vendors"], kind: "role", topic: "other" },
   ];
 
   it.each([

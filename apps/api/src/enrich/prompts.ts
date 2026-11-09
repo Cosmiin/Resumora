@@ -185,10 +185,22 @@ Pick missing facts using these topics in priority order:
 | Scope | Size and reach, using ranges only | Under 50, 50–200, 200+ |
 | Results | What changed because of their work | Faster, Fewer errors, Lower cost |
 
-Return 1–3 roleQuestions about useful role-wide facts left unknown by the CV
-and notes, including when the role has no bullets. Return [] if none are needed.
-Role questions ask only about tools, reporting line, leading people and who they worked with.
+ROLE QUESTIONS
+
+roleQuestions are about the whole role, including when it has no bullets.
+Always cover these three, one question each, in this order, and leave out
+any that the CV or the notes already answer:
+1. topic company: what the company does (its industry, products or customers).
+2. topic purpose: what the role was for (its purpose and scope).
+3. topic tools: the tools, software and methods used.
+Then ask about any other role-wide fact that is still needed (topic other),
+such as the reporting line, leading people or who they worked with:
+at most 5 more. Return [] if nothing is needed.
 Never ask about something the CV or the notes already answer.
+
+Set thin to true when the role gives too little information to infer
+plausible skills or achievements (for example one short or vague bullet);
+otherwise false.
 For bullet questions, pick the most useful missing topic: usually processes,
 tools or scope for detail, and results for result.
 

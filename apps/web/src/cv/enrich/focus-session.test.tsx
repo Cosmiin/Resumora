@@ -28,7 +28,7 @@ function score(r: Experience, value: number | null = 40): RoleResult {
       specificity: "partial", impact: i === 2 ? "specific" : "partial",
       issue: "specificity", tip: null, question: "Which tools?",
     })),
-    roleQuestions: [],
+    roleQuestions: [], thin: false,
     questions: r.bullets.map((b, i) => ({ bulletId: b.id, text: i === 0 ? "Which tools?" : `Which tools for tool ${i}?`, options: [], kind: "detail" })),
   };
 }
@@ -37,8 +37,8 @@ const proposal = {
   bulletBefore: 20, bulletAfter: 80, roleBefore: 40, roleAfter: 70, cached: true,
 };
 const roleQuestions: RoleResult["roleQuestions"] = [
-  { id: "rq1", text: "Who did you report to?", options: ["The CEO", "The owner", "A team lead"], kind: "role" },
-  { id: "rq2", text: "Who did you work with?", options: ["Finance", "Customers", "Vendors"], kind: "role" },
+  { id: "rq1", text: "Who did you report to?", options: ["The CEO", "The owner", "A team lead"], kind: "role", topic: "other" },
+  { id: "rq2", text: "Who did you work with?", options: ["Finance", "Customers", "Vendors"], kind: "role", topic: "other" },
 ];
 function needsDetails() {
   api.improveBullet.mockResolvedValueOnce({ needsDetail: true, nextQuestion: { text: "Which processes?", options: ["Payroll", "Onboarding", "Reporting"] } })

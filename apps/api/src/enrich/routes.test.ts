@@ -59,6 +59,16 @@ describe("/v1/enrich", () => {
     expect(list.items).toEqual([result]);
   });
 
+  it("POST /score with fresh asks the model again instead of returning the stored result", async () => {
+    expect((await score({ roleId: role.id, fingerprint: fp })).status).toBe(200);
+    const calls = model.requests.length;
+    expect((await score({ roleId: role.id, fingerprint: fp })).status).toBe(200);
+    expect(model.requests).toHaveLength(calls);
+    expect((await score({ roleId: role.id, fingerprint: fp, fresh: true })).status).toBe(200);
+    expect(model.requests).toHaveLength(calls + 1);
+    expect((await score({ roleId: role.id, fingerprint: fp, fresh: "yes" })).status).toBe(400);
+  });
+
   it("GET /scores is scoped to the signed-in user", async () => {
     await score({ roleId: role.id, fingerprint: fp });
     expect(await memoryInsightsRepo("user-1", store).list()).toHaveLength(1);
