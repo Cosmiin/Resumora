@@ -43,7 +43,15 @@ export function Menu(props: { label: ReactNode; items: MenuItem[]; variant?: But
   }
 
   return (
-    <div className="ui-menu" ref={root} onKeyDown={onKeyDown}>
+    <div
+      className="ui-menu"
+      ref={root}
+      onKeyDown={onKeyDown}
+      onBlur={(event) => {
+        // Focus left the menu (e.g. Tab past the last item): close it, and leave focus where it went.
+        if (open && event.relatedTarget && !root.current?.contains(event.relatedTarget as Node)) setOpen(false);
+      }}
+    >
       <button
         ref={trigger}
         type="button"

@@ -32,7 +32,12 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
         onClose();
       }}
       onClick={(event) => {
-        if (event.target === ref.current) onClose(); // a click on the backdrop
+        // The backdrop belongs to the dialog element, so a backdrop click also targets it;
+        // only a click outside the dialog's own box is one.
+        if (event.target !== ref.current) return;
+        const box = ref.current.getBoundingClientRect();
+        const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+        if (!inside) onClose();
       }}
     >
       {open && (

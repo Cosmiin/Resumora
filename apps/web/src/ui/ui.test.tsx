@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -106,6 +106,15 @@ describe("Menu", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
+  it("closes when Tab moves focus out of it", async () => {
+    render(<ExportMenu />);
+    await userEvent.click(screen.getByRole("button", { name: "Export" }));
+    await userEvent.tab();
+    await userEvent.tab();
+    expect(screen.getByRole("button", { name: "Re-tailor" })).toHaveFocus();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
   it("closes on Escape and gives focus back to its button", async () => {
     render(<ExportMenu />);
     const trigger = screen.getByRole("button", { name: "Export" });
@@ -160,6 +169,21 @@ describe("Dialog", () => {
       </Dialog>,
     );
     expect(screen.getByRole("dialog", { name: "Delete your account?" })).toHaveTextContent("This can’t be undone.");
+  });
+
+  it("closes on a click outside its box, not on a click on its own padding", () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog open onClose={onClose} title="Pick a language">
+        <p>Body</p>
+      </Dialog>,
+    );
+    const dialog = screen.getByRole("dialog");
+    dialog.getBoundingClientRect = () => ({ left: 100, right: 500, top: 100, bottom: 400, width: 400, height: 300, x: 100, y: 100, toJSON: () => ({}) });
+    fireEvent.click(dialog, { clientX: 110, clientY: 110 });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(dialog, { clientX: 20, clientY: 20 });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("asks to close when the browser cancels it (Escape)", () => {
