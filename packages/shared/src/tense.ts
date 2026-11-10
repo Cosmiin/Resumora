@@ -5,7 +5,8 @@ const PAST_VERBS = new Set([
   "bought", "sold", "taught", "kept", "held", "met", "oversaw", "spent", "sent", "cut", "put", "found",
   "gave", "saw", "chose", "became", "went", "got", "left", "lost", "paid", "read", "rebuilt", "rewrote",
   "undertook", "withdrew", "understood", "thought", "told", "sought", "spoke", "stood", "fought", "flew",
-  "hired", "shaped",
+  "hired", "shaped", "split", "spread", "shut", "quit", "let", "hit", "bid", "upset",
+  "forecast", "broadcast", "outran", "overran", "rerun",
 ]);
 
 /** English bullet openings that do not use a recognised past-tense verb. */

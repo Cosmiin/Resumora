@@ -10,6 +10,8 @@ describe("startsInPresentTense", () => {
 
   it.each([
     "Ensured compliance with legal teams", "Led a team", "Oversaw partner onboarding", "  LED a team",
+    "Split the regional team into two squads", "Forecast quarterly demand", "Shut down the legacy service",
+    ..."split spread shut quit let hit bid upset forecast broadcast outran overran rerun".split(" "),
     ..."led built ran made won grew drove set wrote took began brought bought sold taught kept held met oversaw spent sent cut put found gave saw chose became went got left lost paid read rebuilt rewrote undertook withdrew understood thought told sought spoke stood fought flew hired shaped".split(" "),
   ])("accepts an English past-tense opening: %s", (text) => {
     expect(startsInPresentTense(text, "en")).toBe(false);
