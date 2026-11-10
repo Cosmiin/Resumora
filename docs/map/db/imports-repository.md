@@ -16,6 +16,8 @@ Create and read import jobs, then let the worker finish or expire them and delet
 - The fake creates file/row without SQL quota, filename, UUID, bucket or result constraints and overwrites duplicate IDs; database insertion/upload can fail where the fake succeeds. `apps/api/src/imports/memory-repo.ts:45` -> `files.set`, `apps/api/src/imports/memory-repo.ts:47` -> `rows.set`, `supabase/migrations/20261105000000_imports.sql:5` -> `primary key`, `supabase/migrations/20261105010000_import_limit.sql:12` -> `>= 10`
 - Fake admin logging is a no-op; the SQL admin inserts ai_calls and throws when insertion fails. `apps/api/src/imports/memory-repo.ts:88` -> `logCall`, `apps/api/src/imports/supabase-repo.ts:130` -> `from("ai_calls").insert`, `apps/api/src/imports/supabase-repo.ts:134` -> `throw new Error`
 
+- formatOf treats only a lowercase .docx suffix as DOCX and every other path as PDF; the stored path therefore decides the parser used by the consumer. `apps/api/src/imports/repo.ts:18` -> `path.endsWith(".docx")`, `apps/api/src/imports/consumer.ts:27` -> `formatOf(job.storagePath)`, `apps/api/src/imports/process.ts:44` -> `extractText(input.bytes, input.format)`
+
 ## Connections
 
 - Uses row and Storage policies: `apps/api/src/imports/supabase-repo.ts:66` -> `cv_imports` -> `supabase/migrations/20261105000000_imports.sql:27` -> `auth.uid()`; `apps/api/src/imports/supabase-repo.ts:60` -> `upload` -> `supabase/migrations/20261105000000_imports.sql:41` -> `storage.foldername`.
@@ -23,6 +25,8 @@ Create and read import jobs, then let the worker finish or expire them and delet
 - Stored results originate from admission/extraction prompt templates: `apps/api/src/imports/process.ts:54` -> `admitPrompt` -> `apps/api/src/imports/prompts.ts:18` -> `admitPrompt`; `apps/api/src/imports/process.ts:67` -> `extractPrompt` -> `apps/api/src/imports/prompts.ts:91` -> `extractPrompt`.
 - Web upload/read/apply URLs reach import handlers: `apps/web/src/imports/imports-api.ts:7` -> `/v1/imports`, `apps/web/src/imports/imports-api.ts:11` -> `/v1/imports`, `apps/web/src/imports/imports-api.ts:15` -> `/apply` -> `apps/api/src/imports/routes.ts:27` -> `app.post`, `apps/api/src/imports/routes.ts:51` -> `app.get`, `apps/api/src/imports/routes.ts:58` -> `/:id/apply`; mount `apps/api/src/app.ts:76` -> `/v1/imports`.
 - Cleanup uses admin deletion, which owners cannot do through the import policies: `apps/api/src/imports/consumer.ts:61` -> `admin.deleteFile` -> `apps/api/src/imports/supabase-repo.ts:116` -> `remove`; stale sweep `apps/api/src/imports/consumer.ts:54` -> `expireStale` -> `apps/api/src/imports/supabase-repo.ts:119` -> `expireStale`.
+
+- The consumer passes the stored path through formatOf into import processing: `apps/api/src/imports/consumer.ts:27` -> `formatOf(job.storagePath)` -> `apps/api/src/imports/repo.ts:17` -> `formatOf`; processing uses that format at `apps/api/src/imports/process.ts:44` -> `extractText(input.bytes, input.format)`.
 
 ## Assumptions
 

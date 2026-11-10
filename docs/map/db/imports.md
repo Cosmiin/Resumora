@@ -15,7 +15,9 @@ Store queued imports and private uploads with owner access, upload limits and a 
 - Current original import policies allow authenticated owners to select and insert only; column grants limit inserts to id/file_name/storage_path, and no owner update/delete permission is granted. `supabase/migrations/20261105000000_imports.sql:23` -> `grant select`, `supabase/migrations/20261105000000_imports.sql:24` -> `grant insert`, `supabase/migrations/20261105000000_imports.sql:26` -> `own imports: read`
 - cv-imports is private, limited to 5242880 bytes and PDF/DOCX MIME types; current original object policies allow authenticated upload/read in the caller's first path folder, with no import-file update/delete policy. `supabase/migrations/20261105000000_imports.sql:35` -> `cv-imports`, `supabase/migrations/20261105000000_imports.sql:39` -> `own import files: upload`, `supabase/migrations/20261105000000_imports.sql:42` -> `own import files: read`
 - Current original check_import_limit() serializes inserts per user and rejects the eleventh row in a strict rolling 24-hour window; current original cv_imports_limit is a BEFORE INSERT trigger. `supabase/migrations/20261105010000_import_limit.sql:3` -> `check_import_limit`, `supabase/migrations/20261105010000_import_limit.sql:10` -> `pg_advisory_xact_lock`, `supabase/migrations/20261105010000_import_limit.sql:19` -> `cv_imports_limit`
-- tested by `supabase/tests/database/imports.test.sql:102` -> `results_eq`
+- tested by `supabase/tests/database/imports.test.sql:126` -> `throws_ok`
+
+- The pgTAP fixtures use storage_path values such as x and user-folder paths with numeric or x basenames, rather than `<userId>/<importId>.<ext>`; enforcing that format would break those fixtures. tested by `supabase/tests/database/imports.test.sql:77` -> `'x'`, tested by `supabase/tests/database/imports.test.sql:98` -> `'x'`, tested by `supabase/tests/database/imports.test.sql:124` -> `generate_series`, tested by `supabase/tests/database/imports.test.sql:127` -> `x.pdf`
 
 ## Connections
 

@@ -2,7 +2,7 @@
 id: db/jobs-repository
 area: db
 files: ["apps/api/src/jobs/repo.ts","apps/api/src/jobs/supabase-repo.ts","apps/api/src/jobs/memory-repo.ts"]
-depends_on: ["db/jobs","db/tailoring-tables","db/ai-log","shared/jobs"]
+depends_on: ["db/jobs","db/tailoring-tables","db/ai-log","shared/jobs","db/local-config"]
 contract: false
 checked_hash: 5f97cde1
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
@@ -20,6 +20,8 @@ Expose job creation, pagination, version-checked editing and worker updates thro
 - Fake pagination compares timestamp strings, while SQL compares timestamptz values; equivalent timestamps with different accepted UTC formatting can produce different fake page boundaries. `apps/api/src/jobs/memory-repo.ts:56` -> `row.createdAt < after.createdAt`, `apps/api/src/jobs/supabase-repo.ts:75` -> `created_at.lt`, `apps/api/src/jobs/repo.ts:18` -> `00:00`
 - Fake job removal has no link to the separate tailoring store, whereas SQL job foreign keys cascade tailored documents, runs and scores. `apps/api/src/jobs/memory-repo.ts:91` -> `rows.delete`, `supabase/migrations/20261108000000_tailoring.sql:10` -> `on delete cascade`, `supabase/migrations/20261108000000_tailoring.sql:32` -> `on delete cascade`, `supabase/migrations/20261108000000_tailoring.sql:49` -> `on delete cascade`
 
+- Both repositories hand-map rows to Job; a new required field needs the Supabase COLUMNS select list and snake_case-to-camelCase mapping plus the memory mapping updated together. `apps/api/src/jobs/supabase-repo.ts:26` -> `COLUMNS`, `apps/api/src/jobs/supabase-repo.ts:85` -> `select(COLUMNS)`, `apps/api/src/jobs/supabase-repo.ts:89` -> `JobSchema.safeParse`, `apps/api/src/jobs/memory-repo.ts:67` -> `...toListItem(row)`
+
 ## Connections
 
 - User queries rely on separate job/run policies: `apps/api/src/jobs/supabase-repo.ts:85` -> `from("jobs")` -> `supabase/migrations/20261107000000_jobs.sql:41` -> `auth.uid()`; `apps/api/src/jobs/supabase-repo.ts:67` -> `from("job_runs")` -> `supabase/migrations/20261107000000_jobs.sql:51` -> `auth.uid()`.
@@ -27,6 +29,10 @@ Expose job creation, pagination, version-checked editing and worker updates thro
 - Worker extraction uses prompt templates before finish writes the job: `apps/api/src/jobs/process.ts:16` -> `jobExtractPrompt` -> `apps/api/src/jobs/prompts.ts:3` -> `jobExtractPrompt`; `apps/api/src/jobs/process.ts:17` -> `buildJobUserPrompt` -> `apps/api/src/jobs/prompts.ts:18` -> `buildJobUserPrompt`; `apps/api/src/jobs/consumer.ts:30` -> `admin.finish` -> `apps/api/src/jobs/supabase-repo.ts:144` -> `finish`.
 - Web and extension create URLs reach the mounted POST handler: `apps/web/src/jobs/jobs-api.ts:23` -> `/v1/jobs`, `apps/extension/src/api.ts:21` -> `/v1/jobs` -> `apps/api/src/jobs/routes.ts:29` -> `app.post`, `apps/api/src/app.ts:82` -> `/v1/jobs`.
 - Web list/read/patch/delete URLs reach corresponding handlers: `apps/web/src/jobs/jobs-api.ts:15` -> `/v1/jobs`, `apps/web/src/jobs/jobs-api.ts:19` -> `/v1/jobs`, `apps/web/src/jobs/jobs-api.ts:45` -> `/v1/jobs`, `apps/web/src/jobs/jobs-api.ts:51` -> `/v1/jobs` -> `apps/api/src/jobs/routes.ts:72` -> `app.get`, `apps/api/src/jobs/routes.ts:83` -> `/:id`, `apps/api/src/jobs/routes.ts:115` -> `app.patch`, `apps/api/src/jobs/routes.ts:128` -> `app.delete`.
+
+- list() uses keyset pagination (created_at and ID) with an explicit page limit because the local Data API silently caps an unbounded select at 1000 rows: `supabase/config.toml:18` -> `max_rows = 1000` -> `apps/api/src/jobs/supabase-repo.ts:73` -> `limit(limit + 1)`, with the continuation filter at `apps/api/src/jobs/supabase-repo.ts:75` -> `query.or`.
+
+- A required Job field must also be added to the web Job test fixtures alongside both repository mappings: `apps/api/src/jobs/supabase-repo.ts:89` -> `JobSchema.safeParse`, `apps/api/src/jobs/memory-repo.ts:67` -> `...toListItem(row)` -> `apps/web/src/jobs/job-edit.test.tsx:24` -> `const job: Job`, `apps/web/src/jobs/job-page.test.tsx:25` -> `const job: Job`, `apps/web/src/jobs/jobs-api.test.ts:41` -> `const job: Job`.
 
 ## Assumptions
 

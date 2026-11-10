@@ -31,6 +31,8 @@ Expose current CV, history and note writes through a user-scoped repository and 
 - Used by web history/list/restore URLs: `apps/web/src/cv/cv-api.ts:22` -> `/v1/cv/history`, `apps/web/src/cv/cv-api.ts:26` -> `/v1/cv/history`, `apps/web/src/cv/cv-api.ts:30` -> `/restore` -> `apps/api/src/cv/routes.ts:49` -> `/history`, `apps/api/src/cv/routes.ts:51` -> `/history/:id`, `apps/api/src/cv/routes.ts:57` -> `/history/:id/restore`.
 - History ID errors flow from the unvalidated route to the UUID filter and generic error response: `apps/api/src/cv/routes.ts:52` -> `getHistory` -> `apps/api/src/cv/supabase-repo.ts:84` -> `eq("id", id)` -> `supabase/migrations/20261104000000_baseline.sql:16` -> `uuid`; the throw at `apps/api/src/cv/supabase-repo.ts:86` -> `throw new Error` becomes `apps/api/src/errors.ts:51` -> `status: 500`. The fake instead returns null at `apps/api/src/cv/memory-repo.ts:63` -> `null`, handled by `apps/api/src/cv/routes.ts:53` -> `ApiError(404`.
 
+- CvRepo method changes also require updating the hand-written rawRepo fake used by route tests, outside the repository modules: `apps/api/src/cv/repo.ts:12` -> `CvRepo` -> `apps/api/test/cv.test.ts:175` -> `function rawRepo`, built at `apps/api/test/cv.test.ts:176` -> `return {`.
+
 ## Assumptions
 
 - get and listHistory require RLS to scope rows; no user predicate is added by these queries. `apps/api/src/cv/supabase-repo.ts:35` -> `base_cvs`, `supabase/migrations/20261104000000_baseline.sql:53` -> `auth.uid`, `apps/api/src/cv/supabase-repo.ts:70` -> `base_cv_versions`, `supabase/migrations/20261104000000_baseline.sql:60` -> `auth.uid`

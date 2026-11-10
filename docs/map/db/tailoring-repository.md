@@ -19,6 +19,8 @@ Create, read and save tailored documents with version checks and separate templa
 - Fake document creation does not check that the parent job exists or belongs to the user; SQL foreign keys and RLS reject those writes. `apps/api/src/tailor/memory-repo.ts:45` -> `docs.cvs.set`, `supabase/migrations/20261108000000_tailoring.sql:10` -> `references public.jobs`, `supabase/migrations/20261108000000_tailoring.sql:73` -> `exists`
 - Fake document lists use map insertion order rather than SQL creation timestamps. `apps/api/src/tailor/memory-repo.ts:52` -> `docs.cvs.values()`, `apps/api/src/tailor/supabase-repo.ts:88` -> `order("created_at"`
 
+- RUN_COLUMNS is a hand-kept select list and toRun explicitly maps snake_case columns to camelCase fields; a new run field needs both updated to reach the returned TailorRun. `apps/api/src/tailor/supabase-repo.ts:201` -> `RUN_COLUMNS`, `apps/api/src/tailor/supabase-repo.ts:203` -> `toRun`, `apps/api/src/tailor/supabase-repo.ts:205` -> `userId: row.user_id`
+
 ## Connections
 
 - Uses the document owner policy: `apps/api/src/tailor/supabase-repo.ts:94` -> `tailored_cvs` -> `supabase/migrations/20261108000000_tailoring.sql:69` -> `auth.uid()`.
