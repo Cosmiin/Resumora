@@ -5,7 +5,7 @@ files: ["packages/shared/src/enrich-focus.ts","packages/shared/src/enrich-focus.
 depends_on: ["shared/cv","shared/enrichment-score"]
 contract: true
 checked_hash: f896b8cb
-cited: [8d0ff4, d43863, 839fea, 8458c6, a8d9bf, a41991, 9cd27f, 43ff99, fc7bf3, 09ef5c, f7fd27, fce614, b1aef4, 8fd8cf, 8fcfbe, 988f3f, 7ff367, 075651, 7b9234, 8d0ff4, d43863, e23f17, d43863, 68498e, f3e4ff, 24c607, 0f6500, 66cffc, a41991, 66cffc, c6fea3, 197d3a, d25d5a, fbc523, 860ee6, a41991, 9cd27f, 43ff99, 4be711, 6647e7, 09ef5c, 1103eb, a509ab, 3c11bf, b1aef4, 9c626a, 8b1187, a0295e, 2c7383, f0e64f, debf4f, d46923, 917c3f, b1aef4, fc6d17, 631af0, 49de3e, 09ef5c, 1225ee]
+cited: [8d0ff4, d43863, 839fea, 8458c6, a8d9bf, a41991, 9cd27f, 43ff99, fc7bf3, 09ef5c, f7fd27, fce614, b1aef4, 8fd8cf, bf6464, 988f3f, 7ff367, 075651, 7b9234, 8d0ff4, d43863, e23f17, d43863, 68498e, f3e4ff, 24c607, 0f6500, 66cffc, a41991, 66cffc, c6fea3, 197d3a, d25d5a, fbc523, 860ee6, a41991, 9cd27f, 43ff99, 4be711, 6647e7, 09ef5c, 1103eb, a509ab, 3c11bf, b1aef4, b71df3, 8b1187, a0295e, 2c7383, f0e64f, debf4f, d46923, 917c3f, b1aef4, fc6d17, 631af0, 49de3e, 09ef5c, 1225ee]
 decisions: ["docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

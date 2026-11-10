@@ -19,7 +19,7 @@ Combine cover-letter claim verification with number and tool checks against cand
 
 ## Connections
 
-- Uses api-tailor/proposal-sources traversal and api-tailor/checks `apps/api/src/tailor/letter.ts:39` -> `texts(cv)`; `apps/api/src/tailor/section-pass.ts:96` -> `texts`; `apps/api/src/tailor/letter.ts:62` -> `checkProposal`; `apps/api/src/tailor/checks.ts:43` -> `checkProposal`.
+- Uses api-tailor/proposal-sources traversal and api-tailor/checks `apps/api/src/tailor/letter.ts:39` -> `texts(cv)`; `apps/api/src/tailor/section-pass.ts:96` -> `texts`; `apps/api/src/tailor/letter.ts:62` -> `checkProposal`; `apps/api/src/tailor/checks.ts:45` -> `checkProposal`.
 - Uses api-tailor/letter-prompts under SQL-allowed tailor_verify; api-tailor/letter retries the body and returns remaining flags `apps/api/src/tailor/letter.ts:55` -> `letterVerifySystemPrompt`; `apps/api/src/tailor/letter-prompts.ts:26` -> `letterVerifySystemPrompt`; `supabase/migrations/20261109220000_enrich_item_lines.sql:28` -> `tailor_verify`; `apps/api/src/tailor/letter.ts:73` -> `attempt(result)`; `apps/api/src/tailor/letter.ts:82` -> `flags: result.flags`.
 
 ## Assumptions

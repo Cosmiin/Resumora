@@ -200,10 +200,13 @@ export async function passProposals(
     }));
     return all.map((p) => {
       if (notText(p)) return { ...p, flags: [] };
-      const fields = items.get(p.itemId)!.fields;
+      const item = items.get(p.itemId)!;
+      const fields = item.fields;
+      const role = isRoleSection(section) ? stepItems(cv, section).find((role) => role.id === item.roleId) : undefined;
+      const pastRole = !!role && !role.current && role.endDate !== "";
       const original = "company" in fields ? fields : undefined;
       const claims = verified.results.filter((result) => result.itemId === p.itemId).flatMap((result) => result.claims);
-      return { ...p, flags: [...checkProposal(p, { sources, original }), ...claims.map((detail) => ({ rule: "achievement" as const, detail }))] };
+      return { ...p, flags: [...checkProposal(p, { sources, original, pastRole, locale: steering!.language }), ...claims.map((detail) => ({ rule: "achievement" as const, detail }))] };
     });
   }
 

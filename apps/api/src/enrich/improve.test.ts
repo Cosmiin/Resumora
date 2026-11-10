@@ -64,6 +64,44 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("POST /v1/enrich/improve-bullet", () => {
+  it("retries a present-tense bullet for a past role and offers the past-tense answer", async () => {
+    const text = "Validated compliance with legal teams.";
+    const replies = [{ text: "Validate compliance with legal teams.", nextQuestion: null }, { text, nextQuestion: null }, grade];
+    model = fakeModel(() => replies.shift());
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(ImproveAnswerSchema.parse(await res.json())).toMatchObject({ proposal: { text } });
+    expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_improve_bullet", "enrich_improve_bullet", "enrich_score"]);
+    const first = model.requests[0]!.messages as { role: string; content: string }[];
+    const retry = model.requests[1]!.messages as { role: string; content: string }[];
+    expect(retry).toEqual([first[0], { ...first[1], content: first[1]!.content + "\nThe role has ended: start with a past-tense verb." }]);
+  });
+
+  it("needs detail without a proposal when both answers for a past role use present tense", async () => {
+    model = fakeModel(() => ({ text: "Validate compliance with legal teams.", nextQuestion }));
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(ImproveAnswerSchema.parse(await res.json())).toEqual({
+      needsDetail: true, nextQuestion: { ...nextQuestion, options: ["Excel", "SAP"] },
+    });
+    expect(model.requests).toHaveLength(2);
+    expect(model.logged.every((entry) => entry.task === "enrich_improve_bullet")).toBe(true);
+    expect(await insights.pending(role.id)).toEqual([]);
+  });
+
+  it.each([{ current: true, endDate: "2022-01" }, { current: false, endDate: "" }])(
+    "accepts present tense without retrying when the role has not ended: %j", async (dates) => {
+      Object.assign(role, dates);
+      await save();
+      const text = "Validate compliance with legal teams.";
+      answer(text);
+      const res = await post();
+      expect(res.status).toBe(200);
+      expect(ImproveAnswerSchema.parse(await res.json())).toMatchObject({ proposal: { text } });
+      expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_improve_bullet", "enrich_score"]);
+    },
+  );
+
   it("offers a better bullet and promotes its prediction after saving without another model call", async () => {
     answer(proposal, nextQuestion);
     const saved = await cv.get();

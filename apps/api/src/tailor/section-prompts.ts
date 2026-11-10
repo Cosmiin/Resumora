@@ -9,11 +9,13 @@ Hide: for an item with no link to the job, return itemId "hide:" followed by the
 const SECTION_RULES: Record<Exclude<TailorSection, "layout">, string> = {
   experience: `Reorder each role's bullets so the most relevant come first (return proposals in that order).
 Use only this item's own bullets, notes, facts and answers.
+A role that has ended keeps past tense; only a current role uses present tense.
 Reword bullets with the job's exact keywords inside natural sentences. Condense old or less relevant roles to 1-2 short bullets' worth of wording.
 Never remove a role, a bullet's facts, or change company, title or dates.
 Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; a role's own wording is itemId = the role's id, field "description". Never return a role's bullets as one field.`,
   projects: `The item under "edit" is a project or a volunteering role (its "kind" says which). Tailor it like a role.
 Use only this item's own bullets, notes, facts and answers.
+A role that has ended keeps past tense; only a current role uses present tense.
 Reorder its bullets so the most relevant come first (return proposals in that order).
 Reword bullets with the job's exact keywords inside natural sentences.
 Never remove the item or a bullet's facts, and never change its name (title), organisation (company), dates or link.

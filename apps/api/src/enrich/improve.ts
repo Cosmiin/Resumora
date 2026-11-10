@@ -1,4 +1,4 @@
-import { findScored, fingerprint, isAllowedOption, mergeGrades, repeatKey, type ImproveAnswer } from "@resumora/shared";
+import { findScored, fingerprint, isAllowedOption, mergeGrades, repeatKey, startsInPresentTense, type ImproveAnswer } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
@@ -28,20 +28,29 @@ export async function improveBullet(
 
   try {
     const before = await scoreRole(deps, input);
-    const answer = await callModel(deps.model, {
+    const request = {
       userId: deps.userId,
       task: "enrich_improve_bullet",
       schema: ImproveSchema,
       system: improveBulletSystemPrompt(content.locale),
       user: improveBulletUserMessage(role, input.bulletId),
       maxOutputTokens: 600,
-    });
+    };
+    let answer = await callModel(deps.model, request);
+    const pastRole = !role.current && role.endDate !== "";
+    if (pastRole && answer.text !== null && startsInPresentTense(answer.text, content.locale)) {
+      answer = await callModel(deps.model, {
+        ...request, user: `${request.user}\nThe role has ended: start with a past-tense verb.`,
+      });
+    }
     const question = answer.nextQuestion;
     const nextQuestion = question && !role.notes.some((n) =>
       n.question.trim().toLowerCase() === question.text.trim().toLowerCase())
       ? { text: question.text, options: question.options.filter(isAllowedOption) }
       : null;
-    if (answer.text === null) return { needsDetail: true, nextQuestion };
+    if (answer.text === null || (pastRole && startsInPresentTense(answer.text, content.locale))) {
+      return { needsDetail: true, nextQuestion };
+    }
     const text = squash(answer.text);
     if (checkProposal(role, input.bulletId, text) !== "ok" ||
       role.bullets.some((b) => b.id !== input.bulletId && repeatKey(b.text) === repeatKey(text))) {

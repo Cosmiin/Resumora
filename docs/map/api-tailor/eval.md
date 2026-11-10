@@ -4,8 +4,8 @@ area: api-tailor
 files: ["apps/api/eval/tailor/run.ts","apps/api/eval/tailor/run.eval.ts","apps/api/eval/tailor/README.md","apps/api/test/tailor-eval.test.ts"]
 depends_on: ["shared/cv","shared/jobs","db/cv-repository","db/jobs-repository","db/tailoring-repository","api-core/app","api-core/call-model","api-tailor/score","api-tailor/routes","api-tailor/section-routes","api-tailor/eval-metrics"]
 contract: false
-checked_hash: 3786b834
-cited: [5851d4, 77a5d8, 2e157f, 23cad0, ff827d, eebb5f, 922e39, 996e71, 6ff603, a02b8d, bbecce, 51ba35, ef06db, 3373bf, ea2117, 683868, 742d24, 4c7881, 9169da, 60fbc7, b183b2, 35522d, a083d9, ff827d, 4d0064, 922e39, 3a582f, 996e71, 4b4600, 9169da, e7799c, 679619, eacb3a, db66e3, 24d9ab, 0eefad, b362e0, 92e993, e9b03e, 47899a, 8973f2, 55aa6a]
+checked_hash: d5cd3eb6
+cited: [5851d4, 77a5d8, 2e157f, 23cad0, ff827d, eebb5f, 922e39, 996e71, 6ff603, a02b8d, bbecce, 51ba35, ef06db, 3373bf, ea2117, bd8557, 838efa, 4c7881, 9169da, 60fbc7, b183b2, 35522d, a083d9, ff827d, 4d0064, 922e39, 3a582f, 996e71, 4b4600, 9169da, e7799c, 679619, eacb3a, db66e3, 24d9ab, 0eefad, b362e0, 92e993, e9b03e, 47899a, 8973f2, 55aa6a, ae91fd, 259794, f3ad99, db6e69]
 decisions: []
 open: []
 ---
@@ -26,3 +26,5 @@ Run six synthetic pairs through scoring and HTTP tailoring with real or fake mod
 ## Assumptions
 
 - Fake/in-memory execution does not validate database RLS, RPCs or live model semantics; queue stubs do nothing and model logging stays in arrays `apps/api/eval/tailor/run.ts:161` -> `memoryTailorRepo`; `apps/api/eval/tailor/run.ts:164` -> `send: async`; `apps/api/eval/tailor/run.ts:298` -> `calls.push`.
+
+- The fake rewords an ended role's shortened "Split" bullet as "Separated" so it satisfies the required English past-verb check without an extra retry; the long-career test still permits only its known page gap, with the cost limit unchanged. `apps/api/eval/tailor/run.ts:288` -> `bullet.text.replace`; `packages/shared/src/tense.ts:3` -> `PAST_VERBS`; `apps/api/test/tailor-eval.test.ts:16` -> `row.problems.join`; `apps/api/eval/tailor/run.ts:25` -> `costUsd: 0.05`.

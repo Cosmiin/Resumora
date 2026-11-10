@@ -119,7 +119,7 @@ export type Answer = z.infer<typeof AnswerSchema>;
 
 export const FlagSchema = z.object({
   /** "guess": an inferred change without a reason naming its basis. */
-  rule: z.enum(["number", "entity", "tool", "achievement", "guess"]),
+  rule: z.enum(["number", "entity", "tool", "achievement", "guess", "tense"]),
   detail: z.string(),
 });
 export type Flag = z.infer<typeof FlagSchema>;

@@ -5,7 +5,7 @@ files: ["apps/api/src/enrich/focus-prompts.ts"]
 depends_on: ["api-enrich/score-prompts","api-enrich/score","shared/cv","shared/enrichment-checks","shared/enrichment-focus"]
 contract: true
 checked_hash: 86148ff8
-cited: [73d564, 99350a, 2bb4b4, 02c364, 7177db, e5d6cf, 4c8466, 698827, aeb85e, 780ee6, b19d85, 384830, 7a6c2e, ab557c, a523c9, 8b1cc7, fb8bb5, ae93dd, ebef8d, 9c626a, 8b1187, 468b75, 42c3f8, 80297e, c6ced0, a0295e, 2c7383, 9e13d6, dd7302, 634854, 8f9eb2, f0e64f, debf4f, 464f6c, a523c9, 698827, 8fca03, 780ee6, ea56e7, 2519cc, 7e3280, ec5f84, 12eda3, 4b1b7f, 6681a5, 384830, 75da22, 021698, 43ff99, b1fd64, ffc634, ab557c, fb8bb5]
+cited: [73d564, 99350a, 2bb4b4, 02c364, 7177db, e5d6cf, 4c8466, 698827, aeb85e, 780ee6, b19d85, 384830, 7a6c2e, ab557c, a523c9, 8b1cc7, fb8bb5, 8487db, 7b9f20, b71df3, 8b1187, e19bbe, 42c3f8, 80297e, c6ced0, a0295e, 2c7383, 9e13d6, dd7302, 634854, 8f9eb2, f0e64f, debf4f, 464f6c, a523c9, 698827, 8fca03, 780ee6, ea56e7, 2519cc, 7e3280, ec5f84, 12eda3, 4b1b7f, 6681a5, 384830, 75da22, 021698, 43ff99, b1fd64, ffc634, ab557c, fb8bb5]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

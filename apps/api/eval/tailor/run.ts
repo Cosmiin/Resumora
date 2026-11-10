@@ -285,7 +285,7 @@ export function fakeTailorModel(calls: AiCallLog[]): ModelDeps {
     return {
       proposals: [...guessed, ...input.items.edit.filter((role) => roleIds.indexOf(role.id) >= 2).flatMap((role) => [
         { itemId: role.id, field: "description", text: firstWords(role.description, 6), inferred: false, reason: null, guesses: null },
-        ...role.bullets.map((bullet) => ({ itemId: bullet.id, field: "text", text: firstWords(bullet.text, 6), inferred: false, reason: null, guesses: null })),
+        ...role.bullets.map((bullet) => ({ itemId: bullet.id, field: "text", text: firstWords(!role.current && role.endDate ? bullet.text.replace(/^Split\b/, "Separated") : bullet.text, 6), inferred: false, reason: null, guesses: null })),
       ].filter((proposal) => proposal.text))],
     };
   };

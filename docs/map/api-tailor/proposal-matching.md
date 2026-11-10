@@ -4,8 +4,8 @@ area: api-tailor
 files: ["apps/api/src/tailor/section-pass.ts","apps/api/test/tailor-section.test.ts","apps/api/test/tailor-projects.test.ts"]
 depends_on: ["shared/cv","shared/tailoring"]
 contract: false
-checked_hash: 8004bc19
-cited: [811769, e85f56, ac6050, 29b933, ed8083, 60b0a8, d51ffa, 801aaa, ac04f5, 41ad31, 93766b, d856ad, f4573d, 23ff99, 17d1aa, 3f523e, 5cc000, ae0e76, 10e53b, c30d48, de4c8b, 10e53b, 07def6, 0eb696, 2061c4, d02c8f, 32cdb2, 811769, 836a45, 84a33a, ac6050, cbe504, f533db]
+checked_hash: ff9d58f3
+cited: [811769, e85f56, ac6050, 29b933, ed8083, 60b0a8, d51ffa, 801aaa, ac04f5, 41ad31, 93766b, d856ad, f4573d, 23ff99, 17d1aa, 3f523e, 5cc000, ae0e76, 10e53b, c30d48, de4c8b, 10e53b, 07def6, 0eb696, 2061c4, d02c8f, ac7b2a, d0afc7, 32cdb2, 811769, 836a45, 84a33a, ac6050, cbe504, 83f210]
 decisions: []
 open: []
 ---
@@ -20,10 +20,12 @@ Resolve model item IDs and fields, preserving only allowed targets and matched s
 - tested by `apps/api/test/tailor-section.test.ts:76` -> `section pass`.
 - tested by `apps/api/test/tailor-projects.test.ts:94` -> `Projects & volunteering step`.
 
+- The matched item's roleId also identifies the owning experience, project or volunteering role for past-tense checking of bullet text and role description. `apps/api/src/tailor/section-pass.ts:203` -> `items.get(p.itemId)`; `apps/api/src/tailor/section-pass.ts:205` -> `role.id === item.roleId`.
+
 ## Connections
 
 - Used by api-tailor/section-pass before checking and api-tailor/accept before decisions; writes belong to api-tailor/proposal-application `apps/api/src/tailor/section-pass.ts:144` -> `sectionItems`; `apps/api/src/tailor/section-pass.ts:40` -> `sectionItems`; `apps/api/src/tailor/accept.ts:117` -> `sectionItems`; `apps/api/src/tailor/accept.ts:75` -> `p.field`.
 
 ## Assumptions
 
-- Stable IDs must uniquely identify intended CV items: Map.set overwrites collisions and verification/review also group by item ID `apps/api/src/tailor/section-pass.ts:45` -> `items.set`; `apps/api/src/tailor/section-pass.ts:46` -> `items.set`; `apps/api/src/tailor/section-pass.ts:205` -> `result.itemId`.
+- Stable IDs must uniquely identify intended CV items: Map.set overwrites collisions and verification/review also group by item ID `apps/api/src/tailor/section-pass.ts:45` -> `items.set`; `apps/api/src/tailor/section-pass.ts:46` -> `items.set`; `apps/api/src/tailor/section-pass.ts:208` -> `result.itemId`.
