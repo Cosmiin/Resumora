@@ -32,6 +32,26 @@ Design: `docs/superpowers/specs/2026-11-04-rebuild-design.md`. Current plan: `do
 - Keep files focused (< ~300 lines). Prefer editing an existing module over adding a new layer.
 - Conventional commits, one-line subject: `feat(api): ...`, `fix(web): ...`.
 
+## Keep it small
+- Build the smallest change that does what the task asks. No helpers, options, layers, abstractions or files the task doesn't need, and no refactors on the side.
+- Find the closest existing code that does something similar and follow its pattern.
+
+## Test only as much as the change needs
+- Text, styling, translation, docs and config changes need no new tests: the typecheck is enough.
+- For a small behaviour change, one test of the main case is usually enough. Add more only for logic, data, database rules and shared code, and only for failures that can really happen.
+- While working, run the tests that cover what you changed (`npx vitest related --run <files>` inside the package), not the whole suite. The full suite runs once before merging.
+
+## Known traps
+- Run `npm run typecheck` after changing a shared or API type: the unit tests miss type errors.
+- Never run `npm run db:reset` or `supabase migration down` on a local database you need: both wipe its data. Apply new migrations with `npx supabase migration up`.
+- To change an SQL function's signature, drop the old function first (Postgres keeps both as overloads), then grant execute again.
+- When saving an item, cancel its pending detail queries too, not only the list query: a late refetch can overwrite what was just saved.
+- When a background refetch fails, keep the cached content on screen; show an error state only when there's no cached data.
+- Don't navigate away or reload while an autosave or reload is pending: unmounting clears the save timer, and a late reload can close a form the user just reopened.
+- Paginate, or state a cap for, any list that grows: PostgREST's `max_rows = 1000` silently cuts longer results.
+- Give each auth request a timeout and the whole session lookup one too: Supabase retries token refreshes, so per-request timeouts alone can add up to a hang.
+- Editor typing tests can time out when another test run is using the machine. Rerun once before treating a failure as a regression.
+
 ## Architecture companion
 The owner doesn't write code and learns the architecture through the `/architecture` panel, which reads these files:
 - **Decision records** (`docs/decisions/NNNN-short-title.md`, format in `docs/superpowers/specs/2026-11-04-architecture-companion-design.md`): add one when you make an architectural choice (new table, route, service, changed security rule, new dependency with a structural role). Fill `affects` with real names (`table:x`, `route:/v1/x`, `file:path`). If it replaces one, set the old one's `status: replaced-by-NNNN`.
