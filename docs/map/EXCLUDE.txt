@@ -1,0 +1,12 @@
+# fixture: synthetic CV files and answer keys
+apps/api/eval/import/cases/**
+# fixture: synthetic job pages, JSON-LD and answer keys
+apps/api/eval/jobs/cases/**
+# fixture: rendered evaluation HTML documents
+apps/api/eval/import/templates/*.html
+# fixture: synthetic import case definitions
+apps/api/eval/import/data-a.ts
+# fixture: synthetic import case definitions
+apps/api/eval/import/data-b.ts
+# fixture: synthetic import case definitions
+apps/api/eval/import/data-c.ts
