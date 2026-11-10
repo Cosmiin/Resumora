@@ -95,3 +95,7 @@ Review list:
    - Owner's pick (2026-11-11): on wide screens the whole role beside the question with the affected line pointed out, plus the coach's "Why I ask" note; on phones the question and the note only. Applied to flows 3 and 5; the three-layout page is retired.
    - Tailoring's role step is now two parts: the questions in focus mode, then the suggested changes as a list. The owner has not yet said whether the approvals should also go one at a time.
    - Owner (2026-11-11): tailoring's approvals of suggested lines stay a list.
+
+## Phase 2 approved, 2026-11-11
+
+Owner approved the six flow mockups. Foundation branch merged into main. Phase 3 starts with the public pages and account flow.
