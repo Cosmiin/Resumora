@@ -4,8 +4,8 @@ area: shared
 files: ["packages/shared/src/cv.ts","packages/shared/src/cv.test.ts","packages/shared/src/hidden-items.test.ts"]
 depends_on: ["shared/categories"]
 contract: true
-checked_hash: 3dd86552
-cited: [c28a52, f6d75d, b694c1, 6fee32, 7da6ba, 75da22, 94750a, 9c8371, 124139, 904ed6, a23147, 510388, d5637a, e85070, c58a04, db81b1, a70e43, 4cd30c, 549ed6, 6c5831, 5b1f87, ce9bca, 48de31, e0c3ae, 77cd16, 157862, 4510d2, 20326a, d6e493, 17a9fb, b19c72, bb97b9, ccf7f6, 17533f, e0c3ae, 993d13, 26917f, c28a52, 8ffa68, f56ffb, a44b0f, d5993a, 8fca03, b11e3a, 51909b, 6a70dc, ec62ce, 803306, c9ac75, 1e7ddc, 56aff8, 5a2446, f229bf, b4404c, f30a88, c79db3, 964e15, 116ce1, 03ad9f, 947a64, b98034, 757d8d, 7d7587, a45683, 725171, c84f3c, 12eda3, 304a67, 69af33, 725171, ab085d, c84f3c, e8b438, 149393, a23147, 6e5125, 255703, 1afc5c, 139795, 7461c4, eb0dc2, 6c5831, 0827a4, 3dcf49, c28a52, 56fa38, 5be7b7, 88a6e4, cfd773, 947a64, f7229b, 0d6e05, 50158f, c69e2a, f4325a, a352da, f6d75d, 659d96, 5fedd5, f05071]
+checked_hash: ec13bf37
+cited: [c28a52, f6d75d, b694c1, 6fee32, 7da6ba, 75da22, 94750a, 9c8371, 124139, 904ed6, a23147, 510388, d5637a, e85070, c58a04, db81b1, a70e43, 4cd30c, 549ed6, 6c5831, 5b1f87, ce9bca, 48de31, e0c3ae, 77cd16, 8b0bf9, 820052, 20326a, d6e493, 17a9fb, ff6c54, bb97b9, ccf7f6, 17533f, e0c3ae, 993d13, 26917f, c28a52, 8ffa68, f56ffb, a44b0f, d5993a, 8fca03, b11e3a, 51909b, 6a70dc, ec62ce, 803306, c9ac75, 1e7ddc, 56aff8, 5a2446, f229bf, b4404c, f30a88, c79db3, 964e15, 116ce1, 03ad9f, 947a64, b98034, 757d8d, 7d7587, a45683, 725171, c84f3c, 12eda3, 304a67, 69af33, 725171, ab085d, c84f3c, e8b438, 149393, a23147, 6e5125, 255703, 1afc5c, 139795, 7461c4, eb0dc2, 6c5831, 0827a4, 3dcf49, c28a52, 56fa38, 5be7b7, 88a6e4, cfd773, 947a64, f7229b, 0d6e05, 50158f, c69e2a, f4325a, a352da, f6d75d, 17a9fb, 5fedd5, f05071]
 decisions: ["docs/decisions/0003-one-shared-description-of-a-cv.md","docs/decisions/0009-one-fixed-set-of-cv-categories.md"]
 open: []
 ---
@@ -23,7 +23,7 @@ Define validated CV content, its field and list limits, and item traversal and v
 - Current content requires literal schemaVersion 2 and layout, defaults enrichedAt to null, and rejects extra fields; v1 remains separately expressible. `packages/shared/src/cv.ts:194` -> `CvContentV1Schema`, `packages/shared/src/cv.ts:196` -> `CvContentSchema`, `packages/shared/src/cv.ts:208` -> `enrichedAt:`
 - emptyCv defaults to English, blank basics, empty collections, default layout and null enrichment timestamp; newId uses crypto.randomUUID. `packages/shared/src/cv.ts:225` -> `newId`, `packages/shared/src/cv.ts:229` -> `emptyCv`, `packages/shared/src/cv.ts:255` -> `achievements:`
 - scoredItems visits experience, then projects, then volunteering; findScored returns the first matching ID in that order. `packages/shared/src/cv.ts:270` -> `scoredItems`, `packages/shared/src/cv.ts:278` -> `findScored`
-- tested by `packages/shared/src/cv.test.ts:24` -> `CvContentSchema`; tested by `packages/shared/src/hidden-items.test.ts:5` -> `hidden items`
+- tested by `packages/shared/src/cv.test.ts:2` -> `CvContentSchema`; tested by `packages/shared/src/hidden-items.test.ts:5` -> `hidden items`
 
 ## Connections
 

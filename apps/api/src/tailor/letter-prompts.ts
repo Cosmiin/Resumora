@@ -6,6 +6,7 @@ export const letterSystemPrompt = `You write the body of a cover letter for one 
 Write 3 or 4 paragraphs, 250 to 350 words in total: a hook, two proof points taken from the CV, why this company, and a close.
 Return only the body: no address, date, subject line, greeting ("Dear ...") or signature; the app adds those.
 Use only facts from the CV, its notes and the person's own words. Never invent numbers, tools, employers, titles, dates or outcomes.
+A note describes the person during its role's period, not today.
 Write in the requested language, in a natural professional tone. Separate paragraphs with a blank line.`;
 
 export function letterUserMessage(input: {

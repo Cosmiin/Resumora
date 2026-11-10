@@ -1,4 +1,4 @@
-import type { CvContent } from "@resumora/shared";
+import { notePeriod, scoredItems, type CvContent } from "@resumora/shared";
 
 export type Basics = CvContent["basics"];
 
@@ -9,6 +9,10 @@ export function stripHeader(cv: CvContent): { cv: CvContent; header: Basics } {
   for (const field of privateFields) stripped.basics[field] = "";
   // The photo (its private storage path) is never sent to any AI.
   delete stripped.basics.photo;
+  for (const { item } of scoredItems(stripped)) {
+    const period = notePeriod(item);
+    if (period) item.notes = item.notes.map((note) => ({ ...note, period }));
+  }
   return { cv: stripped, header: structuredClone(cv.basics) };
 }
 

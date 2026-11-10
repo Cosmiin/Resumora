@@ -6,6 +6,7 @@ import type { CvRepo } from "../src/cv/repo.ts";
 import { memoryJobs } from "../src/jobs/memory-repo.ts";
 import { roleWith } from "../src/enrich/fake-model.ts";
 import { fakeModel } from "../src/tailor/fake-model.ts";
+import { stripHeader } from "../src/tailor/strip-header.ts";
 import { memoryTailorDocs, memoryTailorRepo, type MemoryTailorDocs, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
 
 const job: JobExtraction = {
@@ -88,6 +89,27 @@ const jobNotes = async () => (await cv.get()).content.experience.flatMap((role) 
   role.notes.filter((note) => note.jobId === jobId).map((note) => ({ roleId: role.id, ...note })));
 
 describe("job questions", () => {
+  it("sends saved and current-run answers with their role's period in Skills questions", async () => {
+    const content: CvContent = { ...base, experience: [
+      { ...newest, notes: [{ id: "current-note", question: "Which tools?", answer: "Used SQL", via: ["type"], askedAt: "2026-11-01T10:00:00Z", jobId }] },
+      { ...older, notes: [{ id: "past-note", question: "What changed?", answer: "Reduced payroll errors", via: ["voice"], askedAt: "2026-11-02T10:00:00Z", jobId }] },
+    ] };
+    await cv.save(content, 1);
+    const runId = await startRun();
+    await memoryTailorRepo("user-a", scores, docs).updateRun(runId, {
+      questions: [{ id: "past-question", section: "experience", roleId: older.id, text: "How many accounts?",
+        kind: "options", options: ["Ten", "Twenty"], reason: "Gap", gap: "r0" }],
+      answers: [{ questionId: "past-question", value: "Twenty", via: "option" }],
+    });
+    await questions(runId, "skills");
+    const sent = JSON.parse((model.requests[0]!.messages as { content: string }[])[1]!.content);
+    expect(sent.answered).toEqual([
+      { question: "Which tools?", answer: "Used SQL", period: "2021-01 – present" },
+      { question: "What changed?", answer: "Reduced payroll errors", period: "2018-01 – 2020-01" },
+      { question: "How many accounts?", answer: "Twenty", period: "2018-01 – 2020-01" },
+    ]);
+  });
+
   it("asks from the section's gaps with the cheap tier: 5 per role, 5 in Skills, 8 across the other sections", async () => {
     const runId = await startRun();
     replies = [Array.from({ length: 6 }, (_, i) => ask(`Experience ${i}?`)), Array.from({ length: 6 }, (_, i) => ask(`Skill ${i}?`, { roleId: null })),
@@ -226,11 +248,13 @@ describe("job questions", () => {
     const user = messages[1]!.content;
     const sent = JSON.parse(user);
     expect(Object.keys(sent).sort()).toEqual(["answered", "focus", "gaps", "job", "language", "max", "role", "section", "steering"]);
-    expect(sent.role).toMatchObject({ ...b, kind: kind === "experience" ? "role" : kind });
+    expect(sent.role).toMatchObject({ ...b, kind: kind === "experience" ? "role" : kind,
+      notes: b.notes.map((note) => ({ ...note, period: "2001-01 – 2002-12" })) });
+    expect((await cv.get()).content).toEqual(content);
     expect(sent.language).toBe("ro");
     expect(sent.section).toBe(section);
     expect(sent).toMatchObject({ max: 2, focus: false });
-    expect(sent.answered).toEqual([{ question: b.notes[1]!.question, answer: b.notes[1]!.answer }]);
+    expect(sent.answered).toEqual([{ question: b.notes[1]!.question, answer: b.notes[1]!.answer, period: "2001-01 – 2002-12" }]);
     expect(sent.steering).toContain("They want to lean on other roles more than this one.");
     expect(sent.gaps).toContainEqual(expect.objectContaining({ ref: "r1", status: "partial" }));
     expect(sent.gaps.every((gap: object) => !("evidence" in gap))).toBe(true);
@@ -247,7 +271,7 @@ describe("job questions", () => {
     const skills = JSON.parse((model.requests[1]!.messages as { content: string }[])[1]!.content);
     expect(skills).not.toHaveProperty("role");
     expect(skills).not.toHaveProperty("focus");
-    expect(skills.cv).toEqual({ ...content, basics: { ...content.basics, photo: undefined }, layout: undefined });
+    expect(skills.cv).toEqual({ ...stripHeader(content).cv, layout: undefined });
     expect(skills.gaps).toContainEqual(expect.objectContaining({ ref: "r1", evidence: a.bullets[0]!.text }));
   });
 

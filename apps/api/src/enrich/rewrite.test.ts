@@ -165,6 +165,20 @@ describe("POST /v1/enrich/rewrite-summary", () => {
   const r1 = roleWith(["Prepared contracts for 40 workers."], { company: "Acme Payroll", title: "Payroll Specialist", notes: [note("Under 10 a day", "How many?")] });
   const r2 = roleWith(["Ran the front desk."], { company: "Beta Hotel", title: "Receptionist", startDate: "2017-03", endDate: "2019-12" });
 
+  it("labels each note with its role's period and keeps undated note lines unchanged", async () => {
+    const roles = [
+      { ...r1, startDate: "2014-10", endDate: "2015-07", current: false },
+      { ...r1, id: newId(), startDate: "2022-12", endDate: "", current: true },
+      { ...r1, id: newId(), startDate: "" },
+    ];
+    const { post, bodies } = setup({ cv: cvWith(roles), answer: "### end\n" });
+    await readEvents(await post("rewrite-summary"));
+    const user = bodies[0]!.messages[1]!.content;
+    expect(user).toContain('Q: "How many?"\nNote (2014-10 – 2015-07): "Under 10 a day"');
+    expect(user).toContain('Note (2022-12 – present): "Under 10 a day"');
+    expect(user).toContain('Q: "How many?"\nA: "Under 10 a day"');
+  });
+
   it("snapshots once before the model and sends every role in full", async () => {
     const { post, bodies, order } = setup({ cv: cvWith([r1, r2]), answer: "### summary\nPayroll specialist with 40 workers' contracts behind them.\n### end\n" });
     const events = await readEvents(await post("rewrite-summary"));
@@ -172,7 +186,7 @@ describe("POST /v1/enrich/rewrite-summary", () => {
     expect(events.map((e) => e.event)).toContain("ready");
     expect(events.find((e) => e.event === "start")!.data).toEqual({ index: 0, replaces: "summary" });
     const user = bodies[0]!.messages[1]!.content;
-    for (const part of ["Payroll Specialist", "Acme Payroll", "Beta Hotel", "Receptionist", "2017-03", "2019-12", "Ran the front desk.", 'Q: "How many?"\nA: "Under 10 a day"']) {
+    for (const part of ["Payroll Specialist", "Acme Payroll", "Beta Hotel", "Receptionist", "2017-03", "2019-12", "Ran the front desk.", 'Q: "How many?"', '"Under 10 a day"']) {
       expect(user).toContain(part);
     }
   });

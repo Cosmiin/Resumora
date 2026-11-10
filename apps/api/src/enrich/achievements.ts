@@ -1,4 +1,4 @@
-import { MAX_TEXT, hasUnknownNumber, repeatKey, type AchievementsAnswer, type CvContent, type Locale } from "@resumora/shared";
+import { MAX_TEXT, hasUnknownNumber, notePeriod, repeatKey, type AchievementsAnswer, type CvContent, type Locale } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { languageInstruction } from "./prompts.ts";
@@ -13,6 +13,7 @@ export function achievementsSystemPrompt(locale: Locale): string {
 
 Suggest 3 to 5 Key achievements for the top of a CV, right under the summary.
 Each is one line about one role, built only from that role's own bullets and notes, and names that role's id.
+A note describes the person during its role's period, not today.
 Pick the results the person can be proud of: what changed, for whom, how much.
 Never invent facts, names or numbers; use only numbers the role's bullets or notes give.
 Leave out anything already listed under existing_achievements.
@@ -25,7 +26,8 @@ export function achievementsUserMessage(content: CvContent): string {
     "<roles>",
     JSON.stringify(content.experience.map((r) => ({
       id: r.id, title: r.title, company: r.company,
-      bullets: r.bullets.map((b) => b.text), notes: r.notes.map((n) => ({ question: n.question, answer: n.answer })),
+      bullets: r.bullets.map((b) => b.text),
+      notes: r.notes.map((n) => ({ question: n.question, answer: n.answer, ...(notePeriod(r) ? { period: notePeriod(r) } : {}) })),
     }))),
     "</roles>",
     "<existing_achievements>",

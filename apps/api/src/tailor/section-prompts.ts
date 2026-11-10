@@ -39,6 +39,7 @@ export function sectionSystemPrompt(section: Exclude<TailorSection, "layout">): 
 Return proposals keyed by the existing item ids and the field to change; leave out items that need no change.
 When items has "edit" and "context", propose changes only for the items under "edit"; "context" is read-only evidence.
 Use only facts from the CV, its notes, facts and the answers. Never invent numbers, tools, employers, titles, dates or outcomes.
+A note describes the person during its role's period, not today.
 Never write a claim those sources don't support. Rewording true things favourably is fine.
 Set inferred to true for any skill or wording that is a reasonable inference rather than stated. A guess needs a real basis in that text:
 set reason to one short line naming it (the bullet, note or answer it comes from). Set reason to null when inferred is false.

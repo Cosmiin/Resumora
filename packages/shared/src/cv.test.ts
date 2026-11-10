@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, findScored, scoredItems, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, type CvContent } from "./index.ts";
+import { CvContentSchema, findScored, scoredItems, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, notePeriod, type CvContent } from "./index.ts";
 
 function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
   return {
@@ -20,6 +20,18 @@ function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
 function withExperience(items: CvContent["experience"]): CvContent {
   return { ...emptyCv(), experience: items };
 }
+
+describe("notePeriod", () => {
+  it.each([
+    ["2014-10", "2015-07", false, "2014-10 – 2015-07"],
+    ["2022-12", "", true, "2022-12 – present"],
+    ["2022-12", "2024-01", true, "2022-12 – present"],
+    ["2022-12", "", false, "2022-12 – present"],
+    ["", "2015-07", false, ""],
+  ])("formats %s to %s (current: %s)", (startDate, endDate, current, expected) => {
+    expect(notePeriod({ startDate, endDate, current })).toBe(expected);
+  });
+});
 
 describe("CvContentSchema", () => {
   it.each([1, 3])("accepts photo zoom %i", (zoom) => {

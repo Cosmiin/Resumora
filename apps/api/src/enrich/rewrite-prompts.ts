@@ -1,4 +1,4 @@
-import type { Experience, Locale } from "@resumora/shared";
+import { notePeriod, type Experience, type Locale } from "@resumora/shared";
 import { languageInstruction } from "./prompts.ts";
 
 // Prompts for the streamed rewrites. The rules are the spec's "Rewrite rules", word for word, plus one
@@ -37,6 +37,7 @@ export function rewriteSummarySystemPrompt(locale: Locale): string {
   return `${languageInstruction(locale)}
 
 You are a CV writing coach for Resumora. You write the professional summary at the top of a CV, from the roles below.
+A note describes the person during its role's period, not today.
 
 ${RULES}
 
@@ -45,9 +46,10 @@ The summary is 2 to 4 sentences, within 600 characters, and names the person's f
 ${FORMAT(SUMMARY_EXAMPLE)}`;
 }
 
-function notesBlock(role: Pick<Experience, "notes">): string[] {
+function notesBlock(role: Experience): string[] {
   if (role.notes.length === 0) return ["Notes: none"];
-  return ["Notes (the person's own answers):", ...role.notes.map((n) => `Q: ${JSON.stringify(n.question)}\nA: ${JSON.stringify(n.answer)}`)];
+  const period = notePeriod(role);
+  return ["Notes (the person's own answers):", ...role.notes.map((n) => `Q: ${JSON.stringify(n.question)}\n${period ? `Note (${period})` : "A"}: ${JSON.stringify(n.answer)}`)];
 }
 
 /** The current summary and every role with its dates, bullets and notes. */

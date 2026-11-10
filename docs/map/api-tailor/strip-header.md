@@ -4,8 +4,8 @@ area: api-tailor
 files: ["apps/api/src/tailor/strip-header.ts","apps/api/src/tailor/strip-header.test.ts"]
 depends_on: ["shared/cv"]
 contract: false
-checked_hash: edbef11e
-cited: [054630, 58b141, 278954, 32b23e, 054630, 5a6632, 26b137, 817012, ac7a62, b41f0d, 02f95d, 3931b3, c54dc2, 588bd4, 051c5b, 278954, 5a6632]
+checked_hash: 49f473e2
+cited: [6816cf, 82a5bd, ade8ce, 70f189, 6816cf, 1639c8, 1639c8, 817012, 08fb2a, b41f0d, ab8ae5, 3931b3, c54dc2, 588bd4, 929c9a, ade8ce, 1639c8]
 decisions: []
 open: []
 ---
@@ -19,7 +19,7 @@ Clone CV content for model calls while separating private header fields.
 
 ## Connections
 
-- Used before score, question, section, layout and letter prompts `apps/api/src/tailor/score.ts:44` -> `stripHeader`; `apps/api/src/tailor/questions.ts:106` -> `stripHeader`; `apps/api/src/tailor/section-pass.ts:143` -> `stripHeader`; `apps/api/src/tailor/layout-pass.ts:51` -> `stripHeader`; `apps/api/src/tailor/letter.ts:37` -> `stripHeader`; `apps/api/src/tailor/strip-header.ts:7` -> `stripHeader`.
+- Used before score, question, section, layout and letter prompts `apps/api/src/tailor/score.ts:44` -> `stripHeader`; `apps/api/src/tailor/questions.ts:13` -> `stripHeader`; `apps/api/src/tailor/section-pass.ts:143` -> `stripHeader`; `apps/api/src/tailor/layout-pass.ts:51` -> `stripHeader`; `apps/api/src/tailor/letter.ts:37` -> `stripHeader`; `apps/api/src/tailor/strip-header.ts:7` -> `stripHeader`.
 
 ## Assumptions
 

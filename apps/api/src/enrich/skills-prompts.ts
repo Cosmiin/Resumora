@@ -1,4 +1,4 @@
-import type { CvContent, Experience, Locale } from "@resumora/shared";
+import { notePeriod, type CvContent, type Experience, type Locale } from "@resumora/shared";
 import { languageInstruction } from "./prompts.ts";
 
 // Prompts for the skills route. The group definitions are the ones in packages/shared/src/cv.ts.
@@ -24,18 +24,20 @@ export function skillsSystemPrompt(locale: Locale): string {
   return `${languageInstruction(locale)}
 
 You are a CV coach for Resumora. You read a person's work experience and help complete their skills lists.
+A note describes the person during its role's period, not today.
 
 ${BODY}`;
 }
 
 function roleBlock(r: Experience): string {
+  const period = notePeriod(r);
   return [
     "<experience>",
     `Role title: ${JSON.stringify(r.title)}`,
     `Role description: ${JSON.stringify(r.description)}`,
     "Bullets:",
     ...r.bullets.map((b) => `- ${JSON.stringify(b.text)}`),
-    ...r.notes.map((n) => `Note answer: ${JSON.stringify(n.answer)}`),
+    ...r.notes.map((n) => `${period ? `Note (${period})` : "Note answer"}: ${JSON.stringify(n.answer)}`),
     "</experience>",
   ].join("\n");
 }

@@ -10,8 +10,9 @@ import { jobNotFound } from "./start.ts";
 
 const LayoutReplySchema = z.object({ order: z.array(z.string()), headline: z.string() });
 
-const layoutSystemPrompt = [
+export const layoutSystemPrompt = [
   "You finish tailoring a CV to a job. Return JSON with two fields.",
+  "A note describes the person during its role's period, not today.",
   "order: every section key from `order`, each exactly once, most relevant to the job first.",
   "headline: a short job-title headline aimed at the job (at most 8 words, not a sentence, no full stop), using only words that already appear in the CV.",
   "Never add an employer, job title, seniority or skill the CV doesn't have. If nothing fits, return the current headline.",

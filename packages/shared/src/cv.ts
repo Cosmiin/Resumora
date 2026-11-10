@@ -226,6 +226,11 @@ export function newId(): string {
   return crypto.randomUUID();
 }
 
+export function notePeriod(item: { startDate: string; endDate: string; current: boolean }): string {
+  if (!item.startDate) return "";
+  return `${item.startDate} – ${item.current || !item.endDate ? "present" : item.endDate}`;
+}
+
 export function emptyCv(locale: Locale = "en"): CvContent {
   return {
     schemaVersion: 2,

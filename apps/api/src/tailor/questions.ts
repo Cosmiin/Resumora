@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  findScored, isLightTailorSection, isRoleSection, MAX_TEXT, NoteSchema, newId, scoredItems, stepItems,
+  findScored, isLightTailorSection, isRoleSection, MAX_TEXT, NoteSchema, newId, notePeriod, scoredItems, stepItems,
   type Answer, type CvContent, type Experience, type JobExtraction, type Note, type TailorQuestion as Question, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
@@ -42,12 +42,20 @@ export function newestRole(roles: Experience[]): Experience | undefined {
 
 /** Everything already answered for this job (or, with a role, for that role): its job notes on the CV and this run's answers. */
 function answeredForJob(cv: CvContent, run: TailorRun, roleId: string | null) {
-  const notes = scoredItems(cv).map(({ item }) => item).filter((role) => !roleId || role.id === roleId).flatMap((role) => role.notes)
-    .filter((note) => note.jobId === run.jobId).map(({ question, answer }) => ({ question, answer }));
+  const notes = scoredItems(cv).map(({ item }) => item).filter((role) => !roleId || role.id === roleId).flatMap((role) => {
+    const period = notePeriod(role);
+    return role.notes.filter((note) => note.jobId === run.jobId)
+      .map(({ question, answer }) => ({ question, answer, ...(period ? { period } : {}) }));
+  });
   const asked = new Map((run.questions ?? []).filter((question) => question.kind !== "flag" && (!roleId || question.roleId === roleId))
-    .map((question) => [question.id, question.text]));
-  const answers = (run.answers ?? []).flatMap((answer) => answer.value && asked.has(answer.questionId)
-    ? [{ question: asked.get(answer.questionId)!, answer: answer.value }] : []);
+    .map((question) => [question.id, question]));
+  const answers = (run.answers ?? []).flatMap((answer) => {
+    const question = asked.get(answer.questionId);
+    if (!answer.value || !question) return [];
+    const role = question.roleId ? findScored(cv, question.roleId)?.item : undefined;
+    const period = role ? notePeriod(role) : "";
+    return [{ question: question.text, answer: answer.value, ...(period ? { period } : {}) }];
+  });
   return [...notes, ...answers];
 }
 
@@ -62,7 +70,8 @@ export async function askQuestions(
   // The lighter sections' Final touches ask nothing: they are reworded, reordered and offered for hiding only.
   if (isLightTailorSection(input.section)) return [];
   const roleId = currentRole(input.run, input.section, input.roleId);
-  const role = roleId ? stepItems(input.cv, input.section).find((r) => r.id === roleId) : undefined;
+  const cv = stripHeader(input.cv).cv;
+  const role = roleId ? stepItems(cv, input.section).find((r) => r.id === roleId) : undefined;
   // A CV without roles has nothing to ask in Experience.
   if (isRoleSection(input.section) && !role) return [];
   const stored = input.run.tailoredCvId ? await deps.tailor.getSteering(input.run.tailoredCvId) : null;
@@ -103,7 +112,6 @@ export async function askQuestions(
   if (score && gaps.length === 0) return [];
   const gapRefs = new Set(gaps.map((label) => label.ref));
   const answered = answeredForJob(input.cv, input.run, roleId);
-  const cv = stripHeader(input.cv).cv;
   const steering = steeringText(stored?.steering ?? {}, cv, role?.id);
   let reply: z.infer<typeof ModelQuestionsSchema>;
   try {

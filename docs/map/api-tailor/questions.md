@@ -4,8 +4,8 @@ area: api-tailor
 files: ["apps/api/src/tailor/questions.ts","apps/api/test/tailor-questions.test.ts"]
 depends_on: ["shared/tailoring","db/tailoring-runs","db/match-scores-repository","api-tailor/section-pass","api-tailor/question-prompts","api-tailor/answers","api-tailor/section-routes"]
 contract: true
-checked_hash: f0afd5e7
-cited: [3f1031, f0919a, 19b3fd, 034386, 435a40, 1cd596, b15949, b94e26, 769e42, 9c0c69, 469811, 1cd596, 14e74e, a958e4, 6badfd, 3c6699, 3962d7, 669af4, 435a40, bfca10, 4659b1, d9132e, bf3011, e1f3e4, 14bc06, 585395, 2a097e, 2645e0, d90b23, fccb29, 510e15, 9bc6f1, 41d20f, 4bff98, 2c577f, 81b993, df5f8b, 0c3957, 569300]
+checked_hash: ba8be5c5
+cited: [7296ff, 77d3e4, 19b3fd, 034386, 435a40, 1cd596, b15949, b94e26, 769e42, 9c0c69, 148cac, 1cd596, 14e74e, a958e4, 7a666f, af2419, 3962d7, 89cd6f, 435a40, bfca10, b94e26, d9132e, bf3011, e1f3e4, be016d, 585395, 2a097e, 2645e0, d90b23, fccb29, 510e15, 9bc6f1, 41d20f, 4bff98, 2c577f, 81b993, df5f8b, 0c3957, 569300]
 decisions: []
 open: []
 ---
@@ -19,7 +19,7 @@ Select eligible gaps and enforce per-item and run-wide question budgets.
 - Role steps look up the latest score for this tailored CV, then use the document score when the row exists. Steering restarts reset that score to Base, so old tailored history cannot hide a gap whose wording was removed `apps/api/src/tailor/questions.ts:83` -> `getScore`; `apps/api/src/tailor/questions.ts:84` -> `readTailoredCv`; `apps/api/src/tailor/questions.ts:86` -> `tailoredScore`; `apps/api/src/tailor/questions.ts:87` -> `label.status`.
 - tested by `apps/api/test/tailor-questions.test.ts:90` -> `job questions`.
 
-- tested by `apps/api/test/tailor-questions.test.ts:113` -> `filters a later role's base gaps`; `apps/api/test/tailor-questions.test.ts:135` -> `offers a gap again after a steering restart`; `apps/api/test/tailor-questions.test.ts:166` -> `enforces each role's prompt and stored question cap`.
+- tested by `apps/api/test/tailor-questions.test.ts:129` -> `filters a later role's base gaps`; `apps/api/test/tailor-questions.test.ts:151` -> `offers a gap again after a steering restart`; `apps/api/test/tailor-questions.test.ts:182` -> `enforces each role's prompt and stored question cap`.
 
 ## Connections
 

@@ -10,6 +10,7 @@ Never add an option meaning other, something else or none of the above: the scre
 Set roleId to the id of the CV role the question is about, or null for skills, summary, languages or layout questions.
 In experience and projects, ask only about "role". Never mention another employer, role, project or "your previous roles".
 The role ran from its startDate to its endDate, or is current. Ask only about tools, methods and practices that fit that period and that kind of work. Skip a gap the role can't plausibly show; returning fewer questions, or none, is fine.
+A note describes the person during its role's period, not today.
 For a role that isn't a focus role, ask only what helps its bullets show value for this job. Don't stretch; no question is fine.
 In projects, "role" is one project or volunteering role (its "kind" says which): ask only about it, in words that fit a project or volunteering, and set roleId to its id.
 Set bulletId to the id of the role's bullet a question is about, or null when it is about the whole role or not about a role.

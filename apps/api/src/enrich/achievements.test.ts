@@ -38,6 +38,20 @@ beforeEach(async () => {
 });
 
 describe("POST /v1/enrich/achievements", () => {
+  it("sends the period on a past role's notes, leaving undated notes unchanged", async () => {
+    await save({ experience: [
+      { ...payroll, startDate: "2014-10", endDate: "2015-07", current: false },
+      { ...sales, startDate: "", notes: payroll.notes },
+    ] });
+    const before = await cv.get();
+    expect((await post()).status).toBe(200);
+    const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
+    const roles = JSON.parse(user.split("<roles>\n")[1]!.split("\n</roles>")[0]!);
+    expect(roles[0].notes).toEqual(payroll.notes.map(({ question, answer }) => ({ question, answer, period: "2014-10 – 2015-07" })));
+    expect(roles[1].notes).toEqual(payroll.notes.map(({ question, answer }) => ({ question, answer })));
+    expect(await cv.get()).toEqual(before);
+  });
+
   it("needs sign-in", async () => {
     expect((await post({ "content-type": "application/json" } as typeof headers)).status).toBe(401);
   });

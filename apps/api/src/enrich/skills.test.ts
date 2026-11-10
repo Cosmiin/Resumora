@@ -41,6 +41,19 @@ beforeEach(() => {
 });
 
 describe("suggestSkills", () => {
+  it("labels each note with its role's period and keeps undated note lines unchanged", async () => {
+    await save({}, [
+      { ...role, startDate: "2014-10", endDate: "2015-07", current: false },
+      { ...role, id: newId(), startDate: "2022-12", endDate: "", current: true },
+      { ...role, id: newId(), startDate: "" },
+    ]);
+    const { model } = await run({ suggestions: [], sort: [] });
+    const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
+    expect(user).toContain('Note (2014-10 – 2015-07): "I used Excel   macros daily"');
+    expect(user).toContain('Note (2022-12 – present): "I used Excel   macros daily"');
+    expect(user).toContain('Note answer: "I used Excel   macros daily"');
+  });
+
   it("returns empty lists with no model call when there is no CV experience", async () => {
     const { model, result } = await run({ suggestions: [sug("SAP", "SAP")], sort: [] });
     expect(result).toEqual({ suggestions: [], sort: [] });
