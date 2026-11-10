@@ -1,11 +1,20 @@
 import { useReducer } from "react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type CvContent } from "@resumora/shared";
 import { EditablePage } from "./EditablePage.tsx";
 import { useOpenedSections } from "./useOpenedSections.ts";
 import { cvReducer } from "./cvReducer.ts";
+
+const signPhoto = vi.hoisted(() => vi.fn());
+vi.mock("../../lib/supabase.ts", () => ({
+  supabase: { storage: { from: () => ({ createSignedUrl: signPhoto }) } },
+}));
+
+beforeEach(() => {
+  signPhoto.mockReset().mockResolvedValue({ data: { signedUrl: "https://example.test/photo" }, error: null });
+});
 
 function Harness({ initial }: { initial: CvContent }) {
   const [cv, dispatch] = useReducer(cvReducer, initial);
@@ -26,6 +35,39 @@ function withSummary(): CvContent {
 }
 
 describe("EditablePage", () => {
+  it.each(["classic", "modern"] as const)("shows the tailored %s photo before the name without photo controls", async (template) => {
+    const cv = emptyCv();
+    cv.basics.fullName = "Ana Pop";
+    cv.basics.photo = { path: "user-a/photo.jpg", x: 25, y: 75, zoom: 2 };
+    const { container } = render(<EditablePage cv={cv} dispatch={vi.fn()} opened={new Set()} onOpen={vi.fn()} tailored template={template} />);
+    const image = await screen.findByRole("img", { name: "CV photo" });
+    const name = screen.getByRole("textbox", { name: "Full name" });
+    expect(image.closest(".cv-header")).toBe(name.closest(".cv-header"));
+    expect(image.parentElement?.parentElement).toBe(name.parentElement);
+    expect(image.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(image.parentElement).toHaveStyle({ width: "96px", height: "96px", float: "right", overflow: "hidden" });
+    expect(image).toHaveStyle({ objectPosition: "25% 75%", transform: "scale(2)", transformOrigin: "25% 75%" });
+    expect(image).toHaveAttribute("draggable", "false");
+    expect(signPhoto).toHaveBeenCalledWith(cv.basics.photo.path, 3600);
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.queryByRole("slider", { name: "Photo zoom" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove photo" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Photo position" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Drag the photo or use the arrow keys to adjust its position.")).not.toBeInTheDocument();
+  });
+
+  it.each(["with a photo", "without a photo"])("shows no photo controls on a tailored Compact page %s", (scenario) => {
+    const cv = emptyCv();
+    if (scenario === "with a photo") cv.basics.photo = { path: "user-a/photo.jpg", x: 50, y: 50, zoom: 1 };
+    const { container } = render(<EditablePage cv={cv} dispatch={vi.fn()} opened={new Set()} onOpen={vi.fn()} tailored template="compact" />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(signPhoto).not.toHaveBeenCalled();
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.queryByRole("slider", { name: "Photo zoom" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove photo" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Drag the photo or use the arrow keys to adjust its position.")).not.toBeInTheDocument();
+  });
+
   it("every header field is editable", async () => {
     render(<Harness initial={emptyCv()} />);
     const fields: [string, (cv: CvContent) => string, string][] = [

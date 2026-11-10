@@ -23,7 +23,7 @@ Render role scores, stale-result feedback, contextual tips and improvement entry
 
 - Used by the section panel and overview; actions open focus or retry score loading, not content mutation. `apps/web/src/cv/panel/SectionTools.tsx:81` -> `ScoreCard`; `apps/web/src/cv/enrich/ScoreCard.tsx:99` -> `onImprove`; `apps/web/src/cv/panel/Overview.tsx:109` -> `RoleScoreList`; `apps/web/src/cv/enrich/RoleScoreList.tsx:38` -> `onOpen`
 - Used by role titles and weak-bullet tips; the adjacent editor hand-copies <75 and >=40, mirroring shared band/clearCount, so changing bands requires updating those markers too. `apps/web/src/cv/edit/sections/RoleItem.tsx:108` -> `ScorePill`; `apps/web/src/cv/enrich/ScorePill.tsx:40` -> `ScorePill`; `apps/web/src/cv/edit/sections/RoleItem.tsx:51` -> `score < 75`; `apps/web/src/cv/edit/sections/RoleItem.tsx:52` -> `score >= 40`; `packages/shared/src/enrich.ts:278` -> `75`; `packages/shared/src/enrich.ts:279` -> `40`
-- Uses the exhaustive ScoredKind-to-list map: role -> experience, project -> projects, volunteering -> volunteering. `apps/web/src/cv/enrich/RoleScoreList.tsx:34` -> `SCORED_LIST[kind]`; `apps/web/src/cv/edit/lists.ts:20` -> `Record<ScoredKind, RoleList>`; `packages/shared/src/cv.ts:267` -> `ScoredKind`
+- Uses the exhaustive ScoredKind-to-list map: role -> experience, project -> projects, volunteering -> volunteering. `apps/web/src/cv/enrich/RoleScoreList.tsx:34` -> `SCORED_LIST[kind]`; `apps/web/src/cv/edit/lists.ts:20` -> `Record<ScoredKind, RoleList>`; `packages/shared/src/cv.ts:268` -> `ScoredKind`
 
 ## Assumptions
 

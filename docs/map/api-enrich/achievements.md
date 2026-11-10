@@ -4,8 +4,8 @@ area: api-enrich
 files: ["apps/api/src/enrich/achievements.ts","apps/api/src/enrich/achievements.test.ts"]
 depends_on: ["api-enrich/score-prompts","api-enrich/score","api-enrich/rewrite","shared/cv","shared/enrichment-score","shared/enrichment-checks","db/ai-log","api-core/call-model"]
 contract: true
-checked_hash: 1908bb4c
-cited: [44d6c0, bf1498, f73778, 7d0653, 73a830, 1533ed, 36149c, 881bc0, fd0423, 0d3e20, 1d9cfe, 171266, 56aff8, 53290e, fc24cf, 1998d9, fefc81, fe5783, 28a8c1, e4c90a, 6617b1, 92fa92, 35897b, d8d9c2, 8ebe9b, 73a830, 806b8a, 56aff8, f30a88, 7d0653, 0d4312, 53290e, ac9638, 1d9cfe, dd2561, 03a5b8, ec5f84, 12eda3, 020c9d, 179af0, fb5d28, e09fd3, cdb2c1, 53290e, 98c384, a44633]
+checked_hash: 71ead95e
+cited: [44d6c0, bf1498, f73778, 7d0653, 73a830, 1533ed, c36dba, a1bbe7, ebba76, ff760f, 1d9cfe, 171266, 56aff8, 53290e, fc24cf, 1998d9, fefc81, fe5783, 28a8c1, e4c90a, 784095, 92fa92, 38f472, d8d9c2, c55496, 73a830, 806b8a, 56aff8, f30a88, 7d0653, 0d4312, 53290e, ac9638, 1d9cfe, dd2561, a7367e, ec5f84, 12eda3, 020c9d, 179af0, fb5d28, e09fd3, 1576a5, 53290e, 98c384, a44633]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---
@@ -29,4 +29,4 @@ Suggest up to five achievements grounded in individual saved experience roles.
 ## Assumptions
 
 - Numeric membership is enforced, but other factual claims depend on the prompt; filtering does not establish that a result actually happened. `apps/api/src/enrich/achievements.ts:17` -> `Never invent`; `apps/api/src/enrich/achievements.ts:64` -> `hasUnknownNumber`.
-- The service returns suggestions without checking remaining storage capacity or saving them; accepted achievement count in the CV remains governed by MAX_ACHIEVEMENTS. `apps/api/src/enrich/achievements.ts:69` -> `return`; `packages/shared/src/cv.ts:200` -> `MAX_ACHIEVEMENTS`.
+- The service returns suggestions without checking remaining storage capacity or saving them; accepted achievement count in the CV remains governed by MAX_ACHIEVEMENTS. `apps/api/src/enrich/achievements.ts:69` -> `return`; `packages/shared/src/cv.ts:201` -> `MAX_ACHIEVEMENTS`.

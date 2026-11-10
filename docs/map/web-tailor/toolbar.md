@@ -5,7 +5,7 @@ files: ["apps/web/src/tailor/TailorToolbar.tsx","apps/web/src/tailor/tailored-pa
 depends_on: ["web-editor/templates","web-tailor/page","shared/match-score"]
 contract: false
 checked_hash: a54525b8
-cited: [b9a866, ffeb0a, d12f2d, 63cc74, 639c23, 7ce57d, 742e60, f83a22, 6eb17d, 9c4583, 05d7d6, 2bf846, 8a00ae, 760876, e07fbd, 7ce57d]
+cited: [b9a866, ffeb0a, d12f2d, 63cc74, 639c23, 7ce57d, 742e60, f83a22, 6eb17d, 9c473f, 05d7d6, 2bf846, 8a00ae, 760876, e07fbd, 7ce57d]
 decisions: []
 open: []
 ---
@@ -20,7 +20,7 @@ Render CV/letter tabs, score summary and the template selector.
 
 ## Connections
 
-- Uses the shared web template registry with classic, modern and compact and classic fallback. `apps/web/src/tailor/TailorToolbar.tsx:111` -> `TEMPLATES`; `apps/web/src/cv/page/templates.ts:1` -> `TEMPLATES`; `apps/web/src/cv/page/templates.ts:10` -> `TEMPLATES[0]`
+- Uses the shared web template registry with classic, modern and compact and classic fallback. `apps/web/src/tailor/TailorToolbar.tsx:111` -> `TEMPLATES`; `apps/web/src/cv/page/templates.ts:1` -> `export const TEMPLATES`; `apps/web/src/cv/page/templates.ts:10` -> `TEMPLATES[0]`
 - Uses global tailored-bar and aria-selected tab styling. `apps/web/src/tailor/TailorToolbar.tsx:95` -> `tailored-bar`; `apps/web/src/styles/tailor.css:115` -> `.tailored-bar`; `apps/web/src/tailor/TailorToolbar.tsx:98` -> `aria-selected`; `apps/web/src/styles/tailor.css:117` -> `aria-selected`
 
 ## Assumptions

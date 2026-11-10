@@ -34,6 +34,25 @@ describe("notePeriod", () => {
 });
 
 describe("CvContentSchema", () => {
+  it.each(["square", "round"])("accepts photo shape %s", (shape) => {
+    const cv = emptyCv();
+    const photo = { path: "user/photo.jpg", x: 50, y: 50, zoom: 1, shape };
+    expect(CvContentSchema.parse({ ...cv, basics: { ...cv.basics, photo } }).basics.photo).toEqual(photo);
+  });
+
+  it("keeps an old photo without writing a shape default", () => {
+    const cv = emptyCv();
+    cv.basics.photo = { path: "user/photo.jpg", x: 50, y: 50, zoom: 1 };
+    expect(CvContentSchema.parse(cv).basics.photo).toEqual(cv.basics.photo);
+    expect(CvContentSchema.parse(cv).basics.photo).not.toHaveProperty("shape");
+  });
+
+  it("rejects an oval photo", () => {
+    const cv = emptyCv();
+    const photo = { path: "user/photo.jpg", x: 50, y: 50, zoom: 1, shape: "oval" };
+    expect(CvContentSchema.safeParse({ ...cv, basics: { ...cv.basics, photo } }).success).toBe(false);
+  });
+
   it.each([1, 3])("accepts photo zoom %i", (zoom) => {
     const cv = emptyCv();
     cv.basics.photo = { path: "user/photo.jpg", x: 0, y: 100, zoom };

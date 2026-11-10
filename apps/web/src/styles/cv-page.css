@@ -95,6 +95,7 @@
 
 /* Editable page: header, headings, list lines, add buttons and missing boxes */
 .cv-page-edit .cv-name { display: block; width: calc(100% + 8px); font-family: var(--font-display); font-size: 34px; line-height: 1.15; color: var(--pine-800); }
+.cv-page-edit .cv-header:has(> .cv-photo) .cv-name { width: calc(100% - 96px - var(--space-4)); }
 .cv-titles, .cv-contact { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
 .cv-titles { margin-block-start: 2px; font-size: 14px; color: var(--pine-600); }
 .cv-contact { margin-block-start: 6px; font-size: 12px; color: var(--sage-600); }
@@ -183,6 +184,20 @@
 @media print {
   .no-print, .section-menu, .hidden-sections, .section-toast { display: none !important; }
 }
+
+/* Base CV photo: upload, adjust with autosave, then a compact saved photo. */
+.photo-field { float: inline-end; width: 144px; margin-inline-start: var(--space-4); font: var(--type-body); color: var(--sage-600); }
+.photo-field.is-saved { width: 96px; }
+.photo-field p { margin: 6px 0; font-size: 12px; }
+.photo-field .btn:disabled { opacity: .6; cursor: default; }
+.photo-box { position: relative; width: 96px; margin-inline-start: auto; }
+.photo-preview { width: 96px; height: 96px; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--sage-300); cursor: pointer; }
+.photo-preview.is-editing { touch-action: none; cursor: move; }
+.photo-preview:focus-visible, .photo-remove:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
+.photo-remove { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid var(--sage-300); background: var(--white); color: var(--sage-600); font: 16px/1 var(--font-sans); cursor: pointer; }
+.photo-field input[type="range"] { display: block; width: 100%; margin: 0; padding: 0; }
+.cv-page-edit .cv-header:has(> .photo-field) .cv-name { width: calc(100% - 144px - var(--space-4)); }
+.cv-page-edit .cv-header:has(> .photo-field.is-saved) .cv-name { width: calc(100% - 96px - var(--space-4)); }
 
 /* E6 Task 10a: an item hidden on this CV stays in the editor, dimmed, with a switch to show it again. */
 .cv-line.is-hidden > :not(.cv-item-head), .cv-line.is-hidden .cv-item-head > :not(.cv-hide) { opacity: 0.45; }

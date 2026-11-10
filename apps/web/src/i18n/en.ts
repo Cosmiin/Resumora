@@ -63,7 +63,10 @@ export const en = {
   "cv.location": "Location",
   "cv.website": "Website",
   "cv.linkedin": "LinkedIn",
-  "cv.photo.choose": "Choose a photo",
+  "cv.photo.choose": "Upload photo",
+  "cv.photo.formats": "JPG, PNG or WebP",
+  "cv.photo.save": "Save",
+  "cv.photo.edit": "Adjust photo",
   "cv.photo.uploading": "Uploading photo...",
   "cv.photo.unsupported": "Choose a JPEG, PNG or WebP photo.",
   "cv.photo.shrinkError": "Couldn't make this photo small enough. Please try another photo.",
@@ -72,6 +75,9 @@ export const en = {
   "cv.photo.position": "Photo position",
   "cv.photo.positionHint": "Drag the photo or use the arrow keys to adjust its position.",
   "cv.photo.zoom": "Photo zoom",
+  "cv.photo.shape": "Photo shape",
+  "cv.photo.square": "Square",
+  "cv.photo.round": "Round",
   "cv.photo.remove": "Remove photo",
 
 

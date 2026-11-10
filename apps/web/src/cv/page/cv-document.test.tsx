@@ -21,6 +21,20 @@ describe("CV document photos", () => {
     return cv;
   };
 
+  it.each(["classic", "modern"] as const)("renders round and square photos for %s", async (template) => {
+    const cv = withPhoto();
+    const photo = cv.basics.photo!;
+    const shaped = (shape?: "square" | "round") => ({ ...cv, basics: { ...cv.basics, photo: { ...photo, shape } } });
+    const { rerender } = render(<CvDocument content={shaped("round")} template={template} />);
+    const image = await screen.findByRole("img", { name: "CV photo" });
+    expect(image.parentElement).toHaveStyle({ borderRadius: "50%", overflow: "hidden" });
+    for (const shape of ["square", undefined] as const) {
+      rerender(<CvDocument content={shaped(shape)} template={template} />);
+      expect(image.parentElement!.style.borderRadius).not.toBe("50%");
+    }
+    expect(photos.sign).toHaveBeenCalledTimes(1);
+  });
+
   it.each(["classic", "modern"] as const)("shows a signed photo and its crop for %s", async (template) => {
     const { rerender } = render(<CvDocument content={withPhoto()} template={template} />);
     const image = await screen.findByRole("img", { name: "CV photo" });

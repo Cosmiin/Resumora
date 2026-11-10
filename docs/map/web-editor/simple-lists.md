@@ -5,7 +5,7 @@ files: ["apps/web/src/cv/edit/sections/SimpleListEdit.tsx"]
 depends_on: ["web-editor/reducer","web-editor/page-fields","web-editor/bullets","web-editor/drag","web-editor/focus","web-editor/section-controls"]
 contract: false
 checked_hash: b6a6c14f
-cited: [406213, 10fb06, 6ba6df, 2402cf, dca10d, bc2033, dca10d, 929c80, 8221d4, 51673f, 761456, edee2c, 057fc4, ae36d5, d8d141, 7aead8, dca10d, f21d84, e5aaac, 1ff741, 50685a, 939edf, 44cd26, 4fa241, 3bf110, c153de, ee04d6, 4aed8c, f89f06]
+cited: [406213, 10fb06, 6ba6df, 2402cf, dca10d, bc2033, dca10d, 929c80, 8221d4, 51673f, 761456, edee2c, 057fc4, ae36d5, d8d141, 7aead8, dca10d, 328b5c, e5aaac, d74e98, 50685a, 939edf, 44cd26, 4fa241, 3bf110, c153de, ee04d6, 4aed8c, f89f06]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---
@@ -23,8 +23,8 @@ Render configured short lists and retain hidden enrichment items in the editor.
 
 - Used by the renderer registry's simple wrapper: `apps/web/src/cv/edit/sections/renderers.tsx:14` -> `SimpleListEdit`; `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:151` -> `SimpleListEdit`
 - Uses reducer list-local hide/show updates: `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:87` -> `setItemHidden`; `apps/web/src/cv/edit/cvReducer.ts:324` -> `case "setItemHidden"`
-- Uses global .cv-line.is-hidden and .cv-hide so hidden content dims while its show control remains legible: `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:105` -> `is-hidden`; `apps/web/src/styles/cv-page.css:188` -> `.cv-line.is-hidden`; `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:123` -> `cv-hide`; `apps/web/src/styles/cv-page.css:189` -> `.cv-hide`
-- Uses global non-role .cv-item-dates sizing and .cv-item-details layout: `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:109` -> `cv-item-dates`; `apps/web/src/styles/cv-page.css:132` -> `.cv-line:not(.cv-role)`; `apps/web/src/styles/cv-page.css:133` -> `min-width: 9ch`; `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:130` -> `cv-item-details`; `apps/web/src/styles/cv-page.css:115` -> `.cv-item-details`
+- Uses global .cv-line.is-hidden and .cv-hide so hidden content dims while its show control remains legible: `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:105` -> `is-hidden`; `apps/web/src/styles/cv-page.css:203` -> `.cv-line.is-hidden`; `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:123` -> `cv-hide`; `apps/web/src/styles/cv-page.css:204` -> `.cv-hide`
+- Uses global non-role .cv-item-dates sizing and .cv-item-details layout: `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:109` -> `cv-item-dates`; `apps/web/src/styles/cv-page.css:133` -> `.cv-line:not(.cv-role)`; `apps/web/src/styles/cv-page.css:134` -> `min-width: 9ch`; `apps/web/src/cv/edit/sections/SimpleListEdit.tsx:130` -> `cv-item-details`; `apps/web/src/styles/cv-page.css:116` -> `.cv-item-details`
 
 ## Assumptions
 

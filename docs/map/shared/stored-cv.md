@@ -5,7 +5,7 @@ files: ["packages/shared/src/upgrade.ts","packages/shared/src/upgrade.test.ts"]
 depends_on: ["shared/cv","shared/categories"]
 contract: true
 checked_hash: c2e4ace8
-cited: [60f529, f203af, faf887, b17465, defcf5, 238805, f45806, 1de92f, 50158f, defcf5, ce9677, defcf5, 2c17ba, f3b63f, dbfb52, faf887, f24107, 59e5ca, faf887, c69e2a, 48de31, e0c3ae, a269dd, 3dcf49, 30a6de, 60f529, c69e2a]
+cited: [60f529, f203af, faf887, b17465, defcf5, 238805, f45806, 1de92f, 50158f, defcf5, ce9677, defcf5, 2c17ba, fae5f4, dbfb52, faf887, f24107, 59e5ca, faf887, c69e2a, 48de31, e0c3ae, a269dd, 3dcf49, 30a6de, 60f529, c69e2a]
 decisions: ["docs/decisions/0003-one-shared-description-of-a-cv.md","docs/decisions/0009-one-fixed-set-of-cv-categories.md"]
 open: []
 ---
@@ -22,8 +22,8 @@ Read old CVs as current content and repair stored section layouts.
 
 - Used by API stored-row parsing: `apps/api/src/cv/supabase-repo.ts:11` -> `StoredCvSchema` -> `packages/shared/src/upgrade.ts:43` -> `StoredCvSchema`.
 - Used by import result parsing, which also accepts stored v1 content: `packages/shared/src/imports.ts:93` -> `StoredCvSchema` -> `packages/shared/src/upgrade.ts:43` -> `StoredCvSchema`; API consumer `apps/api/src/imports/supabase-repo.ts:27` -> `ImportResultSchema`.
-- Used by web page layout and section tooling: `apps/web/src/cv/page/CvDocument.tsx:2` -> `normalizeLayout`, `apps/web/src/cv/panel/SectionTools.tsx:1` -> `normalizeLayout` -> `packages/shared/src/upgrade.ts:24` -> `normalizeLayout`. PDF and DOCX exports also normalize layouts before rendering, so normalization changes affect export order, hiding and titles: `apps/web/src/export/pdf.tsx:119` -> `normalizeLayout`, `apps/web/src/export/docx.ts:150` -> `normalizeLayout` -> `packages/shared/src/upgrade.ts:24` -> `normalizeLayout`.
-- Uses shared CV schemas and category order: `packages/shared/src/upgrade.ts:44` -> `CvContentSchema` -> `packages/shared/src/cv.ts:194` -> `CvContentV1Schema`, `packages/shared/src/cv.ts:196` -> `CvContentSchema`; `packages/shared/src/upgrade.ts:30` -> `SECTION_KEYS` -> `packages/shared/src/categories.ts:166` -> `SECTION_KEYS`.
+- Used by web page layout and section tooling: `apps/web/src/cv/page/CvDocument.tsx:47` -> `normalizeLayout`, `apps/web/src/cv/panel/SectionTools.tsx:1` -> `normalizeLayout` -> `packages/shared/src/upgrade.ts:24` -> `normalizeLayout`. PDF and DOCX exports also normalize layouts before rendering, so normalization changes affect export order, hiding and titles: `apps/web/src/export/pdf.tsx:119` -> `normalizeLayout`, `apps/web/src/export/docx.ts:160` -> `normalizeLayout` -> `packages/shared/src/upgrade.ts:24` -> `normalizeLayout`.
+- Uses shared CV schemas and category order: `packages/shared/src/upgrade.ts:44` -> `CvContentSchema` -> `packages/shared/src/cv.ts:195` -> `CvContentV1Schema`, `packages/shared/src/cv.ts:197` -> `CvContentSchema`; `packages/shared/src/upgrade.ts:30` -> `SECTION_KEYS` -> `packages/shared/src/categories.ts:166` -> `SECTION_KEYS`.
 
 ## Assumptions
 

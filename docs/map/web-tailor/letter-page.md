@@ -20,7 +20,7 @@ Format letter headings and shared greetings in the document language.
 
 ## Connections
 
-- Used by CoverLetterTab and export letterParts; export consumes greeting/sign-off but its builders assemble recipient text separately. `apps/web/src/tailor/CoverLetterTab.tsx:100` -> `LetterPage`; `apps/web/src/tailor/LetterPage.tsx:37` -> `LetterPage`; `apps/web/src/export/export-files.ts:52` -> `letterWords`; `apps/web/src/tailor/LetterPage.tsx:15` -> `letterWords`; `apps/web/src/export/pdf.tsx:172` -> `recipient`
+- Used by CoverLetterTab and export letterParts; export consumes greeting/sign-off but its builders assemble recipient text separately. `apps/web/src/tailor/CoverLetterTab.tsx:100` -> `LetterPage`; `apps/web/src/tailor/LetterPage.tsx:37` -> `LetterPage`; `apps/web/src/export/export-files.ts:52` -> `letterWords`; `apps/web/src/tailor/LetterPage.tsx:15` -> `letterWords`; `apps/web/src/export/pdf.tsx:174` -> `recipient`
 - Uses global letter-page layout and letter-re weight. `apps/web/src/tailor/LetterPage.tsx:41` -> `letter-page`; `apps/web/src/styles/tailor.css:122` -> `.letter-page`; `apps/web/src/tailor/LetterPage.tsx:47` -> `letter-re`; `apps/web/src/styles/tailor.css:126` -> `.letter-re`
 
 ## Assumptions

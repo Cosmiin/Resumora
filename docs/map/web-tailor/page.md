@@ -31,7 +31,7 @@ Load a language copy and integrate tailored editing, review and document actions
 
 - Used by /jobs/:id/cv and uses Editor's source-injected autosave. `apps/web/src/router.tsx:22` -> `TailoredCvPage`; `apps/web/src/tailor/TailoredCvPage.tsx:52` -> `TailoredCvPage`; `apps/web/src/tailor/TailoredCvPage.tsx:185` -> `source`; `apps/web/src/cv/Editor.tsx:60` -> `useAutosave`
 - Uses global tailored-notice and tailored-redo classes for changed-job and per-section actions. `apps/web/src/tailor/TailoredCvPage.tsx:155` -> `tailored-notice`; `apps/web/src/styles/tailor.css:139` -> `.tailored-notice`; `apps/web/src/tailor/TailoredCvPage.tsx:176` -> `tailored-redo`; `apps/web/src/styles/tailor.css:141` -> `.tailored-redo`
-- Uses ExportMenu with a fresh server load callback, not Editor's unsaved content. `apps/web/src/tailor/TailoredCvPage.tsx:150` -> `ExportMenu`; `apps/web/src/export/ExportMenu.tsx:38` -> `load`
+- Uses ExportMenu with a fresh server load callback, not Editor's unsaved content. `apps/web/src/tailor/TailoredCvPage.tsx:150` -> `ExportMenu`; `apps/web/src/export/ExportMenu.tsx:56` -> `load`
 
 ## Assumptions
 

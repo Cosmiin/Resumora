@@ -4,6 +4,8 @@ import { t } from "../../../i18n/t.ts";
 import type { CvAction } from "../cvReducer.ts";
 import { PageField } from "../PageField.tsx";
 import { PhotoField } from "../../panel/PhotoField.tsx";
+import { CvPhoto } from "../../page/CvPhoto.tsx";
+import { getTemplate, type TemplateId } from "../../page/templates.ts";
 
 type Basics = CvContent["basics"];
 type Dispatch = (a: CvAction) => void;
@@ -52,7 +54,9 @@ const sep = (key: string) => (
 );
 
 /** Name, up to two titles and contact details, typed where they appear on the CV. */
-export function HeaderEdit({ basics, dispatch }: { basics: Basics; dispatch: Dispatch }) {
+export function HeaderEdit({ basics, dispatch, tailored = false, template }: {
+  basics: Basics; dispatch: Dispatch; tailored?: boolean; template?: TemplateId;
+}) {
   const contact: { field: TextKey; label: string }[] = [
     { field: "email", label: t("cv.email") },
     { field: "phone", label: t("cv.phone") },
@@ -61,7 +65,9 @@ export function HeaderEdit({ basics, dispatch }: { basics: Basics; dispatch: Dis
     { field: "linkedin", label: t("cv.linkedin") },
   ];
   return (
-    <header className="cv-header" data-section="header">
+    <header className="cv-header" data-section="header" style={{ display: "flow-root" }}>
+      {tailored && getTemplate(template).photo === "header-right" && <CvPhoto photo={basics.photo} />}
+      {!tailored && <PhotoField photo={basics.photo} onChange={(photo) => dispatch({ type: "setBasics", field: "photo", value: photo })} />}
       <BasicsField
         field="fullName"
         className="cv-name"
@@ -83,7 +89,6 @@ export function HeaderEdit({ basics, dispatch }: { basics: Basics; dispatch: Dis
           </Fragment>
         ))}
       </div>
-      <PhotoField photo={basics.photo} onChange={(photo) => dispatch({ type: "setBasics", field: "photo", value: photo })} />
     </header>
   );
 }

@@ -69,6 +69,19 @@ describe("buildCvDocx", () => {
     expect(xml).toContain("<w:drawing>");
     expect(xml).toContain("<a:blip r:embed=");
     expect(xml).toContain('<wp:extent cx="914400" cy="457200"/>');
+    const document = new DOMParser().parseFromString(xml, "application/xml");
+    const name = Array.from(document.getElementsByTagName("w:p"))
+      .find((p) => p.textContent?.includes(content.basics.fullName))!;
+    expect(name.getElementsByTagName("w:pStyle")[0]?.getAttribute("w:val")).toBe("Title");
+    expect(name.getElementsByTagName("wp:anchor")).toHaveLength(1);
+    const horizontal = name.getElementsByTagName("wp:positionH")[0]!;
+    expect(horizontal.getAttribute("relativeFrom")).toBe("margin");
+    expect(horizontal.textContent).toBe("right");
+    const vertical = name.getElementsByTagName("wp:positionV")[0]!;
+    expect(vertical.getAttribute("relativeFrom")).toBe("paragraph");
+    expect(vertical.textContent).toBe("0");
+    expect(name.getElementsByTagName("wp:wrapSquare")).toHaveLength(1);
+    expect(xml).not.toMatch(/<w:tbl|<wp:inline/);
   });
 
   it.each(["compact", "no bytes", "no photo", "webp"])("omits the image for %s", async (scenario) => {

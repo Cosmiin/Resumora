@@ -15,6 +15,12 @@ beforeEach(() => {
 });
 
 describe("CV templates", () => {
+  it("declares a header-right photo slot for Classic and Modern, and none for Compact", () => {
+    expect(getTemplate("classic").photo).toBe("header-right");
+    expect(getTemplate("modern").photo).toBe("header-right");
+    expect(getTemplate("compact").photo).toBeNull();
+  });
+
   it("shows photos in default Classic and Modern, and hides them in Compact", async () => {
     const cv = sampleCv();
     cv.basics.photo = { path: "user-a/photo.jpg", x: 50, y: 50, zoom: 1 };

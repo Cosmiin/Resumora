@@ -21,10 +21,10 @@ Apply role notes and extracted facts without accepting stale note-derived facts,
 ## Connections
 
 - Uses shared notesHash to prevent stale extracted facts: `apps/web/src/cv/edit/cvReducer.ts:339` -> `notesHash`; `packages/shared/src/enrich-focus.ts:8` -> `notesHash`
-- Uses the central scored-list lookup for both note and fact actions; extending SCORED_LIST and shared scoredItems covers these ID-based actions too. `apps/web/src/cv/edit/cvReducer.ts:334` -> `roleListOf`; `apps/web/src/cv/edit/cvReducer.ts:345` -> `roleListOf`; `apps/web/src/cv/edit/lists.ts:20` -> `SCORED_LIST`; `apps/web/src/cv/edit/lists.ts:24` -> `findScored`; `packages/shared/src/cv.ts:270` -> `scoredItems`
+- Uses the central scored-list lookup for both note and fact actions; extending SCORED_LIST and shared scoredItems covers these ID-based actions too. `apps/web/src/cv/edit/cvReducer.ts:334` -> `roleListOf`; `apps/web/src/cv/edit/cvReducer.ts:345` -> `roleListOf`; `apps/web/src/cv/edit/lists.ts:20` -> `SCORED_LIST`; `apps/web/src/cv/edit/lists.ts:24` -> `findScored`; `packages/shared/src/cv.ts:271` -> `scoredItems`
 - Used by focus-session responses and guided-path completion: `apps/web/src/cv/enrich/useFocusSession.ts:460` -> `setNote`; `apps/web/src/cv/edit/cvReducer.ts:344` -> `case "setNote"`; `apps/web/src/cv/enrich/useFocusSession.ts:563` -> `setFacts`; `apps/web/src/cv/edit/cvReducer.ts:333` -> `case "setFacts"`; `apps/web/src/cv/enrich/EnrichPath.tsx:186` -> `markEnriched`; `apps/web/src/cv/edit/cvReducer.ts:376` -> `case "markEnriched"`
 
 ## Assumptions
 
-- IDs must be unique across scored lists for lookup to be unambiguous; findScored takes the first match. `apps/web/src/cv/edit/lists.ts:24` -> `findScored`; `packages/shared/src/cv.ts:279` -> `.find`
+- IDs must be unique across scored lists for lookup to be unambiguous; findScored takes the first match. `apps/web/src/cv/edit/lists.ts:24` -> `findScored`; `packages/shared/src/cv.ts:280` -> `.find`
 - Note eviction assumes askedAt strings sort chronologically; kind is determined by whether jobId is undefined, not by a separate enum. `apps/web/src/cv/edit/cvReducer.ts:350` -> `jobId === undefined`; `apps/web/src/cv/edit/cvReducer.ts:354` -> `askedAt`

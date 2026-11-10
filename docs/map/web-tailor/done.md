@@ -20,7 +20,7 @@ Summarize completed tailoring and link to review, files or the cover letter.
 
 ## Connections
 
-- Uses the same unreviewed-item predicate as export warnings. `apps/web/src/tailor/DoneScreen.tsx:42` -> `unreviewedItems`; `apps/web/src/export/export-files.ts:17` -> `unreviewedItems`
+- Uses the same unreviewed-item predicate as export warnings. `apps/web/src/tailor/DoneScreen.tsx:42` -> `unreviewedItems`; `apps/web/src/export/export-files.ts:18` -> `unreviewedItems`
 - Links are consumed by TailoredCvPage's initial query-parameter state. `apps/web/src/tailor/DoneScreen.tsx:61` -> `review=1`; `apps/web/src/tailor/TailoredCvPage.tsx:71` -> `search.get`
 - Uses global tailor-done-check and tailor-done-next layouts. `apps/web/src/tailor/DoneScreen.tsx:59` -> `tailor-done-check`; `apps/web/src/styles/tailor.css:166` -> `.tailor-done-check`; `apps/web/src/tailor/DoneScreen.tsx:63` -> `tailor-done-next`; `apps/web/src/styles/tailor.css:168` -> `.tailor-done-next`
 

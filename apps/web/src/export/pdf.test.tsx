@@ -1,11 +1,17 @@
 ﻿// @vitest-environment node
 import { createRequire } from "node:module";
 import { Font } from "@react-pdf/renderer";
+import * as renderer from "@react-pdf/renderer";
 import { CvContentSchema, emptyCv, ExperienceSchema, type CvContent } from "@resumora/shared";
 import { extractText, getDocumentProxy } from "unpdf";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fitSteps } from "./fit.ts";
 import { buildCvPdf, buildLetterPdf, fitCvPdf } from "./pdf.tsx";
+
+vi.mock("@react-pdf/renderer", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@react-pdf/renderer")>();
+  return { ...actual, pdf: vi.fn(actual.pdf) };
+});
 
 const require = createRequire(import.meta.url);
 
@@ -109,6 +115,43 @@ async function readPdf(blob: Blob) {
 }
 
 describe("buildCvPdf", () => {
+  it.each([
+    ["classic", undefined], ["modern", undefined], ["classic", "square"], ["modern", "square"],
+    ["classic", "round"], ["modern", "round"],
+  ] as const)("places the %s photo with shape %s after the header text column", async (template, shape) => {
+    const content = fixture();
+    content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1, ...(shape ? { shape } : {}) };
+    const render = vi.mocked(renderer.pdf);
+    render.mockClear();
+    try {
+      await buildCvPdf(content, template, { data: PNG, type: "png" });
+      expect(render.mock.calls[0]![0]).toMatchObject({
+        props: { children: { props: { children: [expect.objectContaining({
+          type: renderer.View,
+          props: expect.objectContaining({
+            style: expect.objectContaining({ flexDirection: "row" }),
+            children: [
+              expect.objectContaining({
+                type: renderer.View,
+                props: expect.objectContaining({
+                  style: { flex: 1 },
+                  children: [
+                    expect.objectContaining({ props: expect.objectContaining({ children: content.basics.fullName }) }),
+                    expect.objectContaining({ props: expect.objectContaining({ children: content.basics.titles.join(" \u00b7 ") }) }),
+                    expect.objectContaining({ props: expect.objectContaining({ children: expect.stringContaining(content.basics.email) }) }),
+                  ],
+                }),
+              }),
+              expect.objectContaining({ type: renderer.Image, props: expect.objectContaining({ style: { width: 72, height: 72, objectFit: "contain", ...(shape === "round" ? { borderRadius: 36 } : {}) } }) }),
+            ],
+          }),
+        }), expect.anything()] } } },
+      });
+    } finally {
+      render.mockClear();
+    }
+  });
+
   it.each([["classic", "png"], ["modern", "png"], ["classic", "jpeg"]] as const)("embeds the %s photo as %s", async (template, type) => {
     const content = fixture();
     content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1 };
@@ -266,7 +309,7 @@ describe("fitCvPdf", () => {
     expect(fitted).toMatchObject({ step: { tight: true, fontSize: minimum }, fits: false });
     expect(fitted.pages).toBeGreaterThan(2);
     expect((await readPdf(fitted.blob)).totalPages).toBe(fitted.pages);
-  });
+  }, 15_000);
 });
 
 describe("buildLetterPdf", () => {

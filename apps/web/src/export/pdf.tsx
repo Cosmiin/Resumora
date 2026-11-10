@@ -33,12 +33,12 @@ export function buildCvPdf(
   const content = withoutHidden(cv);
   registerPdfFonts();
   const selectedTemplate = getTemplate(template);
-  const image = selectedTemplate.showsPhoto && content.basics.photo && photo && photo.type !== "webp"
+  const image = selectedTemplate.photo !== null && content.basics.photo && photo && photo.type !== "webp"
     ? new Blob([new Uint8Array(photo.data)], { type: `image/${photo.type}` }) : undefined;
   const theme = { ...TEMPLATES[selectedTemplate.id], ...(step.tight ? TIGHT[selectedTemplate.id] : {}), fontSize: step.fontSize };
   const styles = StyleSheet.create({
     page: { padding: step.tight ? 40 : 54, color: "#222222", fontFamily: theme.fontFamily, fontSize: theme.fontSize, lineHeight: theme.lineHeight },
-    header: { marginBottom: step.tight ? 8 : 12 },
+    header: { marginBottom: step.tight ? 8 : 12, flexDirection: image && selectedTemplate.photo === "header-right" ? "row" : "column" },
     // react-pdf turns the page's line height into points at body size, so the large name needs its own (C7: it overlapped the next line).
     name: { fontSize: theme.fontSize + 12, lineHeight: 1.2, fontWeight: 700, color: theme.accent },
     contact: { fontSize: theme.fontSize - 1 },
@@ -124,10 +124,12 @@ export function buildCvPdf(
       <Page size="A4" style={styles.page}>
         {b.fullName || titles || contact || image ? (
           <View style={styles.header}>
-            {image ? <Image src={image} style={{ width: 72, height: 72, objectFit: "contain" }} /> : null}
-            {b.fullName ? <Text style={styles.name}>{b.fullName}</Text> : null}
-            {titles ? paragraph(titles) : null}
-            {contact ? <Text style={styles.contact}>{contact}</Text> : null}
+            <View style={image ? { flex: 1 } : undefined}>
+              {b.fullName ? <Text style={styles.name}>{b.fullName}</Text> : null}
+              {titles ? paragraph(titles) : null}
+              {contact ? <Text style={styles.contact}>{contact}</Text> : null}
+            </View>
+            {image ? <Image src={image} style={{ width: 72, height: 72, objectFit: "contain", ...(b.photo?.shape === "round" ? { borderRadius: 36 } : {}) }} /> : null}
           </View>
         ) : null}
         {layout.order.filter((key) => !layout.hidden.includes(key) && sections[key].length > 0).map((key) => (
