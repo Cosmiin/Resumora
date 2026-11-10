@@ -4,8 +4,8 @@ area: extension
 files: ["apps/extension/src/popup/popup.ts","apps/extension/src/popup/view.test.ts"]
 depends_on: ["extension/messages","extension/popup-view","extension/popup-shell"]
 contract: false
-checked_hash: 6766b5e6
-cited: [ebd32d, ab4092, 563861, ceb56f, 6b5716, 039e61, bf5d56, 34e495, e3aa01, 4fa7a4, 9ca3e1, a69c19, 350ffc, b9d035, ad5cb6, dbbd50, 0df40c, b0aa53, bdb3ab, 6f3a59, 8fcefd, 6ea354, c24d16, 53ca9e, 748324, 130230, 4550ff, 2fd7c1, ab4092, 9467bb, b0aa53, 1d5ed4]
+checked_hash: f8d35dd7
+cited: [ebd32d, ab4092, 563861, ceb56f, 6b5716, 039e61, bf5d56, 34e495, e3aa01, 4fa7a4, 9ca3e1, a69c19, 350ffc, b9d035, ad5cb6, dbbd50, 0df40c, ab8d65, 160cd8, b0aa53, bdb3ab, 6f3a59, 8fcefd, 6ea354, c24d16, 53ca9e, 748324, 130230, 4550ff, 2fd7c1, ab4092, 9467bb, b0aa53, 1d5ed4]
 decisions: []
 open: []
 ---
@@ -22,6 +22,7 @@ Coordinate popup initialization, environment changes, page checks and capture re
 - Sign-in uses a separate reply validator and displays a returned failure message on the existing state. `apps/extension/src/popup/popup.ts:151` -> `signIn`
 - Retry is suppressed during a pending state change; otherwise it retries the failed check, saves, or restarts initialization depending on state. `apps/extension/src/popup/popup.ts:166` -> `retry`
 - Each show refreshes the badge and footer; signed-in footer displays email, sign-out and environment selection. `apps/extension/src/popup/popup.ts:55` -> `const current`; `apps/extension/src/popup/popup.ts:78` -> `footer.append`
+- The signed-in footer labels every unconfigured environment "(not set up in this build)" and disables it. `apps/extension/src/popup/popup.ts:68` -> `unavailable`; tested by `apps/extension/src/popup/view.test.ts:529` -> `renders footer Local with configured=%s`
 - New tabs are opened through tabs.create; rejected creation uses the generic failure view. `apps/extension/src/popup/popup.ts:165` -> `tabs.create`
 - tested by `apps/extension/src/popup/view.test.ts:148` -> `popup interactions`
 

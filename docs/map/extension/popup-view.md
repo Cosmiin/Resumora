@@ -4,7 +4,7 @@ area: extension
 files: ["apps/extension/src/popup/view.ts","apps/extension/src/popup/view.test.ts"]
 depends_on: ["extension/messages","extension/environments","extension/popup-shell","web-app/auth-login"]
 contract: false
-checked_hash: be630c3f
+checked_hash: fc78d12a
 cited: [139065, 7ebc26, 4356cf, b62826, a3b7e2, 3ffc57, 7453b1, 170581, 462683, 410653, 64a553, b0e57e, 19d584, 563db4, 8cf97c, e76f0a, 881baf, 540510, 6ea354, c24d16, c3382f, f05977, 1e5614, 29965c, 230b72, b93037, f1ccd7, 5063a7, 3ffc57, 7b5ab0]
 decisions: []
 open: []

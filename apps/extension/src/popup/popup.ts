@@ -65,7 +65,7 @@ export async function startPopup(
       label.textContent = copy.connectTo;
       const select = doc.createElement("select");
       for (const env of current.environments) {
-        const unavailable = env.id === "hosted" && !env.configured;
+        const unavailable = !env.configured;
         const option = doc.createElement("option");
         option.value = env.id;
         option.textContent = `${env.label}${unavailable ? ` ${copy.notSetUp}` : ""}`;

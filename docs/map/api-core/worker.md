@@ -4,7 +4,7 @@ area: api-core
 files: ["apps/api/src/index.ts","apps/api/test/jobs-consumer.test.ts","apps/api/test/supabase-repo.test.ts"]
 depends_on: ["api-core/app","api-core/auth","api-core/call-model","api-core/import-queue","api-core/job-queue","api-core/config","api-core/environment","db/imports","db/jobs","db/tailoring-repository","db/ai-log","db/match-scores-repository"]
 contract: true
-checked_hash: 20ce72df
+checked_hash: 568f052a
 cited: [c9dd44, 47a888, a52f80, 881486, 8506da, c5d059, 4a6da2, b9d0c9, 8968cd, 92c025, 93f1eb, f13f46, dd67a2, 0cdedd, 7a053f, e03deb, 74b1b6, e6e14e, 20021b, 47ae3f, 1d8b1c, f901fc, b9d0c9, 4a6da2, 8968cd, 844e13, 559aea, 131cee, e63f8c, 70050f, 39c0ad, f13f46, 70c56b, dc4ff9, e3416c, 604221, 0e8422, 93b125, 61c33d, f13f46, d5977e, 624b78, c5d059, f180dc, a52f80, 14cb65, 46f7f8, fc1d09, fdb480, 1f92b2, 92c025, 8968cd, 73983b, e63f8c, ed3bb2, 77ad25, dd67a2, b772af, a6297c, 70050f, 39c0ad, f13f46, f26157, c09742, 9e2b4d, 934b19, f26157, c09742]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md","docs/decisions/0004-imports-go-through-a-queue.md"]
 open: []

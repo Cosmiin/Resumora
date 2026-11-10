@@ -522,4 +522,21 @@ describe("popup interactions", () => {
     expect(document.querySelector("main p")?.textContent).toBe("Your sign-in expired. Sign in again.");
     expect(document.querySelector("footer")?.textContent).toBe("");
   });
+
+  it.each([
+    [false, "Local (not set up in this build)", true],
+    [true, "Local", false],
+  ] as const)("renders footer Local with configured=%s", async (configured, label, disabled) => {
+    const p = await popup();
+    p.sendMessage.mockResolvedValueOnce({
+      ...state, env: "hosted", email: "hosted@example.test",
+      environments: state.environments.map((env) => ({
+        ...env, configured: env.id === "local" ? configured : true,
+      })),
+    });
+    await p.start();
+    const option = document.querySelector<HTMLOptionElement>('footer option[value="local"]')!;
+    expect(option.textContent).toBe(label);
+    expect(option.disabled).toBe(disabled);
+  });
 });
