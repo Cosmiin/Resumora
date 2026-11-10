@@ -1,4 +1,5 @@
 import { JobExtractionSchema, type JobExtraction } from "@resumora/shared";
+import { z } from "zod";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { buildJobUserPrompt, jobExtractPrompt } from "./prompts.ts";
 import type { JobWork } from "./repo.ts";
@@ -12,7 +13,7 @@ export async function processJob(
     const extracted = await callModel(deps.model, {
       userId: work.userId,
       task: "job_extract",
-      schema: JobExtractionSchema,
+      schema: JobExtractionSchema.extend({ positionClosed: z.boolean() }),
       system: jobExtractPrompt,
       user: buildJobUserPrompt(work, today.toISOString().slice(0, 10)),
       maxOutputTokens: 2000,

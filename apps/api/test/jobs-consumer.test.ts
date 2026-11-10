@@ -14,7 +14,7 @@ const extracted: JobExtraction = {
   title: "Engineer", company: null, location: null, workMode: "unknown",
   employmentType: "unknown", seniority: "unknown", salary: null,
   summary: "Build software.", responsibilities: [], requirements: [],
-  benefits: [], applyBy: null, isJobPosting: true,
+  benefits: [], applyBy: null, isJobPosting: true, positionClosed: false,
 };
 const work = { id: "job-a", userId: "user-a", rawText: "Private job page text", jsonLd: null };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { JobExtraction } from "@resumora/shared";
+import { JobExtractionSchema, JobPatchBodySchema, type JobExtraction } from "@resumora/shared";
 import type { ModelDeps } from "../src/ai/call-model.ts";
 import { processJob } from "../src/jobs/process.ts";
 import { buildJobUserPrompt, JOB_PROMPT_VERSION, jobExtractPrompt } from "../src/jobs/prompts.ts";
@@ -9,7 +9,7 @@ const extracted: JobExtraction = {
   employmentType: "full_time", seniority: "unknown", salary: null,
   summary: "Build software.", responsibilities: ["Build software"],
   requirements: [{ text: "TypeScript", kind: "must", category: "skill" }],
-  benefits: [], applyBy: null, isJobPosting: true,
+  benefits: [], applyBy: null, isJobPosting: true, positionClosed: false,
 };
 const work = { id: "job-a", userId: "user-a", rawText: "Private job page text", jsonLd: null };
 
@@ -39,8 +39,31 @@ describe("job user prompt", () => {
 
   it("omits the JSON-LD block when absent", () => {
     const prompt = buildJobUserPrompt(work, "2026-11-06");
-    expect(prompt).toContain(work.rawText);
-    expect(prompt).not.toContain("JSON-LD");
+    expect(prompt).toBe(`Today's date: 2026-11-06.\nPage text:\n${work.rawText}`);
+  });
+
+  it("cuts a closed ad's trailing job lists before building the prompt", () => {
+    const body = "Platform Engineer at Fictional Labs\nBuild software with TypeScript.\nThis position is no longer open for recruitment";
+    const tail = [
+      "Similar jobs", "Data Analyst", "Product Designer", "QA Engineer", "Accountant",
+      "See all", "Next job", "Sales Manager", "Jobs in", "Bucharest", "Cluj",
+    ];
+    const captured = { ...work, rawText: [body, ...tail].join("\n") };
+    expect(buildJobUserPrompt(captured, "2026-11-10"))
+      .toBe(`Today's date: 2026-11-10.\nPage text:\n${body}\n`);
+    expect(captured.rawText).toBe([body, ...tail].join("\n"));
+  });
+
+  it.each(["  sImIlAr JoBs  ", "\tNEXT JOB\t", " See ALL "])("cuts at the first trimmed marker %s", (marker) => {
+    const rawText = `Ad body\r\n${marker}\r\nOther title\r\nSimilar jobs\r\nMore titles`;
+    expect(buildJobUserPrompt({ ...work, rawText }, "2026-11-10"))
+      .toBe("Today's date: 2026-11-10.\nPage text:\nAd body\r\n");
+  });
+
+  it("keeps marker phrases inside sentences", () => {
+    const rawText = "Engineer\nSee all benefits below\nSimilar jobs require experience\nNext job starts in December";
+    expect(buildJobUserPrompt({ ...work, rawText }, "2026-11-10"))
+      .toBe(`Today's date: 2026-11-10.\nPage text:\n${rawText}`);
   });
 
   it("caps page text at 30,000 characters", () => {
@@ -54,9 +77,16 @@ function promptLine(prefix: string): string {
   return jobExtractPrompt.split("\n").find((line) => line.startsWith(prefix)) ?? "";
 }
 
-describe("job extract prompt (job.v2)", () => {
-  it("is version job.v2", () => {
-    expect(JOB_PROMPT_VERSION).toBe("job.v2");
+describe("job extract prompt (job.v3)", () => {
+  it("is version job.v3", () => {
+    expect(JOB_PROMPT_VERSION).toBe("job.v3");
+  });
+
+  it("treats closed ads as postings and explicitly reports whether they are closed", () => {
+    expect(jobExtractPrompt).toContain("closed or no longer accepting applications");
+    expect(jobExtractPrompt).toContain("This position is no longer open for recruitment");
+    expect(jobExtractPrompt).toContain("set isJobPosting: true and positionClosed: true");
+    expect(jobExtractPrompt).toContain("Otherwise set positionClosed: false");
   });
 
   it("keeps every earlier rule", () => {
@@ -97,7 +127,7 @@ describe("job extract prompt (job.v2)", () => {
 });
 
 describe("job extraction", () => {
-  it("sends the job.v2 prompt as the system message and still validates the schema", async () => {
+  it("sends the job.v3 prompt as the system message and still validates the schema", async () => {
     const { model, fetch } = fakeModel();
     expect(await processJob({ model }, work)).toEqual({ ok: true, extracted });
     const request = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
@@ -111,6 +141,9 @@ describe("job extraction", () => {
     expect(await processJob({ model, now }, work)).toEqual({ ok: true, extracted });
     const request = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
     expect(request.response_format.json_schema.name).toBe("job_extract");
+    expect(request.response_format.json_schema.strict).toBe(true);
+    expect(request.response_format.json_schema.schema.required).toContain("positionClosed");
+    expect(request.response_format.json_schema.schema.properties.positionClosed).toEqual({ type: "boolean" });
     expect(request.max_tokens).toBe(2000);
     expect(request.messages[1].content.startsWith("Today's date: 2026-11-06.\n")).toBe(true);
     expect(request.messages[1].content).toContain(work.rawText);
@@ -143,6 +176,27 @@ describe("job extraction", () => {
   it("rejects a page that is not a job posting", async () => {
     const { model } = fakeModel({ ...extracted, title: "", isJobPosting: false });
     expect(await processJob({ model }, work)).toEqual({ ok: false, code: "not_a_job" });
+  });
+
+  it("returns a closed job as a successful extraction", async () => {
+    const answer = { ...extracted, positionClosed: true };
+    const { model } = fakeModel(answer);
+    expect(await processJob({ model }, work)).toEqual({ ok: true, extracted: answer });
+  });
+
+  it("loads and accepts PATCH for an old extraction without positionClosed as not closed", () => {
+    const { positionClosed, ...oldExtraction } = extracted;
+    expect(positionClosed).toBe(false);
+    const parsed = JobExtractionSchema.parse(oldExtraction);
+    expect(parsed).toEqual(oldExtraction);
+    expect(parsed.positionClosed ?? false).toBe(false);
+    expect(JobPatchBodySchema.parse({ version: 1, extracted: oldExtraction }).extracted).toEqual(oldExtraction);
+  });
+
+  it("rejects model output missing the required positionClosed field", async () => {
+    const answer = { ...extracted, positionClosed: undefined };
+    const { model } = fakeModel(answer);
+    expect(await processJob({ model }, work)).toEqual({ ok: false, code: "ai_failed" });
   });
 
   it("fails a posting with a blank title", async () => {

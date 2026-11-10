@@ -23,6 +23,7 @@ export const JobExtractionSchema = z.object({
   benefits: z.array(z.string().max(500)).max(30),
   applyBy: z.iso.date().nullable(),
   isJobPosting: z.boolean(),
+  positionClosed: z.boolean().optional(),
 });
 export type JobExtraction = z.infer<typeof JobExtractionSchema>;
 
