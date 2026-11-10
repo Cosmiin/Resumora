@@ -23,8 +23,8 @@ Reorder ID-bearing rows through pointer, touch and keyboard grips.
 ## Connections
 
 - Used by role rows and overview section rows: `apps/web/src/cv/edit/sections/RolesEdit.tsx:36` -> `<DragList`; `apps/web/src/cv/panel/Overview.tsx:115` -> `<DragList`; `apps/web/src/cv/edit/DragList.tsx:68` -> `DragList`
-- Uses global .drag-row/.is-dragging and .drag-grip visibility/touch rules: `apps/web/src/cv/edit/DragList.tsx:68` -> `"drag-row"`; `apps/web/src/styles/cv-page.css:144` -> `.drag-row`; `apps/web/src/cv/edit/DragList.tsx:46` -> `is-dragging`; `apps/web/src/styles/cv-page.css:145` -> `.drag-row.is-dragging`; `apps/web/src/cv/edit/DragGrip.tsx:25` -> `drag-grip`; `apps/web/src/styles/cv-page.css:146` -> `.drag-grip`; `apps/web/src/styles/cv-page.css:152` -> `.drag-grip`
-- Uses global .sr-only to hide announcements visually, and panel .sec-row overrides the grip's absolute positioning: `apps/web/src/cv/edit/DragList.tsx:154` -> `sr-only`; `apps/web/src/styles/cv-page.css:143` -> `.sr-only`; `apps/web/src/cv/panel/Overview.tsx:119` -> `sec-row`; `apps/web/src/styles/panel.css:22` -> `.sec-row .drag-grip`
+- Uses global .drag-row/.is-dragging and .drag-grip visibility/touch rules: `apps/web/src/cv/edit/DragList.tsx:68` -> `"drag-row"`; `apps/web/src/styles/cv-page.css:145` -> `.drag-row`; `apps/web/src/cv/edit/DragList.tsx:46` -> `is-dragging`; `apps/web/src/styles/cv-page.css:146` -> `.drag-row.is-dragging`; `apps/web/src/cv/edit/DragGrip.tsx:25` -> `drag-grip`; `apps/web/src/styles/cv-page.css:147` -> `.drag-grip`; `apps/web/src/styles/cv-page.css:153` -> `.drag-grip`
+- Uses global .sr-only to hide announcements visually, and panel .sec-row overrides the grip's absolute positioning: `apps/web/src/cv/edit/DragList.tsx:154` -> `sr-only`; `apps/web/src/styles/cv-page.css:144` -> `.sr-only`; `apps/web/src/cv/panel/Overview.tsx:119` -> `sec-row`; `apps/web/src/styles/panel.css:22` -> `.sec-row .drag-grip`
 
 ## Assumptions
 

@@ -5,7 +5,7 @@ files: ["supabase/migrations/20261108030000_cv_photos.sql", "supabase/tests/data
 depends_on: ["shared/cv"]
 contract: true
 checked_hash: f206680e
-cited: [ba7006, ce7e77, 7285f5, 78ee03, c194f4, f05071, 5c7d63, 3ad09c, 7285f5, ba7006, 715da3, 65776a, ce7e77, 06f564, f05071]
+cited: [ba7006, ce7e77, 7285f5, 78ee03, c194f4, f05071, 5c7d63, b696a6, 7285f5, ba7006, 715da3, 65776a, ce7e77, 06f564, f05071]
 decisions: ["docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---
@@ -21,8 +21,8 @@ Keep CV photos in a private bucket with owner-folder access.
 
 ## Connections
 
-- Used directly by browser upload: `apps/web/src/cv/panel/PhotoField.tsx:58` -> `storage.from("cv-photos").upload` -> `supabase/migrations/20261108030000_cv_photos.sql:9` -> `own cv photos: upload`, `supabase/migrations/20261108030000_cv_photos.sql:3` -> `2097152`.
-- Used by one-hour signed URL creation in the editor and shared CV photo display: `apps/web/src/cv/panel/PhotoField.tsx:35` -> `createSignedUrl`, `apps/web/src/cv/page/CvPhoto.tsx:14` -> `createSignedUrl` -> `supabase/migrations/20261108030000_cv_photos.sql:5` -> `own cv photos: read`.
+- Used directly by browser upload: `apps/web/src/cv/panel/PhotoField.tsx:60` -> `storage.from("cv-photos").upload` -> `supabase/migrations/20261108030000_cv_photos.sql:9` -> `own cv photos: upload`, `supabase/migrations/20261108030000_cv_photos.sql:3` -> `2097152`.
+- Used by one-hour signed URL creation in the editor and shared CV photo display: `apps/web/src/cv/panel/PhotoField.tsx:37` -> `createSignedUrl`, `apps/web/src/cv/page/CvPhoto.tsx:14` -> `createSignedUrl` -> `supabase/migrations/20261108030000_cv_photos.sql:5` -> `own cv photos: read`.
 
 ## Assumptions
 

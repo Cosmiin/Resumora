@@ -32,35 +32,26 @@ beforeEach(() => {
 });
 
 describe("CV photo", () => {
-  it("applies a replacement upload after dragging the existing photo", async () => {
+  it("disables the upload button while uploading, then opens editing", async () => {
     let finishUpload!: () => void;
     const pendingUpload = new Promise<{ error: null }>((resolve) => {
       finishUpload = () => resolve({ error: null });
     });
     storage.upload.mockReturnValueOnce(pendingUpload);
-    vi.stubGlobal("PointerEvent", MouseEvent);
-    try {
-      render(<Field initial={initialPhoto} />);
-      await screen.findByRole("img");
-      await userEvent.upload(screen.getByLabelText("Choose a photo"),
-        new File(["photo"], "replacement.png", { type: "image/png" }));
-      const preview = screen.getByRole("group", { name: "Photo position" });
-      preview.setPointerCapture = vi.fn();
-      vi.spyOn(preview, "getBoundingClientRect").mockReturnValue({ width: 120, height: 120 } as DOMRect);
-      fireEvent.pointerDown(preview, { clientX: 60, clientY: 60 });
-      fireEvent.pointerMove(preview, { clientX: 90, clientY: 30 });
-      fireEvent.pointerUp(preview);
-      expect(contentPhoto()).toEqual({ ...initialPhoto, x: 25, y: 75 });
-      await act(async () => {
-        finishUpload();
-        await pendingUpload;
-      });
-      expect(contentPhoto()).toEqual({
-        path: expect.stringMatching(/^user-a\/[\w-]+\.png$/), x: 50, y: 50, zoom: 1,
-      });
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    render(<Field />);
+    const button = screen.getByRole("button", { name: "Upload photo" });
+    expect(screen.getByText("JPG, PNG or WebP")).toBeInTheDocument();
+    await userEvent.tab();
+    expect(button).toHaveFocus();
+    await userEvent.upload(screen.getByLabelText("Upload photo"),
+      new File(["photo"], "portrait.png", { type: "image/png" }));
+    expect(screen.getByRole("button", { name: "Uploading photo..." })).toBeDisabled();
+    await act(async () => {
+      finishUpload();
+      await pendingUpload;
+    });
+    expect(screen.getByRole("slider", { name: "Photo zoom" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
   });
 
   it("does not change content when an upload resolves after unmount", async () => {
@@ -71,7 +62,7 @@ describe("CV photo", () => {
     storage.upload.mockReturnValueOnce(pendingUpload);
     const onChange = vi.fn();
     const { unmount } = render(<PhotoField photo={null} onChange={onChange} />);
-    await userEvent.upload(screen.getByLabelText("Choose a photo"),
+    await userEvent.upload(screen.getByLabelText("Upload photo"),
       new File(["photo"], "portrait.jpg", { type: "image/jpeg" }));
     expect(storage.upload).toHaveBeenCalledOnce();
     unmount();
@@ -86,7 +77,7 @@ describe("CV photo", () => {
     const user = userEvent.setup();
     render(<Field />);
     const file = new File(["photo"], "portrait.jpg", { type: "image/jpeg" });
-    await user.upload(screen.getByLabelText("Choose a photo"), file);
+    await user.upload(screen.getByLabelText("Upload photo"), file);
     expect(await screen.findByRole("img", { name: "CV photo" })).toHaveAttribute("src", "https://example.test/photo");
     const photo = contentPhoto();
     expect(photo).toEqual({ path: expect.stringMatching(/^user-a\/[\w-]+\.jpg$/), x: 50, y: 50, zoom: 1 });
@@ -96,15 +87,25 @@ describe("CV photo", () => {
     fireEvent.change(screen.getByRole("slider", { name: "Photo zoom" }), { target: { value: "2.3" } });
     expect(contentPhoto()).toEqual({ ...photo, zoom: 2.3 });
     expect(screen.getByRole("img")).toHaveStyle({ transform: "scale(2.3)" });
+    expect(screen.queryByRole("button", { name: "Remove photo" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Upload photo")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(contentPhoto()).toEqual({ ...photo, zoom: 2.3 });
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    expect(screen.queryByText("Drag the photo or use the arrow keys to adjust its position.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Adjust photo" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove photo" }));
     expect(contentPhoto()).toBeNull();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload photo" })).toBeInTheDocument();
     expect(storage.remove).not.toHaveBeenCalled();
   });
 
-  it.each([["image/png", "png"], ["image/webp", "webp"]])("replaces a photo with %s without deleting stored photos", async (type, ext) => {
+  it.each([["image/png", "png"], ["image/webp", "webp"]])("removes then uploads %s without deleting stored photos", async (type, ext) => {
     render(<Field initial={initialPhoto} />);
-    await userEvent.upload(screen.getByLabelText("Choose a photo"), new File(["photo"], "portrait", { type }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove photo" }));
+    await userEvent.upload(screen.getByLabelText("Upload photo"), new File(["photo"], "portrait", { type }));
     await waitFor(() => expect(contentPhoto()?.path).toMatch(new RegExp(`^user-a/[\\w-]+\\.${ext}$`)));
     expect(storage.remove).not.toHaveBeenCalled();
   });
@@ -114,7 +115,7 @@ describe("CV photo", () => {
   ])("rejects %s of %i bytes before uploading", async (type, size, message) => {
     render(<Field />);
     const user = userEvent.setup({ applyAccept: false });
-    await user.upload(screen.getByLabelText("Choose a photo"), new File([new Uint8Array(size)], "portrait", { type }));
+    await user.upload(screen.getByLabelText("Upload photo"), new File([new Uint8Array(size)], "portrait", { type }));
     expect(screen.getByRole("alert")).toHaveTextContent(message);
     expect(storage.upload).not.toHaveBeenCalled();
     expect(contentPhoto()).toBeNull();
@@ -122,7 +123,7 @@ describe("CV photo", () => {
 
   it("accepts a photo exactly 2 MB as it is", async () => {
     render(<Field />);
-    await userEvent.upload(screen.getByLabelText("Choose a photo"),
+    await userEvent.upload(screen.getByLabelText("Upload photo"),
       new File([new Uint8Array(2097152)], "portrait.png", { type: "image/png" }));
     await waitFor(() => expect(contentPhoto()).not.toBeNull());
     expect(shrink.shrinkPhoto).not.toHaveBeenCalled();
@@ -133,7 +134,7 @@ describe("CV photo", () => {
     shrink.shrinkPhoto.mockResolvedValue(small);
     render(<Field />);
     const big = new File([new Uint8Array(2097153)], "portrait.png", { type: "image/png" });
-    await userEvent.upload(screen.getByLabelText("Choose a photo"), big);
+    await userEvent.upload(screen.getByLabelText("Upload photo"), big);
     await waitFor(() => expect(contentPhoto()?.path).toMatch(/^user-a\/[\w-]+\.jpg$/));
     expect(shrink.shrinkPhoto).toHaveBeenCalledWith(big, 2097152);
     expect(storage.upload).toHaveBeenCalledTimes(1);
@@ -144,19 +145,21 @@ describe("CV photo", () => {
   it("says so, and uploads nothing, when a large photo can't be shrunk", async () => {
     shrink.shrinkPhoto.mockResolvedValue(null);
     render(<Field />);
-    await userEvent.upload(screen.getByLabelText("Choose a photo"),
+    await userEvent.upload(screen.getByLabelText("Upload photo"),
       new File([new Uint8Array(2097153)], "portrait.jpg", { type: "image/jpeg" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't make this photo small enough. Please try another photo.");
     expect(storage.upload).not.toHaveBeenCalled();
     expect(contentPhoto()).toBeNull();
   });
 
-  it("keeps the previous photo when uploading fails", async () => {
+  it("leaves the CV without a photo when uploading after removal fails", async () => {
     storage.upload.mockResolvedValue({ error: { message: "offline" } });
     render(<Field initial={initialPhoto} />);
-    await userEvent.upload(screen.getByLabelText("Choose a photo"), new File(["photo"], "new.png", { type: "image/png" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove photo" }));
+    await userEvent.upload(screen.getByLabelText("Upload photo"), new File(["photo"], "new.png", { type: "image/png" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't upload this photo. Please try again.");
-    expect(contentPhoto()).toEqual(initialPhoto);
+    expect(contentPhoto()).toBeNull();
+    expect(screen.getByRole("button", { name: "Upload photo" })).toBeEnabled();
   });
 
   it("loads an existing photo and saves position changes from dragging", async () => {
@@ -165,6 +168,7 @@ describe("CV photo", () => {
     try {
       render(<Field initial={initialPhoto} />);
       await screen.findByRole("img");
+      await userEvent.click(screen.getByRole("button", { name: "Adjust photo" }));
       const preview = screen.getByRole("group", { name: "Photo position" });
       preview.setPointerCapture = vi.fn();
       vi.spyOn(preview, "getBoundingClientRect").mockReturnValue({ width: 120, height: 120 } as DOMRect);
@@ -180,11 +184,34 @@ describe("CV photo", () => {
     }
   });
 
-  it("still allows removal when the signed preview fails", async () => {
-    storage.createSignedUrl.mockResolvedValue({ data: null, error: { message: "missing" } });
+  it.each(["click", "Enter", " "])("opens an existing saved photo for editing with %s", async (action) => {
+    render(<Field initial={initialPhoto} />);
+    await screen.findByRole("img");
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Upload photo")).not.toBeInTheDocument();
+    const photo = screen.getByRole("button", { name: "Adjust photo" });
+    if (action === "click") await userEvent.click(photo);
+    else {
+      photo.focus();
+      await userEvent.keyboard(action === "Enter" ? "{Enter}" : " ");
+    }
+    expect(screen.getByRole("slider", { name: "Photo zoom" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove photo" })).not.toBeInTheDocument();
+    expect(contentPhoto()).toEqual(initialPhoto);
+  });
+
+  it.each(["signing", "image"])("still allows editing and removal when %s fails", async (failure) => {
+    if (failure === "signing") storage.createSignedUrl.mockResolvedValue({ data: null, error: { message: "missing" } });
     render(<Field initial={initialPhoto} />);
     await waitFor(() => expect(storage.createSignedUrl).toHaveBeenCalled());
+    if (failure === "image") fireEvent.error(await screen.findByRole("img"));
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove photo" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Adjust photo" }));
+    expect(screen.getByRole("slider", { name: "Photo zoom" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await userEvent.click(screen.getByRole("button", { name: "Remove photo" }));
     expect(contentPhoto()).toBeNull();
     expect(storage.remove).not.toHaveBeenCalled();

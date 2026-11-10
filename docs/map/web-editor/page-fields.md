@@ -25,7 +25,7 @@ Adapt typed page text and dates into stable reducer actions.
 - Uses shared date parsing and locale formatting: `apps/web/src/cv/edit/DateField.tsx:35` -> `parseTypedDate`; `packages/shared/src/dates.ts:41` -> `parseTypedDate`; `apps/web/src/cv/edit/DateField.tsx:20` -> `formatYearMonth`; `packages/shared/src/dates.ts:62` -> `formatYearMonth`
 - Uses reducer list/field membership checks: `apps/web/src/cv/edit/ItemField.tsx:21` -> `setItemField`; `apps/web/src/cv/edit/cvReducer.ts:185` -> `setItemField`
 - Uses ancestor .cv-page input/textarea rules to remove form borders, inherit type and grow fields: `apps/web/src/cv/edit/PageField.tsx:83` -> `<textarea`; `apps/web/src/cv/edit/PageField.tsx:89` -> `<input`; `apps/web/src/cv/edit/EditablePage.tsx:92` -> `cv-page cv-page-edit`; `apps/web/src/styles/cv-page.css:49` -> `.cv-page :is(input, textarea)`; `apps/web/src/styles/cv-page.css:61` -> `field-sizing`; `apps/web/src/styles/cv-page.css:64` -> `.cv-page textarea`
-- Uses global .cv-date-field/.is-wide and .date-hint for positioning and role-end width: `apps/web/src/cv/edit/DateField.tsx:55` -> `cv-date-field`; `apps/web/src/styles/cv-page.css:79` -> `.cv-date-field`; `apps/web/src/styles/cv-page.css:136` -> `.is-wide`; `apps/web/src/cv/edit/DateField.tsx:66` -> `date-hint`; `apps/web/src/styles/cv-page.css:80` -> `.date-hint`
+- Uses global .cv-date-field/.is-wide and .date-hint for positioning and role-end width: `apps/web/src/cv/edit/DateField.tsx:55` -> `cv-date-field`; `apps/web/src/styles/cv-page.css:79` -> `.cv-date-field`; `apps/web/src/styles/cv-page.css:137` -> `.is-wide`; `apps/web/src/cv/edit/DateField.tsx:66` -> `date-hint`; `apps/web/src/styles/cv-page.css:80` -> `.date-hint`
 
 ## Assumptions
 

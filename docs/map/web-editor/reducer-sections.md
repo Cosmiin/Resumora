@@ -21,7 +21,7 @@ Apply basics and section edits while preserving section order, visibility and se
 
 ## Connections
 
-- Used by header title fields and summary editing: `apps/web/src/cv/edit/sections/HeaderEdit.tsx:36` -> `setTitles`; `apps/web/src/cv/edit/cvReducer.ts:231` -> `case "setTitles"`; `apps/web/src/cv/edit/sections/SummaryEdit.tsx:8` -> `setSummary`; `apps/web/src/cv/edit/cvReducer.ts:275` -> `case "setSummary"`
+- Used by header title fields and summary editing: `apps/web/src/cv/edit/sections/HeaderEdit.tsx:38` -> `setTitles`; `apps/web/src/cv/edit/cvReducer.ts:231` -> `case "setTitles"`; `apps/web/src/cv/edit/sections/SummaryEdit.tsx:8` -> `setSummary`; `apps/web/src/cv/edit/cvReducer.ts:275` -> `case "setSummary"`
 - Used by page section undo and overview ordering: `apps/web/src/cv/edit/EditablePage.tsx:126` -> `restoreSection`; `apps/web/src/cv/edit/cvReducer.ts:291` -> `case "restoreSection"`; `apps/web/src/cv/panel/Overview.tsx:40` -> `sectionsOnCv`; `apps/web/src/cv/edit/cvReducer.ts:91` -> `sectionsOnCv`
 - Uses item/bullet creation for list sections and achievements; other maps to the custom list: `apps/web/src/cv/edit/cvReducer.ts:131` -> `addBullet`; `apps/web/src/cv/edit/cvReducer.ts:203` -> `case "addBullet"`; `apps/web/src/cv/edit/cvReducer.ts:133` -> `addItem`; `apps/web/src/cv/edit/cvReducer.ts:119` -> `function addItem`
 

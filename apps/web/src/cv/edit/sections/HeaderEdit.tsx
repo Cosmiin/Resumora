@@ -67,6 +67,7 @@ export function HeaderEdit({ basics, dispatch, tailored = false, template }: {
   return (
     <header className="cv-header" data-section="header" style={{ display: "flow-root" }}>
       {tailored && getTemplate(template).photo === "header-right" && <CvPhoto photo={basics.photo} />}
+      {!tailored && <PhotoField photo={basics.photo} onChange={(photo) => dispatch({ type: "setBasics", field: "photo", value: photo })} />}
       <BasicsField
         field="fullName"
         className="cv-name"
@@ -88,7 +89,6 @@ export function HeaderEdit({ basics, dispatch, tailored = false, template }: {
           </Fragment>
         ))}
       </div>
-      {!tailored && <PhotoField photo={basics.photo} onChange={(photo) => dispatch({ type: "setBasics", field: "photo", value: photo })} />}
     </header>
   );
 }

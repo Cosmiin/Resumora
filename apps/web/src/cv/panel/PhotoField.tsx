@@ -16,6 +16,8 @@ const percent = (n: number) => Math.max(0, Math.min(100, n));
 export function PhotoField({ photo, onChange }: Props) {
   const userId = useAuth().session?.user.id;
   const inputId = useId();
+  const input = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<{ path: string; url: string } | null>(null);
@@ -59,6 +61,7 @@ export function PhotoField({ photo, onChange }: Props) {
       if (error) throw error;
       if (currentPhoto.current && currentPhoto.current.path === startingPath) {
         onChange({ path, x: 50, y: 50, zoom: 1 });
+        setEditing(true);
       }
     } catch {
       setError(t("cv.photo.uploadError"));
@@ -69,6 +72,7 @@ export function PhotoField({ photo, onChange }: Props) {
 
   function remove() {
     onChange(null);
+    setEditing(false);
     setError("");
   }
 
@@ -84,28 +88,43 @@ export function PhotoField({ photo, onChange }: Props) {
   }
 
   return (
-    <div className="no-print" style={{ font: "var(--type-body)", color: "var(--text-body)", marginBlock: "var(--space-4)" }}>
-      <label htmlFor={inputId}>{busy ? t("cv.photo.uploading") : t("cv.photo.choose")}</label>
-      <input id={inputId} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || !userId}
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0];
-          event.currentTarget.value = "";
-          if (file) void upload(file);
-        }} />
+    <div className={`photo-field no-print${photo && !editing ? " is-saved" : ""}`}>
+      {!photo && <>
+        <button type="button" className="btn" disabled={busy || !userId}
+          aria-describedby={`${inputId}-formats`} onClick={() => input.current?.click()}>
+          {busy ? t("cv.photo.uploading") : t("cv.photo.choose")}
+        </button>
+        <input ref={input} id={inputId} type="file" hidden aria-label={t("cv.photo.choose")}
+          accept="image/jpeg,image/png,image/webp" disabled={busy || !userId}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = "";
+            if (file) void upload(file);
+          }} />
+        <p id={`${inputId}-formats`}>{t("cv.photo.formats")}</p>
+      </>}
       {error && <p role="alert" style={{ color: "var(--status-bad-fg)" }}>{error}</p>}
       {photo && (
         <>
-          {url && (
-            <div role="group" aria-label={t("cv.photo.position")} tabIndex={0}
-              style={{ width: 120, height: 120, overflow: "hidden", borderRadius: "var(--radius-md)",
-                touchAction: "none", cursor: "move", border: "1px solid var(--border-field)" }}
+          <div className="photo-box">
+            <div className={`photo-preview${editing ? " is-editing" : ""}`}
+              role={editing ? "group" : "button"} aria-label={t(editing ? "cv.photo.position" : "cv.photo.edit")} tabIndex={0}
+              onClick={() => { if (!editing) setEditing(true); }}
               onPointerDown={(event) => {
+                if (!editing) return;
                 event.preventDefault();
                 drag.current = { id: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: photo.x, y: photo.y };
                 event.currentTarget.setPointerCapture(event.pointerId);
               }}
               onPointerMove={move} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}
               onKeyDown={(event) => {
+                if (!editing) {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setEditing(true);
+                  }
+                  return;
+                }
                 if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
                 event.preventDefault();
                 onChange({ ...photo,
@@ -113,19 +132,23 @@ export function PhotoField({ photo, onChange }: Props) {
                   y: percent(photo.y + (event.key === "ArrowDown" ? 5 : event.key === "ArrowUp" ? -5 : 0)),
                 });
               }}>
-              <img src={url} alt={t("cv.photo.alt")} draggable={false}
+              {url && <img src={url} alt={t("cv.photo.alt")} draggable={false}
                 onError={() => setPreview(null)}
                 style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${photo.x}% ${photo.y}%`,
-                  transform: `scale(${photo.zoom})`, transformOrigin: `${photo.x}% ${photo.y}%` }} />
+                  transform: `scale(${photo.zoom})`, transformOrigin: `${photo.x}% ${photo.y}%` }} />}
             </div>
-          )}
-          <p>{t("cv.photo.positionHint")}</p>
-          <label>{t("cv.photo.zoom")}
-            <input type="range" min={1} max={3} step={0.1} value={photo.zoom} disabled={busy}
-              style={{ accentColor: "var(--action-primary)" }}
-              onChange={(event) => onChange({ ...photo, zoom: Number(event.currentTarget.value) })} />
-          </label>
-          <button type="button" disabled={busy} onClick={remove}>{t("cv.photo.remove")}</button>
+            {!editing && <button type="button" className="photo-remove" aria-label={t("cv.photo.remove")}
+              onClick={remove}>×</button>}
+          </div>
+          {editing && <>
+            <p>{t("cv.photo.positionHint")}</p>
+            <label>{t("cv.photo.zoom")}
+              <input type="range" min={1} max={3} step={0.1} value={photo.zoom} disabled={busy}
+                style={{ accentColor: "var(--action-primary)" }}
+                onChange={(event) => onChange({ ...photo, zoom: Number(event.currentTarget.value) })} />
+            </label>
+            <button type="button" className="btn primary" onClick={() => setEditing(false)}>{t("cv.photo.save")}</button>
+          </>}
         </>
       )}
     </div>

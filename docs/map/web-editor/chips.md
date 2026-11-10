@@ -5,7 +5,7 @@ files: ["apps/web/src/cv/edit/ChipInput.tsx","apps/web/src/cv/edit/sections/Skil
 depends_on: ["web-editor/reducer","web-editor/page-fields","web-editor/bullets","shared/cv"]
 contract: false
 checked_hash: 1283378e
-cited: [85f6b3, 8cbae6, dac385, 76ecf7, ea4bcf, 544921, d64b3b, 3111f5, 1ace63, e768b3, f00621, e6c1ff, 7a13b3, 6261e1, 79e7c6, 0993be, 3111f5, a23147, 1ace63, cf40dd, d9ad07, dd9a19, 6fbce5, e98dce, e0066d, 32ef23, b6480e, 8deb9c, 141db9, 48c604, 43ac84, 154394, e9df0f, 1ff741, df08cf, 0b70c0, 24b84e, 3ee698]
+cited: [85f6b3, 8cbae6, dac385, 76ecf7, ea4bcf, 544921, d64b3b, 3111f5, 1ace63, e768b3, f00621, e6c1ff, 7a13b3, 6261e1, 79e7c6, 0993be, 3111f5, a23147, 1ace63, cf40dd, d9ad07, dd9a19, 6fbce5, e98dce, e0066d, 32ef23, b6480e, 8deb9c, 141db9, 48c604, 43ac84, 154394, e9df0f, d74e98, df08cf, 0b70c0, 24b84e, 3ee698]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---
@@ -24,7 +24,7 @@ Edit grouped skills and interests as chips while retaining hidden-item recovery.
 - Uses shared SkillGroup and the reducer's cross-group duplicate checks: `apps/web/src/cv/edit/sections/SkillsEdit.tsx:19` -> `SkillGroup`; `packages/shared/src/cv.ts:87` -> `SkillGroup`; `apps/web/src/cv/edit/sections/SkillsEdit.tsx:26` -> `addSkill`; `apps/web/src/cv/edit/cvReducer.ts:173` -> `SKILL_GROUPS.some`
 - Uses global .cv-chips/.cv-chip/.cv-chip-sort, with removal buttons visible on focus/hover: `apps/web/src/cv/edit/ChipInput.tsx:39` -> `cv-chips`; `apps/web/src/styles/cv-page.css:41` -> `.cv-chips`; `apps/web/src/cv/edit/ChipInput.tsx:41` -> `cv-chip-sort`; `apps/web/src/styles/cv-page.css:43` -> `.cv-chip-sort`; `apps/web/src/cv/edit/ChipInput.tsx:43` -> `<button`; `apps/web/src/styles/cv-page.css:77` -> `.cv-chip button`
 - Uses global .cv-chip-input and skill-row layout: `apps/web/src/cv/edit/ChipInput.tsx:49` -> `cv-chip-input`; `apps/web/src/styles/cv-page.css:78` -> `.cv-chip-input`; `apps/web/src/cv/edit/sections/SkillsEdit.tsx:32` -> `cv-skill-row`; `apps/web/src/styles/cv-page.css:39` -> `.cv-skill-row`
-- Uses global .cv-hidden-list/.cv-hide to recover hidden interests: `apps/web/src/cv/edit/sections/InterestsEdit.tsx:16` -> `cv-hidden-list`; `apps/web/src/styles/cv-page.css:192` -> `.cv-hidden-list`; `apps/web/src/cv/edit/sections/InterestsEdit.tsx:21` -> `cv-hide`; `apps/web/src/styles/cv-page.css:190` -> `.cv-hide`
+- Uses global .cv-hidden-list/.cv-hide to recover hidden interests: `apps/web/src/cv/edit/sections/InterestsEdit.tsx:16` -> `cv-hidden-list`; `apps/web/src/styles/cv-page.css:206` -> `.cv-hidden-list`; `apps/web/src/cv/edit/sections/InterestsEdit.tsx:21` -> `cv-hide`; `apps/web/src/styles/cv-page.css:204` -> `.cv-hide`
 
 ## Assumptions
 
