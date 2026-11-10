@@ -108,6 +108,7 @@ export function PhotoField({ photo, onChange }: Props) {
         <>
           <div className="photo-box">
             <div className={`photo-preview${editing ? " is-editing" : ""}`}
+              style={{ borderRadius: photo.shape === "round" ? "50%" : undefined }}
               role={editing ? "group" : "button"} aria-label={t(editing ? "cv.photo.position" : "cv.photo.edit")} tabIndex={0}
               onClick={() => { if (!editing) setEditing(true); }}
               onPointerDown={(event) => {
@@ -147,6 +148,14 @@ export function PhotoField({ photo, onChange }: Props) {
                 style={{ accentColor: "var(--action-primary)" }}
                 onChange={(event) => onChange({ ...photo, zoom: Number(event.currentTarget.value) })} />
             </label>
+            <div role="group" aria-label={t("cv.photo.shape")}>
+              {(["square", "round"] as const).map((shape) => (
+                <button key={shape} type="button" className="btn" disabled={busy}
+                  aria-pressed={(photo.shape ?? "square") === shape} onClick={() => onChange({ ...photo, shape })}>
+                  {t(shape === "square" ? "cv.photo.square" : "cv.photo.round")}
+                </button>
+              ))}
+            </div>
             <button type="button" className="btn primary" onClick={() => setEditing(false)}>{t("cv.photo.save")}</button>
           </>}
         </>

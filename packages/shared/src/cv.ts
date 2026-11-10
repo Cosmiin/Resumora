@@ -143,6 +143,7 @@ export const BasicsSchema = z
       x: z.number().min(0).max(100),
       y: z.number().min(0).max(100),
       zoom: z.number().min(1).max(3),
+      shape: z.enum(["square", "round"]).optional(),
     }).strict().nullable().default(null).optional(),
   })
   .strict();

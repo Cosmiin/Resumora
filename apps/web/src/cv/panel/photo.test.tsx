@@ -32,6 +32,35 @@ beforeEach(() => {
 });
 
 describe("CV photo", () => {
+  it("autosaves the shape choice and shows the saved photo in that shape", async () => {
+    render(<Field initial={initialPhoto} />);
+    const image = await screen.findByRole("img");
+    expect(image.parentElement!.style.borderRadius).not.toBe("50%");
+    expect(screen.queryByRole("group", { name: "Photo shape" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Adjust photo" }));
+    expect(screen.getByRole("group", { name: "Photo shape" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Square", pressed: true })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Round" }));
+    expect(contentPhoto()).toEqual({ ...initialPhoto, shape: "round" });
+    expect(screen.getByRole("button", { name: "Round", pressed: true })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(image.parentElement).toHaveStyle({ borderRadius: "50%" });
+    expect(screen.getByRole("button", { name: "Remove photo" }).parentElement).toBe(image.parentElement!.parentElement);
+    await userEvent.click(screen.getByRole("button", { name: "Adjust photo" }));
+    await userEvent.click(screen.getByRole("button", { name: "Square" }));
+    expect(contentPhoto()).toEqual({ ...initialPhoto, shape: "square" });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(image.parentElement!.style.borderRadius).not.toBe("50%");
+  });
+
+  it("calls onChange immediately when Round is chosen", async () => {
+    const onChange = vi.fn();
+    render(<PhotoField photo={initialPhoto} onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: "Adjust photo" }));
+    await userEvent.click(screen.getByRole("button", { name: "Round" }));
+    expect(onChange).toHaveBeenCalledWith({ ...initialPhoto, shape: "round" });
+  });
+
   it("disables the upload button while uploading, then opens editing", async () => {
     let finishUpload!: () => void;
     const pendingUpload = new Promise<{ error: null }>((resolve) => {

@@ -75,6 +75,9 @@ export const en = {
   "cv.photo.position": "Photo position",
   "cv.photo.positionHint": "Drag the photo or use the arrow keys to adjust its position.",
   "cv.photo.zoom": "Photo zoom",
+  "cv.photo.shape": "Photo shape",
+  "cv.photo.square": "Square",
+  "cv.photo.round": "Round",
   "cv.photo.remove": "Remove photo",
 
 

@@ -4,7 +4,7 @@ area: web-tailor
 files: ["apps/web/src/export/fit.ts","apps/web/src/export/fit.test.ts","apps/web/src/export/pdf.test.tsx"]
 depends_on: ["web-editor/templates","web-tailor/pdf","web-tailor/docx","web-tailor/export-files"]
 contract: false
-checked_hash: 7ed44f94
+checked_hash: 68814184
 cited: [18c71d, 83761a, 73248c, 2677da, c993cf, d41f27, fea170, 2e9e86, 18c71d, 73248c, 014661, 70bd25, 2d3981, cd291d, 80e986, 014661, 317494, 006b92, 6ed3f8, e14838, 83761a, 2d3981, 2a03c3, 2677da]
 decisions: []
 open: []
@@ -17,7 +17,7 @@ Try progressively tighter layouts without removing CV content.
 - When no layout fits, the last rendered result returns with fits=false; empty steps throw. `apps/web/src/export/fit.ts:30` -> `last`; `apps/web/src/export/fit.ts:33` -> `throw`
 - pdfPageCount decodes bytes as latin1 and counts /Type /Page objects while excluding alphabetic continuations such as /Pages. `apps/web/src/export/fit.ts:38` -> `pdfPageCount`
 - tested by `apps/web/src/export/fit.test.ts:4` -> `describe`
-- tested by `apps/web/src/export/pdf.test.tsx:286` -> `describe`
+- tested by `apps/web/src/export/pdf.test.tsx:289` -> `describe`
 
 ## Connections
 

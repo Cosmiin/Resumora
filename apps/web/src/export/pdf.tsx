@@ -129,7 +129,7 @@ export function buildCvPdf(
               {titles ? paragraph(titles) : null}
               {contact ? <Text style={styles.contact}>{contact}</Text> : null}
             </View>
-            {image ? <Image src={image} style={{ width: 72, height: 72, objectFit: "contain" }} /> : null}
+            {image ? <Image src={image} style={{ width: 72, height: 72, objectFit: "contain", ...(b.photo?.shape === "round" ? { borderRadius: 36 } : {}) }} /> : null}
           </View>
         ) : null}
         {layout.order.filter((key) => !layout.hidden.includes(key) && sections[key].length > 0).map((key) => (

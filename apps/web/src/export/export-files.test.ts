@@ -17,8 +17,9 @@ const cv = {
   coverLetter: { body: "First paragraph.\n\nSecond\nparagraph.\n\n\n", hiringManager: "  ", whyCompany: "" },
 } as unknown as TailoredCv;
 const image = { width: 200, height: 100, close: vi.fn() };
-const context = { fillStyle: "", fillRect: vi.fn(), drawImage: vi.fn() };
+const context = { fillStyle: "", fillRect: vi.fn(), drawImage: vi.fn(), beginPath: vi.fn(), arc: vi.fn(), clip: vi.fn() };
 const jpegBytes = new Uint8Array([255, 216, 255, 217]);
+const pngBytes = new Uint8Array([137, 80, 78, 71]);
 let clicked: { href: string; download: string }[];
 
 beforeEach(() => {
@@ -28,7 +29,7 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as unknown as CanvasRenderingContext2D);
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (this: HTMLCanvasElement, callback, type) {
     expect([this.width, this.height]).toEqual([50, 50]);
-    callback(new Blob([jpegBytes], { type }));
+    callback(new Blob([type === "image/png" ? pngBytes : jpegBytes], { type }));
   });
   pdf.fitCvPdf.mockResolvedValue({ blob: new Blob(["cv"]), step: { tight: false, fontSize: 11 }, pages: 1, fits: true });
   pdf.buildLetterPdf.mockResolvedValue(new Blob(["letter"]));
@@ -82,6 +83,27 @@ describe("exportFile", () => {
     expect(context.fillStyle).toBe("#fff");
     expect(context.fillRect).toHaveBeenCalledWith(0, 0, 50, 50);
     expect(HTMLCanvasElement.prototype.toBlob).toHaveBeenCalledWith(expect.any(Function), "image/jpeg", 0.9);
+    expect(image.close).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["image/jpeg", "image/png", "image/webp"])("crops round %s photos to PNG with transparent corners for PDF and Word", async (type) => {
+    const photo = { path: "user-a/photo", x: 25, y: 75, zoom: 2, shape: "round" as const };
+    const withPhoto = { ...cv, content: { ...content, basics: { ...content.basics, photo } } };
+    download.mockResolvedValue({ data: new Blob(["photo"], { type }), error: null });
+    for (const format of ["pdf", "docx"] as const) {
+      await exportFile("cv", format, { cv: withPhoto, job, template: "classic" });
+      expect(pdf.fitCvPdf.mock.lastCall![2]).toEqual({ data: pngBytes, type: "png" });
+      if (format === "docx") expect(docx.buildCvDocx.mock.lastCall![2]).toEqual({ data: pngBytes, type: "png" });
+    }
+    expect(context.fillRect).not.toHaveBeenCalled();
+    expect(context.beginPath).toHaveBeenCalledTimes(2);
+    expect(context.arc).toHaveBeenCalledWith(25, 25, 25, 0, 2 * Math.PI);
+    expect(context.clip).toHaveBeenCalledTimes(2);
+    expect(context.beginPath.mock.invocationCallOrder[0]).toBeLessThan(context.arc.mock.invocationCallOrder[0]!);
+    expect(context.arc.mock.invocationCallOrder[0]).toBeLessThan(context.clip.mock.invocationCallOrder[0]!);
+    expect(context.clip.mock.invocationCallOrder[0]).toBeLessThan(context.drawImage.mock.invocationCallOrder[0]!);
+    expect(context.drawImage).toHaveBeenCalledWith(image, 37.5, 37.5, 50, 50, 0, 0, 50, 50);
+    expect(HTMLCanvasElement.prototype.toBlob).toHaveBeenCalledWith(expect.any(Function), "image/png", 0.9);
     expect(image.close).toHaveBeenCalledTimes(2);
   });
 

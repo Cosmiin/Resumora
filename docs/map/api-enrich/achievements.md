@@ -29,4 +29,4 @@ Suggest up to five achievements grounded in individual saved experience roles.
 ## Assumptions
 
 - Numeric membership is enforced, but other factual claims depend on the prompt; filtering does not establish that a result actually happened. `apps/api/src/enrich/achievements.ts:17` -> `Never invent`; `apps/api/src/enrich/achievements.ts:64` -> `hasUnknownNumber`.
-- The service returns suggestions without checking remaining storage capacity or saving them; accepted achievement count in the CV remains governed by MAX_ACHIEVEMENTS. `apps/api/src/enrich/achievements.ts:69` -> `return`; `packages/shared/src/cv.ts:200` -> `MAX_ACHIEVEMENTS`.
+- The service returns suggestions without checking remaining storage capacity or saving them; accepted achievement count in the CV remains governed by MAX_ACHIEVEMENTS. `apps/api/src/enrich/achievements.ts:69` -> `return`; `packages/shared/src/cv.ts:201` -> `MAX_ACHIEVEMENTS`.

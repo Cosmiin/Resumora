@@ -23,7 +23,7 @@ Move lines from a custom section into one supported structured CV list.
 
 - Used by web import review: `apps/web/src/imports/ImportScreen.tsx:65` -> `moveOtherTo` -> `packages/shared/src/move-other.ts:9` -> `moveOtherTo`.
 - Used by web destination choices: `apps/web/src/imports/HeadingMap.tsx:1` -> `MOVE_TARGETS` -> `packages/shared/src/move-other.ts:3` -> `MOVE_TARGETS`, `packages/shared/src/move-other.ts:4` -> `MoveTarget`.
-- Uses shared ID generation and list/text caps: `packages/shared/src/move-other.ts:1` -> `MAX_ITEMS` -> `packages/shared/src/cv.ts:8` -> `MAX_ITEMS`, `packages/shared/src/cv.ts:10` -> `MAX_TEXT`, `packages/shared/src/cv.ts:225` -> `newId`.
+- Uses shared ID generation and list/text caps: `packages/shared/src/move-other.ts:1` -> `MAX_ITEMS` -> `packages/shared/src/cv.ts:8` -> `MAX_ITEMS`, `packages/shared/src/cv.ts:10` -> `MAX_TEXT`, `packages/shared/src/cv.ts:226` -> `newId`.
 
 ## Assumptions
 

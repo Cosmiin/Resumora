@@ -24,4 +24,4 @@ Apply accepted bullet proposals and wait for trustworthy score celebrations.
 ## Assumptions
 
 - Acceptance protects the target bullet text, not the entire role fingerprint; cached role-score predictions therefore rely on unchanged surrounding content. `apps/web/src/cv/enrich/useFocusSession.ts:508` -> `bullet.text !== s.callText`; `apps/web/src/cv/enrich/useFocusSession.ts:515` -> `step.cached`
-- Identity lookup assumes unique scored-item IDs; findScored takes the first matching item. `apps/web/src/cv/enrich/useFocusSession.ts:505` -> `findScored`; `packages/shared/src/cv.ts:279` -> `.find`
+- Identity lookup assumes unique scored-item IDs; findScored takes the first matching item. `apps/web/src/cv/enrich/useFocusSession.ts:505` -> `findScored`; `packages/shared/src/cv.ts:280` -> `.find`

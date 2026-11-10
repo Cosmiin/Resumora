@@ -35,7 +35,7 @@ async function photoFor(input: ExportInput): Promise<ExportPhoto | undefined> {
     if (error || !data) return undefined;
     const cropped = await cropPhoto(data, photo);
     if (!cropped) return undefined;
-    return { data: new Uint8Array(await cropped.arrayBuffer()), type: "jpeg" };
+    return { data: new Uint8Array(await cropped.arrayBuffer()), type: photo.shape === "round" ? "png" : "jpeg" };
   } catch {
     return undefined;
   }

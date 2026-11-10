@@ -5,7 +5,7 @@ files: ["packages/shared/src/categories.ts","packages/shared/src/categories.test
 depends_on: ["shared/cv","shared/stored-cv"]
 contract: true
 checked_hash: 4eb0a4ab
-cited: [0f1363, 03e70c, e94151, 554c0c, d42ec7, a12e17, 4eb828, a15cb1, 017b4d, e6e043, 4548d4, c571f2, 363ac5, 5eef48, a44633, 6f4224, 7a2284, 8e23cf, 27a2fb, 1a6587, 2f37a2, b24e37, 9028fb, 4a29b6, 85316d, 43bf2f, 4548d4, 60da42, 0f7dc9, 110546, 60da42, 8b06fc, a9c9c9, 1bd21d, 1f2235, d83b80, 8e23cf, 27a2fb, 10ef92, d35cd3, faf887, 3bf5ba, 34fa07, d35cd3]
+cited: [0f1363, 03e70c, e94151, 554c0c, d42ec7, a12e17, 4eb828, a15cb1, 017b4d, e6e043, 4548d4, c571f2, 363ac5, 5eef48, a44633, 6f4224, 7a2284, 8e23cf, 27a2fb, 1a6587, 2f37a2, b24e37, 9028fb, 4a29b6, 85316d, 43bf2f, 4548d4, 60da42, 0f7dc9, 110546, 60da42, 214197, a9c9c9, 1bd21d, 1f2235, d83b80, 8e23cf, 27a2fb, 10ef92, d35cd3, faf887, 3bf5ba, 34fa07, d35cd3]
 decisions: ["docs/decisions/0009-one-fixed-set-of-cv-categories.md"]
 open: []
 ---
@@ -15,7 +15,7 @@ Keep category labels, section ordering and missing-content flags consistent acro
 - Category records require labels for six languages and synonyms for English and Romanian only. `packages/shared/src/categories.ts:21` -> `Category`
 - Header, summary, achievements, experience, skills and education carry missing flags; languages carries tip. `packages/shared/src/categories.ts:34` -> `flag:`, `packages/shared/src/categories.ts:41` -> `flag:`, `packages/shared/src/categories.ts:51` -> `flag:`, `packages/shared/src/categories.ts:61` -> `flag:`, `packages/shared/src/categories.ts:71` -> `flag:`, `packages/shared/src/categories.ts:81` -> `flag:`, `packages/shared/src/categories.ts:91` -> `flag:`
 - CATEGORY indexes the list by key; SECTION_KEYS preserves list order while excluding header. `packages/shared/src/categories.ts:162` -> `CATEGORY`
-- Empty skills means all three skill arrays are empty; achievements are `{id,text}` objects, and the section is empty when every object has blank trimmed text (including an empty list), while most sections use list length only. `packages/shared/src/flags.ts:12` -> `skills`, `packages/shared/src/flags.ts:19` -> `b.text.trim()`, `packages/shared/src/cv.ts:25` -> `BulletSchema`, `packages/shared/src/cv.ts:200` -> `achievements:`
+- Empty skills means all three skill arrays are empty; achievements are `{id,text}` objects, and the section is empty when every object has blank trimmed text (including an empty list), while most sections use list length only. `packages/shared/src/flags.ts:12` -> `skills`, `packages/shared/src/flags.ts:19` -> `b.text.trim()`, `packages/shared/src/cv.ts:25` -> `BulletSchema`, `packages/shared/src/cv.ts:201` -> `achievements:`
 - Missing name and email produce independent header flags even when sections are hidden. `packages/shared/src/flags.ts:27` -> `headerFlags`
 - Tailored-section visibility requires not hidden and either content or an explicitly opened section; shownEmptyFlags follows normalized page order. `packages/shared/src/flags.ts:39` -> `isSectionShown`, `packages/shared/src/flags.ts:44` -> `shownEmptyFlags`
 - missingCategories skips hidden, populated and unflagged sections after header flags. `packages/shared/src/flags.ts:53` -> `missingCategories`

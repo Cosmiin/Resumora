@@ -55,8 +55,8 @@ export function cropRectangle(width: number, height: number, x: number, y: numbe
   return { left: (width - side) * x / 100, top: (height - side) * y / 100, side };
 }
 
-/** Crops a downloaded photo to the saved square and encodes JPEG; unreadable photos return null. */
-export async function cropPhoto(file: Blob, crop: { x: number; y: number; zoom: number }): Promise<Blob | null> {
+/** Crops to the saved region: round photos use transparent PNG, square photos JPEG; unreadable photos return null. */
+export async function cropPhoto(file: Blob, crop: { x: number; y: number; zoom: number; shape?: "square" | "round" }): Promise<Blob | null> {
   let image: ImageBitmap;
   try {
     image = await createImageBitmap(file);
@@ -69,10 +69,16 @@ export async function cropPhoto(file: Blob, crop: { x: number; y: number; zoom: 
     canvas.width = canvas.height = Math.max(1, Math.round(side));
     const context = canvas.getContext("2d");
     if (!context) return null;
-    context.fillStyle = "#fff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    if (crop.shape === "round") {
+      context.beginPath();
+      context.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2, 0, 2 * Math.PI);
+      context.clip();
+    } else {
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
     context.drawImage(image, left, top, side, side, 0, 0, canvas.width, canvas.height);
-    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, crop.shape === "round" ? "image/png" : "image/jpeg", 0.9));
   } catch {
     return null;
   } finally {

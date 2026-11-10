@@ -31,11 +31,11 @@ Apply immutable item, bullet and chip edits and centralize list ownership, limit
 ## Connections
 
 - Used by Editor's functional dispatch; unchanged references avoid marking an edit: `apps/web/src/cv/Editor.tsx:79` -> `cvReducer`; `apps/web/src/cv/edit/cvReducer.ts:224` -> `cvReducer`
-- Shared scored lookup searches experience, projects, then volunteering; adding a kind must extend shared scoredItems and the editor's single SCORED_LIST mapping, rather than each ID-based action: `apps/web/src/cv/edit/lists.ts:24` -> `findScored`; `packages/shared/src/cv.ts:278` -> `findScored`; `packages/shared/src/cv.ts:270` -> `scoredItems`; `apps/web/src/cv/edit/lists.ts:20` -> `SCORED_LIST`
+- Shared scored lookup searches experience, projects, then volunteering; adding a kind must extend shared scoredItems and the editor's single SCORED_LIST mapping, rather than each ID-based action: `apps/web/src/cv/edit/lists.ts:24` -> `findScored`; `packages/shared/src/cv.ts:279` -> `findScored`; `packages/shared/src/cv.ts:271` -> `scoredItems`; `apps/web/src/cv/edit/lists.ts:20` -> `SCORED_LIST`
 - Cleanup has its own ROLE_LISTS list, so extending the shared scored lookup alone does not extend cleanup: `apps/web/src/cv/edit/cvReducer.ts:384` -> `ROLE_LISTS.filter`; `apps/web/src/cv/edit/cvReducer.ts:36` -> `ROLE_LISTS`
 
 ## Assumptions
 
 - List helpers use type assertions and field membership rather than full runtime validation; autosave is the schema gate. `apps/web/src/cv/edit/lists.ts:75` -> `getItems`; `apps/web/src/cv/edit/lists.ts:79` -> `withItems`; `apps/web/src/cv/useAutosave.ts:175` -> `safeParse`
-- IDs must be unique across scored lists for lookup to be unambiguous; findScored takes the first match. `apps/web/src/cv/edit/lists.ts:24` -> `findScored`; `packages/shared/src/cv.ts:279` -> `.find`
+- IDs must be unique across scored lists for lookup to be unambiguous; findScored takes the first match. `apps/web/src/cv/edit/lists.ts:24` -> `findScored`; `packages/shared/src/cv.ts:280` -> `.find`
 - RoleList and ROLE_LISTS are separately declared from ScoredKind; satisfies checks values but does not guarantee that an array lists every kind. `apps/web/src/cv/edit/lists.ts:17` -> `RoleList`; `apps/web/src/cv/edit/cvReducer.ts:36` -> `satisfies`

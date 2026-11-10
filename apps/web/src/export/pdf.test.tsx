@@ -115,9 +115,12 @@ async function readPdf(blob: Blob) {
 }
 
 describe("buildCvPdf", () => {
-  it.each(["classic", "modern"])("places the %s photo after the header text column", async (template) => {
+  it.each([
+    ["classic", undefined], ["modern", undefined], ["classic", "square"], ["modern", "square"],
+    ["classic", "round"], ["modern", "round"],
+  ] as const)("places the %s photo with shape %s after the header text column", async (template, shape) => {
     const content = fixture();
-    content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1 };
+    content.basics.photo = { path: "user/photo.png", x: 50, y: 50, zoom: 1, ...(shape ? { shape } : {}) };
     const render = vi.mocked(renderer.pdf);
     render.mockClear();
     try {
@@ -139,7 +142,7 @@ describe("buildCvPdf", () => {
                   ],
                 }),
               }),
-              expect.objectContaining({ type: renderer.Image, props: expect.objectContaining({ style: { width: 72, height: 72, objectFit: "contain" } }) }),
+              expect.objectContaining({ type: renderer.Image, props: expect.objectContaining({ style: { width: 72, height: 72, objectFit: "contain", ...(shape === "round" ? { borderRadius: 36 } : {}) } }) }),
             ],
           }),
         }), expect.anything()] } } },
