@@ -22,7 +22,7 @@ Convert typed dates into stored year/month strings and display them in the CV la
 ## Connections
 
 - Used by web date input: `apps/web/src/cv/edit/DateField.tsx:2` -> `parseTypedDate` -> `packages/shared/src/dates.ts:41` -> `parseTypedDate`; formatter call `apps/web/src/cv/edit/DateField.tsx:20` -> `formatYearMonth` -> `packages/shared/src/dates.ts:62` -> `formatYearMonth`.
-- Used by web PDF/DOCX output and tailoring review: `apps/web/src/export/pdf.tsx:80` -> `formatYearMonth`, `apps/web/src/export/docx.ts:113` -> `formatYearMonth`, `apps/web/src/tailor/LayoutReview.tsx:59` -> `formatYearMonth` -> `packages/shared/src/dates.ts:62` -> `formatYearMonth`. The CV page uses the same formatter for award, course and publication dates: `apps/web/src/cv/page/NewSections.tsx:35` -> `formatYearMonth` -> `packages/shared/src/dates.ts:62` -> `formatYearMonth`.
+- Used by web PDF/DOCX output and tailoring review: `apps/web/src/export/pdf.tsx:80` -> `formatYearMonth`, `apps/web/src/export/docx.ts:123` -> `formatYearMonth`, `apps/web/src/tailor/LayoutReview.tsx:59` -> `formatYearMonth` -> `packages/shared/src/dates.ts:62` -> `formatYearMonth`. The CV page uses the same formatter for award, course and publication dates: `apps/web/src/cv/page/NewSections.tsx:35` -> `formatYearMonth` -> `packages/shared/src/dates.ts:62` -> `formatYearMonth`.
 - Uses CV Locale and produces values compatible with YearMonthSchema: `packages/shared/src/dates.ts:1` -> `Locale` -> `packages/shared/src/cv.ts:223` -> `Locale`; `packages/shared/src/dates.ts:37` -> `value:` -> `packages/shared/src/cv.ts:23` -> `regex`.
 
 ## Assumptions

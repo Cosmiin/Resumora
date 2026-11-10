@@ -41,14 +41,19 @@ describe("exportFile", () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it("passes the photo's bytes when the template shows it, and skips it when the template doesn't", async () => {
+  it.each(["pdf", "docx"] as const)("downloads photos only for templates with a slot for %s", async (format) => {
     const withPhoto = { ...cv, content: { ...content, basics: { ...content.basics, photo: { path: "user-a/p.png", x: 50, y: 50, zoom: 1 } } } };
     download.mockResolvedValue({ data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }), error: null });
-    await exportFile("cv", "pdf", { cv: withPhoto, job, template: "classic" });
-    expect(pdf.fitCvPdf.mock.lastCall![2]).toEqual({ data: new Uint8Array([1, 2, 3]), type: "png" });
-    await exportFile("cv", "pdf", { cv: withPhoto, job, template: "compact" });
+    for (const template of ["classic", "modern"] as const) {
+      await exportFile("cv", format, { cv: withPhoto, job, template });
+      expect(pdf.fitCvPdf.mock.lastCall![2]).toEqual({ data: new Uint8Array([1, 2, 3]), type: "png" });
+      if (format === "docx") expect(docx.buildCvDocx.mock.lastCall![2]).toEqual(pdf.fitCvPdf.mock.lastCall![2]);
+    }
+    expect(download).toHaveBeenCalledWith("user-a/p.png");
+    await exportFile("cv", format, { cv: withPhoto, job, template: "compact" });
     expect(pdf.fitCvPdf.mock.lastCall![2]).toBeUndefined();
-    expect(download).toHaveBeenCalledTimes(1);
+    if (format === "docx") expect(docx.buildCvDocx.mock.lastCall![2]).toBeUndefined();
+    expect(download).toHaveBeenCalledTimes(2);
   });
 
   it("still exports the CV when the photo can't be read", async () => {

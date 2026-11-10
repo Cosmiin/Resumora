@@ -1,7 +1,7 @@
 import {
   CATEGORY, formatYearMonth, normalizeLayout, withoutHidden, type CvContent, type SectionKey,
 } from "@resumora/shared";
-import { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun, type IParagraphOptions } from "docx";
+import { Document, HeadingLevel, HorizontalPositionAlign, HorizontalPositionRelativeFrom, ImageRun, Packer, Paragraph, TextRun, TextWrappingType, VerticalPositionRelativeFrom, type IParagraphOptions } from "docx";
 import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 import { fitSteps, type FitStep } from "./fit.ts";
@@ -70,6 +70,7 @@ export function buildCvDocx(
   const selectedTemplate = getTemplate(template);
   const b = content.basics;
   const children: Paragraph[] = [];
+  let image: ImageRun | undefined;
   if (selectedTemplate.photo !== null && b.photo && photo && photo.type !== "webp") {
     // Read the dimensions to fit the whole image within a 96 px square.
     const bytes = new DataView(photo.data.buffer, photo.data.byteOffset, photo.data.byteLength);
@@ -92,12 +93,21 @@ export function buildCvDocx(
       }
     }
     const scale = 96 / Math.max(width, height);
-    children.push(new Paragraph({ children: [new ImageRun({
+    image = new ImageRun({
       data: photo.data, type: photo.type === "jpeg" ? "jpg" : "png",
       transformation: { width: width * scale, height: height * scale },
-    })] }));
+      floating: selectedTemplate.photo === "header-right" ? {
+        horizontalPosition: { relative: HorizontalPositionRelativeFrom.MARGIN, align: HorizontalPositionAlign.RIGHT },
+        verticalPosition: { relative: VerticalPositionRelativeFrom.PARAGRAPH, offset: 0 },
+        wrap: { type: TextWrappingType.SQUARE },
+      } : undefined,
+    });
   }
-  if (b.fullName) children.push(paragraph(b.fullName, { heading: HeadingLevel.TITLE }));
+  if (b.fullName || image) {
+    const name = paragraph(b.fullName, { heading: HeadingLevel.TITLE });
+    if (image) name.addChildElement(image);
+    children.push(name);
+  }
   const titles = join(b.titles);
   if (titles) children.push(paragraph(titles));
   const contact = join([b.email, b.phone, b.location, b.website, b.linkedin]);
