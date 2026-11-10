@@ -4,8 +4,8 @@ area: api-tailor
 files: ["apps/api/eval/tailor/run.ts","apps/api/eval/tailor/run.eval.ts","apps/api/eval/tailor/README.md","apps/api/test/tailor-eval.test.ts"]
 depends_on: ["shared/cv","shared/jobs","db/cv-repository","db/jobs-repository","db/tailoring-repository","api-core/app","api-core/call-model","api-tailor/score","api-tailor/routes","api-tailor/section-routes","api-tailor/eval-metrics"]
 contract: false
-checked_hash: bcb42a88
-cited: [5851d4, 77a5d8, 2e157f, 23cad0, ff827d, eebb5f, 922e39, 996e71, 6ff603, a02b8d, f95472, 3b93da, f15050, 4f31e5, 4c7881, 9169da, 60fbc7, b183b2, 35522d, a083d9, ff827d, 4d0064, 922e39, 3a582f, 996e71, 4b4600, 9169da, e7799c, 679619, eacb3a, db66e3, 24d9ab, 0eefad, b362e0, 92e993, e9b03e, 5f48bd, 29882d, 55aa6a]
+checked_hash: 3786b834
+cited: [5851d4, 77a5d8, 2e157f, 23cad0, ff827d, eebb5f, 922e39, 996e71, 6ff603, a02b8d, bbecce, 51ba35, ef06db, 3373bf, ea2117, 683868, 742d24, 4c7881, 9169da, 60fbc7, b183b2, 35522d, a083d9, ff827d, 4d0064, 922e39, 3a582f, 996e71, 4b4600, 9169da, e7799c, 679619, eacb3a, db66e3, 24d9ab, 0eefad, b362e0, 92e993, e9b03e, 47899a, 8973f2, 55aa6a]
 decisions: []
 open: []
 ---
@@ -13,7 +13,7 @@ Run six synthetic pairs through scoring and HTTP tailoring with real or fake mod
 
 - Loads exactly six schema-validated fixture pairs before running calls; fixtures.json is fixture data excluded from map ownership `apps/api/eval/tailor/run.ts:19` -> `FIXTURES`; `apps/api/eval/tailor/run.ts:27` -> `PairSchema`; `apps/api/eval/tailor/run.ts:48` -> `length(6)`.
 - Creates an authenticated in-memory app and job, starts neutral tailoring, runs/accepts every section and role without asking questions or supplying decisions, then uses last accept's Score 2 `apps/api/eval/tailor/run.ts:157` -> `verifyToken`; `apps/api/eval/tailor/run.ts:181` -> `/tailor`; `apps/api/eval/tailor/run.ts:187` -> `const body`; `apps/api/eval/tailor/run.ts:188` -> `/run`; `apps/api/eval/tailor/run.ts:190` -> `/accept`; `apps/api/eval/tailor/run.ts:199` -> `score2`.
-- The eval fake returns alternating requirement labels, one keyword, unchanged layout and empty verifier results; old role text is shortened to six words and one tool guess exercises code checks `apps/api/eval/tailor/run.ts:266` -> `i % 2`; `apps/api/eval/tailor/run.ts:272` -> `results: []`; `apps/api/eval/tailor/run.ts:275` -> `input.order`; `apps/api/eval/tailor/run.ts:283` -> `guessed`; `apps/api/eval/tailor/run.ts:287` -> `firstWords`.
+- The eval fake returns alternating requirement labels, one keyword, unchanged layout and empty verifier results. Experience reads only items.edit, reuses one model per pair and tracks unique role IDs across requests in CV order (including retries), and shortens text after the first two roles to six words; one tool guess exercises code checks `apps/api/eval/tailor/run.ts:267` -> `i % 2`; `apps/api/eval/tailor/run.ts:273` -> `results: []`; `apps/api/eval/tailor/run.ts:276` -> `input.order`; `apps/api/eval/tailor/run.ts:149` -> `runModel`; `apps/api/eval/tailor/run.ts:163` -> `runModel`; `apps/api/eval/tailor/run.ts:281` -> `roleIds`; `apps/api/eval/tailor/run.ts:283` -> `guessed`; `apps/api/eval/tailor/run.ts:287` -> `firstWords`.
 - Manual runner validates fixtures, requires configured providers, evaluates pairs concurrently, writes RESULTS.md before asserting problems empty, and allows forty minutes `apps/api/eval/tailor/run.eval.ts:17` -> `loadPairs`; `apps/api/eval/tailor/run.eval.ts:20` -> `Promise.all`; `apps/api/eval/tailor/run.eval.ts:22` -> `writeFileSync`; `apps/api/eval/tailor/run.eval.ts:24` -> `toEqual([])`; `apps/api/eval/tailor/run.eval.ts:25` -> `40 * 60_000`.
 - tested by `apps/api/test/tailor-eval.test.ts:8` -> `tailoring eval (fake model)`.
 

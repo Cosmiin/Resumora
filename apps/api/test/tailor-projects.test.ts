@@ -92,6 +92,31 @@ async function acceptItem(runId: string, section: string, roleId: string, keep: 
 }
 
 describe("Projects & volunteering step", () => {
+  it.each([project, volunteer])("rewrites only $title using its own evidence and answers", async (item) => {
+    const run = await start();
+    const repo = memoryTailorRepo("user-a", scores, docs);
+    await repo.setSteering(run.tailoredCvId!, { tone: "formal", focusRoleIds: [role.id] });
+    const questions = [role, project, volunteer].map((entry) => ({ id: `q-${entry.id}`, roleId: entry.id,
+      section: "projects" as const, text: `What did you do at ${entry.company}?`, kind: "options" as const, options: [], reason: "Gap" }));
+    await repo.updateRun(run.id, { currentSection: "projects", currentRoleId: item.id, questions,
+      answers: questions.map((q) => ({ questionId: q.id, value: `Work at ${q.roleId}`, via: "typed" as const })),
+    });
+    await runItem(run.id, "projects", item.id, reword(item.bullets[0]!.id, item.bullets[0]!.text));
+    const sent = lastUser("items") as { items: { edit: { id: string }[] }; answers: { question: string; answer: string }[]; steering: string };
+    expect(sent.items).toEqual({ edit: [expect.objectContaining({ id: item.id })] });
+    expect(sent.answers).toEqual([{ question: `What did you do at ${item.company}?`, answer: `Work at ${item.id}` }]);
+    const verified = lastUser("sources") as { sources: string[] };
+    expect(verified.sources).toEqual(expect.arrayContaining([item.company, item.bullets[0]!.text, `Work at ${item.id}`]));
+    for (const other of [role, project, volunteer].filter((entry) => entry.id !== item.id)) {
+      expect(JSON.stringify(sent)).not.toContain(other.company);
+      expect(JSON.stringify(sent)).not.toContain(other.bullets[0]!.text);
+      expect(verified.sources).not.toContain(other.bullets[0]!.text);
+      expect(verified.sources).not.toContain(`Work at ${other.id}`);
+    }
+    expect(sent.steering).not.toContain(role.title);
+    expect(JSON.stringify(model.requests.at(-2))).toContain("Use only this item's own bullets, notes, facts and answers.");
+  });
+
   it("comes right after Experience, with one item order for both steps in CV order", async () => {
     const run = await start();
     expect(run.sections.slice(0, 3)).toEqual(["experience", "projects", "skills"]);
@@ -115,9 +140,10 @@ describe("Projects & volunteering step", () => {
     const projectBullet = project.bullets[0]!.id;
     const { proposals } = await runItem(run.id, "projects", project.id, reword(projectBullet, "Built an Excel payroll accuracy checker"));
     expect(proposals.map((p) => p.itemId)).toEqual([projectBullet]);
-    // The model edits only the current item; the others are read-only context.
+    // The model sees only the current item.
     const sent = lastUser("items") as { items: { edit: { id: string }[] } };
     expect(sent.items.edit.map((item) => item.id)).toEqual([project.id]);
+    expect(sent.items).not.toHaveProperty("context");
     const afterProject = await (await acceptItem(run.id, "projects", project.id, [projectBullet])).json() as { run: TailorRun };
     expect(afterProject.run).toMatchObject({ currentSection: "projects", currentRoleId: volunteer.id });
 

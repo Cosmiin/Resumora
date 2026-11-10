@@ -146,7 +146,7 @@ export async function runPair(pair: Pair, model: (calls: AiCallLog[]) => ModelDe
   const totals = row.score1.filter((total): total is number => total !== null);
   row.spread = totals.length === 3 ? Math.max(...totals) - Math.min(...totals) : null;
   row.keywordsBefore = keywordCoverage(first);
-
+  const runModel = model(runCalls);
   const cv = memoryCvRepo();
   await cv.save(pair.cv, 0);
   const jobs = memoryJobs({ now: () => new Date() });
@@ -160,7 +160,7 @@ export async function runPair(pair: Pair, model: (calls: AiCallLog[]) => ModelDe
     jobRepo: (user) => jobs.repoFor(user.id),
     tailorRepo: (user) => memoryTailorRepo(user.id, scores, docs),
     insightsRepo: () => { throw new Error("not used"); },
-    model: () => model(runCalls),
+    model: () => runModel,
     queue: { send: async () => {} },
     jobQueue: { send: async () => {} },
     log: () => {},
@@ -246,13 +246,14 @@ export function report(rows: Row[], when = new Date()): string {
 
 /**
  * A fake model that answers each tailoring call the way the real one must: every requirement labelled with
- * evidence quoted from the CV, one job keyword, the layout unchanged. Its only proposals condense the bullets of
- * roles older than the newest two to their first words (as the experience prompt asks), so a long CV can fit 2 pages.
+ * evidence quoted from the CV, one job keyword, the layout unchanged. After the first two roles in CV order,
+ * proposals condense each role's text to its first words; a tool guess also exercises the truth checks.
  */
 const firstWords = (text: string, count: number) => text.split(/\s+/).filter(Boolean).slice(0, count).join(" ");
 
 export function fakeTailorModel(calls: AiCallLog[]): ModelDeps {
   const provider: Provider = { name: "openai", url: "https://fake.test", apiKey: "fake", model: "gpt-5.4-mini" };
+  const roleIds: string[] = [];
   const reply = (body: { messages: { role: string; content: unknown }[]; response_format: { json_schema: { name: string } } }) => {
     const task = body.response_format.json_schema.name;
     const user = String(body.messages[1]?.content);
@@ -274,16 +275,15 @@ export function fakeTailorModel(calls: AiCallLog[]): ModelDeps {
       const input = JSON.parse(user) as { order: string[]; headline: string };
       return { order: input.order, headline: input.headline };
     }
-    // Experience comes one role at a time: the role is older than the newest two when 2+ other roles started later.
-    const input = JSON.parse(user) as { section: string; items: { edit: CvContent["experience"]; context: { roles: CvContent["experience"] } } };
+    // Experience comes one role at a time, with only that role's text to shorten.
+    const input = JSON.parse(user) as { section: string; items: { edit: CvContent["experience"] } };
     if (input.section !== "experience") return { proposals: [] };
-    const older = (role: CvContent["experience"][number]) =>
-      input.items.context.roles.filter((other) => other.startDate > role.startDate).length >= 2;
+    for (const role of input.items.edit) if (!roleIds.includes(role.id)) roleIds.push(role.id);
     // A tempting guess the truth rule must stop: "reporting for clients" becomes a named tool.
     const guessed = input.items.edit.flatMap((role) => role.bullets).filter((bullet) => /reporting for clients/i.test(bullet.text))
       .map((bullet) => ({ itemId: bullet.id, field: "text", text: "Built Power BI reporting for clients", inferred: true, reason: bullet.text, guesses: null }));
     return {
-      proposals: [...guessed, ...input.items.edit.filter(older).flatMap((role) => [
+      proposals: [...guessed, ...input.items.edit.filter((role) => roleIds.indexOf(role.id) >= 2).flatMap((role) => [
         { itemId: role.id, field: "description", text: firstWords(role.description, 6), inferred: false, reason: null, guesses: null },
         ...role.bullets.map((bullet) => ({ itemId: bullet.id, field: "text", text: firstWords(bullet.text, 6), inferred: false, reason: null, guesses: null })),
       ].filter((proposal) => proposal.text))],

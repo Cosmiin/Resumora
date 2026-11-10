@@ -74,6 +74,56 @@ const reword = (text: string, over: Partial<ModelProposal> = {}): ModelProposal 
   ({ itemId: bullet.id, field: "text", text, inferred: false, ...over });
 
 describe("section pass", () => {
+  it.each(["experience", "summary"] as const)("scopes %s evidence and answers to the permitted roles", async (section) => {
+    const roleA = roleWith(["Built reports on Kubernetes"], { company: "Northwind Traders", title: "Reporting Lead" });
+    const roleB = roleWith(["Ran payroll"], { company: "Contoso Labs", description: "Handled monthly payroll",
+      notes: [{ id: "note-b", question: "What else?", answer: "Checked tax codes", via: ["type"], askedAt: "2026-11-10T10:00:00Z" }],
+      facts: { items: ["Filed returns"], fromNotes: "note-b", updatedAt: "2026-11-10T10:00:00Z" },
+    });
+    const project = { ...roleWith(["Built a scheduling app"], { company: "Fabrikam", title: "Scheduler" }), url: "" };
+    const volunteer = roleWith(["Taught budgeting"], { company: "Woodgrove", title: "Mentor" });
+    await cv.save({ ...base, experience: [roleA, roleB], projects: [project], volunteering: [volunteer] }, 1);
+    const start = await (await post(`/v1/jobs/${jobId}/tailor`, { tone: "formal", focusRoleIds: [roleA.id] })).json() as { run: { id: string } };
+    const questions: TailorQuestion[] = [
+      { id: "q-a", roleId: roleA.id, text: "What reports?", section: "experience", kind: "options", options: [], reason: "Gap" },
+      { id: "q-b", roleId: roleB.id, text: "What checks?", section: "experience", kind: "options", options: [], reason: "Gap" },
+      { id: "q-all", roleId: null, text: "Which skills?", section: "skills", kind: "skill", options: [], reason: "Gap" },
+      { id: "q-flag", roleId: roleB.id, text: "Unsupported claim?", section: "experience", kind: "flag", options: [], reason: "Flag" },
+    ];
+    await memoryTailorRepo("user-a", new Map(), docs).updateRun(start.run.id, {
+      currentSection: section, currentRoleId: section === "experience" ? roleB.id : null, questions,
+      answers: questions.map((q, i) => ({ questionId: q.id, value: ["Client reports", "Reconciled totals", "Excel formulas", "Invented outcome"][i]!, via: "typed" })),
+    });
+    const proposal = reword("Ran payroll on Kubernetes", { itemId: section === "experience" ? roleB.bullets[0]!.id : "summary", field: section === "experience" ? "text" : "summary" });
+    replies = [proposals(proposal), { results: [] }, proposals(proposal), { results: [] }];
+    const res = await post(`/v1/tailor-runs/${start.run.id}/sections/${section}/run`, { roleId: roleB.id });
+    expect(res.status).toBe(200);
+    const sent = JSON.parse(String((model.requests[0]!.messages as { content: string }[])[1]!.content));
+    const verified = JSON.parse(String((model.requests[1]!.messages as { content: string }[])[1]!.content));
+    const ownAnswer = { question: "What checks?", answer: "Reconciled totals" };
+    expect(verified.sources).toEqual(expect.arrayContaining(["Contoso Labs", "Ran payroll", "Handled monthly payroll", "Checked tax codes", "Filed returns", ownAnswer.answer]));
+    expect(JSON.stringify(sent)).not.toContain("Invented outcome");
+    expect(verified.sources).not.toContain("Invented outcome");
+    if (section === "experience") {
+      expect(sent.items).toEqual({ edit: [expect.objectContaining({ id: roleB.id })] });
+      expect(sent.answers).toEqual([ownAnswer]);
+      for (const other of [roleA.company, roleA.title, roleA.bullets[0]!.text, project.company, volunteer.company, "Client reports", "Excel formulas"]) {
+        expect(JSON.stringify(sent)).not.toContain(other);
+        expect(verified.sources).not.toContain(other);
+      }
+      expect(sent.steering).toContain("They want to lean on other roles more than this one.");
+      const retry = JSON.parse(String((model.requests[2]!.messages as { content: string }[])[1]!.content));
+      expect(retry.fix.proposals[0].flags).toContainEqual({ rule: "tool", detail: "Kubernetes" });
+      expect(await res.json()).toMatchObject({ proposals: [], removed: 1 });
+      expect(model.logged.map((call) => call.task)).toEqual(["tailor_section", "tailor_verify", "tailor_section", "tailor_verify"]);
+    } else {
+      expect(sent.items.context.roles.map((item: { id: string }) => item.id)).toEqual([roleA.id, roleB.id]);
+      expect(sent.answers).toEqual([{ question: "What reports?", answer: "Client reports" }, ownAnswer, { question: "Which skills?", answer: "Excel formulas" }]);
+      expect(verified.sources).toContain(roleA.bullets[0]!.text);
+      expect(await res.json()).toMatchObject({ proposals: [expect.objectContaining({ text: proposal.text, flags: [] })], removed: 0 });
+    }
+  });
+
   it("uses the strong tier, retries a flagged proposal once, then drops it: no flag question, counted in removed", async () => {
     replies = [proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] },
       proposals(reword("Cut payroll errors by 30% for 40 staff")), { results: [] }];

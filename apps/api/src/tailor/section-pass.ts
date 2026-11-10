@@ -68,18 +68,16 @@ export function sectionItems(cv: CvContent, section: TailorSection, roleId: stri
 }
 
 /**
- * What the model sees: the section's own items, plus the roles with their notes and facts as read-only
- * context, so skills and the summary can draw on the experience.
+ * Role steps see only their item. Skills and the summary also get the roles as read-only context.
  */
 function sectionData(cv: CvContent, section: TailorSection, jobId: string, roleId: string | null): unknown {
   const roles = cv.experience.map((role) => ({ ...role, notes: role.notes.filter((note) => note.jobId === undefined || note.jobId === jobId) }));
-  // One role to edit; the other roles are read-only context.
-  if (section === "experience") return { edit: roles.filter((role) => role.id === roleId), context: { roles: roles.filter((role) => role.id !== roleId) } };
+  if (section === "experience") return { edit: roles.filter((role) => role.id === roleId) };
   if (section === "projects") {
-    // One project or volunteering role to edit, with its kind; the roles and the other items are read-only context.
+    // One project or volunteering role to edit, with its kind.
     const items = scoredItems(cv).filter(({ kind }) => kind !== "role")
       .map(({ item, kind }) => ({ kind, ...item, notes: item.notes.filter((note) => note.jobId === undefined || note.jobId === jobId) }));
-    return { edit: items.filter((item) => item.id === roleId), context: { roles, projectsAndVolunteering: items.filter((item) => item.id !== roleId) } };
+    return { edit: items.filter((item) => item.id === roleId) };
   }
   const skills = { technicalSkills: cv.technicalSkills, professionalSkills: cv.professionalSkills };
   if (section === "skills") return { edit: skills, context: { roles } };
@@ -145,10 +143,12 @@ export async function passProposals(
   const cv = stripHeader(input.cv).cv;
   const items = sectionItems(cv, section, roleId);
   // Flag questions quote the flagged proposal, so their answers are never a source.
-  const asked = new Map((run.questions ?? []).filter((question) => question.kind !== "flag").map((question) => [question.id, question.text]));
+  const asked = new Map((run.questions ?? []).filter((question) => question.kind !== "flag"
+    && (!isRoleSection(section) || question.roleId === roleId)).map((question) => [question.id, question.text]));
   const answers = (run.answers ?? []).flatMap((answer) => answer.value && asked.has(answer.questionId)
     ? [{ question: asked.get(answer.questionId)!, answer: answer.value }] : []);
-  const sources = [...texts(cv), ...answers.flatMap((answer) => [answer.question, answer.answer])];
+  const sources = [...texts(isRoleSection(section) ? stepItems(cv, section).filter((item) => item.id === roleId) : cv),
+    ...answers.flatMap((answer) => [answer.question, answer.answer])];
   // A confirmed skill names the roles it was used in: "Used in: Title · Company, Title · Company".
   const usedIn = new Map<string, string>();
   for (const answer of run.answers ?? []) {
@@ -165,7 +165,7 @@ export async function passProposals(
   async function propose(retry: Proposal[]): Promise<Proposal[]> {
     const reply = await call("tailor_section", "strong", ModelProposalsSchema, sectionSystemPrompt(contentSection), sectionUserMessage({
       section, items: sectionData(cv, section, run.jobId, roleId), job: input.job, language: steering!.language,
-      steering: steeringText(steering!.steering, cv), answers, retry,
+      steering: steeringText(steering!.steering, cv, isRoleSection(section) ? roleId ?? undefined : undefined), answers, retry,
     }));
     // An item with one editable field (a bullet's text, the summary) takes any field name; other unknown item ids
     // or fields are dropped and logged (ids and fields only); items without a proposal keep the Base CV wording.

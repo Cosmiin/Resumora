@@ -5,7 +5,7 @@ files: ["apps/api/src/tailor/steering.ts","apps/api/src/tailor/tone-examples.ts"
 depends_on: ["shared/tailoring","db/tailoring-runs","db/ai-log","api-core/call-model","api-tailor/answers"]
 contract: true
 checked_hash: 72667d0f
-cited: [935658, fb9ec2, 49bc0e, 3eaea0, 842676, 284829, 4445ee, fac51b, 12f141, dd01a1, bbae22, 126931, ad8b31, bbae22, 4c58f8, e8e7e7, fefc81, 56e0b1, 01051a, 07146d, df6ebf, a4709c, 334a09, 1ed74c, 84752b, 126931, ad8b31, 48d99a, 25e185, 032f5e, 7991e4, 6abfa6, 5061de, 935658, adf1b1, 96e073, fc9d94, 84752b, 284829]
+cited: [935658, fb9ec2, 49bc0e, 3eaea0, 842676, 284829, 4445ee, fac51b, 12f141, dd01a1, bbae22, 126931, ad8b31, bbae22, 4c58f8, e8e7e7, fefc81, 56e0b1, 01051a, 07146d, df6ebf, a4709c, 334a09, 1ed74c, 84752b, 126931, ad8b31, 48d99a, 06c662, 032f5e, 7991e4, 6abfa6, 5061de, 935658, adf1b1, 96e073, fc9d94, 84752b, 284829]
 decisions: []
 open: []
 ---

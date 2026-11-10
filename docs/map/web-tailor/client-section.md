@@ -20,7 +20,7 @@ Send section questions, answers, proposals and acceptance decisions.
 
 ## Connections
 
-- Acceptance carries item decisions without a proposal version; regeneration replaces those items in the stored run, and acceptance reads run.proposals, so another tab can replace the wording those decisions accept. `apps/web/src/tailor/tailor-api.ts:10` -> `AcceptBody`; `apps/api/src/tailor/section-pass.ts:124` -> `updateRun`; `apps/api/src/tailor/accept.ts:124` -> `run.proposals`
+- Acceptance carries item decisions without a proposal version; regeneration replaces those items in the stored run, and acceptance reads run.proposals, so another tab can replace the wording those decisions accept. `apps/web/src/tailor/tailor-api.ts:10` -> `AcceptBody`; `apps/api/src/tailor/section-pass.ts:122` -> `updateRun`; `apps/api/src/tailor/accept.ts:124` -> `run.proposals`
 - The acceptance save check uses the document version freshly fetched inside that request, rather than a version from the review screen. `apps/web/src/tailor/tailor-api.ts:10` -> `AcceptBody`; `apps/api/src/tailor/accept.ts:99` -> `getTailoredCv`; `apps/api/src/tailor/accept.ts:168` -> `doc.version`
 
 - Uses POST /v1/tailor-runs/:id/sections/:section/questions. `apps/web/src/tailor/tailor-api.ts:34` -> `/questions`; `apps/api/src/tailor/routes.ts:69` -> `app.post`

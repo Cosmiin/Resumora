@@ -240,9 +240,10 @@ describe("experience role by role", () => {
   const three: CvContent = { ...base, experience: [roleA, roleB, roleC] };
   const sentEdit = () => {
     const body = JSON.parse(String((model.requests.at(-2)!.messages as { content: string }[])[1]!.content)) as {
-      items: { edit: { id: string }[]; context: { roles: { id: string }[] } };
+      items: { edit: { id: string }[]; context?: unknown };
     };
-    return { edit: body.items.edit.map((r) => r.id), context: body.items.context.roles.map((r) => r.id) };
+    expect(body.items).not.toHaveProperty("context");
+    return { edit: body.items.edit.map((r) => r.id) };
   };
 
   beforeEach(async () => { await cv.save(three, 1); });
@@ -253,7 +254,7 @@ describe("experience role by role", () => {
     for (const [i, current] of [roleA, roleB, roleC].entries()) {
       const bullet = current.bullets[0]!;
       await run(runId, "experience", reword(bullet.id, `${bullet.text} on time`));
-      expect(sentEdit()).toEqual({ edit: [current.id], context: [roleA, roleB, roleC].filter((r) => r !== current).map((r) => r.id) });
+      expect(sentEdit()).toEqual({ edit: [current.id] });
       const scored = model.logged.filter((call) => call.task === "tailor_score").length;
       const res = await accept(runId, "experience", { decisions: [{ itemId: bullet.id, keep: true }] });
       expect(res.status).toBe(200);
