@@ -4,8 +4,8 @@ area: web-app
 files: ["apps/web/src/jobs/JobThoughts.tsx","apps/web/src/jobs/job-page.test.tsx"]
 depends_on: ["web-app/job-saves","web-app/api-client","shared/jobs","web-enrich/voice","web-enrich/voice-ui"]
 contract: false
-checked_hash: 6575287d
-cited: [4f9d21, 105ba1, fd97d7, 2e3db2, 7a926a, 3141d4, 30311f, 238b5c, f3410a, 9b676d, 74b642, 1cd503, 522a7b, 38e51b, 5af36b, d33e71, 1d4f45, d8da1c, 92b6c3, 7a926a, c8f5f4, 6eb347, 888274, 48c12d, e88daf, 92a469, 522a7b, 5c8b99, c24274, 67058c]
+checked_hash: 7058b2fe
+cited: [4f9d21, 105ba1, fd97d7, 2e3db2, 7a926a, 3141d4, 30311f, 238b5c, f3410a, 9b676d, 74b642, 1cd503, 522a7b, 38e51b, 5af36b, d33e71, 1d4f45, 6639cd, 92b6c3, 7a926a, c8f5f4, 6eb347, 888274, 48c12d, e88daf, 92a469, 522a7b, 5c8b99, c24274, 67058c]
 decisions: []
 open: []
 ---
@@ -19,8 +19,8 @@ Keep typed or dictated job thoughts visible while serializing blur saves.
 - Final transcript appends after trimmed trailing whitespace, separated by a space, and truncates to 2,000 characters. Typing has the same cap and native maxLength. `apps/web/src/jobs/JobThoughts.tsx:70` -> `slice(0, 2000)`; `apps/web/src/jobs/JobThoughts.tsx:85` -> `maxLength={2000}`
 - Blur saves immediately unless voice is busy, in which case saving waits for busy to clear. Mic mousedown prevents losing textarea focus. `apps/web/src/jobs/JobThoughts.tsx:75` -> `saveAfterVoice.current`; `apps/web/src/jobs/JobThoughts.tsx:88` -> `onBlur`; `apps/web/src/jobs/JobThoughts.tsx:90` -> `preventDefault`
 - Layout-effect cleanup stops busy voice before passive cleanup, and saves dirty text unless a previous save is still marked failed. `apps/web/src/jobs/JobThoughts.tsx:62` -> `useLayoutEffect`
-- tested by `apps/web/src/jobs/job-page.test.tsx:71` -> `newest queued thoughts`
-- tested by `apps/web/src/jobs/job-page.test.tsx:92` -> `does not retry failed thoughts`
+- tested by `apps/web/src/jobs/job-page.test.tsx:99` -> `newest queued thoughts`
+- tested by `apps/web/src/jobs/job-page.test.tsx:120` -> `does not retry failed thoughts`
 ## Connections
 - Uses the parent's extraction/version save path: `apps/web/src/jobs/JobThoughts.tsx:49` -> `onSave(sent)`; `apps/web/src/jobs/JobPage.tsx:221` -> `saveDetails({ userThoughts })`; `apps/web/src/jobs/JobPage.tsx:108` -> `patchJob`
 - Uses reusable voice controls: `apps/web/src/jobs/JobThoughts.tsx:89` -> `MicButton`; `apps/web/src/cv/enrich/VoiceControls.tsx:39` -> `MicButton`; `apps/web/src/jobs/JobThoughts.tsx:93` -> `VoiceStatus`; `apps/web/src/cv/enrich/VoiceControls.tsx:64` -> `VoiceStatus`

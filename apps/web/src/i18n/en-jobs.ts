@@ -81,6 +81,7 @@ export const jobsEn = {
   "job.editedByYou": "Summary edited by you",
   "job.readByAi": "Summary read by AI. Check it against the ad.",
   "job.applyBy": "Apply by {date}",
+  "job.positionClosed": "This position is no longer open for applications.",
   "job.workMode.onsite": "On-site",
   "job.workMode.hybrid": "Hybrid",
   "job.workMode.remote": "Remote",
