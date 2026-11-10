@@ -84,12 +84,23 @@ describe("popup views", () => {
     expect(root.textContent).not.toContain("Error:");
   });
 
+  it.each([false, true])("renders Local with configured=%s", (configured) => {
+    renderView(root, { kind: "signedOut", state: {
+      ...state, environments: state.environments.map((env) =>
+        env.id === "local" ? { ...env, configured } : env),
+    }, message: null, error: null }, actions);
+    const option = root.querySelector<HTMLOptionElement>('option[value="local"]')!;
+    expect(option.textContent).toBe(configured ? "Local" : "Local (not set up in this build)");
+    expect(option.disabled).toBe(!configured);
+  });
+
   it("enables configured Hosted and changes the environment", () => {
     renderView(root, { kind: "signedOut", state: {
       ...state, environments: state.environments.map((env) => ({ ...env, configured: true })),
     }, message: null, error: null }, actions);
     const select = root.querySelector("select")!;
     expect(select.options[1]!.disabled).toBe(false);
+    expect(select.options[1]!.textContent).toBe("Hosted");
     select.value = "hosted";
     select.dispatchEvent(new Event("change"));
     expect(actions.setEnvironment).toHaveBeenCalledExactlyOnceWith("hosted");
