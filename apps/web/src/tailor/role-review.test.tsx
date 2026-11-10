@@ -51,10 +51,60 @@ describe("RoleReview (RevC)", () => {
     await user.click(screen.getByRole("button", { name: "Original" }));
     expect(screen.getByRole("button", { name: "Original" })).toHaveAttribute("aria-pressed", "true");
     for (const text of ["Owns reporting for sales.", "Made weekly reports", "Checked data", "Ran workshops"]) expect(screen.getByText(text)).toBeInTheDocument();
-    expect(screen.queryByText(/KPI/)).toBeNull();
+    const page = screen.getByRole("heading", { name: "Business Analyst" }).closest(".page-sheet");
+    expect(page).not.toHaveTextContent(/KPI/);
+    expect(page?.querySelector(".page-del, .page-ins")).toBeNull();
     expect(screen.queryByText("AI guess")).toBeNull();
     await user.click(screen.getByRole("button", { name: "New" }));
     expect(screen.getByText("KPI", { selector: "mark" })).toBeInTheDocument();
+  });
+
+  it("shows old wording before new wording on the page, and only old wording in Original", async () => {
+    review({ proposals: [proposals[1]!] });
+    const page = screen.getByRole("heading", { name: "Business Analyst" }).closest<HTMLElement>(".page-sheet")!;
+    expect(page).toBeInTheDocument();
+    const oldText = within(page).getByText("Made weekly reports");
+    expect(oldText).toHaveClass("page-del");
+    expect(oldText.nextElementSibling).toHaveClass("page-ins");
+    expect(oldText.nextElementSibling).toHaveTextContent("Made weekly KPI reports");
+    expect(within(page).getByText("Checked data").closest(".page-del, .page-ins")).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Original" }));
+    expect(within(page).getByText("Made weekly reports")).toBeInTheDocument();
+    expect(page).not.toHaveTextContent("Made weekly KPI reports");
+    expect(page.querySelector(".page-del, .page-ins")).toBeNull();
+  });
+
+  it.each(["Made weekly reports", "  Made weekly reports  "])("shows matching wording %j plain in New view", (text) => {
+    review({ proposals: [{ ...proposals[1]!, text }] });
+    expect(screen.getByRole("button", { name: "New" })).toHaveAttribute("aria-pressed", "true");
+    const page = screen.getByRole("heading", { name: "Business Analyst" }).closest<HTMLElement>(".page-sheet")!;
+    const bullet = within(page).getAllByRole("listitem")[0]!;
+    expect(bullet).toHaveTextContent("Made weekly reports");
+    expect(bullet.querySelector(".page-del, .page-ins")).toBeNull();
+  });
+
+  it("lists a guess and its reason visibly in the note card", () => {
+    review({ proposals: [{ ...proposals[2]!, reason: "Your CV mentions webhooks" }] });
+    const note = screen.getByRole("heading", { name: "AI guesses to check later" }).closest<HTMLElement>(".page-note")!;
+    expect(note).toHaveClass("tailor-card");
+    expect(within(note).getByText(proposals[2]!.text)).toBeVisible();
+    expect(within(note).getByText("Your CV mentions webhooks")).toBeVisible();
+    const oldText = screen.getByText("Checked data");
+    expect(oldText).toHaveClass("page-del");
+    expect(oldText.nextElementSibling).toHaveClass("page-ins");
+    expect(oldText.nextElementSibling?.querySelector(".tailor-guess")).toHaveTextContent(proposals[2]!.text);
+    expect(oldText.nextElementSibling).toHaveTextContent("AI guess");
+  });
+
+  it.each([
+    [undefined, "Experience", "role"], ["project", "Project", "project"], ["volunteering", "Volunteering", "volunteering role"],
+  ] as const)("uses the %s wording in the decision note", (kind, label, item) => {
+    review({ kind });
+    const note = screen.getByRole("heading", { name: `Here's this ${item}, rewritten for the job.` }).closest<HTMLElement>(".page-note")!;
+    expect(within(note).getByText(`${label} · Business Analyst`)).toBeInTheDocument();
+    const page = screen.getByRole("heading", { name: "Business Analyst" }).closest(".page-sheet")!;
+    expect(page.nextElementSibling).toBe(note);
+    expect(page.parentElement).toHaveClass("tailor-split");
   });
 
   it("Keep the original sends every item with keep: false", async () => {
@@ -121,7 +171,9 @@ describe("the Experience review in the flow", () => {
       { initialEntries: ["/jobs/one/tailor"] });
     render(<RouterProvider router={router} />);
 
-    await user.click(await screen.findByRole("button", { name: "My answers" }));
+    const answers = await screen.findByRole("button", { name: "My answers" });
+    expect(answers.closest(".tailor-mode")).toHaveClass("is-wide");
+    await user.click(answers);
     const box = await screen.findByRole("textbox");
     expect(box).toHaveValue("Weekly");
     await user.clear(box);
@@ -130,6 +182,7 @@ describe("the Experience review in the flow", () => {
     expect(redoRole).toHaveBeenCalledWith("run1", "r1", [{ questionId: "q1", value: "Daily", via: "typed" }]);
 
     const card = await screen.findByRole("region", { name: "Business Analyst" });
+    expect(card.closest(".tailor-mode")).toHaveClass("is-wide");
     expect(within(card).getByText("daily KPI", { selector: "mark" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Use the new version" }));
     expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [], roleId: "r1" });

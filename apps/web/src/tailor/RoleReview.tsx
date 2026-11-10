@@ -45,10 +45,14 @@ function NewText({ before, proposal }: { before: string; proposal: Proposal }) {
 export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers, removed = 0, kind }: Props) {
   const [view, setView] = useState<"new" | "original">("new");
   const changes = proposals.filter((p) => p.flags.length === 0);
+  const guesses = changes.filter((p) => p.inferred);
   const find = (itemId: string, field: string) => changes.find((p) => p.itemId === itemId && p.field === field);
 
   const text = (before: string, proposal: Proposal | undefined) =>
-    view === "new" && proposal ? <NewText before={before} proposal={proposal} /> : before;
+    view === "new" && proposal && proposal.text.trim() !== before.trim() ? <>
+      <span className="page-del">{before}</span>{" "}
+      <span className="page-ins"><NewText before={before} proposal={proposal} /></span>
+    </> : before;
   const description = find(role.id, "description");
 
   function decide(keep: boolean) {
@@ -56,25 +60,39 @@ export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers,
     onAccept({ decisions: pick(false), inferred: keep ? [] : pick(true), flags: [] });
   }
 
-  return <section className="tailor-card" aria-label={role.title.trim() || t("tailor.role.untitled")}>
-    <RoleHeading role={role} locale={locale} />
-    {changes.length > 0 && <div className="tailor-switch" role="group" aria-label={t("tailor.roleReview.switch")}>
-      <button type="button" aria-pressed={view === "original"} onClick={() => setView("original")}>{t("tailor.roleReview.original")}</button>
-      <button type="button" aria-pressed={view === "new"} onClick={() => setView("new")}>{t("tailor.roleReview.new")}</button>
-    </div>}
-    <div className="tailor-doc">
-      {(role.description.trim() || description) && <p>{text(role.description, description)}</p>}
-      {role.bullets.length > 0 && <ul>
-        {role.bullets.map((bullet) => <li key={bullet.id}>{text(bullet.text, find(bullet.id, "text"))}</li>)}
-      </ul>}
+  return <section className="tailor-split" aria-label={role.title.trim() || t("tailor.role.untitled")}>
+    <div className="page-sheet tailor-role-block">
+      <RoleHeading role={role} locale={locale} />
+      <div className="tailor-doc">
+        {(role.description.trim() || description) && <p>{text(role.description, description)}</p>}
+        {role.bullets.length > 0 && <ul>
+          {role.bullets.map((bullet) => <li key={bullet.id}>{text(bullet.text, find(bullet.id, "text"))}</li>)}
+        </ul>}
+      </div>
     </div>
-    {changes.length === 0 && <p>{t(`tailor.roleReview.nothing${kindKey(kind)}`)}</p>}
-    {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
-    <div className="fm-foot">
-      {onAnswers && <button type="button" className="fm-ghost" onClick={onAnswers}><span aria-hidden="true">← </span>{t("tailor.roleReview.answers")}</button>}
-      {changes.length > 0 && <button type="button" className="fm-ghost" disabled={busy} onClick={() => decide(false)}>{t("tailor.roleReview.keepOriginal")}</button>}
-      <button type="button" className="fm-btn" disabled={busy} onClick={() => decide(true)}>
-        {t(busy ? "tailor.review.saving" : changes.length > 0 ? "tailor.roleReview.useNew" : "tailor.roleReview.continue")}</button>
+    <div className="tailor-card page-note">
+      <p className="tailor-eyebrow">{t(`tailor.roleReview.eyebrow${kindKey(kind)}`, { title: role.title.trim() || t("tailor.role.untitled") })}</p>
+      <h2>{t(`tailor.roleReview.${changes.length > 0 ? "title" : "nothing"}${kindKey(kind)}`)}</h2>
+      {changes.length > 0 && <div className="tailor-switch" role="group" aria-label={t("tailor.roleReview.switch")}>
+        <button type="button" aria-pressed={view === "original"} onClick={() => setView("original")}>{t("tailor.roleReview.original")}</button>
+        <button type="button" aria-pressed={view === "new"} onClick={() => setView("new")}>{t("tailor.roleReview.new")}</button>
+      </div>}
+      {guesses.length > 0 && <div className="tailor-group">
+        <h3>{t("tailor.roleReview.guesses")}</h3>
+        <ul className="tailor-review-guesses">
+          {guesses.map((guess) => <li key={guess.itemId}>
+            <p>{guess.text}</p>
+            {guess.reason && <p className="tailor-reason">{guess.reason}</p>}
+          </li>)}
+        </ul>
+      </div>}
+      {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
+      <div className="fm-foot">
+        {onAnswers && <button type="button" className="fm-ghost" onClick={onAnswers}><span aria-hidden="true">← </span>{t("tailor.roleReview.answers")}</button>}
+        {changes.length > 0 && <button type="button" className="fm-ghost" disabled={busy} onClick={() => decide(false)}>{t("tailor.roleReview.keepOriginal")}</button>}
+        <button type="button" className="fm-btn" disabled={busy} onClick={() => decide(true)}>
+          {t(busy ? "tailor.review.saving" : changes.length > 0 ? "tailor.roleReview.useNew" : "tailor.roleReview.continue")}</button>
+      </div>
     </div>
   </section>;
 }

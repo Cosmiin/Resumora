@@ -95,6 +95,8 @@
 .tailor-doc { display: grid; gap: var(--space-2); font-family: var(--font-document); line-height: var(--leading-snug); color: var(--text-body); }
 .tailor-doc p { margin: 0; }
 .tailor-doc ul { display: grid; gap: var(--space-2); margin: 0; padding-inline-start: var(--space-5); }
+.tailor-mode .tailor-review-guesses { display: grid; gap: var(--space-3); margin: 0; padding-inline-start: var(--space-5); }
+.tailor-mode .tailor-review-guesses p { margin: 0; }
 .tailor-new { background: var(--pine-100); color: inherit; border-radius: 3px; }
 .tailor-guess { background: var(--marigold-50); color: inherit; box-shadow: inset 0 -2px 0 var(--marigold-500); }
 .tailor-guess-tag { position: relative; padding: 1px 8px; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: var(--text-xs); background: var(--marigold-50); color: var(--text-strong); cursor: help; }

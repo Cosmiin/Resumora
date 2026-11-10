@@ -298,7 +298,9 @@ export function TailorFlow() {
     body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={[]}
       confirmed={[]} busy={phase.busy} onAccept={(accepted) => { setTicks([]); void accept(section, accepted); }} cv={cv} removed={phase.removed} />;
   }
-  const wide = phase.kind === "questions" && isRoleSection(section) && !!roleFor(phase.questions[phase.index]!);
+  const wide = (phase.kind === "questions" && isRoleSection(section) && !!roleFor(phase.questions[phase.index]!))
+    || (phase.kind === "review" && isRoleSection(section) && !!scoredOf(run?.currentRoleId))
+    || (phase.kind === "redo" && !!scoredOf(phase.roleId));
 
   return <div className={wide ? "tailor-mode is-wide" : "tailor-mode"} data-section={colour}>
     <header className="tailor-head">
