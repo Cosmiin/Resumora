@@ -202,7 +202,9 @@ describe("tailoring flow", () => {
     await user.click(screen.getByRole("button", { name: "Accept section" }));
     expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [], roleId: "r1" });
 
-    expect(await screen.findByText("Gusto")).toBeTruthy();
+    const skillsNote = (await screen.findByRole("button", { name: "Save skills" })).closest<HTMLElement>(".tailor-card")!;
+    expect(await within(skillsNote).findByText("Gusto")).toBeTruthy();
+    expect(skillsNote.closest(".tailor-mode")).toHaveClass("is-wide");
     await user.click(screen.getByRole("button", { name: "Remove Gusto" }));
     await user.click(screen.getByRole("button", { name: "Save skills" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "skills", {

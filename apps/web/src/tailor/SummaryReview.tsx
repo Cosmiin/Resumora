@@ -15,7 +15,7 @@ type Props = {
 };
 type Span = ReturnType<typeof placeGuesses>[number];
 
-/** The new summary as in the CV: new words green, each guess marigold (struck through once removed, or as edited). */
+/** New words in green, each guess marigold (struck through once removed, or as edited). */
 function Paragraph({ before, text, spans, choices }: { before: string; text: string; spans: Span[]; choices: Record<number, GuessChoice> }) {
   let at = 0;
   const segments = diffWords(before, text).map((segment) => ({ ...segment, start: at, end: (at += segment.text.length) }));
@@ -33,7 +33,7 @@ function Paragraph({ before, text, spans, choices }: { before: string; text: str
     pos = span.end;
   });
   out.push(...plain(pos, text.length));
-  return <p>{out}</p>;
+  return <>{out}</>;
 }
 
 /** One guess: its phrase, why the AI guessed it, and Keep / Edit / Remove. */
@@ -81,25 +81,36 @@ export function SummaryReview({ proposals, before, busy, onAccept, removed = 0 }
     onAccept({ decisions: proposal.inferred ? [] : [{ itemId: "summary", keep: true }], inferred, flags: [] });
   }
 
-  return <section className="tailor-card" aria-labelledby="tailor-summary-title">
-    <h2 id="tailor-summary-title">{t("tailor.summaryReview.title")}</h2>
-    {proposal ? <>
-      <div className="tailor-doc">{whole
-        ? <p><mark className="tailor-guess">{proposal.text}</mark></p>
-        : <Paragraph before={before} text={proposal.text} spans={spans} choices={choices} />}</div>
-      {whole && proposal.reason && <p className="tailor-reason">
-        {t("tailor.summaryReview.guessLine", { reason: proposal.reason.replace(/[.\s]+$/, "") })}</p>}
-      {spans.length > 0 && <ul className="tailor-items">
-        {spans.map((span, i) => <GuessItem key={i} span={span} choice={choices[i]}
-          onChoose={(choice) => setChoices((state) => ({ ...state, [i]: choice }))} />)}
-      </ul>}
-    </> : <p>{t("tailor.summaryReview.nothing")}</p>}
-    {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
-    <div className="fm-foot">
-      {proposal && <button type="button" className="fm-ghost" disabled={busy}
-        onClick={() => onAccept({ decisions: [{ itemId: "summary", keep: false }], inferred: [], flags: [] })}>{t("tailor.summaryReview.original")}</button>}
-      <button type="button" className="fm-btn" disabled={busy} onClick={use}>
-        {t(busy ? "tailor.review.saving" : proposal ? "tailor.summaryReview.use" : "tailor.roleReview.continue")}</button>
+  return <section className="tailor-split" aria-labelledby="tailor-summary-title">
+    <div className="page-sheet tailor-role-block">
+      <h2>{t("tailor.summaryReview.heading")}</h2>
+      <div className="tailor-doc"><p>{proposal && proposal.text.trim() !== before.trim() ? <>
+        <span className="page-del">{before}</span>{" "}
+        <span className="page-ins">{whole
+          ? <mark className="tailor-guess">{proposal.text}</mark>
+          : <Paragraph before={before} text={proposal.text} spans={spans} choices={choices} />}</span>
+      </> : proposal ? whole
+        ? <mark className="tailor-guess">{proposal.text}</mark>
+        : <Paragraph before={before} text={proposal.text} spans={spans} choices={choices} />
+        : before}</p></div>
+    </div>
+    <div className="tailor-card page-note">
+      <h2 id="tailor-summary-title">{t("tailor.summaryReview.title")}</h2>
+      {proposal ? <>
+        {whole && proposal.reason && <p className="tailor-reason">
+          {t("tailor.summaryReview.guessLine", { reason: proposal.reason.replace(/[.\s]+$/, "") })}</p>}
+        {spans.length > 0 && <ul className="tailor-items">
+          {spans.map((span, i) => <GuessItem key={i} span={span} choice={choices[i]}
+            onChoose={(choice) => setChoices((state) => ({ ...state, [i]: choice }))} />)}
+        </ul>}
+      </> : <p>{t("tailor.summaryReview.nothing")}</p>}
+      {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
+      <div className="fm-foot">
+        {proposal && <button type="button" className="fm-ghost" disabled={busy}
+          onClick={() => onAccept({ decisions: [{ itemId: "summary", keep: false }], inferred: [], flags: [] })}>{t("tailor.summaryReview.original")}</button>}
+        <button type="button" className="fm-btn" disabled={busy} onClick={use}>
+          {t(busy ? "tailor.review.saving" : proposal ? "tailor.summaryReview.use" : "tailor.roleReview.continue")}</button>
+      </div>
     </div>
   </section>;
 }

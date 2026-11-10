@@ -24,7 +24,13 @@ const guess = (n: number) => screen.getAllByRole("listitem")[n]!;
 describe("SummaryReview (SumA)", () => {
   it("shows the new summary as in the CV: new words in green, each guess marigold with its reason and Keep / Edit / Remove", () => {
     review();
-    expect(document.querySelector(".tailor-doc p")?.textContent).toBe(summary.text);
+    expect(screen.getByRole("heading", { name: "About me" }).closest(".page-sheet")).toBeInTheDocument();
+    const old = document.querySelector(".page-sheet .page-del");
+    const inserted = document.querySelector(".page-sheet .page-ins");
+    expect(old).toHaveTextContent(cv.basics.summary);
+    expect(inserted?.textContent).toBe(summary.text);
+    expect(old?.nextElementSibling).toBe(inserted);
+    expect(screen.getByRole("heading", { name: "Your new summary" }).closest(".page-note.tailor-card")).toBeInTheDocument();
     const marks = [...document.querySelectorAll("mark.tailor-guess")].map((mark) => mark.textContent);
     expect(marks).toEqual(["works across borders", "coaches new staff"]);
     expect(document.querySelector("mark.tailor-new")?.textContent).toContain("who");
@@ -73,9 +79,29 @@ describe("SummaryReview (SumA)", () => {
     expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "summary", keep: false }], inferred: [], flags: [] });
   });
 
+  it("shows an unchanged proposal plain, ignoring surrounding spaces", () => {
+    review([{ ...summary, text: `  ${cv.basics.summary}  `, guesses: [] }]);
+    expect(document.querySelector(".page-sheet .tailor-doc p")).toHaveTextContent(cv.basics.summary);
+    expect(document.querySelector(".page-del, .page-ins")).toBeNull();
+  });
+
+  it("Remove updates a guess in an unchanged summary without marking the summary deleted or inserted", async () => {
+    const user = userEvent.setup();
+    review([{ ...summary, text: cv.basics.summary, guesses: [{ text: "40 staff", reason: "From your role" }] }]);
+    const page = document.querySelector(".page-sheet")!;
+    expect(page.querySelector("mark.tailor-guess")).toHaveTextContent("40 staff");
+    expect(page.querySelector(".page-del, .page-ins")).toBeNull();
+    await user.click(within(guess(0)).getByRole("button", { name: /^Remove/ }));
+    expect(page.querySelector("del.tailor-guess")).toHaveTextContent("40 staff");
+    expect(page.querySelector("mark.tailor-guess")).toBeNull();
+    expect(page.querySelector(".page-del, .page-ins")).toBeNull();
+  });
+
   it("with no summary change it says so and continues", async () => {
     const user = userEvent.setup();
     const onAccept = review([]);
+    expect(document.querySelector(".page-sheet .tailor-doc p")?.textContent).toBe(cv.basics.summary);
+    expect(document.querySelector(".page-del, .page-ins")).toBeNull();
     expect(screen.getByText("Summary: nothing to change ✓")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(onAccept).toHaveBeenCalledWith({ decisions: [], inferred: [], flags: [] });

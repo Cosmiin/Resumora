@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type Proposal } from "@resumora/shared";
 import { SectionReview } from "./SectionReview.tsx";
@@ -24,8 +24,9 @@ describe("SkillsReview (SkillsA2)", () => {
     review();
     expect(screen.getByText("Batch 1 of 3")).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
-    expect(screen.getByText("Old 0")).toBeInTheDocument();
-    expect(screen.getByText("New 0")).toBeInTheDocument();
+    const note = within(document.querySelector<HTMLElement>(".tailor-card")!);
+    expect(note.getByText("Old 0")).toBeInTheDocument();
+    expect(note.getByText("New 0")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save skills" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Next 5" }));
     expect(screen.getByText("Batch 2 of 3")).toBeInTheDocument();
@@ -76,6 +77,46 @@ describe("SkillsReview (SkillsA2)", () => {
     await user.click(screen.getByRole("button", { name: "Undo New 0" }));
     await user.click(screen.getByRole("button", { name: "Save skills" }));
     expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "s0", keep: true }], inferred: [{ itemId: "new-skill:BPMN", keep: true }], flags: [] });
+  });
+
+  it("shows current skills in order, marks this batch and updates Undo and Remove on the page", async () => {
+    const user = userEvent.setup();
+    const current = { ...emptyCv("en"), technicalSkills: [{ id: "js", name: "a bit of JavaScript" }],
+      professionalSkills: [{ id: "team", name: "Teamwork" }] };
+    render(<SkillsReview cv={current} busy={false} onAccept={vi.fn()} proposals={[
+      { ...reworded(0), itemId: "js", text: "JavaScript (code steps)" }, added("Webhooks", "Used in your roles"),
+    ]} />);
+    const page = document.querySelector<HTMLElement>(".page-sheet")!;
+    expect(within(page).getByRole("heading", { name: "Skills" })).toBeInTheDocument();
+    expect(within(page).getByText("a bit of JavaScript")).toHaveClass("page-del");
+    expect(within(page).getByText("JavaScript (code steps)")).toHaveClass("page-ins");
+    expect(within(page).getByText("Webhooks")).toHaveClass("page-ins");
+    expect(page.querySelector("p")?.textContent).toBe("a bit of JavaScript JavaScript (code steps), Teamwork, Webhooks");
+    await user.click(screen.getByRole("button", { name: "Undo JavaScript (code steps)" }));
+    expect(page.querySelector(".page-del")).toBeNull();
+    expect(page).toHaveTextContent("a bit of JavaScript, Teamwork, Webhooks");
+    expect(within(page).queryByText("JavaScript (code steps)")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Remove Webhooks" }));
+    expect(page.querySelector("p")?.textContent).toBe("a bit of JavaScript, Teamwork");
+    expect(page.querySelector(".page-ins")).toBeNull();
+  });
+
+  it("shows an unchanged skill plain, ignoring surrounding spaces", () => {
+    review([{ ...reworded(0), text: "  Old 0  " }]);
+    const page = document.querySelector(".page-sheet")!;
+    expect(page).toHaveTextContent("Old 0, Old 1");
+    expect(page.querySelector(".page-del, .page-ins")).toBeNull();
+  });
+
+  it("without a CV shows only this batch's kept proposal names", async () => {
+    const user = userEvent.setup();
+    render(<SkillsReview proposals={twelve} busy={false} onAccept={vi.fn()} />);
+    const page = document.querySelector(".page-sheet")!;
+    expect(page.querySelector("p")?.textContent).toBe("New 0, New 1, New 2, New 3, New 4");
+    expect(page.querySelectorAll(".page-ins")).toHaveLength(5);
+    expect(page.querySelector(".page-del")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Next 5" }));
+    expect(page.querySelector("p")?.textContent).toBe("New 5, New 6, New 7, New 8, New 9");
   });
 
   it("the Skills step of SectionReview uses the batches", () => {

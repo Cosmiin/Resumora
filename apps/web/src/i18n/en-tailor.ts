@@ -127,6 +127,7 @@ export const tailorEn = {
   "tailor.final.hide": "Hide for this job?",
   "tailor.final.hideNamed": "Hide {name} for this job",
   "tailor.final.undoBoth": "Undo both",
+  "tailor.summaryReview.heading": "About me",
   "tailor.summaryReview.title": "Your new summary",
   "tailor.summaryReview.guessLine": "AI guess: {reason}. True?",
   "tailor.summaryReview.keepNamed": "Keep “{text}”",

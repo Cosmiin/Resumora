@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { CvContent, Proposal } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import type { AcceptBody } from "./tailor-api.ts";
@@ -29,7 +29,13 @@ export function SkillsReview({ proposals, cv = null, busy, onAccept, removed = 0
   const batches = Math.max(1, Math.ceil(changes.length / BATCH));
   const shown = changes.slice(batch * BATCH, (batch + 1) * BATCH);
   const last = batch >= batches - 1;
-  const oldName = (p: Proposal) => [...cv?.technicalSkills ?? [], ...cv?.professionalSkills ?? []].find((skill) => skill.id === p.itemId)?.name;
+  const skills = [...cv?.technicalSkills ?? [], ...cv?.professionalSkills ?? []];
+  const oldName = (p: Proposal) => skills.find((skill) => skill.id === p.itemId)?.name;
+  const kept = shown.filter((p) => p.inferred ? guess[keyOf(p)] !== false : !undone[keyOf(p)]);
+  const pageSkills = [
+    ...skills.map((skill) => ({ key: skill.id, before: skill.name, proposal: kept.find((p) => p.itemId === skill.id) })),
+    ...kept.filter((p) => !cv || p.itemId === "new-skill").map((p) => ({ key: keyOf(p), before: undefined, proposal: p })),
+  ];
 
   function accept() {
     const decisions = changes.filter((p) => !p.inferred).map((p) => ({ itemId: keyOf(p), keep: !undone[keyOf(p)] }));
@@ -58,18 +64,30 @@ export function SkillsReview({ proposals, cv = null, busy, onAccept, removed = 0
     </li>;
   };
 
-  return <section className="tailor-card" aria-labelledby="tailor-skills-title">
-    <h2 id="tailor-skills-title">{t("tailor.review.title", { section: t("tailor.section.skills") })}</h2>
-    {changes.length === 0 ? <p>{t("tailor.review.none")}</p> : <>
-      <p className="tailor-eyebrow">{t("tailor.skills.batch", { n: batch + 1, total: batches })}</p>
-      <ul className="tailor-items">{shown.map(row)}</ul>
-    </>}
-    {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
-    <div className="fm-foot">
-      {batch > 0 && <button type="button" className="fm-ghost" onClick={() => setBatch(batch - 1)}>
-        <span aria-hidden="true">← </span>{t("tailor.skills.back")}</button>}
-      {last ? <button type="button" className="fm-btn" disabled={busy} onClick={accept}>{t(busy ? "tailor.review.saving" : "tailor.skills.save")}</button>
-        : <button type="button" className="fm-btn" onClick={() => setBatch(batch + 1)}>{t("tailor.skills.next")}</button>}
+  return <section className="tailor-split" aria-labelledby="tailor-skills-title">
+    <div className="page-sheet tailor-role-block">
+      <h2>{t("tailor.section.skills")}</h2>
+      <div className="tailor-doc"><p>{pageSkills.map(({ key, before, proposal }, i) => <Fragment key={key}>
+        {i > 0 && ", "}
+        {proposal && proposal.text.trim() !== before?.trim() ? <>
+          {before !== undefined && <><span className="page-del">{before}</span>{" "}</>}
+          <span className="page-ins">{proposal.text}</span>
+        </> : before}
+      </Fragment>)}</p></div>
+    </div>
+    <div className="tailor-card page-note">
+      <h2 id="tailor-skills-title">{t("tailor.review.title", { section: t("tailor.section.skills") })}</h2>
+      {changes.length === 0 ? <p>{t("tailor.review.none")}</p> : <>
+        <p className="tailor-eyebrow">{t("tailor.skills.batch", { n: batch + 1, total: batches })}</p>
+        <ul className="tailor-items">{shown.map(row)}</ul>
+      </>}
+      {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
+      <div className="fm-foot">
+        {batch > 0 && <button type="button" className="fm-ghost" onClick={() => setBatch(batch - 1)}>
+          <span aria-hidden="true">← </span>{t("tailor.skills.back")}</button>}
+        {last ? <button type="button" className="fm-btn" disabled={busy} onClick={accept}>{t(busy ? "tailor.review.saving" : "tailor.skills.save")}</button>
+          : <button type="button" className="fm-btn" onClick={() => setBatch(batch + 1)}>{t("tailor.skills.next")}</button>}
+      </div>
     </div>
   </section>;
 }
