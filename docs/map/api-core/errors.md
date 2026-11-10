@@ -13,7 +13,7 @@ Translate thrown errors into the API envelope and structured server logs.
 - errorBody returns exactly error.code, error.message and error.requestId. `apps/api/src/errors.ts:18` -> `errorBody`
 - ApiError passes its status, code and message through without logging, including if its status is 5xx. `apps/api/src/errors.ts:32` -> `ApiError`
 - Zod failures become 400 invalid_content with only the first issue and its dotted path. `apps/api/src/errors.ts:35` -> `ZodError`
-- Other thrown values log request id, path, String(err) and an Error stack. `apps/api/src/errors.ts:43` -> `ctx.log`
+- Other thrown values log request id, path and String(err); stack is err.stack for Error instances and undefined otherwise. `apps/api/src/errors.ts:43` -> `ctx.log`, `apps/api/src/errors.ts:48` -> `stack`
 - Unknown failures return a generic 500 internal message instead of the thrown text. `apps/api/src/errors.ts:50` -> `return`
 - tested by `apps/api/test/app.test.ts:31` -> `describe`
 

@@ -16,7 +16,7 @@ Recognize uploads and extract bounded text while distinguishing scans from empty
 - Normalization keeps line boundaries while collapsing spaces and repeated blank lines. `apps/api/src/imports/extract-text.ts:42` -> `normalize`
 - Parser errors become unreadable_file; too little PDF text becomes isScan:true, while too little Word text throws no_text. `apps/api/src/imports/extract-text.ts:73` -> `rawText`, `apps/api/src/imports/extract-text.ts:79` -> `MIN_TEXT_CHARS`
 - tested by `apps/api/test/extract-text.test.ts:23` -> `sniffFormat`, `apps/api/test/extract-text.test.ts:36` -> `extractText`
-- Shared generated test input is tested by `apps/api/test/fixtures.ts:4` -> `makePdf`, `apps/api/test/fixtures.ts:29` -> `makeDocx`; its extraction consumers are tested by `apps/api/test/extract-text.test.ts:4` -> `fixtures.ts`, `apps/api/test/process.test.ts:7` -> `fixtures.ts`, `apps/api/test/imports.test.ts:10` -> `fixtures.ts`, `apps/api/test/supabase-repo.test.ts:9` -> `fixtures.ts`.
+- Shared generated PDF and DOCX test input is tested by `apps/api/test/extract-text.test.ts:38` -> `makePdf`, `apps/api/test/extract-text.test.ts:44` -> `makeDocx`; its extraction consumers are tested by `apps/api/test/extract-text.test.ts:4` -> `fixtures.ts`, `apps/api/test/process.test.ts:7` -> `fixtures.ts`, `apps/api/test/imports.test.ts:10` -> `fixtures.ts`, `apps/api/test/supabase-repo.test.ts:9` -> `fixtures.ts`.
 
 ## Connections
 - Upload sniff caller: `apps/api/src/imports/routes.ts:36` -> `sniffFormat` -> `apps/api/src/imports/extract-text.ts:34` -> `sniffFormat`.

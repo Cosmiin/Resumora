@@ -17,7 +17,7 @@ Create, list, edit and delete captured jobs, and retrieve or fill missing match 
 - Listing validates query and decoded cursor; response exposes nextCursor instead of the internal cursor object. `apps/api/src/jobs/routes.ts:74` -> `JobListQuerySchema`
 - GET score verifies job existence and returns base/tailored scores; POST requires a ready extraction and only creates a missing base score. `apps/api/src/jobs/routes.ts:92` -> `isUuid`, `apps/api/src/jobs/routes.ts:103` -> `job.status`
 - PATCH distinguishes missing, version conflict and wrong status, then rereads the updated job; DELETE returns 204 only after successful removal. `apps/api/src/jobs/routes.ts:117` -> `JobPatchBodySchema`, `apps/api/src/jobs/routes.ts:128` -> `app.delete`
-- tested by `apps/api/test/jobs.test.ts:83` -> `job endpoints`, `apps/api/test/jobs-repo.test.ts:24` -> `job cursors`, `apps/api/test/jobs-repo.test.ts:52` -> `memoryJobs`, `apps/api/test/supabase-repo.test.ts:19` -> `supabaseJobRepo error mapping`
+- tested by `apps/api/test/jobs.test.ts:83` -> `job endpoints`, `apps/api/test/jobs.test.ts:85` -> `create`
 
 ## Connections
 - Extension/web POST creation: `apps/extension/src/api.ts:21` -> `/v1/jobs` and `apps/web/src/jobs/jobs-api.ts:23` -> `/v1/jobs` -> `apps/api/src/jobs/routes.ts:29` -> `app.post`; mount `apps/api/src/app.ts:82` -> `/v1/jobs`.

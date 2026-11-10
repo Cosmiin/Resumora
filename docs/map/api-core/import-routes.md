@@ -16,7 +16,7 @@ Accept uploads, poll import results and apply reviewed content to My CV.
 - POST returns the repository's import response with 202; polling invalid UUIDs and missing imports returns 404. `apps/api/src/imports/routes.ts:48` -> `202`, `apps/api/src/imports/routes.ts:53` -> `isUuid`
 - Apply accepts a nonnegative version and requires ready status; stale/already-used imports return 409 import_not_ready. `apps/api/src/imports/routes.ts:60` -> `ApplyBody.parse`, `apps/api/src/imports/routes.ts:64` -> `notReady`
 - Apply carries notes from an existing CV; if the carried result fails schema validation it leaves content undefined so the repository uses the import result. `apps/api/src/imports/routes.ts:69` -> `found.result`
-- tested by `apps/api/test/imports.test.ts:70` -> `import endpoints`, `apps/api/test/supabase-repo.test.ts:164` -> `supabaseImportRepo against local Supabase`
+- tested by `apps/api/test/imports.test.ts:70` -> `import endpoints`, `apps/api/test/imports.test.ts:72` -> `upload`
 
 ## Connections
 - Web upload/poll/apply URLs: `apps/web/src/imports/imports-api.ts:7` -> `/v1/imports` -> `apps/api/src/imports/routes.ts:27` -> `app.post`; `apps/web/src/imports/imports-api.ts:11` -> `encodeURIComponent` -> `apps/api/src/imports/routes.ts:51` -> `/:id`; `apps/web/src/imports/imports-api.ts:15` -> `/apply` -> `apps/api/src/imports/routes.ts:58` -> `/:id/apply`; mount `apps/api/src/app.ts:76` -> `/v1/imports`.

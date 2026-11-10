@@ -19,7 +19,7 @@ Define the model's CV admission and word-for-word extraction instructions.
 - The generated category list excludes header and includes English/Romanian synonyms; source headings use skills/other category keys and omit contact headings. `apps/api/src/imports/prompts.ts:71` -> `sourceHeadings`, `apps/api/src/imports/prompts.ts:83` -> `CATEGORIES.filter`
 - Role bullets must not be copied into achievements; a company/location line is not a role description. `apps/api/src/imports/prompts.ts:75` -> `achievements`, `apps/api/src/imports/prompts.ts:78` -> `company`
 - PROMPT_VERSION is a literal marker; extraction uses buildExtractPrompt's result. `apps/api/src/imports/prompts.ts:9` -> `PROMPT_VERSION`, `apps/api/src/imports/prompts.ts:91` -> `buildExtractPrompt`
-- tested by `apps/api/test/prompts.test.ts:6` -> `buildExtractPrompt`, `apps/api/test/prompts.test.ts:32` -> `buildExtractPrompt category rules`; shared file also tested by `apps/api/test/prompts.test.ts:43` -> `improveBulletSystemPrompt`.
+- tested by `apps/api/test/prompts.test.ts:6` -> `buildExtractPrompt`, `apps/api/test/prompts.test.ts:32` -> `buildExtractPrompt category rules`, `apps/api/test/prompts.test.ts:8` -> `buildExtractPrompt`.
 
 ## Connections
 - Categories generate prompt text: `apps/api/src/imports/prompts.ts:83` -> `CATEGORIES` -> `packages/shared/src/categories.ts:30` -> `CATEGORIES`.

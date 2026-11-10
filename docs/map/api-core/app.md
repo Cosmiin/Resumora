@@ -13,9 +13,9 @@ Compose the HTTP API around the AppDeps injection contract.
 - AppDeps requires origin, verifier, CV/import/job/insights factories, model access, both queue senders and a logger; tailorRepo, voice and clock are optional. Adding a required field changes all constructors below. `apps/api/src/app.ts:19` -> `AppDeps`, `apps/api/src/app.ts:28` -> `insightsRepo`, `apps/api/src/app.ts:34` -> `queue`
 - Request ids are generated before downstream middleware and returned in x-request-id; incoming ids are not reused. `apps/api/src/app.ts:46` -> `app.use`
 - CORS permits only the exact configured origin, exposes x-request-id, and accepts authorization/content-type. `apps/api/src/app.ts:55` -> `cors`
-- Health is public; every /v1/* request requires the case-sensitive Bearer prefix and a verified user. `apps/api/src/app.ts:63` -> `/health`, `apps/api/src/app.ts:65` -> `/v1/*`
+- Health is public; non-OPTIONS /v1/* requests require the case-sensitive Bearer prefix and a verified user. CORS answers OPTIONS with 204 before authentication ([Hono v4.13.16](https://github.com/honojs/hono/blob/v4.13.16/src/middleware/cors/index.ts#L110-L146)). `apps/api/src/app.ts:55` -> `cors`, `apps/api/src/app.ts:63` -> `/health`, `apps/api/src/app.ts:65` -> `/v1/*`
 - Missing optional tailorRepo fails only when a job-score/tailoring factory is invoked. `apps/api/src/app.ts:85` -> `tailorRepoFor`, `apps/api/src/app.ts:99` -> `tailorFor`
-- Unknown paths use the standard error envelope; thrown route errors go through toErrorResponse. `apps/api/src/app.ts:123` -> `app.notFound`
+- Unknown non-OPTIONS paths use the standard error envelope; thrown route errors go through toErrorResponse. Unknown OPTIONS paths instead receive CORS 204 before either handler ([Hono v4.13.16](https://github.com/honojs/hono/blob/v4.13.16/src/middleware/cors/index.ts#L110-L146)). `apps/api/src/app.ts:55` -> `cors`, `apps/api/src/app.ts:123` -> `app.notFound`, `apps/api/src/app.ts:126` -> `toErrorResponse`
 - tested by `apps/api/test/app.test.ts:31` -> `describe`
 
 ## Connections

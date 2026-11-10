@@ -15,7 +15,7 @@ Read, save and restore the signed-in user's base CV with version conflicts.
 - Conflicts return 409 version_conflict plus current.version/current.updatedAt; successful saves return the new version/time. `apps/api/src/cv/routes.ts:28` -> `saveResponse`
 - History lookup and restore report 404 for absent entries. `apps/api/src/cv/routes.ts:51` -> `app.get`, `apps/api/src/cv/routes.ts:61` -> `getHistory`
 - Restore merges newer notes from the current CV before validating, size-checking and passing content with the client's version to restore. `apps/api/src/cv/routes.ts:63` -> `repo.get`
-- tested by `apps/api/test/cv.test.ts:50` -> `My CV`, `apps/api/test/cv.test.ts:105` -> `history`, `apps/api/test/cv-history.test.ts:49` -> `history restore keeps newer notes`, `apps/api/test/cv-notes.test.ts:16` -> `notes-only job answers`, `apps/api/test/supabase-repo.test.ts:120` -> `supabaseCvRepo against local Supabase`
+- tested by `apps/api/test/cv.test.ts:50` -> `My CV`, `apps/api/test/cv.test.ts:105` -> `history`, `apps/api/test/cv-history.test.ts:49` -> `history restore keeps newer notes`, `apps/api/test/cv.test.ts:52` -> `get`
 
 ## Connections
 - Web GET/PUT CV: `apps/web/src/cv/cv-api.ts:15` -> `/v1/cv` -> `apps/api/src/cv/routes.ts:42` -> `app.get`; `apps/web/src/cv/cv-api.ts:38` -> `/v1/cv` -> `apps/api/src/cv/routes.ts:44` -> `app.put`; mount `apps/api/src/app.ts:74` -> `/v1/cv`.

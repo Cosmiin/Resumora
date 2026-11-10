@@ -15,7 +15,7 @@ Stream text with fallback only before any output reaches the caller.
 - Keepalive input does not extend the deadline; only yielded text renews the gap timeout when reading resumes. `apps/api/src/ai/stream-model.ts:125` -> `deadline`, `apps/api/src/ai/stream-model.ts:139` -> `deadline`
 - A successful stream needs text plus a completion marker. `apps/api/src/ai/stream-model.ts:149` -> `!yielded`
 - Failure before text advances providers without retrying the same provider; failure after text throws AiStreamBrokenError. `apps/api/src/ai/stream-model.ts:61` -> `for (const provider`, `apps/api/src/ai/stream-model.ts:159` -> `await log`
-- Abort logs an error and returns; cleanup cancels the reader, aborts fetch, and logs reader cancellation if no prior log exists. `apps/api/src/ai/stream-model.ts:155` -> `req.signal`, `apps/api/src/ai/stream-model.ts:161` -> `finally`
+- A signal already aborted before a provider attempt returns without logging or cleanup. Abort caught during an attempt logs an error and returns; cleanup cancels the reader, aborts fetch, and logs reader cancellation if no prior log exists. `apps/api/src/ai/stream-model.ts:62` -> `req.signal`, `apps/api/src/ai/stream-model.ts:155` -> `req.signal`, `apps/api/src/ai/stream-model.ts:161` -> `finally`
 - tested by `apps/api/src/ai/stream-model.test.ts:52` -> `streamModel`
 
 ## Connections
