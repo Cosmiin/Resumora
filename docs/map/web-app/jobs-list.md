@@ -28,4 +28,4 @@ Page through the signed-in user's jobs, poll unfinished captures and open add li
 - Uses paginated listJobs and AddJobDialog: `apps/web/src/jobs/JobsPage.tsx:40` -> `listJobs`; `apps/web/src/jobs/jobs-api.ts:13` -> `listJobs`; `apps/web/src/jobs/JobsPage.tsx:151` -> `AddJobDialog`; `apps/web/src/jobs/AddJobDialog.tsx:7` -> `AddJobDialog`
 - Job row links match the detail route: `apps/web/src/jobs/JobsPage.tsx:126` -> `/jobs/`; `apps/web/src/router.tsx:20` -> `/jobs/:id`
 ## Assumptions
-- hostOf constructs URL directly although the shared list schema only requires a string, so persisted URLs must remain parseable. `apps/web/src/jobs/JobsPage.tsx:12` -> `new URL`; `packages/shared/src/jobs.ts:71` -> `z.string()`
+- hostOf constructs URL directly although the shared list schema only requires a string, so persisted URLs must remain parseable. `apps/web/src/jobs/JobsPage.tsx:12` -> `new URL`; `packages/shared/src/jobs.ts:72` -> `z.string()`

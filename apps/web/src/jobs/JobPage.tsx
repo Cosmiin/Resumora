@@ -196,6 +196,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           <div><h1 className="vtitle">{job.title}</h1><div className="vsub">{[job.company, job.location].filter(Boolean).join(" · ")}</div></div>
           <div className="job-actions"><button type="button" className="secondary" disabled={pendingSaves > 0 || thoughtsBusy} onClick={() => setEditing(true)}>{t("job.edit")}</button>{deletion}</div>
         </div>
+        {extracted.positionClosed === true && <p role="status" className="jobs-note">{t("job.positionClosed")}</p>}
         {tailorOnTop && tailor}
         <div className="facts">
           {extracted.workMode !== "unknown" && <span className="fact">{t(`job.workMode.${extracted.workMode}`)}</span>}
