@@ -26,6 +26,7 @@ type Props = {
   onClose(): void;
   /** The guided path's bar ("Role n of N" and its segments), across the top. */
   topBar?: ReactNode;
+  pathRole?: { n: number; total: number };
   /** In the guided path, "That's all for this role" moves on ("Next role →") instead of going back to the CV. */
   next?: { label: string; onNext(): void };
 };
@@ -84,7 +85,7 @@ export function useFocusFrame(root: RefObject<HTMLDivElement | null>, onClose: (
 }
 
 /** Full-screen focus mode: the role on the left, one step at a time on the right. */
-export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, topBar, next }: Props) {
+export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, topBar, next, pathRole }: Props) {
   // The session always closes the same way (saving the role's facts); only where it goes next differs.
   const moving = useRef(false);
   const leave = useRef({ onClose, next });
@@ -98,6 +99,8 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
   });
   const session = useFocusSession({ cv, roleId: target.roleId, bulletId: target.bulletId, mode: target.mode, scores, dispatch, waitForSave, onClose: finish });
   const { step, queue, position, busy } = session;
+  const [intro, setIntro] = useState(Boolean(pathRole));
+  const section = intro ? "role" : session.section;
   const root = useRef<HTMLDivElement>(null);
   const right = useRef<HTMLDivElement>(null);
   // Scores we already know before the next background score arrives: accepted bullets and celebrated roles.
@@ -119,7 +122,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     if (revisit !== null && step.kind === "brainDump") setDump({ value: prefill ?? "", via: [] });
   }, [revisit, prefill, step.kind]);
   useEffect(() => {
-    if (SELF_FOCUSING.has(step.kind)) return;
+    if (!intro && SELF_FOCUSING.has(step.kind)) return;
     const frame = requestAnimationFrame(() => {
       const pane = right.current;
       if (!pane || pane.contains(document.activeElement)) return;
@@ -127,7 +130,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
       el?.focus();
     });
     return () => cancelAnimationFrame(frame);
-  }, [stepKey, step.kind]);
+  }, [stepKey, step.kind, intro]);
 
   const found = findScored(cv, target.roleId);
   const role = found?.item;
@@ -141,11 +144,11 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
   const roleScore = fresh ? (result?.score ?? null) : (known ?? result?.score ?? null);
   const grades = new Map(result?.bullets.map((b) => [b.id, b.score]));
   const scoreOf = (id: string) => (fresh ? grades.get(id) : (accepted.get(id) ?? grades.get(id)));
-  const currentId = session.section === "bullets" && step.kind !== "celebrate"
+  const currentId = !intro && session.section === "bullets" && step.kind !== "celebrate"
     ? ("bulletId" in step ? step.bulletId : queue[position]) : undefined;
   // Turning role answers into bullets is a plain working screen, not the box (E1).
   const answersWorking = step.kind === "dumpWorking" && step.source === "answers";
-  const dumping = (DUMP_KINDS.has(step.kind) && !answersWorking) || (step.kind === "scoring" && step.source === "dump");
+  const dumping = !intro && ((DUMP_KINDS.has(step.kind) && !answersWorking) || (step.kind === "scoring" && step.source === "dump"));
   const dates = formatRange(role.startDate, role.endDate, role.current, cv.locale);
 
   const proposalText = step.kind === "proposal" ? role.bullets.find((b) => b.id === step.bulletId)?.text ?? "" : "";
@@ -156,9 +159,13 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     || step.kind === "dumpPick" || step.kind === "dumpEmpty";
   const back = session.canBack ? session.back : undefined;
   const roleQuestion = step.kind === "role" ? session.roleQuestions[step.index] : undefined;
-  const sectionIndex = session.section === "done" ? SECTIONS.length : SECTIONS.indexOf(session.section);
+  const sectionIndex = section === "done" ? SECTIONS.length : SECTIONS.indexOf(section);
+  const firstName = cv.basics.fullName.trim().split(/\s+/)[0] ?? "";
+  const itemKind = t(`enrich.focus.item.${kind}`);
+  const ordinal = pathRole && pathRole.n <= 10
+    ? t(`enrich.focus.ordinal.${pathRole.n as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`) : "";
   const bulletIndex = "bulletId" in step && step.bulletId !== null ? queue.indexOf(step.bulletId) : -1;
-  const eyebrow = session.section === "role" && step.kind === "role"
+  const eyebrow = intro && pathRole ? t("enrich.focus.intro.eyebrow", pathRole) : session.section === "role" && step.kind === "role"
     ? t("enrich.focus.section.roleEyebrow", { n: step.index + 1, total: session.roleQuestions.length })
     : session.section === "bullets"
       ? t("enrich.focus.section.bulletsEyebrow", { n: bulletIndex >= 0 ? bulletIndex + 1 : Math.min(position + 1, queue.length), total: queue.length })
@@ -169,7 +176,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     <div
       ref={root}
       className={topBar ? "focus-mode has-path" : "focus-mode"}
-      data-section={session.section}
+      data-section={section}
       role="dialog"
       aria-modal="true"
       aria-label={t("enrich.focus.dialog", { role: name })}
@@ -178,21 +185,22 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
       <aside className="fm-left">
         <p className="fm-eyebrow">{t(`enrich.focus.your.${kind}`)}</p>
         <div className="page-tabs">
-          {SECTIONS.map((section, i) => (
-            <span key={section} aria-current={section === session.section ? "step" : undefined} className={i < sectionIndex ? "is-done" : undefined}>
-              {i < sectionIndex && <span aria-hidden="true">✓ </span>}{t(`enrich.focus.section.${section}`)}
+          {SECTIONS.map((tab, i) => (
+            <span key={tab} aria-current={tab === section ? "step" : undefined} className={i < sectionIndex ? "is-done" : undefined}>
+              {i < sectionIndex && <span aria-hidden="true">✓ </span>}{t(`enrich.focus.section.${tab}`)}
             </span>
           ))}
         </div>
         <div className="page-sheet">
-          <div className={session.section === "role" || session.section === "tools" || session.section === "description" ? "fm-role-block page-bar" : "fm-role-block"}>
+          {!intro && step.kind === "roleDone" && pathRole && <span className="page-stamp">{t("enrich.focus.congrats.stamp", pathRole)}</span>}
+          <div className={section === "role" || section === "tools" || section === "description" ? "fm-role-block page-bar" : "fm-role-block"}>
             <div className="fm-role-line">
               <p className="fm-role"><span>{name}</span>{role.company && <> — {role.company}</>}</p>
               <p className="fm-role-meta">{dates}</p>
             </div>
-            {(role.description || step.kind === "description") && (
-              <p className={step.kind === "description" ? "fm-page-description is-proposed" : "fm-page-description"}>
-                {step.kind === "description" ? step.text : role.description}
+            {(role.description || (!intro && step.kind === "description")) && (
+              <p className={!intro && step.kind === "description" ? "fm-page-description is-proposed" : "fm-page-description"}>
+                {!intro && step.kind === "description" ? step.text : role.description}
               </p>
             )}
           </div>
@@ -226,12 +234,24 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
         </p>
       </aside>
 
-      <section className="fm-right" ref={right} aria-busy={busy}>
+      <section className="fm-right" ref={right} aria-busy={!intro && busy}>
         <div className="page-note">
           {eyebrow && <p className="page-note-eyebrow">{eyebrow}</p>}
           <button type="button" className="fm-close" onClick={() => session.close()}>
             <span aria-hidden="true">✕</span> {t("enrich.focus.close")}
           </button>
+          {intro && pathRole ? (
+            <>
+              <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>
+                {t(pathRole.n > 1 ? "enrich.focus.intro.again" : firstName ? "enrich.focus.intro.named" : "enrich.focus.intro.title", { firstName, kind: itemKind })}
+              </h2>
+              <p className="fm-hint">{t("enrich.focus.intro.line")}</p>
+              <div className="fm-foot">
+                <button type="button" className="fm-ghost" onClick={() => session.close()}>{t("enrich.focus.intro.notNow")}</button>
+                <button type="button" className="fm-btn" onClick={() => setIntro(false)}>{t("enrich.focus.intro.start")}</button>
+              </div>
+            </>
+          ) : <>
           {askingStep && (
             <div className="fm-steps" aria-hidden="true">
               {Array.from({ length: session.dots.total }, (_, i) => (
@@ -326,12 +346,14 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
           )}
           {step.kind === "roleDone" && (
             <div className="fm-done">
-              <p className="fm-eyebrow">{t("enrich.focus.done.eyebrow")}</p>
-              <h2 className="fm-q is-big" id="fm-step-title" tabIndex={-1}>{t("enrich.focus.done.title")}</h2>
+              <p className="fm-eyebrow">{pathRole ? t("enrich.focus.congrats.eyebrow", pathRole) : t("enrich.focus.done.eyebrow")}</p>
+              <h2 className="fm-q is-big" id="fm-step-title" tabIndex={-1}>{pathRole ? t(pathRole.n === pathRole.total ? "enrich.focus.congrats.last" : ordinal ? "enrich.focus.congrats.title" : "enrich.focus.congrats.numbered",
+                { kind: itemKind, ordinal, n: pathRole.n }) : t("enrich.focus.done.title")}</h2>
               <p className="fm-done-score">
                 <b>{step.score ?? "–"}</b>
                 <span className="fm-eyebrow">{t(`enrich.focus.score.${kind}`)}</span>
               </p>
+              {pathRole && pathRole.n < pathRole.total && <p className="fm-hint">{t("enrich.focus.congrats.next")}</p>}
               <button type="button" className="fm-btn" onClick={() => {
                 moving.current = true;
                 session.close();
@@ -340,10 +362,11 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
               </button>
             </div>
           )}
+          </>}
         </div>
       </section>
 
-      {step.kind === "celebrate" && <CelebrateMoment key={`${step.from}-${step.to}`} from={step.from} to={step.to} role={name} onNext={session.next} />}
+      {!intro && step.kind === "celebrate" && <CelebrateMoment key={`${step.from}-${step.to}`} from={step.from} to={step.to} role={name} onNext={session.next} />}
     </div>,
     document.body,
   );

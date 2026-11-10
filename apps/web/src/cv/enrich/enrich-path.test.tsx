@@ -8,10 +8,10 @@ import type { RoleScoreState } from "./useRoleScores.ts";
 
 // Each role's focus session is replaced by a stub: these tests are about the path around it.
 vi.mock("./FocusMode.tsx", () => ({
-  FocusMode: ({ target, next, onClose, topBar }: {
-    target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; topBar?: React.ReactNode;
+  FocusMode: ({ target, next, onClose, topBar, pathRole }: {
+    target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; topBar?: React.ReactNode; pathRole?: { n: number; total: number };
   }) => (
-    <div data-testid="focus">
+    <div data-testid="focus" data-role-n={pathRole?.n} data-role-total={pathRole?.total}>
       {topBar}
       <p>Session for {target.roleId}</p>
       <button type="button" onClick={() => next?.onNext()}>{next?.label}</button>
@@ -56,6 +56,18 @@ describe("the guided path (1A)", () => {
     expect(rows[0]).toContain("61");
     expect(rows[1]).toContain("Clerk");
     expect(screen.getByRole("button", { name: "Start with Buyer →" })).toBeInTheDocument();
+  });
+
+  it("numbers scored stops without counting light stops, achievements, or skills", async () => {
+    const content = { ...cv, courses: [{ id: "course", name: "Routing", provider: "", date: "", bullets: [] }] };
+    render(<MemoryRouter><EnrichPath cv={content} dispatch={() => {}} scores={scores}
+      waitForSave={() => Promise.resolve()} onClose={() => {}} /></MemoryRouter>);
+    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer \u2192" }));
+    expect(screen.getByTestId("focus")).toHaveAttribute("data-role-n", "1");
+    expect(screen.getByTestId("focus")).toHaveAttribute("data-role-total", "2");
+    await userEvent.click(screen.getByRole("button", { name: "Next role \u2192" }));
+    expect(screen.getByTestId("focus")).toHaveAttribute("data-role-n", "2");
+    expect(screen.getByTestId("focus")).toHaveAttribute("data-role-total", "2");
   });
 
   it("goes role by role, then on to Key achievements", async () => {

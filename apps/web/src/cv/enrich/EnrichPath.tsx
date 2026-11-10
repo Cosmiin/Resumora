@@ -96,6 +96,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
     return (
       <FocusMode
         key={roleId}
+        pathRole={{ n: stage.index + 1, total: stops.length }}
         target={{ roleId, mode: "improve" }}
         cv={cv}
         dispatch={dispatch}
