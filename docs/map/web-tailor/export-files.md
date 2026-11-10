@@ -4,8 +4,8 @@ area: web-tailor
 files: ["apps/web/src/export/export-files.ts","apps/web/src/export/export-files.test.ts","apps/web/src/export/export.test.tsx"]
 depends_on: ["web-tailor/pdf","web-tailor/docx","web-tailor/file-name","web-tailor/letter-page","web-editor/templates","web-editor/photos","db/cv-photos","shared/tailoring"]
 contract: false
-checked_hash: c65587f9
-cited: [b95b6e, 48a870, 18aef2, e9868a, 37f754, 92b934, 0744e7, 584dec, 5607bc, d9b7f6, 4692a1, 5c53f8, 70bd25, c7d13e, cd291d, 17704c, 27df2b, 6eae5b, d6c7da, ab7614, 2f6843, ba7006, ce7e77, f05071, 37f754, 01d2b5, 70bd25, 9dd2e6, 2d3981, 2092c1, b28967, b95b6e, 2f6843, 18aef2, f05071]
+checked_hash: 5e9c794c
+cited: [b95b6e, 48a870, 18aef2, e9868a, 37f754, 92b934, 0744e7, 584dec, 5607bc, d9b7f6, 4692a1, 5c53f8, 70bd25, c7d13e, cd291d, 17704c, 27df2b, 6eae5b, d6c7da, 130738, 2f6843, ba7006, ce7e77, f05071, 37f754, 01d2b5, 70bd25, 9dd2e6, 2d3981, 2092c1, b28967, b95b6e, 2f6843, 18aef2, f05071]
 decisions: []
 open: []
 ---
