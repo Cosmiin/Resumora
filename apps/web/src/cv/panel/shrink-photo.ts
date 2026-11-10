@@ -48,3 +48,34 @@ export async function shrinkPhoto(file: File, limit: number): Promise<Blob | nul
     image.close();
   }
 }
+
+/** Source square matching cover, object-position and zoom around the same x/y point. */
+export function cropRectangle(width: number, height: number, x: number, y: number, zoom: number) {
+  const side = Math.min(width, height) / zoom;
+  return { left: (width - side) * x / 100, top: (height - side) * y / 100, side };
+}
+
+/** Crops a downloaded photo to the saved square and encodes JPEG; unreadable photos return null. */
+export async function cropPhoto(file: Blob, crop: { x: number; y: number; zoom: number }): Promise<Blob | null> {
+  let image: ImageBitmap;
+  try {
+    image = await createImageBitmap(file);
+  } catch {
+    return null;
+  }
+  try {
+    const { left, top, side } = cropRectangle(image.width, image.height, crop.x, crop.y, crop.zoom);
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = Math.max(1, Math.round(side));
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, left, top, side, side, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+  } catch {
+    return null;
+  } finally {
+    image.close();
+  }
+}

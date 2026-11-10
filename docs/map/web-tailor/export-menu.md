@@ -23,7 +23,7 @@ Offer four file exports with advisory guess and length warnings.
 
 ## Connections
 
-- Uses exportFile and unreviewedItems. `apps/web/src/export/ExportMenu.tsx:50` -> `exportFile`; `apps/web/src/export/export-files.ts:74` -> `exportFile`; `apps/web/src/export/ExportMenu.tsx:65` -> `unreviewedItems`; `apps/web/src/export/export-files.ts:17` -> `unreviewedItems`
+- Uses exportFile and unreviewedItems. `apps/web/src/export/ExportMenu.tsx:50` -> `exportFile`; `apps/web/src/export/export-files.ts:74` -> `exportFile`; `apps/web/src/export/ExportMenu.tsx:65` -> `unreviewedItems`; `apps/web/src/export/export-files.ts:18` -> `unreviewedItems`
 - Uses global tailored-menu-pop, export-warning and export-choices styling. `apps/web/src/export/ExportMenu.tsx:70` -> `tailored-menu-pop`; `apps/web/src/styles/tailor.css:149` -> `.tailored-menu-pop`; `apps/web/src/export/ExportMenu.tsx:76` -> `export-warning`; `apps/web/src/styles/tailor.css:155` -> `.export-warning`; `apps/web/src/export/ExportMenu.tsx:83` -> `export-choices`; `apps/web/src/styles/tailor.css:158` -> `.export-choices`
 
 ## Assumptions

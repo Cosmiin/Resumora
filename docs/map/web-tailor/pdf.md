@@ -5,7 +5,7 @@ files: ["apps/web/src/export/pdf.tsx","apps/web/src/export/pdf.test.tsx"]
 depends_on: ["shared/cv","shared/categories","shared/dates","web-editor/templates","web-editor/document","web-tailor/fit","web-tailor/pdf-fonts","web-tailor/docx","shared/stored-cv","web-tailor/letter-page","shared/tailoring"]
 contract: false
 checked_hash: a2a4114f
-cited: [211905, 24914c, 6e9300, 4a4928, 7684bc, 3b9f34, f50668, 0f7dc9, c3ff85, 5f2e14, eb9b6b, 260a93, f24107, 8b06fc, aa7136, 7c5b5e, 8a07f2, 3bd4ec, de99d3, 317494, 349ece, 1b1679, 950911, c2d4f9, 7f4895, ac9456, 6e9300, 4a4928, 802453, 895e8c, 82c10f, 6f4f70, 18c71d, d5327f, bac527, 5c549f, 3bbf3f, 69af33, 4ef88f, e3eddb, d91ed6, 5607bc, a831ac, 05d7d6, aaec5d, 211905, 6c5831, 0f7dc9, 110546, c28cfa, b169ea, f6c8d3, f24107, faf887, b17465, 5f2e14, df7a9a, c3ff85, d3e550, 1ec158, a2f028, 2938dd, 5d3ac5, a70e43, 24914c, de99d3, 5135fa, 2fa248, 0c913a, 0f7dc9]
+cited: [211905, 24914c, 6e9300, 4a4928, 7684bc, 3b9f34, f50668, 0f7dc9, c3ff85, 5f2e14, eb9b6b, 260a93, f24107, 8b06fc, aa7136, 7c5b5e, 8a07f2, 3bd4ec, de99d3, 317494, 349ece, 1b1679, 950911, c2d4f9, 7f4895, ac9456, 6e9300, 4a4928, 802453, 895e8c, 82c10f, 6f4f70, 18c71d, d5327f, bac527, 5c549f, 3bbf3f, 69af33, 4ef88f, e3eddb, d91ed6, 5607bc, a831ac, 05d7d6, aaec5d, 211905, 6c5831, 0f7dc9, 110546, c28cfa, b169ea, f6c8d3, f24107, faf887, b17465, 5f2e14, df7a9a, c3ff85, d3e550, 1ec158, a2f028, 2938dd, 5d3ac5, b1c3f1, 7c3e55, de99d3, 2fa248, 0c913a, 0f7dc9]
 decisions: []
 open: []
 ---
@@ -41,6 +41,6 @@ Render CV and letter PDF documents with normalized sections and embedded font fa
 ## Assumptions
 
 - Both CV formats select printable fields rather than dump stored data: unclearSkills, role/project/volunteering notes and facts, separate firstName/lastName and internal metadata are not printed; names use fullName, while education notes are printed. `apps/web/src/export/pdf.tsx:71` -> `roles`; `apps/web/src/export/pdf.tsx:88` -> `item.notes`; `apps/web/src/export/pdf.tsx:90` -> `skills`; `apps/web/src/export/pdf.tsx:128` -> `b.fullName`; `apps/web/src/export/docx.ts:106` -> `b.fullName`; `apps/web/src/export/docx.ts:125` -> `roles`; `apps/web/src/export/docx.ts:139` -> `item.notes`; `apps/web/src/export/docx.ts:141` -> `skills`
-- Shared photo x/y/zoom crop settings are ignored in both formats: PDF contains the whole image in a 72-point square and DOCX scales it into a 96-pixel square; both exclude WebP photos. `packages/shared/src/cv.ts:141` -> `photo`; `apps/web/src/export/pdf.tsx:36` -> `image`; `apps/web/src/export/pdf.tsx:132` -> `Image`; `apps/web/src/export/docx.ts:74` -> `webp`; `apps/web/src/export/docx.ts:95` -> `scale`
+- CV exports crop saved x/y/zoom and convert WebP to JPEG before calling either builder; the builders place the prepared square without applying crop settings themselves. `apps/web/src/export/export-files.ts:36` -> `cropPhoto`; `apps/web/src/export/export-files.ts:38` -> `type: "jpeg"`; `apps/web/src/export/pdf.tsx:132` -> `Image`; `apps/web/src/export/docx.ts:95` -> `scale`
 
 - Input must already be valid CvContent; rendering reads its arrays directly and does not schema-parse them. `apps/web/src/export/pdf.tsx:27` -> `CvContent`; `apps/web/src/export/pdf.tsx:82` -> `sections`

@@ -1,4 +1,5 @@
 import type { JobExtraction, TailoredCv } from "@resumora/shared";
+import { cropPhoto } from "../cv/panel/shrink-photo.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 import { supabase } from "../lib/supabase.ts";
 import { letterWords } from "../tailor/LetterPage.tsx";
@@ -25,17 +26,16 @@ export function unreviewedItems(review: TailoredCv["review"]): string[] {
   return items;
 }
 
-const PHOTO_TYPES: Record<string, ExportPhoto["type"]> = { "image/jpeg": "jpeg", "image/png": "png", "image/webp": "webp" };
-
 /** The photo's bytes for a template that shows it; a photo that can't be read is left out, never blocks the export. */
 async function photoFor(input: ExportInput): Promise<ExportPhoto | undefined> {
   const photo = input.cv.content.basics.photo;
   if (!photo || getTemplate(input.template).photo === null) return undefined;
   try {
     const { data, error } = await supabase.storage.from("cv-photos").download(photo.path);
-    const type = data ? PHOTO_TYPES[data.type] : undefined;
-    if (error || !data || !type) return undefined;
-    return { data: new Uint8Array(await data.arrayBuffer()), type };
+    if (error || !data) return undefined;
+    const cropped = await cropPhoto(data, photo);
+    if (!cropped) return undefined;
+    return { data: new Uint8Array(await cropped.arrayBuffer()), type: "jpeg" };
   } catch {
     return undefined;
   }

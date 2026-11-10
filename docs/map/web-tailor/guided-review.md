@@ -27,7 +27,7 @@ Resolve retained AI guesses one at a time against versioned saved content.
 - Tailor .cv-mark-changed/.cv-mark-inferred and import-review .map-wrap/.map-title/.map rules share the global CSS namespace without feature roots, so class-name reuse outside their features also matches. `apps/web/src/styles/tailor.css:136` -> `.cv-mark-changed`; `apps/web/src/styles/tailor.css:137` -> `.cv-mark-inferred`; `apps/web/src/styles/review.css:26` -> `.map-wrap`; `apps/web/src/styles/review.css:27` -> `.map-title`; `apps/web/src/styles/review.css:28` -> `.map`
 
 - Uses CvDocument focus marks and global guide-page dimming; the sticky card is ordered before the page by CSS. `apps/web/src/tailor/GuidedReview.tsx:99` -> `focus={focus}`; `apps/web/src/cv/page/CvDocument.tsx:32` -> `focus === id ? "cv-mark-focus"`; `apps/web/src/tailor/GuidedReview.tsx:100` -> `guide-card`; `apps/web/src/styles/tailor.css:172` -> `.guide-card`; `apps/web/src/styles/tailor.css:173` -> `.guide-page`
-- Uses the same retained-guess predicate as export warning counting. `apps/web/src/tailor/GuidedReview.tsx:20` -> `item?.kept`; `apps/web/src/export/export-files.ts:22` -> `item?.kept`
+- Uses the same retained-guess predicate as export warning counting. `apps/web/src/tailor/GuidedReview.tsx:20` -> `item?.kept`; `apps/web/src/export/export-files.ts:23` -> `item?.kept`
 - Versioned decisions reach the server review validator through reviewItem. `apps/web/src/tailor/GuidedReview.tsx:60` -> `version: row.version`; `apps/web/src/tailor/tailored-api.ts:32` -> `PATCH`; `apps/api/src/tailor/review-item.ts:39` -> `doc.version`
 
 ## Assumptions

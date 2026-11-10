@@ -4,8 +4,8 @@ area: web-editor
 files: ["apps/web/src/cv/panel/PhotoField.tsx","apps/web/src/cv/panel/shrink-photo.ts","apps/web/src/cv/panel/photo.test.tsx","apps/web/src/cv/panel/shrink-photo.test.ts"]
 depends_on: ["shared/cv","db/cv-photos"]
 contract: false
-checked_hash: 0e6108dc
-cited: [7883ca, 991a50, c85a14, 8804cb, e4dca0, 26230b, 07b84f, f6483d, d19811, 8b2a6f, ee304d, 12c2e0, b43c1f, b3f29f, c1e26b, c19e21, 21aa2e, 971f66, 36d424, 9549d9, 6d8667, 4d7828, 7b1305, 715da3, 472cfc, 75c5ec, a16ef3, e01836, 10ffe0, 5340d0, b930cc, 8b29ae, 197d9f, 487da3, fcad91, b66504, 043445, e10389, 1f129b, 21cb47, dbb641, b696a6, 7285f5, 7b42c1, c19e21, ba7006, 715da3, 65776a, ce7e77, f05071, 29d1ba, 9545c6, b1ee80, 86a802, a16ef3, db9a3c, 2558d4, b930cc, a0d8c1, 971f66, 0200ae, 7b42c1, bb40f3, 7140f6, b66504, 4d7828, 894351]
+checked_hash: 40cd038a
+cited: [7883ca, 991a50, c85a14, 8804cb, e4dca0, 26230b, 07b84f, f6483d, d19811, 8b2a6f, ee304d, 12c2e0, b43c1f, b3f29f, c1e26b, c19e21, 21aa2e, 971f66, 36d424, 9549d9, 6d8667, 4d7828, 7b1305, 715da3, 472cfc, 75c5ec, a16ef3, e01836, 10ffe0, 5340d0, b930cc, 8b29ae, 197d9f, 487da3, fcad91, b66504, 043445, 84b67a, 1f3dc7, de318b, 0a30a1, 8a78a0, 60e3bd, a3c576, 6eae5b, cda4ce, e10389, 3143a1, 21cb47, dbb641, b696a6, 7285f5, 7b42c1, c19e21, ba7006, 715da3, 65776a, ce7e77, f05071, 29d1ba, 9545c6, b1c3f1, 7c3e55, b1ee80, 86a802, a16ef3, db9a3c, 2558d4, b930cc, a0d8c1, 971f66, 0200ae, 7b42c1, bb40f3, 7140f6, b66504, 4d7828, 894351]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---
@@ -24,6 +24,10 @@ Upload private CV photos, shrink oversized files locally and persist crop settin
 - Zoom input ranges from 1 to 3 in 0.1 increments, and image transforms use the stored crop origin. `apps/web/src/cv/panel/PhotoField.tsx:137` -> `objectPosition`; `apps/web/src/cv/panel/PhotoField.tsx:146` -> `type="range"`
 - shrinkToFit tries JPEG qualities 0.9/0.8/0.7 at each of ten scales, reducing scale by 0.75, then returns null if nothing fits. `apps/web/src/cv/panel/shrink-photo.ts:4` -> `QUALITIES`; `apps/web/src/cv/panel/shrink-photo.ts:10` -> `shrinkToFit`
 - Canvas shrinking paints a white background for transparency, emits JPEG and closes ImageBitmap in finally; decoding/encoding failures return null. `apps/web/src/cv/panel/shrink-photo.ts:25` -> `try`; `apps/web/src/cv/panel/shrink-photo.ts:38` -> `fillStyle`; `apps/web/src/cv/panel/shrink-photo.ts:42` -> `"image/jpeg"`; `apps/web/src/cv/panel/shrink-photo.ts:45` -> `catch`
+- cropRectangle computes the square source region matching cover, object-position and zoom around the saved x/y origin. `apps/web/src/cv/panel/shrink-photo.ts:53` -> `cropRectangle`; `apps/web/src/cv/panel/shrink-photo.ts:55` -> `left`
+- cropPhoto draws that region on a white square canvas, encodes JPEG and closes the bitmap in finally; decode/canvas/encode failure returns null. `apps/web/src/cv/panel/shrink-photo.ts:59` -> `cropPhoto`; `apps/web/src/cv/panel/shrink-photo.ts:74` -> `drawImage`; `apps/web/src/cv/panel/shrink-photo.ts:75` -> `"image/jpeg"`; `apps/web/src/cv/panel/shrink-photo.ts:79` -> `image.close()`
+- Crop maths tested by `apps/web/src/cv/panel/shrink-photo.test.ts:28` -> `describe("cropRectangle"`
+- Crop encoding and failures tested by `apps/web/src/export/export-files.test.ts:71` -> `crops %s`; `apps/web/src/export/export-files.test.ts:88` -> `after %s`
 - tested by `apps/web/src/cv/panel/photo.test.tsx:34` -> `describe("CV photo"`; `apps/web/src/cv/panel/shrink-photo.test.ts:6` -> `describe("shrinkToFit"`
 
 ## Connections
@@ -32,6 +36,7 @@ Upload private CV photos, shrink oversized files locally and persist crop settin
 - Upload uses the private bucket's owner-folder INSERT policy and duplicates its MIME/size bounds: `apps/web/src/cv/panel/PhotoField.tsx:60` -> `storage.from("cv-photos").upload`; `supabase/migrations/20261108030000_cv_photos.sql:9` -> `own cv photos: upload`; `supabase/migrations/20261108030000_cv_photos.sql:11` -> `auth.uid()`; `apps/web/src/cv/panel/PhotoField.tsx:12` -> `2097152`; `supabase/migrations/20261108030000_cv_photos.sql:3` -> `2097152`
 - Signed previews use the owner-folder SELECT policy, both in the field and the read-only document: `apps/web/src/cv/panel/PhotoField.tsx:37` -> `createSignedUrl`; `apps/web/src/cv/page/CvPhoto.tsx:14` -> `createSignedUrl`; `supabase/migrations/20261108030000_cv_photos.sql:5` -> `own cv photos: read`; `supabase/migrations/20261108030000_cv_photos.sql:7` -> `storage.foldername`
 - Uses the local resize helper before storage upload: `apps/web/src/cv/panel/PhotoField.tsx:55` -> `shrinkPhoto`; `apps/web/src/cv/panel/shrink-photo.ts:23` -> `shrinkPhoto`
+- Used by exportFile to supply the saved square as JPEG to both builders. `apps/web/src/export/export-files.ts:36` -> `cropPhoto`; `apps/web/src/export/export-files.ts:38` -> `type: "jpeg"`
 - Uses global .no-print to omit photo controls when printing: `apps/web/src/cv/panel/PhotoField.tsx:91` -> `no-print`; `apps/web/src/styles/cv-page.css:185` -> `.no-print`
 - Crop controls copy shared schema bounds rather than deriving them: percent clamps x/y to 0..100 and the range input fixes zoom to 1..3, so bound changes require updating both UI and schema. `apps/web/src/cv/panel/PhotoField.tsx:13` -> `percent`; `packages/shared/src/cv.ts:143` -> `x: z.number()`; `packages/shared/src/cv.ts:144` -> `y: z.number()`; `apps/web/src/cv/panel/PhotoField.tsx:146` -> `min={1} max={3}`; `packages/shared/src/cv.ts:145` -> `zoom: z.number()`
 
