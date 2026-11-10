@@ -33,14 +33,15 @@ export function withColumns(steering: Steering, tone: Tone | null, instruction: 
   };
 }
 
-/** The person's steering as a short plain block. Without a role id, unknown focus role ids are dropped. */
+/** The person's steering as a short plain block. Unknown focus role ids are dropped. */
 export function steeringText(steering: Steering, cv: CvContent, roleId?: string): string {
   const tone = steering.tone ?? "neutral";
   const lines = [`Tone: ${tone} — ${TONE_MEANINGS[tone]}.`];
   if (steering.draws?.length) lines.push(`What draws them to this job: ${steering.draws.map((draw) => DRAWS[draw]).join(", ")}.`);
   if (steering.fit) lines.push(`How well they think their experience fits: ${FITS[steering.fit]}.`);
   if (roleId) {
-    if (steering.focusRoleIds?.length) lines.push(steering.focusRoleIds.includes(roleId)
+    const focusRoleIds = (steering.focusRoleIds ?? []).filter((id) => cv.experience.some((role) => role.id === id));
+    if (focusRoleIds.length) lines.push(focusRoleIds.includes(roleId)
       ? "This role is one of the roles they want to lean on most."
       : "They want to lean on other roles more than this one.");
   } else {

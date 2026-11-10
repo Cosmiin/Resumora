@@ -75,7 +75,8 @@ export async function askQuestions(
   // A CV without roles has nothing to ask in Experience.
   if (isRoleSection(input.section) && !role) return [];
   const stored = input.run.tailoredCvId ? await deps.tailor.getSteering(input.run.tailoredCvId) : null;
-  const focusRoleIds = stored?.steering.focusRoleIds ?? [];
+  const roleIds = new Set(scoredItems(input.cv).map(({ item }) => item.id));
+  const focusRoleIds = (stored?.steering.focusRoleIds ?? []).filter((id) => roleIds.has(id));
   const nonFocus = !!role && focusRoleIds.length > 0 && !focusRoleIds.includes(role.id);
   const roleMax = nonFocus ? NON_FOCUS_ROLE_QUESTIONS : MAX_ROLE_QUESTIONS;
   const asked = input.run.questions ?? [];
@@ -93,7 +94,12 @@ export async function askQuestions(
   const doc = latest && input.run.tailoredCvId ? await deps.tailor.readTailoredCv(input.run.tailoredCvId) : null;
   // Steering restarts reset the document's score to Base; old tailored scores stay in history.
   const tailoredScore = doc ? doc.score : latest;
-  const met = new Set((tailoredScore?.labels ?? []).filter((label) => label.status === "met" && !label.inferred).map((label) => label.ref));
+  const sameRequirements = tailoredScore?.requirementTexts !== undefined
+    && tailoredScore.requirementTexts.length === input.job.requirements.length
+    && tailoredScore.requirementTexts.every((text, index) => text === input.job.requirements[index]!.text);
+  const met = new Set((tailoredScore?.labels ?? [])
+    .filter((label) => (label.kind === "keyword" || sameRequirements) && label.status === "met" && !label.inferred)
+    .map((label) => label.ref.startsWith("k:") ? label.ref.toLowerCase() : label.ref));
   // A gap answered in this run is done; one asked but skipped (or left) may come back once, not again.
   const answers = new Map((input.run.answers ?? []).map((answer) => [answer.questionId, answer]));
   const byGap = new Map<string, { asks: Set<string>; answered: boolean }>();
@@ -108,11 +114,11 @@ export async function askQuestions(
   // In Experience a gap may be asked once in each role; elsewhere the run-wide rule above applies.
   const open = role ? (ref: string) => !asked.some((question) => inRole(question) && question.gap === ref)
     : (ref: string) => { const entry = byGap.get(ref); return !entry || (!entry.answered && entry.asks.size < 2); };
-  const gaps = (score?.labels ?? []).filter((label) => (label.status !== "met" || label.inferred) && !met.has(label.ref) && open(label.ref));
+  const gaps = (score?.labels ?? []).filter((label) => (label.status !== "met" || label.inferred) && !met.has(label.ref.startsWith("k:") ? label.ref.toLowerCase() : label.ref) && open(label.ref));
   if (score && gaps.length === 0) return [];
   const gapRefs = new Set(gaps.map((label) => label.ref));
   const answered = answeredForJob(input.cv, input.run, roleId);
-  const steering = steeringText(stored?.steering ?? {}, cv, role?.id);
+  const steering = steeringText({ ...stored?.steering, focusRoleIds }, cv, role?.id);
   let reply: z.infer<typeof ModelQuestionsSchema>;
   try {
     reply = await callModel(deps.model, {
@@ -128,7 +134,6 @@ export async function askQuestions(
     throw new ApiError(502, "ai_failed", `Couldn't tailor ${input.section}. Try again.`);
   }
 
-  const roleIds = new Set(scoredItems(input.cv).map(({ item }) => item.id));
   // A question that fits two roles is asked once in each, so only this role's questions count as asked.
   const seen = new Set([...answered.map((item) => same(item.question)),
     ...asked.filter((question) => !role || inRole(question)).map((question) => same(question.text))]);

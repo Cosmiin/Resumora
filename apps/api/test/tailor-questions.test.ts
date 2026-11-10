@@ -140,7 +140,8 @@ describe("job questions", () => {
     const runId = await startRun();
     const run = (await repo.getRun(runId))!;
     if (inferred !== null) {
-      const tailoredScore: MatchScore = { ...score, labels: [...score.labels, { ...gap, status: "met", inferred, evidence: "Handled incidents" }] };
+      const tailoredScore: MatchScore = { ...score, requirementTexts: ["Kubernetes", "Team lead", "Incident response"],
+        labels: [...score.labels, { ...gap, status: "met", inferred, evidence: "Handled incidents" }] };
       const doc = (await repo.readTailoredCv(run.tailoredCvId!))!;
       await repo.saveTailoredCv(doc.id, doc.version, { content: doc.content, review: {}, score: tailoredScore });
       await repo.saveScore(jobId, "tailored", doc.id, tailoredScore);
@@ -154,12 +155,64 @@ describe("job questions", () => {
     expect((await repo.getRun(runId))!.questions).toEqual(got);
   });
 
+  it.each([
+    { baseRef: "k:sql", tailoredRef: "k:SQL", inferred: false, offered: false },
+    { baseRef: "k:SQL", tailoredRef: "k:sql", inferred: false, offered: false },
+    { baseRef: "k:sql", tailoredRef: "k:SQL", inferred: true, offered: true },
+  ])("matches keyword gaps $baseRef and $tailoredRef with inferred=$inferred", async ({ baseRef, tailoredRef, inferred, offered }) => {
+    const repo = memoryTailorRepo("user-a", scores, docs);
+    const keyword: MatchScore["labels"][number] = { ref: baseRef, kind: "keyword", status: "missing", evidence: null, inferred: false };
+    await repo.saveScore(jobId, "base", null, { ...score, labels: [...score.labels, keyword] });
+    const runId = await startRun();
+    const run = (await repo.getRun(runId))!;
+    const doc = (await repo.readTailoredCv(run.tailoredCvId!))!;
+    const tailoredScore: MatchScore = { ...score, requirementTexts: ["Kubernetes", "Team lead"], labels: [
+      { ...score.labels[0]!, ref: "R0", status: "met", evidence: "Ran Kubernetes clusters" },
+      { ...keyword, ref: tailoredRef, status: "met", evidence: "Used SQL", inferred },
+    ] };
+    await repo.saveTailoredCv(doc.id, doc.version, { content: doc.content, review: {}, score: tailoredScore });
+    await repo.saveScore(jobId, "tailored", doc.id, tailoredScore);
+    replies = [[ask("Did you use SQL?", { gap: baseRef }), ask("Did you lead a team?", { gap: "r1" })]];
+    const got = await questions(runId, "experience");
+    const sent = JSON.parse((model.requests[0]!.messages as { content: string }[])[1]!.content);
+    expect(sent.gaps.map((label: { ref: string }) => label.ref)).toEqual(offered ? ["r0", "r1", baseRef] : ["r0", "r1"]);
+    expect(got.map((question) => question.gap)).toEqual(offered ? [baseRef, "r1"] : ["r1"]);
+    expect((await repo.getRun(runId))!.questions).toEqual(got);
+  });
+
+  it.each(["changed requirement text", "no stored requirement texts"])("offers requirement gaps with %s while matching keywords by term", async (scenario) => {
+    const repo = memoryTailorRepo("user-a", scores, docs);
+    const keyword: MatchScore["labels"][number] = { ref: "k:platform", kind: "keyword", status: "missing", evidence: null, inferred: false };
+    await repo.saveScore(jobId, "base", null, { ...score, labels: [...score.labels, keyword] });
+    const runId = await startRun();
+    const run = (await repo.getRun(runId))!;
+    const doc = (await repo.readTailoredCv(run.tailoredCvId!))!;
+    const tailoredScore: MatchScore = { ...score,
+      ...(scenario === "changed requirement text" ? { requirementTexts: ["Kubernetes", "Team lead"] } : {}),
+      labels: [
+        { ...score.labels[0]!, status: "met", evidence: "Ran Kubernetes clusters" },
+        score.labels[1]!, { ...keyword, status: "met", evidence: "Ran the platform" },
+      ],
+    };
+    await repo.saveTailoredCv(doc.id, doc.version, { content: doc.content, review: {}, score: tailoredScore });
+    await repo.saveScore(jobId, "tailored", doc.id, tailoredScore);
+    if (scenario === "changed requirement text") {
+      await jobs.admin.finish(jobId, { ...job, requirements: [{ ...job.requirements[0]!, text: "Docker" }, job.requirements[1]!] });
+    }
+    replies = [[ask("Have you used Docker?"), ask("Did you run the platform?", { gap: "k:platform" })]];
+    const got = await questions(runId, "experience");
+    const sent = JSON.parse((model.requests[0]!.messages as { content: string }[])[1]!.content);
+    expect(sent.gaps.map((label: { ref: string }) => label.ref)).toEqual(["r0", "r1"]);
+    expect(got).toEqual([expect.objectContaining({ gap: "r0" })]);
+    expect((await repo.getRun(runId))!.questions).toEqual(got);
+  });
+
   it("offers a gap again after a steering restart resets wording, despite the old tailored score", async () => {
     const runId = await startRun();
     const repo = memoryTailorRepo("user-a", scores, docs);
     const run = (await repo.getRun(runId))!;
     const doc = (await repo.readTailoredCv(run.tailoredCvId!))!;
-    const tailoredScore: MatchScore = { ...score, labels: score.labels.map((label) => label.ref === "r0"
+    const tailoredScore: MatchScore = { ...score, requirementTexts: ["Kubernetes", "Team lead"], labels: score.labels.map((label) => label.ref === "r0"
       ? { ...label, status: "met", inferred: false, evidence: "Ran Kubernetes clusters" } : label) };
     const content = structuredClone(doc.content);
     content.experience[0]!.bullets[0]!.text = "Ran Kubernetes clusters";
@@ -205,6 +258,24 @@ describe("job questions", () => {
       const calls = model.requests.length;
       expect(await questions(runId, "experience")).toEqual([]);
       expect(model.requests).toHaveLength(calls);
+    }
+  });
+
+  it("gives every role five questions when all focus roles have been deleted", async () => {
+    const runId = await startRun();
+    const repo = memoryTailorRepo("user-a", scores, docs);
+    const run = (await repo.getRun(runId))!;
+    await repo.setSteering(run.tailoredCvId!, { focusRoleIds: ["deleted-role"] });
+    for (const role of [newest, older]) {
+      await repo.updateRun(runId, { currentRoleId: role.id });
+      replies = [Array.from({ length: 6 }, (_, i) => ask(`Question ${i} for ${role.id}?`))];
+      const got = await questions(runId, "experience");
+      expect(got).toHaveLength(5);
+      const sent = JSON.parse((model.requests.at(-1)!.messages as { content: string }[])[1]!.content);
+      expect(sent.max).toBe(5);
+      expect(sent).not.toHaveProperty("focus");
+      expect(sent.steering).not.toContain("They want to lean on other roles more than this one.");
+      expect((await repo.getRun(runId))!.questions!.filter((question) => question.roleId === role.id)).toEqual(got);
     }
   });
 
