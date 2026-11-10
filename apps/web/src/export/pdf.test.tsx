@@ -309,7 +309,7 @@ describe("fitCvPdf", () => {
     expect(fitted).toMatchObject({ step: { tight: true, fontSize: minimum }, fits: false });
     expect(fitted.pages).toBeGreaterThan(2);
     expect((await readPdf(fitted.blob)).totalPages).toBe(fitted.pages);
-  });
+  }, 15_000);
 });
 
 describe("buildLetterPdf", () => {

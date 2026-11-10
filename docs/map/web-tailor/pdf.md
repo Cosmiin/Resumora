@@ -4,8 +4,8 @@ area: web-tailor
 files: ["apps/web/src/export/pdf.tsx","apps/web/src/export/pdf.test.tsx"]
 depends_on: ["shared/cv","shared/categories","shared/dates","web-editor/templates","web-editor/document","web-tailor/fit","web-tailor/pdf-fonts","web-tailor/docx","shared/stored-cv","web-tailor/letter-page","shared/tailoring"]
 contract: false
-checked_hash: 65ae7d41
-cited: [211905, 24914c, 6e9300, 4a4928, 7684bc, 3b9f34, f50668, 0f7dc9, c3ff85, 5f2e14, eb9b6b, 260a93, f24107, 214197, aa7136, 7c5b5e, 8a07f2, a1236e, f528ee, f528ee, 317494, 349ece, 1b1679, 950911, d30637, 7f4895, ac9456, 6e9300, 4a4928, 802453, 895e8c, 82c10f, 6f4f70, 18c71d, d5327f, 94a4ac, 5c549f, 3bbf3f, 69af33, 4ef88f, e3eddb, d91ed6, 5607bc, a831ac, 05d7d6, aaec5d, 211905, 6c5831, 0f7dc9, 110546, c28cfa, b169ea, f6c8d3, f24107, faf887, b17465, 5f2e14, df7a9a, c3ff85, 340ece, 1ec158, a2f028, 2938dd, 5d3ac5, 37f754, 92b934, f528ee, 2fa248, 0c913a, 0f7dc9]
+checked_hash: 731b5bef
+cited: [211905, 24914c, 6e9300, 4a4928, 7684bc, 3b9f34, f50668, 0f7dc9, c3ff85, 5f2e14, eb9b6b, 260a93, f24107, 214197, aa7136, 7c5b5e, 8a07f2, a1236e, f528ee, f528ee, 317494, 349ece, 1b1679, 950911, d30637, 3cddbf, ac9456, 6e9300, 4a4928, 802453, 895e8c, 82c10f, 6f4f70, 18c71d, d5327f, 94a4ac, 5c549f, 3bbf3f, 69af33, 4ef88f, e3eddb, d91ed6, 5607bc, a831ac, 05d7d6, aaec5d, 211905, 6c5831, 0f7dc9, 110546, c28cfa, b169ea, f6c8d3, f24107, faf887, b17465, 5f2e14, df7a9a, c3ff85, 340ece, 1ec158, a2f028, 2938dd, 5d3ac5, 37f754, 92b934, f528ee, 2fa248, 0c913a, 0f7dc9]
 decisions: []
 open: []
 ---
