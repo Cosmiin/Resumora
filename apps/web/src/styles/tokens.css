@@ -41,6 +41,29 @@
   --sky-200: #cddbed;
   --sky-600: #355d8c;
 
+  /* Plum — role description */
+  --plum-50: #f5f0f8;
+  --plum-100: #ece3f2;
+  --plum-200: #dccdea;
+  --plum-400: #9a7bb5;
+  --plum-600: #6d4a86;
+  --plum-800: #4a2f5e;
+
+  /* Sections — strong colour, tint and ink */
+  --sec-role: var(--pine-600);
+  --sec-role-tint: var(--pine-100);
+  --sec-role-ink: var(--pine-800);
+  --sec-bullets: var(--marigold-600);
+  --sec-bullets-tint: var(--marigold-100);
+  --sec-bullets-ink: var(--marigold-800);
+  --sec-bullets-mark: var(--marigold-300);
+  --sec-tools: var(--sky-600);
+  --sec-tools-tint: var(--sky-50);
+  --sec-tools-ink: #203d60;
+  --sec-description: var(--plum-600);
+  --sec-description-tint: var(--plum-100);
+  --sec-description-ink: var(--plum-800);
+
   /* Semantic — surfaces */
   --surface-page: var(--sage-50);
   --surface-card: var(--white);

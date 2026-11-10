@@ -252,3 +252,63 @@
   border-radius: var(--radius-lg); background: var(--surface-card); border: 1px solid var(--border-subtle);
 }
 .fm-end-score { font-weight: var(--weight-semibold); color: var(--status-good-fg); white-space: nowrap; }
+/* Shared paper and note styles: each screen supplies its section. */
+[data-section="role"] { --sec: var(--sec-role); --sec-tint: var(--sec-role-tint); --sec-ink: var(--sec-role-ink); --sec-mark: var(--sec-role-tint); }
+[data-section="bullets"] { --sec: var(--sec-bullets); --sec-tint: var(--sec-bullets-tint); --sec-ink: var(--sec-bullets-ink); --sec-mark: var(--sec-bullets-mark); }
+[data-section="tools"] { --sec: var(--sec-tools); --sec-tint: var(--sec-tools-tint); --sec-ink: var(--sec-tools-ink); --sec-mark: var(--sec-tools-tint); }
+[data-section="description"] { --sec: var(--sec-description); --sec-tint: var(--sec-description-tint); --sec-ink: var(--sec-description-ink); --sec-mark: var(--sec-description-tint); }
+.page-sheet {
+  box-sizing: border-box; padding: clamp(24px, 3vw, 46px); min-height: 420px;
+  border-radius: var(--radius-xs); background: var(--surface-document); box-shadow: var(--shadow-paper);
+  font-family: var(--font-document); color: var(--text-document); line-height: var(--leading-document);
+}
+.page-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-5); font-family: var(--font-sans); font-size: var(--text-xs); }
+.page-tabs > span { padding: 7px 11px; border-radius: var(--radius-pill); background: var(--surface-page); color: var(--text-muted); }
+.page-tabs > .is-done { color: var(--sec-ink); }
+.page-tabs > [aria-current="step"] { background: var(--sec); color: var(--white); }
+.page-note {
+  position: relative; padding: var(--space-9) var(--space-8); border-radius: var(--radius-lg); border-top: 4px solid var(--sec, var(--border-subtle));
+  background: var(--surface-card); box-shadow: var(--shadow-raised);
+}
+.page-note::before { content: ""; position: absolute; top: 36px; inset-inline-end: 100%; width: 28px; border-top: 2px dashed var(--sec); }
+.page-note-eyebrow { margin: 0 0 var(--space-5); padding-inline-end: var(--space-12); color: var(--sec); font-size: var(--text-xs); font-weight: var(--weight-semibold); }
+.page-mark { background: linear-gradient(transparent 12%, var(--sec-mark) 12%, var(--sec-mark) 90%, transparent 90%); box-decoration-break: clone; -webkit-box-decoration-break: clone; color: var(--sec-ink); }
+.page-bar { position: relative; }
+.page-bar::before { content: ""; position: absolute; inset-inline-start: -18px; top: 0; bottom: 0; width: 6px; border-radius: var(--radius-pill); background: var(--sec); }
+.page-del { color: var(--text-muted); text-decoration: line-through; }
+.page-ins { text-decoration: underline; text-decoration-color: var(--sec-mark); text-decoration-thickness: 3px; text-underline-offset: 4px; }
+
+/* Only the section-based focus screen uses the paper layout; LightStop keeps its frame. */
+.focus-mode[data-section] {
+  grid-template-columns: minmax(0, 660px) minmax(0, 600px);
+  background: radial-gradient(var(--border-subtle) 0.7px, transparent 0.7px) 0 0 / 14px 14px var(--surface-sunken);
+}
+.focus-mode[data-section] .fm-left > .fm-eyebrow { margin-bottom: var(--space-3); }
+.focus-mode[data-section] .fm-left { padding: var(--space-12) var(--space-9) var(--space-9); border: 0; min-width: 0; }
+.focus-mode[data-section] .fm-right { padding: var(--space-12) var(--space-9) var(--space-9); min-width: 0; }
+.focus-mode[data-section] .fm-close { top: var(--space-3); inset-inline-end: var(--space-3); }
+.focus-mode[data-section] .fm-role-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+.focus-mode[data-section] .fm-role { margin: 0; font-family: inherit; font-size: var(--text-lg); font-weight: var(--weight-bold); line-height: var(--leading-snug); }
+.focus-mode[data-section] .fm-role-meta { flex: none; margin: 0; font-size: var(--text-xs); }
+.focus-mode[data-section] .fm-page-description { margin: var(--space-4) 0 0; font-style: italic; font-size: var(--text-sm); }
+.focus-mode[data-section] .fm-page-description.is-proposed { padding: var(--space-4); border-radius: var(--radius-sm); background: var(--sec-tint); color: var(--sec-ink); }
+.focus-mode[data-section] .fm-bullets { display: block; list-style: disc; margin: var(--space-6) 0 0; padding-inline-start: var(--space-6); }
+.focus-mode[data-section] .fm-bullet { display: list-item; padding: var(--space-2) var(--space-1); border: 0; border-radius: var(--radius-xs); box-shadow: none; line-height: var(--leading-document); }
+.focus-mode[data-section] .fm-bullet.fm-improved::marker { color: var(--pine-600); }
+.focus-mode[data-section] .fm-bullet .fm-tag { float: inline-end; margin-inline-start: var(--space-2); font-family: var(--font-sans); }
+.focus-mode[data-section] .fm-score { margin-top: var(--space-5); }
+.focus-mode[data-section] .fm-score b { font-size: var(--text-h2); }
+.focus-mode[data-section] .fm-score .fm-eyebrow { font-size: var(--text-2xs); }
+@media (max-width: 760px) {
+  .page-note::before { display: none; }
+  .focus-mode[data-section] { grid-template-columns: minmax(0, 1fr); }
+  .focus-mode[data-section] .fm-left { display: flex; flex-direction: column; max-height: 40vh; padding: var(--space-11) 16px var(--space-4); overflow: hidden; }
+  .focus-mode[data-section] .page-tabs { flex: none; }
+  .focus-mode[data-section] .page-sheet { min-height: 0; overflow-y: auto; }
+  .focus-mode[data-section] .fm-score { flex: none; margin-top: var(--space-3); }
+  .focus-mode[data-section] .fm-right { padding: var(--space-4) 16px var(--space-6); }
+  .focus-mode[data-section] .fm-role-line { flex-wrap: wrap; gap: var(--space-1); }
+  .focus-mode[data-section] .fm-close { position: fixed; top: 8px; inset-inline-end: 8px; }
+  .page-note { padding: var(--space-6); }
+  .page-note-eyebrow { padding-inline-end: 0; }
+}

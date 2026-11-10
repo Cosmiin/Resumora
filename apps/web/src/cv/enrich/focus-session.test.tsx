@@ -101,7 +101,7 @@ describe("useFocusSession", () => {
     expect(h.result.current.roleQuestions).toEqual([roleQuestions[1]]);
     const ui = render(<FocusMode target={{ roleId: "r", mode: "improve" }} {...h.opts()} />);
     await settle();
-    expect(screen.getByText("Question 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("About the role · Question 1 of 1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: roleQuestions[1]!.text })).toBeInTheDocument();
     ui.unmount();
     await submit(h, "Finance");
@@ -140,10 +140,10 @@ describe("useFocusSession", () => {
   it("skips a bullet whose stored question repeats an earlier bullet question", () => {
     const r = role(4);
     const result = score(r);
-    result.questions[3]!.text = " WHICH  tools? ";
+    result.questions[1]!.text = " WHICH  tools? ";
     const h = mount({ scores: new Map([["r", { state: "ready", result }]]) }, r);
     act(() => h.result.current.skip());
-    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b3" });
     expect(h.result.current.position).toBe(2);
     expect(api.improveBullet).not.toHaveBeenCalled();
   });
@@ -160,6 +160,160 @@ describe("useFocusSession", () => {
     expect(second.result.current.step).toEqual({ kind: "role", index: 0 });
     expect(second.result.current.roleQuestions[0]).toEqual(roleQuestions[0]);
     expect(saved.notes).toEqual([]);
+  });
+
+  it.each([undefined, "b2"])("walks role questions, CV-ordered bullets and tools (chosen: %s)", (bulletId) => {
+    const r = role();
+    const result = score(r);
+    result.bullets.forEach((b, i) => { b.score = [60, 20, 40][i]!; });
+    result.roleQuestions = [
+      { ...roleQuestions[0]!, topic: "company" },
+      { ...roleQuestions[1]!, topic: "purpose" },
+      { id: "tools", text: "Which systems did you use?", options: [], kind: "role", topic: "tools" },
+    ];
+    const h = mount({ bulletId, scores: new Map([["r", { state: "ready", result }]]) }, r);
+    const queue = bulletId ? ["b2", "b0", "b1"] : ["b0", "b1", "b2"];
+    expect(h.result.current.queue).toEqual(queue);
+    for (const index of [0, 1]) {
+      expect(h.result.current.step).toEqual({ kind: "role", index });
+      expect(h.result.current.section).toBe("role");
+      expect(h.result.current.dots).toEqual({ done: index, total: 6 });
+      act(() => h.result.current.skip());
+    }
+    for (const [index, id] of queue.entries()) {
+      expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: id });
+      expect(h.result.current.section).toBe("bullets");
+      expect(h.result.current.dots).toEqual({ done: index + 2, total: 6 });
+      act(() => h.result.current.skip());
+    }
+    expect(h.result.current.step).toEqual({ kind: "role", index: 2 });
+    expect(h.result.current.section).toBe("tools");
+    expect(h.result.current.dots).toEqual({ done: 5, total: 6 });
+    act(() => h.result.current.back());
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: queue[2] });
+    expect(h.result.current.section).toBe("bullets");
+    expect(h.result.current.dots).toEqual({ done: 4, total: 6 });
+    act(() => h.result.current.skip());
+    expect(h.result.current.section).toBe("tools");
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toEqual({ kind: "describing" });
+    expect(h.result.current.section).toBe("description");
+    expect(h.opts().cv.experience[0]!.notes).toEqual([]);
+  });
+
+  it.each([false, true])("defers tools even as the only role question (answer: %s)", async (answer) => {
+    const r = role();
+    const tools: RoleResult["roleQuestions"][number] = {
+      id: "tools", text: "Which systems did you use?", options: [], kind: "role", topic: "tools",
+    };
+    api.roleDescription.mockReturnValue(new Promise(() => {}));
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions: [tools] } }]]) }, r);
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b0" });
+    act(() => h.result.current.skip());
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    expect(h.result.current.section).toBe("tools");
+    if (answer) await submit(h, "Python and SQL");
+    else act(() => h.result.current.skip());
+    expect(h.opts().cv.experience[0]!.notes).toEqual(answer ? [expect.objectContaining({
+      question: tools.text, answer: "Python and SQL", via: ["type"],
+    })] : []);
+    expect(h.result.current.step.kind).toBe("describing");
+    expect(h.result.current.section).toBe("description");
+    expect(api.brainDump).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("continues queued bullets after free talk from tools (answer: %s)", async (answer) => {
+    const r = role();
+    const tools: RoleResult["roleQuestions"][number] = {
+      id: "tools", text: "Which systems did you use?", options: [], kind: "role", topic: "tools",
+    };
+    api.roleDescription.mockReturnValue(new Promise(() => {}));
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions: [tools] } }]]) }, r);
+    act(() => h.result.current.skip());
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    act(() => h.result.current.freeTalk());
+    await submit(h, "Built weekly reports");
+    act(() => h.result.current.addSelected(["p"]));
+    const updated = h.opts().cv.experience[0]!;
+    const addedId = updated.bullets.at(-1)!.id;
+    const fresh = score(updated);
+    fresh.bullets.find((b) => b.id === addedId)!.score = 60;
+    h.update({ scores: new Map([["r", { state: "ready", result: fresh }]]) });
+    expect(h.result.current.queue).toEqual([addedId]);
+    expect(h.result.current.dots.total - h.result.current.dots.done).toBe(3);
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    if (answer) await submit(h, "Python and SQL");
+    else act(() => h.result.current.skip());
+    expect(h.result.current.step).toMatchObject({
+      kind: "question", bulletId: addedId, question: fresh.questions.find((q) => q.bulletId === addedId),
+    });
+    act(() => h.result.current.skip());
+    expect(h.result.current.step.kind).toBe("describing");
+  });
+
+  it("Back from tools returns to the last bullet text step after a free-talk detour", () => {
+    const r = role();
+    const tools: RoleResult["roleQuestions"][number] = {
+      id: "tools", text: "Which systems did you use?", options: [], kind: "role", topic: "tools",
+    };
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions: [tools] } }]]) }, r);
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    act(() => h.result.current.freeTalk());
+    act(() => h.result.current.skip());
+    act(() => h.result.current.skip());
+    expect(h.result.current.section).toBe("tools");
+    act(() => h.result.current.back());
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    expect(h.result.current.section).toBe("bullets");
+  });
+
+  it("skips a saved tools answer and goes straight from bullets to description", () => {
+    const r = role();
+    const tools: RoleResult["roleQuestions"][number] = {
+      id: "tools", text: "Which systems did you use?", options: [], kind: "role", topic: "tools",
+    };
+    r.notes = [{ id: "saved", question: tools.text, answer: "Python", via: ["type"], askedAt: "2026-11-10T00:00:00Z" }];
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions: [tools] } }]]) }, r);
+    act(() => h.result.current.skip());
+    act(() => h.result.current.skip());
+    expect(h.result.current.step.kind).toBe("describing");
+    expect(h.result.current.section).toBe("description");
+  });
+
+  it("keeps thin-role picks before bullets and answering tools does not reopen them", async () => {
+    const r = role(1);
+    const questions: RoleResult["roleQuestions"] = [
+      { id: "tools", text: "Which systems did you use?", options: [], kind: "role", topic: "tools" },
+      roleQuestions[0]!,
+    ];
+    const h = mount({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions: questions } }]]) }, r);
+    expect(h.result.current.step.kind).toBe("brainDump");
+    expect(h.result.current.section).toBe("role");
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toEqual({ kind: "role", index: 1 });
+    await submit(h, "The CEO");
+    expect(h.result.current.step.kind).toBe("dumpPick");
+    expect(h.result.current.section).toBe("role");
+    act(() => h.result.current.addSelected(["p"]));
+    expect(h.result.current.section).toBe("role");
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    const addedId = h.opts().cv.experience[0]!.bullets[1]!.id;
+    expect(h.result.current.queue).toEqual(["b0", addedId]);
+    expect(h.result.current.section).toBe("bullets");
+    act(() => h.result.current.skip());
+    await settle();
+    expect(h.result.current.step.kind).toBe("proposal");
+    act(() => h.result.current.keepMine());
+    expect(h.result.current.section).toBe("tools");
+    api.roleDescription.mockReturnValue(new Promise(() => {}));
+    await submit(h, "SQL");
+    expect(h.result.current.step.kind).toBe("describing");
+    expect(h.result.current.section).toBe("description");
+    expect(api.brainDump).toHaveBeenCalledTimes(1);
+    expect(h.opts().cv.experience[0]!.notes.at(-1)).toMatchObject({ question: questions[0]!.text, answer: "SQL" });
   });
 
   it("saves role answers before bullet questions without calling AI", async () => {
@@ -234,7 +388,52 @@ describe("useFocusSession", () => {
     expect(h.result.current.step.kind).toBe(count <= 1 ? "brainDump" : "proposal");
   });
 
-  it("sorts improve by score with CV-order ties, excludes 100, and moves the chosen bullet first", () => {
+  it("counts no future dots at tools after adopting background role questions late", () => {
+    const r = role(2);
+    const h = mount({}, r);
+    expect(h.result.current.roleQuestions).toEqual([]);
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b0" });
+    const questions: RoleResult["roleQuestions"] = [
+      { ...roleQuestions[0]!, topic: "company" },
+      { ...roleQuestions[1]!, topic: "purpose" },
+      { id: "tools", text: "Which systems did you use?", options: [], kind: "role", topic: "tools" },
+    ];
+    h.update({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions: questions } }]]) });
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    act(() => h.result.current.skip());
+    expect(h.result.current.roleQuestions).toEqual(questions);
+    expect(h.result.current.step).toEqual({ kind: "role", index: 2 });
+    expect(h.result.current.section).toBe("tools");
+    expect(h.result.current.dots.total - h.result.current.dots.done - 1).toBe(0);
+  });
+
+  it.each([false, true])("keeps the background tools question after opening scoring fails (empty cache: %s)", async (cached) => {
+    const r = role(2);
+    const tools: RoleResult["roleQuestions"][number] = {
+      id: "tools", text: "Which systems did you use?", options: [], kind: "role", topic: "tools",
+    };
+    api.roleDescription.mockReturnValue(new Promise(() => {}));
+    const h = mount({ scores: cached ? new Map([["r", { state: "ready", result: { ...score(r), fingerprint: "stale" } }]]) : new Map() }, r);
+    await settle();
+    expect(api.scoreRole).toHaveBeenCalledExactlyOnceWith("r", fingerprint(r, "en"));
+    expect(h.result.current.result?.roleQuestions).toEqual(cached ? [] : undefined);
+    expect(h.result.current.step).toMatchObject({ kind: "proposal", bulletId: "b0" });
+    h.update({ scores: new Map([["r", { state: "ready", result: { ...score(r), roleQuestions: [tools] } }]]) });
+    act(() => h.result.current.keepMine());
+    expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
+    act(() => h.result.current.skip());
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    expect(h.result.current.roleQuestions[0]?.text).toBe(tools.text);
+    expect(h.result.current.section).toBe("tools");
+    await submit(h, "Python and SQL");
+    expect(h.opts().cv.experience[0]!.notes).toEqual([expect.objectContaining({
+      question: tools.text, answer: "Python and SQL", via: ["type"],
+    })]);
+    expect(h.result.current.step).toEqual({ kind: "describing" });
+  });
+
+  it("keeps improve in CV order, excludes 100, and moves the chosen bullet first", () => {
     const h = mount({ bulletId: "b1" }, role(4));
     expect(h.result.current.queue).toEqual(["b1", "b0", "b3"]);
     expect(h.result.current.position).toBe(0);
@@ -328,6 +527,7 @@ describe("useFocusSession", () => {
       type: "replaceBullet", roleId: "r", bulletId: "b0", text: proposal.proposal.text,
     });
     expect(h.result.current.step).toEqual({ kind: "celebrate", from: 40, to: 70, next: "queue" });
+    expect(h.result.current.section).toBe("bullets");
     act(() => h.result.current.next());
     expect(h.result.current.step).toMatchObject({ kind: "question", bulletId: "b1" });
   });
@@ -959,9 +1159,11 @@ describe("the role description step (3B)", () => {
     const h = await toTheEnd();
     expect(api.roleDescription).toHaveBeenCalledExactlyOnceWith({ roleId: "r", fingerprint: fingerprint(role(), "en") });
     expect(h.result.current.step).toEqual({ kind: "description", ...proposed });
+    expect(h.result.current.section).toBe("description");
     act(() => h.result.current.useDescription(proposed.text));
     expect(h.opts().cv.experience[0]!.description).toBe(proposed.text);
     expect(h.result.current.step.kind).toBe("roleDone");
+    expect(h.result.current.section).toBe("done");
   });
   it("Use it with edited text saves the edit", async () => {
     const h = await toTheEnd();
