@@ -23,6 +23,6 @@ Collect a job URL and pasted text, including extension fallback and duplicate ha
 - tested by `apps/web/src/jobs/jobs-page.test.tsx:418` -> `duplicate open`
 ## Connections
 - Used by JobsList with the extension URL as the dialog key and initial value: `apps/web/src/jobs/JobsPage.tsx:151` -> `key={initialUrl}`; `apps/web/src/jobs/AddJobDialog.tsx:8` -> `initialUrl`
-- Hand-copied minimum 200 must track the shared create schema, whose 60,000 text/2,048 URL maxima are enforced server-side: `apps/web/src/jobs/AddJobDialog.tsx:41` -> `200`; `packages/shared/src/jobs.ts:41` -> `2048`; `packages/shared/src/jobs.ts:42` -> `60000`
+- Hand-copied minimum 200 must track the shared create schema, whose 60,000 text/2,048 URL maxima are enforced server-side: `apps/web/src/jobs/AddJobDialog.tsx:41` -> `200`; `packages/shared/src/jobs.ts:42` -> `2048`; `packages/shared/src/jobs.ts:43` -> `60000`
 ## Assumptions
 - The UI submits URL plus text rather than fetching the URL; the API is responsible for content validation and duplicate detection. `apps/web/src/jobs/AddJobDialog.tsx:51` -> `createJob`; `apps/api/src/jobs/routes.ts:39` -> `safeParse`; `apps/api/src/jobs/routes.ts:52` -> `findByUrl`

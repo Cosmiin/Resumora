@@ -107,12 +107,25 @@ describe("POST /v1/tailored/:id/cover-letter", () => {
     for (const secret of ["Ana Pop", "ana@example.test", "+40 700 000 000", "Maria Ionescu"]) expect(sent).not.toContain(secret);
   });
 
-  it("sends the user's thoughts on the role", async () => {
+  it("sends no thoughtsOnTheRole key or old-tab note to the writer or fact check", async () => {
     const { jobId, id } = await tailored();
-    const current = (await jobs.repoFor("user-a").get(jobId))!;
-    expect(await jobs.repoFor("user-a").patch(jobId, current.version, job, { userThoughts: "Love the remote setup" })).toBe("ok");
-    await write(id);
-    expect(JSON.stringify(writerRequests().at(-1))).toContain("Love the remote setup");
+    const oldNote = "I led 900 lunar payroll projects";
+    const patched = await app.request(`/v1/jobs/${jobId}`, {
+      method: "PATCH", headers: auth(),
+      body: JSON.stringify({ version: 1, extracted: job, userThoughts: oldNote }),
+    });
+    expect(patched.status).toBe(200);
+    expect((await write(id, { whyCompany: "I like their payroll tools" })).status).toBe(200);
+    const messages = writerRequests().at(-1)!.messages as { content: string }[];
+    const sent = JSON.parse(messages[1]!.content);
+    expect(sent).not.toHaveProperty("thoughtsOnTheRole");
+    expect(sent.whyThisCompany).toBe("I like their payroll tools");
+    const verify = model.requests.find((r) => (r.messages as { content: string }[])[0]!.content.startsWith("You check"))!;
+    const checked = JSON.parse((verify.messages as { content: string }[])[1]!.content);
+    expect(checked.sources).toContain("Paid 40 staff on time every month");
+    expect(checked.sources).toContain("I like their payroll tools");
+    expect(checked.sources).not.toContain(oldNote);
+    expect(JSON.stringify(writerRequests())).not.toContain(oldNote);
   });
 
   it("retries a letter with an invented number once and returns the flags that remain", async () => {

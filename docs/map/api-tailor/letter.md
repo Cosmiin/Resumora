@@ -4,8 +4,8 @@ area: api-tailor
 files: ["apps/api/src/tailor/letter.ts","apps/api/test/tailor-letter.test.ts"]
 depends_on: ["shared/tailoring","db/tailoring-repository","db/jobs-repository","api-core/call-model","api-tailor/letter-prompts","api-tailor/letter-checks"]
 contract: true
-checked_hash: daa3cc3d
-cited: [0e4fcf, 9b69e3, 4304b4, 575d46, 3f7ce5, 50a1a6, 9b5df0, 26019d, fefc81, 47579e, a9b4f5, 0ffb0a, 52f8a7, 7e2ccd, 326c04, 9b5df0, 55ef6b, 83d4d7, c20532, 725c15, 9f45d4, e71dd8, 8b0ad7, 8c0484, 3d90d9, f98040, 6d73ff, 020ff6, b652bf, 8486ef, 3f7ce5, b1a554, 020ff6, 52f8a7, 326c04]
+checked_hash: c3243666
+cited: [0e4fcf, 9b69e3, 4304b4, 19e756, 3f7ce5, 50a1a6, 9b5df0, 26019d, fefc81, 0df9e1, a9b4f5, 0ffb0a, 52f8a7, 7e2ccd, 326c04, 9b5df0, 55ef6b, 83d4d7, c20532, 725c15, 3370e1, 9f45d4, e71dd8, 8b0ad7, 8c0484, 3d90d9, f98040, 6d73ff, 020ff6, eadcef, 8486ef, 3f7ce5, b1a554, 020ff6, 52f8a7, 326c04]
 decisions: []
 open: []
 ---
@@ -17,7 +17,9 @@ Generate, retry and save a cover letter, or persist edits to an existing letter.
 - Editing requires an existing letter, otherwise 409 no_letter; preserves generatedAt and omitted metadata, makes supplied empty metadata null and runs no truth check `apps/api/src/tailor/letter.ts:91` -> `no_letter`; `apps/api/src/tailor/letter.ts:93` -> `...doc.coverLetter`; `apps/api/src/tailor/letter.ts:94` -> `hiringManager`; `apps/api/src/tailor/letter.ts:97` -> `setCoverLetter`.
 - Letter saves have no document version check or bump; repeated generation or editing overwrites cover_letter and updates timestamp `apps/api/src/tailor/letter.ts:81` -> `setCoverLetter`; `apps/api/src/tailor/supabase-repo.ts:149` -> `cover_letter: letter`; `apps/api/src/tailor/supabase-repo.ts:150` -> `eq("id", id)`.
 - tested by `apps/api/test/tailor-letter.test.ts:87` -> `POST /v1/tailored/:id/cover-letter`.
-- tested by `apps/api/test/tailor-letter.test.ts:198` -> `PUT /v1/tailored/:id/cover-letter`.
+- tested by `apps/api/test/tailor-letter.test.ts:211` -> `PUT /v1/tailored/:id/cover-letter`.
+
+- Old-tab job notes reach neither writer nor verifier, tested by `apps/api/test/tailor-letter.test.ts:110` -> `sends no thoughtsOnTheRole key or old-tab note`.
 
 ## Connections
 

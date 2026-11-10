@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(77);
+select plan(76);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -21,12 +21,7 @@ select lives_ok(
   $$ update public.jobs set application_status = 'applied' $$,
   'a job can be marked applied');
 select is((select application_status from public.jobs), 'applied', 'the application status is saved');
-select lives_ok(
-  $$ update public.jobs set user_thoughts = repeat('a', 2000) $$,
-  'thoughts can contain 2000 characters');
-select throws_ok(
-  $$ update public.jobs set user_thoughts = repeat('a', 2001) $$,
-  '23514', null, 'thoughts cannot exceed 2000 characters');
+select hasnt_column('public', 'jobs', 'user_thoughts', 'jobs no longer stores job thoughts');
 
 select lives_ok(
   $$ insert into public.tailored_cvs (id, job_id, language, content, base_snapshot, base_snapshot_at)

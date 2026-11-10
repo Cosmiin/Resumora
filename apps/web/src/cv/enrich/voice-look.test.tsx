@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useVoice, type VoiceState } from "./useVoice.ts";
 import { SteeringStep } from "../../tailor/SteeringStep.tsx";
-import { JobThoughts } from "../../jobs/JobThoughts.tsx";
 
 vi.mock("./useVoice.ts", () => ({ useVoice: vi.fn() }));
 vi.mock("../../tailor/tailor-api.ts", () => ({ getToneExamples: vi.fn(() => new Promise(() => {})) }));
@@ -20,7 +19,6 @@ const mics = {
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     return view;
   },
-  "job thoughts": () => render(<JobThoughts value="" onSave={vi.fn(async () => ({}))} />),
 };
 
 describe.each(Object.entries(mics))("the %s mic", (_name, renderMic) => {

@@ -21,7 +21,7 @@ Apply a permissive local job-page heuristic before the user chooses capture.
 
 ## Connections
 - The capture check invokes the heuristic only after the 200-character minimum. `apps/extension/src/save.ts:90` -> `trim().length`; `apps/extension/src/save.ts:93` -> `looksLikeJob`; `apps/extension/src/job-check.ts:25` -> `looksLikeJob`
-- JSON-LD recognition differs from the API selector: the heuristic recurses arrays, while findJobPosting skips top-level array values. `apps/extension/src/job-check.ts:18` -> `Array.isArray`; `apps/api/src/jobs/routes.ts:60` -> `findJobPosting`; `packages/shared/src/jobs.ts:114` -> `Array.isArray(value)`
+- JSON-LD recognition differs from the API selector: the heuristic recurses arrays, while findJobPosting skips top-level array values. `apps/extension/src/job-check.ts:18` -> `Array.isArray`; `apps/api/src/jobs/routes.ts:60` -> `findJobPosting`; `packages/shared/src/jobs.ts:112` -> `Array.isArray(value)`
 - Final single-job admission is downstream model processing, which can reject a locally accepted capture. `apps/extension/src/job-check.ts:31` -> `JOB_HOSTS`; `apps/api/src/jobs/consumer.ts:28` -> `processJob`; `apps/api/src/jobs/process.ts:21` -> `not_a_job`
 
 ## Assumptions

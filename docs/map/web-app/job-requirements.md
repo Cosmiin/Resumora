@@ -22,7 +22,7 @@ Display ordered job requirements with base-match evidence and weighted score det
 - tested by `apps/web/src/jobs/job-score.test.tsx:70` -> `requirements changed`
 - tested by `apps/web/src/jobs/job-score.test.tsx:92` -> `toggling the points`
 ## Connections
-- Used by JobPage with the base score, not tailored score: `apps/web/src/jobs/JobPage.tsx:208` -> `score.data?.base`; `apps/web/src/jobs/RequirementList.tsx:17` -> `RequirementList`
+- Used by JobPage with the base score, not tailored score: `apps/web/src/jobs/JobPage.tsx:207` -> `score.data?.base`; `apps/web/src/jobs/RequirementList.tsx:17` -> `RequirementList`
 - RequirementList uses JobScoreHow for every present score: `apps/web/src/jobs/RequirementList.tsx:57` -> `JobScoreHow`; `apps/web/src/jobs/JobScoreCard.tsx:6` -> `JobScoreHow`
 ## Assumptions
 - Count equality is the only stale-label check; same-length edits/reordering still map old labels by index. `apps/web/src/jobs/RequirementList.tsx:21` -> `length !== requirements.length`; `apps/web/src/jobs/RequirementList.tsx:35` -> `r`

@@ -4,8 +4,8 @@ area: web-enrich
 files: ["apps/web/src/cv/enrich/VoiceControls.tsx","apps/web/src/cv/enrich/voice-look.test.tsx"]
 depends_on: ["web-enrich/voice","web-enrich/voice-recording","web-enrich/answers"]
 contract: false
-checked_hash: 0f09dde2
-cited: [954682, 999b19, 80b98f, b66a98, a8f635, 93feaa, a1d029, 5855ca, 7ed9ef, 68f903, 07ad07, 8942e6, 7fca9b, 30311f, 238b5c, 71a572, e88daf, 92a469, 954682, 1c3e6a]
+checked_hash: aeaec366
+cited: [954682, 999b19, 80b98f, b66a98, a8f635, 93feaa, a1d029, 5855ca, 7ed9ef, 68f903, 991b19, 8942e6, 7fca9b, 238b5c, 71a572, 92a469, 954682, 1c3e6a]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---
@@ -13,11 +13,11 @@ Render microphone availability, recording controls and accessible transcription 
 
 - micAvailable excludes denied/unavailable/limit; AnswerBox also hides the mic when readOnly. MicButton disables it while asking/stopping; countdown permits cancellation. `apps/web/src/cv/enrich/VoiceControls.tsx:27` -> `micAvailable`; `apps/web/src/cv/enrich/AnswerBox.tsx:90` -> `!readOnly`; `apps/web/src/cv/enrich/AnswerBox.tsx:128` -> `micShown`; `apps/web/src/cv/enrich/VoiceControls.tsx:50` -> `disabled`; `apps/web/src/cv/enrich/VoiceControls.tsx:54` -> `voice.stop`; `apps/web/src/cv/enrich/useVoice.ts:109` -> `end("idle")`
 - VoiceStatus shows finishing and the last ten seconds as visible text outside any aria-live region; the live words block uses aria-live="polite" for announcements, and word animation respects reduced motion. `apps/web/src/cv/enrich/VoiceControls.tsx:99` -> `left <= 10`; `apps/web/src/cv/enrich/VoiceControls.tsx:103` -> `stopping`; `apps/web/src/cv/enrich/VoiceControls.tsx:105` -> `aria-live="polite"`; `apps/web/src/cv/enrich/VoiceControls.tsx:108` -> `reduceMotion`
-- tested by `apps/web/src/cv/enrich/voice-look.test.tsx:26` -> `describe.each`
+- tested by `apps/web/src/cv/enrich/voice-look.test.tsx:24` -> `describe.each`
 
 ## Connections
 
-- Used by AnswerBox, tailoring steering and job thoughts; changing transport or recording controls affects those flows too. `apps/web/src/cv/enrich/AnswerBox.tsx:66` -> `useVoice`; `apps/web/src/tailor/SteeringStep.tsx:16` -> `useVoice`; `apps/web/src/jobs/JobThoughts.tsx:26` -> `useVoice`; `apps/web/src/cv/enrich/useVoice.ts:77` -> `useVoice`; `apps/web/src/tailor/SteeringStep.tsx:21` -> `VoiceStatus`; `apps/web/src/jobs/JobThoughts.tsx:93` -> `VoiceStatus`; `apps/web/src/cv/enrich/VoiceControls.tsx:64` -> `VoiceStatus`
+- Used by AnswerBox and tailoring steering; changing transport or recording controls affects those flows too. `apps/web/src/cv/enrich/AnswerBox.tsx:66` -> `useVoice`; `apps/web/src/tailor/SteeringStep.tsx:16` -> `useVoice`; `apps/web/src/cv/enrich/useVoice.ts:77` -> `useVoice`; `apps/web/src/tailor/SteeringStep.tsx:21` -> `VoiceStatus`; `apps/web/src/cv/enrich/VoiceControls.tsx:64` -> `VoiceStatus`
 - Uses [voice-recording](./voice-recording.md): control availability reflects the hook state returned after recording or interruption. `apps/web/src/cv/enrich/VoiceControls.tsx:27` -> `voice.state`; `apps/web/src/cv/enrich/useVoice.ts:101` -> `setState(next)`
 
 ## Assumptions

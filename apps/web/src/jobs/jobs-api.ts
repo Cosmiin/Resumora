@@ -40,7 +40,7 @@ export function scoreJob(id: string) {
 
 export function patchJob(
   id: string, version: number, extracted: JobExtraction,
-  changes: Pick<JobPatch, "userThoughts" | "applicationStatus"> = {},
+  changes: Pick<JobPatch, "applicationStatus"> = {},
 ): Promise<Job> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(id)}`, {
     method: "PATCH", json: { version, extracted, ...changes }, schema: JobSchema,

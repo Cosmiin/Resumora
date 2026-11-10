@@ -39,7 +39,7 @@ export function memoryJobs(opts: { now?: () => Date }) {
       rows.set(input.id, {
         ...structuredClone(input), userId, status: "queued", errorCode: null, attempts: 0,
         title: null, company: null, location: null, extracted: null, editedByUser: false,
-        userThoughts: null, applicationStatus: "saved",
+        applicationStatus: "saved",
         version: 1, createdAt, updatedAt: createdAt,
       });
       runs.push({ userId, jobId: input.id, createdAt });
@@ -65,7 +65,7 @@ export function memoryJobs(opts: { now?: () => Date }) {
       if (!row || row.userId !== userId) return null;
       return {
         ...toListItem(row), rawText: row.rawText, extracted: structuredClone(row.extracted), editedByUser: row.editedByUser,
-        userThoughts: row.userThoughts, applicationStatus: row.applicationStatus,
+        applicationStatus: row.applicationStatus,
         version: row.version, updatedAt: row.updatedAt,
       };
     },
@@ -75,13 +75,12 @@ export function memoryJobs(opts: { now?: () => Date }) {
       if (row.status !== "ready") return "wrong_status";
       if (row.version !== expectedVersion) return "conflict";
       Object.assign(row, {
-        ...(fields.userThoughts !== undefined ? { userThoughts: fields.userThoughts } : {}),
         ...(fields.applicationStatus !== undefined ? { applicationStatus: fields.applicationStatus } : {}),
         extracted: structuredClone(extracted), title: extracted.title, company: extracted.company,
         location: extracted.location,
-        // Thoughts and status saves resend the current extraction; only extraction edits count as user edits.
+        // Status saves resend the current extraction; only extraction edits count as user edits.
         // updatedAt follows extraction edits only: the Tailored CV's "job changed" notice compares it.
-        ...(fields.userThoughts === undefined && fields.applicationStatus === undefined ? { editedByUser: true, updatedAt: now().toISOString() } : {}),
+        ...(fields.applicationStatus === undefined ? { editedByUser: true, updatedAt: now().toISOString() } : {}),
         version: row.version + 1,
       });
       return "ok";

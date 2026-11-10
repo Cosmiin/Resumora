@@ -48,7 +48,6 @@ export type CreateJobBody = z.infer<typeof CreateJobBodySchema>;
 export const JobPatchBodySchema = z.object({
   version: z.number().int().min(1),
   extracted: JobExtractionSchema.extend({ title: z.string().trim().min(1) }),
-  userThoughts: z.string().max(2000).nullable().optional(),
   applicationStatus: applicationStatus.optional(),
 });
 export type JobPatchBody = z.infer<typeof JobPatchBodySchema>;
@@ -84,7 +83,6 @@ export const JobSchema = JobListItemSchema.extend({
   rawText: z.string().nullable(),
   extracted: JobExtractionSchema.nullable(),
   editedByUser: z.boolean(),
-  userThoughts: z.string().max(2000).nullable(),
   applicationStatus,
   version: z.number().int().min(1),
   updatedAt: z.string(),

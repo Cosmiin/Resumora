@@ -17,13 +17,12 @@ type Row = {
   raw_text: string | null;
   extracted: unknown;
   edited_by_user: boolean;
-  user_thoughts: string | null;
   application_status: string;
   version: number;
   updated_at: string;
 };
 const LIST_COLUMNS = "id, status, error_code, title, company, location, source, url, created_at";
-const COLUMNS = `${LIST_COLUMNS}, raw_text, extracted, edited_by_user, user_thoughts, application_status, version, updated_at`;
+const COLUMNS = `${LIST_COLUMNS}, raw_text, extracted, edited_by_user, application_status, version, updated_at`;
 
 function toListItem(row: Row) {
   const parsed = JobListItemSchema.safeParse({
@@ -88,17 +87,16 @@ export function supabaseJobRepo(env: SupabaseEnv, user: AuthUser): JobRepo {
       const row = data as Row;
       const parsed = JobSchema.safeParse({
         ...toListItem(row), rawText: row.raw_text, extracted: row.extracted, editedByUser: row.edited_by_user,
-        userThoughts: row.user_thoughts, applicationStatus: row.application_status,
+        applicationStatus: row.application_status,
         version: row.version, updatedAt: row.updated_at,
       });
       if (!parsed.success) throw new Error(`stored job ${row.id} has an unexpected shape`);
       return parsed.data;
     },
     async patch(id, expectedVersion, extracted, fields = {}) {
-      // Thoughts and status saves resend the current extraction; only extraction edits count as user edits.
-      const extractionEdit = fields.userThoughts === undefined && fields.applicationStatus === undefined;
+      // Status saves resend the current extraction; only extraction edits count as user edits.
+      const extractionEdit = fields.applicationStatus === undefined;
       const { data, error } = await db.from("jobs").update({
-        ...(fields.userThoughts !== undefined ? { user_thoughts: fields.userThoughts } : {}),
         ...(fields.applicationStatus !== undefined ? { application_status: fields.applicationStatus } : {}),
         extracted, title: extracted.title, company: extracted.company, location: extracted.location,
         // updated_at follows extraction edits only: the Tailored CV's "job changed" notice compares it.

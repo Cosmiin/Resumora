@@ -129,26 +129,32 @@ describe("job endpoints", () => {
     expect(await memoryTailorRepo("user-a", scores).getScore(id, "base")).toBeNull();
   });
 
-  it("round-trips thoughts and application status, preserves omitted fields, and clears thoughts", async () => {
+  it("round-trips application status and preserves it when omitted", async () => {
     const id = await create();
     await store.admin.finish(id, extracted);
-    const userThoughts = "x".repeat(2000);
-    const res = await patch(id, 1, extracted, { userThoughts, applicationStatus: "applied" });
+    const res = await patch(id, 1, extracted, { applicationStatus: "applied" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ userThoughts, applicationStatus: "applied", version: 2, editedByUser: false });
-    expect(await (await get(id)).json()).toMatchObject({ userThoughts, applicationStatus: "applied" });
+    expect(await res.json()).toMatchObject({ applicationStatus: "applied", version: 2, editedByUser: false });
     expect((await patch(id, 2)).status).toBe(200);
-    expect(await (await get(id)).json()).toMatchObject({ userThoughts, applicationStatus: "applied" });
-    expect((await patch(id, 3, extracted, { userThoughts: null })).status).toBe(200);
-    expect(await (await get(id)).json()).toMatchObject({ userThoughts: null, applicationStatus: "applied", version: 4 });
+    expect(await (await get(id)).json()).toMatchObject({ applicationStatus: "applied", version: 3 });
   });
 
-  it("rejects thoughts over 2000 characters and invalid application statuses", async () => {
+  it("ignores old thoughts in PATCH and returns no thoughts in GET", async () => {
     const id = await create();
     await store.admin.finish(id, extracted);
-    await error(await patch(id, 1, extracted, { userThoughts: "x".repeat(2001) }), 400, "invalid_content");
+    const res = await patch(id, 1, extracted, { userThoughts: "x".repeat(2001), unknown: "ignored" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).not.toHaveProperty("userThoughts");
+    const detail = await get(id);
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).not.toHaveProperty("userThoughts");
+  });
+
+  it("rejects invalid application statuses", async () => {
+    const id = await create();
+    await store.admin.finish(id, extracted);
     await error(await patch(id, 1, extracted, { applicationStatus: "invalid" }), 400, "invalid_content");
-    expect(await (await get(id)).json()).toMatchObject({ userThoughts: null, applicationStatus: "saved", version: 1 });
+    expect(await (await get(id)).json()).toMatchObject({ applicationStatus: "saved", version: 1 });
   });
   it("creates a queued extension job and sends one message", async () => {
     const res = await post();

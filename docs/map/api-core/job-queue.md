@@ -5,7 +5,7 @@ files: ["apps/api/src/jobs/consumer.ts","apps/api/test/jobs-consumer.test.ts","a
 depends_on: ["api-core/job-processing","api-core/config","db/jobs-repository","db/match-scores-repository","db/ai-log"]
 contract: true
 checked_hash: 9cfde676
-cited: [01bf61, 81255a, 70050f, 145572, e936d0, 3e8443, c4a0d8, 1d426d, fbb07f, 5190c8, 64ea60, fbb07f, 304b17, 74b1b6, 073e3d, e936d0, 9641f6, b772af, ad1ed9, 9658f6, b0bdfb, 93b125, 9e2b4d, f13f46, d5977e, 4a56c3, 8d57f3, 91a6bc, b98502, 93f1eb, dd67a2, fc1d09, fdb480, f13f46, 0cdedd, 39c0ad, f26157, 9c151e, 410b74, e428af, 8a4caf, 0b57c4, d36037, d6ef11, f4b04b, 843b70]
+cited: [01bf61, 81255a, 70050f, 145572, e936d0, 3e8443, c4a0d8, 1d426d, fbb07f, 5190c8, 64ea60, fbb07f, 304b17, 74b1b6, 073e3d, e936d0, 9641f6, b772af, 750ab6, f391ee, b0bdfb, 93b125, 9e2b4d, f13f46, d5977e, 4a56c3, 8d57f3, 91a6bc, b98502, 93f1eb, dd67a2, fc1d09, fdb480, f13f46, 0cdedd, 39c0ad, f26157, 9c151e, 410b74, e428af, 8a4caf, 0b57c4, d36037, d6ef11, f4b04b, 843b70]
 decisions: []
 open: []
 ---
@@ -20,15 +20,15 @@ Consume job messages and optionally score the extracted job against the base CV.
 - tested by `apps/api/test/jobs-consumer.test.ts:70` -> `job consumer`, `apps/api/test/jobs-consumer.test.ts:191` -> `queue dispatch`, `apps/api/test/jobs-consumer.test.ts:74` -> `handleJobMessage`
 
 ## Connections
-- Completion has no status/version guard: `apps/api/src/jobs/consumer.ts:30` -> `admin.finish` -> `apps/api/src/jobs/supabase-repo.ts:145` -> `update` -> `apps/api/src/jobs/supabase-repo.ts:128` -> `eq("id", id)`. A late worker can overwrite a prior ready extraction or subsequent user edits written through `apps/api/src/jobs/supabase-repo.ts:103` -> `extracted`, even though those user edits check version and ready status at `apps/api/src/jobs/supabase-repo.ts:106` -> `expectedVersion`.
+- Completion has no status/version guard: `apps/api/src/jobs/consumer.ts:30` -> `admin.finish` -> `apps/api/src/jobs/supabase-repo.ts:143` -> `update` -> `apps/api/src/jobs/supabase-repo.ts:126` -> `eq("id", id)`. A late worker can overwrite a prior ready extraction or subsequent user edits written through `apps/api/src/jobs/supabase-repo.ts:101` -> `extracted`, even though those user edits check version and ready status at `apps/api/src/jobs/supabase-repo.ts:104` -> `expectedVersion`.
 
 - Producer -> binding -> dispatch -> consumer: `apps/api/src/jobs/routes.ts:64` -> `queue.send` -> `apps/api/src/index.ts:56` -> `env.JOBS.send` -> `apps/api/src/index.ts:27` -> `deps.jobs` -> `apps/api/src/index.ts:76` -> `handleJobMessage` -> `apps/api/src/jobs/consumer.ts:11` -> `handleJobMessage`.
 - Cloudflare batch size one and two retries accompany the consumer's three-delivery cap: `apps/api/wrangler.jsonc:16` -> `max_retries` -> `apps/api/src/jobs/consumer.ts:54` -> `MAX_ATTEMPTS`.
 - Consumer uses pipeline: `apps/api/src/jobs/consumer.ts:28` -> `processJob` -> `apps/api/src/jobs/process.ts:7` -> `processJob`.
-- Privileged job client and AI log wiring: `apps/api/src/index.ts:74` -> `supabaseJobAdmin` -> `apps/api/src/jobs/supabase-repo.ts:124` -> `SUPABASE_SERVICE_ROLE_KEY`; `apps/api/src/index.ts:75` -> `admin.logCall` -> `apps/api/src/jobs/supabase-repo.ts:151` -> `ai_calls`.
+- Privileged job client and AI log wiring: `apps/api/src/index.ts:74` -> `supabaseJobAdmin` -> `apps/api/src/jobs/supabase-repo.ts:122` -> `SUPABASE_SERVICE_ROLE_KEY`; `apps/api/src/index.ts:75` -> `admin.logCall` -> `apps/api/src/jobs/supabase-repo.ts:149` -> `ai_calls`.
 - Privileged scoring access: `apps/api/src/index.ts:76` -> `supabaseTailorAdmin` -> `apps/api/src/tailor/supabase-repo.ts:214` -> `SUPABASE_SERVICE_ROLE_KEY`; `apps/api/src/jobs/consumer.ts:34` -> `deps.baseCv` -> `apps/api/src/tailor/supabase-repo.ts:219` -> `user_id`.
 - Base score calculation/storage: `apps/api/src/jobs/consumer.ts:36` -> `scoreMatch` -> `apps/api/src/tailor/score.ts:46` -> `callModel`; `apps/api/src/jobs/consumer.ts:39` -> `scores.saveScore` -> `apps/api/src/tailor/supabase-repo.ts:235` -> `match_scores`.
 
 ## Assumptions
-- Queue ids are trusted for privileged lookup; ownership is obtained from the row, not verified against the payload userId. `apps/api/src/jobs/consumer.ts:25` -> `admin.start(id)`, `apps/api/src/jobs/supabase-repo.ts:142` -> `data.user_id`
-- The admin start update compares the attempts value just read and permits queued/processing status; terminal rows return null. A duplicate arriving after the first start can read the increased attempts and start concurrently, because processing remains eligible. `apps/api/src/jobs/supabase-repo.ts:134` -> `attempts`, `apps/api/src/jobs/supabase-repo.ts:136` -> `data.status`, `apps/api/src/jobs/supabase-repo.ts:139` -> `eq("attempts"`
+- Queue ids are trusted for privileged lookup; ownership is obtained from the row, not verified against the payload userId. `apps/api/src/jobs/consumer.ts:25` -> `admin.start(id)`, `apps/api/src/jobs/supabase-repo.ts:140` -> `data.user_id`
+- The admin start update compares the attempts value just read and permits queued/processing status; terminal rows return null. A duplicate arriving after the first start can read the increased attempts and start concurrently, because processing remains eligible. `apps/api/src/jobs/supabase-repo.ts:132` -> `attempts`, `apps/api/src/jobs/supabase-repo.ts:134` -> `data.status`, `apps/api/src/jobs/supabase-repo.ts:137` -> `eq("attempts"`

@@ -4,7 +4,7 @@ area: db
 files: ["supabase/migrations/20261108000000_tailoring.sql", "supabase/migrations/20261109200000_tailor_r2.sql", "supabase/tests/database/tailoring.test.sql", "supabase/tests/database/tailor_r2.test.sql"]
 depends_on: ["db/jobs", "shared/cv", "shared/tailoring", "shared/match-score"]
 contract: true
-checked_hash: e0338702
+checked_hash: 143d0d75
 cited: [152f35, ac56bb, 955275, e0a24c, 37b1ce, d68e7e, 97d1eb, ec7852, 0881e8, 12e3cb, 17a511, ff2797, 35e94f, 64495a, 140b80, c0e086, a5aa6e, 2bf14c, 1ced02, 91eb68, 3086e7, 285f5e, 6b9e00, cc7af7, 91ea83, f4a251, 5d7904, ffa578, bffb8e, ef358e, 0640b6, 4ba030, 101e7b, 291638, deb3ff, bec628, db8f9d, e3c4fa, 4e5696, 569300, f74cb8, b656f2, bbfcfb, 61e432, c06cae, 4e5696, fc9d94, 066e9a, deb3ff, 12b254, cdea93, aa84d2, 347f97, 4e5696, 89e738, f74cb8, 37b1ce, db8f9d, 12e3cb, bbfcfb]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
@@ -21,7 +21,7 @@ Store per-job tailored CVs, resumable runs and match scores under owner and pare
 - Current original match_scores SELECT/DELETE policies check row ownership; INSERT/UPDATE additionally require an owned job but do not validate tailored_cv_id ownership. `supabase/migrations/20261108000000_tailoring.sql:106` -> `own match scores: read`, `supabase/migrations/20261108000000_tailoring.sql:108` -> `own match scores: create`, `supabase/migrations/20261108000000_tailoring.sql:113` -> `own match scores: update`, `supabase/migrations/20261108000000_tailoring.sql:118` -> `own match scores: delete`
 - Round two adds steering defaulting to an empty JSON object and role_order defaulting to an empty text array, with nullable current_role_id; it does not replace the original policies. `supabase/migrations/20261109200000_tailor_r2.sql:3` -> `alter table public.tailored_cvs`, `supabase/migrations/20261109200000_tailor_r2.sql:6` -> `alter table public.tailor_runs`, `supabase/migrations/20261108000000_tailoring.sql:76` -> `with check`
 - SQL content/base_snapshot fields require only non-null JSONB, and version defaults to 1 without a positive-version check; shared schemas impose stricter reading requirements. `supabase/migrations/20261108000000_tailoring.sql:13` -> `content`, `supabase/migrations/20261108000000_tailoring.sql:22` -> `version`, `apps/api/src/tailor/supabase-repo.ts:97` -> `TailoredCvSchema.parse`
-- tested by `supabase/tests/database/tailoring.test.sql:113` -> `throws_ok`
+- tested by `supabase/tests/database/tailoring.test.sql:108` -> `throws_ok`
 - tested by `supabase/tests/database/tailor_r2.test.sql:41` -> `another user cannot read the steering`
 
 ## Connections
@@ -30,7 +30,7 @@ Store per-job tailored CVs, resumable runs and match scores under owner and pare
 - Used by run insert/update with owned job and document checks: `apps/api/src/tailor/supabase-repo.ts:161` -> `from("tailor_runs").insert` -> `supabase/migrations/20261108000000_tailoring.sql:88` -> `exists`; `apps/api/src/tailor/supabase-repo.ts:183` -> `update` -> `supabase/migrations/20261108000000_tailoring.sql:97` -> `exists`.
 - Used by score writes and reads: `apps/api/src/tailor/supabase-repo.ts:22` -> `from("match_scores").insert` -> `supabase/migrations/20261108000000_tailoring.sql:111` -> `exists`; `apps/api/src/tailor/supabase-repo.ts:32` -> `from("match_scores")` -> `supabase/migrations/20261108000000_tailoring.sql:107` -> `auth.uid()`.
 - Parent checks depend on jobs and tailored CV ownership: `supabase/migrations/20261108000000_tailoring.sql:88` -> `public.jobs` -> `supabase/migrations/20261107000000_jobs.sql:41` -> `auth.uid()`; `supabase/migrations/20261108000000_tailoring.sql:90` -> `public.tailored_cvs` -> `supabase/migrations/20261108000000_tailoring.sql:69` -> `auth.uid()`.
-- Job deletion cascades child data through foreign keys: `apps/api/src/jobs/supabase-repo.ts:115` -> `delete()` -> `supabase/migrations/20261108000000_tailoring.sql:10` -> `on delete cascade`, `supabase/migrations/20261108000000_tailoring.sql:32` -> `on delete cascade`, `supabase/migrations/20261108000000_tailoring.sql:49` -> `on delete cascade`.
+- Job deletion cascades child data through foreign keys: `apps/api/src/jobs/supabase-repo.ts:113` -> `delete()` -> `supabase/migrations/20261108000000_tailoring.sql:10` -> `on delete cascade`, `supabase/migrations/20261108000000_tailoring.sql:32` -> `on delete cascade`, `supabase/migrations/20261108000000_tailoring.sql:49` -> `on delete cascade`.
 
 ## Assumptions
 

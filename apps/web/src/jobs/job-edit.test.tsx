@@ -25,7 +25,7 @@ const job: Job = {
   id: "one", title: "Engineer", company: "Acme", location: "London", status: "ready",
   errorCode: null, source: "link", url: "https://example.com/jobs/1", createdAt: "2026-11-05T10:00:00Z",
   updatedAt: "2026-11-05T10:00:00Z", version: 1, editedByUser: false, rawText: "Original job ad", extracted,
-  userThoughts: null, applicationStatus: "saved",
+  applicationStatus: "saved",
 };
 function renderJob() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

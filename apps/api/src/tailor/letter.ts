@@ -36,7 +36,7 @@ export async function writeCoverLetter(
   const extracted = job.extracted;
   const cv = stripHeader(doc.content).cv;
   // The person's own words may back a number; the job's name, company and place may be named in prose.
-  const sources = [...texts(cv), job.userThoughts ?? "", input.whyCompany ?? "", extracted.title, extracted.company ?? "",
+  const sources = [...texts(cv), input.whyCompany ?? "", extracted.title, extracted.company ?? "",
     extracted.location ?? "", "I"];
   // Facts the ad states (its countries, tools, years asked for) may be named as facts about the job: the number and
   // name checks accept them, and the claim check gets them apart, so a claim about the candidate still needs the CV.
@@ -46,7 +46,7 @@ export async function writeCoverLetter(
   async function attempt(retry: { body: string; flags: TailorFlag[] } | null) {
     const { body } = await callModel(deps.model, {
       userId: input.userId, task: "tailor_letter", tier: "strong", schema: ReplySchema, system: letterSystemPrompt,
-      user: letterUserMessage({ cv, job: extracted, language: doc!.language, thoughts: job!.userThoughts, whyCompany: input.whyCompany, retry }),
+      user: letterUserMessage({ cv, job: extracted, language: doc!.language, whyCompany: input.whyCompany, retry }),
       maxOutputTokens: 4000,
     });
     const text = body.trim();

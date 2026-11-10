@@ -24,11 +24,11 @@ Prepare bounded capture data, authorize its POST, and map the result to popup ac
 - tested by `apps/extension/src/save.test.ts:181` -> `saveActiveTab`
 
 ## Connections
-- The shared input schema permits optional text of 200-60,000 characters and 20 JSON-LD items; this caller sends a stricter 30,000-character cap. `apps/extension/src/save.ts:39` -> `30_000`; `packages/shared/src/jobs.ts:42` -> `max(60000)`
+- The shared input schema permits optional text of 200-60,000 characters and 20 JSON-LD items; this caller sends a stricter 30,000-character cap. `apps/extension/src/save.ts:39` -> `30_000`; `packages/shared/src/jobs.ts:43` -> `max(60000)`
 - The API checks 100 * 1024 body bytes, slightly above the extension's 100,000-byte threshold, and also truncates stored text to 30,000 characters. `apps/extension/src/save.ts:42` -> `100_000`; `apps/api/src/jobs/routes.ts:12` -> `100 * 1024`; `apps/api/src/jobs/routes.ts:32` -> `bytes.byteLength`; `apps/api/src/jobs/routes.ts:60` -> `30_000`
 - Successful links resolve to the web job route; unreadable links supply the jobs page add parameter. `apps/extension/src/save.ts:65` -> `/jobs/`; `apps/web/src/router.tsx:20` -> `/jobs/:id`; `apps/extension/src/save.ts:34` -> `/jobs?add=`; `apps/web/src/jobs/JobsPage.tsx:48` -> `searchParams.get("add")`
 - Body validation is shared with the receiving API handler. `apps/extension/src/save.ts:44` -> `CreateJobBodySchema.safeParse`; `apps/api/src/jobs/routes.ts:39` -> `CreateJobBodySchema.safeParse`
 
 ## Assumptions
 - Success means accepted for background processing, not completed extraction: new jobs are queued before the API returns 202. `apps/extension/src/api.ts:30` -> `saved`; `apps/api/src/jobs/routes.ts:64` -> `queue.send`; `apps/api/src/jobs/routes.ts:69` -> `202`
-- Reader URL and text are untrusted until shared input validation; JSON-LD values remain unknown objects under that schema. `apps/extension/src/save.ts:44` -> `safeParse`; `packages/shared/src/jobs.ts:43` -> `z.unknown()`
+- Reader URL and text are untrusted until shared input validation; JSON-LD values remain unknown objects under that schema. `apps/extension/src/save.ts:44` -> `safeParse`; `packages/shared/src/jobs.ts:44` -> `z.unknown()`

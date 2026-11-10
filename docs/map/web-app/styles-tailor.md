@@ -4,8 +4,8 @@ area: web-app
 files: ["apps/web/src/styles/tailor.css"]
 depends_on: ["web-app/styles-base","web-app/styles-focus","web-app/styles-document","web-tailor/flow","web-tailor/page","web-tailor/guided-review","web-tailor/cover-letter","web-tailor/export-menu"]
 contract: false
-checked_hash: e3a7683d
-cited: [39cb42, 6d8157, 8a00ae, ae7507, 6f5fef, 1a82b1, b28147, 8a2ff1, f59d3f, b7e90d, 1ad807, 281e4e, d2fe18, 841456, ff8325, f8ddd6, 436294, 90e7ec, a0d63b, b28147, a22099, ebb8d5, fde637, 3699f7, 1a3d05, 8df121, 5a7ca6, 078a31, 39cb42, 2d6b0f, b28147, b871fd, ebb8d5, d2fe18, 7eb0eb, d11953, 1ad807, a22099]
+checked_hash: c3cbd5eb
+cited: [39cb42, 6d8157, 8a00ae, ae7507, 6f5fef, 1a82b1, b28147, 8a2ff1, f59d3f, b7e90d, 1ad807, 281e4e, d2fe18, 841456, ff8325, 45c5c0, 436294, 90e7ec, a0d63b, b28147, a22099, ebb8d5, fde637, 3699f7, 1a3d05, 8df121, fe1456, 5a7ca6, 078a31, 39cb42, 2d6b0f, b28147, b871fd, ebb8d5, d2fe18, 7eb0eb, d11953, 1ad807, a22099]
 decisions: []
 open: []
 ---
@@ -21,6 +21,8 @@ Style tailoring flows, translated documents, letters and guided review.
 - Retailor checkboxes explicitly override global field width to 18px and prevent flex growth. `apps/web/src/styles/tailor.css:145` -> `width: 18px`
 - .guide is a flex column with .guide-card ordered first and sticky; the page dims non-focus content while the focused CV mark gets a ring and 14rem scroll margin. `apps/web/src/styles/tailor.css:171` -> `.guide`; `apps/web/src/styles/tailor.css:173` -> `:not`; `apps/web/src/styles/tailor.css:175` -> `position: sticky`
 - Hidden offered items dim only direct child elements other than .tailor-hide; bare subtitle/description text in LayoutReview stays undimmed. The .tailor-hide checkbox overrides global width. `apps/web/src/styles/tailor.css:181` -> `> :not(.tailor-hide)`; `apps/web/src/tailor/LayoutReview.tsx:97` -> `item.sub`; `apps/web/src/tailor/LayoutReview.tsx:98` -> `item.fields.description`; `apps/web/src/styles/tailor.css:183` -> `width: auto`
+- Letter save status uses muted text. `apps/web/src/styles/tailor.css:131` -> `.letter-saved {`.
+
 ## Connections
 - Imported by both tailoring page modules rather than main directly: `apps/web/src/tailor/TailorFlow.tsx:20` -> `tailor.css`; `apps/web/src/tailor/TailoredCvPage.tsx:19` -> `tailor.css`; `apps/web/src/styles/tailor.css:3` -> `.tailor-mode`
 - GuidedReview uses the global guide layout around CvDocument: `apps/web/src/tailor/GuidedReview.tsx:98` -> `className="guide"`; `apps/web/src/styles/tailor.css:171` -> `.guide`; `apps/web/src/tailor/GuidedReview.tsx:100` -> `guide-card`; `apps/web/src/styles/tailor.css:175` -> `.guide-card`

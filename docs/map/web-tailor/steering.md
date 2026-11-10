@@ -5,7 +5,7 @@ files: ["apps/web/src/tailor/SteeringStep.tsx","apps/web/src/tailor/steering.tes
 depends_on: ["web-tailor/tone","shared/tailoring","web-enrich/answers","web-enrich/voice","web-tailor/flow-redo","web-tailor/cover-letter","api-tailor/letter"]
 contract: false
 checked_hash: fcb9403a
-cited: [0c2a6f, d1db38, 8c8900, ca71e4, 33864e, a21fd4, 80dc5a, 13a98a, 4f8c30, f96bb3, 4849ad, 151ced, 632a0e, f46024, 88bd2c, 0b932e, 494cc0, 56ffe8, 9b69e3, e4122d, 9bcc3a, 7ac20c, 13a98a, 904e1c, af8738, 151ced, 9c2236, 93eab7, 1f5491, a4cfb8, c1ac6d, 97f974]
+cited: [0c2a6f, d1db38, 8c8900, ca71e4, 33864e, a21fd4, 80dc5a, 13a98a, 4f8c30, f96bb3, 4849ad, 151ced, 632a0e, f46024, 88bd2c, 0b932e, 494cc0, d0ddea, 9b69e3, e4122d, 9bcc3a, 7ac20c, 13a98a, 904e1c, af8738, 151ced, 9c2236, 93eab7, 1f5491, a4cfb8, c1ac6d, 97f974]
 decisions: []
 open: []
 ---

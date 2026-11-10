@@ -109,7 +109,6 @@ export function CoverLetterTab({ cv, job, letter, onLetter, today = new Date() }
         {status}
         <label htmlFor="letter-manager">{t("letter.manager")}</label>
         <input id="letter-manager" maxLength={120} value={hiringManager} disabled={writing === "busy"} onChange={(event) => edit(setHiringManager)(event.target.value)} />
-        {job?.userThoughts?.trim() && <p className="letter-thoughts">{t("letter.thoughts")}</p>}
         {!letter ? (
           <button type="button" className="primary" disabled={writing === "busy"} onClick={() => void write()}>
             {t(writing === "busy" ? "letter.writing" : "letter.write")}

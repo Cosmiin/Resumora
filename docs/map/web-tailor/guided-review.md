@@ -5,7 +5,7 @@ files: ["apps/web/src/tailor/GuidedReview.tsx","apps/web/src/tailor/guided-revie
 depends_on: ["web-tailor/client-document","web-tailor/export-files","web-editor/document","api-tailor/review-item"]
 contract: false
 checked_hash: 6e5960b2
-cited: [14aed2, 477903, 9d2135, 01fe77, 39ea84, 0eee2c, f2540b, 537f5c, 6c45ba, 7e39d7, 638b98, 19d542, 2d6b0f, b871fd, b28147, ebb8d5, 7b8bbf, 063aaa, 523ad5, c5a5fe, 87fd5a, 530efa, 27ce4f, b871fd, 74e325, a22099, 661b03, b8832e, f2540b, f154be, b0724e, 0eee2c, 90391a, 6c45ba, f2540b, 1d7bfb, ca4931, b77fd8]
+cited: [14aed2, 477903, 9d2135, 01fe77, 39ea84, 0eee2c, f2540b, 537f5c, 6c45ba, 7e39d7, 638b98, 19d542, 2d6b0f, b871fd, b28147, ebb8d5, a339eb, 063aaa, 523ad5, c5a5fe, 87fd5a, 530efa, 27ce4f, b871fd, 74e325, a22099, 661b03, b8832e, f2540b, f154be, b0724e, 0eee2c, 90391a, 6c45ba, f2540b, 1d7bfb, ca4931, b77fd8]
 decisions: []
 open: []
 ---

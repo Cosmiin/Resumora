@@ -128,7 +128,7 @@
 .letter-empty { color: var(--text-muted); }
 .letter-close { margin-block-start: var(--space-3) !important; }
 .letter-side { display: grid; gap: var(--space-2); }
-.letter-thoughts, .letter-saved { color: var(--text-muted); }
+.letter-saved { color: var(--text-muted); }
 .letter-confirm { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .letter-flags { padding: var(--space-3); border-radius: var(--radius-md); background: var(--marigold-50); }
 .letter-flags ul { margin: 0; padding-inline-start: var(--space-4); }

@@ -201,7 +201,6 @@ export const tailorEn = {
   "letter.why": "Why {company}?",
   "letter.whyAny": "Why this company?",
   "letter.manager": "Hiring manager",
-  "letter.thoughts": "Uses your thoughts on the role ✓",
   "letter.write": "Write letter",
   "letter.writing": "Writing…",
   "letter.regenerate": "Regenerate",

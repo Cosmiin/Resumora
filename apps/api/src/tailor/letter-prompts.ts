@@ -9,14 +9,13 @@ Use only facts from the CV, its notes and the person's own words. Never invent n
 Write in the requested language, in a natural professional tone. Separate paragraphs with a blank line.`;
 
 export function letterUserMessage(input: {
-  cv: CvContent; job: JobExtraction; language: TailorLanguage; thoughts: string | null; whyCompany: string | null;
+  cv: CvContent; job: JobExtraction; language: TailorLanguage; whyCompany: string | null;
   retry: { body: string; flags: TailorFlag[] } | null;
 }): string {
   return JSON.stringify({
     language: NAMES[input.language],
     cv: input.cv,
     job: input.job,
-    thoughtsOnTheRole: input.thoughts,
     whyThisCompany: input.whyCompany,
     // One retry: the previous body broke these rules; write it again without them.
     ...(input.retry ? { previousBody: input.retry.body, problems: input.retry.flags.map((flag) => `${flag.rule}: ${flag.detail}`) } : {}),

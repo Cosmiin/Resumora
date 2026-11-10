@@ -4,8 +4,8 @@ area: web-app
 files: ["apps/web/src/jobs/JobEditForm.tsx","apps/web/src/jobs/job-edit.test.tsx"]
 depends_on: ["web-app/jobs-client","web-app/i18n","shared/jobs","web-app/styles-jobs"]
 contract: false
-checked_hash: ac0d10af
-cited: [c5c537, 888c1e, 34eebb, 986b8e, 21a65b, a23e56, 5dbcd4, e70d37, 98e7b5, d28546, b50ed1, 140a52, ffa06b, cbdcf5, 10a06a, 97440a, 26c153, fe4ebd, 8efa8f, 3218da, a23e56, 3a702b, b28896, 26c153, 02c320, fe4ebd, efefee, 98e7b5, b48a4d, 58963e, 98e7b5, 870c84]
+checked_hash: 99ac5da8
+cited: [c5c537, 888c1e, 34eebb, 986b8e, 21a65b, a23e56, 5dbcd4, e70d37, 98e7b5, d28546, b50ed1, 140a52, ffa06b, cbdcf5, 10a06a, 97440a, 26c153, fe4ebd, 8efa8f, 3218da, 1df6bf, a23e56, 3a702b, b28896, 26c153, 02c320, fe4ebd, efefee, 98e7b5, 2e8682, 58963e, 98e7b5, 870c84]
 decisions: ["docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---
@@ -22,6 +22,8 @@ Edit a captured extraction using a fixed starting version and shared enum choice
 - Requirement text inputs cap at 500, and Add disables at 60 rows. `apps/web/src/jobs/JobEditForm.tsx:122` -> `maxLength={500}`; `apps/web/src/jobs/JobEditForm.tsx:135` -> `>= 60`
 - tested by `apps/web/src/jobs/job-edit.test.tsx:177` -> `caps responsibilities`
 - tested by `apps/web/src/jobs/job-edit.test.tsx:219` -> `disables Save and Cancel`
+- The edit tests use a full Job fixture with application status and no job note. `apps/web/src/jobs/job-edit.test.tsx:28` -> `applicationStatus: "saved"`.
+
 ## Connections
 - Copied limits must change with shared/jobs: `apps/web/src/jobs/JobEditForm.tsx:49` -> `40`; `packages/shared/src/jobs.ts:17` -> `max(40)`; `packages/shared/src/jobs.ts:23` -> `max(30)`; `apps/web/src/jobs/JobEditForm.tsx:122` -> `500`; `packages/shared/src/jobs.ts:19` -> `max(500)`; `apps/web/src/jobs/JobEditForm.tsx:135` -> `60`; `packages/shared/src/jobs.ts:22` -> `max(60)`
 - Uses the full extraction PATCH client: `apps/web/src/jobs/JobEditForm.tsx:56` -> `patchJob`; `apps/web/src/jobs/jobs-api.ts:46` -> `version, extracted`

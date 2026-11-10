@@ -21,7 +21,7 @@ const tailored = (coverLetter: CoverLetter | null): TailoredCv => ({
   template: "classic", tone: "neutral", instruction: null, review: null, score: null, coverLetter, version: 1,
   createdAt: "2026-11-08T09:00:00Z", updatedAt: "2026-11-08T09:00:00Z",
 } as TailoredCv);
-const job = { id: "job-1", status: "ready", userThoughts: "Love the remote setup",
+const job = { id: "job-1", status: "ready",
   extracted: { title: "Payroll Engineer", company: "Globex" } } as unknown as Job;
 const today = new Date("2026-11-08T12:00:00Z");
 
@@ -41,7 +41,7 @@ beforeEach(() => {
 describe("Cover letter tab", () => {
   it("shows Write letter when there's no letter yet, and writes one with the side fields", async () => {
     const onLetter = renderTab(null);
-    expect(screen.getByText("Uses your thoughts on the role ✓")).toBeInTheDocument();
+    expect(screen.queryByText(/Uses your thoughts on the role/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Regenerate" })).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Why Globex?"), "Their payroll tools");
     await userEvent.type(screen.getByLabelText("Hiring manager"), "Maria Ionescu");

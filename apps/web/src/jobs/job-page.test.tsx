@@ -20,13 +20,12 @@ import { AuthProvider } from "../auth/AuthProvider.tsx";
 import { routes } from "../router.tsx";
 import { ApiClientError } from "../lib/api.ts";
 import { deleteJob, getJob, getJobScore, listJobs, patchJob, scoreJob } from "./jobs-api.ts";
-import { JobThoughts } from "./JobThoughts.tsx";
 
 const job: Job = {
   id: "one", title: "Engineer", company: "Acme", location: "London", status: "ready",
   errorCode: null, source: "link", url: "https://example.com/jobs/1", createdAt: "2026-11-05T10:00:00Z",
   updatedAt: "2026-11-05T10:00:00Z", version: 1, editedByUser: false,
-  userThoughts: null, applicationStatus: "saved",
+  applicationStatus: "saved",
   rawText: "We need Strong SQL skills.\nGerman is welcome.\n<b>Plain text</b>",
   extracted: {
     title: "Engineer", company: "Acme", location: "London", workMode: "hybrid", employmentType: "full_time",
@@ -68,6 +67,29 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("job page", () => {
+  it("shows no thoughts box or voice button for a ready job", async () => {
+    renderJob(); await ready();
+    expect(screen.queryByRole("textbox", { name: "Your thoughts on this role" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Your thoughts on this role")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Speak your thoughts" })).not.toBeInTheDocument();
+    expect(document.querySelector("button.mic")).toBeNull();
+  });
+  it("keeps Edit disabled until the status save finishes, then edits the current version", async () => {
+    let finishStatus!: (value: Job) => void;
+    vi.mocked(patchJob).mockReturnValueOnce(new Promise<Job>((resolve) => { finishStatus = resolve; }));
+    renderJob(); await ready();
+    const edit = screen.getByRole("button", { name: "Edit" });
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Application status" }), "applied");
+    expect(edit).toBeDisabled();
+    await userEvent.click(edit);
+    expect(screen.queryByRole("textbox", { name: "Job title" })).not.toBeInTheDocument();
+    await act(async () => { finishStatus({ ...job, applicationStatus: "applied", version: 2 }); });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await userEvent.click(edit);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await ready();
+    expect(patchJob).toHaveBeenLastCalledWith("one", 2, job.extracted);
+  });
   it("shows a closed-position notice near the top while keeping job actions available", async () => {
     vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, positionClosed: true } });
     renderJob(); await ready();
@@ -96,108 +118,6 @@ describe("job page", () => {
     expect(screen.getByText("Build better tools.")).toBeInTheDocument();
     expect(screen.getByText("This position is no longer open for applications.")).toBeVisible();
   });
-  it("keeps the newest queued thoughts visible when their save fails after an earlier response", async () => {
-    let finishFirst!: (value: Job) => void, failNext!: (cause: Error) => void;
-    const first = new Promise<Job>((resolve) => { finishFirst = resolve; });
-    const next = new Promise<Job>((_resolve, reject) => { failNext = reject; });
-    vi.mocked(patchJob).mockReturnValueOnce(first).mockReturnValueOnce(next);
-    const { client } = renderJob(); await ready();
-    const field = screen.getByRole("textbox", { name: "Your thoughts on this role" });
-    fireEvent.change(field, { target: { value: "First thoughts" } }); fireEvent.blur(field);
-    await waitFor(() => expect(patchJob).toHaveBeenCalledTimes(1));
-    fireEvent.change(field, { target: { value: "Intermediate thoughts" } }); fireEvent.blur(field);
-    fireEvent.change(field, { target: { value: "Newest thoughts" } }); fireEvent.blur(field);
-    await act(async () => { finishFirst({ ...job, userThoughts: "First thoughts", version: 2 }); });
-    await waitFor(() => expect(patchJob).toHaveBeenCalledTimes(2));
-    expect(field).toHaveValue("Newest thoughts");
-    expect(patchJob).toHaveBeenLastCalledWith("one", 2, job.extracted, { userThoughts: "Newest thoughts" });
-    await act(async () => { failNext(new ApiClientError(409, "version_conflict", "Changed elsewhere")); });
-    expect(await screen.findByRole("alert")).toHaveTextContent("This job changed elsewhere.");
-    expect(field).toHaveValue("Newest thoughts");
-    expect(client.getQueryData(["job", "u1", "one"])).toMatchObject({ userThoughts: "First thoughts", version: 2 });
-    expect(patchJob).toHaveBeenCalledTimes(2);
-  });
-  it("does not retry failed thoughts on unmount when opening Edit", async () => {
-    vi.mocked(patchJob).mockRejectedValueOnce(new ApiClientError(409, "version_conflict", "Changed elsewhere"));
-    renderJob(); await ready();
-    const field = screen.getByRole("textbox", { name: "Your thoughts on this role" });
-    await userEvent.type(field, "Unsaved thoughts"); await userEvent.tab();
-    expect(await screen.findByRole("alert")).toHaveTextContent("This job changed elsewhere.");
-    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
-    expect(screen.getByRole("textbox", { name: "Job title" })).toBeInTheDocument();
-    expect(patchJob).toHaveBeenCalledTimes(1);
-    await userEvent.click(screen.getByRole("button", { name: "Save" })); await ready();
-    expect(patchJob).toHaveBeenCalledTimes(2);
-    expect(patchJob).toHaveBeenLastCalledWith("one", 1, job.extracted);
-  });
-  it("refreshes clean unfocused thoughts while keeping focused or unsaved text", async () => {
-    const onSave = vi.fn(async () => undefined);
-    const { rerender } = render(<JobThoughts value="Original thoughts" onSave={onSave} />);
-    const field = screen.getByRole("textbox", { name: "Your thoughts on this role" });
-    rerender(<JobThoughts value="Refetched thoughts" onSave={onSave} />);
-    expect(field).toHaveValue("Refetched thoughts");
-    await userEvent.click(field);
-    rerender(<JobThoughts value="Changed while focused" onSave={onSave} />);
-    expect(field).toHaveValue("Refetched thoughts");
-    await userEvent.tab();
-    fireEvent.change(field, { target: { value: "Unsaved thoughts" } });
-    rerender(<JobThoughts value="Changed elsewhere again" onSave={onSave} />);
-    expect(field).toHaveValue("Unsaved thoughts");
-  });
-  it("keeps Edit disabled until thoughts and status saves settle, then edits the current version", async () => {
-    let finishThoughts!: (value: Job) => void, finishStatus!: (value: Job) => void;
-    const thoughts = new Promise<Job>((resolve) => { finishThoughts = resolve; });
-    const status = new Promise<Job>((resolve) => { finishStatus = resolve; });
-    vi.mocked(patchJob).mockReturnValueOnce(thoughts).mockReturnValueOnce(status);
-    renderJob(); await ready();
-    const edit = screen.getByRole("button", { name: "Edit" });
-    fireEvent.change(screen.getByRole("textbox", { name: "Your thoughts on this role" }), { target: { value: "My thoughts" } });
-    fireEvent.blur(screen.getByRole("textbox", { name: "Your thoughts on this role" }));
-    await waitFor(() => expect(edit).toBeDisabled());
-    await userEvent.click(edit);
-    expect(screen.queryByRole("textbox", { name: "Job title" })).not.toBeInTheDocument();
-    await act(async () => { finishThoughts({ ...job, userThoughts: "My thoughts", version: 2 }); });
-    await waitFor(() => expect(edit).toBeEnabled());
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Application status" }), "applied");
-    expect(edit).toBeDisabled();
-    await userEvent.click(edit);
-    expect(screen.queryByRole("textbox", { name: "Job title" })).not.toBeInTheDocument();
-    await act(async () => { finishStatus({ ...job, userThoughts: "My thoughts", applicationStatus: "applied", version: 3 }); });
-    await waitFor(() => expect(edit).toBeEnabled());
-    await userEvent.click(edit);
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
-    await ready();
-    expect(patchJob).toHaveBeenLastCalledWith("one", 3, job.extracted);
-  });
-  it("saves thoughts reverted to their original value while the earlier save is pending", async () => {
-    let finishFirst!: (value: Job) => void;
-    const first = new Promise<Job>((resolve) => { finishFirst = resolve; });
-    vi.mocked(getJob).mockResolvedValue({ ...job, userThoughts: "Original thoughts" });
-    vi.mocked(patchJob).mockImplementationOnce(() => first);
-    const { client } = renderJob(); await ready();
-    const field = screen.getByRole("textbox", { name: "Your thoughts on this role" });
-    fireEvent.change(field, { target: { value: "Changed thoughts" } }); fireEvent.blur(field);
-    await waitFor(() => expect(patchJob).toHaveBeenCalledTimes(1));
-    fireEvent.change(field, { target: { value: "Original thoughts" } }); fireEvent.blur(field);
-    await act(async () => { finishFirst({ ...job, userThoughts: "Changed thoughts", version: 2 }); });
-    await waitFor(() => expect(client.getQueryData(["job", "u1", "one"])).toMatchObject({ userThoughts: "Original thoughts", version: 3 }));
-    expect(patchJob).toHaveBeenLastCalledWith("one", 2, job.extracted, { userThoughts: "Original thoughts" });
-  });
-  it("blocks Edit during dictation and saves transcribed thoughts when leaving", async () => {
-    const { router } = renderJob(); await ready();
-    const voice = vi.mocked(useVoice).mock.results[0]!.value;
-    await userEvent.click(screen.getByRole("button", { name: "Speak your thoughts" }));
-    vi.mocked(useVoice).mockReturnValue({ ...voice, state: "recording" });
-    act(() => vi.mocked(voice.onFinal).mock.calls.at(-1)![0]("Spoken thoughts"));
-    const edit = screen.getByRole("button", { name: "Edit" });
-    expect(edit).toBeDisabled();
-    await userEvent.click(edit);
-    expect(screen.getByRole("textbox", { name: "Your thoughts on this role" })).toHaveValue("Spoken thoughts");
-    await userEvent.click(screen.getByRole("link", { name: /All jobs/ }));
-    expect(router.state.location.pathname).toBe("/jobs");
-    expect(voice.stop).toHaveBeenCalled();
-    await waitFor(() => expect(patchJob).toHaveBeenCalledWith("one", 1, job.extracted, { userThoughts: "Spoken thoughts" }));
-  });
   it("an enriched CV goes straight into tailoring, with no dialog", async () => {
     vi.mocked(useRoleScores).mockReturnValue(roleScores(40));
     vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv(), experience: [role], enrichedAt: "2026-11-09T12:00:00.000Z" }, version: 1, updatedAt: job.updatedAt });
@@ -221,10 +141,10 @@ describe("job page", () => {
 
   describe("reopening a tailored CV", () => {
     const box = async () => (await screen.findByText(/Tailored CV ready|Tailoring in progress/)).closest(".tailor") as HTMLElement;
-    /** C5: the box sits at the top of the job page, above the requirements, the ad and the thoughts. */
+    /** C5: the box sits at the top of the job page, above the requirements, the ad and application status. */
     const expectAtTop = (tailor: HTMLElement) => {
       for (const below of [screen.getByRole("heading", { name: /What they ask for/ }),
-        screen.getByRole("button", { name: "Show original ad" }), screen.getByRole("textbox", { name: "Your thoughts on this role" })]) {
+        screen.getByRole("button", { name: "Show original ad" }), screen.getByRole("combobox", { name: "Application status" })]) {
         expect(tailor.compareDocumentPosition(below) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       }
     };
@@ -309,37 +229,6 @@ describe("job page", () => {
     renderJob(); await ready();
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
     expect(await screen.findByText("Not scored yet")).toBeInTheDocument();
-  });
-  it("saves thoughts on blur and refreshes the cached job", async () => {
-    const { client } = renderJob(); await ready();
-    const field = screen.getByRole("textbox", { name: "Your thoughts on this role" });
-    expect(field).toHaveAttribute("maxlength", "2000");
-    await userEvent.type(field, "I enjoy reporting.");
-    expect(patchJob).not.toHaveBeenCalled();
-    await userEvent.tab();
-    await waitFor(() => expect(client.getQueryData(["job", "u1", "one"])).toMatchObject({ userThoughts: "I enjoy reporting.", version: 2 }));
-    expect(patchJob).toHaveBeenCalledWith("one", 1, job.extracted, { userThoughts: "I enjoy reporting." });
-  });
-  it("keeps thoughts visible and warns when their save has a version conflict", async () => {
-    vi.mocked(patchJob).mockRejectedValue(new ApiClientError(409, "version_conflict", "Changed elsewhere"));
-    renderJob(); await ready();
-    const field = screen.getByRole("textbox", { name: "Your thoughts on this role" });
-    await userEvent.type(field, "My thoughts"); await userEvent.tab();
-    expect(await screen.findByRole("alert")).toHaveTextContent("This job changed elsewhere.");
-    expect(field).toHaveValue("My thoughts");
-  });
-  it("appends voice to typed thoughts, caps it at 2000 and saves on blur", async () => {
-    renderJob(); await ready();
-    const field = screen.getByRole("textbox", { name: "Your thoughts on this role" });
-    await userEvent.type(field, "Interested");
-    await userEvent.click(screen.getByRole("button", { name: "Speak your thoughts" }));
-    const voice = vi.mocked(useVoice).mock.results[0]!.value;
-    expect(voice.start).toHaveBeenCalled();
-    const final = vi.mocked(voice.onFinal).mock.calls.at(-1)![0];
-    act(() => final("in reporting " + "x".repeat(2000)));
-    expect(field).toHaveValue(("Interested in reporting " + "x".repeat(2000)).slice(0, 2000));
-    fireEvent.blur(field);
-    await waitFor(() => expect(patchJob).toHaveBeenCalledWith("one", 1, job.extracted, { userThoughts: expect.any(String) }));
   });
   it("offers all six statuses and saves the selected status", async () => {
     const { client } = renderJob(); await ready();
@@ -544,21 +433,6 @@ describe("job page", () => {
     renderJob(); await screen.findByRole("button", { name: "Delete" });
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(within(screen.getByRole("dialog")).queryByText("This also deletes its tailored CVs, translations and cover letters.")).toBeNull();
-  });
-
-  it("saves on unmount again after a failed save is followed by a successful one", async () => {
-    const onSave = vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValue(undefined);
-    const { unmount } = render(<JobThoughts value="" onSave={onSave} />);
-    const field = screen.getByRole("textbox", { name: "Your thoughts on this role" });
-    fireEvent.change(field, { target: { value: "One" } }); fireEvent.blur(field);
-    await screen.findByRole("alert");
-    fireEvent.change(field, { target: { value: "Two" } }); fireEvent.blur(field);
-    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
-    fireEvent.change(field, { target: { value: "Three" } });
-    unmount();
-    expect(onSave).toHaveBeenCalledTimes(3);
-    expect(onSave).toHaveBeenLastCalledWith("Three");
   });
 
   it("cancels deletion and keeps the job", async () => {

@@ -4,8 +4,8 @@ area: api-tailor
 files: ["apps/api/src/tailor/retailor.ts","apps/api/test/tailor-retailor.test.ts","apps/api/test/tailor-redo.test.ts"]
 depends_on: ["shared/tailoring","db/tailoring-runs","db/tailoring-repository","db/match-scores-repository","db/cv-repository","api-tailor/start"]
 contract: true
-checked_hash: 30a5299c
-cited: [622714, 3bcc91, 2aba7a, 1f10d5, 65c0a7, 6f2c4b, bd3370, 0995d2, c8bdc1, 90885d, e131c2, 8053aa, 3adbcc, 8053aa, 1c5777, 3adbcc, c54052, 5530c7, 973961, 0b7e77, c54052, d6c3d6, eca151, 8f7d05, 646413, 26f36d, d1bad7, 568568, f56a16, dc9c07, da9169, c3ad51, 8053aa, 6742c1, 3adbcc, f1e47c, 1f8c4b, 69cf18, 0e9776, 8053aa, 8b5a35, 9e323d]
+checked_hash: c09a2577
+cited: [622714, 3bcc91, 2aba7a, 1f10d5, 65c0a7, 6f2c4b, bd3370, 0995d2, c8bdc1, 90885d, e131c2, 8053aa, 3adbcc, 8053aa, 1c5777, 3adbcc, c54052, 5530c7, 973961, 0b7e77, c54052, d6c3d6, eca151, 8f7d05, 307abb, 646413, 26f36d, d1bad7, 568568, f56a16, dc9c07, da9169, c3ad51, 8053aa, 6742c1, 3adbcc, f1e47c, 1f8c4b, 69cf18, 0e9776, 8053aa, 8b5a35, 9e323d]
 decisions: []
 open: []
 ---
@@ -21,6 +21,8 @@ Start selected-section runs or reset every step when steering changes.
 - Old run is not closed or marked superseded; restart updates only the new run, and repeated restart makes another run `apps/api/src/tailor/retailor.ts:60` -> `created`; `apps/api/src/tailor/retailor.ts:68` -> `updateRun(created.id`.
 - tested by `apps/api/test/tailor-retailor.test.ts:99` -> `re-tailor`.
 - tested by `apps/api/test/tailor-redo.test.ts:157` -> `changing steering after Experience`.
+
+- Status saves leave the job-change timestamp alone; extraction edits advance it, tested by `apps/api/test/tailor-retailor.test.ts:174` -> `only an extraction edit moves the job's updatedAt`.
 
 ## Connections
 

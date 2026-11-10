@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
-import type { Job, JobListPage, JobPatch } from "@resumora/shared";
+import type { Job, JobListPage } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ApiClientError } from "../lib/api.ts";
@@ -10,7 +10,6 @@ import { deleteJob, getJob, getJobScore, patchJob, scoreJob } from "./jobs-api.t
 import { JobSummary } from "./JobSummary.tsx";
 import { JobEditForm } from "./JobEditForm.tsx";
 import { RequirementList } from "./RequirementList.tsx";
-import { JobThoughts } from "./JobThoughts.tsx";
 import { TailorGate } from "./TailorGate.tsx";
 import { getRun } from "../tailor/tailor-api.ts";
 import { remembered } from "../tailor/TailorFlow.tsx";
@@ -31,10 +30,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const [tailorGate, setTailorGate] = useState(false);
   const [tailorReason, setTailorReason] = useState<string | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
-  const [pendingSaves, setPendingSaves] = useState(0);
-  const [thoughtsBusy, setThoughtsBusy] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
-  const detailsSave = useRef<Promise<unknown>>(Promise.resolve());
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const query = useQuery({
@@ -100,22 +96,15 @@ function JobView({ id, userId }: { id: string; userId: string }) {
     await cacheJob(updated);
     setEditing(false);
   }
-  function saveDetails(changes: Pick<JobPatch, "userThoughts" | "applicationStatus">): Promise<Job> {
-    setPendingSaves((count) => count + 1);
-    const pending = detailsSave.current.catch(() => undefined).then(async () => {
-      const current = queryClient.getQueryData<Job>(["job", userId, id]);
-      if (!current?.extracted) throw new Error(t("jobs.error.wrong_status"));
-      const updated = await patchJob(id, current.version, current.extracted, changes);
-      await cacheJob(updated);
-      return updated;
-    }).finally(() => setPendingSaves((count) => count - 1));
-    detailsSave.current = pending;
-    return pending;
-  }
   async function changeStatus(applicationStatus: Job["applicationStatus"]) {
     setStatusSaving(true);
     setStatusError(null);
-    try { await saveDetails({ applicationStatus }); }
+    try {
+      const current = queryClient.getQueryData<Job>(["job", userId, id]);
+      if (!current?.extracted) throw new Error(t("jobs.error.wrong_status"));
+      const updated = await patchJob(id, current.version, current.extracted, { applicationStatus });
+      await cacheJob(updated);
+    }
     catch (cause) { setStatusError(t(cause instanceof ApiClientError && cause.code === "version_conflict"
       ? "jobs.error.version_conflict" : "jobs.error.generic")); }
     finally { setStatusSaving(false); }
@@ -194,7 +183,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         }} /> : extracted ? <>
         <div className="view-head">
           <div><h1 className="vtitle">{job.title}</h1><div className="vsub">{[job.company, job.location].filter(Boolean).join(" · ")}</div></div>
-          <div className="job-actions"><button type="button" className="secondary" disabled={pendingSaves > 0 || thoughtsBusy} onClick={() => setEditing(true)}>{t("job.edit")}</button>{deletion}</div>
+          <div className="job-actions"><button type="button" className="secondary" disabled={statusSaving} onClick={() => setEditing(true)}>{t("job.edit")}</button>{deletion}</div>
         </div>
         {extracted.positionClosed === true && <p role="status" className="jobs-note">{t("job.positionClosed")}</p>}
         {tailorOnTop && tailor}
@@ -219,7 +208,6 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           </select>
         </label>
         {statusError && <p role="alert" className="jobs-field-error">{statusError}</p>}
-        <JobThoughts value={job.userThoughts} onBusyChange={setThoughtsBusy} onSave={(userThoughts) => saveDetails({ userThoughts })} />
         {!tailorOnTop && tailor}
         <footer className="foot">{original}<span>{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</span></footer>
       </> : job?.status === "needs_text" ? <div className="waiting">

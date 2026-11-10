@@ -4,7 +4,7 @@ area: db
 files: ["supabase/migrations/20261108020000_add_job_notes.sql", "supabase/migrations/20261109230000_job_notes_projects.sql", "supabase/tests/database/job_notes_projects.test.sql", "supabase/tests/database/tailoring.test.sql"]
 depends_on: ["db/base-cv", "shared/cv", "shared/notes"]
 contract: true
-checked_hash: c7ab23e2
+checked_hash: 6e57f713
 cited: [cfd773, 263336, 8a90b7, 4901e4, b5047d, 73da61, 263336, 11a8c6, 15f7af, 0d6e05, 8b9c7d, 5be7b7, c3f0ab, 7d4ba9, 2204df, d361fe, f2c276, 88a6e4, cfd773, 8a94de, d841d0, fcdeb7, e48a51, 66e105, 254135, 964e15, 263336, 0d6e05, 15f7af, fb5708, 763aab, 5be7b7, e7c939]
 decisions: ["docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
@@ -20,8 +20,8 @@ Append job answers to the latest saved role or project without creating history.
 - Successful calls update content, version and updated_at with no history insertion, including calls with an empty notes array. `supabase/migrations/20261109230000_job_notes_projects.sql:48` -> `update public.base_cvs`
 - Execution is restricted to authenticated by the current migration's grants. `supabase/migrations/20261109230000_job_notes_projects.sql:57` -> `revoke execute`
 - tested by `supabase/tests/database/job_notes_projects.test.sql:13` -> `results_eq`
-- tested by `supabase/tests/database/tailoring.test.sql:228` -> `results_eq`
-- tested by `supabase/tests/database/tailoring.test.sql:278` -> `throws_ok`
+- tested by `supabase/tests/database/tailoring.test.sql:223` -> `results_eq`
+- tested by `supabase/tests/database/tailoring.test.sql:273` -> `throws_ok`
 
 ## Connections
 

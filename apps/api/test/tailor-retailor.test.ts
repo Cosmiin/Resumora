@@ -171,7 +171,7 @@ describe("re-tailor", () => {
 });
 
 describe("job changes the re-tailor notice reads", () => {
-  it("only an extraction edit moves the job's updatedAt; status and thoughts saves don't", async () => {
+  it("only an extraction edit moves the job's updatedAt; status saves don't", async () => {
     let clock = new Date("2026-11-08T10:00:00Z");
     const own = memoryJobs({ now: () => clock });
     const repoA = own.repoFor("user-a");
@@ -180,7 +180,7 @@ describe("job changes the re-tailor notice reads", () => {
     await own.admin.finish(id, job);
     const before = (await repoA.get(id))!;
     clock = new Date("2026-11-08T11:00:00Z");
-    expect(await repoA.patch(id, before.version, job, { applicationStatus: "tailored", userThoughts: "Nice team" })).toBe("ok");
+    expect(await repoA.patch(id, before.version, job, { applicationStatus: "tailored" })).toBe("ok");
     const afterStatus = (await repoA.get(id))!;
     expect(afterStatus).toMatchObject({ applicationStatus: "tailored", updatedAt: before.updatedAt, editedByUser: false });
     clock = new Date("2026-11-08T12:00:00Z");

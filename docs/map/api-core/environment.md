@@ -26,4 +26,4 @@ Define runtime environment names, queue binding types and the request identity p
 
 ## Assumptions
 - Env is a TypeScript declaration, not runtime validation; provider selection silently drops incomplete model/key pairs. `apps/api/src/env.ts:3` -> `Env`, `apps/api/src/ai/call-model.ts:89` -> `filter`
-- The narrower SupabaseEnv type is the request-side boundary; privileged queue clients accept the service-role name separately. `apps/api/src/env.ts:24` -> `SupabaseEnv`, `apps/api/src/imports/supabase-repo.ts:87` -> `SUPABASE_SERVICE_ROLE_KEY`, `apps/api/src/jobs/supabase-repo.ts:123` -> `SUPABASE_SERVICE_ROLE_KEY`
+- The narrower SupabaseEnv type is the request-side boundary; privileged queue clients accept the service-role name separately. `apps/api/src/env.ts:24` -> `SupabaseEnv`, `apps/api/src/imports/supabase-repo.ts:87` -> `SUPABASE_SERVICE_ROLE_KEY`, `apps/api/src/jobs/supabase-repo.ts:121` -> `SUPABASE_SERVICE_ROLE_KEY`

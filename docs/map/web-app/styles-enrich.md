@@ -5,7 +5,7 @@ files: ["apps/web/src/styles/enrich.css"]
 depends_on: ["web-app/styles-base","web-app/styles-panel","web-app/styles-document","web-enrich/score-display","web-enrich/voice-ui","web-enrich/summary-review","web-enrich/skills-review"]
 contract: false
 checked_hash: b05dd8dd
-cited: [93fe6a, 38323d, 619cfb, 49330f, e03f0a, dbe32a, 761b8a, eb1520, 05782b, ecde40, 468b70, c98f72, 1d79d8, aab88a, 489426, 27064f, 4f22da, 1a5e4b, 335b6b, 0c54da, 01d2bd, 00bcda, 888274, be7fbe, ecde40, cb8b37, 01d2bd, 740c61, 00bcda, ecde40, 0c52ea, ae193f]
+cited: [93fe6a, 38323d, 619cfb, 49330f, e03f0a, dbe32a, 761b8a, eb1520, 05782b, ecde40, 468b70, c98f72, 1d79d8, aab88a, 489426, 27064f, 4f22da, 1a5e4b, 335b6b, 0c54da, 01d2bd, 00bcda, e10f9a, be7fbe, ecde40, cb8b37, 01d2bd, 740c61, 00bcda, ecde40, 0c52ea, f023ab]
 decisions: []
 open: []
 ---
@@ -21,7 +21,7 @@ Style shared scores, answer/voice controls and enrichment proposal states.
 - Reduced-motion overrides disable new-word, microphone, streaming-caret and spinner animations; the microphone retains a static shadow. `apps/web/src/styles/enrich.css:98` -> `prefers-reduced-motion`
 - Global .check with scoped .ok/.no and global .sugg with scoped .grp/.ev support checklists and skill choices; .sugg.sort-pick changes columns and cursor. `apps/web/src/styles/enrich.css:106` -> `.check`; `apps/web/src/styles/enrich.css:111` -> `.sugg`
 ## Connections
-- Microphone styling is used indirectly by jobs: `apps/web/src/jobs/JobThoughts.tsx:89` -> `MicButton`; `apps/web/src/cv/enrich/VoiceControls.tsx:46` -> `className="mic"`; `apps/web/src/styles/enrich.css:60` -> `.mic`
+- Microphone styling is shared with tailoring steering: `apps/web/src/tailor/SteeringStep.tsx:20` -> `MicButton`; `apps/web/src/cv/enrich/VoiceControls.tsx:46` -> `className="mic"`; `apps/web/src/styles/enrich.css:60` -> `.mic`
 - Shared checklist/skill classes connect to enrichment renderers: `apps/web/src/cv/enrich/Checklist.tsx:6` -> `check`; `apps/web/src/styles/enrich.css:106` -> `.check`; `apps/web/src/cv/enrich/SkillsTools.tsx:37` -> `sugg`; `apps/web/src/styles/enrich.css:111` -> `.sugg`
 ## Assumptions
-- .mic needs a positioned field wrapper to anchor correctly; answer-field and job-thoughts-field provide it in their respective styles. `apps/web/src/styles/enrich.css:60` -> `position: absolute`; `apps/web/src/styles/enrich.css:56` -> `position: relative`; `apps/web/src/styles/jobs.css:202` -> `position: relative`
+- .mic needs a positioned field wrapper to anchor correctly; answer-field and tailor-field provide it. `apps/web/src/styles/enrich.css:60` -> `position: absolute`; `apps/web/src/styles/enrich.css:56` -> `position: relative`; `apps/web/src/styles/tailor.css:33` -> `.tailor-field {`

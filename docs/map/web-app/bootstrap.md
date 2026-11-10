@@ -5,7 +5,7 @@ files: ["apps/web/src/main.tsx","apps/web/src/router.tsx","apps/web/index.html"]
 depends_on: ["web-app/auth-state","web-app/auth-login","web-app/auth-reset","web-app/styles-base","web-editor/page","web-app/jobs-list","web-app/job-page","web-tailor/flow","web-tailor/page"]
 contract: false
 checked_hash: 4e3650e4
-cited: [19832f, 4b46e5, e75bd6, 40ac5e, ebc754, 1e5614, 9acc78, 0480af, 592da7, 559a7f, 95ea98, 5a7ca6, 1d78db, aa16d7, 9acc78, 51e821, f3297e, 565aaf, 08e098, e57f51, 93e707, 03889c, c80046, 4b46e5]
+cited: [19832f, 4b46e5, e75bd6, 40ac5e, ebc754, 1e5614, 9acc78, 0480af, 592da7, 559a7f, 95ea98, 5a7ca6, 1d78db, aa16d7, 9acc78, 51e821, f3297e, 565aaf, 08e098, 552bb4, 93e707, 03889c, c80046, 4b46e5]
 decisions: []
 open: []
 ---
@@ -19,6 +19,6 @@ Mount the browser application and choose public and authenticated pages.
 - Router dependencies load tailor.css before main imports tokens.css and app.css, so main's direct stylesheet list is not the complete load order. Later rules can affect earlier feature markup. `apps/web/src/main.tsx:8` -> `router.tsx`; `apps/web/src/router.tsx:8` -> `TailorFlow`; `apps/web/src/tailor/TailorFlow.tsx:20` -> `tailor.css`; `apps/web/src/main.tsx:9` -> `tokens.css`; `apps/web/src/main.tsx:10` -> `app.css`
 ## Connections
 - Uses the auth guard for the protected route branch: `apps/web/src/router.tsx:15` -> `RequireAuth`; `apps/web/src/auth/RequireAuth.tsx:10` -> `Navigate`
-- Uses the CV, job and tailoring pages by route: `apps/web/src/router.tsx:18` -> `CvPage`; `apps/web/src/cv/CvPage.tsx:18` -> `CvPage`; `apps/web/src/router.tsx:20` -> `JobPage`; `apps/web/src/jobs/JobPage.tsx:18` -> `JobPage`; `apps/web/src/router.tsx:21` -> `TailorFlow`; `apps/web/src/tailor/TailorFlow.tsx:25` -> `TailorFlow`
+- Uses the CV, job and tailoring pages by route: `apps/web/src/router.tsx:18` -> `CvPage`; `apps/web/src/cv/CvPage.tsx:18` -> `CvPage`; `apps/web/src/router.tsx:20` -> `JobPage`; `apps/web/src/jobs/JobPage.tsx:17` -> `JobPage`; `apps/web/src/router.tsx:21` -> `TailorFlow`; `apps/web/src/tailor/TailorFlow.tsx:25` -> `TailorFlow`
 ## Assumptions
 - The non-null root assertion relies on index.html retaining its root element. `apps/web/src/main.tsx:25` -> `getElementById`; `apps/web/index.html:9` -> `root`

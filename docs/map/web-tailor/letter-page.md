@@ -4,8 +4,8 @@ area: web-tailor
 files: ["apps/web/src/tailor/LetterPage.tsx","apps/web/src/tailor/cover-letter.test.tsx"]
 depends_on: ["shared/tailoring","web-tailor/export-files"]
 contract: false
-checked_hash: 2addf52f
-cited: [d91ed6, 9991fd, beecf9, 7e0374, 67dc63, 425ae7, b2c39c, 1a7e22, f0a364, 552f8e, 5607bc, 8590eb, 950911, 2ddd60, 97044e, 557264, 4ada4d, c26a8f, e3eddb]
+checked_hash: 9e9b2d86
+cited: [d91ed6, 9991fd, beecf9, 7e0374, 67dc63, 425ae7, b2c39c, 1a7e22, f0a364, 552f8e, 5607bc, 8590eb, 950911, 2ddd60, 97044e, 557264, f9e14c, c26a8f, e3eddb]
 decisions: []
 open: []
 ---
