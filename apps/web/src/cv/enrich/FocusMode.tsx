@@ -26,7 +26,7 @@ type Props = {
   onClose(): void;
   /** The guided path's bar ("Role n of N" and its segments), across the top. */
   topBar?: ReactNode;
-  pathRole?: { n: number; total: number };
+  pathRole?: { n: number; total: number; hasNext?: boolean };
   /** In the guided path, "That's all for this role" moves on ("Next role →") instead of going back to the CV. */
   next?: { label: string; onNext(): void };
 };
@@ -159,14 +159,15 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     || step.kind === "dumpPick" || step.kind === "dumpEmpty";
   const back = session.canBack ? session.back : undefined;
   const roleQuestion = step.kind === "role" ? session.roleQuestions[step.index] : undefined;
+  const generalQuestions = session.roleQuestions.filter((q) => q.topic !== "tools");
   const sectionIndex = section === "done" ? SECTIONS.length : SECTIONS.indexOf(section);
   const firstName = cv.basics.fullName.trim().split(/\s+/)[0] ?? "";
   const itemKind = t(`enrich.focus.item.${kind}`);
   const ordinal = pathRole && pathRole.n <= 10
     ? t(`enrich.focus.ordinal.${pathRole.n as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}`) : "";
   const bulletIndex = "bulletId" in step && step.bulletId !== null ? queue.indexOf(step.bulletId) : -1;
-  const eyebrow = intro && pathRole ? t("enrich.focus.intro.eyebrow", pathRole) : session.section === "role" && step.kind === "role"
-    ? t("enrich.focus.section.roleEyebrow", { n: step.index + 1, total: session.roleQuestions.length })
+  const eyebrow = intro && pathRole ? t("enrich.focus.intro.eyebrow", { n: pathRole.n, total: pathRole.total }) : session.section === "role" && roleQuestion
+    ? t("enrich.focus.section.roleEyebrow", { n: generalQuestions.indexOf(roleQuestion) + 1, total: generalQuestions.length })
     : session.section === "bullets"
       ? t("enrich.focus.section.bulletsEyebrow", { n: bulletIndex >= 0 ? bulletIndex + 1 : Math.min(position + 1, queue.length), total: queue.length })
       : session.section === "description" ? t("enrich.focus.section.descriptionEyebrow")
@@ -192,7 +193,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
           ))}
         </div>
         <div className="page-sheet">
-          {!intro && step.kind === "roleDone" && pathRole && <span className="page-stamp">{t("enrich.focus.congrats.stamp", pathRole)}</span>}
+          {!intro && step.kind === "roleDone" && pathRole && <span className="page-stamp">{t("enrich.focus.congrats.stamp", { n: pathRole.n, total: pathRole.total })}</span>}
           <div className={section === "role" || section === "tools" || section === "description" ? "fm-role-block page-bar" : "fm-role-block"}>
             <div className="fm-role-line">
               <p className="fm-role"><span>{name}</span>{role.company && <> — {role.company}</>}</p>
@@ -346,14 +347,14 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
           )}
           {step.kind === "roleDone" && (
             <div className="fm-done">
-              <p className="fm-eyebrow">{pathRole ? t("enrich.focus.congrats.eyebrow", pathRole) : t("enrich.focus.done.eyebrow")}</p>
+              <p className="fm-eyebrow">{pathRole ? t("enrich.focus.congrats.eyebrow", { n: pathRole.n, total: pathRole.total }) : t("enrich.focus.done.eyebrow")}</p>
               <h2 className="fm-q is-big" id="fm-step-title" tabIndex={-1}>{pathRole ? t(pathRole.n === pathRole.total ? "enrich.focus.congrats.last" : ordinal ? "enrich.focus.congrats.title" : "enrich.focus.congrats.numbered",
                 { kind: itemKind, ordinal, n: pathRole.n }) : t("enrich.focus.done.title")}</h2>
               <p className="fm-done-score">
                 <b>{step.score ?? "–"}</b>
                 <span className="fm-eyebrow">{t(`enrich.focus.score.${kind}`)}</span>
               </p>
-              {pathRole && pathRole.n < pathRole.total && <p className="fm-hint">{t("enrich.focus.congrats.next")}</p>}
+              {pathRole && (pathRole.hasNext ?? pathRole.n < pathRole.total) && <p className="fm-hint">{t("enrich.focus.congrats.next")}</p>}
               <button type="button" className="fm-btn" onClick={() => {
                 moving.current = true;
                 session.close();

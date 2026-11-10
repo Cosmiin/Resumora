@@ -2,6 +2,7 @@ import { useReducer } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { BRAIN_DUMP_QUESTION, emptyCv, fingerprint, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import { en } from "../../i18n/en.ts";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
@@ -13,6 +14,7 @@ import { BulletList } from "../edit/BulletList.tsx";
 import { CvDocument } from "../page/CvDocument.tsx";
 import { FocusOpenProvider } from "./focus-context.ts";
 import { FocusMode, LightStop } from "./FocusMode.tsx";
+import { EnrichPath } from "./EnrichPath.tsx";
 
 const role: Experience = {
   id: "r1",
@@ -108,6 +110,22 @@ describe("focus mode", () => {
     expect(api.improveBullet).not.toHaveBeenCalled();
     expect(api.brainDump).not.toHaveBeenCalled();
     expect(screen.queryByText("What else can you tell us about this?")).not.toBeInTheDocument();
+  });
+  it.each([
+    [["company", "purpose", "tools"], 2],
+    [["tools", "company"], 1],
+  ] as const)("counts only general role questions for topics %j", async (topics, total) => {
+    const roleQuestions: RoleResult["roleQuestions"] = topics.map((topic) => ({
+      id: topic, text: `Tell us about ${topic}?`, options: [], kind: "role", topic,
+    }));
+    render(<Harness roleResult={{ ...result, roleQuestions }} />);
+    expect(screen.getByRole("heading", { name: "Tell us about company?" })).toBeInTheDocument();
+    expect(screen.getByText(`About the role · Question 1 of ${total}`)).toBeInTheDocument();
+    for (let i = 0; i < total + role.bullets.length; i++) {
+      await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    }
+    expect(screen.getByRole("heading", { name: "Tell us about tools?" })).toBeInTheDocument();
+    expect(screen.getByText("Tools", { selector: ".page-note-eyebrow" })).toBeInTheDocument();
   });
   it("shows the role on the left with the weakest bullet first and its question on the right", () => {
     render(<Harness />);
@@ -293,7 +311,7 @@ describe("focus mode", () => {
     expect(screen.getByRole("heading", { name: box })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "← Back" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByText("About the role · Question 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("About the role · Question 1 of 1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Who did you work with?" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Finance" }));
     await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
@@ -490,6 +508,36 @@ describe("the role description step (3B) on screen", () => {
 });
 
 describe("focus mode inside the guided path", () => {
+  it("counts within each kind and offers the next project after the last role", async () => {
+    const roles = [role, { ...role, id: "r2", title: "Planner" }];
+    const projects = [
+      { ...role, id: "p1", title: "Routing", url: "" },
+      { ...role, id: "p2", title: "Tracking", url: "" },
+    ];
+    const content = { ...cv, experience: roles, projects };
+    const scores = new Map(roles.concat(projects).map((item) => [item.id, {
+      state: "ready" as const,
+      result: { ...result, roleId: item.id, fingerprint: fingerprint(item, "en"), questions: [], bullets: item.bullets.map(b => grade(b.id, 100)) },
+    }]));
+    render(<MemoryRouter><EnrichPath cv={content} dispatch={() => {}} scores={scores}
+      waitForSave={() => Promise.resolve()} onClose={() => {}} /></MemoryRouter>);
+    await userEvent.click(screen.getByRole("button", { name: "Start with Dispatcher →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Next role →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(await screen.findByRole("heading", { name: "Congrats, you just finished updating your last role." })).toBeInTheDocument();
+    expect(screen.getByText("Let's go to the next one.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    expect(screen.getByText("Project 1 of 2")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(await screen.findByRole("heading", { name: "Congrats, you just finished updating your first project." })).toBeInTheDocument();
+    expect(screen.getByText("Let's go to the next one.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(await screen.findByRole("heading", { name: "Congrats, you just finished updating your last project." })).toBeInTheDocument();
+    expect(screen.queryByText("Let's go to the next one.")).toBeNull();
+  });
+
   it("greets the first role by first name and shows its question only after Let's start", async () => {
     const roleQuestions: RoleResult["roleQuestions"] = [
       { id: "rq1", text: "Who did you report to?", options: ["The CEO"], kind: "role", topic: "other" },
