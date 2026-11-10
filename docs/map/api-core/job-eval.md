@@ -5,7 +5,7 @@ files: ["apps/api/eval/jobs/run.eval.ts"]
 depends_on: ["api-core/job-processing","api-core/config","shared/jobs"]
 contract: false
 checked_hash: 2bb0b8d4
-cited: [6288e6, 9fa24d, 4ec4b4, 46da2c, 738919, 5a8de9, 69d390, dfb93d, 19e9c2, 468cf7, 890fe9, b5b546, 95904c, 51ab33, 5337fc, fd2380, 1eb8b6, c81eb6, 4727cf, a3950c, cd4667, 738919]
+cited: [6288e6, 9fa24d, 4ec4b4, 46da2c, 738919, 5a8de9, 69d390, dfb93d, 19e9c2, 468cf7, 890fe9, b5b546, 95904c, 51ab33, 5337fc, b98502, 1eb8b6, c81eb6, 4727cf, dcdd9c, 1671f9, cd4667, 738919]
 decisions: []
 open: []
 ---
@@ -21,9 +21,9 @@ Validate all job fixtures before optionally evaluating extraction with real prov
 
 ## Connections
 - Package script selects this runner: `apps/api/package.json:12` -> `eval:jobs` -> `apps/api/eval/jobs/run.eval.ts:87` -> `job extraction evaluation`.
-- Evaluation calls real production processing: `apps/api/eval/jobs/run.eval.ts:43` -> `processJob` -> `apps/api/src/jobs/process.ts:6` -> `processJob`.
+- Evaluation calls real production processing: `apps/api/eval/jobs/run.eval.ts:43` -> `processJob` -> `apps/api/src/jobs/process.ts:7` -> `processJob`.
 - Provider selection uses shared env adapter: `apps/api/eval/jobs/run.eval.ts:100` -> `providersFromEnv` -> `apps/api/src/ai/call-model.ts:76` -> `providersFromEnv`.
 
 ## Assumptions
-- A valid fixture may exceed the prompt text limit; only the first 30,000 characters reach extraction. `apps/api/eval/jobs/run.eval.ts:32` -> `60_000`, `apps/api/src/jobs/prompts.ts:23` -> `slice(0, 30_000)`
+- A valid fixture may exceed the prompt text limit; extraction receives at most 30,000 page-text characters after cutting at the first exact trailing-job marker line. `apps/api/eval/jobs/run.eval.ts:32` -> `60_000`, `apps/api/src/jobs/prompts.ts:24` -> `trailingJobs`, `apps/api/src/jobs/prompts.ts:26` -> `slice(0, 30_000)`
 - Dry-run mode still uses the eval config, which loads its configured vars file; it is not a guarantee of no secret-file reads. `apps/api/vitest.eval.config.ts:26` -> `readDevVars`, `apps/api/eval/jobs/run.eval.ts:97` -> `EVAL_JOBS_DRY_RUN`

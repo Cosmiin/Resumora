@@ -1,4 +1,4 @@
-export const JOB_PROMPT_VERSION = "job.v2";
+export const JOB_PROMPT_VERSION = "job.v3";
 
 export const jobExtractPrompt = `Copy facts from the page. Never invent a company, salary, date or requirement.
 Use unknown or null when the page doesn't say.
@@ -13,6 +13,7 @@ responsibilities: short phrases starting with a verb, no duplicates, nothing alr
 benefits: short phrases ("Private medical care"), no duplicates.
 Ignore page chrome: navigation, cookie banners, "similar jobs", ads.
 If a JSON-LD JobPosting is given, trust it for title, company, location, salary and dates, and use the text for the rest.
+If the page says the position is closed or no longer accepting applications ("This position is no longer open for recruitment"), it is still a job posting: set isJobPosting: true and positionClosed: true. Otherwise set positionClosed: false.
 Set isJobPosting: false for pages that are not a single job posting (search results, company home pages, articles).`;
 
 export function buildJobUserPrompt(
@@ -20,5 +21,7 @@ export function buildJobUserPrompt(
   today: string,
 ): string {
   const jsonLd = work.jsonLd === null ? "" : `JSON-LD JobPosting:\n${JSON.stringify(work.jsonLd)}\n\n`;
-  return `Today's date: ${today}.\n${jsonLd}Page text:\n${work.rawText.slice(0, 30_000)}`;
+  const trailingJobs = work.rawText.search(/^[^\S\r\n]*(?:Similar jobs|Next job|See all)[^\S\r\n]*\r?$/im);
+  const pageText = trailingJobs < 0 ? work.rawText : work.rawText.slice(0, trailingJobs);
+  return `Today's date: ${today}.\n${jsonLd}Page text:\n${pageText.slice(0, 30_000)}`;
 }

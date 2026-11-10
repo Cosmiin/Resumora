@@ -68,6 +68,34 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("job page", () => {
+  it("shows a closed-position notice near the top while keeping job actions available", async () => {
+    vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, positionClosed: true } });
+    renderJob(); await ready();
+    const notice = screen.getByText("This position is no longer open for applications.");
+    expect(notice).toBeVisible();
+    expect(notice.compareDocumentPosition(screen.getByRole("heading", { name: "In short" }))
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tailor my CV" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Application status" })).toBeEnabled();
+  });
+  it.each([{}, { positionClosed: false }])("shows no closed-position notice for extraction flag %j", async (flag) => {
+    vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, ...flag } });
+    renderJob(); await ready();
+    expect(screen.queryByText("This position is no longer open for applications.")).not.toBeInTheDocument();
+  });
+  it("keeps positionClosed true when editing and saving a closed job", async () => {
+    const extracted = { ...job.extracted!, positionClosed: true };
+    vi.mocked(getJob).mockResolvedValue({ ...job, extracted });
+    renderJob(); await ready();
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Summary" }), { target: { value: "Build better tools." } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await ready();
+    expect(patchJob).toHaveBeenCalledExactlyOnceWith("one", 1, { ...extracted, summary: "Build better tools." });
+    expect(screen.getByText("Build better tools.")).toBeInTheDocument();
+    expect(screen.getByText("This position is no longer open for applications.")).toBeVisible();
+  });
   it("keeps the newest queued thoughts visible when their save fails after an earlier response", async () => {
     let finishFirst!: (value: Job) => void, failNext!: (cause: Error) => void;
     const first = new Promise<Job>((resolve) => { finishFirst = resolve; });

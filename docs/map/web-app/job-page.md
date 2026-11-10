@@ -4,8 +4,8 @@ area: web-app
 files: ["apps/web/src/jobs/JobPage.tsx","apps/web/src/jobs/job-page.test.tsx"]
 depends_on: ["web-app/jobs-client","web-app/job-saves","web-app/job-requirements","web-app/job-summary","web-app/tailor-gate","web-app/app-shell","web-tailor/flow-state","web-tailor/client-run","api-tailor/routes"]
 contract: false
-checked_hash: fef2bfa2
-cited: [5254a2, 71a0a1, 99ffe2, 5bf541, 60fe81, d9c699, ed396c, 4055b2, a8c56c, 806f75, c904c5, b7d88d, 7f50b5, 0cb5d4, 8a3340, 39ed5b, 6d2402, 07c255, 71a0a1, 889221, 7086bf, cb7207, 0494d0, 7cf99d, 4583b8, 2c3b94, 49b3d7, c70c38, 3612e5, 5a38fb, 93e707, 549f50, a7904e, 6cd010, f86844]
+checked_hash: c1fba2ab
+cited: [5254a2, 71a0a1, 99ffe2, 5bf541, 60fe81, d9c699, ed396c, 4055b2, a8c56c, 806f75, c904c5, b7d88d, 7f50b5, 0cb5d4, 8a3340, 39ed5b, d94f7b, f6d7b7, aab44c, 628a72, 6d2402, 07c255, 71a0a1, 889221, 7086bf, cb7207, 0494d0, 7cf99d, 4583b8, 2c3b94, 49b3d7, c70c38, 3612e5, 5a38fb, 93e707, 549f50, a7904e, 6cd010, f86844]
 decisions: []
 open: []
 ---
@@ -21,8 +21,12 @@ Load a job and its scores, select display states and offer tailoring navigation.
 - A remembered active run takes precedence over an existing tailored score; both move the tailoring banner above the ad, whereas the initial tailor action stays below it. `apps/web/src/jobs/JobPage.tsx:138` -> `run ?`; `apps/web/src/jobs/JobPage.tsx:161` -> `tailorOnTop`
 - The initial tailor button remains clickable for unready jobs to show a status-specific reason; ready jobs open TailorGate. `apps/web/src/jobs/JobPage.tsx:153` -> `onClick`
 - Salary displays only if a bound exists; applyBy is formatted with a UTC midnight date and UTC timezone. `apps/web/src/jobs/JobPage.tsx:163` -> `T00:00:00Z`; `apps/web/src/jobs/JobPage.tsx:167` -> `salary.min !== null`
-- tested by `apps/web/src/jobs/job-page.test.tsx:181` -> `missing Score 1`
-- tested by `apps/web/src/jobs/job-page.test.tsx:449` -> `stops polling`
+- The job detail shows a no-longer-open notice below the heading only when positionClosed is strictly true; false or missing values show no notice. `apps/web/src/jobs/JobPage.tsx:199` -> `extracted.positionClosed === true`
+- Notice visibility, placement above the summary and enabled job actions are tested by `apps/web/src/jobs/job-page.test.tsx:71` -> `shows a closed-position notice near the top while keeping job actions available`
+- False and missing positionClosed values showing no notice are tested by `apps/web/src/jobs/job-page.test.tsx:82` -> `shows no closed-position notice for extraction flag %j`
+- Editing a closed job preserves positionClosed true in the submitted extraction and the notice after saving, tested by `apps/web/src/jobs/job-page.test.tsx:87` -> `keeps positionClosed true when editing and saving a closed job`
+- tested by `apps/web/src/jobs/job-page.test.tsx:209` -> `missing Score 1`
+- tested by `apps/web/src/jobs/job-page.test.tsx:477` -> `stops polling`
 ## Connections
 - Uses GET job and GET/POST score clients: `apps/web/src/jobs/JobPage.tsx:41` -> `getJob`; `apps/web/src/jobs/jobs-api.ts:19` -> `/v1/jobs/`; `apps/web/src/jobs/JobPage.tsx:46` -> `getJobScore`; `apps/web/src/jobs/jobs-api.ts:29` -> `/score`; `apps/web/src/jobs/JobPage.tsx:64` -> `scoreJob`; `apps/web/src/jobs/jobs-api.ts:36` -> `/score`
 - Remembered-run reads ultimately call GET /v1/tailor-runs/:id: `apps/web/src/jobs/JobPage.tsx:54` -> `getRun`; `apps/web/src/tailor/tailor-api.ts:29` -> `getRun`; `apps/web/src/tailor/tailor-api.ts:8` -> `/v1/tailor-runs/`; `apps/api/src/tailor/routes.ts:67` -> `app.get`; `apps/api/src/app.ts:95` -> `/v1`
