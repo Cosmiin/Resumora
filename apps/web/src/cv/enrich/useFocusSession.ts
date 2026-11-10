@@ -43,12 +43,22 @@ const isText = (step: FocusStep): step is TextStep => TEXT_KINDS.has(step.kind);
 /** Steps that show Back (when there is an earlier answered step). */
 const BACK_KINDS = new Set<FocusStep["kind"]>(["role", "brainDump", "question", "needsDetail", "dumpEmpty", "dumpPick"]);
 type Entry = { step: TextStep; question: string; noteId?: string; answer?: string };
+type Section = "role" | "bullets" | "tools" | "description" | "done";
 /** history: every text step shown, in order. revisit: the history index Back went to, or null on the latest step. */
-type View = { step: FocusStep; queue: string[]; position: number; busy: boolean; history: Entry[]; revisit: number | null };
+type View = { step: FocusStep; section: Section; queue: string[]; position: number; busy: boolean; history: Entry[]; revisit: number | null };
 /** Opening, box: the session scores the role itself, so background scores never finish these. */
 const selfScored = (source: string) => source === "opening" || source === "box";
 const isThin = (role: Experience | undefined, result: RoleResult | undefined) =>
   !!role && (role.bullets.length <= 1 || !!result?.thin);
+
+function sectionOf(step: FocusStep, result: RoleResult | undefined, previous: Section): Section {
+  if (step.kind === "role") return result?.roleQuestions[step.index]?.topic === "tools" ? "tools" : "role";
+  if (step.kind === "celebrate" || (step.kind === "failed" && step.bulletId === null)) return previous;
+  if (step.kind === "roleDone") return "done";
+  if (step.kind === "describing" || step.kind === "description") return "description";
+  if (step.kind === "scoring") return step.source === "bullet" ? "bullets" : "role";
+  return "bulletId" in step ? "bullets" : "role";
+}
 
 function buildQueue(role: Experience | undefined, result: RoleResult | undefined, opts: Options): string[] {
   const grades = new Map(role && result && result.fingerprint === fingerprint(role, opts.cv.locale)
@@ -57,7 +67,6 @@ function buildQueue(role: Experience | undefined, result: RoleResult | undefined
   const bullets = (role?.bullets ?? []).filter((b) => b.id === opts.bulletId || (opts.mode === "improve"
     ? (grades.get(b.id)?.score ?? 0) < 75 : grades.get(b.id)?.impact !== "specific"));
   if (opts.mode === "improve") {
-    bullets.sort((a, b) => (grades.get(a.id)?.score ?? 0) - (grades.get(b.id)?.score ?? 0));
     const chosen = bullets.findIndex((b) => b.id === opts.bulletId);
     if (chosen > 0) bullets.unshift(...bullets.splice(chosen, 1));
   }
@@ -84,6 +93,11 @@ function bulletStep(
     counts.set(bulletId, count + 1);
     return { position, step: { kind: followUp ? "needsDetail" : "question", bulletId, question, asked: count + 1 } };
   }
+  const index = result?.roleQuestions.findIndex((q) => q.topic === "tools" && !asked.has(questionKey(q.text))) ?? -1;
+  if (index >= 0) {
+    asked.add(questionKey(result!.roleQuestions[index]!.text));
+    return { position, step: { kind: "role", index } };
+  }
   return { position, step: { kind: "roleDone", score: result?.score ?? null } };
 }
 function firstStep(
@@ -92,9 +106,10 @@ function firstStep(
 ): Pick<View, "step" | "position"> {
   // A thin role opens with "Tell us about your time as…"; its role questions come after it.
   if (isThin(role, result)) return { position: 0, step: { kind: "brainDump" } };
-  if (result?.roleQuestions.length) {
-    asked.add(questionKey(result.roleQuestions[0]!.text));
-    return { position: 0, step: { kind: "role", index: 0 } };
+  const index = result?.roleQuestions.findIndex((q) => q.topic !== "tools") ?? -1;
+  if (index >= 0) {
+    asked.add(questionKey(result!.roleQuestions[index]!.text));
+    return { position: 0, step: { kind: "role", index } };
   }
   return bulletStep(role, queue, 0, result, counts, asked, completed);
 }
@@ -112,6 +127,12 @@ function entryIndex(view: View): number {
 /** The history entry Back goes to, or null on the first step. */
 function backTarget(view: View): number | null {
   const at = view.revisit ?? entryIndex(view);
+  if (view.revisit === null && view.section === "tools") {
+    for (let i = at - 1; i >= 0; i--) {
+      const step = view.history[i]!.step;
+      if (step.kind === "question" || step.kind === "needsDetail") return i;
+    }
+  }
   return at > 0 ? at - 1 : null;
 }
 /** The question a text step's note is saved under. */
@@ -127,7 +148,7 @@ function unasked(result: RoleResult, asked: Set<string>): RoleResult {
 
 /** Owns one open focus session; every content change goes through the editor's reducer. */
 export function useFocusSession(opts: Options): {
-  step: FocusStep; queue: string[]; position: number; busy: boolean;
+  step: FocusStep; section: Section; queue: string[]; position: number; busy: boolean;
   roleQuestions: RoleResult["roleQuestions"];
   result: RoleResult | undefined;
   /** The earlier answer, while Back shows an earlier step; null otherwise. */
@@ -157,7 +178,9 @@ export function useFocusSession(opts: Options): {
     // Nothing to ask: the role's description is still the last step.
     const describing = start.step.kind === "roleDone";
     if (describing) start.step = { kind: "describing" };
-    return { counts, asked, completed, result, describing, view: { queue, busy: !fresh || describing, history, revisit: null, ...start } };
+    return { counts, asked, completed, result, describing, view: {
+      queue, busy: !fresh || describing, history, revisit: null, ...start, section: sectionOf(start.step, result, "role"),
+    } };
   });
   const [view, setView] = useState<View>(initial.view);
   const current = useRef(opts);
@@ -188,7 +211,7 @@ export function useFocusSession(opts: Options): {
     // A text step joins the history the first time it is shown (a paused step that comes back is the same object).
     const history = step && isText(step) && !(patch.history ?? s.view.history).some((e) => e.step === step)
       ? [...(patch.history ?? s.view.history), { step, question: questionText(step, s.result) }] : patch.history ?? s.view.history;
-    s.view = { ...s.view, ...patch, history };
+    s.view = { ...s.view, ...patch, history, section: step ? sectionOf(step, s.result, s.view.section) : s.view.section };
     if (s.alive && !s.closed) setView(s.view);
   }, []);
   const go = useCallback((position: number, queue = session.current.view.queue, next?: { bulletId: string; question: Question | null }) => {
@@ -212,7 +235,8 @@ export function useFocusSession(opts: Options): {
     }
     const entry = o.scores.get(o.roleId);
     const result = entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)
-      ? entry.result : session.current.result;
+      ? { ...entry.result, roleQuestions: s.result?.roleQuestions.length ? s.result.roleQuestions : entry.result.roleQuestions } : s.result;
+    s.result = result;
     for (const id of queue.slice(0, position)) s.completed.add(id);
     update({ queue, busy: false, ...bulletStep(role, queue, position, result, s.counts, s.asked, s.completed, next) });
   }, [update]);
@@ -372,7 +396,7 @@ export function useFocusSession(opts: Options): {
     const s = session.current;
     s.thinFlow = true;
     const questions = s.result?.roleQuestions ?? [];
-    const index = questions.findIndex((q) => !s.asked.has(questionKey(q.text)));
+    const index = questions.findIndex((q) => q.topic !== "tools" && !s.asked.has(questionKey(q.text)));
     if (index < 0) { finishRoleQuestions(); return; }
     s.asked.add(questionKey(questions[index]!.text));
     update({ busy: false, step: { kind: "role", index } });
@@ -404,8 +428,12 @@ export function useFocusSession(opts: Options): {
     const step = s.view.step;
     if (step.kind === "role") {
       const questions = s.result?.roleQuestions ?? [];
+      if (questions[step.index]?.topic === "tools") {
+        go(0);
+        return;
+      }
       let index = step.index + 1;
-      while (questions[index] && s.asked.has(questionKey(questions[index]!.text))) index++;
+      while (questions[index] && (questions[index]!.topic === "tools" || s.asked.has(questionKey(questions[index]!.text)))) index++;
       if (questions[index]) {
         s.asked.add(questionKey(questions[index]!.text));
         update({ step: { kind: "role", index } });
@@ -433,12 +461,14 @@ export function useFocusSession(opts: Options): {
   const at = entryIndex(view);
   // Dots: the answered steps, the shown one, then the ones still to come on the latest step.
   const latestShown = isText(view.step) && view.history[at] !== undefined;
-  const left = Math.max(0, view.queue.length - view.position);
-  const toCome = view.step.kind === "role" ? roleQuestions.length - view.step.index - 1 + left
-    : view.step.kind === "brainDump" && !session.current.returnStep ? roleQuestions.filter((q) => !session.current.asked.has(questionKey(q.text))).length + left
-    : view.step.kind === "question" || view.step.kind === "needsDetail" ? Math.max(0, left - 1) : 0;
+  const left = view.queue.filter((id) => !session.current.completed.has(id)).length;
+  const remaining = roleQuestions.filter((q) => !session.current.asked.has(questionKey(q.text)));
+  const toolsLeft = remaining.some((q) => q.topic === "tools") ? 1 : 0;
+  const toCome = view.step.kind === "role" ? (roleQuestions[view.step.index]?.topic === "tools" ? left : remaining.length + left)
+    : view.step.kind === "brainDump" && !session.current.returnStep ? remaining.length + left
+    : view.step.kind === "question" || view.step.kind === "needsDetail" ? Math.max(0, left - 1) + toolsLeft : toolsLeft;
   return {
-    ...view, step, roleQuestions, result: session.current.result,
+    ...view, step, section: sectionOf(step, session.current.result, view.section), roleQuestions, result: session.current.result,
     prefill: shown?.answer ?? null,
     canBack: backTo !== null && BACK_KINDS.has(step.kind),
     dots: { done: view.revisit ?? at, total: view.history.length + (latestShown ? 0 : 1) + Math.max(0, toCome) },
