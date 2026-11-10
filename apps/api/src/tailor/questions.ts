@@ -12,9 +12,10 @@ import type { TailorRepo } from "./repo.ts";
 import { steeringText } from "./steering.ts";
 import { stripHeader } from "./strip-header.ts";
 
-/** Job questions per run outside Experience; Experience asks up to 5 per role and Skills up to 5. */
+/** Job questions per run outside role steps; roles ask up to 5 (2 outside focus), Skills up to 5. */
 export const MAX_RUN_QUESTIONS = 8;
 export const MAX_ROLE_QUESTIONS = 5;
+export const NON_FOCUS_ROLE_QUESTIONS = 2;
 export const MAX_SKILL_QUESTIONS = 5;
 
 const ModelQuestionsSchema = z.object({
@@ -52,7 +53,7 @@ function answeredForJob(cv: CvContent, run: TailorRun, roleId: string | null) {
 
 /**
  * New questions for one section, stored on the run. Experience asks about the run's current role only
- * (up to 5 per role); the other sections share the run's cap of 8, Skills at most 5 of them.
+ * (up to 5 per role, 2 outside focus); other sections share the run's cap of 8, Skills at most 5 of them.
  */
 export async function askQuestions(
   deps: { model: ModelDeps; tailor: TailorRepo },
@@ -64,16 +65,26 @@ export async function askQuestions(
   const role = roleId ? stepItems(input.cv, input.section).find((r) => r.id === roleId) : undefined;
   // A CV without roles has nothing to ask in Experience.
   if (isRoleSection(input.section) && !role) return [];
+  const stored = input.run.tailoredCvId ? await deps.tailor.getSteering(input.run.tailoredCvId) : null;
+  const focusRoleIds = stored?.steering.focusRoleIds ?? [];
+  const nonFocus = !!role && focusRoleIds.length > 0 && !focusRoleIds.includes(role.id);
+  const roleMax = nonFocus ? NON_FOCUS_ROLE_QUESTIONS : MAX_ROLE_QUESTIONS;
   const asked = input.run.questions ?? [];
   // Flag questions from the section checks are not job questions and do not count toward the caps.
   const jobQuestions = asked.filter((question) => question.kind !== "flag");
   const inRole = (question: Question) => question.section === input.section && question.roleId === roleId;
   const runLeft = MAX_RUN_QUESTIONS - jobQuestions.filter((question) => !isRoleSection(question.section)).length;
-  const max = role ? MAX_ROLE_QUESTIONS - jobQuestions.filter(inRole).length
+  const max = role ? roleMax - jobQuestions.filter(inRole).length
     : input.section === "skills" ? Math.min(runLeft, MAX_SKILL_QUESTIONS - jobQuestions.filter((question) => question.section === "skills").length)
     : runLeft;
   if (max <= 0) return [];
   const score = await deps.tailor.getScore(input.run.jobId, "base");
+  const latest = role && input.run.tailoredCvId
+    ? await deps.tailor.getScore(input.run.jobId, "tailored", input.run.tailoredCvId) : null;
+  const doc = latest && input.run.tailoredCvId ? await deps.tailor.readTailoredCv(input.run.tailoredCvId) : null;
+  // Steering restarts reset the document's score to Base; old tailored scores stay in history.
+  const tailoredScore = doc ? doc.score : latest;
+  const met = new Set((tailoredScore?.labels ?? []).filter((label) => label.status === "met" && !label.inferred).map((label) => label.ref));
   // A gap answered in this run is done; one asked but skipped (or left) may come back once, not again.
   const answers = new Map((input.run.answers ?? []).map((answer) => [answer.questionId, answer]));
   const byGap = new Map<string, { asks: Set<string>; answered: boolean }>();
@@ -88,12 +99,11 @@ export async function askQuestions(
   // In Experience a gap may be asked once in each role; elsewhere the run-wide rule above applies.
   const open = role ? (ref: string) => !asked.some((question) => inRole(question) && question.gap === ref)
     : (ref: string) => { const entry = byGap.get(ref); return !entry || (!entry.answered && entry.asks.size < 2); };
-  const gaps = (score?.labels ?? []).filter((label) => (label.status !== "met" || label.inferred) && open(label.ref));
+  const gaps = (score?.labels ?? []).filter((label) => (label.status !== "met" || label.inferred) && !met.has(label.ref) && open(label.ref));
   if (score && gaps.length === 0) return [];
   const gapRefs = new Set(gaps.map((label) => label.ref));
   const answered = answeredForJob(input.cv, input.run, roleId);
   const cv = stripHeader(input.cv).cv;
-  const stored = input.run.tailoredCvId ? await deps.tailor.getSteering(input.run.tailoredCvId) : null;
   const steering = steeringText(stored?.steering ?? {}, cv, role?.id);
   let reply: z.infer<typeof ModelQuestionsSchema>;
   try {
@@ -102,7 +112,7 @@ export async function askQuestions(
       system: questionSystemPrompt,
       user: questionUserMessage({
         section: input.section, cv, job: input.job, gaps, answered, max, steering,
-        ...(role ? { role: { kind: findScored(cv, role.id)!.kind, ...role } } : {}),
+        ...(role ? { role: { kind: findScored(cv, role.id)!.kind, ...role } } : {}), ...(nonFocus ? { focus: false } : {}),
       }),
       maxOutputTokens: 4000,
     });

@@ -5,7 +5,7 @@ files: ["apps/api/src/tailor/start.ts","apps/api/src/tailor/language.ts","apps/a
 depends_on: ["shared/tailoring","shared/cv","db/tailoring-runs","db/tailoring-repository","db/jobs-repository","db/cv-repository","api-tailor/routes","api-tailor/accept-save"]
 contract: false
 checked_hash: 63e98019
-cited: [4f06f8, 944ad1, 9daef1, a0b851, 7af32b, f756b2, 285cfb, 0efdc2, 75b48b, e03a9f, 72174f, 53d8d3, 63facd, 3855ff, 0aa02d, 8a47f8, 9c9f6c, bddee2, 6bf0de, 8f46b7, 2274f5, f9f3e5, 5c1365, 7f036b, 838056, 66e65c, 10c474, 8fe5a2, 4d0064, 6bb4f8, 4caaef, 53d8d3, 5540ff, 955275, 838a94, e3c4fa, 1ced02, 4e5696, 838a94, 0aa02d, 569300]
+cited: [4f06f8, 944ad1, 9daef1, a0b851, 7af32b, f756b2, 285cfb, 0efdc2, 75b48b, e03a9f, 72174f, 53d8d3, 63facd, 3855ff, 0aa02d, 8a47f8, 9c9f6c, bddee2, 6bf0de, 8f46b7, f12ebc, f9f3e5, 5c1365, 7f036b, 838056, 66e65c, 10c474, 8fe5a2, 4d0064, 6bb4f8, 4caaef, 53d8d3, 5540ff, 955275, 838a94, e3c4fa, 1ced02, 4e5696, 838a94, 0aa02d, 569300]
 decisions: []
 open: []
 ---
@@ -18,7 +18,7 @@ Start or resume a job-language tailoring document and establish its ordered revi
 - Creates a document from current Base CV with neutral default tone; duplicate insert returns exists and triggers a second lookup `apps/api/src/tailor/start.ts:34` -> `createTailoredCv`; `apps/api/src/tailor/start.ts:38` -> `"exists"`; `apps/api/src/tailor/start.ts:42` -> `findTailoredCvId`.
 - Repeated start returns the existing document's newest run, including done/failed runs; creates a run only if absent, without applying newly submitted steering `apps/api/src/tailor/start.ts:45` -> `latestRun`.
 - Run status vocabulary is running, waiting_user, done, failed. Repository creation sets running; section/layout passes set waiting_user; acceptance advances to running or done `packages/shared/src/tailor.ts:192` -> `status`; `apps/api/src/tailor/supabase-repo.ts:163` -> `status: "running"`; `apps/api/src/tailor/section-pass.ts:125` -> `"waiting_user"`; `apps/api/src/tailor/layout-pass.ts:82` -> `"waiting_user"`; `apps/api/src/tailor/accept.ts:192` -> `"done"`.
-- Failed is representable but has no transition writer in these tailoring services: question/section/layout AI failures throw rather than persisting failed. Retrying a current pass regenerates proposals, whereas accepting an already advanced section returns 409 `apps/api/src/tailor/questions.ts:110` -> `ai_failed`; `apps/api/src/tailor/section-pass.ts:231` -> `ai_failed`; `apps/api/src/tailor/layout-pass.ts:64` -> `ai_failed`; `apps/api/src/tailor/section-pass.ts:123` -> `passProposals`; `apps/api/src/tailor/accept.ts:94` -> `run.status`.
+- Failed is representable but has no transition writer in these tailoring services: question/section/layout AI failures throw rather than persisting failed. Retrying a current pass regenerates proposals, whereas accepting an already advanced section returns 409 `apps/api/src/tailor/questions.ts:120` -> `ai_failed`; `apps/api/src/tailor/section-pass.ts:231` -> `ai_failed`; `apps/api/src/tailor/layout-pass.ts:64` -> `ai_failed`; `apps/api/src/tailor/section-pass.ts:123` -> `passProposals`; `apps/api/src/tailor/accept.ts:94` -> `run.status`.
 - tested by `apps/api/test/tailor-start.test.ts:64` -> `POST /v1/jobs/:id/tailor`.
 - tested by `apps/api/src/tailor/language.test.ts:4` -> `detectAdLanguage`.
 

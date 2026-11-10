@@ -106,6 +106,86 @@ describe("job questions", () => {
     expect(model.requests).toHaveLength(3);
   });
 
+  it.each([
+    { name: "a confirmed tailored match", inferred: false, offered: false },
+    { name: "an inferred tailored match", inferred: true, offered: true },
+    { name: "no tailored score yet", inferred: null, offered: true },
+  ])("filters a later role's base gaps with $name", async ({ inferred, offered }) => {
+    const repo = memoryTailorRepo("user-a", scores, docs);
+    const gap: MatchScore["labels"][number] = { ref: "r2", kind: "requirement", status: "missing", inferred: false, evidence: null };
+    await jobs.admin.finish(jobId, { ...job, requirements: [...job.requirements, { text: "Incident response", kind: "must", category: "skill" }] });
+    await repo.saveScore(jobId, "base", null, { ...score, labels: [...score.labels, gap] });
+    const runId = await startRun();
+    const run = (await repo.getRun(runId))!;
+    if (inferred !== null) {
+      const tailoredScore: MatchScore = { ...score, labels: [...score.labels, { ...gap, status: "met", inferred, evidence: "Handled incidents" }] };
+      const doc = (await repo.readTailoredCv(run.tailoredCvId!))!;
+      await repo.saveTailoredCv(doc.id, doc.version, { content: doc.content, review: {}, score: tailoredScore });
+      await repo.saveScore(jobId, "tailored", doc.id, tailoredScore);
+    }
+    await repo.updateRun(runId, { currentRoleId: older.id });
+    replies = [[ask("Did you handle incidents?", { gap: "r2" }), ask("Did you lead a team?", { gap: "r1" })]];
+    const got = await questions(runId, "experience");
+    const sent = JSON.parse((model.requests[0]!.messages as { content: string }[])[1]!.content);
+    expect(sent.gaps.map((label: { ref: string }) => label.ref)).toEqual(offered ? ["r0", "r1", "r2"] : ["r0", "r1"]);
+    expect(got.map((question) => question.gap)).toEqual(offered ? ["r2", "r1"] : ["r1"]);
+    expect((await repo.getRun(runId))!.questions).toEqual(got);
+  });
+
+  it("offers a gap again after a steering restart resets wording, despite the old tailored score", async () => {
+    const runId = await startRun();
+    const repo = memoryTailorRepo("user-a", scores, docs);
+    const run = (await repo.getRun(runId))!;
+    const doc = (await repo.readTailoredCv(run.tailoredCvId!))!;
+    const tailoredScore: MatchScore = { ...score, labels: score.labels.map((label) => label.ref === "r0"
+      ? { ...label, status: "met", inferred: false, evidence: "Ran Kubernetes clusters" } : label) };
+    const content = structuredClone(doc.content);
+    content.experience[0]!.bullets[0]!.text = "Ran Kubernetes clusters";
+    await repo.saveTailoredCv(doc.id, doc.version, { content, review: {}, score: tailoredScore });
+    await repo.saveScore(jobId, "tailored", doc.id, tailoredScore);
+    await repo.updateRun(runId, { currentRoleId: older.id });
+    await questions(runId, "experience");
+    const before = JSON.parse((model.requests[0]!.messages as { content: string }[])[1]!.content);
+    expect(before.gaps.map((label: { ref: string }) => label.ref)).toEqual(["r1"]);
+
+    const restarted = await call(`/v1/tailor-runs/${runId}/steering`, { tone: "warm" });
+    expect(restarted.status).toBe(200);
+    const { run: next } = await restarted.json() as { run: { id: string } };
+    expect(await repo.getScore(jobId, "tailored", doc.id)).toEqual(tailoredScore);
+    expect(await repo.readTailoredCv(doc.id)).toMatchObject({ content: base, score });
+    replies = [[ask("Have you used Kubernetes?")]];
+    expect(await questions(next.id, "experience")).toEqual([expect.objectContaining({ gap: "r0" })]);
+    const after = JSON.parse((model.requests[1]!.messages as { content: string }[])[1]!.content);
+    expect(after.gaps.map((label: { ref: string }) => label.ref)).toEqual(["r0", "r1"]);
+  });
+
+  it.each([
+    { name: "one focus role", focusRoleIds: [newest.id] },
+    { name: "an empty focus list", focusRoleIds: [] },
+    { name: "no focus setting", focusRoleIds: undefined },
+  ])("enforces each role's prompt and stored question cap with $name", async ({ focusRoleIds }) => {
+    const runId = await startRun();
+    const repo = memoryTailorRepo("user-a", scores, docs);
+    const run = (await repo.getRun(runId))!;
+    await repo.setSteering(run.tailoredCvId!, { focusRoleIds });
+    for (const role of [newest, older]) {
+      await repo.updateRun(runId, { currentRoleId: role.id });
+      replies = [Array.from({ length: 6 }, (_, i) => ask(`Question ${i} for ${role.id}?`))];
+      const got = await questions(runId, "experience");
+      const nonFocus = !!focusRoleIds?.length && !focusRoleIds.includes(role.id);
+      const max = nonFocus ? 2 : 5;
+      expect(got).toHaveLength(max);
+      const sent = JSON.parse((model.requests.at(-1)!.messages as { content: string }[])[1]!.content);
+      expect(sent.max).toBe(max);
+      if (nonFocus) expect(sent.focus).toBe(false);
+      else expect(sent).not.toHaveProperty("focus");
+      expect((await repo.getRun(runId))!.questions!.filter((question) => question.roleId === role.id)).toEqual(got);
+      const calls = model.requests.length;
+      expect(await questions(runId, "experience")).toEqual([]);
+      expect(model.requests).toHaveLength(calls);
+    }
+  });
+
   it("gives every Experience question the current role, whatever role the model names, and keeps only that role's bullets", async () => {
     const runId = await startRun();
     replies = [[ask("We think you led a team because of 'Led 3 people'. Correct?", { kind: "confirm_inferred", bulletId: newest.bullets[0]!.id }),
@@ -145,10 +225,11 @@ describe("job questions", () => {
     const messages = model.requests[0]!.messages as { content: string }[];
     const user = messages[1]!.content;
     const sent = JSON.parse(user);
-    expect(Object.keys(sent).sort()).toEqual(["answered", "gaps", "job", "language", "max", "role", "section", "steering"]);
+    expect(Object.keys(sent).sort()).toEqual(["answered", "focus", "gaps", "job", "language", "max", "role", "section", "steering"]);
     expect(sent.role).toMatchObject({ ...b, kind: kind === "experience" ? "role" : kind });
     expect(sent.language).toBe("ro");
     expect(sent.section).toBe(section);
+    expect(sent).toMatchObject({ max: 2, focus: false });
     expect(sent.answered).toEqual([{ question: b.notes[1]!.question, answer: b.notes[1]!.answer }]);
     expect(sent.steering).toContain("They want to lean on other roles more than this one.");
     expect(sent.gaps).toContainEqual(expect.objectContaining({ ref: "r1", status: "partial" }));
@@ -161,9 +242,11 @@ describe("job questions", () => {
     expect(messages[0]!.content).toContain('Never mention another employer, role, project or "your previous roles".');
     expect(messages[0]!.content).toContain("The role ran from its startDate to its endDate, or is current. Ask only about tools, methods and practices that fit that period and that kind of work. Skip a gap the role can't plausibly show; returning fewer questions, or none, is fine.");
     expect(messages[0]!.content).toContain("Never add an option meaning other, something else or none of the above: the screen adds its own.");
+    expect(messages[0]!.content).toContain("For a role that isn't a focus role, ask only what helps its bullets show value for this job. Don't stretch; no question is fine.");
     await questions(runId, "skills");
     const skills = JSON.parse((model.requests[1]!.messages as { content: string }[])[1]!.content);
     expect(skills).not.toHaveProperty("role");
+    expect(skills).not.toHaveProperty("focus");
     expect(skills.cv).toEqual({ ...content, basics: { ...content.basics, photo: undefined }, layout: undefined });
     expect(skills.gaps).toContainEqual(expect.objectContaining({ ref: "r1", evidence: a.bullets[0]!.text }));
   });

@@ -24,7 +24,7 @@ const withItems: CvContent = {
   experience: [role], projects: [project], volunteering: [volunteer], technicalSkills: [{ id: "s1", name: "Excel" }],
 };
 const scoreReply = { labels: [
-  { ref: "r0", kind: "requirement", status: "met", evidence: "payroll", inferred: false },
+  { ref: "r0", kind: "requirement", status: "partial", evidence: "payroll", inferred: false }, // Still open for later projects.
   { ref: "k:Payroll", kind: "keyword", status: "met", evidence: "payroll", inferred: false },
 ], cvSeniority: "mid" };
 

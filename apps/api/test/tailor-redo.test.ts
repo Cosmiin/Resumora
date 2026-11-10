@@ -22,7 +22,7 @@ const base: CvContent = {
   experience: [one, two], technicalSkills: [{ id: "s1", name: "Excel" }],
 };
 const scoreReply = { labels: [
-  { ref: "r0", kind: "requirement", status: "met", evidence: "payroll", inferred: false },
+  { ref: "r0", kind: "requirement", status: "partial", evidence: "payroll", inferred: false }, // Both roles need answers to redo.
   { ref: "k:Payroll", kind: "keyword", status: "met", evidence: "payroll", inferred: false },
 ], cvSeniority: "mid" };
 

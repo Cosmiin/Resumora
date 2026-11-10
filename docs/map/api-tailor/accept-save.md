@@ -22,7 +22,7 @@ Recompute Score 2, save the document and notes, then advance the run and job sta
 
 - Uses version-checked document storage and owner RLS `apps/api/src/tailor/accept.ts:168` -> `saveTailoredCv`; `apps/api/src/tailor/supabase-repo.ts:82` -> `eq("version", expectedVersion)`; `supabase/migrations/20261108000000_tailoring.sql:75` -> `own tailored cvs: update`.
 - Uses append-only score writes and note RPC `apps/api/src/tailor/accept.ts:171` -> `saveScore`; `apps/api/src/tailor/supabase-repo.ts:22` -> `from("match_scores").insert`; `apps/api/src/tailor/accept.ts:182` -> `addJobNotes`; `apps/api/src/cv/supabase-repo.ts:57` -> `rpc("add_job_notes"`; `supabase/migrations/20261109230000_job_notes_projects.sql:3` -> `add_job_notes`.
-- Uses api-tailor/score for Score 2 and api-tailor/answers for note placement `apps/api/src/tailor/accept.ts:164` -> `scoreMatch`; `apps/api/src/tailor/score.ts:39` -> `scoreMatch`; `apps/api/src/tailor/accept.ts:176` -> `newestRole`; `apps/api/src/tailor/questions.ts:37` -> `newestRole`.
+- Uses api-tailor/score for Score 2 and api-tailor/answers for note placement `apps/api/src/tailor/accept.ts:164` -> `scoreMatch`; `apps/api/src/tailor/score.ts:39` -> `scoreMatch`; `apps/api/src/tailor/accept.ts:176` -> `newestRole`; `apps/api/src/tailor/questions.ts:38` -> `newestRole`.
 
 ## Assumptions
 
