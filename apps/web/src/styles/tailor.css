@@ -12,6 +12,10 @@
 .tailor-eyebrow { margin: 0; font-size: var(--text-eyebrow); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 
 .tailor-steps { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.tailor-steps .page-tabs { list-style: none; padding: 0; margin-top: 0; margin-inline: 0; }
+.tailor-steps .page-tabs > li { padding: 7px 11px; border-radius: var(--radius-pill); background: var(--surface-page); color: var(--text-muted); }
+.tailor-steps .page-tabs > li.is-done { color: var(--sec-ink); }
+.tailor-steps .page-tabs > li[aria-current="step"] { background: var(--sec); color: var(--white); }
 .tailor-step-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .tailor-back-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .tailor-back-answer { display: grid; gap: var(--space-2); }
