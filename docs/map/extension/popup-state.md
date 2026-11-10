@@ -10,7 +10,7 @@ open: []
 ---
 Coordinate popup initialization, environment changes, page checks and capture results.
 
-- Startup sends getState and rejects malformed state replies before rendering. `apps/extension/src/popup/popup.ts:172` -> `getState`
+- Startup sends getState and validates env and environment summaries before showState; validation accepts missing or wrongly typed email despite the string-or-null contract. `apps/extension/src/popup/popup.ts:172` -> `getState`; `apps/extension/src/popup/popup.ts:15` -> `isPopupState`; `apps/extension/src/messages.ts:14` -> `email`
 - Without a truthy state email, showState renders signedOut without querying the tab. `apps/extension/src/popup/popup.ts:85` -> `state.email`
 - Signed-in state queries the active tab, displays only HTTP(S) host plus pathname, and rejects an empty display location. `apps/extension/src/popup/popup.ts:91` -> `tabs.query`
 - The popup shows checking before checkActiveTab; a capturing reply joins the existing save. `apps/extension/src/popup/popup.ts:99` -> `checking`

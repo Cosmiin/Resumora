@@ -12,8 +12,7 @@ Close a focus session and derive facts only from the notes that still match.
 
 - Close works while busy, closes immediately, and only if notes changed starts save -> roleFacts in the background; returned facts dispatch only if notesHash still equals fromNotes. All fact failures, including 502/503, are ignored. `apps/web/src/cv/enrich/useFocusSession.ts:558` -> `s.closed = true`; `apps/web/src/cv/enrich/useFocusSession.ts:560` -> `roleFacts`; `apps/web/src/cv/enrich/useFocusSession.ts:562` -> `notesHash`; `apps/web/src/cv/enrich/useFocusSession.ts:565` -> `catch`; `apps/web/src/cv/enrich/useFocusSession.ts:566` -> `o.onClose`
 - Leaving by navigation or another unmount does not call Close: cleanup only clears alive, so changed notes do not trigger roleFacts on departure. Remount initializes notesChanged=false and does not recover that pending fact generation. `apps/web/src/cv/enrich/useFocusSession.ts:177` -> `s.alive = false`; `apps/web/src/cv/enrich/useFocusSession.ts:165` -> `notesChanged: false`; `apps/web/src/cv/enrich/useFocusSession.ts:560` -> `s.notesChanged`
-- tested by `apps/web/src/cv/enrich/focus-session.test.tsx:79` -> `describe`
-- tested by `apps/web/src/cv/enrich/focus-session.test.tsx:802` -> `describe`
+- API and saving use stand-ins; these tests do not cover departure recovery or specifically 502/503 fact failures. Close while busy, waiting for save, changed-note fact dispatch, stale/missing-role rejection, and no-note/generic-failure behavior are tested by `apps/web/src/cv/enrich/focus-session.test.tsx:475` -> `it`; `apps/web/src/cv/enrich/focus-session.test.tsx:748` -> `it`; `apps/web/src/cv/enrich/focus-session.test.tsx:763` -> `it.each`; `apps/web/src/cv/enrich/focus-session.test.tsx:780` -> `it`
 
 ## Connections
 

@@ -16,7 +16,7 @@ Define global palette, spacing, typography and focus variables.
 - Focus styling is shared through outline/offset tokens. `apps/web/src/styles/tokens.css:202` -> `--focus-outline`; `apps/web/src/styles/tokens.css:203` -> `--focus-offset`
 - --text-body is declared first as a color alias and later as 0.92rem. The later :root declaration wins, so color: var(--text-body) consumers receive a non-color value. `apps/web/src/styles/tokens.css:55` -> `--text-body`; `apps/web/src/styles/tokens.css:160` -> `--text-body: 0.92rem`
 ## Connections
-- Loaded before base and feature styles: `apps/web/src/main.tsx:9` -> `tokens.css`; `apps/web/src/main.tsx:10` -> `app.css`; `apps/web/src/styles/tokens.css:2` -> `:root`
+- Loaded before app.css but after tailor.css, which is imported through router and TailorFlow: `apps/web/src/main.tsx:8` -> `router.tsx`; `apps/web/src/router.tsx:8` -> `TailorFlow`; `apps/web/src/tailor/TailorFlow.tsx:20` -> `tailor.css`; `apps/web/src/main.tsx:9` -> `tokens.css`; `apps/web/src/main.tsx:10` -> `app.css`; `apps/web/src/styles/tokens.css:2` -> `:root`
 - Base header rules consume shared surface/border tokens: `apps/web/src/styles/app.css:75` -> `--white`; `apps/web/src/styles/app.css:76` -> `--border-subtle`; `apps/web/src/styles/tokens.css:15` -> `--white`; `apps/web/src/styles/tokens.css:62` -> `--border-subtle`
 
 ## Assumptions

@@ -13,7 +13,6 @@ Start summary rewriting after saving and present the advisory checklist.
 - Starting records the current summary and waits for save before mounting the stream; save failure returns to idle with a specific saveFailed alert. `apps/web/src/cv/enrich/SummaryTools.tsx:135` -> `setStarted`; `apps/web/src/cv/enrich/SummaryTools.tsx:138` -> `waitForSave`; `apps/web/src/cv/enrich/SummaryTools.tsx:141` -> `setFailed(true)`; `apps/web/src/cv/enrich/SummaryTools.tsx:156` -> `saveFailed`
 - Checklist maps sentences/firstPerson/length/mentionsRole/mentionsNumber to labels and fixes. FIX is Record<string,...>, so the non-null lookup assumes shared check keys remain covered. `apps/web/src/cv/enrich/SummaryTools.tsx:112` -> `FIX`; `apps/web/src/cv/enrich/SummaryTools.tsx:149` -> `FIX[c.key]!`; `apps/web/src/cv/enrich/Checklist.tsx:14` -> `!it.ok && it.fix`
 - tested by `apps/web/src/cv/enrich/summary-skills.test.tsx:76` -> `describe`
-- tested by `apps/web/src/cv/enrich/save-failed.test.tsx:102` -> `describe`
 
 ## Connections
 

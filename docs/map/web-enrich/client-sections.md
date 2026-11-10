@@ -13,7 +13,6 @@ Define JSON contracts for skills, achievements, item lines and voice-session cre
 - Skills POSTs `{}`; the local response schema requires suggestions `{name,group,evidence}[]` and sort `{skillId,group}[]`, restricting group to technicalSkills/professionalSkills. `apps/web/src/cv/enrich/enrich-api.ts:142` -> `SkillGroupSchema`; `apps/web/src/cv/enrich/enrich-api.ts:154` -> `json: {}`
 - Achievements POSTs `{}` and parses at most five `{text,roleId}` suggestions. Item-lines sends `{section,itemId,text}` and parses at most four nonempty lines of at most 200 characters; section is courses/awards/publications/interests. `apps/web/src/cv/enrich/enrich-api.ts:159` -> `AchievementsAnswerSchema`; `packages/shared/src/enrich.ts:301` -> `AchievementsAnswerSchema`; `apps/web/src/cv/enrich/enrich-api.ts:164` -> `ItemLinesAnswerSchema`; `packages/shared/src/enrich.ts:307` -> `LIGHT_SECTIONS`; `packages/shared/src/enrich.ts:311` -> `ItemLinesBodySchema`; `packages/shared/src/enrich.ts:319` -> `ItemLinesAnswerSchema`
 - Voice POST has no JSON body and expects a transient session credential plus expiresAt and model; the client requires a nonempty credential string. `apps/web/src/cv/enrich/enrich-api.ts:55` -> `VoiceSessionSchema`; `apps/web/src/cv/enrich/enrich-api.ts:63` -> `schema: VoiceSessionSchema`
-- tested by `apps/web/src/cv/enrich/enrich-api.test.ts:20` -> `describe`
 
 ## Connections
 

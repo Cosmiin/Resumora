@@ -2,7 +2,7 @@
 id: web-tailor/translation
 area: web-tailor
 files: ["apps/web/src/tailor/TailorToolbar.tsx","apps/web/src/tailor/translate.test.tsx"]
-depends_on: ["web-tailor/client-document","web-tailor/client-actions","shared/tailoring","api-tailor/translate"]
+depends_on: ["web-tailor/client-document","web-tailor/client-actions","shared/tailoring","api-tailor/translate","shared/cv"]
 contract: false
 checked_hash: 6d427b48
 decisions: []

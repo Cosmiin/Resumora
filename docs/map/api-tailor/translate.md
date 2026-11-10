@@ -20,7 +20,7 @@ Translate selected CV and letter strings into an independent job-language docume
 - Forces CV locale to target, validates CV and nullable letter and enforces MAX_CV_BYTES; invalid final output returns 502 before save `apps/api/src/tailor/translate.ts:86` -> `locale: input.language`; `apps/api/src/tailor/translate.ts:88` -> `MAX_CV_BYTES`.
 - Writes a new/refreshed copy with source ID, template/tone/instruction and timestamp; a target becoming independently tailored during the call still returns language_taken `apps/api/src/tailor/translate.ts:92` -> `saveTranslation`; `apps/api/src/tailor/translate.ts:96` -> `"language_taken"`.
 - Repeated requests regenerate translation and refresh the target; storage clears review/score and uses translated content as its Base snapshot `apps/api/src/tailor/translate.ts:68` -> `callModel`; `apps/api/src/tailor/supabase-repo.ts:116` -> `base_snapshot: input.content`; `apps/api/src/tailor/supabase-repo.ts:118` -> `review: null`.
-- tested by `apps/api/test/tailor-translate.test.ts:72` -> `POST /v1/tailored/:id/translate`.
+- tested by `apps/api/test/tailor-translate.test.ts:72` -> `POST /v1/tailored/:id/translate`; the default fake prefixes FR regardless of target language, so these tests do not prove target-language output `apps/api/test/tailor-translate.test.ts:38` -> `sent.texts.map`.
 
 ## Connections
 

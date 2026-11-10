@@ -15,7 +15,7 @@ Mount the browser application and choose public and authenticated pages.
 - StrictMode wraps QueryClientProvider, then AuthProvider, then RouterProvider. `apps/web/src/main.tsx:26` -> `StrictMode`
 - Login and password reset sit outside RequireAuth; the CV, jobs, tailoring flow and tailored document sit inside it. `apps/web/src/router.tsx:12` -> `/login`; `apps/web/src/router.tsx:15` -> `RequireAuth`
 - Root redirects to /cv with replacement, and unmatched paths first redirect to root. `apps/web/src/router.tsx:17` -> `replace`; `apps/web/src/router.tsx:25` -> `replace`
-- Global styles load in explicit order: tokens, app, auth, editor, review, CV page, panel, enrich, jobs, focus. Later rules can affect earlier feature markup. `apps/web/src/main.tsx:9` -> `tokens.css`
+- Router dependencies load tailor.css before main imports tokens.css and app.css, so main's direct stylesheet list is not the complete load order. Later rules can affect earlier feature markup. `apps/web/src/main.tsx:8` -> `router.tsx`; `apps/web/src/router.tsx:8` -> `TailorFlow`; `apps/web/src/tailor/TailorFlow.tsx:20` -> `tailor.css`; `apps/web/src/main.tsx:9` -> `tokens.css`; `apps/web/src/main.tsx:10` -> `app.css`
 ## Connections
 - Uses the auth guard for the protected route branch: `apps/web/src/router.tsx:15` -> `RequireAuth`; `apps/web/src/auth/RequireAuth.tsx:10` -> `Navigate`
 - Uses the CV, job and tailoring pages by route: `apps/web/src/router.tsx:18` -> `CvPage`; `apps/web/src/cv/CvPage.tsx:18` -> `CvPage`; `apps/web/src/router.tsx:20` -> `JobPage`; `apps/web/src/jobs/JobPage.tsx:18` -> `JobPage`; `apps/web/src/router.tsx:21` -> `TailorFlow`; `apps/web/src/tailor/TailorFlow.tsx:25` -> `TailorFlow`

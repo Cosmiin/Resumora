@@ -16,8 +16,6 @@ Send section questions, answers, proposals and acceptance decisions.
 - Section generation POSTs the optional role id, validates proposals and questions arrays, and defaults missing removed to zero with nonnegative integer validation. `apps/web/src/tailor/tailor-api.ts:45` -> `runSection`
 - Section acceptance sends AcceptBody and requires {run:TailorRun,score:MatchScore}. `apps/web/src/tailor/tailor-api.ts:52` -> `acceptSection`
 - Redo sends {answers} and validates proposals plus default-zero removed; role acceptance returns the same run-and-score envelope as section acceptance. `apps/web/src/tailor/tailor-api.ts:74` -> `redoRole`; `apps/web/src/tailor/tailor-api.ts:81` -> `acceptRole`
-- tested by `apps/web/src/tailor/tailor-flow.test.tsx:74` -> `it`
-- tested by `apps/web/src/tailor/redo.test.tsx:59` -> `it`
 
 ## Connections
 

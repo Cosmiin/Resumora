@@ -10,7 +10,7 @@ open: []
 ---
 Style shared scores, answer/voice controls and enrichment proposal states.
 
-- Global .score-pill is positioned outside a role, with clear/good/work/previous variants; at 720px it becomes static. More-specific .role-scores .score-pill is always static. `apps/web/src/styles/enrich.css:3` -> `.score-pill`; `apps/web/src/styles/enrich.css:10` -> `720px`; `apps/web/src/styles/enrich.css:29` -> `.role-scores .score-pill`
+- Global .score-pill defaults to absolute outside positioning, with clear/good/work/previous variants, and becomes static at widths up to 720px. More-specific .role-scores .score-pill and .cv-role .score-pill keep pills static at every width. `apps/web/src/styles/enrich.css:3` -> `.score-pill`; `apps/web/src/styles/enrich.css:10` -> `720px`; `apps/web/src/styles/enrich.css:29` -> `.role-scores .score-pill`; `apps/web/src/styles/cv-page.css:161` -> `.cv-role .score-pill`
 - .score-ring draws a conic gradient from --v and --c, with clear/work color overrides and an inner circular span. `apps/web/src/styles/enrich.css:16` -> `.score-ring`
 - .role-open is a shared row button; .weak-mark positions a bullet indicator and .weak-tip appears on hover/focus or .is-open. At 720px the marker moves inward. `apps/web/src/styles/enrich.css:30` -> `.role-open`; `apps/web/src/styles/enrich.css:39` -> `.weak-mark`; `apps/web/src/styles/enrich.css:44` -> `.weak-tip.is-open`
 - Global answer-* rules style answer choices and fields, while .mic is an unprefixed absolutely positioned circular button reused beyond enrichment. `apps/web/src/styles/enrich.css:50` -> `.answer-box`; `apps/web/src/styles/enrich.css:60` -> `.mic`

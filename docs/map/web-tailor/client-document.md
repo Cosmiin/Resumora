@@ -16,8 +16,6 @@ Read tailored documents and perform versioned content and review saves.
 - The server validates expectedVersion >= 1 and returns {version,updatedAt} on success; mismatch is HTTP 409 with error.code version_conflict and current {version,updatedAt}. `apps/api/src/tailor/tailored-routes.ts:17` -> `expectedVersion`; `apps/api/src/cv/routes.ts:29` -> `result.ok`; `apps/api/src/cv/routes.ts:32` -> `version_conflict`
 - Review PATCH sends {section,key,action,text?,version} with keep/remove/edit actions, returning a full TailoredCv. `apps/web/src/tailor/tailored-api.ts:28` -> `ReviewDecision`; `apps/web/src/tailor/tailored-api.ts:32` -> `PATCH`
 - Template PATCH sends only {template}, returning {template} validated against the shared template enum. `apps/web/src/tailor/tailored-api.ts:65` -> `TailoredCvSchema.shape.template`
-- tested by `apps/web/src/tailor/tailored-page.test.tsx:142` -> `it`
-- tested by `apps/web/src/tailor/guided-review.test.tsx:67` -> `it`
 
 - Content saves conditionally update the row matching id and expectedVersion and increment version; a second read distinguishes stale from missing rows. `apps/api/src/tailor/supabase-repo.ts:104` -> `saveTailoredContent`
 - Template and letter writes update timestamps without content-version checks or increments. `apps/api/src/tailor/supabase-repo.ts:142` -> `setTemplate`; `apps/api/src/tailor/supabase-repo.ts:148` -> `setCoverLetter`

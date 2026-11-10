@@ -12,7 +12,7 @@ Accept only ready summary proposals while the starting summary remains unchanged
 
 - A ready proposal remains usable after a later stream failure if the current summary equals started; unfinished text never becomes usable. If summary changed, Use is disabled and the UI offers regeneration. `apps/web/src/cv/enrich/SummaryTools.tsx:48` -> `summary !== started`; `apps/web/src/cv/enrich/SummaryTools.tsx:62` -> `ready`; `apps/web/src/cv/enrich/SummaryTools.tsx:75` -> `disabled={changed}`
 - Use dispatches setSummary then marks that proposal used; Keep closes review. Restart unmounts review during drafting, so it discards that review's proposal list even though the lower-level event reducer supports run IDs. `apps/web/src/cv/enrich/SummaryTools.tsx:38` -> `setSummary`; `apps/web/src/cv/enrich/SummaryTools.tsx:39` -> `state: "used"`; `apps/web/src/cv/enrich/SummaryTools.tsx:78` -> `onClose`; `apps/web/src/cv/enrich/SummaryTools.tsx:136` -> `setStep("drafting")`; `apps/web/src/cv/enrich/SummaryTools.tsx:171` -> `step === "review"`
-- tested by `apps/web/src/cv/enrich/summary-skills.test.tsx:76` -> `describe`
+- These tests do not cover ready-proposal usability or unfinished text after a later stream failure. Readiness, Use, Keep, restart after an error with no proposals, and changed-summary protection are tested by `apps/web/src/cv/enrich/summary-skills.test.tsx:99` -> `it`; `apps/web/src/cv/enrich/summary-skills.test.tsx:117` -> `it`; `apps/web/src/cv/enrich/summary-skills.test.tsx:134` -> `it`; `apps/web/src/cv/enrich/summary-skills.test.tsx:160` -> `it`; `apps/web/src/cv/enrich/summary-skills.test.tsx:173` -> `it`
 
 ## Connections
 

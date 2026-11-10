@@ -16,8 +16,6 @@ Validate run, steering, tone-example and score HTTP responses.
 - Tone examples POSTs an empty object and validates nullable bullet plus nullable tone-to-string record. `apps/web/src/tailor/tailor-api.ts:66` -> `getToneExamples`
 - Changing steering POSTs Steering and parses {run}; reading steering unwraps {steering: SteeringSchema}. `apps/web/src/tailor/tailor-api.ts:88` -> `changeSteering`; `apps/web/src/tailor/tailor-api.ts:94` -> `SteeringSchema`
 - Response validation and HTTP failures are delegated to apiFetch, which throws ApiClientError on non-OK and parses successful JSON. `apps/web/src/tailor/tailor-api.ts:6` -> `apiFetch`; `apps/web/src/lib/api.ts:64` -> `ApiClientError`
-- tested by `apps/web/src/tailor/tailor-flow.test.tsx:74` -> `it`
-- tested by `apps/web/src/tailor/steering.test.tsx:35` -> `it`
 
 ## Connections
 

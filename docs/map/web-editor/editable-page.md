@@ -12,7 +12,7 @@ Choose editable section bodies, preserve open empty sections and route section c
 
 - Layout order is normalized; base mode uses sectionsOnCv while tailored mode initially counts only nonempty sections. `apps/web/src/cv/edit/EditablePage.tsx:59` -> `normalizeLayout`
 - Sections on the page are added to the visit's opened set, keeping them editable after their contents are cleared. `apps/web/src/cv/edit/EditablePage.tsx:64` -> `useEffect`
-- Adding a section dispatches data creation, records it as opened, then focuses its first field after rendering. `apps/web/src/cv/edit/EditablePage.tsx:48` -> `addSection`
+- Adding a section dispatches addSection, records it as opened, then schedules its first field for focus after rendering; summary and skills only unhide existing content, without creating data. `apps/web/src/cv/edit/EditablePage.tsx:51` -> `dispatch`; `apps/web/src/cv/edit/useFocusAfterRender.ts:12` -> `useEffect`; `apps/web/src/cv/edit/cvReducer.ts:129` -> `return unhide(cv, key)`
 - Hidden sections or missing renderers are skipped; base-mode missing flags render MissingBox instead of a section body. `apps/web/src/cv/edit/EditablePage.tsx:94` -> `layout.order.map`; `apps/web/src/cv/edit/EditablePage.tsx:109` -> `const level`
 - MissingBox uses the shared category label and why text, with tip versus missing styling and an add callback. `apps/web/src/cv/edit/MissingBox.tsx:13` -> `CATEGORY`; `apps/web/src/cv/edit/MissingBox.tsx:16` -> `level`
 - Only tailored mode renders section menus, hidden-section recovery and a single delete/undo snapshot. `apps/web/src/cv/edit/EditablePage.tsx:101` -> `SectionHeading`; `apps/web/src/cv/edit/EditablePage.tsx:116` -> `if (!tailored)`; `apps/web/src/cv/edit/EditablePage.tsx:126` -> `restoreSection`

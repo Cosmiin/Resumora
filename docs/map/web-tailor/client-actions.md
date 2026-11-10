@@ -15,9 +15,6 @@ Request re-tailoring, translation and cover-letter generation or editing.
 - Letter generation POSTs {whyCompany,hiringManager} and validates {coverLetter:CoverLetter,flags:Flag[]}. `apps/web/src/tailor/tailored-api.ts:52` -> `writeLetter`
 - Letter editing PUTs {body,hiringManager,whyCompany} and requires {coverLetter}; no version is sent. `apps/web/src/tailor/tailored-api.ts:59` -> `saveLetter`
 - FlagSchema and CoverLetterSchema come from shared contracts; failed parsing propagates from apiFetch. `apps/web/src/tailor/tailored-api.ts:47` -> `CoverLetterSchema`; `apps/web/src/lib/api.ts:66` -> `parse`
-- tested by `apps/web/src/tailor/retailor.test.tsx:62` -> `it`
-- tested by `apps/web/src/tailor/translate.test.tsx:67` -> `it`
-- tested by `apps/web/src/tailor/cover-letter.test.tsx:42` -> `it`
 
 ## Connections
 

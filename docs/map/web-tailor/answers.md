@@ -11,10 +11,10 @@ open: []
 Display earlier answers and prepare a complete replacement set for role redo.
 
 - FinishedRoles renders only the supplied list and calls onPick with the selected role id. `apps/web/src/tailor/YourAnswers.tsx:15` -> `roles.map`
-- Drafts initialize by matching questionId; skipped or missing answers become empty text while persisted roleIds are retained. `apps/web/src/tailor/YourAnswers.tsx:38` -> `questions.map`
-- Update sends every displayed question, trims nonempty answers, recalculates via and retains roleIds; emptied answers become null/skip. `apps/web/src/tailor/YourAnswers.tsx:42` -> `update`
+- Drafts initialize by matching questionId; only null or missing values become empty text, even when via is skip, and persisted roleIds are retained. `apps/web/src/tailor/YourAnswers.tsx:39` -> `questionId`; `apps/web/src/tailor/YourAnswers.tsx:40` -> `value`
+- Update sends every displayed question; nonempty answers are trimmed, have via recalculated and retain roleIds, while emptied answers become null/skip without roleIds. `apps/web/src/tailor/YourAnswers.tsx:42` -> `update`; `apps/web/src/tailor/YourAnswers.tsx:46` -> `skip`
 - An absent onUpdate renders plain answer text or the skipped label; it does not expose editors or Update. `apps/web/src/tailor/YourAnswers.tsx:55` -> `onUpdate`; `apps/web/src/tailor/YourAnswers.tsx:63` -> `onUpdate`
-- Busy makes AnswerBox read-only and disables Update; the resume button still calls onClose. `apps/web/src/tailor/YourAnswers.tsx:57` -> `readOnly`; `apps/web/src/tailor/YourAnswers.tsx:62` -> `onClose`
+- Busy passes readOnly to AnswerBox and disables Update; the textarea becomes read-only, but option buttons can still change answers and the resume button still calls onClose. `apps/web/src/tailor/YourAnswers.tsx:57` -> `readOnly`; `apps/web/src/cv/enrich/AnswerBox.tsx:125` -> `readOnly`; `apps/web/src/cv/enrich/AnswerBox.tsx:109` -> `onChange`; `apps/web/src/tailor/YourAnswers.tsx:63` -> `disabled`; `apps/web/src/tailor/YourAnswers.tsx:62` -> `onClose`
 - tested by `apps/web/src/tailor/redo.test.tsx:59` -> `it`
 
 ## Connections

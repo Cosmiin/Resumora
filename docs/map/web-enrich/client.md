@@ -13,7 +13,6 @@ Validate score JSON responses and share authenticated enrichment error handling.
 - GET scores unwraps `{items: RoleResult[]}`; POST score sends `{roleId, fingerprint}` and includes optional `fresh` only when truthy, parsing a bare RoleResult. `apps/web/src/cv/enrich/enrich-api.ts:23` -> `ScoresSchema`; `apps/web/src/cv/enrich/enrich-api.ts:27` -> `items`; `apps/web/src/cv/enrich/enrich-api.ts:35` -> `RoleResultSchema`
 - RoleResult carries roleId, policy, fingerprint, nullable score, per-bullet grades/issues/tips/questions, nextStep, questions, roleQuestions and thin. `packages/shared/src/enrich.ts:82` -> `roleId`; `packages/shared/src/enrich.ts:89` -> `id`; `packages/shared/src/enrich.ts:101` -> `nextStep`
 - JSON failures preserve HTTP status and server error code through ApiClientError; schema-invalid successful responses throw during parsing. This layer does not choose UI recovery for 502 ai_bad_answer or 503 ai_unavailable. `apps/web/src/lib/api.ts:60` -> `authedFetch`; `apps/web/src/lib/api.ts:64` -> `ApiClientError`; `apps/web/src/lib/api.ts:66` -> `parse`
-- tested by `apps/web/src/cv/enrich/enrich-api.test.ts:20` -> `describe`
 
 ## Connections
 

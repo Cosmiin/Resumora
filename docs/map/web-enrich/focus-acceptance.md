@@ -15,7 +15,6 @@ Apply accepted bullet proposals and wait for trustworthy score celebrations.
 - Brain-dump acceptance filters by selected proposal IDs, dispatches one addBullets, and waits for actual scoring rather than celebrating roleAfterAll. `apps/web/src/cv/enrich/useFocusSession.ts:530` -> `ids.includes`; `apps/web/src/cv/enrich/useFocusSession.ts:536` -> `source: "dump"`; `apps/web/src/cv/enrich/useFocusSession.ts:537` -> `addBullets`
 - New scores celebrate only an increase (or first score); after adding bullets, the queue is rebuilt excluding completed IDs. `apps/web/src/cv/enrich/useFocusSession.ts:329` -> `buildQueue`; `apps/web/src/cv/enrich/useFocusSession.ts:332` -> `fresh.score > s.scoreBefore`
 - tested by `apps/web/src/cv/enrich/focus-session.test.tsx:79` -> `describe`
-- tested by `apps/web/src/cv/enrich/focus-session.test.tsx:802` -> `describe`
 
 ## Connections
 

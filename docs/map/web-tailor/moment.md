@@ -14,7 +14,7 @@ Animate completion scores with reduced-motion handling and shared celebration st
 - The counter uses cubic easing over COUNT_MS=1400 and rounds the displayed value. `apps/web/src/tailor/TailorMoment.tsx:3` -> `COUNT_MS`; `apps/web/src/tailor/TailorMoment.tsx:29` -> `COUNT_MS`
 - The effect focuses the optional button, skips animation for reduced motion or null target, and cancels its frame on cleanup. `apps/web/src/tailor/TailorMoment.tsx:23` -> `focus`; `apps/web/src/tailor/TailorMoment.tsx:34` -> `cancelAnimationFrame`
 - Confetti appears only for non-reduced-motion increases with both scores non-null. `apps/web/src/tailor/TailorMoment.tsx:45` -> `to > from`
-- Children select has-more layout; null shown score omits the numeric element, and a missing button omits navigation. `apps/web/src/tailor/TailorMoment.tsx:37` -> `has-more`
+- Truthy children select has-more layout; null shown score omits the numeric element, and a missing button omits only that button; DoneScreen supplies navigation through children. `apps/web/src/tailor/TailorMoment.tsx:37` -> `has-more`; `apps/web/src/tailor/TailorMoment.tsx:43` -> `button`; `apps/web/src/tailor/DoneScreen.tsx:51` -> `TailorMoment`; `apps/web/src/tailor/DoneScreen.tsx:63` -> `nav`
 - tested by `apps/web/src/tailor/role-done.test.tsx:94` -> `it`
 - tested by `apps/web/src/tailor/done-screen.test.tsx:36` -> `it`
 

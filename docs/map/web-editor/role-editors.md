@@ -18,7 +18,7 @@ Edit role-shaped lists and education with stable IDs, dates and row controls.
 - Score pills focus the role's title, which drives section/item tools through DOM focus. `apps/web/src/cv/edit/sections/RoleItem.tsx:84` -> `openRole`; `apps/web/src/cv/edit/sections/RoleItem.tsx:108` -> `ScorePill`
 - Education uses degree as the main editable title and school as a detail; adding an item focuses degree. `apps/web/src/cv/edit/sections/EducationEdit.tsx:62` -> `field("degree"`; `apps/web/src/cv/edit/sections/EducationEdit.tsx:71` -> `field("school"`; `apps/web/src/cv/edit/sections/EducationEdit.tsx:85` -> `const add`
 - Education notes are multiline but pass no explicit maxLength, so ItemField/PageField apply the standard text limit. `apps/web/src/cv/edit/sections/EducationEdit.tsx:35` -> `<ItemField`; `apps/web/src/cv/edit/sections/EducationEdit.tsx:77` -> `field("notes"`; `apps/web/src/cv/edit/PageField.tsx:42` -> `MAX_TEXT`
-- tested by `apps/web/src/cv/edit/roles.test.tsx:43` -> `describe("roles on the page"`; `apps/web/src/cv/edit/roles.test.tsx:103` -> `describe("education on the page"`; `apps/web/src/cv/edit/roles.test.tsx:130` -> `describe("skills on the page"`
+- tested by `apps/web/src/cv/edit/roles.test.tsx:43` -> `describe("roles on the page"`; `apps/web/src/cv/edit/roles.test.tsx:103` -> `describe("education on the page"`
 
 ## Connections
 

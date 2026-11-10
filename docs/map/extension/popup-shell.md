@@ -12,7 +12,7 @@ Supply the popup document, visual states and extension-specific user-facing copy
 
 - The document has a header badge, empty main and footer, and a module entry script for popup.ts. `apps/extension/popup.html:11` -> `environment-badge`; `apps/extension/popup.html:15` -> `popup.ts`
 - The body is fixed at 320px wide with zero margin. `apps/extension/src/popup/popup.css:7` -> `body`
-- Main and form buttons fill their container; disabled buttons lower opacity and show a not-allowed cursor. `apps/extension/src/popup/popup.css:47` -> `button:disabled`
+- Direct main and form buttons fill their container, except .link-button uses auto width for Capture anyway; disabled buttons lower opacity and show a not-allowed cursor. `apps/extension/src/popup/popup.css:48` -> `width: 100%`; `apps/extension/src/popup/popup.css:51` -> `width: auto`; `apps/extension/src/popup/view.ts:101` -> `link-button`; `apps/extension/src/popup/popup.css:47` -> `button:disabled`
 - Paragraphs and request-id small text permit wrapping anywhere. `apps/extension/src/popup/popup.css:42` -> `overflow-wrap`; `apps/extension/src/popup/popup.css:58` -> `overflow-wrap`
 - Spinner animation is disabled when reduced motion is preferred. `apps/extension/src/popup/popup.css:73` -> `prefers-reduced-motion`
 - Connection-failure copy differs for Local and Hosted. `apps/extension/src/copy.ts:6` -> `cantReach`
