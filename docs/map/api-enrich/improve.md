@@ -16,11 +16,11 @@ Propose a single replacement only when regrading gives the target bullet a stric
 - Moves the proposed target after every other bullet for grading so duplicates can point backward, but merges the result into the original bullet order. `apps/api/src/enrich/improve.ts:53` -> `gradingRole`; `apps/api/src/enrich/improve.ts:57` -> `gradeBullets`; `apps/api/src/enrich/improve.ts:59` -> `mergeGrades`.
 - Rejects model-marked duplicate or meaningless proposals and any proposal whose new target score is not strictly greater. `apps/api/src/enrich/improve.ts:58` -> `duplicateOf`; `apps/api/src/enrich/improve.ts:62` -> `after <= bulletBefore`.
 - Writes a predicted pending score only if no other original bullet was marked duplicate; returns cached false otherwise, with before/after scores in either accepted case. `apps/api/src/enrich/improve.ts:64` -> `cached`; `apps/api/src/enrich/improve.ts:66` -> `putPending`; `apps/api/src/enrich/improve.ts:69` -> `proposal`.
+- tested by `apps/api/src/enrich/improve.test.ts:67` -> `offers a better bullet`
 - Malformed JSON or schema-invalid output retries through the gateway; exhausted providers become 503 ai_unavailable, while output truncation becomes 502 ai_bad_answer. `apps/api/src/ai/call-model.ts:228` -> `schema.safeParse`; `apps/api/src/ai/call-model.ts:174` -> `AiUnavailableError`; `apps/api/src/enrich/score.ts:23` -> `AiUnavailableError`; `apps/api/src/enrich/score.ts:24` -> `AiOutputTooLongError`.
 - tested by `apps/api/src/enrich/improve.test.ts:66` -> `POST /v1/enrich/improve-bullet`
 
 - Secondary enrich_score calls use ModelScoreSchema for baseline scoring when needed and for proposal regrading. A schema-valid reply with wrong requested IDs fails after gateway success logging: 502 ai_bad_answer, without a model retry. `apps/api/src/enrich/improve.ts:30` -> `scoreRole`; `apps/api/src/enrich/improve.ts:57` -> `gradeBullets`; `apps/api/src/enrich/score.ts:32` -> `enrich_score`; `apps/api/src/enrich/score.ts:33` -> `ModelScoreSchema`; `apps/api/src/enrich/score.ts:39` -> `actual.size`; `apps/api/src/enrich/score.ts:24` -> `ai_bad_answer`; `apps/api/src/ai/call-model.ts:162` -> `status: "ok"`.
-- tested by `apps/api/src/enrich/score.test.ts:284` -> `without retries`
 
 ## Connections
 

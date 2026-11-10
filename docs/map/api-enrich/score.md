@@ -15,13 +15,13 @@ Grade saved roles, projects and volunteering, reuse compatible results, and supp
 - Answered role questions are removed from the returned result by trimmed, case-insensitive question text after cache storage. `apps/api/src/enrich/score.ts:96` -> `answered`.
 - Both grading paths log enrich_score and parse ModelScoreSchema; full scoring caps output at 4000 tokens, while selected grading uses 600 + 180 per requested ID. `apps/api/src/enrich/score.ts:32` -> `enrich_score`; `apps/api/src/enrich/score.ts:36` -> `maxOutputTokens`; `apps/api/src/enrich/score.ts:83` -> `enrich_score`; `apps/api/src/enrich/score.ts:87` -> `Math.min`.
 - Full scoring runs buildRoleResult after callModel; duplicate, extra or missing IDs become 502 ai_bad_answer before any result write. `apps/api/src/enrich/score.ts:89` -> `buildRoleResult`; `packages/shared/src/enrich.ts:183` -> `EnrichParseError`; `apps/api/src/enrich/score.ts:94` -> `insights.put`; `apps/api/src/enrich/score.ts:24` -> `ai_bad_answer`.
+- tested by `apps/api/src/enrich/score.test.ts:220` -> `502 and nothing stored`
 - Malformed JSON or schema-invalid output retries through the gateway; exhausted providers become 503 ai_unavailable, while output truncation becomes 502 ai_bad_answer. `apps/api/src/ai/call-model.ts:228` -> `schema.safeParse`; `apps/api/src/ai/call-model.ts:174` -> `AiUnavailableError`; `apps/api/src/enrich/score.ts:23` -> `AiUnavailableError`; `apps/api/src/enrich/score.ts:24` -> `AiOutputTooLongError`.
 - Project and volunteering context is added by kindNote for full scoring; gradeBullets calls scoreUserMessage without kind, so selected regrading uses its role default. `apps/api/src/enrich/score.ts:86` -> `found!.kind`; `apps/api/src/enrich/score.ts:35` -> `scoreUserMessage(role, ids)`; `apps/api/src/enrich/prompts.ts:270` -> `kind: ScoredKind = "role"`.
 - tested by `apps/api/src/enrich/score.test.ts:43` -> `scoreRole`
 - tested by `apps/api/src/enrich/score.test.ts:263` -> `gradeBullets`
 
 - Selected grading also requires exactly the requested unique IDs. Failure occurs after the gateway logs success, so it returns 502 ai_bad_answer without retrying the model. `apps/api/src/enrich/score.ts:39` -> `actual.size`; `apps/api/src/enrich/score.ts:40` -> `EnrichParseError`; `apps/api/src/ai/call-model.ts:162` -> `status: "ok"`; `apps/api/src/enrich/score.ts:24` -> `ai_bad_answer`.
-- tested by `apps/api/src/enrich/score.test.ts:220` -> `502 and nothing stored`
 - tested by `apps/api/src/enrich/score.test.ts:284` -> `without retries`
 
 ## Connections

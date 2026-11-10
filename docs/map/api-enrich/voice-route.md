@@ -13,7 +13,7 @@ Reserve a daily voice-session attempt before asking the provider for a transcrip
 - Missing voice configuration returns 503 ai_unavailable before a quota reservation. `apps/api/src/enrich/routes.ts:196` -> `!deps.voice`.
 - The saved CV supplies locale; VOICE supplies model and daily quota, and reservation denial returns 429 voice_limit. `apps/api/src/enrich/routes.ts:197` -> `content.locale`; `apps/api/src/enrich/routes.ts:199` -> `VOICE.perDay`; `apps/api/src/enrich/routes.ts:200` -> `voice_limit`.
 - Reservation precedes createVoiceSession; provider failure maps to 503 without refunding that attempt. `apps/api/src/enrich/routes.ts:199` -> `reserveVoiceSession`; `apps/api/src/enrich/routes.ts:203` -> `createVoiceSession`; `apps/api/src/enrich/routes.ts:205` -> `VoiceUnavailableError`.
-- tested by `apps/api/src/enrich/routes.test.ts:42` -> `/v1/enrich`
+- tested by `apps/api/src/ai/voice-session.test.ts:125` -> `uses the saved CV's language, and English when there is no CV`
 
 ## Connections
 

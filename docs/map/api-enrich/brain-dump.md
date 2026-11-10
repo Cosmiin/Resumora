@@ -16,11 +16,11 @@ Turn saved role answers into bounded, checked and graded new bullet proposals.
 - BrainDumpSchema permits up to four strings; enrich_brain_dump uses a 1200-token budget and the locale/kind-aware focus templates. `apps/api/src/enrich/brain-dump.ts:9` -> `BrainDumpSchema`; `apps/api/src/enrich/brain-dump.ts:46` -> `enrich_brain_dump`; `apps/api/src/enrich/brain-dump.ts:49` -> `found!.kind`.
 - Normalizes whitespace, checks proposal rules and repetition, assigns unused newN IDs, and stops selecting candidates at available slots before grading. `apps/api/src/enrich/brain-dump.ts:57` -> `squash`; `apps/api/src/enrich/brain-dump.ts:59` -> `checkProposal`; `apps/api/src/enrich/brain-dump.ts:61` -> `usedIds`; `apps/api/src/enrich/brain-dump.ts:65` -> `slots`.
 - Grades candidates appended after existing bullets, keeps only scores at least 40, and recomputes roleAfterAll from the survivors; it returns proposals without persisting pending results. `apps/api/src/enrich/brain-dump.ts:70` -> `appended`; `apps/api/src/enrich/brain-dump.ts:74` -> `b.score >= 40`; `apps/api/src/enrich/brain-dump.ts:76` -> `mergeGrades`; `apps/api/src/enrich/brain-dump.ts:77` -> `return`.
+- tested by `apps/api/src/enrich/brain-dump.test.ts:75` -> `returns up to four scored proposals`
 - Malformed JSON or schema-invalid output retries through the gateway; exhausted providers become 503 ai_unavailable, while output truncation becomes 502 ai_bad_answer. `apps/api/src/ai/call-model.ts:228` -> `schema.safeParse`; `apps/api/src/ai/call-model.ts:174` -> `AiUnavailableError`; `apps/api/src/enrich/score.ts:23` -> `AiUnavailableError`; `apps/api/src/enrich/score.ts:24` -> `AiOutputTooLongError`.
 - tested by `apps/api/src/enrich/brain-dump.test.ts:74` -> `POST /v1/enrich/brain-dump`
 
 - Secondary enrich_score calls use ModelScoreSchema for baseline scoring when needed and for proposal regrading. A schema-valid reply with wrong requested IDs fails after gateway success logging: 502 ai_bad_answer, without a model retry. `apps/api/src/enrich/brain-dump.ts:43` -> `scoreRole`; `apps/api/src/enrich/brain-dump.ts:71` -> `gradeBullets`; `apps/api/src/enrich/score.ts:32` -> `enrich_score`; `apps/api/src/enrich/score.ts:33` -> `ModelScoreSchema`; `apps/api/src/enrich/score.ts:39` -> `actual.size`; `apps/api/src/enrich/score.ts:24` -> `ai_bad_answer`; `apps/api/src/ai/call-model.ts:162` -> `status: "ok"`.
-- tested by `apps/api/src/enrich/score.test.ts:284` -> `without retries`
 
 ## Connections
 
