@@ -12,3 +12,5 @@ apps/api/eval/import/data-b.ts
 apps/api/eval/import/data-c.ts
 # fixture: synthetic tailoring CV and job pairs
 apps/api/eval/tailor/fixtures.json
+# fixture: shared synthetic CV data for browser tests
+apps/web/src/test/sample-cv.ts

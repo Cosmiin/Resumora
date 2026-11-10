@@ -1,0 +1,28 @@
+---
+id: web-app/styles-document
+area: web-app
+files: ["apps/web/src/styles/cv-page.css"]
+depends_on: ["web-app/styles-base","web-app/styles-editor","web-editor/document","web-editor/page-fields","web-editor/drag","web-editor/section-controls"]
+contract: false
+checked_hash: 998f6c23
+decisions: []
+open: []
+---
+Style CV preview/editing markup and shared page controls across editor, import and tailoring.
+
+- .cv-page is centered, full width up to 680px, with A4 aspect ratio and document typography; at 720px and below its padding shrinks. `apps/web/src/styles/cv-page.css:2` -> `.cv-page`; `apps/web/src/styles/cv-page.css:46` -> `720px`
+- CV inputs/textarea override global field chrome and width, use content sizing, and gain background/inset underline on focus. `apps/web/src/styles/cv-page.css:49` -> `:is(input, textarea)`; `apps/web/src/styles/cv-page.css:61` -> `field-sizing`; `apps/web/src/styles/cv-page.css:66` -> `:focus`
+- Chip removal buttons are hidden until chip hover or section focus-within; a global .date-hint is positioned absolutely below its parent. `apps/web/src/styles/cv-page.css:76` -> `visibility: hidden`; `apps/web/src/styles/cv-page.css:80` -> `.date-hint`
+- At 560px or below, item heads wrap; dates stop flexing. `apps/web/src/styles/cv-page.css:109` -> `560px`
+- Unprefixed .adder and .remover start transparent and appear on section hover/focus or their own keyboard focus. `apps/web/src/styles/cv-page.css:120` -> `.adder`; `apps/web/src/styles/cv-page.css:123` -> `.remover`
+- Global .ghost styles missing-section boxes; .ghost.tip changes status colors and nested .note/.btn rules change layout/control size. `apps/web/src/styles/cv-page.css:125` -> `.ghost`
+- Global .sr-only visually clips accessible text; .drag-row/.drag-grip handle dragged rows, hidden grips and pressed/focus states. `apps/web/src/styles/cv-page.css:143` -> `.sr-only`; `apps/web/src/styles/cv-page.css:144` -> `.drag-row`
+- On non-hover devices, .adder, .remover and .drag-grip become partly visible, along with empty role descriptions. `apps/web/src/styles/cv-page.css:151` -> `hover: none`
+- More-specific .cv-role .score-pill places scores statically in role headers despite enrichment's global absolute-positioned pill. `apps/web/src/styles/cv-page.css:161` -> `.cv-role .score-pill`; `apps/web/src/styles/enrich.css:3` -> `.score-pill`
+- Global .section-menu, .hidden-sections and sticky .section-toast style section controls; .section-menu-list buttons override generic button chrome. `apps/web/src/styles/cv-page.css:167` -> `.section-menu`; `apps/web/src/styles/cv-page.css:170` -> `.section-menu-list`; `apps/web/src/styles/cv-page.css:174` -> `.hidden-sections`; `apps/web/src/styles/cv-page.css:180` -> `.section-toast`
+- Print hides global .no-print plus section-menu/hidden-sections/toast with !important; hidden CV rows dim their contents but preserve the hide control. `apps/web/src/styles/cv-page.css:183` -> `@media print`; `apps/web/src/styles/cv-page.css:188` -> `.cv-line.is-hidden`
+## Connections
+- Used by document rendering, including import preview: `apps/web/src/cv/page/CvDocument.tsx:203` -> `cv-page`; `apps/web/src/styles/cv-page.css:2` -> `.cv-page`; `apps/web/src/imports/ImportScreen.tsx:133` -> `CvDocument`
+- Shared edit controls depend on unprefixed names: `apps/web/src/cv/edit/sections/AddButton.tsx:4` -> `adder`; `apps/web/src/styles/cv-page.css:120` -> `.adder`; `apps/web/src/cv/edit/sections/RemoveButton.tsx:5` -> `remover`; `apps/web/src/styles/cv-page.css:123` -> `.remover`; `apps/web/src/cv/edit/DateField.tsx:66` -> `date-hint`; `apps/web/src/styles/cv-page.css:80` -> `.date-hint`
+## Assumptions
+- These selectors also affect document markup outside the editor; only explicitly qualified rules restrict themselves to .cv-page-edit. `apps/web/src/styles/cv-page.css:49` -> `.cv-page`; `apps/web/src/styles/cv-page.css:103` -> `.cv-page-edit`
