@@ -26,7 +26,7 @@ Append job answers to the latest saved role or project without creating history.
 ## Connections
 
 - Used by CvRepo.addJobNotes: `apps/api/src/cv/supabase-repo.ts:57` -> `rpc("add_job_notes"` -> `supabase/migrations/20261109230000_job_notes_projects.sql:3` -> `add_job_notes`.
-- Used by tailoring answer and acceptance flows: `apps/api/src/tailor/questions.ts:175` -> `deps.cv.addJobNotes`, `apps/api/src/tailor/accept.ts:182` -> `deps.cv.addJobNotes` -> `apps/api/src/cv/supabase-repo.ts:56` -> `addJobNotes`.
+- Used by tailoring answer and acceptance flows: `apps/api/src/tailor/questions.ts:168` -> `deps.cv.addJobNotes`, `apps/api/src/tailor/accept.ts:182` -> `deps.cv.addJobNotes` -> `apps/api/src/cv/supabase-repo.ts:56` -> `addJobNotes`.
 - Uses owner-scoped base CV access: `supabase/migrations/20261109230000_job_notes_projects.sql:51` -> `auth.uid()` -> `supabase/migrations/20261104000000_baseline.sql:57` -> `auth.uid()`.
 - Mirrored by fake item selection and pruning: `apps/api/src/cv/memory-repo.ts:43` -> `content.projects`, `apps/api/src/cv/memory-repo.ts:49` -> `MAX_JOB_NOTES` -> `supabase/migrations/20261109230000_job_notes_projects.sql:20` -> `projects`, `supabase/migrations/20261109230000_job_notes_projects.sql:40` -> `25`.
 

@@ -39,14 +39,6 @@ export function newestRole(roles: Experience[]): Experience | undefined {
     || (b.endDate || b.startDate).localeCompare(a.endDate || a.startDate) || b.startDate.localeCompare(a.startDate))[0];
 }
 
-/** A role step's question context: the item to ask about (with its kind), and the CV without it as read-only context. */
-function aboutItem(cv: CvContent, id: string) {
-  const found = findScored(cv, id)!;
-  const without = <T extends { id: string }>(list: T[]) => list.filter((item) => item.id !== id);
-  return { role: { kind: found.kind, ...found.item },
-    cv: { ...cv, experience: without(cv.experience), projects: without(cv.projects), volunteering: without(cv.volunteering) } };
-}
-
 /** Everything already answered for this job (or, with a role, for that role): its job notes on the CV and this run's answers. */
 function answeredForJob(cv: CvContent, run: TailorRun, roleId: string | null) {
   const notes = scoredItems(cv).map(({ item }) => item).filter((role) => !roleId || role.id === roleId).flatMap((role) => role.notes)
@@ -102,16 +94,15 @@ export async function askQuestions(
   const answered = answeredForJob(input.cv, input.run, roleId);
   const cv = stripHeader(input.cv).cv;
   const stored = input.run.tailoredCvId ? await deps.tailor.getSteering(input.run.tailoredCvId) : null;
-  const steering = steeringText(stored?.steering ?? {}, cv);
+  const steering = steeringText(stored?.steering ?? {}, cv, role?.id);
   let reply: z.infer<typeof ModelQuestionsSchema>;
   try {
     reply = await callModel(deps.model, {
       userId: input.userId, task: "tailor_questions", tier: "cheap", schema: ModelQuestionsSchema,
       system: questionSystemPrompt,
-      // Experience: the role to ask about, the other roles as read-only context.
       user: questionUserMessage({
-        section: input.section, job: input.job, gaps, answered, max, steering,
-        ...(role ? aboutItem(cv, role.id) : { cv }),
+        section: input.section, cv, job: input.job, gaps, answered, max, steering,
+        ...(role ? { role: { kind: findScored(cv, role.id)!.kind, ...role } } : {}),
       }),
       maxOutputTokens: 4000,
     });
@@ -133,7 +124,9 @@ export async function askQuestions(
     seen.add(same(text));
     const onBullet = role && bulletId && role.bullets.some((bullet) => bullet.id === bulletId) ? { bulletId } : {};
     const aboutSkill = skills ? { kind: "skill" as const, ...(skill?.trim() ? { skill: skill.trim().slice(0, MAX_TEXT) } : {}) } : {};
-    fresh.push({ ...question, text, id: newId(), section: input.section, ...onBullet, ...aboutSkill,
+    const options = question.options.filter((option) => !/^(other|others|something else|none of the above)$/i.test(option.trim()
+      .replace(/\s*\([^()]*\)[\p{P}\s]*$/u, "").replace(/[\p{P}\s]+$/u, "").trim()));
+    fresh.push({ ...question, text, options, id: newId(), section: input.section, ...onBullet, ...aboutSkill,
       roleId: role ? role.id : named && roleIds.has(named) ? named : null });
   }
   if (fresh.length > 0) await deps.tailor.updateRun(input.run.id, { questions: [...asked, ...fresh] });

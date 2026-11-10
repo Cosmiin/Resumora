@@ -14,8 +14,8 @@ const job: JobExtraction = {
 const cv: CvContent = {
   ...emptyCv("en"),
   experience: [
-    roleWith(["Ran payroll"], { id: "r1", title: "Business Analyst", company: "Emedi" }),
-    roleWith(["Ran reports"], { id: "r2", title: "Consultant", company: "Acme" }),
+    roleWith(["Ran payroll"], { id: "r1", title: "Business Analyst", company: "Northwind Traders" }),
+    roleWith(["Ran reports"], { id: "r2", title: "Consultant", company: "Contoso Labs" }),
   ],
 };
 const text = steeringText({ tone: "warm", draws: ["work", "step_up"], fit: "mostly", focusRoleIds: ["r2", "gone"], instruction: "Stress \"automation\"" }, cv);
@@ -26,14 +26,26 @@ describe("steeringText", () => {
     expect(text).toContain("the work itself");
     expect(text).toContain("a step up");
     expect(text).toMatch(/fit.*mostly/i);
-    expect(text).toContain("Consultant · Acme");
+    expect(text).toContain("Consultant · Contoso Labs");
     expect(text).toContain(JSON.stringify("Stress \"automation\""));
   });
 
   it("drops an unknown focus role id", () => {
     expect(text).not.toContain("gone");
-    expect(text).not.toContain("Business Analyst · Emedi");
+    expect(text).not.toContain("Business Analyst · Northwind Traders");
     expect(steeringText({ focusRoleIds: ["gone"] }, cv)).not.toMatch(/lean/i);
+  });
+
+  it("describes only this role's focus status when a role id is supplied", () => {
+    const steering = { focusRoleIds: ["r1"] };
+    const other = steeringText(steering, cv, "r2");
+    expect(other).toContain("They want to lean on other roles more than this one.");
+    expect(other).not.toContain("Business Analyst");
+    expect(other).not.toContain("Northwind Traders");
+    expect(steeringText(steering, cv, "r1")).toContain("This role is one of the roles they want to lean on most.");
+    expect(steeringText(steering, cv)).toContain("Lean most on these roles: Business Analyst · Northwind Traders.");
+    expect(steeringText({ focusRoleIds: [] }, cv, "r2")).not.toMatch(/lean/i);
+    expect(steeringText({}, cv, "r2")).not.toMatch(/lean/i);
   });
 
   it("defaults to the neutral tone and leaves out what wasn't answered", () => {
@@ -50,12 +62,12 @@ describe("steeringText", () => {
 
 describe("every prompt carries the steering", () => {
   it.each([
-    ["questions", () => questionUserMessage({ section: "experience", cv, job, gaps: [], answered: [], max: 5, steering: text })],
+    ["questions", () => questionUserMessage({ section: "skills", cv, job, gaps: [], answered: [], max: 5, steering: text })],
     ["section", () => sectionUserMessage({ section: "experience", items: {}, job, language: "en", steering: text, answers: [], retry: [] })],
     ["layout", () => layoutUserMessage({ order: [], headline: "", job, cv, steering: text })],
   ])("the %s user message has the tone line and the focus role names", (_name, build) => {
     const message = build();
     expect(message).toContain("Tone: warm");
-    expect(message).toContain("Consultant · Acme");
+    expect(message).toContain("Consultant · Contoso Labs");
   });
 });
