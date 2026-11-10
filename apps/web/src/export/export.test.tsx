@@ -37,6 +37,74 @@ describe("ExportMenu", () => {
     expect(unreviewedItems(null)).toEqual([]);
   });
 
+  it.each(["button", "text"])("closes on a pointer press on outside %s", async (target) => {
+    const user = userEvent.setup();
+    render(<>
+      <ExportMenu load={async () => cv} job={job} template="classic" />
+      <button type="button">Outside button</button>
+      <p>Outside text</p>
+    </>);
+    const toggle = screen.getByRole("button", { name: /^Export/ });
+    await user.click(toggle);
+    await screen.findByRole("button", { name: "CV as PDF" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    await user.pointer({ target: screen.getByText(`Outside ${target}`), keys: "[MouseLeft>]" });
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "CV as PDF" })).not.toBeInTheDocument();
+  });
+
+  it("closes on Escape with focus outside the menu", async () => {
+    const user = userEvent.setup();
+    render(<>
+      <ExportMenu load={async () => cv} job={job} template="classic" />
+      <button type="button">Outside</button>
+    </>);
+    const toggle = screen.getByRole("button", { name: /^Export/ });
+    await user.click(toggle);
+    await screen.findByRole("button", { name: "CV as PDF" });
+
+    screen.getByRole("button", { name: "Outside" }).focus();
+    await user.keyboard("{Escape}");
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "CV as PDF" })).not.toBeInTheDocument();
+  });
+
+  it("toggles closed when Export is clicked twice", async () => {
+    const user = userEvent.setup();
+    const load = vi.fn(async () => cv);
+    render(<ExportMenu load={load} job={job} template="classic" />);
+    const toggle = screen.getByRole("button", { name: /^Export/ });
+    await user.click(toggle);
+    await screen.findByRole("button", { name: "CV as PDF" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "CV as PDF" })).not.toBeInTheDocument();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays closed on outside presses and Escape", async () => {
+    const user = userEvent.setup();
+    const load = vi.fn(async () => cv);
+    render(<>
+      <ExportMenu load={load} job={job} template="classic" />
+      <button type="button">Outside</button>
+    </>);
+    const toggle = screen.getByRole("button", { name: /^Export/ });
+
+    await user.click(screen.getByRole("button", { name: "Outside" }));
+    await user.keyboard("{Escape}");
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "CV as PDF" })).not.toBeInTheDocument();
+    expect(load).not.toHaveBeenCalled();
+  });
+
   it("warns about 2 AI guesses not checked yet and still exports the PDF", async () => {
     const load = vi.fn(async () => cv);
     render(<ExportMenu load={load} job={job} template="modern" />);
@@ -44,8 +112,11 @@ describe("ExportMenu", () => {
     const warning = await screen.findByRole("note");
     expect(warning).toHaveTextContent("2 AI guesses not checked yet");
     expect(warning).toHaveTextContent("Or export anyway:");
+    await userEvent.click(warning);
+    expect(screen.getByRole("button", { name: /^Export/ })).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(screen.getByRole("button", { name: "CV as PDF" }));
     await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "pdf", { cv, job, template: "modern" }));
+    expect(screen.getByRole("button", { name: /^Export/ })).toHaveAttribute("aria-expanded", "true");
     await userEvent.click(screen.getByRole("button", { name: "CV as Word" }));
     await waitFor(() => expect(files.exportFile).toHaveBeenCalledWith("cv", "docx", { cv, job, template: "modern" }));
   });

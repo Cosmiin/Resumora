@@ -29,6 +29,24 @@ export function ExportMenu({ load, job, template, startOpen = false, onReview }:
   const [state, setState] = useState<"idle" | "loading" | "busy" | "loadError" | "error">("idle");
   const [tooLong, setTooLong] = useState<number | null>(null);
 
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   async function toggle() {
     if (open) { setOpen(false); return; }
     setOpen(true);
@@ -64,7 +82,7 @@ export function ExportMenu({ load, job, template, startOpen = false, onReview }:
 
   const unreviewed = row ? unreviewedItems(row.review) : [];
   return (
-    <div className="tailored-menu">
+    <div className="tailored-menu" ref={root}>
       <button type="button" className="secondary" aria-expanded={open} onClick={() => void toggle()}>{t("tailored.export")}</button>
       {open && (
         <div className="tailored-menu-pop export-menu">
