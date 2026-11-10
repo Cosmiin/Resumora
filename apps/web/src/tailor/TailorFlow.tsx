@@ -272,7 +272,7 @@ export function TailorFlow() {
           {done.from !== null && done.to !== null && <strong>{t("tailor.score.change", { from: done.from, to: done.to })}</strong>}
         </div>
       </div>
-      <TailorMoment celebrated from={done.from} to={done.to} title={done.title} line={done.line} button={done.button} onNext={() => enter(done.next)} />
+      <TailorMoment from={done.from} to={done.to} title={done.title} line={done.line} button={done.button} onNext={() => enter(done.next)} />
     </div>;
   } else if (phase.kind === "done") {
     body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job} />;
