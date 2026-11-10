@@ -56,3 +56,5 @@ Owner chose variant B, "Coach's Page". `DESIGN.md` describes it. Work is on bran
 - 2026-11-11: voice input is not a kit component: the flows reuse the existing `cv/enrich/VoiceControls`.
 - 2026-11-11: gallery at `/dev/ui` exists only in development; verified absent from the production build.
 - 2026-11-11: known issue, not from this work: six "rapid typing" tests in `src/cv/editor.test.tsx` take about 2.7s each against a 5s limit and time out when the whole suite runs under load. Same timing and same failures on main. Left unchanged; owner to decide whether to raise the limit.
+- 2026-11-11: Codex review of the foundation found two bugs (a dialog closed on a click on its own padding; a menu stayed open after Tab moved focus out). Both fixed with tests. Owner confirmed: keep the Codex review for every flow.
+- 2026-11-11: the foundation branch stays unmerged until the flow mockups are approved, so the shell and routes can be reviewed together with the kit.
