@@ -64,7 +64,7 @@ export function renderView(root: HTMLElement, view: View, actions: ViewActions):
       const label = add("label", copy.connectTo);
       const select = doc.createElement("select");
       for (const env of state.environments) {
-        const unavailable = env.id === "hosted" && !env.configured;
+        const unavailable = !env.configured;
         const option = doc.createElement("option");
         option.value = env.id;
         option.textContent = `${env.label}${unavailable ? ` ${copy.notSetUp}` : ""}`;
