@@ -90,7 +90,7 @@ export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId
 
   const page = (
     <div className={template ? `cv-page cv-page-edit ${getTemplate(template).className}` : "cv-page cv-page-edit"} ref={root} tabIndex={-1}>
-      <HeaderEdit basics={cv.basics} dispatch={dispatch} />
+      <HeaderEdit basics={cv.basics} dispatch={dispatch} tailored={tailored} template={template} />
       {layout.order.map((key) => {
         const Body = sectionRenderers[key];
         if (!Body || layout.hidden.includes(key)) return null;

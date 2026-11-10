@@ -70,7 +70,7 @@ export function buildCvDocx(
   const selectedTemplate = getTemplate(template);
   const b = content.basics;
   const children: Paragraph[] = [];
-  if (selectedTemplate.showsPhoto && b.photo && photo && photo.type !== "webp") {
+  if (selectedTemplate.photo !== null && b.photo && photo && photo.type !== "webp") {
     // Read the dimensions to fit the whole image within a 96 px square.
     const bytes = new DataView(photo.data.buffer, photo.data.byteOffset, photo.data.byteLength);
     let width = 96;

@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { CATEGORY, normalizeLayout, type CvContent, type SectionKey } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
-import { supabase } from "../../lib/supabase.ts";
+import { CvPhoto } from "./CvPhoto.tsx";
 import { newSectionBody } from "./NewSections.tsx";
 import { formatRange, SKILL_GROUPS } from "./blocks.ts";
 import { getTemplate, type TemplateId } from "./templates.ts";
@@ -33,21 +33,10 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic", hi
   const itemTitle = (text: string, className = "cv-item-title") => <span className={className}>{text}</span>;
 
   const b = cv.basics;
-  const photo = getTemplate(template).showsPhoto ? b.photo : null;
-  const path = photo?.path;
-  const [signedPhoto, setSignedPhoto] = useState<{ path: string; url: string } | null>(null);
-  const photoUrl = path && signedPhoto?.path === path ? signedPhoto.url : null;
-  useEffect(() => {
-    if (!path) return;
-    let active = true;
-    supabase.storage.from("cv-photos").createSignedUrl(path, 3600).then(({ data, error }) => {
-      if (active) setSignedPhoto(!error && data ? { path, url: data.signedUrl } : null);
-    }).catch(() => { if (active) setSignedPhoto(null); });
-    return () => { active = false; };
-  }, [path]);
+  const photo = getTemplate(template).photo === "header-right" ? b.photo : null;
   const contact = joinParts([b.email, b.phone, b.location, b.website, b.linkedin]);
   const titles = joinParts(b.titles);
-  const hasBasics = !!(b.fullName || titles || contact || photoUrl);
+  const hasBasics = !!(b.fullName || titles || contact || photo);
 
   const skillRows = [
     { key: "technical", label: SKILL_GROUPS[cv.locale].technical, items: cv.technicalSkills, sort: false },
@@ -203,13 +192,7 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic", hi
     <article className={`cv-page ${getTemplate(template).className}`} aria-label={t("cv.page.label")}>
       {hasBasics && (
         <header className="cv-header" style={{ display: "flow-root" }}>
-          {photo && photoUrl && (
-            <div style={{ width: 96, height: 96, overflow: "hidden", float: "right", marginInlineStart: "var(--space-4)" }}>
-              <img src={photoUrl} alt={t("cv.photo.alt")} onError={() => setSignedPhoto(null)}
-                style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${photo.x}% ${photo.y}%`,
-                  transform: `scale(${photo.zoom})`, transformOrigin: `${photo.x}% ${photo.y}%` }} />
-            </div>
-          )}
+          <CvPhoto photo={photo} />
           <Block>
             {b.fullName && <span className="cv-name">{b.fullName}</span>}
             {titles && <span className="cv-titles">{titles}</span>}

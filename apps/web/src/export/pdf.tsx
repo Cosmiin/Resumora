@@ -33,7 +33,7 @@ export function buildCvPdf(
   const content = withoutHidden(cv);
   registerPdfFonts();
   const selectedTemplate = getTemplate(template);
-  const image = selectedTemplate.showsPhoto && content.basics.photo && photo && photo.type !== "webp"
+  const image = selectedTemplate.photo !== null && content.basics.photo && photo && photo.type !== "webp"
     ? new Blob([new Uint8Array(photo.data)], { type: `image/${photo.type}` }) : undefined;
   const theme = { ...TEMPLATES[selectedTemplate.id], ...(step.tight ? TIGHT[selectedTemplate.id] : {}), fontSize: step.fontSize };
   const styles = StyleSheet.create({

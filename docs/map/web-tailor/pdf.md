@@ -4,14 +4,14 @@ area: web-tailor
 files: ["apps/web/src/export/pdf.tsx","apps/web/src/export/pdf.test.tsx"]
 depends_on: ["shared/cv","shared/categories","shared/dates","web-editor/templates","web-editor/document","web-tailor/fit","web-tailor/pdf-fonts","web-tailor/docx","shared/stored-cv","web-tailor/letter-page","shared/tailoring"]
 contract: false
-checked_hash: e97e7ace
-cited: [2bccd5, 6e9300, 4a4928, 1ee206, 40218a, f50668, 0f7dc9, c3ff85, 5f2e14, eb9b6b, 260a93, f24107, d888e4, aa7136, 772590, 317494, 349ece, 1b1679, 950911, ef0b94, 7f4895, 27ff79, 6e9300, 4a4928, c00e2e, 895e8c, 82c10f, 6f4f70, 18c71d, d5327f, 266680, 5c549f, 3bbf3f, 69af33, 4ef88f, e3eddb, d91ed6, 5607bc, 821114, 05d7d6, 956369, 2bccd5, 6c5831, 0f7dc9, 110546, c7ef32, b169ea, f6c8d3, f24107, faf887, b17465, 5f2e14, df7a9a, c3ff85, 3d320c, b47bba, a2f028, 2938dd, 5d3ac5, a70e43, 48324f, 933622, 481a5f, 55c3fe, 0c913a, 0f7dc9]
+checked_hash: 43b83f52
+cited: [211905, c2f811, 6e9300, 4a4928, 513544, 40218a, f50668, 0f7dc9, c3ff85, 5f2e14, eb9b6b, 260a93, f24107, d888e4, aa7136, 772590, 317494, 349ece, 1b1679, 950911, ef0b94, 7f4895, ac9456, 6e9300, 4a4928, 783428, 895e8c, 82c10f, 6f4f70, 18c71d, d5327f, 266680, 5c549f, 3bbf3f, 69af33, 4ef88f, e3eddb, d91ed6, 5607bc, a831ac, 05d7d6, aaec5d, 211905, 6c5831, 0f7dc9, 110546, c28cfa, b169ea, f6c8d3, f24107, faf887, b17465, 5f2e14, df7a9a, c3ff85, 3d320c, b47bba, a2f028, 2938dd, 5d3ac5, a70e43, c2f811, 933622, 17a053, 55c3fe, 0c913a, 0f7dc9]
 decisions: []
 open: []
 ---
 Render CV and letter PDF documents with normalized sections and embedded font families.
 
-- buildCvPdf removes hidden items before rendering and registers fonts; photos require template support, metadata and non-WebP bytes. `apps/web/src/export/pdf.tsx:33` -> `withoutHidden`
+- buildCvPdf removes hidden items before rendering and registers fonts; photos require a declared photo slot, metadata and non-WebP bytes. `apps/web/src/export/pdf.tsx:33` -> `withoutHidden`; `apps/web/src/export/pdf.tsx:36` -> `photo !== null`
 - Classic uses serif fonts, modern/compact sans; modern accent is green, and tight themes lower spacing and margins from 54 to 40 points. `apps/web/src/export/pdf.tsx:12` -> `TEMPLATES`; `apps/web/src/export/pdf.tsx:18` -> `TIGHT`; `apps/web/src/export/pdf.tsx:40` -> `padding`
 - Name size is body+12 with its own lineHeight; headings reserve 24 points ahead of themselves. `apps/web/src/export/pdf.tsx:43` -> `name`; `apps/web/src/export/pdf.tsx:53` -> `minPresenceAhead`
 - Sections is an exhaustive Record<SectionKey,ReactElement[]>; adding a SectionKey requires a renderer entry. `apps/web/src/export/pdf.tsx:82` -> `Record<SectionKey`
@@ -32,7 +32,7 @@ Render CV and letter PDF documents with normalized sections and embedded font fa
 - Extending the CV locale set also reaches skill-group and category labels: both renderers index them directly by content.locale. `apps/web/src/export/pdf.tsx:91` -> `SKILL_GROUPS`; `apps/web/src/export/pdf.tsx:135` -> `CATEGORY`; `apps/web/src/export/docx.ts:132` -> `SKILL_GROUPS`; `apps/web/src/export/docx.ts:153` -> `CATEGORY`; `apps/web/src/cv/page/blocks.ts:9` -> `Record<Locale`; `packages/shared/src/categories.ts:23` -> `label`
 - Letter greetings/sign-offs use the separate TailorLanguage-indexed WORDS map; adding a tailoring language reaches that map through export letterParts as well as the on-screen letter. `packages/shared/src/tailor.ts:4` -> `TailorLanguageSchema`; `apps/web/src/tailor/LetterPage.tsx:5` -> `WORDS`; `apps/web/src/export/export-files.ts:52` -> `letterWords`
 
-- Uses the template registry for fallback and showsPhoto, alongside renderer-specific theme maps. `apps/web/src/export/pdf.tsx:35` -> `getTemplate`; `apps/web/src/cv/page/templates.ts:10` -> `TEMPLATES[0]`; `apps/web/src/cv/page/templates.ts:4` -> `showsPhoto: false`
+- Uses the template registry for fallback and photo slots, alongside renderer-specific theme maps. `apps/web/src/export/pdf.tsx:35` -> `getTemplate`; `apps/web/src/cv/page/templates.ts:10` -> `TEMPLATES[0]`; `apps/web/src/cv/page/templates.ts:4` -> `photo: null`
 - Uses shared item hiding and layout normalization; DOCX has a parallel exhaustive section map that must change with categories too. `apps/web/src/export/pdf.tsx:33` -> `withoutHidden`; `packages/shared/src/cv.ts:283` -> `withoutHidden`; `apps/web/src/export/pdf.tsx:82` -> `Record<SectionKey`; `apps/web/src/export/docx.ts:123` -> `Record<SectionKey`
 - Uses font registration at both CV and letter entry points. `apps/web/src/export/pdf.tsx:34` -> `registerPdfFonts`; `apps/web/src/export/pdf.tsx:165` -> `registerPdfFonts`; `apps/web/src/export/pdf-fonts.ts:24` -> `registerPdfFonts`
 

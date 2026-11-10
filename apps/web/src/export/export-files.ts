@@ -30,7 +30,7 @@ const PHOTO_TYPES: Record<string, ExportPhoto["type"]> = { "image/jpeg": "jpeg",
 /** The photo's bytes for a template that shows it; a photo that can't be read is left out, never blocks the export. */
 async function photoFor(input: ExportInput): Promise<ExportPhoto | undefined> {
   const photo = input.cv.content.basics.photo;
-  if (!photo || !getTemplate(input.template).showsPhoto) return undefined;
+  if (!photo || getTemplate(input.template).photo === null) return undefined;
   try {
     const { data, error } = await supabase.storage.from("cv-photos").download(photo.path);
     const type = data ? PHOTO_TYPES[data.type] : undefined;

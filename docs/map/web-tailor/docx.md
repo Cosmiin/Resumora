@@ -4,8 +4,8 @@ area: web-tailor
 files: ["apps/web/src/export/docx.ts","apps/web/src/export/docx.test.ts"]
 depends_on: ["shared/cv","shared/categories","shared/dates","web-editor/templates","web-editor/document","web-tailor/fit","web-tailor/pdf","shared/stored-cv"]
 contract: true
-checked_hash: 526e60a4
-cited: [048b85, 895e8c, c4ca32, 61ebcc, 502fc9, 8a0adb, 78b80b, 3fbe9b, 481a5f, 11ecf8, aad6e5, 55c3fe, 110546, 5d3ac5, 97dcd4, a2f028, 2e6549, acdd49, 59e5ca, db33fb, fdea82, aac19d, 5ecd2f, ec3875, 98edf4, 6cf6c8, 2d3981, 2092c1, 228c63, 8b2d72, 110546, 0f7dc9, 59e5ca, faf887, b17465, b82977, 12176c]
+checked_hash: c5245ae5
+cited: [048b85, 895e8c, c4ca32, 61ebcc, 502fc9, 8a0adb, 78b80b, 15257f, 17a053, 629fc4, aad6e5, 55c3fe, 110546, 5d3ac5, 97dcd4, a2f028, 2e6549, acdd49, 59e5ca, db33fb, fdea82, aac19d, 5ecd2f, ec3875, 98edf4, 6cf6c8, 2d3981, 2092c1, f31dae, 5f5c3a, 110546, 0f7dc9, 59e5ca, faf887, b17465, db6671, 12176c]
 decisions: []
 open: []
 ---
@@ -16,7 +16,7 @@ Build Word documents with explicit paragraph sections and PDF-selected fit setti
 - Page dimensions are 11906 by 16838 twips; normal margins are 1134 and tight margins 794. `apps/web/src/export/docx.ts:31` -> `PAGE`
 - paragraph converts all CRLF/CR/LF forms into separate TextRuns with explicit line breaks. `apps/web/src/export/docx.ts:35` -> `paragraph`
 - pack sets default font/spacing and keepNext on headings, then serializes with Packer.toBlob. `apps/web/src/export/docx.ts:44` -> `Packer.toBlob`; `apps/web/src/export/docx.ts:54` -> `keepNext`
-- Hidden items are removed first; photos require showsPhoto and non-WebP bytes. PNG dimensions come from header offsets, JPEG dimensions from marker scanning. `apps/web/src/export/docx.ts:69` -> `withoutHidden`; `apps/web/src/export/docx.ts:73` -> `photo.type`; `apps/web/src/export/docx.ts:78` -> `png`; `apps/web/src/export/docx.ts:82` -> `offset`
+- Hidden items are removed first; photos require a declared photo slot and non-WebP bytes. PNG dimensions come from header offsets, JPEG dimensions from marker scanning. `apps/web/src/export/docx.ts:69` -> `withoutHidden`; `apps/web/src/export/docx.ts:73` -> `photo !== null`; `apps/web/src/export/docx.ts:78` -> `png`; `apps/web/src/export/docx.ts:82` -> `offset`
 - Photo dimensions scale proportionally to a maximum 96-pixel square. `apps/web/src/export/docx.ts:94` -> `scale`
 - Sections is exhaustive Record<SectionKey,Paragraph[]>; skill output uses technical and professional groups separately, excluding unclearSkills. `apps/web/src/export/docx.ts:123` -> `Record<SectionKey`; `apps/web/src/export/docx.ts:131` -> `skills`
 - Role-shaped content includes project links, localized ranges and list bullets; lighter-section blank lines are omitted and interests switch between joined and per-entry forms. `apps/web/src/export/docx.ts:111` -> `lines`; `apps/web/src/export/docx.ts:115` -> `roles`; `apps/web/src/export/docx.ts:144` -> `interests`

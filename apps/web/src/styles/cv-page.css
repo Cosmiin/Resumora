@@ -95,6 +95,7 @@
 
 /* Editable page: header, headings, list lines, add buttons and missing boxes */
 .cv-page-edit .cv-name { display: block; width: calc(100% + 8px); font-family: var(--font-display); font-size: 34px; line-height: 1.15; color: var(--pine-800); }
+.cv-page-edit .cv-header:has(> .cv-photo) .cv-name { width: calc(100% - 96px - var(--space-4)); }
 .cv-titles, .cv-contact { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
 .cv-titles { margin-block-start: 2px; font-size: 14px; color: var(--pine-600); }
 .cv-contact { margin-block-start: 6px; font-size: 12px; color: var(--sage-600); }

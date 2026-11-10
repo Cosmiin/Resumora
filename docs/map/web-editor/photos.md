@@ -5,7 +5,7 @@ files: ["apps/web/src/cv/panel/PhotoField.tsx","apps/web/src/cv/panel/shrink-pho
 depends_on: ["shared/cv","db/cv-photos"]
 contract: false
 checked_hash: f4695c3b
-cited: [b3f29f, c1e26b, c19e21, 21aa2e, 390fa8, 28516c, 9549d9, 6d8667, f1d557, 7b1305, 715da3, d4cdbb, 8d424e, a16ef3, 77862f, 63a631, 9e09e4, e7c83b, 8b29ae, 197d9f, 487da3, fcad91, b66504, 043445, 7a31e2, 1f129b, 0a2da0, 39315a, 3ad09c, 7285f5, 7b42c1, c19e21, ba7006, 715da3, d20b83, ce7e77, f05071, 29d1ba, 9545c6, 95b765, 494be2, a16ef3, db9a3c, 2558d4, e7c83b, a0d8c1, 390fa8, 0200ae, 7b42c1, bb40f3, 7140f6, b66504, f1d557, c00e14]
+cited: [b3f29f, c1e26b, c19e21, 21aa2e, 390fa8, 28516c, 9549d9, 6d8667, f1d557, 7b1305, 715da3, d4cdbb, 8d424e, a16ef3, 77862f, 63a631, 9e09e4, e7c83b, 8b29ae, 197d9f, 487da3, fcad91, b66504, 043445, 7a31e2, 1f129b, b936d2, 39315a, 3ad09c, 7285f5, 7b42c1, c19e21, ba7006, 715da3, 65776a, ce7e77, f05071, 29d1ba, 9545c6, 95b765, 494be2, a16ef3, db9a3c, 2558d4, e7c83b, a0d8c1, 390fa8, 0200ae, 7b42c1, bb40f3, 7140f6, b66504, f1d557, c00e14]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---
@@ -25,11 +25,11 @@ Upload private CV photos, shrink oversized files locally and persist crop settin
 
 ## Connections
 
-- Used by HeaderEdit to store photo metadata through setBasics: `apps/web/src/cv/edit/sections/HeaderEdit.tsx:86` -> `<PhotoField`; `apps/web/src/cv/panel/PhotoField.tsx:16` -> `PhotoField`
+- Used by HeaderEdit to store photo metadata through setBasics: `apps/web/src/cv/edit/sections/HeaderEdit.tsx:91` -> `<PhotoField`; `apps/web/src/cv/panel/PhotoField.tsx:16` -> `PhotoField`
 - Upload uses the private bucket's owner-folder INSERT policy and duplicates its MIME/size bounds: `apps/web/src/cv/panel/PhotoField.tsx:58` -> `storage.from("cv-photos").upload`; `supabase/migrations/20261108030000_cv_photos.sql:9` -> `own cv photos: upload`; `supabase/migrations/20261108030000_cv_photos.sql:11` -> `auth.uid()`; `apps/web/src/cv/panel/PhotoField.tsx:12` -> `2097152`; `supabase/migrations/20261108030000_cv_photos.sql:3` -> `2097152`
-- Signed previews use the owner-folder SELECT policy, both in the field and the read-only document: `apps/web/src/cv/panel/PhotoField.tsx:35` -> `createSignedUrl`; `apps/web/src/cv/page/CvDocument.tsx:43` -> `createSignedUrl`; `supabase/migrations/20261108030000_cv_photos.sql:5` -> `own cv photos: read`; `supabase/migrations/20261108030000_cv_photos.sql:7` -> `storage.foldername`
+- Signed previews use the owner-folder SELECT policy, both in the field and the read-only document: `apps/web/src/cv/panel/PhotoField.tsx:35` -> `createSignedUrl`; `apps/web/src/cv/page/CvPhoto.tsx:14` -> `createSignedUrl`; `supabase/migrations/20261108030000_cv_photos.sql:5` -> `own cv photos: read`; `supabase/migrations/20261108030000_cv_photos.sql:7` -> `storage.foldername`
 - Uses the local resize helper before storage upload: `apps/web/src/cv/panel/PhotoField.tsx:53` -> `shrinkPhoto`; `apps/web/src/cv/panel/shrink-photo.ts:23` -> `shrinkPhoto`
-- Uses global .no-print to omit photo controls when printing: `apps/web/src/cv/panel/PhotoField.tsx:87` -> `no-print`; `apps/web/src/styles/cv-page.css:184` -> `.no-print`
+- Uses global .no-print to omit photo controls when printing: `apps/web/src/cv/panel/PhotoField.tsx:87` -> `no-print`; `apps/web/src/styles/cv-page.css:185` -> `.no-print`
 - Crop controls copy shared schema bounds rather than deriving them: percent clamps x/y to 0..100 and the range input fixes zoom to 1..3, so bound changes require updating both UI and schema. `apps/web/src/cv/panel/PhotoField.tsx:13` -> `percent`; `packages/shared/src/cv.ts:143` -> `x: z.number()`; `packages/shared/src/cv.ts:144` -> `y: z.number()`; `apps/web/src/cv/panel/PhotoField.tsx:124` -> `min={1} max={3}`; `packages/shared/src/cv.ts:145` -> `zoom: z.number()`
 
 ## Assumptions

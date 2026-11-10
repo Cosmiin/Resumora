@@ -4,15 +4,15 @@ area: web-tailor
 files: ["apps/web/src/export/export-files.ts","apps/web/src/export/export-files.test.ts","apps/web/src/export/export.test.tsx"]
 depends_on: ["web-tailor/pdf","web-tailor/docx","web-tailor/file-name","web-tailor/letter-page","web-editor/templates","db/cv-photos","shared/tailoring"]
 contract: false
-checked_hash: b5b5c82b
-cited: [b95b6e, 7e8db3, 7d4a02, 0744e7, 584dec, 5607bc, d9b7f6, 4692a1, 5c53f8, 70bd25, c7d13e, cd291d, b00a98, ab7614, 8b7b56, ba7006, ce7e77, f05071, 70bd25, 9dd2e6, 2d3981, 2092c1, b28967, b95b6e, 8b7b56, 6d3a72, f05071]
+checked_hash: c5224a81
+cited: [b95b6e, adb6f4, 3faeb3, 0744e7, 584dec, 5607bc, d9b7f6, 4692a1, 5c53f8, 70bd25, c7d13e, cd291d, b00a98, ab7614, dc62da, ba7006, ce7e77, f05071, 70bd25, 9dd2e6, 2d3981, 2092c1, b28967, b95b6e, dc62da, cb3929, f05071]
 decisions: []
 open: []
 ---
 Build downloads in the browser from saved CV content and optional private photo bytes.
 
 - unreviewedItems returns text for kept inferred items not reviewed, with empty text fallback and no deduplication. `apps/web/src/export/export-files.ts:17` -> `unreviewedItems`
-- Photo download is skipped without photo metadata or when the template hides photos; download errors and unsupported MIME types silently omit the image. `apps/web/src/export/export-files.ts:28` -> `PHOTO_TYPES`; `apps/web/src/export/export-files.ts:33` -> `showsPhoto`
+- Photo download is skipped without photo metadata or when the template has no photo slot; download errors and unsupported MIME types silently omit the image. `apps/web/src/export/export-files.ts:28` -> `PHOTO_TYPES`; `apps/web/src/export/export-files.ts:33` -> `photo === null`
 - Letter export throws if no coverLetter, uses current date unless supplied, and splits body into trimmed blank-line paragraphs. `apps/web/src/export/export-files.ts:47` -> `throw`; `apps/web/src/export/export-files.ts:53` -> `paragraphs`
 - Letter headers use current CV basics and job company/title; shared letterWords supplies the greeting/sign-off. `apps/web/src/export/export-files.ts:52` -> `letterWords`; `apps/web/src/export/export-files.ts:56` -> `greeting`
 - Browser download uses an object URL and detached anchor click, then revokes the URL in a zero-delay timer. `apps/web/src/export/export-files.ts:61` -> `save`

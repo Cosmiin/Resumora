@@ -5,7 +5,7 @@ files: ["apps/web/src/export/pdf-fonts.ts","apps/web/src/export/pdf.test.tsx"]
 depends_on: ["web-tailor/pdf"]
 contract: false
 checked_hash: 27ddf424
-cited: [8b8234, 00591d, eb85a5, 5c06fa, d1a404, 61d345, 50bc0d, 70a803, 7f4895, c7775d, 349ece, eb85a5, c7ef32, f6c8d3, 00591d, f8d246, 1ee206]
+cited: [8b8234, 00591d, eb85a5, 5c06fa, d1a404, 61d345, 50bc0d, 70a803, 7f4895, c7775d, 349ece, eb85a5, c28cfa, f6c8d3, 00591d, f8d246, 513544]
 decisions: []
 open: []
 ---
@@ -21,8 +21,8 @@ Register bundled Latin and Latin-extended fonts and disable PDF word splitting.
 
 ## Connections
 
-- Used by PDF CV themes and the letter theme; both builders call registration. `apps/web/src/export/pdf.tsx:13` -> `PDF_FONTS.serif`; `apps/web/src/export/pdf.tsx:167` -> `PDF_FONTS.letter`; `apps/web/src/export/pdf-fonts.ts:16` -> `PDF_FONTS`; `apps/web/src/export/pdf.tsx:34` -> `registerPdfFonts`; `apps/web/src/export/pdf-fonts.ts:24` -> `registerPdfFonts`
+- Used by PDF CV themes and the letter theme; both builders call registration. `apps/web/src/export/pdf.tsx:13` -> `PDF_FONTS.serif`; `apps/web/src/export/pdf.tsx:167` -> `PDF_FONTS.letter`; `apps/web/src/export/pdf-fonts.ts:16` -> `PDF_FONTS`; `apps/web/src/export/pdf.tsx:34` -> `registerPdfFonts(`; `apps/web/src/export/pdf-fonts.ts:24` -> `registerPdfFonts`
 
 ## Assumptions
 
-- The bundler must resolve fontsource WOFF ?url imports; glyph fallback depends on the font-family arrays passed to react-pdf. `apps/web/src/export/pdf-fonts.ts:2` -> `woff?url`; `apps/web/src/export/pdf-fonts.ts:17` -> `Extended`; `apps/web/src/export/pdf.tsx:40` -> `fontFamily`
+- The bundler must resolve fontsource WOFF ?url imports; glyph fallback depends on the font-family arrays passed to react-pdf. `apps/web/src/export/pdf-fonts.ts:2` -> `woff?url`; `apps/web/src/export/pdf-fonts.ts:17` -> `Extended`; `apps/web/src/export/pdf.tsx:40` -> `fontFamily: theme.fontFamily`
