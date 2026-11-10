@@ -101,7 +101,7 @@ describe("useFocusSession", () => {
     expect(h.result.current.roleQuestions).toEqual([roleQuestions[1]]);
     const ui = render(<FocusMode target={{ roleId: "r", mode: "improve" }} {...h.opts()} />);
     await settle();
-    expect(screen.getByText("Question 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText("About the role · Question 1 of 1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: roleQuestions[1]!.text })).toBeInTheDocument();
     ui.unmount();
     await submit(h, "Finance");

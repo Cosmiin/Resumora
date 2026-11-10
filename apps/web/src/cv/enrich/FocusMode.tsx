@@ -32,6 +32,7 @@ type Props = {
 
 const FOCUSABLE = 'button:not(:disabled), textarea:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
 const DUMP_KINDS = new Set<FocusStep["kind"]>(["brainDump", "dumpWorking", "dumpEmpty", "dumpPick"]);
+const SECTIONS = ["role", "bullets", "tools", "description"] as const;
 const SELF_FOCUSING = new Set<FocusStep["kind"]>(["proposal", "celebrate"]);
 
 /** The frame every focus screen shares: scroll lock (focus goes back on close), Esc closes, Tab stays inside. */
@@ -140,7 +141,8 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
   const roleScore = fresh ? (result?.score ?? null) : (known ?? result?.score ?? null);
   const grades = new Map(result?.bullets.map((b) => [b.id, b.score]));
   const scoreOf = (id: string) => (fresh ? grades.get(id) : (accepted.get(id) ?? grades.get(id)));
-  const currentId = "bulletId" in step ? step.bulletId : step.kind === "celebrate" || step.kind === "role" ? undefined : queue[position];
+  const currentId = session.section === "bullets" && step.kind !== "celebrate"
+    ? ("bulletId" in step ? step.bulletId : queue[position]) : undefined;
   // Turning role answers into bullets is a plain working screen, not the box (E1).
   const answersWorking = step.kind === "dumpWorking" && step.source === "answers";
   const dumping = (DUMP_KINDS.has(step.kind) && !answersWorking) || (step.kind === "scoring" && step.source === "dump");
@@ -149,18 +151,25 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
   const proposalText = step.kind === "proposal" ? role.bullets.find((b) => b.id === step.bulletId)?.text ?? "" : "";
   const inQueue = !dumping && !answersWorking && step.kind !== "roleDone" && step.kind !== "role" && step.kind !== "describing" && step.kind !== "description"
     && !(step.kind === "scoring" && (step.source === "opening" || step.source === "box")) && queue.length > 0;
-  const asking = step.kind === "question" && step.question !== null;
   // 2B: one dot per step of the role (done / shown / to come) on steps that ask something.
   const askingStep = step.kind === "role" || step.kind === "brainDump" || step.kind === "question" || step.kind === "needsDetail"
     || step.kind === "dumpPick" || step.kind === "dumpEmpty";
   const back = session.canBack ? session.back : undefined;
   const roleQuestion = step.kind === "role" ? session.roleQuestions[step.index] : undefined;
-  const topic = roleQuestion && roleQuestion.topic !== "other" ? t(`enrich.focus.topic.${roleQuestion.topic}`) : null;
+  const sectionIndex = session.section === "done" ? SECTIONS.length : SECTIONS.indexOf(session.section);
+  const bulletIndex = "bulletId" in step && step.bulletId !== null ? queue.indexOf(step.bulletId) : -1;
+  const eyebrow = session.section === "role" && step.kind === "role"
+    ? t("enrich.focus.section.roleEyebrow", { n: step.index + 1, total: session.roleQuestions.length })
+    : session.section === "bullets"
+      ? t("enrich.focus.section.bulletsEyebrow", { n: bulletIndex >= 0 ? bulletIndex + 1 : Math.min(position + 1, queue.length), total: queue.length })
+      : session.section === "description" ? t("enrich.focus.section.descriptionEyebrow")
+        : session.section === "done" ? null : t(`enrich.focus.section.${session.section}`);
 
   return createPortal(
     <div
       ref={root}
       className={topBar ? "focus-mode has-path" : "focus-mode"}
+      data-section={session.section}
       role="dialog"
       aria-modal="true"
       aria-label={t("enrich.focus.dialog", { role: name })}
@@ -168,30 +177,49 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
       {topBar}
       <aside className="fm-left">
         <p className="fm-eyebrow">{t(`enrich.focus.your.${kind}`)}</p>
-        <p className="fm-role">{name}</p>
-        <p className="fm-role-meta">{[role.company, dates].filter(Boolean).join(" · ")}</p>
-        <ul className="fm-bullets">
-          {role.bullets.map((b) => {
-            const n = scoreOf(b.id);
-            const cls = ["fm-bullet", b.id === currentId && "is-current", b.id === currentId && step.kind === "working" && "is-working", accepted.has(b.id) && "is-new"];
-            return (
-              <li key={b.id} className={cls.filter(Boolean).join(" ")} aria-current={b.id === currentId ? "true" : undefined}>
-                <span>{b.text}</span>
-                {n !== undefined && (
-                  <span className={n >= 75 ? "fm-tag is-up" : "fm-tag is-low"} aria-label={t("enrich.focus.bulletScore", { n })}>
-                    {n}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-          {dumping && step.kind !== "dumpPick" && (
-            <>
-              <li className="fm-slot" aria-hidden="true">{t("enrich.focus.dump.slot")}</li>
-              <li className="fm-slot" aria-hidden="true">+</li>
-            </>
-          )}
-        </ul>
+        <div className="page-tabs">
+          {SECTIONS.map((section, i) => (
+            <span key={section} aria-current={section === session.section ? "step" : undefined} className={i < sectionIndex ? "is-done" : undefined}>
+              {i < sectionIndex && <span aria-hidden="true">✓ </span>}{t(`enrich.focus.section.${section}`)}
+            </span>
+          ))}
+        </div>
+        <div className="page-sheet">
+          <div className={session.section === "role" || session.section === "tools" || session.section === "description" ? "fm-role-block page-bar" : "fm-role-block"}>
+            <div className="fm-role-line">
+              <p className="fm-role"><span>{name}</span>{role.company && <> — {role.company}</>}</p>
+              <p className="fm-role-meta">{dates}</p>
+            </div>
+            {(role.description || step.kind === "description") && (
+              <p className={step.kind === "description" ? "fm-page-description is-proposed" : "fm-page-description"}>
+                {step.kind === "description" ? step.text : role.description}
+              </p>
+            )}
+          </div>
+          <ul className="fm-bullets">
+            {role.bullets.map((b) => {
+              const n = scoreOf(b.id);
+              const cls = ["fm-bullet", b.id === currentId && "page-mark", b.id === currentId && step.kind === "working" && "is-working", accepted.has(b.id) && "fm-improved"];
+              return (
+                <li key={b.id} className={cls.filter(Boolean).join(" ")} aria-current={b.id === currentId ? "true" : undefined}>
+                  <span>{step.kind === "proposal" && b.id === currentId
+                    ? <><s className="page-del">{b.text}</s>{" "}<ins className="page-ins">{step.text}</ins></> : b.text}</span>
+                  {n !== undefined && (
+                    <span className={n >= 75 ? "fm-tag is-up" : "fm-tag is-low"} aria-label={t("enrich.focus.bulletScore", { n })}>
+                      {n}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+            {dumping && step.kind !== "dumpPick" && (
+              <>
+                <li className="fm-slot" aria-hidden="true">{t("enrich.focus.dump.slot")}</li>
+                <li className="fm-slot" aria-hidden="true">+</li>
+              </>
+            )}
+          </ul>
+        </div>
         <p className="fm-score">
           <b>{roleScore ?? "–"}</b>
           <span className="fm-eyebrow">{roleScore === null ? t("enrich.focus.noScore") : t(`enrich.focus.score.${kind}`)}</span>
@@ -199,131 +227,120 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
       </aside>
 
       <section className="fm-right" ref={right} aria-busy={busy}>
-        <button type="button" className="fm-close" onClick={() => session.close()}>
-          <span aria-hidden="true">✕</span> {t("enrich.focus.close")}
-        </button>
-        {askingStep && (
-          <div className="fm-steps" aria-hidden="true">
-            {Array.from({ length: session.dots.total }, (_, i) => (
-              <i key={i} className={i < session.dots.done ? "is-done" : i === session.dots.done ? "is-on" : undefined} />
-            ))}
-          </div>
-        )}
-        {inQueue && (
-          <>
-            {!askingStep && (
-              <div className="fm-steps" aria-hidden="true">
-                {queue.map((id, i) => (
-                  <i key={id} className={i < position ? "is-done" : i === position ? "is-on" : undefined} />
-                ))}
-              </div>
-            )}
-            {session.revisit === null && (
-              <p className="fm-eyebrow">
-                {t(asking ? "enrich.focus.questionOf" : "enrich.focus.progress", { n: Math.min(position + 1, queue.length), total: queue.length })}
-              </p>
-            )}
-          </>
-        )}
-        {step.kind === "role" && roleQuestion && (
-          <>
-            <p className="fm-eyebrow">
-              {[t("enrich.focus.questionOf", { n: step.index + 1, total: session.roleQuestions.length }), topic].filter(Boolean).join(" · ")}
-            </p>
+        <div className="page-note">
+          {eyebrow && <p className="page-note-eyebrow">{eyebrow}</p>}
+          <button type="button" className="fm-close" onClick={() => session.close()}>
+            <span aria-hidden="true">✕</span> {t("enrich.focus.close")}
+          </button>
+          {askingStep && (
+            <div className="fm-steps" aria-hidden="true">
+              {Array.from({ length: session.dots.total }, (_, i) => (
+                <i key={i} className={i < session.dots.done ? "is-done" : i === session.dots.done ? "is-on" : undefined} />
+              ))}
+            </div>
+          )}
+          {inQueue && !askingStep && (
+            <div className="fm-steps" aria-hidden="true">
+              {queue.map((id, i) => (
+                <i key={id} className={i < position ? "is-done" : i === position ? "is-on" : undefined} />
+              ))}
+            </div>
+          )}
+          {step.kind === "role" && roleQuestion && (
             <QuestionStep key={stepKey} question={roleQuestion} needsDetail={false} initial={session.prefill ?? ""} onBack={back}
               locale={cv.locale} busy={busy} onSubmit={session.submitAnswer} onSkip={session.skip} onFreeTalk={session.freeTalk} />
-          </>
-        )}
+          )}
 
-        {answersWorking && <Working text={t("enrich.focus.dump.working")} />}
-        {(step.kind === "brainDump" || (step.kind === "dumpWorking" && !answersWorking) || step.kind === "dumpEmpty") && (
-          <BrainDumpStep
-            roleId={role.id}
-            title={role.title}
-            company={role.company}
-            value={dump.value}
-            via={dump.via}
-            onChange={(value, via) => setDump({ value, via })}
-            locale={cv.locale}
-            working={step.kind === "dumpWorking"}
-            empty={step.kind === "dumpEmpty"}
-            busy={busy}
-            boxFirst={session.boxFirst}
-            onSubmit={session.submitAnswer}
-            onSkip={session.skip}
-            onBack={back}
-          />
-        )}
-        {step.kind === "dumpPick" && (
-          <DumpPickStep proposals={step.proposals} roleAfterAll={step.roleAfterAll} busy={busy} onAdd={session.addSelected} onBack={back} />
-        )}
-        {step.kind === "scoring" && <Working text={t(step.source === "dump" ? "enrich.focus.dump.scoring" : step.source === "opening" ? "enrich.focus.loading"
-          : step.source === "box" ? "enrich.focus.box.scoring" : "enrich.focus.scoring")} />}
-        {(step.kind === "question" || step.kind === "needsDetail") && (
-          <QuestionStep
-            key={stepKey}
-            question={step.question}
-            initial={session.prefill ?? ""}
-            onBack={back}
-            needsDetail={step.kind === "needsDetail"}
-            locale={cv.locale}
-            busy={busy}
-            onSubmit={session.submitAnswer}
-            onSkip={session.skip}
-            onFreeTalk={session.freeTalk}
-          />
-        )}
-        {step.kind === "working" && <Working text={t("enrich.focus.working")} />}
-        {step.kind === "describing" && <Working text={t("enrich.focus.describe.working")} />}
-        {step.kind === "description" && (
-          <DescriptionStep key={step.text} text={step.text} keywords={step.keywords} busy={busy} onUse={session.useDescription} onSkip={session.skip} />
-        )}
-        {step.kind === "proposal" && (
-          <ProposalStep
-            key={stepKey}
-            before={proposalText}
-            after={step.text}
-            bulletBefore={step.bulletBefore}
-            bulletAfter={step.bulletAfter}
-            busy={busy}
-            onUse={() => {
-              setAccepted((m) => new Map(m).set(step.bulletId, step.bulletAfter));
-              session.useProposal();
-            }}
-            onKeep={session.keepMine}
-          />
-        )}
-        {step.kind === "failed" && (
-          <>
-            <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>
-              {t(step.reason === "saving" ? "enrich.focus.failed.saving" : "enrich.focus.failed.unavailable")}
-            </h2>
-            <div className="fm-foot">
-              <button type="button" className="fm-ghost" onClick={session.skip} disabled={busy}>
-                {t("enrich.focus.skip")}
-              </button>
-              <button type="button" className="fm-btn" onClick={session.retry} disabled={busy}>
-                {t("enrich.focus.tryAgain")}
+          {answersWorking && <Working text={t("enrich.focus.dump.working")} />}
+          {(step.kind === "brainDump" || (step.kind === "dumpWorking" && !answersWorking) || step.kind === "dumpEmpty") && (
+            <BrainDumpStep
+              roleId={role.id}
+              title={role.title}
+              company={role.company}
+              value={dump.value}
+              via={dump.via}
+              onChange={(value, via) => setDump({ value, via })}
+              locale={cv.locale}
+              working={step.kind === "dumpWorking"}
+              empty={step.kind === "dumpEmpty"}
+              busy={busy}
+              boxFirst={session.boxFirst}
+              onSubmit={session.submitAnswer}
+              onSkip={session.skip}
+              onBack={back}
+            />
+          )}
+          {step.kind === "dumpPick" && (
+            <DumpPickStep proposals={step.proposals} roleAfterAll={step.roleAfterAll} busy={busy} onAdd={session.addSelected} onBack={back} />
+          )}
+          {step.kind === "scoring" && <Working text={t(step.source === "dump" ? "enrich.focus.dump.scoring" : step.source === "opening" ? "enrich.focus.loading"
+            : step.source === "box" ? "enrich.focus.box.scoring" : "enrich.focus.scoring")} />}
+          {(step.kind === "question" || step.kind === "needsDetail") && (
+            <QuestionStep
+              key={stepKey}
+              question={step.question}
+              initial={session.prefill ?? ""}
+              onBack={back}
+              needsDetail={step.kind === "needsDetail"}
+              locale={cv.locale}
+              busy={busy}
+              onSubmit={session.submitAnswer}
+              onSkip={session.skip}
+              onFreeTalk={session.freeTalk}
+            />
+          )}
+          {step.kind === "working" && <Working text={t("enrich.focus.working")} />}
+          {step.kind === "describing" && <Working text={t("enrich.focus.describe.working")} />}
+          {step.kind === "description" && (
+            <DescriptionStep key={step.text} text={step.text} keywords={step.keywords} busy={busy} onUse={session.useDescription} onSkip={session.skip} />
+          )}
+          {step.kind === "proposal" && (
+            <ProposalStep
+              key={stepKey}
+              before={proposalText}
+              after={step.text}
+              bulletBefore={step.bulletBefore}
+              bulletAfter={step.bulletAfter}
+              busy={busy}
+              onUse={() => {
+                setAccepted((m) => new Map(m).set(step.bulletId, step.bulletAfter));
+                session.useProposal();
+              }}
+              onKeep={session.keepMine}
+            />
+          )}
+          {step.kind === "failed" && (
+            <>
+              <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>
+                {t(step.reason === "saving" ? "enrich.focus.failed.saving" : "enrich.focus.failed.unavailable")}
+              </h2>
+              <div className="fm-foot">
+                <button type="button" className="fm-ghost" onClick={session.skip} disabled={busy}>
+                  {t("enrich.focus.skip")}
+                </button>
+                <button type="button" className="fm-btn" onClick={session.retry} disabled={busy}>
+                  {t("enrich.focus.tryAgain")}
+                </button>
+              </div>
+            </>
+          )}
+          {step.kind === "roleDone" && (
+            <div className="fm-done">
+              <p className="fm-eyebrow">{t("enrich.focus.done.eyebrow")}</p>
+              <h2 className="fm-q is-big" id="fm-step-title" tabIndex={-1}>{t("enrich.focus.done.title")}</h2>
+              <p className="fm-done-score">
+                <b>{step.score ?? "–"}</b>
+                <span className="fm-eyebrow">{t(`enrich.focus.score.${kind}`)}</span>
+              </p>
+              <button type="button" className="fm-btn" onClick={() => {
+                moving.current = true;
+                session.close();
+              }}>
+                {next ? next.label : t("enrich.focus.done.back")}
               </button>
             </div>
-          </>
-        )}
-        {step.kind === "roleDone" && (
-          <div className="fm-done">
-            <p className="fm-eyebrow">{t("enrich.focus.done.eyebrow")}</p>
-            <h2 className="fm-q is-big" id="fm-step-title" tabIndex={-1}>{t("enrich.focus.done.title")}</h2>
-            <p className="fm-done-score">
-              <b>{step.score ?? "–"}</b>
-              <span className="fm-eyebrow">{t(`enrich.focus.score.${kind}`)}</span>
-            </p>
-            <button type="button" className="fm-btn" onClick={() => {
-              moving.current = true;
-              session.close();
-            }}>
-              {next ? next.label : t("enrich.focus.done.back")}
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </section>
 
       {step.kind === "celebrate" && <CelebrateMoment key={`${step.from}-${step.to}`} from={step.from} to={step.to} role={name} onNext={session.next} />}

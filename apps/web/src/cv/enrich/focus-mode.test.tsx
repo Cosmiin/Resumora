@@ -12,7 +12,7 @@ vi.mock("./enrich-api.ts", () => api);
 import { BulletList } from "../edit/BulletList.tsx";
 import { CvDocument } from "../page/CvDocument.tsx";
 import { FocusOpenProvider } from "./focus-context.ts";
-import { FocusMode } from "./FocusMode.tsx";
+import { FocusMode, LightStop } from "./FocusMode.tsx";
 
 const role: Experience = {
   id: "r1",
@@ -93,11 +93,15 @@ describe("focus mode", () => {
       { id: "rq2", text: "Who did you work with?", options: ["Finance", "Customers", "Vendors"], kind: "role", topic: "other" },
     ];
     render(<Harness roleResult={{ ...result, roleQuestions }} onAction={(a) => actions.push(a)} />);
-    expect(screen.getByText("Question 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("About the role · Question 1 of 2")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("data-section", "role");
+    expect(dialog.querySelector('li[aria-current="true"]')).toBeNull();
+    expect(dialog.querySelector('[aria-current="step"]')).toHaveTextContent("About the role");
     await userEvent.click(screen.getByRole("button", { name: "The CEO" }));
     await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
     expect(actions[0]).toMatchObject({ type: "setNote", note: { question: "Who did you report to?", answer: "The CEO", via: ["pick"] } });
-    expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("About the role · Question 2 of 2")).toBeInTheDocument();
     expect(screen.getByLabelText("Your answer")).toHaveValue("");
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(screen.getByRole("heading", { name: result.questions[0]!.text })).toBeInTheDocument();
@@ -108,14 +112,55 @@ describe("focus mode", () => {
   it("shows the role on the left with the weakest bullet first and its question on the right", () => {
     render(<Harness />);
     const dialog = screen.getByRole("dialog", { name: "Improve your Dispatcher role" });
-    expect(within(dialog).getByText("Question 1 of 3")).toBeInTheDocument();
+    expect(within(dialog).getByText("Bullet points · Bullet 1 of 3")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Roughly how many drivers did you plan for each day?" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Under 10" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "10\u201350" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Something else" })).toBeInTheDocument();
     const current = dialog.querySelector('[aria-current="true"]');
     expect(current).toHaveTextContent("Responsible for planning routes for drivers.");
+    expect(current).toHaveClass("page-mark");
+    expect(dialog.querySelector(".fm-right .page-note")).toBeInTheDocument();
+    const tabs = dialog.querySelector<HTMLElement>(".page-tabs")!;
+    expect([...tabs.children].map(tab => tab.textContent?.replace("✓ ", ""))).toEqual(["About the role", "Bullet points", "Tools", "Description"]);
+    expect(tabs.querySelector('[aria-current="step"]')).toHaveTextContent("Bullet points");
     expect(within(dialog).getByText("52")).toBeInTheDocument();
+  });
+
+  it("marks only the second queued bullet while asking its question", async () => {
+    render(<Harness roleResult={{ ...result, questions: [...result.questions, { ...result.questions[0]!, bulletId: "b2", text: "Who needed your delivery updates?" }] }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("data-section", "bullets");
+    expect(dialog.querySelectorAll('li[aria-current="true"]')).toHaveLength(1);
+    expect(dialog.querySelector('li[aria-current="true"]')).toHaveTextContent(role.bullets[1]!.text);
+    expect(dialog.querySelector('li[aria-current="true"]')).toHaveClass("page-mark");
+    expect(screen.getByText("Bullet points · Bullet 2 of 3")).toBeInTheDocument();
+  });
+
+  it("shows the revisited bullet number when going Back from Tools", async () => {
+    render(<Harness roleResult={{ ...result,
+      questions: role.bullets.map((bullet, i) => ({ ...result.questions[0]!, bulletId: bullet.id, text: `What did you handle for bullet ${i + 1}?` })),
+      roleQuestions: [{ id: "tools", text: "Which tools did you use?", options: ["Excel", "SAP"], kind: "role", topic: "tools" }],
+    }} />);
+    for (let i = 0; i < 3; i++) await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-section", "tools");
+    expect(screen.getByRole("heading", { name: "Which tools did you use?" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "← Back" }));
+    expect(screen.getByText("Bullet points · Bullet 3 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What did you handle for bullet 3?" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "← Back" }));
+    expect(screen.getByText("Bullet points · Bullet 2 of 3")).toBeInTheDocument();
+  });
+
+  it("keeps LightStop on its existing frame without a section or paper card", () => {
+    render(<LightStop section="courses" itemId="c1" cv={{ ...cv, courses: [{ id: "c1", name: "Routing", provider: "TransLog", date: "", bullets: [] }] }}
+      dispatch={() => {}} waitForSave={() => Promise.resolve()} onClose={() => {}} onNext={() => {}} />);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).not.toHaveAttribute("data-section");
+    expect(dialog.querySelector(".page-note, .page-sheet")).toBeNull();
+    expect(dialog.querySelector(".fm-right")).toHaveTextContent("Routing");
   });
 
   it("Use this replaces the bullet in one dispatch, then celebrates with the returned numbers", async () => {
@@ -124,8 +169,12 @@ describe("focus mode", () => {
     render(<Harness onAction={(a) => actions.push(a)} />);
     await answerFirstQuestion();
 
-    expect(await screen.findByText("Planned daily routes for 10–50 regional drivers.")).toBeInTheDocument();
-    expect(screen.getByText("Responsible for planning routes for drivers.", { selector: "s" })).toBeInTheDocument();
+    const note = screen.getByRole("dialog").querySelector<HTMLElement>(".page-note")!;
+    const page = screen.getByRole("dialog").querySelector<HTMLElement>(".page-sheet")!;
+    expect(await within(note).findByText(proposal.proposal.text)).toBeInTheDocument();
+    expect(within(note).getByText(role.bullets[0]!.text, { selector: "s" })).toBeInTheDocument();
+    expect(within(page).getByText(proposal.proposal.text)).toHaveClass("page-ins");
+    expect(within(page).getByText(role.bullets[0]!.text, { selector: "s" })).toHaveClass("page-del");
     await userEvent.click(screen.getByRole("button", { name: "Use this" }));
 
     expect(actions.filter((a) => a.type === "replaceBullet")).toHaveLength(1);
@@ -166,7 +215,7 @@ describe("focus mode", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Keep mine" }));
     expect(actions.some((a) => a.type === "replaceBullet")).toBe(false);
     expect(screen.queryByRole("heading", { name: /Nice work/ })).toBeNull();
-    expect(screen.getByText("Bullet 2 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Bullet points · Bullet 2 of 3")).toBeInTheDocument();
   });
 
   it("needs more detail: shows the specific next question and option chips", async () => {
@@ -243,7 +292,7 @@ describe("focus mode", () => {
     expect(screen.getByRole("heading", { name: box })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "← Back" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("About the role · Question 2 of 2")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Who did you work with?" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Finance" }));
     await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
@@ -258,7 +307,9 @@ describe("focus mode", () => {
     await userEvent.click(screen.getByRole("button", { name: "None of these" }));
     expect(screen.getByRole("heading", { name: result.questions[0]!.text })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByText("Question 1 of 2 · Tools")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-section", "tools");
+    expect(screen.getByText("Tools", { selector: ".page-note-eyebrow" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog").querySelector('li[aria-current="true"]')).toBeNull();
     expect(screen.getByRole("heading", { name: "Which tools did you use?" })).toBeInTheDocument();
   });
 });
@@ -310,7 +361,7 @@ describe("focus mode edge cases", () => {
     render(<FocusMode target={{ roleId: "r1", bulletId: "b3", mode: "improve" }} cv={cv} dispatch={() => {}} scores={new Map([["r1", { state: "ready", result: top }]])} waitForSave={() => Promise.resolve()} onClose={() => {}} />);
     const dialog = screen.getByRole("dialog");
     expect(dialog.querySelector('[aria-current="true"]')).toHaveTextContent("Worked with the warehouse team on loading plans.");
-    expect(within(dialog).getByText("Bullet 1 of 3")).toBeInTheDocument();
+    expect(within(dialog).getByText("Bullet points · Bullet 1 of 3")).toBeInTheDocument();
   });
 });
 
@@ -353,7 +404,7 @@ describe("free talk", () => {
         await screen.findByRole("heading", { name: "Which tools did you use?" });
       }
       const heading = screen.getByRole("heading").textContent!;
-      const progress = screen.getByText(/^(About this role ·|Question \d|Bullet \d)/).textContent!;
+      const progress = screen.getByText(/^(About the role ·|Bullet points ·)/, { selector: ".page-note-eyebrow" }).textContent!;
       const callsBefore = api.improveBullet.mock.calls.length;
       for (const finish of ["skip", "proposals"]) {
         expect(screen.getAllByRole("button", { name: link })).toHaveLength(1);
@@ -417,7 +468,12 @@ describe("the role description step (3B) on screen", () => {
     render(<Harness roleResult={{ ...result, questions: [], bullets: [grade("b1", 100), grade("b2", 100), grade("b3", 100)] }} onAction={(a) => actions.push(a)} />);
     expect(await screen.findByRole("heading", { name: "How should we introduce this role?" })).toBeInTheDocument();
     expect(screen.getByText("Last thing for this role")).toBeInTheDocument();
-    expect(screen.getByText("TransLog moves freight for retailers. The role kept regional deliveries on time.")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("data-section", "description");
+    expect(within(dialog.querySelector<HTMLElement>(".page-note")!).getByText("TransLog moves freight for retailers. The role kept regional deliveries on time.")).toBeInTheDocument();
+    expect(within(dialog.querySelector<HTMLElement>(".page-sheet")!).getByText("TransLog moves freight for retailers. The role kept regional deliveries on time.")).toHaveClass("fm-page-description", "is-proposed");
+    expect(screen.getByText("Description · Last step for this role")).toBeInTheDocument();
+    expect(dialog.querySelector('li[aria-current="true"]')).toBeNull();
     expect(screen.getByText("Helps ATS with:")).toBeInTheDocument();
     expect(screen.getByText("freight")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -427,6 +483,8 @@ describe("the role description step (3B) on screen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(actions).toContainEqual({ type: "setItemField", list: "experience", itemId: "r1", field: "description", value: "TransLog moves freight." });
     expect(await screen.findByRole("heading", { name: "That's all for this role" })).toBeInTheDocument();
+    expect(dialog).toHaveAttribute("data-section", "done");
+    expect(dialog.querySelector(".page-mark, .page-bar")).toBeNull();
   });
 });
 
