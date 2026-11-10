@@ -103,7 +103,19 @@
 .tailor-tip { display: none; margin-inline-start: var(--space-2); font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-muted); }
 .tailor-guess-tag:hover + .tailor-tip, .tailor-guess-tag:focus + .tailor-tip { display: inline; }
 
+/* A finished role's stamp sits over the page, with space above the role's wording. */
+.tailor-stamped-role { position: relative; }
+.tailor-stamped-role .tailor-role-block { padding-block-start: calc(var(--space-12) + var(--space-4)); }
+.tailor-stamp {
+  position: absolute; inset-block-start: var(--space-10); inset-inline-end: var(--space-5);
+  display: grid; gap: var(--space-1); padding: var(--space-2) var(--space-3); text-align: center;
+  border: 3px solid var(--pine-600); color: var(--pine-600); transform: rotate(-7deg);
+}
+.tailor-stamp span { font-size: var(--text-eyebrow); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; }
+.tailor-stamp strong { font-family: var(--font-display); font-size: var(--text-h3); font-weight: var(--weight-medium); }
+
 /* Role done and Tailoring done: enrichment's fm-moment inside a card. */
+.tailor-moment.is-done { border-top: 4px solid var(--marigold-500); }
 .tailor-moment { position: relative; min-height: 24rem; overflow: hidden; }
 /* The done screen: the moment sits in the card's flow, with what is now met and the next steps under it. */
 .tailor-moment.has-more { min-height: 0; }

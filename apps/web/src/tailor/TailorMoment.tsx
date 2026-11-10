@@ -10,10 +10,10 @@ const CONFETTI = [
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** `children`: more content under the moment (the done screen); without `button` there is no button. */
-type Props = { from: number | null; to: number | null; title: string; line?: string | null; button?: string; onNext?(): void; children?: ReactNode };
+type Props = { from: number | null; to: number | null; title: string; line?: string | null; button?: string; onNext?(): void; children?: ReactNode; celebrated?: boolean };
 
 /** A tailoring celebration in the enrichment look: the job score counts up, confetti, one line, one button. */
-export function TailorMoment({ from, to, title, line, button, onNext, children }: Props) {
+export function TailorMoment({ from, to, title, line, button, onNext, children, celebrated = false }: Props) {
   const still = useRef(reducedMotion()).current;
   const start = from ?? to ?? 0;
   const [shown, setShown] = useState(still || to === null ? to : start);
@@ -34,7 +34,7 @@ export function TailorMoment({ from, to, title, line, button, onNext, children }
     return () => cancelAnimationFrame(frame);
   }, [start, to, still]);
 
-  return <section className={children ? "tailor-card tailor-moment has-more" : "tailor-card tailor-moment"}>
+  return <section className={`tailor-card page-note tailor-moment${children ? " has-more" : ""}${celebrated ? " is-done" : ""}`}>
     <div className="fm-moment" role="status">
       <div className="fm-moment-body">
         {shown !== null && <div className="fm-moment-num" aria-hidden="true">{shown}</div>}

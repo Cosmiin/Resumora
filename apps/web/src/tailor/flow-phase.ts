@@ -1,4 +1,5 @@
-import type { Proposal, Steering, TailorQuestion, TailorRun, TailorSection } from "@resumora/shared";
+import type { Proposal, ScoredKind, Steering, TailorQuestion, TailorRun, TailorSection } from "@resumora/shared";
+import type { Role } from "./RolePanel.tsx";
 import type { Draft } from "./QuestionCard.tsx";
 
 /** Where the tailoring flow stands; each kind is one screen. */
@@ -17,7 +18,7 @@ export type Phase =
   | { kind: "working" }
   | { kind: "review"; proposals: Proposal[]; busy: boolean; removed?: number }
   /** After each role's accept (RoleDone): the score before → after, then the next role or step. */
-  | { kind: "roleDone"; from: number | null; to: number | null; title: string; line: string | null; button: string; next: TailorRun }
+  | { kind: "roleDone"; item: Role; itemKind: ScoredKind; position: number; from: number | null; to: number | null; title: string; line: string | null; button: string; next: TailorRun }
   /** DoneA: after the last step. */
   | { kind: "done" }
   | { kind: "error"; message: string; retry(): void }

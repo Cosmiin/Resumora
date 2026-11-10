@@ -7,6 +7,7 @@ import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard, type Draft } from "./QuestionCard.tsx";
 import { keptChanges, keptTexts, kindKey, nameOf, newlyMet, roleDone } from "./role-done.ts";
+import { RolePanel } from "./RolePanel.tsx";
 import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
@@ -46,6 +47,7 @@ export function TailorFlow() {
   const section = run?.currentSection ?? null;
   const shownSection = phase.kind === "back" ? phase.section
     : phase.kind === "role" || phase.kind === "redo" ? "experience"
+    : phase.kind === "roleDone" ? phase.itemKind === "role" ? "experience" : "projects"
     : phase.kind === "questions" || phase.kind === "review" ? section : null;
   const colour = isRoleSection(shownSection) ? "bullets"
     : shownSection === "skills" ? "tools" : shownSection === "summary" ? "description" : "role";
@@ -114,8 +116,14 @@ export function TailorFlow() {
       const done = scoredOf(roleId);
       if (!done || phase.kind !== "review") return enter(result.run);
       const kept = keptChanges(phase.proposals, body);
+      let item = done.item;
+      for (const proposal of kept) {
+        item = proposal.itemId === item.id ? { ...item, [proposal.field]: proposal.text }
+          : { ...item, bullets: item.bullets.map((bullet) => bullet.id === proposal.itemId ? { ...bullet, [proposal.field]: proposal.text } : bullet) };
+      }
+      const kindOrder = cv ? stepOrder(runRef.current!, cv, at).filter((id) => scoredOf(id)?.kind === done.kind) : [];
       track(result.run);
-      setPhase({ kind: "roleDone", from: latest ?? base, to: result.score.total, next: result.run, ...roleDone({
+      setPhase({ kind: "roleDone", item, itemKind: done.kind, position: kindOrder.indexOf(done.item.id) + 1, from: latest ?? base, to: result.score.total, next: result.run, ...roleDone({
         names: newlyMet(before, result.score, keptTexts(done.item, kept), job), company: job?.company ?? null, changed: kept.length > 0,
         from: latest ?? base, to: result.score.total, next: result.run, kind: done.kind,
         roles: cv ? scoredItems(cv).map(({ item, kind }) => ({ ...item, kind })) : [] }) });
@@ -256,7 +264,16 @@ export function TailorFlow() {
   }
   else if (phase.kind === "roleDone") {
     const done = phase;
-    body = <TailorMoment from={done.from} to={done.to} title={done.title} line={done.line} button={done.button} onNext={() => enter(done.next)} />;
+    body = <div className="tailor-split">
+      <div className="tailor-stamped-role">
+        <RolePanel role={done.item} kind={done.itemKind} locale={locale} />
+        <div className="tailor-stamp">
+          <span>{t(`tailor.roleDone.stamp${kindKey(done.itemKind)}`, { n: done.position })}</span>
+          {done.from !== null && done.to !== null && <strong>{t("tailor.score.change", { from: done.from, to: done.to })}</strong>}
+        </div>
+      </div>
+      <TailorMoment celebrated from={done.from} to={done.to} title={done.title} line={done.line} button={done.button} onNext={() => enter(done.next)} />
+    </div>;
   } else if (phase.kind === "done") {
     body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job} />;
   } else if (phase.kind === "deleted") {
@@ -300,7 +317,7 @@ export function TailorFlow() {
   }
   const wide = (phase.kind === "questions" && isRoleSection(section) && !!roleFor(phase.questions[phase.index]!))
     || (phase.kind === "review" && isRoleSection(section) && !!scoredOf(run?.currentRoleId))
-    || (phase.kind === "redo" && !!scoredOf(phase.roleId));
+    || (phase.kind === "redo" && !!scoredOf(phase.roleId)) || phase.kind === "roleDone";
 
   return <div className={wide ? "tailor-mode is-wide" : "tailor-mode"} data-section={colour}>
     <header className="tailor-head">

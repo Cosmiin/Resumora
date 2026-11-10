@@ -37,6 +37,10 @@ describe("DoneScreen (DoneA)", () => {
     vi.mocked(getTailored).mockResolvedValue(doc({}));
     renderDone();
     expect(screen.getByRole("heading", { name: "Tailoring done 🎉" })).toBeInTheDocument();
+    expect(screen.getByText("62 → 81")).toBeInTheDocument();
+    const card = screen.getByRole("heading", { name: "Tailoring done 🎉" }).closest("section");
+    expect(card).toHaveClass("page-note", "is-done");
+    expect(document.querySelector(".tailor-split")).toBeNull();
     const met = screen.getByRole("list", { name: "Now met" });
     expect(met).toHaveTextContent("Payroll accuracy");
     expect(met).toHaveTextContent("German");

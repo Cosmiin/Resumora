@@ -48,7 +48,8 @@ export function DoneScreen({ jobId, docId, base, final, job }: Props) {
   const met = nowMet(base, final, job);
   const musts = openMusts(final, job);
 
-  return <TailorMoment from={base?.total ?? null} to={final?.total ?? null} title={t("tailor.done.title")}>
+  return <TailorMoment celebrated from={base?.total ?? null} to={final?.total ?? null} title={t("tailor.done.title")}
+    line={base?.total != null && final?.total != null ? t("tailor.score.change", { from: base.total, to: final.total }) : null}>
     <div className="tailor-done">
       {met.length > 0 && <>
         <h3 id="tailor-done-met">{t("tailor.done.nowMet")}</h3>
