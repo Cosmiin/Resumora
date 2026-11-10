@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/tailored-api.ts","apps/web/src/tailor/tailored-page
 depends_on: ["shared/tailoring","shared/api-responses","api-tailor/tailored-routes","api-tailor/review-item","api-core/cv-routes","db/tailoring-repository","web-editor/autosave","db/tailoring-tables"]
 contract: true
 checked_hash: 0b392e70
+cited: [2e5303, 68525a, 36a0d3, cc946f, 03f37a, 0fda38, ac52d1, 6f4440, 748136, 009a73, f154be, 46fb5a, cae0d2, e3a113, ab0ddf, 68525a, 8e9a8b, 36a0d3, 65b44e, 0fda38, 41c62d, 072faa, 211fbe, f154be, 8db4ef, 46fb5a, 4bd0b3, 68008b, 123912, 2fbcc8, cae0d2, 291638, deb3ff, 227040, ffa578, 2457b3, ae2767, a6b1af, d7e916, 501779]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/useRoleScores.ts","apps/web/src/cv/enrich/scores
 depends_on: ["web-enrich/client","shared/cv","shared/enrichment-score","api-enrich/score","web-editor/autosave","web-editor/page"]
 contract: false
 checked_hash: 8595913a
+cited: [b08f3e, 9ea02b, 6e8b22, fde5e1, 1e932b, 40161b, ec634f, 83a9ce, cfc7da, 2e7d3b, 02f2c8, 941da8, 44f473, bb77f5, 0c07d8, 30b09a, eea3b2, 9785bd, 8b612f, beaf05, c5f9d4, 73cc62, 48a8de, f4c569, c6ca9e, 8b0632, 9ea418, b08f3e, 3bf89a, 48a8de, 48c23d, b08f3e, f639d9, 747e41, 48a8de, c88f16, 241ac4, 8533fe, 2b9cf0, ece376, a7f629, 1d5f13, 7a8154, 585844, 40161b, d09660]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

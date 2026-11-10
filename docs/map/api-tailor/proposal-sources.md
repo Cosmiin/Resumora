@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/section-pass.ts","apps/api/src/tailor/enriched-at.t
 depends_on: ["shared/cv","api-tailor/strip-header"]
 contract: false
 checked_hash: 06897067
+cited: [3c3cdc, 13f2c7, 45bfd0, 22014a, 81ede1, 45bfd0, 0bdcc2, b360bc, 2eecb3, 13f2c7, 620702, 45bfd0, 22014a, 0ecc43, 27b639, e8d11b, 22014a, 620702, 45bfd0]
 decisions: []
 open: []
 ---

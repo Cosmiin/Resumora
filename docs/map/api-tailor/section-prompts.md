@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/section-prompts.ts","apps/api/src/tailor/section-pa
 depends_on: ["shared/tailoring","db/ai-log","api-core/call-model","api-tailor/steering","api-tailor/proposal-matching","api-tailor/proposal-application","api-tailor/checks"]
 contract: true
 checked_hash: 026449b6
+cited: [d1a044, 863a14, 4bc2e5, 588265, 636f18, 798098, 92b928, 04db0c, 8660f9, da54db, d52e34, 638348, 3c6095, 110b06, 9e7e17, d52e34, 93766b, 8664af, 35a524, 866b6c, 92b928, f5c065, 92b928, ab544a, 04db0c, 1ebd4b, 7cb8da, 7cb8da, cc37c8, f4573d, 27b639]
 decisions: []
 open: []
 ---

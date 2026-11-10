@@ -5,6 +5,7 @@ files: ["apps/api/eval/import/generate.ts","apps/api/eval/import/render.ts","app
 depends_on: ["api-core/import-eval","shared/categories"]
 contract: false
 checked_hash: 09f1ba76
+cited: [2daba3, bf1e88, 7eaed7, 49d87f, cde4d8, 634c2b, 5b78d0, 1fae5e, a15c00, 29def3, c7add0, 194f68, 94f91d, b1758b, 98095c, 466b57, a9b9d1, 576c45, 4d4204, 640230, 6abaf6, 1b4a4b, 9921c3, 30bcec, 4a45ef, e99837, 1b4a4b, 9921c3, a9b9d1, 4d4204, 98095c, 8dd2a6, 6598fd, a43484, aecee6, 7eaed7, 466b57, 94f91d, 3261f0, 4e13c5, 98095c, 7a683b, 85ea23, bf0679, 5ffd55, 913d32, 2b6b38, 81f655, 3c81f2, 49d87f, a43484, 5b5555]
 decisions: []
 open: []
 ---

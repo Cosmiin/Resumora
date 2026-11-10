@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/useVoice.ts","apps/web/src/cv/enrich/answer-box.
 depends_on: ["web-enrich/voice","web-enrich/voice-transport","web-enrich/voice-capture","web-enrich/answers","web-enrich/focus-answers","web-enrich/brain-dump","shared/cv","shared/enrichment-score","api-enrich/voice-route","api-core/voice-session"]
 contract: false
 checked_hash: 0115760f
+cited: [cf39a7, cac511, 43d804, 35760f, 3589fe, 238b5c, cc960f, 8db9f0, 4892fc, e04f7f, 6b8f0e, 0838e2, 1407ac, 35387c, d9d7a8, 427cd0, 427cd0, 0713c9, e8a5ce, 35387c, d6daaa, c88bad, 6982ff, 46fd98, 372f05, f3ce8d, 9b09bb, 9c4c65, 5c0092, 7715e0, cac511, 43d804, 8a585f, f3410a, 88f8ce, 238b5c, 747d1a, d9d7a8, 0838e2, 6ab0b7]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

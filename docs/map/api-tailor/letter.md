@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/letter.ts","apps/api/test/tailor-letter.test.ts"]
 depends_on: ["shared/tailoring","db/tailoring-repository","db/jobs-repository","api-core/call-model","api-tailor/letter-prompts","api-tailor/letter-checks"]
 contract: true
 checked_hash: daa3cc3d
+cited: [0e4fcf, 9b69e3, 4304b4, 575d46, 3f7ce5, 50a1a6, 9b5df0, 26019d, fefc81, 47579e, a9b4f5, 0ffb0a, 52f8a7, 7e2ccd, 326c04, 9b5df0, 55ef6b, 83d4d7, c20532, 725c15, 9f45d4, e71dd8, 8b0ad7, 8c0484, 3d90d9, f98040, 6d73ff, 020ff6, b652bf, 8486ef, 3f7ce5, b1a554, 020ff6, 52f8a7, 326c04]
 decisions: []
 open: []
 ---

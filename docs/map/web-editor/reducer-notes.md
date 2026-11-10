@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/cvReducer.ts","apps/web/src/cv/edit/cvReducer.test
 depends_on: ["web-editor/reducer","shared/cv","shared/enrichment-focus"]
 contract: false
 checked_hash: 03024e47
+cited: [c2a062, baaa47, a05967, 2e84a3, 5509ba, 291e54, a7c7f8, ac68f2, ebb52d, 29a84d, 611be4, 592554, a25931, 24827b, e23f17, d43863, 5509ba, a7c7f8, ab085d, 8cfb7d, d6e493, 7715e0, baaa47, 8c0410, c2a062, f3c377, 611be4, 8cfb7d, 659d96, a05967, aff153]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md"]
 open: []
 ---

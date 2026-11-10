@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/start.ts","apps/api/src/tailor/language.ts","apps/a
 depends_on: ["shared/tailoring","shared/cv","db/tailoring-runs","db/tailoring-repository","db/jobs-repository","db/cv-repository","api-tailor/routes","api-tailor/accept-save"]
 contract: false
 checked_hash: 63e98019
+cited: [4f06f8, 944ad1, 9daef1, a0b851, 7af32b, f756b2, 285cfb, 0efdc2, 75b48b, e03a9f, 72174f, 53d8d3, 63facd, 3855ff, 0aa02d, 8a47f8, 9c9f6c, bddee2, 6bf0de, 8f46b7, e1bb96, f9f3e5, 5c1365, 7f036b, 838056, 66e65c, 10c474, 8fe5a2, 4d0064, 6bb4f8, 4caaef, 53d8d3, 5540ff, 955275, 838a94, e3c4fa, 1ced02, 4e5696, 838a94, 0aa02d, 569300]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/TailorFlow.tsx","apps/web/src/tailor/tailor-flow.te
 depends_on: ["web-tailor/flow-state","web-tailor/client-run","web-tailor/client-section","web-tailor/flow-redo","web-tailor/question","web-tailor/section-review","web-tailor/role-review","web-tailor/done","shared/tailoring","web-editor/cv-api","api-tailor/accept","api-tailor/section-pass"]
 contract: false
 checked_hash: 6d94b265
+cited: [cd7d90, 4acdc6, c12c62, 5f0029, 3c3a83, bd4c0a, 06ea0d, 4e577b, 0da774, 34505e, 61a2d3, 72b147, 72b147, 771d86, b64bce, 230d05, d79567, 7cfde6, e84229, f59518, c93711, 9fa85e, f1ea5d, 01dd79, b14840, 34eaea, 93e707, 03889c, 6872e6, 3a654c, 3bcc91, 473022, 39cb42, 6d8157, 72b147, 93a13e]
 decisions: []
 open: []
 ---

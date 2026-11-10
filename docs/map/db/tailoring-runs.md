@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/repo.ts","apps/api/src/tailor/supabase-repo.ts","ap
 depends_on: ["db/tailoring-tables","db/tailoring-repository","db/jobs","shared/tailoring"]
 contract: false
 checked_hash: 5c6e48f8
+cited: [b1d742, d7f24b, 5061de, f1e47c, edc186, 9c9f6c, d893f0, 451c51, 569300, fa8122, 96e073, 1d1152, e2c3f3, fc9d94, 3d891c, 4e5696, 066e9a, 5a6b35, d1fbfa, 8be03c, 15154d, 0047c8, fc9d94, 8fe5a2, 49b3d7, df6ebf, 4d0064, c70c38, a4709c, d90b23, 6faba3, 9984fb, 10e202, fccb29, 3a582f, 4b4600, 614648, 5f4e20, 82f1ab, f56a16, c63989, ae5461, 2b1539, a930aa, dc9c07, 92b928, f5c065, 04db0c, 1ebd4b, 1cf5ef, 3e8d51, 2bd8c7, cd46dc, 84752b, 126931, 569300, df2887]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

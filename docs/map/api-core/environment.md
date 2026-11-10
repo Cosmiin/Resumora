@@ -5,6 +5,7 @@ files: ["apps/api/src/env.ts","apps/api/.dev.vars.example"]
 depends_on: ["api-core/worker","api-core/auth","api-core/call-model","api-core/config"]
 contract: true
 checked_hash: 23c276e6
+cited: [bea093, 8968cd, bb002a, 39b04c, 25a509, c31d8e, 04e18c, 6e2231, fbc064, e6ca42, 6b1d61, 456b27, cec33f, 06631b, 2de722, e055e3, 67c2e3, 8d138c, acae23, 87fb40, 39430b, 7a053f, e03deb, b96d03, e7027d, bb002a, 6adb0a, 322f9c, c81eb6, b96d03, e3416c, e7027d, 61c33d, 786896, f30488, cd88ca, e96cf0, e03deb, 696d7b, 8fa979]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md","docs/decisions/0007-every-ai-call-goes-through-one-function.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/api/src/imports/repo.ts","apps/api/src/imports/supabase-repo.ts","
 depends_on: ["db/imports","db/imports-apply","db/ai-log","shared/imports","shared/api-responses"]
 contract: false
 checked_hash: a0f1ebd2
+cited: [dbbaa5, 23ffed, 2c17ba, a0d3e4, be700e, 20021b, 2df0c3, a0dc05, 7fb292, 40e034, 82be5c, dd7426, 1ff85a, 92c025, 8ab97f, e6cad6, 844e13, 89dc3b, 841c79, 10d980, 23ffed, c68d95, df9988, 1f5195, 7943e0, a2ad11, 1d8b1c, 3805b7, ca8f94, 4a29b6, 85316d, 2409e3, 2fa953, ba9436, ae16b4, 91fccc, 8f5709, 43ff12, f27eec, f901fc, 131cee, e63f8c, 844e13, b3ed32, 89dc3b, 8968cd, 559aea, 844e13, e7bb9b, 5ecfb2, 74a1d2]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0004-imports-go-through-a-queue.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

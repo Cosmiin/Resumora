@@ -5,6 +5,7 @@ files: ["packages/shared/src/match-score.ts","packages/shared/src/match-score.te
 depends_on: ["shared/jobs","shared/tailoring"]
 contract: true
 checked_hash: fa41201e
+cited: [5b449e, 5e4f36, 44d44c, a6d00a, 2128aa, ad3f0c, fc15d1, cedccd, 61c6d9, f52da2, 28b87a, 30515a, cedccd, f03580, 269b1f, 9c570f, 7a54d1, 9d5fa0, a8a8c1, 7a54d1, 1753ed, 223dc1, 19682e, abc2da, 089e84, cb7207, 7cf99d, 14cb8f, 80db86, a9ccf2, dd1ccd, ff6111, 8296c3, df7d2c, 61e432, c06cae, ce0830, 65aec8, 9a4447]
 decisions: []
 open: []
 ---

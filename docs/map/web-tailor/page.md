@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/TailoredCvPage.tsx","apps/web/src/tailor/tailored-p
 depends_on: ["web-tailor/client-document","web-tailor/client-actions","web-tailor/client-run","web-tailor/flow-state","web-tailor/toolbar","web-tailor/translation","web-tailor/retailor","web-tailor/guided-review","web-tailor/cover-letter","web-tailor/export-menu","web-editor/page","web-editor/autosave"]
 contract: false
 checked_hash: 0ec7fe3f
+cited: [66aed1, 0ee629, f516cb, eead4b, b15f7c, e82eb1, f62277, aa0882, 647798, 8a2d30, 30139c, 4db614, 9bfb30, aaabc9, 8722ab, b33496, 8208be, d904d0, e818a0, 93212c, a7904e, 2f9f49, fcf480, ae2767, 404b21, 6cd8ea, f7b460, b603b9, 96bfc3, ff3b81, 66aed1, d7e916]
 decisions: []
 open: []
 ---

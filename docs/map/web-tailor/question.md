@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/QuestionCard.tsx","apps/web/src/tailor/role-context
 depends_on: ["shared/tailoring","web-enrich/answers","web-tailor/role-panel","web-tailor/flow"]
 contract: false
 checked_hash: 369560c2
+cited: [300b97, a1a0f6, f7dc53, 682715, 8e641b, 398d32, f351a5, d5fc96, ff4194, 85a4d4, 904e1c, 0040d8, a4b361, 03b390, 398d32]
 decisions: []
 open: []
 ---

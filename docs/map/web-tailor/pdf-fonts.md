@@ -5,6 +5,7 @@ files: ["apps/web/src/export/pdf-fonts.ts","apps/web/src/export/pdf.test.tsx"]
 depends_on: ["web-tailor/pdf"]
 contract: false
 checked_hash: 27ddf424
+cited: [8b8234, 00591d, eb85a5, 5c06fa, d1a404, 61d345, 50bc0d, 70a803, 7f4895, c7775d, 349ece, eb85a5, c7ef32, f6c8d3, 00591d, f8d246, 1ee206]
 decisions: []
 open: []
 ---

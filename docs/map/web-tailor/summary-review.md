@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/SummaryReview.tsx","apps/web/src/tailor/summary-rev
 depends_on: ["shared/tailoring","web-tailor/diff-words","web-tailor/client-section"]
 contract: false
 checked_hash: 75cc7107
+cited: [859355, cb8b2c, 212c48, 6ab550, 9b5ef0, fc5c4e, 63fc10, 85d91c, 8a5ca6, 375ca5, 0fe379, 7e4846, f57b97, b7e90d, aca897, 031e1f, fc5c4e]
 decisions: []
 open: []
 ---

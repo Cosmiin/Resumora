@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/VoiceControls.tsx","apps/web/src/cv/enrich/voice
 depends_on: ["web-enrich/voice","web-enrich/voice-recording","web-enrich/answers"]
 contract: false
 checked_hash: 0f09dde2
+cited: [954682, 999b19, 80b98f, b66a98, a8f635, 93feaa, a1d029, 5855ca, 7ed9ef, 68f903, 07ad07, 8942e6, 7fca9b, 30311f, 238b5c, 71a572, e88daf, 92a469, 954682, 1c3e6a]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

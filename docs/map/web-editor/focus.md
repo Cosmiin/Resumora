@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/focus.ts","apps/web/src/cv/edit/useFocusAfterRende
 depends_on: ["shared/categories"]
 contract: false
 checked_hash: 6e0f3201
+cited: [fe4ba4, bb3642, 10a21e, 80b755, 7c2297, 13d297, 6cd555, da55bb, 9933a7, 8d407f, a47e16, 4226a1, 46cb77, bc6988, edc1be, 4f747a, ad1e9f, a1ba68, 7d41c8, dca685, 49da8f, 5bc1ca, 12e68b, 0eabfd, 4ee0b5, edc1be]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

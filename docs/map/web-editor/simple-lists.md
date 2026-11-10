@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/sections/SimpleListEdit.tsx"]
 depends_on: ["web-editor/reducer","web-editor/page-fields","web-editor/bullets","web-editor/drag","web-editor/focus","web-editor/section-controls"]
 contract: false
 checked_hash: b6a6c14f
+cited: [406213, 10fb06, 6ba6df, 2402cf, dca10d, bc2033, dca10d, 929c80, 8221d4, 51673f, 761456, edee2c, 057fc4, ae36d5, d8d141, 7aead8, dca10d, f21d84, e5aaac, 1ff741, 50685a, 939edf, 44cd26, 4fa241, 3bf110, c153de, ee04d6, 4aed8c, f89f06]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

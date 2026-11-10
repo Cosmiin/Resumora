@@ -5,6 +5,7 @@ files: ["apps/web/src/jobs/JobEditForm.tsx","apps/web/src/jobs/job-edit.test.tsx
 depends_on: ["web-app/jobs-client","web-app/i18n","shared/jobs","web-app/styles-jobs"]
 contract: false
 checked_hash: ac0d10af
+cited: [c5c537, 888c1e, 34eebb, 986b8e, 21a65b, a23e56, 5dbcd4, e70d37, 98e7b5, d28546, b50ed1, 140a52, ffa06b, cbdcf5, 10a06a, 97440a, 26c153, fe4ebd, 8efa8f, 3218da, a23e56, 3a702b, 6a6993, 26c153, 02c320, fe4ebd, 918ced, 98e7b5, b48a4d, 58963e, 98e7b5, 870c84]
 decisions: ["docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

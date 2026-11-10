@@ -5,6 +5,7 @@ files: ["apps/extension/src/api.ts","apps/extension/src/api.test.ts"]
 depends_on: ["shared/jobs","shared/api-responses","api-core/job-routes","api-core/auth","api-core/job-queue","db/jobs-repository","db/jobs"]
 contract: false
 checked_hash: a9098836
+cited: [a18282, 164b69, d28bd1, c8e41a, 07c09a, 2e05a8, 4caa7d, 572c54, 56d768, d4f3f5, 333c3e, a18282, 01a1ad, c47b0d, 97ec38, 51501f, 4fc0cd, 666888, eb6818, 298c9e, 4b6af3, 4c0bbb, 89cd2f, de748c, 31c62f, 22be30, 5fe590, eb6818, 510338, b0bdfb, 510338, 718ce0, 01fb2b, 509bba, b0bdfb, b0bdfb, 81255a, 061512, 7a7534, edf74a, 8eb8be, 8eb8be, 6349e0, 5142bb, 94fef5, 5fe590, fc9d94, b9c098, 18fad5, 878197, c8e41a, 4e40c0, cfe3d6, f4325a, 94fef5, b9c098]
 decisions: ["docs/decisions/0001-an-api-between-browser-and-database.md","docs/decisions/0002-the-api-acts-as-the-signed-in-user.md"]
 open: []
 ---

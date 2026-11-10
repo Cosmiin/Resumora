@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/TailorMoment.tsx","apps/web/src/tailor/role-done.te
 depends_on: ["web-enrich/celebration"]
 contract: false
 checked_hash: c2a1da50
+cited: [038de0, db9f99, 95ccb9, 169414, 45dce9, 473e70, fe61b7, fb3e13, fe8f8b, 2d8f8f, 7120d0, b64399, 76646e, fe8f8b, 56f79d, d11953, 7eb0eb, 473e70, dfbdaa, d2fe18, 0a2f95, 71ef0a]
 decisions: []
 open: []
 ---

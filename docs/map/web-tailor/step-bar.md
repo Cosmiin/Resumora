@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/StepBar.tsx","apps/web/src/tailor/tailor-flow.test.
 depends_on: ["web-tailor/flow","web-tailor/flow-redo"]
 contract: false
 checked_hash: ba7a5ad1
+cited: [cd1767, 2fc0f2, f2f632, f2fba7, f39123, e39a75, 0fea3c, 7dc335, 6872e6, 174042, 13f25a, 1cd130, f7a352, f2fba7]
 decisions: []
 open: []
 ---

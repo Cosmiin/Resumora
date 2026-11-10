@@ -5,6 +5,7 @@ files: ["apps/api/scripts/check-pdf-input.ts","apps/api/scripts/check-voice-sess
 depends_on: ["api-core/call-model","api-core/voice-session"]
 contract: false
 checked_hash: f1d4cc48
+cited: [3052c5, 230191, 16443a, a3f618, 0fdf69, 3e1d0a, 65bde6, 748589, f75ac3, 43d683, 5f3e2d, 258aa9, bba02e, 706d6d, 0f4882, f9e889, d1d08b, 076ab3, 6fff2f, 54acbf, 9c110d, 9d36c1, bd1688, f75ac3, 225971, ac4b09, 921660]
 decisions: ["docs/decisions/0010-cv-files-go-to-the-model-as-files.md"]
 open: []
 ---

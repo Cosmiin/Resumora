@@ -5,6 +5,7 @@ files: ["apps/api/package.json","apps/api/tsconfig.json","apps/api/vitest.eval.c
 depends_on: ["api-core/worker","api-core/environment"]
 contract: true
 checked_hash: ffa5adb4
+cited: [598868, c5ea60, 624b78, e3416c, 61c33d, f3e409, 4a56c3, 48cdb8, f5b702, 33da27, 8dd2a6, 8a55ac, 8a55ac, 5eb4e0, 4f2b8b, 511931, 598868, db2706, b96d03, e3416c, e7027d, 61c33d, f3e409, 28452d, 4a56c3, 8506da, 33da27, c0244b, 4f2b8b, 3052c5, a3f618]
 decisions: ["docs/decisions/0004-imports-go-through-a-queue.md","docs/decisions/0007-every-ai-call-goes-through-one-function.md"]
 open: []
 ---

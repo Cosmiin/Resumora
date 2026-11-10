@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/EnrichPath.tsx","apps/web/src/cv/enrich/PathStar
 depends_on: ["web-enrich/scores","web-enrich/focus-ui","web-enrich/item-lines","web-enrich/achievements","web-enrich/skills-path","web-enrich/path-completion","web-enrich/client-sections","api-enrich/achievements","api-enrich/skills","shared/cv","shared/enrichment-score","web-editor/page"]
 contract: false
 checked_hash: ae62582c
+cited: [4d8420, 08e860, e1f545, 3191dc, 59e831, d6e493, d8aeb5, fbcfca, f2da34, dfab52, 2380cc, 105909, c84f3c, d51619, 6fcecd, 659343, 8f8f39, 0b9a8e, faffe0, 97a8e0, 98d83f, 967d5e, dc473b, 726a7d, 2683cb, ed3bb0, e73d7b, 8c43ba, 4f59f7, 39d741, 020c9d, 179af0, 01eba9, 5ba525, 025146, bc152b, a398d1, 2380cc, 92eb1d, 3f57b3, fcf213, b3436e, 39d741, 4b486e, d6b919, 5ba525, d79ff5]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

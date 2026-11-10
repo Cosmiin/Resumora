@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/review-item.ts","apps/api/test/tailored.test.ts"]
 depends_on: ["shared/cv","shared/tailoring","db/tailoring-repository","api-tailor/accept","api-tailor/accept-save"]
 contract: true
 checked_hash: 54e3ae47
+cited: [7adbd5, 39f46b, b0724e, f35170, 429587, ad408c, 9a50d5, 21d1ec, e24b5a, d388fe, 905467, c214e9, 265a80, 405def, 946715, 768db7, a796dd, 821a12, c69515, 974d4f, 62131d, 946715, 8672b0, 42e1c9, b16a4d, ac5551, f154be, 8db4ef, 5eea9a, eeb8b2, 5364a5, d55a26, 5acc6b, 42e1c9, 6742c1, c0e086, 98c92e, 8672b0, 405def]
 decisions: ["docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

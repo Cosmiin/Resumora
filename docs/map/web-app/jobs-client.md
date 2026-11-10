@@ -5,6 +5,7 @@ files: ["apps/web/src/jobs/jobs-api.ts","apps/web/src/jobs/jobs-api.test.ts"]
 depends_on: ["web-app/api-client","shared/jobs","shared/match-score","api-core/job-routes","db/jobs-repository","db/jobs","api-core/job-queue"]
 contract: false
 checked_hash: efc6281f
+cited: [b51899, 889221, 73c317, 83e152, cb7207, 6de013, ee0bc4, b48a4d, e53712, 5f0792, 01368d, dd6e08, 01a1ad, f13403, 889221, 5e358a, 8a680e, a18282, c47b0d, cb7207, 14cb8f, 7cf99d, 80db86, b48a4d, 110495, 870c84, 5b4070, 41b18c, 498f4a, c6a1fc, 94fef5, fc9d94, f03be8, 83e152, b0bdfb, 81255a, 061512, 7a7534, 8eb8be, 6349e0, 5142bb, b48a4d, 870c84]
 decisions: ["docs/decisions/0001-an-api-between-browser-and-database.md","docs/decisions/0002-the-api-acts-as-the-signed-in-user.md"]
 open: []
 ---

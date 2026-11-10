@@ -5,6 +5,7 @@ files: ["packages/shared/src/categories.ts","packages/shared/src/categories.test
 depends_on: ["shared/cv","shared/stored-cv"]
 contract: true
 checked_hash: 4eb0a4ab
+cited: [0f1363, 03e70c, e94151, 554c0c, d42ec7, a12e17, 4eb828, a15cb1, 017b4d, e6e043, 4548d4, c571f2, 363ac5, 5eef48, a44633, 6f4224, 7a2284, 8e23cf, 27a2fb, 1a6587, 2f37a2, b24e37, 9028fb, 4a29b6, 85316d, f3b63f, 4548d4, 60da42, 0f7dc9, 110546, 60da42, d888e4, a9c9c9, 1bd21d, 1f2235, d83b80, 8e23cf, 27a2fb, 10ef92, d35cd3, faf887, 3bf5ba, 34fa07, d35cd3]
 decisions: ["docs/decisions/0009-one-fixed-set-of-cv-categories.md"]
 open: []
 ---

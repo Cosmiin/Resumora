@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/section-pass.ts","apps/api/test/tailor-section.test
 depends_on: ["shared/tailoring","db/tailoring-runs","api-core/call-model","api-tailor/section-prompts","api-tailor/proposal-matching","api-tailor/proposal-sources","api-tailor/checks","api-tailor/section-routes"]
 contract: true
 checked_hash: 03bd484b
+cited: [75dd34, 28b78a, bfca10, 289baf, 23ff99, d0f0d4, 74005c, 0ecc43, f533db, 892773, 55f68e, 76a88e, f9f3e5, cb20cb, 64eddd, fefc81, 7f036b, bddee2, f88a9a, 5b1723, 6ae89c, 5b1723, bc07e8, 9cd637, 421868, c70c38, c11d15, f88fa3, 6faba3, 3a582f, a297d5, be0a70, c35826, 9afdf1, 27b639, 34183f, ea6a10, 811769, 45bfd0, 22014a, 92b928, f5c065, 6ae89c, 569300, df2887]
 decisions: []
 open: []
 ---

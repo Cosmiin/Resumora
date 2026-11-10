@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/prompts.ts","apps/api/src/enrich/score.test.ts"]
 depends_on: ["shared/cv","shared/enrichment-score"]
 contract: true
 checked_hash: 4e383179
+cited: [12eda3, 7443b2, ca9dad, 8f0e91, b248ab, 9e6f66, b583a4, 267106, 4a5795, 07e650, adeebe, f8bfd7, 868a4b, a9a709, 6681a5, 610f14, 4ff777, 1af88a, d71aea, 100997, 0a667f, 5b2a37, b0c61c, 07e650, 12eda3, 725171, 6681a5, c84f3c, 4a5795, 1d5f13, 9885ce, d35e15, ec5f84, 7e3280, 50474f, f6f156, 03a5b8, 71c9c9, 498100, 208953, 868a4b]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

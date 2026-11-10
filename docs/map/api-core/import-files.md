@@ -5,6 +5,7 @@ files: ["apps/api/src/imports/extract-text.ts","apps/api/test/extract-text.test.
 depends_on: ["api-core/config"]
 contract: false
 checked_hash: 6eec63fd
+cited: [e7cb48, b59cd2, 8562ef, cafe93, 7fbdfc, 2f8d24, bd615a, 6a4824, fb9502, e5f6c7, 3961dd, 7de202, ea13ed, a80e58, c6ebd6, 51917b, 559e57, ed80ae, e7cb48, 89dc3b, c27149, 658f89, ea2a87, 484ff5, 84695f, 2f8d24, c5ea60, 0c05de, 844398]
 decisions: ["docs/decisions/0010-cv-files-go-to-the-model-as-files.md"]
 open: []
 ---

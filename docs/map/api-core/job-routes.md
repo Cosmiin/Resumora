@@ -5,6 +5,7 @@ files: ["apps/api/src/jobs/routes.ts","apps/api/test/jobs.test.ts","apps/api/tes
 depends_on: ["shared/jobs","shared/match-score","db/jobs","db/jobs-repository","db/match-scores-repository","api-core/job-queue","api-core/call-model"]
 contract: true
 checked_hash: 9d314d26
+cited: [4eec1a, ab9f1d, cbffe2, e070e6, 4b6af3, 510338, 509bba, 0da9ea, a9b0a3, 754c41, 870c84, 498f4a, 94a792, d20e60, a18282, 8a680e, c47b0d, 01a1ad, dd6e08, f13403, 889221, 5e358a, cb7207, 14cb8f, 7cf99d, 80db86, 664da5, 80db86, 0398fc, 110495, 41b18c, 498f4a, 510338, 061512, 7a7534, edf74a, 7e7db9, 8eb8be, 6349e0, 5142bb, e825a7, b0bdfb, 01bf61, 81255a, ff6111, 410b74, 94fef5, 5fe590, f0c40a, 0a73a1, 9658f6, 12b254, 18fad5, 54979d]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

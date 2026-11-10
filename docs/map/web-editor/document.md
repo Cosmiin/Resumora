@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/page/CvDocument.tsx","apps/web/src/cv/page/NewSections.
 depends_on: ["web-editor/templates","shared/cv","shared/categories","shared/dates","shared/stored-cv","db/cv-photos"]
 contract: false
 checked_hash: 4ea911e3
+cited: [c08a06, 8da2b5, 388785, d20b83, 94ac9f, 99b5d4, 6919a9, fd3ba3, 3e1ef9, 6de2ef, bdebee, 3cb359, 9a90cf, 0dff76, 01dad9, 85d5bb, 220c34, 7e1a30, 304a67, 69af33, 485131, d4f9d4, 2a715e, 63e400, d8d571, 1c359a, 530efa, c08a06, 304a67, 725171, 6919a9, 60da42, d20b83, ce7e77, f05071, 3cb359, 6c5831, 9b05f2, c13a2e, 13e1c9, 059bb1, 3e04a2, b51f2e, e0ae22, 23c413, 8da2b5, 063aaa, 7b8bbf, 436294, 27ce4f, 0b75dc, f230ca, 6ee6c0, 7df846, d10506, d20b83, f05071, 7417e2, 43bf2f, d20b83, 718c63]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/extension/popup.html","apps/extension/src/popup/popup.css","apps/e
 depends_on: ["extension/environments"]
 contract: false
 checked_hash: beed1606
+cited: [4550ff, cbe9b2, 2ab782, 00656e, 66953c, ec1790, 12e1c9, 6a0559, b6e148, 8ce830, e51bc7, 991420, b94bc5, 3dbfb4, cbe9b2, f08c0f, 7ec727, 5b5859, 824b1c, a76d70, 59a4bf, f17b04, e51bc7, 4550ff, 2fd7c1, 130230]
 decisions: []
 open: []
 ---

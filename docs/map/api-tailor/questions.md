@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/questions.ts","apps/api/test/tailor-questions.test.
 depends_on: ["shared/tailoring","db/tailoring-runs","db/match-scores-repository","api-tailor/section-pass","api-tailor/question-prompts","api-tailor/answers","api-tailor/section-routes"]
 contract: true
 checked_hash: 9722e18f
+cited: [93f103, 1120d8, 87015c, d2844e, eb5682, 45665e, 37130d, c9d37b, 769e42, c4a084, 35b5b3, 45665e, 93a7bb, a958e4, 5179ab, 3962d7, 8a6920, eb5682, bfca10, 14bc06, d90b23, fccb29, 510e15, 98b2d8, 5c971a, 4bff98, 733722, 81b993, 522cde, 8465bd, 569300]
 decisions: []
 open: []
 ---

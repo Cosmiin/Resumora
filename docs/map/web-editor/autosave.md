@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/useAutosave.ts","apps/web/src/cv/unsaved.ts","apps/web/
 depends_on: ["web-editor/cv-api","shared/cv","shared/notes","api-core/cv-routes"]
 contract: false
 checked_hash: 31a8d021
+cited: [2e4f8d, 61f5d4, 919062, 33e3b7, 9679ed, 3f3726, c4ddbf, 74ca77, 9258e8, c09880, 7f5390, 1b740f, 3f3726, dfd57d, fe71c3, 31ae71, 64f993, 290eea, 82dd42, 28a904, f42a1f, 6a0006, b30447, 974fd5, 1d0077, f60fdd, a9dfe1, 83c32a, 7b5162, 87ec97, 63a734, dc68f2, e1b98e, 19cdc5, c74ce9, 7d6293, ae2767, 2e4f8d, 7f5390, 76392f, 35379f, 3f3726, 1b9cd5, 215f7b, e92900, 06d671, 748136, 974fd5, f95bee, 57c69d, 2223e5, 29b0dd, fa6265, f15f03, 77dfad, 1ff255, 319f1c, 63937a, 2684c4, dece1f, 716a7f, 49a1b2, c4ddbf]
 decisions: ["docs/decisions/0006-last-save-wins-with-a-version-check.md","docs/decisions/0012-ai-enrichment-scores-and-notes.md"]
 open: []
 ---

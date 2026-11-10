@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/translate.ts","apps/api/src/tailor/translate-prompt
 depends_on: ["shared/cv","shared/tailoring","shared/enrichment-checks","db/tailoring-translations","db/ai-log","api-core/call-model"]
 contract: true
 checked_hash: 77257dd8
+cited: [46b1d6, 97fac3, b8e54b, 7d947a, b8d749, 325d75, bcc518, a62adb, a62adb, ec0435, bb0acd, 916a94, 76356c, ae5770, fefc81, bab8a3, 925ce8, c78aaf, a8e930, 9e56bb, 2a4f9f, f5e50f, 8d3e3e, f0a362, 4e2c20, a95aa1, a9d345, 9a18ea, 96024b, a84da6, 76356c, 4273ac, 76356c, f38218, be9103, 916a94, 7cb8da, a876ea, dade95, 24878d, 0ad4fa, f0a362, ad8861, 1a4f33, d7cee4, 955275, db8f9d, f7d2b7, c78aaf, a8e930, 7eb31c, a62adb]
 decisions: []
 open: []
 ---

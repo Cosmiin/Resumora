@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/EnrichPath.tsx","apps/web/src/cv/enrich/Enriched
 depends_on: ["web-enrich/path","web-enrich/scores","web-enrich/focus-ui","web-enrich/skills-path","shared/cv","shared/enrichment-score","web-editor/reducer-notes","web-editor/reducer","web-editor/autosave"]
 contract: false
 checked_hash: 3a79fd6a
+cited: [346b6d, 6bd96b, eec6b1, 4d8420, 3981f2, 83f818, 034dc5, f3c377, 0b53af, 52f264, fa299f, 6a756e, 0e7771, e79f64, cd84cd, bfcd7c, 287aa6, 88c6ed, 98d83f, a62060, 92eb1d, 346b6d, cbeb0d, 6bd96b, 361da0]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

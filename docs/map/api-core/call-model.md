@@ -5,6 +5,7 @@ files: ["apps/api/src/ai/call-model.ts","apps/api/test/call-model.test.ts"]
 depends_on: ["db/ai-log"]
 contract: true
 checked_hash: a2a8205d
+cited: [f5bc30, e96cf0, faea7d, 01596c, d22a0e, 317f05, 1f3bab, ce1c13, cf12d0, 8fe862, cfa844, 724657, 10fd33, 8ec466, 764ae5, f1e691, 589e5e, 83ebd9, f9f2ed, a24794, 24324d, b5ac0e, e7bf16, c88b2d, 60e7df, a6d7b9, ec5c61, 3318aa, c006dc, 88fd71, 218509, 3cc324, edafda, 3581d7, a7c25d, 14f645, 67e83a, 86708c, c006dc, c6a59b, 0a48a0, 653857, 3f61b4, 410b74, 798098, b11129, a95aa1, c006dc, 14cb65, 7b270e, 79af61, 01596c, b20d4c, 9b676d, 0eb00d, fefc81, cfa844, 35f73e]
 decisions: ["docs/decisions/0007-every-ai-call-goes-through-one-function.md","docs/decisions/0010-cv-files-go-to-the-model-as-files.md"]
 open: []
 ---

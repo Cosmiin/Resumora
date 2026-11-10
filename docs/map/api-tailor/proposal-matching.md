@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/section-pass.ts","apps/api/test/tailor-section.test
 depends_on: ["shared/cv","shared/tailoring"]
 contract: false
 checked_hash: 03bd484b
+cited: [811769, e85f56, ac6050, 29b933, ed8083, 60b0a8, d51ffa, 801aaa, ac04f5, 41ad31, 93766b, d856ad, f4573d, 23ff99, 17d1aa, 3f523e, 5cc000, ae0e76, 10e53b, c30d48, de4c8b, 10e53b, 07def6, 0eb696, c11d15, f88fa3, ea6a10, 811769, 836a45, 84a33a, ac6050, cbe504, f533db]
 decisions: []
 open: []
 ---

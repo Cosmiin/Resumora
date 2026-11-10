@@ -5,6 +5,7 @@ files: ["apps/extension/src/save.ts","apps/extension/src/save.test.ts"]
 depends_on: ["extension/messages","extension/job-check","extension/capture-state","web-app/jobs-list"]
 contract: false
 checked_hash: f962faeb
+cited: [1b1676, 8735a4, 1f8c00, 86545c, 8a5d79, 8e2211, 399684, fda59f, f15459, 8a5d79, 32b5c7, edaf6f, a7c7e9, 1f8c00, ead136, 8a5d79, 3cdcc6, 12b48f]
 decisions: []
 open: []
 ---

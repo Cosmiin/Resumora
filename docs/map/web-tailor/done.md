@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/DoneScreen.tsx","apps/web/src/tailor/done-screen.te
 depends_on: ["web-tailor/moment","web-tailor/role-done","web-tailor/client-document","web-tailor/export-files","web-tailor/page"]
 contract: false
 checked_hash: 3ceb6b88
+cited: [8fc071, fd5d0b, 0c31c3, b28967, 4e6748, f2ab5c, 27fae7, 6f213d, b28967, b95b6e, 880510, a8e7d4, f2ab5c, e576b7, 2d8f8f, 1270c1, 9b0c5e, b28967]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/imports/ImportScreen.tsx","apps/web/src/imports/imports.te
 depends_on: ["web-app/import-client","web-app/import-summary","web-app/styles-import","web-editor/document","web-editor/autosave","web-editor/cv-api","shared/move-other","api-core/import-routes"]
 contract: false
 checked_hash: bd3bd8b0
+cited: [687927, 6fc44a, 2209aa, 876d7c, a0e729, 9ed538, b8e636, fcd7dd, be280c, 1c61b4, 760972, 3d8b18, 1c61b4, 293d0d, feb21b, 81dd1d, 613cab, 4dcbfc, ac0008, e98645, 2d6aa5, 613cab, 15c290, 3d8b18, e15887, 374d76, 1c359a, c08a06, 760972, a054fd, d92ec1, 2d6aa5]
 decisions: ["docs/decisions/0004-imports-go-through-a-queue.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

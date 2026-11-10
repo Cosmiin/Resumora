@@ -5,6 +5,7 @@ files: ["apps/extension/src/readers/linkedin.ts","apps/extension/src/readers/rea
 depends_on: ["extension/readers"]
 contract: false
 checked_hash: 4084c7f0
+cited: [f56bc6, c98f88, f0098b, f40fcc, a9a5c4, da7653, d04dee, 7bb1f4, 9a0c6f, 3fe8e4, 2421ca, e53070, fe2431, 0a9870, f31665, c8d115, 204036, 75553e, f0098b, a32e12, da7653]
 decisions: []
 open: []
 ---

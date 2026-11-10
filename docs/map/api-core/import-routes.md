@@ -5,6 +5,7 @@ files: ["apps/api/src/imports/routes.ts","apps/api/test/imports.test.ts","apps/a
 depends_on: ["api-core/import-files","api-core/import-queue","api-core/cv-routes","db/imports","db/imports-repository","db/imports-apply","shared/imports","shared/notes"]
 contract: true
 checked_hash: 7f532582
+cited: [acb606, e8ddeb, 07ec59, e463aa, ed80ae, dfdde5, 2cdb6a, 67c652, 3d8f4a, 43f166, d8f46a, 26a573, 9a1ea5, fb1c80, 2409e3, ae16b4, 2fa953, 91fccc, ba9436, 8f5709, 43ff12, df9988, 1f5195, 7943e0, d06a1e, cd14f5, 5a696b, 2cdb6a, dbbaa5, 23ffed, dbbaa5, ff7036, 202242, 187ad8, 23ffed, 80eef3, a054fd, fdf517, acb606, e8ddeb, e463aa, 43ef46, 841c79, e3b4ca, 10d980, 42f52c, a7050b]
 decisions: ["docs/decisions/0004-imports-go-through-a-queue.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

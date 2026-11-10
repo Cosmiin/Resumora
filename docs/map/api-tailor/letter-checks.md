@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/letter.ts"]
 depends_on: ["shared/enrichment-checks","api-tailor/checks","api-tailor/proposal-sources","api-tailor/letter-prompts","api-core/call-model","db/ai-log"]
 contract: true
 checked_hash: 5627e17d
+cited: [2a7913, b1a554, f37c43, e8d11b, a8114e, b95246, b02bb2, ed4391, f1e182, b95246, c3c82d, f37c43, e8d11b, 22014a, f1e182, 34183f, b1a554, e06955, 7cb8da, 50a1a6, 26019d, 0dd1ae, 00eb66, b02bb2]
 decisions: []
 open: []
 ---

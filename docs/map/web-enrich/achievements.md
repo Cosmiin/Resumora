@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/AchievementsPick.tsx","apps/web/src/cv/enrich/En
 depends_on: ["web-enrich/client-sections","web-enrich/path","web-enrich/skills-path","api-enrich/achievements","shared/enrichment-score","shared/cv","web-editor/reducer","web-editor/role-editors"]
 contract: false
 checked_hash: 4f4f0b77
+cited: [b3436e, 39d741, 01eba9, 76a2e5, f63fe2, 01eba9, 020c9d, 020c9d, 0d4312, 98f36e, c78e11, 9404ce, f6bbbc, e80e81, 0bb50e, 0c6f1e, 81a727, 2ba80e, 52068b, a1f741, e2d1b9, 3ef387, b9ca15, 24fbe7, 9e3a5e, 3cfc04, 39d741, 020c9d, 179af0, fb5d28, 0bb50e, 31ee49, 52068b, ff8185, 740646, 020c9d, 0d4312, f30a88, 56aff8, e80e81, 3ef387]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

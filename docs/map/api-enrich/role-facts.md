@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/role-facts.ts","apps/api/src/enrich/role-facts.test
 depends_on: ["api-enrich/score","api-enrich/focus-prompts","shared/cv","shared/enrichment-focus","shared/enrichment-checks","db/ai-log","api-core/call-model"]
 contract: true
 checked_hash: 1f1756f0
+cited: [f804c0, 5a8318, 5483d7, fdcb51, 0b7db5, 33dec6, 634854, 486e6f, 3fd565, 53f543, 53f543, 021698, fefc81, fe5783, 28a8c1, e4c90a, e51d5e, f0e64f, debf4f, 464f6c, a523c9, 634854, cff603, fdcb51, d43863, f804c0, 43ff99, 53f543, ac9638, 33dec6, 75da22, 197d3a, 860ee6, c8fa24, f804c0, 3fd565, ab557c, fdcb51, fc6d17, 09ca8c, fb1cf9]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

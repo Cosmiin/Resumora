@@ -5,6 +5,7 @@ files: ["apps/web/src/lib/api.ts","apps/web/src/lib/api-error.ts","apps/web/src/
 depends_on: ["web-app/supabase","shared/api-responses","api-core/auth","api-core/errors"]
 contract: false
 checked_hash: 1a5a2777
+cited: [be1a5f, 9674d9, d83444, baf119, 5cae69, c5195b, 4e7f79, 8c157c, 4a704c, 725b3a, f4c569, c6ca9e, 9e344a, bd14c2, 6f88fa, 556064, 5ca111, 827316, c329ae, deb51a, 41b18c, d6c40f, 556064, 9c6d7e, 409b24]
 decisions: ["docs/decisions/0001-an-api-between-browser-and-database.md","docs/decisions/0002-the-api-acts-as-the-signed-in-user.md"]
 open: []
 ---

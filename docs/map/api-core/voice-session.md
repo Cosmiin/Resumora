@@ -5,6 +5,7 @@ files: ["apps/api/src/ai/voice-session.ts","apps/api/src/ai/voice-session.test.t
 depends_on: ["db/voice-reservations","db/ai-log","shared/enrichment-score","api-core/errors"]
 contract: true
 checked_hash: 5c22c867
+cited: [0eb00d, bd1688, 68d85e, aca6b4, 6eec86, 7874b9, a667d6, 1f1c6f, e04f7f, e04f7f, 2976e8, 2d4d3d, 4c1e0b, 3e48dd, c104c8, 1f1c6f, 9b676d, d8788c, e04f7f, 9366e3, 86da04, a667d6, 881486, 14cb65, 46f7f8, b8cf4c, 6eec86, 583675, e04f7f, 88f8ce, 4892fc, f30488, 6eec86, 9366e3, 86da04]
 decisions: ["docs/decisions/0007-every-ai-call-goes-through-one-function.md"]
 open: []
 ---

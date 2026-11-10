@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/question-prompts.ts","apps/api/src/tailor/questions
 depends_on: ["shared/tailoring","db/ai-log","api-core/call-model","api-tailor/steering","api-tailor/strip-header"]
 contract: true
 checked_hash: 1e5016de
+cited: [28011f, 9f5304, 5dd87a, fefc81, e1bb96, 8465bd, 73bfb1, 45665e, 0d3d56, 811ee4, 29382c, 576859, eb19a4, 73d22c, e1f89a, 714518, 1cf5ef, 3e8d51, 5c971a, 87f5a0, 9f5304, 7cb8da, 5f9d37, fdf26b, 714518]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/FocusMode.tsx","apps/web/src/cv/enrich/focus-con
 depends_on: ["web-enrich/focus-session","web-enrich/focus-answers","web-enrich/focus-generation","web-enrich/focus-facts","web-enrich/focus-feedback","web-enrich/answers","web-enrich/question-step","web-enrich/brain-dump","web-enrich/role-description","web-enrich/item-lines","web-editor/page","web-editor/bullets"]
 contract: false
 checked_hash: 74969f83
+cited: [b60e8e, debcbd, dfb1ab, f440e3, cc5227, 87be6c, 9232b3, 2b52f4, bda8cc, 7a9736, b67b75, 863efa, 5373ca, 082875, 0f63aa, 7475e7, 625540, f8342f, 9405ee, 10d58e, a006b8, e447d6, 81b987, 084f81, e73d7b, f1ff66, 4407dc, ba4d5e, 1ac3c2, 19a930, 7ff2fc, b15b7a, 335a2e, 8600e7]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261106010000_apply_import_content.sql","apps/api/
 depends_on: ["db/imports","db/base-cv","shared/cv","shared/notes","shared/api-responses"]
 contract: true
 checked_hash: b6bf9577
+cited: [58a735, 5a696b, e24103, 42f52c, 4251d5, a7050b, 12bba6, a76caf, 6c6968, 2b1103, d523fd, f6aaed, a22242, d523fd, 1963d7, 56fa38, e34a89, ee178c, a22242, 184b29, cd14f5, 5a696b, 168b2b, 5716bd, ba9436, 8f5709, cd14f5, 5a696b, a7050b, 12bba6, 56fa38]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0004-imports-go-through-a-queue.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/SkillsTools.tsx","apps/web/src/cv/enrich/summary
 depends_on: ["web-enrich/client-sections","web-enrich/skills-review","web-enrich/skills-path","web-enrich/path","api-enrich/skills","shared/cv","web-editor/section-tools","web-editor/autosave"]
 contract: false
 checked_hash: 9bea3fc4
+cited: [0d8d56, d35698, 75b923, f40d66, 7a37e2, 5748c7, 38db12, 8eb687, 025146, 2adf01, 37afa8, fc165d, 025146, 2b2188, 47d472, 82c001, 7ccbbb, 0ad7e2, 5ba525, 025146, bc152b, 4bff71, 767b49, 4417e3, 46eab2, 37afa8, ec962d, f043ee, 3935a3, 90a5a6, e1f545]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/DescriptionStep.tsx","apps/web/src/cv/enrich/use
 depends_on: ["web-enrich/client-focus","web-enrich/focus-session","web-enrich/focus-ui","api-enrich/role-description","shared/enrichment-score","web-editor/reducer"]
 contract: false
 checked_hash: 3be5355b
+cited: [f12986, 24adad, 8d60aa, 5fcbd0, 67e994, e72835, 730afb, bac1b3, 807c87, a4122e, 0e7a55, 1c8b0b, a4122e, 077c8b, 9620de, 1aea40, d7b09a, 177064, 057638, 2d24ac, b32b8b, 1a7de6, b0e503, d3112a, 609b8a, e3cbed, 0471c2, 434b97, 248b9c, bac1b3, 077c8b, 9745cf, b0e503, 75b836, 945ecf, 3d78c4, 0cc32e, 1a7de6, aa41d3, ee04d6, 6e5c2d, b32b8b, 0cc32e, 1a7de6]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/score.ts","apps/api/src/tailor/score-prompts.ts","a
 depends_on: ["shared/match-score","shared/tailoring","db/match-scores-repository","db/ai-log","api-core/call-model","api-core/job-queue","api-core/job-routes","api-enrich/score","api-tailor/strip-header","db/jobs-repository","api-tailor/accept-save"]
 contract: true
 checked_hash: d220ff0e
+cited: [a8a8c1, b9db5a, b41f0d, 9f97c5, d6fd6e, a566f2, 949f56, 793228, a566f2, 12def2, 11bb71, a785a6, 950e5f, 231e7d, cbe4cd, 7555fe, 6d95c2, b5e35d, 82c16a, 1399c1, 58c927, fefc81, cf12d0, 06f4a7, 5a5f0a, 25a5cf, f4b04b, b772af, 91a6bc, 3e8443, e428af, 1753ed, 223dc1, 5d3704, 42aadb, b9db5a, 7cb8da, 14cb65, 46f7f8, 4266ab, b0bdfb, 81255a, 121c0b, 9c151e, cd3747, 664da5, 6de013, 14cb8f, 80db86, ff6111, 3240a7, da18a0, 5a5f0a, 092729, 58c927, cedccd, fc1d09, fdb480, 0b57c4, 32d037, e936d0, 4303fc, e428af, 8a4caf, 950e5f, f13f46, f26157, b0a6b5, ef7a0b, 70f9ed]
 decisions: ["docs/decisions/0007-every-ai-call-goes-through-one-function.md"]
 open: ["accepted: R12 duplicate base score on overlapping deliveries"]
 ---

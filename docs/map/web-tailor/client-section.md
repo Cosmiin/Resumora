@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/tailor-api.ts","apps/web/src/tailor/tailor-flow.tes
 depends_on: ["shared/tailoring","api-tailor/section-routes","api-tailor/answers","api-tailor/accept","api-tailor/redo","api-tailor/section-pass","api-tailor/accept-save"]
 contract: true
 checked_hash: dd389091
+cited: [fb2b0b, 5b2042, 58e0ca, 10e202, 813f5c, 20f448, c9aab2, f4b22e, 932587, fb2b0b, 6ae89c, ad4a41, fb2b0b, 77d89f, 2966ed, d90b23, fccb29, 10e202, 614648, 6faba3, 3a582f, 9984fb, 4b4600, 5f4e20, ae5461, 82f1ab, 2b1539, e78169, 58e0ca, 02abc0, ec0866]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261107000000_jobs.sql","supabase/migrations/20261
 depends_on: ["db/jobs-repository","shared/jobs"]
 contract: true
 checked_hash: f7888c86
+cited: [cc3da5, 70ef19, 8d0942, 58667c, 54979d, c4f61e, b9bf88, a4742f, 99acd7, eb4574, ba4e12, e825a7, bdfbd3, 6349e0, 7e7db9, 8eb8be, 7a7534, 5cab87, 8663c0, 89e3c5, 061512, 7a7534, edf74a, 7e7db9, 8eb8be, 6349e0, 5142bb, e825a7, 0a73a1, fc9d94, 18fad5, 878197, 79f65c, 976a60, 373579, 2e0783, 99acd7, f03be8, 9658f6]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

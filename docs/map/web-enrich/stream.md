@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/enrich-api.ts","apps/web/src/cv/enrich/stream-ev
 depends_on: ["web-enrich/client","web-enrich/summary-stream","web-enrich/summary-review","api-enrich/routes","api-enrich/rewrite","shared/enrichment-focus"]
 contract: true
 checked_hash: 80139f56
+cited: [2da7f9, 2f5d07, 0766c8, 7517bb, cdfa50, 77e0f1, 6647e7, 2c950a, eb4e07, dae8f8, 1225ee, a6789f, 17336e, 282459, 1213b1, 4371eb, 77da9f, 326eec, 6ff2d9, 0ebf72, fc7bf3, 4e6e8c, 7320f2, bc70a7, fce614, de85e6, b218d7, d46923, 917c3f, 4be711, 6647e7, f33674, 0c2000, 50fe28, 57d3e6, dc3d7c, b8d79e, 33dd2f]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

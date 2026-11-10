@@ -5,6 +5,7 @@ files: ["apps/api/eval/import/run.eval.ts","apps/api/eval/import/score.ts","apps
 depends_on: ["api-core/import-processing","api-core/import-source-check","api-core/config","shared/categories","shared/imports"]
 contract: false
 checked_hash: 5cb33d96
+cited: [af9432, deaf7a, fed5d1, e7e36d, 88c772, b16c70, 7bd4d3, b7d5d3, db5078, d11842, 4adffb, 5b9959, fa25b5, bb752e, 130757, 0aada2, 5e6d0a, c6a5f2, 8e9253, 33da27, 51079c, fed5d1, 6f500b, 1d65bb, b9793c, 42f123, 1fee19, 11e6d0, b5f610, ddf414, fd8485, b5f610, db5078, d696d4, 825571]
 decisions: ["docs/decisions/0010-cv-files-go-to-the-model-as-files.md"]
 open: []
 ---

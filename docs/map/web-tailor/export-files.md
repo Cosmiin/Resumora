@@ -5,6 +5,7 @@ files: ["apps/web/src/export/export-files.ts","apps/web/src/export/export-files.
 depends_on: ["web-tailor/pdf","web-tailor/docx","web-tailor/file-name","web-tailor/letter-page","web-editor/templates","db/cv-photos","shared/tailoring"]
 contract: false
 checked_hash: b5b5c82b
+cited: [b95b6e, 7e8db3, 7d4a02, 0744e7, 584dec, 5607bc, d9b7f6, 4692a1, 5c53f8, 70bd25, c7d13e, cd291d, b00a98, ab7614, 8b7b56, ba7006, ce7e77, f05071, 70bd25, 9dd2e6, 2d3981, 2092c1, b28967, b95b6e, 8b7b56, 6d3a72, f05071]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/extension/src/auth.ts","apps/extension/src/auth.test.ts"]
 depends_on: ["extension/storage","extension/environments","web-app/supabase"]
 contract: false
 checked_hash: 59c1a656
+cited: [384a60, 705169, fdeb1c, 05121f, 34a34b, 8f3089, f442ba, 9d5c91, 0f61f1, 87bd38, 85800b, 2f5646, 14b476, 528ce7, afa187, 7870a0, 2da0d3, 6c0b2c, f442ba, 11f076, 361705, b334b0, 15f4f4, 470464, b9d035, 1e1f73, 14b476, 85b605, 34a34b, 013388, 69d6f9, cfe3d6, f4325a, 85b605, b3b168]
 decisions: []
 open: []
 ---

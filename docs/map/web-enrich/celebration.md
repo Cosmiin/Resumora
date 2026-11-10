@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/CelebrateMoment.tsx","apps/web/src/cv/enrich/foc
 depends_on: ["web-enrich/focus-feedback","web-enrich/focus-acceptance","shared/enrichment-score"]
 contract: false
 checked_hash: 176f1b0a
+cited: [4fac63, d26c8b, 2e2a5c, f38b7f, b64839, f10f1e, 9897f1, 56d52f, 10d58e, 9723d8, 6f664e]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

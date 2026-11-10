@@ -5,6 +5,7 @@ files: ["packages/shared/src/enrich.ts","packages/shared/src/enrich.test.ts"]
 depends_on: ["shared/cv"]
 contract: true
 checked_hash: 442d7dfe
+cited: [de61d2, b1652c, 40e8e4, b90471, abcff5, 07e650, 426824, 698002, 5dadaa, 6c4c7e, a67e95, 0ca105, 91f511, d5b183, e61107, edee78, 1bcded, 33c39f, e30607, ef992d, e720fd, 7f561e, 7903e4, a7f629, 5ae1f0, 973a3a, 4892fc, b0e503, e8e543, 7b2cd2, fd884f, 88e1b8, e892f9, 100997, c88f16, 07e650, 1f6a34, c88f16, 241ac4, c104c8, 4a5795, 9885ce, de61d2, 0a667f, b0c61c, 589185, 0a42ef, da8a06, 706232, f65d07, 52b9ae, a7f629, 7ace14, dc7c79, 35dbca, 5ae1f0, 973a3a, 4f9701, a3848b, da735e, 5ae1f0, 973a3a, e04f7f, 88f8ce, 238b5c, 4892fc, 9366e3, 86da04, 077c8b, 020c9d, 0c72b2, ba7e6f, ca8822, 15fbe0, b0e503, e8e543, 88e1b8, 077c8b, 020c9d, 0c72b2, 3e48dd, f639d9, 9745cf, 179af0, 8406c4, 1f1c6f, 747e41, 1dbb49, 49eb49, eec293, b255d4, 92fa92, 35897b, 1a1d51, 43a994, 33c39f, 100997, 2d01f4, 1d5f13, 9885ce]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

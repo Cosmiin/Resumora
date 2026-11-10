@@ -5,6 +5,7 @@ files: ["packages/shared/src/upgrade.ts","packages/shared/src/upgrade.test.ts"]
 depends_on: ["shared/cv","shared/categories"]
 contract: true
 checked_hash: c2e4ace8
+cited: [60f529, f203af, faf887, b17465, defcf5, 238805, f45806, 1de92f, 50158f, defcf5, ce9677, defcf5, 2c17ba, f3b63f, dbfb52, faf887, f24107, 59e5ca, faf887, c69e2a, 48de31, e0c3ae, a269dd, 3dcf49, 30a6de, 60f529, c69e2a]
 decisions: ["docs/decisions/0003-one-shared-description-of-a-cv.md","docs/decisions/0009-one-fixed-set-of-cv-categories.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/imports/imports-api.ts"]
 depends_on: ["web-app/api-client","shared/imports","shared/api-responses","api-core/import-routes","web-editor/cv-api","api-core/import-queue","db/imports-repository","db/imports-apply","db/imports"]
 contract: false
 checked_hash: c92ad69d
+cited: [8eadbe, 2409e3, 2fa953, ba9436, 2c65e4, 3d8b18, 2409e3, 43ff12, ae16b4, 2fa953, 91fccc, ba9436, 8f5709, cc7e47, 0f3542, 1c61b4, 2c65e4, 2409e3, df9988, 7943e0, d06a1e, cd14f5, 5a696b, 841c79, 10d980, 23ffed, c68d95, dbbaa5, ff7036, 202242, ba9436, 43ef46]
 decisions: ["docs/decisions/0001-an-api-between-browser-and-database.md","docs/decisions/0002-the-api-acts-as-the-signed-in-user.md","docs/decisions/0004-imports-go-through-a-queue.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

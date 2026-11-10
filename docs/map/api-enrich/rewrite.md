@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/rewrite.ts","apps/api/src/enrich/rewrite-prompts.ts
 depends_on: ["api-enrich/blocks","api-enrich/score-prompts","api-enrich/score","shared/cv","shared/enrichment-checks","shared/enrichment-focus","db/cv-history","db/ai-log","api-core/stream-model"]
 contract: true
 checked_hash: 1dd09fc6
+cited: [35bde3, 5c0416, 06ee0e, 2519cc, 981b60, 2c693e, 43d49c, 0251c8, 233e33, 84288a, d2bf84, a4796b, bf9f97, 227604, 67c521, 33dd2f, f33674, 89dbdd, eab65e, c67ed8, df375d, 86a877, 9f02af, 3d0a4e, 06f308, 6797dd, a2723a, d46923, 917c3f, 8bc536, 6d8499, 6647e7, 09ef5c, cf7b4d, 94e3f3, b2d383, 89b9a6, e1a3ac, 85d90e, 20ae6e, d4639f, a7234c, f7fd27, 4be711, 09ef5c, 2519cc, ea56e7, 4e4319, 233e33, df375d, 684e5b, 4fcab3, 0bed4e, eb5a89, 522bee, 9887d5, 50474f, ec5f84, 67c521, 33dd2f, 3a1d34, b7b0cb, df375d, 790c7d]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/accept.ts","apps/api/test/tailor-accept.test.ts"]
 depends_on: ["shared/tailoring","shared/notes","db/tailoring-runs","api-tailor/proposal-matching","api-tailor/proposal-application","api-tailor/accept-save","api-tailor/section-routes"]
 contract: true
 checked_hash: dc7f97e0
+cited: [0ce123, e08db5, 838056, 20b0c3, bfca10, 01dd79, f1560d, 836a45, ad4a41, f1560d, 2621dc, 69361b, f87893, 03c014, d841d0, 5f4703, d55a26, 53e9bc, 90de37, 38360d, f2dce7, 7c5c9a, fb2b0b, ad4a41, 77d89f, 2966ed, 9984fb, 4b4600, 99c7cf, 82f1ab, 2b1539, b68419, db47b1, 7c5c9a, 3c3a83, 6faba3, 3a582f, eabaeb, 95dd4e, dcbaff, 3240a7, 2966ed, 0ce123, ad4a41]
 decisions: ["docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/RoleReview.tsx","apps/web/src/tailor/role-review.te
 depends_on: ["web-tailor/role-panel","web-tailor/diff-words","web-tailor/client-section","web-tailor/role-done"]
 contract: false
 checked_hash: 5a3af0dd
+cited: [396213, 76024c, 9aca46, 238187, b322df, 3cf775, 9c7b99, 8e7259, 1ecbcd, 175209, 5ce30b, ad08a6, 8241cb, 9cdc10, bf8b25, 7626b8, b7e90d, 1ad807, 04af80]
 decisions: []
 open: []
 ---

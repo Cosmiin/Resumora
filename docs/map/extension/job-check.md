@@ -5,6 +5,7 @@ files: ["apps/extension/src/job-check.ts","apps/extension/src/job-check.test.ts"
 depends_on: ["extension/readers","shared/jobs","api-core/job-processing"]
 contract: false
 checked_hash: d04a7682
+cited: [7de771, 2d7e86, 58514a, 0af3dc, bec289, 3023d9, dc92c3, fc811f, 6a8b5c, 1fec57, 86545c, 8a5d79, 32b5c7, 8d7d94, 713516, e897ac, 553ab9, 91a6bc, 37f1eb, 553ab9, e0338f]
 decisions: []
 open: []
 ---

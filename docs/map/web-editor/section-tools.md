@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/panel/SectionTools.tsx","apps/web/src/cv/panel/sectionT
 depends_on: ["web-editor/reducer","web-editor/role-editors","shared/categories","shared/cv","web-editor/reducer-sections"]
 contract: false
 checked_hash: e7515626
+cited: [07a00b, 1b16e7, 2a9bbb, b4c5c6, b5f7f4, df6362, ae29a7, 625966, fa9d6f, c4c06a, 851c5d, 8a6b44, d97b9b, 1400bd, e23375, 851c5d, 8c9589, a1ba68, a2c6e6, c91397, ce5982, c57732, 5e6a3d, 3217bd, 0608a5, 915b6a, 46d65e, ad6e3f, 0f7952, 5f6f57, c91397, d03786, 82c001, d35698, 2a7ecc, 8f7e97, 9c3dff, 65a63b, 13987c, 31c8f6, 5417af, 30d1c5, 659123, 9c4e5b, a3faff, 6dfe3f, c61edb, 06818b, be716e, a82a0e, 57f2f9, 74df03, 1bd7c3, 0c1079, ec31e7, 434293, 5c57b7, c0502f, bb0e2a, 5f6f57, 1ea836, 1400bd, 815f22]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/HistoryPanel.tsx","apps/web/src/cv/historyFormat.ts","a
 depends_on: ["web-editor/cv-api","web-editor/document","shared/api-responses","db/cv-repository"]
 contract: false
 checked_hash: 1f2debe9
+cited: [3dfac0, 988e9b, 718c20, 05ebf7, 6988f3, 75f09a, d0c26e, 2baba4, c93b2e, 7110d5, 543788, b9ed7e, 5ddfb1, 718c20, 224250, d8d571, c08a06, ea394d, 37ff6e, 93758d, e89e13, 2af10f, 1c5a97, 4ec527, b5038d, 0de7fc, 36e4c5, 4128a9, 559b92, a59c58, de46ce, 6988f3, 3343f1, 17e277, dac296]
 decisions: ["docs/decisions/0005-one-cv-per-user-with-history.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

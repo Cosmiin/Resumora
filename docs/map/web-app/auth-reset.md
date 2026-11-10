@@ -5,6 +5,7 @@ files: ["apps/web/src/auth/ResetPasswordPage.tsx"]
 depends_on: ["web-app/auth-login","web-app/auth-layout","web-app/supabase","web-app/i18n"]
 contract: false
 checked_hash: a784708f
+cited: [a229d9, 6575d2, 861719, b2dbc1, c5da0c, 30c00d, 861719, f3b5e2, bd3354, b2dbc1, 0484a2, f3b5e2, 861719]
 decisions: []
 open: []
 ---

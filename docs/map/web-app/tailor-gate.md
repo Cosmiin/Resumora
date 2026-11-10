@@ -5,6 +5,7 @@ files: ["apps/web/src/jobs/TailorGate.tsx","apps/web/src/jobs/job-page.test.tsx"
 depends_on: ["web-editor/page","web-enrich/scores","web-enrich/path-completion","web-app/i18n","web-app/styles-jobs"]
 contract: false
 checked_hash: 99607d57
+cited: [52129f, 6e82a7, ecffcb, f06948, d4dcb6, 92c554, 36cfa1, fb56d1, 85845c, 881fd4, a40c6d, 4d8420, 1a4b21, ac05df, 52129f, 465f1b, fb56d1, 346b6d, a40c6d, 4d8420, 1a4b21, e2abff, e2abff, dc696c, 579c56, 36cfa1, db0b03, 6aff36]
 decisions: []
 open: []
 ---

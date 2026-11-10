@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261108030000_cv_photos.sql", "supabase/tests/data
 depends_on: ["shared/cv"]
 contract: true
 checked_hash: f206680e
+cited: [ba7006, ce7e77, 7285f5, 78ee03, c194f4, f05071, 5c7d63, 3ad09c, 7285f5, ba7006, 715da3, d20b83, ce7e77, 06f564, f05071]
 decisions: ["docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

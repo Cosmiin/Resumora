@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261104000000_baseline.sql", "supabase/migrations/
 depends_on: ["db/base-cv", "shared/notes"]
 contract: true
 checked_hash: 61a0ab92
+cited: [fb1cb9, 9590d0, cc42a6, b1d66b, 4bf5ad, 43abe0, bc3596, bb8bcf, 56fa38, 81cfca, 812d3c, c0defa, cde008, 856309, 85db3a, 298637, bb85fb, e5d885, 298637, 27081d, 624131, a8766d, 3c49a6, 07c9a0, 9590d0, 6d3223, 81cfca, 647891, 298637, 5716bd, 263c88, 1e4695, bb8bcf, 4bf5ad, bb8bcf, 263c88, e5d885, c590fc]
 decisions: ["docs/decisions/0005-one-cv-per-user-with-history.md", "docs/decisions/0006-last-save-wins-with-a-version-check.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

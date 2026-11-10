@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261106020000_voice_reservation.sql", "supabase/te
 depends_on: ["db/ai-log", "shared/enrichment-score"]
 contract: true
 checked_hash: c013f43a
+cited: [86da04, 96e154, 274853, 43a595, 0e8243, 8e86f2, 0e8243, 7006a6, 97df4b, e2e47e, 0f8b33, 9366e3, 86da04, e04f7f, 0a1315, 9b676d, d8788c, 8e86f2, 3ff05e, c5a4cd, 3e48dd, 1f1c6f, a667d6, 14cb65, cb77c1, 23342e, e02475, 475c90, c20785, e2e47e, 86da04, 0e8243, 3b9f0a]
 decisions: ["docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

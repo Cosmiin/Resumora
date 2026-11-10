@@ -5,6 +5,7 @@ files: ["apps/web/src/styles/panel.css"]
 depends_on: ["web-app/styles-base","web-app/styles-editor","web-editor/overview","web-editor/section-tools","web-enrich/skills","web-app/tailor-gate"]
 contract: false
 checked_hash: e9734798
+cited: [b91902, 79b3b6, 27a71b, 0b0c0b, 8c6a36, 0b8f06, fb60fe, b95e73, 676162, c622e3, 303085, 6dfe3f, fbb3b1, 434293, 74df03, 0c1079, cab05a, 73529a, d78aaf, 79b3b6, 13b4dd, 676162, 1f14a9, c622e3, 6b83cf, 676162, c622e3]
 decisions: []
 open: []
 ---

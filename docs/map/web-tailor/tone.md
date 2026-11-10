@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/ToneStep.tsx","apps/web/src/tailor/steering.test.ts
 depends_on: ["web-tailor/client-run","web-tailor/steering","shared/tailoring"]
 contract: false
 checked_hash: 00e1e106
+cited: [6c8840, 051b8c, 50d3c6, 3c5b0c, 81d0fb, 020578, 205bd4, 97bae9, 6c1623, 81d0fb, 1bcb53, cc63ff, b7c0b3, b914a8, 3c5b0c]
 decisions: []
 open: []
 ---

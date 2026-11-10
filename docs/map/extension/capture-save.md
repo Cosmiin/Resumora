@@ -5,6 +5,7 @@ files: ["apps/extension/src/save.ts","apps/extension/src/save.test.ts"]
 depends_on: ["extension/api","extension/auth-token","extension/messages","shared/jobs","api-core/job-routes","web-app/job-page","web-app/jobs-list"]
 contract: false
 checked_hash: f962faeb
+cited: [3cdcc6, aa9041, 6dc729, 5e9d9d, 099ced, 6c0b2c, 361705, c60abc, 37b440, 12ac14, 12ac14, b069e8, 9b0360, 6dc729, a5280c, 1b1b9e, 4eec1a, ef0b94, 713516, 4e40c0, 08e098, 9b84a2, a7c7e9, 099ced, cbffe2, 666888, b0bdfb, 298c9e, 099ced, 63b1ef]
 decisions: []
 open: []
 ---

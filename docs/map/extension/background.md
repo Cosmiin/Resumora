@@ -5,6 +5,7 @@ files: ["apps/extension/src/background.ts","apps/extension/src/reader-entry.ts",
 depends_on: ["extension/handler","extension/auth-session","extension/storage","extension/environments","extension/capture-state","extension/readers"]
 contract: false
 checked_hash: b7e8c2f0
+cited: [fb25b7, 25ed17, 46ed14, dbf620, c1c7ee, ea35ef, 8fcefd, 2b5f7e, 2ec35e, 86c76f, ad8bbc, 6f3a59, 8fcefd, a6cb9c, ea35ef, 5b56ba, fa8ed6, c1c7ee, a01dca, 4c34b4, 505dc7]
 decisions: []
 open: []
 ---

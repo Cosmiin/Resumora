@@ -5,6 +5,7 @@ files: ["apps/web/src/styles/cv-page.css"]
 depends_on: ["web-app/styles-base","web-app/styles-editor","web-editor/document","web-editor/page-fields","web-editor/drag","web-editor/section-controls"]
 contract: false
 checked_hash: 998f6c23
+cited: [059bb1, deedf9, eea587, 0152a4, c4ac53, 5ed9ca, 0fef56, cc9526, 575b4e, 9d48bf, 05854c, 68f8c6, e9e17c, 489dd4, 49330f, 93fe6a, 5c394a, 5d9d6a, 78da66, 5f13ee, 69eeae, f21d84, 13e1c9, 059bb1, 1c359a, 5f9f6c, 575b4e, f7600b, 9d48bf, e11db3, 0fef56, eea587, d096c1]
 decisions: []
 open: []
 ---

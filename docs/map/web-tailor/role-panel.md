@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/RolePanel.tsx","apps/web/src/tailor/role-context.te
 depends_on: ["shared/cv","web-editor/document","web-tailor/role-done"]
 contract: false
 checked_hash: d1dcc748
+cited: [6125ad, 5b0abe, a1f3f7, 94fd14, 763769, 4b4d10, 09860e, dfacc0, 071da9, 4c831b, 6e38f7, 5ee321, 953c19, 4b4d10, a2c773, 5b0abe, 7ef53a]
 decisions: []
 open: []
 ---

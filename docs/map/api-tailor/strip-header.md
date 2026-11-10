@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/strip-header.ts","apps/api/src/tailor/strip-header.
 depends_on: ["shared/cv"]
 contract: false
 checked_hash: edbef11e
+cited: [054630, 58b141, 278954, 32b23e, 054630, 5a6632, 26b137, 817012, ac7a62, b41f0d, fdf26b, 3c3cdc, c54dc2, ef9a91, 051c5b, 278954, 5a6632]
 decisions: []
 open: []
 ---

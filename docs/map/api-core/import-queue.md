@@ -5,6 +5,7 @@ files: ["apps/api/src/imports/consumer.ts","apps/api/test/imports.test.ts"]
 depends_on: ["api-core/import-processing","db/imports-repository","db/imports-apply","api-core/config"]
 contract: true
 checked_hash: c50bfe54
+cited: [1f5195, 7943e0, 844e13, 7943e0, 02c68f, a5e507, f228b4, 647286, f27eec, 1f011a, 4e41c4, bf2c73, 6534dc, e2eb94, 25490e, e63f8c, a2ad11, 1d8b1c, 73983b, e6272e, a34147, d06a1e, cd14f5, d523fd, df9988, dc4ff9, 934b19, 604221, 0e8422, f3e409, e64f8e, 7943e0, b9d0c9, 8968cd, 844e13, 6f500b, 4a6da2, f180dc, 131cee, e63f8c, a2ad11, 73983b, 1d8b1c, 7943e0, 20021b, 559aea, 20021b, 2df0c3]
 decisions: ["docs/decisions/0004-imports-go-through-a-queue.md"]
 open: []
 ---

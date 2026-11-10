@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/achievements.ts","apps/api/src/enrich/achievements.
 depends_on: ["api-enrich/score-prompts","api-enrich/score","api-enrich/rewrite","shared/cv","shared/enrichment-score","shared/enrichment-checks","db/ai-log","api-core/call-model"]
 contract: true
 checked_hash: 1908bb4c
+cited: [44d6c0, bf1498, f73778, 7d0653, 73a830, 1533ed, 36149c, 881bc0, fd0423, 0d3e20, 1d9cfe, 171266, 56aff8, 53290e, fc24cf, 1998d9, fefc81, fe5783, 28a8c1, e4c90a, 6617b1, 92fa92, 35897b, d8d9c2, 8ebe9b, 73a830, 806b8a, 56aff8, f30a88, 7d0653, 0d4312, 53290e, ac9638, 1d9cfe, dd2561, 03a5b8, ec5f84, 12eda3, 020c9d, 179af0, fb5d28, e09fd3, cdb2c1, 53290e, 98c384, a44633]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

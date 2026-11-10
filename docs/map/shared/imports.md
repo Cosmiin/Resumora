@@ -5,6 +5,7 @@ files: ["packages/shared/src/imports.ts","packages/shared/src/imports.test.ts","
 depends_on: ["shared/cv","shared/categories","shared/stored-cv"]
 contract: true
 checked_hash: 1eae2f73
+cited: [3318f4, 1762a6, 381e18, f01317, 78aadc, 864045, 7c6516, d49d34, 112eea, 9837ba, a86372, 13f5b9, 5f7996, 25de77, 8952f9, 3cecdc, 531a09, c89aa9, 008c8f, a6ce95, fc5179, 9cac8e, 9cf450, 0557fe, 3e4d25, f021d7, 1301cb, 145208, 8aca1b, 6fb7b5, 3318f4, 1762a6, 3805b7, 4a29b6, ca8f94, 85316d, 6a70dc, 1f2235, 5d4e4f, f1b3f7, 06f7e0, 89bbdf, 5f7996, 112eea, 7c9d4f, a2ad11, 70b788, 2c17ba, 5d2a77, 6a70dc, 1f2235, 42d2ff, 98be53, c89aa9, a6ce95, df9988, 7943e0, 1f5195, 844e13, 06f7e0, 178c71, ff7036, 202242, cd14f5, 5a696b, ce9677, 841c79, 10d980, f1b3f7, a86372, f5d5de, c89aa9, b728d0, 7943e0, 844e13]
 decisions: ["docs/decisions/0003-one-shared-description-of-a-cv.md","docs/decisions/0004-imports-go-through-a-queue.md","docs/decisions/0010-cv-files-go-to-the-model-as-files.md"]
 open: []
 ---

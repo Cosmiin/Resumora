@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/tailored-api.ts","apps/web/src/tailor/retailor.test
 depends_on: ["shared/tailoring","api-tailor/tailored-routes","api-tailor/retailor","api-tailor/translate","api-tailor/letter"]
 contract: true
 checked_hash: 7aee7903
+cited: [8aa1f6, 6ec5d0, b4a7ff, c571f9, e65e1e, c6ca9e, 646413, 26f36d, a876ea, dade95, 9f45d4, e71dd8, 3d90d9, f98040, 646413, d7e916]
 decisions: []
 open: []
 ---

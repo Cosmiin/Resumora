@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/sections/RolesEdit.tsx","apps/web/src/cv/edit/sect
 depends_on: ["web-editor/reducer","web-editor/bullets","web-editor/page-fields","web-editor/focus","web-editor/drag","web-editor/section-controls","web-editor/document","shared/cv"]
 contract: false
 checked_hash: d5e24bed
+cited: [685071, a321ee, 78d1c7, 6079af, 18f046, eff336, 7018ff, c78798, 6ab76c, ee6bf6, 280b15, c544b4, 073c38, 77a422, edbe7d, 7fb1ca, d6abf9, f229bf, 3b1e6f, dbed49, 46e5b2, 7eca63, 685071, b01f74, b1e74b, 18efc5, 162ea9, 7ddde2, a82e5a, b47965, 38b390, 4e94d1, c27b77, dca685, dfe7cb, fb0e54, 866c60, 29ff23, 0c11fe, 3bf110, 3b8cc0, 573479, 218e8d]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

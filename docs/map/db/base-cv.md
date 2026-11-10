@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261104000000_baseline.sql", "supabase/migrations/
 depends_on: ["shared/cv", "shared/stored-cv"]
 contract: true
 checked_hash: eab10acd
+cited: [38c60c, cd319e, 56fa38, a6ebaf, 8540c5, a4ec58, b09e42, ad40ab, b5d47b, 5ac443, 083b87, c568e8, 2ec2f1, d83ca9, e27519, 882c34, 9d6618, 653087, 235342, adb752, 5716bd, 2f3ae6, 8f249d, 2df0a1, 84f132, 9ec57c, 19b510, c568e8, ebb494, 5716bd, 2b8a5e, a20565, ac74c9, 3d023c, f2f79a, ccf7f6, 50158f, c43500, 693925, e2008a, 16f1c4, 4480bf, 0236bb, 8540c5, ef195f, dd53d6, 5ed189]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0005-one-cv-per-user-with-history.md", "docs/decisions/0006-last-save-wins-with-a-version-check.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

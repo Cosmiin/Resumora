@@ -5,6 +5,7 @@ files: ["apps/api/src/imports/prompts.ts","apps/api/test/prompts.test.ts"]
 depends_on: ["shared/categories","shared/imports","api-core/call-model"]
 contract: true
 checked_hash: dae6628a
+cited: [15786c, f7934e, 3bafe2, ca8f94, 4c1913, 79a4b6, 5249a5, fa9f24, 7d4f09, 931e72, 35c6d8, b24e37, 3372c2, 9b8dfd, 0591d8, 85316d, a7b1ba, 8c13e7, 2cd9b3, b24e37, 9028fb, 3805b7, ca8f94, 4a29b6, 85316d, 6fb7b5, 1762a6, c6591f, 66fe90]
 decisions: ["docs/decisions/0009-one-fixed-set-of-cv-categories.md","docs/decisions/0010-cv-files-go-to-the-model-as-files.md"]
 open: []
 ---

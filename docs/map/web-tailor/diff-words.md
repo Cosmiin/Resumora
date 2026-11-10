@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/diff-words.ts","apps/web/src/tailor/diff-words.test
 depends_on: []
 contract: false
 checked_hash: c047f722
+cited: [68c7f4, ef0071, e90395, f4381e, b64c3a, ed63df, 35d74c, e73116, 212c48, 21e092, e45c25, ef0071, 0a8e36]
 decisions: []
 open: []
 ---

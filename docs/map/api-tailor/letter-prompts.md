@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/letter-prompts.ts","apps/api/src/tailor/letter.ts"]
 depends_on: ["shared/tailoring","db/ai-log","api-core/call-model","api-tailor/strip-header","api-tailor/letter-checks"]
 contract: true
 checked_hash: 05e69483
+cited: [ef9a91, f233ef, 398138, 559e30, b5c81a, b652bf, 47579e, 0b932e, fd748c, 47579e, b04e15, 95e1de, 47579e, b652bf, 8486ef, f233ef, 677ebc, b1a554, e06955, 7cb8da, 7cb8da, ef9a91, cbb89b]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["packages/shared/src/api.ts"]
 depends_on: ["shared/cv","shared/imports"]
 contract: true
 checked_hash: a9ff8f8f
+cited: [ef0867, bd7cbf, bfc57b, 15bcac, 1bf360, e1f6e7, c329ae, e15887, 666166, 374d76, a352da, ef0867, bd7cbf, 086796, 78cdb8, 9ec6a7, 13fe6b, feecaa, ac30fe, bfc57b, 9c82ef, bfc57b, c93b2e, 083b87, 7e1b46, 39a537, 725b3a, 2e05a8, 15bcac, 2409e3, 2fa953, ba9436, ae16b4, 91fccc, 8f5709, 43ff12, e1f6e7, bd7cbf, 119af3, 1bf360, 1bf360, f72159, 19b510, c568e8, 748136, bd7cbf, 2b8a5e, ac74c9, a20565, 3d023c, 7cfc68, 6eb4f6, 0b28ea, 163b42]
 decisions: ["docs/decisions/0003-one-shared-description-of-a-cv.md","docs/decisions/0005-one-cv-per-user-with-history.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

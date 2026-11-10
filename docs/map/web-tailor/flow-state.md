@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/flow-phase.ts","apps/web/src/tailor/tailor-flow.tes
 depends_on: ["shared/tailoring","web-tailor/flow","web-tailor/skills-review"]
 contract: false
 checked_hash: 501273b4
+cited: [2b4ba6, ff86d9, c4d70c, 8a47f8, 792848, 2553d4, b49eab, 5f592d, 07ff65, c11c32, b49eab, 410db0, 4acdc6, 93a13e, 4c874e, 5745b5, f8cd16, 5fd7b4, 2e8d8f, f8cd16, bed506, b49eab, eda562, c5195b]
 decisions: []
 open: []
 ---

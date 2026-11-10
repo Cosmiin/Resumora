@@ -5,6 +5,7 @@ files: ["supabase/config.toml", "supabase/.gitignore"]
 depends_on: ["db/imports", "db/cv-photos"]
 contract: false
 checked_hash: 7643d953
+cited: [c0cf62, c0aaaf, 783f56, 6b4ca7, a4c3ac, f84ebd, d77cf5, 28cca7, 5bd96d, f78054, c4aa24, 56ba64, ba7006, 2cab68, 7d2eab, f03498, e25035, 0d27f6, 1db908, ca2b45, feeafa, e3c0a5, 011e1f, ed608b, 79c9d7, 7f5466, b81c71, b81c71, 8a2e3f, 0edc63, 102bbd, c0cf62, 6b4ca7, 4643b5, 366e3d, c12e74, 2cab68, feeafa, 5bd96d]
 decisions: ["docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

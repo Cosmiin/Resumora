@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/FocusMode.tsx","apps/web/src/cv/enrich/light-sto
 depends_on: ["web-enrich/client-sections","web-enrich/focus-ui","web-enrich/brain-dump","web-enrich/path","api-enrich/item-lines","shared/enrichment-score","web-editor/reducer","shared/dates","web-editor/document","web-editor/page-fields"]
 contract: false
 checked_hash: bd821239
+cited: [8b63f2, 70c652, ec50ee, af4860, 2821b0, f43c29, 8dd543, 52ed48, 1b6564, 3b75f3, 093954, 01d7d3, e6c0c4, 0c72b2, 5301e0, 4cd8e2, 045856, 66aad3, a78e8e, f40226, 19ef7a, 5bf349, fd884f, 2be506, 88e1b8, 5cfb73, 563653, 8c43ba, 4f59f7, 8dd543, 0c72b2, 8406c4, a0988d, 5bf349, fc14b1, ade003, f0fd5c, b26fc9, d4f9d4, b04ad5, 304a67, 9b05f2, c13a2e, caa28b, 790645, 8dd543, 5bf349, 1491fb]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/extension/src/popup/view.ts","apps/extension/src/popup/view.test.t
 depends_on: ["extension/messages","extension/environments","extension/popup-shell","web-app/auth-login"]
 contract: false
 checked_hash: 15d5f9b0
+cited: [139065, 7ebc26, 4356cf, b62826, 824b1c, 310e88, 7453b1, 170581, 462683, 410653, 64a553, b0e57e, 19d584, 563db4, 8cf97c, e76f0a, 6ea354, c24d16, c3382f, f05977, 1e5614, 29965c, 230b72, b93037, f1ccd7, 5063a7, 310e88, 7b5ab0]
 decisions: []
 open: []
 ---

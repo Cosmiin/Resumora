@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261108000000_tailoring.sql", "supabase/migrations
 depends_on: ["db/jobs", "shared/cv", "shared/tailoring", "shared/match-score"]
 contract: true
 checked_hash: e0338702
+cited: [152f35, ac56bb, 955275, e0a24c, 37b1ce, d68e7e, 97d1eb, ec7852, 0881e8, 12e3cb, 17a511, ff2797, 35e94f, 64495a, 140b80, c0e086, a5aa6e, 2bf14c, 1ced02, 91eb68, 3086e7, 285f5e, 6b9e00, cc7af7, 91ea83, f4a251, 5d7904, ffa578, bffb8e, ef358e, 0640b6, 4ba030, 101e7b, 291638, deb3ff, bec628, db8f9d, e3c4fa, 4e5696, 569300, f74cb8, b656f2, bbfcfb, 61e432, c06cae, 4e5696, fc9d94, 066e9a, deb3ff, 12b254, cdea93, aa84d2, 347f97, 4e5696, 89e738, f74cb8, 37b1ce, db8f9d, 12e3cb, bbfcfb]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

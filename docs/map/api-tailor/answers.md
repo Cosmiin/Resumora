@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/questions.ts","apps/api/test/tailor-questions.test.
 depends_on: ["shared/notes","db/job-notes","db/tailoring-runs","api-tailor/section-routes"]
 contract: false
 checked_hash: 9722e18f
+cited: [5aa66e, aa5b1b, 4263e7, ef3ec1, 9f5f7f, 77b68a, 5ee81e, eb9cbc, 8a94de, 81b993, b2c39b, 04011b, fb662d, 8a94de, 88a6e4, cfd773, 10e202, 614648, 262678, 5a22fa, 9dcd11, 4866b7]
 decisions: []
 open: []
 ---

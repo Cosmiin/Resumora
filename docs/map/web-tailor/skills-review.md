@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/SkillsReview.tsx","apps/web/src/tailor/skills-revie
 depends_on: ["web-tailor/client-section","shared/cv"]
 contract: false
 checked_hash: a22ceaed
+cited: [641f1b, 15bc33, 10e3ca, 4c874e, 179549, 5065ae, 603aa8, 97a5b5, 30e6de, a45f14, bf394b, 53ef97, e8d391, a1cca3, 49cfb9, 6d857a, a1cca3, 5065ae]
 decisions: []
 open: []
 ---

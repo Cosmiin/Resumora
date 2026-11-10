@@ -5,6 +5,7 @@ files: ["apps/extension/src/popup/popup.ts","apps/extension/src/popup/view.test.
 depends_on: ["extension/messages","extension/popup-view","extension/popup-shell"]
 contract: false
 checked_hash: bd983161
+cited: [ebd32d, ab4092, 563861, ceb56f, 6b5716, 039e61, bf5d56, 34e495, e3aa01, 4fa7a4, 9ca3e1, a69c19, 350ffc, b9d035, ad5cb6, dbbd50, 0df40c, b0aa53, bdb3ab, 6f3a59, 8fcefd, 6ea354, c24d16, 53ca9e, 748324, 130230, 4550ff, 2fd7c1, ab4092, 9467bb, b0aa53, 1d5ed4]
 decisions: []
 open: []
 ---

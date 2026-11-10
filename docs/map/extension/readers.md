@@ -5,6 +5,7 @@ files: ["apps/extension/src/readers/index.ts","apps/extension/src/readers/generi
 depends_on: ["extension/linkedin","shared/jobs","api-core/job-processing"]
 contract: true
 checked_hash: c87ab78f
+cited: [66850c, 2421ca, d83705, 5d31f3, e98289, baef26, 3ac02b, d4e1e7, d15b6c, 101740, b9b4de, 88caeb, ea35ef, fa8ed6, 0a9870, 8283d7, 101740, 6dc729, 5d31f3, 713516, f4181c, 444473, 204036, 713516, 8ebad0, f5905b, 204036, 713516, 75798e, df6268, 75798e, 0f61fa, d1f1be, b68bd3, f19fe4, 4bd115, b3babc, baef26]
 decisions: []
 open: []
 ---

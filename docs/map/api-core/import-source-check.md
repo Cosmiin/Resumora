@@ -5,6 +5,7 @@ files: ["apps/api/src/imports/source-check.ts","apps/api/test/source-check.test.
 depends_on: ["shared/cv"]
 contract: false
 checked_hash: 428f2942
+cited: [d02860, ba54d4, fdcbd4, 80a65a, 60e329, 165efd, e7dc45, d0fb6c, a79af5, a9977e, 51d1d0, 468ea4, f513d1, 66fe90, 1fee19, 42f123, 1fee19, ff42b1, ba54d4, 0c7486, fdcbd4]
 decisions: ["docs/decisions/0010-cv-files-go-to-the-model-as-files.md"]
 open: []
 ---

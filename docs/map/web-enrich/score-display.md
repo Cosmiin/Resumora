@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/ScoreCard.tsx","apps/web/src/cv/enrich/ScorePill
 depends_on: ["web-enrich/scores","web-enrich/focus-session","shared/enrichment-score","shared/enrichment-checks","web-editor/role-editors","web-editor/overview","web-editor/section-tools","web-editor/reducer"]
 contract: false
 checked_hash: 0ef7b98e
+cited: [44b6ad, ee14db, 560708, e2088d, 68ebb0, 4ba0b0, 9f42be, 7169bf, 83f818, 61f407, 7122d7, 5ed209, 7ce870, b64839, 8954d3, c00298, f22d2a, b9584a, b2c9a0, 444bc8, 9327b5, ffd0d0, d72cbe, 9c3dff, 81ee0c, 189e46, 444bc8, c544b4, 98614d, 4f9701, a3848b, 83f818, 61f407, 9525f7, ab085d, c84f3c, cda9c0, c88f16]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

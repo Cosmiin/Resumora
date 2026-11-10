@@ -5,6 +5,7 @@ files: ["apps/web/src/lib/supabase.ts","apps/web/.env.example"]
 depends_on: ["api-core/auth"]
 contract: false
 checked_hash: 488464c4
+cited: [62f602, b54c8e, 86bd66, 013388, 83577a, afb160, c5195b, 013388, c08448, b54c8e, b54c8e, 827316]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md"]
 open: []
 ---

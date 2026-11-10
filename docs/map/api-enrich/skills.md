@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/skills.ts","apps/api/src/enrich/skills-prompts.ts",
 depends_on: ["api-enrich/score-prompts","api-enrich/score","shared/cv","db/cv-repository","db/ai-log","api-core/call-model"]
 contract: true
 checked_hash: 699be24a
+cited: [ace09c, 895a6e, f043ee, 90a5a6, 96f37a, ed1861, a18ac7, f155ab, b6019d, e2cc78, a9b3d6, fd64e4, 6e7b36, 5b3adb, adf9aa, c8b485, fefc81, fe5783, 256b94, 430780, c3afcd, 3edc28, c74416, a74e92, 26fda6, 2498a3, be95ae, ee01c8, 58bb05, bef8ca, 96f37a, 85d90e, ace09c, 5b3adb, a23147, d97c10, 8042cb, f6f156, ec5f84, 025146, bc152b, 25a594, 59a5fa, 025146, c3afcd, 6115ee, b6019d, ace09c, adf9aa]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

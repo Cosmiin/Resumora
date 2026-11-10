@@ -5,6 +5,7 @@ files: ["apps/extension/src/handler.ts","apps/extension/src/handler.test.ts"]
 depends_on: ["extension/messages","extension/storage","extension/auth-session","extension/capture-check","extension/capture-state"]
 contract: false
 checked_hash: 5bb002cf
+cited: [614021, 6333ac, 1e1f73, 50bf5c, 7b5ab0, 3ac3a8, 088b97, 4a6fb6, c8ead1, bc3229, 7c2c55, 2f5646, 7b5ab0]
 decisions: []
 open: []
 ---

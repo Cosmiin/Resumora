@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261105000000_imports.sql","supabase/migrations/20
 depends_on: ["db/imports-repository","db/imports-apply","shared/imports"]
 contract: true
 checked_hash: 4922a82c
+cited: [d878a4, f72159, 34f864, 2dbb09, 6e3769, 15218f, 270d14, 56ba64, 80eef3, fe0275, 187ad8, 9f5d43, ff7036, 143c37, f91bb0, 4c3ff3, b5dd97, 052492, dbbaa5, ff7036, 202242, 187ad8, 841c79, 10d980, 23ffed, c68d95, 56ba64, c96cea, e463aa, 204b4a, 5ad613, 23ffed, 34f864, 2cdb6a, dd7426, a2416d, 6ebecf, 39d854, c3222e, 2452d7, 4a6da2, 131cee, a0dc05, 036cdb, a7d68b, f27eec, f901fc, 15218f, b90772, e7bb9b, 8968cd, f901fc]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0004-imports-go-through-a-queue.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

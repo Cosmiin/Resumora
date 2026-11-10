@@ -5,6 +5,7 @@ files: ["apps/web/src/styles/jobs.css"]
 depends_on: ["web-app/styles-base","web-app/jobs-list","web-app/jobs-add","web-app/job-page","web-app/job-edit","web-app/job-requirements","web-app/job-thoughts","web-app/tailor-gate"]
 contract: false
 checked_hash: 1583b213
+cited: [aee17b, 551628, 544cff, 0d79b0, 4020bb, 99835c, 239cbf, 1a468d, 66b8fb, 072407, 424895, c4a13c, a6810a, d56416, cb78e5, 6070e9, 0b4294, ce5ed2, 802863, b31ad0, 5d61a4, ae193f, 106086, ff9c31, 0c4129, 66b8fb, c5cfa8, 2a6d50, 881fd4, ff9c31, f969b7, 239cbf]
 decisions: []
 open: []
 ---

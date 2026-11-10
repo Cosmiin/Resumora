@@ -5,6 +5,7 @@ files: ["apps/api/src/app.ts","apps/api/test/app.test.ts"]
 depends_on: ["api-core/auth","api-core/errors","api-core/cv-routes","api-core/import-routes","api-core/job-routes","api-core/voice-session"]
 contract: true
 checked_hash: 35e86b1c
+cited: [6c907b, a5d078, d218a6, 89d363, 23d370, 23d370, 9c6de1, 7cfc68, 55e367, d36cf9, 23d370, 365e05, c0649f, daeb19, 0d08d7, 11c139, 640b35, a352da, e8630d, f58fe7, 4ec53e, 9866f2, eb6a7f, c104c8, 7e4264, bc7870, 78048d, f8885a, c320d3, c6cd2e, 106488, 0c7b37, 72c1cb, 9e5169, 4ca54d, 6c907b, 3610bc, 2be2f4, c7255a, f34035, b9afcb, e3bbd8, d483c4, 775bf9, 710904, 6c907b, ceffd1, 269da1, da308a, da308a, 8f7aa6, ceffd1, ceffd1, e05a0e, f8945f, c087be, 269da1, f8945f, 6c907b, a352da, 44dcf7]
 decisions: ["docs/decisions/0001-an-api-between-browser-and-database.md"]
 open: []
 ---

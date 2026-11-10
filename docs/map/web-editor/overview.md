@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/panel/HelperPanel.tsx","apps/web/src/cv/panel/Overview.
 depends_on: ["web-editor/reducer","web-editor/drag","web-editor/editable-page","web-editor/section-tools","shared/categories","shared/cv","web-editor/reducer-sections"]
 contract: false
 checked_hash: 0a36f5ab
+cited: [0ca3ea, 38e066, dc18df, edaa1f, 6836ea, 6ce9d7, dfb6f3, 8ebb79, 6affff, 9bb0a5, b83696, c52d96, bc88bc, 091521, 0352ce, 189e46, d6e493, 189e46, 2c5960, 3e71b1, ff311b, 09d372, 41a9c4, ff9c7c, 27a71b, 5bfc74, b36a8d, b350f6, a17db3, 0b0c0b, 749f55, ecc25f, 92e0b8, b56fdc, b8348d, b95e73, 72d6fe, fb60fe, 85a196, 676162, 7bb40a, 0f7952, a12a1d, c0346b]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

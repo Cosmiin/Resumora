@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/panel/BottomSheet.tsx","apps/web/src/cv/panel/bottom-sh
 depends_on: []
 contract: false
 checked_hash: 95681691
+cited: [ea03a1, b8547f, 0bbd16, 2dd3db, e17ca8, 3d5270, dbf88b, eb462c, 57887c, d3c650, 2132e3, 46d501, b8547f, b7b8d5, 162bfe, 2cb6f4, d0a74a, 39408f, a99d43, f5909e, 57887c, 7e2c0c, ae8b6e, 1df5b2, eb462c, 95191f, 9250d6]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

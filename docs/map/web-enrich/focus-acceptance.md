@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/useFocusSession.ts","apps/web/src/cv/enrich/focu
 depends_on: ["web-enrich/focus-session","web-enrich/focus-generation","web-enrich/focus-feedback","web-enrich/scores","shared/cv","shared/enrichment-score","web-editor/reducer"]
 contract: false
 checked_hash: 6860a7f1
+cited: [0cc92d, 291349, 8834b9, cc26a7, b080db, c90dc7, 7c073d, 806e81, 407980, d9cbcd, 6a1f85, cdb2a0, bea7ad, ceb031, cc26a7, 9b1e68, f09514, 6a1f85, 1ae8ec, 5a16a2, 291349, b080db, f5f2f2, 659d96]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

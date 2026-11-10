@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/SummaryTools.tsx","apps/web/src/cv/enrich/summar
 depends_on: ["web-enrich/summary","web-enrich/summary-stream","web-enrich/stream","api-enrich/rewrite","web-editor/reducer"]
 contract: false
 checked_hash: d7006c73
+cited: [d49d48, c4d581, baf7a3, b1b267, 20df46, 02cb91, 610d6c, 2782bc, c80801, 4b04b6, 86007a, b516cf, 0fc885, b1b267, 07e757, 56b5b6, 569bad, 2782bc, d03786, d49d48, baf7a3, 8bc536]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/SectionReview.tsx","apps/web/src/tailor/section-rev
 depends_on: ["web-tailor/skills-review","web-tailor/summary-review","web-tailor/layout-review","web-tailor/role-panel","web-tailor/client-section","shared/categories"]
 contract: false
 checked_hash: e51c4d76
+cited: [9874b6, c6c3db, aff19e, c90164, 68e623, 10ca93, 4b4796, e8d391, 9572de, 0572da, 84b128, d9ea05, 67270f, 183e47, 8a2ff1, d32ad8, 027895, bc7947]
 decisions: []
 open: []
 ---

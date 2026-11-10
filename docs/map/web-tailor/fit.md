@@ -5,6 +5,7 @@ files: ["apps/web/src/export/fit.ts","apps/web/src/export/fit.test.ts","apps/web
 depends_on: ["web-editor/templates","web-tailor/pdf","web-tailor/docx","web-tailor/export-files"]
 contract: false
 checked_hash: dda9cff4
+cited: [18c71d, 83761a, 73248c, 2677da, c993cf, d41f27, fea170, 2e9e86, 18c71d, 73248c, 014661, 70bd25, 2d3981, cd291d, 80e986, 014661, 317494, 006b92, 6ed3f8, e14838, 83761a, 2d3981, 2a03c3, 2677da]
 decisions: []
 open: []
 ---

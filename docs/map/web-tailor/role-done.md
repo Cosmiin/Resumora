@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/role-done.ts","apps/web/src/tailor/role-done.test.t
 depends_on: ["shared/match-score","shared/tailoring","web-tailor/client-section"]
 contract: false
 checked_hash: f66b11dd
+cited: [5fac33, b69ba4, 11fb80, 0388be, 9afe5b, 8f98fe, ca9096, dc1c95, 3d9ef8, 31aab9, a5cb9e, 79dd9a, 4e577b, 221600, a570dd, 5fac33, 1e55ca, b70f98, 7a0c60]
 decisions: []
 open: []
 ---

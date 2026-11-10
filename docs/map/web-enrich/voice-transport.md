@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/realtime.ts","apps/web/src/cv/enrich/voice-trans
 depends_on: ["web-enrich/voice","web-enrich/voice-recording","web-enrich/voice-capture"]
 contract: false
 checked_hash: 2a233a54
+cited: [75cb99, 583675, e46b92, 1a9ff2, 27aef0, 97a77c, 8a585f, 73b8fc, 912d79, b8665f, 3c1221, 87286d, 0838e2]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

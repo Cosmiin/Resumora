@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/cvReducer.ts","apps/web/src/cv/edit/cvReducer.test
 depends_on: ["web-editor/reducer","shared/cv","shared/categories","shared/stored-cv"]
 contract: false
 checked_hash: 03024e47
+cited: [c509a5, 2fd8cb, 07e757, 1cc0d8, 39d222, be4966, 10df16, c7602b, 595dc6, a0354c, 63ea3c, b5afec, b156f9, 2fd8cb, 8ab6c3, 07e757, 9935a2, 49673f, 13ab04, 1cc0d8, 821a03, 665cde, 4b1344, b3363d, 1072df, a23147, 191d08, f56ffb, b11e3a]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md","docs/decisions/0006-last-save-wins-with-a-version-check.md","docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0009-one-fixed-set-of-cv-categories.md"]
 open: []
 ---

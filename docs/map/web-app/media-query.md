@@ -5,6 +5,7 @@ files: ["apps/web/src/hooks/useMediaQuery.ts"]
 depends_on: ["web-app/styles-editor","web-editor/page"]
 contract: false
 checked_hash: 0400bb23
+cited: [8fef2a, 8e98e2, 82d8ce, e85bf4, b61e0b, ec2953, 2132e3, 8fef2a, 2132e3, 1673bc, e85bf4]
 decisions: []
 open: []
 ---

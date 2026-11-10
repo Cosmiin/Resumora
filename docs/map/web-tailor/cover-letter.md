@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/CoverLetterTab.tsx","apps/web/src/tailor/cover-lett
 depends_on: ["web-tailor/client-actions","web-tailor/letter-page","web-tailor/steering","shared/tailoring","api-tailor/letter","db/tailoring-repository"]
 contract: false
 checked_hash: 9e9504c4
+cited: [0a21be, 87ca05, 4018c9, d8e8e7, 00f5f3, ef6f1b, e0fb11, 713101, 877a2d, f2f039, efa877, 88bd2c, 0b932e, 7951b1, 494cc0, 9b69e3, 9bcc3a, 718c82, 56ffe8, 9b69e3, e4122d, 7ac20c, c0e911, 45325d, 437d6b, 1294f6, 08bf26, 82258d, c03a56, 867669, f2f039, fd8eee, 9b5df0, 326c04, ab0ddf, fd8eee, 3d90d9, f2f039, 9f45d4, 609fe6, ae7507, 88bd2c, 29e869, 0d435a, 3d90d9]
 decisions: []
 open: []
 ---

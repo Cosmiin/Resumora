@@ -5,6 +5,7 @@ files: ["packages/shared/src/index.ts","packages/shared/package.json","packages/
 depends_on: ["shared/cv","shared/categories","shared/stored-cv","shared/dates","shared/imports","shared/move-other","shared/api-responses","shared/notes","shared/enrichment-score","shared/enrichment-focus","shared/enrichment-checks","shared/jobs","shared/tailoring","shared/match-score"]
 contract: true
 checked_hash: 13a103ab
+cited: [dbf566, 0896ca, ee26f6, 26f874, 3d7f0e, 8e907c, 39897a, 928480, dbf566, af3b2f, dbf566, 2c564f, dbf566, dbf566, 900103, ac134d]
 decisions: ["docs/decisions/0003-one-shared-description-of-a-cv.md"]
 open: []
 ---

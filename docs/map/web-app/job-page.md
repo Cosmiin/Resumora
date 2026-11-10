@@ -5,6 +5,7 @@ files: ["apps/web/src/jobs/JobPage.tsx","apps/web/src/jobs/job-page.test.tsx"]
 depends_on: ["web-app/jobs-client","web-app/job-saves","web-app/job-requirements","web-app/job-summary","web-app/tailor-gate","web-app/app-shell","web-tailor/flow-state","web-tailor/client-run","api-tailor/routes"]
 contract: false
 checked_hash: fef2bfa2
+cited: [5254a2, 71a0a1, 99ffe2, 5bf541, 60fe81, d9c699, ed396c, 4055b2, a8c56c, 806f75, c904c5, b7d88d, 7f50b5, 0cb5d4, 8a3340, 39ed5b, 6d2402, 07c255, 71a0a1, 889221, 7086bf, cb7207, 0494d0, 7cf99d, 4583b8, 2c3b94, 49b3d7, c70c38, 3612e5, 5a38fb, 93e707, 549f50, a7904e, 6cd010, f86844]
 decisions: []
 open: []
 ---

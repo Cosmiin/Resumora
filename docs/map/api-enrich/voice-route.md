@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/routes.ts","apps/api/src/enrich/routes.test.ts"]
 depends_on: ["api-core/app","api-core/voice-session","shared/cv","shared/enrichment-score","db/voice-reservations","db/ai-log"]
 contract: true
 checked_hash: 20776aab
+cited: [90b77c, f3410a, e04f7f, 936ab8, e04f7f, 9b676d, 2976e8, 213df7, 3e48dd, 1f1c6f, 3e48dd, e04f7f, 4892fc, 9b676d, d8788c, e04f7f, 9366e3, 86da04, e02475, 85d90e, f4325a, c104c8, 7fa862, e04f7f]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

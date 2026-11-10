@@ -5,6 +5,7 @@ files: ["apps/web/src/jobs/JobsPage.tsx","apps/web/src/jobs/jobs-page.test.tsx"]
 depends_on: ["web-app/jobs-client","web-app/jobs-add","web-app/auth-state","web-app/app-shell","web-app/styles-jobs"]
 contract: false
 checked_hash: 4acf419e
+cited: [cd49ba, c315b0, 0f43da, 1895e0, 46645b, 9dc6dc, 44eec9, a7c7e9, 772b9a, b660c2, 72c646, 2d9aba, 16ae7c, 773ab1, 72eec4, 2e280c, 52db29, 2db8a5, f88b29, 9b84a2, a7c7e9, 8b613e, 07d281, b85c33, e1e972, 3d4ac9, 08e098, 9ad67b, 52bb80]
 decisions: []
 open: []
 ---

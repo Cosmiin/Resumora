@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/DragList.tsx","apps/web/src/cv/edit/DragGrip.tsx",
 depends_on: []
 contract: false
 checked_hash: cb4ceeec
+cited: [5eabc1, 89d0bd, 7e3b55, 496b38, 32c5c9, afeb09, ec231f, 545ae3, cad4af, 1cf4aa, 31b8a1, dfb6ea, 720c5c, c18c70, 4afe5e, 3429ed, a49cf1, a49cf1, e9e17c, a0c9d5, d3fa39, 977b18, bb2237, 25b255, dfb6ea, 68f8c6, 749f55, 0b8f06, 927695, 2a2b71, 07055a, da7b2f]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

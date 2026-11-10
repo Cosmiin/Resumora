@@ -5,6 +5,7 @@ files: ["apps/web/src/layout/AppShell.tsx","apps/web/src/auth/auth.test.tsx"]
 depends_on: ["web-app/auth-state","web-app/supabase","web-app/i18n","web-editor/autosave","web-app/styles-base"]
 contract: false
 checked_hash: 655676e5
+cited: [dbd1a3, c348a6, 34ea41, 8c7804, d707ed, 68944a, 57c69d, 19c308, 66a5d6, 05fdac, 57c69d, f95bee, b1559c, dbd1a3, 66a5d6, 7fd9e2, bc9fc0, 1d0077]
 decisions: []
 open: []
 ---

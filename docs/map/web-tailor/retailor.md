@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/RetailorDialog.tsx","apps/web/src/tailor/retailor.t
 depends_on: ["shared/tailoring","web-tailor/page","web-tailor/client-actions"]
 contract: false
 checked_hash: 6f386fca
+cited: [94dbdb, 06d649, 6fa505, dbcd92, f60e5b, 9a1146, e9924e, eded56, 1492ec, b13cb7, b32b57, 303ae2, e05e3c, d475d3, e9924e, 99835c, 362e58, 239cbf, 141317, a0d63b, 431689, 3bcc91]
 decisions: []
 open: []
 ---

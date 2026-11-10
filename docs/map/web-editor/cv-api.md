@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/cv-api.ts"]
 depends_on: ["shared/api-responses","shared/cv","api-core/cv-routes","api-core/auth","db/cv-repository","shared/notes"]
 contract: false
 checked_hash: 7160bb48
+cited: [c329ae, 65a053, 086796, 4bd914, 78cdb8, 79e42e, df4aad, bd7cbf, e15887, c329ae, a352da, 666166, e15887, 374d76, 086796, 13fe6b, 78cdb8, feecaa, 9ec6a7, ac30fe, a9900d, deb51a, 4cf21b, 2bac6b, 66931f, 3dfac0, 296741, 9ec6a7, 263c88, 60b46f, 215f7b, 17c679, 556064, c5195b, 3a862b, 2b8a5e]
 decisions: ["docs/decisions/0001-an-api-between-browser-and-database.md","docs/decisions/0002-the-api-acts-as-the-signed-in-user.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

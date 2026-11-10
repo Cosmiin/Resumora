@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/TailorToolbar.tsx","apps/web/src/tailor/tailored-pa
 depends_on: ["web-editor/templates","web-tailor/page","shared/match-score"]
 contract: false
 checked_hash: a54525b8
+cited: [b9a866, ffeb0a, d12f2d, 63cc74, 639c23, 7ce57d, 742e60, f83a22, 6eb17d, 9c4583, 05d7d6, 2bf846, 8a00ae, 760876, e07fbd, 7ce57d]
 decisions: []
 open: []
 ---

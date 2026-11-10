@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/redo.ts","apps/api/test/tailor-redo.test.ts"]
 depends_on: ["shared/tailoring","shared/notes","db/cv-repository","db/cv-history","db/tailoring-runs","api-tailor/section-pass","api-tailor/accept","api-tailor/section-routes"]
 contract: true
 checked_hash: ceb70151
+cited: [2e2d59, 4fa902, c1755a, 2f8207, b5cc4a, e9dfa1, d2b464, c1050d, 3b531a, f2bdd3, 9f8ba8, c117ae, eb5a22, c9e0c2, c35826, fef74a, 8e1081, fef74a, f8a6f8, 5f4e20, ae5461, 71e7c0, 0edbec, 82f1ab, ec0866, e78169, fc71e6, eb5a22, 19b510, c568e8, c35826, 9afdf1, 9f8ba8, 8e1081, 99c82b, 71e7c0, 7d487c]
 decisions: []
 open: []
 ---

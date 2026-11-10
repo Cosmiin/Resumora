@@ -5,6 +5,7 @@ files: ["apps/web/src/main.tsx","apps/web/src/router.tsx","apps/web/index.html"]
 depends_on: ["web-app/auth-state","web-app/auth-login","web-app/auth-reset","web-app/styles-base","web-editor/page","web-app/jobs-list","web-app/job-page","web-tailor/flow","web-tailor/page"]
 contract: false
 checked_hash: 4e3650e4
+cited: [19832f, 4b46e5, e75bd6, 40ac5e, ebc754, 1e5614, 9acc78, 0480af, 592da7, 559a7f, 95ea98, 5a7ca6, 1d78db, aa16d7, 9acc78, 51e821, f3297e, 565aaf, 08e098, e57f51, 93e707, 03889c, c80046, 4b46e5]
 decisions: []
 open: []
 ---

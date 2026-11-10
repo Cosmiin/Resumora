@@ -5,6 +5,7 @@ files: ["apps/api/eval/tailor/run.ts","apps/api/eval/tailor/run.eval.ts","apps/a
 depends_on: ["shared/cv","shared/jobs","db/cv-repository","db/jobs-repository","db/tailoring-repository","api-core/app","api-core/call-model","api-tailor/score","api-tailor/routes","api-tailor/section-routes","api-tailor/eval-metrics"]
 contract: false
 checked_hash: bcb42a88
+cited: [5851d4, 77a5d8, 2e157f, 23cad0, ff827d, eebb5f, 922e39, 996e71, 6ff603, a02b8d, f95472, 3b93da, f15050, 4f31e5, 4c7881, 9169da, 60fbc7, b183b2, 35522d, a083d9, ff827d, 4d0064, 922e39, 3a582f, 996e71, 4b4600, 9169da, e7799c, 679619, eacb3a, db66e3, 24d9ab, 0eefad, b362e0, 92e993, e9b03e, 5f48bd, 29882d, 55aa6a]
 decisions: []
 open: []
 ---

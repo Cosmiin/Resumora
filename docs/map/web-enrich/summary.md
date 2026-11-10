@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/SummaryTools.tsx","apps/web/src/cv/enrich/Checkl
 depends_on: ["web-enrich/summary-stream","web-enrich/summary-review","web-enrich/skills-review","api-enrich/routes","api-enrich/rewrite","api-enrich/score-prompts","shared/enrichment-checks","web-editor/section-tools","web-editor/autosave"]
 contract: false
 checked_hash: d8305242
+cited: [a6fffa, d03786, b6c4e5, eb4ab6, f1e800, bc245f, 5e04bc, a8d161, c91397, dbbe9c, d46923, 917c3f, 0de3f2, cf7b4d, 94e3f3, b2d383, 89b9a6, 8bc536, 50474f, 7443b2, 12eda3, bc245f, 0948d8, 8195f9, 3d9a76, 5e04bc, 233e33, 684e5b, bc245f, 2782bc, d46923, 790c7d, d2bf84, a4796b, c10c53, 8ec8b9]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

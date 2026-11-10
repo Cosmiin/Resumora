@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/BrainDumpStep.tsx","apps/web/src/cv/enrich/focus
 depends_on: ["web-enrich/answers","web-enrich/focus-ui","web-enrich/focus-answers","web-enrich/focus-generation","web-enrich/focus-acceptance","web-enrich/item-lines","web-enrich/voice-recording","shared/enrichment-score","shared/enrichment-focus","shared/cv"]
 contract: false
 checked_hash: 8b4f9445
+cited: [13c478, 917b94, 8db9f0, 4892fc, 08bde2, 158ab6, bd220a, 999b19, f40226, 213d68, 512362, 6b962e, 83f818, 1e2d0d, ed34b2, c67330, 7715e0, 91d94c, 6a1f85, a78e8e, f40226]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

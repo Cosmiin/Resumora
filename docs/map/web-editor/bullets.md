@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/BulletList.tsx","apps/web/src/cv/edit/bullets.test
 depends_on: ["web-editor/reducer","web-editor/page-fields","web-editor/focus","shared/cv"]
 contract: false
 checked_hash: 9abb831e
+cited: [af2f1e, 40e737, 05b2a4, 2a6c0c, 95f550, 5325ea, eca9d8, ade26e, a72988, f1ff66, 39d2af, 177d90, 398e6a, a3cc50, 959424, c8ee8e, 6e6cbd, f1ff66, 4407dc, 44e919, e8dbb7, a35149, 761b8a, 1a47dd, da3825, eb1520, 101ce8, e39175, a3cc50, 15b0f6]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

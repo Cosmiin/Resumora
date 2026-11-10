@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/sections/HeaderEdit.tsx","apps/web/src/cv/edit/sec
 depends_on: ["web-editor/reducer","web-editor/page-fields","web-editor/photos","web-editor/bullets","web-editor/drag","web-editor/focus","web-editor/section-controls","shared/categories","shared/cv","web-editor/reducer-sections"]
 contract: false
 checked_hash: a2d5e1f0
+cited: [99d845, b156f9, c16ead, 3e322f, 0a2da0, 8ab6c3, b4404c, 000337, 496500, 25a5e4, 4c9553, 451d3a, 84a3e7, cd6651, 2f5020, 3a79ba, fe0c51, 989ee6, 277b1d, c1c427, bb08e2, d8d159, 0a2da0, 39315a, 1604e5, 04ef57, 37eba8, dda5f4, 55953e, 2feb94, 98b0a2, c4339f, e32b6e, 998350, 11daa8, 9694f8, a725c1, 13d4d7, c16ead, a47b4a, b11e3a, 191d08, 8ab6c3, ff8185, f89f06, 2f00a0, c9fe4d]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

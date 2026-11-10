@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/accept.ts","apps/api/test/tailor-light.test.ts"]
 depends_on: ["shared/cv","shared/tailoring","api-tailor/proposal-matching","api-tailor/section-pass"]
 contract: false
 checked_hash: ae29a686
+cited: [94a247, d47820, bee7aa, fa985a, 28a280, 74005c, 478c2c, 4d7624, aa363b, 4c8477, aaf26c, 225ff7, b1d45f, 4888ac, 84a33a, c2dc05, 272f76, d348a7, 7f89c0, 95dd4e, dcbaff, 836a45, 811769, ad4a41, 95dd4e, 84a33a]
 decisions: ["docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

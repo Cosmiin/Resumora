@@ -5,6 +5,7 @@ files: ["apps/web/src/styles/enrich.css"]
 depends_on: ["web-app/styles-base","web-app/styles-panel","web-app/styles-document","web-enrich/score-display","web-enrich/voice-ui","web-enrich/summary-review","web-enrich/skills-review"]
 contract: false
 checked_hash: b05dd8dd
+cited: [93fe6a, 38323d, 619cfb, 49330f, e03f0a, dbe32a, 761b8a, eb1520, 05782b, ecde40, 468b70, c98f72, 1d79d8, aab88a, 489426, 27064f, 4f22da, 1a5e4b, 335b6b, 0c54da, 01d2bd, 00bcda, 888274, be7fbe, ecde40, cb8b37, 01d2bd, 740c61, 00bcda, ecde40, 0c52ea, ae193f]
 decisions: []
 open: []
 ---

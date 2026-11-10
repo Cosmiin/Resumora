@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/blocks.ts","apps/api/src/enrich/blocks.test.ts"]
 depends_on: []
 contract: true
 checked_hash: 3be827f8
+cited: [881da1, 0fd194, 9ba949, 0f7c2c, ec1cab, 168514, 64eb25, 0fd194, 78bf7b, 7b714b, c31886, 899215, 20ae6e, 89dbdd, 65809a, edcabe, 7b714b, 33dd2f, 06db0c, 881da1, f81dc8, 7fc437, 33dd2f]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

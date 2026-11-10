@@ -5,6 +5,7 @@ files: ["apps/web/src/imports/ImportSummary.tsx","apps/web/src/imports/imports.t
 depends_on: ["web-app/import-headings","web-app/i18n","shared/categories","shared/imports","web-app/styles-import"]
 contract: false
 checked_hash: 4e8ba9a9
+cited: [990f4c, 33b978, ab0511, 0d823a, 5da833, 4b561a, b7adb3, f1cc1f, 02b40e, b42e7f, 67ab9a, dee9ca, d70832, 4d1320, 72b049, 4b561a]
 decisions: []
 open: []
 ---

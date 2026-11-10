@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/EditablePage.tsx","apps/web/src/cv/edit/MissingBox
 depends_on: ["web-editor/reducer","web-editor/focus","web-editor/section-controls","web-editor/role-editors","web-editor/text-sections","web-editor/chips","web-editor/simple-lists","web-editor/templates","shared/categories","web-editor/reducer-sections"]
 contract: false
 checked_hash: de2f0b82
+cited: [53bf5d, b65070, 5f6cd3, 10a21e, 305c55, 0ef5f2, d49478, 4b6813, 0debeb, 14c86a, cc70b8, 9935a2, d13cc2, 8d54a8, c1ea7f, 012901, 03ef67, 8d3034, eb30b7, a3516a, 2233db, 63dfe2, ec10cf, bc71a3, 7a2284, 1cfd86, e8177e, 8d3034, 37d243, d096c1, f1e9cc, 0debeb, 05854c, 0587cf, a9f775, 56ef2c, 1b6cb9, 5f13ee, 38201e, c622e3, 5d3f02, 6431e2, e0bf30, c8b5a8]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

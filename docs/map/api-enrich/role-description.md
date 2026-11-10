@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/role-description.ts","apps/api/src/enrich/role-desc
 depends_on: ["api-enrich/score-prompts","api-enrich/score","api-enrich/rewrite","shared/cv","shared/enrichment-score","db/ai-log","api-core/call-model"]
 contract: true
 checked_hash: 629f3107
+cited: [56225a, 017893, 841520, 5b58e1, 9c128e, 50982f, 907649, 782d5e, 2dfd23, 8fc815, d10bae, 5a2446, 0b2ac0, c966d4, aad374, 6daf2d, 6b5f09, 356bc9, 7b3351, fefc81, fe5783, 28a8c1, e4c90a, 9f93b9, 84ddb5, eec293, b255d4, 37eb19, 79373d, 5b58e1, 806b8a, 5a2446, c79db3, 7b3351, b0e503, 71c9c9, ec5f84, 12eda3, 077c8b, 9745cf, 06eeaa, 75667e, e22d69, 907649, c966d4, eec293, 37eb19]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

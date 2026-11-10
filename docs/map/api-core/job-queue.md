@@ -5,6 +5,7 @@ files: ["apps/api/src/jobs/consumer.ts","apps/api/test/jobs-consumer.test.ts","a
 depends_on: ["api-core/job-processing","api-core/config","db/jobs-repository","db/match-scores-repository","db/ai-log"]
 contract: true
 checked_hash: e1535bac
+cited: [01bf61, 81255a, 70050f, 145572, e936d0, 3e8443, c4a0d8, 1d426d, fbb07f, 5190c8, 64ea60, fbb07f, 304b17, 74b1b6, 073e3d, e936d0, 9641f6, b772af, ad1ed9, 9658f6, b0bdfb, 93b125, 9e2b4d, f13f46, d5977e, 4a56c3, 8d57f3, 91a6bc, fd2380, 93f1eb, dd67a2, fc1d09, fdb480, f13f46, 0cdedd, 39c0ad, f26157, 9c151e, 410b74, e428af, 8a4caf, 0b57c4, d36037, d6ef11, f4b04b, 843b70]
 decisions: []
 open: []
 ---

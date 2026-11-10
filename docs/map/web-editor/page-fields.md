@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/PageField.tsx","apps/web/src/cv/edit/DateField.tsx
 depends_on: ["web-editor/reducer","shared/cv","shared/dates"]
 contract: false
 checked_hash: b026e5b5
+cited: [f229bf, 306040, 0e5bb8, 21df7f, 8f210a, 888a7d, f0d8d1, fef32b, a1cc9a, 37d953, a9edeb, 05002f, c8e7d4, 73cd05, d305b9, 7c199d, ce3ac8, 6cdc90, ea48c9, 60614f, 3814a9, c13a2e, c4a7b2, df7a26, 74d76b, c52d39, 37d243, eea587, 0152a4, d42873, 5f7317, fa2c7b, 5ca537, e11db3, 0fef56, 510d48, f89f06, f9013e, 5f2c1c]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

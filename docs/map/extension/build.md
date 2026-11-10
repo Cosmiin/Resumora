@@ -5,6 +5,7 @@ files: ["apps/extension/package.json","apps/extension/tsconfig.json","apps/exten
 depends_on: ["extension/environments","extension/manifest","extension/background","extension/popup-shell"]
 contract: false
 checked_hash: 7c69b245
+cited: [374593, ee9897, b5396e, 280203, 8ea2f1, 2a9ec9, 2ca90c, 03ca18, a4df6f, ee9897, 33e771, d7f986, 46ed14, ee9897, 9e5ed4, a18bbf, 57917a]
 decisions: []
 open: []
 ---

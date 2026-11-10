@@ -5,6 +5,7 @@ files: ["apps/web/src/jobs/JobSummary.tsx","apps/web/src/jobs/JobAd.tsx","apps/w
 depends_on: ["shared/jobs","web-app/job-marks","web-app/i18n","web-app/styles-jobs"]
 contract: false
 checked_hash: 6be7ece8
+cited: [43f011, da097a, 454891, 22a5ae, f64b5f, 8b515c, 4aa89e, cdd7db, c3ddab, 394296, 85f5d0, 90aeb6, e61037, 50cce0, 295b12, 85f5d0, 3c6f50, 85f5d0, 9ff851]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/api/src/imports/process.ts","apps/api/test/process.test.ts"]
 depends_on: ["api-core/call-model","api-core/import-files","api-core/import-prompts","api-core/import-source-check","shared/imports","shared/cv"]
 contract: false
 checked_hash: 61b2114d
+cited: [89dc3b, 1846b1, 7917cd, 1f1a13, 26f56c, 334ff7, 54cc5c, 546257, a4c9e9, 755fa6, bcabf8, dfa6ae, eee044, 016908, 844e13, fed5d1, 6f500b, 3805b7, ca8f94, 4a29b6, 85316d, 6fb7b5, 1762a6, 546257, f1b3f7, 66fe90, 1fee19, a6d7b9, b193c8, bcabf8]
 decisions: ["docs/decisions/0004-imports-go-through-a-queue.md","docs/decisions/0010-cv-files-go-to-the-model-as-files.md"]
 open: []
 ---

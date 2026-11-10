@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/ChipInput.tsx","apps/web/src/cv/edit/sections/Skil
 depends_on: ["web-editor/reducer","web-editor/page-fields","web-editor/bullets","shared/cv"]
 contract: false
 checked_hash: 1283378e
+cited: [85f6b3, 8cbae6, dac385, 76ecf7, ea4bcf, 544921, d64b3b, 3111f5, 1ace63, e768b3, f00621, e6c1ff, 7a13b3, 6261e1, 79e7c6, 0993be, 3111f5, a23147, 1ace63, cf40dd, d9ad07, dd9a19, 6fbce5, e98dce, e0066d, 32ef23, b6480e, 8deb9c, 141db9, 48c604, 43ac84, 154394, e9df0f, 1ff741, df08cf, 0b70c0, 24b84e, 3ee698]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

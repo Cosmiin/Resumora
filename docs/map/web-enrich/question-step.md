@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/QuestionStep.tsx","apps/web/src/cv/enrich/focus-
 depends_on: ["web-enrich/answers","web-enrich/focus-answers","web-enrich/focus-ui","shared/enrichment-score"]
 contract: false
 checked_hash: a2083f0a
+cited: [b3b13b, 742a52, 16a8b9, 9b88a9, f79cef, 983b42, 1dac29, 82d7a2, 904e1c, 0fb424, 7715e0, b3b13b, e61107, 0bb9f8]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

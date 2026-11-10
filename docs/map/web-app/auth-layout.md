@@ -5,6 +5,7 @@ files: ["apps/web/src/auth/AuthLayout.tsx","apps/web/src/styles/auth.css","apps/
 depends_on: ["web-app/i18n","web-app/styles-base"]
 contract: false
 checked_hash: 776e2a0b
+cited: [373100, fddf0d, 760a9d, 5bc2bc, 397be0, a47822, cf6d94, 641e1e, 0cbaf7, 40ab17, 59103d, 3023fb, fddf0d, 12f424, 5bc2bc, acb0fe, cf6d94]
 decisions: []
 open: []
 ---

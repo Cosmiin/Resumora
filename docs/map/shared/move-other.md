@@ -5,6 +5,7 @@ files: ["packages/shared/src/move-other.ts","packages/shared/src/move-other.test
 depends_on: ["shared/cv"]
 contract: true
 checked_hash: 334ed1e6
+cited: [589810, 78b49c, aa40c7, c553bc, 13f537, 977c9a, da03c8, 966fb2, a037be, 5072c4, fcd7dd, a6b991, 5d4e4f, 589810, 5523e3, 264e8f, d5993a, f30a88, 157862, a6b991, 49e0b6, 966fb2, a037be]
 decisions: ["docs/decisions/0009-one-fixed-set-of-cv-categories.md"]
 open: []
 ---

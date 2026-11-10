@@ -5,6 +5,7 @@ files: ["apps/api/src/auth.ts","apps/api/test/auth.test.ts"]
 depends_on: ["db/cv-repository","db/imports-repository","db/jobs-repository","db/insights","db/tailoring-repository","db/tailoring-tables","api-core/errors"]
 contract: true
 checked_hash: 0c9943fc
+cited: [501351, 568791, 762369, 14e3e2, 556064, 4e7f79, 2e3d8c, 8c157c, 409b24, 1bf88d, 0c8dde, 476903, 1fce9f, f4325a, 827316, 556064, cfe3d6, 5ca111, 2b8a5e, a4ec58, ac74c9, 0fab54, b5d47b, 841c79, e3b4ca, 270d14, 5fe590, f0c40a, 0a73a1, c4f61e, 18fad5, eb4574, 9658f6, b9bf88, 12b254, a4742f, 1dbb49, 290500, 5d6e8f, 744b7a, de0a06, f3e4ff, 716a47, 7bea77, 331311, 61e432, 285f5e, 41ece8, fa8a98, 23edfe, 817025, 291638, 846bf4, e05ec9, 64495a, d5d4b9, 8b5a35, 457057, ce25f3, 45f374, 55ef6b, c0e086, edc186, 8be03c, 2bf14c, 569300, 91eb68, 0047c8, c4f61e, 96e073, b9bf88, 5e3f35, c4f61e, fa6f1e, b48fe7, b656f2, 6b9e00, bec628, aeb953, 140b80, e3c4fa, 1ced02, 827316, 3a862b, 43ef46, 94fef5, 1b0bf5, 486972]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md"]
 open: []
 ---

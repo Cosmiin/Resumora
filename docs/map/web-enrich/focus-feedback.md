@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/FocusMode.tsx","apps/web/src/cv/enrich/ProposalS
 depends_on: ["web-enrich/focus-ui","web-enrich/focus-session","web-enrich/focus-acceptance","web-enrich/celebration","web-enrich/scores","shared/enrichment-score","shared/cv","web-editor/reducer","web-editor/page-fields"]
 contract: false
 checked_hash: 707d901f
+cited: [d0d510, faf8dd, d198fe, 3a906f, 83f818, 7122d7, dea7ae, a9e09a, 711dc0, b15b7a, 9fa3b1, 291349, 10d58e, 057c51, ab085d, d789f5, d4f9d4, 304a67, b04ad5, 9fa3b1, 291349, 9723d8, 6f664e, 7ff2fc, 9fa3b1]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

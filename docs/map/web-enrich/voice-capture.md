@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/enrich/mic.ts","apps/web/src/cv/enrich/voice-transport.
 depends_on: ["web-enrich/voice-recording","web-enrich/voice-transport"]
 contract: false
 checked_hash: e2cb7102
+cited: [15e90c, 389e37, b58187, c57903, 95b557, accd1d, cd9651, 39a5f7, becff6, 7aa085, 77b3ae, a3bec7, cd9651, 2313de, f3ce8d, cf39a7, 9b09bb, accd1d, cd9651, cac511, 43d804]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

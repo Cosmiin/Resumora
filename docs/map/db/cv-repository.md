@@ -5,6 +5,7 @@ files: ["apps/api/src/cv/repo.ts", "apps/api/src/cv/supabase-repo.ts", "apps/api
 depends_on: ["db/base-cv", "db/cv-history", "db/job-notes", "shared/cv", "shared/api-responses", "shared/stored-cv", "shared/notes"]
 contract: false
 checked_hash: cf364301
+cited: [00f6d3, 131285, 90cc8f, 3a862b, 2b8a5e, 0b28ea, 50158f, 599268, 91581c, f1fa48, 919b08, 90296a, fed4f6, 9a5efd, 58b945, 83f003, ee178c, c58746, 56fa38, 50158f, 5ffd7d, a48089, 4e2e12, 40571f, 13b5c0, 121c13, c590fc, e5d885, e7c939, 5be7b7, 006c86, 19b510, c568e8, 07c9a0, 9590d0, 88a6e4, cfd773, 6d3223, 81cfca, c329ae, e15887, 666166, 374d76, a352da, 086796, 78cdb8, 9ec6a7, 13fe6b, feecaa, ac30fe, 5ffd7d, ca3538, 40571f, 13b5c0, 121c13, 4e2e12, a48089, 073a4c, 55e01a, ccc7d4, 2b8a5e, a20565, ac74c9, 3d023c]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

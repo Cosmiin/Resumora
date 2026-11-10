@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/page/templates.ts","apps/web/src/cv/page/templates.css"
 depends_on: []
 contract: false
 checked_hash: c1f8ac61
+cited: [9c4583, 27ff79, 8b2d72, ddb6e7, 956369, c932aa, bb1327, 1a86c0, fe74fc, bd89ef, ef3921, d7f35c, ecaa25, d95a99, 5d1288, 13e1c9, 37d243, 8b2d72, fe74fc, 059bb1, 677c53, 9fd7c6, ef3921, b51f2e, 956369, 388785, 2f5020, 0a2da0, 13e1c9, f4bd55, ddb6e7, 05d7d6]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

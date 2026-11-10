@@ -5,6 +5,7 @@ files: ["apps/extension/src/messages.ts"]
 depends_on: ["extension/environments"]
 contract: true
 checked_hash: e7002cf5
+cited: [9a010a, ee0ac0, 4f80a4, f08b01, 8866b0, 80647f, ebd32d, cd630f, b9d035, 0a1607, 651921, 05a452, 350ffc, dcd0c7, e3269a, 3ac3a8, ead136, 2bface, 3a914d, 16459b, 2bface, b2907f, dbf620, ea35ef, 66850c, 8fcefd, e3e607]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/api/src/ai/stream-model.ts","apps/api/src/ai/stream-model.test.ts"
 depends_on: ["api-core/call-model","shared/enrichment-focus","db/ai-log"]
 contract: true
 checked_hash: 1b480d76
+cited: [1c096d, 68d1c4, 1faa3f, cb557e, d89fa6, 390a92, 4d86fe, 6fe178, 8b382f, caa1bb, b26248, 7ea947, 6af0a9, 0de3f2, c3d2e6, 265de4, 79af61, 01596c, cf7b4d, b2d383, 092f8b, 508ecf, 6d3223, 81cfca, d46923, 917c3f, c104c8, cf7b4d, 94e3f3, b2d383, 89b9a6, edecfe, 8bc536]
 decisions: ["docs/decisions/0007-every-ai-call-goes-through-one-function.md"]
 open: []
 ---

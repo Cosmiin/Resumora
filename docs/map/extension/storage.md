@@ -5,6 +5,7 @@ files: ["apps/extension/src/storage.ts","apps/extension/src/handler.test.ts"]
 depends_on: ["extension/environments"]
 contract: false
 checked_hash: 41cc89de
+cited: [519dd7, 7f13a1, ea352f, bbec03, 74c70c, 17cc98, 6f3bc3, 58af10, 05121f, cdab0d, 614021, 013711, e33686, 372efe, ea352f, 69d6f9]
 decisions: []
 open: []
 ---

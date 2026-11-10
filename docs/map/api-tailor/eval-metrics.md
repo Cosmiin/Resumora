@@ -5,6 +5,7 @@ files: ["apps/api/eval/tailor/run.ts","apps/api/test/tailor-eval.test.ts"]
 depends_on: ["shared/enrichment-checks","api-tailor/checks","api-tailor/score"]
 contract: false
 checked_hash: 7c79949c
+cited: [78d48c, 783274, d3f5f8, ec823d, 203f57, befae7, 92e993, 43ee9a, bf6cb9, d0376b, 2a7c3c, 78ad02, e2b175, ba3bcb, 982f64, a3a4bc, 6cee89, db6e69, 25741d, 8a30c7, ccaec0, 0b65ce, 51d44b, ccaec0, 2d86b6, ec808c, aa9c5e, bf6cb9, 9138d4]
 decisions: []
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/package.json","apps/web/tsconfig.json","apps/web/vite.config.t
 depends_on: ["web-app/bootstrap","web-app/test-setup","web-app/supabase","api-core/app"]
 contract: false
 checked_hash: bb811082
+cited: [c3527a, af3b2f, 59b164, d8118d, 5c3e6b, 1a09b0, aaabda, ae7b26, 5d6042, 3986d4, ff497c, ff497c, 9c6de1, 7cfc68, 0f659d, e44b10, 9c6d7e, 40c404]
 decisions: []
 open: []
 ---

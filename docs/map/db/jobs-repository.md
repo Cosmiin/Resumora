@@ -5,6 +5,7 @@ files: ["apps/api/src/jobs/repo.ts","apps/api/src/jobs/supabase-repo.ts","apps/a
 depends_on: ["db/jobs","db/tailoring-tables","db/ai-log","shared/jobs","db/local-config"]
 contract: false
 checked_hash: 5f97cde1
+cited: [ecd987, 718ce0, c8e294, cc0bd0, b0719a, 8ab36b, d6dd75, fc389a, 7d209c, 9658f6, 5e3f35, eaf596, ad1ed9, cc2463, 843b70, 0e414b, 9641f6, a857c2, 2e0783, 51cffc, 4943fe, 2d7331, 77d0d0, b39d02, 8ab36b, c8e294, d2e178, cdea93, aa84d2, 347f97, 965363, 0a73a1, d6dd75, c88e97, 0a73a1, fc9d94, 18fad5, 878197, 01bf61, b0bdfb, 81255a, 0b57c4, 32d037, 75798e, 0f61fa, d1f1be, 06b93f, e936d0, 4303fc, 8a680e, a18282, c47b0d, 01a1ad, dd6e08, 889221, 0398fc, 41b18c, f13403, 5e358a, 110495, 498f4a, 783f56, b0719a, 8ab36b, d6dd75, c88e97, 500157, 1d4c90, 7ffef1, 99acd7, f03be8, 9658f6, dd67a2, d36037, 0b57c4]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

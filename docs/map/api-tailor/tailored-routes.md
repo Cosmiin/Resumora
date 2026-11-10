@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/tailored-routes.ts","apps/api/test/tailored.test.ts
 depends_on: ["shared/cv","shared/tailoring","shared/api-responses","api-core/app","api-core/auth","api-core/cv-routes","api-core/errors","db/tailoring-repository","api-tailor/review-item","api-tailor/retailor","api-tailor/translate","api-tailor/letter"]
 contract: true
 checked_hash: 32888ec4
+cited: [6422fb, 15f0b2, 949649, d79acb, c63dbb, 04e030, ac52d1, ff931b, 2fbcc8, 072faa, cac7fd, 1f10e7, 1c61c4, 8db4ef, c337a7, 318b0a, a03ecf, d1bad7, 695a9c, 34439f, c416df, 83c5f1, d1d873, d27605, 2fbcc8, 457057, fd3afc, 123912, f8885a, c320d3, d7e916, 68525a, 8e9a8b, 68008b, 36a0d3, 65b44e, 0fda38, 41c62d, 46fb5a, 4bd0b3, f154be, 8db4ef, 646413, 26f36d, a876ea, dade95, 9f45d4, e71dd8, 3d90d9, f98040, ff931b, effb0a, 072faa, 211fbe, c63dbb, 291638, deb3ff, 2fbcc8, 227040, ffa578, d7e916, 486972, c63dbb, 1f10e7, d1d873, 45f374, 55ef6b]
 decisions: ["docs/decisions/0001-an-api-between-browser-and-database.md","docs/decisions/0002-the-api-acts-as-the-signed-in-user.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

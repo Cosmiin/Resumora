@@ -5,6 +5,7 @@ files: ["apps/extension/src/manifest.ts","apps/extension/src/manifest.test.ts"]
 depends_on: ["extension/environments","extension/background","extension/storage","extension/auth-session","extension/api"]
 contract: false
 checked_hash: 74ba5a33
+cited: [f7bd9c, 6b8580, 979d5f, dc3a8d, fe6a4d, bfae06, 4e6bbe, a2b932, dc3a8d, 25ed17, 46ed14, dc3a8d, 7f13a1, 05121f, bfae06, a18282, 85b605, dc3a8d, bfae06, 46ed14]
 decisions: []
 open: []
 ---

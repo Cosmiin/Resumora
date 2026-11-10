@@ -5,6 +5,7 @@ files: ["packages/shared/src/enrich-checks.ts","packages/shared/src/enrich-check
 depends_on: ["shared/cv"]
 contract: true
 checked_hash: de82224c
+cited: [ea56e7, 9b416f, ed1ae3, 862aaa, 0948d8, 102431, c41f09, 5e1af5, a9b1fa, f00e5e, f7b0de, 9f9968, a25b40, fe0af7, ac9638, c43f9e, 2519cc, 35dbca, ea56e7, 9b416f, 780ee6, 4e4319, ea56e7, 9c5ec2, 543d7a, 0a42ef, 0948d8, 5e1af5, cc7370, 4ac9f2, 023328, 7ff367, ac9638, 8664af, ac9638, 05cfc9, dc0701, 8a2d18, 85b1d8, 684e5b, e0fd17]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md"]
 open: []
 ---

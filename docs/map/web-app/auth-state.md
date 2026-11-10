@@ -5,6 +5,7 @@ files: ["apps/web/src/auth/AuthProvider.tsx","apps/web/src/auth/RequireAuth.tsx"
 depends_on: ["web-app/supabase","web-app/i18n","api-core/auth"]
 contract: false
 checked_hash: 3aaf922a
+cited: [5650ab, afb160, 731912, fa0878, 8072cf, 0682c7, 9acc78, 674adb, 51e821, 3de633, 1bf88d, 7732dc, 51e821, f4325a]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md"]
 open: []
 ---

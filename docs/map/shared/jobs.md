@@ -5,6 +5,7 @@ files: ["packages/shared/src/jobs.ts","packages/shared/src/jobs.test.ts"]
 depends_on: []
 contract: true
 checked_hash: e11b3709
+cited: [9c570f, 0bbd91, 3a702b, 2ab863, 029016, 4fc0cd, bdc5e1, a654f9, f59fc0, 3b69b8, 34b38a, d449ae, 8fa78b, 0113b1, 6c1ac6, f4181c, 117ea3, 099ced, 91af91, 4fc0cd, a18282, c47b0d, 01a1ad, e9ae87, 4fc0cd, bdc5e1, 3b69b8, 0113b1, f4181c, dd6e08, 889221, 8a680e, 0398fc, 41b18c, f13403, 5e358a, c47b0d, 110495, 498f4a, dd6e08, 889221, 6893dc, d6dd75, 34b38a, d449ae, 8fa78b, 172e91, aedf8b, 9c570f, 75798e, 0f61fa, 34eebb, a23e56, fe4ebd, 3a702b, 02c320, 918ced, 6a6993, 522a7b, 5cab87, 5c8b99, 3155ef, 284aa1, 722063, 614d90, 889221, aada7a, dd7059, b0bdfb, 81255a, 01bf61, 91a6bc, 9c570f, 061512, 7a7534, edf74a, 6349e0, 5142bb, 0a73a1, 18fad5, fc9d94, 878197, 630fce, 35c625, 63b1ef, f5905b]
 decisions: ["docs/decisions/0003-one-shared-description-of-a-cv.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/tailor-api.ts","apps/web/src/tailor/tailor-flow.tes
 depends_on: ["shared/tailoring","api-tailor/routes","api-tailor/start","api-tailor/steering","api-tailor/retailor","api-core/job-routes","api-core/auth","db/tailoring-runs"]
 contract: true
 checked_hash: 024db43a
+cited: [85575f, 49b3d7, 2c3b94, 156e68, cc3562, e09647, c63989, aba283, 4cf21b, 8fe5a2, 4d0064, 18e7a4, c70c38, 664da5, 14cb8f, df6ebf, a4709c, f56a16, dc9c07, c63989, a930aa, 49b3d7, 3612e5, 664da5, 01a1ad, eda562, 8be03c, 15154d, 486972, 556064, 839e71]
 decisions: []
 open: []
 ---

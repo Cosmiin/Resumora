@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/checks.ts","apps/api/src/tailor/checks.test.ts"]
 depends_on: ["shared/enrichment-checks","shared/tailoring"]
 contract: false
 checked_hash: b1c7cadc
+cited: [bfbf38, df6a74, be7012, 8664af, ac9638, 773ad8, 29ec5e, b72fb1, 687d6f, 6d6c65, f2dc62, 304b6a, 6d6c65, 4965ae, 8e05cf, abf264, 27b639, f1e182, 34183f, 2a7c3c, cdf525, 8664af, 4fc7e7, 2a4f9f, ac9638, 3a026a, 78100c, 687d6f, 6d6c65]
 decisions: []
 open: []
 ---

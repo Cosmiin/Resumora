@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261104000000_baseline.sql", "supabase/migrations/
 depends_on: []
 contract: true
 checked_hash: 64473b99
+cited: [b06bf1, 04ba17, 3ff05e, c5a4cd, 46f7f8, 806b8a, 928b65, 8f57c3, ed2fb2, 2f68f7, dd65b1, 928b65, d519f3, 3bbea9, 7b270e, 1199b3, c50d67, baced7, 130dc2, 6a94ee, 1199b3, 4266ab, f1ba8b, 14cb65, 92c025, fdb480, 1ff85a, 7362fc, 874029, 14cb65, 46f7f8, a52f80, 0c8dde, 321888, 92c025, fdb480, b06bf1, c5a4cd, 1a1d51, 43a994, 806b8a, eec293, b255d4, 92fa92, 35897b, 806b8a, 9c626a, 8b1187, a0295e, 2c7383, f0e64f, debf4f, cf7b4d, 94e3f3, be95ae, ee01c8, 66cffc, c6fea3, 197d3a, d25d5a, fbc523, 860ee6, 077c8b, 020c9d, 0c72b2, 9745cf, 179af0, 8406c4, 025146, d46923, bc152b, 917c3f, 321888, c13b54, 7b270e, 78af51, 4266ab, 3bbea9, c50d67, 8968cd, 77ad25, dd67a2]
 decisions: ["docs/decisions/0007-every-ai-call-goes-through-one-function.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

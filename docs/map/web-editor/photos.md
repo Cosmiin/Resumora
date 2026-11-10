@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/panel/PhotoField.tsx","apps/web/src/cv/panel/shrink-pho
 depends_on: ["shared/cv","db/cv-photos"]
 contract: false
 checked_hash: f4695c3b
+cited: [b3f29f, c1e26b, c19e21, 21aa2e, 390fa8, 28516c, 9549d9, 6d8667, f1d557, 7b1305, 715da3, d4cdbb, 8d424e, a16ef3, 77862f, 63a631, 9e09e4, e7c83b, 8b29ae, 197d9f, 487da3, fcad91, b66504, 043445, 7a31e2, 1f129b, 0a2da0, 39315a, 3ad09c, 7285f5, 7b42c1, c19e21, ba7006, 715da3, d20b83, ce7e77, f05071, 29d1ba, 9545c6, 95b765, 494be2, a16ef3, db9a3c, 2558d4, e7c83b, a0d8c1, 390fa8, 0200ae, 7b42c1, bb40f3, 7140f6, b66504, f1d557, c00e14]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

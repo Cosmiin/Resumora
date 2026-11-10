@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/routes.ts"]
 depends_on: ["shared/tailoring","api-core/errors","api-tailor/routes","api-tailor/questions","api-tailor/answers","api-tailor/section-pass","api-tailor/layout-pass","api-tailor/accept","api-tailor/redo"]
 contract: true
 checked_hash: 7fe72d97
+cited: [01194f, 30b3e2, 6d4d5a, 8d1d94, ab37ec, f3804e, ec0866, e78169, 813f5c, 6a115e, 262678, 0921a4, 30a720, 510e15, 262678, 28b78a, 838056, d90b23, fccb29, 6faba3, 3a582f, 9984fb, 4b4600, 10e202, 614648, 5f4e20, ae5461, 82f1ab, 2b1539, 64e5a1, 4bb7f2, eda562, a297d5]
 decisions: ["docs/decisions/0001-an-api-between-browser-and-database.md","docs/decisions/0002-the-api-acts-as-the-signed-in-user.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["supabase/migrations/20261106000000_enrichment.sql", "supabase/migration
 depends_on: ["shared/enrichment-score", "shared/enrichment-focus", "db/voice-reservations", "db/ai-log"]
 contract: true
 checked_hash: f1dd7457
+cited: [5a0f47, 0c29bf, de0a06, 716a47, bbb49a, b3c776, 01e56c, 79f1cf, e2d5a4, 9f57c5, 81c278, 02d828, 75f007, f3e4ff, 71e0bf, 7bea77, 289d0f, 44d8e6, f8cc28, 140221, 24c607, 744b7a, 11c973, 11a054, 50b63d, 1dbb49, 49eb49, f3e4ff, b3c776, 646314, d35e15, c23f21, a7c942, 90e1ee, 5ebc68, 5b2a37, b0c61c, c23f21, fa6f1e, f639d9, c88f16, 747e41, 241ac4, c104c8, 9366e3, 86da04, 14cb65, 46f7f8, c1f2d7, 5d852e, 9885ce, 1b0bf5, c60ca8, 09b08c]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md", "docs/decisions/0012-ai-enrichment-scores-and-notes.md", "docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md", "docs/decisions/0008-every-database-change-is-a-new-migration.md"]
 open: []
 ---

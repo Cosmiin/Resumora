@@ -5,6 +5,7 @@ files: ["apps/web/src/export/docx.ts","apps/web/src/export/docx.test.ts"]
 depends_on: ["shared/cv","shared/categories","shared/dates","web-editor/templates","web-editor/document","web-tailor/fit","web-tailor/pdf","shared/stored-cv"]
 contract: true
 checked_hash: 526e60a4
+cited: [048b85, 895e8c, c4ca32, 61ebcc, 502fc9, 8a0adb, 78b80b, 3fbe9b, 481a5f, 11ecf8, aad6e5, 55c3fe, 110546, 5d3ac5, 97dcd4, a2f028, 2e6549, acdd49, 59e5ca, db33fb, fdea82, aac19d, 5ecd2f, ec3875, 98edf4, 6cf6c8, 2d3981, 2092c1, 228c63, 8b2d72, 110546, 0f7dc9, 59e5ca, faf887, b17465, b82977, 12176c]
 decisions: []
 open: []
 ---

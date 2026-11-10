@@ -5,6 +5,7 @@ files: ["apps/api/src/jobs/process.ts","apps/api/src/jobs/prompts.ts","apps/api/
 depends_on: ["api-core/call-model","shared/jobs"]
 contract: true
 checked_hash: 1fe02a79
+cited: [3318aa, 37f1eb, 64ea60, 8533f6, b9c9cf, 06b93f, 0f61fa, 6b702f, 5be6d3, d541a6, 312641, 66172e, 91a6bc, 5337fc, fd2380, 75798e, 0f61fa, d1f1be, 06b93f, 172e91, 9c570f, 3318aa, c006dc, b68bd3, 0f61fa, e23f6c, fbb07f]
 decisions: ["docs/decisions/0007-every-ai-call-goes-through-one-function.md"]
 open: []
 ---

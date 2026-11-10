@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/CvPage.tsx","apps/web/src/cv/Editor.tsx","apps/web/src/
 depends_on: ["web-editor/autosave","web-editor/cv-api","web-editor/history","web-editor/reducer","web-editor/editable-page","web-editor/focus","web-editor/document","web-editor/overview","web-editor/bottom-sheet","shared/cv","web-editor/reducer-sections","web-editor/reducer-notes"]
 contract: false
 checked_hash: dc9315be
+cited: [465f1b, 2f8b2e, 451315, c010c1, 10d013, 14d8c9, 55b22b, 8533fe, e447d6, dc696c, 579c56, 08bd66, a67a3d, aaa41d, 616a1b, b1559c, 6c8c3e, 3343f1, 2d6aa5, acea0b, f3297e, 565aaf, ae2767, 2e4f8d, 65036d, a7d2c2, 746094, 14d8c9, 726a7d, 2683cb, 084f81, e73d7b, 2132e3, 1673bc, 15c290, 620aa3, b7b8d5, 9b02aa, 1f40ff, 7bf245, 6c8c3e, 18f973, bceba0, daff69, 85a562, 8e49ca, e6da5f, c329ae, ae2767, edceb5]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

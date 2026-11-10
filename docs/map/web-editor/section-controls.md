@@ -5,6 +5,7 @@ files: ["apps/web/src/cv/edit/SectionHeading.tsx","apps/web/src/cv/edit/SectionM
 depends_on: ["web-editor/reducer","web-editor/page-fields","shared/categories","web-editor/reducer-sections"]
 contract: false
 checked_hash: f56b1451
+cited: [955f6b, e4c18d, f87754, 5badbf, d89814, f695e2, f4d013, 1d3b77, b0ec0a, 089659, 5f9f6c, f7600b, 75d711, 6530d0, ed5cc0, e1907d, 49673f, ab7f3d, 440d11, 5badbf, f1e984, 4cac98, 5c394a, c82a0b, 5d9d6a, afe9cf, 78da66, 5f9f6c, 575b4e, bf7ae3, f7600b, 9d48bf, 25b255, 4cac98, afe9cf, 494be2, e923e9, 6e2380, 955f6b]
 decisions: ["docs/decisions/0011-edit-the-cv-on-the-page.md"]
 open: []
 ---

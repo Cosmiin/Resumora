@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/item-lines.ts","apps/api/src/enrich/item-lines.test
 depends_on: ["api-enrich/score-prompts","api-enrich/score","api-enrich/rewrite","shared/cv","shared/enrichment-score","shared/enrichment-checks","db/ai-log","api-core/call-model"]
 contract: true
 checked_hash: 2733dbec
+cited: [4fe2b8, e91333, af01f1, d470a9, c49a1c, 31d350, 93c753, 2206b3, e3d18f, 158bd0, b8d992, 68ab13, a383df, a2c7ed, 63e6f2, 5385b8, cffc8d, 687d6f, 6d6c65, 29ec5e, 2530dc, 768d3d, fefc81, fe5783, 28a8c1, e4c90a, 4c5b41, 1a1d51, 43a994, 3b6ea0, 058aeb, 2206b3, 806b8a, af01f1, 7b2cd2, a0988d, fd884f, 520279, c49a1c, 88e1b8, c49a1c, 8fca03, cffc8d, ac9638, cffc8d, cdf525, 687d6f, 95f140, dd2561, 498100, ec5f84, 0c72b2, 8406c4, e077a3, 685e0b, a0988d, 51e67d, 2be506, 687d6f, 6d6c65, e3d18f, faea7d]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

@@ -5,6 +5,7 @@ files: ["apps/web/src/jobs/RequirementList.tsx","apps/web/src/jobs/JobScoreCard.
 depends_on: ["shared/jobs","shared/match-score","web-app/i18n","web-app/styles-jobs"]
 contract: false
 checked_hash: a0671ad1
+cited: [2d588f, 7819af, 68e737, 764b08, 2b7930, 98327d, df48db, 0708a1, ddab64, e38d2c, e346af, ed800c, 355c63, cae891, cb3ecb, 4bfe5d, 841e2c, 8ba6f2, 90359b, b87475, 2d588f, 2b7930]
 decisions: []
 open: []
 ---

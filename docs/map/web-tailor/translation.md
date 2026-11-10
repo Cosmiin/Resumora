@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/TailorToolbar.tsx","apps/web/src/tailor/translate.t
 depends_on: ["web-tailor/client-document","web-tailor/client-actions","shared/tailoring","api-tailor/translate","shared/cv"]
 contract: false
 checked_hash: 6d427b48
+cited: [2e1663, 57e2e2, ae5ebd, a5acc2, 93ae76, 375ec0, cee89f, cad3f8, 77db41, 1d7739, cee89f, 6ec5d0, 2e1663, e07a33, 52333c, 9d0be0, 6779d3, 87a81b, 7d4e0c, 7e8e62, 3822ec, 6eb8d6]
 decisions: []
 open: []
 ---

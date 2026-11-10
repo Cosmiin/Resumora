@@ -5,6 +5,7 @@ files: ["apps/api/src/tailor/layout-pass.ts"]
 depends_on: ["shared/cv","shared/tailoring","db/tailoring-runs","db/ai-log","api-core/call-model","api-tailor/steering","api-tailor/strip-header","api-tailor/proposal-application","api-tailor/section-routes"]
 contract: true
 checked_hash: 4803a557
+cited: [7cd8de, 331573, c54dc2, c22bda, 2bd8c7, 56fd80, 93e738, b5f3e5, fefc81, 5c1365, 47177f, 38579d, af7fdb, 3159c2, 10925e, c450a0, 5f9553, 48d786, 2b373a, 2bd8c7, cd46dc, 7991e4, 93e738, 7cb8da, 6faba3, 3a582f, 644c47, 8101e6, 48e018, d01990, 280614, aaf26c, 5f9553]
 decisions: []
 open: []
 ---

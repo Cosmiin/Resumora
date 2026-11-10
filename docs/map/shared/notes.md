@@ -5,6 +5,7 @@ files: ["packages/shared/src/notes.ts","packages/shared/src/notes.test.ts"]
 depends_on: ["shared/cv"]
 contract: true
 checked_hash: c49a582b
+cited: [ef3e5a, 735688, c59b27, e92900, fdf517, 05c03b, 1b9cd5, 215f7b, 17c679, 76392f, 35379f, 1b740f, ffe344, a054fd, fdf517, 263c88, 7f5390, 3f3726, 60b46f, 76392f, f1da0c, 03ad9f, 947a64, 0ec58b, 07c9a0, 9590d0, 88a6e4, cfd773, 947a64, 0d6e05, c28a52, 5be7b7, 6d3223, 81cfca, 01539e, 716a7f, 1b9cd5, dece1f]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

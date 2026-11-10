@@ -5,6 +5,7 @@ files: ["apps/web/src/styles/tailor.css"]
 depends_on: ["web-app/styles-base","web-app/styles-focus","web-app/styles-document","web-tailor/flow","web-tailor/page","web-tailor/guided-review","web-tailor/cover-letter","web-tailor/export-menu"]
 contract: false
 checked_hash: e3a7683d
+cited: [39cb42, 6d8157, 8a00ae, ae7507, 6f5fef, 1a82b1, b28147, 8a2ff1, f59d3f, b7e90d, 1ad807, 281e4e, d2fe18, 841456, ff8325, f8ddd6, 436294, 90e7ec, a0d63b, b28147, a22099, ebb8d5, fde637, 3699f7, 1a3d05, 8df121, 5a7ca6, 078a31, 39cb42, 2d6b0f, b28147, b871fd, ebb8d5, d2fe18, 7eb0eb, d11953, 1ad807, a22099]
 decisions: []
 open: []
 ---

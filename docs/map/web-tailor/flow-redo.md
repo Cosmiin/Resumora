@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/TailorFlow.tsx","apps/web/src/tailor/redo.test.tsx"
 depends_on: ["web-tailor/flow-state","web-tailor/client-run","web-tailor/client-section","web-tailor/answers","web-tailor/steering"]
 contract: false
 checked_hash: e08bddc5
+cited: [b1595a, 744b34, f58bc9, fdd555, c99817, c16c6e, cab249, 9d0743, 7c8753, 3e42b6, b9afda, f58bc9, d725ba, 7c8753, 38df48, f4b22e, 8ebb18, ebca8b, c8df0c]
 decisions: []
 open: []
 ---

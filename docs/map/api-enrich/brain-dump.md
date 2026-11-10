@@ -5,6 +5,7 @@ files: ["apps/api/src/enrich/score.test.ts","apps/api/src/enrich/brain-dump.ts",
 depends_on: ["api-enrich/score-prompts","api-enrich/score","api-enrich/focus-prompts","api-enrich/rewrite","shared/cv","shared/enrichment-score","shared/enrichment-focus","db/cv-history","db/ai-log","api-core/call-model"]
 contract: true
 checked_hash: 3d8fe268
+cited: [a5b5ad, 25ad4e, 64c263, 76889b, 2e2063, b279ec, eb731d, d2aa37, 80297e, 9e13d6, b495e8, 0bed4e, 15ecfb, 928f62, d56ab0, 16e356, 634b68, 14ee92, 87a1df, fefc81, fe5783, 28a8c1, e4c90a, d86cd2, 99106c, 11214f, d71aea, 100997, 93eaba, e4c90a, 2ce5a2, a0295e, 2c7383, 9e13d6, dd7302, 80297e, cff603, b279ec, 8fca03, 16e356, 61f407, 25ad4e, 8d0ff4, e292b0, 7b9234, 48b522, 9cd27f, 2e2063, 6d3223, 81cfca, 11214f, 414f3c, c6fea3, fbc523, e73356, 2e2f7c, 11214f, 414f3c, 0a667f, b0c61c, d71aea, 85d90e, b279ec, a58860, 2c7c98, 0bed4e, 981b60, 2c693e, aeb85e]
 decisions: ["docs/decisions/0012-ai-enrichment-scores-and-notes.md","docs/decisions/0013-focus-mode-graded-single-bullet-rewrites.md"]
 open: []
 ---

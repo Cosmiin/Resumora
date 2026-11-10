@@ -5,6 +5,7 @@ files: ["apps/web/src/auth/LoginPage.tsx","apps/web/src/auth/authErrors.ts","app
 depends_on: ["web-app/auth-state","web-app/auth-layout","web-app/auth-reset","web-app/supabase","web-app/i18n"]
 contract: false
 checked_hash: 0db2a746
+cited: [8b454d, 265d18, 3de633, a9687e, 30588d, 4a571a, 9fca16, fec3f7, 4b55b7, b136c7, 13eaa5, 769f03, 0392a4, 30588d, 013388, b65968, f3b5e2, b65968]
 decisions: []
 open: []
 ---

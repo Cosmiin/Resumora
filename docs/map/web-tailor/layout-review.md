@@ -5,6 +5,7 @@ files: ["apps/web/src/tailor/LayoutReview.tsx","apps/web/src/tailor/final-touche
 depends_on: ["shared/cv","shared/categories","web-tailor/diff-words","web-tailor/client-section"]
 contract: false
 checked_hash: dc061fc1
+cited: [e8c740, d91daf, 0653ee, ee217a, 4fac6e, 505e8f, d12a08, 6d2c39, 3bd6ad, 4cfae0, 55125b, 782e23, a39958, 2e76aa, 2ddd58, 8d54b7, 260538, c54d03, 733f83, db7ec0, c6cbc5, 55125b, 222f4c, 100201, fde637, 45181e, 9c6773]
 decisions: []
 open: []
 ---

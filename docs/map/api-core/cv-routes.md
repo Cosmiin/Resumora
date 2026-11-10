@@ -5,6 +5,7 @@ files: ["apps/api/src/cv/routes.ts","apps/api/test/cv.test.ts","apps/api/test/cv
 depends_on: ["api-core/errors","db/cv-repository","db/base-cv","db/cv-history","db/job-notes","shared/cv","shared/notes","shared/api-responses","shared/stored-cv"]
 contract: true
 checked_hash: 8c5373af
+cited: [effb0a, ccf7f6, f2f79a, 211fbe, feecaa, fce5f9, ee567e, abf458, 663231, 0d6682, 49a9e8, c329ae, 666166, e15887, 374d76, a352da, 086796, 13fe6b, 78cdb8, feecaa, 9ec6a7, ac30fe, a2dcd1, 19b510, c568e8, 1e4695, 07c9a0, 9590d0, 263c88, 60b46f, 88a6e4, cfd773, 2b8a5e, a4ec58, 0fab54, b5d47b, a352da, ee567e, 1e4695]
 decisions: ["docs/decisions/0005-one-cv-per-user-with-history.md","docs/decisions/0006-last-save-wins-with-a-version-check.md"]
 open: []
 ---

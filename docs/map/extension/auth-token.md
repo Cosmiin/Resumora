@@ -5,6 +5,7 @@ files: ["apps/extension/src/auth.ts","apps/extension/src/auth.test.ts"]
 depends_on: ["extension/auth-session","extension/storage","api-core/auth"]
 contract: false
 checked_hash: 59c1a656
+cited: [85c8d4, 7781bb, 3223d3, d5bc2c, 391dbe, d60a23, 6f119b, dcc4d3, 6c0b2c, 85c8d4, 361705, 15f4f4, afa187, cfe3d6, f4325a, 827316, 0f61f1, 4f1c39]
 decisions: ["docs/decisions/0002-the-api-acts-as-the-signed-in-user.md"]
 open: []
 ---
