@@ -58,3 +58,22 @@ Owner chose variant B, "Coach's Page". `DESIGN.md` describes it. Work is on bran
 - 2026-11-11: known issue, not from this work: six "rapid typing" tests in `src/cv/editor.test.tsx` take about 2.7s each against a 5s limit and time out when the whole suite runs under load. Same timing and same failures on main. Left unchanged; owner to decide whether to raise the limit.
 - 2026-11-11: Codex review of the foundation found two bugs (a dialog closed on a click on its own padding; a menu stayed open after Tab moved focus out). Both fixed with tests. Owner confirmed: keep the Codex review for every flow.
 - 2026-11-11: the foundation branch stays unmerged until the flow mockups are approved, so the shell and routes can be reviewed together with the kit.
+
+## Phase 2: flow mockups (2026-11-11)
+
+Six clickable mockups published as private pages, one per flow, English and Romanian, with empty, loading and error states switchable from a bar at the top. Sources in the private workspace (`mockups/phase2/`).
+
+- 2026-11-11: all six share one stylesheet and one script, so a wording or look change is made once.
+- 2026-11-11: checked before publishing: 130 screen-and-state views across both languages, no missing copy and no sideways scroll at phone width; key screens looked at on desktop. The formal critique and accessibility skills were run on variant B itself, not again on each flow page.
+- 2026-11-11: tailoring demo uses the English CV with the English job (Flowbridge); the language-mismatch case is shown as a state of the language screen with the Romanian job.
+- 2026-11-11: import ends on a short "we found 3 roles" confirmation with "Start with the questions" and "Skip for now", then goes into focus and the per-role forms.
+- 2026-11-11: base CV keeps a 0–100 "CV strength" score with one line of reason per change; tailoring shows keyword and must-have coverage, no score.
+- 2026-11-11: no claims invented: removed a file-size limit, a link-expiry time and a statement about screening software from draft copy. Time estimates ("about a minute", "about 10 minutes") are placeholders to confirm.
+
+Open for the owner at the mockup review:
+1. Finish screen: unmet must-haves are listed with the reason and a "Change my answer" button, and "Mark as ready anyway" stays possible. Should marking ready be blocked instead?
+2. Extension install: the copy assumes testers download a zip and load it by hand in Chrome. Is that how testers will get it?
+3. "Export all my data": shown as one prepared file to download. Needs a new API route; "Delete my account" needs a database and auth change. Both need approval before build.
+4. "Add a job by hand" (paste the ad text) is kept from the current app. Keep it?
+5. Base CV score name "CV strength": keep the number, or show only the reasons?
+6. Default tailoring language preference offers "the job ad's language", "my CV's language" or a fixed language. The brief only says "default tailoring language"; are the first two wanted?
