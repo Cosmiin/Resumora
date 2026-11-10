@@ -6,7 +6,7 @@ import { getJob } from "../jobs/jobs-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard, type Draft } from "./QuestionCard.tsx";
-import { keptChanges, keptTexts, kindKey, newlyMet, roleDone } from "./role-done.ts";
+import { keptChanges, keptTexts, kindKey, nameOf, newlyMet, roleDone } from "./role-done.ts";
 import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { StepBar } from "./StepBar.tsx";
@@ -286,6 +286,7 @@ export function TailorFlow() {
         n: phase.index + 1, total: phase.questions.length })
       : t("tailor.question.progress", { n: phase.index + 1, total: phase.questions.length });
     body = <QuestionCard key={question.id} question={question} progress={progress} initial={phase.answers[phase.index]}
+      asks={question.gap ? nameOf(question.gap, job) : null}
       onNext={answerWith} onSkip={() => answerWith({ value: null, via: "skip" })}
       onBack={phase.index > 0 ? () => setPhase({ ...phase, index: phase.index - 1 }) : undefined}
       role={roleFor(question)} kind={scoredOf(question.roleId)?.kind} roles={cv?.experience ?? []} locale={cv?.locale} />;

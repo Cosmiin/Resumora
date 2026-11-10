@@ -10,6 +10,7 @@ type Props = {
   question: TailorQuestion;
   /** "Role 1 of 3 · Question 2 of 2", or "Question 2 of 5". */
   progress: string;
+  asks?: string | null;
   /** The answer given before (after Back), shown selected. */
   initial?: Draft;
   /** Next: the answer, kept in the browser until the step's last question. */
@@ -34,11 +35,11 @@ export function QuestionCard({ role, kind, locale = "en", ...props }: Props) {
   if (!role || !isRoleSection(props.question.section)) return <Question {...props} locale={locale} />;
   return <div className="tailor-split">
     <RolePanel role={role} locale={locale} bulletId={props.question.bulletId} kind={kind} />
-    <Question {...props} locale={locale} />
+    <Question {...props} role={role} locale={locale} />
   </div>;
 }
 
-function Question({ question, progress, initial, onNext, onSkip, onBack, roles = [], locale }: Omit<Props, "role" | "kind">) {
+function Question({ question, progress, asks, initial, onNext, onSkip, onBack, role, roles = [], locale }: Omit<Props, "kind">) {
   const [value, setValue] = useState(initial?.value ?? "");
   const [via, setVia] = useState<Via[]>(initial ? VIA[initial.via] : []);
   const [roleIds, setRoleIds] = useState<string[]>(initial?.roleIds ?? []);
@@ -51,9 +52,13 @@ function Question({ question, progress, initial, onNext, onSkip, onBack, roles =
     onNext({ value: answer, via: answerVia(via), ...(picked.length > 0 ? { roleIds: picked } : {}) });
   };
 
-  return <section className="tailor-card" aria-labelledby={`q-${question.id}`}>
+  return <section className={role ? "tailor-card page-note" : "tailor-card"} aria-labelledby={`q-${question.id}`}>
     <p className="tailor-eyebrow">{progress}</p>
     <h2 id={`q-${question.id}`}>{question.text}</h2>
+    {asks && <div className="tailor-asks">
+      <p className="tailor-eyebrow">{t("tailor.question.asks")}</p>
+      <p>{asks}</p>
+    </div>}
     <AnswerBox question={{ bulletId: question.bulletId ?? question.id, text: question.text, options: question.options, kind: "detail" }} value={value} via={via}
       locale={locale} onChange={(text, how) => { setValue(text); setVia(how); }} />
     {confirmed && roles.length > 0 && <div className="answer-opts" role="group" aria-label={t("tailor.question.usedIn")}>

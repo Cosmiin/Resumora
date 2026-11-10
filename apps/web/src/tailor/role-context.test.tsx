@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { emptyCv, type CvContent, type Proposal, type TailorQuestion } from "@resumora/shared";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { emptyCv, type CvContent, type Proposal, type TailorQuestion, type TailorRun } from "@resumora/shared";
 
 vi.mock("../cv/enrich/useVoice.ts", () => ({
   useVoice: () => ({ state: "unavailable", count: null, connecting: false, partial: "", partialWords: [], seconds: 0,
@@ -10,11 +11,19 @@ vi.mock("../cv/enrich/useVoice.ts", () => ({
 import { QuestionCard } from "./QuestionCard.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 
+vi.mock("./tailor-api.ts", () => ({ getRun: vi.fn(), askQuestions: vi.fn(), getScores: vi.fn() }));
+vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
+vi.mock("../jobs/jobs-api.ts", () => ({ getJob: vi.fn() }));
+import { getCv } from "../cv/cv-api.ts";
+import { getJob } from "../jobs/jobs-api.ts";
+import { askQuestions, getRun, getScores } from "./tailor-api.ts";
+import { TailorFlow } from "./TailorFlow.tsx";
+
 const cv: CvContent = {
   ...emptyCv("en"),
   experience: [
     { id: "r1", company: "Emedi", title: "Business Analyst", location: "", startDate: "2021-03", endDate: "", current: true,
-      description: "Owns reporting for sales.", bullets: [{ id: "b1", text: "Made weekly reports" }, { id: "b2", text: "Ran workshops" }], notes: [] },
+      description: "Owns reporting for sales.", bullets: [{ id: "b1", text: "Made weekly reports" }, { id: "b2", text: "Ran workshops" }, { id: "b4", text: "Checked forecasts" }], notes: [] },
     { id: "r2", company: "Acme", title: "Analyst", location: "", startDate: "2018-01", endDate: "2021-02", current: false,
       description: "", bullets: [{ id: "b3", text: "Cleaned data" }], notes: [] },
   ],
@@ -35,8 +44,12 @@ describe("ExpQA / SkillsA1: the question screen", () => {
   it("shows the role's title, company, dates, description and bullets beside the question", () => {
     card();
     const panel = screen.getByRole("complementary", { name: "The role this is about" });
-    expect(within(panel).getByText("Business Analyst")).toBeInTheDocument();
-    expect(within(panel).getByText(/Emedi · Mar 2021 – Present/)).toBeInTheDocument();
+    expect(within(panel).getByRole("heading", { name: "Business Analyst" }).parentElement).toHaveTextContent("Business Analyst — Emedi");
+    expect(within(panel).getByText("Mar 2021 – Present")).toBeInTheDocument();
+    expect(within(panel).getByText("Owns reporting for sales.").tagName).toBe("EM");
+    expect(panel.querySelector(".page-sheet")).toBeInTheDocument();
+    expect(panel.querySelector(".page-bar")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: question.text })).toHaveClass("page-note");
     expect(within(panel).getByText("Owns reporting for sales.")).toBeInTheDocument();
     expect(within(panel).getByText("Made weekly reports")).toBeInTheDocument();
     expect(within(panel).getByText("About the whole role")).toBeInTheDocument();
@@ -48,8 +61,38 @@ describe("ExpQA / SkillsA1: the question screen", () => {
     card({ question: { ...question, bulletId: "b2" } });
     const panel = screen.getByRole("complementary", { name: "The role this is about" });
     expect(within(panel).getByText("Ran workshops").closest("li")).toHaveAttribute("aria-current", "true");
-    expect(within(panel).getByText("Made weekly reports").closest("li")).not.toHaveAttribute("aria-current");
+    expect(within(panel).getByText("Ran workshops").closest("li")).toHaveClass("page-mark");
+    for (const text of ["Made weekly reports", "Checked forecasts"]) {
+      const bullet = within(panel).getByText(text).closest("li");
+      expect(bullet).not.toHaveAttribute("aria-current");
+      expect(bullet).not.toHaveClass("page-mark");
+    }
+    expect(panel.querySelector(".page-bar")).toBeNull();
     expect(within(panel).queryByText("About the whole role")).toBeNull();
+  });
+
+  it("marks the whole role when the bullet does not match", () => {
+    card({ question: { ...question, bulletId: "missing" } });
+    const panel = screen.getByRole("complementary");
+    expect(panel.querySelector(".page-bar")).toBeInTheDocument();
+    expect(within(panel).getByText("About the whole role")).toHaveClass("fm-tag");
+    expect(panel.querySelector(".page-mark")).toBeNull();
+  });
+
+  it.each(["experience", "skills"] as const)("shows what the job asks for on a %s question", (section) => {
+    card({ question: section === "skills" ? skill : question, asks: "REST APIs and webhooks" });
+    expect(screen.getByText("The job asks for")).toBeInTheDocument();
+    expect(screen.getByText("REST APIs and webhooks")).toBeInTheDocument();
+    if (section === "skills") {
+      expect(screen.queryByRole("complementary")).toBeNull();
+      expect(screen.getByRole("region", { name: skill.text }).closest(".tailor-split")).toBeNull();
+    }
+  });
+
+  it.each([undefined, null])("omits the job requirement box when asks is %s", (asks) => {
+    card({ asks });
+    expect(screen.queryByText("The job asks for")).toBeNull();
+    expect(screen.getByRole("region", { name: question.text }).querySelector(".tailor-asks")).toBeNull();
   });
 
   it("keeps the question on screen when a choice is tapped; Next sends it", async () => {
@@ -93,6 +136,42 @@ describe("ExpQA / SkillsA1: the question screen", () => {
     expect(within(roles).getByRole("button", { name: /^Analyst/ })).toHaveAttribute("aria-pressed", "true");
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(onNext).toHaveBeenCalledWith({ value: "A little", via: "option", roleIds: ["r1", "r2"] });
+  });
+});
+
+describe.each(["experience", "skills"] as const)("the job requirement on a %s flow question", (section) => {
+  const at = "2026-11-10T10:00:00Z";
+  const run: TailorRun = {
+    id: "run1", userId: "u1", jobId: "one", tailoredCvId: "cv1", kind: "tailor", sections: ["experience", "skills"],
+    status: "running", currentSection: section, currentRoleId: section === "experience" ? "r1" : null, roleOrder: ["r1", "r2"],
+    questions: null, answers: null, proposals: null, errorCode: null, createdAt: at, updatedAt: at,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getCv).mockResolvedValue({ content: cv, version: 1, updatedAt: at });
+    vi.mocked(getJob).mockResolvedValue({ extracted: { requirements: [{ text: "REST APIs and webhooks" }] } } as never);
+    vi.mocked(getScores).mockResolvedValue({ base: null, tailored: null });
+    vi.mocked(getRun).mockResolvedValue(run);
+  });
+
+  it.each([
+    ["k:SQL", "SQL"], ["r0", "REST APIs and webhooks"], [undefined, null], ["r99", null],
+  ] as const)("resolves gap %s", async (gap, asks) => {
+    const question: TailorQuestion = { id: "q1", section, roleId: run.currentRoleId ?? null, text: "Did you use SQL?",
+      kind: section === "skills" ? "skill" : "options", options: ["Yes", "No"], reason: "Gap", gap };
+    vi.mocked(askQuestions).mockResolvedValue([question]);
+    render(<RouterProvider router={createMemoryRouter([{ path: "/jobs/:id/tailor", element: <TailorFlow /> }],
+      { initialEntries: ["/jobs/one/tailor"] })} />);
+    await screen.findByRole("heading", { name: question.text });
+    const card = screen.getByRole("region", { name: question.text });
+    if (asks) {
+      expect(within(card).getByText("The job asks for")).toBeInTheDocument();
+      expect(within(card).getByText(asks)).toBeInTheDocument();
+    } else expect(within(card).queryByText("The job asks for")).toBeNull();
+    if (section === "skills") expect(card.closest(".tailor-split")).toBeNull();
   });
 });
 

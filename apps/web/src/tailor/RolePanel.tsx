@@ -23,18 +23,25 @@ export function RoleHeading({ role, locale }: { role: Role; locale: Locale }) {
 
 /**
  * The role a question is about, as in enrichment: its current wording, with the bullet the question points at
- * glowing (marigold edge), or "About the whole role" when it points at none.
+ * highlighted on the page, or "About the whole role" when it points at none.
  */
 export function RolePanel({ role, locale, bulletId, kind }: { role: Role; locale: Locale; bulletId?: string; kind?: ScoredKind }) {
   const pointed = role.bullets.some((bullet) => bullet.id === bulletId);
   return <aside className="tailor-role" aria-label={t("tailor.role.label")}>
     <p className="tailor-eyebrow">{t(`tailor.role.eyebrow${kindKey(kind)}`)}</p>
-    <RoleHeading role={role} locale={locale} />
-    {!pointed && <p><span className="fm-tag">{t(`tailor.role.whole${kindKey(kind)}`)}</span></p>}
-    {role.description.trim() && <p className="tailor-role-text">{role.description}</p>}
-    {role.bullets.length > 0 && <ul className="fm-bullets">
-      {role.bullets.map((bullet) => <li key={bullet.id} className={bullet.id === bulletId ? "fm-bullet is-current" : "fm-bullet"}
-        aria-current={bullet.id === bulletId ? "true" : undefined}><span>{bullet.text}</span></li>)}
-    </ul>}
+    <div className="page-sheet">
+      <div className={pointed ? "tailor-role-block" : "tailor-role-block page-bar"}>
+        <div className="tailor-role-line">
+          <div><h3>{role.title.trim() || t("tailor.role.untitled")}</h3>{role.company.trim() && ` — ${role.company.trim()}`}</div>
+          <p>{formatRange(role.startDate, role.endDate, role.current, locale)}</p>
+        </div>
+        {!pointed && <p className="tailor-role-text"><span className="fm-tag">{t(`tailor.role.whole${kindKey(kind)}`)}</span></p>}
+        {role.description.trim() && <p className="tailor-role-text"><em>{role.description}</em></p>}
+        {role.bullets.length > 0 && <ul className="tailor-role-bullets">
+          {role.bullets.map((bullet) => <li key={bullet.id} className={bullet.id === bulletId ? "page-mark" : undefined}
+            aria-current={bullet.id === bulletId ? "true" : undefined}>{bullet.text}</li>)}
+        </ul>}
+      </div>
+    </div>
   </aside>;
 }

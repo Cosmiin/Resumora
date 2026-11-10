@@ -65,6 +65,7 @@ export const tailorEn = {
   "tailor.voice.stop": "Stop recording",
 
   "tailor.question.progress": "Question {n} of {total}",
+  "tailor.question.asks": "The job asks for",
   "tailor.question.skip": "Skip",
   "tailor.question.next": "Next",
   "tailor.question.back": "Back",
