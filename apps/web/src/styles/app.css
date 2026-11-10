@@ -6,7 +6,7 @@
 
 h1,
 h2 {
-  font-family: var(--font-display);
+  font-family: var(--old-font-display);
   font-weight: 500;
 }
 
@@ -76,7 +76,7 @@ label {
   border-bottom: 1px solid var(--border-subtle);
 }
 .app-brand {
-  font-family: var(--font-display);
+  font-family: var(--old-font-display);
   font-size: 1.25rem;
   font-weight: 500;
 }

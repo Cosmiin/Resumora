@@ -36,7 +36,7 @@
 }
 
 /* Skill groups */
-.skill-group { margin-block: var(--space-3, 12px); }
+.skill-group { margin-block: var(--old-space-3, 12px); }
 .skill-group h3 { font-size: 1rem; margin-block-end: 4px; }
 .skill-group-unclear { border-inline-start: 3px solid var(--color-warning, #b7791f); padding-inline-start: 12px; }
 .skill-row { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
@@ -129,7 +129,7 @@
   text-transform: uppercase;
   color: var(--pine-600);
 }
-.side-panel-title { margin: 2px 0 0; font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; color: var(--pine-800); overflow-wrap: anywhere; }
+.side-panel-title { margin: 2px 0 0; font-family: var(--old-font-display); font-size: 1.5rem; font-weight: 500; color: var(--pine-800); overflow-wrap: anywhere; }
 .side-panel-close {
   flex: none;
   min-width: 44px;

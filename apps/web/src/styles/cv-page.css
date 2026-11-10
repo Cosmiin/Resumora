@@ -18,7 +18,7 @@
 .cv-block { display: block; position: relative; margin: 0 -10px; padding: 6px 10px; }
 .cv-block > span { display: block; }
 .cv-header { margin-block-end: 18px; }
-.cv-name { font-family: var(--font-display); font-size: 34px; line-height: 1.1; font-weight: 500; color: var(--pine-800); }
+.cv-name { font-family: var(--old-font-display); font-size: 34px; line-height: 1.1; font-weight: 500; color: var(--pine-800); }
 .cv-titles { margin-block-start: 4px; font-size: 14px; color: var(--pine-600); }
 .cv-contact { margin-block-start: 6px; font-size: 12px; color: var(--text-muted); }
 .cv-section { margin-block-start: 18px; }
@@ -94,8 +94,8 @@
 }
 
 /* Editable page: header, headings, list lines, add buttons and missing boxes */
-.cv-page-edit .cv-name { display: block; width: calc(100% + 8px); font-family: var(--font-display); font-size: 34px; line-height: 1.15; color: var(--pine-800); }
-.cv-page-edit .cv-header:has(> .cv-photo) .cv-name { width: calc(100% - 96px - var(--space-4)); }
+.cv-page-edit .cv-name { display: block; width: calc(100% + 8px); font-family: var(--old-font-display); font-size: 34px; line-height: 1.15; color: var(--pine-800); }
+.cv-page-edit .cv-header:has(> .cv-photo) .cv-name { width: calc(100% - 96px - var(--old-space-4)); }
 .cv-titles, .cv-contact { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
 .cv-titles { margin-block-start: 2px; font-size: 14px; color: var(--pine-600); }
 .cv-contact { margin-block-start: 6px; font-size: 12px; color: var(--sage-600); }
@@ -162,7 +162,7 @@
 .cv-role .score-pill { position: static; flex: none; margin: 0; }
 
 /* Tailored CV (9B): the section menu on each heading, the hidden line and the Undo bar under the page. */
-.cv-section-head { display: flex; align-items: center; gap: var(--space-2); }
+.cv-section-head { display: flex; align-items: center; gap: var(--old-space-2); }
 .cv-section-head > .cv-section-heading { flex: 1; min-width: 0; }
 .cv-section-head > .tailored-redo { float: none; margin: 0; }
 .section-menu { position: relative; flex: none; }
@@ -172,13 +172,13 @@
 .section-menu-list button { font: inherit; font-size: 14px; text-align: start; padding: 8px 10px; border: 0; border-radius: 6px; background: none; box-shadow: none; color: var(--text-body); cursor: pointer; }
 .section-menu-list button:hover, .section-menu-list button:focus-visible { background: var(--pine-50); }
 .section-menu-list button.danger { color: var(--status-bad-fg); }
-.hidden-sections { margin-block-start: var(--space-4); font-size: 14px; color: var(--text-muted); }
+.hidden-sections { margin-block-start: var(--old-space-4); font-size: 14px; color: var(--text-muted); }
 .hidden-sections p { margin: 0; }
-.hidden-sections ul { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-2); max-width: 420px; }
-.hidden-sections li { display: flex; align-items: center; gap: var(--space-2); padding: 6px 10px; border: 1px dashed var(--border-field); border-radius: var(--radius-md); }
+.hidden-sections ul { list-style: none; margin: var(--old-space-2) 0 0; padding: 0; display: grid; gap: var(--old-space-2); max-width: 420px; }
+.hidden-sections li { display: flex; align-items: center; gap: var(--old-space-2); padding: 6px 10px; border: 1px dashed var(--border-field); border-radius: var(--radius-md); }
 .hidden-sections li > span { flex: 1; color: var(--text-body); }
 .hidden-sections small { font-size: 12px; }
-.section-toast { position: sticky; bottom: var(--space-4); width: fit-content; margin: var(--space-4) auto 0; padding: 10px 16px; border-radius: var(--radius-md); background: var(--pine-800); color: var(--white); box-shadow: var(--shadow-raised); font-size: 14px; }
+.section-toast { position: sticky; bottom: var(--old-space-4); width: fit-content; margin: var(--old-space-4) auto 0; padding: 10px 16px; border-radius: var(--radius-md); background: var(--pine-800); color: var(--white); box-shadow: var(--shadow-raised); font-size: 14px; }
 .section-toast .link { color: var(--marigold-200); }
 
 @media print {
@@ -186,7 +186,7 @@
 }
 
 /* Base CV photo: upload, adjust with autosave, then a compact saved photo. */
-.photo-field { float: inline-end; width: 144px; margin-inline-start: var(--space-4); font: var(--type-body); color: var(--sage-600); }
+.photo-field { float: inline-end; width: 144px; margin-inline-start: var(--old-space-4); font: var(--type-body); color: var(--sage-600); }
 .photo-field.is-saved { width: 96px; }
 .photo-field p { margin: 6px 0; font-size: 12px; }
 .photo-field .btn:disabled { opacity: .6; cursor: default; }
@@ -196,8 +196,8 @@
 .photo-preview:focus-visible, .photo-remove:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
 .photo-remove { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid var(--sage-300); background: var(--white); color: var(--sage-600); font: 16px/1 var(--font-sans); cursor: pointer; }
 .photo-field input[type="range"] { display: block; width: 100%; margin: 0; padding: 0; }
-.cv-page-edit .cv-header:has(> .photo-field) .cv-name { width: calc(100% - 144px - var(--space-4)); }
-.cv-page-edit .cv-header:has(> .photo-field.is-saved) .cv-name { width: calc(100% - 96px - var(--space-4)); }
+.cv-page-edit .cv-header:has(> .photo-field) .cv-name { width: calc(100% - 144px - var(--old-space-4)); }
+.cv-page-edit .cv-header:has(> .photo-field.is-saved) .cv-name { width: calc(100% - 96px - var(--old-space-4)); }
 
 /* E6 Task 10a: an item hidden on this CV stays in the editor, dimmed, with a switch to show it again. */
 .cv-line.is-hidden > :not(.cv-item-head), .cv-line.is-hidden .cv-item-head > :not(.cv-hide) { opacity: 0.45; }

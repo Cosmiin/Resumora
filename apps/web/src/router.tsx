@@ -22,5 +22,7 @@ export const routes: RouteObject[] = [
       { path: "/jobs/:id/cv", element: <TailoredCvPage /> },
     ],
   },
+  // Development only: every kit component and state. Not part of the built app.
+  ...(import.meta.env.DEV ? [{ path: "/dev/ui", lazy: async () => ({ Component: (await import("./dev/UiGallery.tsx")).UiGallery }) }] : []),
   { path: "*", element: <Navigate to="/" replace /> },
 ];

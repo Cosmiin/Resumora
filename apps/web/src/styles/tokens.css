@@ -1,4 +1,92 @@
-/* Design tokens ported from main:apps/web/src/design/*.css */
+/* Design tokens: the single source for every color, size, radius, shadow and duration.
+   System: "Coach's Page" (see DESIGN.md at the repository root). Components use only these. */
+:root {
+  /* Color */
+  --color-desk: #fff0a8;
+  --color-desk-soft: #fff7cc;
+  --color-paper: #ffffff;
+  --color-paper-veil: rgb(255 255 255 / 0.55);
+  --color-ink: #24272e;
+  --color-ink-hover: #3a3f4a;
+  --color-muted: #535966;
+  --color-line: #e4e0cf;
+  --color-coach: #2446b0;
+  --color-coach-soft: #e6ecfb;
+  --color-highlight: #ffe14d;
+  --color-strike: #c7323a;
+  --color-good: #1f7a4d;
+  --color-good-soft: #ddf2e6;
+  --color-warn-soft: #ffe9c7;
+  --color-bad: #a3262d;
+  --color-bad-soft: #fbe3e4;
+  --color-on-ink: #ffffff;
+  --color-backdrop: rgb(36 39 46 / 0.45);
+
+  /* Type */
+  --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  --font-coach: "Shantell Sans Variable", "Comic Sans MS", cursive;
+  --text-hero: clamp(2.3rem, 5.4vw, 4.4rem);
+  --text-title: clamp(1.7rem, 3.2vw, 2.5rem);
+  --text-heading: 1.375rem;
+  --text-coach: 1.3125rem;
+  --text-coach-sm: 1.0625rem;
+  --text-lead: 1.1875rem;
+  --text-base: 1.0625rem;
+  --text-small: 0.9375rem;
+  --text-label: 0.875rem;
+  --leading-tight: 1.08;
+  --leading-heading: 1.2;
+  --leading-coach: 1.35;
+  --leading-base: 1.55;
+  --tracking-display: -0.025em;
+  --tracking-hero: -0.035em;
+  --weight-regular: 400;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-display: 800;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 56px;
+  --space-10: 72px;
+  --content-max: 1180px;
+  --gutter: 16px;
+  --control-h: 48px;
+  --control-h-sm: 44px;
+  --border-control: 2px;
+
+  /* Radius */
+  --radius-sheet: 6px;
+  --radius-field: 10px;
+  --radius-block: 16px;
+  --radius-band: 28px;
+  --radius-pill: 999px;
+
+  /* Shadow */
+  --shadow-sheet: 0 1px 2px rgb(60 50 0 / 0.08), 0 10px 28px rgb(60 50 0 / 0.12);
+  --shadow-pop: 0 2px 6px rgb(60 50 0 / 0.1), 0 18px 44px rgb(60 50 0 / 0.18);
+
+  /* Motion */
+  --dur-fast: 150ms;
+  --dur-base: 250ms;
+  --dur-slow: 350ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Focus */
+  --focus-width: 3px;
+  --focus-gap: 3px;
+}
+
+/* ---- Old look. Used only by screens not yet rebuilt; each rebuilt flow deletes what it no longer needs.
+        Nothing new may use these. Names that clashed with the new tokens carry an --old- prefix. ---- */
 :root {
   /* Pine — primary. 600 is the prototype accent #17695d, 800 its ink #173b39 */
   --pine-50: #f1f8f4;
@@ -99,18 +187,18 @@
 
 :root {
   /* Spacing — prototype values preserved (7, 9, 11, 15, 25 occur in source) */
-  --space-1: 4px;
-  --space-2: 7px;
-  --space-3: 9px;
-  --space-4: 12px;
-  --space-5: 15px;
-  --space-6: 18px;
-  --space-7: 20px;
-  --space-8: 25px;
-  --space-9: 30px;
-  --space-10: 38px;
-  --space-11: 46px;
-  --space-12: 60px;
+  --old-space-1: 4px;
+  --old-space-2: 7px;
+  --old-space-3: 9px;
+  --old-space-4: 12px;
+  --old-space-5: 15px;
+  --old-space-6: 18px;
+  --old-space-7: 20px;
+  --old-space-8: 25px;
+  --old-space-9: 30px;
+  --old-space-10: 38px;
+  --old-space-11: 46px;
+  --old-space-12: 60px;
   --pad-card: 25px;
   --pad-hero: 38px;
   --pad-page-x: 44px;
@@ -118,7 +206,7 @@
   --gap-grid: 24px;
   --gap-stack: 18px;
   --sidebar-width: 218px;
-  --content-max: 1440px;
+  --old-content-max: 1440px;
   --reading-max: 760px;
   --control-height: 41px;
   --control-height-sm: 34px;
@@ -139,7 +227,7 @@
 }
 
 :root {
-  --font-display: "Newsreader Variable", Georgia, serif;
+  --old-font-display: "Newsreader Variable", Georgia, serif;
   --font-sans: "Instrument Sans Variable", system-ui, sans-serif;
   --shadow-page: 0 1px 2px rgb(15 40 38 / 0.06), 0 12px 40px rgb(15 40 38 / 0.08);
   --outline-selected: 2px solid var(--pine-600);
@@ -148,7 +236,7 @@
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   --weight-regular: 400;
   --weight-medium: 500;
-  --weight-semibold: 650;
+  --old-weight-semibold: 650;
   --weight-bold: 700;
   --weight-heavy: 750;
   /* Scale (px at 16px root) — derived from prototype rem values */
@@ -163,7 +251,7 @@
   --text-2xs: 0.7rem;
   --text-eyebrow: 0.73rem;
   --text-stat: 2.4rem;
-  --leading-tight: 1.15;
+  --old-leading-tight: 1.15;
   --leading-snug: 1.3;
   --leading-body: 1.6;
   --leading-document: 1.55;
@@ -174,12 +262,12 @@
   --tracking-nav-group: 0.12em;
   /* Semantic */
   --type-page-title: var(--weight-bold)
-    clamp(1.8rem, 3vw, var(--text-h1))/var(--leading-tight) var(--font-display);
-  --type-section-title: var(--weight-semibold)
-    var(--text-h2)/var(--leading-snug) var(--font-display);
+    clamp(1.8rem, 3vw, var(--text-h1))/var(--old-leading-tight) var(--old-font-display);
+  --type-section-title: var(--old-weight-semibold)
+    var(--text-h2)/var(--leading-snug) var(--old-font-display);
   --type-body: var(--weight-regular) var(--text-body)/var(--leading-body)
     var(--font-sans);
-  --type-label: var(--weight-semibold) 0.79rem/1.4 var(--font-sans);
+  --type-label: var(--old-weight-semibold) 0.79rem/1.4 var(--font-sans);
 }
 
 :root {
@@ -195,9 +283,9 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); /* @kind other */
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* @kind other */
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
-  --dur-fast: 120ms; /* @kind other */
-  --dur-base: 200ms; /* @kind other */
-  --dur-slow: 360ms; /* @kind other */
+  --old-dur-fast: 120ms; /* @kind other */
+  --old-dur-base: 200ms; /* @kind other */
+  --old-dur-slow: 360ms; /* @kind other */
   --dur-celebrate: 700ms; /* @kind other */
   --focus-outline: 3px solid var(--focus-ring);
   --focus-offset: 3px;

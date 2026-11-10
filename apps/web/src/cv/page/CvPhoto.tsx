@@ -19,7 +19,7 @@ export function CvPhoto({ photo }: { photo: CvContent["basics"]["photo"] }) {
 
   if (!photo || !photoUrl) return null;
   return (
-    <div className="cv-photo" style={{ width: 96, height: 96, borderRadius: photo.shape === "round" ? "50%" : undefined, overflow: "hidden", float: "right", marginInlineStart: "var(--space-4)" }}>
+    <div className="cv-photo" style={{ width: 96, height: 96, borderRadius: photo.shape === "round" ? "50%" : undefined, overflow: "hidden", float: "right", marginInlineStart: "var(--old-space-4)" }}>
       <img src={photoUrl} alt={t("cv.photo.alt")} draggable={false} onError={() => setSignedPhoto(null)}
         style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${photo.x}% ${photo.y}%`,
           transform: `scale(${photo.zoom})`, transformOrigin: `${photo.x}% ${photo.y}%` }} />

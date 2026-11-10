@@ -14,7 +14,7 @@
 .import-counts { display: flex; gap: 12px; margin: 0; }
 .import-counts div { flex: 1; padding: 12px; background: var(--surface-sunken); border-radius: var(--radius-md); }
 .import-counts dt { color: var(--text-muted); font-size: 0.85rem; }
-.import-counts dd { margin: 0; font-family: var(--font-display); font-size: 1.75rem; color: var(--pine-800); }
+.import-counts dd { margin: 0; font-family: var(--old-font-display); font-size: 1.75rem; color: var(--pine-800); }
 .import-note { padding: 12px 14px; border-radius: var(--radius-md); background: var(--status-warn-bg); border: 1px solid var(--status-warn-border); color: var(--status-warn-fg); }
 .import-note h3 { margin: 0 0 8px; font-size: 1rem; }
 .import-note p { margin: 8px 0 0; }
@@ -24,7 +24,7 @@
 .import-summary-kept { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
 .import-apply { width: 100%; }
 .map-wrap { overflow-x: auto; }
-.map-title { margin: 0 0 8px; font-family: var(--font-display); font-weight: 500; font-size: 1.25rem; color: var(--pine-800); }
+.map-title { margin: 0 0 8px; font-family: var(--old-font-display); font-weight: 500; font-size: 1.25rem; color: var(--pine-800); }
 .map { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .map th { text-align: start; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); padding: 0 10px 8px; border-bottom: 1px solid var(--border-subtle); }
 .map td { padding: 9px 10px; border-bottom: 1px solid var(--sage-100); vertical-align: middle; }
