@@ -258,9 +258,14 @@
 [data-section="tools"] { --sec: var(--sec-tools); --sec-tint: var(--sec-tools-tint); --sec-ink: var(--sec-tools-ink); --sec-mark: var(--sec-tools-tint); }
 [data-section="description"] { --sec: var(--sec-description); --sec-tint: var(--sec-description-tint); --sec-ink: var(--sec-description-ink); --sec-mark: var(--sec-description-tint); }
 .page-sheet {
-  box-sizing: border-box; padding: clamp(24px, 3vw, 46px); min-height: 420px;
+  position: relative; box-sizing: border-box; padding: clamp(24px, 3vw, 46px); min-height: 420px;
   border-radius: var(--radius-xs); background: var(--surface-document); box-shadow: var(--shadow-paper);
   font-family: var(--font-document); color: var(--text-document); line-height: var(--leading-document);
+}
+.page-stamp {
+  position: absolute; top: var(--space-2); inset-inline-end: var(--space-3); padding: 2px 7px;
+  border: 1px solid var(--pine-600); border-radius: var(--radius-xs); color: var(--pine-600);
+  font-family: var(--font-sans); font-size: var(--text-2xs); font-weight: var(--weight-semibold); line-height: var(--leading-snug);
 }
 .page-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-5); font-family: var(--font-sans); font-size: var(--text-xs); }
 .page-tabs > span { padding: 7px 11px; border-radius: var(--radius-pill); background: var(--surface-page); color: var(--text-muted); }

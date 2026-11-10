@@ -1,7 +1,8 @@
 import { useReducer } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { BRAIN_DUMP_QUESTION, emptyCv, fingerprint, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import { en } from "../../i18n/en.ts";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
@@ -13,6 +14,7 @@ import { BulletList } from "../edit/BulletList.tsx";
 import { CvDocument } from "../page/CvDocument.tsx";
 import { FocusOpenProvider } from "./focus-context.ts";
 import { FocusMode, LightStop } from "./FocusMode.tsx";
+import { EnrichPath } from "./EnrichPath.tsx";
 
 const role: Experience = {
   id: "r1",
@@ -44,8 +46,8 @@ const result: RoleResult = {
 };
 const proposal = { proposal: { bulletId: "b1", text: "Planned daily routes for 10–50 regional drivers." }, bulletBefore: 43, bulletAfter: 80, roleBefore: 52, roleAfter: 71, cached: true };
 
-function Harness({ onAction, onClose = () => {}, initialRole = role, roleResult = { ...result, fingerprint: fingerprint(initialRole, "en") } }: {
-  onAction?(a: CvAction): void; onClose?(): void; initialRole?: Experience; roleResult?: RoleResult;
+function Harness({ onAction, onClose = () => {}, initialRole = role, pathRole, roleResult = { ...result, fingerprint: fingerprint(initialRole, "en") } }: {
+  onAction?(a: CvAction): void; onClose?(): void; initialRole?: Experience; roleResult?: RoleResult; pathRole?: { n: number; total: number };
 }) {
   const [state, apply] = useReducer(cvReducer, { ...cv, experience: [initialRole] });
   const dispatch = (a: CvAction) => {
@@ -55,7 +57,7 @@ function Harness({ onAction, onClose = () => {}, initialRole = role, roleResult 
   return (
     <>
       <p data-testid="saved-b1">{state.experience[0]?.bullets[0]?.text}</p>
-      <FocusMode target={{ roleId: "r1", mode: "improve" }} cv={state} dispatch={dispatch} scores={new Map([["r1", { state: "ready", result: roleResult }]])} waitForSave={() => Promise.resolve()} onClose={onClose} />
+      <FocusMode pathRole={pathRole} target={{ roleId: "r1", mode: "improve" }} cv={state} dispatch={dispatch} scores={new Map([["r1", { state: "ready", result: roleResult }]])} waitForSave={() => Promise.resolve()} onClose={onClose} />
     </>
   );
 }
@@ -109,9 +111,26 @@ describe("focus mode", () => {
     expect(api.brainDump).not.toHaveBeenCalled();
     expect(screen.queryByText("What else can you tell us about this?")).not.toBeInTheDocument();
   });
+  it.each([
+    [["company", "purpose", "tools"], 2],
+    [["tools", "company"], 1],
+  ] as const)("counts only general role questions for topics %j", async (topics, total) => {
+    const roleQuestions: RoleResult["roleQuestions"] = topics.map((topic) => ({
+      id: topic, text: `Tell us about ${topic}?`, options: [], kind: "role", topic,
+    }));
+    render(<Harness roleResult={{ ...result, roleQuestions }} />);
+    expect(screen.getByRole("heading", { name: "Tell us about company?" })).toBeInTheDocument();
+    expect(screen.getByText(`About the role · Question 1 of ${total}`)).toBeInTheDocument();
+    for (let i = 0; i < total + role.bullets.length; i++) {
+      await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    }
+    expect(screen.getByRole("heading", { name: "Tell us about tools?" })).toBeInTheDocument();
+    expect(screen.getByText("Tools", { selector: ".page-note-eyebrow" })).toBeInTheDocument();
+  });
   it("shows the role on the left with the weakest bullet first and its question on the right", () => {
     render(<Harness />);
     const dialog = screen.getByRole("dialog", { name: "Improve your Dispatcher role" });
+    expect(screen.queryByRole("button", { name: "Let's start" })).toBeNull();
     expect(within(dialog).getByText("Bullet points · Bullet 1 of 3")).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Roughly how many drivers did you plan for each day?" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Under 10" })).toBeInTheDocument();
@@ -292,7 +311,7 @@ describe("focus mode", () => {
     expect(screen.getByRole("heading", { name: box })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "← Back" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByText("About the role · Question 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("About the role · Question 1 of 1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Who did you work with?" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Finance" }));
     await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
@@ -489,6 +508,136 @@ describe("the role description step (3B) on screen", () => {
 });
 
 describe("focus mode inside the guided path", () => {
+  it("counts within each kind and offers the next project after the last role", async () => {
+    const roles = [role, { ...role, id: "r2", title: "Planner" }];
+    const projects = [
+      { ...role, id: "p1", title: "Routing", url: "" },
+      { ...role, id: "p2", title: "Tracking", url: "" },
+    ];
+    const content = { ...cv, experience: roles, projects };
+    const scores = new Map(roles.concat(projects).map((item) => [item.id, {
+      state: "ready" as const,
+      result: { ...result, roleId: item.id, fingerprint: fingerprint(item, "en"), questions: [], bullets: item.bullets.map(b => grade(b.id, 100)) },
+    }]));
+    render(<MemoryRouter><EnrichPath cv={content} dispatch={() => {}} scores={scores}
+      waitForSave={() => Promise.resolve()} onClose={() => {}} /></MemoryRouter>);
+    await userEvent.click(screen.getByRole("button", { name: "Start with Dispatcher →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Next role →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(await screen.findByRole("heading", { name: "Congrats, you just finished updating your last role." })).toBeInTheDocument();
+    expect(screen.getByText("Let's go to the next one.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    expect(screen.getByText("Project 1 of 2")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(await screen.findByRole("heading", { name: "Congrats, you just finished updating your first project." })).toBeInTheDocument();
+    expect(screen.getByText("Let's go to the next one.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(await screen.findByRole("heading", { name: "Congrats, you just finished updating your last project." })).toBeInTheDocument();
+    expect(screen.queryByText("Let's go to the next one.")).toBeNull();
+  });
+
+  it("greets the first role by first name and shows its question only after Let's start", async () => {
+    const roleQuestions: RoleResult["roleQuestions"] = [
+      { id: "rq1", text: "Who did you report to?", options: ["The CEO"], kind: "role", topic: "other" },
+    ];
+    render(<FocusMode pathRole={{ n: 1, total: 3 }} target={{ roleId: "r1", mode: "improve" }}
+      cv={{ ...cv, basics: { ...cv.basics, fullName: "  Andrei Munteanu " } }} dispatch={() => {}}
+      scores={new Map([["r1", { state: "ready", result: { ...result, roleQuestions } }]])}
+      waitForSave={() => Promise.resolve()} onClose={() => {}} />);
+    expect(screen.getByRole("heading", { name: "Hey Andrei, we're going to ask you a few questions to gather some ideas about this role." })).toBeInTheDocument();
+    expect(screen.getByText("Role 1 of 3 \u00b7 About the role")).toBeInTheDocument();
+    expect(screen.getByText("First some general questions about the role. Then we'll go through your bullet points one by one, then your tools, and finish with a short description.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Your answer")).toBeNull();
+    expect(screen.queryByRole("heading", { name: roleQuestions[0]!.text })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(screen.getByRole("heading", { name: roleQuestions[0]!.text })).toBeInTheDocument();
+  });
+
+  it("keeps the intro and role bar visible when background scoring reaches a bullet", async () => {
+    let scored!: (value: RoleResult) => void;
+    api.scoreRole.mockReturnValue(new Promise<RoleResult>((resolve) => { scored = resolve; }));
+    render(<FocusMode pathRole={{ n: 1, total: 3 }} target={{ roleId: "r1", mode: "improve" }} cv={cv}
+      dispatch={() => {}} scores={new Map()} waitForSave={() => Promise.resolve()} onClose={() => {}} />);
+    await vi.waitFor(() => expect(api.scoreRole).toHaveBeenCalledTimes(1));
+    await act(async () => scored(result));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("data-section", "role");
+    expect(dialog.querySelector(".fm-role-block")).toHaveClass("page-bar");
+    expect(dialog.querySelector('[aria-current="step"]')).toHaveTextContent("About the role");
+    expect(dialog.querySelector(".page-mark")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Hey, we're going to ask you a few questions to gather some ideas about this role." })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: result.questions[0]!.text })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(screen.getByRole("heading", { name: result.questions[0]!.text })).toBeInTheDocument();
+    expect(dialog).toHaveAttribute("data-section", "bullets");
+  });
+
+  it("shows the usual working screen when Let's start is pressed while scoring", async () => {
+    api.scoreRole.mockReturnValue(new Promise(() => {}));
+    render(<FocusMode pathRole={{ n: 1, total: 3 }} target={{ roleId: "r1", mode: "improve" }} cv={cv}
+      dispatch={() => {}} scores={new Map()} waitForSave={() => Promise.resolve()} onClose={() => {}} />);
+    expect(screen.queryByRole("status")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Loading your questions");
+  });
+
+  it("greets the next role with Hey again", () => {
+    render(<Harness pathRole={{ n: 2, total: 3 }} />);
+    expect(screen.getByRole("heading", { name: "Hey again! Same rhythm for this role: a few general questions first, to gather some ideas." })).toBeInTheDocument();
+    expect(screen.getByText("Role 2 of 3 \u00b7 About the role")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Your answer")).toBeNull();
+  });
+
+  it("Not now closes the intro like the close button", async () => {
+    const onClose = vi.fn();
+    render(<Harness pathRole={{ n: 1, total: 3 }} onClose={onClose} />);
+    await userEvent.click(screen.getByRole("button", { name: "Not now" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [1, 3, "first role", true],
+    [2, 3, "second role", true],
+    [3, 4, "third role", true],
+    [4, 5, "fourth role", true],
+    [5, 6, "fifth role", true],
+    [6, 7, "sixth role", true],
+    [7, 8, "seventh role", true],
+    [8, 9, "eighth role", true],
+    [9, 10, "ninth role", true],
+    [10, 11, "tenth role", true],
+    [11, 12, "role 11", true],
+    [3, 3, "last role", false],
+    [2, 2, "last role", false],
+  ])("congratulates role %i of %i as the %s", async (n, total, wording, hasNext) => {
+    const done = { ...result, questions: [], bullets: role.bullets.map(b => grade(b.id, 100)) };
+    render(<Harness pathRole={{ n, total }} roleResult={done} />);
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(await screen.findByRole("heading", { name: `Congrats, you just finished updating your ${wording}.` })).toBeInTheDocument();
+    expect(screen.getByText(`Role ${n} of ${total} \u00b7 Finished`)).toBeInTheDocument();
+    expect(Boolean(screen.queryByText("Let's go to the next one."))).toBe(hasNext);
+    const paper = screen.getByRole("dialog").querySelector<HTMLElement>(".page-sheet")!;
+    expect(within(paper).getByText(`Role ${n} done`)).toHaveClass("page-stamp");
+    expect(screen.getByRole("dialog").querySelector(".fm-done-score")).toHaveTextContent("52");
+  });
+
+  it.each([
+    ["project", "project"],
+    ["volunteering", "volunteering role"],
+  ] as const)("uses %s wording in the intro and congratulations", async (kind, wording) => {
+    const item = { ...role, name: "Routing", organization: "TransLog" };
+    const content = { ...cv, experience: [], [kind === "project" ? "projects" : "volunteering"]: [item] };
+    const done = { ...result, fingerprint: fingerprint(item, "en"), questions: [], bullets: role.bullets.map(b => grade(b.id, 100)) };
+    render(<FocusMode pathRole={{ n: 1, total: 3 }} target={{ roleId: "r1", mode: "improve" }} cv={content}
+      dispatch={() => {}} scores={new Map([["r1", { state: "ready", result: done }]])}
+      waitForSave={() => Promise.resolve()} onClose={() => {}} />);
+    expect(screen.getByRole("heading", { name: `Hey, we're going to ask you a few questions to gather some ideas about this ${wording}.` })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
+    expect(await screen.findByRole("heading", { name: `Congrats, you just finished updating your first ${wording}.` })).toBeInTheDocument();
+  });
+
   it("shows the path bar, and at the end of the role the button moves on after saving the role's facts", async () => {
     const onNext = vi.fn();
     const onClose = vi.fn();
@@ -496,9 +645,10 @@ describe("focus mode inside the guided path", () => {
     function Path() {
       const [state, dispatch] = useReducer(cvReducer, cv);
       return <FocusMode target={{ roleId: "r1", mode: "improve" }} cv={state} dispatch={dispatch} scores={new Map([["r1", { state: "ready", result: done }]])}
-        waitForSave={() => Promise.resolve()} onClose={onClose} topBar={<p>Role 1 of 2</p>} next={{ label: "Next role →", onNext }} />;
+        waitForSave={() => Promise.resolve()} onClose={onClose} pathRole={{ n: 1, total: 2 }} topBar={<p>Role 1 of 2</p>} next={{ label: "Next role →", onNext }} />;
     }
     render(<Path />);
+    await userEvent.click(screen.getByRole("button", { name: "Let's start" }));
     expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "Next role →" }));
     expect(onNext).toHaveBeenCalledTimes(1);
