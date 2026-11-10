@@ -77,3 +77,18 @@ Open for the owner at the mockup review:
 4. "Add a job by hand" (paste the ad text) is kept from the current app. Keep it?
 5. Base CV score name "CV strength": keep the number, or show only the reasons?
 6. Default tailoring language preference offers "the job ad's language", "my CV's language" or a fixed language. The brief only says "default tailoring language"; are the first two wanted?
+
+## Phase 2 review, 2026-11-11
+
+Owner's answers to the six open questions (agreed with what the mockups show):
+1. Finish screen: unmet must-haves are listed, "Mark as ready anyway" stays possible.
+2. Extension: testers install from a zip, loaded by hand in Chrome.
+3. "Export all my data" and "Delete my account" are wanted. The migration and auth change still get shown to the owner before they are applied.
+4. "Add a job by hand" stays.
+5. "CV strength" keeps its number, with the reasons.
+6. Default tailoring language offers the ad's language, the CV's language, or a fixed one.
+
+Review list:
+1. Questions in the base CV flow and in tailoring appear one at a time (focus mode), not as a scrolling list, with an indication of what each question and answer is for.
+   - Offered three layouts on one page (`mockups/phase2/focus-questions.html`): A the line it changes, B the whole role beside, C the reason in words. Waiting for the owner's pick, then flows 3 and 5 are updated.
+   - Tailoring's line-by-line approvals stay a list unless the owner says otherwise.
