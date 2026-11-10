@@ -4,7 +4,7 @@
   position: fixed; inset: 0; z-index: 1000; overflow-y: auto;
   display: grid; grid-template-columns: minmax(0, 720px); justify-content: center; align-content: start; gap: var(--space-6);
   padding: var(--space-10) var(--space-6) var(--space-12);
-  background: radial-gradient(1200px 500px at 30% 0%, var(--surface-card) 0%, var(--sage-50) 60%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--pine-800) 5%, transparent) 1px, transparent 1px) 0 0 / 14px 14px var(--surface-sunken);
   color: var(--text-strong); font-family: var(--font-sans);
 }
 .tailor-mode :focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-offset); }
@@ -12,17 +12,15 @@
 .tailor-eyebrow { margin: 0; font-size: var(--text-eyebrow); font-weight: var(--weight-semibold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 
 .tailor-steps { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.tailor-steps ol { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.tailor-steps li { padding: var(--space-1) var(--space-3); border-radius: var(--radius-pill); font-size: var(--text-sm); color: var(--text-muted); background: var(--surface-sunken); }
-.tailor-steps li.is-done { color: var(--pine-700); background: var(--pine-50); }
-.tailor-steps li.is-current { color: var(--text-strong); background: var(--surface-card); box-shadow: var(--shadow-raised); }
 .tailor-step-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .tailor-back-list { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .tailor-back-answer { display: grid; gap: var(--space-2); }
-.tailor-score { font-weight: var(--weight-semibold); color: var(--text-accent); }
+.tailor-mode .tailor-score { margin-inline-start: auto; text-align: end; font-weight: var(--weight-semibold); color: var(--text-accent); }
 
 .tailor-main { display: grid; gap: var(--space-5); }
 .tailor-card { display: grid; gap: var(--space-4); padding: var(--space-7); border-radius: var(--radius-card); background: var(--surface-card); box-shadow: var(--shadow-card); }
+.tailor-mode .tailor-card { border-top: 4px solid var(--sec); }
+.tailor-mode .tailor-card .tailor-eyebrow { color: var(--sec); }
 .tailor-card h2 { margin: 0; font-family: var(--font-display); font-size: var(--text-h3); font-weight: var(--weight-medium); line-height: var(--leading-tight); }
 .tailor-card.is-flag { border-inline-start: 3px solid var(--marigold-500); }
 .tailor-working { color: var(--text-muted); }

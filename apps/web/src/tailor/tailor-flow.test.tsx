@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { TAILOR_SECTIONS, type MatchScore, type TailorQuestion, type TailorRun } from "@resumora/shared";
 
 vi.mock("./tailor-api.ts", () => ({
   startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(),
-  runSection: vi.fn(), acceptSection: vi.fn(), getScores: vi.fn(), getToneExamples: vi.fn(),
+  runSection: vi.fn(), acceptSection: vi.fn(), redoRole: vi.fn(), getScores: vi.fn(), getToneExamples: vi.fn(),
 }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
@@ -16,7 +16,7 @@ import { emptyCv } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { useVoice } from "../cv/enrich/useVoice.ts";
 import { ApiClientError } from "../lib/api.ts";
-import { acceptSection, askQuestions, getRun, getScores, getToneExamples, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
+import { acceptSection, askQuestions, getRun, getScores, getToneExamples, redoRole, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
 import { TailorFlow } from "./TailorFlow.tsx";
 
 const at = "2026-11-08T10:00:00Z";
@@ -57,6 +57,57 @@ beforeEach(() => {
 });
 
 describe("tailoring flow", () => {
+  it.each([
+    ["experience", "bullets"], ["projects", "bullets"], ["skills", "tools"], ["summary", "description"],
+  ] as const)("colours a %s question as %s", async (section, colour) => {
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun({ currentSection: section }));
+    vi.mocked(askQuestions).mockResolvedValue([question("q1", { section })]);
+    renderFlow();
+    expect((await screen.findByRole("heading", { name: "Question q1?" })).closest(".tailor-mode"))
+      .toHaveAttribute("data-section", colour);
+  });
+
+  it("uses role colours for tone and steering, with no finished ticks before starting", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    expect((await screen.findByRole("button", { name: /^Confident/ })).closest(".tailor-mode"))
+      .toHaveAttribute("data-section", "role");
+    const steps = await screen.findByRole("navigation", { name: "Tailoring steps" });
+    expect(steps).not.toHaveTextContent("✓");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("button", { name: "Start tailoring" }).closest(".tailor-mode"))
+      .toHaveAttribute("data-section", "role");
+  });
+
+  it("keeps finished Experience, its answers and redo review coloured as bullets while Skills is current", async () => {
+    const user = userEvent.setup();
+    const cv = { ...emptyCv("en"), experience: [{ id: "r1", company: "Emedi", title: "Analyst", location: "",
+      startDate: "2021-03", endDate: "", current: true, description: "", bullets: [], notes: [] }] };
+    vi.mocked(getCv).mockResolvedValue({ content: cv, version: 1, updatedAt: at });
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun({ currentSection: "skills", currentRoleId: null }));
+    vi.mocked(askQuestions).mockResolvedValue([question("q1", { section: "skills" })]);
+    vi.mocked(redoRole).mockResolvedValue({ proposals: [], removed: 0 });
+    renderFlow();
+    await screen.findByRole("heading", { name: "Question q1?" });
+    const steps = screen.getByRole("navigation", { name: "Tailoring steps" });
+    expect(within(steps).getByRole("list")).toHaveClass("page-tabs");
+    expect(within(steps).getByRole("listitem", { current: "step" })).toHaveTextContent("Skills");
+    const experience = within(steps).getByRole("button", { name: "Experience" });
+    expect(experience.closest("li")?.textContent).toMatch(/^✓ /);
+    await user.click(experience);
+    expect(screen.getByRole("list", { name: "Finished roles" }).closest(".tailor-mode"))
+      .toHaveAttribute("data-section", "bullets");
+    await user.click(screen.getByRole("button", { name: /Analyst/ }));
+    expect(screen.getByRole("heading", { name: "Your answers" }).closest(".tailor-mode"))
+      .toHaveAttribute("data-section", "bullets");
+    await user.click(screen.getByRole("button", { name: "Update this role" }));
+    expect((await screen.findByRole("region", { name: "Analyst" })).closest(".tailor-mode"))
+      .toHaveAttribute("data-section", "bullets");
+    expect(redoRole).toHaveBeenCalledWith("run1", "r1", []);
+  });
+
   it("explains a capped tailored score when the base score is missing", async () => {
     vi.mocked(getScores).mockResolvedValue({ base: null, tailored: { ...score(69), capped: true, cappedBy: ["Payroll accuracy"] } });
     renderFlow();
@@ -79,7 +130,7 @@ describe("tailoring flow", () => {
   ])("shows no cap explanation for %s", async (_, base) => {
     vi.mocked(getScores).mockResolvedValue({ base, tailored: null });
     renderFlow();
-    await screen.findByText(`Score ${base.total}`);
+    await screen.findByText(`match with the job ${base.total}`);
     expect(screen.queryByText(/Held at 69/)).not.toBeInTheDocument();
   });
 
@@ -206,9 +257,11 @@ describe("tailoring flow", () => {
     vi.mocked(getRun).mockResolvedValue(makeRun());
     vi.mocked(acceptSection).mockResolvedValue({ run: makeRun({ currentSection: "skills" }), score: score(71) });
     renderFlow();
-    expect(await screen.findByText("Score 62")).toBeTruthy();
+    expect(await screen.findByText("match with the job 62")).toBeTruthy();
     await user.click(await screen.findByRole("button", { name: "Accept section" }));
-    expect(await screen.findByText("Score 62→71")).toBeTruthy();
+    const line = await screen.findByText("match with the job 71");
+    expect(line).toHaveTextContent("match with the job 71 62");
+    expect(line.querySelector("s")).toHaveTextContent("62");
   });
 
   it("resumes at section 2 after a reload", async () => {

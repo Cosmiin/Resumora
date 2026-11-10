@@ -44,6 +44,11 @@ export function TailorFlow() {
   // FinalA: final touches with nothing to change, accepted on their own; the next screen shows a tick for each.
   const [ticks, setTicks] = useState<TailorSection[]>([]);
   const section = run?.currentSection ?? null;
+  const shownSection = phase.kind === "back" ? phase.section
+    : phase.kind === "role" || phase.kind === "redo" ? "experience"
+    : phase.kind === "questions" || phase.kind === "review" ? section : null;
+  const colour = isRoleSection(shownSection) ? "bullets"
+    : shownSection === "skills" ? "tools" : shownSection === "summary" ? "description" : "role";
 
   function track(next: TailorRun) { runRef.current = next; setRun(next); }
   /** Experience and Projects & volunteering steps name the run's current item. */
@@ -255,10 +260,10 @@ export function TailorFlow() {
   } else if (phase.kind === "done") {
     body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job} />;
   } else if (phase.kind === "deleted") {
-    body = <section className="tailor-card" role="alert"><h2>{t("tailor.error.deleted")}</h2>
+    body = <section className="tailor-card page-note" role="alert"><h2>{t("tailor.error.deleted")}</h2>
       <Link to="/jobs">{t("tailor.error.toJobs")}</Link></section>;
   } else if (phase.kind === "error") {
-    body = <section className="tailor-card" role="alert"><p>{phase.message}</p>
+    body = <section className="tailor-card page-note" role="alert"><p>{phase.message}</p>
       <button type="button" className="primary" onClick={phase.retry}>{t("tailor.retry")}</button></section>;
   } else if (!section) body = null;
   else if (phase.kind === "asking" || phase.kind === "working") {
@@ -294,7 +299,7 @@ export function TailorFlow() {
   }
   const wide = phase.kind === "questions" && isRoleSection(section) && !!roleFor(phase.questions[phase.index]!);
 
-  return <div className={wide ? "tailor-mode is-wide" : "tailor-mode"}>
+  return <div className={wide ? "tailor-mode is-wide" : "tailor-mode"} data-section={colour}>
     <header className="tailor-head">
       <p className="tailor-eyebrow">{t("tailor.eyebrow")}</p>
       <Link to={`/jobs/${encodeURIComponent(jobId)}`}>{t("tailor.back")}</Link>

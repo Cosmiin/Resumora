@@ -17,18 +17,21 @@ type Props = {
 export function StepBar({ sections, current, base, latest, score, open = [], onOpen, onSteer }: Props) {
   const index = current ? sections.indexOf(current) : sections.length;
   const total = latest ?? base;
+  const started = current !== null || !!onOpen || !!onSteer;
   return <nav className="tailor-steps" aria-label={t("tailor.steps")}>
-    <ol>
-      {onSteer && <li className="is-done"><button type="button" className="tailor-step-link" onClick={onSteer}>{t("tailor.steps.steering")}</button></li>}
+    <ol className="page-tabs">
+      {onSteer && <li className="is-done">✓ <button type="button" className="tailor-step-link" onClick={onSteer}>{t("tailor.steps.steering")}</button></li>}
       {sections.map((section, i) => <li key={section} aria-current={section === current ? "step" : undefined}
         className={i < index ? "is-done" : section === current ? "is-current" : undefined}>
+        {started && i < index && "✓ "}
         {onOpen && open.includes(section)
           ? <button type="button" className="tailor-step-link" onClick={() => onOpen(section)}>{t(`tailor.section.${section}`)}</button>
           : t(`tailor.section.${section}`)}
       </li>)}
     </ol>
     {total !== null && <span className="tailor-score" role="status">
-      {base !== null && latest !== null && latest !== base ? t("tailor.scoreUp", { base, latest }) : t("tailor.score", { base: total })}
+      {t("tailor.score", { latest: total })}
+      {base !== null && latest !== null && latest !== base && <> <s>{base}</s></>}
       {score?.capped && score.total === 69 && !!score.cappedBy?.length && <small style={{ display: "block" }}>
         {t("tailor.scoreCapped", { list: score.cappedBy.join(", ") })}
       </small>}
