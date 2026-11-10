@@ -57,6 +57,59 @@ beforeEach(() => {
 });
 
 describe("tailoring flow", () => {
+  it("explains a capped tailored score when the base score is missing", async () => {
+    vi.mocked(getScores).mockResolvedValue({ base: null, tailored: { ...score(69), capped: true, cappedBy: ["Payroll accuracy"] } });
+    renderFlow();
+    expect(await screen.findByText("Held at 69 until the CV shows: Payroll accuracy. That's fine: it's your real experience, tailored as far as it honestly goes."))
+      .toBeInTheDocument();
+  });
+
+  it("explains the base score's cap before any accept", async () => {
+    vi.mocked(getScores).mockResolvedValue({ base: { ...score(69), capped: true, cappedBy: ["Payroll accuracy", "SQL"] }, tailored: null });
+    renderFlow();
+    expect(await screen.findByText("Held at 69 until the CV shows: Payroll accuracy, SQL. That's fine: it's your real experience, tailored as far as it honestly goes."))
+      .toBeInTheDocument();
+  });
+
+  it.each([
+    ["not capped", { ...score(69), cappedBy: ["SQL"] }],
+    ["below 69", { ...score(40), capped: true, cappedBy: ["SQL"] }],
+    ["an older score", { ...score(69), capped: true }],
+    ["an empty list", { ...score(69), capped: true, cappedBy: [] }],
+  ])("shows no cap explanation for %s", async (_, base) => {
+    vi.mocked(getScores).mockResolvedValue({ base, tailored: null });
+    renderFlow();
+    await screen.findByText(`Score ${base.total}`);
+    expect(screen.queryByText(/Held at 69/)).not.toBeInTheDocument();
+  });
+
+  it("uses the latest stored score's cap rather than the base's", async () => {
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun());
+    vi.mocked(getScores).mockResolvedValue({
+      base: { ...score(69), capped: true, cappedBy: ["SQL"] },
+      tailored: { ...score(69), capped: true, cappedBy: ["Payroll accuracy"] },
+    });
+    renderFlow();
+    const line = await screen.findByText(/Held at 69/);
+    expect(line).toHaveTextContent("Payroll accuracy");
+    expect(line).not.toHaveTextContent("SQL");
+  });
+
+  it("updates and removes the cap explanation after accepts", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun());
+    vi.mocked(acceptSection)
+      .mockResolvedValueOnce({ run: makeRun({ currentSection: "skills" }), score: { ...score(69), capped: true, cappedBy: ["Payroll accuracy"] } })
+      .mockResolvedValueOnce({ run: makeRun({ currentSection: "summary" }), score: score(75) });
+    renderFlow();
+    await user.click(await screen.findByRole("button", { name: "Accept section" }));
+    expect(await screen.findByText(/Held at 69 until the CV shows: Payroll accuracy/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Save skills" }));
+    await waitFor(() => expect(screen.queryByText(/Held at 69/)).not.toBeInTheDocument());
+  });
+
   it("shows the role a question is about, from the Base CV (F3)", async () => {
     const cv = { ...emptyCv("en"), experience: [{ id: "r1", company: "Emedi", title: "Business Analyst", location: "", startDate: "2021-03",
       endDate: "", current: true, description: "Owns reporting.", bullets: [{ id: "b1", text: "Made weekly reports" }], notes: [] }] };

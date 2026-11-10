@@ -299,10 +299,10 @@ export function TailorFlow() {
       <p className="tailor-eyebrow">{t("tailor.eyebrow")}</p>
       <Link to={`/jobs/${encodeURIComponent(jobId)}`}>{t("tailor.back")}</Link>
     </header>
-    {run && <StepBar sections={run.sections} current={section} base={base} latest={latest} open={open}
+    {run && <StepBar sections={run.sections} current={section} base={base} latest={latest} score={scoreRef.current} open={open}
       onOpen={(s) => setPhase({ kind: "back", section: s, resume: phase })}
       onSteer={settled ? () => void openSteer(phase) : undefined} />}
-    {!run && base !== null && <StepBar sections={[...TAILOR_SECTIONS]} current={null} base={base} latest={latest} />}
+    {!run && (base !== null || latest !== null) && <StepBar sections={[...TAILOR_SECTIONS]} current={null} base={base} latest={latest} score={scoreRef.current} />}
     <main className="tailor-main">
       {ticks.map((s) => <p key={s} className="tailor-tick">{t("tailor.final.nothing", { section: t(`tailor.section.${s}`) })}</p>)}
       {body}

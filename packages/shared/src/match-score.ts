@@ -98,12 +98,14 @@ export function computeMatchScore(input: MatchInput): MatchScore {
     sum += part.points * part.max;
   }
 
-  const capped = input.job.requirements.some((requirement, index) =>
+  const cappedBy = input.job.requirements.filter((requirement, index) =>
     requirement.kind === "must"
-      && labelPoints(requirementLabel(input.labels, index), input.keptInferred) === 0);
+      && labelPoints(requirementLabel(input.labels, index), input.keptInferred) === 0)
+    .map((requirement) => requirement.text);
+  const capped = cappedBy.length > 0;
   const total = weight === 0 ? null : Math.min(Math.round(sum), capped ? 69 : 100);
   return {
     policy: "match/1", total, band: total === null ? null : bandOf(total),
-    parts, capped, labels: input.labels,
+    parts, capped, cappedBy, requirementTexts: input.job.requirements.map((requirement) => requirement.text), labels: input.labels,
   };
 }

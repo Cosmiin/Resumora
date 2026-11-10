@@ -1,4 +1,4 @@
-import type { TailorSection } from "@resumora/shared";
+import type { MatchScore, TailorSection } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 
 type Props = {
@@ -6,6 +6,7 @@ type Props = {
   current: TailorSection | null;
   base: number | null;
   latest: number | null;
+  score?: MatchScore | null;
   /** Steps that open (finished ones, and Experience once a role is finished); none while a step is loading. */
   open?: TailorSection[];
   onOpen?(section: TailorSection): void;
@@ -13,8 +14,9 @@ type Props = {
   onSteer?(): void;
 };
 
-export function StepBar({ sections, current, base, latest, open = [], onOpen, onSteer }: Props) {
+export function StepBar({ sections, current, base, latest, score, open = [], onOpen, onSteer }: Props) {
   const index = current ? sections.indexOf(current) : sections.length;
+  const total = latest ?? base;
   return <nav className="tailor-steps" aria-label={t("tailor.steps")}>
     <ol>
       {onSteer && <li className="is-done"><button type="button" className="tailor-step-link" onClick={onSteer}>{t("tailor.steps.steering")}</button></li>}
@@ -25,8 +27,11 @@ export function StepBar({ sections, current, base, latest, open = [], onOpen, on
           : t(`tailor.section.${section}`)}
       </li>)}
     </ol>
-    {base !== null && <span className="tailor-score" role="status">
-      {latest !== null && latest !== base ? t("tailor.scoreUp", { base, latest }) : t("tailor.score", { base })}
+    {total !== null && <span className="tailor-score" role="status">
+      {base !== null && latest !== null && latest !== base ? t("tailor.scoreUp", { base, latest }) : t("tailor.score", { base: total })}
+      {score?.capped && score.total === 69 && !!score.cappedBy?.length && <small style={{ display: "block" }}>
+        {t("tailor.scoreCapped", { list: score.cappedBy.join(", ") })}
+      </small>}
     </span>}
   </nav>;
 }

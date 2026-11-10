@@ -93,6 +93,62 @@ async function accept(runId: string, section: string, body: Record<string, unkno
 }
 
 describe("accept section", () => {
+  it("keeps the document's confirmed match after its score history save failed", async () => {
+    const runId = await start();
+    const insert = vi.spyOn(scores, "set").mockImplementationOnce(() => { throw new Error("history insert failed"); });
+    const failed = await accept(runId, "experience", {}, scoreReply(first.text));
+    insert.mockRestore();
+    expect(failed.status).toBe(500);
+    const confirmed = tailored().score!.labels.find((label) => label.ref === "r0")!;
+    expect(confirmed).toMatchObject({ status: "met", inferred: false, evidence: first.text });
+    expect(await repo().getScore(jobId, "tailored", tailored().id)).toBeNull();
+
+    const response = await accept(runId, "experience", {}, {
+      ...scoreReply(), labels: scoreReply().labels.map((label) => ({ ...label, status: "missing", evidence: null })),
+    });
+    expect(response.status).toBe(200);
+    const { score } = await response.json() as { score: MatchScore };
+    expect(score.labels.find((label) => label.ref === "r0")).toEqual(confirmed);
+  });
+
+  it.each([
+    ["base", "same", "met"], ["tailored", "same", "met"],
+    ["base", "edited", "missing"], ["tailored", "edited", "missing"],
+    ["base", "legacy", "missing"], ["tailored", "legacy", "missing"],
+  ] as const)("uses the %s score safely when requirement texts are %s", async (target, texts, expected) => {
+    const runId = await start();
+    const previous: MatchScore = {
+      policy: "match/1", total: 100, band: "excellent", capped: false,
+      parts: { requirements: null, keywords: null, seniority: null, langEdu: null },
+      labels: scoreReply(first.text).labels as MatchScore["labels"],
+      ...(texts === "legacy" ? {} : { requirementTexts: [job.requirements[0]!.text] }),
+    };
+    if (target === "tailored") await repo().saveScore(jobId, "base", null, { ...previous, labels: [] });
+    await repo().saveScore(jobId, target, target === "tailored" ? tailored().id : null, previous);
+    if (texts === "edited") {
+      const current = (await jobs.repoFor("user-a").get(jobId))!;
+      await jobs.repoFor("user-a").patch(jobId, current.version, { ...job, requirements: [{ ...job.requirements[0]!, text: "Payroll team leadership" }] });
+    }
+    const missing = { ...scoreReply(), labels: scoreReply().labels.map((label) => ({ ...label, status: "missing", evidence: null })) };
+    const response = await accept(runId, "experience", {}, missing);
+    expect(response.status).toBe(200);
+    const { score } = await response.json() as { score: MatchScore };
+    expect(score.labels.find((label) => label.ref === "r0")?.status).toBe(expected);
+    expect(score.labels.find((label) => label.ref === "k:Payroll")?.status).toBe("met");
+    expect(score.requirementTexts).toEqual([texts === "edited" ? "Payroll team leadership" : "Payroll accuracy"]);
+  });
+
+  it("uses the current tailored score even when the base had a stronger label", async () => {
+    const runId = await start();
+    await accept(runId, "experience", {}, { ...scoreReply(), labels: scoreReply().labels.map((label) => ({ ...label, status: "missing", evidence: null })) });
+    const current = (await repo().getScore(jobId, "tailored", tailored().id))!;
+    await repo().saveScore(jobId, "base", null, { ...current, labels: scoreReply(first.text).labels as MatchScore["labels"] });
+    const response = await accept(runId, "skills", {}, { ...scoreReply(), labels: scoreReply().labels.map((label) => ({ ...label, status: "missing", evidence: null })) });
+    expect(response.status).toBe(200);
+    const { score } = await response.json() as { score: MatchScore };
+    expect(score.labels.find((label) => label.ref === "r0")?.status).toBe("missing");
+  });
+
   it("writes only the kept Experience proposals, saves Score 2 and moves to Skills", async () => {
     const runId = await start();
     await run(runId, "experience", reword(first.id, "Ran accurate payroll for 40 staff"), reword(second.id, "Filed payroll taxes"));

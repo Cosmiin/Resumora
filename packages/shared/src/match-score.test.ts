@@ -24,7 +24,8 @@ describe("computeMatchScore", () => {
   it("scores all met inputs at 100 with the policy weights", () => {
     const score = computeMatchScore(input);
     expect(score).toEqual({
-      policy: "match/1", total: 100, band: "excellent", capped: false, labels,
+      policy: "match/1", total: 100, band: "excellent", capped: false, cappedBy: [], labels,
+      requirementTexts: job.requirements.map((requirement) => requirement.text),
       parts: {
         requirements: { points: 1, max: 50 }, keywords: { points: 1, max: 30 },
         seniority: { points: 1, max: 10 }, langEdu: { points: 1, max: 10 },
@@ -49,6 +50,17 @@ describe("computeMatchScore", () => {
     expect(score).toMatchObject({ total: 67, band: "fair", capped: false });
   });
 
+  it("names every zero-point must requirement in job order", () => {
+    const requirements = ["TypeScript", "React", "SQL"].map((text) => ({ text, kind: "must" as const, category: "skill" as const }));
+    const score = computeMatchScore({
+      ...input, job: { ...job, requirements },
+      labels: labels.slice(0, 3).map((label, index) => ({ ...label, status: index === 1 ? "missing" : "met" })),
+    });
+    expect(score).toMatchObject({ capped: true, cappedBy: ["React"], requirementTexts: ["TypeScript", "React", "SQL"] });
+    expect(computeMatchScore({ ...input, job: { ...job, requirements }, labels: [] }).cappedBy)
+      .toEqual(["TypeScript", "React", "SQL"]);
+  });
+
   it("rescales requirements and keywords to 62.5 and 37.5", () => {
     const score = computeMatchScore({
       ...input, job: { ...job, requirements: job.requirements.slice(0, 2), seniority: "unknown" },
@@ -64,7 +76,7 @@ describe("computeMatchScore", () => {
       ...input, job: { ...job, requirements: [], seniority: "unknown" }, labels: [], cvSeniority: null,
     });
     expect(score).toEqual({
-      policy: "match/1", total: null, band: null, capped: false, labels: [],
+      policy: "match/1", total: null, band: null, capped: false, cappedBy: [], requirementTexts: [], labels: [],
       parts: { requirements: null, keywords: null, seniority: null, langEdu: null },
     });
   });

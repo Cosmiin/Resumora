@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { computeMatchScore, JobExtractionSchema, MatchLabelSchema, type CvContent, type JobExtraction, type MatchScore } from "@resumora/shared";
+import { computeMatchScore, JobExtractionSchema, MatchLabelSchema, type CvContent, type JobExtraction, type MatchLabel, type MatchScore } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
 import { scoreSystemPrompt, scoreUserMessage } from "./score-prompts.ts";
@@ -39,7 +39,7 @@ function fluentEvidence(requirement: string, languages: CvContent["languages"]):
 export async function scoreMatch(
   deps: { model: ModelDeps },
   /** keptInferredTexts: texts of inferred items the user kept; an inferred label quoting one counts in full. */
-  input: { userId: string; cv: CvContent; job: JobExtraction; keptInferred: Set<string>; keptInferredTexts?: string[] },
+  input: { userId: string; cv: CvContent; job: JobExtraction; keptInferred: Set<string>; keptInferredTexts?: string[]; previous?: MatchLabel[] },
 ): Promise<MatchScore> {
   const { cv } = stripHeader(input.cv);
   try {
@@ -85,6 +85,13 @@ export async function scoreMatch(
       return label.status === "missing" || !label.evidence?.trim() || !quoted(label.evidence)
         ? { ...label, status: "missing" as const, evidence: null, inferred: false }
         : label;
+    }).map((label) => {
+      if (label.status === "met" && !label.inferred) return label;
+      const previous = input.previous?.find((old) => old.kind === label.kind && (label.kind === "keyword"
+        ? old.ref.slice(2).trim().toLowerCase() === label.ref.slice(2).trim().toLowerCase()
+        : old.ref === label.ref));
+      return previous?.status === "met" && !previous.inferred && previous.evidence && quoted(previous.evidence)
+        ? { ...previous, ref: label.ref } : label;
     });
     const kept = new Set(input.keptInferred);
     for (const label of checked) {

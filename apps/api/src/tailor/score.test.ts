@@ -3,7 +3,7 @@ import { emptyCv, type JobExtraction, type MatchLabel, type MatchScore } from "@
 import { fakeModel } from "./fake-model.ts";
 import { memoryTailorRepo, type MemoryTailorStore } from "./memory-repo.ts";
 import { scoreMatch } from "./score.ts";
-import { supabaseTailorRepo } from "./supabase-repo.ts";
+import { supabaseTailorAdmin, supabaseTailorRepo } from "./supabase-repo.ts";
 
 const job: JobExtraction = {
   title: "Engineer", company: "Acme", location: null, workMode: "remote", employmentType: "full_time",
@@ -23,6 +23,36 @@ const input = () => {
 const answer = () => ({ labels: [label(), label("k:TypeScript"), label("k:SQL")], cvSeniority: "unknown" });
 
 describe("scoreMatch", () => {
+  it.each([
+    ["missing", false, false, false, "met"],
+    ["met", true, false, false, "met"],
+    ["missing", false, true, false, "missing"],
+    ["missing", false, false, true, "missing"],
+  ] as const)("rescores r4 (%s, inferred=%s, rewritten=%s, previously inferred=%s)", async (status, inferred, rewritten, previouslyInferred, expected) => {
+    const evidence = "Designed onboarding workflows";
+    const cv = input().cv;
+    cv.experience = [{ id: "role", company: "Example", title: "Designer", location: "", startDate: "2020", endDate: "2022",
+      current: false, description: "", notes: [], bullets: [{ id: "bullet", text: rewritten ? "Improved the onboarding process" : evidence }] }];
+    const work = { ...input(), cv, job: { ...job, requirements: Array.from({ length: 5 }, (_, i) => ({ ...job.requirements[0]!, text: `Requirement ${i}` })) },
+      previous: [label("r4", { evidence, inferred: previouslyInferred })] };
+    const model = fakeModel(() => ({ cvSeniority: "unknown", labels: [
+      ...work.job.requirements.map((_, i) => label(`r${i}`, { status, inferred, evidence: status === "missing" ? null : evidence })), label("k:SQL"),
+    ] }));
+    const result = await scoreMatch({ model: model.deps }, work);
+    expect(result.labels.find((item) => item.ref === "r4")).toEqual(expected === "met"
+      ? work.previous[0] : label("r4", { status: "missing", evidence: null }));
+  });
+
+  it.each([true, false])("keeps previous keyword matches only while every evidence part remains (all present=%s)", async (present) => {
+    const work = input();
+    work.cv.basics.summary = present ? "Designed onboarding workflows using SQL" : "Designed onboarding workflows";
+    const previous = label("k:sql", { evidence: "Designed onboarding workflows | SQL" });
+    const model = fakeModel(() => ({ ...answer(), labels: [label(), label("k:SQL", { status: "missing", evidence: null })] }));
+    const result = await scoreMatch({ model: model.deps }, { ...work, previous: [previous] });
+    expect(result.labels.find((item) => item.ref === "k:SQL")).toEqual(present
+      ? { ...previous, ref: "k:SQL" } : label("k:SQL", { status: "missing", evidence: null }));
+  });
+
   it("scores requirement and keyword labels using the cheap model and logs the task", async () => {
     const model = fakeModel(answer);
     model.deps.providers[0]!.strongModel = "expensive";
@@ -207,7 +237,7 @@ describe("score repositories", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const storedScore: MatchScore = {
-    policy: "match/1", total: 0, band: "low", capped: true,
+    policy: "match/1", total: 0, band: "low", capped: true, cappedBy: ["TypeScript"], requirementTexts: ["TypeScript"],
     parts: { requirements: { points: 0, max: 100 }, keywords: null, seniority: null, langEdu: null },
     labels: [label("r0", { status: "missing", evidence: null })],
   };
@@ -254,6 +284,7 @@ describe("score repositories", () => {
     expect(await repo.getScore("job", "base")).toBeNull();
     await repo.saveScore("job", "tailored", "copy-a", storedScore);
     expect(row).toMatchObject({ user_id: "a", job_id: "job", target: "tailored", tailored_cv_id: "copy-a" });
+    expect(row).toHaveProperty("parts", { ...storedScore.parts, capped: true, cappedBy: ["TypeScript"], requirementTexts: ["TypeScript"] });
     expect(await repo.getScore("job", "tailored", "copy-a")).toEqual(storedScore);
     const params = urls.at(-1)!.searchParams;
     expect(params.get("job_id")).toBe("eq.job");
@@ -271,5 +302,32 @@ describe("score repositories", () => {
     );
     await expect(repo.getScore("job", "base")).rejects.toThrow("match_scores select failed");
     await expect(repo.saveScore("job", "base", null, storedScore)).rejects.toThrow("match_scores insert failed");
+  });
+
+  it("round-trips base score metadata through the queue repository", async () => {
+    let row: Record<string, unknown> | null = null;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+      if (init.method === "POST") {
+        row = JSON.parse(String(init.body));
+        return new Response(null, { status: 201 });
+      }
+      return Response.json(row);
+    }));
+    const repo = supabaseTailorAdmin({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "queue-key" }).tailorRepo("a");
+    await repo.saveScore("job", storedScore);
+    expect(row).toMatchObject({ target: "base", parts: { cappedBy: ["TypeScript"], requirementTexts: ["TypeScript"] } });
+    expect(await repo.getScore("job")).toEqual(storedScore);
+    expect((await repo.getScore("job"))?.parts).toEqual(storedScore.parts);
+  });
+
+  it("loads older scores without the new metadata in both repositories", async () => {
+    const older = { ...storedScore };
+    delete older.cappedBy;
+    delete older.requirementTexts;
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ...older, parts: { ...older.parts, capped: older.capped } })));
+    const repo = supabaseTailorRepo({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "public-key" }, { id: "a", token: "user-token" });
+    const admin = supabaseTailorAdmin({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "queue-key" }).tailorRepo("a");
+    expect(await repo.getScore("job", "base")).toEqual(older);
+    expect(await admin.getScore("job")).toEqual(older);
   });
 });

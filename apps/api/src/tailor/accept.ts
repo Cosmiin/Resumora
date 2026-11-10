@@ -96,7 +96,7 @@ export async function acceptSection(
   }
   const roleId = input.redo ? body.roleId ?? null : currentRole(run, section, body.roleId);
   if (!input.job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
-  const doc = run.tailoredCvId ? await deps.tailor.getTailoredCv(run.tailoredCvId) : null;
+  const doc = run.tailoredCvId ? await deps.tailor.readTailoredCv(run.tailoredCvId) : null;
   if (!doc) throw jobNotFound();
 
   const content = structuredClone(doc.content);
@@ -161,9 +161,15 @@ export async function acceptSection(
   const review: Review = { ...(doc.review ?? {}), [section]: { ...others, ...state } };
   const keptInferredTexts = Object.values(review).flatMap((items) => Object.values(items as Record<string, ItemReview>))
     .filter((item) => item.inferred && item.kept).map((item) => item.text);
+  const previous = doc.score ?? await deps.tailor.getScore(run.jobId, "tailored", doc.id)
+    ?? await deps.tailor.getScore(run.jobId, "base");
+  const sameRequirements = previous?.requirementTexts !== undefined
+    && previous.requirementTexts.length === input.job.extracted.requirements.length
+    && previous.requirementTexts.every((text, index) => text === input.job.extracted!.requirements[index]!.text);
   const score = await scoreMatch({ model: deps.model }, {
     // Items hidden for this job are not on the CV the recruiter sees, so they do not count.
     userId: input.userId, cv: withoutHidden(parsed.data), job: input.job.extracted, keptInferred: new Set(), keptInferredTexts,
+    previous: previous?.labels.filter((label) => label.kind === "keyword" || sameRequirements),
   });
   if (await deps.tailor.saveTailoredCv(doc.id, doc.version, { content: parsed.data, review, score }) === "conflict") {
     throw new ApiError(409, "version_conflict", "This tailored CV was saved somewhere else first.");

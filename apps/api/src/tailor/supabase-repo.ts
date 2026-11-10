@@ -22,8 +22,8 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const { error } = await db.from("match_scores").insert({
         user_id: user.id, job_id: jobId, target, tailored_cv_id: tailoredCvId,
         policy: score.policy, labels: score.labels,
-        // The existing table has no capped column; keep the flag with its JSON score parts.
-        parts: { ...score.parts, capped: score.capped },
+        // Keep score metadata with the existing JSON parts, without adding columns.
+        parts: { ...score.parts, capped: score.capped, cappedBy: score.cappedBy, requirementTexts: score.requirementTexts },
         total: score.total, band: score.band,
       });
       if (error) throw new Error(`match_scores insert failed: ${error.message}`);
@@ -35,8 +35,8 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const { data, error } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (error) throw new Error(`match_scores select failed: ${error.message}`);
       if (!data) return null;
-      const { capped, ...parts } = data.parts;
-      return MatchScoreSchema.parse({ ...data, parts, capped });
+      const { capped, cappedBy, requirementTexts, ...parts } = data.parts;
+      return MatchScoreSchema.parse({ ...data, parts, capped, cappedBy, requirementTexts });
     },
     async findTailoredCvId(jobId, language) {
       const { data, error } = await db.from("tailored_cvs").select("id").eq("job_id", jobId).eq("language", language).maybeSingle();
@@ -228,13 +228,14 @@ export function supabaseTailorAdmin(env: Pick<Env, "SUPABASE_URL" | "SUPABASE_SE
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
           if (error) throw new Error(`match_scores select failed: ${error.message}`);
           if (!data) return null;
-          const { capped, ...parts } = data.parts;
-          return MatchScoreSchema.parse({ ...data, parts, capped });
+          const { capped, cappedBy, requirementTexts, ...parts } = data.parts;
+          return MatchScoreSchema.parse({ ...data, parts, capped, cappedBy, requirementTexts });
         },
         async saveScore(jobId: string, score: MatchScore) {
           const { error } = await db.from("match_scores").insert({
             user_id: userId, job_id: jobId, target: "base", tailored_cv_id: null,
-            policy: score.policy, labels: score.labels, parts: { ...score.parts, capped: score.capped },
+            policy: score.policy, labels: score.labels,
+            parts: { ...score.parts, capped: score.capped, cappedBy: score.cappedBy, requirementTexts: score.requirementTexts },
             total: score.total, band: score.band,
           });
           if (error) throw new Error(`match_scores insert failed: ${error.message}`);

@@ -85,6 +85,8 @@ export const MatchScoreSchema = z.object({
     z.object({ points: z.number(), max: z.number() }).nullable(),
   ),
   capped: z.boolean(),
+  cappedBy: z.array(z.string()).optional(),
+  requirementTexts: z.array(z.string()).optional(),
   labels: z.array(MatchLabelSchema),
 });
 export type MatchScore = z.infer<typeof MatchScoreSchema>;
