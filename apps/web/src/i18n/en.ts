@@ -1,8 +1,9 @@
 import { enrichSectionsEn } from "./en-enrich.ts";
 import { jobsEn } from "./en-jobs.ts";
 import { tailorEn } from "./en-tailor.ts";
+import { uiEn } from "./en-ui.ts";
 
-/** All UI copy. Romanian gets its own file with the same keys later. */
+/** All UI copy. Romanian: ro.ts. */
 export const en = {
   "app.name": "Resumora",
   "app.loading": "Loading…",
@@ -531,6 +532,7 @@ export const en = {
   ...enrichSectionsEn,
   ...jobsEn,
   ...tailorEn,
+  ...uiEn,
 } as const;
 
 export type MessageKey = keyof typeof en;

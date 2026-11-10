@@ -1,0 +1,20 @@
+/** Copy for the shared components in `src/ui`. Romanian: `ro-ui.ts`, same keys. */
+export const uiEn = {
+  "ui.close": "Close",
+  "ui.loading": "Working…",
+  "ui.language.label": "Interface language",
+  "ui.language.en": "English",
+  "ui.language.ro": "Română",
+  "ui.diff.now": "Now",
+  "ui.diff.suggested": "Suggested",
+  "ui.diff.keep": "Keep",
+  "ui.diff.useNew": "Use new",
+  "ui.diff.edit": "Edit",
+  "ui.diff.saveEdit": "Save edit",
+  "ui.diff.editLabel": "Edit the suggested bullet",
+  "ui.diff.kept": "Kept",
+  "ui.diff.usingNew": "Using new",
+  "ui.diff.usingEdit": "Using your edit",
+  "ui.diff.inferred": "Inferred, please confirm",
+  "ui.diff.noChange": "This bullet already fits the job. No change suggested.",
+} as const;
