@@ -2,7 +2,7 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/6";
+export const SCORE_POLICY = "score/7";
 
 /** A bullet's five checks. A clear, short bullet with no result scores 80. */
 export const WEIGHTS = { contribution: 30, clarity: 20, specificity: 20, impact: 20, concise: 10 } as const;
@@ -19,8 +19,13 @@ export const MAX_FOCUS = 600;
 /** Company, purpose and tools, plus at most 5 more. */
 export const MAX_ROLE_QUESTIONS = 8;
 
-/** What a role question is about. The first three are always covered unless the CV or notes already say it. */
-export const ROLE_TOPICS = ["company", "purpose", "tools", "other"] as const;
+/**
+ * What a role question is about. The first three are always covered unless the CV or notes already say it.
+ * The next four are the conditional parameters: asked when the reviewer cannot tell, or when the page leaves them out.
+ */
+export const ROLE_TOPICS = ["company", "purpose", "tools", "leadership", "seniority", "people", "domain", "other"] as const;
+/** The role topics that are conditional coverage parameters. */
+export const CONDITIONAL_TOPICS: readonly RoleTopic[] = ["leadership", "seniority", "people", "domain"];
 export const RoleTopicSchema = z.enum(ROLE_TOPICS);
 export type RoleTopic = z.infer<typeof RoleTopicSchema>;
 

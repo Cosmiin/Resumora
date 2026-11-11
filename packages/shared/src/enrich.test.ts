@@ -64,8 +64,8 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/6", () => {
-    expect(SCORE_POLICY).toBe("score/6");
+  it("uses policy score/7", () => {
+    expect(SCORE_POLICY).toBe("score/7");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -117,6 +117,15 @@ describe("buildRoleResult", () => {
       bullets: [], nextStep: null, questions: [],
     };
     expect(RoleResultSchema.parse(stored)).toEqual({ ...stored, roleQuestions: [], thin: false });
+  });
+
+  it("a role question may be about a conditional parameter, and a quick check keeps No as its first option", () => {
+    const topics = ["leadership", "seniority", "people", "domain"] as const;
+    const roleQuestions = topics.map((topic) => ({ text: `About ${topic}?`, options: ["No", "1–5 people", "6–20", "20+"], topic }));
+    const result = buildRoleResult(role([]), { ...model([]), roleQuestions }, "fp");
+    expect(result.roleQuestions.map((q) => q.topic)).toEqual(topics);
+    expect(result.roleQuestions[0]!.options).toEqual(["No", "1–5 people", "6–20", "20+"]);
+    expect(RoleResultSchema.parse(result)).toEqual(result);
   });
 
   it("keeps up to eight role questions with their topics, ids and allowed options, and rejects nine", () => {

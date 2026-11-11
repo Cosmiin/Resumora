@@ -333,6 +333,17 @@ describe("score prompt", () => {
     expect(prompt).not.toContain("Role questions ask only about");
   });
 
+  it("asks one role question for each conditional parameter it cannot tell or the page leaves out, a quick check when it cannot tell", () => {
+    const prompt = scoreSystemPrompt("en");
+    const at = (text: string) => prompt.indexOf(text);
+    expect(at("one question for each of leadership, seniority, people and domain")).toBeGreaterThan(at("topic tools: the tools"));
+    expect(prompt).toContain('marked unknown: a quick check. Word it so that "No" is a full answer');
+    expect(prompt).toContain('give "No", in the\n  language of the questions, as the first option');
+    expect(prompt).toContain("marked applies: ask for the fact itself");
+    expect(prompt).toContain("Never ask one for a parameter you mark shown or na.");
+    expect(at("Then any other role-wide fact that is still needed (topic other).")).toBeGreaterThan(at("marked applies"));
+  });
+
   it("requires options for every question and avoids facts already answered", () => {
     const prompt = scoreSystemPrompt("en");
     expect(prompt).toContain("up to 4 options for every question");
