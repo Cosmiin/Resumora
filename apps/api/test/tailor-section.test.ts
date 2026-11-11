@@ -111,7 +111,7 @@ describe("section pass", () => {
         expect(JSON.stringify(sent)).not.toContain(other);
         expect(verified.sources).not.toContain(other);
       }
-      expect(sent.steering).toContain("They want to lean on other roles more than this one.");
+      expect(sent.steering).not.toMatch(/lean/i);
       const retry = JSON.parse(String((model.requests[2]!.messages as { content: string }[])[1]!.content));
       expect(retry.fix.proposals[0].flags).toContainEqual({ rule: "tool", detail: "Kubernetes" });
       expect(await res.json()).toMatchObject({ proposals: [], removed: 1 });
@@ -291,8 +291,10 @@ describe("section pass", () => {
     replies = [proposals()];
     await runSection();
     const system = JSON.stringify(model.requests[0]);
-    expect(system).toContain("Never invent numbers, tools, employers, titles, dates or outcomes");
-    expect(system).toContain("never guess");
+    expect(system).toContain("Only what is true.");
+    expect(system).toContain("Do not invent or guess numbers, tools, employers, titles, dates or outcomes, not even as an inference.");
+    expect(system).toContain("A change must be a real improvement");
+    expect(system).toContain("A role that has ended stays in the past tense.");
     expect(system).toContain("reason");
   });
 

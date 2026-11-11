@@ -32,7 +32,7 @@ export async function improveBullet(
       userId: deps.userId,
       task: "enrich_improve_bullet",
       schema: ImproveSchema,
-      system: improveBulletSystemPrompt(content.locale),
+      system: improveBulletSystemPrompt(content.locale, deps.questionLanguage),
       user: improveBulletUserMessage(role, input.bulletId),
       maxOutputTokens: 600,
     };

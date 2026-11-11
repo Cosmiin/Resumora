@@ -17,7 +17,11 @@ import { ApiError } from "../errors.ts";
 import { scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
 import type { InsightsRepo } from "./repo.ts";
 
-export type ScoreDeps = { cv: CvRepo; insights: InsightsRepo; model: ModelDeps; userId: string };
+export type ScoreDeps = {
+  cv: CvRepo; insights: InsightsRepo; model: ModelDeps; userId: string;
+  /** The language the person uses the app in; questions and tips are written in it. Absent: the CV's language. */
+  questionLanguage?: Locale;
+};
 
 export function aiError(err: unknown): never {
   if (err instanceof AiUnavailableError || err instanceof AiInputRejectedError) throw new ApiError(503, "ai_unavailable", "The AI service is unavailable right now. Try again soon.");
@@ -68,12 +72,15 @@ export async function scoreRole(
   const role = found?.item;
   if (!role || fingerprint(role, content.locale) !== input.fingerprint) throw notSaved();
 
+  // Stored questions are reused only when they were written in the language wanted now.
+  const wanted = deps.questionLanguage ?? content.locale;
+  const inWantedLanguage = (stored: RoleResult) => (stored.questionLanguage ?? content.locale) === wanted;
   const cached = await deps.insights.get(role.id);
   let result: RoleResult;
-  if (!input.fresh && cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY) {
+  if (!input.fresh && cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY && inWantedLanguage(cached)) {
     result = cached;
   } else {
-    const pending = (await deps.insights.pending(role.id)).find((entry) => entry.fingerprint === input.fingerprint && entry.result.policy === SCORE_POLICY);
+    const pending = (await deps.insights.pending(role.id)).find((entry) => entry.fingerprint === input.fingerprint && entry.result.policy === SCORE_POLICY && inWantedLanguage(entry.result));
     if (pending && !input.fresh) {
       result = pending.result;
     } else {
@@ -82,11 +89,11 @@ export async function scoreRole(
           userId: deps.userId,
           task: "enrich_score",
           schema: ModelScoreSchema,
-          system: scoreSystemPrompt(content.locale),
+          system: scoreSystemPrompt(content.locale, wanted),
           user: scoreUserMessage(role, undefined, found!.kind),
           maxOutputTokens: Math.min(4000, 600 + 180 * role.bullets.length),
         });
-        result = buildRoleResult(role, answer, input.fingerprint);
+        result = { ...buildRoleResult(role, answer, input.fingerprint), questionLanguage: wanted };
       } catch (err) {
         aiError(err);
       }

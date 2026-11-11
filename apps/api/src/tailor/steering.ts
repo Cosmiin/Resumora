@@ -39,12 +39,8 @@ export function steeringText(steering: Steering, cv: CvContent, roleId?: string)
   const lines = [`Tone: ${tone} — ${TONE_MEANINGS[tone]}.`];
   if (steering.draws?.length) lines.push(`What draws them to this job: ${steering.draws.map((draw) => DRAWS[draw]).join(", ")}.`);
   if (steering.fit) lines.push(`How well they think their experience fits: ${FITS[steering.fit]}.`);
-  if (roleId) {
-    const focusRoleIds = (steering.focusRoleIds ?? []).filter((id) => cv.experience.some((role) => role.id === id));
-    if (focusRoleIds.length) lines.push(focusRoleIds.includes(roleId)
-      ? "This role is one of the roles they want to lean on most."
-      : "They want to lean on other roles more than this one.");
-  } else {
+  // A role step is told nothing about focus roles: they only change how many questions that role gets.
+  if (!roleId) {
     const roles = (steering.focusRoleIds ?? []).flatMap((id) => {
       const role = cv.experience.find((entry) => entry.id === id);
       return role ? [[role.title, role.company].filter(Boolean).join(" · ")] : [];

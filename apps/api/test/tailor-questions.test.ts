@@ -252,8 +252,9 @@ describe("job questions", () => {
       expect(got).toHaveLength(max);
       const sent = JSON.parse((model.requests.at(-1)!.messages as { content: string }[])[1]!.content);
       expect(sent.max).toBe(max);
-      if (nonFocus) expect(sent.focus).toBe(false);
-      else expect(sent).not.toHaveProperty("focus");
+      // Focus roles change the number of questions only; the model is not told which roles are in focus.
+      expect(sent).not.toHaveProperty("focus");
+      expect(sent.steering).not.toMatch(/lean/i);
       expect((await repo.getRun(runId))!.questions!.filter((question) => question.roleId === role.id)).toEqual(got);
       const calls = model.requests.length;
       expect(await questions(runId, "experience")).toEqual([]);
@@ -318,13 +319,13 @@ describe("job questions", () => {
     const messages = model.requests[0]!.messages as { content: string }[];
     const user = messages[1]!.content;
     const sent = JSON.parse(user);
-    expect(Object.keys(sent).sort()).toEqual(["answered", "focus", "gaps", "job", "language", "max", "role", "section", "steering"]);
+    expect(Object.keys(sent).sort()).toEqual(["answered", "cvLanguage", "gaps", "job", "max", "questionLanguage", "role", "section", "steering"]);
     expect(sent.role).toMatchObject({ ...b, kind: kind === "experience" ? "role" : kind,
       notes: b.notes.map((note) => ({ ...note, period: "2001-01 – 2002-12" })) });
     expect((await cv.get()).content).toEqual(content);
-    expect(sent.language).toBe("ro");
+    expect(sent.cvLanguage).toBe("ro");
     expect(sent.section).toBe(section);
-    expect(sent).toMatchObject({ max: 2, focus: false });
+    expect(sent).toMatchObject({ max: 2 });
     expect(sent.answered).toEqual([{ question: b.notes[1]!.question, answer: b.notes[1]!.answer, period: "2001-01 – 2002-12" }]);
     expect(sent.steering).toContain("They want to lean on other roles more than this one.");
     expect(sent.gaps).toContainEqual(expect.objectContaining({ ref: "r1", status: "partial" }));

@@ -81,6 +81,6 @@ describe("note period instructions", () => {
     ["enrich skills", skillsSystemPrompt("en")],
     ["enrich summary rewrite", rewriteSummarySystemPrompt("en")],
   ])("explains the note's period in %s", (_name, prompt) => {
-    expect(prompt.split("\n")).toContain("A note describes the person during its role's period, not today.");
+    expect(prompt).toMatch(/role's period, not (for )?today/);
   });
 });

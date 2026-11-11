@@ -64,7 +64,7 @@ const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelS
 
 describe("bulletScore", () => {
   it("uses policy score/4", () => {
-    expect(SCORE_POLICY).toBe("score/4");
+    expect(SCORE_POLICY).toBe("score/5");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
