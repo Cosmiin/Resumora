@@ -319,7 +319,10 @@ describe("job questions", () => {
     const messages = model.requests[0]!.messages as { content: string }[];
     const user = messages[1]!.content;
     const sent = JSON.parse(user);
-    expect(Object.keys(sent).sort()).toEqual(["answered", "cvLanguage", "gaps", "job", "max", "questionLanguage", "role", "section", "steering"]);
+    expect(Object.keys(sent).sort()).toEqual(["answered", "cvLanguage", "gaps", "job", "max", "questionLanguage", "role", "rolePeriod", "section", "steering"]);
+    // When the role ran is spelled out, so a question can fit its years.
+    expect(sent.rolePeriod).toBe(b.current ? `${b.startDate} to today` : `${b.startDate} to ${b.endDate}`);
+    expect(messages[0]!.content).toContain("a role that ended in 2015 gets no question about AI-powered or prompt based tools");
     expect(sent.role).toMatchObject({ ...b, kind: kind === "experience" ? "role" : kind,
       notes: b.notes.map((note) => ({ ...note, period: "2001-01 – 2002-12" })) });
     expect((await cv.get()).content).toEqual(content);
@@ -337,7 +340,7 @@ describe("job questions", () => {
     }
     expect(messages[0]!.content).toContain("One role at a time.");
     expect(messages[0]!.content).toContain('Do not mention another employer, role or project, and do not write "your previous roles" or "your other roles".');
-    expect(messages[0]!.content).toContain("The role ran from its startDate to its endDate, or is current. Ask only about tools, methods and practices that existed then and fit that work.");
+    expect(messages[0]!.content).toContain("\"rolePeriod\" says when the role ran. Read it before you write anything, and ask only about tools, methods and practices that were in ordinary use at work in those years and fit that work.");
     expect(messages[0]!.content).toContain("Do not add an option meaning other, something else or none of the above");
     expect(messages[0]!.content).not.toMatch(/focus role/i);
     await questions(runId, "skills");
