@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
-import { ItemLinesBodySchema, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
+import { ItemLinesBodySchema, MAX_FOCUS, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
 import { z } from "zod";
 import type { AppEnv } from "../app.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -26,8 +26,11 @@ const RoleBody = z.object({ roleId: z.string().min(1).max(64) });
 
 const ScoreBody = z.object({ roleId: z.string().min(1).max(64), fingerprint: z.string().min(1).max(64) });
 const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
-/** fresh: ask the model again with the notes in view, instead of returning the stored result. */
-const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional() });
+/**
+ * fresh: ask the model again with the notes in view, instead of returning the stored result.
+ * focus: what the person wants their CV to bring out; the model is asked again with it in view.
+ */
+const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), focus: z.string().trim().max(MAX_FOCUS).optional() });
 const BrainDumpBody = ScoreBody.extend({ source: z.enum(["ramble", "answers"]).default("ramble") });
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */

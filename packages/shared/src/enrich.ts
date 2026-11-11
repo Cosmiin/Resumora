@@ -7,6 +7,8 @@ export const SCORE_POLICY = "score/5";
 export const WEIGHTS = { contribution: 35, clarity: 25, specificity: 20, impact: 20 } as const;
 
 export const MAX_QUESTIONS = 20;
+/** The longest "what should your CV bring out" text the enrichment path sends with a score request. */
+export const MAX_FOCUS = 600;
 /** Company, purpose and tools, plus at most 5 more. */
 export const MAX_ROLE_QUESTIONS = 8;
 

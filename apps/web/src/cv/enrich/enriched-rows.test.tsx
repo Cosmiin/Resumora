@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router";
 import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
-// Task 8 (E6, 4A): "Your CV is enriched" has one row per item: roles, projects and volunteering, then "Also".
+// The result screen has one row per item (roles, projects and volunteering), then what else the path added.
 
 vi.mock("./FocusMode.tsx", async (orig) => {
   const real = await orig<typeof import("./FocusMode.tsx")>();
@@ -64,12 +64,13 @@ beforeEach(() => {
 /** Roles and the project, two lines on the first course, skip the rest, one Key achievement. */
 async function walk(after: Map<string, RoleScoreState>) {
   const view = render(<Host scores={start} />);
-  await userEvent.click(screen.getByRole("button", { name: "Start with Buyer →" }));
+  await userEvent.click(screen.getByRole("checkbox", { name: /Route planner/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
   view.rerender(<Host scores={after} />);
-  await userEvent.click(screen.getByRole("button", { name: "Next →" }));
-  await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+  await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+  await userEvent.click(screen.getByRole("button", { name: "Continue" }));
   await userEvent.type(screen.getByRole("textbox"), "Pivot tables and dashboards");
-  await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+  await userEvent.click(screen.getByRole("button", { name: "Continue" }));
   const boxes = await screen.findAllByRole("checkbox");
   await userEvent.click(boxes[0]!);
   await userEvent.click(boxes[1]!);
@@ -80,30 +81,29 @@ async function walk(after: Map<string, RoleScoreState>) {
   await userEvent.click(screen.getByRole("button", { name: "Add 1 achievement" }));
 }
 
-describe("Your CV is enriched (4A)", () => {
-  it("rows in order: roles, projects and volunteering, then Also (sections with lines added) and Key achievements", async () => {
+describe("the result of the path", () => {
+  it("rows in order: roles, projects and volunteering, then sections with lines added and Key achievements", async () => {
     await walk(new Map([["a", ready(90)], ["b", ready(82)], ["p", ready(86)]]));
-    expect(await screen.findByRole("heading", { name: "Your CV is enriched" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
     // Q1: the project counts toward the average when the CV has one: (90 + 61 + 50) / 3 → (90 + 82 + 86) / 3.
-    expect(screen.getByText("Average score 67 → 86")).toBeInTheDocument();
-    expect(screen.getByText("Projects and volunteering")).toBeInTheDocument();
-    expect(screen.getByText("Also")).toBeInTheDocument();
-    const rows = screen.getAllByRole("listitem").map((li) => li.textContent);
+    expect(screen.getByText("From 67 to 86 out of 100.")).toBeInTheDocument();
+    const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent);
     expect(rows).toEqual([
-      "Analyst · Analyst Co90", "Buyer · Buyer Co61 → 82",
-      "Route planner · Personal project50 → 86",
-      "Courses & training · 2 lines added", "Key achievements · 1 added", "Skills · 1 added",
+      "0Analyst, Analyst Co already reads clearly, so it had no questions.at 90",
+      "+21Buyer, Buyer Cofrom 61 to 82",
+      "+36Route planner, Personal projectfrom 50 to 86",
+      "+Courses & training: 2 lines added", "+Key achievements: 1 added", "+Skills: 1 added",
     ]);
     // Interests had nothing added: no row.
     expect(screen.queryByText(/Interests/)).toBeNull();
     expect(dispatched.some((a) => a.type === "markEnriched")).toBe(true);
   });
 
-  it("below 80 over every scored item: Almost there names the lowest item of any kind, and not saved as enriched", async () => {
+  it("below 80 over every scored item: names the lowest item of any kind, and not saved as enriched", async () => {
     await walk(new Map([["a", ready(90)], ["b", ready(82)], ["p", ready(60)]]));
-    expect(await screen.findByRole("heading", { name: "Almost there" })).toBeInTheDocument();
-    expect(screen.getByText("Route planner is at 60. One more pass would get you over 80.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Improve Route planner" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
+    expect(screen.getByText("Route planner is at 60. One more pass would lift it.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Answer more questions" })).toBeInTheDocument();
     expect(dispatched.some((a) => a.type === "markEnriched")).toBe(false);
   });
 

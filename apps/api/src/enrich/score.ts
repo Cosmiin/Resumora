@@ -14,7 +14,7 @@ import {
 import { AiInputRejectedError, AiOutputTooLongError, AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
-import { questionLanguageReminder, scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
+import { focusNote, questionLanguageReminder, scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
 import type { InsightsRepo } from "./repo.ts";
 
 export type ScoreDeps = {
@@ -60,8 +60,9 @@ const notSaved = () => new ApiError(409, "not_saved", "Your latest changes aren'
 export async function scoreRole(
   deps: ScoreDeps,
   /** fresh: skip the stored result and ask the model again, with the notes in view (after "Tell us about…"). */
-  input: { roleId: string; fingerprint: string; fresh?: boolean },
+  input: { roleId: string; fingerprint: string; fresh?: boolean; /** What the person wants their CV to bring out: asks again, with it in view. */ focus?: string },
 ): Promise<RoleResult> {
+  const fresh = input.fresh || !!input.focus?.trim();
   const { content } = await deps.cv.get();
   // Roles, projects and volunteering are all scored; a cached row for anything else is stale.
   const present = new Set(scoredItems(content).map(({ item }) => item.id));
@@ -77,11 +78,11 @@ export async function scoreRole(
   const inWantedLanguage = (stored: RoleResult) => (stored.questionLanguage ?? content.locale) === wanted;
   const cached = await deps.insights.get(role.id);
   let result: RoleResult;
-  if (!input.fresh && cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY && inWantedLanguage(cached)) {
+  if (!fresh && cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY && inWantedLanguage(cached)) {
     result = cached;
   } else {
     const pending = (await deps.insights.pending(role.id)).find((entry) => entry.fingerprint === input.fingerprint && entry.result.policy === SCORE_POLICY && inWantedLanguage(entry.result));
-    if (pending && !input.fresh) {
+    if (pending && !fresh) {
       result = pending.result;
     } else {
       try {
@@ -90,7 +91,7 @@ export async function scoreRole(
           task: "enrich_score",
           schema: ModelScoreSchema,
           system: scoreSystemPrompt(content.locale, wanted),
-          user: scoreUserMessage(role, undefined, found!.kind) + questionLanguageReminder(content.locale, wanted),
+          user: scoreUserMessage(role, undefined, found!.kind) + focusNote(input.focus) + questionLanguageReminder(content.locale, wanted),
           maxOutputTokens: Math.min(4000, 600 + 180 * role.bullets.length),
         });
         result = { ...buildRoleResult(role, answer, input.fingerprint), questionLanguage: wanted };

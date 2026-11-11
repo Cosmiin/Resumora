@@ -300,6 +300,21 @@ export function periodLine(role: Partial<Pick<Experience, "startDate" | "endDate
   return [`Role period (context only, not graded): ${role.startDate} – ${end}, ${role.current ? "current" : "ended"}.`];
 }
 
+/**
+ * What the person said they want their CV to bring out. It steers which questions are asked, never the grades,
+ * and it is a goal, not something that happened in this role.
+ */
+export function focusNote(focus?: string): string {
+  const text = focus?.trim();
+  if (!text) return "";
+  return [
+    "",
+    `What the person wants this CV to bring out (their own words; a goal, not a fact about this role): ${JSON.stringify(text)}`,
+    "Grade the bullets exactly as you would without it. Use it only to choose which questions to ask: prefer the missing facts that serve this goal.",
+    "Do not assume that anything in it happened in this role, and do not repeat it back in a tip or a question.",
+  ].join("\n");
+}
+
 /** The role as the model sees it: context for the title, description and period, bullets to grade. No company. */
 export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes"> & Partial<Pick<Experience, "startDate" | "endDate" | "current">>, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));

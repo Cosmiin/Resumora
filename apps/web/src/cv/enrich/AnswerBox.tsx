@@ -14,6 +14,8 @@ type Props = {
   /** The CV's language, so screen readers read the answer in it. */
   locale?: Locale;
   maxSeconds?: number;
+  /** Names the text box for screen readers, instead of "Your answer". */
+  label?: string;
   /** Replaces the default "Pick, type or speak…" placeholder. */
   placeholder?: string;
   /** No option chips (the brain dump): just the text box and the mic. */
@@ -62,7 +64,7 @@ function appendSpoken(value: string, text: string, options: string[]): string {
 const addVia = (via: Via[], how: Via): Via[] => (via.includes(how) ? via : [...via, how]);
 
 /** One question's answer: pick option chips, type, or speak. It never saves on its own. */
-export function AnswerBox({ question, value, via, onChange, locale = "en", maxSeconds = VOICE.maxSeconds, placeholder, plain = false, readOnly = false, onBusyChange }: Props) {
+export function AnswerBox({ question, value, via, onChange, locale = "en", maxSeconds = VOICE.maxSeconds, label, placeholder, plain = false, readOnly = false, onBusyChange }: Props) {
   const voice = useVoice({ locale, maxSeconds });
   const field = useRef<HTMLTextAreaElement>(null);
   // spoken pieces can arrive faster than re-renders, so they build on the latest text
@@ -99,7 +101,7 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
 
   return (
     <div className={plain ? "answer-box is-plain" : "answer-box"}>
-      {!plain && <div className="answer-opts" role="group" aria-label={t("enrich.answer.options")}>
+      {!plain && question.options.length > 0 && <div className="answer-opts" role="group" aria-label={t("enrich.answer.options")}>
         {question.options.map((o, i) => (
           <button
             key={`${i}:${o}`}
@@ -119,7 +121,7 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
         <textarea
           ref={field}
           lang={locale}
-          aria-label={t("enrich.answer.label")}
+          aria-label={label ?? t("enrich.answer.label")}
           placeholder={placeholder ?? t("enrich.answer.placeholder")}
           value={value}
           readOnly={readOnly}

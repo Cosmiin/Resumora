@@ -9,7 +9,7 @@ import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryPanel } from "./HistoryPanel.tsx";
 import { whenLabel } from "./historyFormat.ts";
 import { AppShell } from "../layout/AppShell.tsx";
-import { ImportButton } from "../imports/ImportButton.tsx";
+import { ImportButton, UploadDrop } from "../imports/ImportButton.tsx";
 import { ImportScreen } from "../imports/ImportScreen.tsx";
 import { CvDocument } from "./page/CvDocument.tsx";
 import { EditablePage } from "./edit/EditablePage.tsx";
@@ -24,6 +24,8 @@ import { useRoleScores } from "./enrich/useRoleScores.ts";
 import { FocusOpenProvider, type FocusTarget } from "./enrich/focus-context.ts";
 import { FocusMode } from "./enrich/FocusMode.tsx";
 import { EnrichPath } from "./enrich/EnrichPath.tsx";
+import { PathSteps } from "./enrich/PathStart.tsx";
+import { CvFacts, isBlankCv, useStartTemplate } from "./CvFacts.tsx";
 import { useSearchParams } from "react-router";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
@@ -62,6 +64,11 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   const [historyOpen, setHistoryOpen] = useState(false);
   const [restoreFailed, setRestoreFailed] = useState(false);
   const [importId, setImportId] = useState<string | null>(null);
+  // An import used without the questions: the page says they are waiting, until they are started or dismissed.
+  const [questionsWaiting, setQuestionsWaiting] = useState(false);
+  // With no CV yet the page starts with the upload; "write it from scratch" opens the empty page instead.
+  const [fromScratch, setFromScratch] = useState(false);
+  const startTemplate = useStartTemplate(!isTailored);
   const dialogOpen = historyOpen || importId !== null;
   const [preview, setPreview] = useState<{ content: CvContent; createdAt: string } | null>(null);
   const historyButton = useRef<HTMLButtonElement>(null);
@@ -207,22 +214,82 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       onRetry={retry}
       waitForSave={waitForSave}
       original={tailored?.original}
-      onEnrich={isTailored ? undefined : () => setPathOpen(true)}
       tailored={isTailored}
+      top={isTailored ? undefined : (
+        <CvFacts cv={content} scores={roleScores.scores} template={startTemplate.template} onTemplate={startTemplate.choose} templateFailed={startTemplate.failed} />
+      )}
     />
   );
 
   const page = historyOpen ? (
-    <CvDocument content={preview?.content ?? content} showUnsorted />
+    <CvDocument content={preview?.content ?? content} template={isTailored ? undefined : startTemplate.template} showUnsorted />
   ) : tailored && showChanges ? (
     <CvDocument content={content} template={tailored.template} highlights={tailored.highlights} inferred={tailored.inferred} sectionAction={tailored.sectionAction} />
   ) : (
-    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} template={tailored?.template} sectionAction={tailored?.sectionAction} tailored={isTailored} />
+    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} template={tailored ? tailored.template : startTemplate.template} sectionAction={tailored?.sectionAction} tailored={isTailored} />
   );
+
+  const importScreen = importId && (
+    <ImportScreen
+      importId={importId}
+      canApply={status === "saved"}
+      replaces={!isBlankCv(content)}
+      currentVersion={autosave.currentVersion}
+      onClose={() => setImportId(null)}
+      onApplied={(cv, next) => {
+        autosave.reset(cv);
+        clearOpened();
+        setImportId(null);
+        if (next === "questions") setPathOpen(true);
+        else setQuestionsWaiting(cv.content.experience.length > 0);
+      }}
+      onConflict={(c) => {
+        autosave.reportConflict(c);
+        setImportId(null);
+      }}
+    />
+  );
+
+  // No CV yet: the flow starts with the upload.
+  if (!isTailored && !fromScratch && !pathOpen && isBlankCv(content)) {
+    return (
+      <AppShell inert={importId !== null}>
+        <main className="ui-page cv-start-page">
+          <div className="ui-wrap cv-start" inert={importId !== null}>
+            <PathSteps current={0} />
+            <h1 className="ui-title">{t("cv.start.title")}</h1>
+            <p className="ui-lead">{t("cv.start.line")}</p>
+            <UploadDrop onStarted={setImportId} />
+            <button type="button" className="ui-btn ui-btn--quiet" onClick={() => setFromScratch(true)}>{t("cv.start.scratch")}</button>
+          </div>
+          {importScreen}
+        </main>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell actions={actions} inert={importId !== null || covered}>
       <main className="editor">
+      {!isTailored && (
+        <header className="cv-head" inert={importId !== null || covered}>
+          <div>
+            <h1 className="ui-title">{t("cv.head.title")}</h1>
+            <p className="ui-lead">{t("cv.head.line")}</p>
+          </div>
+          <button type="button" className="ui-btn enrich-open" onClick={() => setPathOpen(true)}>{t("enrich.path.open")}</button>
+        </header>
+      )}
+      {questionsWaiting && !covered && !historyOpen && (
+        <div className="ui-notice ui-notice--info cv-waiting" role="status" inert={importId !== null}>
+          <span>{t("cv.waiting.line")}</span>
+          <button type="button" className="ui-btn ui-btn--sm" onClick={() => {
+            setQuestionsWaiting(false);
+            setPathOpen(true);
+          }}>{t("import.start")}</button>
+          <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm" onClick={() => setQuestionsWaiting(false)}>{t("cv.waiting.dismiss")}</button>
+        </div>
+      )}
       {/* While an import is open the whole workspace is inert. While history is open only the page is,
           so a restore can't race the user's typing; the history panel stays usable. */}
       {/* No focus mode on a tailored CV: without the opener, the ✨ bullet and role buttons render nothing. */}
@@ -277,23 +344,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
           onClose={closeFocus}
         />
       )}
-      {importId && (
-        <ImportScreen
-          importId={importId}
-          canApply={status === "saved"}
-          currentVersion={autosave.currentVersion}
-          onClose={() => setImportId(null)}
-          onApplied={(cv) => {
-            autosave.reset(cv);
-            clearOpened();
-            setImportId(null);
-          }}
-          onConflict={(c) => {
-            autosave.reportConflict(c);
-            setImportId(null);
-          }}
-        />
-      )}
+      {importScreen}
       </main>
     </AppShell>
   );

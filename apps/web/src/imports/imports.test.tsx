@@ -42,7 +42,8 @@ const ready = imp("ready", { result: { content: imported, warnings: ["Check the 
 const pdf = () => new File(["%PDF-1.4 test"], "cv.pdf", { type: "application/pdf" });
 
 const summaryOf = (dialog: HTMLElement) => within(within(dialog).getByRole("complementary", { name: "We organized your CV" }));
-const useThisCv = (dialog: HTMLElement) => within(dialog).findAllByRole("button", { name: "Use this CV" }).then((all) => all[0]!);
+/** Uses the import and goes to the CV page (the other button goes on into the questions). */
+const useThisCv = (dialog: HTMLElement) => within(dialog).findByRole("button", { name: "Skip for now" });
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -98,12 +99,16 @@ describe("CV import", () => {
     importsApi.getImport.mockResolvedValueOnce(imp("queued")).mockResolvedValueOnce(imp("processing")).mockResolvedValue(ready);
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     expect(within(dialog).getByText("Reading your CV…")).toBeInTheDocument();
 
     await advance(2000);
     await advance(2000);
-    expect(await within(dialog).findByText("Ana Popescu")).toBeInTheDocument();
+    expect(await within(dialog).findByRole("heading", { name: "We found 1 role" })).toBeInTheDocument();
+    // The name shows on the summary sheet and on the full page under "Something is wrong or missing".
+    expect(within(dialog).getAllByText("Ana Popescu")).toHaveLength(2);
+    expect(within(dialog).getByText("2019 – Mar 2024, 1 bullet")).toBeInTheDocument();
+    expect(within(dialog).getByText("Your CV is in English.")).toBeInTheDocument();
     expect(within(dialog).getByText("Senior Product Manager")).toBeInTheDocument();
     expect(within(dialog).getByText("Check the dates of Acme SRL.")).toBeInTheDocument();
     expect(within(dialog).getByText("Led the redesign.")).toBeInTheDocument();
@@ -121,7 +126,7 @@ describe("CV import", () => {
     importsApi.getImport.mockResolvedValue(ready);
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     expect(await within(dialog).findByText("1 skill to sort")).toBeInTheDocument();
     expect(within(dialog).getAllByText("Management").length).toBeGreaterThan(0);
     expect(within(dialog).getByText("You can sort these right after using the CV.")).toBeInTheDocument();
@@ -139,7 +144,7 @@ describe("CV import", () => {
     importsApi.getImport.mockResolvedValue(imp("ready", { result: { content, warnings: ["A", "B"], sourceHeadings: [], unsourcedLines: [], isScan: false } }));
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     expect(await within(dialog).findByText("2 skills to sort")).toBeInTheDocument();
     expect(within(dialog).getByText("2 things to confirm")).toBeInTheDocument();
     expect(summaryOf(dialog).getByText("Roles").nextElementSibling).toHaveTextContent("3");
@@ -158,7 +163,7 @@ describe("CV import", () => {
     importsApi.getImport.mockResolvedValue(imp("ready", { result: { content, warnings: [], sourceHeadings: [], unsourcedLines: [], isScan: false } }));
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     await within(dialog).findByText("PSM I");
     expect(summaryOf(dialog).getByText("Sections").nextElementSibling).toHaveTextContent("6");
   });
@@ -169,7 +174,7 @@ describe("CV import", () => {
     const header = (await screen.findByRole("button", { name: "Import CV" })).closest("header")!;
     expect(header.closest("[inert]")).toBeNull();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     expect(header.closest("[inert]")).not.toBeNull();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(header.closest("[inert]")).toBeNull();
@@ -180,7 +185,7 @@ describe("CV import", () => {
     importsApi.getImport.mockResolvedValue(imp("queued"));
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     expect(dialog).toContainElement(document.activeElement as HTMLElement);
   });
 
@@ -192,7 +197,7 @@ describe("CV import", () => {
     expect(field.closest("[inert]")).toBeNull();
     expect(panel.closest("[inert]")).toBeNull();
     await chooseFile(pdf());
-    await screen.findByRole("dialog", { name: "Import review" });
+    await screen.findByRole("dialog", { name: "Import your CV" });
     expect(field.closest("[inert]")).not.toBeNull();
     expect(panel.closest("[inert]")).not.toBeNull();
   });
@@ -203,9 +208,10 @@ describe("CV import", () => {
     );
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     expect(await within(dialog).findByText("This doesn't look like a CV. Upload your CV as PDF or Word.")).toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Use this CV" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Start with the questions" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Skip for now" })).not.toBeInTheDocument();
   });
 
   it("applies and replaces the editor content", async () => {
@@ -213,11 +219,11 @@ describe("CV import", () => {
     importsApi.applyImport.mockResolvedValue({ version: 4, updatedAt: "2026-11-04T10:05:00Z" });
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     await user.click(await useThisCv(dialog));
 
     expect(importsApi.applyImport).toHaveBeenCalledWith("imp-1", 3);
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import your CV" })).not.toBeInTheDocument());
     expect(screen.getByRole("textbox", { name: "Full name" })).toHaveValue("Ana Popescu");
     expect(screen.getByRole("textbox", { name: "Title 1" })).toHaveValue("Senior Product Manager");
     expect(screen.getByText("Saved")).toBeInTheDocument();
@@ -231,7 +237,7 @@ describe("CV import", () => {
     renderPage();
     await user.type(await screen.findByRole("textbox", { name: "Full name" }), "!");
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     const useIt = await useThisCv(dialog);
     expect(useIt).toBeDisabled();
     expect(within(dialog).getByText("Saving your changes first…")).toBeInTheDocument();
@@ -250,16 +256,16 @@ describe("CV import", () => {
     );
     renderPage();
     await chooseFile(pdf());
-    await user.click(await useThisCv(await screen.findByRole("dialog", { name: "Import review" })));
+    await user.click(await useThisCv(await screen.findByRole("dialog", { name: "Import your CV" })));
     expect(await screen.findByText("This CV was saved in another tab or device.")).toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Import your CV" })).not.toBeInTheDocument();
   });
 
   it("keeps waiting for a slow import, then stops after 20 minutes", async () => {
     importsApi.getImport.mockResolvedValue(imp("processing"));
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     await advance(5 * 60_000);
     expect(within(dialog).getByText("Reading your CV…")).toBeInTheDocument();
     await advance(15 * 60_000);
@@ -273,10 +279,10 @@ describe("CV import", () => {
     importsApi.getImport.mockResolvedValue(ready);
     renderPage();
     await chooseFile(pdf());
-    const dialog = await screen.findByRole("dialog", { name: "Import review" });
-    await within(dialog).findByText("Ana Popescu");
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
+    await within(dialog).findByRole("heading", { name: "We found 1 role" });
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Import your CV" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Full name" })).toHaveValue("Current");
     expect(importsApi.applyImport).not.toHaveBeenCalled();
   });
@@ -288,7 +294,7 @@ describe("import review: where each heading went", () => {
   const open = async () => {
     renderPage();
     await chooseFile(pdf());
-    return screen.findByRole("dialog", { name: "Import review" });
+    return screen.findByRole("dialog", { name: "Import your CV" });
   };
 
   it("the review lists each original heading with its category", async () => {
@@ -320,7 +326,7 @@ describe("import review: where each heading went", () => {
     expect(version).toBe(4);
     expect(content.interests.map((i: { name: string }) => i.name)).toEqual(["Chess", "Hiking"]);
     expect(content.custom).toEqual([]);
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import your CV" })).not.toBeInTheDocument());
   });
 
   it("a failed save of the moves keeps the review open, and retry saves only the moves", async () => {
@@ -333,9 +339,9 @@ describe("import review: where each heading went", () => {
     await user.selectOptions(await within(dialog).findByRole("combobox", { name: "Move Hobby-uri to" }), "interests");
     await user.click(await useThisCv(dialog));
     expect(await within(dialog).findByText("Imported, but your moves weren't saved. Try again.")).toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "Import review" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Import your CV" })).toBeInTheDocument();
     await user.click(await useThisCv(dialog));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import your CV" })).not.toBeInTheDocument());
     expect(importsApi.applyImport).toHaveBeenCalledTimes(1);
     expect(cvApi.saveCv.mock.calls.at(-1)![1]).toBe(4);
   });
@@ -369,7 +375,7 @@ describe("import review: where each heading went", () => {
     await user.click(await useThisCv(dialog));
     await within(dialog).findByText("Imported, but your moves weren't saved. Try again.");
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import review" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Import your CV" })).not.toBeInTheDocument());
     // The editor now holds the imported CV at the version the server applied it with.
     expect(await screen.findByRole("textbox", { name: "Full name" })).toHaveValue("Ana Popescu");
     expect(cvApi.saveCv).toHaveBeenCalledTimes(1);
@@ -402,7 +408,7 @@ describe("import review: where each heading went", () => {
     const scan = "This file is a scan. Check every line.";
     importsApi.getImport.mockResolvedValue(withResult(imported, { isScan: true, warnings: [scan] }));
     const dialog = await open();
-    await within(dialog).findByText("Ana Popescu");
+    await within(dialog).findByRole("heading", { name: "We found 1 role" });
     expect(within(dialog).getAllByText(scan)).toHaveLength(1);
   });
 
@@ -410,5 +416,69 @@ describe("import review: where each heading went", () => {
     importsApi.getImport.mockResolvedValue(withResult(imported));
     const dialog = await open();
     expect(await within(dialog).findByText("Recruiters read this first. Two to four sentences is enough.")).toBeInTheDocument();
+  });
+});
+
+describe("the start of the base CV flow", () => {
+  const blank = { content: emptyCv(), version: 1, updatedAt: "2026-11-04T10:00:00Z" };
+
+  it("with no CV yet the page starts with the upload, and the import goes straight into the questions", async () => {
+    cvApi.getCv.mockResolvedValue(blank);
+    importsApi.getImport.mockResolvedValue(ready);
+    importsApi.applyImport.mockResolvedValue({ version: 2, updatedAt: "2026-11-04T10:05:00Z" });
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Start with the CV you have" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose a file" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Import CV" })).toBeNull();
+    await chooseFile(pdf());
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
+    await within(dialog).findByRole("heading", { name: "We found 1 role" });
+    // Nothing is replaced, so nothing is said about History.
+    expect(within(dialog).queryByText("Your current CV is kept in History, so you can go back.")).toBeNull();
+    await user.click(within(dialog).getByRole("button", { name: "Start with the questions" }));
+    expect(importsApi.applyImport).toHaveBeenCalledWith("imp-1", 1);
+    expect(await screen.findByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Product Manager, Acme SRL/ })).toBeChecked();
+  });
+
+  it("a file that is not a CV is refused on the upload screen", async () => {
+    cvApi.getCv.mockResolvedValue(blank);
+    renderPage();
+    await screen.findByRole("heading", { name: "Start with the CV you have" });
+    await chooseFile(new File(["x"], "photo.png", { type: "image/png" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Upload your CV as a PDF or Word (.docx) file.");
+    expect(importsApi.startImport).not.toHaveBeenCalled();
+  });
+
+  it("writing it from scratch opens the empty page instead", async () => {
+    cvApi.getCv.mockResolvedValue(blank);
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "I'd rather write it from scratch" }));
+    expect(screen.getByRole("textbox", { name: "Full name" })).toHaveValue("");
+    expect(screen.getByRole("heading", { name: "My CV" })).toBeInTheDocument();
+  });
+
+  it("Skip for now shows the CV with the questions waiting; starting them opens the focus step", async () => {
+    importsApi.getImport.mockResolvedValue(ready);
+    importsApi.applyImport.mockResolvedValue({ version: 4, updatedAt: "2026-11-04T10:05:00Z" });
+    renderPage();
+    await chooseFile(pdf());
+    await user.click(await useThisCv(await screen.findByRole("dialog", { name: "Import your CV" })));
+    const notice = await screen.findByText("Your CV is imported as it was. The questions are waiting whenever you have 10 minutes.");
+    await user.click(within(notice.parentElement!).getByRole("button", { name: "Start with the questions" }));
+    expect(await screen.findByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
+    expect(screen.queryByText("Your CV is imported as it was. The questions are waiting whenever you have 10 minutes.")).toBeNull();
+  });
+
+  it("the waiting notice can be dismissed", async () => {
+    importsApi.getImport.mockResolvedValue(ready);
+    importsApi.applyImport.mockResolvedValue({ version: 4, updatedAt: "2026-11-04T10:05:00Z" });
+    renderPage();
+    await chooseFile(pdf());
+    await user.click(await useThisCv(await screen.findByRole("dialog", { name: "Import your CV" })));
+    const notice = await screen.findByText("Your CV is imported as it was. The questions are waiting whenever you have 10 minutes.");
+    await user.click(within(notice.parentElement!).getByRole("button", { name: "Not now" }));
+    expect(screen.queryByText("Your CV is imported as it was. The questions are waiting whenever you have 10 minutes.")).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Full name" })).toHaveValue("Ana Popescu");
   });
 });

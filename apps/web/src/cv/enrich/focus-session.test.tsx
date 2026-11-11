@@ -1000,3 +1000,25 @@ describe("a role the AI called thin, after the box (review fix)", () => {
     expect(h.result.current.step.kind).toBe("dumpPick");
   });
 });
+
+describe("a session opened with what the person wants their CV to bring out", () => {
+  it("asks for the role's questions again with it, even when a stored result is fresh, and uses that answer", async () => {
+    const r = role();
+    api.scoreRole.mockResolvedValue({ ...score(r), roleQuestions });
+    const h = mount({ focus: "Move into automation" }, r);
+    expect(h.result.current.step).toEqual({ kind: "scoring", source: "opening" });
+    await settle();
+    expect(api.scoreRole).toHaveBeenCalledExactlyOnceWith("r", fingerprint(r, "en"), true, "Move into automation");
+    // The stored result has no role questions; the answer asked with the focus does.
+    expect(h.result.current.step).toEqual({ kind: "role", index: 0 });
+    expect(h.result.current.roleQuestions.map((q) => q.text)).toEqual(["Who did you report to?", "Who did you work with?"]);
+  });
+
+  it("falls back to the stored result when that call fails", async () => {
+    const r = role();
+    api.scoreRole.mockRejectedValue(new Error("down"));
+    const h = mount({ focus: "Move into automation" }, r);
+    await settle();
+    expect(h.result.current.step.kind).toBe("question");
+  });
+});

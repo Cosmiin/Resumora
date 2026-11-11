@@ -119,14 +119,14 @@ describe("CV editor", () => {
       withCv({ basics });
       renderPage();
       await userEvent.click(await screen.findByRole("button", { name: "Enrich my CV" }));
-      expect(screen.getByRole("heading", { name: "Let's make your CV stronger, one step at a time" })).toBeInTheDocument();
-      await userEvent.click(screen.getByRole("button", { name: "Not now" }));
+      expect(screen.getByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Skip for now" }));
       expect(screen.queryByRole("dialog", { name: "Enrich your CV" })).toBeNull();
     });
     it("/cv?enrich=1 opens it on arrival", async () => {
       withCv({ basics });
       renderPage("/cv?enrich=1");
-      expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one step at a time" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
     });
   });
 
@@ -196,7 +196,7 @@ describe("CV editor", () => {
     const summary = await screen.findByRole("textbox", { name: "Summary" });
     expect(summary.closest("[inert]")).toBeNull();
     await user.upload(screen.getByLabelText("Choose a CV file"), new File(["%PDF-1.4 test"], "cv.pdf", { type: "application/pdf" }));
-    await screen.findByRole("dialog", { name: "Import review" });
+    await screen.findByRole("dialog", { name: "Import your CV" });
     expect(summary.closest("[inert]")).not.toBeNull();
     expect(screen.getByRole("complementary", { name: "Helper panel" }).closest("[inert]")).not.toBeNull();
   });
@@ -209,6 +209,8 @@ describe("CV editor", () => {
       }),
     );
     renderPage();
+    // A brand-new account starts on the upload; this person writes the CV by hand instead.
+    await user.click(await screen.findByRole("button", { name: "I'd rather write it from scratch" }));
     await user.type(await screen.findByRole("textbox", { name: "Full name" }), "Mine");
     expect(await screen.findByText("This CV was saved in another tab or device.", {}, { timeout: 3000 })).toBeInTheDocument();
 
@@ -254,7 +256,8 @@ describe("CV editor", () => {
     renderPage();
     const retry = await screen.findByRole("button", { name: "Try again" });
     await userEvent.click(retry);
-    expect(await screen.findByRole("textbox", { name: "Full name" })).toBeInTheDocument();
+    // The CV loaded (it is empty, so the page starts with the upload).
+    expect(await screen.findByRole("heading", { name: "Start with the CV you have" })).toBeInTheDocument();
   });
 
   it("sorts an unclear skill from the panel and saves it", async () => {

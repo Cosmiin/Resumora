@@ -2,16 +2,13 @@ import { CATEGORY, missingCategories, SCAN_WARNING, type ImportResult, type Move
 import { t } from "../i18n/t.ts";
 import { HeadingMap } from "./HeadingMap.tsx";
 
-/** The right-hand panel of the import review: what was found, what needs a look, and the "use it" button. */
+/** The details of an import: what was found, where each heading went, and what needs a look. */
 export function ImportSummary(props: {
   result: ImportResult;
-  canApply: boolean;
-  applying: boolean;
-  onApply(): void;
   onMove(customId: string, target: MoveTarget, headingIndex: number): void;
 }) {
-  const { result, canApply, applying, onApply, onMove } = props;
-  const { content: cv, sourceHeadings, unsourcedLines, isScan } = result;
+  const { result, onMove } = props;
+  const { content: cv, sourceHeadings, unsourcedLines } = result;
   const warnings = result.warnings.filter((w) => w !== SCAN_WARNING);
   const flags = missingCategories(cv).filter((f, i, all) => all.findIndex((o) => o.key === f.key) === i);
   const unsorted = cv.unclearSkills;
@@ -30,14 +27,11 @@ export function ImportSummary(props: {
 
   return (
     <aside className="import-summary" aria-label={t("import.summary.title")}>
-      <h2 className="import-summary-title">{t("import.summary.title")}</h2>
       <dl className="import-counts">
         <div><dt>{t("import.summary.roles")}</dt><dd>{cv.experience.length}</dd></div>
         <div><dt>{t("import.summary.skills")}</dt><dd>{skills}</dd></div>
         <div><dt>{t("import.summary.sections")}</dt><dd>{sections}</dd></div>
       </dl>
-
-      {isScan && <p role="alert" className="import-note import-note-warn">{t("import.scan")}</p>}
 
       <HeadingMap headings={sourceHeadings} content={cv} onMove={onMove} />
 
@@ -69,9 +63,6 @@ export function ImportSummary(props: {
           <ul>{warnings.map((w) => <li key={w}>{w}</li>)}</ul>
         </section>
       )}
-
-      <p className="import-summary-kept">{t("import.summary.kept")}</p>
-      <button type="button" className="import-apply" disabled={!canApply || applying} onClick={onApply}>{t("import.apply")}</button>
     </aside>
   );
 }

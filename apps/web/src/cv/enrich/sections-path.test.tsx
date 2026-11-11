@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, renderHook, screen, within } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { emptyCv, fingerprint, notesHash, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
@@ -13,7 +13,7 @@ vi.mock("./FocusMode.tsx", async (orig) => {
     ...real,
     FocusMode: (props: Parameters<typeof real.FocusMode>[0]) => (props.target.roleId.startsWith("real-") ? real.FocusMode(props) : (
       <div data-testid="focus">
-        {props.topBar}
+        <p>{props.context}</p>
         <p>Session for {props.target.roleId}</p>
         <button type="button" onClick={() => props.next?.onNext()}>{props.next?.label}</button>
         <button type="button" onClick={props.onClose}>✕ Close</button>
@@ -77,67 +77,70 @@ function Path({ cv = full, s = scores, onClose = () => {} }: { cv?: CvContent; s
 describe("path start (1A)", () => {
   it("groups roles, then projects and volunteering, listing only items below 80, and a quick-pass row", () => {
     render(<Path />);
-    expect(screen.getByRole("heading", { name: "Let's make your CV stronger, one step at a time" })).toBeInTheDocument();
-    expect(screen.getByText("About 3 minutes per role · 1 per section")).toBeInTheDocument();
-    const roles = screen.getByRole("list", { name: "Your roles" });
-    expect(within(roles).getAllByRole("listitem").map((li) => li.textContent)).toEqual([expect.stringContaining("Buyer")]);
-    const other = screen.getByRole("list", { name: "Projects and volunteering" });
-    const rows = within(other).getAllByRole("listitem").map((li) => li.textContent);
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toContain("Chess bot");
-    expect(rows[0]).toContain("40");
-    expect(rows[1]).toContain("Food bank helper");
+    expect(screen.getByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes).toHaveLength(3);
+    // The role starts ticked; projects and volunteering are offered under their own label, unticked.
+    expect(boxes[0]).toHaveAccessibleName(/Buyer/);
+    expect(boxes[0]).toBeChecked();
+    expect(screen.getByText("Projects and volunteering")).toBeInTheDocument();
+    expect(boxes[1]).toHaveAccessibleName(/Chess bot/);
+    expect(boxes[1]).not.toBeChecked();
+    expect(boxes[2]).toHaveAccessibleName(/Food bank helper/);
+    expect(boxes[2]).not.toBeChecked();
+    expect(screen.getByText("1 of 3 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
     // Only lighter items with no lines yet are counted (Q3): the Git course has lines.
-    expect(screen.getByText("Courses & training · 2 · Awards and honors · 1 · Interests · 3")).toBeInTheDocument();
+    expect(screen.getByText("After that, a quick pass with no questions: Courses & training (2), Awards and honors (1), Interests (3).")).toBeInTheDocument();
   });
 
   it("shows no projects group when the CV has no projects or volunteering", () => {
     render(<Path cv={{ ...full, projects: [], volunteering: [] }} />);
-    expect(screen.queryByRole("list", { name: "Projects and volunteering" })).toBeNull();
     expect(screen.queryByText("Projects and volunteering")).toBeNull();
   });
 
   it("finishing the last role opens the first project, then volunteering, with their own top bar", async () => {
     render(<Path />);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer →" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Chess bot/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Food bank helper/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
     expect(screen.getByText("Session for b")).toBeInTheDocument();
     expect(screen.getByText("Role 1 of 1")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(screen.getByText("Session for p2")).toBeInTheDocument();
     expect(screen.getByText("Project 1 of 1")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Next →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(screen.getByText("Session for v1")).toBeInTheDocument();
     expect(screen.getByText("Volunteering 1 of 1")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.queryByTestId("focus")).toBeNull();
     // Then the lighter items with no lines yet (Task 7).
-    expect(screen.getByText("Courses & training · 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Courses & training, 1 of 2")).toBeInTheDocument();
   });
 
   it("✕ and reopen start at the first item still below 80, roles or not", async () => {
     const onClose = vi.fn();
     const { unmount } = render(<Path onClose={onClose} />);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
     await userEvent.click(screen.getByRole("button", { name: "✕ Close" }));
     expect(onClose).toHaveBeenCalledTimes(1);
     unmount();
     render(<Path s={new Map(scores).set("b", ready(84))} />);
-    expect(screen.queryByRole("list", { name: "Your roles" })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Start with Chess bot →" }));
+    expect(screen.queryByRole("checkbox", { name: /Buyer/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Start with Chess bot" }));
     expect(screen.getByText("Session for p2")).toBeInTheDocument();
   });
 });
 
 describe("focus mode on a project", () => {
-  it("says Your project and project score", () => {
+  it("says it is a project, with the project score", () => {
     const p = { ...project("real-p", "Route planner"), bullets: [{ id: "rb", text: "Built a planner." }] };
     const cv: CvContent = { ...emptyCv(), projects: [p] };
     const result: RoleResult = { roleId: "real-p", policy: "score/4", fingerprint: fingerprint(p, "en"), score: 50, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false };
     render(<FocusMode target={{ roleId: "real-p", mode: "improve" }} cv={cv} dispatch={() => {}} scores={new Map([["real-p", { state: "ready", result }]])}
       waitForSave={() => Promise.resolve()} onClose={() => {}} />);
-    expect(screen.getByText("Your project")).toBeInTheDocument();
+    expect(screen.getByText("This project on your CV")).toBeInTheDocument();
     expect(screen.getByText("project score")).toBeInTheDocument();
-    expect(screen.getByText("Route planner")).toBeInTheDocument();
+    expect(screen.getAllByText("Route planner").length).toBeGreaterThan(0);
   });
 });
 
