@@ -210,7 +210,7 @@ function Diffs() {
   const decide = (id: string) => (decision: DiffDecision | null) => setDecisions((all) => ({ ...all, [id]: decision }));
   return (
     <Section title="DiffRow">
-      <Sheet aria-label="Bullets for this role">
+      <div aria-label="Bullets for this role" style={{ display: "grid", gap: 16 }}>
         <DiffRow
           textLang="en"
           oldText="Build and maintain 10–30 automations in Zapier and Make"
@@ -237,7 +237,7 @@ function Diffs() {
           onDecide={decide("c")}
         />
         <DiffRow textLang="en" oldText="Fix failed automations and add alerts so problems are caught sooner" newText={null} decision={null} onDecide={() => undefined} />
-      </Sheet>
+      </div>
     </Section>
   );
 }

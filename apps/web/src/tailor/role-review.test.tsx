@@ -38,7 +38,7 @@ const rows = () => screen.getAllByRole("article");
 const press = (row: HTMLElement, name: string) => userEvent.setup().click(within(row).getByRole("button", { name }));
 
 describe("RoleReview: a role's suggestions as a list", () => {
-  it("lists the role's lines in CV order, each with its suggestion, its reason and the guess marked; a line with no suggestion says so", () => {
+  it("lists the role's suggestions side by side, each with its reason; a suggestion starts chosen, a guess waits; lines with none are gathered below", () => {
     review({ position: "Role 1 of 2", keywords: { has: 2, total: 5 } });
     expect(screen.getByRole("heading", { level: 1, name: "Business Analyst, Emedi" })).toBeInTheDocument();
     expect(screen.getByText("Role 1 of 2 · Mar 2021 – Present")).toBeInTheDocument();
@@ -47,37 +47,49 @@ describe("RoleReview: a role's suggestions as a list", () => {
     expect(rows()[0]).toHaveTextContent("Owns reporting for sales.");
     expect(rows()[0]).toHaveTextContent("Owns reporting and KPI dashboards for sales.");
     expect(rows()[1]).toHaveTextContent("Made weekly KPI reports");
-    expect(within(rows()[1]!).queryByText("Inferred, please confirm")).toBeNull();
-    expect(within(rows()[2]!).getByText("Inferred, please confirm")).toBeInTheDocument();
+    expect(within(rows()[1]!).queryByText("Please check this one")).toBeNull();
+    expect(within(rows()[1]!).getByRole("button", { name: "Use this" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(rows()[2]!).getByText("Please check this one")).toBeInTheDocument();
+    expect(within(rows()[2]!).getByRole("button", { name: "Yes, it's true. Use it" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(rows()[2]!).getByRole("button", { name: "Keep mine" })).toHaveAttribute("aria-pressed", "false");
     expect(within(rows()[2]!).getByText("From your answer: worked with sales leads")).toBeInTheDocument();
+    expect(screen.getByText("Already fit the job · no change")).toBeInTheDocument();
     expect(rows()[3]).toHaveTextContent("Ran workshops");
     expect(within(rows()[3]!).getByText("This bullet already fits the job. No change suggested.")).toBeInTheDocument();
     expect(within(rows()[3]!).queryByRole("button")).toBeNull();
-    expect(screen.getByText("0 of 3 decided")).toBeInTheDocument();
+    expect(screen.getByText("2 of 3 decided")).toBeInTheDocument();
+    expect(screen.getByText("A line you have not checked stays as it is on your CV.")).toBeInTheDocument();
   });
 
-  it("sends each decision as made: kept, used, and reworded with the person's own text; an undecided line is left out", async () => {
+  it("sends each decision as made: kept, and reworded with the person's own text; a guess nobody confirmed stays off the CV", async () => {
     const onAccept = review();
-    await press(rows()[0]!, "Keep");
-    await press(rows()[1]!, "Edit");
+    await press(rows()[0]!, "Keep mine");
+    await press(rows()[1]!, "Edit the new line myself");
     const box = within(rows()[1]!).getByRole("textbox");
     await userEvent.clear(box);
     await userEvent.type(box, "Made weekly KPI reports for sales");
     await press(rows()[1]!, "Save edit");
     expect(screen.getByText("2 of 3 decided")).toBeInTheDocument();
-    expect(screen.getByText("Lines you leave undecided take the suggestion.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(onAccept).toHaveBeenCalledWith({
-      decisions: [{ itemId: "r1", keep: false }, { itemId: "b1", keep: true, text: "Made weekly KPI reports for sales" }], inferred: [], flags: [],
+      decisions: [{ itemId: "r1", keep: false }, { itemId: "b1", keep: true, text: "Made weekly KPI reports for sales" }, { itemId: "b2", keep: false }], inferred: [], flags: [],
     });
+  });
+
+  it("an untouched suggestion is left out, so it is used; a guess is used once the person says it is true", async () => {
+    const onAccept = review();
+    await press(rows()[2]!, "Yes, it's true. Use it");
+    expect(screen.getByText("3 of 3 decided")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "b2", keep: true }], inferred: [], flags: [] });
   });
 
   it("Accept all for this role uses every suggestion still undecided and keeps the decisions already made", async () => {
     const onAccept = review();
-    await press(rows()[1]!, "Keep");
+    await press(rows()[1]!, "Keep mine");
     await userEvent.click(screen.getByRole("button", { name: "Accept all for this role" }));
     expect(screen.getByText("3 of 3 decided")).toBeInTheDocument();
-    expect(screen.queryByText("Lines you leave undecided take the suggestion.")).toBeNull();
+    expect(screen.queryByText("A line you have not checked stays as it is on your CV.")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(onAccept).toHaveBeenCalledWith({
       decisions: [{ itemId: "r1", keep: true }, { itemId: "b1", keep: false }, { itemId: "b2", keep: true }], inferred: [], flags: [],
@@ -158,9 +170,9 @@ describe("the Experience review in the flow", () => {
     expect(redoRole).toHaveBeenCalledWith("run1", "r1", [{ questionId: "q1", value: "Daily", via: "typed" }]);
 
     const card = await screen.findByRole("region", { name: "Business Analyst, Emedi" });
-    expect(within(card).getByText("Made daily KPI reports")).toBeInTheDocument();
+    expect(card.querySelector(".ui-diff-new .ui-diff-text")).toHaveTextContent("Made daily KPI reports");
     expect(within(card).getByText("Role 1 of 1 · Mar 2021 – Present")).toBeInTheDocument();
-    await user.click(within(card).getByRole("button", { name: "Use new" }));
+    await user.click(within(card).getByRole("button", { name: "Use this" }));
     await user.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [], roleId: "r1" });
     expect(acceptRole).not.toHaveBeenCalled();

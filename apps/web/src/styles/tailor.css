@@ -11,6 +11,29 @@
 .tailor-lead { margin-bottom: var(--space-6); }
 .tailor-gap { margin-top: var(--space-4); }
 .tailor-working { margin: var(--space-7) 0; }
+
+/* The wait after the answers: the coach's lines take turns, and the marker runs down the role, line by line. */
+.tailor-wait { display: grid; gap: var(--space-5); max-width: 720px; margin: var(--space-7) auto 0; }
+.tailor-wait-say { position: relative; min-height: 2.6em; text-align: center; }
+.tailor-wait-say p { position: absolute; inset: 0; margin: 0; opacity: 0; animation: tailor-say 9s infinite both; }
+.tailor-wait-say p:nth-child(2) { animation-delay: 3s; }
+.tailor-wait-say p:nth-child(3) { animation-delay: 6s; }
+.tailor-wait .fm-left { animation: tailor-rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.tailor-wait .fm-ptr { display: none; }
+.tailor-wait .fm-bullets { gap: var(--space-3); }
+.tailor-wait .fm-bullet { display: block; --at: calc(var(--i, 0) * 0.75s + 0.5s); }
+.tailor-wait .fm-bullet > span { background: linear-gradient(color-mix(in srgb, var(--color-highlight) 60%, transparent), color-mix(in srgb, var(--color-highlight) 60%, transparent)) no-repeat 0 0 / 0% 100%; box-decoration-break: clone; -webkit-box-decoration-break: clone; animation: tailor-mark 7.2s var(--at) infinite both; }
+.tailor-wait .fm-bullet::after { content: "✓"; position: absolute; left: -2px; top: 0; width: 16px; background: var(--color-paper); color: var(--color-good); font-weight: var(--weight-bold); opacity: 0; animation: tailor-tick 7.2s var(--at) infinite both; }
+.tailor-wait .fm-bullet:nth-child(2) { --i: 1; } .tailor-wait .fm-bullet:nth-child(3) { --i: 2; } .tailor-wait .fm-bullet:nth-child(4) { --i: 3; }
+.tailor-wait .fm-bullet:nth-child(5) { --i: 4; } .tailor-wait .fm-bullet:nth-child(6) { --i: 5; } .tailor-wait .fm-bullet:nth-child(n + 7) { --i: 6; }
+@keyframes tailor-say { 0% { opacity: 0; transform: translateY(8px); } 4%, 30% { opacity: 1; transform: none; } 34%, 100% { opacity: 0; transform: translateY(-8px); } }
+@keyframes tailor-rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes tailor-mark { 0% { background-size: 0% 100%; background-position: 0 0; } 9%, 10% { background-size: 100% 100%; background-position: 0 0; } 60% { background-size: 100% 100%; background-position: 100% 0; } 70%, 100% { background-size: 0% 100%; background-position: 100% 0; } }
+@keyframes tailor-tick { 0%, 9% { opacity: 0; transform: scale(0.4); } 12%, 60% { opacity: 1; transform: none; } 70%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .tailor-wait *, .tailor-wait *::after { animation: none !important; }
+  .tailor-wait-say [role="status"] { opacity: 1; }
+}
 .tailor-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-3); margin-top: var(--space-6); }
 
 /* Step 1: the two languages side by side, then the choice. */
@@ -38,8 +61,8 @@
 
 /* A role's suggestions: the heading with the keyword bar, then one row per line. */
 .tailor-page-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: var(--space-5); align-items: end; margin-bottom: var(--space-6); }
-.tailor-review { max-width: 900px; }
-.tailor-diffs { min-width: 0; margin: 0; border: 0; }
+.tailor-diffs { display: grid; gap: var(--space-4); min-width: 0; margin: 0; padding: 0; border: 0; }
+.tailor-fits { display: grid; gap: var(--space-2); padding: var(--space-4) var(--space-6); border-radius: var(--radius-block); background: var(--color-paper-veil); }
 .tailor-review-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
 
 /* The finish: must-haves with a dot each. */
@@ -168,3 +191,6 @@
 .tailor-focus:not(.is-done) .fm-bullets.has-current .fm-bullet:not(.is-current) { color: var(--color-ink); opacity: 0.42; filter: blur(1.3px); }
 .tailor-focus:not(.is-done) .fm-bullets.has-current .fm-bullet.is-current { margin: var(--space-1) -14px; padding: 12px 14px 12px 34px; border-radius: 10px; background: color-mix(in srgb, var(--color-highlight) 50%, transparent); box-shadow: inset 4px 0 var(--color-coach); font-size: 1.1875rem; font-weight: var(--weight-semibold); }
 .tailor-focus:not(.is-done) .fm-bullets.has-current .fm-bullet.is-current::before { left: 18px; top: calc(12px + 0.62em); background: var(--color-ink); }
+
+/* A role's suggestions sit side by side, so the page takes the same width as the question screen. */
+.tailor-page .ui-wrap:has(.tailor-diffs) { max-width: 1300px; }

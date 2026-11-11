@@ -118,6 +118,8 @@ export const tailorRo: Record<FlowKey, string> = {
   "tailor.question.roleProgress.volunteering": "Voluntariatul {role} din {roles} · Întrebarea {n} din {total}",
   "tailor.question.usedIn": "În ce rol ai folosit-o?",
   "tailor.working": "Comparăm {section} cu anunțul…",
+  "tailor.working.reading": "Citim răspunsurile tale…",
+  "tailor.working.writing": "Scriem propuneri pentru rândurile tale…",
   "tailor.asking": "Căutăm ce lipsește la {section}…",
 
   "tailor.review.title": "Verifică {section}",
@@ -206,7 +208,8 @@ export const tailorRo: Record<FlowKey, string> = {
   "tailor.roleReview.acceptAll.project": "Acceptă toate pentru acest proiect",
   "tailor.roleReview.acceptAll.volunteering": "Acceptă toate pentru acest rol de voluntariat",
   "tailor.roleReview.decided": "{n} din {total} hotărâte",
-  "tailor.roleReview.undecided": "Rândurile lăsate nehotărâte primesc propunerea.",
+  "tailor.roleReview.undecided": "Un rând pe care nu l-ai verificat rămâne cum este pe CV.",
+  "tailor.roleReview.fits": "Se potrivesc deja cu jobul · fără schimbări",
   "tailor.roleReview.skip": "Sari peste acest rol",
   "tailor.roleReview.skip.project": "Sari peste acest proiect",
   "tailor.roleReview.skip.volunteering": "Sari peste acest rol de voluntariat",

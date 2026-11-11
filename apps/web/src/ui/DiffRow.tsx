@@ -1,9 +1,8 @@
 import { Check } from "lucide-react";
 import { useId, useState } from "react";
 import { useT } from "../i18n/t.ts";
-import { Button } from "./Button.tsx";
+import { diffWords } from "../tailor/diff-words.ts";
 import { CoachNote } from "./Card.tsx";
-import { Tag } from "./Chip.tsx";
 
 export type DiffDecision = { choice: "keep" } | { choice: "new"; text: string };
 
@@ -22,7 +21,11 @@ type Props = {
   onDecide: (decision: DiffDecision | null) => void;
 };
 
-/** One bullet, old against new: Keep, Use new, or Edit the suggestion. The replaced text stays visible. */
+/**
+ * One bullet, side by side: the line on the CV now (the words that would go struck through) against the
+ * suggestion (the new words marked). The person picks a side, or edits the suggestion. A guess says so in a
+ * sentence and asks for a yes.
+ */
 export function DiffRow({ oldText, newText, reason, inferred = false, textLang, decision, onDecide }: Props) {
   const t = useT();
   const [draft, setDraft] = useState<string | null>(null);
@@ -31,15 +34,11 @@ export function DiffRow({ oldText, newText, reason, inferred = false, textLang, 
   if (newText === null) {
     return (
       <article className="ui-diff ui-diff--nochange">
-        <div className="ui-diff-line ui-diff-old">
-          <span className="ui-diff-label">{t("ui.diff.now")}</span>
-          <p className="ui-diff-text" lang={textLang}>
-            {oldText}
-          </p>
-        </div>
-        <div className="ui-diff-body">
-          <CoachNote size="sm">{t("ui.diff.noChange")}</CoachNote>
-        </div>
+        <Check size={16} strokeWidth={2.6} aria-hidden="true" />
+        <p className="ui-diff-text" lang={textLang}>
+          {oldText}
+        </p>
+        <span className="ui-sr">{t("ui.diff.noChange")}</span>
       </article>
     );
   }
@@ -55,61 +54,72 @@ export function DiffRow({ oldText, newText, reason, inferred = false, textLang, 
     setDraft(null);
   }
 
+  const side = (choice: "keep" | "new") => `ui-diff-side ui-diff-${choice === "keep" ? "old" : "new"}${decision?.choice === choice ? " is-chosen" : ""}`;
+  const stamp = (choice: "keep" | "new") => decision?.choice === choice && <span className="ui-diff-chosen">{t("ui.diff.chosen")}</span>;
+
   return (
-    <article className="ui-diff" data-decision={decision?.choice}>
-      <div className="ui-diff-line ui-diff-old">
-        <span className="ui-diff-label">{t("ui.diff.now")}</span>
-        <p className="ui-diff-text" lang={textLang}>
-          {oldText}
-        </p>
-      </div>
-      <div className="ui-diff-line ui-diff-new">
-        <span className="ui-diff-label">{t("ui.diff.suggested")}</span>
-        {inferred && <Tag>{t("ui.diff.inferred")}</Tag>}
-        {draft === null ? (
-          <p className="ui-diff-text" lang={textLang}>
-            {chosenText}
+    <article className="ui-sheet ui-diff" data-decision={decision?.choice}>
+      {reason && <CoachNote size="sm">{reason}</CoachNote>}
+      <div className="ui-diff-pair">
+        <div className={side("keep")}>
+          <p className="ui-diff-top">
+            <span className="ui-diff-label">{t("ui.diff.now")}</span>
+            {stamp("keep")}
           </p>
-        ) : (
-          <>
-            <label className="ui-sr" htmlFor={editId}>
-              {t("ui.diff.editLabel")}
-            </label>
-            <textarea id={editId} className="ui-input" rows={3} lang={textLang} value={draft} onChange={(event) => setDraft(event.target.value)} autoFocus />
-          </>
-        )}
-      </div>
-      <div className="ui-diff-body">
-        {reason && <CoachNote size="sm">{reason}</CoachNote>}
-        <div className="ui-diff-actions">
+          <p className="ui-diff-text" lang={textLang}>
+            {diffWords(chosenText, oldText).map((part, i) => (part.changed ? <del key={i}>{part.text}</del> : part.text))}
+          </p>
+          <button type="button" className="ui-btn ui-btn--sm ui-diff-pick" aria-pressed={decision?.choice === "keep"} onClick={() => onDecide({ choice: "keep" })}>
+            {t("ui.diff.keep")}
+          </button>
+        </div>
+        <span className="ui-diff-arrow" aria-hidden="true">
+          →
+        </span>
+        <div className={side("new")}>
+          <p className="ui-diff-top">
+            <span className="ui-diff-label">{t("ui.diff.suggested")}</span>
+            {stamp("new")}
+          </p>
           {draft === null ? (
             <>
-              <Button aria-pressed={decision?.choice === "keep"} onClick={() => onDecide(decision?.choice === "keep" ? null : { choice: "keep" })}>
-                {t("ui.diff.keep")}
-              </Button>
-              <Button aria-pressed={decision?.choice === "new"} onClick={() => onDecide(decision?.choice === "new" ? null : { choice: "new", text: newText })}>
-                {t("ui.diff.useNew")}
-              </Button>
-              <Button variant="quiet" onClick={() => setDraft(chosenText)}>
-                {t("ui.diff.edit")}
-              </Button>
+              <p className="ui-diff-text" lang={textLang}>
+                {diffWords(oldText, chosenText).map((part, i) => (part.changed ? <ins key={i}>{part.text}</ins> : part.text))}
+              </p>
+              <button type="button" className="ui-btn ui-btn--sm ui-diff-pick" aria-pressed={decision?.choice === "new"} onClick={() => onDecide({ choice: "new", text: chosenText })}>
+                {t(inferred ? "ui.diff.useGuess" : "ui.diff.useNew")}
+              </button>
             </>
           ) : (
-            <Button variant="primary" onClick={saveEdit}>
-              {t("ui.diff.saveEdit")}
-            </Button>
-          )}
-        </div>
-        {/* Stays in the page so a screen reader announces the decision when it changes. */}
-        <p className="ui-diff-status" role="status">
-          {status && (
             <>
-              <Check size={16} strokeWidth={2.6} aria-hidden="true" />
-              {status}
+              <label className="ui-sr" htmlFor={editId}>
+                {t("ui.diff.editLabel")}
+              </label>
+              <textarea id={editId} className="ui-input" rows={3} lang={textLang} value={draft} onChange={(event) => setDraft(event.target.value)} autoFocus />
+              <button type="button" className="ui-btn ui-btn--sm ui-btn--primary ui-diff-save" onClick={saveEdit}>
+                {t("ui.diff.saveEdit")}
+              </button>
             </>
           )}
-        </p>
+        </div>
       </div>
+      {inferred && (
+        <p className="ui-diff-check">
+          <b>{t("ui.diff.checkTitle")}</b>
+          <span>{t("ui.diff.checkText")}</span>
+        </p>
+      )}
+      {draft === null && (
+        <p className="ui-diff-more">
+          <button type="button" className="ui-diff-edit" onClick={() => setDraft(chosenText)}>
+            {t("ui.diff.edit")}
+          </button>
+        </p>
+      )}
+      {/* Stays in the page so a screen reader announces the decision when it changes. */}
+      <p className="ui-sr" role="status">
+        {status}
+      </p>
     </article>
   );
 }

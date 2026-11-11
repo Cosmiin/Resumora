@@ -530,72 +530,83 @@ select.ui-input {
 }
 
 /* ---------- DiffRow ---------- */
+/* One suggestion, side by side: the line on the CV now against the new one. The chosen side is stamped. */
 .ui-diff {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-6) var(--space-7);
-  border-bottom: 1px solid var(--color-line);
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
   color: var(--color-ink);
 }
-.ui-diff:last-child {
-  border-bottom: 0;
-}
-.ui-diff-line {
+.ui-diff-pair {
   display: grid;
-  grid-template-columns: 6.5em minmax(0, 1fr);
-  gap: var(--space-1) var(--space-3);
-  align-items: baseline;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: stretch;
+}
+.ui-diff-arrow {
+  align-self: center;
+  font: var(--weight-semibold) 1.75rem / 1 var(--font-coach);
+  color: var(--color-coach);
+}
+.ui-diff-side {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding: var(--space-4) var(--space-5);
+  border: var(--border-control) solid var(--color-line);
+  border-radius: var(--radius-block);
+  background: var(--color-paper);
+}
+.ui-diff-side:has(.ui-diff-pick):hover {
+  border-color: var(--color-ink);
+}
+.ui-diff-side.is-chosen {
+  border-color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-highlight) 22%, var(--color-paper));
+  box-shadow: 4px 4px 0 var(--color-ink);
+}
+.ui-diff-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
 }
 .ui-diff-label {
   font-size: var(--text-label);
   font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--color-muted);
+}
+.ui-diff-chosen {
+  padding: 1px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-good);
+  color: var(--color-paper);
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
 }
 .ui-diff-text {
   margin: 0;
+  font-size: var(--text-lead);
+  line-height: 1.45;
 }
 .ui-diff-old .ui-diff-text {
   color: var(--color-muted);
 }
+.ui-diff-old.is-chosen .ui-diff-text {
+  color: var(--color-ink);
+}
 .ui-diff-new .ui-diff-text {
-  font-size: var(--text-lead);
-  font-weight: var(--weight-bold);
-  line-height: 1.45;
+  font-weight: var(--weight-semibold);
 }
-.ui-diff-new .ui-tag,
-.ui-diff-new .ui-diff-text,
-.ui-diff-new .ui-input {
-  grid-column: 2;
-  justify-self: start;
+.ui-diff-text del {
+  color: var(--color-bad);
+  text-decoration-thickness: 1.5px;
 }
-.ui-diff-new .ui-input {
-  justify-self: stretch;
-}
-.ui-diff-body {
-  display: grid;
-  gap: var(--space-3);
-  padding-left: calc(6.5em + var(--space-3));
-}
-.ui-diff-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: center;
-}
-.ui-diff-status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 1.5em;
-  font-weight: var(--weight-bold);
-  color: var(--color-good);
-}
-.ui-diff[data-decision="new"] .ui-diff-old .ui-diff-text {
-  text-decoration: line-through;
-  text-decoration-color: var(--color-strike);
-  text-decoration-thickness: 2.5px;
-}
-.ui-diff[data-decision="new"] .ui-diff-new .ui-diff-text,
+.ui-diff-text ins,
 .ui-mark {
   background: linear-gradient(transparent 10%, var(--color-highlight) 10%, var(--color-highlight) 92%, transparent 92%);
   box-decoration-break: clone;
@@ -603,33 +614,78 @@ select.ui-input {
   padding: 0 var(--space-1);
   margin: 0 calc(-1 * var(--space-1));
 }
-.ui-diff[data-decision="keep"] .ui-diff-new .ui-diff-text {
-  font-size: var(--text-base);
-  font-weight: var(--weight-regular);
+.ui-diff-text ins {
+  text-decoration: none;
+}
+.ui-diff-pick,
+.ui-diff-save {
+  justify-self: start;
+}
+/* The whole side picks, not only its button. */
+.ui-diff-pick::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.ui-diff-pick[aria-pressed="true"] {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+.ui-diff-check {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-control) dashed var(--color-ink);
+  border-radius: var(--radius-block);
+  background: var(--color-warn-soft);
+}
+.ui-diff-more {
+  margin: 0;
+}
+.ui-diff-edit {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--color-coach);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ui-diff-edit:hover {
+  color: var(--color-ink);
+}
+.ui-diff--nochange {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: 0;
   color: var(--color-muted);
 }
-.ui-diff[data-decision="keep"] .ui-diff-old .ui-diff-text,
-.ui-diff--nochange .ui-diff-old .ui-diff-text {
-  font-size: var(--text-lead);
-  font-weight: var(--weight-bold);
-  color: var(--color-ink);
+.ui-diff--nochange svg {
+  color: var(--color-good);
+  transform: translateY(2px);
+}
+.ui-diff--nochange .ui-diff-text {
+  font-size: var(--text-base);
 }
 
 @media (max-width: 900px) {
   .ui-diff {
     padding: var(--space-5);
   }
-  .ui-diff-line {
+  .ui-diff-pair {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ui-diff-new .ui-tag,
-  .ui-diff-new .ui-diff-text,
-  .ui-diff-new .ui-input {
-    grid-column: 1;
+  .ui-diff-arrow {
+    justify-self: center;
+    transform: rotate(90deg);
   }
-  .ui-diff-body {
-    padding-left: 0;
-  }
+
   .ui-sheet {
     padding: var(--space-6) var(--space-5);
   }

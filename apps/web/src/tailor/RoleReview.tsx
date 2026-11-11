@@ -26,8 +26,9 @@ type Props = {
 };
 
 /**
- * One role's suggested changes as a list: each line as it is now against the suggestion, decided one by one
- * (Keep, Use new, or Edit). A line with no suggestion says so. Undecided suggestions are used.
+ * One role's suggested changes, side by side: each line as it is now against the suggestion, decided one by one
+ * (keep mine, use the new one, or edit it). A suggestion is used unless the person keeps their line; a guess is
+ * used only when the person says it is true. Lines with no suggestion are gathered below.
  */
 export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers, removed = 0, kind, position, keywords }: Props) {
   const [decided, setDecided] = useState<Record<string, DiffDecision>>({});
@@ -40,7 +41,11 @@ export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers,
     ...role.bullets.map((bullet) => ({ id: bullet.id, old: bullet.text, proposal: find(bullet.id, "text") })),
   ];
   const open = lines.filter((line) => line.proposal);
-  const count = open.filter((line) => decided[line.id]).length;
+  // What each line stands at: the person's own decision, else the suggestion, except a guess, which waits for a yes.
+  const standing = (line: (typeof open)[number]): DiffDecision | null =>
+    decided[line.id] ?? (line.proposal!.inferred ? null : { choice: "new", text: line.proposal!.text });
+  const fits = lines.filter((line) => !line.proposal);
+  const count = open.filter((line) => standing(line)).length;
   const decide = (id: string, decision: DiffDecision | null) => setDecided((state) => {
     const next = { ...state };
     if (decision) next[id] = decision; else delete next[id];
@@ -50,7 +55,8 @@ export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers,
   function save() {
     const decisions = open.flatMap((line) => {
       const decision = decided[line.id];
-      if (!decision) return [];
+      // A guess nobody confirmed stays off the CV; any other undecided line takes the suggestion.
+      if (!decision) return line.proposal!.inferred ? [{ itemId: line.id, keep: false }] : [];
       const reworded = decision.choice === "new" && decision.text !== line.proposal!.text;
       return [{ itemId: line.id, keep: decision.choice === "new", ...(reworded ? { text: decision.text } : {}) }];
     });
@@ -78,10 +84,15 @@ export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers,
       </div>
       {lines.length === 0 ? <p className="ui-notice">{t(`tailor.roleReview.nothing${kindKey(kind)}`)}</p>
         // While the role is being saved the rows are frozen: a decision made then would not be part of what was sent.
-        : <fieldset className="ui-sheet tailor-diffs" disabled={busy}>
-          {lines.map((line) => <DiffRow key={line.id} oldText={line.old.trim() || t("tailor.review.empty")} newText={line.proposal?.text ?? null}
-            reason={line.proposal?.reason} inferred={line.proposal?.inferred} textLang={locale}
-            decision={decided[line.id] ?? null} onDecide={(decision) => decide(line.id, decision)} />)}
+        : <fieldset className="tailor-diffs" disabled={busy}>
+          {open.map((line) => <DiffRow key={line.id} oldText={line.old.trim() || t("tailor.review.empty")} newText={line.proposal!.text}
+            reason={line.proposal!.reason} inferred={line.proposal!.inferred} textLang={locale}
+            decision={standing(line)} onDecide={(decision) => decide(line.id, decision)} />)}
+          {fits.length > 0 && <div className="tailor-fits">
+            <p className="ui-label">{t("tailor.roleReview.fits")}</p>
+            {fits.map((line) => <DiffRow key={line.id} oldText={line.old.trim() || t("tailor.review.empty")} newText={null} textLang={locale}
+              decision={null} onDecide={() => undefined} />)}
+          </div>}
         </fieldset>}
       {open.length === 0 && lines.length > 0 && <p className="ui-notice tailor-gap">{t(`tailor.roleReview.nothing${kindKey(kind)}`)}</p>}
       {removed > 0 && <p className="ui-small ui-muted tailor-gap">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}

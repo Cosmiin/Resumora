@@ -22,52 +22,63 @@ const decision = () => JSON.parse(screen.getByTestId("decision").textContent ?? 
 describe("DiffRow", () => {
   it("shows the old bullet, the suggestion and the reason", () => {
     render(<Row />);
-    expect(screen.getByText(OLD)).toHaveAttribute("lang", "en");
-    expect(screen.getByText(NEW)).toHaveAttribute("lang", "en");
+    const [old, suggested] = [...document.querySelectorAll(".ui-diff-text")];
+    expect(old).toHaveTextContent(OLD);
+    expect(old).toHaveAttribute("lang", "en");
+    expect(suggested).toHaveTextContent(NEW);
+    expect(suggested).toHaveAttribute("lang", "en");
+    // The words that go are struck through on the old side; the words that come are marked on the new side.
+    expect([...old!.querySelectorAll("del")].map((part) => part.textContent)).toEqual(["Worked with", "Airtable"]);
+    expect(suggested!.querySelector("ins")).toHaveTextContent("Design data tables in Airtable and");
     expect(screen.getByText("The ad asks for data models.")).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
-  it("Keep keeps the old bullet and says so", async () => {
+  it("Keep mine keeps the old bullet, stamps that side and says so", async () => {
     render(<Row />);
-    await userEvent.click(screen.getByRole("button", { name: "Keep" }));
+    expect(screen.queryByText("Chosen")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Keep mine" }));
     expect(decision()).toEqual({ choice: "keep" });
     expect(screen.getByRole("status")).toHaveTextContent("Kept");
-    expect(screen.getByRole("button", { name: "Keep" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Keep mine" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Chosen").closest(".ui-diff-side")).toHaveClass("ui-diff-old");
   });
 
-  it("Use new takes the suggestion; pressing it again undoes the choice", async () => {
+  it("Use this takes the suggestion; pressing it again changes nothing", async () => {
     render(<Row />);
-    await userEvent.click(screen.getByRole("button", { name: "Use new" }));
+    await userEvent.click(screen.getByRole("button", { name: "Use this" }));
     expect(decision()).toEqual({ choice: "new", text: NEW });
     expect(screen.getByRole("status")).toHaveTextContent("Using new");
-    await userEvent.click(screen.getByRole("button", { name: "Use new" }));
-    expect(decision()).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Use this" }));
+    expect(decision()).toEqual({ choice: "new", text: NEW });
   });
 
   it("Edit lets you change the suggestion and uses your version", async () => {
     render(<Row />);
-    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit the new line myself" }));
     const field = screen.getByRole("textbox", { name: "Edit the suggested bullet" });
     await userEvent.clear(field);
     await userEvent.type(field, "Maintain data tables in Airtable");
     await userEvent.click(screen.getByRole("button", { name: "Save edit" }));
     expect(decision()).toEqual({ choice: "new", text: "Maintain data tables in Airtable" });
-    expect(screen.getByText("Maintain data tables in Airtable")).toBeInTheDocument();
+    expect(document.querySelector(".ui-diff-new .ui-diff-text")).toHaveTextContent("Maintain data tables in Airtable");
     expect(screen.getByRole("status")).toHaveTextContent("Using your edit");
   });
 
   it("an edit saved empty falls back to the suggestion", async () => {
     render(<Row />);
-    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit the new line myself" }));
     await userEvent.clear(screen.getByRole("textbox", { name: "Edit the suggested bullet" }));
     await userEvent.click(screen.getByRole("button", { name: "Save edit" }));
     expect(decision()).toEqual({ choice: "new", text: NEW });
   });
 
-  it("marks a suggestion that contains an inferred fact", () => {
+  it("a guess says so in a sentence and asks for a yes", () => {
     render(<Row inferred />);
-    expect(screen.getByText("Inferred, please confirm")).toBeInTheDocument();
+    expect(screen.getByText("Please check this one")).toBeInTheDocument();
+    expect(screen.getByText("Part of this line is my guess: it is not written in your CV or your answers. Use it only if it is true.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Yes, it's true. Use it" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use this" })).toBeNull();
   });
 
   it("offers nothing when there is no real improvement", () => {

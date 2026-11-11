@@ -111,6 +111,8 @@ export const tailorEn = {
   "tailor.question.roleProgress.volunteering": "Volunteering {role} of {roles} · Question {n} of {total}",
   "tailor.question.usedIn": "In which role did you use it?",
   "tailor.working": "Comparing {section} with the ad…",
+  "tailor.working.reading": "Reading your answers…",
+  "tailor.working.writing": "Writing suggestions for your lines…",
   "tailor.asking": "Looking for gaps in {section}…",
 
   "tailor.review.title": "Review {section}",
@@ -197,7 +199,8 @@ export const tailorEn = {
   "tailor.roleReview.acceptAll.project": "Accept all for this project",
   "tailor.roleReview.acceptAll.volunteering": "Accept all for this volunteering role",
   "tailor.roleReview.decided": "{n} of {total} decided",
-  "tailor.roleReview.undecided": "Lines you leave undecided take the suggestion.",
+  "tailor.roleReview.undecided": "A line you have not checked stays as it is on your CV.",
+  "tailor.roleReview.fits": "Already fit the job · no change",
   "tailor.roleReview.skip": "Skip this role",
   "tailor.roleReview.skip.project": "Skip this project",
   "tailor.roleReview.skip.volunteering": "Skip this volunteering role",

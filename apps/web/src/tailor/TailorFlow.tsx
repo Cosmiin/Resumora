@@ -12,6 +12,7 @@ import { QuestionCard, type Draft } from "./QuestionCard.tsx";
 import { kindKey } from "./role-done.ts";
 import { KeywordsStep, keywordsOf } from "./KeywordsStep.tsx";
 import { LanguageStep } from "./LanguageStep.tsx";
+import { Working } from "./Working.tsx";
 import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
 import { SteerConfirm, SteeringStep } from "./SteeringStep.tsx";
@@ -277,8 +278,9 @@ export function TailorFlow() {
       <p><button type="button" className="ui-btn" onClick={phase.retry}>{t("tailor.retry")}</button></p></section>;
   } else if (!section) body = null;
   else if (phase.kind === "asking" || phase.kind === "working") {
-    body = <p role="status" className="ui-coach tailor-working">
-      {t(phase.kind === "asking" ? "tailor.asking" : "tailor.working", { section: t(`tailor.section.${section}`) })}</p>;
+    const waiting = phase.kind === "working" && isRoleSection(section) ? scoredOf(run?.currentRoleId) : undefined;
+    body = phase.kind === "asking" ? <p role="status" className="ui-coach tailor-working">{t("tailor.asking", { section: t(`tailor.section.${section}`) })}</p>
+      : <Working text={t("tailor.working", { section: t(`tailor.section.${section}`) })} role={waiting?.item} kind={waiting?.kind} locale={locale} />;
   } else if (phase.kind === "questions") {
     const question = phase.questions[phase.index]!;
     // Next or Skip stores the answer; after the last question the step's answers go together.
