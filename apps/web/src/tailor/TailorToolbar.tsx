@@ -1,23 +1,21 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
+import { LeaveLink } from "../layout/LeaveLink.tsx";
 import { useQuery } from "@tanstack/react-query";
-import { TailorLanguageSchema, type MatchScore, type TailorLanguage } from "@resumora/shared";
+import { TailorLanguageSchema, type TailorLanguage } from "@resumora/shared";
 import { listTailored, translate } from "./tailored-api.ts";
 import { t } from "../i18n/t.ts";
-import type { MessageKey } from "../i18n/en.ts";
-import { getTemplate, TEMPLATES, type TemplateId } from "../cv/page/templates.ts";
+import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 
 export type TailoredTab = "cv" | "letter";
 
 type Props = {
   tab: TailoredTab;
   onTab(tab: TailoredTab): void;
-  /** Score 1 (Base CV) and this tailored CV's Score 2. */
-  base: MatchScore | null;
-  latest: MatchScore | null;
   template: TemplateId;
-  onTemplate(template: TemplateId): void;
-  /** Actions after Template (Language, Re-tailor, Export). */
+  /** This CV's template page and download page. */
+  links: { template: string; export: string };
+  /** Actions between Template and Export (Language, Re-tailor). */
   children?: ReactNode;
 };
 
@@ -50,10 +48,10 @@ export function LanguageMenu({ jobId, current }: { jobId: string; current: { id:
 
   return (
     <div className="tailored-menu">
-      <button type="button" className="secondary" aria-expanded={open} onClick={() => setOpen((v) => !v)}>{t("tailored.language")}</button>
+      <button type="button" className="ui-btn ui-btn--sm" aria-expanded={open} onClick={() => setOpen((v) => !v)}>{t("tailored.language")}</button>
       {open && (
         <div className="tailored-menu-pop">
-          {failed && <p role="alert" className="form-error">{t("tailored.lang.error")}</p>}
+          {failed && <p role="alert" className="ui-notice ui-notice--bad">{t("tailored.lang.error")}</p>}
           {copies.isPending ? <p role="status">{t("tailor.loading")}</p> : (
             <ul aria-label={t("tailored.languages")}>
               {TailorLanguageSchema.options.filter((language) => language !== current.language).map((language) => {
@@ -62,18 +60,18 @@ export function LanguageMenu({ jobId, current }: { jobId: string; current: { id:
                 return (
                   <li key={language}>
                     <span>{name}</span>
-                    {copy && <button type="button" className="link" onClick={() => show(copy.id)}>{t("tailored.lang.open")}</button>}
+                    {copy && <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm" onClick={() => show(copy.id)}>{t("tailored.lang.open")}</button>}
                     {busy === language ? <span role="status">{t("tailored.lang.working")}</span>
                       : confirming === language ? (
                         <span className="tailored-confirm">
                           <span>{t("tailored.lang.replaceWarning", { language: name })}</span>
-                          <button type="button" className="btn danger" onClick={() => void run(language)}>{t("tailored.lang.replace")}</button>
-                          <button type="button" className="link" onClick={() => setConfirming(null)}>{t("tailored.lang.cancel")}</button>
+                          <button type="button" className="ui-btn ui-btn--sm" onClick={() => void run(language)}>{t("tailored.lang.replace")}</button>
+                          <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm" onClick={() => setConfirming(null)}>{t("tailored.lang.cancel")}</button>
                         </span>
                       ) : !copy ? (
-                        <button type="button" className="btn" disabled={busy !== null} onClick={() => void run(language)}>{t("tailored.lang.translate")}</button>
+                        <button type="button" className="ui-btn ui-btn--sm" disabled={busy !== null} onClick={() => void run(language)}>{t("tailored.lang.translate")}</button>
                       ) : copy.translatedFrom !== null && (
-                        <button type="button" className="btn" disabled={busy !== null} onClick={() => setConfirming(language)}>{t("tailored.lang.again")}</button>
+                        <button type="button" className="ui-btn ui-btn--sm" disabled={busy !== null} onClick={() => setConfirming(language)}>{t("tailored.lang.again")}</button>
                       )}
                   </li>
                 );
@@ -86,32 +84,20 @@ export function LanguageMenu({ jobId, current }: { jobId: string; current: { id:
   );
 }
 
-const total =(score: MatchScore | null) => (score?.total ?? null) === null ? "—" : String(score!.total);
-
-/** Tabs CV | Cover letter, the score lift and the tailored CV's actions. */
-export function TailorToolbar({ tab, onTab, base, latest, template, onTemplate, children }: Props) {
-  const band = latest?.band ?? base?.band;
+/** Above a tailored CV: CV | Cover letter, then its template, its other languages, tailoring again, and Export. */
+export function TailorToolbar({ tab, onTab, template, links, children }: Props) {
   return (
-    <div className="tailored-bar">
+    <div className="tailored-bar" role="group" aria-label={t("tailored.toolbar")}>
       <div className="tailored-tabs" role="tablist" aria-label={t("tailored.tabs")}>
         {(["cv", "letter"] as const).map((key) => (
-          <button key={key} type="button" role="tab" className="secondary" aria-selected={tab === key} onClick={() => onTab(key)}>
+          <button key={key} type="button" role="tab" className="ui-btn ui-btn--sm" aria-selected={tab === key} onClick={() => onTab(key)}>
             {t(key === "cv" ? "tailored.tab.cv" : "tailored.tab.letter")}
           </button>
         ))}
       </div>
-      {band && (
-        <span className="tailored-score">
-          {t("tailored.score", { base: total(base), latest: total(latest ?? base), band: t(`job.score.band.${band}` as MessageKey) })}
-        </span>
-      )}
-      <label className="tailored-template">
-        <span>{t("tailored.template")}</span>
-        <select value={template} onChange={(event) => onTemplate(getTemplate(event.target.value).id)}>
-          {TEMPLATES.map((item) => <option key={item.id} value={item.id}>{t(item.label)}</option>)}
-        </select>
-      </label>
+      <LeaveLink className="ui-btn ui-btn--sm" to={links.template}>{t("tailored.templateLink", { name: t(getTemplate(template).label) })}</LeaveLink>
       {children}
+      <LeaveLink className="ui-btn ui-btn--primary ui-btn--sm" to={links.export}>{t("tailored.exportLink")}</LeaveLink>
     </div>
   );
 }

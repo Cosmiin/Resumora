@@ -1,14 +1,15 @@
 import { z } from "zod";
 import {
   MatchScoreSchema, ProposalSchema, SteeringSchema, TailorLanguageSchema, TailorQuestionSchema, TailorRunSchema, ToneSchema,
-  type Answer, type MatchScore, type Proposal, type Steering, type TailorQuestion, type TailorRun, type TailorSection, type Tone,
+  type Answer, type MatchScore, type Proposal, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun, type TailorSection, type Tone,
 } from "@resumora/shared";
 import { apiFetch } from "../lib/api.ts";
 
 const run = (id: string) => `/v1/tailor-runs/${encodeURIComponent(id)}`;
 
 export type AcceptBody = {
-  decisions: { itemId: string; keep: boolean }[];
+  /** `text`: a kept line the person reworded on the review. */
+  decisions: { itemId: string; keep: boolean; text?: string }[];
   /** A summary guess ("summary#<n>") may carry its edited `text`. */
   inferred: { itemId: string; keep: boolean; text?: string }[];
   flags: { questionId: string; confirmed: boolean }[];
@@ -19,9 +20,17 @@ export type AcceptBody = {
 /** Experience steps name the run's current role; other sections send none. */
 const roleBody = (roleId?: string) => (roleId ? { roleId } : {});
 
-export function startTailoring(jobId: string, steering: Steering): Promise<{ run: TailorRun }> {
+/** The language step: the CV's language, the ad's (null when unclear), and the one tailoring would start in. */
+const LanguagesSchema = z.object({ cv: TailorLanguageSchema, ad: TailorLanguageSchema.nullable(), chosen: TailorLanguageSchema });
+export type Languages = z.infer<typeof LanguagesSchema>;
+export function getLanguages(jobId: string): Promise<Languages> {
+  return apiFetch(`/v1/jobs/${encodeURIComponent(jobId)}/tailor-language`, { schema: LanguagesSchema });
+}
+
+/** `language`: the one picked on the language step; without it the person's default decides. */
+export function startTailoring(jobId: string, steering: Steering, language?: TailorLanguage): Promise<{ run: TailorRun; language: TailorLanguage }> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(jobId)}/tailor`, {
-    method: "POST", json: steering,
+    method: "POST", json: language ? { ...steering, language } : steering,
     schema: z.object({ run: TailorRunSchema, tailoredCvId: z.string(), language: TailorLanguageSchema }),
   });
 }

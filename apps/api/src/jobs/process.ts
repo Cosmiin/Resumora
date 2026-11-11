@@ -13,13 +13,21 @@ export async function processJob(
     const extracted = await callModel(deps.model, {
       userId: work.userId,
       task: "job_extract",
-      schema: JobExtractionSchema.extend({ positionClosed: z.boolean() }),
+      schema: JobExtractionSchema.extend({ positionClosed: z.boolean(), keywords: z.array(z.string().max(80)).max(30) }),
       system: jobExtractPrompt,
       user: buildJobUserPrompt(work, today.toISOString().slice(0, 10)),
-      maxOutputTokens: 2000,
+      maxOutputTokens: 2400,
     });
     if (!extracted.isJobPosting) return { ok: false, code: "not_a_job" };
     if (!extracted.title.trim()) return { ok: false, code: "ai_failed" };
+    // One of each, whatever the letter case.
+    const seen = new Set<string>();
+    extracted.keywords = extracted.keywords.map((term) => term.trim()).filter((term) => {
+      const key = term.toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     if (extracted.applyBy) {
       const earliest = new Date(today);
       const latest = new Date(today);

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CvResponseSchema, ErrorBodySchema, emptyCv, newId, type CvContent } from "@resumora/shared";
 import { createApp } from "../src/app.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
+import { memoryInsightsRepo } from "../src/enrich/memory-repo.ts";
+import type { InsightsRepo } from "../src/enrich/repo.ts";
 import { storedCv } from "../src/cv/supabase-repo.ts";
 import type { CvRepo } from "../src/cv/repo.ts";
 
@@ -15,12 +17,14 @@ function cvNamed(fullName: string): CvContent {
 }
 
 let repo: CvRepo;
+let insights: InsightsRepo;
 let app: ReturnType<typeof createApp>;
 let clock: Date;
 
 beforeEach(() => {
   clock = new Date("2026-11-04T10:00:00Z");
   repo = memoryCvRepo({ now: () => clock });
+  insights = memoryInsightsRepo("user-1");
   app = createApp({
     appOrigin: "http://127.0.0.1:5173",
     verifyToken: async (token) => (token === "good" ? { id: "user-1", token } : null),
@@ -31,9 +35,7 @@ beforeEach(() => {
     jobRepo: () => {
       throw new Error("not used");
     },
-    insightsRepo: () => {
-      throw new Error("not used");
-    },
+    insightsRepo: () => insights,
     model: () => {
       throw new Error("not used");
     },
@@ -194,6 +196,7 @@ describe("old v1 CVs", () => {
         row = versions[id];
         return { ok: true, version: 2, updatedAt: "2026-11-04T10:01:00Z" };
       },
+      async clearHistory() {},
       async snapshot() {
         throw new Error("not used");
       },
@@ -232,5 +235,45 @@ describe("old v1 CVs", () => {
     const res = await send("PUT", "/v1/cv", { content: storedV1("Old"), version: 0 });
     expect(res.status).toBe(400);
     expect(ErrorBodySchema.parse(await json(res)).error.code).toBe("invalid_content");
+  });
+});
+
+describe("Remove my CV", () => {
+  it("empties the CV and deletes its history and role scores", async () => {
+    await send("PUT", "/v1/cv", { content: cvNamed("Ana Pop"), version: 0 });
+    clock = new Date(clock.getTime() + 11 * 60_000);
+    await send("PUT", "/v1/cv", { content: cvNamed("Ana Popescu"), version: 1 });
+    expect((await repo.listHistory()).length).toBeGreaterThan(0);
+    await insights.put("r1", { roleId: "r1" } as never);
+
+    const res = await send("DELETE", "/v1/cv", { version: 2 });
+    expect(res.status).toBe(200);
+    const body = CvResponseSchema.parse(await json(res));
+    expect(body.content).toEqual(emptyCv());
+    expect(body.version).toBe(3);
+    expect((await repo.get()).content).toEqual(emptyCv());
+    expect(await repo.listHistory()).toEqual([]);
+    expect(await insights.list()).toEqual([]);
+  });
+
+  it("a second try after a half-finished removal finishes the cleanup", async () => {
+    await send("PUT", "/v1/cv", { content: cvNamed("Ana Pop"), version: 0 });
+    await insights.put("r1", { roleId: "r1" } as never);
+    // The first try emptied the CV, then failed before the scores were deleted.
+    await repo.save(emptyCv(), 1);
+    const res = await send("DELETE", "/v1/cv", { version: 1 });
+    expect(res.status).toBe(200);
+    expect(CvResponseSchema.parse(await json(res)).version).toBe(2);
+    expect(await repo.listHistory()).toEqual([]);
+    expect(await insights.list()).toEqual([]);
+  });
+
+  it("changes nothing when the CV was saved somewhere else first", async () => {
+    await send("PUT", "/v1/cv", { content: cvNamed("Ana Pop"), version: 0 });
+    await insights.put("r1", { roleId: "r1" } as never);
+    const res = await send("DELETE", "/v1/cv", { version: 0 });
+    expect(res.status).toBe(409);
+    expect((await repo.get()).content.basics.fullName).toBe("Ana Pop");
+    expect(await insights.list()).toHaveLength(1);
   });
 });

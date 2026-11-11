@@ -105,9 +105,11 @@ describe("scoreRole", () => {
     await save(role);
     const model = fakeModel(() => allSpecific(role));
     const result = await run(model, role);
-    expect(result.score).toBe(100);
+    expect(result.lines).toBe(100);
+    // One perfect bullet with nothing known about the role: Lines 100, Coverage 32 (actions, results, no repeats, a result first).
+    expect(result.score).toBe(73);
     expect(model.requests).toHaveLength(1);
-    expect(model.requests[0]).toMatchObject({ temperature: 0, max_completion_tokens: 780 });
+    expect(model.requests[0]).toMatchObject({ temperature: 0, max_completion_tokens: 1200 });
     expect(model.logged.map((l) => l.task)).toEqual(["enrich_score"]);
     expect(await insights.get(role.id)).toEqual(result);
   });
@@ -210,7 +212,7 @@ describe("scoreRole", () => {
       ],
     });
     expect(model.requests).toHaveLength(1);
-    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 600 });
+    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 1000 });
     expect(JSON.stringify(model.requests[0]?.messages)).toContain("[]");
     expect(await insights.get(role.id)).toEqual(result);
     expect(await run(model, role)).toEqual(result);
@@ -331,9 +333,21 @@ describe("score prompt", () => {
     expect(prompt).not.toContain("Role questions ask only about");
   });
 
+  it("asks one role question for each conditional parameter it cannot tell or the page leaves out, a quick check when it cannot tell", () => {
+    const prompt = scoreSystemPrompt("en");
+    const at = (text: string) => prompt.indexOf(text);
+    expect(at("one question for each of leadership, seniority, people and domain")).toBeGreaterThan(at("topic tools: the tools"));
+    expect(prompt).toContain('marked unknown: a quick check. Ask whether it happened, so that "No" is\n  a full answer');
+    expect(prompt).toContain('in the language of the questions, as the first option: that one word');
+    expect(prompt).toContain("marked applies: ask for the fact itself");
+    expect(prompt).toContain("Never ask one for a parameter you mark shown or na.");
+    expect(at("Then any other role-wide fact that is still needed (topic other).")).toBeGreaterThan(at("marked applies"));
+  });
+
   it("requires options for every question and avoids facts already answered", () => {
     const prompt = scoreSystemPrompt("en");
-    expect(prompt).toContain("3–4 options for every question");
+    expect(prompt).toContain("up to 4 options for every question");
+    expect(prompt).toContain("Do not add an option\n  meaning other, something else or none of the above");
     expect(prompt).toContain("Never ask about something the CV or the notes already answer.");
     expect(prompt).not.toContain("Use an empty list when the question is open");
   });
@@ -345,7 +359,7 @@ describe("score prompt", () => {
     expect(scoreUserMessage(role)).toContain(JSON.stringify({ question: "Which tools did you use?", answer: "SAP" }));
   });
 
-  it("sends title and description as context and every bullet as { id, text }, with no company or dates", () => {
+  it("sends title and description as context and every bullet as { id, text }, its period, and no company", () => {
     const role = roleWith(["First", "Second"], { company: "Secret Corp", startDate: "2019-03" });
     const message = scoreUserMessage(role);
     expect(message).toContain("context only");
@@ -353,7 +367,7 @@ describe("score prompt", () => {
     expect(message).toContain("Payroll for 40 staff.");
     for (const b of role.bullets) expect(message).toContain(JSON.stringify({ id: b.id, text: b.text }));
     expect(message).not.toContain("Secret Corp");
-    expect(message).not.toContain("2019");
+    expect(message).toContain("Role period (context only, not graded): 2019-03 – ");
   });
 
   it("contains all 7 calibration lines and no unsupported-language escape", () => {
@@ -415,5 +429,60 @@ describe("projects and volunteering are scored like roles", () => {
     await save(role);
     await run(fakeModel(() => allSpecific(role)), role);
     expect(await insights.get(p.id)).toBeNull();
+  });
+});
+
+describe("scoreRole asked for more questions", () => {
+  it("asks the model again, for a question with options for all that is still short of 100", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    await insights.put(role.id, buildRoleResult(role, allSpecific(role), fp(role)));
+    const model = fakeModel(() => allSpecific(role));
+    await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: fp(role), more: true });
+    expect(model.requests).toHaveLength(1);
+    const sent = JSON.stringify(model.requests[0]);
+    expect(sent).toContain("as close to 100 as it can go");
+    expect(sent).toContain("3 or 4 answer options the person can pick");
+  });
+
+  it("keeps the stored grades and score, and takes only the new questions", async () => {
+    const role = roleWith(["Prepared payroll files.", "Answered staff questions."]);
+    await save(role);
+    const stored = buildRoleResult(role, allSpecific(role), fp(role));
+    await insights.put(role.id, stored);
+    // The model grades lower this time and asks about the first bullet.
+    const model = fakeModel(() => {
+      const answer = allSpecific(role);
+      Object.assign(answer.bullets[0]!, { impact: "missing", issue: "impact", question: "How many payroll files a month?", options: ["Under 50", "50–200", "200+"] });
+      return answer;
+    });
+    const result = await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: fp(role), more: true });
+    expect(result.score).toBe(stored.score);
+    expect(result.bullets).toEqual(stored.bullets);
+    expect(result.questions).toEqual([{ bulletId: role.bullets[0]!.id, text: "How many payroll files a month?", options: ["Under 50", "50–200", "200+"], kind: "result" }]);
+    expect((await insights.get(role.id))?.score).toBe(stored.score);
+  });
+});
+
+describe("scoreRole with what the person wants their CV to bring out", () => {
+  it("asks the model again with the goal in view, even when a stored result exists", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    await insights.put(role.id, buildRoleResult(role, allSpecific(role), fp(role)));
+    const model = fakeModel(() => allSpecific(role));
+    await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: fp(role), focus: "  Move into automation work  " });
+    expect(model.requests).toHaveLength(1);
+    const sent = JSON.stringify(model.requests[0]);
+    expect(sent).toContain("Move into automation work");
+    expect(sent).toContain("a goal, not a fact about this role");
+  });
+
+  it("an empty focus returns the stored result without a model call", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    await insights.put(role.id, buildRoleResult(role, allSpecific(role), fp(role)));
+    const model = fakeModel(() => allSpecific(role));
+    await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: fp(role), focus: "   " });
+    expect(model.requests).toHaveLength(0);
   });
 });

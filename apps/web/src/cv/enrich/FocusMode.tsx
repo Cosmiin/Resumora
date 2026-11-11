@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { findScored, fingerprint, type CvContent } from "@resumora/shared";
+import { CLEAR_AT, findScored, fingerprint, type CvContent } from "@resumora/shared";
 import { SCORED_LIST, type LineList } from "../edit/lists.ts";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
@@ -10,10 +10,12 @@ import { formatRange } from "../page/blocks.ts";
 import type { Via } from "./AnswerBox.tsx";
 import { BrainDumpStep, DumpPickStep } from "./BrainDumpStep.tsx";
 import { CelebrateMoment } from "./CelebrateMoment.tsx";
+import { FocusBar } from "./FocusBar.tsx";
 import { DescriptionStep } from "./DescriptionStep.tsx";
 import type { FocusTarget } from "./focus-context.ts";
 import { ProposalStep } from "./ProposalStep.tsx";
 import { QuestionStep } from "./QuestionStep.tsx";
+import { issueTip } from "./tips.ts";
 import { useFocusSession, type FocusStep } from "./useFocusSession.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
@@ -24,27 +26,24 @@ type Props = {
   scores: Map<string, RoleScoreState>;
   waitForSave(): Promise<void>;
   onClose(): void;
-  /** The guided path's bar ("Role n of N" and its segments), across the top. */
-  topBar?: ReactNode;
-  /** In the guided path, "That's all for this role" moves on ("Next role →") instead of going back to the CV. */
+  /** In the guided path: where this role sits in it ("Role 1 of 2"), shown in the top bar. */
+  context?: string;
+  /** In the guided path, "That's all for this role" moves on ("Next role") instead of going back to the CV. */
   next?: { label: string; onNext(): void };
+  /** What the person wants their CV to bring out (the path's focus step): the role's questions are asked with it in view. */
+  focus?: string;
 };
 
 const FOCUSABLE = 'button:not(:disabled), textarea:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
 const DUMP_KINDS = new Set<FocusStep["kind"]>(["brainDump", "dumpWorking", "dumpEmpty", "dumpPick"]);
 const SELF_FOCUSING = new Set<FocusStep["kind"]>(["proposal", "celebrate"]);
 
-/** The frame every focus screen shares: scroll lock (focus goes back on close), Esc closes, Tab stays inside. */
+/** The frame every focus screen shares: focus goes back on close, Esc closes, Tab stays inside. */
 export function useFocusFrame(root: RefObject<HTMLDivElement | null>, onClose: () => void) {
-  // Scroll lock while open; focus goes back where it was on close.
+  // Focus goes back where it was on close. (The page behind is kept from scrolling by the top bar every focus screen has.)
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = overflow;
-      opener?.focus?.();
-    };
+    return () => opener?.focus?.();
   }, []);
 
   // Esc and Tab are handled on the document, not the dialog: when the focused control disappears
@@ -82,8 +81,8 @@ export function useFocusFrame(root: RefObject<HTMLDivElement | null>, onClose: (
   }, [root]);
 }
 
-/** Full-screen focus mode: the role on the left, one step at a time on the right. */
-export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, topBar, next }: Props) {
+/** Full-screen focus mode: one step at a time, with the role on paper beside it. */
+export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, context, next, focus }: Props) {
   // The session always closes the same way (saving the role's facts); only where it goes next differs.
   const moving = useRef(false);
   const leave = useRef({ onClose, next });
@@ -95,7 +94,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     if (moving.current && then) then.onNext();
     else close();
   });
-  const session = useFocusSession({ cv, roleId: target.roleId, bulletId: target.bulletId, mode: target.mode, scores, dispatch, waitForSave, onClose: finish });
+  const session = useFocusSession({ cv, roleId: target.roleId, bulletId: target.bulletId, mode: target.mode, scores, dispatch, waitForSave, onClose: finish, focus });
   const { step, queue, position, busy } = session;
   const root = useRef<HTMLDivElement>(null);
   const right = useRef<HTMLDivElement>(null);
@@ -157,82 +156,60 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
   const roleQuestion = step.kind === "role" ? session.roleQuestions[step.index] : undefined;
   const topic = roleQuestion && roleQuestion.topic !== "other" ? t(`enrich.focus.topic.${roleQuestion.topic}`) : null;
 
+  const grade = "bulletId" in step ? result?.bullets.find((g) => g.id === step.bulletId) : undefined;
+  // "Why I ask": what the line is missing (from its score), or why the topic matters for the whole role.
+  const why = step.kind === "question" || step.kind === "needsDetail"
+    ? (grade?.tip?.trim() ? issueTip(grade.issue, grade.tip) : t(`enrich.focus.whyKind.${step.question.kind}`))
+    : roleQuestion ? t(`enrich.focus.whyTopic.${roleQuestion.topic}`) : null;
+  const pointing = step.kind === "question" || step.kind === "needsDetail";
+  // The line being worked on stands out while it is asked about, rewritten or proposed.
+  const marking = pointing || step.kind === "working" || step.kind === "proposal";
+  // Role questions are counted among themselves, bullet questions among the bullets still to improve.
+  const progress = step.kind === "role" && roleQuestion
+    ? [t("enrich.focus.questionOf", { n: step.index + 1, total: session.roleQuestions.length }), topic].filter(Boolean).join(" · ")
+    : inQueue && session.revisit === null
+      ? t(asking ? "enrich.focus.questionOf" : "enrich.focus.progress", { n: Math.min(position + 1, queue.length), total: queue.length })
+      : null;
+  const done = step.kind === "roleDone";
+  const leaveRole = () => {
+    moving.current = true;
+    session.close();
+  };
+
   return createPortal(
     <div
       ref={root}
-      className={topBar ? "focus-mode has-path" : "focus-mode"}
+      className={done ? "ui-page focus-mode is-done" : "ui-page focus-mode"}
       role="dialog"
       aria-modal="true"
       aria-label={t("enrich.focus.dialog", { role: name })}
     >
-      {topBar}
-      <aside className="fm-left">
-        <p className="fm-eyebrow">{t(`enrich.focus.your.${kind}`)}</p>
-        <p className="fm-role">{name}</p>
-        <p className="fm-role-meta">{[role.company, dates].filter(Boolean).join(" · ")}</p>
-        <ul className="fm-bullets">
-          {role.bullets.map((b) => {
-            const n = scoreOf(b.id);
-            const cls = ["fm-bullet", b.id === currentId && "is-current", b.id === currentId && step.kind === "working" && "is-working", accepted.has(b.id) && "is-new"];
-            return (
-              <li key={b.id} className={cls.filter(Boolean).join(" ")} aria-current={b.id === currentId ? "true" : undefined}>
-                <span>{b.text}</span>
-                {n !== undefined && (
-                  <span className={n >= 75 ? "fm-tag is-up" : "fm-tag is-low"} aria-label={t("enrich.focus.bulletScore", { n })}>
-                    {n}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-          {dumping && step.kind !== "dumpPick" && (
-            <>
-              <li className="fm-slot" aria-hidden="true">{t("enrich.focus.dump.slot")}</li>
-              <li className="fm-slot" aria-hidden="true">+</li>
-            </>
+      <FocusBar context={context} name={name} onClose={() => session.close()}
+        skip={next && !done ? { label: t(kind === "role" ? "enrich.focus.skipRole" : "enrich.focus.skipItem"), onSkip: leaveRole } : undefined} />
+      {(progress || askingStep || inQueue) && (
+        <div className="fm-prog">
+          {progress && <p className="fm-eyebrow">{progress}</p>}
+          {askingStep ? (
+            <div className="fm-steps" aria-hidden="true">
+              {Array.from({ length: session.dots.total }, (_, i) => (
+                <i key={i} className={i < session.dots.done ? "is-done" : i === session.dots.done ? "is-on" : undefined} />
+              ))}
+            </div>
+          ) : inQueue && (
+            <div className="fm-steps" aria-hidden="true">
+              {queue.map((id, i) => (
+                <i key={id} className={i < position ? "is-done" : i === position ? "is-on" : undefined} />
+              ))}
+            </div>
           )}
-        </ul>
-        <p className="fm-score">
-          <b>{roleScore ?? "–"}</b>
-          <span className="fm-eyebrow">{roleScore === null ? t("enrich.focus.noScore") : t(`enrich.focus.score.${kind}`)}</span>
-        </p>
-      </aside>
+        </div>
+      )}
 
+      <div className="fm-grid has-sheet">
       <section className="fm-right" ref={right} aria-busy={busy}>
-        <button type="button" className="fm-close" onClick={() => session.close()}>
-          <span aria-hidden="true">✕</span> {t("enrich.focus.close")}
-        </button>
-        {askingStep && (
-          <div className="fm-steps" aria-hidden="true">
-            {Array.from({ length: session.dots.total }, (_, i) => (
-              <i key={i} className={i < session.dots.done ? "is-done" : i === session.dots.done ? "is-on" : undefined} />
-            ))}
-          </div>
-        )}
-        {inQueue && (
-          <>
-            {!askingStep && (
-              <div className="fm-steps" aria-hidden="true">
-                {queue.map((id, i) => (
-                  <i key={id} className={i < position ? "is-done" : i === position ? "is-on" : undefined} />
-                ))}
-              </div>
-            )}
-            {session.revisit === null && (
-              <p className="fm-eyebrow">
-                {t(asking ? "enrich.focus.questionOf" : "enrich.focus.progress", { n: Math.min(position + 1, queue.length), total: queue.length })}
-              </p>
-            )}
-          </>
-        )}
         {step.kind === "role" && roleQuestion && (
-          <>
-            <p className="fm-eyebrow">
-              {[t("enrich.focus.questionOf", { n: step.index + 1, total: session.roleQuestions.length }), topic].filter(Boolean).join(" · ")}
-            </p>
-            <QuestionStep key={stepKey} question={roleQuestion} needsDetail={false} initial={session.prefill ?? ""} onBack={back}
-              locale={cv.locale} busy={busy} onSubmit={session.submitAnswer} onSkip={session.skip} onFreeTalk={session.freeTalk} />
-          </>
+          <QuestionStep key={stepKey} question={roleQuestion} needsDetail={false} initial={session.prefill ?? ""} onBack={back} why={why}
+            locale={cv.locale} busy={busy} onSubmit={session.submitAnswer} onSkip={session.skip} onFreeTalk={session.freeTalk} />
         )}
 
         {answersWorking && <Working text={t("enrich.focus.dump.working")} />}
@@ -266,6 +243,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
             initial={session.prefill ?? ""}
             onBack={back}
             needsDetail={step.kind === "needsDetail"}
+            why={why}
             locale={cv.locale}
             busy={busy}
             onSubmit={session.submitAnswer}
@@ -295,9 +273,9 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
         )}
         {step.kind === "failed" && (
           <>
-            <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>
+            <p className="ui-notice ui-notice--bad" role="alert" id="fm-step-title" tabIndex={-1}>
               {t(step.reason === "saving" ? "enrich.focus.failed.saving" : "enrich.focus.failed.unavailable")}
-            </h2>
+            </p>
             <div className="fm-foot">
               <button type="button" className="fm-ghost" onClick={session.skip} disabled={busy}>
                 {t("enrich.focus.skip")}
@@ -310,21 +288,53 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
         )}
         {step.kind === "roleDone" && (
           <div className="fm-done">
-            <p className="fm-eyebrow">{t("enrich.focus.done.eyebrow")}</p>
             <h2 className="fm-q is-big" id="fm-step-title" tabIndex={-1}>{t("enrich.focus.done.title")}</h2>
-            <p className="fm-done-score">
-              <b>{step.score ?? "–"}</b>
-              <span className="fm-eyebrow">{t(`enrich.focus.score.${kind}`)}</span>
-            </p>
-            <button type="button" className="fm-btn" onClick={() => {
-              moving.current = true;
-              session.close();
-            }}>
-              {next ? next.label : t("enrich.focus.done.back")}
-            </button>
+            <p className="fm-lead">{t(accepted.size > 0 ? "enrich.focus.done.lineChanged" : "enrich.focus.done.line")}</p>
           </div>
         )}
       </section>
+
+      <aside className="fm-left">
+        <p className="fm-eyebrow">{t(`enrich.focus.your.${kind}`)}</p>
+        <p className="fm-role">{name}</p>
+        <p className="fm-role-meta">{[role.company, dates].filter(Boolean).join(", ")}</p>
+        <ul className={marking && role.bullets.some((b) => b.id === currentId) ? "fm-bullets has-current" : "fm-bullets"}>
+          {role.bullets.map((b) => {
+            const n = scoreOf(b.id);
+            const cls = ["fm-bullet", b.id === currentId && "is-current", b.id === currentId && step.kind === "working" && "is-working", accepted.has(b.id) && "is-new"];
+            return (
+              <li key={b.id} className={cls.filter(Boolean).join(" ")} aria-current={b.id === currentId ? "true" : undefined}>
+                <span>{b.text}</span>
+                {n !== undefined && (
+                  <span className={n >= CLEAR_AT ? "fm-tag is-up" : "fm-tag is-low"} aria-label={t("enrich.focus.bulletScore", { n })}>
+                    {n}
+                  </span>
+                )}
+                {pointing && b.id === currentId && <span className="fm-ptr">{t("enrich.focus.rewrites")}</span>}
+              </li>
+            );
+          })}
+          {dumping && step.kind !== "dumpPick" && (
+            <>
+              <li className="fm-slot" aria-hidden="true">{t("enrich.focus.dump.slot")}</li>
+              <li className="fm-slot" aria-hidden="true">+</li>
+            </>
+          )}
+        </ul>
+        <p className="fm-score">
+          <b>{(done ? step.score : null) ?? roleScore ?? "–"}</b>
+          <span className="fm-eyebrow">{roleScore === null && !(done && step.score !== null) ? t("enrich.focus.noScore") : t(`enrich.focus.score.${kind}`)}</span>
+        </p>
+      </aside>
+
+      {done && (
+        <div className="fm-done-actions">
+          <button type="button" className="fm-btn" onClick={leaveRole}>
+            {next ? next.label : t("enrich.focus.done.back")}
+          </button>
+        </div>
+      )}
+      </div>
 
       {step.kind === "celebrate" && <CelebrateMoment key={`${step.from}-${step.to}`} from={step.from} to={step.to} role={name} onNext={session.next} />}
     </div>,
@@ -349,9 +359,9 @@ type LightStep = { kind: "box" } | { kind: "working" } | { kind: "pick"; lines: 
  * the item on the left; on the right "Tell us about ‹item›", then "Pick the ones that are true" (none ticked).
  * No score and no questions. Skip, None of these and an empty answer all move on; Back returns to the box.
  */
-export function LightStop({ section, itemId, cv, dispatch, waitForSave, onClose, onNext, topBar }: {
+export function LightStop({ section, itemId, cv, dispatch, waitForSave, onClose, onNext, context }: {
   section: LineList; itemId: string; cv: CvContent; dispatch(a: CvAction): void; waitForSave(): Promise<void>;
-  onClose(): void; onNext(): void; topBar?: ReactNode;
+  onClose(): void; onNext(): void; context?: string;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const right = useRef<HTMLDivElement>(null);
@@ -375,7 +385,7 @@ export function LightStop({ section, itemId, cv, dispatch, waitForSave, onClose,
   const item = (cv[section] as LightItem[]).find((i) => i.id === itemId);
   if (!item) return null;
   const name = (item.name ?? item.title ?? "").trim() || t(`enrich.path.section.${section}`);
-  const meta = [item.provider ?? item.issuer ?? item.publisher ?? "", formatRange(item.date ?? "", "", false, cv.locale)].map((s) => s.trim()).filter(Boolean).join(" · ");
+  const meta = [item.provider ?? item.issuer ?? item.publisher ?? "", formatRange(item.date ?? "", "", false, cv.locale)].map((s) => s.trim()).filter(Boolean).join(", ");
   const lines = (item.bullets ?? []).filter((b) => b.text.trim() !== "");
   const busy = step.kind === "working";
 
@@ -393,21 +403,10 @@ export function LightStop({ section, itemId, cv, dispatch, waitForSave, onClose,
   };
 
   return createPortal(
-    <div ref={root} className={topBar ? "focus-mode has-path" : "focus-mode"} role="dialog" aria-modal="true" aria-label={t("enrich.light.dialog", { name })}>
-      {topBar}
-      <aside className="fm-left">
-        <p className="fm-eyebrow">{t(`enrich.path.section.${section}`)}</p>
-        <p className="fm-role">{name}</p>
-        {meta && <p className="fm-role-meta">{meta}</p>}
-        <ul className="fm-bullets">
-          {lines.map((b) => <li key={b.id} className="fm-bullet"><span>{b.text}</span></li>)}
-          {step.kind !== "pick" && <li className="fm-slot" aria-hidden="true">{t("enrich.light.slot")}</li>}
-        </ul>
-      </aside>
+    <div ref={root} className="ui-page focus-mode" role="dialog" aria-modal="true" aria-label={t("enrich.light.dialog", { name })}>
+      <FocusBar context={context} name={name} onClose={onClose} />
+      <div className="fm-grid has-sheet">
       <section className="fm-right" ref={right} aria-busy={busy}>
-        <button type="button" className="fm-close" onClick={onClose}>
-          <span aria-hidden="true">✕</span> {t("enrich.focus.close")}
-        </button>
         {(step.kind === "box" || step.kind === "working") && (
           <BrainDumpStep
             roleId={itemId} title={name} company="" value={answer.value} via={answer.via}
@@ -428,7 +427,7 @@ export function LightStop({ section, itemId, cv, dispatch, waitForSave, onClose,
         )}
         {step.kind === "failed" && (
           <>
-            <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.light.failed")}</h2>
+            <p className="ui-notice ui-notice--bad" role="alert" id="fm-step-title" tabIndex={-1}>{t("enrich.light.failed")}</p>
             <div className="fm-foot">
               <button type="button" className="fm-ghost" onClick={onNext}>{t("enrich.focus.skip")}</button>
               <button type="button" className="fm-btn" onClick={() => void ask(answer.value)}>{t("enrich.focus.tryAgain")}</button>
@@ -436,6 +435,16 @@ export function LightStop({ section, itemId, cv, dispatch, waitForSave, onClose,
           </>
         )}
       </section>
+      <aside className="fm-left">
+        <p className="fm-eyebrow">{t(`enrich.path.section.${section}`)}</p>
+        <p className="fm-role">{name}</p>
+        {meta && <p className="fm-role-meta">{meta}</p>}
+        <ul className="fm-bullets">
+          {lines.map((b) => <li key={b.id} className="fm-bullet"><span>{b.text}</span></li>)}
+          {step.kind !== "pick" && <li className="fm-slot" aria-hidden="true">{t("enrich.light.slot")}</li>}
+        </ul>
+      </aside>
+      </div>
     </div>,
     document.body,
   );

@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { emptyCv, TAILOR_SECTIONS, type MatchScore, type TailorQuestion, type TailorRun } from "@resumora/shared";
-import { roleDone } from "./role-done.ts";
 
 // E6 Task 9: the "Projects & volunteering" step reuses the Experience loop, item by item, with the kind's labels.
 vi.mock("./tailor-api.ts", () => ({
@@ -48,7 +47,7 @@ describe("Projects & volunteering step", () => {
       interrupted: false, start: vi.fn(), stop: vi.fn(), onFinal: vi.fn() });
     vi.mocked(getScores).mockResolvedValue({ base: score(82), tailored: null });
     vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv("en"), experience: [analyst], projects: [checker], volunteering: [mentor] }, version: 1, updatedAt: at });
-    vi.mocked(getJob).mockResolvedValue({ extracted: { company: "DSV", requirements: [] } } as never);
+    vi.mocked(getJob).mockResolvedValue({ extracted: { title: "Analyst", company: "DSV", requirements: [] } } as never);
     vi.mocked(getRun).mockResolvedValue(run());
     vi.mocked(sendAnswers).mockResolvedValue();
   });
@@ -62,21 +61,43 @@ describe("Projects & volunteering step", () => {
 
     expect(await screen.findByText("Project 1 of 1 · Question 1 of 1")).toBeInTheDocument();
     expect(askQuestions).toHaveBeenLastCalledWith("run1", "projects", "p1");
-    expect(screen.getByText("You're tailoring this project")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Payroll checker" })).toBeInTheDocument();
-    expect(screen.getByText("Projects & volunteering")).toBeInTheDocument();
+    expect(screen.getByText("The project, as it is on your CV now")).toBeInTheDocument();
+    expect(within(screen.getByRole("complementary")).getByText("Payroll checker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Skip this project" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Skip" }));
-    expect(await screen.findByRole("button", { name: "Use the new version" })).toBeInTheDocument();
+    expect(await screen.findByText("Suggestion 1 of 1")).toBeInTheDocument();
+    expect(screen.getByText(/^Project 1 of 1/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Skip this project" })).toBeInTheDocument();
     expect(runSection).toHaveBeenLastCalledWith("run1", "projects", "p1");
-    await user.click(screen.getByRole("button", { name: "Use the new version" }));
+    await user.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "projects", expect.objectContaining({ roleId: "p1" }));
-    expect(await screen.findByText("Up from 82. Nice work! 🎉")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Next volunteering role: Mentor" }));
+    // The project ends on its score; Next goes on to the next item.
+    await user.click(await screen.findByRole("button", { name: /^Next: / }));
     expect(await screen.findByText("Volunteering 1 of 1 · Question 1 of 1")).toBeInTheDocument();
     expect(askQuestions).toHaveBeenLastCalledWith("run1", "projects", "v1");
-    expect(screen.getByText("You're tailoring this volunteering role")).toBeInTheDocument();
+    expect(screen.getByText("The volunteering role, as it is on your CV now")).toBeInTheDocument();
+  });
+});
+
+describe("the finish screen of a CV with only a project", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    const met = { ref: "r0", kind: "requirement" as const, status: "missing" as const, evidence: null, inferred: false };
+    vi.mocked(getScores).mockResolvedValue({ base: score(82), tailored: { ...score(82), labels: [met] } });
+    vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv("en"), projects: [checker] }, version: 1, updatedAt: at });
+    vi.mocked(getJob).mockResolvedValue({ extracted: { title: "Analyst", company: "DSV", requirements: [{ text: "BPMN", kind: "must", category: "skill" }] } } as never);
+    vi.mocked(getRun).mockResolvedValue(run({ status: "done", currentSection: null, currentRoleId: null, roleOrder: ["p1"], sections: ["projects", "skills"] }));
+  });
+
+  it("Change my answer opens the finished project, though the CV has no roles", async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(await screen.findByRole("button", { name: "Change my answer" }));
+    expect(screen.getByRole("button", { name: /Payroll checker/ })).toBeInTheDocument();
   });
 });
 
@@ -87,7 +108,7 @@ describe("a project with nothing to change (browser check)", () => {
     localStorage.setItem("resumora.tailorRun.one", "run1");
     vi.mocked(getScores).mockResolvedValue({ base: score(82), tailored: null });
     vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv("en"), experience: [analyst], projects: [checker], volunteering: [mentor] }, version: 1, updatedAt: at });
-    vi.mocked(getJob).mockResolvedValue({ extracted: { company: "DSV", requirements: [] } } as never);
+    vi.mocked(getJob).mockResolvedValue({ extracted: { title: "Analyst", company: "DSV", requirements: [] } } as never);
     vi.mocked(getRun).mockResolvedValue(run({ status: "waiting_user" }));
     vi.mocked(runSection).mockResolvedValue({ proposals: [], questions: [] });
   });
@@ -95,19 +116,5 @@ describe("a project with nothing to change (browser check)", () => {
   it("says so in project words", async () => {
     open();
     expect(await screen.findByText("Nothing to change in this project ✓")).toBeInTheDocument();
-  });
-});
-
-describe("roleDone for projects and volunteering", () => {
-  const items = [analyst, checker, mentor];
-
-  it("names the step after the last role, and the kind for projects", () => {
-    expect(roleDone({ names: [], company: "DSV", changed: true, from: 82, to: 82, next: run({ currentRoleId: "p1" }), roles: items, kind: "role" }).button)
-      .toBe("On to Projects & volunteering");
-    const nothing = roleDone({ names: [], company: null, changed: false, from: 82, to: 82, next: run({ currentSection: "skills", currentRoleId: null }), roles: items, kind: "project" });
-    expect(nothing.title).toBe("Nothing to change in this project ✓");
-    expect(nothing.button).toBe("On to Skills");
-    expect(roleDone({ names: ["BPMN"], company: "DSV", changed: true, from: 82, to: 84, next: run({ currentRoleId: "v1" }), roles: items, kind: "project" }).line)
-      .toBe("This project now shows BPMN, something DSV asks for.");
   });
 });

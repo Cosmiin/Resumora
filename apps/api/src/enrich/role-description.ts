@@ -29,6 +29,7 @@ export function roleDescriptionSystemPrompt(locale: Locale): string {
 Write the short introduction that sits under one role on a CV: at most two sentences.
 First sentence: what the company does (its industry, products or customers).
 Second sentence: what the role was for (its purpose and scope).
+Keep both sentences short: together they fit on two lines of a CV.
 The bullets already say what the person did: never repeat or paraphrase a bullet.
 Use the plain terms an applicant tracking system would match, such as the industry, the function and the domain.
 Use only facts from the role and the notes. Never invent facts, names or numbers.

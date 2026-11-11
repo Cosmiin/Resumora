@@ -20,6 +20,8 @@ export interface CvRepo {
   getHistory(id: string): Promise<{ content: CvContent; createdAt: string } | null>;
   /** null when the history id does not exist (for this user). */
   restore(id: string, expectedVersion: number, content: CvContent): Promise<SaveResult | null>;
+  /** Deletes every History snapshot of the user's CV. */
+  clearHistory(): Promise<void>;
   /** Copies the current saved CV into History (same 50-item limit). Does nothing when the user has no saved CV. */
   snapshot(reason: "ai"): Promise<void>;
 }

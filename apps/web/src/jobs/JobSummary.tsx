@@ -1,4 +1,4 @@
-﻿import { useId, useState } from "react";
+﻿import { useId, useState, type ReactNode } from "react";
 import type { JobExtraction } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { JobAd } from "./JobAd.tsx";
@@ -10,8 +10,10 @@ function count(n: number, one: Parameters<typeof t>[0], many: Parameters<typeof 
 }
 
 /** 7A, below the requirements: duties, benefits, and what was read from the ad with the full ad behind a toggle. */
-export function JobSummary({ extracted, rawText, salaryStated }: {
+export function JobSummary({ extracted, rawText, salaryStated, keywords }: {
   extracted: JobExtraction; rawText: string | null; salaryStated: boolean;
+  /** The ATS keywords, shown between the duties and the benefits. */
+  keywords?: ReactNode;
 }) {
   const dutiesId = useId();
   const adId = useId();
@@ -25,9 +27,10 @@ export function JobSummary({ extracted, rawText, salaryStated }: {
       <ul aria-labelledby={dutiesId}>{duties.slice(0, duties.length - hidden).map((text, index) => <li key={index}>{text}</li>)}</ul>
       {hidden > 0 && <button type="button" className="link" onClick={() => setAllDuties(true)}>{t("job.duties.more", { n: hidden })}</button>}
     </section>}
+    {keywords}
     {extracted.benefits.length > 0 && <section className="sec">
       <h2>{t("job.benefits.title", { n: extracted.benefits.length })}</h2>
-      <p>{extracted.benefits.join(" · ")}</p>
+      <ul className="job-kw job-kw--plain">{extracted.benefits.map((text, index) => <li key={index}>{text}</li>)}</ul>
     </section>}
     <div className="job-read">
       <p className="jobs-note">{t("job.read.line", {

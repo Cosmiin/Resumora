@@ -15,10 +15,12 @@ type Props = {
   initial?: string;
   /** Shown (bottom left) when there is an earlier step. */
   onBack?(): void;
+  /** The coach's reason for asking, shown under the answer. */
+  why?: string | null;
 };
 
 /** One question about the current bullet; the answer turns into a proposal right away. */
-export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, onSkip, onFreeTalk, initial = "", onBack }: Props) {
+export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, onSkip, onFreeTalk, initial = "", onBack, why }: Props) {
   const [value, setValue] = useState(initial);
   const [via, setVia] = useState<Via[]>([]);
   const [voiceBusy, setVoiceBusy] = useState(false);
@@ -41,6 +43,7 @@ export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, on
         locale={locale}
         onBusyChange={setVoiceBusy}
       />
+      {why && <p className="fm-why">{t("enrich.focus.why", { reason: why })}</p>}
       <button type="button" className="fm-ghost fm-free-talk" onClick={onFreeTalk} disabled={busy}>
         {t("enrich.focus.freeTalk")}
       </button>

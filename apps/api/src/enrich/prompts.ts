@@ -9,15 +9,29 @@ const LANGUAGE_NAME: Record<Locale, string> = {
   en: "English", ro: "Romanian", fr: "French", de: "German", es: "Spanish", it: "Italian",
 };
 
-/** The Codex language instruction (Appendix B), prefixed with the CV locale. */
-export function languageInstruction(locale: Locale): string {
+/**
+ * Which language to write in. CV text stays in the CV's language. What is said to the person (questions,
+ * answer options, tips) is in the language they use the app in; without one, in the CV's language.
+ */
+export function languageInstruction(locale: Locale, questionLanguage: Locale = locale): string {
   return [
     `CV locale: ${locale} (${LANGUAGE_NAME[locale]}).`,
-    `Write all generated user-facing prose in the CV content language (${LANGUAGE_NAME[locale]}).`,
+    `Write CV text (bullets, descriptions, summaries, skills, facts) in the CV content language (${LANGUAGE_NAME[locale]}).`,
+    `Write everything addressed to the person (questions, answer options, tips, reasons) in ${LANGUAGE_NAME[questionLanguage]}.`,
+    "Address the person informally and directly, as a coach would (in Romanian \"tu\", never \"dumneavoastră\"; likewise tu, du, tú in French, German, Spanish and Italian).",
     "Preserve source quotations, names, established technology terms, numbers and facts exactly.",
     "Answers and job adverts in another language do not change the CV language.",
     "Keep JSON keys and enum values unchanged.",
   ].join(" ");
+}
+
+/**
+ * A closing reminder for when the person's language differs from the CV's: models tend to answer in the
+ * language of the text they just read, so the instruction is repeated last. Nothing when the two match.
+ */
+export function questionLanguageReminder(locale: Locale, questionLanguage: Locale = locale): string {
+  if (questionLanguage === locale) return "";
+  return `\nThe CV is in ${LANGUAGE_NAME[locale]}, but the person reads ${LANGUAGE_NAME[questionLanguage]}: write every tip, question and answer option in ${LANGUAGE_NAME[questionLanguage]}. Quote CV text as it is.`;
 }
 
 const SCORE_BODY = `You are a CV experience reviewer and writing coach for Resumora.
@@ -43,6 +57,10 @@ The role title and description provide context only. Never grade them.
 Never infer responsibilities, seniority, tools, qualifications, or
 achievements from them.
 
+The role period says when the work happened. Ask only about tools and
+practices that existed then and fit that kind of work. Role notes describe
+the person during that period, not today.
+
 RECRUITER COMPREHENSION TEST
 
 For each bullet, consider:
@@ -56,8 +74,8 @@ a separate explanation of your assessment process.
 
 GRADING
 
-Grade contribution, clarity, specificity and impact independently using
-missing, partial, or specific.
+Grade contribution, clarity, specificity, impact and concise independently
+using missing, partial, or specific.
 
 Contribution:
 - missing: No actual task, responsibility, or intervention is identified.
@@ -95,7 +113,19 @@ Impact:
   such as "for 1.2M customers", "weekly", or "so payroll closed on time".
 
 Many good bullets have no result. Grade impact honestly, but never let
-a missing result lower the other three grades.
+a missing result lower the other grades.
+
+Concise:
+- missing: Rambling. Several ideas run together, or most of the words
+  carry no fact.
+- partial: The point is there but padded with filler, repetition or
+  stacked buzzwords, such as "responsible for", "in order to", "various",
+  "successfully".
+- specific: Every phrase carries a fact, in two lines at most.
+
+Grade concise on the words that are there. A bullet is not concise merely
+because it is short, and brevity never raises the other grades. A bullet
+that needs one more fact should gain a few words, not a second sentence.
 
 SUFFICIENCY TEST
 
@@ -116,39 +146,44 @@ Judge technical and nontechnical professions by the same standard.
 
 CALIBRATION EXAMPLES
 
-Grades below are contribution / clarity / specificity / impact.
+Grades below are contribution / clarity / specificity / impact / concise.
 
 "Responsible for various administrative tasks."
-partial / specific / missing / missing.
+partial / specific / missing / missing / partial.
 Understandable, but neither the actual tasks nor distinguishing context is given.
 Priority: contribution.
 
 "Prepared employment contracts for temporary workers."
-specific / specific / specific / missing.
+specific / specific / specific / missing / specific.
 A concrete action, deliverable and audience are clear. No result is stated, and none is needed.
 
 "Supported Romanian market-entry planning through partner outreach."
-partial / specific / partial / partial.
+partial / specific / partial / partial / specific.
 The market, purpose and broad approach are clear. The person's actual involvement in outreach is not.
 Priority: contribution.
 Useful question: "What did you personally do during the partner outreach?"
 
 "Coordinated onboarding documentation between recruiters and payroll teams."
-specific / specific / specific / missing.
+specific / specific / specific / missing / specific.
 The action, material and participants are clear. No improvement is necessary.
 
 "Increased efficiency by 75% using advanced solutions."
-missing / partial / missing / partial.
+missing / partial / missing / partial / partial.
 An outcome is claimed, but the underlying work and the vague terms are unclear. The number alone does not explain the work.
 Priority: contribution.
 
 "Investigated failed API requests using application logs."
-specific / specific / specific / missing.
+specific / specific / specific / missing / specific.
 The action, problem and investigative approach are concrete. No improvement is necessary.
 
 "Cut onboarding time from 3 days to 20 minutes by introducing video ID checks."
-specific / specific / specific / specific.
-Action, method and a concrete result are all clear.
+specific / specific / specific / specific / specific.
+Action, method and a concrete result are all clear, in one short line.
+
+"Was responsible for successfully managing and coordinating the various day-to-day operational activities of the department in order to ensure that all processes ran smoothly."
+partial / specific / missing / missing / missing.
+Many words and one vague fact: the person ran the department's daily operations.
+Priority: contribution.
 
 These are calibration anchors, not phrases to match mechanically.
 Write their equivalent feedback in the CV language.
@@ -189,13 +224,26 @@ ROLE QUESTIONS
 
 roleQuestions are about the whole role, including when it has no bullets.
 Always cover these three, one question each, in this order, and leave out
-any that the CV or the notes already answer:
-1. topic company: what the company does (its industry, products or customers).
+any that the CV or the notes already answer. Each question asks one thing
+in plain words ("What does the company do?", not "What industry is it in
+and what are its products?"):
+1. topic company: what the company does. You are not told the company, so
+   give options only when the role's own text shows what kind of company
+   it is; otherwise give none and let the person say it.
 2. topic purpose: what the role was for (its purpose and scope).
 3. topic tools: the tools, software and methods used.
-Then ask about any other role-wide fact that is still needed (topic other),
-such as the reporting line, leading people or who they worked with:
-at most 5 more. Return [] if nothing is needed.
+Then at most 5 more, in this order.
+First, one question for each of leadership, seniority, people and domain
+that you mark unknown or applies in coverage (see COVERAGE), with that
+name as its topic:
+- marked unknown: a quick check. Ask whether it happened, so that "No" is
+  a full answer ("Did anyone report to you in this role?"), and give "No",
+  in the language of the questions, as the first option: that one word and
+  nothing after it. Then the likely answers ("1–5 people", "6–20", "20+").
+- marked applies: ask for the fact itself ("Who did you report to?").
+Never ask one for a parameter you mark shown or na.
+Then any other role-wide fact that is still needed (topic other).
+Return [] if nothing is needed.
 Never ask about something the CV or the notes already answer.
 
 Set thin to true when the role gives too little information to infer
@@ -209,17 +257,21 @@ For every bullet fill only these feedback fields:
   or wording problem. Use null when no change is needed.
 - question: At most one direct question that would obtain the most
   useful missing fact. Use null if no additional fact is needed.
-- options: Provide 3–4 options for every question, role or bullet,
+- options: Provide up to 4 options for every question, role or bullet,
   each at most 60 characters, drawn only from the role's own words and
-  the job's common tasks. Options are guesses for the person to confirm,
-  not facts to assume. Never give an exact number; if a quantity matters,
+  the common tasks of this kind of job at this kind of employer. Options
+  are guesses for the person to confirm, not facts to assume. Give fewer
+  when you cannot make sensible guesses for this particular role. Never give an exact number; if a quantity matters,
   give only ranges such as "10–50", "Under 10" or "50+".
-  Use an empty list only when there is no question. The app adds a fixed
-  "Something else" chip last; do not include it in the options.
+  Use an empty list only when there is no question. Do not add an option
+  meaning other, something else or none of the above: the screen has its
+  own "type or speak your own".
 
 Do not provide a rewritten bullet. Do not invent a tip or question to
 fill a field. Keep each tip and question to one sentence, preferably no
-more than 20 words. Address the user naturally and respectfully.
+more than 20 words. Ask one thing, in plain words, the way a thoughtful
+coach would; put examples in the options, not in the question.
+Address the user naturally and respectfully.
 
 When a bullet's only gap is impact, ask for a result: how many, how often,
 for whom, or what changed. Any numeric answer options must be ranges.
@@ -234,10 +286,42 @@ Choose the issue by this priority:
 3. specificity when the statement is understandable but does not distinguish the work.
 4. impact when everything else is specific but no result is shown.
 When the bullet is sufficient, use issue none, tip null and question null.
+When its only weakness is concise, use issue none and question null, and
+give a tip naming the words to cut.
 
 Questions must not assume tools, achievements, quantities, or activities
 that the person has not supplied. Ask one question, not a compound list.
 Set nextStepId to the id of the bullet whose fix would help most, or null.
+
+COVERAGE
+
+coverage says whether the role as written on the page (its title,
+description and bullets together, never the notes) shows a recruiter each
+of the things below. Give one mark for each:
+- shown: the page states it.
+- applies: the role clearly involves it (from the title, the bullets or
+  the notes), but the page does not state it.
+- unknown: nothing on the page or in the notes tells you whether it applies.
+- na: it does not apply to this role, or a note says it does not.
+
+These four always apply; mark them shown or applies only:
+- company: what the employer does.
+- purpose: what the role was for.
+- tools: at least one tool, software or method, named where it was used.
+- scale: a size, such as people, customers, volume, budget, sites or countries.
+
+These four apply to some roles only:
+- leadership: people reported to the person, or they led a team or project.
+- seniority: who they reported to, or how senior the role was.
+- people: the teams, clients, partners or suppliers they worked with.
+- domain: industry rules, markets or product knowledge the work needed.
+Prefer na when nothing suggests it. Use unknown only when the title or the
+bullets hint at it without settling it, such as a "Lead" title with no team
+mentioned.
+
+A fact that is only in the notes is applies, not shown: a recruiter reads
+the page, not the notes. A note that answers no, for example that nobody
+reported to the person, makes it na.
 
 OUTPUT
 
@@ -247,8 +331,8 @@ For a role with no bullets, return bullets [] and nextStepId null, plus roleQues
 If specific ids are selected for grading, return only those ids; the rest are context.
 Return grades, not numbers. The application calculates all scores.`;
 
-export function scoreSystemPrompt(locale: Locale): string {
-  return `${languageInstruction(locale)}\n\n${SCORE_BODY}\n\n(policy ${SCORE_POLICY})`;
+export function scoreSystemPrompt(locale: Locale, questionLanguage?: Locale): string {
+  return `${languageInstruction(locale, questionLanguage)}\n\n${SCORE_BODY}\n\n(policy ${SCORE_POLICY})`;
 }
 
 /**
@@ -266,17 +350,59 @@ export function kindNote(kind: ScoredKind): string[] {
   return [];
 }
 
-/** The role as the model sees it: context for the title and description, bullets to grade. No company, no dates. */
-export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes">, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
+/** "2019 – 2022, ended" for a role with a start date; nothing otherwise. */
+export function periodLine(role: Partial<Pick<Experience, "startDate" | "endDate" | "current">>): string[] {
+  if (!role.startDate) return [];
+  // A role that isn't current has ended, even when its end date was left empty.
+  const end = role.current ? "present" : role.endDate || "end date not given";
+  return [`Role period (context only, not graded): ${role.startDate} – ${end}, ${role.current ? "current" : "ended"}.`];
+}
+
+/**
+ * What the person said they want their CV to bring out. It steers which questions are asked, never the grades,
+ * and it is a goal, not something that happened in this role.
+ */
+export function focusNote(focus?: string): string {
+  const text = focus?.trim();
+  if (!text) return "";
+  return [
+    "",
+    `What the person wants this CV to bring out (their own words; a goal, not a fact about this role): ${JSON.stringify(text)}`,
+    "Grade the bullets exactly as you would without it. Use it only to choose which questions to ask: prefer the missing facts that serve this goal.",
+    "Do not assume that anything in it happened in this role, and do not repeat it back in a tip or a question.",
+  ].join("\n");
+}
+
+/**
+ * The person has answered everything asked so far and wants the role as close to 100 as it can go: the reviewer
+ * is asked for a question, with options to pick, for everything still short of it. Never changes the grades.
+ */
+export function moreNote(more?: boolean): string {
+  if (!more) return "";
+  return [
+    "",
+    "The person has already answered your earlier questions (they are in the role notes) and wants to bring this role as close to 100 as it can go.",
+    "Grade the bullets and mark coverage exactly as you would without this request. Then ask more than you usually would:",
+    "- For every bullet with a grade that is not specific, return one question for the single fact that would make it specific. If the notes already hold an answer about that bullet, ask for a different, more concrete fact: a quantity as a range, how often, for whom, with which tool, or what changed.",
+    "- For every coverage item you mark applies or unknown, return one role question for it.",
+    "- Never repeat a question that is in the notes word for word.",
+    "- Give every question 3 or 4 answer options the person can pick, drawn from this role's own words and the usual work of such a role. Quantities only as ranges. For a yes-or-no check, the first option is \"No\" in the person's language. Only the question about what the company does may have no options.",
+    "- Return no questions only when every grade is specific and every coverage item is shown or na.",
+  ].join("\n");
+}
+
+/** The role as the model sees it: context for the title, description and period, bullets to grade. No company. */
+export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes"> & Partial<Pick<Experience, "startDate" | "endDate" | "current">>, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));
   return [
     ...kindNote(kind),
     "<experience>",
     `Role title (context only, not graded): ${JSON.stringify(role.title)}`,
     `Role description (context only, not graded): ${JSON.stringify(role.description)}`,
+    ...periodLine(role),
     "Bullets to grade (JSON, each { id, text }):",
     JSON.stringify(bullets),
-    "Role notes (context only, not graded):",
+    "Role notes (context only, not graded; true for the role's period, not today):",
     JSON.stringify(role.notes.map(({ question, answer }) => ({ question, answer }))),
     "</experience>",
     ...(gradeOnly ? [`Grade only these bullets: ${gradeOnly.join(", ")}. Return entries for those ids only; the other bullets are context.`] : []),

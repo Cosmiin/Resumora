@@ -6,8 +6,9 @@
 
 h1,
 h2 {
-  font-family: var(--font-display);
-  font-weight: 500;
+  font-family: var(--old-font-display);
+  font-weight: 800;
+  letter-spacing: -0.015em;
 }
 
 body {
@@ -23,7 +24,8 @@ button {
   border: 1px solid var(--pine-600, #17695d);
   background: var(--pine-600, #17695d);
   color: var(--white, #fff);
-  border-radius: 8px;
+  border-radius: 999px;
+  font-weight: 700;
   padding: 0.55rem 1rem;
 }
 button:disabled {
@@ -33,7 +35,9 @@ button:disabled {
 button.link {
   background: none;
   border: none;
-  color: var(--pine-600, #17695d);
+  border-radius: 0;
+  font-weight: 600;
+  color: var(--pine-500, #2446b0);
   padding: 0;
   text-decoration: underline;
 }
@@ -66,69 +70,6 @@ label {
   color: var(--pine-700, #105649);
 }
 
-.app-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 24px;
-  padding: 14px 32px;
-  background: var(--white);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.app-brand {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-.app-nav a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 4px;
-  color: var(--text-muted);
-  text-decoration: none;
-}
-.app-nav a[aria-current="page"] {
-  color: var(--text-strong);
-  box-shadow: inset 0 -2px 0 var(--pine-600);
-}
-.app-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-left: auto;
-}
-.app-account {
-  position: relative;
-}
-.app-account-button {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: var(--radius-pill);
-  font-weight: 600;
-}
-.app-account-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 20;
-  display: grid;
-  gap: 8px;
-  min-width: 220px;
-  padding: 12px;
-  background: var(--white);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-page);
-}
-.app-account-email {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  overflow-wrap: anywhere;
-}
 .page-loading {
   padding: 2rem;
 }
@@ -143,3 +84,10 @@ label.checkbox input {
 }
 
 .page-error { display: grid; gap: 12px; justify-items: start; padding: 2rem; }
+
+/* Still used by the import screen's own top bar (old look). */
+.app-brand {
+  font-family: var(--old-font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+}

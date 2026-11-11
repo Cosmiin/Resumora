@@ -47,7 +47,7 @@ const role: Experience = { id: "role", company: "Acme", title: "Engineer", locat
 const match: MatchScore = { policy: "match/1", total: 80, band: "strong", capped: false, labels: [],
   parts: { requirements: null, keywords: null, seniority: null, langEdu: null } };
 const roleScores = (score: number) => ({ scores: new Map([["role", { state: "ready" as const,
-  result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } }]]), retry: vi.fn() });
+  result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } }]]), retry: vi.fn(), put: vi.fn() });
 const ready = () => screen.findByRole("heading", { name: "Engineer", level: 1 });
 
 beforeEach(() => {
@@ -93,7 +93,7 @@ describe("job page", () => {
   it("shows a closed-position notice near the top while keeping job actions available", async () => {
     vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, positionClosed: true } });
     renderJob(); await ready();
-    const notice = screen.getByText("This position is no longer open for applications.");
+    const notice = screen.getByText("This position is no longer open, according to the ad. You can still read it and tailor a CV to it.");
     expect(notice).toBeVisible();
     expect(notice.compareDocumentPosition(screen.getByRole("heading", { name: "In short" }))
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -104,7 +104,7 @@ describe("job page", () => {
   it.each([{}, { positionClosed: false }])("shows no closed-position notice for extraction flag %j", async (flag) => {
     vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, ...flag } });
     renderJob(); await ready();
-    expect(screen.queryByText("This position is no longer open for applications.")).not.toBeInTheDocument();
+    expect(screen.queryByText("This position is no longer open, according to the ad. You can still read it and tailor a CV to it.")).not.toBeInTheDocument();
   });
   it("keeps positionClosed true when editing and saving a closed job", async () => {
     const extracted = { ...job.extracted!, positionClosed: true };
@@ -116,7 +116,7 @@ describe("job page", () => {
     await ready();
     expect(patchJob).toHaveBeenCalledExactlyOnceWith("one", 1, { ...extracted, summary: "Build better tools." });
     expect(screen.getByText("Build better tools.")).toBeInTheDocument();
-    expect(screen.getByText("This position is no longer open for applications.")).toBeVisible();
+    expect(screen.getByText("This position is no longer open, according to the ad. You can still read it and tailor a CV to it.")).toBeVisible();
   });
   it("an enriched CV goes straight into tailoring, with no dialog", async () => {
     vi.mocked(useRoleScores).mockReturnValue(roleScores(40));
@@ -129,21 +129,22 @@ describe("job page", () => {
   it("computes a missing Score 1 when Try again is clicked, and says so when that fails", async () => {
     vi.mocked(scoreJob).mockRejectedValueOnce(new Error("ai")).mockResolvedValueOnce({ base: match, tailored: null });
     renderJob(); await ready();
-    const box = (await screen.findByText("Your match score isn't available yet.")).closest(".job-score") as HTMLElement;
-    await userEvent.click(within(box).getByRole("button", { name: "Try again" }));
+    await screen.findByText("Your match score isn't available yet.");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Couldn't work out your match score. Try again.")).toBeInTheDocument();
-    await userEvent.click(within(screen.getByText("Couldn't work out your match score. Try again.").closest(".job-score") as HTMLElement).getByRole("button", { name: "Try again" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.queryByText("Couldn't work out your match score. Try again.")).toBeNull());
     expect(scoreJob).toHaveBeenCalledWith("one");
     expect(scoreJob).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("Your match score isn't available yet.")).toBeNull();
+    expect(screen.getByText("Your match: 80 of 100")).toBeInTheDocument();
   });
 
   describe("reopening a tailored CV", () => {
-    const box = async () => (await screen.findByText(/Tailored CV ready|Tailoring in progress/)).closest(".tailor") as HTMLElement;
-    /** C5: the box sits at the top of the job page, above the requirements, the ad and application status. */
+    const box = async () => (await screen.findByRole("link", { name: /Open tailored CV|Continue tailoring/ })).closest(".job-tailor") as HTMLElement;
+    /** C5: the action sits in the page's head, above the must-haves, the ad and application status. */
     const expectAtTop = (tailor: HTMLElement) => {
-      for (const below of [screen.getByRole("heading", { name: /What they ask for/ }),
+      for (const below of [screen.getByRole("heading", { name: "Must-haves" }),
         screen.getByRole("button", { name: "Show original ad" }), screen.getByRole("combobox", { name: "Application status" })]) {
         expect(tailor.compareDocumentPosition(below) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       }
@@ -169,10 +170,10 @@ describe("job page", () => {
       vi.mocked(getJobScore).mockResolvedValue({ base: match, tailored: match });
       const { router } = renderJob(); await ready();
       const tailor = await box();
-      expect(tailor).toHaveTextContent("Step 3 of 6 · Summary");
+      expect(tailor).toHaveTextContent("Tailoring in progress: step 3 of 6, Summary");
       expectAtTop(tailor);
       expect(getRun).toHaveBeenCalledWith("run1");
-      await userEvent.click(within(tailor).getByRole("link", { name: "Continue" }));
+      await userEvent.click(within(tailor).getByRole("link", { name: "Continue tailoring" }));
       expect(router.state.location.pathname).toBe("/jobs/one/tailor");
       localStorage.clear();
     });
@@ -190,18 +191,18 @@ describe("job page", () => {
   it.each([false, true])("warns about tailored CV deletion only when one exists: %s", async (tailored) => {
     vi.mocked(getJobScore).mockResolvedValue({ base: match, tailored: tailored ? match : null });
     renderJob(); await ready();
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
-    const dialog = within(screen.getByRole("dialog", { name: "Delete this job?" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove this job" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Remove this job?" }));
     expect(!!dialog.queryByText("This also deletes its tailored CVs, translations and cover letters.")).toBe(tailored);
   });
-  it.each(["queued", "processing", "needs_text", "failed"] as const)("explains why a %s job cannot be tailored", async (status) => {
+  // These states no longer carry a Tailor button that explains itself when pressed: the page says what is going on instead.
+  it.each(["queued", "processing", "needs_text", "failed"] as const)("a %s job says where it stands and offers no tailoring", async (status) => {
     vi.mocked(getJob).mockResolvedValue({ ...job, status, extracted: null });
     renderJob();
-    const button = await screen.findByRole("button", { name: "Tailor my CV" });
-    expect(button).toBeEnabled();
-    await userEvent.click(button);
-    expect(screen.getByRole("status")).toHaveTextContent(status === "failed" ? "This job couldn't be read."
-      : status === "needs_text" ? "This job needs its description" : "This job isn't ready yet.");
+    expect(await screen.findByText(status === "failed" ? "We couldn't read this job."
+      : status === "needs_text" ? "This job needs its description before you can tailor your CV." : "Reading the ad…")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tailor my CV" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Open the original ad" })).toBeInTheDocument();
     expect(getCv).not.toHaveBeenCalled();
   });
   it("a CV that isn't enriched shows Before you tailor with its average, even at 80 or more, and Tailor anyway tailors", async () => {
@@ -210,7 +211,7 @@ describe("job page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
     expect(await screen.findByRole("heading", { name: "Before you tailor" })).toBeInTheDocument();
     expect(screen.getByText("Your CV isn't enriched yet. Tailoring works much better when your roles have more detail.")).toBeInTheDocument();
-    expect(screen.getByText("Average role score 84 · enriched at 80")).toBeInTheDocument();
+    expect(screen.getByText("Average role score 84; a CV counts as enriched from 80")).toBeInTheDocument();
     expect(screen.getByRole("meter", { name: "Average role score" })).toHaveAttribute("aria-valuenow", "84");
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Tailor anyway" }));
@@ -222,10 +223,10 @@ describe("job page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
     await userEvent.click(await screen.findByRole("button", { name: "Enrich first" }));
     expect(router.state.location.pathname).toBe("/cv");
-    expect(await screen.findByRole("heading", { name: "Let's make your CV stronger, one step at a time" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
   });
   it("with no scores yet the dialog says Not scored yet", async () => {
-    vi.mocked(useRoleScores).mockReturnValue({ scores: new Map([["role", { state: "scoring" as const }]]), retry: vi.fn() });
+    vi.mocked(useRoleScores).mockReturnValue({ scores: new Map([["role", { state: "scoring" as const }]]), retry: vi.fn(), put: vi.fn() });
     renderJob(); await ready();
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
     expect(await screen.findByText("Not scored yet")).toBeInTheDocument();
@@ -248,7 +249,7 @@ describe("job page", () => {
     const { client } = renderJob(); await ready();
     expect(getJob).toHaveBeenCalledWith("one");
     expect(client.getQueryData(["job", "u1", "one"])).toEqual(job);
-    for (const text of ["Acme · London", "Hybrid", "Full time", "7,000–9,000 RON / month", "Apply by 1 Dec 2026"]) {
+    for (const text of ["Acme, London", "Hybrid", "Full time", "7,000–9,000 RON / month", "Apply by 1 Dec 2026"]) {
       expect(screen.getByText(text)).toBeInTheDocument();
     }
     expect(screen.queryByText(/2026-12-01/)).not.toBeInTheDocument();
@@ -268,34 +269,50 @@ describe("job page", () => {
     await userEvent.click(show);
     expect(show).toHaveAccessibleName("Show original ad");
     expect(document.querySelector(".doc")).toBeNull();
-    expect(screen.getByRole("link", { name: "View original posting" })).toHaveAttribute("rel", "noopener noreferrer");
-    expect(screen.getByRole("link", { name: "View original posting" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: "Open the original ad" })).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getByRole("link", { name: "Open the original ad" })).toHaveAttribute("target", "_blank");
     expect(screen.getByText("Summary read by AI. Check it against the ad.")).toBeInTheDocument();
   });
 
-  it("shows In short, one requirements list, duties, benefits and the counts line, in that order", async () => {
+  it("shows the must-haves, the nice-to-haves, then In short, duties, benefits and the counts line, in that order", async () => {
     renderJob(); await ready();
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
-    expect(headings).toEqual(["In short", "What they ask for · 2", "What you'll do · 1", "Benefits · 1"]);
+    expect(screen.getAllByRole("heading").map((heading) => heading.textContent)).toEqual(
+      ["Engineer", "Must-haves", "Nice to have", "About this job", "In short", "What you'll do (1)", "Benefits (1)"]);
     expect(screen.getByText("Build useful tools.")).toBeInTheDocument();
     expect(screen.getAllByText("Strong SQL skills")).toHaveLength(1);
-    const list = within(screen.getByRole("list", { name: /What they ask for/ })).getAllByRole("listitem");
-    expect(list.map((line) => line.textContent)).toEqual(["Strong SQL skills", "GermanNice"]);
+    expect(within(screen.getByRole("list", { name: "Must-haves" })).getAllByRole("listitem").map((line) => line.textContent)).toEqual(["Strong SQL skills"]);
+    expect(screen.getByText("German").closest("section")).toContainElement(screen.getByRole("heading", { name: "Nice to have" }));
     expect(screen.getByText("Meal allowance")).toBeInTheDocument();
     expect(screen.getByText("Read from the ad: 2 requirements, 1 duty, 1 benefit, salary stated")).toBeInTheDocument();
+    // No score yet: no keywords and no sentence about how much the CV covers.
+    expect(screen.queryByRole("heading", { name: "ATS keywords" })).toBeNull();
+    expect(screen.queryByText(/must-haves/)).toBeNull();
   });
 
-  it("marks the requirements from the base match score and puts the total in the list heading", async () => {
+  it("marks the must-haves and nice-to-haves from the base match, shows the keywords and says how much the CV covers", async () => {
     vi.mocked(getJobScore).mockResolvedValue({ base: { ...match, total: 62, band: "fair", labels: [
       { ref: "r0", kind: "requirement", status: "met", evidence: "Wrote SQL daily", inferred: false },
       { ref: "r1", kind: "requirement", status: "missing", evidence: null, inferred: false },
+      { ref: "k:SQL", kind: "keyword", status: "met", evidence: "SQL", inferred: false },
+      { ref: "k:dbt", kind: "keyword", status: "missing", evidence: null, inferred: false },
     ] }, tailored: null });
     renderJob(); await ready();
-    expect(await screen.findByRole("heading", { name: "What they ask for · 2 · your match 62 Fair" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Met" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Missing" })).toBeInTheDocument();
+    expect(await screen.findByText("Your match: 62 of 100")).toBeInTheDocument();
+    expect(screen.getByText("Fair")).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Already on your CV · 1" })).getByText("Strong SQL skills")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Missing" })).toBeNull();
+    // The match, the coach's sentence and the main action share the strip under the title.
+    const band = screen.getByRole("region", { name: "Your match with this job" });
+    expect(within(band).getByText("Your match: 62 of 100")).toBeInTheDocument();
+    expect(within(band).getByRole("button", { name: "How is this scored?" })).toBeInTheDocument();
+    expect(within(band).getByRole("button", { name: "Tailor my CV" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Strong SQL skills/ }));
     expect(screen.getByText("Wrote SQL daily")).toBeInTheDocument();
+    expect(screen.getByText("German").closest("li")).toHaveTextContent("German (not on your CV yet)");
+    const keywords = screen.getByRole("heading", { name: "ATS keywords" }).closest("section")!;
+    expect(within(keywords).getByRole("progressbar", { name: "On your CV" })).toHaveAttribute("aria-valuetext", "1 of 2");
+    expect(within(keywords).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["SQL (on your CV)", "dbt (not on your CV yet)"]);
+    expect(screen.getByText("Your CV already shows every must-have. Tailoring will bring them out in this ad's words.")).toBeInTheDocument();
     expect(screen.queryByText("Base CV match")).toBeNull();
   });
 
@@ -303,18 +320,18 @@ describe("job page", () => {
     const responsibilities = ["Build reports", "Run audits", "Train staff", "Write specs", "Lead reviews"];
     vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, responsibilities } });
     renderJob(); await ready();
-    const duties = () => within(screen.getByRole("list", { name: "What you'll do · 5" })).getAllByRole("listitem").map((item) => item.textContent);
+    const duties = () => within(screen.getByRole("list", { name: "What you'll do (5)" })).getAllByRole("listitem").map((item) => item.textContent);
     expect(duties()).toEqual(responsibilities.slice(0, 3));
     await userEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
     expect(duties()).toEqual(responsibilities);
     expect(screen.queryByRole("button", { name: /Show \d+ more/ })).toBeNull();
   });
 
-  it("joins benefits on one line and counts several of each", async () => {
+  it("shows each benefit as a tag and counts several of each", async () => {
     vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, salary: null,
       responsibilities: ["Build reports", "Run audits"], benefits: ["Meal allowance", "Private medical care"] } });
     renderJob(); await ready();
-    expect(screen.getByText("Meal allowance · Private medical care")).toBeInTheDocument();
+    expect(screen.getByText("Meal allowance").closest("ul")).toContainElement(screen.getByText("Private medical care"));
     expect(screen.getByText("Read from the ad: 2 requirements, 2 duties, 2 benefits, salary not stated")).toBeInTheDocument();
   });
 
@@ -323,8 +340,9 @@ describe("job page", () => {
       extracted: { ...job.extracted!, requirements: [], benefits: [] } });
     renderJob(); await ready();
     expect(screen.getByText("Summary edited by you")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "What they ask for · 0" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Must-haves" })).toBeInTheDocument();
     expect(screen.getByText("None listed.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Nice to have" })).toBeNull();
     expect(screen.queryByRole("heading", { name: /Benefits/ })).not.toBeInTheDocument();
     expect(screen.getByText("Read from the ad: 0 requirements, 1 duty, 0 benefits, salary stated")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Show original ad" }));
@@ -342,7 +360,7 @@ describe("job page", () => {
   it("keeps the back link while loading", async () => {
     vi.mocked(getJob).mockReturnValue(new Promise(() => {}));
     renderJob();
-    expect(await screen.findByRole("link", { name: "← All jobs" })).toHaveAttribute("href", "/jobs");
+    expect(await screen.findByRole("link", { name: "All jobs" })).toHaveAttribute("href", "/jobs");
     expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
 
@@ -351,9 +369,9 @@ describe("job page", () => {
     vi.useFakeTimers();
     await act(async () => { renderJob(); });
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-    expect(screen.getByRole("heading", { name: "Reading this job" })).toBeInTheDocument();
-    expect(screen.getByText("Reading job…")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View original posting" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reading the ad…" })).toBeInTheDocument();
+    expect(screen.getByText("We're picking out what the ad asks for. About a minute.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open the original ad" })).toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(2998); });
     expect(getJob).toHaveBeenCalledTimes(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
@@ -368,7 +386,7 @@ describe("job page", () => {
     vi.useFakeTimers();
     await act(async () => { renderJob(); });
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-    expect(screen.getByRole("heading", { name: "Reading this job" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reading the ad…" })).toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
     expect(screen.getByText("Still reading. Reload the page to check again.")).toBeInTheDocument();
     const calls = vi.mocked(getJob).mock.calls.length;
@@ -380,21 +398,21 @@ describe("job page", () => {
     ["fetch_blocked", "We couldn't read this job."]] as const)("shows the failed message for %s", async (errorCode, message) => {
     vi.mocked(getJob).mockResolvedValue({ ...job, status: "failed", errorCode, extracted: null });
     renderJob(); expect(await screen.findByRole("heading", { name: message })).toBeInTheDocument();
-    expect(screen.getByText("Failed")).toBeInTheDocument();
-    expect(screen.getByText(errorCode === "not_a_job"
-      ? "Check that you pasted a single job ad, then delete this and add it again." : "Delete it and add it again.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(errorCode === "not_a_job"
+      ? "Check that it is a single job ad, then remove this job and add it again."
+      : "Remove this job, open the ad again and save it once it has fully loaded.");
+    expect(screen.getByRole("button", { name: "Remove this job" })).toBeInTheDocument();
   });
 
   it("shows a missing job with a back link", async () => {
     vi.mocked(getJob).mockRejectedValue(new ApiClientError(404, "not_found", "Missing"));
     renderJob(); expect(await screen.findByText("This job isn't in your list.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "← All jobs" })).toHaveAttribute("href", "/jobs");
+    expect(screen.getByRole("link", { name: "All jobs" })).toHaveAttribute("href", "/jobs");
   });
 
   it("retries other loading failures", async () => {
     vi.mocked(getJob).mockRejectedValueOnce(new Error("Offline")).mockResolvedValue(job);
-    renderJob(); expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong loading your jobs.");
+    renderJob(); expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't load your jobs.");
     await userEvent.click(screen.getByRole("button", { name: "Try again" })); await ready();
   });
 
@@ -407,10 +425,10 @@ describe("job page", () => {
     client.setQueryData(["jobs", "u1"], cached);
     client.setQueryData(["jobs", "u2"], cached);
     vi.mocked(listJobs).mockReturnValue(new Promise(() => {}));
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
-    expect(screen.getByText("Delete this job?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove this job" }));
+    const confirm = screen.getByRole("dialog", { name: "Remove this job?" });
     expect(deleteJob).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(within(confirm).getByRole("button", { name: "Remove this job" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/jobs"));
     expect(deleteJob).toHaveBeenCalledWith("one");
     expect(client.getQueryData(["jobs", "u1"])).toEqual({ ...cached,
@@ -423,31 +441,31 @@ describe("job page", () => {
     vi.mocked(getJobScore).mockRejectedValue(new Error("down"));
     renderJob(); await ready();
     await screen.findByText("Couldn't load your match score.");
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
-    const dialog = within(screen.getByRole("dialog"));
+    await userEvent.click(screen.getByRole("button", { name: "Remove this job" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Remove this job?" }));
     expect(dialog.getByText("This also deletes its tailored CVs, translations and cover letters.")).toBeInTheDocument();
   });
 
   it("does not warn about tailored CVs for a failed job", async () => {
     vi.mocked(getJob).mockResolvedValue({ ...job, status: "failed", errorCode: "ai_failed", extracted: null });
-    renderJob(); await screen.findByRole("button", { name: "Delete" });
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
-    expect(within(screen.getByRole("dialog")).queryByText("This also deletes its tailored CVs, translations and cover letters.")).toBeNull();
+    renderJob(); await screen.findByRole("button", { name: "Remove this job" });
+    await userEvent.click(screen.getByRole("button", { name: "Remove this job" }));
+    expect(within(screen.getByRole("dialog", { name: "Remove this job?" })).queryByText("This also deletes its tailored CVs, translations and cover letters.")).toBeNull();
   });
 
   it("cancels deletion and keeps the job", async () => {
     const { router } = renderJob(); await ready();
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
-    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByText("Delete this job?")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove this job" }));
+    await userEvent.click(within(screen.getByRole("dialog", { name: "Remove this job?" })).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("Remove this job?")).not.toBeInTheDocument();
     expect(deleteJob).not.toHaveBeenCalled(); expect(router.state.location.pathname).toBe("/jobs/one");
   });
 
   it("keeps the job and reports a failed delete", async () => {
     vi.mocked(deleteJob).mockRejectedValue(new Error("Can't delete this job."));
     const { router } = renderJob(); await ready();
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove this job" }));
+    await userEvent.click(within(screen.getByRole("dialog", { name: "Remove this job?" })).getByRole("button", { name: "Remove this job" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Can't delete this job.");
     expect(router.state.location.pathname).toBe("/jobs/one"); expect(await ready()).toBeInTheDocument();
   });

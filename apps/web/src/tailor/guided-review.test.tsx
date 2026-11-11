@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, type TailoredCv } from "@resumora/shared";
 
 vi.mock("./tailored-api.ts", () => ({ getTailored: vi.fn(), reviewItem: vi.fn() }));
 vi.mock("../lib/supabase.ts", () => ({ supabase: {} }));
 import { ApiClientError } from "../lib/api-error.ts";
-import { ExportMenu } from "../export/ExportMenu.tsx";
 import { GuidedReview } from "./GuidedReview.tsx";
 import { getTailored, reviewItem } from "./tailored-api.ts";
 
@@ -91,23 +90,5 @@ describe("GuidedReview (GuideA)", () => {
     const { onClose } = guide();
     await user.click(await screen.findByRole("button", { name: "Stop" }));
     expect(onClose).toHaveBeenCalled();
-  });
-});
-
-describe("Export warning (ExportWarn)", () => {
-  it("shows the guesses not checked yet with Review, above Or export anyway; the count drops after each decision", async () => {
-    const user = userEvent.setup();
-    const onReview = vi.fn();
-    const load = vi.fn().mockResolvedValueOnce(two)
-      .mockResolvedValueOnce(row({ ...two.review, experience: { b1: guess("Led the payroll migration", "y", true) } }));
-    render(<ExportMenu load={load} job={null} template="classic" onReview={onReview} />);
-    await user.click(screen.getByRole("button", { name: "Export ▾" }));
-    expect(await screen.findByText("2 AI guesses not checked yet")).toBeInTheDocument();
-    expect(screen.getByText("Or export anyway:")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Review 2 items" }));
-    expect(onReview).toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Export ▾" }));
-    await waitFor(() => expect(screen.getByText("1 AI guess not checked yet")).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Review 1 item" })).toBeInTheDocument();
   });
 });

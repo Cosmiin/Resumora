@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import type { Locale } from "@resumora/shared";
 import type { AuthUser } from "./env.ts";
 import type { CvRepo } from "./cv/repo.ts";
 import { ApiError, errorBody, toErrorResponse, type LogFn } from "./errors.ts";
@@ -15,6 +16,8 @@ import type { ModelDeps } from "./ai/call-model.ts";
 import type { VoiceDeps } from "./ai/voice-session.ts";
 import type { InsightsRepo } from "./enrich/repo.ts";
 import { enrichRoutes } from "./enrich/routes.ts";
+import type { AccountAdmin, AccountRepo } from "./account/repo.ts";
+import { accountRoutes } from "./account/routes.ts";
 
 export type AppDeps = {
   /** The only browser origin allowed to call the API cross-origin. */
@@ -26,6 +29,8 @@ export type AppDeps = {
   jobRepo(user: AuthUser): JobRepo;
   tailorRepo?(user: AuthUser): TailorRepo;
   insightsRepo(user: AuthUser): InsightsRepo;
+  /** Preferences, data export and account deletion. `admin` has service role access and is used only to delete the caller. */
+  account?: { repo(user: AuthUser): AccountRepo; admin(): AccountAdmin };
   /** Model access for request handlers, logging each call as this user. */
   model(user: AuthUser): ModelDeps;
   /** Live voice sessions (OpenAI key and logging). */
@@ -38,7 +43,9 @@ export type AppDeps = {
   log: LogFn;
 };
 
-export type AppEnv = { Variables: { requestId: string; user: AuthUser } };
+export type AppEnv = { Variables: { requestId: string; user: AuthUser; interfaceLanguage: Locale | undefined } };
+
+const INTERFACE_LANGUAGES: readonly string[] = ["en", "ro", "fr", "de", "es", "it"];
 
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
@@ -54,7 +61,7 @@ export function createApp(deps: AppDeps) {
     "*",
     cors({
       origin: (origin) => (origin === deps.appOrigin ? origin : null),
-      allowHeaders: ["authorization", "content-type"],
+      allowHeaders: ["authorization", "content-type", "x-interface-language"],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       exposeHeaders: ["x-request-id"],
     }),
@@ -68,10 +75,13 @@ export function createApp(deps: AppDeps) {
     const user = token ? await deps.verifyToken(token) : null;
     if (!user) throw new ApiError(401, "unauthorized", "Please sign in again.");
     c.set("user", user);
+    // The language the person uses the app in: questions are written in it. Clients that don't send it get the CV's language.
+    const language = c.req.header("x-interface-language")?.trim().toLowerCase();
+    c.set("interfaceLanguage", language && INTERFACE_LANGUAGES.includes(language) ? (language as Locale) : undefined);
     await next();
   });
 
-  app.route("/v1/cv", cvRoutes((c) => deps.cvRepo(c.get("user"))));
+  app.route("/v1/cv", cvRoutes((c) => deps.cvRepo(c.get("user")), (c) => deps.insightsRepo(c.get("user"))));
   app.route(
     "/v1/imports",
     importRoutes({ repoFor: (c) => deps.importRepo(c.get("user")), cvRepoFor: (c) => deps.cvRepo(c.get("user")), queue: deps.queue, now: deps.now ?? (() => new Date()) }),
@@ -101,6 +111,7 @@ export function createApp(deps: AppDeps) {
         return deps.tailorRepo(c.get("user"));
       },
       modelFor: (c) => deps.model(c.get("user")),
+      preferencesFor: deps.account && ((c) => deps.account!.repo(c.get("user")).getPreferences()),
       now: deps.now ?? (() => new Date()),
       log: deps.log,
     }),
@@ -116,6 +127,21 @@ export function createApp(deps: AppDeps) {
         return deps.tailorRepo(c.get("user"));
       },
       modelFor: (c) => deps.model(c.get("user")),
+      now: deps.now ?? (() => new Date()),
+    }),
+  );
+
+  app.route(
+    "/v1/account",
+    accountRoutes({
+      repoFor: (c) => {
+        if (!deps.account) throw new Error("Account repository is not configured");
+        return deps.account.repo(c.get("user"));
+      },
+      admin: () => {
+        if (!deps.account) throw new Error("Account repository is not configured");
+        return deps.account.admin();
+      },
       now: deps.now ?? (() => new Date()),
     }),
   );

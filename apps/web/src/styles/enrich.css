@@ -16,7 +16,7 @@
 .score-ring { --v: 0; --c: var(--marigold-600); width: 64px; height: 64px; border-radius: 50%; flex: none; display: grid; place-items: center; background: conic-gradient(var(--c) calc(var(--v) * 1%), var(--sage-100) 0); }
 .score-ring.is-clear { --c: var(--pine-600); }
 .score-ring.is-work { --c: var(--rose-600); }
-.score-ring span { width: 50px; height: 50px; border-radius: 50%; background: var(--white); display: grid; place-items: center; font: 600 20px/1 var(--font-display); color: var(--pine-800); font-variant-numeric: tabular-nums; }
+.score-ring span { width: 50px; height: 50px; border-radius: 50%; background: var(--white); display: grid; place-items: center; font: 600 20px/1 var(--old-font-display); color: var(--pine-800); font-variant-numeric: tabular-nums; }
 .score-meta { display: grid; gap: 2px; justify-items: start; }
 .score-meta strong { font-size: 14px; }
 .score-meta span { font-size: 12.5px; color: var(--sage-600); }
@@ -112,3 +112,16 @@
 .sugg .grp { margin-inline-start: 8px; font-size: 11.5px; color: var(--sage-600); }
 .sugg .ev { grid-column: 1 / -1; font-size: 12px; color: var(--sage-600); font-style: italic; }
 .sugg.sort-pick { grid-template-columns: auto 1fr; cursor: pointer; }
+
+/* Role list: what the number means, and a role's score card under its row (Contents column). */
+.role-explain { margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: var(--color-ink); }
+.role-why { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 4px 0 12px; font-size: 14px; }
+.role-why .score-card { background: var(--color-paper); }
+.role-num { margin: 0; display: flex; align-items: baseline; gap: 8px; }
+.role-num b { font: var(--weight-display) 1.6rem / 1 var(--font-display); font-variant-numeric: tabular-nums; }
+.role-num span { font-weight: 700; overflow-wrap: anywhere; }
+.role-next { margin: 0; font: 500 var(--text-coach-sm) / var(--leading-coach) var(--font-coach); color: var(--color-coach); }
+.role-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.role-why .fine { margin: 0; }
+.role-goto { justify-self: start; padding: 0; border: 0; border-radius: 4px; background: none; font: inherit; color: var(--color-coach); text-decoration: underline; cursor: pointer; }
+.role-goto:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }

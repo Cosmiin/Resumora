@@ -1,7 +1,19 @@
+/* The extension's panel, in the app's look ("Coach's Page"): yellow desk, ink text, pill buttons.
+   The extension ships no web fonts, so it uses the system's own. */
 :root {
+  --desk: #fff0a8;
+  --paper: #ffffff;
+  --ink: #24272e;
+  --muted: #535966;
+  --line: #e4e0cf;
+  --coach: #2446b0;
+  --highlight: #ffe14d;
+  --bad: #a3262d;
+  --bad-soft: #fbe3e4;
   font-family: system-ui, sans-serif;
-  color: #1e293b;
-  background: #ffffff;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--desk);
 }
 
 body {
@@ -14,49 +26,58 @@ header {
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  border-bottom: 1px solid #e2e8f0;
 }
 
 h1 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 #environment-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  background: #f1f5f9;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--paper);
   font-size: 12px;
+  font-weight: 700;
 }
 
 main {
   min-height: 48px;
-  padding: 16px;
+  padding: 0 16px 16px;
 }
 
 footer {
   padding: 0 16px 16px;
 }
 
-h2 { margin: 0 0 12px; font-size: 18px; }
-p { line-height: 1.5; overflow-wrap: anywhere; }
-label { display: block; margin: 12px 0; font-size: 14px; }
+h2 { margin: 0 0 12px; font-size: 17px; font-weight: 700; line-height: 1.35; color: var(--coach); }
+p { margin: 0 0 12px; line-height: 1.5; overflow-wrap: anywhere; }
+label { display: block; margin: 12px 0; font-size: 14px; font-weight: 700; }
 input, select, button { box-sizing: border-box; font: inherit; }
-input, select { display: block; width: 100%; margin-top: 6px; padding: 8px; }
-button { padding: 8px 12px; cursor: pointer; }
+input, select { display: block; width: 100%; min-height: 44px; margin-top: 6px; padding: 8px 12px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper); color: var(--ink); font-weight: 400; }
+button { min-height: 44px; padding: 0 20px; border: 2px solid var(--ink); border-radius: 999px; background: var(--ink); color: #fff; font-weight: 700; cursor: pointer; }
+button:hover:not(:disabled) { background: #3a3f4a; }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 main > button, form > button { width: 100%; }
 a, small { display: block; margin: 12px 0; }
+a { color: var(--coach); font-weight: 700; text-underline-offset: 3px; }
 .link-button {
   width: auto;
+  min-height: 0;
   padding: 0;
   border: 0;
+  border-radius: 4px;
   background: none;
-  color: #1d4ed8;
+  color: var(--coach);
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
-small { overflow-wrap: anywhere; color: #475569; }
-[role="alert"] { color: #b91c1c; }
+.link-button:hover:not(:disabled) { background: none; color: var(--ink); }
+:focus-visible { outline: 3px solid var(--coach); outline-offset: 3px; }
+small { overflow-wrap: anywhere; color: var(--muted); }
+[role="alert"] { padding: 10px 12px; border-radius: 12px; background: var(--bad-soft); color: var(--bad); font-weight: 600; }
 .spinner {
   display: inline-block;
   box-sizing: border-box;
@@ -64,8 +85,8 @@ small { overflow-wrap: anywhere; color: #475569; }
   height: 14px;
   margin-right: 8px;
   vertical-align: -2px;
-  border: 2px solid #e2e8f0;
-  border-top-color: #334155;
+  border: 2px solid var(--ink);
+  border-right-color: transparent;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }

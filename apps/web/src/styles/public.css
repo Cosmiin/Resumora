@@ -1,0 +1,268 @@
+/* Public pages: homepage, sign up, log in, password reset ("Coach's Page", see DESIGN.md). */
+
+/* ---------- Homepage: hero ---------- */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: var(--space-9);
+  align-items: center;
+  padding-block: 36px var(--space-10);
+}
+.home-hero-title {
+  font: var(--weight-display) var(--text-hero) / 1 var(--font-display);
+  letter-spacing: var(--tracking-hero);
+  text-wrap: balance;
+}
+.home-hero-sub {
+  margin-top: 22px;
+  max-width: 52ch;
+  font-size: var(--text-lead);
+}
+.home-hero-actions {
+  margin-top: 30px;
+}
+/* On the yellow desk, small print is ink, not grey: grey looks washed out on a color. */
+.home-hero-note {
+  margin-top: var(--space-3);
+  font-size: var(--text-small);
+}
+.home-cap {
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+  color: var(--color-muted);
+}
+.home-demo {
+  position: relative;
+  transform: rotate(1.4deg);
+}
+.home-demo .ui-sheet {
+  display: grid;
+  gap: 18px;
+  padding: 34px 34px 38px;
+}
+.home-demo-label {
+  position: absolute;
+  top: -14px;
+  left: 28px;
+  padding: 3px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+  font-size: 0.8125rem;
+  font-weight: var(--weight-bold);
+}
+.home-demo-before {
+  font-size: 1.125rem;
+  color: var(--color-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--color-strike);
+  text-decoration-thickness: 2.5px;
+}
+.home-demo-answer {
+  justify-self: start;
+  padding: var(--space-2) 18px;
+  border: var(--border-control) solid var(--color-ink);
+  border-radius: var(--radius-pill);
+  background: var(--color-highlight);
+  font-weight: var(--weight-bold);
+}
+.home-demo-after {
+  font-size: var(--text-lead);
+  font-weight: var(--weight-bold);
+}
+
+/* ---------- Homepage: how it works ---------- */
+.home-band {
+  background: var(--color-paper);
+  border-radius: var(--radius-band) var(--radius-band) 0 0;
+}
+.home-band .ui-wrap,
+.home-extension .ui-wrap {
+  padding-block: var(--space-9) 64px;
+}
+.home-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 36px;
+  margin-top: 30px;
+}
+.home-steps li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  align-content: start;
+}
+.home-step-n {
+  grid-row: span 2;
+  color: var(--color-coach);
+  font: var(--weight-display) 3.4rem / 0.9 var(--font-display);
+}
+.home-steps h3 {
+  align-self: end;
+  font: var(--weight-bold) 1.25rem / 1.25 var(--font-display);
+}
+
+/* ---------- Homepage: browser extension ---------- */
+.home-extension {
+  background: var(--color-paper);
+  border-top: 1px solid var(--color-line);
+}
+.home-extension .ui-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-9);
+  align-items: start;
+}
+.home-extension-lead {
+  margin-top: 10px;
+}
+.home-extension-actions {
+  margin-top: var(--space-6);
+}
+.home-extension-note {
+  margin-top: 10px;
+}
+.install-steps {
+  counter-reset: step;
+  display: grid;
+  gap: 14px;
+  margin-top: var(--space-5);
+}
+.install-steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+.install-steps li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: var(--border-control) solid var(--color-ink);
+  border-radius: 50%;
+  font-size: var(--text-small);
+  font-weight: var(--weight-bold);
+}
+.install-steps li > span {
+  padding-top: 3px;
+}
+.home-panel {
+  display: grid;
+  gap: var(--space-3);
+  justify-self: center;
+  width: 100%;
+  max-width: 380px;
+  padding: var(--space-5);
+  border-radius: var(--radius-block);
+  background: var(--color-desk);
+}
+.home-panel > .home-cap {
+  color: var(--color-ink);
+}
+.home-panel-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px var(--space-5);
+  border-radius: var(--radius-sheet);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-sheet);
+}
+.home-panel-title {
+  font-weight: var(--weight-bold);
+}
+.home-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.home-keywords li {
+  padding: 3px 14px;
+  border: var(--border-control) dashed var(--color-ink);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper);
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+}
+.home-keywords li.has {
+  border-style: solid;
+  border-color: var(--color-good);
+  background: var(--color-good-soft);
+  color: #14553a;
+}
+.home-panel-button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+  font-size: var(--text-small);
+  font-weight: var(--weight-bold);
+}
+
+/* ---------- Homepage: closing ---------- */
+.home-closing .ui-wrap {
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+  padding-block: var(--space-9) var(--space-10);
+}
+
+/* ---------- Sign up, log in, reset ---------- */
+.auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 460px);
+  gap: var(--space-9);
+  align-items: center;
+  padding-block: var(--space-8) var(--space-10);
+}
+.auth-side-title {
+  font: var(--weight-display) clamp(2rem, 4vw, 3.2rem) / 1.04 var(--font-display);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.auth-side-text {
+  margin-top: 10px;
+}
+.auth-form {
+  display: grid;
+  gap: var(--space-4);
+}
+.auth-form .ui-btn {
+  justify-self: start;
+}
+.auth-said {
+  min-height: 1.5em;
+  color: var(--color-good);
+  font: var(--weight-semibold) 1.125rem / 1.4 var(--font-coach);
+}
+
+@media (max-width: 900px) {
+  .home-hero,
+  .home-extension .ui-wrap,
+  .auth {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+  }
+  .home-hero {
+    padding-block: var(--space-5) 48px;
+  }
+  .home-demo {
+    transform: rotate(0.6deg);
+  }
+  .home-demo .ui-sheet {
+    padding: 28px 22px;
+  }
+  .home-steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 26px;
+  }
+  .auth {
+    padding-block: var(--space-5) 48px;
+  }
+}

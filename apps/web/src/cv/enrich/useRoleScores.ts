@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fingerprint, scoredItems, type CvContent, type Experience, type Locale, type RoleResult } from "@resumora/shared";
 import { ApiClientError } from "../../lib/api-error.ts";
 import type { SaveStatus } from "../useAutosave.ts";
+import { getLanguage } from "../../i18n/language.ts";
 import { getScores, scoreRole } from "./enrich-api.ts";
+
+/** A stored score is current when it is for this text and its questions are in the language the person uses now. */
+function isCurrent(result: RoleResult | undefined, print: string): result is RoleResult {
+  return result?.fingerprint === print && (result.questionLanguage ?? getLanguage()) === getLanguage();
+}
 
 /** Wait this long after a save before asking for scores, so typing never races a request. */
 export const RESCORE_DELAY_MS = 2000;
@@ -38,6 +44,8 @@ function sameEntry(a: RoleScoreState | undefined, b: RoleScoreState): boolean {
 export function useRoleScores({ cv, status }: Props): {
   scores: Map<string, RoleScoreState>;
   retry(roleId: string): void;
+  /** Takes a score asked for elsewhere (a role's run), so every place shows the same number. */
+  put(result: RoleResult): void;
 } {
   const { locale } = cv;
   // Roles, projects and volunteering are all scored, in that order (one list, kept stable between renders).
@@ -117,7 +125,7 @@ export function useRoleScores({ cv, status }: Props): {
     const next = experience.find((r) => {
       if (!hasBullets(r) || waiting.current.has(r.id)) return false;
       const print = printOf(r, locale);
-      return results.get(r.id)?.fingerprint !== print && failed.get(r.id) !== print;
+      return !isCurrent(results.get(r.id), print) && failed.get(r.id) !== print;
     });
     if (!next) return;
     const go = () => {
@@ -137,6 +145,10 @@ export function useRoleScores({ cv, status }: Props): {
     setFailed((m) => (m.has(roleId) ? new Map([...m].filter(([k]) => k !== roleId)) : m));
   }, []);
 
+  const put = useCallback((result: RoleResult) => {
+    if (current.current.experience.some((r) => r.id === result.roleId)) setResults((m) => new Map(m).set(result.roleId, result));
+  }, []);
+
   const last = useRef<Map<string, RoleScoreState>>(new Map());
   return {
     scores: useMemo(() => {
@@ -145,10 +157,10 @@ export function useRoleScores({ cv, status }: Props): {
         const print = printOf(role, locale);
         const result = results.get(role.id);
         let entry: RoleScoreState;
-        if (!hasBullets(role) || (result?.fingerprint === print && result.score === null)) entry = { state: "none" };
+        if (!hasBullets(role) || (isCurrent(result, print) && result.score === null)) entry = { state: "none" };
         else if (inFlight?.roleId === role.id && inFlight.fingerprint === print) entry = { state: "scoring", result };
         else if (failed.get(role.id) === print) entry = { state: "unavailable", result };
-        else if (result?.fingerprint === print) entry = { state: "ready", result };
+        else if (isCurrent(result, print)) entry = { state: "ready", result };
         else if (result) entry = { state: "previous", result };
         else entry = { state: "scoring" };
         const old = last.current.get(role.id);
@@ -161,5 +173,6 @@ export function useRoleScores({ cv, status }: Props): {
       return last.current;
     }, [experience, locale, results, failed, inFlight]),
     retry,
+    put,
   };
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyCv, type CvContent, type JobExtraction } from "@resumora/shared";
+import { emptyCv, type CvContent, type JobExtraction, type Preferences } from "@resumora/shared";
 import { createApp, type AppDeps } from "../src/app.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
 import type { CvRepo } from "../src/cv/repo.ts";
@@ -78,6 +78,29 @@ describe("POST /v1/jobs/:id/tailor", () => {
     expect(cv.baseSnapshotAt).toEqual(expect.any(String));
   });
 
+  it("starts in the language picked on the language step, whatever the default would be", async () => {
+    const jobId = await readyJob();
+    const res = await start(jobId, { language: "de" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { tailoredCvId: string; language: string };
+    expect(body.language).toBe("de");
+    expect(docs.cvs.get(body.tailoredCvId)).toMatchObject({ language: "de", tone: "neutral" });
+    await expectError(await start(jobId, { language: "nl" }), 400, "invalid_content");
+  });
+
+  it("tells the language step the CV's language, the ad's and the one a start would use", async () => {
+    const languages = (jobId: string, token = "token-a") =>
+      app.request(`/v1/jobs/${jobId}/tailor-language`, { headers: { authorization: `Bearer ${token}` } });
+    const clear = await languages(await readyJob());
+    expect(clear.status).toBe(200);
+    expect(await clear.json()).toEqual({ cv: "ro", ad: "en", chosen: "en" });
+    // An ad in a language outside the six: unclear, so the CV's language is the starting choice.
+    expect(await (await languages(await readyJob(dutch))).json()).toEqual({ cv: "ro", ad: null, chosen: "ro" });
+    expect(docs.cvs.size).toBe(0);
+    await expectError(await languages(crypto.randomUUID()), 404, "job_not_found");
+    await expectError(await languages(await readyJob(english, "user-b")), 404, "job_not_found");
+  });
+
   it("returns the same run and tailored CV for a second start, even at the same moment (Review focus 1)", async () => {
     const jobId = await readyJob();
     const [one, two] = await Promise.all([start(jobId), start(jobId)]);
@@ -154,5 +177,48 @@ describe("GET /v1/tailor-runs/:id", () => {
     await expectError(await getRun(run.id, "token-b"), 404, "job_not_found");
     await jobs.repoFor("user-a").remove(jobId);
     await expectError(await getRun(run.id), 404, "job_not_found");
+  });
+});
+
+describe("starting from the person's saved defaults", () => {
+  function appWith(preferences: Preferences) {
+    return createApp({
+      appOrigin: "http://127.0.0.1:5173",
+      verifyToken: async (token) => (USERS[token] ? { id: USERS[token], token } : null),
+      cvRepo: (user) => cvs[user.id]!,
+      importRepo: () => { throw new Error("not used"); },
+      jobRepo: (user) => jobs.repoFor(user.id),
+      tailorRepo: (user) => memoryTailorRepo(user.id, new Map(), docs),
+      insightsRepo: () => { throw new Error("not used"); },
+      model: () => { throw new Error("not used"); },
+      account: {
+        repo: () => ({ getPreferences: async () => preferences, savePreferences: async () => preferences, exportAll: async () => { throw new Error("not used"); } }),
+        admin: () => ({ deleteUser: async () => {} }),
+      },
+      queue: { send: async () => {} },
+      jobQueue: { send: async () => {} },
+      log: vi.fn(),
+    });
+  }
+  const startWith = async (preferences: Preferences) => {
+    const jobId = await readyJob(english);
+    const res = await appWith(preferences).request(`/v1/jobs/${jobId}/tailor`, {
+      method: "POST", headers: { authorization: "Bearer token-a", "content-type": "application/json" }, body: JSON.stringify({ tone: "neutral" }),
+    });
+    expect(res.status).toBe(200);
+    const { tailoredCvId, language } = (await res.json()) as { tailoredCvId: string; language: string };
+    return { language, template: docs.cvs.get(tailoredCvId)!.template };
+  };
+
+  it("follows the job ad's language and the classic template by default", async () => {
+    expect(await startWith({ displayName: null, defaultTemplate: "classic", tailoringLanguage: "job" })).toEqual({ language: "en", template: "classic" });
+  });
+
+  it("uses the CV's language when the person asked for that", async () => {
+    expect(await startWith({ displayName: null, defaultTemplate: "classic", tailoringLanguage: "cv" })).toMatchObject({ language: "ro" });
+  });
+
+  it("uses the fixed language and the template the person chose", async () => {
+    expect(await startWith({ displayName: null, defaultTemplate: "modern", tailoringLanguage: "de" })).toEqual({ language: "de", template: "modern" });
   });
 });

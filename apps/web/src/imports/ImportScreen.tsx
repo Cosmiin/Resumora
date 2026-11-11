@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { moveOtherTo, type CvResponse, type SaveResponse, type ImportResult, type MoveTarget } from "@resumora/shared";
+import { moveOtherTo, SCAN_WARNING, type CvResponse, type SaveResponse, type ImportResult, type MoveTarget } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { conflictFrom, isConflict, type Conflict } from "../cv/useAutosave.ts";
 import { CvDocument } from "../cv/page/CvDocument.tsx";
+import { formatRange } from "../cv/page/blocks.ts";
 import { saveCv } from "../cv/cv-api.ts";
+import { FocusBar } from "../cv/enrich/FocusBar.tsx";
+import { PathSteps } from "../cv/enrich/PathStart.tsx";
+import { Skeleton } from "../ui/Page.tsx";
 import { applyImport, getImport } from "./imports-api.ts";
 import { ImportSummary } from "./ImportSummary.tsx";
+import { ConfirmList } from "./ConfirmList.tsx";
+import type { CvContent } from "@resumora/shared";
 
 export const POLL_MS = 2000;
 /**
@@ -15,17 +21,22 @@ export const POLL_MS = 2000;
  */
 export const GIVE_UP_MS = 20 * 60_000;
 
-/** Full-window review of an import: the organized CV on a page, a summary beside it. */
+/** Where the person goes once the import is their CV: straight into the questions, or to the CV page. */
+export type AfterImport = "questions" | "cv";
+
+/** The first step of the flow, full window: the CV is read, then shown as found, with the way into the questions. */
 export function ImportScreen(props: {
   importId: string;
   /** False while the editor has unsaved or in-flight changes. */
   canApply: boolean;
+  /** True when using this import replaces a CV that has something in it. */
+  replaces: boolean;
   currentVersion(): number;
   onClose(): void;
-  onApplied(cv: CvResponse): void;
+  onApplied(cv: CvResponse, next: AfterImport): void;
   onConflict(conflict: Conflict): void;
 }) {
-  const { importId, canApply, currentVersion, onClose, onApplied, onConflict } = props;
+  const { importId, canApply, replaces, currentVersion, onClose, onApplied, onConflict } = props;
   const [slow, setSlow] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyFailed, setApplyFailed] = useState(false);
@@ -72,13 +83,19 @@ export function ImportScreen(props: {
     });
   }
 
+  /** A correction made on a "thing to confirm": it goes into the CV being imported, saved when the import is used. */
+  function change(fn: (cv: CvContent) => CvContent) {
+    const base = edited ?? imp?.result;
+    if (base) setEdited({ ...base, content: fn(base.content) });
+  }
+
   /** If the import was already applied (a retry of the moves is pending), the editor must hear about it. */
   function close() {
-    if (appliedRef.current && imp?.result) onApplied({ content: imp.result.content, ...appliedRef.current });
+    if (appliedRef.current && imp?.result) onApplied({ content: imp.result.content, ...appliedRef.current }, "cv");
     else onClose();
   }
 
-  async function apply() {
+  async function apply(next: AfterImport) {
     if (!imp?.result || !result) return;
     setApplying(true);
     setApplyFailed(false);
@@ -86,11 +103,11 @@ export function ImportScreen(props: {
     try {
       const saved = appliedRef.current ?? (await applyImport(importId, currentVersion()));
       appliedRef.current = saved;
-      if (!edited) return onApplied({ content: imp.result.content, ...saved });
+      if (!edited) return onApplied({ content: imp.result.content, ...saved }, next);
       // The server applies the import as it found it; save the moved version on top of that.
       try {
         const final = await saveCv(edited.content, saved.version);
-        onApplied({ content: edited.content, ...final });
+        onApplied({ content: edited.content, ...final }, next);
       } catch (err) {
         if (isConflict(err)) return onConflict(conflictFrom(err));
         setMovesFailed(true);
@@ -103,44 +120,90 @@ export function ImportScreen(props: {
     }
   }
 
+  const cv = result?.content;
+  const roles = cv?.experience ?? [];
+  const name = cv?.basics.fullName.trim() ?? "";
+  const confirms = result?.warnings.filter((w) => w !== SCAN_WARNING) ?? [];
+  // Lines we could not place open the details without being asked; things to confirm have their own list.
+  const needsLook = !!result && (result.isScan || result.unsourcedLines.length > 0);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={t("import.title")}
-      className="import-screen"
+      className={`ui-page focus-mode fm-path import-screen${result ? " is-wide" : ""}`}
       ref={screenRef}
       tabIndex={-1}
       onKeyDown={(e) => e.key === "Escape" && close()}
     >
-      <header className="import-bar">
-        <strong className="app-brand">{t("app.name")}</strong>
-        <p className="import-bar-title">{t("import.bar", { file: imp?.fileName ?? "" })}</p>
-        <div className="import-bar-actions">
-          <button type="button" className="secondary" onClick={close}>{t("import.cancel")}</button>
-          {result && (
-            <button type="button" disabled={!canApply || applying} onClick={() => void apply()}>{t("import.apply")}</button>
-          )}
-        </div>
-      </header>
-
-      <div className="import-body">
-        <div className="import-page-area">
-          {query.isError && <p role="alert" className="form-error import-state">{t("import.loadError")}</p>}
-          {!done && !query.isError && (slow ? <p role="alert" className="import-state">{t("import.slow")}</p> : <p aria-live="polite" className="import-state">{t("import.reading")}</p>)}
-          {imp?.status === "failed" && <p role="alert" className="form-error import-state">{imp.error?.message ?? t("import.loadError")}</p>}
-          {imp?.status === "applied" && <p className="import-state">{t("import.alreadyUsed")}</p>}
-          {result && <CvDocument content={result.content} showUnsorted />}
-        </div>
-        {result && (
-          <div className="import-side">
-            {applyFailed && <p role="alert" className="form-error">{t("import.applyError")}</p>}
-            {movesFailed && <p role="alert" className="form-error">{t("import.movesError")}</p>}
-            {!canApply && <p aria-live="polite">{t("import.waitingSave")}</p>}
-            <ImportSummary result={result} canApply={canApply} applying={applying} onApply={() => void apply()} onMove={move} />
+      <FocusBar context={imp?.fileName} onClose={close} closeLabel={t("import.cancel")} />
+      <section className="fm-path-start">
+        <PathSteps current={0} />
+        {query.isError && <p role="alert" className="ui-notice ui-notice--bad">{t("import.loadError")}</p>}
+        {!done && !query.isError && (slow ? <p role="alert" className="ui-notice">{t("import.slow")}</p> : (
+          <div aria-busy="true">
+            <h2 className="fm-q is-big">{t("import.reading")}</h2>
+            <p className="fm-lead" aria-live="polite">{t("import.readingLine")}</p>
+            <div className="import-found import-loading">
+              <Skeleton width="45%" height="30px" /><Skeleton width="70%" /><Skeleton /><Skeleton width="85%" /><Skeleton width="60%" />
+            </div>
           </div>
+        ))}
+        {imp?.status === "failed" && <p role="alert" className="ui-notice ui-notice--bad">{imp.error?.message ?? t("import.loadError")}</p>}
+        {imp?.status === "applied" && <p className="ui-notice">{t("import.alreadyUsed")}</p>}
+        {result && cv && (
+          <>
+            <h2 className="fm-q is-big">{t(roles.length === 0 ? "import.found.none" : roles.length === 1 ? "import.found.one" : "import.found.many", { n: roles.length })}</h2>
+            <p className="fm-lead">{t("import.found.line")}</p>
+            <div className="import-cols">
+              <div className="import-right">
+                {result.isScan && <p role="alert" className="ui-notice import-gap">{t("import.scan")}</p>}
+                <div inert={applying}><ConfirmList warnings={confirms} cv={cv} onChange={change} /></div>
+                {roles.length > 0 && <p className="ui-coach import-next">{t("import.found.next")}</p>}
+                {replaces && <p className="fm-fine">{t("import.summary.kept")}</p>}
+                {applyFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.applyError")}</p>}
+                {movesFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.movesError")}</p>}
+                {!canApply && <p aria-live="polite" className="fm-fine">{t("import.waitingSave")}</p>}
+                <div className="fm-foot">
+                  {roles.length > 0 ? (
+                    <>
+                      <button type="button" className="fm-ghost" disabled={!canApply || applying} onClick={() => void apply("cv")}>{t("import.skip")}</button>
+                      <button type="button" className="fm-btn" disabled={!canApply || applying} onClick={() => void apply("questions")}>{t("import.start")}</button>
+                    </>
+                  ) : (
+                    <button type="button" className="fm-btn" disabled={!canApply || applying} onClick={() => void apply("cv")}>{t("import.apply")}</button>
+                  )}
+                </div>
+              </div>
+              <div className="import-left">
+                <div className="import-found">
+                  {name && <p className="import-name" lang={cv.locale}>{name}</p>}
+                  {cv.basics.location.trim() && <p className="ui-muted" lang={cv.locale}>{cv.basics.location}</p>}
+                  {roles.length > 0 && (
+                    <ul className="import-roles" lang={cv.locale}>
+                      {roles.map((r) => (
+                        <li key={r.id}>
+                          <span><b>{r.title.trim() || t("import.found.untitled")}</b>{r.company.trim() ? `, ${r.company.trim()}` : ""}</span>
+                          <span className="ui-muted ui-small" lang="">
+                            {[formatRange(r.startDate, r.endDate, r.current, cv.locale), t(r.bullets.length === 1 ? "import.found.bullet" : "import.found.bullets", { n: r.bullets.length })].filter(Boolean).join(", ")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="import-found-note">{t(`import.found.lang.${cv.locale}`)}</p>
+                </div>
+                <details className="import-details" open={needsLook || undefined}>
+                  <summary>{t("import.found.fix")}</summary>
+                  <ImportSummary result={result} onMove={move} />
+                  <div className="import-page"><CvDocument content={cv} showUnsorted /></div>
+                </details>
+              </div>
+            </div>
+          </>
         )}
-      </div>
+      </section>
     </div>
   );
 }

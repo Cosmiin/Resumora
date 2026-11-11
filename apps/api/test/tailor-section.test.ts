@@ -111,7 +111,7 @@ describe("section pass", () => {
         expect(JSON.stringify(sent)).not.toContain(other);
         expect(verified.sources).not.toContain(other);
       }
-      expect(sent.steering).toContain("They want to lean on other roles more than this one.");
+      expect(sent.steering).not.toMatch(/lean/i);
       const retry = JSON.parse(String((model.requests[2]!.messages as { content: string }[])[1]!.content));
       expect(retry.fix.proposals[0].flags).toContainEqual({ rule: "tool", detail: "Kubernetes" });
       expect(await res.json()).toMatchObject({ proposals: [], removed: 1 });
@@ -287,12 +287,26 @@ describe("section pass", () => {
     expect(body.proposals).toEqual([expect.objectContaining({ text: "Led payroll for 40 staff", inferred: true, reason: "Ran payroll for 40 staff", flags: [] })]);
   });
 
+  it("a guessed line keeps the phrases it guessed, each with its why; a phrase not in the line is left out", async () => {
+    const based = reword("Led payroll for 40 staff", { inferred: true, reason: "Ran payroll for 40 staff", guesses: [
+      { text: "Led payroll", reason: "Your line says you ran payroll; it does not say you led it." },
+      { text: "for 90 staff", reason: "Not in the line." },
+    ] });
+    replies = [proposals(based), { results: [] }];
+    const body = await (await runSection()).res.json() as { proposals: Proposal[] };
+    expect(body.proposals[0]).toMatchObject({ inferred: true,
+      inferredParts: [{ text: "Led payroll", reason: "Your line says you ran payroll; it does not say you led it." }] });
+    expect(body.proposals[0]!.guesses).toBeUndefined();
+  });
+
   it("states the truth rule in the section prompt", async () => {
     replies = [proposals()];
     await runSection();
     const system = JSON.stringify(model.requests[0]);
-    expect(system).toContain("Never invent numbers, tools, employers, titles, dates or outcomes");
-    expect(system).toContain("never guess");
+    expect(system).toContain("Only what is true.");
+    expect(system).toContain("Do not invent or guess numbers, tools, employers, titles, dates or outcomes, not even as an inference.");
+    expect(system).toContain("A change must be a real improvement");
+    expect(system).toContain("A role that has ended stays in the past tense.");
     expect(system).toContain("reason");
   });
 

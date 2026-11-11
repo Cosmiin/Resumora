@@ -20,6 +20,11 @@ type Props = {
   onEnrich?(): void;
   /** Tailored CV: Needs attention lists every shown section that is empty; auto-hidden empty ones don't count. */
   tailored?: boolean;
+  /** Wide screens split the overview: "contents" (sections and roles, left of the page) and "coach" (what needs attention, right). */
+  part?: "contents" | "coach";
+  /** Contents only: scroll the page to a section. */
+  onJump?(key: SectionKey): void;
+  onRetry?(roleId: string): void;
 };
 
 const CUSTOM = "custom";
@@ -34,7 +39,7 @@ function Eye({ on }: { on: boolean }) {
 }
 
 /** The panel's home view: what is missing, the sections on the CV (order, hide) and a way to add more. */
-export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, onEnrich, tailored = false }: Props) {
+export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, onEnrich, tailored = false, part, onJump, onRetry }: Props) {
   const layout = normalizeLayout(cv.layout);
   const nameOf = (key: SectionKey) => layout.titles[key] || CATEGORY[key].label[cv.locale];
   const saved = sectionsOnCv(cv);
@@ -66,16 +71,24 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, o
     onFocusField(`custom-${id}-title`);
   };
 
+  const roles = scores && (
+    <RoleScoreList items={scoredItems(cv)} scores={scores} onOpen={(id, list) => onFocusField(`${list}-${id}-title`)}
+      expandable={part === "contents"} onRetry={onRetry} />
+  );
+
   return (
     <div className="panel-overview">
-      {onEnrich && (
+      {part !== "contents" && onEnrich && (
         <button type="button" className="btn primary enrich-open" onClick={onEnrich}>{t("enrich.path.open")}</button>
       )}
+      {part !== "contents" && (
       <div>
         <h3 className="p-h">{t("panel.overview.title")}</h3>
         <p className="fine">{t("panel.overview.hint")}</p>
       </div>
+      )}
 
+      {part !== "contents" && (
       <div>
         <p className="p-sub">{t("panel.overview.needs")}</p>
         {flags.length === 0 ? (
@@ -104,13 +117,13 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, o
           </div>
         )}
       </div>
-
-      {scores && (
-        <RoleScoreList items={scoredItems(cv)} scores={scores} onOpen={(id, list) => onFocusField(`${list}-${id}-title`)} />
       )}
 
+      {!part && roles}
+
+      {part !== "coach" && (
       <div>
-        <p className="p-sub">{t("panel.overview.sections")}</p>
+        <p className="p-sub">{t(part ? "cv.contents.title" : "panel.overview.sections")}</p>
         <div className="sec-list">
           <DragList
             items={present.map((key) => ({ id: key }))}
@@ -124,7 +137,11 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, o
               const name = nameOf(key);
               return (
                 <>
-                  <span className={off ? "name off" : "name"}>{name}</span>
+                  {onJump && !off ? (
+                    <button type="button" className="name sec-jump" aria-label={t("cv.contents.jump", { name })} onClick={() => onJump(key)}>{name}</button>
+                  ) : (
+                    <span className={off ? "name off" : "name"}>{name}</span>
+                  )}
                   {off && <span className="badge">{t("panel.overview.hidden")}</span>}
                   <button
                     type="button"
@@ -155,6 +172,9 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, o
         </div>
         <p className="fine">{t("panel.overview.fine")}</p>
       </div>
+      )}
+
+      {part === "contents" && roles}
     </div>
   );
 }

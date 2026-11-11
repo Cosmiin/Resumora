@@ -9,6 +9,7 @@ vi.mock("./tailor-api.ts", () => ({
   startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(), runSection: vi.fn(), acceptSection: vi.fn(),
   getScores: vi.fn(), getToneExamples: vi.fn(), redoRole: vi.fn(), acceptRole: vi.fn(), getSteering: vi.fn(), changeSteering: vi.fn(),
 }));
+vi.mock("../jobs/jobs-api.ts", () => ({ getJob: () => Promise.reject(new Error("offline")), scoreJob: () => Promise.resolve({ base: null, tailored: null }) }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
 import { getCv } from "../cv/cv-api.ts";
@@ -33,48 +34,85 @@ function review(over: Partial<React.ComponentProps<typeof RoleReview>> = {}) {
   return onAccept;
 }
 
-describe("RoleReview (RevC)", () => {
-  it("shows the role as in the CV with the new words highlighted and the guess marked with its reason", () => {
-    review();
-    expect(screen.getByRole("heading", { level: 3, name: "Business Analyst" })).toBeInTheDocument();
-    expect(screen.getByText("and KPI dashboards", { selector: "mark" })).toBeInTheDocument();
-    expect(screen.getByText("KPI", { selector: "mark" })).toBeInTheDocument();
-    expect(screen.getByText("Ran workshops")).toBeInTheDocument();
-    const guess = screen.getByText("AI guess");
-    expect(guess).toHaveAccessibleDescription("From your answer: worked with sales leads");
-    expect(screen.getByRole("button", { name: "New" })).toHaveAttribute("aria-pressed", "true");
+const card = () => screen.getByRole("article");
+const press = (name: string) => userEvent.setup().click(screen.getByRole("button", { name }));
+
+describe("RoleReview: a role's suggestions, one at a time", () => {
+  it("shows the first suggestion alone, with where it stands among them; a suggestion starts chosen; lines with none are only counted", () => {
+    review({ position: "Role 1 of 2", keywords: { has: 2, total: 5 } });
+    expect(screen.getByRole("heading", { level: 1, name: "Business Analyst, Emedi" })).toBeInTheDocument();
+    expect(screen.getByText("Role 1 of 2 · Mar 2021 – Present")).toBeInTheDocument();
+    expect(screen.getByText("Suggestion 1 of 3")).toBeInTheDocument();
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(card()).toHaveTextContent("Owns reporting and KPI dashboards for sales.");
+    expect(card()).toHaveTextContent("Now: Owns reporting for sales.");
+    expect(screen.getByRole("button", { name: "Use this" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("One part of this line is my guess")).toBeNull();
+    expect(screen.getByText("1 other line already fits the job and stays as it is.")).toBeInTheDocument();
+    expect(screen.queryByText("Ran workshops")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save and continue" })).toBeNull();
   });
 
-  it("the switch shows the Base wording for every changed item", async () => {
-    const user = userEvent.setup();
+  it("Next and Previous walk through the suggestions; a guess waits for an answer; the last one offers Save", async () => {
     review();
-    await user.click(screen.getByRole("button", { name: "Original" }));
-    expect(screen.getByRole("button", { name: "Original" })).toHaveAttribute("aria-pressed", "true");
-    for (const text of ["Owns reporting for sales.", "Made weekly reports", "Checked data", "Ran workshops"]) expect(screen.getByText(text)).toBeInTheDocument();
-    expect(screen.queryByText(/KPI/)).toBeNull();
-    expect(screen.queryByText("AI guess")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "New" }));
-    expect(screen.getByText("KPI", { selector: "mark" })).toBeInTheDocument();
+    await press("Next suggestion");
+    expect(screen.getByText("Suggestion 2 of 3")).toBeInTheDocument();
+    expect(card()).toHaveTextContent("Made weekly KPI reports");
+    await press("Next suggestion");
+    expect(card()).toHaveTextContent("Checked data quality with sales leads");
+    expect(screen.getByText("One part of this line is my guess")).toBeInTheDocument();
+    expect(screen.getByText("From your answer: worked with sales leads")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Yes, it's true. Use it" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Keep my line" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "Next suggestion" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Save and continue" })).toBeInTheDocument();
+    await press("Previous");
+    expect(screen.getByText("Suggestion 2 of 3")).toBeInTheDocument();
   });
 
-  it("Keep the original sends every item with keep: false", async () => {
+  it("sends each decision as made: kept, and reworded with the person's own text; a guess nobody confirmed stays off the CV", async () => {
     const onAccept = review();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Keep the original" }));
+    await press("Keep my line");
+    await press("Next suggestion");
+    await press("Edit the line");
+    const box = screen.getByRole("textbox");
+    await userEvent.clear(box);
+    await userEvent.type(box, "Made weekly KPI reports for sales");
+    await press("Save edit");
+    await press("Next suggestion");
+    await press("Save and continue");
     expect(onAccept).toHaveBeenCalledWith({
-      decisions: [{ itemId: "r1", keep: false }, { itemId: "b1", keep: false }], inferred: [{ itemId: "b2", keep: false }], flags: [],
+      decisions: [{ itemId: "r1", keep: false }, { itemId: "b1", keep: true, text: "Made weekly KPI reports for sales" }, { itemId: "b2", keep: false }], inferred: [], flags: [],
     });
   });
 
-  it("Use the new version keeps every change and leaves the guess unreviewed", async () => {
+  it("an untouched suggestion is left out, so it is used; a guess is used once the person says it is true", async () => {
     const onAccept = review();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Use the new version" }));
-    expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "r1", keep: true }, { itemId: "b1", keep: true }], inferred: [], flags: [] });
+    await press("Next suggestion");
+    await press("Next suggestion");
+    await press("Yes, it's true. Use it");
+    await press("Save and continue");
+    expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "b2", keep: true }], inferred: [], flags: [] });
   });
 
-  it("offers My answers only when given, and says how many claims were left out", async () => {
+  it("freezes the suggestion while the role is being saved", () => {
+    review({ busy: true, proposals: [proposals[1]!] });
+    for (const button of within(card()).getAllByRole("button")) expect(button).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+  });
+
+  it("Skip this role keeps every line as it is on the CV", async () => {
+    const onAccept = review();
+    await userEvent.click(screen.getByRole("button", { name: "Skip this role" }));
+    expect(onAccept).toHaveBeenCalledWith({
+      decisions: [{ itemId: "r1", keep: false }, { itemId: "b1", keep: false }, { itemId: "b2", keep: false }], inferred: [], flags: [],
+    });
+  });
+
+  it("offers Change my answers only when given, and says how many claims were left out", async () => {
     const onAnswers = vi.fn();
     review({ onAnswers, removed: 1 });
-    await userEvent.setup().click(screen.getByRole("button", { name: "My answers" }));
+    await userEvent.click(screen.getByRole("button", { name: "Change my answers" }));
     expect(onAnswers).toHaveBeenCalled();
     expect(screen.getByText("We left out 1 claim your CV doesn't back up.")).toBeInTheDocument();
   });
@@ -82,8 +120,9 @@ describe("RoleReview (RevC)", () => {
   it("a role with nothing to change says so and goes on", async () => {
     const onAccept = review({ proposals: [] });
     expect(screen.getByText("Nothing to change in this role ✓")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Original" })).toBeNull();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.queryByRole("button", { name: "Accept all for this role" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Skip this role" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(onAccept).toHaveBeenCalledWith({ decisions: [], inferred: [], flags: [] });
   });
 });
@@ -113,7 +152,7 @@ describe("the Experience review in the flow", () => {
     vi.mocked(runSection).mockResolvedValue({ proposals: [proposals[1]!], questions: [] });
   });
 
-  it("shows the current role's review; My answers updates this role and the accept still moves the run on", async () => {
+  it("shows the current role's review; Change my answers updates this role and the accept still moves the run on", async () => {
     const user = userEvent.setup();
     vi.mocked(redoRole).mockResolvedValue({ proposals: [{ ...proposals[1]!, text: "Made daily KPI reports" }], removed: 0 });
     vi.mocked(acceptSection).mockResolvedValue({ run: run({ status: "done", currentSection: null }), score: score(70) });
@@ -121,7 +160,7 @@ describe("the Experience review in the flow", () => {
       { initialEntries: ["/jobs/one/tailor"] });
     render(<RouterProvider router={router} />);
 
-    await user.click(await screen.findByRole("button", { name: "My answers" }));
+    await user.click(await screen.findByRole("button", { name: "Change my answers" }));
     const box = await screen.findByRole("textbox");
     expect(box).toHaveValue("Weekly");
     await user.clear(box);
@@ -129,9 +168,11 @@ describe("the Experience review in the flow", () => {
     await user.click(screen.getByRole("button", { name: "Update this role" }));
     expect(redoRole).toHaveBeenCalledWith("run1", "r1", [{ questionId: "q1", value: "Daily", via: "typed" }]);
 
-    const card = await screen.findByRole("region", { name: "Business Analyst" });
-    expect(within(card).getByText("daily KPI", { selector: "mark" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Use the new version" }));
+    const card = await screen.findByRole("region", { name: "Business Analyst, Emedi" });
+    expect(card.querySelector(".ui-diff-new")).toHaveTextContent("Made daily KPI reports");
+    expect(within(card).getByText("Role 1 of 1 · Mar 2021 – Present")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Use this" }));
+    await user.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [], roleId: "r1" });
     expect(acceptRole).not.toHaveBeenCalled();
   });

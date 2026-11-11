@@ -90,9 +90,9 @@ export function SectionReview({ section, proposals, flags, confirmed, busy, onAc
       {p.inferred && <span className="tailor-tag">{t("tailor.review.inferred")}</span>}
       {flagged(p) ? <span className="tailor-tag">{t(kept ? "tailor.review.flagged" : "tailor.review.reverted")}</span>
         : <span className="tailor-item-actions">
-          <button type="button" className="secondary" aria-pressed={p.inferred ? keep[key] === true : kept}
+          <button type="button" className="ui-btn ui-btn--sm" aria-pressed={p.inferred ? keep[key] === true : kept}
             aria-label={t("tailor.review.keepNamed", { text: shown(p) })} onClick={() => set(p, true)}>{t("tailor.review.keep")}</button>
-          <button type="button" className="secondary" aria-pressed={p.inferred ? keep[key] === false : !kept}
+          <button type="button" className="ui-btn ui-btn--sm" aria-pressed={p.inferred ? keep[key] === false : !kept}
             aria-label={t(p.inferred ? "tailor.review.removeNamed" : "tailor.review.revertNamed", { text: shown(p) })}
             onClick={() => set(p, false)}>{t(p.inferred ? "tailor.review.remove" : "tailor.review.revert")}</button>
         </span>}
@@ -110,13 +110,13 @@ export function SectionReview({ section, proposals, flags, confirmed, busy, onAc
   if (proposals.length === 0) body = <p>{t("tailor.review.none")}</p>;
   else body = <ul className="tailor-items">{proposals.map((p, i) => item(p, i, cv && section === "experience" ? partName(cv, p) : undefined))}</ul>;
 
-  return <section className="tailor-card" aria-labelledby="tailor-review-title">
-    <h2 id="tailor-review-title">{t("tailor.review.title", { section: t(`tailor.section.${section}`) })}</h2>
+  return <section className="ui-sheet tailor-card" aria-labelledby="tailor-review-title">
+    <h2 className="ui-heading ui-heading--lg" id="tailor-review-title">{t("tailor.review.title", { section: t(`tailor.section.${section}`) })}</h2>
     {body}
     {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
     <div className="tailor-actions">
-      {proposals.some((p) => !flagged(p)) && <button type="button" className="secondary" onClick={revertAll}>{t("tailor.review.revertAll")}</button>}
-      <button type="button" className="primary" disabled={busy} onClick={accept}>{t(busy ? "tailor.review.saving" : "tailor.review.accept")}</button>
+      {proposals.some((p) => !flagged(p)) && <button type="button" className="ui-btn ui-btn--sm" onClick={revertAll}>{t("tailor.review.revertAll")}</button>}
+      <button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={accept}>{t(busy ? "tailor.review.saving" : "tailor.review.accept")}</button>
     </div>
   </section>;
 }

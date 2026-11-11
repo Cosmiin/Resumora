@@ -1,97 +1,101 @@
 import type { ReactNode } from "react";
 import type { LightSection, ScoredKind } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
+import { PathSteps } from "./PathStart.tsx";
 
-export type RoleRow = { roleId: string; kind: ScoredKind; label: string; before: number | null; after: number | null; visited: boolean };
+/** visited: the path worked on it. offered: it was on the focus step's list (below 80 when the path started). */
+export type RoleRow = { roleId: string; kind: ScoredKind; label: string; before: number | null; after: number | null; visited: boolean; offered: boolean };
 
 type Props = {
-  /** The average score of every scored item (roles, projects, volunteering) when the path started, and now. */
+  /** CV strength: the average score of every scored item (roles, projects, volunteering) when the path started, and now. */
   start: number | null;
   average: number;
   rows: RoleRow[];
-  /** "Also": lines the path added under each lighter section (sections with none are left out). */
+  /** Lines the path added under each lighter section (sections with none are left out). */
   also: { section: LightSection; n: number }[];
   achievementsAdded: number;
   skillsAdded: number;
-  /** The dark skills bar (5A), on top of whichever screen shows. */
+  /** The skills bar (with Undo), on top of the screen. */
   notice: ReactNode;
-  onBack(): void;
-  onFindJob(): void;
-  /** Below 80: the lowest scored item of any kind, and "Improve the ‹role› role" / "Finish for now". */
-  lowest: RoleRow | null;
+  /** The lowest scored item of any kind, and the one thing that would help it most (when its score names one). */
+  lowest: (RoleRow & { tip?: { line: string; text: string } }) | null;
   onImprove(roleId: string): void;
   onFinish(): void;
+  onFindJob(): void;
 };
 
 export const ENRICHED_AVERAGE = 80;
 
-/** 6B: "Your CV is enriched" (average 80 or more), or "Almost there" below it. */
-export function EnrichedScreen({ start, average, rows, also, achievementsAdded, skillsAdded, notice, onBack, onFindJob, lowest, onImprove, onFinish }: Props) {
-  if (average < ENRICHED_AVERAGE) {
-    return (
-      <div className="fm-end">
-        {notice}
-        <p className="fm-eyebrow">{t("enrich.end.almostEyebrow")}</p>
-        <h2 className="fm-q is-big" id="fm-step-title">{t("enrich.end.almostTitle")}</h2>
-        <p className="fm-done-score">
-          <b>{average}</b>
-          <span className="fm-eyebrow">{t("enrich.end.almostLine")}</span>
-        </p>
-        {lowest && lowest.after !== null && <p className="fm-hint">{t("enrich.end.lowest", { role: lowest.label, n: lowest.after })}</p>}
-        <div className="fm-foot">
-          <button type="button" className="fm-ghost" onClick={onFinish}>{t("enrich.end.finish")}</button>
-          {lowest && (
-            <button type="button" className="fm-btn" onClick={() => onImprove(lowest.roleId)}>
-              {t(lowest.kind === "role" ? "enrich.end.improve" : "enrich.end.improveItem", { role: lowest.label })}
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
+/** The result of the path: CV strength before and after, what moved it, and what would help most next. */
+export function EnrichedScreen({ start, average, rows, also, achievementsAdded, skillsAdded, notice, lowest, onImprove, onFinish, onFindJob }: Props) {
+  const moved = start !== null && start !== average;
+  const more = lowest && lowest.after !== null && lowest.after < 100 ? lowest : null;
+  const extras = [
+    ...also.map((a) => t(a.n === 1 ? "enrich.end.lineAdded" : "enrich.end.linesAdded", { section: t(`enrich.path.section.${a.section}`), n: a.n })),
+    ...(achievementsAdded > 0 ? [t("enrich.end.achievements", { n: achievementsAdded })] : []),
+    ...(skillsAdded > 0 ? [t("enrich.end.skills", { n: skillsAdded })] : []),
+  ];
   return (
     <div className="fm-end">
+      <PathSteps current={3} />
       {notice}
-      <h2 className="fm-q is-big" id="fm-step-title">{t("enrich.end.title")}</h2>
-      <p className="fm-end-average">
-        {start !== null && start !== average ? t("enrich.end.average", { from: start, to: average }) : t("enrich.end.averageOnly", { n: average })}
-      </p>
-      <ScoreRows rows={rows.filter((r) => r.kind === "role")} />
-      {rows.some((r) => r.kind !== "role") && <p className="fm-eyebrow fm-end-group">{t("enrich.end.other")}</p>}
-      <ScoreRows rows={rows.filter((r) => r.kind !== "role")} />
-      {(also.length > 0 || achievementsAdded > 0 || skillsAdded > 0) && (
-        <>
-          <p className="fm-eyebrow fm-end-group">{t("enrich.end.also")}</p>
-          <ul className="fm-end-rows">
-            {also.map((a) => (
-              <li key={a.section}><span>{t(a.n === 1 ? "enrich.end.lineAdded" : "enrich.end.linesAdded", { section: t(`enrich.path.section.${a.section}`), n: a.n })}</span></li>
-            ))}
-            {achievementsAdded > 0 && <li><span>{t("enrich.end.achievements", { n: achievementsAdded })}</span></li>}
-            {skillsAdded > 0 && <li><span>{t("enrich.end.skills", { n: skillsAdded })}</span></li>}
-          </ul>
-        </>
-      )}
+      <h2 className="fm-q is-big" id="fm-step-title" tabIndex={-1}>{t(start !== null && average > start ? "enrich.end.title" : "enrich.end.titleSame")}</h2>
+      <p className="fm-lead">{t("enrich.end.line")}</p>
+      <div className="fm-result">
+        <div>
+          <p className="fm-eyebrow">{t("enrich.end.strength")}</p>
+          <p className="fm-strength" aria-hidden="true">
+            {moved && <><span className="was">{start}</span><span>→</span></>}
+            <span>{average}</span>
+            <small>{t("enrich.end.of100")}</small>
+          </p>
+          <p className="visually-hidden">{moved ? t("enrich.end.average", { from: start, to: average }) : t("enrich.end.averageOnly", { n: average })}</p>
+        </div>
+        <hr />
+        <h3>{t("enrich.end.why")}</h3>
+        <ul className="fm-reasons">
+          {rows.map((r) => <Reason key={r.roleId} row={r} />)}
+          {extras.map((text) => <li key={text}><b aria-hidden="true">+</b><span>{text}</span></li>)}
+        </ul>
+        <hr />
+        <h3>{t("enrich.end.next")}</h3>
+        {more?.tip ? (
+          <p className="fm-next-tip">{t("enrich.end.nextTip", { line: more.tip.line, tip: more.tip.text })}</p>
+        ) : more && average < ENRICHED_AVERAGE ? (
+          <p className="fm-next-tip">{t("enrich.end.lowest", { role: more.label, n: more.after! })}</p>
+        ) : (
+          <p className="fm-next-tip">{t("enrich.end.ready")}</p>
+        )}
+      </div>
       <div className="fm-foot">
-        <button type="button" className="fm-ghost" onClick={onBack}>{t("enrich.end.back")}</button>
-        <button type="button" className="fm-btn" onClick={onFindJob}>{t("enrich.end.findJob")}</button>
+        {more && (
+          <button type="button" className="ui-btn fm-back" onClick={() => onImprove(more.roleId)}>{t("enrich.end.more")}</button>
+        )}
+        {average >= ENRICHED_AVERAGE && <button type="button" className="fm-ghost" onClick={onFindJob}>{t("enrich.end.findJob")}</button>}
+        <button type="button" className="fm-btn" onClick={onFinish}>{t("enrich.end.back")}</button>
       </div>
     </div>
   );
 }
 
-/** One row per scored item: before → after when the path visited it and the score moved, else the score now. */
-function ScoreRows({ rows }: { rows: RoleRow[] }) {
-  if (!rows.length) return null;
+/** One row of "What moved the score": how far the item's score moved, or why it didn't. */
+function Reason({ row }: { row: RoleRow }) {
+  const delta = row.visited && row.before !== null && row.after !== null ? row.after - row.before : 0;
+  if (delta > 0) {
+    return (
+      <li>
+        <b>+{delta}</b>
+        <span>{row.label}<small>{t("enrich.end.fromTo", { from: row.before!, to: row.after! })}</small></span>
+      </li>
+    );
+  }
   return (
-    <ul className="fm-end-rows">
-      {rows.map((r) => (
-        <li key={r.roleId}>
-          <span>{r.label}</span>
-          <span className="fm-end-score">
-            {r.visited && r.before !== null && r.after !== null && r.before !== r.after ? `${r.before} → ${r.after}` : (r.after ?? "–")}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <li>
+      <b className="is-flat">0</b>
+      <span>
+        {t(row.visited ? "enrich.end.same" : row.offered ? "enrich.end.notChosen" : "enrich.end.notOffered", { role: row.label })}
+        {row.after !== null && <small>{t("enrich.end.at", { n: row.after })}</small>}
+      </span>
+    </li>
   );
 }

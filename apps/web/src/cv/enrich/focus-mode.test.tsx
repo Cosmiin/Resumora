@@ -62,7 +62,7 @@ function Harness({ onAction, onClose = () => {}, initialRole = role, roleResult 
 
 async function answerFirstQuestion() {
   await userEvent.click(screen.getByRole("button", { name: "10–50" }));
-  await userEvent.click(screen.getByRole("button", { name: "Improve this bullet →" }));
+  await userEvent.click(screen.getByRole("button", { name: "Next" }));
 }
 
 function reducedMotion(on: boolean) {
@@ -95,7 +95,7 @@ describe("focus mode", () => {
     render(<Harness roleResult={{ ...result, roleQuestions }} onAction={(a) => actions.push(a)} />);
     expect(screen.getByText("Question 1 of 2")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "The CEO" }));
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(actions[0]).toMatchObject({ type: "setNote", note: { question: "Who did you report to?", answer: "The CEO", via: ["pick"] } });
     expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
     expect(screen.getByLabelText("Your answer")).toHaveValue("");
@@ -130,7 +130,7 @@ describe("focus mode", () => {
 
     expect(actions.filter((a) => a.type === "replaceBullet")).toHaveLength(1);
     expect(screen.getByTestId("saved-b1")).toHaveTextContent("Planned daily routes for 10–50 regional drivers.");
-    expect(screen.getByRole("heading", { name: "Up from 52. Nice work! 🎉" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Up from 52. Nice work!" })).toBeInTheDocument();
     expect(screen.getByText("Your Dispatcher role is almost in the Clear band.")).toBeInTheDocument();
     expect(screen.getAllByTestId("confetti").length).toBeGreaterThan(0);
   });
@@ -212,7 +212,7 @@ describe("focus mode", () => {
     render(<Harness onClose={onClose} />);
     await answerFirstQuestion();
     expect(await screen.findByText("Improving your bullet…")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save and exit" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -226,9 +226,9 @@ describe("focus mode", () => {
     expect(await screen.findByRole("heading", { name: "Tell us about your time as Dispatcher at TransLog" })).toBeInTheDocument();
     expect(screen.getByText("+ new bullets will appear here")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "What did you handle every day?" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Continue →" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
     await userEvent.type(await screen.findByLabelText("Your answer"), "I ran the front desk");
-    expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
   });
   it("E1: a thin role opens on the box; after its role questions a plain working screen shows, never the box again", async () => {
     const thin = { ...role, bullets: [{ id: "b1", text: "Managed the office." }] };
@@ -241,16 +241,16 @@ describe("focus mode", () => {
     render(<Harness initialRole={thin} roleResult={{ ...result, fingerprint: fingerprint(thin, "en"), bullets: [grade("b1", 43)], questions: [], roleQuestions }} />);
     const box = "Tell us about your time as Dispatcher at TransLog";
     expect(screen.getByRole("heading", { name: box })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "← Back" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(screen.getByText("Question 1 of 2 · Tools")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "SAP" }));
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "← Back" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByRole("heading", { name: "Which tools did you use?" })).toBeInTheDocument();
     expect(screen.getByLabelText("Your answer")).toHaveValue("SAP");
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(screen.getByRole("heading", { name: "Turning this into bullets…" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: box })).toBeNull();
@@ -265,7 +265,7 @@ describe("focus mode edge cases", () => {
     render(<Harness />);
     await userEvent.click(screen.getByRole("button", { name: "Questions not specific enough? Describe what you did there in your own words." }));
     await userEvent.type(await screen.findByLabelText("Your answer"), "I ran the front desk");
-    await userEvent.click(screen.getByRole("button", { name: "Turn this into bullets →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn this into bullets" }));
     await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "Pick the ones that are true" })).toBeInTheDocument();
     expect(api.brainDump).toHaveBeenCalledTimes(2);
@@ -276,7 +276,7 @@ describe("focus mode edge cases", () => {
     render(<Harness />);
     await userEvent.click(screen.getByRole("button", { name: "Questions not specific enough? Describe what you did there in your own words." }));
     await userEvent.type(await screen.findByLabelText("Your answer"), "I ran the front desk");
-    await userEvent.click(screen.getByRole("button", { name: "Turn this into bullets →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn this into bullets" }));
     expect(await screen.findByRole("button", { name: "Turning this into bullets…" })).toBeDisabled();
     expect(screen.getByLabelText("Your answer")).toHaveAttribute("readonly");
     expect(screen.queryByRole("button", { name: "Answer by speaking" })).toBeNull();
@@ -357,7 +357,7 @@ describe("free talk", () => {
         expect(screen.getByRole("heading", { name: "Tell us about your time as Dispatcher at TransLog" })).toBeInTheDocument();
         if (finish === "proposals") {
           await userEvent.type(screen.getByLabelText("Your answer"), "Built weekly reports");
-          await userEvent.click(screen.getByRole("button", { name: "Turn this into bullets →" }));
+          await userEvent.click(screen.getByRole("button", { name: "Turn this into bullets" }));
           await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
         } else await userEvent.click(screen.getByRole("button", { name: "Skip" }));
         expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
@@ -374,7 +374,7 @@ describe("free talk", () => {
     render(<Harness onAction={(a) => actions.push(a)} />);
     await userEvent.click(screen.getByRole("button", { name: link }));
     await userEvent.type(screen.getByLabelText("Your answer"), "Built weekly reports");
-    await userEvent.click(screen.getByRole("button", { name: "Turn this into bullets →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Turn this into bullets" }));
     expect(await screen.findByRole("heading", { name: result.questions[0]!.text })).toBeInTheDocument();
     expect(actions[0]).toMatchObject({ type: "setNote", note: { question: BRAIN_DUMP_QUESTION, answer: "Built weekly reports" } });
     expect(api.brainDump).toHaveBeenCalledTimes(1);
@@ -422,7 +422,7 @@ describe("the role description step (3B) on screen", () => {
     await userEvent.type(box, "TransLog moves freight.");
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(actions).toContainEqual({ type: "setItemField", list: "experience", itemId: "r1", field: "description", value: "TransLog moves freight." });
-    expect(await screen.findByRole("heading", { name: "That's all for this role" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "That's this role done" })).toBeInTheDocument();
   });
 });
 
@@ -434,12 +434,76 @@ describe("focus mode inside the guided path", () => {
     function Path() {
       const [state, dispatch] = useReducer(cvReducer, cv);
       return <FocusMode target={{ roleId: "r1", mode: "improve" }} cv={state} dispatch={dispatch} scores={new Map([["r1", { state: "ready", result: done }]])}
-        waitForSave={() => Promise.resolve()} onClose={onClose} topBar={<p>Role 1 of 2</p>} next={{ label: "Next role →", onNext }} />;
+        waitForSave={() => Promise.resolve()} onClose={onClose} context="Role 1 of 2" next={{ label: "Save and go to the next role", onNext }} />;
     }
     render(<Path />);
     expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole("button", { name: "Next role →" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Save and go to the next role" }));
     expect(onNext).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("the question screen of the redesign", () => {
+  const r: Experience = {
+    id: "r1", company: "Acme", title: "Engineer", location: "", startDate: "2020", endDate: "", current: true, description: "", notes: [],
+    bullets: [{ id: "b1", text: "Helped with reports" }, { id: "b2", text: "Built tools" }],
+  };
+  const cvOf: CvContent = { ...emptyCv(), experience: [r] };
+  const scored = (roleQuestions: RoleResult["roleQuestions"]): RoleResult => ({
+    roleId: "r1", policy: "p", fingerprint: fingerprint(r, "en"), score: 40, nextStep: null, thin: false, roleQuestions,
+    bullets: [
+      { id: "b1", score: 20, contribution: "partial", clarity: "specific", specificity: "partial", impact: "partial", issue: "specificity", tip: "It does not say which reports.", question: "Which reports?" },
+      { id: "b2", score: 30, contribution: "partial", clarity: "specific", specificity: "partial", impact: "partial", issue: "specificity", tip: null, question: "Which tools?" },
+    ],
+    questions: [
+      { bulletId: "b1", text: "Which reports?", options: ["Sales", "Finance"], kind: "detail" },
+      { bulletId: "b2", text: "Which tools?", options: [], kind: "detail" },
+    ],
+  });
+  const open = (result: RoleResult, extra: Partial<Parameters<typeof FocusMode>[0]> = {}) => render(
+    <FocusMode target={{ roleId: "r1", mode: "improve" }} cv={cvOf} dispatch={() => {}} scores={new Map([["r1", { state: "ready", result }]])}
+      waitForSave={() => Promise.resolve()} onClose={() => {}} {...extra} />);
+
+  it("says why it asks (the line's own gap) and points at the line the answer rewrites", () => {
+    open(scored([]));
+    expect(screen.getByRole("heading", { name: "Which reports?" })).toBeInTheDocument();
+    expect(screen.getByText("Why I ask: It does not say which reports.")).toBeInTheDocument();
+    const line = screen.getByText("Helped with reports").closest("li")!;
+    expect(line).toHaveAttribute("aria-current", "true");
+    expect(within(line).getByText("Your answer rewrites this line in your CV")).toBeInTheDocument();
+    expect(within(screen.getByText("Built tools").closest("li")!).queryByText("Your answer rewrites this line in your CV")).toBeNull();
+  });
+
+  it("a question with no likely answers shows only the text box; a line with no tip gets the general reason", async () => {
+    open(scored([]));
+    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(screen.getByRole("heading", { name: "Which tools?" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Likely answers" })).toBeNull();
+    expect(screen.getByText("Why I ask: a concrete detail lets a reader picture the work.")).toBeInTheDocument();
+  });
+
+  it("a question about the whole role gives the reason for its topic and points at no line", () => {
+    open(scored([{ id: "rq1", text: "What does the company do?", options: [], kind: "role", topic: "company" }]));
+    expect(screen.getByText("Why I ask: one line about the company helps a reader place your work.")).toBeInTheDocument();
+    expect(screen.queryByText("Your answer rewrites this line in your CV")).toBeNull();
+  });
+
+  it("in the path, the top bar says where the role sits and Skip this role moves on", async () => {
+    const onNext = vi.fn();
+    const onClose = vi.fn();
+    open(scored([]), { context: "Role 1 of 2", next: { label: "Save and go to the next role", onNext }, onClose });
+    expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Skip this role for now" }));
+    expect(onNext).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("outside the path there is no Skip this role, and Save and exit closes", async () => {
+    const onClose = vi.fn();
+    open(scored([]), { onClose });
+    expect(screen.queryByRole("button", { name: "Skip this role for now" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Save and exit" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

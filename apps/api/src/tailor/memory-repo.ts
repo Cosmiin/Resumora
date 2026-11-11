@@ -43,7 +43,7 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       const id = crypto.randomUUID();
       const now = new Date().toISOString();
       docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, translatedFrom: null, content: structuredClone(input.content),
-        baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, template: "classic", tone: input.tone,
+        baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, template: input.template ?? "classic", tone: input.tone,
         instruction: input.instruction, review: null, score: null, coverLetter: null, version: 1, createdAt: now, updatedAt: now });
       docs.steering.set(id, structuredClone(input.steering));
       return id;
@@ -51,6 +51,14 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     async listTailoredCvs(jobId) {
       return [...docs.cvs.values()].filter((cv) => cv.userId === userId && cv.jobId === jobId)
         .map(({ id, language, translatedFrom, updatedAt }) => ({ id, language, translatedFrom, updatedAt }));
+    },
+    async listAllTailoredCvs() {
+      const newest = (id: string) => [...docs.runs.values()].reverse().find((run) => run.tailoredCvId === id && run.userId === userId);
+      return [...docs.cvs.values()].filter((cv) => cv.userId === userId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map(({ id, jobId, language, template, translatedFrom, updatedAt }) => {
+          const run = newest(id);
+          return { id, jobId, language, template, translatedFrom, updatedAt, inProgress: !!run && run.status !== "done" };
+        });
     },
     async readTailoredCv(id) {
       const cv = docs.cvs.get(id);

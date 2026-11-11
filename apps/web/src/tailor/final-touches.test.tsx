@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { emptyCv, TAILOR_SECTIONS, type MatchScore, type Proposal, type TailorRun } from "@resumora/shared";
+import { emptyCv, isSectionEmpty, TAILOR_SECTIONS, type MatchScore, type Proposal, type TailorRun } from "@resumora/shared";
 
 vi.mock("./tailor-api.ts", () => ({
   startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(),
@@ -92,21 +92,37 @@ describe("final touches (FinalA)", () => {
     expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "l1", keep: false }], inferred: [], flags: [] });
   });
 
-  it("Order and headline: the old headline struck through, moved sections marked; Undo both sends keep: false for both", async () => {
+  it("Order and headline as a picture: each change on its own, only sections the CV has, the picture follows the choices", async () => {
     const user = userEvent.setup();
     const onAccept = vi.fn();
-    const order = [cv.layout.order[1]!, cv.layout.order[0]!, ...cv.layout.order.slice(2)];
+    // The CV has two sections with something in them; the suggestion swaps them.
+    const has = cv.layout.order.filter((key) => !isSectionEmpty(cv, key));
+    expect(has).toHaveLength(2);
+    const order = [has[1]!, has[0]!, ...cv.layout.order.filter((key) => !has.includes(key))];
     const proposals: Proposal[] = [
       { itemId: "layout", field: "order", text: order.join(","), inferred: false, flags: [] },
       { itemId: "headline", field: "title", text: "Payroll Lead", inferred: false, flags: [] },
     ];
     render(<SectionReview section="layout" proposals={proposals} flags={[]} confirmed={[]} busy={false} onAccept={onAccept} cv={cv} />);
-    expect(screen.getByText("Payroll Specialist").tagName).toBe("DEL");
-    expect(screen.getByText("Payroll Lead")).toBeInTheDocument();
-    const list = screen.getByRole("list", { name: "Section order" });
-    // Two sections swapped: one of them moved.
-    expect(within(list).getAllByText("moved")).toHaveLength(1);
-    await user.click(screen.getByRole("button", { name: "Undo both" }));
-    expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "layout", keep: false }, { itemId: "headline", keep: false }], inferred: [], flags: [] });
+    expect(screen.getByRole("heading", { name: "Headline and section order" })).toBeInTheDocument();
+    const headline = screen.getByRole("article", { name: "Headline" });
+    expect(within(headline).getByText("Payroll Specialist").tagName).toBe("DEL");
+    expect(within(headline).getByText("Lead").tagName).toBe("INS");
+    // Two sections swapped: one of them moved, and it says from where to where.
+    const moves = within(screen.getByRole("list", { name: "Section order" })).getAllByRole("listitem");
+    expect(moves).toHaveLength(1);
+    expect(moves[0]).toHaveTextContent(/moves down. From place 1 to place 2, at the end./);
+    const picture = screen.getByRole("img", { name: "Your tailored CV, in small" });
+    expect(picture.querySelectorAll(".tailor-pic-blk")).toHaveLength(2);
+    expect(picture.querySelector(".is-moved")).toHaveTextContent("2 · moved down");
+    expect(within(picture).getByText(/ was here$/)).toBeInTheDocument();
+    expect(picture.querySelector(".tailor-pic-head")).toHaveTextContent("Payroll Lead");
+
+    // Keeping my order puts the picture back; the headline stays new.
+    await user.click(within(screen.getByRole("article", { name: "Section order" })).getByRole("button", { name: "Keep mine" }));
+    expect(picture.querySelector(".is-moved")).toBeNull();
+    expect(within(picture).queryByText(/ was here$/)).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Save and continue" }));
+    expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "layout", keep: false }, { itemId: "headline", keep: true }], inferred: [], flags: [] });
   });
 });

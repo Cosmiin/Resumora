@@ -5,11 +5,15 @@ import type { Job, JobListPage } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ApiClientError } from "../lib/api.ts";
-import { t } from "../i18n/t.ts";
+import { useT } from "../i18n/t.ts";
+import { getLanguage } from "../i18n/language.ts";
+import { Dialog } from "../ui/Dialog.tsx";
+import { Skeleton } from "../ui/Page.tsx";
 import { deleteJob, getJob, getJobScore, patchJob, scoreJob } from "./jobs-api.ts";
 import { JobSummary } from "./JobSummary.tsx";
 import { JobEditForm } from "./JobEditForm.tsx";
-import { RequirementList } from "./RequirementList.tsx";
+import { Keywords, MatchNumber, MustHaves, NiceToHave, mustCount } from "./JobMatch.tsx";
+import { JobScoreHow } from "./JobScoreCard.tsx";
 import { TailorGate } from "./TailorGate.tsx";
 import { getRun } from "../tailor/tailor-api.ts";
 import { remembered } from "../tailor/TailorFlow.tsx";
@@ -21,6 +25,7 @@ export function JobPage() {
 }
 
 function JobView({ id, userId }: { id: string; userId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [pollUntil] = useState(() => Date.now() + 120_000);
@@ -112,110 +117,149 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const job = query.data;
   const extracted = job?.extracted;
   const busy = job?.status === "queued" || job?.status === "processing";
-  const original = job && <a href={job.url} target="_blank" rel="noopener noreferrer">{t("job.original")}</a>;
-  const deletion = <div className="job-delete">
-    {confirmDelete ? <div role="dialog" aria-label={t("job.deleteConfirm")}>
-      <p className="jobs-note">{t("job.deleteConfirm")}</p>
-      {query.data?.status === "ready" && (!score.isSuccess || score.data.tailored != null) && <p className="jobs-note">{t("job.deleteTailored")}</p>}
-      <button type="button" className="secondary danger" disabled={deleting} onClick={() => void remove()}>{t("job.delete")}</button>
-      <button type="button" className="secondary" disabled={deleting} onClick={() => { setConfirmDelete(false); setDeleteError(null); }}>{t("job.deleteCancel")}</button>
-    </div> : <button type="button" className="secondary danger" onClick={() => setConfirmDelete(true)}>{t("job.delete")}</button>}
-  </div>;
+  const dates = getLanguage() === "ro" ? "ro-RO" : "en-GB";
+  const original = job && <a className="ui-small" href={job.url} target="_blank" rel="noopener noreferrer">{t("job.original")}</a>;
+  const removeButton = <button type="button" className="ui-btn ui-btn--quiet" onClick={() => setConfirmDelete(true)}>{t("job.delete")}</button>;
   const jobPath = `/jobs/${encodeURIComponent(id)}`;
   const run = openRun.data;
   const tailored = score.data?.tailored;
-  const tailor = !job || editing ? null : run ? <div className="tailor">
-    <div><strong>{t("job.tailor.inProgress")}</strong>
-      <span>{t("job.tailor.step", { n: run.sections.indexOf(run.currentSection!) + 1, total: run.sections.length,
-        section: t(`tailor.section.${run.currentSection!}`) })}</span></div>
-    <Link className="tailor-link" to={`${jobPath}/tailor`}>{t("job.tailor.continue")}</Link>
-  </div> : tailored ? <div className="tailor">
-    <div><strong>{t("job.tailor.ready")}</strong>
-      {tailored.total !== null && <span>{t("job.tailor.lift", { base: score.data?.base?.total ?? "—", latest: tailored.total })}</span>}</div>
-    <div className="tailor-links">
-      <Link className="tailor-link" to={`${jobPath}/cv`}>{t("job.tailor.open")}</Link>
-      <Link className="tailor-link secondary" to={`${jobPath}/cv?retailor=1`}>{t("job.tailor.again")}</Link>
+  // The one main action of the page: continue a run, open the tailored CV, or start tailoring.
+  const tailor = !job ? null : run ? (
+    <div className="job-tailor">
+      <Link className="ui-btn ui-btn--primary" to={`${jobPath}/tailor`}>{t("job.tailor.continue")}</Link>
+      <p className="ui-small ui-muted">{t("job.tailor.step", { n: run.sections.indexOf(run.currentSection!) + 1, total: run.sections.length,
+        section: t(`tailor.section.${run.currentSection!}`) })}</p>
     </div>
-  </div> : <div className="tailor">
-    <div><strong>{t("job.tailor.title")}</strong><span>{t("job.tailor.text")}</span>
-      {tailorReason && <p role="status" className="jobs-note">{tailorReason}</p>}</div>
-    <button type="button" onClick={() => {
-      if (job.status !== "ready") {
-        setTailorReason(t(job.status === "failed" ? "job.tailor.failed"
-          : job.status === "needs_text" ? "job.tailor.needsText" : "job.tailor.notReady"));
-      } else { setTailorReason(null); setTailorGate(true); }
-    }}>{t("job.tailor.button")}</button>
-  </div>;
-  // A tailored CV (or a run to continue) is shown at the top of the job page; the Tailor button stays below the ad.
-  const tailorOnTop = !!(run || tailored);
+  ) : tailored ? (
+    <div className="job-tailor">
+      <div className="ui-row">
+        <Link className="ui-btn ui-btn--primary" to={`${jobPath}/cv`}>{t("job.tailor.open")}</Link>
+        <Link className="ui-btn" to={`${jobPath}/cv?retailor=1`}>{t("job.tailor.again")}</Link>
+      </div>
+      {tailored.total !== null && <p className="ui-small ui-muted">{t("job.tailor.lift", { base: score.data?.base?.total ?? "–", latest: tailored.total })}</p>}
+    </div>
+  ) : (
+    <div className="job-tailor">
+      <button type="button" className="ui-btn ui-btn--primary" onClick={() => {
+        if (job.status !== "ready") {
+          setTailorReason(t(job.status === "failed" ? "job.tailor.failed"
+            : job.status === "needs_text" ? "job.tailor.needsText" : "job.tailor.notReady"));
+        } else { setTailorReason(null); setTailorGate(true); }
+      }}>{t("job.tailor.button")}</button>
+      {tailorReason && <p role="status" className="ui-small">{tailorReason}</p>}
+    </div>
+  );
   const applyByText = extracted?.applyBy
-    ? new Date(`${extracted.applyBy}T00:00:00Z`).toLocaleDateString("en-GB", {
+    ? new Date(`${extracted.applyBy}T00:00:00Z`).toLocaleDateString(dates, {
       day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
     }) : null;
   const salary = extracted?.salary;
   const salaryText = salary && (salary.min !== null || salary.max !== null)
     ? [salary.min, salary.max].filter((value) => value !== null).map((value) => value.toLocaleString("en")).join("–")
       + (salary.currency ? ` ${salary.currency}` : "") + (salary.period ? ` / ${t(`job.period.${salary.period}`)}` : "") : null;
+  const base = score.data?.base ?? null;
+  const musts = extracted ? mustCount(extracted.requirements, base) : null;
 
   return <AppShell>
-    <main className="jobs-page job-page">
-      <Link className="crumb" to="/jobs">{t("job.back")}</Link>
-      {query.isPending ? <p>{t("app.loading")}</p> : query.isError && query.data === undefined ? (
-        query.error instanceof ApiClientError && query.error.status === 404 ? <p>{t("job.notFound")}</p> :
-          <div className="jobs-state"><p role="alert">{t("jobs.loadError")}</p>
-            <button type="button" onClick={() => void query.refetch()}>{t("jobs.retry")}</button></div>
-      ) : busy ? <div className="waiting">
-        <span className="job-badge">{t("jobs.badge.reading")}</span>
-        <h1 className="vtitle">{t("job.reading.title")}</h1>
-        <p className="jobs-note">{t("job.reading.text")}</p>
-        {pollStopped && <p className="jobs-note" role="status">{t("jobs.stillReading")}</p>}
-        {original}{tailor}
-      </div> : job?.status === "failed" ? <div className="waiting">
-        <span className="job-badge job-badge-failed">{t("jobs.badge.failed")}</span>
-        <h1 className="vtitle">{t(job.errorCode === "not_a_job" ? "jobs.error.not_a_job" : "jobs.error.ai_failed")}</h1>
-        <p className="jobs-note">{t(job.errorCode === "not_a_job" ? "job.failed.notAJob" : "job.failed.other")}</p>
-        {original}{deletion}{tailor}
-      </div> : extracted && editing ? <JobEditForm id={id} version={job.version} extracted={extracted}
+    <main className="ui-page jobs-page job-page">
+      <div className="ui-wrap ui-main">
+      <p className="ui-small job-crumb"><Link to="/jobs">{t("job.back")}</Link></p>
+      {query.isPending ? (
+        <div className="ui-sheet ui-stack jobs-narrow" aria-busy="true">
+          <span className="ui-sr" role="status">{t("app.loading")}</span>
+          <Skeleton width="60%" height="28px" /><Skeleton /><Skeleton width="80%" />
+        </div>
+      ) : query.isError && query.data === undefined ? (
+        query.error instanceof ApiClientError && query.error.status === 404 ? <p className="ui-notice jobs-narrow">{t("job.notFound")}</p> :
+          <div className="ui-stack jobs-narrow"><p role="alert" className="ui-notice ui-notice--bad">{t("jobs.loadError")}</p>
+            <div className="ui-row"><button type="button" className="ui-btn" onClick={() => void query.refetch()}>{t("jobs.retry")}</button></div></div>
+      ) : busy ? <div className="ui-stack jobs-narrow" aria-busy="true">
+        <h1 className="ui-title">{t("job.reading.title")}</h1>
+        <p className="ui-lead" role="status">{t("job.reading.text")}</p>
+        <div className="ui-sheet ui-stack"><Skeleton width="60%" height="28px" /><Skeleton /><Skeleton width="80%" /></div>
+        {pollStopped && <p className="ui-notice" role="status">{t("jobs.stillReading")}</p>}
+        <div className="ui-row">{original}</div>
+      </div> : job?.status === "failed" ? <div className="ui-stack jobs-narrow">
+        <h1 className="ui-title">{t(job.errorCode === "not_a_job" ? "jobs.error.not_a_job" : "jobs.error.ai_failed")}</h1>
+        <p className="ui-notice ui-notice--bad" role="alert">{t(job.errorCode === "not_a_job" ? "job.failed.notAJob" : "job.failed.other")}</p>
+        <div className="ui-row">{removeButton}{original}</div>
+      </div> : extracted && editing ? <div className="ui-sheet"><JobEditForm id={id} version={job.version} extracted={extracted}
         onSaved={saved} onCancel={() => setEditing(false)} onReload={async () => {
           const result = await query.refetch();
           if (result.isError) throw result.error;
           setEditing(false);
-        }} /> : extracted ? <>
-        <div className="view-head">
-          <div><h1 className="vtitle">{job.title}</h1><div className="vsub">{[job.company, job.location].filter(Boolean).join(" · ")}</div></div>
-          <div className="job-actions"><button type="button" className="secondary" disabled={statusSaving} onClick={() => setEditing(true)}>{t("job.edit")}</button>{deletion}</div>
+        }} /></div> : extracted ? <>
+        <div className="jobs-head">
+          <div>
+            <h1 className="ui-title">{job.title}</h1>
+            <p className="ui-muted job-place">{[job.company, job.location].filter(Boolean).join(", ")}</p>
+            <div className="ui-row job-facts">
+              {extracted.workMode !== "unknown" && <span className="ui-pill">{t(`job.workMode.${extracted.workMode}`)}</span>}
+              {extracted.employmentType !== "unknown" && <span className="ui-pill">{t(`job.type.${extracted.employmentType}`)}</span>}
+              {extracted.seniority !== "unknown" && <span className="ui-pill">{t(`job.seniority.${extracted.seniority}`)}</span>}
+              {salaryText !== null && <span className="ui-pill">{salaryText}</span>}
+              {applyByText && <span className="ui-pill">{t("job.applyBy", { date: applyByText })}</span>}
+              {original}
+            </div>
+          </div>
         </div>
-        {extracted.positionClosed === true && <p role="status" className="jobs-note">{t("job.positionClosed")}</p>}
-        {tailorOnTop && tailor}
-        <div className="facts">
-          {extracted.workMode !== "unknown" && <span className="fact">{t(`job.workMode.${extracted.workMode}`)}</span>}
-          {extracted.employmentType !== "unknown" && <span className="fact">{t(`job.type.${extracted.employmentType}`)}</span>}
-          {extracted.seniority !== "unknown" && <span className="fact">{t(`job.seniority.${extracted.seniority}`)}</span>}
-          {salaryText !== null && <span className="fact">{salaryText}</span>}
-          {applyByText && <span className="fact">{t("job.applyBy", { date: applyByText })}</span>}
+        {extracted.positionClosed === true && <p role="status" className="ui-notice job-closed">{t("job.positionClosed")}</p>}
+        {/* The answer first: the match, what the coach says about it, and the page's one main action. */}
+        <section className="job-band" aria-label={t("job.band.label")}>
+          {base && <MatchNumber score={base} />}
+          {((musts && musts.total > 0 && !tailored && !run) || (base && base.total !== null)) && (
+            <div className="job-band-say">
+              {musts && musts.total > 0 && !tailored && !run && (
+                <p className="ui-coach job-coach">{t(musts.met === musts.total ? "job.coach.all" : musts.met === 0 ? "job.coach.none" : "job.coach.some", { n: musts.met, total: musts.total })}</p>
+              )}
+              {base && base.total !== null && <JobScoreHow score={base} />}
+            </div>
+          )}
+          {tailor}
+        </section>
+        <div className="job-cols">
+          <div className="ui-stack">
+          <MustHaves requirements={extracted.requirements} score={base}
+            state={<div className="ui-row"><p className="ui-small ui-muted">{t(score.isPending || scoring === "busy" ? "job.score.checking"
+              : score.isError ? "job.score.loadError" : scoring === "failed" ? "job.score.computeError" : "job.score.pending")}</p>
+              {!score.isPending && <button type="button" className="ui-btn ui-btn--sm" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button>}</div>}>
+            <NiceToHave inside requirements={extracted.requirements} score={base} />
+          </MustHaves>
+          </div>
+        <section className="job-more ui-stack">
+          <h2 className="ui-heading">{t("job.more.title")}</h2>
+          {extracted.summary.trim() && <div className="sec"><h3>{t("job.inShort")}</h3><p>{extracted.summary}</p></div>}
+          <JobSummary extracted={extracted} rawText={job.rawText} salaryStated={salaryText !== null}
+            keywords={<Keywords inside score={base} terms={extracted.keywords} />} />
+          <label className="job-application-status"><span className="ui-label">{t("job.status.title")}</span>
+            <select className="ui-input" value={job.applicationStatus} disabled={statusSaving}
+              onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>
+              {(["saved", "tailored", "applied", "interview", "offer", "rejected"] as const).map((status) =>
+                <option value={status} key={status}>{t(`job.status.${status}`)}</option>)}
+            </select>
+          </label>
+          {statusError && <p role="alert" className="ui-notice ui-notice--bad">{statusError}</p>}
+          <div className="ui-row">
+            <button type="button" className="ui-btn" disabled={statusSaving} onClick={() => setEditing(true)}>{t("job.edit")}</button>
+            {removeButton}
+          </div>
+          <p className="ui-small ui-muted">{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</p>
+        </section>
         </div>
-        {extracted.summary.trim() && <section className="sec"><h2>{t("job.inShort")}</h2><p>{extracted.summary}</p></section>}
-        <RequirementList requirements={extracted.requirements} score={score.data?.base ?? null}
-          state={<div className="job-score"><p className="jobs-note">{t(score.isPending || scoring === "busy" ? "app.loading"
-            : score.isError ? "job.score.loadError" : scoring === "failed" ? "job.score.computeError" : "job.score.pending")}</p>
-            <button type="button" className="secondary" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button></div>} />
-        <JobSummary extracted={extracted} rawText={job.rawText} salaryStated={salaryText !== null} />
-        <label className="job-application-status">{t("job.status.title")}
-          <select value={job.applicationStatus} disabled={statusSaving}
-            onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>
-            {(["saved", "tailored", "applied", "interview", "offer", "rejected"] as const).map((status) =>
-              <option value={status} key={status}>{t(`job.status.${status}`)}</option>)}
-          </select>
-        </label>
-        {statusError && <p role="alert" className="jobs-field-error">{statusError}</p>}
-        {!tailorOnTop && tailor}
-        <footer className="foot">{original}<span>{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</span></footer>
-      </> : job?.status === "needs_text" ? <div className="waiting">
-        <p>{t("job.tailor.needsText")}</p>{original}{deletion}{tailor}
+      </> : job?.status === "needs_text" ? <div className="ui-stack jobs-narrow">
+        <p className="ui-notice">{t("job.tailor.needsText")}</p><div className="ui-row">{removeButton}{original}</div>
       </div> : null}
       {tailorGate && <TailorGate onTailor={() => void navigate(`/jobs/${encodeURIComponent(id)}/tailor`)}
         onEnrich={() => void navigate("/cv?enrich=1")} onClose={() => setTailorGate(false)} />}
-      {deleteError && <p role="alert" className="jobs-field-error">{deleteError}</p>}
+      <Dialog open={confirmDelete} onClose={() => { if (!deleting) { setConfirmDelete(false); setDeleteError(null); } }} title={t("job.deleteConfirm")}
+        actions={<>
+          <button type="button" className="ui-btn ui-btn--quiet" disabled={deleting} onClick={() => { setConfirmDelete(false); setDeleteError(null); }}>{t("job.deleteCancel")}</button>
+          <button type="button" className="ui-btn ui-btn--danger" disabled={deleting} onClick={() => void remove()}>{t("job.delete")}</button>
+        </>}>
+        {query.data?.status === "ready" && (!score.isSuccess || score.data.tailored != null) && <p>{t("job.deleteTailored")}</p>}
+        {deleteError && <p role="alert" className="ui-notice ui-notice--bad">{deleteError}</p>}
+      </Dialog>
+      </div>
     </main>
   </AppShell>;
 }

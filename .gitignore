@@ -9,3 +9,6 @@ coverage/
 .dev.vars
 supabase/.temp/
 supabase/.branches/
+
+# Built by `npm run package -w @resumora/extension`
+apps/web/public/downloads/

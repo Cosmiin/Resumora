@@ -252,8 +252,9 @@ describe("job questions", () => {
       expect(got).toHaveLength(max);
       const sent = JSON.parse((model.requests.at(-1)!.messages as { content: string }[])[1]!.content);
       expect(sent.max).toBe(max);
-      if (nonFocus) expect(sent.focus).toBe(false);
-      else expect(sent).not.toHaveProperty("focus");
+      // Focus roles change the number of questions only; the model is not told which roles are in focus.
+      expect(sent).not.toHaveProperty("focus");
+      expect(sent.steering).not.toMatch(/lean/i);
       expect((await repo.getRun(runId))!.questions!.filter((question) => question.roleId === role.id)).toEqual(got);
       const calls = model.requests.length;
       expect(await questions(runId, "experience")).toEqual([]);
@@ -318,15 +319,18 @@ describe("job questions", () => {
     const messages = model.requests[0]!.messages as { content: string }[];
     const user = messages[1]!.content;
     const sent = JSON.parse(user);
-    expect(Object.keys(sent).sort()).toEqual(["answered", "focus", "gaps", "job", "language", "max", "role", "section", "steering"]);
+    expect(Object.keys(sent).sort()).toEqual(["answered", "cvLanguage", "gaps", "job", "max", "questionLanguage", "role", "rolePeriod", "section", "steering"]);
+    // When the role ran is spelled out, so a question can fit its years.
+    expect(sent.rolePeriod).toBe(b.current ? `${b.startDate} to today` : `${b.startDate} to ${b.endDate}`);
+    expect(messages[0]!.content).toContain("a role that ended in 2015 gets no question about AI-powered or prompt based tools");
     expect(sent.role).toMatchObject({ ...b, kind: kind === "experience" ? "role" : kind,
       notes: b.notes.map((note) => ({ ...note, period: "2001-01 – 2002-12" })) });
     expect((await cv.get()).content).toEqual(content);
-    expect(sent.language).toBe("ro");
+    expect(sent.cvLanguage).toBe("ro");
     expect(sent.section).toBe(section);
-    expect(sent).toMatchObject({ max: 2, focus: false });
+    expect(sent).toMatchObject({ max: 2 });
     expect(sent.answered).toEqual([{ question: b.notes[1]!.question, answer: b.notes[1]!.answer, period: "2001-01 – 2002-12" }]);
-    expect(sent.steering).toContain("They want to lean on other roles more than this one.");
+    expect(sent.steering).not.toMatch(/lean/i);
     expect(sent.gaps).toContainEqual(expect.objectContaining({ ref: "r1", status: "partial" }));
     expect(sent.gaps.every((gap: object) => !("evidence" in gap))).toBe(true);
     for (const other of [a, c]) {
@@ -334,10 +338,11 @@ describe("job questions", () => {
         expect(user).not.toContain(value);
       }
     }
-    expect(messages[0]!.content).toContain('Never mention another employer, role, project or "your previous roles".');
-    expect(messages[0]!.content).toContain("The role ran from its startDate to its endDate, or is current. Ask only about tools, methods and practices that fit that period and that kind of work. Skip a gap the role can't plausibly show; returning fewer questions, or none, is fine.");
-    expect(messages[0]!.content).toContain("Never add an option meaning other, something else or none of the above: the screen adds its own.");
-    expect(messages[0]!.content).toContain("For a role that isn't a focus role, ask only what helps its bullets show value for this job. Don't stretch; no question is fine.");
+    expect(messages[0]!.content).toContain("One role at a time.");
+    expect(messages[0]!.content).toContain('Do not mention another employer, role or project, and do not write "your previous roles" or "your other roles".');
+    expect(messages[0]!.content).toContain("\"rolePeriod\" says when the role ran. Read it before you write anything, and ask only about tools, methods and practices that were in ordinary use at work in those years and fit that work.");
+    expect(messages[0]!.content).toContain("Do not add an option meaning other, something else or none of the above");
+    expect(messages[0]!.content).not.toMatch(/focus role/i);
     await questions(runId, "skills");
     const skills = JSON.parse((model.requests[1]!.messages as { content: string }[])[1]!.content);
     expect(skills).not.toHaveProperty("role");

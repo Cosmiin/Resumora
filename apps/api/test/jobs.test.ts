@@ -129,6 +129,21 @@ describe("job endpoints", () => {
     expect(await memoryTailorRepo("user-a", scores).getScore(id, "base")).toBeNull();
   });
 
+  it("lists each job with its application status and the ad's own closed flag", async () => {
+    const open = await create();
+    clock = new Date(clock.getTime() + 1000);
+    const closed = await create({ ...body, url: "https://example.test/jobs/closed" });
+    await store.admin.finish(open, extracted);
+    await store.admin.finish(closed, { ...extracted, positionClosed: true });
+    expect((await patch(open, 1, extracted, { applicationStatus: "tailored" })).status).toBe(200);
+    const list = (await (await get()).json()) as JobListPage;
+    expect(list.items.map(({ id, applicationStatus, positionClosed }) => ({ id, applicationStatus, positionClosed }))).toEqual([
+      { id: closed, applicationStatus: "saved", positionClosed: true },
+      { id: open, applicationStatus: "tailored", positionClosed: false },
+    ]);
+    listFields(list);
+  });
+
   it("round-trips application status and preserves it when omitted", async () => {
     const id = await create();
     await store.admin.finish(id, extracted);
@@ -163,6 +178,13 @@ describe("job endpoints", () => {
     expect(result).toEqual({ id: expect.any(String) });
     expect(sent).toEqual([{ jobId: result.id, userId: "user-a" }]);
     expect(store.rows.get(result.id)).toMatchObject({ status: "queued", source: "extension", rawText: body.pageText, jsonLd: null });
+  });
+
+  it("labels a job sent by the web app as a link", async () => {
+    const res = await post({ ...body, source: "link" });
+    expect(res.status).toBe(202);
+    const result = (await res.json()) as { id: string };
+    expect(store.rows.get(result.id)).toMatchObject({ source: "link" });
   });
 
   it("trims page text, caps stored text, and selects the JobPosting", async () => {
@@ -266,6 +288,18 @@ describe("job endpoints", () => {
     await error(await patch(other), 404, "not_found");
     await error(await remove(other), 404, "not_found");
     expect(store.rows.has(other)).toBe(true);
+  });
+
+  it("lists only the jobs that came from one source when asked", async () => {
+    const byHand = ((await (await post({ ...body, source: "link" })).json()) as { id: string }).id;
+    clock = new Date(clock.getTime() + 1000);
+    const fromExtension = await create({ ...body, url: "https://example.test/jobs/from-extension" });
+    const request = (query: string) => app.request(`/v1/jobs?${query}`, { headers: { authorization: "Bearer token-a" } });
+    const extension = await (await request("limit=1&source=extension")).json() as JobListPage;
+    expect(extension.items.map((job) => job.id)).toEqual([fromExtension]);
+    const link = await (await request("source=link")).json() as JobListPage;
+    expect(link.items.map((job) => job.id)).toEqual([byHand]);
+    expect((await request("source=email")).status).toBe(400);
   });
 
   it("follows list cursors and keeps other users and private fields off every page", async () => {

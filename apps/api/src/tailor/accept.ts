@@ -13,7 +13,7 @@ import { scoreMatch } from "./score.ts";
 import { currentRole, lightList, sectionItems } from "./section-pass.ts";
 import { jobNotFound } from "./start.ts";
 
-/** `text`: a summary guess's edited wording (its item id is "summary#<n>"). */
+/** `text`: a summary guess's edited wording (its item id is "summary#<n>"), or a kept line the person reworded. */
 const Choice = z.object({ itemId: z.string(), keep: z.boolean(), text: z.string().trim().min(1).max(MAX_TEXT).optional() });
 export const AcceptBodySchema = z.object({
   decisions: z.array(Choice).max(500).default([]),
@@ -117,6 +117,9 @@ export async function acceptSection(
   const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));
   const inferred = new Map(body.inferred.map((d) => [d.itemId, d.keep]));
+  // A kept line the person reworded on the review (a bullet, a description, the summary). Never a flagged one:
+  // its confirmation is recorded with the wording that was checked.
+  const reworded = new Map(body.decisions.flatMap((d) => (d.keep && d.text !== undefined ? [[d.itemId, d.text] as const] : [])));
   const guessChoices = new Map(body.inferred.map((d) => [d.itemId, d.text === undefined ? { keep: d.keep } : { keep: d.keep, text: d.text }]));
   const flags = new Map(body.flags.map((f) => [f.questionId, f.confirmed]));
   const state: Record<string, ItemReview> = {};
@@ -137,6 +140,10 @@ export async function acceptSection(
       keep = p.inferred ? inferred.get(key) ?? decisions.get(key) : decisions.get(key);
     }
     let applied = p;
+    const own = reworded.get(key);
+    if (own !== undefined && keep && !p.flags.length && !p.guesses?.length && (p.field === "text" || p.field === "description" || p.itemId === "summary")) {
+      applied = { ...p, text: own };
+    }
     if (p.guesses?.length && (keep ?? true)) {
       // Each summary guess is its own item: removed, edited, or left undecided (kept, unreviewed).
       const choices = p.guesses.map((_, i) => guessChoices.get(`${key}#${i}`));

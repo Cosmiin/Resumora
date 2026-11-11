@@ -3,6 +3,7 @@ import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
 import { improveBulletSystemPrompt, improveBulletUserMessage } from "./focus-prompts.ts";
+import { questionLanguageReminder } from "./prompts.ts";
 import { checkProposal, squash } from "./rewrite.ts";
 import { aiError, gradeBullets, scoreRole, type ScoreDeps } from "./score.ts";
 
@@ -32,8 +33,8 @@ export async function improveBullet(
       userId: deps.userId,
       task: "enrich_improve_bullet",
       schema: ImproveSchema,
-      system: improveBulletSystemPrompt(content.locale),
-      user: improveBulletUserMessage(role, input.bulletId),
+      system: improveBulletSystemPrompt(content.locale, deps.questionLanguage),
+      user: improveBulletUserMessage(role, input.bulletId) + questionLanguageReminder(content.locale, deps.questionLanguage),
       maxOutputTokens: 600,
     };
     let answer = await callModel(deps.model, request);
@@ -65,7 +66,8 @@ export async function improveBullet(
     ] };
     const graded = await gradeBullets(deps, gradingRole, content.locale, [input.bulletId]);
     if (graded[0]!.duplicateOf !== null || graded[0]!.meaningful === false) return { needsDetail: true, nextQuestion };
-    const predicted = mergeGrades(swapped, before, graded, fingerprint(swapped, content.locale));
+    // The prediction keeps the language its questions were written in, so the next score request can reuse it.
+    const predicted = { ...mergeGrades(swapped, before, graded, fingerprint(swapped, content.locale)), questionLanguage: deps.questionLanguage ?? content.locale };
     const bulletBefore = before.bullets.find((b) => b.id === input.bulletId)!.score;
     const after = predicted.bullets.find((b) => b.id === input.bulletId)!.score;
     if (after <= bulletBefore) return { needsDetail: true, nextQuestion };

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Experience, Note } from "./cv.ts";
-import { buildRoleResult, EnrichParseError, hashText, type ModelBullet, type RoleResult } from "./enrich.ts";
+import { buildRoleResult, EnrichParseError, hashText, modelMarks, type ModelBullet, type RoleResult } from "./enrich.ts";
 
 export const BRAIN_DUMP_QUESTION = "What did a normal week here look like?";
 export const MAX_PENDING = 5;
@@ -27,6 +27,7 @@ export function mergeGrades(
       clarity: old.clarity,
       specificity: old.specificity,
       impact: old.impact,
+      concise: old.concise,
       issue: old.issue,
       duplicateOf: old.issue === "duplicate" ? role.bullets[0]!.id : null,
       tip: old.tip,
@@ -35,7 +36,8 @@ export function mergeGrades(
     };
   });
   return {
-    ...buildRoleResult(role, { bullets, nextStepId: stored?.nextStep?.bulletId ?? null }, fingerprintValue),
+    // The role-wide marks are kept from the stored result: grading one bullet again does not re-read the role.
+    ...buildRoleResult(role, { bullets, nextStepId: stored?.nextStep?.bulletId ?? null, coverage: stored?.coverage ? modelMarks(stored.coverage) : undefined }, fingerprintValue),
     roleQuestions: stored?.roleQuestions ?? [],
     thin: role.bullets.length <= 1 || (stored?.thin ?? false),
   };

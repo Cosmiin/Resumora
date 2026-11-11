@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
-import { ItemLinesBodySchema, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
+import { ItemLinesBodySchema, MAX_FOCUS, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
 import { z } from "zod";
 import type { AppEnv } from "../app.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -26,8 +26,12 @@ const RoleBody = z.object({ roleId: z.string().min(1).max(64) });
 
 const ScoreBody = z.object({ roleId: z.string().min(1).max(64), fingerprint: z.string().min(1).max(64) });
 const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
-/** fresh: ask the model again with the notes in view, instead of returning the stored result. */
-const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional() });
+/**
+ * fresh: ask the model again with the notes in view, instead of returning the stored result.
+ * focus: what the person wants their CV to bring out; the model is asked again with it in view.
+ * more: every earlier question is answered; the model is asked for more, each with options to pick.
+ */
+const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), focus: z.string().trim().max(MAX_FOCUS).optional(), more: z.boolean().optional() });
 const BrainDumpBody = ScoreBody.extend({ source: z.enum(["ramble", "answers"]).default("ramble") });
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */
@@ -57,7 +61,7 @@ export function enrichRoutes(deps: {
     if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
     const user = c.get("user");
     const result = await scoreRole(
-      { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+      { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
       body.data,
     );
     return c.json(result);
@@ -69,7 +73,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       const result = await improveBullet(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       );
       return c.json(result);
@@ -87,7 +91,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       return c.json(await brainDump(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));
     } catch (err) {
@@ -116,7 +120,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       return c.json(await roleDescription(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));
     } catch (err) {
@@ -133,7 +137,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       return c.json(await itemLines(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));
     } catch (err) {
@@ -150,7 +154,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       return c.json(await roleFacts(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));
     } catch (err) {

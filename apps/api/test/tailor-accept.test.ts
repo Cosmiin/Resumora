@@ -168,6 +168,21 @@ describe("accept section", () => {
     expect(model.logged.at(-1)?.task).toBe("tailor_score");
   });
 
+  it("writes a kept line with the person's own rewording, and ignores a rewording on a line they did not keep", async () => {
+    const runId = await start();
+    await run(runId, "experience", reword(first.id, "Ran accurate payroll for 40 staff"), reword(second.id, "Filed payroll taxes"));
+    const res = await accept(runId, "experience", { decisions: [
+      { itemId: first.id, keep: true, text: "  Ran payroll for 40 staff, always on time  " },
+      { itemId: second.id, keep: false, text: "Filed every payroll tax" },
+    ] });
+    expect(res.status).toBe(200);
+    const doc = tailored();
+    expect(doc.content.experience[0]!.bullets.map((b) => b.text)).toEqual(["Ran payroll for 40 staff, always on time", "Filed taxes"]);
+    expect(doc.review).toMatchObject({ experience: {
+      [first.id]: { kept: true, reviewed: true, text: "Ran payroll for 40 staff, always on time" }, [second.id]: { kept: false },
+    } });
+  });
+
   it("never writes a flagged proposal: the item keeps its Base wording and no flag question exists", async () => {
     const runId = await start();
     const title = reword(role.id, "Payroll Lead", { field: "title" });

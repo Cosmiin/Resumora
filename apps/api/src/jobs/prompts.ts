@@ -1,4 +1,4 @@
-export const JOB_PROMPT_VERSION = "job.v3";
+export const JOB_PROMPT_VERSION = "job.v4";
 
 export const jobExtractPrompt = `Copy facts from the page. Never invent a company, salary, date or requirement.
 Use unknown or null when the page doesn't say.
@@ -11,6 +11,7 @@ summary: at most two sentences: what the company is or does, and what the role i
 requirements: one requirement per item, a short line (aim for under 10 words); keep the ad's exact terms for tools, methods, degrees and languages, because they are ATS keywords ("BPMN", "Power BI", "Fluent English"). No duplicates.
 responsibilities: short phrases starting with a verb, no duplicates, nothing already listed as a requirement.
 benefits: short phrases ("Private medical care"), no duplicates.
+keywords: the 8 to 20 terms an applicant tracking system (ATS) would most likely scan a CV for in this job, most important first: tools, software, methods, standards, certifications, hard skills, domain terms, and the role's own name. Copy each exactly as the page writes it, 1 to 4 words ("Power BI", "process mapping", "SOP"). Only terms the page itself uses. No soft filler ("team player", "motivated"), no benefits, no company names, no duplicates.
 Ignore page chrome: navigation, cookie banners, "similar jobs", ads.
 If a JSON-LD JobPosting is given, trust it for title, company, location, salary and dates, and use the text for the rest.
 If the page says the position is closed or no longer accepting applications ("This position is no longer open for recruitment"), it is still a job posting: set isJobPosting: true and positionClosed: true. Otherwise set positionClosed: false.

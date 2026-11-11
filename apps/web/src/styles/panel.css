@@ -3,7 +3,7 @@
 .panel :is(.tips, .toggle, .box-title, .sort-row, .add-sec select, .ai button, .role-open) { font-size: 14px; }
 .panel .role-open { padding: 10px; }
 .panel-overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
-.p-h { font-family: var(--font-display); font-size: 20px; font-weight: 500; margin: 0; color: var(--pine-800); }
+.p-h { font-family: var(--old-font-display); font-size: 20px; font-weight: 500; margin: 0; color: var(--pine-800); }
 .p-sub { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sage-600); margin: 0 0 8px; }
 .health { display: grid; gap: 8px; }
 .flag { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rose-200); background: var(--rose-50); }
@@ -21,6 +21,9 @@
 .sec-row:hover { background: var(--sage-50); }
 .sec-row .drag-grip { position: static; opacity: 1; flex: none; }
 .sec-row .name { flex: 1; min-width: 0; font-size: 14px; }
+.sec-row .sec-jump { min-height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.sec-row .sec-jump:hover { text-decoration: underline; }
+.sec-row .sec-jump:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
 .sec-row .name.off { color: var(--sage-500); text-decoration: line-through; text-decoration-color: var(--sage-300); }
 .sec-row .badge { font-size: 11px; color: var(--sage-500); margin-inline-end: 4px; }
 .sec-row.is-dragging { background: var(--surface-card); }

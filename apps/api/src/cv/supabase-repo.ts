@@ -98,6 +98,12 @@ export function supabaseCvRepo(env: SupabaseEnv, user: AuthUser): CvRepo {
       return rows.length ? toSaveResult(rows) : null;
     },
 
+    async clearHistory() {
+      // RLS limits this to the caller's own rows; the filter is only there because a delete needs one.
+      const { error } = await db.from("base_cv_versions").delete().not("id", "is", null);
+      if (error) throw new Error(`base_cv_versions delete failed: ${error.message}`);
+    },
+
     async snapshot(reason) {
       const { error } = await db.rpc("snapshot_base_cv", { p_reason: reason });
       if (error) throw new Error(`snapshot_base_cv failed: ${error.message}`);

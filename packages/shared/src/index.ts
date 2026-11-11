@@ -14,6 +14,7 @@ export * from "./notes.ts";
 export * from "./enrich-stream.ts";
 export * from "./jobs.ts";
 export * from "./tailor.ts";
+export * from "./account.ts";
 export * from "./role-description.ts";
 export type { Flag } from "./flags.ts";
 export type { Flag as TailorFlag } from "./tailor.ts";

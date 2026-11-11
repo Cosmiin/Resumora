@@ -71,7 +71,7 @@ describe("score card", () => {
     card(ready());
     expect(screen.getByText("62")).toBeInTheDocument();
     expect(screen.getByText("A good start")).toBeInTheDocument();
-    expect(screen.getByText("3 of 5 bullets clear")).toBeInTheDocument();
+    expect(screen.getByText("2 of 5 bullets clear")).toBeInTheDocument();
   });
 
   it("shows at most two tips: the next step, then the first format tip", () => {
@@ -181,19 +181,19 @@ const cvOf = (...roles: Experience[]): CvContent => ({
 describe("weak bullet markers", () => {
   const scores = new Map([["r1", ready()]]);
 
-  it("appear only on bullets below 75, and only while the role's tools are open", async () => {
+  it("appear only on bullets below 80, and only while the role's tools are open", async () => {
     render(<Harness initial={cvOf(role())} scores={scores} />);
     expect(screen.queryAllByRole("button", { name: "Weak bullet" })).toHaveLength(0);
     await userEvent.click(screen.getByRole("textbox", { name: "Role title" }));
     const marks = screen.getAllByRole("button", { name: "Weak bullet" });
-    expect(marks).toHaveLength(2); // 30 and 40; 76 is clear
+    expect(marks).toHaveLength(3); // 30, 76 and 40: a bullet is clear from 80
     expect(marks[0]).toHaveAttribute("title", "Name the tasks you did.");
-    expect(marks[1]).toHaveAttribute("title", "Name the tool, system, client or task so a reader can picture it.");
+    expect(marks[2]).toHaveAttribute("title", "Name the tool, system, client or task so a reader can picture it.");
     const described = document.getElementById(marks[0]!.getAttribute("aria-describedby")!);
     expect(described).toHaveTextContent("Name the tasks you did.");
     expect(marks[0]).toHaveClass("weak-mark");
     expect(marks[0]).not.toHaveClass("mid"); // 30 is below 40
-    expect(marks[1]).toHaveClass("mid"); // 40 is mid
+    expect(marks[2]).toHaveClass("mid"); // 40 is mid
     await userEvent.click(screen.getByRole("button", { name: "← All sections" }));
     expect(screen.queryAllByRole("button", { name: "Weak bullet" })).toHaveLength(0);
   });

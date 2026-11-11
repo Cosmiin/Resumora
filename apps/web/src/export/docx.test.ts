@@ -166,7 +166,7 @@ describe("buildCvDocx", () => {
     content.custom = [{ id: "o", title: "Community involvement", details: "Organised local meetups." }];
     const xml = await documentXml(await buildCvDocx(CvContentSchema.parse(content), "compact"));
     for (const text of [
-      "Won ten customers.", "Technical: TypeScript", "Professional: Team leadership", "Romanian", "Native",
+      "Won ten customers.", "Technical: TypeScript", "Professional: Team leadership", "Romanian (Native)",
       "Cloud certification", "Cloud Institute", "Public project", "https://project.example.com",
       "Open source toolkit.", "Used by 40 teams.", "Volunteer mentor", "Community award", "Local council",
       "Recognised for mentoring.", "Architecture course", "Learning Institute", "Event-driven design", "Cost modelling", "Crossed the Fagaras ridge", "Chess", "Engineering article",

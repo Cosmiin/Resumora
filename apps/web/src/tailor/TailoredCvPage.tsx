@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { SectionKey, TailoredCv, TailorSection } from "@resumora/shared";
@@ -10,11 +10,9 @@ import { t } from "../i18n/t.ts";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { Editor, type CvSource } from "../cv/Editor.tsx";
-import { getScores } from "./tailor-api.ts";
-import { getTailored, listTailored, retailor, saveTailored, setTemplate } from "./tailored-api.ts";
-import type { TemplateId } from "../cv/page/templates.ts";
+import { getTailored, listTailored, retailor, saveTailored } from "./tailored-api.ts";
+import { getTemplate } from "../cv/page/templates.ts";
 import { LanguageMenu, TailorToolbar, type TailoredTab } from "./TailorToolbar.tsx";
-import { ExportMenu } from "../export/ExportMenu.tsx";
 import { GuidedReview } from "./GuidedReview.tsx";
 import "../styles/tailor.css";
 
@@ -64,14 +62,10 @@ export function TailoredCvPage() {
     staleTime: Infinity,
     gcTime: 0,
   });
-  const scores = useQuery({ queryKey: ["tailored-scores", userId, jobId], queryFn: () => getScores(jobId) });
-  // The done screen's links: ?tab=letter opens the cover letter, ?export=1 the Export menu.
+  // ?tab=letter opens the cover letter.
   const [tab, setTab] = useState<TailoredTab>(search.get("tab") === "letter" ? "letter" : "cv");
   // GuideA: the guided review of the AI guesses (?review=1 from the done screen, or the Export menu's Review).
   const [guiding, setGuiding] = useState(search.get("review") === "1");
-  // The Export menu opens on arrival (?export=1) or from the guided review's Export, never after Review or Stop.
-  const [openExport, setOpenExport] = useState(search.get("export") === "1");
-  const [exportKey, setExportKey] = useState(0);
   // Letters written or edited since each copy's row was loaded (switching tabs doesn't refetch the row).
   const [letters, setLetters] = useState<Record<string, LetterOverride>>({});
   const cv = doc.data ?? null;
@@ -87,27 +81,6 @@ export function TailoredCvPage() {
   // "Tailor again" on the job page opens this page with the Re-tailor dialog already open.
   const [dialog, setDialog] = useState(search.get("retailor") === "1");
   const [retailoring, setRetailoring] = useState<{ busy: boolean; error: boolean }>({ busy: false, error: false });
-  // Templates picked since each copy's row was loaded; saves run one at a time, so the newest pick lands last.
-  const [templates, setTemplates] = useState<Record<string, TemplateId>>({});
-  const [templateError, setTemplateError] = useState(false);
-  const templateSaves = useRef<Promise<unknown>>(Promise.resolve());
-  const templatePick = useRef(0);
-  const savedTemplates = useRef<Record<string, TemplateId>>({});
-
-  /** Switches the page at once and saves the pick; a failed newest save goes back to the last template the server took. */
-  function pickTemplate(id: string, loaded: TemplateId, next: TemplateId) {
-    const pick = ++templatePick.current;
-    setTemplateError(false);
-    setTemplates((all) => ({ ...all, [id]: next }));
-    const save = templateSaves.current.then(() => setTemplate(id, next)).then(() => { savedTemplates.current[id] = next; });
-    templateSaves.current = save.catch(() => {});
-    save.catch(() => {
-      if (pick !== templatePick.current) return;
-      setTemplates((all) => ({ ...all, [id]: savedTemplates.current[id] ?? loaded }));
-      setTemplateError(true);
-    });
-  }
-
   /** Starts a run over the picked sections and hands it to the tailoring flow, which resumes the remembered run. */
   async function startRetailor(sections: TailorSection[]) {
     if (!tailoredId || retailoring.busy) return;
@@ -123,38 +96,39 @@ export function TailoredCvPage() {
   }
 
   if (doc.isPending) {
-    return <AppShell><p className="page-loading">{t("app.loading")}</p></AppShell>;
+    return <AppShell><main className="ui-page"><div className="ui-wrap ui-main"><p role="status">{t("app.loading")}</p></div></main></AppShell>;
   }
   if (doc.isError || !cv || !source) {
     return (
       <AppShell>
-        <main className="page-error">
-          <p role="alert">{t(doc.isError ? "tailored.loadError" : "tailored.none")}</p>
-          {doc.isError && <button type="button" onClick={() => doc.refetch()}>{t("tailor.retry")}</button>}
-          <Link to={`/jobs/${encodeURIComponent(jobId)}`}>{t("tailored.toJob")}</Link>
-        </main>
+        <main className="ui-page"><div className="ui-wrap ui-main ui-stack">
+          <p role="alert" className="ui-notice ui-notice--bad">{t(doc.isError ? "tailored.loadError" : "tailored.none")}</p>
+          <p className="ui-row">
+            {doc.isError && <button type="button" className="ui-btn" onClick={() => void doc.refetch()}>{t("tailor.retry")}</button>}
+            <Link className="ui-btn ui-btn--quiet" to={`/jobs/${encodeURIComponent(jobId)}`}>{t("tailored.toJob")}</Link>
+          </p>
+        </div></main>
       </AppShell>
     );
   }
 
   // updatedAt moves only on the user's own extraction edits (thoughts and status saves leave it).
   const jobChanged = !!job.data?.editedByUser && Date.parse(job.data.updatedAt) > Date.parse(cv.createdAt);
-  const template = templates[cv.id] ?? cv.template;
+  const template = getTemplate(cv.template).id;
+  const page = `/jobs/${encodeURIComponent(jobId)}/cv`;
+  const query = `?cv=${encodeURIComponent(cv.id)}`;
+  const links = { template: `${page}/template${query}`, export: `${page}/export${query}` };
   const openDialog = () => { setRetailoring({ busy: false, error: false }); setDialog(true); };
   const toolbar = (
     <>
-      <TailorToolbar tab={tab} onTab={setTab} base={scores.data?.base ?? null} latest={cv.score ?? scores.data?.tailored ?? null}
-        template={template} onTemplate={(next) => pickTemplate(cv.id, cv.template, next)}>
+      <TailorToolbar tab={tab} onTab={setTab} template={template} links={links}>
         <LanguageMenu key={cv.id} jobId={jobId} current={{ id: cv.id, language: cv.language }} />
-        <button type="button" className="secondary" onClick={openDialog}>{t("tailored.retailor")}</button>
-        <ExportMenu key={exportKey} load={() => getTailored(cv.id)} job={job.data?.extracted ?? null} template={template}
-          startOpen={openExport} onReview={() => { setOpenExport(false); setTab("cv"); setGuiding(true); }} />
+        <button type="button" className="ui-btn ui-btn--sm" onClick={openDialog}>{t("tailored.retailor")}</button>
       </TailorToolbar>
-      {templateError && <p role="alert" className="form-error">{t("tailored.templateError")}</p>}
       {jobChanged && (
-        <p className="tailored-notice" role="status">
+        <p className="ui-notice tailored-notice" role="status">
           <span>{t("tailored.jobChanged")}</span>{" "}
-          <button type="button" className="link" onClick={openDialog}>{t("tailored.jobChangedAction")}</button>
+          <button type="button" className="ui-btn ui-btn--sm" onClick={openDialog}>{t("tailored.jobChangedAction")}</button>
         </p>
       )}
       {dialog && <RetailorDialog busy={retailoring.busy} error={retailoring.error}
@@ -164,8 +138,7 @@ export function TailoredCvPage() {
   // The guided review saved its own versions: reload the row, and the editor starts again from it.
   const closeGuide = (exporting: boolean) => {
     setGuiding(false);
-    setOpenExport(exporting);
-    if (exporting) setExportKey((n) => n + 1);
+    if (exporting) return void navigate(links.export);
     void doc.refetch();
   };
   const sectionAction = (key: SectionKey) => {

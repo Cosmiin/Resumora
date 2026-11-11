@@ -54,19 +54,19 @@ function Host({ cv = start }: { cv?: CvContent }) {
 
 async function openFirst() {
   render(<Host />);
-  await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+  await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 }
 
 describe("lighter stops in the path (3B)", () => {
   it("visits each course with no lines: the box, then the picks; Add 2 adds exactly 2 lines under that course", async () => {
     api.itemLines.mockResolvedValue({ lines: ["Built pivot tables for sales.", "Made a monthly dashboard.", "Cleaned raw exports."] });
     await openFirst();
-    expect(screen.getByText("Courses & training · 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Courses & training, 1 of 2")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tell us about Excel for analysts" })).toBeInTheDocument();
-    expect(screen.getByText("Tell us more · no wrong answers")).toBeInTheDocument();
-    expect(screen.getByText("Excel for analysts")).toBeInTheDocument();
+    expect(screen.getByText("Tell us more. There are no wrong answers.")).toBeInTheDocument();
+    expect(screen.getAllByText("Excel for analysts").length).toBeGreaterThan(0);
     await userEvent.type(screen.getByRole("textbox"), "Pivot tables and a dashboard");
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(api.itemLines).toHaveBeenCalledWith({ section: "courses", itemId: "c1", text: "Pivot tables and a dashboard" });
     expect(await screen.findByRole("heading", { name: "Pick the ones that are true" })).toBeInTheDocument();
     const boxes = screen.getAllByRole("checkbox");
@@ -78,7 +78,7 @@ describe("lighter stops in the path (3B)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add 2 lines" }));
     expect(latest.courses[0]!.bullets?.map((b) => b.text)).toEqual(["Built pivot tables for sales.", "Cleaned raw exports."]);
     expect(latest.courses[1]!.bullets).toBeUndefined();
-    expect(screen.getByText("Courses & training · 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Courses & training, 2 of 2")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tell us about SQL basics" })).toBeInTheDocument();
   });
 
@@ -95,7 +95,7 @@ describe("lighter stops in the path (3B)", () => {
     api.itemLines.mockResolvedValue({ lines: [] });
     await openFirst();
     await userEvent.type(screen.getByRole("textbox"), "Not much to say");
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByRole("heading", { name: "Tell us about SQL basics" })).toBeInTheDocument();
     expect(latest.courses[0]!.bullets).toBeUndefined();
   });
@@ -104,11 +104,11 @@ describe("lighter stops in the path (3B)", () => {
     api.itemLines.mockResolvedValue({ lines: ["Built pivot tables for sales."] });
     await openFirst();
     await userEvent.type(screen.getByRole("textbox"), "Pivot tables");
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByRole("heading", { name: "Pick the ones that are true" });
-    await userEvent.click(screen.getByRole("button", { name: "← Back" }));
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByRole("textbox")).toHaveValue("Pivot tables");
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
     expect(latest.courses[0]!.bullets).toBeUndefined();
     expect(screen.getByRole("heading", { name: "Tell us about SQL basics" })).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("lighter stops in the path (3B)", () => {
     api.itemLines.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce({ lines: ["Built pivot tables for sales."] });
     await openFirst();
     await userEvent.type(screen.getByRole("textbox"), "Pivot tables");
-    await userEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("heading", { name: "Pick the ones that are true" })).toBeInTheDocument();
     expect(api.itemLines).toHaveBeenCalledTimes(2);

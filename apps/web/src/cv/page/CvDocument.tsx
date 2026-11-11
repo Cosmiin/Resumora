@@ -140,14 +140,17 @@ export function CvDocument({ content: cv, showUnsorted, template = "classic", hi
     languages: section(
         "languages",
         cv.languages.length > 0,
-        <div className="cv-inline-items">
-          {cv.languages.map((lang) => (
-            <Block key={lang.id}>
-              {itemTitle(lang.name, mark(lang.id, "cv-item-title"))}
-              {lang.level && <span className="cv-item-sub"> {lang.level}</span>}
-            </Block>
-          ))}
-        </div>,
+        <Block>
+          <span className="cv-langs">
+            {cv.languages.map((lang, i) => (
+              <Fragment key={lang.id}>
+                {i > 0 && <span className="sep" aria-hidden="true"> · </span>}
+                {itemTitle(lang.name, mark(lang.id, "cv-item-title"))}
+                {lang.level.trim() && <span className="cv-item-sub"> ({lang.level.trim()})</span>}
+              </Fragment>
+            ))}
+          </span>
+        </Block>,
     ),
 
     certifications: section(

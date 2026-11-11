@@ -29,7 +29,7 @@ describe("ExpQA / SkillsA1: the question screen", () => {
   const skill: TailorQuestion = { id: "q2", section: "skills", roleId: null, text: "Do you know SQL?", kind: "skill",
     options: ["Yes", "A little", "No"], reason: "Gap", skill: "SQL" };
   const card = (over: Partial<React.ComponentProps<typeof QuestionCard>> = {}) =>
-    render(<QuestionCard question={question} progress="Role 1 of 2 · Question 1 of 2" onNext={vi.fn()} onSkip={vi.fn()}
+    render(<QuestionCard question={question} progress="Role 1 of 2 · Question 1 of 2" index={0} total={2} onNext={vi.fn()} onSkip={vi.fn()}
       role={cv.experience[0]} locale="en" {...over} />);
 
   it("shows the role's title, company, dates, description and bullets beside the question", () => {

@@ -24,6 +24,8 @@ export const JobExtractionSchema = z.object({
   applyBy: z.iso.date().nullable(),
   isJobPosting: z.boolean(),
   positionClosed: z.boolean().optional(),
+  /** The terms a screening system (ATS) would most likely look for, copied from the ad. Absent on jobs read before job.v4. */
+  keywords: z.array(z.string().max(80)).max(30).optional(),
 });
 export type JobExtraction = z.infer<typeof JobExtractionSchema>;
 
@@ -42,6 +44,8 @@ export const CreateJobBodySchema = z.object({
   url: z.url({ protocol: /^https?$/ }).max(2048),
   pageText: z.string().trim().min(200).max(60000).optional(),
   jsonLd: z.array(z.unknown()).max(20).optional(),
+  /** Who is sending the page: the web app sends "link"; the extension sends nothing. */
+  source: JobSourceSchema.optional(),
 });
 export type CreateJobBody = z.infer<typeof CreateJobBodySchema>;
 
@@ -57,6 +61,8 @@ export type JobPatch = z.infer<typeof JobPatchSchema>;
 export const JobListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().max(200).optional(),
+  /** Only jobs that arrived this way. */
+  source: JobSourceSchema.optional(),
 });
 export type JobListQuery = z.infer<typeof JobListQuerySchema>;
 
@@ -70,6 +76,10 @@ export const JobListItemSchema = z.object({
   source: JobSourceSchema,
   url: z.string(),
   createdAt: z.string(),
+  /** Where the person is with this job; the list shows "CV tailored" from it. */
+  applicationStatus: applicationStatus.optional(),
+  /** True when the ad itself says the position is no longer open. */
+  positionClosed: z.boolean().optional(),
 });
 export type JobListItem = z.infer<typeof JobListItemSchema>;
 
