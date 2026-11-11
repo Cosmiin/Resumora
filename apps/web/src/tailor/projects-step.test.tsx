@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { emptyCv, TAILOR_SECTIONS, type MatchScore, type TailorQuestion, type TailorRun } from "@resumora/shared";
@@ -62,7 +62,7 @@ describe("Projects & volunteering step", () => {
     expect(await screen.findByText("Project 1 of 1 · Question 1 of 1")).toBeInTheDocument();
     expect(askQuestions).toHaveBeenLastCalledWith("run1", "projects", "p1");
     expect(screen.getByText("The project, as it is on your CV now")).toBeInTheDocument();
-    expect(screen.getByText("Payroll checker")).toBeInTheDocument();
+    expect(within(screen.getByRole("complementary")).getByText("Payroll checker")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Skip this project" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Skip" }));
@@ -73,7 +73,8 @@ describe("Projects & volunteering step", () => {
     await user.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "projects", expect.objectContaining({ roleId: "p1" }));
 
-    // Straight on to the next item: no screen in between.
+    // The project ends on its score; Next goes on to the next item.
+    await user.click(await screen.findByRole("button", { name: /^Next: / }));
     expect(await screen.findByText("Volunteering 1 of 1 · Question 1 of 1")).toBeInTheDocument();
     expect(askQuestions).toHaveBeenLastCalledWith("run1", "projects", "v1");
     expect(screen.getByText("The volunteering role, as it is on your CV now")).toBeInTheDocument();

@@ -11,6 +11,8 @@ type Props = {
   jobId: string; docId: string | null; base: MatchScore | null; final: MatchScore | null; job: JobExtraction | null;
   /** Opens the finished roles, to change an answer; absent when there is nothing to go back to. */
   onAnswers?(): void;
+  /** The points each stop added in this visit, for "Where the points came from". */
+  gains?: { name: string; points: number }[];
 };
 
 /** The job's must-haves in ad order, each with whether the tailored CV fully shows it. */
@@ -21,12 +23,11 @@ export function mustHaves(final: MatchScore | null, job: JobExtraction | null): 
 }
 
 /**
- * The last step: how the tailored CV stands on the ad's keywords and must-haves. A must-have the CV does not
- * show is named, and the CV can still be marked as ready. Then: where to go next.
+ * The result: the match before and after, what moved it, how the tailored CV stands on the ad's keywords and
+ * must-haves (one it does not show is named), and where to go next.
  */
-export function DoneScreen({ jobId, docId, base, final, job, onAnswers }: Props) {
+export function DoneScreen({ jobId, docId, base, final, job, onAnswers, gains = [] }: Props) {
   const [unchecked, setUnchecked] = useState(0);
-  const [ready, setReady] = useState(false);
   useEffect(() => {
     if (!docId) return;
     let live = true;
@@ -43,23 +44,35 @@ export function DoneScreen({ jobId, docId, base, final, job, onAnswers }: Props)
   const before = keywordsOf(base);
   const total = now.has.length + now.missing.length;
 
-  if (ready) {
-    return <section className="ui-stack tailor-narrow">
-      <h1 className="ui-title">{t("tailor.finish.readyTitle")}</h1>
-      <p className="ui-notice ui-notice--good" role="status">{t("tailor.finish.ready")}</p>
-      <p className="ui-coach">{t("tailor.finish.readyNext")}</p>
-      <nav aria-label={t("tailor.done.next")} className="ui-row">
-        <Link className="ui-btn ui-btn--primary" to={`/jobs/${encodeURIComponent(jobId)}/cv/template${query}`}>{t("cvs.template.title")}</Link>
-        <Link className="ui-btn" to={page}>{t("tailor.finish.open")}</Link>
-        <Link className="ui-btn ui-btn--quiet" to={to("tab=letter")}>{t("tailor.done.letter")}</Link>
-      </nav>
-    </section>;
-  }
+  const mustsBefore = mustHaves(base, job).filter((must) => must.met).length;
+  const diff = (final?.total ?? 0) - (base?.total ?? final?.total ?? 0);
+  const most = Math.max(1, ...gains.map((gain) => gain.points));
 
-  return <section className="tailor-narrow">
+  return <section className="tailor-result">
     <h1 className="ui-title">{musts.length === 0 ? t("tailor.finish.titlePlain")
       : open === 0 ? t("tailor.finish.titleMet") : t(open === 1 ? "tailor.finish.titleOpenOne" : "tailor.finish.titleOpenMany", { n: open })}</h1>
     <p className="ui-lead">{musts.length === 0 ? t("tailor.finish.leadPlain") : t(open === 0 ? "tailor.finish.leadMet" : "tailor.finish.leadOpen")}</p>
+    {final && <div className="tailor-result-cards">
+      <div className="ui-sheet tailor-result-card">
+        <p className="ui-label">{t("tailor.result.match")}</p>
+        <p className="tailor-bigscore">
+          {base && diff !== 0 ? <><s>{base.total}</s> <span aria-hidden="true">→</span> <b className={diff > 0 ? "is-up" : undefined}>{final.total}</b></> : <b>{final.total}</b>}
+        </p>
+        {base && <p>{diff === 0 ? t("tailor.result.same") : t(diff === 1 ? "tailor.result.betterOne" : diff > 0 ? "tailor.result.better" : diff === -1 ? "tailor.result.lowerOne" : "tailor.result.lower", { n: Math.abs(diff) })}</p>}
+      </div>
+      {base && (total > 0 || musts.length > 0) && <div className="ui-sheet tailor-result-card">
+        <p className="ui-label">{t("tailor.result.moved")}</p>
+        <ul>
+          {total > 0 && <li>{t("tailor.result.keywords", { a: before.has.length, b: now.has.length, total })}</li>}
+          {musts.length > 0 && <li>{t("tailor.result.musts", { a: mustsBefore, b: musts.length - open, total: musts.length })}</li>}
+        </ul>
+      </div>}
+      {gains.length > 0 && <div className="ui-sheet tailor-result-card">
+        <p className="ui-label">{t("tailor.result.from")}</p>
+        <ul className="tailor-result-from">{gains.map((gain) => <li key={gain.name}>
+          <span>{gain.name}</span><i style={{ width: `${Math.round((gain.points / most) * 100)}%` }} /><b>+{gain.points}</b></li>)}</ul>
+      </div>}
+    </div>}
     <div className="ui-sheet ui-stack tailor-finish">
       {total > 0 && <>
         <Progress tone="good" label={t("tailor.kw.bar")} valueText={t("tailor.kw.count", { n: now.has.length, total })} value={now.has.length} max={total} />
@@ -87,9 +100,10 @@ export function DoneScreen({ jobId, docId, base, final, job, onAnswers }: Props)
       {t(unchecked === 1 ? "tailor.done.checkOne" : "tailor.done.checkMany", { n: unchecked })}{" "}
       <Link to={to("review=1")}>{t("tailor.done.review")}</Link>
     </p>}
-    <div className="tailor-foot">
-      <span />
-      <button type="button" className="ui-btn ui-btn--primary" onClick={() => setReady(true)}>{t(open > 0 ? "tailor.finish.markAnyway" : "tailor.finish.mark")}</button>
-    </div>
+    <nav aria-label={t("tailor.done.next")} className="ui-row tailor-gap">
+      <Link className="ui-btn ui-btn--primary" to={`/jobs/${encodeURIComponent(jobId)}/cv/template${query}`}>{t("cvs.template.title")}</Link>
+      <Link className="ui-btn" to={page}>{t("tailor.finish.open")}</Link>
+      <Link className="ui-btn ui-btn--quiet" to={to("tab=letter")}>{t("tailor.done.letter")}</Link>
+    </nav>
   </section>;
 }

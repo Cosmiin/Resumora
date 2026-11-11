@@ -153,9 +153,10 @@ describe("tailoring flow", () => {
     const router = renderFlow();
 
     await waitFor(() => expect(askQuestions).toHaveBeenCalledWith("run1", "experience", "r1"));
-    // Questions are answered on the focus screen: no app navigation.
+    // The run happens in the room: no app navigation, the map of the stops instead.
     await user.click(await screen.findByRole("button", { name: "Yes, daily" }));
-    expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByRole("link", { name: "My CV" })).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Tailoring steps" })).toBeInTheDocument();
     expect(screen.getByText("Why I ask: Gap")).toBeInTheDocument();
     expect(sendAnswers).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Finish the questions" }));
@@ -165,15 +166,19 @@ describe("tailoring flow", () => {
     await user.click(screen.getByRole("button", { name: "Accept section" }));
     expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [], roleId: "r1" });
 
+    // The stop ends on its score, and waits for Next.
+    expect(await screen.findByRole("status")).toHaveTextContent("Your match went from 62 to 71.");
+    await user.click(screen.getByRole("button", { name: "Next: Skills" }));
     expect(await screen.findByText("Gusto")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Remove Gusto" }));
     await user.click(screen.getByRole("button", { name: "Save skills" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "skills", {
       decisions: [], inferred: [{ itemId: "new-skill:Gusto", keep: false }], flags: [],
     });
+    await user.click(await screen.findByRole("button", { name: "See my result" }));
     expect(await screen.findByRole("heading", { name: "Tailoring is done" })).toBeInTheDocument();
-    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Finish");
-    await user.click(screen.getByRole("button", { name: "Mark as ready" }));
+    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Result");
+    expect(screen.getByText("16 points better than your base CV.")).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "Open the CV" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/one/cv"));
     expect(router.state.location.search).toBe("?cv=cv1");
@@ -210,9 +215,11 @@ describe("tailoring flow", () => {
       .mockResolvedValueOnce({ run: makeRun({ roleOrder: ["r1", "r2"], currentRoleId: null, currentSection: "skills" }), score: score(70) });
     renderFlow();
     await user.click(await screen.findByRole("button", { name: "Accept section" }));
+    await user.click(await screen.findByRole("button", { name: /^Next: / }));
     await waitFor(() => expect(askQuestions).toHaveBeenCalledWith("run1", "experience", "r2"));
     await user.click(await screen.findByRole("button", { name: "Accept section" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "experience", { decisions: [], inferred: [], flags: [], roleId: "r2" });
+    await user.click(await screen.findByRole("button", { name: "Next: Skills" }));
     await waitFor(() => expect(askQuestions).toHaveBeenLastCalledWith("run1", "skills", undefined));
   });
 
@@ -221,7 +228,7 @@ describe("tailoring flow", () => {
     vi.mocked(getRun).mockResolvedValue(makeRun({ currentSection: "skills" }));
     renderFlow();
     await waitFor(() => expect(askQuestions).toHaveBeenCalledWith("run1", "skills", undefined));
-    expect(await screen.findByRole("listitem", { current: "step" })).toHaveTextContent("Summary and skills");
+    expect(await screen.findByRole("listitem", { current: "step" })).toHaveTextContent("Skills");
     expect(screen.queryByRole("button", { name: /Start/ })).toBeNull();
     expect(startTailoring).not.toHaveBeenCalled();
   });

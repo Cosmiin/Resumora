@@ -37,16 +37,22 @@ function renderDone(over: { final?: MatchScore; base?: MatchScore; job?: JobExtr
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(getTailored).mockResolvedValue(doc({})); });
 
 describe("the finish screen", () => {
-  it("says every must-have is covered, lists them, and offers Mark as ready", () => {
+  it("shows the match before and after and what moved it, says every must-have is covered, and offers the next steps", () => {
     renderDone();
     expect(screen.getByRole("heading", { name: "Your CV covers every must-have" })).toBeInTheDocument();
     const musts = within(screen.getByRole("list", { name: "Must-haves" })).getAllByRole("listitem");
     expect(musts.map((item) => item.textContent)).toEqual(["Payroll accuracy (covered)", "Team lead (covered)"]);
-    expect(screen.getByRole("button", { name: "Mark as ready" })).toBeInTheDocument();
+    const big = document.querySelector(".tailor-bigscore")!;
+    expect(big.querySelector("s")).toHaveTextContent("62");
+    expect(big.querySelector("b")).toHaveTextContent("81");
+    expect(screen.getByText("19 points better than your base CV.")).toBeInTheDocument();
+    expect(screen.getByText("Must-haves shown: 1 of 2 → 2 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Choose a template" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mark as ready" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Change my answer" })).toBeNull();
   });
 
-  it("names a must-have the CV does not show, offers to change the answer, and still lets the CV be marked as ready", async () => {
+  it("names a must-have the CV does not show and offers to change the answer", async () => {
     const user = userEvent.setup();
     const onAnswers = vi.fn();
     renderDone({ final: score(70, [label("r0", "partial"), label("r1", "met"), label("r2", "met")]), onAnswers });
@@ -56,8 +62,6 @@ describe("the finish screen", () => {
     expect(within(open).getByText("Not covered")).toBeInTheDocument();
     await user.click(within(open).getByRole("button", { name: "Change my answer" }));
     expect(onAnswers).toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Mark as ready anyway" }));
-    expect(screen.getByRole("status")).toHaveTextContent("This CV is ready.");
   });
 
   it("counts several open must-haves, and has no Change my answer without somewhere to go back to", () => {
@@ -73,6 +77,14 @@ describe("the finish screen", () => {
     });
     expect(screen.getByRole("progressbar", { name: "Keywords from the ad on your CV" })).toHaveAttribute("aria-valuetext", "2 of 3");
     expect(screen.getByText("Up from 1. Still missing: Excel.")).toBeInTheDocument();
+  });
+
+  it("lists where the points came from when it knows", () => {
+    const router = createMemoryRouter([{ path: "/", element: <DoneScreen jobId="one" docId="cv1" base={base} final={final} job={job}
+      gains={[{ name: "Payroll Lead", points: 12 }, { name: "Skills", points: 7 }]} /> }]);
+    render(<RouterProvider router={router} />);
+    const rows = [...document.querySelectorAll(".tailor-result-from li")].map((row) => row.textContent);
+    expect(rows).toEqual(["Payroll Lead+12", "Skills+7"]);
   });
 
   it("a job with no must-haves just says tailoring is done", () => {
@@ -103,10 +115,9 @@ describe("the finish screen", () => {
     ["Choose a template", "/jobs/one/cv/template?cv=cv1"],
     ["Open the CV", "/jobs/one/cv?cv=cv1"],
     ["Write a cover letter", "/jobs/one/cv?cv=cv1&tab=letter"],
-  ])("once marked as ready, %s goes to %s", async (name, to) => {
+  ])("%s goes to %s", async (name, to) => {
     const user = userEvent.setup();
     const router = renderDone();
-    await user.click(screen.getByRole("button", { name: "Mark as ready" }));
     await user.click(screen.getByRole("link", { name }));
     expect(router.state.location.pathname + router.state.location.search).toBe(to);
   });

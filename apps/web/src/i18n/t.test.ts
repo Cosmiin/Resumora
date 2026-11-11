@@ -9,12 +9,12 @@ afterEach(() => setLanguage("en"));
 describe("interface language", () => {
   it("starts in English", () => {
     expect(getLanguage()).toBe("en");
-    expect(t("ui.diff.keep")).toBe("Keep");
+    expect(t("ui.diff.keep")).toBe("Keep mine");
   });
 
   it("switches to Romanian and remembers the choice", () => {
     setLanguage("ro");
-    expect(t("ui.diff.keep")).toBe("Păstrez");
+    expect(t("ui.diff.keep")).toBe("Păstrez varianta mea");
     expect(localStorage.getItem("resumora.language")).toBe("ro");
     expect(document.documentElement.lang).toBe("ro");
   });

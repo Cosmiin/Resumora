@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { findScored, isRoleSection, stepItems, stepOf, stepOrder, type Answer, type CvContent, type JobExtraction, type MatchScore, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
-import { FocusBar } from "../cv/enrich/FocusBar.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { Stepper } from "../ui/index.ts";
+import { Room, StopDone, type Stop } from "./Room.tsx";
 import { getJob, scoreJob } from "../jobs/jobs-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard, type Draft } from "./QuestionCard.tsx";
-import { kindKey } from "./role-done.ts";
+import { kindKey, nameOf } from "./role-done.ts";
 import { KeywordsStep, keywordsOf } from "./KeywordsStep.tsx";
 import { LanguageStep } from "./LanguageStep.tsx";
 import { Working } from "./Working.tsx";
@@ -26,8 +26,8 @@ import "../styles/tailor.css";
 export { remember, remembered } from "./flow-phase.ts";
 
 /**
- * `/jobs/:id/tailor`: the language check and the keywords, then each section's questions (on the focus screen),
- * run and review (Experience role by role), then the finish.
+ * `/jobs/:id/tailor`: the language check and the keywords, then the room: one stop after another (each role, the
+ * skills, the summary, the last touches), each with its questions, its wait and its review, then the result.
  */
 export function TailorFlow() {
   const jobId = useParams().id ?? "";
@@ -55,6 +55,22 @@ export function TailorFlow() {
   const [ticks, setTicks] = useState<TailorSection[]>([]);
   // A change inside these screens never needs the newest score on screen, only on the next one.
   const noteScore = (score: MatchScore) => { scoreRef.current = score; };
+  // The points each stop added, by stop (a role's id, a section, "last" for the last touches): this visit only.
+  const [gains, setGains] = useState<Record<string, number>>({});
+  const stopKey = (at: TailorSection, roleId?: string) => roleId ?? (FINAL_SECTIONS.includes(at) ? "last" : at);
+  /** Takes the new score in and says what it moved: the points, and what the CV shows now that it did not before. */
+  function gained(at: TailorSection, roleId: string | undefined, score: MatchScore) {
+    const before = scoreRef.current;
+    noteScore(score);
+    const to = score.total ?? 0;
+    const from = before?.total ?? to;
+    const key = stopKey(at, roleId);
+    if (to !== from) setGains((all) => ({ ...all, [key]: (all[key] ?? 0) + to - from }));
+    const had = new Set((before?.labels ?? []).filter((label) => label.status === "met").map((label) => label.ref));
+    const won = score.labels.filter((label) => label.status === "met" && !had.has(label.ref))
+      .flatMap((label) => nameOf(label.ref, job) ?? []).slice(0, 3);
+    return { from, to, won: before ? won : [] };
+  }
   const section = run?.currentSection ?? null;
 
   function track(next: TailorRun) { runRef.current = next; setRun(next); }
@@ -104,7 +120,7 @@ export function TailorFlow() {
     setPhase({ kind: "working" });
     try {
       const result = await api.acceptSection(runRef.current!.id, at, { decisions: [], inferred: [], flags: [] });
-      noteScore(result.score);
+      gained(at, undefined, result.score);
       setTicks((list) => (list.includes(at) ? list : [...list, at]));
       enter(result.run);
     } catch (cause) { fail(cause, at, () => void pass(at)); }
@@ -114,8 +130,12 @@ export function TailorFlow() {
     try {
       const roleId = roleArg(at);
       const result = await api.acceptSection(runRef.current!.id, at, roleId ? { ...body, roleId } : body);
-      noteScore(result.score);
-      enter(result.run);
+      const name = roleId ? scoredOf(roleId)?.item.title.trim() || t("tailor.role.untitled") : t(`tailor.section.${at}`);
+      const moved = gained(at, roleId, result.score);
+      // A role, the skills or the summary ends on its score; the short last touches go straight on.
+      if (FINAL_SECTIONS.includes(at)) return enter(result.run);
+      track(result.run);
+      setPhase({ kind: "stop", name, ...moved, next: result.run });
     } catch (cause) {
       setPhase((current) => current.kind === "review" ? { ...current, busy: false } : current);
       if (cause instanceof ApiClientError && cause.code === "job_not_found") fail(cause, at, () => {});
@@ -131,7 +151,7 @@ export function TailorFlow() {
     try {
       const roleId = roleArg(at);
       const result = await api.acceptSection(runRef.current!.id, at, { decisions: [], inferred: [], flags: [], ...(roleId ? { roleId } : {}) });
-      noteScore(result.score);
+      gained(at, roleId, result.score);
       enter(result.run);
     } catch (cause) { fail(cause, at, () => void ask(at)); }
   }
@@ -228,6 +248,33 @@ export function TailorFlow() {
     .filter((q) => q.section === s && q.kind !== "flag" && (!roleId || q.roleId === roleId));
   const locale = cv?.locale ?? "en";
 
+  // The map: every stop of the run, in order, with where it stands and the points it added.
+  const stops: Stop[] = [];
+  if (run) {
+    const over = run.status === "done" || !section || phase.kind === "done";
+    stops.push({ id: "setup", name: t("tailor.room.setup"), state: "ok", group: "" });
+    for (const s of run.sections.filter(isRoleSection)) {
+      const ids = cv ? stepOrder(run, cv, s) : s === "experience" ? run.roleOrder ?? [] : [];
+      for (const id of ids) {
+        const item = scoredOf(id)?.item;
+        const state = over || doneRoles.includes(id) ? "ok" : run.currentRoleId === id && isRoleSection(section) ? "now" : "todo";
+        stops.push({ id: `item:${id}`, name: item?.title.trim() || t("tailor.role.untitled"), state, gain: gains[id],
+          sub: state === "now" && item ? item.company.trim() || undefined : undefined, group: t(`tailor.section.${s}`) });
+      }
+    }
+    const rest = t("tailor.room.rest");
+    const at = (s: TailorSection) => run.sections.indexOf(s);
+    for (const s of run.sections.filter((key) => !isRoleSection(key) && !FINAL_SECTIONS.includes(key))) {
+      stops.push({ id: s, name: t(`tailor.section.${s}`), state: over || at(s) < reached ? "ok" : s === section ? "now" : "todo", gain: gains[s], group: rest });
+    }
+    const last = run.sections.filter((key) => FINAL_SECTIONS.includes(key));
+    if (last.length > 0) {
+      stops.push({ id: "last", name: t("tailor.room.last"), gain: gains.last, group: rest,
+        state: over || last.every((s) => at(s) < reached) ? "ok" : section && last.includes(section) ? "now" : "todo" });
+    }
+    stops.push({ id: "result", name: t("tailor.room.result"), state: phase.kind === "done" ? "now" : "todo", group: rest });
+  }
+
   let body: React.ReactNode;
   if (phase.kind === "loading") body = <p role="status">{t("tailor.loading")}</p>;
   else if (phase.kind === "lang") {
@@ -267,8 +314,14 @@ export function TailorFlow() {
       : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
         busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
   }
+  else if (phase.kind === "stop") {
+    const upcoming = phase.next.status === "done" || !phase.next.currentSection ? undefined : stops.find((stop) => stop.state === "now")?.name;
+    body = <StopDone name={phase.name} from={phase.from} to={phase.to} won={phase.won} nextName={upcoming}
+      left={stops.filter((stop) => stop.state !== "ok" && stop.id !== "result").length} onNext={() => enter(phase.next)} />;
+  }
   else if (phase.kind === "done") {
     body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job}
+      gains={stops.flatMap((stop) => (stop.gain && stop.gain > 0 ? [{ name: stop.name, points: stop.gain }] : []))}
       onAnswers={anyDone("experience") || anyDone("projects") ? () => setPhase({ kind: "back", section: "experience", resume: phase }) : undefined} />;
   } else if (phase.kind === "deleted") {
     body = <section className="ui-stack tailor-narrow" role="alert"><h1 className="ui-title">{t("tailor.error.deleted")}</h1>
@@ -320,29 +373,33 @@ export function TailorFlow() {
   const jobName = [job?.title.trim(), job?.company?.trim()].filter(Boolean).join(", ");
   const toJob = `/jobs/${encodeURIComponent(jobId)}`;
 
-  // Questions are answered on the focus screen: no app navigation, the role beside the question.
-  if (section && (phase.kind === "questions" || phase.kind === "asking")) {
-    return <div className="ui-page focus-mode tailor-focus">
-      <FocusBar context={t("tailor.for")} name={jobName || undefined} closeLabel={t("tailor.back")} onClose={() => void navigate(toJob)}
-        skip={phase.kind === "questions" && isRoleSection(section)
-          ? { label: t(`tailor.roleReview.skip${kindKey(scoredOf(run?.currentRoleId)?.kind)}`), onSkip: () => void skipRole(section) } : undefined} />
-      {phase.kind === "asking" ? <div className="fm-grid">{body}</div> : body}
-    </div>;
+  // A started run happens in the room: one bar, the map of every stop, and the stop's own screen, from the first
+  // question to the result.
+  if (run && phase.kind !== "deleted") {
+    const asking = !!section && (phase.kind === "questions" || phase.kind === "asking");
+    const staged = !!section && !FINAL_SECTIONS.includes(section);
+    const moment = !staged ? undefined : asking ? 0 : phase.kind === "working" ? 1 : phase.kind === "review" ? 2 : undefined;
+    return <Room jobName={jobName || undefined} onExit={() => void navigate(toJob)} base={baseScore?.total ?? null} now={scoreRef.current?.total ?? null}
+      stops={stops} moment={moment}
+      skip={section && phase.kind === "questions" && isRoleSection(section)
+        ? { label: t(`tailor.roleReview.skip${kindKey(scoredOf(run.currentRoleId)?.kind)}`), onSkip: () => void skipRole(section) } : undefined}>
+      {settled && <p className="tailor-links">
+        <span className="ui-muted">{t("tailor.lookBack")}</span>
+        {open.map((s) => <button key={s} type="button" onClick={() => setPhase({ kind: "back", section: s, resume: phase })}>{t(`tailor.section.${s}`)}</button>)}
+        <button type="button" onClick={() => void openSteer(phase)}>{t("tailor.steps.steering")}</button>
+      </p>}
+      {ticks.map((s) => <p key={s} className="ui-small ui-muted tailor-tick">{t("tailor.final.nothing", { section: t(`tailor.section.${s}`) })}</p>)}
+      {asking ? <div className="focus-mode tailor-focus">{phase.kind === "asking" ? <div className="fm-grid">{body}</div> : body}</div> : body}
+    </Room>;
   }
 
-  const step = phase.kind === "lang" ? 0 : !run ? 1 : phase.kind === "done" || run.status === "done" || !section ? 4 : isRoleSection(section) ? 2 : 3;
+  const step = phase.kind === "lang" ? 0 : 1;
   return <AppShell>
     <main className="ui-page tailor-page">
       <div className="ui-wrap ui-main">
         <Stepper label={t("tailor.steps")} current={step}
           steps={[t("tailor.step.language"), t("tailor.step.keywords"), t("tailor.step.roles"), t("tailor.step.summary"), t("tailor.step.finish")]} />
         {jobName && <p className="ui-small ui-muted tailor-for">{t("tailor.for")}: <Link to={toJob}>{jobName}</Link></p>}
-        {run && settled && <p className="tailor-links">
-          <span className="ui-muted">{t("tailor.lookBack")}</span>
-          {open.map((s) => <button key={s} type="button" onClick={() => setPhase({ kind: "back", section: s, resume: phase })}>{t(`tailor.section.${s}`)}</button>)}
-          <button type="button" onClick={() => void openSteer(phase)}>{t("tailor.steps.steering")}</button>
-        </p>}
-        {ticks.map((s) => <p key={s} className="ui-small ui-muted tailor-tick">{t("tailor.final.nothing", { section: t(`tailor.section.${s}`) })}</p>)}
         {body}
       </div>
     </main>

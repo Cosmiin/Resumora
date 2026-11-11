@@ -229,3 +229,63 @@
 .tailor-sec .tailor-kw.has-new li { opacity: 0.45; filter: blur(1px); }
 .tailor-sec .tailor-kw li.is-new { border-style: dashed; background: color-mix(in srgb, var(--color-highlight) 50%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-highlight) 35%, transparent); font-size: var(--text-base); }
 .tailor-sec-lit { margin: 0 -14px; padding: 12px 14px; border-radius: 10px; background: color-mix(in srgb, var(--color-highlight) 50%, transparent); box-shadow: inset 4px 0 var(--color-coach); }
+
+/* The room: one bar, the map of every stop on the left, the stop's own screen in the middle. */
+.tailor-room { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; background: var(--color-desk); color: var(--color-ink); }
+.tailor-room-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); padding: 14px max(var(--space-6), env(safe-area-inset-right, 0px)) 14px max(var(--space-6), env(safe-area-inset-left, 0px)); border-bottom: 2px solid color-mix(in srgb, var(--color-ink) 12%, transparent); }
+.tailor-room-bar p { margin: 0; }
+.tailor-room-score { display: inline-flex; align-items: baseline; gap: var(--space-2); padding: 4px 16px; border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
+.tailor-room-score b { font: var(--weight-display) 1.25rem / 1 var(--font-display); }
+.tailor-room-score b.is-up, .tailor-bigscore b.is-up { color: var(--color-good); }
+.tailor-room-body { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 0; }
+.tailor-map { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-5) var(--space-3) var(--space-6) var(--space-5); border-inline-end: 2px solid color-mix(in srgb, var(--color-ink) 12%, transparent); font-size: var(--text-small); }
+.tailor-map ol { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.tailor-map .ui-label { margin: 0 0 var(--space-1) 10px; }
+.tailor-stop { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; padding: 7px 10px; border-radius: 10px; }
+.tailor-stop-dot { display: grid; place-items: center; width: 20px; height: 20px; border: var(--border-control) solid currentColor; border-radius: 50%; font-size: 0.6875rem; font-weight: var(--weight-bold); }
+.tailor-stop-name small { display: block; font-weight: var(--weight-regular); color: var(--color-muted); }
+.tailor-stop.is-ok { color: var(--color-good); font-weight: var(--weight-semibold); }
+.tailor-stop.is-ok .tailor-stop-dot { border-color: var(--color-good); background: var(--color-good); color: var(--color-paper); }
+.tailor-stop.is-now { background: var(--color-paper); box-shadow: var(--shadow-sheet); font-weight: var(--weight-bold); }
+.tailor-stop.is-now .tailor-stop-dot { border-color: var(--color-ink); background: var(--color-highlight); }
+.tailor-stop.is-todo { color: var(--color-muted); }
+.tailor-stop-gain { font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
+.tailor-room-main { min-width: 0; padding: var(--space-5) max(var(--space-6), env(safe-area-inset-right, 0px)) var(--space-10) var(--space-6); }
+.tailor-moments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin: 0 0 var(--space-4); padding: 0; list-style: none; font-size: var(--text-label); font-weight: var(--weight-bold); }
+.tailor-moments li { padding: 4px 12px; border-radius: var(--radius-pill); background: var(--color-paper-veil); color: var(--color-muted); }
+.tailor-moments li.is-on { background: var(--color-ink); color: var(--color-paper); }
+.tailor-moments li.is-done { color: var(--color-good); }
+/* A question keeps its own styles, but inside the room it is part of the page, not a screen over it. */
+.tailor-room .focus-mode { position: static; inset: auto; z-index: auto; overflow: visible; padding: 0; background: none; animation: none; }
+.tailor-room .fm-prog, .tailor-room .fm-grid { margin-inline: 0; }
+.tailor-room .fm-prog { margin-top: 0; }
+.tailor-room .tailor-focus:not(.is-done) .fm-grid.has-sheet { grid-template-columns: minmax(0, 470px) minmax(0, 1fr); gap: var(--space-6) 40px; }
+
+/* Between two stops, and on the result: the match before and after. */
+.tailor-stopdone { display: grid; gap: var(--space-3); max-width: 720px; margin: var(--space-7) auto 0; padding: var(--space-7); animation: tailor-rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.tailor-stopdone p { margin: 0; }
+.tailor-bigscore { display: flex; align-items: baseline; gap: var(--space-3); margin: 0; font: var(--weight-display) 3.25rem / 1 var(--font-display); font-variant-numeric: tabular-nums; }
+.tailor-bigscore s { color: var(--color-muted); font-size: 1.875rem; text-decoration-thickness: 3px; }
+.tailor-wins { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.tailor-wins li { position: relative; padding-inline-start: 24px; }
+.tailor-wins li::before { content: "✓"; position: absolute; inset-inline-start: 2px; color: var(--color-good); font-weight: var(--weight-bold); }
+.tailor-result { display: grid; gap: var(--space-4); max-width: 1000px; }
+.tailor-result > * { margin: 0; }
+.tailor-result-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
+.tailor-result-card { display: grid; gap: var(--space-2); align-content: start; padding: var(--space-5) var(--space-6); }
+.tailor-result-card p { margin: 0; }
+.tailor-result-card ul { display: grid; gap: var(--space-2); margin: 0; padding-inline-start: var(--space-4); }
+.tailor-result-from { padding: 0 !important; list-style: none; }
+.tailor-result-from li { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; font-size: var(--text-small); }
+.tailor-result-from i { height: 10px; border-radius: var(--radius-pill); background: var(--color-good); }
+.tailor-result .tailor-finish { margin-top: 0; }
+@media (max-width: 900px) {
+  .tailor-room-body { grid-template-columns: minmax(0, 1fr); }
+  .tailor-map { border-inline-end: 0; padding: var(--space-3) var(--space-4); }
+  .tailor-map .ui-label { display: none; }
+  .tailor-map, .tailor-map ol, .tailor-map-group { display: contents; }
+  .tailor-stop { display: none; }
+  .tailor-stop.is-now { display: grid; margin: var(--space-3) var(--space-4) 0; }
+  .tailor-room-main { padding: var(--space-4); }
+}
+@media (prefers-reduced-motion: reduce) { .tailor-stopdone { animation: none; } }
