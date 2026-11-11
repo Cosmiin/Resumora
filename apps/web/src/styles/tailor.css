@@ -194,3 +194,38 @@
 
 /* A role's suggestions sit side by side, so the page takes the same width as the question screen. */
 .tailor-page .ui-wrap:has(.tailor-diffs) { max-width: 1300px; }
+
+/* Order and headline as a picture: one card per change on the left, the CV in small on the right. */
+.tailor-page .ui-wrap:has(.tailor-pic) { max-width: 1300px; }
+.tailor-pic { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: var(--space-6) 56px; align-items: start; }
+.tailor-pic-changes { display: grid; gap: var(--space-4); }
+.tailor-pic-card { display: grid; gap: var(--space-3); padding: var(--space-5) var(--space-6); }
+.tailor-pic-card p { margin: 0; }
+.tailor-pic-card del { color: var(--color-muted); }
+.tailor-pic ins { text-decoration: none; background: color-mix(in srgb, var(--color-highlight) 60%, transparent); border-radius: 3px; padding: 0 2px; }
+.tailor-pic .ui-heading { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
+.tailor-pic-n { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; margin-inline-end: 6px; border: var(--border-control) solid var(--color-ink); border-radius: 50%; background: var(--color-highlight); font: var(--weight-bold) 0.8125rem / 1 var(--font-body, inherit); }
+.tailor-pic-moves { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.tailor-pic-moves li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1); align-items: baseline; }
+.tailor-pic [aria-pressed="true"] { background: var(--color-ink); color: var(--color-paper); }
+.tailor-pic-page { display: grid; gap: var(--space-2); padding: var(--space-6) var(--space-7); }
+.tailor-pic-page p { margin: 0; }
+.tailor-pic-name { font: var(--weight-display) 1.5rem / 1.2 var(--font-display); }
+.tailor-pic-head { display: flex; align-items: center; flex-wrap: wrap; margin-bottom: var(--space-2) !important; }
+.tailor-pic-blk { position: relative; display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: var(--space-4); align-items: center; padding: 8px 10px; border: 1.5px solid transparent; border-radius: 8px; }
+.tailor-pic-blk b { font-size: var(--text-label); letter-spacing: 0.08em; text-transform: uppercase; }
+.tailor-pic-blk i { display: block; height: 8px; border-radius: var(--radius-pill); background: var(--color-line); }
+.tailor-pic-blk i + i { width: 70%; margin-top: 5px; }
+.tailor-pic-blk.is-moved { border-color: var(--color-ink); background: color-mix(in srgb, var(--color-highlight) 40%, transparent); animation: tailor-rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.tailor-pic-tag { position: absolute; right: 10px; top: -11px; padding: 1px 10px; border-radius: var(--radius-pill); background: var(--color-ink); color: var(--color-paper); font-size: var(--text-label); font-weight: var(--weight-bold); }
+.tailor-pic-ghost { padding: 4px 10px; border: 1.5px dashed var(--color-line); border-radius: 8px; font-size: var(--text-label); color: var(--color-muted); }
+@media (max-width: 900px) { .tailor-pic { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .tailor-pic-blk.is-moved { animation: none; } }
+
+/* A question about the skills or the summary: that part of the CV on the sheet, the place in question lit. */
+.tailor-sec { display: grid; gap: var(--space-3); align-content: start; }
+.tailor-sec .fm-role { margin: 0; }
+.tailor-sec-group { display: grid; gap: var(--space-2); }
+.tailor-sec .tailor-kw.has-new li { opacity: 0.45; filter: blur(1px); }
+.tailor-sec .tailor-kw li.is-new { border-style: dashed; background: color-mix(in srgb, var(--color-highlight) 50%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-highlight) 35%, transparent); font-size: var(--text-base); }
+.tailor-sec-lit { margin: 0 -14px; padding: 12px 14px; border-radius: 10px; background: color-mix(in srgb, var(--color-highlight) 50%, transparent); box-shadow: inset 4px 0 var(--color-coach); }

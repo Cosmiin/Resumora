@@ -301,7 +301,7 @@ export function TailorFlow() {
       job={job} score={baseRef.current} initial={phase.answers[phase.index]}
       onNext={answerWith} onSkip={() => answerWith({ value: null, via: "skip" })}
       onBack={phase.index > 0 ? () => setPhase({ ...phase, index: phase.index - 1 }) : undefined}
-      role={roleFor(question)} kind={scoredOf(question.roleId)?.kind} roles={cv?.experience ?? []} locale={cv?.locale} />;
+      role={roleFor(question)} kind={scoredOf(question.roleId)?.kind} roles={cv?.experience ?? []} locale={cv?.locale} cv={cv} />;
   } else if (isRoleSection(section) && scoredOf(run?.currentRoleId)) {
     const review = phase;
     const current = scoredOf(run!.currentRoleId)!;

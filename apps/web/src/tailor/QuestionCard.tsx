@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { isRoleSection, type Answer, type JobExtraction, type Locale, type MatchScore, type ScoredKind, type TailorQuestion } from "@resumora/shared";
+import { isRoleSection, type Answer, type CvContent, type JobExtraction, type Locale, type MatchScore, type ScoredKind, type TailorQuestion } from "@resumora/shared";
 import { AnswerBox, type Via } from "../cv/enrich/AnswerBox.tsx";
 import { t } from "../i18n/t.ts";
 import { nameOf } from "./role-done.ts";
 import { RolePanel, roleMeta, type Role } from "./RolePanel.tsx";
+import { hasSectionPanel, SectionPanel } from "./SectionPanel.tsx";
 
 export type Draft = Omit<Answer, "questionId">;
 
@@ -27,6 +28,8 @@ type Props = {
   /** Skills: the person's roles, to say where a confirmed skill was used. */
   roles?: Role[];
   locale?: Locale;
+  /** Skills and Summary: the CV, to show beside the question the part the answer will change. */
+  cv?: CvContent | null;
   /** The job and the base CV's match with it: what the ad asks for behind this question. */
   job?: JobExtraction | null;
   score?: MatchScore | null;
@@ -36,9 +39,13 @@ export const VIA: Record<Answer["via"], Via[]> = { option: ["pick"], typed: ["ty
 /** Spoken words win, then typed ones; a pick alone is an option. */
 export const answerVia = (via: Via[]): Answer["via"] => (via.includes("voice") ? "voice" : via.includes("type") ? "typed" : "option");
 
-/** One question on the focus screen: the role's sheet beside it, what the ad asks for, and why the coach asks. */
-export function QuestionCard({ role, kind, locale = "en", ...props }: Props) {
+/**
+ * One question on the focus screen, with what its answer will change beside it (the role's sheet, or the CV's
+ * skills or summary), what the ad asks for, and why the coach asks.
+ */
+export function QuestionCard({ role, kind, locale = "en", cv, ...props }: Props) {
   const sheet = !!role && isRoleSection(props.question.section);
+  const part = !sheet && !!cv && hasSectionPanel(props.question.section);
   return <>
     <div className="fm-prog">
       <p className="fm-eyebrow" role="status">{props.progress}</p>
@@ -46,9 +53,10 @@ export function QuestionCard({ role, kind, locale = "en", ...props }: Props) {
         {Array.from({ length: props.total }, (_, i) => <i key={i} className={i < props.index ? "is-done" : i === props.index ? "is-on" : undefined} />)}
       </div>
     </div>
-    <div className={sheet ? "fm-grid has-sheet" : "fm-grid"}>
+    <div className={sheet || part ? "fm-grid has-sheet" : "fm-grid"}>
       <Question {...props} locale={locale} scoped={sheet} />
       {sheet && <RolePanel role={role} locale={locale} bulletId={props.question.bulletId} kind={kind} />}
+      {part && <SectionPanel cv={cv} question={props.question} locale={cv.locale} />}
     </div>
   </>;
 }
