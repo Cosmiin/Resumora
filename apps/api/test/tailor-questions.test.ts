@@ -327,7 +327,7 @@ describe("job questions", () => {
     expect(sent.section).toBe(section);
     expect(sent).toMatchObject({ max: 2 });
     expect(sent.answered).toEqual([{ question: b.notes[1]!.question, answer: b.notes[1]!.answer, period: "2001-01 – 2002-12" }]);
-    expect(sent.steering).toContain("They want to lean on other roles more than this one.");
+    expect(sent.steering).not.toMatch(/lean/i);
     expect(sent.gaps).toContainEqual(expect.objectContaining({ ref: "r1", status: "partial" }));
     expect(sent.gaps.every((gap: object) => !("evidence" in gap))).toBe(true);
     for (const other of [a, c]) {
@@ -335,10 +335,11 @@ describe("job questions", () => {
         expect(user).not.toContain(value);
       }
     }
-    expect(messages[0]!.content).toContain('Never mention another employer, role, project or "your previous roles".');
-    expect(messages[0]!.content).toContain("The role ran from its startDate to its endDate, or is current. Ask only about tools, methods and practices that fit that period and that kind of work. Skip a gap the role can't plausibly show; returning fewer questions, or none, is fine.");
-    expect(messages[0]!.content).toContain("Never add an option meaning other, something else or none of the above: the screen adds its own.");
-    expect(messages[0]!.content).toContain("For a role that isn't a focus role, ask only what helps its bullets show value for this job. Don't stretch; no question is fine.");
+    expect(messages[0]!.content).toContain("One role at a time.");
+    expect(messages[0]!.content).toContain('Do not mention another employer, role or project, and do not write "your previous roles" or "your other roles".');
+    expect(messages[0]!.content).toContain("The role ran from its startDate to its endDate, or is current. Ask only about tools, methods and practices that existed then and fit that work.");
+    expect(messages[0]!.content).toContain("Do not add an option meaning other, something else or none of the above");
+    expect(messages[0]!.content).not.toMatch(/focus role/i);
     await questions(runId, "skills");
     const skills = JSON.parse((model.requests[1]!.messages as { content: string }[])[1]!.content);
     expect(skills).not.toHaveProperty("role");
