@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { findScored, fingerprint, type CvContent } from "@resumora/shared";
+import { CLEAR_AT, findScored, fingerprint, type CvContent } from "@resumora/shared";
 import { SCORED_LIST, type LineList } from "../edit/lists.ts";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
@@ -306,7 +306,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
               <li key={b.id} className={cls.filter(Boolean).join(" ")} aria-current={b.id === currentId ? "true" : undefined}>
                 <span>{b.text}</span>
                 {n !== undefined && (
-                  <span className={n >= 75 ? "fm-tag is-up" : "fm-tag is-low"} aria-label={t("enrich.focus.bulletScore", { n })}>
+                  <span className={n >= CLEAR_AT ? "fm-tag is-up" : "fm-tag is-low"} aria-label={t("enrich.focus.bulletScore", { n })}>
                     {n}
                   </span>
                 )}

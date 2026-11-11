@@ -2,9 +2,16 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/5";
+export const SCORE_POLICY = "score/6";
 
-export const WEIGHTS = { contribution: 35, clarity: 25, specificity: 20, impact: 20 } as const;
+/** A bullet's five checks. A clear, short bullet with no result scores 80. */
+export const WEIGHTS = { contribution: 30, clarity: 20, specificity: 20, impact: 20, concise: 10 } as const;
+/** A role's score: this share from its bullets (Lines), the rest from what the role shows a recruiter (Coverage). */
+export const LINES_SHARE = 0.6;
+/** A bullet longer than the first is at most "partial" on concise; longer than the second is "missing". */
+export const CONCISE_CHARS = { partial: 220, missing: 300 } as const;
+/** From this score a bullet or a role reads clearly and has nothing waiting. */
+export const CLEAR_AT = 80;
 
 export const MAX_QUESTIONS = 20;
 /** The longest "what should your CV bring out" text the enrichment path sends with a score request. */
@@ -23,6 +30,47 @@ export type Grade = z.infer<typeof GradeSchema>;
 export const IssueSchema = z.enum(["example", "duplicate", "contribution", "clarity", "specificity", "impact", "none"]);
 export type Issue = z.infer<typeof IssueSchema>;
 
+/** What a recruiter looks for in a role. Core ones count for every role; conditional ones only when they apply. */
+export const CORE_PARAMETERS = ["company", "purpose", "actions", "tools", "results", "scale"] as const;
+export const CONDITIONAL_PARAMETERS = ["leadership", "seniority", "people", "domain"] as const;
+export type CoverageParameter = (typeof CORE_PARAMETERS)[number] | (typeof CONDITIONAL_PARAMETERS)[number];
+/** shown: on the page. applies: the role involves it but the page does not say it. unknown: no clue either way. na: does not apply. */
+export const MarkSchema = z.enum(["shown", "applies", "unknown", "na"]);
+export type Mark = z.infer<typeof MarkSchema>;
+/** The marks the model gives. Actions and results are worked out from the bullet grades instead. */
+export const ModelCoverageSchema = z.object({
+  company: MarkSchema.default("unknown"),
+  purpose: MarkSchema.default("unknown"),
+  tools: MarkSchema.default("unknown"),
+  scale: MarkSchema.default("unknown"),
+  leadership: MarkSchema.default("unknown"),
+  seniority: MarkSchema.default("unknown"),
+  people: MarkSchema.default("unknown"),
+  domain: MarkSchema.default("unknown"),
+}).strict();
+export type ModelCoverage = z.infer<typeof ModelCoverageSchema>;
+const NO_COVERAGE: ModelCoverage = { company: "unknown", purpose: "unknown", tools: "unknown", scale: "unknown", leadership: "unknown", seniority: "unknown", people: "unknown", domain: "unknown" };
+/** Coverage is 100 points: each core parameter shown, the conditional ones that apply (shared), and the role's shape. */
+export const COVERAGE_POINTS = { core: 10, conditional: 20, amount: 8, repeats: 6, order: 6 } as const;
+export const CoverageSchema = z.object({
+  score: z.number().int().min(0).max(100),
+  marks: z.object({
+    company: MarkSchema,
+    purpose: MarkSchema,
+    actions: MarkSchema,
+    tools: MarkSchema,
+    results: MarkSchema,
+    scale: MarkSchema,
+    leadership: MarkSchema,
+    seniority: MarkSchema,
+    people: MarkSchema,
+    domain: MarkSchema,
+  }).strict(),
+  /** amount: three to six bullets. repeats: no bullet repeats another. order: a bullet with a result comes first. */
+  shape: z.object({ amount: z.boolean(), repeats: z.boolean(), order: z.boolean() }).strict(),
+}).strict();
+export type Coverage = z.infer<typeof CoverageSchema>;
+
 /** Most urgent first. "none" is last. */
 const ISSUE_ORDER: readonly Issue[] = ["example", "duplicate", "contribution", "clarity", "specificity", "impact", "none"];
 
@@ -36,6 +84,8 @@ export const ModelBulletSchema = z
     clarity: GradeSchema,
     specificity: GradeSchema,
     impact: GradeSchema,
+    /** Every phrase carries a fact, in two lines at most. Absent (older answers, test doubles) reads as specific. */
+    concise: GradeSchema.optional(),
     issue: IssueSchema,
     duplicateOf: id.nullable(),
     tip: z.string().max(240).nullable(),
@@ -56,6 +106,7 @@ export const ModelScoreSchema = z
     }).strict()).max(MAX_ROLE_QUESTIONS).default([]),
     /** Too little information to infer plausible skills or achievements. */
     thin: z.boolean().default(false),
+    coverage: ModelCoverageSchema.optional(),
   })
   .strict();
 export type ModelScore = z.infer<typeof ModelScoreSchema>;
@@ -94,6 +145,8 @@ export const RoleResultSchema = z
           clarity: GradeSchema,
           specificity: GradeSchema,
           impact: GradeSchema,
+          /** Absent on results older than score/6: reads as specific. */
+          concise: GradeSchema.optional(),
           issue: IssueSchema,
           tip: z.string().nullable(),
           question: z.string().nullable(),
@@ -107,6 +160,9 @@ export const RoleResultSchema = z
     thin: z.boolean().default(false),
     /** The language the questions and tips were written in; absent on older results (then: the CV's language). */
     questionLanguage: z.string().optional(),
+    /** The average of the bullets (the role's score before Coverage). Absent on results older than score/6. */
+    lines: z.number().int().min(0).max(100).nullable().optional(),
+    coverage: CoverageSchema.optional(),
   })
   .strict();
 export type RoleResult = z.infer<typeof RoleResultSchema>;
@@ -121,13 +177,23 @@ export class EnrichParseError extends Error {
 
 const MULTIPLIER: Record<Grade, number> = { missing: 0, partial: 0.5, specific: 1 };
 
-export function bulletScore(g: Record<keyof typeof WEIGHTS, Grade>): number {
+export function bulletScore(g: Record<Exclude<keyof typeof WEIGHTS, "concise">, Grade> & { concise?: Grade }): number {
   return Math.round(
     WEIGHTS.contribution * MULTIPLIER[g.contribution] +
       WEIGHTS.clarity * MULTIPLIER[g.clarity] +
       WEIGHTS.specificity * MULTIPLIER[g.specificity] +
-      WEIGHTS.impact * MULTIPLIER[g.impact],
+      WEIGHTS.impact * MULTIPLIER[g.impact] +
+      // A bullet that does not say what the person did earns nothing for being short.
+      (g.contribution === "missing" ? 0 : WEIGHTS.concise * MULTIPLIER[g.concise ?? "specific"]),
   );
+}
+
+/** The model's concise grade, capped by length: a long bullet is not concise however it is worded. */
+export function conciseGrade(text: string, grade: Grade): Grade {
+  const length = text.trim().length;
+  if (length > CONCISE_CHARS.missing) return "missing";
+  if (length > CONCISE_CHARS.partial && grade === "specific") return "partial";
+  return grade;
 }
 
 const RANGE_PATTERNS = [/\d+\s*[–-]\s*\d+/g, /\d+\+/g, /\b(?:under|over|sub|peste)\s+\d+/gi];
@@ -205,6 +271,33 @@ function normalizedIssue(m: ModelBullet, unusable: boolean, duplicate: boolean):
 
 type ResultBullet = RoleResult["bullets"][number];
 
+/** What the role shows a recruiter, as points. Actions and results come from the bullet grades; the rest from the model's marks. */
+export function buildCoverage(bullets: readonly ResultBullet[], model: ModelCoverage): Coverage {
+  const real = bullets.filter((b) => b.issue !== "example" && b.issue !== "duplicate");
+  // The four that always apply are either on the page or not.
+  const core = (mark: Mark): Mark => (mark === "shown" ? "shown" : "applies");
+  const marks: Coverage["marks"] = {
+    ...model,
+    company: core(model.company),
+    purpose: core(model.purpose),
+    tools: core(model.tools),
+    scale: core(model.scale),
+    actions: real.length > 0 && real.filter((b) => b.contribution === "specific").length * 2 >= real.length ? "shown" : "applies",
+    results: real.some((b) => b.impact === "specific") ? "shown" : "applies",
+  };
+  const shape = {
+    amount: real.length >= 3 && real.length <= 6,
+    repeats: !bullets.some((b) => b.issue === "duplicate"),
+    order: real[0]?.impact === "specific",
+  };
+  const applies = CONDITIONAL_PARAMETERS.filter((p) => marks[p] !== "na");
+  const conditional = applies.length === 0 ? COVERAGE_POINTS.conditional
+    : Math.round((COVERAGE_POINTS.conditional * applies.filter((p) => marks[p] === "shown").length) / applies.length);
+  const score = CORE_PARAMETERS.filter((p) => marks[p] === "shown").length * COVERAGE_POINTS.core + conditional
+    + (shape.amount ? COVERAGE_POINTS.amount : 0) + (shape.repeats ? COVERAGE_POINTS.repeats : 0) + (shape.order ? COVERAGE_POINTS.order : 0);
+  return { score, marks, shape };
+}
+
 export function buildRoleResult(role: Experience, model: z.input<typeof ModelScoreSchema>, fingerprintValue: string): RoleResult {
   const ids = role.bullets.map((b) => b.id);
   const byId = new Map<string, ModelBullet>();
@@ -230,16 +323,18 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
     seen.add(key);
 
     const issue = normalizedIssue(m, unusable, duplicate);
+    const concise = conciseGrade(b.text, m.concise ?? "specific");
     const keep = issue === m.issue;
     const question = keep && issue !== "duplicate" ? blankToNull(m.question) : null;
     if (question !== null) options.set(b.id, m.options.filter(isAllowedOption));
     return {
       id: b.id,
-      score: unusable || duplicate ? 0 : bulletScore(m),
+      score: unusable || duplicate ? 0 : bulletScore({ ...m, concise }),
       contribution: m.contribution,
       clarity: m.clarity,
       specificity: m.specificity,
       impact: m.impact,
+      concise,
       issue,
       tip: keep ? blankToNull(m.tip) : null,
       question,
@@ -264,14 +359,16 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
     nextStep = { bulletId: picked.id, issue: picked.issue, tip: picked.tip };
   }
 
-  const score =
-    bullets.length === 0 ? null : Math.round(bullets.reduce((sum, b) => sum + b.score, 0) / bullets.length);
+  // Lines: the bullets' average. The role's score adds what the role shows a recruiter (Coverage).
+  const lines = bullets.length === 0 ? null : Math.round(bullets.reduce((sum, b) => sum + b.score, 0) / bullets.length);
+  const coverage = buildCoverage(bullets, { ...NO_COVERAGE, ...model.coverage });
+  const score = lines === null ? null : Math.round(LINES_SHARE * lines + (1 - LINES_SHARE) * coverage.score);
 
   const roleQuestions: RoleQuestion[] = (model.roleQuestions ?? []).slice(0, MAX_ROLE_QUESTIONS).map((q, i) => ({
     id: `rq${i + 1}`, text: q.text, options: q.topic === "company" ? [] : q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
   }));
   const thin = role.bullets.length <= 1 || model.thin === true;
-  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions, thin };
+  return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions, thin, lines, coverage };
 }
 
 /** Small synchronous 53-bit string hash (cyrb53), so the browser and the worker agree. */
@@ -305,13 +402,13 @@ export function fingerprint(role: Experience, locale: Locale): string {
 export type Band = "needsWork" | "goodStart" | "clear";
 
 export function band(score: number): Band {
-  if (score >= 75) return "clear";
+  if (score >= CLEAR_AT) return "clear";
   if (score >= 40) return "goodStart";
   return "needsWork";
 }
 
 export function clearCount(result: Pick<RoleResult, "bullets">): { clear: number; total: number } {
-  return { clear: result.bullets.filter((b) => b.score >= 75).length, total: result.bullets.length };
+  return { clear: result.bullets.filter((b) => b.score >= CLEAR_AT).length, total: result.bullets.length };
 }
 
 /** Voice answers: at most 60 s per recording, 20 sessions per user per day. */
@@ -348,3 +445,9 @@ export type ItemLinesBody = z.infer<typeof ItemLinesBodySchema>;
 /** Suggested short lines for that item, from its own fields and the answer only. Empty: skip the picks. */
 export const ItemLinesAnswerSchema = z.object({ lines: z.array(z.string().min(1).max(200)).max(4) }).strict();
 export type ItemLinesAnswer = z.infer<typeof ItemLinesAnswerSchema>;
+
+/** The model's part of stored marks. Actions and results are left out: they are worked out again from the bullets. */
+export function modelMarks(coverage: Coverage): ModelCoverage {
+  const { company, purpose, tools, scale, leadership, seniority, people, domain } = coverage.marks;
+  return { company, purpose, tools, scale, leadership, seniority, people, domain };
+}

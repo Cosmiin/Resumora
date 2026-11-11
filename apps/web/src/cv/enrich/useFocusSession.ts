@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  BRAIN_DUMP_QUESTION, MAX_LONG_TEXT, findScored, fingerprint, newId, notesHash,
+  BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, findScored, fingerprint, newId, notesHash,
   type CvContent, type Experience, type Question, type RoleResult,
 } from "@resumora/shared";
 import { ApiClientError } from "../../lib/api-error.ts";
@@ -57,7 +57,7 @@ function buildQueue(role: Experience | undefined, result: RoleResult | undefined
     ? result.bullets.map((b) => [b.id, b]) : []);
   // The bullet picked with ✨ is always in the queue, even at 100: focus mode opens on that bullet.
   const bullets = (role?.bullets ?? []).filter((b) => b.id === opts.bulletId || (opts.mode === "improve"
-    ? (grades.get(b.id)?.score ?? 0) < 75 : grades.get(b.id)?.impact !== "specific"));
+    ? (grades.get(b.id)?.score ?? 0) < CLEAR_AT : grades.get(b.id)?.impact !== "specific"));
   if (opts.mode === "improve") {
     bullets.sort((a, b) => (grades.get(a.id)?.score ?? 0) - (grades.get(b.id)?.score ?? 0));
     const chosen = bullets.findIndex((b) => b.id === opts.bulletId);

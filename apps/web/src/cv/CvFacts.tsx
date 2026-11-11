@@ -4,7 +4,7 @@ import { scoredItems, type CvContent } from "@resumora/shared";
 import { getPreferences, preferencesKey, savePreferences } from "../account/account-api.ts";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { t } from "../i18n/t.ts";
-import { averageScore, belowTarget } from "./enrich/EnrichPath.tsx";
+import { averageScore, belowTarget, strengthWeights } from "./enrich/EnrichPath.tsx";
 import type { RoleScoreState } from "./enrich/useRoleScores.ts";
 import { TEMPLATES, type TemplateId } from "./page/templates.ts";
 import { SCORED_LIST } from "./edit/lists.ts";
@@ -50,7 +50,7 @@ export function CvFacts({ cv, scores, template, onTemplate, templateFailed, onAn
   const strength = averageScore(new Map(items.map(({ item }) => {
     const s = scores.get(item.id);
     return [item.id, s?.state === "ready" ? (s.result?.score ?? null) : null];
-  })));
+  })), strengthWeights(cv));
   const waitingItems = items.filter(({ item }) => scores.get(item.id)?.state === "ready" && belowTarget(scores.get(item.id)));
   const waiting = waitingItems.length;
   const [all, setAll] = useState(false);

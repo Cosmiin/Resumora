@@ -110,7 +110,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     const result = ImproveAnswerSchema.parse(await res.json());
     expect(result).toEqual({
       proposal: { bulletId: input().bulletId, text: proposal },
-      bulletBefore: 43, bulletAfter: 80, roleBefore: 72, roleAfter: 90, cached: true,
+      bulletBefore: 45, bulletAfter: 80, roleBefore: 54, roleAfter: 64, cached: true,
     });
     const swapped = { ...role, bullets: role.bullets.map((b, i) => i === 0 ? { ...b, text: proposal } : b) };
     const predicted = buildRoleResult(swapped, { ...initial, bullets: [grade.bullets[0]!, initial.bullets[1]!] }, fingerprint(swapped, "en"));
@@ -270,7 +270,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     initial.bullets[1]!.duplicateOf = role.bullets[0]!.id;
     await save();
     expect(await (await post()).json()).toMatchObject({
-      proposal: { text: proposal }, bulletAfter: 80, roleBefore: 22, roleAfter: 40, cached: false,
+      proposal: { text: proposal }, bulletAfter: 80, roleBefore: 14, roleAfter: 28, cached: false,
     });
     expect(await insights.pending(role.id)).toEqual([]);
   });
@@ -279,7 +279,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     await insights.remove([role.id]);
     const answers = [initial, { text: proposal, nextQuestion: null }, grade];
     model = fakeModel(() => answers.shift());
-    expect(await (await post()).json()).toMatchObject({ bulletBefore: 43, bulletAfter: 80 });
+    expect(await (await post()).json()).toMatchObject({ bulletBefore: 45, bulletAfter: 80 });
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_score", "enrich_improve_bullet", "enrich_score"]);
   });
 

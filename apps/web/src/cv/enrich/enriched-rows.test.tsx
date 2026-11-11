@@ -85,8 +85,8 @@ describe("the result of the path", () => {
   it("rows in order: roles, projects and volunteering, then sections with lines added and Key achievements", async () => {
     await walk(new Map([["a", ready(90)], ["b", ready(82)], ["p", ready(86)]]));
     expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
-    // Q1: the project counts toward the average when the CV has one: (90 + 61 + 50) / 3 → (90 + 82 + 86) / 3.
-    expect(screen.getByText("From 67 to 86 out of 100.")).toBeInTheDocument();
+    // Q1: the project counts toward the average when the CV has one: the latest role counts 3 times, the next twice: (270 + 122 + 50) / 6 → (270 + 164 + 86) / 6.
+    expect(screen.getByText("From 74 to 87 out of 100.")).toBeInTheDocument();
     const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent);
     expect(rows).toEqual([
       "0Analyst, Analyst Co already reads clearly, so it had no questions.at 90",
@@ -100,9 +100,9 @@ describe("the result of the path", () => {
   });
 
   it("below 80 over every scored item: names the lowest item of any kind, and not saved as enriched", async () => {
-    await walk(new Map([["a", ready(90)], ["b", ready(82)], ["p", ready(60)]]));
+    await walk(new Map([["a", ready(90)], ["b", ready(82)], ["p", ready(30)]]));
     expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
-    expect(screen.getByText("Route planner is at 60. One more pass would lift it.")).toBeInTheDocument();
+    expect(screen.getByText("Route planner is at 30. One more pass would lift it.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Answer more questions" })).toBeInTheDocument();
     expect(dispatched.some((a) => a.type === "markEnriched")).toBe(false);
   });

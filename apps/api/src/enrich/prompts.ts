@@ -74,8 +74,8 @@ a separate explanation of your assessment process.
 
 GRADING
 
-Grade contribution, clarity, specificity and impact independently using
-missing, partial, or specific.
+Grade contribution, clarity, specificity, impact and concise independently
+using missing, partial, or specific.
 
 Contribution:
 - missing: No actual task, responsibility, or intervention is identified.
@@ -113,7 +113,19 @@ Impact:
   such as "for 1.2M customers", "weekly", or "so payroll closed on time".
 
 Many good bullets have no result. Grade impact honestly, but never let
-a missing result lower the other three grades.
+a missing result lower the other grades.
+
+Concise:
+- missing: Rambling. Several ideas run together, or most of the words
+  carry no fact.
+- partial: The point is there but padded with filler, repetition or
+  stacked buzzwords, such as "responsible for", "in order to", "various",
+  "successfully".
+- specific: Every phrase carries a fact, in two lines at most.
+
+Grade concise on the words that are there. A bullet is not concise merely
+because it is short, and brevity never raises the other grades. A bullet
+that needs one more fact should gain a few words, not a second sentence.
 
 SUFFICIENCY TEST
 
@@ -134,39 +146,44 @@ Judge technical and nontechnical professions by the same standard.
 
 CALIBRATION EXAMPLES
 
-Grades below are contribution / clarity / specificity / impact.
+Grades below are contribution / clarity / specificity / impact / concise.
 
 "Responsible for various administrative tasks."
-partial / specific / missing / missing.
+partial / specific / missing / missing / partial.
 Understandable, but neither the actual tasks nor distinguishing context is given.
 Priority: contribution.
 
 "Prepared employment contracts for temporary workers."
-specific / specific / specific / missing.
+specific / specific / specific / missing / specific.
 A concrete action, deliverable and audience are clear. No result is stated, and none is needed.
 
 "Supported Romanian market-entry planning through partner outreach."
-partial / specific / partial / partial.
+partial / specific / partial / partial / specific.
 The market, purpose and broad approach are clear. The person's actual involvement in outreach is not.
 Priority: contribution.
 Useful question: "What did you personally do during the partner outreach?"
 
 "Coordinated onboarding documentation between recruiters and payroll teams."
-specific / specific / specific / missing.
+specific / specific / specific / missing / specific.
 The action, material and participants are clear. No improvement is necessary.
 
 "Increased efficiency by 75% using advanced solutions."
-missing / partial / missing / partial.
+missing / partial / missing / partial / partial.
 An outcome is claimed, but the underlying work and the vague terms are unclear. The number alone does not explain the work.
 Priority: contribution.
 
 "Investigated failed API requests using application logs."
-specific / specific / specific / missing.
+specific / specific / specific / missing / specific.
 The action, problem and investigative approach are concrete. No improvement is necessary.
 
 "Cut onboarding time from 3 days to 20 minutes by introducing video ID checks."
-specific / specific / specific / specific.
-Action, method and a concrete result are all clear.
+specific / specific / specific / specific / specific.
+Action, method and a concrete result are all clear, in one short line.
+
+"Was responsible for successfully managing and coordinating the various day-to-day operational activities of the department in order to ensure that all processes ran smoothly."
+partial / specific / missing / missing / missing.
+Many words and one vague fact: the person ran the department's daily operations.
+Priority: contribution.
 
 These are calibration anchors, not phrases to match mechanically.
 Write their equivalent feedback in the CV language.
@@ -260,10 +277,42 @@ Choose the issue by this priority:
 3. specificity when the statement is understandable but does not distinguish the work.
 4. impact when everything else is specific but no result is shown.
 When the bullet is sufficient, use issue none, tip null and question null.
+When its only weakness is concise, use issue none and question null, and
+give a tip naming the words to cut.
 
 Questions must not assume tools, achievements, quantities, or activities
 that the person has not supplied. Ask one question, not a compound list.
 Set nextStepId to the id of the bullet whose fix would help most, or null.
+
+COVERAGE
+
+coverage says whether the role as written on the page (its title,
+description and bullets together, never the notes) shows a recruiter each
+of the things below. Give one mark for each:
+- shown: the page states it.
+- applies: the role clearly involves it (from the title, the bullets or
+  the notes), but the page does not state it.
+- unknown: nothing on the page or in the notes tells you whether it applies.
+- na: it does not apply to this role, or a note says it does not.
+
+These four always apply; mark them shown or applies only:
+- company: what the employer does.
+- purpose: what the role was for.
+- tools: at least one tool, software or method, named where it was used.
+- scale: a size, such as people, customers, volume, budget, sites or countries.
+
+These four apply to some roles only:
+- leadership: people reported to the person, or they led a team or project.
+- seniority: who they reported to, or how senior the role was.
+- people: the teams, clients, partners or suppliers they worked with.
+- domain: industry rules, markets or product knowledge the work needed.
+Prefer na when nothing suggests it. Use unknown only when the title or the
+bullets hint at it without settling it, such as a "Lead" title with no team
+mentioned.
+
+A fact that is only in the notes is applies, not shown: a recruiter reads
+the page, not the notes. A note that answers no, for example that nobody
+reported to the person, makes it na.
 
 OUTPUT
 

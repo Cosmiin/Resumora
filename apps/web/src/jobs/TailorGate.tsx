@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { CvContent } from "@resumora/shared";
 import { useMyCv } from "../cv/CvPage.tsx";
 import { useRoleScores } from "../cv/enrich/useRoleScores.ts";
-import { ENRICHED_AT, averageScore } from "../cv/enrich/EnrichPath.tsx";
+import { ENRICHED_AT, averageScore, strengthWeights } from "../cv/enrich/EnrichPath.tsx";
 import { useT } from "../i18n/t.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 
@@ -33,7 +33,7 @@ function CheckCv({ cv, onTailor, onEnrich, onClose }: Props & { cv: CvContent })
   const { scores } = useRoleScores({ cv, status: "saved" });
   useEffect(() => { if (enriched) onTailor(); }, [enriched, onTailor]);
   if (enriched) return <p role="status">{t("job.gate.checking")}</p>;
-  const average = averageScore(new Map(cv.experience.map((role) => [role.id, scores.get(role.id)?.result?.score ?? null])));
+  const average = averageScore(new Map(cv.experience.map((role) => [role.id, scores.get(role.id)?.result?.score ?? null])), strengthWeights(cv));
   return (
     <>
       <p>{t("job.gate.notEnriched")}</p>

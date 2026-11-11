@@ -159,10 +159,25 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   );
 }
 
-/** The average of every score given (roles, projects and volunteering with a score), rounded; null when none has one. */
-export function averageScore(scores: ReadonlyMap<string, number | null>): number | null {
-  const known = [...scores.values()].filter((n): n is number => n !== null);
-  return known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length) : null;
+/**
+ * The CV's strength: the average of every score given (roles, projects and volunteering with a score), rounded;
+ * null when none has one. With weights, a recent role counts more than the rest.
+ */
+export function averageScore(scores: ReadonlyMap<string, number | null>, weights?: ReadonlyMap<string, number>): number | null {
+  let sum = 0;
+  let total = 0;
+  for (const [id, n] of scores) {
+    if (n === null) continue;
+    const w = weights?.get(id) ?? 1;
+    sum += n * w;
+    total += w;
+  }
+  return total ? Math.round(sum / total) : null;
+}
+
+/** How much each role counts in the CV's strength: the most recent role 3 times, the one before it twice, the rest once. */
+export function strengthWeights(cv: Pick<CvContent, "experience">): ReadonlyMap<string, number> {
+  return new Map(cv.experience.map((role, i) => [role.id, i === 0 ? 3 : i === 1 ? 2 : 1]));
 }
 const scoreOf = (s: RoleScoreState | undefined) => (s && s.state !== "none" ? (s.result?.score ?? null) : null);
 
@@ -177,7 +192,8 @@ function EndStop({ cv, scores, waitForSave, before, stops, lights, achievementsA
   const scored = scoredItems(cv);
   const settled = scored.every(({ item }) => !["scoring", "previous"].includes(scores.get(item.id)?.state ?? ""));
   const now = new Map(scored.map(({ item }) => [item.id, scoreOf(scores.get(item.id))]));
-  const average = averageScore(now) ?? 0;
+  const weights = strengthWeights(cv);
+  const average = averageScore(now, weights) ?? 0;
   const enriched = settled && average >= ENRICHED_AVERAGE;
   useEffect(() => {
     if (enriched) dispatch({ type: "markEnriched", at: new Date().toISOString() });
@@ -210,7 +226,7 @@ function EndStop({ cv, scores, waitForSave, before, stops, lights, achievementsA
     }, 0),
   })).filter((a) => a.n > 0);
   return (
-    <EnrichedScreen start={averageScore(before)} average={average} rows={rows} also={also} achievementsAdded={achievementsAdded} skillsAdded={skillsAdded}
+    <EnrichedScreen start={averageScore(before, weights)} average={average} rows={rows} also={also} achievementsAdded={achievementsAdded} skillsAdded={skillsAdded}
       notice={notice} lowest={lowest ? { ...lowest, label: roleName(findScored(cv, lowest.roleId)!.item, SCORED_LIST[lowest.kind]), tip } : null}
       onFinish={onClose} onImprove={onImprove}
       onFindJob={() => void (async () => {

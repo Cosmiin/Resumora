@@ -10,6 +10,7 @@ import {
   buildRoleResult,
   bulletScore,
   clearCount,
+  conciseGrade,
   fingerprint,
   isAllowedOption,
   isPlaceholder,
@@ -63,8 +64,8 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/4", () => {
-    expect(SCORE_POLICY).toBe("score/5");
+  it("uses policy score/6", () => {
+    expect(SCORE_POLICY).toBe("score/6");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -77,9 +78,12 @@ describe("bulletScore", () => {
   it("applies the weights", () => {
     expect(bulletScore(g("specific", "specific", "specific", "specific"))).toBe(100);
     expect(bulletScore(g("specific", "specific", "specific", "missing"))).toBe(80);
-    expect(bulletScore(g("partial", "specific", "missing", "missing"))).toBe(43);
-    expect(bulletScore(g("partial", "specific", "partial", "partial"))).toBe(63);
-    expect(bulletScore(g("missing", "partial", "missing", "partial"))).toBe(23);
+    expect(bulletScore(g("partial", "specific", "missing", "missing"))).toBe(45);
+    expect(bulletScore(g("partial", "specific", "partial", "partial"))).toBe(65);
+    expect(bulletScore(g("missing", "partial", "missing", "partial"))).toBe(20);
+    // Concise is the fifth check: 10 points, half for partly.
+    expect(bulletScore({ ...g("specific", "specific", "specific", "specific"), concise: "partial" })).toBe(95);
+    expect(bulletScore({ ...g("specific", "specific", "specific", "missing"), concise: "missing" })).toBe(70);
   });
 });
 
@@ -208,7 +212,7 @@ describe("buildRoleResult", () => {
       model([mb("b1"), mb("b2", g("specific", "specific", "specific", "missing")), mb("b3")]),
       "fp",
     );
-    expect(r.score).toBe(60);
+    expect(r.lines).toBe(60);
     expect(r.policy).toBe(SCORE_POLICY);
     expect(r.fingerprint).toBe("fp");
   });
@@ -322,7 +326,7 @@ describe("mergeGrades role questions", () => {
     expect(result.roleQuestions).toEqual([
       { id: "rq2", text: "Who did you report to?", options: ["The CEO", "The owner"], kind: "role", topic: "other" },
     ]);
-    expect(result.score).toBe(80);
+    expect(result.lines).toBe(80);
     expect(result.fingerprint).toBe("new");
   });
 });
@@ -371,8 +375,8 @@ describe("band and clearCount", () => {
   it("bands", () => {
     expect(band(39)).toBe("needsWork");
     expect(band(40)).toBe("goodStart");
-    expect(band(74)).toBe("goodStart");
-    expect(band(75)).toBe("clear");
+    expect(band(79)).toBe("goodStart");
+    expect(band(80)).toBe("clear");
   });
   it("counts clear bullets", () => {
     const r = buildRoleResult(
@@ -393,5 +397,54 @@ describe("blank tip and question", () => {
     );
     expect(r.bullets[0]).toMatchObject({ tip: null, question: null });
     expect(r.questions).toEqual([]);
+  });
+});
+
+// score/6: a role's score is 60% its bullets (Lines) and 40% what the role shows a recruiter (Coverage).
+describe("coverage and the role score", () => {
+  const texts = ["Planned routes for 14 depots in Excel", "Built the weekly delivery report", "Trained colleagues"];
+  const bullets = [
+    mb("b1", g("specific", "specific", "specific", "missing")),
+    mb("b2", g("specific", "specific", "specific", "missing")),
+    mb("b3", g("specific", "specific", "missing", "missing")),
+  ];
+  const marks = { company: "applies", purpose: "applies", tools: "shown", scale: "shown", leadership: "shown", seniority: "na", people: "na", domain: "na" } as const;
+
+  it("adds up the example from the owner's score page: lines 73, coverage 64, score 69", () => {
+    const r = buildRoleResult(role(texts), { ...model(bullets), coverage: marks }, "fp");
+    expect(r.bullets.map((b) => b.score)).toEqual([80, 80, 60]);
+    expect(r.lines).toBe(73);
+    // Core shown: actions (from the grades), tools, scale = 30. Leadership applies and is shown = 20. Shape: 3 bullets, no repeats = 14.
+    expect(r.coverage).toMatchObject({ score: 64, marks: { actions: "shown", results: "applies" }, shape: { amount: true, repeats: true, order: false } });
+    expect(r.score).toBe(69);
+  });
+
+  it("gives the conditional points when nothing conditional applies, and none while one is still unknown", () => {
+    const none = { ...marks, leadership: "na" } as const;
+    expect(buildRoleResult(role(texts), { ...model(bullets), coverage: none }, "fp").coverage?.score).toBe(64);
+    const unknown = { ...marks, leadership: "unknown" } as const;
+    expect(buildRoleResult(role(texts), { ...model(bullets), coverage: unknown }, "fp").coverage?.score).toBe(44);
+  });
+
+  it("counts a result first, and a core parameter the model calls not applicable as not shown", () => {
+    const first = [mb("b1"), bullets[1]!, bullets[2]!];
+    const r = buildRoleResult(role(texts), { ...model(first), coverage: { ...marks, company: "na" } }, "fp");
+    expect(r.coverage).toMatchObject({ marks: { company: "applies", results: "shown" }, shape: { order: true } });
+    expect(r.coverage?.score).toBe(80);
+  });
+
+  it("caps concise by length, whatever the model says", () => {
+    expect(conciseGrade("x".repeat(220), "specific")).toBe("specific");
+    expect(conciseGrade("x".repeat(221), "specific")).toBe("partial");
+    expect(conciseGrade("x".repeat(301), "specific")).toBe("missing");
+    expect(conciseGrade("short", "partial")).toBe("partial");
+    const r = buildRoleResult(role(["y".repeat(250)]), model([mb("b1")]), "fp");
+    expect(r.bullets[0]).toMatchObject({ concise: "partial", score: 95 });
+  });
+
+  it("keeps the role-wide marks when one bullet is graded again", () => {
+    const stored = buildRoleResult(role(texts), { ...model(bullets), coverage: marks }, "old");
+    const again = mergeGrades(role(texts), stored, [mb("b3")], "new");
+    expect(again.coverage?.marks).toMatchObject({ tools: "shown", company: "applies", leadership: "shown", results: "shown" });
   });
 });

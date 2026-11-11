@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BRAIN_DUMP_QUESTION, MAX_LONG_TEXT, type Locale, type Question } from "@resumora/shared";
+import { BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, type Locale, type Question } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { AnswerBox, type Via } from "./AnswerBox.tsx";
 import { BackButton } from "./QuestionStep.tsx";
@@ -114,7 +114,7 @@ export function DumpPickStep({ proposals, roleAfterAll, busy, onAdd, onBack, lin
             <label className={picked.has(p.id) ? "fm-pick is-on" : "fm-pick"}>
               <input type="checkbox" checked={picked.has(p.id)} onChange={() => toggle(p.id)} />
               <span className="fm-pick-text">{p.text}</span>
-              {p.score !== undefined && <span className={p.score >= 75 ? "fm-tag is-up" : "fm-tag is-low"}>{p.score}</span>}
+              {p.score !== undefined && <span className={p.score >= CLEAR_AT ? "fm-tag is-up" : "fm-tag is-low"}>{p.score}</span>}
             </label>
           </li>
         ))}

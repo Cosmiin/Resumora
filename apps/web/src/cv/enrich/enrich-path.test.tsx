@@ -224,11 +224,11 @@ describe("the end of the path (6B)", () => {
     return dispatch;
   }
 
-  it("average 84: saves the CV as enriched and shows the report card", async () => {
+  it("average 85: saves the CV as enriched and shows the report card", async () => {
     const dispatch = await finish(new Map([["a", ready(90)], ["b", ready(82)], ["c", ready(84)], ["d", ready(80)]]));
     expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
     expect(dispatch).toHaveBeenCalledWith({ type: "markEnriched", at: expect.any(String) });
-    expect(screen.getByText("From 75 to 84 out of 100.")).toBeInTheDocument();
+    expect(screen.getByText("From 77 to 85 out of 100.")).toBeInTheDocument();
     const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent);
     expect(rows).toEqual([
       "0Analyst, Analyst Co already reads clearly, so it had no questions.at 90",
@@ -242,11 +242,11 @@ describe("the end of the path (6B)", () => {
     expect(screen.getByRole("button", { name: "See my CV" })).toBeInTheDocument();
   });
 
-  it("average 76: not saved as enriched, names the lowest role; Answer more questions opens it and comes back", async () => {
+  it("average 79: not saved as enriched, names the lowest role; Answer more questions opens it and comes back", async () => {
     const dispatch = await finish(new Map([["a", ready(90)], ["b", ready(66)], ["c", ready(68)], ["d", ready(80)]]));
     expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
     expect(dispatch.mock.calls.some(([a]) => a.type === "markEnriched")).toBe(false);
-    expect(screen.getByText("From 75 to 76 out of 100.")).toBeInTheDocument();
+    expect(screen.getByText("From 77 to 79 out of 100.")).toBeInTheDocument();
     expect(screen.getByText("Buyer is at 66. One more pass would lift it.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Find a job" })).toBeNull();
     expect(screen.getByText("Added 1 skill from your roles: SAP")).toBeInTheDocument();

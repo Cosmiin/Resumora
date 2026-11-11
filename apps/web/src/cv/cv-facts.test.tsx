@@ -39,9 +39,10 @@ beforeEach(() => {
 });
 
 describe("the facts beside the base CV", () => {
-  it("shows the CV's strength as the average of its scored roles, and how many still have questions", async () => {
+  it("shows the CV's strength as the weighted average of its scored roles, and how many still have questions", async () => {
     show(new Map([["a", ready(90)], ["b", ready(60)], ["c", ready(72)]]));
-    expect(screen.getByText("74")).toBeInTheDocument();
+    // The most recent role counts 3 times, the next twice, the rest once: (90×3 + 60×2 + 72) / 6.
+    expect(screen.getByText("77")).toBeInTheDocument();
     expect(screen.getByText("2 roles still have questions waiting.")).toBeInTheDocument();
     expect(screen.getByText("English")).toBeInTheDocument();
   });

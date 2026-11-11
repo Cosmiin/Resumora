@@ -43,10 +43,10 @@ describe("mergeGrades", () => {
         grade("b2", { contribution: "partial", specificity: "missing", issue: "contribution" })],
       nextStepId: "b1",
     }, "old");
-    expect(stored.bullets[0]!.score).toBe(43);
+    expect(stored.bullets[0]!.score).toBe(45);
     const result = mergeGrades(r, stored, [grade("b1")], "new");
     expect(result.bullets[0]!.score).toBe(80);
-    expect(result.score).toBe(62);
+    expect(result.lines).toBe(63);
     expect(result.fingerprint).toBe("new");
     expect(result.nextStep?.bulletId).toBe("b2");
     expect(result.bullets[1]).toEqual(stored.bullets[1]);
@@ -60,13 +60,13 @@ describe("mergeGrades", () => {
       bullets: [grade("b1"), grade("b2", { duplicateOf: "b1", issue: "duplicate" })],
       nextStepId: null,
     }, "old");
-    expect(stored.score).toBe(40);
+    expect(stored.lines).toBe(40);
 
     const result = mergeGrades(r, stored, [grade("b1")], "new");
 
     expect(result.bullets[1]).toMatchObject({ score: 0, issue: "duplicate" });
-    expect(result.score).toBe(40);
-    expect(result.score).toBe(stored.score);
+    expect(result.lines).toBe(40);
+    expect(result.lines).toBe(stored.lines);
   });
   it("throws if a bullet has neither fresh nor stored grades", () => {
     expect(() => mergeGrades(role(), null, [grade("b1")], "fp")).toThrow(EnrichParseError);
@@ -76,7 +76,7 @@ describe("mergeGrades", () => {
 
   it("builds the first result when all bullets have fresh grades", () => {
     const result = mergeGrades(role(), null, [grade("b1"), grade("b2")], "fp");
-    expect(result.score).toBe(80);
+    expect(result.lines).toBe(80);
     expect(result.bullets).toHaveLength(2);
     expect(mergeGrades(role([]), null, [], "empty").score).toBeNull();
   });
@@ -85,7 +85,7 @@ describe("mergeGrades", () => {
     const stored = buildRoleResult(role(), { bullets: [grade("b1"), grade("b2")], nextStepId: null }, "old");
     const result = mergeGrades(role(["Handled orders", "  HANDLED   orders "]), stored, [grade("b2")], "new");
     expect(result.bullets[1]).toMatchObject({ score: 0, issue: "duplicate", question: null });
-    expect(result.score).toBe(40);
+    expect(result.lines).toBe(40);
   });
 });
 
