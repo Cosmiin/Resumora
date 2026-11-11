@@ -10,7 +10,11 @@
 .jobs-list > li:first-child { padding-top: 0; }
 .jobs-list > li:last-child { border-bottom: 0; padding-bottom: 0; }
 .jobs-page .job-title { font: var(--weight-display) 1.25rem / 1.2 var(--font-display); letter-spacing: -0.01em; color: var(--color-ink); text-decoration: none; overflow-wrap: anywhere; }
-.jobs-page a.job-title:hover { text-decoration: underline; text-underline-offset: 4px; }
+.jobs-page a.job-title:hover, .jobs-list > li:hover a.job-title { text-decoration: underline; text-underline-offset: 4px; }
+/* The whole row opens the job: the title's link is stretched over it, and the row's button stays on top. */
+.jobs-list > li { position: relative; }
+.jobs-list a.job-title::after { content: ""; position: absolute; inset: 0; }
+.jobs-list > li .ui-btn { position: relative; z-index: 1; }
 .jobs-spinner { width: 16px; height: 16px; flex: none; border: 2px solid var(--color-ink); border-right-color: transparent; border-radius: 50%; animation: ui-spin 0.7s linear infinite; }
 .jobs-note { margin-top: var(--space-4); }
 .jobs-load-more { display: flex; margin: var(--space-6) auto 0; }
