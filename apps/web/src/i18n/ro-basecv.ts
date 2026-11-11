@@ -30,6 +30,8 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "cv.facts.language.de": "Germană",
   "cv.facts.language.es": "Spaniolă",
   "cv.facts.language.it": "Italiană",
+  "cv.contents.title": "Cuprins",
+  "cv.contents.jump": "Mergi la {name}",
   "import.drop": "Trage CV-ul aici",
   "import.chooseFile": "Alege un fișier",
   "import.fileNote": "PDF sau Word, cel mult 5 MB.",

@@ -1,5 +1,5 @@
 import { useReducer, useRef } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, newId, type CvContent, type Experience } from "@resumora/shared";
@@ -8,6 +8,7 @@ import { cvReducer } from "../edit/cvReducer.ts";
 import { useFocusAfterRender } from "../edit/useFocusAfterRender.ts";
 import { useOpenedSections } from "../edit/useOpenedSections.ts";
 import { HelperPanel } from "./HelperPanel.tsx";
+import { Overview } from "./Overview.tsx";
 
 function Harness({ initial }: { initial: CvContent }) {
   const [cv, dispatch] = useReducer(cvReducer, initial);
@@ -97,5 +98,22 @@ describe("helper panel overview", () => {
     expect(screen.queryByRole("button", { name: "Add Summary" })).toBeNull();
     expect(screen.getByRole("button", { name: "Reorder Summary" })).toBeInTheDocument();
     expect(state().basics.summary).toBe("");
+  });
+
+  // Wide screens split the overview in two: contents left of the page, what needs attention right.
+  it("contents part lists the sections and jumps to one; the coach part keeps what needs attention", async () => {
+    const onJump = vi.fn();
+    const props = { cv: filled(), dispatch: () => {}, onFocusField: () => {}, opened: new Set<never>(), onOpen: () => {} };
+    const { unmount } = render(<Overview {...props} part="contents" onJump={onJump} />);
+    expect(screen.getByText("Contents")).toBeInTheDocument();
+    expect(screen.queryByText("Needs attention")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Go to Experience" }));
+    expect(onJump).toHaveBeenCalledWith("experience");
+    unmount();
+
+    render(<Overview {...props} part="coach" />);
+    expect(screen.getByText("Needs attention")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Education" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reorder Experience" })).toBeNull();
   });
 });

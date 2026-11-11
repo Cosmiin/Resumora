@@ -21,6 +21,7 @@ import { useOpenedSections } from "./edit/useOpenedSections.ts";
 import { HelperPanel } from "./panel/HelperPanel.tsx";
 import { BottomSheet, type SheetState } from "./panel/BottomSheet.tsx";
 import { useMediaQuery } from "../hooks/useMediaQuery.ts";
+import { Overview } from "./panel/Overview.tsx";
 import { useRoleScores } from "./enrich/useRoleScores.ts";
 import { FocusOpenProvider, type FocusTarget } from "./enrich/focus-context.ts";
 import { FocusMode } from "./enrich/FocusMode.tsx";
@@ -102,6 +103,8 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   // A tailored CV opens editable by clicking, like the base CV; "Show changes" is the option.
   const [showChanges, setShowChanges] = useState(false);
   const phone = useMediaQuery("(max-width: 899px)");
+  // Wide screens: contents left of the page, the page larger, the helper panel right.
+  const wide = useMediaQuery("(min-width: 1360px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   // 1A: the guided path. "/cv?enrich=1" (Enrich first, from a job) opens it too; the parameter is then removed.
@@ -250,6 +253,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       waitForSave={waitForSave}
       original={tailored?.original}
       tailored={isTailored}
+      coachOnly={wide}
       top={isTailored ? undefined : (
         <CvFacts cv={content} scores={roleScores.scores} template={startTemplate.template} onTemplate={startTemplate.choose} templateFailed={startTemplate.failed} />
       )}
@@ -333,6 +337,12 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       {/* No focus mode on a tailored CV: without the opener, the ✨ bullet and role buttons render nothing. */}
       <FocusOpenProvider value={isTailored ? null : setFocusTarget}>
       <div className="editor-workspace" inert={importId !== null || covered}>
+        {wide && !historyOpen && (
+          <nav className="cv-outline" aria-label={t("cv.contents.title")}>
+            <Overview cv={content} dispatch={dispatch} onFocusField={focusField} opened={opened} onOpen={onOpen} scores={scores} tailored={isTailored} part="contents"
+              onJump={(key) => pageRef.current?.querySelector(`[data-section="${key}"]`)?.scrollIntoView?.({ behavior: "smooth", block: "start" })} />
+          </nav>
+        )}
         <div className="stage" ref={pageRef} tabIndex={-1} onFocus={() => setSheet("peek")}>
           {restoreFailed && <p role="alert" className="form-error">{t("history.restoreError")}</p>}
           {notices}

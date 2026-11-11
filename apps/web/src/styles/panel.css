@@ -21,6 +21,9 @@
 .sec-row:hover { background: var(--sage-50); }
 .sec-row .drag-grip { position: static; opacity: 1; flex: none; }
 .sec-row .name { flex: 1; min-width: 0; font-size: 14px; }
+.sec-row .sec-jump { min-height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.sec-row .sec-jump:hover { text-decoration: underline; }
+.sec-row .sec-jump:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
 .sec-row .name.off { color: var(--sage-500); text-decoration: line-through; text-decoration-color: var(--sage-300); }
 .sec-row .badge { font-size: 11px; color: var(--sage-500); margin-inline-end: 4px; }
 .sec-row.is-dragging { background: var(--surface-card); }

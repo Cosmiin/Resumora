@@ -28,6 +28,8 @@ export const basecvEn = {
   "cv.facts.language.de": "German",
   "cv.facts.language.es": "Spanish",
   "cv.facts.language.it": "Italian",
+  "cv.contents.title": "Contents",
+  "cv.contents.jump": "Go to {name}",
   "import.drop": "Drop your CV here",
   "import.chooseFile": "Choose a file",
   "import.fileNote": "PDF or Word, up to 5 MB.",

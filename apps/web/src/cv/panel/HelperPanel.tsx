@@ -29,10 +29,12 @@ type Props = {
   tailored?: boolean;
   /** Shown above the overview (the base CV's strength, template and language). */
   top?: ReactNode;
+  /** Wide screens: the sections and roles sit left of the page, so the panel keeps only what needs attention. */
+  coachOnly?: boolean;
 };
 
 /** The right-hand panel: the overview, or the tools for the section being edited. */
-export function HelperPanel({ cv, dispatch, focus, onBack, onFocusField, onFocusPage, opened, onOpen, scores, onRetry, waitForSave, original, onEnrich, tailored = false, top }: Props) {
+export function HelperPanel({ cv, dispatch, focus, onBack, onFocusField, onFocusPage, opened, onOpen, scores, onRetry, waitForSave, original, onEnrich, tailored = false, top, coachOnly = false }: Props) {
   return (
     <aside className="panel" aria-label={t("panel.label")}>
       {focus ? (
@@ -40,7 +42,7 @@ export function HelperPanel({ cv, dispatch, focus, onBack, onFocusField, onFocus
       ) : (
         <>
         {top}
-        <Overview cv={cv} dispatch={dispatch} onFocusField={onFocusField} opened={opened} onOpen={onOpen} scores={scores} onEnrich={onEnrich} tailored={tailored} />
+        <Overview cv={cv} dispatch={dispatch} onFocusField={onFocusField} opened={opened} onOpen={onOpen} scores={scores} onEnrich={onEnrich} tailored={tailored} part={coachOnly ? "coach" : undefined} />
         </>
       )}
     </aside>

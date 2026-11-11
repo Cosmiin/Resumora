@@ -245,3 +245,12 @@ Built by the forked session while the main session was on templates and export. 
 - Not looked at in a browser: only one copy of the app can run at a time (the API port is fixed) and the main session was using it. Covered by tests only until the owner's review.
 - Codex review (feedback branch), fixed: a second try at Remove my CV after a half-finished first one now finishes the cleanup; removing closes an open History preview; identical "things to confirm" are separate items; two correction forms open at once no longer overwrite each other (only changed fields are written); a section moved into Certifications while its form is open no longer crashes it; corrections are locked while the import is being used.
 - Codex review, not changed: a score request already in flight when the CV is removed can store one score for a role that no longer exists. The scoring step already deletes such leftovers the next time any role is scored, so it cleans itself up.
+
+## Owner review of the built flows, 2026-11-11 (on `redesign/templates-export`, after merging `redesign/base-cv-feedback`)
+
+- Owner feedback 1 (My CV): the page wasted the width of a desktop screen and its text was small. Three wider layouts were shown (`mockups/phase3/my-cv-wide.html` in the workspace); the owner chose B, three columns.
+- From 1360 px wide: "Contents" left of the page (the sections with reorder and hide, add a section, then the roles with their scores), the page in the middle, and the helper panel on the right with the strength, template, language and what needs attention. Below 1360 px nothing changes (one panel on the right; a bottom sheet on phones).
+- A section's name in Contents scrolls the page to it. A role still puts the cursor in its title, as before.
+- The sheet grows with the screen: 15% larger from 1500 px, 30% from 1700 px (the browser's zoom on the sheet only, so every template scales the same way).
+- Differs from the chosen mockup: roles are listed under the sections, not nested under "Experience" (the section list is a drag-to-reorder list); the template stays a dropdown, not three pictures (the template page already shows them).
+- The tailored CV's page uses the same editor and gets the same three columns.
