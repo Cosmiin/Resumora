@@ -77,11 +77,12 @@ export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers,
           {t(`tailor.roleReview.acceptAll${kindKey(kind)}`)}</button>}
       </div>
       {lines.length === 0 ? <p className="ui-notice">{t(`tailor.roleReview.nothing${kindKey(kind)}`)}</p>
-        : <div className="ui-sheet tailor-diffs">
+        // While the role is being saved the rows are frozen: a decision made then would not be part of what was sent.
+        : <fieldset className="ui-sheet tailor-diffs" disabled={busy}>
           {lines.map((line) => <DiffRow key={line.id} oldText={line.old.trim() || t("tailor.review.empty")} newText={line.proposal?.text ?? null}
             reason={line.proposal?.reason} inferred={line.proposal?.inferred} textLang={locale}
             decision={decided[line.id] ?? null} onDecide={(decision) => decide(line.id, decision)} />)}
-        </div>}
+        </fieldset>}
       {open.length === 0 && lines.length > 0 && <p className="ui-notice tailor-gap">{t(`tailor.roleReview.nothing${kindKey(kind)}`)}</p>}
       {removed > 0 && <p className="ui-small ui-muted tailor-gap">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
       <div className="tailor-foot">

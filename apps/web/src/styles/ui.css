@@ -452,6 +452,11 @@ select.ui-input {
   gap: var(--space-4);
   font-variant-numeric: tabular-nums;
 }
+/* The count ("4 of 8") stays on one line; a long label wraps beside it. */
+.ui-progress-top > :last-child {
+  flex: none;
+  white-space: nowrap;
+}
 .ui-progress-bar {
   height: 14px;
   border: var(--border-control) solid var(--color-ink);

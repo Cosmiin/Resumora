@@ -39,6 +39,7 @@
 /* A role's suggestions: the heading with the keyword bar, then one row per line. */
 .tailor-page-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: var(--space-5); align-items: end; margin-bottom: var(--space-6); }
 .tailor-review { max-width: 900px; }
+.tailor-diffs { min-width: 0; margin: 0; border: 0; }
 .tailor-review-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
 
 /* The finish: must-haves with a dot each. */

@@ -117,7 +117,8 @@ export async function acceptSection(
   const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));
   const inferred = new Map(body.inferred.map((d) => [d.itemId, d.keep]));
-  // A kept line the person reworded on the review (a bullet, a description, the summary).
+  // A kept line the person reworded on the review (a bullet, a description, the summary). Never a flagged one:
+  // its confirmation is recorded with the wording that was checked.
   const reworded = new Map(body.decisions.flatMap((d) => (d.keep && d.text !== undefined ? [[d.itemId, d.text] as const] : [])));
   const guessChoices = new Map(body.inferred.map((d) => [d.itemId, d.text === undefined ? { keep: d.keep } : { keep: d.keep, text: d.text }]));
   const flags = new Map(body.flags.map((f) => [f.questionId, f.confirmed]));
@@ -140,7 +141,7 @@ export async function acceptSection(
     }
     let applied = p;
     const own = reworded.get(key);
-    if (own !== undefined && keep && !p.guesses?.length && (p.field === "text" || p.field === "description" || p.itemId === "summary")) {
+    if (own !== undefined && keep && !p.flags.length && !p.guesses?.length && (p.field === "text" || p.field === "description" || p.itemId === "summary")) {
       applied = { ...p, text: own };
     }
     if (p.guesses?.length && (keep ?? true)) {

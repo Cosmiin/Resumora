@@ -246,7 +246,8 @@ export function TailorFlow() {
   } else if (phase.kind === "back") {
     const { resume } = phase;
     body = isRoleSection(phase.section)
-      ? <FinishedRoles roles={doneIn(phase.section)} locale={locale}
+      // From the finish every finished item is offered (roles, then projects and volunteering); from a step, that step's.
+      ? <FinishedRoles roles={resume.kind === "done" ? [...doneIn("experience"), ...doneIn("projects")] : doneIn(phase.section)} locale={locale}
         onPick={(roleId) => setPhase({ kind: "role", roleId, busy: false, resume })} onClose={() => setPhase(resume)} />
       : <YourAnswers key={phase.section} title={t(`tailor.section.${phase.section}`)} questions={stepQuestions(phase.section)}
         answers={run?.answers ?? []} busy={false} locale={locale} onClose={() => setPhase(resume)} />;
@@ -267,7 +268,7 @@ export function TailorFlow() {
   }
   else if (phase.kind === "done") {
     body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job}
-      onAnswers={anyDone("experience") ? () => setPhase({ kind: "back", section: "experience", resume: phase }) : undefined} />;
+      onAnswers={anyDone("experience") || anyDone("projects") ? () => setPhase({ kind: "back", section: "experience", resume: phase }) : undefined} />;
   } else if (phase.kind === "deleted") {
     body = <section className="ui-stack tailor-narrow" role="alert"><h1 className="ui-title">{t("tailor.error.deleted")}</h1>
       <p><Link className="ui-btn" to="/jobs">{t("tailor.error.toJobs")}</Link></p></section>;

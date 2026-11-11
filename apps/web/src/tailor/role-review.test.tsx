@@ -84,6 +84,12 @@ describe("RoleReview: a role's suggestions as a list", () => {
     });
   });
 
+  it("freezes every row while the role is being saved", () => {
+    review({ busy: true });
+    for (const button of within(rows()[0]!).getAllByRole("button")) expect(button).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+  });
+
   it("Skip this role keeps every line as it is on the CV", async () => {
     const onAccept = review();
     await userEvent.click(screen.getByRole("button", { name: "Skip this role" }));

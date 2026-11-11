@@ -204,3 +204,7 @@ Branch `redesign/tailoring`, on top of `redesign/jobs`, in the same folder as th
 - Finish: keywords now on the CV against the start, must-haves with a dot each, "Not covered" with "Change my answer" (opens the finished roles), and "Mark as ready" or "Mark as ready anyway". Marking ready is a step on this screen only: nothing new is stored (the job already shows "CV tailored" when tailoring ends). The mockup's reason per uncovered must-have ("You answered No...") is not shown: the engine does not record which answer left it uncovered.
 - "Choose a template" on the ready screen comes with flow 6; until then the screen offers Open the CV, Export and Write a cover letter.
 - Romanian: the whole tailoring flow. The tailored CV's own page, the cover letter and export stay English until flow 6.
+- Codex review (tailoring): while a role is being saved its rows are frozen, so a decision made in that moment is not silently dropped.
+- Codex review (tailoring): "Change my answer" on the finish screen lists every finished item (roles, projects, volunteering), and appears for a CV that has only projects.
+- Codex review (tailoring): the person's own rewording is never applied to a flagged suggestion (older runs only; today's runs have none).
+- The count on a keyword bar ("4 of 8") stays on one line; the label wraps beside it (seen at phone width).

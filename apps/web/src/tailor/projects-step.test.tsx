@@ -80,6 +80,26 @@ describe("Projects & volunteering step", () => {
   });
 });
 
+describe("the finish screen of a CV with only a project", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    const met = { ref: "r0", kind: "requirement" as const, status: "missing" as const, evidence: null, inferred: false };
+    vi.mocked(getScores).mockResolvedValue({ base: score(82), tailored: { ...score(82), labels: [met] } });
+    vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv("en"), projects: [checker] }, version: 1, updatedAt: at });
+    vi.mocked(getJob).mockResolvedValue({ extracted: { title: "Analyst", company: "DSV", requirements: [{ text: "BPMN", kind: "must", category: "skill" }] } } as never);
+    vi.mocked(getRun).mockResolvedValue(run({ status: "done", currentSection: null, currentRoleId: null, roleOrder: ["p1"], sections: ["projects", "skills"] }));
+  });
+
+  it("Change my answer opens the finished project, though the CV has no roles", async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(await screen.findByRole("button", { name: "Change my answer" }));
+    expect(screen.getByRole("button", { name: /Payroll checker/ })).toBeInTheDocument();
+  });
+});
+
 describe("a project with nothing to change (browser check)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
