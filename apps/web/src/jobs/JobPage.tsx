@@ -225,12 +225,12 @@ function JobView({ id, userId }: { id: string; userId: string }) {
               {!score.isPending && <button type="button" className="ui-btn ui-btn--sm" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button>}</div>}>
             <NiceToHave inside requirements={extracted.requirements} score={base} />
           </MustHaves>
-          <Keywords score={base} />
           </div>
         <section className="job-more ui-stack">
           <h2 className="ui-heading">{t("job.more.title")}</h2>
           {extracted.summary.trim() && <div className="sec"><h3>{t("job.inShort")}</h3><p>{extracted.summary}</p></div>}
-          <JobSummary extracted={extracted} rawText={job.rawText} salaryStated={salaryText !== null} />
+          <JobSummary extracted={extracted} rawText={job.rawText} salaryStated={salaryText !== null}
+            keywords={<Keywords inside score={base} terms={extracted.keywords} />} />
           <label className="job-application-status"><span className="ui-label">{t("job.status.title")}</span>
             <select className="ui-input" value={job.applicationStatus} disabled={statusSaving}
               onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>

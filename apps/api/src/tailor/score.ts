@@ -56,6 +56,8 @@ export async function scoreMatch(
     const requirements = new Set(input.job.requirements.map((_, index) => `r${index}`));
     const keywordSources = [...input.job.requirements.map((requirement) => requirement.text), ...input.job.responsibilities]
       .map((source) => source.toLowerCase());
+    // The job's own keywords (read from the ad), when it has them: only those are labelled.
+    const supplied = new Map((input.job.keywords ?? []).map((term) => [`k:${term}`.toLowerCase(), `k:${term}`]));
     // A bad requirement ref fails the score; a bad or repeated keyword (e.g. one taken from the job title) is only dropped.
     const labels = reply.filter((label) => {
       const key = label.ref.toLowerCase();
@@ -63,14 +65,19 @@ export async function scoreMatch(
         if (!requirements.has(label.ref) || refs.has(key)) throw new Error("Invalid requirement label refs");
       } else {
         const term = key.slice(2).trim();
-        if (!key.startsWith("k:") || !term || refs.has(key) || !keywordSources.some((source) => source.includes(term))) return false;
+        if (supplied.size ? !supplied.has(key) || refs.has(key)
+          : !key.startsWith("k:") || !term || refs.has(key) || !keywordSources.some((source) => source.includes(term))) return false;
       }
       refs.add(key);
       return true;
     });
     if (![...requirements].every((ref) => refs.has(ref))) throw new Error("Missing requirement labels");
-    if (keywordSources.some((source) => source.trim()) && !reply.some((label) => label.kind === "keyword")) {
+    if (!supplied.size && keywordSources.some((source) => source.trim()) && !reply.some((label) => label.kind === "keyword")) {
       throw new Error("Missing keyword labels");
+    }
+    // A supplied keyword the reply skipped is not on the CV as far as we know.
+    for (const [key, ref] of supplied) {
+      if (!refs.has(key)) labels.push({ ref, kind: "keyword", status: "missing", evidence: null, inferred: false });
     }
 
     const text = cvText(cv);

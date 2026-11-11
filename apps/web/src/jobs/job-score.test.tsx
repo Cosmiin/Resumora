@@ -147,6 +147,20 @@ describe("keywords", () => {
     expect(chips.map((chip) => chip.className)).toEqual(["is-has", "is-miss", "is-miss"]);
   });
 
+  it("says what they are, and inside another block uses a smaller heading", () => {
+    render(<Keywords inside score={score} />);
+    expect(screen.getByRole("heading", { name: "ATS keywords", level: 3 })).toBeInTheDocument();
+    expect(screen.getByText("Words a recruiter's screening software (ATS) is likely to look for, taken from the ad.")).toBeInTheDocument();
+  });
+
+  it("lists the job's own keywords plain while there is no match to mark them with", () => {
+    render(<Keywords score={null} terms={["SQL", "Power BI"]} />);
+    const chips = screen.getAllByRole("listitem");
+    expect(chips.map((chip) => chip.textContent)).toEqual(["SQL", "Power BI"]);
+    expect(chips.every((chip) => chip.className === "")).toBe(true);
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
   it.each([null, { ...score, labels: score.labels.filter((label) => label.kind === "requirement") }])("shows nothing without keywords", (value) => {
     const { container } = render(<Keywords score={value} />);
     expect(container).toBeEmptyDOMElement();

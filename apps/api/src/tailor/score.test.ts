@@ -53,6 +53,19 @@ describe("scoreMatch", () => {
       ? { ...previous, ref: "k:SQL" } : label("k:SQL", { status: "missing", evidence: null }));
   });
 
+  it("labels exactly the job's own ATS keywords when it has them: extras are dropped, skipped ones are missing", async () => {
+    const work = { ...input(), job: { ...job, keywords: ["SQL", "Power BI", "Kanban"] } };
+    // "Kanban" is in no requirement or duty; "TypeScript" is not one of the job's keywords; "Power BI" is skipped.
+    const model = fakeModel(() => ({ cvSeniority: "unknown", labels: [label(), label("k:SQL"), label("k:TypeScript"),
+      label("k:Kanban", { status: "missing", evidence: null })] }));
+    const result = await scoreMatch({ model: model.deps }, work);
+    expect(result.labels.filter((item) => item.kind === "keyword")).toEqual([
+      label("k:SQL"), label("k:Kanban", { status: "missing", evidence: null }), label("k:Power BI", { status: "missing", evidence: null }),
+    ]);
+    const sent = JSON.parse((model.requests[0]!.messages as { content: string }[])[1]!.content);
+    expect(sent.keywords).toEqual([{ ref: "k:SQL", term: "SQL" }, { ref: "k:Power BI", term: "Power BI" }, { ref: "k:Kanban", term: "Kanban" }]);
+  });
+
   it("scores requirement and keyword labels using the cheap model and logs the task", async () => {
     const model = fakeModel(answer);
     model.deps.providers[0]!.strongModel = "expensive";

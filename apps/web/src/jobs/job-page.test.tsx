@@ -285,7 +285,7 @@ describe("job page", () => {
     expect(screen.getByText("Meal allowance")).toBeInTheDocument();
     expect(screen.getByText("Read from the ad: 2 requirements, 1 duty, 1 benefit, salary stated")).toBeInTheDocument();
     // No score yet: no keywords and no sentence about how much the CV covers.
-    expect(screen.queryByRole("heading", { name: "Keywords" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "ATS keywords" })).toBeNull();
     expect(screen.queryByText(/must-haves/)).toBeNull();
   });
 
@@ -309,7 +309,7 @@ describe("job page", () => {
     await userEvent.click(screen.getByRole("button", { name: /Strong SQL skills/ }));
     expect(screen.getByText("Wrote SQL daily")).toBeInTheDocument();
     expect(screen.getByText("German").closest("li")).toHaveTextContent("German (not on your CV yet)");
-    const keywords = screen.getByRole("heading", { name: "Keywords" }).closest("section")!;
+    const keywords = screen.getByRole("heading", { name: "ATS keywords" }).closest("section")!;
     expect(within(keywords).getByRole("progressbar", { name: "On your CV" })).toHaveAttribute("aria-valuetext", "1 of 2");
     expect(within(keywords).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["SQL (on your CV)", "dbt (not on your CV yet)"]);
     expect(screen.getByText("Your CV already shows every must-have. Tailoring will bring them out in this ad's words.")).toBeInTheDocument();

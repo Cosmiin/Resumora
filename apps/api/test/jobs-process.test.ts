@@ -9,7 +9,7 @@ const extracted: JobExtraction = {
   employmentType: "full_time", seniority: "unknown", salary: null,
   summary: "Build software.", responsibilities: ["Build software"],
   requirements: [{ text: "TypeScript", kind: "must", category: "skill" }],
-  benefits: [], applyBy: null, isJobPosting: true, positionClosed: false,
+  benefits: [], applyBy: null, isJobPosting: true, positionClosed: false, keywords: [],
 };
 const work = { id: "job-a", userId: "user-a", rawText: "Private job page text", jsonLd: null };
 
@@ -77,9 +77,9 @@ function promptLine(prefix: string): string {
   return jobExtractPrompt.split("\n").find((line) => line.startsWith(prefix)) ?? "";
 }
 
-describe("job extract prompt (job.v3)", () => {
-  it("is version job.v3", () => {
-    expect(JOB_PROMPT_VERSION).toBe("job.v3");
+describe("job extract prompt (job.v4)", () => {
+  it("is version job.v4", () => {
+    expect(JOB_PROMPT_VERSION).toBe("job.v4");
   });
 
   it("treats closed ads as postings and explicitly reports whether they are closed", () => {
@@ -127,7 +127,7 @@ describe("job extract prompt (job.v3)", () => {
 });
 
 describe("job extraction", () => {
-  it("sends the job.v3 prompt as the system message and still validates the schema", async () => {
+  it("sends the job.v4 prompt as the system message and still validates the schema", async () => {
     const { model, fetch } = fakeModel();
     expect(await processJob({ model }, work)).toEqual({ ok: true, extracted });
     const request = JSON.parse(String(fetch.mock.calls[0]![1]?.body));
@@ -144,7 +144,7 @@ describe("job extraction", () => {
     expect(request.response_format.json_schema.strict).toBe(true);
     expect(request.response_format.json_schema.schema.required).toContain("positionClosed");
     expect(request.response_format.json_schema.schema.properties.positionClosed).toEqual({ type: "boolean" });
-    expect(request.max_tokens).toBe(2000);
+    expect(request.max_tokens).toBe(2400);
     expect(request.messages[1].content.startsWith("Today's date: 2026-11-06.\n")).toBe(true);
     expect(request.messages[1].content).toContain(work.rawText);
     expect(logCall).toHaveBeenCalledWith(expect.objectContaining({ userId: work.userId, task: "job_extract", status: "ok" }));
@@ -171,6 +171,17 @@ describe("job extraction", () => {
     const { model } = fakeModel(answer);
     const now = () => new Date("2026-11-06T12:00:00Z");
     expect(await processJob({ model, now }, work)).toEqual({ ok: true, extracted: answer });
+  });
+
+  it("keeps one of each ATS keyword, trimmed, whatever the letter case", async () => {
+    const { model } = fakeModel({ ...extracted, keywords: ["Power BI", " SQL ", "power bi", "", "SOP"] });
+    const result = await processJob({ model }, work);
+    expect(result.ok && result.extracted.keywords).toEqual(["Power BI", "SQL", "SOP"]);
+  });
+
+  it("asks for the ATS keywords in the page's own words", () => {
+    expect(jobExtractPrompt).toContain("keywords: the 8 to 20 terms an applicant tracking system (ATS) would most likely scan a CV for");
+    expect(jobExtractPrompt).toContain("Only terms the page itself uses.");
   });
 
   it("rejects a page that is not a job posting", async () => {

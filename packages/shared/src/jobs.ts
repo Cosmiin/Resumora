@@ -24,6 +24,8 @@ export const JobExtractionSchema = z.object({
   applyBy: z.iso.date().nullable(),
   isJobPosting: z.boolean(),
   positionClosed: z.boolean().optional(),
+  /** The terms a screening system (ATS) would most likely look for, copied from the ad. Absent on jobs read before job.v4. */
+  keywords: z.array(z.string().max(80)).max(30).optional(),
 });
 export type JobExtraction = z.infer<typeof JobExtractionSchema>;
 

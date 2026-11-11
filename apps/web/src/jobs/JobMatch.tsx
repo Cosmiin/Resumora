@@ -143,15 +143,30 @@ export function MustHaves({ requirements, score, state, children }: MustProps) {
   );
 }
 
-/** The ad's keywords: how many the CV already has, then each one, solid when it is there and dashed when it is not. */
-export function Keywords({ score }: { score: MatchScore | null }) {
+/**
+ * The words a screening system (ATS) is likely to look for: how many the CV already has, then each one, solid
+ * when it is there and dashed when it is not. Before there is a match, the job's own list (`terms`) is shown
+ * plain. `inside` makes it a part of another block.
+ */
+export function Keywords({ score, terms = [], inside = false }: { score: MatchScore | null; terms?: readonly string[]; inside?: boolean }) {
   const t = useT();
   const words = (score?.labels ?? []).filter((label) => label.kind === "keyword").map((label) => ({ term: label.ref.replace(/^k:/, ""), has: statusOf(label) === "met" }));
-  if (words.length === 0) return null;
+  if (words.length === 0 && terms.length === 0) return null;
+  const Title = inside ? "h3" : "h2";
+  if (words.length === 0) {
+    return (
+      <section className={inside ? "sec job-ats" : "ui-sheet ui-stack"}>
+        <Title className={inside ? undefined : "ui-heading"}>{t("job.keywords.title")}</Title>
+        <p className="ui-muted ui-small">{t("job.keywords.hint")}</p>
+        <ul className="job-kw">{terms.map((term) => <li key={term}>{term}</li>)}</ul>
+      </section>
+    );
+  }
   const has = words.filter((w) => w.has).length;
   return (
-    <section className="ui-sheet ui-stack">
-      <h2 className="ui-heading">{t("job.keywords.title")}</h2>
+    <section className={inside ? "sec job-ats" : "ui-sheet ui-stack"}>
+      <Title className={inside ? undefined : "ui-heading"}>{t("job.keywords.title")}</Title>
+      <p className="ui-muted ui-small">{t("job.keywords.hint")}</p>
       <Progress tone="good" label={t("job.keywords.onCv")} valueText={t("job.keywords.count", { n: has, total: words.length })} value={has} max={words.length} />
       <ul className="job-kw">
         {words.map((w) => (
