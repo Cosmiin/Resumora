@@ -182,6 +182,9 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       autosave.reset(await removeCv(autosave.currentVersion()));
       clearOpened();
       setQuestionsWaiting(false);
+      // An open History preview is of the CV that is now gone.
+      setHistoryOpen(false);
+      setPreview(null);
       // Back to the start: with no CV, the next step is to import one.
       setFromScratch(false);
       setRemoveOpen(false);

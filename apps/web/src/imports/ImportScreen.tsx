@@ -159,7 +159,7 @@ export function ImportScreen(props: {
             <div className="import-cols">
               <div className="import-right">
                 {result.isScan && <p role="alert" className="ui-notice import-gap">{t("import.scan")}</p>}
-                <ConfirmList warnings={confirms} cv={cv} onChange={change} />
+                <div inert={applying}><ConfirmList warnings={confirms} cv={cv} onChange={change} /></div>
                 {roles.length > 0 && <p className="ui-coach import-next">{t("import.found.next")}</p>}
                 {replaces && <p className="fm-fine">{t("import.summary.kept")}</p>}
                 {applyFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.applyError")}</p>}

@@ -133,4 +133,23 @@ describe("things to confirm", () => {
     expect(screen.getByRole("textbox", { name: "Level for English" })).toBeInTheDocument();
     expect(screen.getByText("0 of 4 confirmed")).toBeInTheDocument();
   });
+
+  it("the same sentence twice is two items, confirmed one at a time", async () => {
+    render(<Host list={["[other] Check the dates.", "[other] Check the dates."]} />);
+    await userEvent.click(within(items()[0]!).getByRole("button", { name: "It's correct" }));
+    expect(screen.getByText("1 of 2 confirmed")).toBeInTheDocument();
+    expect(within(items()[1]!).getByRole("button", { name: "It's correct" })).toBeInTheDocument();
+  });
+
+  it("two forms open at once do not undo each other", async () => {
+    render(<Host list={["[languages] English has no level.", "[languages] Check the level of English."]} />);
+    await userEvent.click(within(items()[0]!).getByRole("button", { name: "Change it" }));
+    await userEvent.click(within(items()[1]!).getByRole("button", { name: "Change it" }));
+    await userEvent.type(within(items()[0]!).getByRole("textbox", { name: "Level for English" }), "C1");
+    await userEvent.click(within(items()[0]!).getByRole("button", { name: "Save" }));
+    expect(state().level).toBe("C1");
+    // The second form still shows what it opened with; saving it unchanged must not write that back.
+    await userEvent.click(within(items()[1]!).getByRole("button", { name: "Save" }));
+    expect(state().level).toBe("C1");
+  });
 });

@@ -30,40 +30,41 @@ type State = "open" | "editing" | "confirmed" | "later";
  */
 export function ConfirmList(props: { warnings: readonly string[]; cv: CvContent; onChange(change: (cv: CvContent) => CvContent): void }) {
   const { warnings, cv, onChange } = props;
-  const [states, setStates] = useState<Record<string, State>>({});
+  // Kept by position: the reader may give the same sentence twice, and each one is its own item.
+  const [states, setStates] = useState<Record<number, State>>({});
   if (warnings.length === 0) return null;
-  const set = (key: string, state: State) => setStates((s) => ({ ...s, [key]: state }));
-  const done = warnings.filter((w) => ["confirmed", "later"].includes(states[w] ?? "open")).length;
+  const set = (key: number, state: State) => setStates((s) => ({ ...s, [key]: state }));
+  const done = warnings.filter((_, i) => ["confirmed", "later"].includes(states[i] ?? "open")).length;
 
   return (
     <section className="import-confirm" aria-labelledby="import-confirm-title">
       <h3 id="import-confirm-title">{t(warnings.length === 1 ? "import.summary.confirmOne" : "import.summary.confirmMany", { n: warnings.length })}</h3>
       <p className="ui-small ui-muted" role="status">{t("import.confirm.done", { n: done, total: warnings.length })}</p>
       <ul>
-        {warnings.map((warning) => {
+        {warnings.map((warning, index) => {
           const { topic, text } = parseWarning(warning);
-          const state = states[warning] ?? "open";
+          const state = states[index] ?? "open";
           const editable = topic !== "other";
           return (
-            <li key={warning} className={state === "confirmed" || state === "later" ? "is-done" : undefined}>
+            <li key={index} className={state === "confirmed" || state === "later" ? "is-done" : undefined}>
               <p>{text}</p>
               {state === "editing" ? (
-                <ConfirmForm topic={topic} cv={cv} onCancel={() => set(warning, "open")}
+                <ConfirmForm topic={topic} cv={cv} onCancel={() => set(index, "open")}
                   onSave={(change) => {
                     onChange(change);
-                    set(warning, "confirmed");
+                    set(index, "confirmed");
                   }} />
               ) : state === "open" ? (
                 <div className="ui-row">
-                  <button type="button" className="ui-btn ui-btn--sm" onClick={() => set(warning, "confirmed")}>{t("import.confirm.ok")}</button>
+                  <button type="button" className="ui-btn ui-btn--sm" onClick={() => set(index, "confirmed")}>{t("import.confirm.ok")}</button>
                   {editable
-                    ? <button type="button" className="ui-btn ui-btn--primary ui-btn--sm" onClick={() => set(warning, "editing")}>{t("import.confirm.change")}</button>
-                    : <button type="button" className="ui-btn ui-btn--sm" onClick={() => set(warning, "later")}>{t("import.confirm.later")}</button>}
+                    ? <button type="button" className="ui-btn ui-btn--primary ui-btn--sm" onClick={() => set(index, "editing")}>{t("import.confirm.change")}</button>
+                    : <button type="button" className="ui-btn ui-btn--sm" onClick={() => set(index, "later")}>{t("import.confirm.later")}</button>}
                 </div>
               ) : (
                 <div className="ui-row">
                   <span className="ui-pill ui-pill--good">{t(state === "confirmed" ? "import.confirm.confirmed" : "import.confirm.noted")}</span>
-                  <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm" onClick={() => set(warning, editable ? "editing" : "open")}>{t("import.confirm.again")}</button>
+                  <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm" onClick={() => set(index, editable ? "editing" : "open")}>{t("import.confirm.again")}</button>
                 </div>
               )}
             </li>
@@ -74,25 +75,29 @@ export function ConfirmList(props: { warnings: readonly string[]; cv: CvContent;
   );
 }
 
-type Field = { key: string; label: string; value: string; date?: boolean };
+/** `stored` is what the CV holds when it differs from the value offered (the name's starting split). */
+type Field = { key: string; label: string; value: string; stored?: string; date?: boolean };
 
-/** The fields a topic can change, read from the CV being imported, and how the edited values go back into it. */
+/**
+ * The fields a topic can change, read from the CV being imported, and how the edited values go back into it.
+ * `apply` gets only the fields the person changed, so two open forms never overwrite each other's saved values.
+ */
 function fieldsFor(topic: ConfirmTopic, cv: CvContent): { fields: Field[]; apply(values: Record<string, string>): (cv: CvContent) => CvContent } {
   if (topic === "name") {
     const guess = cv.basics.firstName || cv.basics.lastName ? cv.basics : splitName(cv.basics.fullName);
     return {
       fields: [
-        { key: "firstName", label: t("import.confirm.firstName"), value: guess.firstName },
-        { key: "lastName", label: t("import.confirm.lastName"), value: guess.lastName },
+        { key: "firstName", label: t("import.confirm.firstName"), value: guess.firstName, stored: cv.basics.firstName },
+        { key: "lastName", label: t("import.confirm.lastName"), value: guess.lastName, stored: cv.basics.lastName },
       ],
-      apply: (v) => (c) => ({ ...c, basics: { ...c.basics, firstName: v.firstName!.trim(), lastName: v.lastName!.trim() } }),
+      apply: (v) => (c) => ({ ...c, basics: { ...c.basics, firstName: (v.firstName ?? c.basics.firstName).trim(), lastName: (v.lastName ?? c.basics.lastName).trim() } }),
     };
   }
   if (topic === "contact") {
     const keys = ["email", "phone", "location"] as const;
     return {
       fields: keys.map((key) => ({ key, label: t(`import.confirm.${key}`), value: cv.basics[key] })),
-      apply: (v) => (c) => ({ ...c, basics: { ...c.basics, email: v.email!.trim(), phone: v.phone!.trim(), location: v.location!.trim() } }),
+      apply: (v) => (c) => ({ ...c, basics: { ...c.basics, email: (v.email ?? c.basics.email).trim(), phone: (v.phone ?? c.basics.phone).trim(), location: (v.location ?? c.basics.location).trim() } }),
     };
   }
   if (topic === "languages") {
@@ -122,16 +127,19 @@ function fieldsFor(topic: ConfirmTopic, cv: CvContent): { fields: Field[]; apply
 function ConfirmForm(props: { topic: ConfirmTopic; cv: CvContent; onSave(change: (cv: CvContent) => CvContent): void; onCancel(): void }) {
   const { fields, apply } = fieldsFor(props.topic, props.cv);
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, f.value])));
-  const badDate = fields.some((f) => f.date && !DATE.test(values[f.key]!.trim()));
+  // A field that joined the list after the form opened (a section moved into it) shows the CV's value.
+  const valueOf = (f: Field) => values[f.key] ?? f.value;
+  const badDate = fields.some((f) => f.date && !DATE.test(valueOf(f).trim()));
   return (
     <form className="import-confirm-form" onSubmit={(e) => {
       e.preventDefault();
-      if (!badDate) props.onSave(apply(values));
+      if (badDate) return;
+      props.onSave(apply(Object.fromEntries(fields.filter((f) => valueOf(f) !== (f.stored ?? f.value)).map((f) => [f.key, valueOf(f)]))));
     }}>
       {fields.map((f) => (
         <label key={f.key}>
           <span className="ui-label">{f.label}</span>
-          <input className="ui-input" value={values[f.key]} maxLength={200} aria-invalid={f.date && !DATE.test(values[f.key]!.trim()) || undefined}
+          <input className="ui-input" value={valueOf(f)} maxLength={200} aria-invalid={f.date && !DATE.test(valueOf(f).trim()) || undefined}
             onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} />
         </label>
       ))}

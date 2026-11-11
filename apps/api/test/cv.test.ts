@@ -256,6 +256,18 @@ describe("Remove my CV", () => {
     expect(await insights.list()).toEqual([]);
   });
 
+  it("a second try after a half-finished removal finishes the cleanup", async () => {
+    await send("PUT", "/v1/cv", { content: cvNamed("Ana Pop"), version: 0 });
+    await insights.put("r1", { roleId: "r1" } as never);
+    // The first try emptied the CV, then failed before the scores were deleted.
+    await repo.save(emptyCv(), 1);
+    const res = await send("DELETE", "/v1/cv", { version: 1 });
+    expect(res.status).toBe(200);
+    expect(CvResponseSchema.parse(await json(res)).version).toBe(2);
+    expect(await repo.listHistory()).toEqual([]);
+    expect(await insights.list()).toEqual([]);
+  });
+
   it("changes nothing when the CV was saved somewhere else first", async () => {
     await send("PUT", "/v1/cv", { content: cvNamed("Ana Pop"), version: 0 });
     await insights.put("r1", { roleId: "r1" } as never);

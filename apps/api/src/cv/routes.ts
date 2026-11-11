@@ -54,8 +54,13 @@ export function cvRoutes(repoFor: (c: Context<AppEnv>) => CvRepo, insightsFor: (
   app.delete("/", async (c) => {
     const { version } = RestoreBody.parse(await readJson(c));
     const repo = repoFor(c);
-    const result = await repo.save(emptyCv(), version);
-    if (!result.ok) return saveResponse(c, result);
+    let result = await repo.save(emptyCv(), version);
+    if (!result.ok) {
+      // An earlier try may have emptied the CV and then failed while cleaning up: finish that, do not refuse it.
+      const current = await repo.get();
+      if (JSON.stringify(current.content) !== JSON.stringify(emptyCv())) return saveResponse(c, result);
+      result = { ok: true, version: current.version, updatedAt: current.updatedAt };
+    }
     // After the save, which may itself have put the old CV into History.
     await repo.clearHistory();
     const insights = insightsFor(c);
