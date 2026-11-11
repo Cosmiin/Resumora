@@ -14,6 +14,8 @@ export type PathItem = {
   item: Experience; kind: ScoredKind;
   /** The role's score once known, and whether it is still being worked out. */
   score?: number | null; scoring?: boolean;
+  /** True while the role's current score is not known yet, so it cannot be ticked or passed over yet. */
+  waiting?: boolean;
   /** True once the score is at the target: listed, but not ticked unless the person ticks it. */
   strong?: boolean;
 };
@@ -54,17 +56,29 @@ export function PathStart({ items, quick, locale, speech, onStart, onNotNow }: P
   }, [onNotNow]);
   const roles = items.filter((p) => p.kind === "role");
   const others = items.filter((p) => p.kind !== "role");
-  // Every role stays listed. Until the person ticks something themselves, the most recent ones that still
-  // need work are ticked; with no role on the list, the first projects or volunteering roles instead.
-  const [picked, setPicked] = useState<ReadonlySet<string> | null>(null);
-  const open = (list: readonly PathItem[]) => list.filter((p) => !p.strong);
-  const chosen = picked ?? new Set((open(roles).length ? open(roles) : open(others)).slice(0, TICKED_ROLES).map((p) => p.item.id));
-  const needWork = items.some((p) => !p.strong);
-  const toggle = (id: string) => {
-    const next = new Set(chosen);
-    if (!next.delete(id)) next.add(id);
-    setPicked(next);
+  // Every role stays listed. The most recent ones that still need work are ticked; with no role to tick, the
+  // first projects or volunteering roles instead. A tick is placed only once the score of that role and of
+  // every one above it is known, so a tick never moves while scores arrive. What the person ticks or unticks
+  // themselves is kept on top of that.
+  const [byHand, setByHand] = useState<ReadonlyMap<string, boolean>>(new Map());
+  const settle = (list: readonly PathItem[]) => {
+    const ids: string[] = [];
+    for (const p of list) {
+      if (ids.length === TICKED_ROLES) break;
+      if (p.waiting) return { ids, done: false };
+      if (!p.strong) ids.push(p.item.id);
+    }
+    return { ids, done: true };
   };
+  let auto = settle(roles);
+  if (auto.done && auto.ids.length === 0) auto = settle(others);
+  const chosen = new Set(auto.ids);
+  for (const [id, on] of byHand) {
+    if (on) chosen.add(id);
+    else chosen.delete(id);
+  }
+  const needWork = items.some((p) => !p.strong);
+  const toggle = (id: string) => setByHand(new Map(byHand).set(id, !chosen.has(id)));
   const [focus, setFocus] = useState<{ value: string; via: Via[] }>({ value: "", via: [] });
   const [voiceBusy, setVoiceBusy] = useState(false);
   const focusId = useId();
@@ -125,7 +139,7 @@ export function PathStart({ items, quick, locale, speech, onStart, onNotNow }: P
         </div>
         <div className="fm-foot">
           <button type="button" className="fm-ghost" onClick={onNotNow}>{t("enrich.path.notNow")}</button>
-          <button type="button" className="fm-btn" disabled={voiceBusy} onClick={() => onStart(picks.map((p) => p.item.id), focus.value.trim())}>
+          <button type="button" className="fm-btn" disabled={voiceBusy || (!auto.done && picks.length === 0)} onClick={() => onStart(picks.map((p) => p.item.id), focus.value.trim())}>
             {first ? t("enrich.path.start", { title: nameOf(first) }) : t("enrich.focus.continue")}
           </button>
         </div>

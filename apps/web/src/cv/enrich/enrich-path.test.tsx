@@ -45,20 +45,40 @@ function Host({ scores, onClose = () => {}, dispatch = () => {} }: { scores: Map
 }
 
 describe("the guided path (1A)", () => {
-  const scores = new Map<string, RoleScoreState>([["a", ready(90)], ["b", ready(61)], ["c", { state: "scoring" }], ["d", ready(80)]]);
+  const scores = new Map<string, RoleScoreState>([["a", ready(90)], ["b", ready(61)], ["c", ready(55)], ["d", ready(80)]]);
 
-  it("lists every role in CV order with its score, ticks the recent ones below 80 (still scoring counts), and starts with the first ticked", () => {
+  it("lists every role in CV order with its score, ticks the recent ones below 80, and starts with the first ticked", () => {
     render(<Host scores={scores} />);
     expect(screen.getByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
     const rows = screen.getAllByRole("checkbox");
     expect(rows).toHaveLength(4);
     expect(rows[0]).toHaveAccessibleName(/Analyst, Analyst Co.*Score: 90 of 100/);
     expect(rows[1]).toHaveAccessibleName(/Buyer, Buyer Co.*Score: 61 of 100/);
-    expect(rows[2]).toHaveAccessibleName(/Clerk, Clerk Co.*Checking this role…/);
+    expect(rows[2]).toHaveAccessibleName(/Clerk, Clerk Co.*Score: 55 of 100/);
     expect(rows[3]).toHaveAccessibleName(/Driver, Driver Co.*Score: 80 of 100/);
     expect(rows.map((r) => (r as HTMLInputElement).checked)).toEqual([false, true, true, false]);
     expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start with Buyer" })).toBeInTheDocument();
+  });
+
+  it("a tick never moves while scores arrive: each is placed once the roles above it have a score", () => {
+    const checked = () => screen.getAllByRole("checkbox").map((r) => (r as HTMLInputElement).checked);
+    const wait: RoleScoreState = { state: "scoring" };
+    const view = render(<Host scores={new Map([["a", wait], ["b", wait], ["c", wait], ["d", wait]])} />);
+    expect(screen.getAllByRole("checkbox")[2]).toHaveAccessibleName(/Clerk, Clerk Co.*Checking this role…/);
+    expect(checked()).toEqual([false, false, false, false]);
+    // Nothing to start with yet: the button waits rather than skipping every role.
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    // A later role scored first is not ticked ahead of the ones above it.
+    view.rerender(<Host scores={new Map([["a", wait], ["b", wait], ["c", ready(55)], ["d", wait]])} />);
+    expect(checked()).toEqual([false, false, false, false]);
+    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", wait], ["c", ready(55)], ["d", wait]])} />);
+    expect(checked()).toEqual([false, false, false, false]);
+    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(55)], ["d", wait]])} />);
+    expect(checked()).toEqual([false, true, true, false]);
+    expect(screen.getByRole("button", { name: "Start with Buyer" })).toBeEnabled();
+    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(55)], ["d", ready(40)]])} />);
+    expect(checked()).toEqual([false, true, true, false]);
   });
 
   it("goes role by role, then on to Key achievements", async () => {
@@ -266,7 +286,8 @@ describe("whole-branch review fixes", () => {
     view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(85)], ["d", ready(80)]])} />);
     expect(screen.getAllByRole("checkbox")).toHaveLength(4);
     expect(screen.getByRole("checkbox", { name: /Driver/ })).toBeChecked();
-    expect(screen.getByText("3 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
+    // Buyer (61) is ticked for them; Driver is their own tick.
+    expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
   });
 
   it("opened before the stored scores arrive (from /cv?enrich=1), it still leaves roles at 80 or more unticked", async () => {

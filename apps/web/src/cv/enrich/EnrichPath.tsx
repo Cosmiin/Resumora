@@ -66,7 +66,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   // The focus step lists every role, strong or not, so the list never shrinks while scores arrive.
   const items = scoredItems(cv).map((p) => {
     const s = scores.get(p.item.id);
-    return { ...p, score: scoreOf(s), scoring: s?.state === "scoring", strong: !belowTarget(s) };
+    return { ...p, score: scoreOf(s), scoring: s?.state === "scoring", waiting: s?.state === "scoring" || s?.state === "previous", strong: !belowTarget(s) };
   });
   const quick = LIGHT_SECTIONS.map((section) => ({ section, count: light.filter((l) => l.section === section).length })).filter((q) => q.count > 0);
   const afterRoles = () => setStage(lights.length ? { kind: "light", index: 0 } : { kind: "achievements" });
