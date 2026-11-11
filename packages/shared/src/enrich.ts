@@ -2,7 +2,7 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/4";
+export const SCORE_POLICY = "score/5";
 
 export const WEIGHTS = { contribution: 35, clarity: 25, specificity: 20, impact: 20 } as const;
 
@@ -103,6 +103,8 @@ export const RoleResultSchema = z
     roleQuestions: z.array(RoleQuestionSchema).max(MAX_ROLE_QUESTIONS).default([]),
     /** One bullet or fewer, or too little to infer skills or achievements: focus mode opens with "Tell us about…". */
     thin: z.boolean().default(false),
+    /** The language the questions and tips were written in; absent on older results (then: the CV's language). */
+    questionLanguage: z.string().optional(),
   })
   .strict();
 export type RoleResult = z.infer<typeof RoleResultSchema>;
@@ -128,8 +130,33 @@ export function bulletScore(g: Record<keyof typeof WEIGHTS, Grade>): number {
 
 const RANGE_PATTERNS = [/\d+\s*[–-]\s*\d+/g, /\d+\+/g, /\b(?:under|over|sub|peste)\s+\d+/gi];
 
-/** An answer option may hold a number only as a range or a bound. */
+const OTHER_OPTIONS = new Set([
+  // en
+  "other", "others", "something else", "none of the above", "none of these",
+  // ro
+  "altele", "altul", "alta", "altceva", "alt răspuns", "niciuna dintre cele de mai sus", "niciunul dintre cele de mai sus", "niciuna dintre acestea",
+  // fr
+  "autre", "autres", "autre chose", "aucune de ces réponses", "aucun de ces choix",
+  // de
+  "andere", "anderes", "sonstiges", "etwas anderes", "keine der genannten", "nichts davon",
+  // es
+  "otro", "otra", "otros", "otras", "otra cosa", "ninguna de las anteriores", "ninguno de los anteriores",
+  // it
+  "altro", "altra", "altri", "qualcos'altro", "nessuna delle precedenti", "nessuno dei precedenti",
+]);
+
+/**
+ * An option that only means "other" ("Other", "Altele", "Other (please specify)"). The screen has its own
+ * "type or speak your own", so the AI's are dropped.
+ */
+export function isOtherOption(option: string): boolean {
+  const bare = option.trim().toLowerCase().replace(/\s*\([^()]*\)[\p{P}\s]*$/u, "").replace(/[\p{P}\s]+$/u, "").replace(/^[\p{P}\s]+/u, "").trim();
+  return OTHER_OPTIONS.has(bare);
+}
+
+/** An answer option may hold a number only as a range or a bound, and may not be an "other" option. */
 export function isAllowedOption(option: string): boolean {
+  if (isOtherOption(option)) return false;
   let rest = option;
   for (const p of RANGE_PATTERNS) rest = rest.replace(p, " ");
   return !/\d/.test(rest);
@@ -239,7 +266,7 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
     bullets.length === 0 ? null : Math.round(bullets.reduce((sum, b) => sum + b.score, 0) / bullets.length);
 
   const roleQuestions: RoleQuestion[] = (model.roleQuestions ?? []).slice(0, MAX_ROLE_QUESTIONS).map((q, i) => ({
-    id: `rq${i + 1}`, text: q.text, options: q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
+    id: `rq${i + 1}`, text: q.text, options: q.topic === "company" ? [] : q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
   }));
   const thin = role.bullets.length <= 1 || model.thin === true;
   return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions, thin };
@@ -264,11 +291,12 @@ export function hashText(text: string): string {
 }
 
 /**
- * Changes when anything the score depends on changes: bullet ids and texts, title, description, locale or policy.
+ * Changes when anything the score depends on changes: bullet ids and texts, title, description, the role's period,
+ * locale or policy. The period counts because questions are written for the time the work happened.
  * Ids count because the result points at bullets by id: a bullet deleted and retyped gets a new id.
  */
 export function fingerprint(role: Experience, locale: Locale): string {
-  const parts = [SCORE_POLICY, locale, role.title, role.description, ...role.bullets.flatMap((b) => [b.id, b.text])];
+  const parts = [SCORE_POLICY, locale, role.title, role.description, role.startDate, role.endDate, String(role.current), ...role.bullets.flatMap((b) => [b.id, b.text])];
   return cyrb53(parts.join("\u0000")).toString(16);
 }
 

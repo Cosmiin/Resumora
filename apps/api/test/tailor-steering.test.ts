@@ -40,13 +40,13 @@ describe("steeringText", () => {
     expect(steeringText({ focusRoleIds: ["gone"] }, cv, roleId)).not.toMatch(/lean/i);
   });
 
-  it("describes only this role's focus status when a role id is supplied", () => {
+  it("tells a role step nothing about focus roles", () => {
     const steering = { focusRoleIds: ["gone", "r1"] };
     const other = steeringText(steering, cv, "r2");
-    expect(other).toContain("They want to lean on other roles more than this one.");
+    expect(other).not.toMatch(/lean/i);
     expect(other).not.toContain("Business Analyst");
     expect(other).not.toContain("Northwind Traders");
-    expect(steeringText(steering, cv, "r1")).toContain("This role is one of the roles they want to lean on most.");
+    expect(steeringText(steering, cv, "r1")).not.toMatch(/lean/i);
     expect(steeringText(steering, cv)).toContain("Lean most on these roles: Business Analyst · Northwind Traders.");
     expect(steeringText({ focusRoleIds: [] }, cv, "r2")).not.toMatch(/lean/i);
     expect(steeringText({}, cv, "r2")).not.toMatch(/lean/i);

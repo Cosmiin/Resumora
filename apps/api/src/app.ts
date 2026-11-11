@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import type { Locale } from "@resumora/shared";
 import type { AuthUser } from "./env.ts";
 import type { CvRepo } from "./cv/repo.ts";
 import { ApiError, errorBody, toErrorResponse, type LogFn } from "./errors.ts";
@@ -42,7 +43,9 @@ export type AppDeps = {
   log: LogFn;
 };
 
-export type AppEnv = { Variables: { requestId: string; user: AuthUser } };
+export type AppEnv = { Variables: { requestId: string; user: AuthUser; interfaceLanguage: Locale | undefined } };
+
+const INTERFACE_LANGUAGES: readonly string[] = ["en", "ro", "fr", "de", "es", "it"];
 
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
@@ -58,7 +61,7 @@ export function createApp(deps: AppDeps) {
     "*",
     cors({
       origin: (origin) => (origin === deps.appOrigin ? origin : null),
-      allowHeaders: ["authorization", "content-type"],
+      allowHeaders: ["authorization", "content-type", "x-interface-language"],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       exposeHeaders: ["x-request-id"],
     }),
@@ -72,6 +75,9 @@ export function createApp(deps: AppDeps) {
     const user = token ? await deps.verifyToken(token) : null;
     if (!user) throw new ApiError(401, "unauthorized", "Please sign in again.");
     c.set("user", user);
+    // The language the person uses the app in: questions are written in it. Clients that don't send it get the CV's language.
+    const language = c.req.header("x-interface-language")?.trim().toLowerCase();
+    c.set("interfaceLanguage", language && INTERFACE_LANGUAGES.includes(language) ? (language as Locale) : undefined);
     await next();
   });
 

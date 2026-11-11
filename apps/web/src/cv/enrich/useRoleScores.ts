@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fingerprint, scoredItems, type CvContent, type Experience, type Locale, type RoleResult } from "@resumora/shared";
 import { ApiClientError } from "../../lib/api-error.ts";
 import type { SaveStatus } from "../useAutosave.ts";
+import { getLanguage } from "../../i18n/language.ts";
 import { getScores, scoreRole } from "./enrich-api.ts";
+
+/** A stored score is current when it is for this text and its questions are in the language the person uses now. */
+function isCurrent(result: RoleResult | undefined, print: string): result is RoleResult {
+  return result?.fingerprint === print && (result.questionLanguage ?? getLanguage()) === getLanguage();
+}
 
 /** Wait this long after a save before asking for scores, so typing never races a request. */
 export const RESCORE_DELAY_MS = 2000;
@@ -117,7 +123,7 @@ export function useRoleScores({ cv, status }: Props): {
     const next = experience.find((r) => {
       if (!hasBullets(r) || waiting.current.has(r.id)) return false;
       const print = printOf(r, locale);
-      return results.get(r.id)?.fingerprint !== print && failed.get(r.id) !== print;
+      return !isCurrent(results.get(r.id), print) && failed.get(r.id) !== print;
     });
     if (!next) return;
     const go = () => {
@@ -145,10 +151,10 @@ export function useRoleScores({ cv, status }: Props): {
         const print = printOf(role, locale);
         const result = results.get(role.id);
         let entry: RoleScoreState;
-        if (!hasBullets(role) || (result?.fingerprint === print && result.score === null)) entry = { state: "none" };
+        if (!hasBullets(role) || (isCurrent(result, print) && result.score === null)) entry = { state: "none" };
         else if (inFlight?.roleId === role.id && inFlight.fingerprint === print) entry = { state: "scoring", result };
         else if (failed.get(role.id) === print) entry = { state: "unavailable", result };
-        else if (result?.fingerprint === print) entry = { state: "ready", result };
+        else if (isCurrent(result, print)) entry = { state: "ready", result };
         else if (result) entry = { state: "previous", result };
         else entry = { state: "scoring" };
         const old = last.current.get(role.id);

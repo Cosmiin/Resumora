@@ -9,15 +9,29 @@ const LANGUAGE_NAME: Record<Locale, string> = {
   en: "English", ro: "Romanian", fr: "French", de: "German", es: "Spanish", it: "Italian",
 };
 
-/** The Codex language instruction (Appendix B), prefixed with the CV locale. */
-export function languageInstruction(locale: Locale): string {
+/**
+ * Which language to write in. CV text stays in the CV's language. What is said to the person (questions,
+ * answer options, tips) is in the language they use the app in; without one, in the CV's language.
+ */
+export function languageInstruction(locale: Locale, questionLanguage: Locale = locale): string {
   return [
     `CV locale: ${locale} (${LANGUAGE_NAME[locale]}).`,
-    `Write all generated user-facing prose in the CV content language (${LANGUAGE_NAME[locale]}).`,
+    `Write CV text (bullets, descriptions, summaries, skills, facts) in the CV content language (${LANGUAGE_NAME[locale]}).`,
+    `Write everything addressed to the person (questions, answer options, tips, reasons) in ${LANGUAGE_NAME[questionLanguage]}.`,
+    "Address the person informally and directly, as a coach would (in Romanian \"tu\", never \"dumneavoastră\"; likewise tu, du, tú in French, German, Spanish and Italian).",
     "Preserve source quotations, names, established technology terms, numbers and facts exactly.",
     "Answers and job adverts in another language do not change the CV language.",
     "Keep JSON keys and enum values unchanged.",
   ].join(" ");
+}
+
+/**
+ * A closing reminder for when the person's language differs from the CV's: models tend to answer in the
+ * language of the text they just read, so the instruction is repeated last. Nothing when the two match.
+ */
+export function questionLanguageReminder(locale: Locale, questionLanguage: Locale = locale): string {
+  if (questionLanguage === locale) return "";
+  return `\nThe CV is in ${LANGUAGE_NAME[locale]}, but the person reads ${LANGUAGE_NAME[questionLanguage]}: write every tip, question and answer option in ${LANGUAGE_NAME[questionLanguage]}. Quote CV text as it is.`;
 }
 
 const SCORE_BODY = `You are a CV experience reviewer and writing coach for Resumora.
@@ -42,6 +56,10 @@ Use no external tools.
 The role title and description provide context only. Never grade them.
 Never infer responsibilities, seniority, tools, qualifications, or
 achievements from them.
+
+The role period says when the work happened. Ask only about tools and
+practices that existed then and fit that kind of work. Role notes describe
+the person during that period, not today.
 
 RECRUITER COMPREHENSION TEST
 
@@ -189,8 +207,12 @@ ROLE QUESTIONS
 
 roleQuestions are about the whole role, including when it has no bullets.
 Always cover these three, one question each, in this order, and leave out
-any that the CV or the notes already answer:
-1. topic company: what the company does (its industry, products or customers).
+any that the CV or the notes already answer. Each question asks one thing
+in plain words ("What does the company do?", not "What industry is it in
+and what are its products?"):
+1. topic company: what the company does. You are not told the company, so
+   give options only when the role's own text shows what kind of company
+   it is; otherwise give none and let the person say it.
 2. topic purpose: what the role was for (its purpose and scope).
 3. topic tools: the tools, software and methods used.
 Then ask about any other role-wide fact that is still needed (topic other),
@@ -209,17 +231,21 @@ For every bullet fill only these feedback fields:
   or wording problem. Use null when no change is needed.
 - question: At most one direct question that would obtain the most
   useful missing fact. Use null if no additional fact is needed.
-- options: Provide 3–4 options for every question, role or bullet,
+- options: Provide up to 4 options for every question, role or bullet,
   each at most 60 characters, drawn only from the role's own words and
-  the job's common tasks. Options are guesses for the person to confirm,
-  not facts to assume. Never give an exact number; if a quantity matters,
+  the common tasks of this kind of job at this kind of employer. Options
+  are guesses for the person to confirm, not facts to assume. Give fewer
+  when you cannot make sensible guesses for this particular role. Never give an exact number; if a quantity matters,
   give only ranges such as "10–50", "Under 10" or "50+".
-  Use an empty list only when there is no question. The app adds a fixed
-  "Something else" chip last; do not include it in the options.
+  Use an empty list only when there is no question. Do not add an option
+  meaning other, something else or none of the above: the screen has its
+  own "type or speak your own".
 
 Do not provide a rewritten bullet. Do not invent a tip or question to
 fill a field. Keep each tip and question to one sentence, preferably no
-more than 20 words. Address the user naturally and respectfully.
+more than 20 words. Ask one thing, in plain words, the way a thoughtful
+coach would; put examples in the options, not in the question.
+Address the user naturally and respectfully.
 
 When a bullet's only gap is impact, ask for a result: how many, how often,
 for whom, or what changed. Any numeric answer options must be ranges.
@@ -247,8 +273,8 @@ For a role with no bullets, return bullets [] and nextStepId null, plus roleQues
 If specific ids are selected for grading, return only those ids; the rest are context.
 Return grades, not numbers. The application calculates all scores.`;
 
-export function scoreSystemPrompt(locale: Locale): string {
-  return `${languageInstruction(locale)}\n\n${SCORE_BODY}\n\n(policy ${SCORE_POLICY})`;
+export function scoreSystemPrompt(locale: Locale, questionLanguage?: Locale): string {
+  return `${languageInstruction(locale, questionLanguage)}\n\n${SCORE_BODY}\n\n(policy ${SCORE_POLICY})`;
 }
 
 /**
@@ -266,17 +292,26 @@ export function kindNote(kind: ScoredKind): string[] {
   return [];
 }
 
-/** The role as the model sees it: context for the title and description, bullets to grade. No company, no dates. */
-export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes">, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
+/** "2019 – 2022, ended" for a role with a start date; nothing otherwise. */
+export function periodLine(role: Partial<Pick<Experience, "startDate" | "endDate" | "current">>): string[] {
+  if (!role.startDate) return [];
+  // A role that isn't current has ended, even when its end date was left empty.
+  const end = role.current ? "present" : role.endDate || "end date not given";
+  return [`Role period (context only, not graded): ${role.startDate} – ${end}, ${role.current ? "current" : "ended"}.`];
+}
+
+/** The role as the model sees it: context for the title, description and period, bullets to grade. No company. */
+export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes"> & Partial<Pick<Experience, "startDate" | "endDate" | "current">>, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));
   return [
     ...kindNote(kind),
     "<experience>",
     `Role title (context only, not graded): ${JSON.stringify(role.title)}`,
     `Role description (context only, not graded): ${JSON.stringify(role.description)}`,
+    ...periodLine(role),
     "Bullets to grade (JSON, each { id, text }):",
     JSON.stringify(bullets),
-    "Role notes (context only, not graded):",
+    "Role notes (context only, not graded; true for the role's period, not today):",
     JSON.stringify(role.notes.map(({ question, answer }) => ({ question, answer }))),
     "</experience>",
     ...(gradeOnly ? [`Grade only these bullets: ${gradeOnly.join(", ")}. Return entries for those ids only; the other bullets are context.`] : []),

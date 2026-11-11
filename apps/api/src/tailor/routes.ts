@@ -76,6 +76,7 @@ export function tailorRoutes(deps: {
     if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
     const questions = await askQuestions({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
       userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section, roleId,
+      questionLanguage: c.get("interfaceLanguage"),
     });
     return c.json({ questions });
   });

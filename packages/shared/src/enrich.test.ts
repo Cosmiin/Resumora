@@ -64,7 +64,7 @@ const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelS
 
 describe("bulletScore", () => {
   it("uses policy score/4", () => {
-    expect(SCORE_POLICY).toBe("score/4");
+    expect(SCORE_POLICY).toBe("score/5");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -121,7 +121,9 @@ describe("buildRoleResult", () => {
     expect(MAX_ROLE_QUESTIONS).toBe(8);
     const result = buildRoleResult(role([]), { ...model([]), roleQuestions }, "fp");
     expect(result.roleQuestions).toHaveLength(8);
-    expect(result.roleQuestions[0]).toEqual({ id: "rq1", text: "Question 1?", options: ["No", "20+"], kind: "role", topic: "company" });
+    // The company question carries no options: the model is not told the employer, so its guesses would be noise.
+    expect(result.roleQuestions[0]).toEqual({ id: "rq1", text: "Question 1?", options: [], kind: "role", topic: "company" });
+    expect(result.roleQuestions[1]).toEqual({ id: "rq2", text: "Question 2?", options: ["No", "20+"], kind: "role", topic: "purpose" });
     expect(result.roleQuestions.map((q) => q.topic)).toEqual(topics);
     expect(RoleResultSchema.parse(result)).toEqual(result);
     expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions }).success).toBe(true);
@@ -342,10 +344,11 @@ describe("fingerprint", () => {
     const retyped = { ...base, bullets: [base.bullets[0]!, { id: "b9", text: "two" }] };
     expect(fingerprint(retyped, "en")).not.toBe(fp);
   });
-  it("ignores company and dates", () => {
-    expect(
-      fingerprint(role(["one", "two"], { company: "Z", startDate: "2000", endDate: "", current: true }), "en"),
-    ).toBe(fp);
+  it("ignores the company", () => {
+    expect(fingerprint(role(["one", "two"], { company: "Z" }), "en")).toBe(fp);
+  });
+  it("changes with the role's period, because questions are written for the time the work happened", () => {
+    expect(fingerprint(role(["one", "two"], { startDate: "2000", endDate: "", current: true }), "en")).not.toBe(fp);
   });
   it("ignores hidden notes and facts", () => {
     expect(fingerprint({

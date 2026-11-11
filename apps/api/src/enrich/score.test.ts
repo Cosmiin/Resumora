@@ -333,7 +333,8 @@ describe("score prompt", () => {
 
   it("requires options for every question and avoids facts already answered", () => {
     const prompt = scoreSystemPrompt("en");
-    expect(prompt).toContain("3–4 options for every question");
+    expect(prompt).toContain("up to 4 options for every question");
+    expect(prompt).toContain("Do not add an option\n  meaning other, something else or none of the above");
     expect(prompt).toContain("Never ask about something the CV or the notes already answer.");
     expect(prompt).not.toContain("Use an empty list when the question is open");
   });
@@ -345,7 +346,7 @@ describe("score prompt", () => {
     expect(scoreUserMessage(role)).toContain(JSON.stringify({ question: "Which tools did you use?", answer: "SAP" }));
   });
 
-  it("sends title and description as context and every bullet as { id, text }, with no company or dates", () => {
+  it("sends title and description as context and every bullet as { id, text }, its period, and no company", () => {
     const role = roleWith(["First", "Second"], { company: "Secret Corp", startDate: "2019-03" });
     const message = scoreUserMessage(role);
     expect(message).toContain("context only");
@@ -353,7 +354,7 @@ describe("score prompt", () => {
     expect(message).toContain("Payroll for 40 staff.");
     for (const b of role.bullets) expect(message).toContain(JSON.stringify({ id: b.id, text: b.text }));
     expect(message).not.toContain("Secret Corp");
-    expect(message).not.toContain("2019");
+    expect(message).toContain("Role period (context only, not graded): 2019-03 – ");
   });
 
   it("contains all 7 calibration lines and no unsupported-language escape", () => {

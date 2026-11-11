@@ -57,7 +57,7 @@ export function enrichRoutes(deps: {
     if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
     const user = c.get("user");
     const result = await scoreRole(
-      { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+      { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
       body.data,
     );
     return c.json(result);
@@ -69,7 +69,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       const result = await improveBullet(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       );
       return c.json(result);
@@ -87,7 +87,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       return c.json(await brainDump(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));
     } catch (err) {
@@ -116,7 +116,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       return c.json(await roleDescription(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));
     } catch (err) {
@@ -133,7 +133,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       return c.json(await itemLines(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));
     } catch (err) {
@@ -150,7 +150,7 @@ export function enrichRoutes(deps: {
     const user = c.get("user");
     try {
       return c.json(await roleFacts(
-        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id },
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));
     } catch (err) {

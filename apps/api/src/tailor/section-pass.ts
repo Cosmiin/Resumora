@@ -147,7 +147,9 @@ export async function passProposals(
     && (!isRoleSection(section) || question.roleId === roleId)).map((question) => [question.id, question.text]));
   const answers = (run.answers ?? []).flatMap((answer) => answer.value && asked.has(answer.questionId)
     ? [{ question: asked.get(answer.questionId)!, answer: answer.value }] : []);
-  const sources = [...texts(isRoleSection(section) ? stepItems(cv, section).filter((item) => item.id === roleId) : cv),
+  const ownItems = stepItems(cv, section).filter((item) => item.id === roleId)
+    .map((item) => ({ ...item, notes: item.notes.filter((note) => !note.jobId || note.jobId === run.jobId) }));
+  const sources = [...texts(isRoleSection(section) ? ownItems : cv),
     ...answers.flatMap((answer) => [answer.question, answer.answer])];
   // A confirmed skill names the roles it was used in: "Used in: Title · Company, Title · Company".
   const usedIn = new Map<string, string>();

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  findScored, isLightTailorSection, isRoleSection, MAX_TEXT, NoteSchema, newId, notePeriod, scoredItems, stepItems,
-  type Answer, type CvContent, type Experience, type JobExtraction, type Note, type TailorQuestion as Question, type TailorRun, type TailorSection,
+  findScored, isLightTailorSection, isOtherOption, isRoleSection, MAX_TEXT, NoteSchema, newId, notePeriod, scoredItems, stepItems,
+  type Answer, type CvContent, type Experience, type JobExtraction, type Locale, type Note, type TailorQuestion as Question, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
@@ -65,7 +65,7 @@ function answeredForJob(cv: CvContent, run: TailorRun, roleId: string | null) {
  */
 export async function askQuestions(
   deps: { model: ModelDeps; tailor: TailorRepo },
-  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection; roleId?: string },
+  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; section: TailorSection; roleId?: string; questionLanguage?: Locale },
 ): Promise<Question[]> {
   // The lighter sections' Final touches ask nothing: they are reworded, reordered and offered for hiding only.
   if (isLightTailorSection(input.section)) return [];
@@ -125,8 +125,8 @@ export async function askQuestions(
       userId: input.userId, task: "tailor_questions", tier: "cheap", schema: ModelQuestionsSchema,
       system: questionSystemPrompt,
       user: questionUserMessage({
-        section: input.section, cv, job: input.job, gaps, answered, max, steering,
-        ...(role ? { role: { kind: findScored(cv, role.id)!.kind, ...role } } : {}), ...(nonFocus ? { focus: false } : {}),
+        section: input.section, cv, job: input.job, gaps, answered, max, steering, questionLanguage: input.questionLanguage,
+        ...(role ? { role: { kind: findScored(cv, role.id)!.kind, ...role } } : {}),
       }),
       maxOutputTokens: 4000,
     });
@@ -147,8 +147,7 @@ export async function askQuestions(
     seen.add(same(text));
     const onBullet = role && bulletId && role.bullets.some((bullet) => bullet.id === bulletId) ? { bulletId } : {};
     const aboutSkill = skills ? { kind: "skill" as const, ...(skill?.trim() ? { skill: skill.trim().slice(0, MAX_TEXT) } : {}) } : {};
-    const options = question.options.filter((option) => !/^(other|others|something else|none of the above)$/i.test(option.trim()
-      .replace(/\s*\([^()]*\)[\p{P}\s]*$/u, "").replace(/[\p{P}\s]+$/u, "").trim()));
+    const options = question.options.filter((option) => !isOtherOption(option));
     fresh.push({ ...question, text, options, id: newId(), section: input.section, ...onBullet, ...aboutSkill,
       roleId: role ? role.id : named && roleIds.has(named) ? named : null });
   }

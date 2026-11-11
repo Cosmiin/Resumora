@@ -119,7 +119,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     await cv.save({ ...saved.content, experience: [swapped] }, saved.version);
     expect(await scoreRole({ cv, insights, model: model.deps, userId: "user-a" }, {
       roleId: role.id, fingerprint: fingerprint(swapped, "en"),
-    })).toEqual(predicted);
+    })).toEqual({ ...predicted, questionLanguage: "en" });
     expect(model.requests).toHaveLength(2);
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_improve_bullet", "enrich_score"]);
     expect(model.logged.every((entry) => entry.userId === "user-a")).toBe(true);

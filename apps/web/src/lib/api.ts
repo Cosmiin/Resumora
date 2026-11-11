@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { ErrorBodySchema } from "@resumora/shared";
+import { getLanguage } from "../i18n/language.ts";
 import { supabase } from "./supabase.ts";
 import { ApiClientError } from "./api-error.ts";
 
@@ -13,6 +14,8 @@ async function send(path: string, init: Omit<ApiInit, "schema">, token: string |
   const headers = new Headers(init.headers);
   if (token) headers.set("authorization", `Bearer ${token}`);
   if (init.json !== undefined) headers.set("content-type", "application/json");
+  // Questions come back in the language the person uses the app in.
+  headers.set("x-interface-language", getLanguage());
   try {
     return await fetch(path, {
       ...init,
