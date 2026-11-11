@@ -224,3 +224,6 @@ Branch `redesign/templates-export`, on top of `redesign/tailoring`, same folder.
 - The finish screen of tailoring now offers "Choose a template" first, as in the mockup, then "Open the CV" and "Write a cover letter".
 - Romanian: My CVs, templates, download, and the tailored CV's page with its cover letter panel. Still English only: the editor's own panel labels (as on the base CV page).
 - Not rebuilt in this flow: the cover letter tab's layout and the guided check of AI guesses keep their structure and take the new colours and buttons only.
+- Codex review (templates and export): "Template" and "Export" on a CV's page, and "Export" on the My CV page, ask before leaving while an edit is still being saved, like the top navigation does. The pages they open read the saved CV, so leaving early lost the edit.
+- Codex review (templates and export): the server reads each tailored CV together with only its newest tailoring run, in one query. The first version asked for all runs of all CVs and would have gone wrong for someone with very many (a failed list near 500 CVs, wrong "In progress" past 1,000 runs).
+- Codex review (templates and export): My CVs keeps the list on screen when a later refresh fails; the error with "Try again" shows only when there is nothing to show.

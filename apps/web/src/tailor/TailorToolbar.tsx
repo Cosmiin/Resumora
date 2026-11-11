@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
+import { LeaveLink } from "../layout/LeaveLink.tsx";
 import { useQuery } from "@tanstack/react-query";
 import { TailorLanguageSchema, type TailorLanguage } from "@resumora/shared";
 import { listTailored, translate } from "./tailored-api.ts";
@@ -94,9 +95,9 @@ export function TailorToolbar({ tab, onTab, template, links, children }: Props) 
           </button>
         ))}
       </div>
-      <Link className="ui-btn ui-btn--sm" to={links.template}>{t("tailored.templateLink", { name: t(getTemplate(template).label) })}</Link>
+      <LeaveLink className="ui-btn ui-btn--sm" to={links.template}>{t("tailored.templateLink", { name: t(getTemplate(template).label) })}</LeaveLink>
       {children}
-      <Link className="ui-btn ui-btn--primary ui-btn--sm" to={links.export}>{t("tailored.exportLink")}</Link>
+      <LeaveLink className="ui-btn ui-btn--primary ui-btn--sm" to={links.export}>{t("tailored.exportLink")}</LeaveLink>
     </div>
   );
 }

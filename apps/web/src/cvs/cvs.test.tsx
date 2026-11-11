@@ -100,6 +100,17 @@ describe("My CVs", () => {
     expect(screen.getByRole("link", { name: "Upload my CV" })).toHaveAttribute("href", "/cv");
   });
 
+  it("keeps the list on screen when a later refresh fails", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const router = createMemoryRouter([{ path: "/cvs", element: <MyCvsPage /> }], { initialEntries: ["/cvs"] });
+    render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
+    await screen.findByRole("region", { name: "Base CV" });
+    list.listAllTailored.mockRejectedValue(new Error("offline"));
+    await client.refetchQueries();
+    expect(screen.getByRole("region", { name: "Base CV" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("offers a retry when the list cannot be loaded", async () => {
     list.listAllTailored.mockRejectedValueOnce(new Error("offline"));
     open("/cvs");

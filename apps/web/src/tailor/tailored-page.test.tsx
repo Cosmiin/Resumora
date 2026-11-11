@@ -19,6 +19,7 @@ const enrichApi = vi.hoisted(() => ({
 vi.mock("../cv/enrich/enrich-api.ts", () => enrichApi);
 vi.mock("../auth/AuthProvider.tsx", () => ({ useAuth: () => ({ loading: false, session: { user: { id: "user-a" } } }) }));
 
+import { setUnsavedChanges } from "../cv/unsaved.ts";
 import { TailoredCvPage } from "./TailoredCvPage.tsx";
 
 const role = {
@@ -161,6 +162,22 @@ describe("TailoredCvPage", () => {
     expect(within(panel).getByText("Original summary.")).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: "Use original wording" }));
     expect(screen.getByRole("textbox", { name: "Summary" })).toHaveTextContent("Original summary.");
+  });
+
+  it("asks before leaving for the template or download page while an edit is still unsaved", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderPage();
+    const link = await screen.findByRole("link", { name: "Export" });
+    setUnsavedChanges(true);
+    try {
+      await userEvent.click(link);
+      expect(confirm).toHaveBeenCalledWith("You have unsaved changes. Leave this page anyway?");
+      // Still on the CV: the toolbar is there.
+      expect(screen.getByRole("group", { name: "This tailored CV" })).toBeInTheDocument();
+    } finally {
+      setUnsavedChanges(false);
+      confirm.mockRestore();
+    }
   });
 
   it("shows the CV in the template it was saved with", async () => {

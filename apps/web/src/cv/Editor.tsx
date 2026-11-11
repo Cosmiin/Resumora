@@ -26,7 +26,8 @@ import { FocusMode } from "./enrich/FocusMode.tsx";
 import { EnrichPath } from "./enrich/EnrichPath.tsx";
 import { PathSteps } from "./enrich/PathStart.tsx";
 import { CvFacts, isBlankCv, useStartTemplate } from "./CvFacts.tsx";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
+import { LeaveLink } from "../layout/LeaveLink.tsx";
 
 const statusLabel: Record<SaveStatus, MessageKey> = {
   saved: "cv.status.saved",
@@ -278,7 +279,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
             <p className="ui-lead">{t("cv.head.line")}</p>
           </div>
           <div className="ui-row">
-            <Link className="ui-btn" to="/cv/export">{t("cvs.export")}</Link>
+            <LeaveLink className="ui-btn" to="/cv/export">{t("cvs.export")}</LeaveLink>
             <button type="button" className="ui-btn enrich-open" onClick={() => setPathOpen(true)}>{t("enrich.path.open")}</button>
           </div>
         </header>

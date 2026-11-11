@@ -32,7 +32,8 @@ export function MyCvsPage() {
   if (all.isPending) {
     body = <div className="ui-sheet ui-stack" aria-busy="true"><p role="status" className="ui-sr">{t("cvs.loading")}</p>
       <Skeleton width="40%" height="26px" /><Skeleton width="60%" /><Skeleton width="55%" height="26px" /><Skeleton width="35%" /></div>;
-  } else if (all.isError) {
+  } else if (!all.data) {
+    // Only when there is nothing to show: a failed refresh keeps the list that was already loaded.
     body = <div className="ui-stack"><p role="alert" className="ui-notice ui-notice--bad">{t("cvs.loadError")}</p>
       <p><button type="button" className="ui-btn" onClick={() => void all.refetch()}>{t("tailor.retry")}</button></p></div>;
   } else if (isBlankCv(all.data.base.content) && all.data.tailored.length === 0) {

@@ -84,19 +84,19 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       return data.length > 0 ? "ok" : "conflict";
     },
     async listAllTailoredCvs() {
-      const { data, error } = await db.from("tailored_cvs").select("id, job_id, language, template, translated_from, updated_at")
-        .order("updated_at", { ascending: false });
+      // One query: each CV with only its newest run, so the list never depends on how many runs or CVs there are.
+      const { data, error } = await db.from("tailored_cvs")
+        .select("id, job_id, language, template, translated_from, updated_at, tailor_runs(status, created_at)")
+        .order("updated_at", { ascending: false })
+        .order("created_at", { referencedTable: "tailor_runs", ascending: false })
+        .limit(1, { referencedTable: "tailor_runs" });
       if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
-      if (data.length === 0) return [];
-      // Newest first: the first run seen for a CV is its newest.
-      const runs = await db.from("tailor_runs").select("tailored_cv_id, status").in("tailored_cv_id", data.map((row) => row.id))
-        .order("created_at", { ascending: false });
-      if (runs.error) throw new Error(`tailor_runs select failed: ${runs.error.message}`);
-      const newest = new Map<string, string>();
-      for (const run of runs.data) if (run.tailored_cv_id && !newest.has(run.tailored_cv_id)) newest.set(run.tailored_cv_id, run.status);
-      return data.map((row) => ({ id: row.id, jobId: row.job_id, language: TailorLanguageSchema.parse(row.language),
-        template: TailoredCvSchema.shape.template.parse(row.template), translatedFrom: row.translated_from, updatedAt: row.updated_at,
-        inProgress: newest.has(row.id) && newest.get(row.id) !== "done" }));
+      return data.map((row) => {
+        const newest = (row.tailor_runs as { status: string }[] | null)?.[0];
+        return { id: row.id, jobId: row.job_id, language: TailorLanguageSchema.parse(row.language),
+          template: TailoredCvSchema.shape.template.parse(row.template), translatedFrom: row.translated_from, updatedAt: row.updated_at,
+          inProgress: !!newest && newest.status !== "done" };
+      });
     },
     async listTailoredCvs(jobId) {
       const { data, error } = await db.from("tailored_cvs").select("id, language, translated_from, updated_at")
