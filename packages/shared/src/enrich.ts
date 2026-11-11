@@ -291,11 +291,12 @@ export function hashText(text: string): string {
 }
 
 /**
- * Changes when anything the score depends on changes: bullet ids and texts, title, description, locale or policy.
+ * Changes when anything the score depends on changes: bullet ids and texts, title, description, the role's period,
+ * locale or policy. The period counts because questions are written for the time the work happened.
  * Ids count because the result points at bullets by id: a bullet deleted and retyped gets a new id.
  */
 export function fingerprint(role: Experience, locale: Locale): string {
-  const parts = [SCORE_POLICY, locale, role.title, role.description, ...role.bullets.flatMap((b) => [b.id, b.text])];
+  const parts = [SCORE_POLICY, locale, role.title, role.description, role.startDate, role.endDate, String(role.current), ...role.bullets.flatMap((b) => [b.id, b.text])];
   return cyrb53(parts.join("\u0000")).toString(16);
 }
 

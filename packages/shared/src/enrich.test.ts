@@ -344,10 +344,11 @@ describe("fingerprint", () => {
     const retyped = { ...base, bullets: [base.bullets[0]!, { id: "b9", text: "two" }] };
     expect(fingerprint(retyped, "en")).not.toBe(fp);
   });
-  it("ignores company and dates", () => {
-    expect(
-      fingerprint(role(["one", "two"], { company: "Z", startDate: "2000", endDate: "", current: true }), "en"),
-    ).toBe(fp);
+  it("ignores the company", () => {
+    expect(fingerprint(role(["one", "two"], { company: "Z" }), "en")).toBe(fp);
+  });
+  it("changes with the role's period, because questions are written for the time the work happened", () => {
+    expect(fingerprint(role(["one", "two"], { startDate: "2000", endDate: "", current: true }), "en")).not.toBe(fp);
   });
   it("ignores hidden notes and facts", () => {
     expect(fingerprint({

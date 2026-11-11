@@ -66,7 +66,8 @@ export async function improveBullet(
     ] };
     const graded = await gradeBullets(deps, gradingRole, content.locale, [input.bulletId]);
     if (graded[0]!.duplicateOf !== null || graded[0]!.meaningful === false) return { needsDetail: true, nextQuestion };
-    const predicted = mergeGrades(swapped, before, graded, fingerprint(swapped, content.locale));
+    // The prediction keeps the language its questions were written in, so the next score request can reuse it.
+    const predicted = { ...mergeGrades(swapped, before, graded, fingerprint(swapped, content.locale)), questionLanguage: deps.questionLanguage ?? content.locale };
     const bulletBefore = before.bullets.find((b) => b.id === input.bulletId)!.score;
     const after = predicted.bullets.find((b) => b.id === input.bulletId)!.score;
     if (after <= bulletBefore) return { needsDetail: true, nextQuestion };

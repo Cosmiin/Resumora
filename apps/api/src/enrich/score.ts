@@ -35,8 +35,8 @@ export async function gradeBullets(deps: ScoreDeps, role: Experience, locale: Lo
       userId: deps.userId,
       task: "enrich_score",
       schema: ModelScoreSchema,
-      system: scoreSystemPrompt(locale),
-      user: scoreUserMessage(role, ids),
+      system: scoreSystemPrompt(locale, deps.questionLanguage),
+      user: scoreUserMessage(role, ids) + questionLanguageReminder(locale, deps.questionLanguage),
       maxOutputTokens: 600 + 180 * ids.length,
     });
     const actual = new Set(answer.bullets.map((b) => b.id));

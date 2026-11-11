@@ -295,8 +295,9 @@ export function kindNote(kind: ScoredKind): string[] {
 /** "2019 – 2022, ended" for a role with a start date; nothing otherwise. */
 export function periodLine(role: Partial<Pick<Experience, "startDate" | "endDate" | "current">>): string[] {
   if (!role.startDate) return [];
-  const ended = !role.current && !!role.endDate;
-  return [`Role period (context only, not graded): ${role.startDate} – ${ended ? role.endDate : "present"}, ${ended ? "ended" : "current"}.`];
+  // A role that isn't current has ended, even when its end date was left empty.
+  const end = role.current ? "present" : role.endDate || "end date not given";
+  return [`Role period (context only, not graded): ${role.startDate} – ${end}, ${role.current ? "current" : "ended"}.`];
 }
 
 /** The role as the model sees it: context for the title, description and period, bullets to grade. No company. */
