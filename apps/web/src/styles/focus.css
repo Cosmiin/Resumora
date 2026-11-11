@@ -263,7 +263,8 @@
 .se-num b { font: var(--weight-display) 2.4rem / 1 var(--font-display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .se-num small { font-weight: var(--weight-bold); color: var(--color-muted); }
 .se-ticks { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
-.se-tick { display: flex; align-items: baseline; gap: var(--space-2); }
+/* Two classes: a list item rule elsewhere sets display, and it must not win here. */
+.se-ticks .se-tick { display: flex; align-items: baseline; gap: var(--space-2); }
 .se-tick::before { content: "✓"; flex: none; width: 1em; font-weight: var(--weight-bold); color: var(--color-good); }
 .se-tick.is-no::before { content: "○"; color: var(--color-bad); }
 .se-tick.is-na { color: var(--color-muted); }
@@ -298,3 +299,10 @@
 @keyframes fm-blink { 50% { opacity: 0.3; } }
 @keyframes fm-wave { 0%, 100% { height: 6px; } 50% { height: 26px; } }
 @keyframes fm-burst { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(400deg); } }
+
+/* Role done: a bar fills while the new score counts up, then the coach's sentence comes in. */
+.rr-bar { width: 100%; max-width: 320px; height: 8px; border-radius: var(--radius-pill); background: var(--color-desk-soft); overflow: hidden; }
+.rr-bar i { display: block; height: 100%; border-radius: inherit; background: var(--color-ink); }
+@keyframes rr-rise { from { opacity: 0; transform: translateY(4px); } }
+.rr-line.is-after-count { animation: rr-rise var(--dur-slow) var(--ease-out) 900ms both; }
+@media (prefers-reduced-motion: reduce) { .rr-line.is-after-count { animation: none; } }

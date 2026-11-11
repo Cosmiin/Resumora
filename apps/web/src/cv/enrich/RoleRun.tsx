@@ -141,7 +141,7 @@ export function RoleRun({ target, cv, dispatch, scores, waitForSave, onClose, co
           <div className="rr-card">
             <p className="rr-where">{name}</p>
             <Numbers before={run.before} after={run.after} waiting={run.waiting} />
-            <p className="fm-why rr-line">{doneLine(kind === "role", run.applied, run.answered, run.waiting, run.result)}</p>
+            <p className={run.before !== null && run.after !== null && run.after !== run.before ? "fm-why rr-line is-after-count" : "fm-why rr-line"}>{doneLine(kind === "role", run.applied, run.answered, run.waiting, run.result)}</p>
             <div className="rr-actions">
               <button type="button" className="fm-btn" onClick={leaveRole}>{next ? next.label : t("enrich.focus.done.back")}</button>
               {next && <button type="button" className="ui-btn" onClick={() => run.close()}>{t("enrich.run.done.finish")}</button>}
@@ -185,22 +185,51 @@ function doneLine(isRole: boolean, applied: number, answered: number, waiting: b
 }
 
 /** "69 → 88": the role's score before and after. One number when it did not move or the new one is not known. */
+const COUNT_MS = 900;
+/** No count-up for people who asked for less motion, or where the screen cannot say (tests). */
+const stillMotion = () => typeof matchMedia !== "function" || matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** The new score counting up from the old one, once (owner review, point 7). */
+function useCountUp(from: number, to: number): number {
+  const still = useRef(stillMotion()).current;
+  const [shown, setShown] = useState(still ? to : from);
+  useEffect(() => {
+    if (still) return;
+    let frame = 0;
+    let t0: number | null = null;
+    const step = (now: number) => {
+      t0 ??= now;
+      const p = Math.min(1, (now - t0) / COUNT_MS);
+      setShown(Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [still, from, to]);
+  return shown;
+}
+
+/** "69 → 88", the second number climbing, with a bar that fills along with it. */
+function Moved({ before, after }: { before: number; after: number }) {
+  const shown = useCountUp(before, after);
+  return (
+    <>
+      <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>
+        <span className="visually-hidden">{t("enrich.run.done.fromTo", { from: before, to: after })}</span>
+        <span aria-hidden="true">{before} → {shown}</span>
+      </h2>
+      <div className="rr-bar" aria-hidden="true"><i style={{ width: `${shown}%` }} /></div>
+    </>
+  );
+}
+
 function Numbers({ before, after, waiting }: { before: number | null; after: number | null; waiting: boolean }) {
-  const moved = before !== null && after !== null && after !== before;
   const one = after ?? before;
+  if (before !== null && after !== null && after !== before) return <Moved before={before} after={after} />;
   return (
     <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>
-      {moved ? (
-        <>
-          <span className="visually-hidden">{t("enrich.run.done.fromTo", { from: before, to: after })}</span>
-          <span aria-hidden="true">{before} → {after}</span>
-        </>
-      ) : (
-        <>
-          <span className="visually-hidden">{one === null ? t("enrich.focus.noScore") : t("enrich.focus.bulletScore", { n: one })}</span>
-          <span aria-hidden="true">{one ?? "–"}{waiting && before !== null ? " → …" : ""}</span>
-        </>
-      )}
+      <span className="visually-hidden">{one === null ? t("enrich.focus.noScore") : t("enrich.focus.bulletScore", { n: one })}</span>
+      <span aria-hidden="true">{one ?? "–"}{waiting && before !== null ? " → …" : ""}</span>
     </h2>
   );
 }

@@ -285,3 +285,6 @@ Built by the forked session while the main session was on templates and export. 
   - The ✨ button on one bullet and "Make it stand out" still open the old single-bullet flow, unchanged.
 - Owner tried flow B on 2026-11-11 and confirmed the five choices raised: weak lines without their own question are rewritten too; a role that has a description gets a new one only when the run brought answers; question screens keep Back and Skip; one column on every screen; a follow-up takes the place of the last question still to come.
 - Owner feedback 7: an animation while the score is being worked out would be nice. Options shown on `mockups/phase3/score-animation.html` in the workspace.
+- Owner's pick for feedback 7: the number counts up. On "role done" the new score climbs from the old one in 0.9 s while a bar fills, then the sentence comes in. No movement for people who asked their device for less motion.
+- Golden set on `score/7` (2026-11-11): 4 cases, 80 AI calls, 0 bad patterns, 0 problems. The first run failed one role: the reviewer's answer was cut off, because it now carries more per role. Its length limit was raised.
+- "Understand the score": the ticks were tight against their labels (another list rule won over the layout); fixed.
