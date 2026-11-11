@@ -62,7 +62,12 @@
 /* A role's suggestions: the heading with the keyword bar, then one row per line. */
 .tailor-page-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); gap: var(--space-5); align-items: end; margin-bottom: var(--space-6); }
 .tailor-diffs { display: grid; gap: var(--space-4); min-width: 0; margin: 0; padding: 0; border: 0; }
-.tailor-fits { display: grid; gap: var(--space-2); padding: var(--space-4) var(--space-6); border-radius: var(--radius-block); background: var(--color-paper-veil); }
+/* A role's suggestions, one at a time: a narrow column with the suggestion's place among them above the card. */
+.tailor-one { max-width: 860px; }
+.tailor-one-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--space-3) var(--space-6); margin-bottom: var(--space-5); }
+.tailor-one-step { display: grid; gap: var(--space-2); min-width: 180px; font-weight: var(--weight-bold); font-size: var(--text-small); }
+.tailor-one-step p { margin: 0; }
+.tailor-one .tailor-foot { margin-top: var(--space-5); }
 .tailor-review-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
 
 /* The finish: must-haves with a dot each. */

@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { useId, useState } from "react";
+import { placeGuesses } from "@resumora/shared";
 import { useT } from "../i18n/t.ts";
 import { diffWords } from "../tailor/diff-words.ts";
 import { CoachNote } from "./Card.tsx";
@@ -23,10 +24,28 @@ type Props = {
   onDecide: (decision: DiffDecision | null) => void;
 };
 
+/** The new line in pieces: which words are new, and which belong to a guess. */
+function pieces(oldText: string, text: string, guesses: { text: string; reason: string }[]) {
+  const spans = placeGuesses(text, guesses);
+  const out: { text: string; changed: boolean; guess: boolean }[] = [];
+  let at = 0;
+  for (const part of diffWords(oldText, text)) {
+    const end = at + part.text.length;
+    // Cut the part wherever a guess starts or ends inside it.
+    const cuts = [at, ...spans.flatMap((span) => [span.start, span.end]).filter((cut) => cut > at && cut < end), end].sort((a, b) => a - b);
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const from = cuts[i]!, to = cuts[i + 1]!;
+      out.push({ text: text.slice(from, to), changed: part.changed, guess: spans.some((span) => from >= span.start && to <= span.end) });
+    }
+    at = end;
+  }
+  return out;
+}
+
 /**
- * One bullet, side by side: the line on the CV now (the words that would go struck through) against the
- * suggestion (the new words marked). The person picks a side, or edits the suggestion. A guess says so in a
- * sentence and asks for a yes.
+ * One suggested line on its own: the new line large (new words marked, guessed words underlined), the line on
+ * the CV now small under it, and the choice. A guess says in two short sentences what was written and why, and
+ * asks whether it is true.
  */
 export function DiffRow({ oldText, newText, reason, inferred = false, guesses = [], textLang, decision, onDecide }: Props) {
   const t = useT();
@@ -49,6 +68,7 @@ export function DiffRow({ oldText, newText, reason, inferred = false, guesses = 
   const edited = decision?.choice === "new" && decision.text !== newText;
   const status =
     decision?.choice === "keep" ? t("ui.diff.kept") : decision?.choice === "new" ? t(edited ? "ui.diff.usingEdit" : "ui.diff.usingNew") : "";
+  const shown = placeGuesses(chosenText, guesses);
 
   function saveEdit() {
     const text = (draft ?? "").trim();
@@ -56,82 +76,62 @@ export function DiffRow({ oldText, newText, reason, inferred = false, guesses = 
     setDraft(null);
   }
 
-  const side = (choice: "keep" | "new") => `ui-diff-side ui-diff-${choice === "keep" ? "old" : "new"}${decision?.choice === choice ? " is-chosen" : ""}`;
-  const stamp = (choice: "keep" | "new") => decision?.choice === choice && <span className="ui-diff-chosen">{t("ui.diff.chosen")}</span>;
-
   return (
     <article className="ui-sheet ui-diff" data-decision={decision?.choice}>
+      <p className="ui-diff-label">{t("ui.diff.suggested")}</p>
+      {draft === null ? (
+        <p className="ui-diff-text ui-diff-new" lang={textLang}>
+          {pieces(oldText, chosenText, guesses).map((piece, i) => {
+            const words = piece.guess ? <span className="ui-diff-guess">{piece.text}</span> : piece.text;
+            return piece.changed ? <ins key={i}>{words}</ins> : <span key={i}>{words}</span>;
+          })}
+        </p>
+      ) : (
+        <>
+          <label className="ui-sr" htmlFor={editId}>
+            {t("ui.diff.editLabel")}
+          </label>
+          <textarea id={editId} className="ui-input" rows={3} lang={textLang} value={draft} onChange={(event) => setDraft(event.target.value)} autoFocus />
+        </>
+      )}
+      <p className="ui-diff-was">
+        <b>{t("ui.diff.now")}</b> <span lang={textLang}>{oldText}</span>
+      </p>
       {reason && <CoachNote size="sm">{reason}</CoachNote>}
-      <div className="ui-diff-pair">
-        <div className={side("keep")}>
-          <p className="ui-diff-top">
-            <span className="ui-diff-label">{t("ui.diff.now")}</span>
-            {stamp("keep")}
-          </p>
-          <p className="ui-diff-text" lang={textLang}>
-            {diffWords(chosenText, oldText).map((part, i) => (part.changed ? <del key={i}>{part.text}</del> : part.text))}
-          </p>
-          <button type="button" className="ui-btn ui-btn--sm ui-diff-pick" aria-pressed={decision?.choice === "keep"} onClick={() => onDecide({ choice: "keep" })}>
-            {t("ui.diff.keep")}
-          </button>
-        </div>
-        <span className="ui-diff-arrow" aria-hidden="true">
-          →
-        </span>
-        <div className={side("new")}>
-          <p className="ui-diff-top">
-            <span className="ui-diff-label">{t("ui.diff.suggested")}</span>
-            {stamp("new")}
-          </p>
-          {draft === null ? (
-            <>
-              <p className="ui-diff-text" lang={textLang}>
-                {diffWords(oldText, chosenText).map((part, i) => (part.changed ? <ins key={i}>{part.text}</ins> : part.text))}
-              </p>
-              <button type="button" className="ui-btn ui-btn--sm ui-diff-pick" aria-pressed={decision?.choice === "new"} onClick={() => onDecide({ choice: "new", text: chosenText })}>
-                {t(inferred ? "ui.diff.useGuess" : "ui.diff.useNew")}
-              </button>
-            </>
-          ) : (
-            <>
-              <label className="ui-sr" htmlFor={editId}>
-                {t("ui.diff.editLabel")}
-              </label>
-              <textarea id={editId} className="ui-input" rows={3} lang={textLang} value={draft} onChange={(event) => setDraft(event.target.value)} autoFocus />
-              <button type="button" className="ui-btn ui-btn--sm ui-btn--primary ui-diff-save" onClick={saveEdit}>
-                {t("ui.diff.saveEdit")}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-      {inferred && (
+      {inferred && draft === null && (
         <div className="ui-diff-check">
           <b>{t("ui.diff.checkTitle")}</b>
-          {guesses.length === 0 ? (
+          {shown.length === 0 ? (
             <span>{t("ui.diff.checkText")}</span>
           ) : (
-            <ul>
-              {guesses.map((guess) => (
-                <li key={guess.text}>
-                  <span>
-                    {t("ui.diff.guess")} <q lang={textLang}>{guess.text}</q>
-                  </span>
-                  <span>{guess.reason}</span>
-                </li>
-              ))}
-            </ul>
+            shown.map((guess) => (
+              <p key={guess.text}>
+                {t("ui.diff.guess")} <q className="ui-diff-guess" lang={textLang}>{guess.text}</q>. {guess.reason}
+              </p>
+            ))
           )}
-          {guesses.length > 0 && <span>{t("ui.diff.checkAsk")}</span>}
+          <b>{t("ui.diff.checkAsk")}</b>
         </div>
       )}
-      {draft === null && (
-        <p className="ui-diff-more">
-          <button type="button" className="ui-diff-edit" onClick={() => setDraft(chosenText)}>
-            {t("ui.diff.edit")}
+      <div className="ui-diff-actions">
+        {draft === null ? (
+          <>
+            <button type="button" className="ui-btn ui-diff-pick" aria-pressed={decision?.choice === "new"} onClick={() => onDecide({ choice: "new", text: chosenText })}>
+              {t(inferred ? "ui.diff.useGuess" : "ui.diff.useNew")}
+            </button>
+            <button type="button" className="ui-btn ui-diff-pick" aria-pressed={decision?.choice === "keep"} onClick={() => onDecide({ choice: "keep" })}>
+              {t("ui.diff.keep")}
+            </button>
+            <button type="button" className="ui-diff-edit" onClick={() => setDraft(chosenText)}>
+              {t("ui.diff.edit")}
+            </button>
+          </>
+        ) : (
+          <button type="button" className="ui-btn ui-btn--primary" onClick={saveEdit}>
+            {t("ui.diff.saveEdit")}
           </button>
-        </p>
-      )}
+        )}
+      </div>
       {/* Stays in the page so a screen reader announces the decision when it changes. */}
       <p className="ui-sr" role="status">
         {status}

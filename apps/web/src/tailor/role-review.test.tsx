@@ -34,43 +34,53 @@ function review(over: Partial<React.ComponentProps<typeof RoleReview>> = {}) {
   return onAccept;
 }
 
-const rows = () => screen.getAllByRole("article");
-const press = (row: HTMLElement, name: string) => userEvent.setup().click(within(row).getByRole("button", { name }));
+const card = () => screen.getByRole("article");
+const press = (name: string) => userEvent.setup().click(screen.getByRole("button", { name }));
 
-describe("RoleReview: a role's suggestions as a list", () => {
-  it("lists the role's suggestions side by side, each with its reason; a suggestion starts chosen, a guess waits; lines with none are gathered below", () => {
+describe("RoleReview: a role's suggestions, one at a time", () => {
+  it("shows the first suggestion alone, with where it stands among them; a suggestion starts chosen; lines with none are only counted", () => {
     review({ position: "Role 1 of 2", keywords: { has: 2, total: 5 } });
     expect(screen.getByRole("heading", { level: 1, name: "Business Analyst, Emedi" })).toBeInTheDocument();
     expect(screen.getByText("Role 1 of 2 · Mar 2021 – Present")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "Keywords from the ad on your CV" })).toHaveAttribute("aria-valuetext", "2 of 5");
-    expect(rows()).toHaveLength(4);
-    expect(rows()[0]).toHaveTextContent("Owns reporting for sales.");
-    expect(rows()[0]).toHaveTextContent("Owns reporting and KPI dashboards for sales.");
-    expect(rows()[1]).toHaveTextContent("Made weekly KPI reports");
-    expect(within(rows()[1]!).queryByText("Please check this one")).toBeNull();
-    expect(within(rows()[1]!).getByRole("button", { name: "Use this" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(rows()[2]!).getByText("Please check this one")).toBeInTheDocument();
-    expect(within(rows()[2]!).getByRole("button", { name: "Yes, it's true. Use it" })).toHaveAttribute("aria-pressed", "false");
-    expect(within(rows()[2]!).getByRole("button", { name: "Keep mine" })).toHaveAttribute("aria-pressed", "false");
-    expect(within(rows()[2]!).getByText("From your answer: worked with sales leads")).toBeInTheDocument();
-    expect(screen.getByText("Already fit the job · no change")).toBeInTheDocument();
-    expect(rows()[3]).toHaveTextContent("Ran workshops");
-    expect(within(rows()[3]!).getByText("This bullet already fits the job. No change suggested.")).toBeInTheDocument();
-    expect(within(rows()[3]!).queryByRole("button")).toBeNull();
-    expect(screen.getByText("2 of 3 decided")).toBeInTheDocument();
-    expect(screen.getByText("A line you have not checked stays as it is on your CV.")).toBeInTheDocument();
+    expect(screen.getByText("Suggestion 1 of 3")).toBeInTheDocument();
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(card()).toHaveTextContent("Owns reporting and KPI dashboards for sales.");
+    expect(card()).toHaveTextContent("Now: Owns reporting for sales.");
+    expect(screen.getByRole("button", { name: "Use this" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("One part of this line is my guess")).toBeNull();
+    expect(screen.getByText("1 other line already fits the job and stays as it is.")).toBeInTheDocument();
+    expect(screen.queryByText("Ran workshops")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save and continue" })).toBeNull();
+  });
+
+  it("Next and Previous walk through the suggestions; a guess waits for an answer; the last one offers Save", async () => {
+    review();
+    await press("Next suggestion");
+    expect(screen.getByText("Suggestion 2 of 3")).toBeInTheDocument();
+    expect(card()).toHaveTextContent("Made weekly KPI reports");
+    await press("Next suggestion");
+    expect(card()).toHaveTextContent("Checked data quality with sales leads");
+    expect(screen.getByText("One part of this line is my guess")).toBeInTheDocument();
+    expect(screen.getByText("From your answer: worked with sales leads")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Yes, it's true. Use it" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Keep my line" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "Next suggestion" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Save and continue" })).toBeInTheDocument();
+    await press("Previous");
+    expect(screen.getByText("Suggestion 2 of 3")).toBeInTheDocument();
   });
 
   it("sends each decision as made: kept, and reworded with the person's own text; a guess nobody confirmed stays off the CV", async () => {
     const onAccept = review();
-    await press(rows()[0]!, "Keep mine");
-    await press(rows()[1]!, "Edit the new line myself");
-    const box = within(rows()[1]!).getByRole("textbox");
+    await press("Keep my line");
+    await press("Next suggestion");
+    await press("Edit the line");
+    const box = screen.getByRole("textbox");
     await userEvent.clear(box);
     await userEvent.type(box, "Made weekly KPI reports for sales");
-    await press(rows()[1]!, "Save edit");
-    expect(screen.getByText("2 of 3 decided")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await press("Save edit");
+    await press("Next suggestion");
+    await press("Save and continue");
     expect(onAccept).toHaveBeenCalledWith({
       decisions: [{ itemId: "r1", keep: false }, { itemId: "b1", keep: true, text: "Made weekly KPI reports for sales" }, { itemId: "b2", keep: false }], inferred: [], flags: [],
     });
@@ -78,27 +88,16 @@ describe("RoleReview: a role's suggestions as a list", () => {
 
   it("an untouched suggestion is left out, so it is used; a guess is used once the person says it is true", async () => {
     const onAccept = review();
-    await press(rows()[2]!, "Yes, it's true. Use it");
-    expect(screen.getByText("3 of 3 decided")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await press("Next suggestion");
+    await press("Next suggestion");
+    await press("Yes, it's true. Use it");
+    await press("Save and continue");
     expect(onAccept).toHaveBeenCalledWith({ decisions: [{ itemId: "b2", keep: true }], inferred: [], flags: [] });
   });
 
-  it("Accept all for this role uses every suggestion still undecided and keeps the decisions already made", async () => {
-    const onAccept = review();
-    await press(rows()[1]!, "Keep mine");
-    await userEvent.click(screen.getByRole("button", { name: "Accept all for this role" }));
-    expect(screen.getByText("3 of 3 decided")).toBeInTheDocument();
-    expect(screen.queryByText("A line you have not checked stays as it is on your CV.")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
-    expect(onAccept).toHaveBeenCalledWith({
-      decisions: [{ itemId: "r1", keep: true }, { itemId: "b1", keep: false }, { itemId: "b2", keep: true }], inferred: [], flags: [],
-    });
-  });
-
-  it("freezes every row while the role is being saved", () => {
-    review({ busy: true });
-    for (const button of within(rows()[0]!).getAllByRole("button")) expect(button).toBeDisabled();
+  it("freezes the suggestion while the role is being saved", () => {
+    review({ busy: true, proposals: [proposals[1]!] });
+    for (const button of within(card()).getAllByRole("button")) expect(button).toBeDisabled();
     expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
   });
 
@@ -170,7 +169,7 @@ describe("the Experience review in the flow", () => {
     expect(redoRole).toHaveBeenCalledWith("run1", "r1", [{ questionId: "q1", value: "Daily", via: "typed" }]);
 
     const card = await screen.findByRole("region", { name: "Business Analyst, Emedi" });
-    expect(card.querySelector(".ui-diff-new .ui-diff-text")).toHaveTextContent("Made daily KPI reports");
+    expect(card.querySelector(".ui-diff-new")).toHaveTextContent("Made daily KPI reports");
     expect(within(card).getByText("Role 1 of 1 · Mar 2021 – Present")).toBeInTheDocument();
     await user.click(within(card).getByRole("button", { name: "Use this" }));
     await user.click(screen.getByRole("button", { name: "Save and continue" }));

@@ -66,9 +66,9 @@ describe("Projects & volunteering step", () => {
     expect(screen.getByRole("button", { name: "Skip this project" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Skip" }));
-    expect(await screen.findByRole("heading", { name: "Lines for this project" })).toBeInTheDocument();
+    expect(await screen.findByText("Suggestion 1 of 1")).toBeInTheDocument();
     expect(screen.getByText(/^Project 1 of 1/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Accept all for this project" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Skip this project" })).toBeInTheDocument();
     expect(runSection).toHaveBeenLastCalledWith("run1", "projects", "p1");
     await user.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "projects", expect.objectContaining({ roleId: "p1" }));

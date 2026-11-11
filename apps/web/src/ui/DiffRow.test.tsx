@@ -6,42 +6,39 @@ import { DiffRow, type DiffDecision } from "./DiffRow.tsx";
 
 const OLD = "Worked with Google Sheets and Airtable";
 const NEW = "Design data tables in Airtable and Google Sheets that the workflows read and write";
+const GUESS = { text: "Design data tables", reason: "Your line says “worked with Airtable”, so I inferred this." };
 
-function Row({ inferred = false }: { inferred?: boolean }) {
+function Row({ inferred = false, guesses }: { inferred?: boolean; guesses?: { text: string; reason: string }[] }) {
   const [decision, setDecision] = useState<DiffDecision | null>(null);
   return (
     <>
-      <DiffRow textLang="en" oldText={OLD} newText={NEW} reason="The ad asks for data models." inferred={inferred} decision={decision} onDecide={setDecision} />
+      <DiffRow textLang="en" oldText={OLD} newText={NEW} reason="The ad asks for data models." inferred={inferred} guesses={guesses} decision={decision} onDecide={setDecision} />
       <pre data-testid="decision">{JSON.stringify(decision)}</pre>
     </>
   );
 }
 
 const decision = () => JSON.parse(screen.getByTestId("decision").textContent ?? "null") as DiffDecision | null;
+const line = () => document.querySelector(".ui-diff-new")!;
 
 describe("DiffRow", () => {
-  it("shows the old bullet, the suggestion and the reason", () => {
+  it("shows the new line with its new words marked, the line on the CV now under it, and the reason", () => {
     render(<Row />);
-    const [old, suggested] = [...document.querySelectorAll(".ui-diff-text")];
-    expect(old).toHaveTextContent(OLD);
-    expect(old).toHaveAttribute("lang", "en");
-    expect(suggested).toHaveTextContent(NEW);
-    expect(suggested).toHaveAttribute("lang", "en");
-    // The words that go are struck through on the old side; the words that come are marked on the new side.
-    expect([...old!.querySelectorAll("del")].map((part) => part.textContent)).toEqual(["Worked with", "Airtable"]);
-    expect(suggested!.querySelector("ins")).toHaveTextContent("Design data tables in Airtable and");
+    expect(line()).toHaveTextContent(NEW);
+    expect(line()).toHaveAttribute("lang", "en");
+    expect(line().querySelector("ins")).toHaveTextContent("Design data tables in Airtable and");
+    expect(screen.getByText(OLD)).toHaveAttribute("lang", "en");
+    expect(screen.getByText("Now:")).toBeInTheDocument();
     expect(screen.getByText("The ad asks for data models.")).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
-  it("Keep mine keeps the old bullet, stamps that side and says so", async () => {
+  it("Keep my line keeps the old bullet and says so", async () => {
     render(<Row />);
-    expect(screen.queryByText("Chosen")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Keep mine" }));
+    await userEvent.click(screen.getByRole("button", { name: "Keep my line" }));
     expect(decision()).toEqual({ choice: "keep" });
     expect(screen.getByRole("status")).toHaveTextContent("Kept");
-    expect(screen.getByRole("button", { name: "Keep mine" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("Chosen").closest(".ui-diff-side")).toHaveClass("ui-diff-old");
+    expect(screen.getByRole("button", { name: "Keep my line" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("Use this takes the suggestion; pressing it again changes nothing", async () => {
@@ -55,40 +52,41 @@ describe("DiffRow", () => {
 
   it("Edit lets you change the suggestion and uses your version", async () => {
     render(<Row />);
-    await userEvent.click(screen.getByRole("button", { name: "Edit the new line myself" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit the line" }));
     const field = screen.getByRole("textbox", { name: "Edit the suggested bullet" });
     await userEvent.clear(field);
     await userEvent.type(field, "Maintain data tables in Airtable");
     await userEvent.click(screen.getByRole("button", { name: "Save edit" }));
     expect(decision()).toEqual({ choice: "new", text: "Maintain data tables in Airtable" });
-    expect(document.querySelector(".ui-diff-new .ui-diff-text")).toHaveTextContent("Maintain data tables in Airtable");
+    expect(line()).toHaveTextContent("Maintain data tables in Airtable");
     expect(screen.getByRole("status")).toHaveTextContent("Using your edit");
   });
 
   it("an edit saved empty falls back to the suggestion", async () => {
     render(<Row />);
-    await userEvent.click(screen.getByRole("button", { name: "Edit the new line myself" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit the line" }));
     await userEvent.clear(screen.getByRole("textbox", { name: "Edit the suggested bullet" }));
     await userEvent.click(screen.getByRole("button", { name: "Save edit" }));
     expect(decision()).toEqual({ choice: "new", text: NEW });
   });
 
-  it("a guess says so in a sentence and asks for a yes", () => {
-    render(<Row inferred />);
-    expect(screen.getByText("Please check this one")).toBeInTheDocument();
-    expect(screen.getByText("Part of this line is my guess: it is not written in your CV or your answers. Use it only if it is true.")).toBeInTheDocument();
+  it("a guess underlines the guessed words, says in short what was written and why, and asks whether it is true", () => {
+    render(<Row inferred guesses={[GUESS]} />);
+    // The guessed words carry the mark on the line itself.
+    expect(line().querySelector(".ui-diff-guess")).toHaveTextContent("Design data tables");
+    const box = screen.getByText("One part of this line is my guess").parentElement!;
+    expect(box).toHaveTextContent("I wrote Design data tables. Your line says “worked with Airtable”, so I inferred this.");
+    expect(box).toHaveTextContent("Did you do this in this role?");
     expect(screen.getByRole("button", { name: "Yes, it's true. Use it" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Use this" })).toBeNull();
   });
 
-  it("a guess that names its phrases says what was guessed and why", () => {
-    render(<DiffRow textLang="en" oldText={OLD} newText={NEW} inferred decision={null} onDecide={() => undefined}
-      guesses={[{ text: "Design data tables", reason: "The ad asks for data models; your line only says you worked with the tools." }]} />);
-    const box = screen.getByText("Please check this one").parentElement!;
-    expect(box).toHaveTextContent("My guess: Design data tables");
-    expect(box).toHaveTextContent("The ad asks for data models; your line only says you worked with the tools.");
-    expect(box).toHaveTextContent("Use the new line only if this is true.");
-    expect(screen.queryByText(/Part of this line is my guess/)).toBeNull();
+  it("a guess that names no phrase, or one that is not in the line, says only that it is not written anywhere", () => {
+    render(<Row inferred guesses={[{ text: "Built dashboards", reason: "Not in the line." }]} />);
+    const box = screen.getByText("One part of this line is my guess").parentElement!;
+    expect(box).toHaveTextContent("It is not written in your CV or your answers.");
+    expect(box).not.toHaveTextContent("Built dashboards");
+    expect(line().querySelector(".ui-diff-guess")).toBeNull();
   });
 
   it("offers nothing when there is no real improvement", () => {
