@@ -54,7 +54,8 @@ select throws_ok($$ select 1 from public.user_preferences $$, '42501', null, 'si
 -- Deleting the login removes the row.
 reset role;
 delete from auth.users where id = '11111111-1111-1111-1111-111111111111';
-select is((select count(*)::int from public.user_preferences), 0, 'the row is removed with the account');
+select is((select count(*)::int from public.user_preferences where user_id = '11111111-1111-1111-1111-111111111111'), 0,
+  'the row is removed with the account');
 
 select * from finish();
 rollback;

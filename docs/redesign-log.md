@@ -132,3 +132,8 @@ Codex deep review of this flow (two reads: server side, web side) and what chang
 
 Open for the owner:
 - For up to an hour after deleting an account, the still-valid session could upload a file into that user's own storage folder, and it would stay. Closing it means changing the storage access rules (a check that the user still exists), which needs approval.
+
+Owner review of this flow (2026-11-11): parts 1 and 2 approved with no changes. Decisions from the same review:
+- CV language detection stays English and Romanian only for now.
+- Close the gap after account deletion, kept simple: one rule on file storage that requires the account to still exist (`20261111120000_deleted_account_files.sql`).
+- The golden examples report is accepted for now; the owner will test the prompts more deeply later.
