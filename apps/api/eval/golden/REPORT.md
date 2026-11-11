@@ -6,7 +6,7 @@ No answers are given during a run, so rewrites show what the AI does from the CV
 
 | | Earlier prompts | Reworked prompts |
 |---|---|---|
-| Run | 2026-11-11 05:52 at `fc7cd3d` | 2026-11-11 06:08 at `38911ef` |
+| Run | 2026-11-11 05:52 at `fc7cd3d` | 2026-11-11 16:00 at `81102a5` |
 | Bad patterns found | 52 | 0 |
 
 The patterns looked for: another employer named in a role's question, talk of "your previous roles", a role asked about
@@ -60,31 +60,39 @@ Bad patterns found: none
 **Reworked prompts**
 
 Base CV questions:
-- What does your company do?
-- What was the primary purpose of your role as an Automation Specialist?  
-  Options: Improving operational efficiency / Reducing manual data entry / Scaling internal business processes / Integrating disparate software systems
+- What does the company do?
+- What was the primary purpose and scope of your role as an Automation Specialist?  
+  Options: Improving internal operational efficiency / Building client-facing automation solutions / Managing data pipelines and integrations / Supporting digital transformation projects
 - Besides Zapier, Make, Google Sheets, and Airtable, what other tools or methods did you use?  
-  Options: SQL for data manipulation / API documentation and testing tools / Project management software like Jira or Trello / Scripting languages like Python or JavaScript
+  Options: SQL or database management / API documentation and testing tools / Project management software like Jira or Asana / Scripting languages like Python or JavaScript
+- Did you lead any automation projects or mentor other team members?  
+  Options: No / Led small automation projects / Mentored junior team members / Managed a small team of specialists
 - Who did you report to in this role?  
-  Options: IT Manager / Operations Director / Head of Sales / Business Owner
-- What kind of workflows did you automate using Zapier and Make?
+  Options: Operations Manager / IT Director / Head of Sales / Business Owner
+- Which teams or external stakeholders did you work with most closely?  
+  Options: Sales and Marketing teams / Finance and Accounting departments / External clients and vendors / IT and Engineering teams
+- Did your work require knowledge of specific industry regulations or market standards?  
+  Options: No / Data privacy regulations (GDPR/CCPA) / Financial reporting standards / E-commerce compliance
+- What kind of workflows or business processes did you automate using Zapier and Make?
 - How did you use Google Sheets and Airtable in your automation projects?
-- What specific improvements did you implement for the sales or accounting teams?
-- Which applications did you integrate most frequently?
+- What specific processes did you improve for the sales and accounting teams?
+- Which applications did you integrate to support your team's operations?
 
 Tailoring questions:
-- Your CV mentions integrations in Make. Did they use APIs or webhooks?  
-  Options: Yes, both / Only APIs / Only webhooks / No
-- Have you used n8n for building workflows in this role?  
-  Options: Yes, frequently / Yes, occasionally / No
-- Did you implement error handling or logging when fixing automations?  
-  Options: Yes, both / Only logging / Only error handling / No
-- Did you write SQL queries to manage data in this role?  
+- In your integrations, did you work with REST APIs and webhooks?  
+  Options: Yes, both / Only webhooks / Only REST APIs
+- Did you handle authentication like OAuth2 or API keys when building these integrations?  
+  Options: Yes, both / Only API keys / Only OAuth2
+- When fixing automations, did you implement logging or monitoring to track errors?  
+  Options: Yes, both / Only logging / Only monitoring
+- Have you written any SQL queries while working with Airtable or other databases in this role?  
   Options: Yes, frequently / Yes, occasionally / No
 
 Tailoring rewrites:
 - Responsible for making automations in Zapier and Make  
   → Design and build business workflows using Make and Zapier. *(inferred, to confirm)*
+- Fixed problems when the automations stopped working  
+  → Implement error handling and monitoring to ensure automations function reliably. *(inferred, to confirm)*
 
 Bad patterns found: none
 
@@ -121,16 +129,16 @@ Bad patterns found: none
 **Reworked prompts**
 
 Base CV questions:
-- What was the primary purpose of your role in this office?  
-  Options: General office administration / Technical IT support / Front desk reception / Operations support
-- What specific software or tools did you use most frequently?  
-  Options: Microsoft Office Suite / Ticketing systems / Accounting software / Internal databases
-- Who did you report to in this position?  
-  Options: Office Manager / IT Manager / Business Owner / Department Head
-- What specific hardware or network tools did you support?
-- Which software or system did you use for managing appointments?
-- What was the primary purpose of the Excel reports you prepared?
-- What is one specific task you handled that isn't listed yet?
+- What does the company do?
+- What was the primary purpose of your role?  
+  Options: Internal IT support / Administrative support / Front desk operations
+- What tools or software did you use most often?  
+  Options: Microsoft Excel / Windows OS / Ticketing software
+- Who did you report to?  
+  Options: Office Manager / IT Manager / Business Owner
+- What specific software or hardware tools did you use to manage the network and devices?
+- Which software or system did you use to manage the appointments?
+- What kind of data or metrics did you track in these Excel reports?
 
 Tailoring questions:
 - Did you use advanced Excel features like VLOOKUP, Pivot Tables, or Power Query for your reports?  
@@ -172,13 +180,17 @@ Bad patterns found: none
 **Reworked prompts**
 
 Base CV questions:
-- What kind of products or services did the company sell?
-- What was the primary purpose of your role beyond sales?  
-  Options: Customer service and support / Inventory management / Visual merchandising / Cash handling
+- What kind of company was this?
+- What was the main purpose of your role beyond sales?  
+  Options: Customer service / Inventory management / Visual merchandising / Cash handling
 - What tools or systems did you use for sales or inventory?  
-  Options: POS system / Handheld barcode scanner / Excel for inventory / Internal stock database
-- What kind of products were you responsible for selling?
-- Did you follow specific visual merchandising guidelines or manage inventory while arranging shelves?
+  Options: POS system / Barcode scanner / Inventory software / Excel
+- Did you have any responsibilities for training or guiding new staff?  
+  Options: No / Yes, trained new hires / Yes, supervised a small team
+- Who did you report to in this role?  
+  Options: Store Manager / Assistant Manager / Shift Supervisor
+- What kind of products did you sell, or what was the typical customer profile?
+- How often did you restock or reorganize the shelves to maintain store standards?
 
 Tailoring questions:
 - (none)
@@ -248,15 +260,21 @@ Bad patterns found (11):
 **Reworked prompts**
 
 Base CV questions:
-- Ce tip de activitate desfășoară compania unde ai lucrat ca Automation Specialist?
-- Care a fost scopul principal al rolului tău în cadrul echipei?  
-  Options: Reducerea timpului de lucru manual / Eliminarea erorilor umane / Scalarea proceselor interne / Îmbunătățirea fluxului de date
-- Pe lângă Zapier și Make, ce alte instrumente sau metode ai utilizat?  
-  Options: Scripturi (ex. Python, JavaScript) / API-uri REST / SQL pentru interogări / Instrumente de monitorizare
+- Ce face compania pentru care lucrezi?
+- Care a fost scopul principal al rolului tău de Automation Specialist?  
+  Options: Reducerea muncii manuale / Îmbunătățirea acurateței datelor / Scalarea proceselor interne / Integrarea sistemelor software
+- Ce alte instrumente sau metode ai mai folosit în afară de Zapier și Make?  
+  Options: SQL / Python pentru scripturi / API-uri REST / Power Automate
+- Ai avut responsabilități de conducere sau ai coordonat proiecte?  
+  Options: Nu / Am coordonat proiecte de automatizare / Am instruit colegii în utilizarea automatizărilor
+- Cui i-ai raportat în cadrul organizației?  
+  Options: Managerului de departament / Directorului IT / Fondatorului/CEO-ului / Managerului de operațiuni
+- Cu ce echipe ai colaborat cel mai des?  
+  Options: Vânzări / Contabilitate / Suport clienți / Marketing
 - Ce fel de fluxuri de lucru ai automatizat folosind Zapier și Make?
-- Cum ai utilizat Google Sheets și Airtable în cadrul proiectelor tale?
-- Ce procese specifice ai optimizat pentru departamentele de vânzări sau contabilitate?
-- Ce aplicații ai integrat cel mai des în activitatea ta?
+- Cum ai utilizat Google Sheets și Airtable în cadrul automatizărilor tale?
+- Ce procese specifice ai optimizat pentru echipele de vânzări și contabilitate?
+- Ce aplicații ai integrat pentru a eficientiza fluxul de lucru?
 
 Tailoring questions:
 - Ai lucrat cu API-uri REST sau webhooks în cadrul integrărilor realizate în acest rol?  
@@ -315,16 +333,15 @@ Bad patterns found (9):
 
 Base CV questions:
 - Cu ce se ocupă compania la care ai lucrat?
-- Care a fost scopul principal al rolului tău de IT Support / Office Assistant?  
-  Options: Asigurarea suportului tehnic intern / Administrarea activității de birou / Suport administrativ pentru management / Coordonarea fluxului de clienți
+- Care a fost scopul principal al rolului tău în cadrul echipei?  
+  Options: Suport tehnic pentru angajați / Administrare birou / Asistență operațională / Coordonare logistică
 - Ce instrumente sau software ai utilizat frecvent în activitatea ta?  
-  Options: Microsoft Office Suite / Sisteme de ticketing IT / Software de contabilitate / Instrumente de administrare rețea
-- Cui îi raportai direct în cadrul acestei companii?  
-  Options: Managerului de birou / Directorului IT / Proprietarului companiei / Managerului de departament
-- Ce activități de mentenanță ai realizat pentru computere și rețea?
-- Ce instrumente sau software ai utilizat pentru gestionarea programărilor?
-- Ce fel de rapoarte ai creat pentru manager?
-- Ce altă responsabilitate importantă ai avut în acest rol?
+  Options: Microsoft Office / Sisteme de ticketing / Platforme de inventar / Instrumente de administrare rețea
+- Câți angajați deserveai în acest rol?  
+  Options: Sub 20 / 20–50 / 50–100 / Peste 100
+- Ce tip de probleme tehnice sau mentenanță ai gestionat cel mai des?
+- Ce instrumente ai folosit pentru a gestiona sistemul de programări?
+- Ce fel de date analizai în rapoartele Excel?
 
 Tailoring questions:
 - Ai folosit formule avansate sau tabele pivot în Excel pentru rapoartele tale?  
@@ -371,22 +388,22 @@ Bad patterns found (5):
 Base CV questions:
 - Cu ce se ocupă compania la care ai lucrat?
 - Care a fost scopul principal al rolului tău de Sales Assistant?  
-  Options: Consilierea clienților / Gestionarea stocurilor / Operarea casei de marcat / Menținerea aspectului magazinului
-- Ce instrumente sau sisteme ai folosit în activitatea ta zilnică?  
-  Options: Sistem POS (casă de marcat) / Sistem de gestiune a stocurilor / Scaner de coduri de bare / Excel pentru inventar
-- Cui îi raportai direct în cadrul acestui rol?  
-  Options: Managerului de magazin / Supervizorului de tură / Proprietarului magazinului
-- Ce fel de produse vindeai în acest rol?
-- Care a fost scopul principal al organizării rafturilor?
+  Options: Asistență clienți / Gestionarea stocurilor / Vânzări directe / Administrarea magazinului
+- Ce instrumente sau sisteme ai folosit pentru vânzări sau inventar?  
+  Options: Sistem POS / Excel / Software de gestiune stocuri / Scanere de coduri de bare
+- Câți clienți deserveai în medie pe zi?  
+  Options: Sub 50 / 50–100 / 100–200 / 200+
+- Ce fel de produse sau clienți ai gestionat în acest rol?
+- Ai urmat anumite standarde de vizualizare sau ai gestionat și stocurile în timp ce aranjai rafturile?
 
 Tailoring questions:
 - (none)
 
 Tailoring rewrites:
 - Selling products to customers  
-  → Am gestionat interacțiunile cu clienții și am oferit suport în procesul de vânzare.
+  → Am gestionat interacțiunile cu clienții și am facilitat procesul de vânzare a produselor.
 - Arranging the shelves  
-  → Am organizat produsele pe rafturi pentru a menține ordinea în magazin.
+  → Am organizat și am menținut ordinea pe rafturile magazinului.
 
 Bad patterns found: none
 
@@ -440,15 +457,18 @@ Bad patterns found: none
 **Reworked prompts**
 
 Base CV questions:
-- Ce tip de clienți sau companii ai deservit în acest rol?
+- Ce tip de clienți sau industrii deservea compania?
 - Care a fost scopul principal al rolului tău în cadrul echipei?  
-  Options: Optimizarea proceselor interne / Implementarea soluțiilor pentru clienți / Reducerea timpului de lucru manual / Scalarea operațiunilor clienților
-- Pe lângă Make, n8n, HubSpot și Typeform, ce alte instrumente ai mai utilizat?  
-  Options: Google Sheets / Airtable / Slack / Microsoft Teams / WordPress / Webflow / Stripe / PayPal
-- Ce fel de procese ai automatizat folosind Make și n8n?
-- Cum ai integrat HubSpot și Typeform în fluxurile tale de lucru?
-- Ce tip de aplicații ai conectat cel mai des pentru clienții tăi?
-- Cum ai contribuit la automatizarea trimiterii emailurilor pentru echipa de marketing?
+  Options: Optimizarea proceselor interne / Implementarea de soluții pentru clienți / Mentenanța sistemelor de automatizare / Scalarea operațiunilor
+- Ce alte instrumente sau metode ai utilizat în afară de Make, n8n, HubSpot și Typeform?  
+  Options: Google Sheets / Airtable / Slack / Microsoft Teams / SQL / Baze de date / API-uri REST
+- Ai coordonat sau instruit pe cineva în utilizarea acestor automatizări?  
+  Options: Nu / Am instruit utilizatorii finali / Am coordonat o echipă mică / Am oferit suport tehnic echipei
+- Cui îi raportai în cadrul acestui rol?  
+  Options: Managerului de proiect / Fondatorului / CEO-ului / Directorului de marketing / Echipei tehnice
+- Ce procese ai configurat sau optimizat folosind HubSpot și Typeform?
+- Ce tip de aplicații ai integrat și care a fost scopul acestor conexiuni?
+- Cum ai automatizat trimiterea emailurilor pentru echipa de marketing?
 
 Tailoring questions:
 - Ai lucrat cu API-uri REST sau webhook-uri pentru a conecta aplicațiile în Make și n8n?  
@@ -499,16 +519,14 @@ Bad patterns found (1):
 **Reworked prompts**
 
 Base CV questions:
-- Ce activitate principală avea compania unde ai lucrat?
-- Care a fost scopul principal al rolului tău în cadrul echipei?  
-  Options: Suport administrativ pentru departament / Gestionarea bazei de date clienți / Asigurarea fluxului de documente / Suport operațional pentru vânzări
-- Ce alte instrumente sau software-uri ai utilizat în afară de Excel?  
-  Options: SAP / ERP intern / CRM / Platforme de e-mail
-- Cui îi raportai activitatea ta zilnică?  
-  Options: Managerului de departament / Team leader-ului / Administratorului firmei / Directorului operațional
-- Ce tip de date gestionai și în ce platformă?
-- Pentru cine realizai aceste rapoarte și ce urmăreau ele?
-- Ce procese ai automatizat folosind macro-uri?
+- Ce fel de companie era aceasta?
+- Care a fost scopul principal al rolului tău în cadrul departamentului?  
+  Options: Suport administrativ general / Gestionarea bazei de date / Asistență operațională / Suport pentru echipa de vânzări
+- Ce instrumente sau software ai utilizat în activitatea ta zilnică?  
+  Options: Pachetul Microsoft Office / Sisteme ERP / Platforme CRM / Instrumente de comunicare internă
+- Ce tip de date introduceai și în ce platformă sau sistem lucrai?
+- Ce fel de rapoarte generai și pentru cine erau acestea?
+- Ce procese ai automatizat sau îmbunătățit folosind macro-uri în Excel?
 - Ce fel de solicitări gestionai în corespondența cu clienții?
 
 Tailoring questions:
@@ -551,9 +569,11 @@ Base CV questions:
 - Ce fel de companie era aceasta?
 - Care a fost scopul principal al rolului tău?  
   Options: Gestionarea fluxului de clienți / Suport administrativ pentru echipă / Coordonarea programărilor / Gestionarea apelurilor telefonice
-- Ce instrumente sau software ai folosit pentru rezervări?  
-  Options: Microsoft Excel / Software dedicat de rezervări / Agenda fizică / Sistem CRM
-- Câți clienți primeai în medie pe zi sau săptămână?
+- Ce instrumente sau software ai utilizat în activitatea ta zilnică?  
+  Options: Microsoft Office / Sistem de gestiune (PMS) / Centrală telefonică / Software de facturare
+- Câți clienți sau vizitatori primeai zilnic în medie?  
+  Options: Sub 20 / 20–50 / 50–100 / Peste 100
+- Ce sistem sau instrument ai folosit pentru a înregistra rezervările?
 
 Tailoring questions:
 - (none)
@@ -620,22 +640,32 @@ Bad patterns found (12):
 **Reworked prompts**
 
 Base CV questions:
-- What is the primary purpose of your role in the company?  
-  Options: Optimizing internal operations / Building client solutions / Scaling marketing efforts / Improving data management
-- Who did you work with most closely in this role?  
-  Options: Marketing teams / Sales departments / External clients / Technical developers
-- What kind of workflows did you automate using Make and n8n?
-- What was your main task when working with HubSpot and Typeform?
-- What was the goal of connecting these client applications?
+- What does the company do?
+- What was the primary purpose and scope of your role?  
+  Options: Internal process automation / Client-facing automation projects / System integration consulting / Marketing operations support
+- Besides Make and n8n, what other tools or methods did you use?  
+  Options: Zapier / SQL/Databases / JavaScript/JSON / API documentation
+- Did anyone report to you in this role?  
+  Options: No / 1–5 people / 6–20 people
+- Who did you report to?  
+  Options: The business owner / Marketing Manager / Technical Lead / Operations Manager
+- Which teams or clients did you work with most closely?  
+  Options: Marketing team / Sales department / External clients / IT/Development team
+- What kind of business processes did you automate using Make and n8n?
+- How did you integrate HubSpot and Typeform in your workflows?
+- Which specific applications did you connect for your clients?
 - What was your specific contribution to the email marketing process?
+- What kind of issues did you typically resolve in your scenarios?
 
 Tailoring questions:
-- In your Make and n8n workflows, did you work with REST APIs and webhooks?  
-  Options: Yes, frequently / Occasionally / No
-- When resolving errors in your scenarios, did you implement logging or monitoring to track failures?  
-  Options: Yes, I set up automated alerts / I used manual logs / No, I only fixed errors as they appeared
-- Did you use Airtable or SQL databases to store and manage data for your automations?  
-  Options: Yes, I used Airtable / Yes, I used SQL / No, I used other tools
+- Your CV mentions connecting apps. Did you use REST APIs and webhooks for these integrations?  
+  Options: Yes, frequently / Only webhooks / Only REST APIs / No
+- When fixing errors in your scenarios, did you implement logging or monitoring to ensure they fail safely?  
+  Options: Yes, I set up logging / I used basic error handling / No, I only fixed errors manually
+- Did you use Airtable or Google Sheets to design data models for your automation projects?  
+  Options: Yes, both / Only Google Sheets / Only Airtable / No
+- Did you write any SQL queries to manage or retrieve data for your automation workflows?  
+  Options: Yes, regularly / Occasionally / No
 
 Tailoring rewrites:
 - Responsabilă de automatizări în Make și n8n  
@@ -691,16 +721,17 @@ Bad patterns found (9):
 **Reworked prompts**
 
 Base CV questions:
-- What was the main purpose and scope of your role as an administrative assistant?  
-  Options: Supporting daily office operations / Managing data accuracy for the team / Facilitating communication with clients / Streamlining administrative workflows
-- Besides Excel, what other tools or software did you use in your daily work?  
-  Options: ERP systems / CRM software / Email management tools / Internal databases
+- What does the company do?
+- What was the main purpose of your role?  
+  Options: Data management and reporting / Administrative support / Customer service operations
+- Besides Excel, what other tools or software did you use?  
+  Options: SAP / ERP systems / CRM software / Outlook
 - Who did you report to in this role?  
-  Options: Office Manager / Department Head / Business Owner / Team Lead
-- What kind of data did you enter into the system?
-- What was the purpose of the reports you created in Excel?
-- What specific task did your macros or tables automate or improve?
-- What was the primary goal of your correspondence with clients?
+  Options: Office Manager / Department Head / Operations Manager / Business Owner
+- What kind of data were you entering, and which system did you use?
+- What were these Excel reports used for?
+- What process did you automate or improve with these macros?
+- What was the primary purpose of your correspondence with clients?
 
 Tailoring questions:
 - Did you use VBA or Google Apps Script to create those macros in Excel?  
@@ -746,12 +777,14 @@ Bad patterns found (5):
 **Reworked prompts**
 
 Base CV questions:
-- What kind of company were you working for?
-- What was the main purpose of your role beyond greeting clients?  
-  Options: Managing office supplies / Handling incoming calls / Coordinating schedules / Managing client database
-- What software or tools did you use for reservations and communication?  
-  Options: Microsoft Excel / Booking software / Outlook / Internal CRM
-- How many reservations did you typically handle on a daily or weekly basis?
+- What kind of company was this for?
+- What was the main purpose of your role?  
+  Options: Front desk operations / Client support / Administrative support / Facility management
+- What tools or software did you use in your daily work?  
+  Options: Microsoft Office / Internal CRM / Phone switchboard / Email management tools
+- What was the scale of your work (e.g., daily visitors or bookings)?  
+  Options: Under 20 per day / 20–50 per day / 50–100 per day / 100+ per day
+- What software or tools did you use to manage the reservations?
 
 Tailoring questions:
 - (none)

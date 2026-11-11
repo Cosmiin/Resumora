@@ -109,7 +109,7 @@ describe("scoreRole", () => {
     // One perfect bullet with nothing known about the role: Lines 100, Coverage 32 (actions, results, no repeats, a result first).
     expect(result.score).toBe(73);
     expect(model.requests).toHaveLength(1);
-    expect(model.requests[0]).toMatchObject({ temperature: 0, max_completion_tokens: 780 });
+    expect(model.requests[0]).toMatchObject({ temperature: 0, max_completion_tokens: 1200 });
     expect(model.logged.map((l) => l.task)).toEqual(["enrich_score"]);
     expect(await insights.get(role.id)).toEqual(result);
   });
@@ -212,7 +212,7 @@ describe("scoreRole", () => {
       ],
     });
     expect(model.requests).toHaveLength(1);
-    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 600 });
+    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 1000 });
     expect(JSON.stringify(model.requests[0]?.messages)).toContain("[]");
     expect(await insights.get(role.id)).toEqual(result);
     expect(await run(model, role)).toEqual(result);

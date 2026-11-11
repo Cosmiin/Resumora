@@ -92,7 +92,8 @@ export async function scoreRole(
           schema: ModelScoreSchema,
           system: scoreSystemPrompt(content.locale, wanted),
           user: scoreUserMessage(role, undefined, found!.kind) + focusNote(input.focus) + questionLanguageReminder(content.locale, wanted),
-          maxOutputTokens: Math.min(4000, 600 + 180 * role.bullets.length),
+          // score/6 and score/7 made the answer longer: a concise grade per bullet, the coverage marks and up to four more role questions.
+          maxOutputTokens: Math.min(5000, 1000 + 200 * role.bullets.length),
         });
         result = { ...buildRoleResult(role, answer, input.fingerprint), questionLanguage: wanted };
       } catch (err) {

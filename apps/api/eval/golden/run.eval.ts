@@ -17,7 +17,12 @@ const providers = providersFromEnv({
   OPENROUTER_API_KEY: env("OPENROUTER_API_KEY"), OPENROUTER_MODEL: env("OPENROUTER_MODEL"), OPENROUTER_MODEL_STRONG: env("OPENROUTER_MODEL_STRONG"),
   OPENAI_API_KEY: env("OPENAI_API_KEY"), OPENAI_MODEL: env("OPENAI_MODEL"), OPENAI_MODEL_STRONG: env("OPENAI_MODEL_STRONG"),
 });
-const realModel = (calls: AiCallLog[]): ModelDeps => ({ providers, fetch, logCall: async (entry) => void calls.push(entry) });
+const realModel = (calls: AiCallLog[]): ModelDeps => ({ providers, fetch, logCall: async (entry) => {
+  // A failed call says where the answer broke the schema: print it, the report only says that it failed.
+  if (entry.status === "error") process.stdout.write(`  AI error in ${entry.task}: ${entry.error ?? ""}
+`);
+  calls.push(entry);
+} });
 const file = (label: string) => join(import.meta.dirname, `run-${label}.json`);
 function load(label: string): SavedRun | null {
   if (!existsSync(file(label))) return null;
