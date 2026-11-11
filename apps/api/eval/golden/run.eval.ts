@@ -10,7 +10,7 @@ import { expect, it } from "vitest";
 import { providersFromEnv, type AiCallLog, type ModelDeps } from "../../src/ai/call-model.ts";
 import { CASES } from "./cases.ts";
 import { report, type SavedRun } from "./report.ts";
-import { runCase } from "./run.ts";
+import { runCase, withHits } from "./run.ts";
 
 const env = (key: string) => process.env[key] ?? "";
 const providers = providersFromEnv({
@@ -19,7 +19,12 @@ const providers = providersFromEnv({
 });
 const realModel = (calls: AiCallLog[]): ModelDeps => ({ providers, fetch, logCall: async (entry) => void calls.push(entry) });
 const file = (label: string) => join(import.meta.dirname, `run-${label}.json`);
-const load = (label: string): SavedRun | null => existsSync(file(label)) ? JSON.parse(readFileSync(file(label), "utf8")) as SavedRun : null;
+function load(label: string): SavedRun | null {
+  if (!existsSync(file(label))) return null;
+  const saved = JSON.parse(readFileSync(file(label), "utf8")) as SavedRun;
+  // Judge the saved answers with today's checks, so both columns of the report are measured the same way.
+  return { ...saved, cases: saved.cases.map((c) => { const golden = CASES.find((g) => g.id === c.id); return golden ? { ...c, roles: withHits(golden, c.roles) } : c; }) };
+}
 
 it("runs the golden set and writes the report", async () => {
   const label = env("GOLDEN_LABEL") || "after";

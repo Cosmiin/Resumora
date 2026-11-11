@@ -34,7 +34,7 @@ const NEW_THINGS: Array<[RegExp, number]> = [
   [/\b(gpt(-?\d)?|chatgpt|openai|claude|llms?|large language models?|generative ai|genai|copilot)\b/i, 2022],
   [/\b(n8n)\b/i, 2019],
 ];
-const AI_WORD = /\b(ai|artificial intelligence|inteligență artificială|ia)\b/i;
+const AI_WORD = /\b(AI|IA)\b|artificial intelligence|inteligență artificială/;
 const OLD_TEMPLATE = /we think you know|credem că (știi|cunoști)/i;
 const OTHER_ROLES = /\b(your previous roles?|in your (other|earlier) roles?|rolurile (tale )?anterioare|în alte roluri)\b/i;
 const RO_MARKS = /[ăâîșț]|\b(și|sau|care|pentru|este|ești|cum|câte|câți|cât|ce|ai|în|cu|la|din|acest|această)\b/i;
@@ -92,6 +92,17 @@ export function forcedThemes(golden: GoldenCase, roles: RoleOutput[]): string[] 
     .filter((t) => !["with", "and", "for", "the", "sau", "cu", "de", "years", "experience", "experiență", "good", "basic", "minimum", "ani", "nivel", "limba"].includes(t)));
   return [...terms].filter((term) => roles.every((role) => role.tailorQuestions.some((q) => q.text.toLowerCase().includes(term))))
     .map((term) => `every role is asked about “${term}”, whatever its dates or kind of work`);
+}
+
+/** The roles with their bad-pattern hits worked out afresh, so a saved run is always judged by the current checks. */
+export function withHits(golden: GoldenCase, roles: RoleOutput[]): RoleOutput[] {
+  const judged = roles.map((collected) => {
+    const role = golden.cv.experience.find((r) => r.id === collected.roleId)!;
+    return { ...collected, hits: patternHits(golden, role, collected) };
+  });
+  const themes = forcedThemes(golden, judged);
+  if (themes.length && judged[0]) judged[0].hits.push(...themes);
+  return judged;
 }
 
 // ---- running one case ----
@@ -194,12 +205,7 @@ export async function runCase(golden: GoldenCase, model: (calls: AiCallLog[]) =>
     out.problems.push(`tailoring failed: ${(cause as Error).message.slice(0, 300)}`);
   }
 
-  out.roles = golden.cv.experience.map((role) => {
-    const collected = byRole.get(role.id)!;
-    return { ...collected, hits: patternHits(golden, role, collected) };
-  });
-  const themes = forcedThemes(golden, out.roles);
-  if (themes.length && out.roles[0]) out.roles[0].hits.push(...themes);
+  out.roles = withHits(golden, golden.cv.experience.map((role) => ({ ...byRole.get(role.id)!, hits: [] })));
   if (out.tailoredIn && out.tailoredIn !== golden.tailoringLanguage) out.problems.push(`tailoring started in "${out.tailoredIn}", expected "${golden.tailoringLanguage}"`);
   out.calls = calls.length;
   return out;
