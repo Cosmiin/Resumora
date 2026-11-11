@@ -16,7 +16,10 @@ function repoFor(userId: string): AccountRepo {
       saved.set(userId, next);
       return next;
     },
-    exportAll: async (now) => ({ exportedAt: now.toISOString(), userId, tables: { jobs: [{ id: `job-of-${userId}` }] }, files: [] }),
+    exportAll: async (now) => ({
+      exportedAt: now.toISOString(), userId, login: { email: `${userId}@example.test`, createdAt: null, details: {} },
+      tables: { jobs: [{ id: `job-of-${userId}` }] }, files: [],
+    }),
   };
 }
 
@@ -84,7 +87,10 @@ describe("account export", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-disposition")).toBe('attachment; filename="resumora-data-2026-11-11.json"');
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(await res.json()).toEqual({ exportedAt: "2026-11-11T09:00:00.000Z", userId: "user-a", tables: { jobs: [{ id: "job-of-user-a" }] }, files: [] });
+    expect(await res.json()).toEqual({
+      exportedAt: "2026-11-11T09:00:00.000Z", userId: "user-a", login: { email: "user-a@example.test", createdAt: null, details: {} },
+      tables: { jobs: [{ id: "job-of-user-a" }] }, files: [],
+    });
   });
 });
 

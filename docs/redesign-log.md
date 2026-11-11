@@ -118,3 +118,17 @@ Choices made while building:
 - Italian is offered as a tailoring language (the engine supports six; the mockup listed five).
 - Extension download: `npm run package -w @resumora/extension` builds the zip into `apps/web/public/downloads/` (not committed). It must be run before the web app is deployed, or the download button has no file.
 - The default template and tailoring language are saved now; tailoring and export start reading them when flows 5 and 6 are rebuilt.
+
+Codex deep review of this flow (two reads: server side, web side) and what changed because of it:
+- No way found for one user to read, change, export or delete another user's data.
+- Export: files are listed with one-hour download links instead of being packed into the file (many photos would exceed what one request may hold); the login's email, sign-up date and details are now included. The page says so.
+- Preferences are cached per person, so a second person signing in on the same device never sees the first one's.
+- Tailoring now starts from the saved defaults (language and template). The base CV preview still uses the classic template until flow 3 rebuilds that screen.
+- Profile: a failed email change no longer claims "nothing was changed" when the name was saved; typing during a save is kept; a failed background refresh no longer discards what is being typed.
+- Email change copy now says both addresses get a confirmation link (the project is set to confirm both).
+- The page a person was heading to survives a detour through sign up or password reset.
+- The extension page asks the server for the newest extension job (new `source` filter on the job list) instead of looking only at the newest 50 jobs.
+- After deleting an account, the "go to the homepage" request is used once only.
+
+Open for the owner:
+- For up to an hour after deleting an account, the still-valid session could upload a file into that user's own storage folder, and it would stay. Closing it means changing the storage access rules (a check that the user still exists), which needs approval.

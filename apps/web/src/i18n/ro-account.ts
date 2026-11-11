@@ -21,10 +21,11 @@ export const accountRo: Record<keyof typeof accountEn, string> = {
   "profile.title": "Profil",
   "profile.name": "Nume",
   "profile.email": "Email",
-  "profile.emailHint": "Dacă îl schimbi, trimitem un link de confirmare la adresa nouă.",
+  "profile.emailHint": "Dacă îl schimbi, trimitem linkuri de confirmare la adresa actuală și la cea nouă. Se schimbă după ce le confirmi pe amândouă.",
   "profile.save": "Salvează profilul",
   "profile.saved": "Profil salvat.",
-  "profile.emailSent": "Profil salvat. Deschide linkul de confirmare trimis la {email} ca să termini schimbarea emailului.",
+  "profile.emailSent": "Profil salvat. Ca să termini schimbarea emailului, deschide linkurile de confirmare trimise la {email} și la adresa ta actuală.",
+  "profile.emailError": "Numele a fost salvat, dar n-am putut porni schimbarea emailului. Emailul a rămas cel vechi. Încearcă din nou.",
   "profile.error": "N-am putut salva profilul. Nu s-a schimbat nimic. Încearcă din nou.",
   "password.title": "Parolă",
   "password.current": "Parola actuală",
@@ -62,7 +63,7 @@ export const accountRo: Record<keyof typeof accountEn, string> = {
 
   "data.export.title": "Exportă toate datele mele",
   "data.export.text":
-    "Un singur fișier cu tot ce păstrează Resumora despre tine: CV-ul de bază și istoricul lui, CV-urile adaptate, joburile salvate și toate răspunsurile date.",
+    "Un singur fișier cu tot ce păstrează Resumora despre tine: CV-ul de bază și istoricul lui, CV-urile adaptate, joburile salvate și toate răspunsurile date. Fotografiile încărcate apar ca linkuri de descărcare valabile o oră.",
   "data.export.prepare": "Pregătește datele",
   "data.export.preparing": "Se pregătește…",
   "data.export.wait": "Poate dura puțin. Rămâi pe pagină până e gata fișierul.",

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { supabase } from "../lib/supabase.ts";
 import { useT } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
@@ -10,6 +10,7 @@ import { AuthLayout } from "./AuthLayout.tsx";
 /** Asks for the email and sends a link to `/reset-password`. */
 export function ForgotPasswordPage() {
   const t = useT();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
@@ -36,7 +37,7 @@ export function ForgotPasswordPage() {
         <div className="auth-form">
           <h2 className="ui-heading">{t("forgot.sent.title")}</h2>
           <p role="status">{t("forgot.sent.text")}</p>
-          <ButtonLink to="/login" variant="quiet">
+          <ButtonLink to="/login" state={location.state} variant="quiet">
             {t("forgot.back")}
           </ButtonLink>
         </div>
@@ -49,7 +50,9 @@ export function ForgotPasswordPage() {
             {t("forgot.submit")}
           </Button>
           <p className="ui-small">
-            <Link to="/login">{t("forgot.back")}</Link>
+            <Link to="/login" state={location.state}>
+              {t("forgot.back")}
+            </Link>
           </p>
         </form>
       )}

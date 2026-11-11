@@ -1,7 +1,8 @@
 import { PreferencesSchema, type Preferences, type PreferencesPatch } from "@resumora/shared";
 import { ApiClientError, apiFetch, authedFetch, errorOf } from "../lib/api.ts";
 
-export const PREFERENCES_KEY = ["account", "preferences"] as const;
+/** Cached per person, so signing in as someone else on the same device never shows the previous person's preferences. */
+export const preferencesKey = (userId: string | undefined) => ["account", "preferences", userId ?? "signed-out"] as const;
 
 export function getPreferences(): Promise<Preferences> {
   return apiFetch("/v1/account/preferences", { schema: PreferencesSchema });

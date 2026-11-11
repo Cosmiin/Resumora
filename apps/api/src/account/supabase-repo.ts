@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_PREFERENCES, PreferencesSchema, type Preferences } from "@resumora/shared";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
-import { USER_BUCKETS, USER_TABLES, type AccountAdmin, type AccountRepo, type ExportedFile } from "./repo.ts";
+import { EXPORT_LINK_SECONDS, USER_BUCKETS, USER_TABLES, type AccountAdmin, type AccountRepo, type ExportedFile } from "./repo.ts";
 
 const PAGE = 1000;
 const PREFERENCE_COLUMNS = "display_name, default_template, tailoring_language";
@@ -33,12 +33,6 @@ async function listFiles(db: SupabaseClient, bucket: string, folder: string): Pr
   }
 }
 
-function toBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary);
-}
-
 /** Queries as the signed-in user so RLS applies. */
 export function supabaseAccountRepo(env: SupabaseEnv, user: AuthUser): AccountRepo {
   const db = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
@@ -64,6 +58,8 @@ export function supabaseAccountRepo(env: SupabaseEnv, user: AuthUser): AccountRe
       return toPreferences(data);
     },
     async exportAll(now) {
+      const login = await db.auth.getUser(user.token);
+      if (login.error) throw new Error(`login export failed: ${login.error.message}`);
       const tables: Record<string, unknown[]> = {};
       for (const table of USER_TABLES) {
         const rows: unknown[] = [];
@@ -76,14 +72,29 @@ export function supabaseAccountRepo(env: SupabaseEnv, user: AuthUser): AccountRe
         tables[table] = rows;
       }
       const files: ExportedFile[] = [];
+      const linkExpiresAt = new Date(now.getTime() + EXPORT_LINK_SECONDS * 1000).toISOString();
       for (const bucket of USER_BUCKETS) {
-        for (const path of await listFiles(db, bucket, user.id)) {
-          const { data, error } = await db.storage.from(bucket).download(path);
-          if (error) throw new Error(`${bucket} download failed: ${error.message}`);
-          files.push({ bucket, path, contentType: data.type, base64: toBase64(new Uint8Array(await data.arrayBuffer())) });
+        const paths = await listFiles(db, bucket, user.id);
+        for (let i = 0; i < paths.length; i += PAGE) {
+          const batch = paths.slice(i, i + PAGE);
+          const { data, error } = await db.storage.from(bucket).createSignedUrls(batch, EXPORT_LINK_SECONDS);
+          if (error) throw new Error(`${bucket} links failed: ${error.message}`);
+          // Links come back in the order the paths were sent.
+          batch.forEach((path, k) => {
+            const link = data[k];
+            if (!link || link.error || !link.signedUrl) throw new Error(`${bucket} link failed: ${link?.error ?? "no link"}`);
+            files.push({ bucket, path, downloadUrl: link.signedUrl, linkExpiresAt });
+          });
         }
       }
-      return { exportedAt: now.toISOString(), userId: user.id, tables, files };
+      const { email, created_at, user_metadata } = login.data.user;
+      return {
+        exportedAt: now.toISOString(),
+        userId: user.id,
+        login: { email: email ?? null, createdAt: created_at ?? null, details: user_metadata ?? {} },
+        tables,
+        files,
+      };
     },
   };
 }

@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useLanguage } from "../i18n/language.ts";
 import { useT } from "../i18n/t.ts";
-import { listJobs } from "../jobs/jobs-api.ts";
+import { useAuth } from "../auth/AuthProvider.tsx";
+import { getLastExtensionJob } from "../jobs/jobs-api.ts";
 import { EXTENSION_DOWNLOAD_URL, InstallSteps } from "../public/extension.tsx";
 import { ButtonAnchor } from "../ui/index.ts";
 
@@ -13,9 +14,9 @@ import { ButtonAnchor } from "../ui/index.ts";
 export function ExtensionPage() {
   const t = useT();
   const language = useLanguage();
-  // The newest page of jobs is enough to find the latest one that came from the extension.
-  const jobs = useQuery({ queryKey: ["account", "extension-last-job"], queryFn: () => listJobs() });
-  const last = jobs.data?.items.find((job) => job.source === "extension");
+  const userId = useAuth().session?.user.id;
+  const jobs = useQuery({ queryKey: ["account", "extension-last-job", userId], queryFn: getLastExtensionJob });
+  const last = jobs.data;
 
   return (
     <section className="account-section" aria-labelledby="extension-page-title">

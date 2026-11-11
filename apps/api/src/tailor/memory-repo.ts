@@ -43,7 +43,7 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       const id = crypto.randomUUID();
       const now = new Date().toISOString();
       docs.cvs.set(id, { id, userId, jobId: input.jobId, language: input.language, translatedFrom: null, content: structuredClone(input.content),
-        baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, template: "classic", tone: input.tone,
+        baseSnapshot: structuredClone(input.content), baseSnapshotAt: input.baseSnapshotAt, template: input.template ?? "classic", tone: input.tone,
         instruction: input.instruction, review: null, score: null, coverLetter: null, version: 1, createdAt: now, updatedAt: now });
       docs.steering.set(id, structuredClone(input.steering));
       return id;

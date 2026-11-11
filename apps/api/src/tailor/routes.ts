@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { AnswerSchema, stepOf, SteeringSchema, TailorSectionSchema } from "@resumora/shared";
+import type { Preferences } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { AppEnv } from "../app.ts";
 import type { CvRepo } from "../cv/repo.ts";
@@ -28,6 +29,8 @@ export function tailorRoutes(deps: {
   cvFor(c: Context<AppEnv>): CvRepo;
   tailorFor(c: Context<AppEnv>): TailorRepo;
   modelFor(c: Context<AppEnv>): ModelDeps;
+  /** The person's saved defaults; without it a new tailored CV starts from the built-in ones. */
+  preferencesFor?(c: Context<AppEnv>): Promise<Preferences>;
   now(): Date;
   log?: LogFn;
 }) {
@@ -39,7 +42,7 @@ export function tailorRoutes(deps: {
     const { instruction, ...steering } = SteeringSchema.parse(await c.req.json().catch(() => ({})));
     if (!isUuid(id)) throw jobNotFound();
     const result = await startTailoring(
-      { jobs: deps.jobsFor(c), cv: deps.cvFor(c), tailor: deps.tailorFor(c), now: deps.now },
+      { jobs: deps.jobsFor(c), cv: deps.cvFor(c), tailor: deps.tailorFor(c), now: deps.now, preferences: deps.preferencesFor && (() => deps.preferencesFor!(c)) },
       id, { ...steering, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) },
     );
     return c.json(result);

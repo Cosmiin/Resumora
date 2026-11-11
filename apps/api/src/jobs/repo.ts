@@ -36,7 +36,7 @@ export type JobRepo = {
   }): Promise<{ id: string; existing: boolean }>;
   findByUrl(urlNormalized: string): Promise<string | null>;
   countRunsSince(iso: string): Promise<number>;
-  list(page: { limit: number; after: JobCursor | null }): Promise<{ items: JobListItem[]; next: JobCursor | null }>;
+  list(page: { limit: number; after: JobCursor | null; source?: JobSource }): Promise<{ items: JobListItem[]; next: JobCursor | null }>;
   get(id: string): Promise<Job | null>;
   patch(id: string, expectedVersion: number, extracted: JobExtraction, fields?: Pick<JobPatchBody, "applicationStatus">): Promise<"ok" | "conflict" | "wrong_status" | "not_found">;
   remove(id: string): Promise<boolean>;

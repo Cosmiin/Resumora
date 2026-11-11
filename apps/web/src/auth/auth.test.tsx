@@ -120,6 +120,23 @@ describe("log in", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("That email and password don’t match. Check both, or reset your password.");
   });
 
+  it("still returns to the requested page after a detour through the password reset", async () => {
+    auth.signInWithPassword.mockImplementation(async () => {
+      auth.onAuthStateChange.mock.calls[0]?.[0]("SIGNED_IN", signedIn.data.session);
+      return signedIn;
+    });
+    const router = renderAt("/jobs?add=https%3A%2F%2Fexample.com%2Fjob%2F1");
+    await userEvent.click(await screen.findByRole("link", { name: "Forgot your password?" }));
+    await userEvent.click(await screen.findByRole("link", { name: "Back to log in" }));
+    await userEvent.type(await screen.findByLabelText("Email"), "ana@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "a-good-password");
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/jobs");
+      expect(router.state.location.search).toBe("?add=https%3A%2F%2Fexample.com%2Fjob%2F1");
+    });
+  });
+
   it("links to sign up and to the password reset", async () => {
     renderAt("/login");
     expect(await screen.findByRole("link", { name: "Forgot your password?" })).toHaveAttribute("href", "/forgot-password");

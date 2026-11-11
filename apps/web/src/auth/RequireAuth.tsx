@@ -15,10 +15,17 @@ export function RequireAuth() {
   const { session, loading } = useAuth();
   const location = useLocation();
 
-  // A request made for one sign-out doesn't apply to a later one.
+  // The request is for one sign-out only: it is dropped once this guard has left the screen (the redirect happened)
+  // or a session is back.
   useEffect(() => {
     if (session) signedOutPath = null;
   }, [session]);
+  useEffect(
+    () => () => {
+      signedOutPath = null;
+    },
+    [],
+  );
 
   if (loading) return <p className="page-loading">{t("app.loading")}</p>;
   if (!session) {

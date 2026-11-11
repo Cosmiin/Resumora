@@ -13,9 +13,9 @@ const auth = vi.hoisted(() => ({
   signOut: vi.fn(),
 }));
 const api = vi.hoisted(() => ({ getPreferences: vi.fn(), savePreferences: vi.fn(), exportAccount: vi.fn(), deleteAccount: vi.fn() }));
-const jobs = vi.hoisted(() => ({ listJobs: vi.fn() }));
+const jobs = vi.hoisted(() => ({ getLastExtensionJob: vi.fn() }));
 vi.mock("../lib/supabase.ts", () => ({ supabase: { auth } }));
-vi.mock("./account-api.ts", () => ({ PREFERENCES_KEY: ["account", "preferences"], ...api }));
+vi.mock("./account-api.ts", () => ({ preferencesKey: (userId: string | undefined) => ["account", "preferences", userId ?? "signed-out"], ...api }));
 vi.mock("../jobs/jobs-api.ts", () => jobs);
 vi.mock("../cv/CvPage.tsx", () => ({ CvPage: () => <h1>My CV</h1> }));
 vi.mock("../jobs/JobsPage.tsx", () => ({ JobsPage: () => <h1>Jobs</h1> }));
@@ -49,7 +49,7 @@ beforeEach(() => {
   auth.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   auth.signOut.mockResolvedValue({ error: null });
   api.getPreferences.mockResolvedValue(DEFAULTS);
-  jobs.listJobs.mockResolvedValue({ items: [], nextCursor: null });
+  jobs.getLastExtensionJob.mockResolvedValue(null);
   setUnsavedChanges(false);
   setLanguage("en");
 });
@@ -89,7 +89,18 @@ describe("profile", () => {
     await userEvent.type(email, "ana.new@example.com");
     await userEvent.click(screen.getByRole("button", { name: "Save profile" }));
     expect(auth.updateUser).toHaveBeenCalledWith({ email: "ana.new@example.com" });
-    expect(await screen.findByText(/Open the confirmation link we sent to ana.new@example.com/)).toBeInTheDocument();
+    expect(await screen.findByText(/open the confirmation links we sent to ana.new@example.com and to your current address/)).toBeInTheDocument();
+  });
+
+  it("says the name was saved when only the email change fails", async () => {
+    api.savePreferences.mockResolvedValue({ ...DEFAULTS, displayName: "Ana Popescu" });
+    auth.updateUser.mockResolvedValue({ data: {}, error: { message: "rate limit" } });
+    renderAt("/account/profile");
+    const email = await screen.findByLabelText(/^Email/);
+    await userEvent.clear(email);
+    await userEvent.type(email, "ana.new@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your name was saved, but we couldn’t start the email change.");
   });
 
   it("says nothing was changed when saving fails", async () => {
@@ -176,6 +187,17 @@ describe("preferences", () => {
     await waitFor(() => expect(screen.getByRole("radio", { name: "Modern" })).toBeChecked());
   });
 
+  it("goes back to what is saved when two quick changes both fail", async () => {
+    let fail: Array<() => void> = [];
+    api.savePreferences.mockImplementation(() => new Promise((_resolve, reject) => fail.push(() => reject(new Error("down")))));
+    renderAt("/account/preferences");
+    await userEvent.click(await screen.findByRole("radio", { name: "Modern" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Compact" }));
+    fail.forEach((reject) => reject());
+    fail = [];
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Classic" })).toBeChecked());
+  });
+
   it("puts the earlier choice back when saving fails", async () => {
     api.savePreferences.mockRejectedValue(new Error("down"));
     renderAt("/account/preferences");
@@ -245,7 +267,7 @@ describe("browser extension", () => {
   const job = { id: "job-1", status: "ready", errorCode: null, title: "Automation Developer", company: "Flowbridge", location: null, url: "https://example.test/1", createdAt: "2026-11-10T08:00:00Z" };
 
   it("shows how to install it and the newest job it saved", async () => {
-    jobs.listJobs.mockResolvedValue({ items: [{ ...job, id: "job-2", source: "link", title: "Added by hand" }, { ...job, source: "extension" }], nextCursor: null });
+    jobs.getLastExtensionJob.mockResolvedValue({ ...job, source: "extension" });
     renderAt("/account/extension");
     expect(await screen.findByRole("link", { name: "Automation Developer, Flowbridge" })).toHaveAttribute("href", "/jobs/job-1");
     expect(screen.getByRole("link", { name: "Download the extension" })).toHaveAttribute("href", "/downloads/resumora-extension.zip");
@@ -254,7 +276,6 @@ describe("browser extension", () => {
   });
 
   it("says so when the extension hasn't saved a job yet", async () => {
-    jobs.listJobs.mockResolvedValue({ items: [{ ...job, source: "link" }], nextCursor: null });
     renderAt("/account/extension");
     expect(await screen.findByText("No job has been saved from the extension yet.")).toBeInTheDocument();
   });

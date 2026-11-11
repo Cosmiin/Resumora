@@ -64,7 +64,7 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const { data, error } = await db.from("tailored_cvs").insert({
         user_id: user.id, job_id: input.jobId, language: input.language, content: input.content,
         base_snapshot: input.content, base_snapshot_at: input.baseSnapshotAt, tone: input.tone, instruction: input.instruction,
-        steering: input.steering,
+        steering: input.steering, template: input.template ?? "classic",
       }).select("id").single();
       if (error?.code === "23505") return "exists";
       if (error) throw new Error(`tailored_cvs insert failed: ${error.message}`);

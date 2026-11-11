@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, Navigate } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 import { supabase } from "../lib/supabase.ts";
 import { useT } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
@@ -7,10 +7,12 @@ import { Button, ButtonLink, CoachNote, Input, Notice } from "../ui/index.ts";
 import { useAuth } from "./AuthProvider.tsx";
 import { authErrorKey } from "./authErrors.ts";
 import { AuthLayout } from "./AuthLayout.tsx";
+import { returnTo } from "./returnTo.ts";
 
 export function SignUpPage() {
   const t = useT();
   const { session } = useAuth();
+  const location = useLocation();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +22,7 @@ export function SignUpPage() {
   const [resent, setResent] = useState(false);
 
   // With a session the person is already signed in (no email confirmation needed): on to the app.
-  if (session) return <Navigate to="/cv" replace />;
+  if (session) return <Navigate to={returnTo(location.state)} replace />;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -65,7 +67,7 @@ export function SignUpPage() {
             <Button loading={busy} onClick={resend}>
               {t("signup.sent.resend")}
             </Button>
-            <ButtonLink to="/login" variant="quiet">
+            <ButtonLink to="/login" state={location.state} variant="quiet">
               {t("public.nav.login")}
             </ButtonLink>
           </div>
@@ -84,7 +86,10 @@ export function SignUpPage() {
             {t("signup.submit")}
           </Button>
           <p className="ui-small">
-            {t("signup.haveAccount")} <Link to="/login">{t("public.nav.login")}</Link>
+            {t("signup.haveAccount")}{" "}
+            <Link to="/login" state={location.state}>
+              {t("public.nav.login")}
+            </Link>
           </p>
         </form>
       )}

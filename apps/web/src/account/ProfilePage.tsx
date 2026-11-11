@@ -6,19 +6,34 @@ import { hasUnsavedChanges } from "../cv/unsaved.ts";
 import { useT } from "../i18n/t.ts";
 import { supabase } from "../lib/supabase.ts";
 import { Button, Input, Notice, Skeleton } from "../ui/index.ts";
-import { PREFERENCES_KEY, getPreferences, savePreferences } from "./account-api.ts";
+import { getPreferences, preferencesKey, savePreferences } from "./account-api.ts";
 
 /** Profile (name, email), password and sign out. */
 export function ProfilePage() {
   const t = useT();
-  const preferences = useQuery({ queryKey: PREFERENCES_KEY, queryFn: getPreferences });
+  const userId = useAuth().session?.user.id;
+  const preferences = useQuery({ queryKey: preferencesKey(userId), queryFn: getPreferences });
 
   function signOut() {
     if (hasUnsavedChanges() && !window.confirm(t("signOut.unsaved"))) return;
     void supabase.auth.signOut();
   }
 
-  if (preferences.isPending) {
+  // Once loaded, the forms stay on screen: a later refresh that fails must not throw away what is being typed.
+  if (!preferences.data) {
+    if (preferences.isError) {
+      return (
+        <div className="ui-stack">
+          <Notice kind="bad">{t("account.loadError")}</Notice>
+          <div className="ui-row">
+            <Button onClick={() => void preferences.refetch()}>{t("account.tryAgain")}</Button>
+            <Button variant="quiet" onClick={signOut}>
+              {t("signOut.button")}
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="ui-stack" aria-busy="true">
         <span className="ui-sr" role="status">
@@ -31,24 +46,12 @@ export function ProfilePage() {
       </div>
     );
   }
-  if (preferences.isError) {
-    return (
-      <div className="ui-stack">
-        <Notice kind="bad">{t("account.loadError")}</Notice>
-        <div className="ui-row">
-          <Button onClick={() => void preferences.refetch()}>{t("account.tryAgain")}</Button>
-          <Button variant="quiet" onClick={signOut}>
-            {t("signOut.button")}
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
-      <ProfileForm preferences={preferences.data} />
-      <PasswordForm />
+      {/* Keyed by person: someone else signing in on this device starts from their own name, not the one typed before. */}
+      <ProfileForm key={userId} preferences={preferences.data} />
+      <PasswordForm key={`password-${userId}`} />
       <section className="account-section" aria-labelledby="sign-out-title">
         <h2 className="ui-heading" id="sign-out-title">
           {t("signOut.title")}
@@ -78,23 +81,31 @@ function ProfileForm({ preferences }: { preferences: Preferences }) {
     event.preventDefault();
     setBusy(true);
     setResult(null);
+    const submittedName = name;
     try {
-      const saved = await savePreferences({ displayName: name });
-      queryClient.setQueryData(PREFERENCES_KEY, saved);
-      setName(saved.displayName ?? "");
-      const newEmail = email.trim();
-      if (newEmail && newEmail !== currentEmail) {
+      const saved = await savePreferences({ displayName: submittedName });
+      queryClient.setQueryData(preferencesKey(user?.id), saved);
+      // Show the name as stored (trimmed), unless the person kept typing while it was saving.
+      setName((current) => (current === submittedName ? (saved.displayName ?? "") : current));
+    } catch {
+      setResult({ kind: "bad", text: t("profile.error") });
+      setBusy(false);
+      return;
+    }
+    // The name is saved at this point; the email is a separate step that can fail on its own.
+    const newEmail = email.trim();
+    if (!newEmail || newEmail === currentEmail) {
+      setResult({ kind: "good", text: t("profile.saved") });
+    } else {
+      try {
         const { error } = await supabase.auth.updateUser({ email: newEmail });
         if (error) throw error;
         setResult({ kind: "good", text: t("profile.emailSent", { email: newEmail }) });
-      } else {
-        setResult({ kind: "good", text: t("profile.saved") });
+      } catch {
+        setResult({ kind: "bad", text: t("profile.emailError") });
       }
-    } catch {
-      setResult({ kind: "bad", text: t("profile.error") });
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   return (

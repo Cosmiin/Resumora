@@ -73,10 +73,10 @@ export function jobRoutes(deps: {
     const invalid = () => new ApiError(400, "invalid_request", "Something went wrong loading your jobs. Reload the page.");
     const parsed = JobListQuerySchema.safeParse(c.req.query());
     if (!parsed.success) throw invalid();
-    const { limit, cursor } = parsed.data;
+    const { limit, cursor, source } = parsed.data;
     const after = cursor === undefined ? null : decodeJobCursor(cursor);
     if (cursor !== undefined && !after) throw invalid();
-    const { items, next } = await deps.repoFor(c).list({ limit, after });
+    const { items, next } = await deps.repoFor(c).list({ limit, after, source });
     return c.json({ items, nextCursor: next ? encodeJobCursor(next) : null });
   });
 

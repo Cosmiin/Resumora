@@ -1,12 +1,22 @@
 import type { Preferences, PreferencesPatch } from "@resumora/shared";
 
-/** One stored file, with its bytes as base64 so it fits in the JSON export. */
-export type ExportedFile = { bucket: string; path: string; contentType: string; base64: string };
+/**
+ * One stored file. The export carries a download link instead of the bytes: a person can upload any
+ * number of photos, and holding them all in memory would exceed what one request may use.
+ */
+export type ExportedFile = { bucket: string; path: string; downloadUrl: string; linkExpiresAt: string };
+
+/** How long the download links in an export work. */
+export const EXPORT_LINK_SECONDS = 3600;
+
+/** What the login itself holds about the person. */
+export type ExportedLogin = { email: string | null; createdAt: string | null; details: Record<string, unknown> };
 
 /** Everything stored about one user: table rows as stored, plus their uploaded files. */
 export type AccountExport = {
   exportedAt: string;
   userId: string;
+  login: ExportedLogin;
   tables: Record<string, unknown[]>;
   files: ExportedFile[];
 };

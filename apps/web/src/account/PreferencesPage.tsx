@@ -3,28 +3,41 @@ import { TailorLanguageSchema, TemplateIdSchema, type Preferences, type Preferen
 import { LANGUAGES, setLanguage, useLanguage, type Language } from "../i18n/language.ts";
 import { useT } from "../i18n/t.ts";
 import { Button, ChipGroup, CoachNote, Notice, Select, Skeleton } from "../ui/index.ts";
-import { PREFERENCES_KEY, getPreferences, savePreferences } from "./account-api.ts";
+import { useAuth } from "../auth/AuthProvider.tsx";
+import { getPreferences, preferencesKey, savePreferences } from "./account-api.ts";
 
 /** Interface language (kept in this browser), plus the defaults new tailored CVs start with (kept with the account). */
 export function PreferencesPage() {
   const t = useT();
   const language = useLanguage();
   const queryClient = useQueryClient();
-  const preferences = useQuery({ queryKey: PREFERENCES_KEY, queryFn: getPreferences });
+  const key = preferencesKey(useAuth().session?.user.id);
+  const preferences = useQuery({ queryKey: key, queryFn: getPreferences });
 
-  // Show the new choice at once; put the old one back if saving fails.
+  // Show the new choice at once. If saving fails, take that one choice back and re-read what the server has:
+  // with two changes in flight, "what it was before" may itself be a choice that never got saved.
   const save = useMutation({
     mutationFn: savePreferences,
     onMutate: async (patch: PreferencesPatch) => {
-      await queryClient.cancelQueries({ queryKey: PREFERENCES_KEY });
-      const before = queryClient.getQueryData<Preferences>(PREFERENCES_KEY);
-      if (before) queryClient.setQueryData<Preferences>(PREFERENCES_KEY, { ...before, ...patch });
-      return { before };
+      await queryClient.cancelQueries({ queryKey: key });
+      const before = queryClient.getQueryData<Preferences>(key);
+      if (before) queryClient.setQueryData<Preferences>(key, { ...before, ...patch });
+      return { before, patch };
     },
     onError: (_error, _patch, context) => {
-      if (context?.before) queryClient.setQueryData(PREFERENCES_KEY, context.before);
+      const now = queryClient.getQueryData<Preferences>(key);
+      if (now && context?.before) {
+        const undone = { ...now };
+        for (const field of Object.keys(context.patch) as (keyof Preferences)[]) Object.assign(undone, { [field]: context.before[field] });
+        queryClient.setQueryData(key, undone);
+      }
+      void queryClient.invalidateQueries({ queryKey: key });
     },
-    onSuccess: (saved) => queryClient.setQueryData(PREFERENCES_KEY, saved),
+    onSuccess: (saved) => {
+      // An older answer must not overwrite a newer choice still being saved.
+      if (queryClient.isMutating({ mutationKey: ["account", "preferences", "save"] }) <= 1) queryClient.setQueryData(key, saved);
+    },
+    mutationKey: ["account", "preferences", "save"],
   });
 
   return (
@@ -45,7 +58,8 @@ export function PreferencesPage() {
         </div>
       </section>
 
-      {preferences.isPending ? (
+      {/* Once loaded, the choices stay on screen even if a later refresh fails. */}
+      {!preferences.data && !preferences.isError ? (
         <div className="account-section ui-stack" aria-busy="true">
           <span className="ui-sr" role="status">
             {t("account.loading")}
@@ -55,7 +69,7 @@ export function PreferencesPage() {
           <Skeleton width="40%" height="28px" />
           <Skeleton height="120px" />
         </div>
-      ) : preferences.isError ? (
+      ) : !preferences.data ? (
         <div className="account-section ui-stack">
           <Notice kind="bad">{t("account.loadError")}</Notice>
           <div className="ui-row">

@@ -19,10 +19,11 @@ export const accountEn = {
   "profile.title": "Profile",
   "profile.name": "Name",
   "profile.email": "Email",
-  "profile.emailHint": "If you change it, we send a confirmation link to the new address.",
+  "profile.emailHint": "If you change it, we email confirmation links to your current and your new address. It changes once both are confirmed.",
   "profile.save": "Save profile",
   "profile.saved": "Profile saved.",
-  "profile.emailSent": "Profile saved. Open the confirmation link we sent to {email} to finish changing your email.",
+  "profile.emailSent": "Profile saved. To finish changing your email, open the confirmation links we sent to {email} and to your current address.",
+  "profile.emailError": "Your name was saved, but we couldn’t start the email change. Your email is still the old one. Try again.",
   "profile.error": "We couldn’t save your profile. Nothing was changed. Try again.",
   "password.title": "Password",
   "password.current": "Current password",
@@ -60,7 +61,7 @@ export const accountEn = {
 
   "data.export.title": "Export all my data",
   "data.export.text":
-    "One file with everything Resumora holds about you: your base CV and its history, tailored CVs, saved jobs, and every answer you gave.",
+    "One file with everything Resumora holds about you: your base CV and its history, tailored CVs, saved jobs, and every answer you gave. Photos you uploaded are listed with download links that work for one hour.",
   "data.export.prepare": "Prepare my data",
   "data.export.preparing": "Preparing…",
   "data.export.wait": "This can take a moment. Stay on this page until the file is ready.",

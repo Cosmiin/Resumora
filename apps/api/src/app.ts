@@ -105,6 +105,7 @@ export function createApp(deps: AppDeps) {
         return deps.tailorRepo(c.get("user"));
       },
       modelFor: (c) => deps.model(c.get("user")),
+      preferencesFor: deps.account && ((c) => deps.account!.repo(c.get("user")).getPreferences()),
       now: deps.now ?? (() => new Date()),
       log: deps.log,
     }),

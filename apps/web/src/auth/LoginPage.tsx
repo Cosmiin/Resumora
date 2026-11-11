@@ -7,6 +7,7 @@ import { Button, Input, Notice } from "../ui/index.ts";
 import { useAuth } from "./AuthProvider.tsx";
 import { authErrorKey } from "./authErrors.ts";
 import { AuthLayout } from "./AuthLayout.tsx";
+import { returnTo } from "./returnTo.ts";
 
 export function LoginPage() {
   const t = useT();
@@ -17,12 +18,7 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
 
-  // After logging in, go back to the page that asked for it (same site only).
-  const from = location.state?.from;
-  const destination =
-    typeof from?.pathname === "string" && from.pathname.startsWith("/") && !from.pathname.startsWith("//")
-      ? from.pathname + (typeof from.search === "string" ? from.search : "")
-      : "/cv";
+  const destination = returnTo(location.state);
 
   if (session) return <Navigate to={destination} replace />;
 
@@ -51,10 +47,15 @@ export function LoginPage() {
           {t("login.submit")}
         </Button>
         <p className="ui-small">
-          <Link to="/forgot-password">{t("login.forgot")}</Link>
+          <Link to="/forgot-password" state={location.state}>
+            {t("login.forgot")}
+          </Link>
         </p>
         <p className="ui-small">
-          {t("login.new")} <Link to="/signup">{t("public.nav.signup")}</Link>
+          {t("login.new")}{" "}
+          <Link to="/signup" state={location.state}>
+            {t("public.nav.signup")}
+          </Link>
         </p>
       </form>
     </AuthLayout>

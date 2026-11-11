@@ -59,6 +59,8 @@ export type JobPatch = z.infer<typeof JobPatchSchema>;
 export const JobListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().max(200).optional(),
+  /** Only jobs that arrived this way. */
+  source: JobSourceSchema.optional(),
 });
 export type JobListQuery = z.infer<typeof JobListQuerySchema>;
 

@@ -275,6 +275,18 @@ describe("job endpoints", () => {
     expect(store.rows.has(other)).toBe(true);
   });
 
+  it("lists only the jobs that came from one source when asked", async () => {
+    const byHand = ((await (await post({ ...body, source: "link" })).json()) as { id: string }).id;
+    clock = new Date(clock.getTime() + 1000);
+    const fromExtension = await create({ ...body, url: "https://example.test/jobs/from-extension" });
+    const request = (query: string) => app.request(`/v1/jobs?${query}`, { headers: { authorization: "Bearer token-a" } });
+    const extension = await (await request("limit=1&source=extension")).json() as JobListPage;
+    expect(extension.items.map((job) => job.id)).toEqual([fromExtension]);
+    const link = await (await request("source=link")).json() as JobListPage;
+    expect(link.items.map((job) => job.id)).toEqual([byHand]);
+    expect((await request("source=email")).status).toBe(400);
+  });
+
   it("follows list cursors and keeps other users and private fields off every page", async () => {
     const ids: string[] = [];
     for (let i = 0; i < 3; i++) {
