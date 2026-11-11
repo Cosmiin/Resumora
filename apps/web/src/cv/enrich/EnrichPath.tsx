@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { LIGHT_SECTIONS, findScored, newId, scoredItems, type CvContent, type LightSection, type ScoredKind, type SkillGroup } from "@resumora/shared";
+import { LIGHT_SECTIONS, findScored, newId, scoredItems, type CvContent, type LightSection, type RoleResult, type ScoredKind, type SkillGroup } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { AchievementsPick } from "./AchievementsPick.tsx";
@@ -10,7 +10,8 @@ import { ENRICHED_AVERAGE, EnrichedScreen, type RoleRow } from "./EnrichedScreen
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { useNavigate } from "react-router";
 import { FocusBar } from "./FocusBar.tsx";
-import { FocusMode, LightStop } from "./FocusMode.tsx";
+import { LightStop } from "./FocusMode.tsx";
+import { RoleRun } from "./RoleRun.tsx";
 import { getLanguage } from "../../i18n/language.ts";
 import { issueTip } from "./tips.ts";
 import { PathStart } from "./PathStart.tsx";
@@ -23,6 +24,8 @@ type Props = {
   scores: Map<string, RoleScoreState>;
   waitForSave(): Promise<void>;
   onClose(): void;
+  /** A score a role's run asked for itself, so the editor shows the same number. */
+  onScore?(result: RoleResult): void;
 };
 
 /** The path's score line: a role counts as done at 80. One still being scored (or with no score) is below. */
@@ -46,10 +49,10 @@ type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "ligh
 /**
  * One guided path through the CV. It opens on the focus step: the roles, projects and volunteering below 80 are
  * offered, the person ticks the ones to work on and may say what the CV should bring out. Each ticked one gets its
- * own focus session (in CV order), then one stop per lighter item with no lines yet, then Key achievements,
+ * own run of questions (in CV order), then one stop per lighter item with no lines yet, then Key achievements,
  * Skills and the result. "Save and exit" closes it; opening it again offers the roles still below 80.
  */
-export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props) {
+export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore }: Props) {
   // The roles below 80 and each role's score are read live on the start screen (stored scores may still be
   // loading, e.g. from "/cv?enrich=1") and fixed when the path starts.
   // Roles, then projects, then volunteering (CV order within each), each below 80.
@@ -87,7 +90,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
     const ofKind = stops.filter((id) => findScored(cv, id)?.kind === kind);
     const nextKind = last ? null : findScored(cv, stops[stage.index + 1]!)?.kind;
     return (
-      <FocusMode
+      <RoleRun
         key={roleId}
         target={{ roleId, mode: "improve" }}
         cv={cv}
@@ -95,10 +98,11 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
         scores={scores}
         waitForSave={waitForSave}
         onClose={onClose}
+        onScore={onScore}
         focus={fixed?.focus || undefined}
         context={t(OF_KEY[kind], { n: ofKind.indexOf(roleId) + 1, total: ofKind.length })}
         next={{
-          label: t(last ? "enrich.focus.continue" : nextKind === "role" ? "enrich.path.nextRole" : "enrich.path.next"),
+          label: t(!last && nextKind === "role" ? "enrich.run.done.nextRole" : "enrich.focus.continue"),
           onNext: () => (last ? afterRoles() : setStage({ kind: "role", index: stage.index + 1 })),
         }}
       />
@@ -138,8 +142,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   }
   if (stage.kind === "improve") {
     return (
-      <FocusMode key={`improve:${stage.roleId}`} target={{ roleId: stage.roleId, mode: "improve" }} cv={cv} dispatch={dispatch} scores={scores}
-        waitForSave={waitForSave} onClose={onClose} next={{ label: t("enrich.focus.continue"), onNext: () => setStage({ kind: "end" }) }} />
+      <RoleRun key={`improve:${stage.roleId}`} target={{ roleId: stage.roleId, mode: "improve" }} cv={cv} dispatch={dispatch} scores={scores}
+        waitForSave={waitForSave} onClose={onClose} onScore={onScore} next={{ label: t("enrich.focus.continue"), onNext: () => setStage({ kind: "end" }) }} />
     );
   }
   const notice = <SkillsNotice names={skills.names} undone={skills.undone} onUndo={() => {

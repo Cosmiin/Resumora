@@ -6,9 +6,9 @@ import { MemoryRouter } from "react-router";
 import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
-// Each role's focus session is replaced by a stub: these tests are about the path around it.
-vi.mock("./FocusMode.tsx", () => ({
-  FocusMode: ({ target, next, onClose, context, focus }: {
+// Each role's run of questions is replaced by a stub: these tests are about the path around it.
+vi.mock("./RoleRun.tsx", () => ({
+  RoleRun: ({ target, next, onClose, context, focus }: {
     target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; context?: string; focus?: string;
   }) => (
     <div data-testid="focus">
@@ -66,7 +66,7 @@ describe("the guided path (1A)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
     expect(screen.getByText("Session for b")).toBeInTheDocument();
     expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Save and go to the next role" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next role" }));
     expect(screen.getByText("Session for c")).toBeInTheDocument();
     expect(screen.getByText("Role 2 of 2")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -213,7 +213,7 @@ describe("the end of the path (6B)", () => {
     api.getSkillSuggestions.mockResolvedValue({ suggestions: [{ name: "SAP", group: "technicalSkills", evidence: "SAP" }], sort: [] });
     const view = render(<Host scores={start} dispatch={dispatch} />);
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    await userEvent.click(screen.getByRole("button", { name: "Save and go to the next role" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next role" }));
     view.rerender(<Host scores={new Map([...after].map(([k, v]) => [k, k === "c" ? { state: "scoring" as const, result: v.result } : v]))} dispatch={dispatch} />);
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await userEvent.click(await screen.findByRole("checkbox"));
@@ -308,7 +308,7 @@ describe("the focus step", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
     expect(screen.getByText("Session for b")).toBeInTheDocument();
     expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Save and go to the next role" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next role" }));
     expect(screen.getByText("Session for c")).toBeInTheDocument();
   });
 
@@ -326,7 +326,7 @@ describe("the focus step", () => {
     await userEvent.type(screen.getByRole("textbox", { name: "Is there anything you want your CV to bring out?" }), "  Move into automation  ");
     await userEvent.click(screen.getByRole("button", { name: "Start with Analyst" }));
     expect(screen.getByText("Focus: Move into automation")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Save and go to the next role" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next role" }));
     expect(screen.getByText("Focus: Move into automation")).toBeInTheDocument();
   });
 

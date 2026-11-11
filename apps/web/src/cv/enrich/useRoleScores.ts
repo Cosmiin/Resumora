@@ -44,6 +44,8 @@ function sameEntry(a: RoleScoreState | undefined, b: RoleScoreState): boolean {
 export function useRoleScores({ cv, status }: Props): {
   scores: Map<string, RoleScoreState>;
   retry(roleId: string): void;
+  /** Takes a score asked for elsewhere (a role's run), so every place shows the same number. */
+  put(result: RoleResult): void;
 } {
   const { locale } = cv;
   // Roles, projects and volunteering are all scored, in that order (one list, kept stable between renders).
@@ -143,6 +145,10 @@ export function useRoleScores({ cv, status }: Props): {
     setFailed((m) => (m.has(roleId) ? new Map([...m].filter(([k]) => k !== roleId)) : m));
   }, []);
 
+  const put = useCallback((result: RoleResult) => {
+    if (current.current.experience.some((r) => r.id === result.roleId)) setResults((m) => new Map(m).set(result.roleId, result));
+  }, []);
+
   const last = useRef<Map<string, RoleScoreState>>(new Map());
   return {
     scores: useMemo(() => {
@@ -167,5 +173,6 @@ export function useRoleScores({ cv, status }: Props): {
       return last.current;
     }, [experience, locale, results, failed, inFlight]),
     retry,
+    put,
   };
 }

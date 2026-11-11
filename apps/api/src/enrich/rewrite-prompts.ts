@@ -2,7 +2,8 @@ import { notePeriod, type Experience, type Locale } from "@resumora/shared";
 import { languageInstruction } from "./prompts.ts";
 
 // Prompts for the streamed rewrites. The rules are the spec's "Rewrite rules", word for word, plus one
-// line for Romanian, where rewrites sometimes opened in the first person ("Am scanat…").
+// line for Romanian, where rewrites sometimes opened in the first person ("Am scanat…"), and one from the
+// rules of enrichment flow B: facts add words, not lines.
 
 const RULES = `REWRITE RULES
 
@@ -10,6 +11,7 @@ const RULES = `REWRITE RULES
 - Write in the CV's own language.
 - Start with a verb, using past tense for past roles and present tense for the current role.
 - Keep each bullet to 2 lines or less (≤ 220 characters).
+- A known fact adds a few words to the bullet it belongs to, never a new line. Name a tool inside the bullet where it was used.
 - No first person.
 - For Romanian, start with a past participle or a noun ("Coordonat…", "Coordonarea…"), never with "Am …".
 - Keep tool, product and domain names exactly as written.

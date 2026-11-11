@@ -47,7 +47,7 @@ const role: Experience = { id: "role", company: "Acme", title: "Engineer", locat
 const match: MatchScore = { policy: "match/1", total: 80, band: "strong", capped: false, labels: [],
   parts: { requirements: null, keywords: null, seniority: null, langEdu: null } };
 const roleScores = (score: number) => ({ scores: new Map([["role", { state: "ready" as const,
-  result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } }]]), retry: vi.fn() });
+  result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } }]]), retry: vi.fn(), put: vi.fn() });
 const ready = () => screen.findByRole("heading", { name: "Engineer", level: 1 });
 
 beforeEach(() => {
@@ -226,7 +226,7 @@ describe("job page", () => {
     expect(await screen.findByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
   });
   it("with no scores yet the dialog says Not scored yet", async () => {
-    vi.mocked(useRoleScores).mockReturnValue({ scores: new Map([["role", { state: "scoring" as const }]]), retry: vi.fn() });
+    vi.mocked(useRoleScores).mockReturnValue({ scores: new Map([["role", { state: "scoring" as const }]]), retry: vi.fn(), put: vi.fn() });
     renderJob(); await ready();
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
     expect(await screen.findByText("Not scored yet")).toBeInTheDocument();

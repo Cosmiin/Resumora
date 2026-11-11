@@ -63,7 +63,7 @@ describe("CV editor", () => {
   describe.each(["real", "mocked"])("rapid section typing with %s role scores and panel", (components) => {
     beforeEach(() => {
       if (components === "mocked") {
-        vi.spyOn(roleScores, "useRoleScores").mockReturnValue({ scores: new Map(), retry: vi.fn() });
+        vi.spyOn(roleScores, "useRoleScores").mockReturnValue({ scores: new Map(), retry: vi.fn(), put: vi.fn() });
         vi.spyOn(helperPanel, "HelperPanel").mockReturnValue(<></>);
       }
     });

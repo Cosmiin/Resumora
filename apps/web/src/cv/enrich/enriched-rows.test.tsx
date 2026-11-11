@@ -8,6 +8,16 @@ import type { RoleScoreState } from "./useRoleScores.ts";
 
 // The result screen has one row per item (roles, projects and volunteering), then what else the path added.
 
+// Each item's run of questions is replaced by a stub: these tests are about the path around it.
+vi.mock("./RoleRun.tsx", () => ({
+  RoleRun: ({ target, next, onClose }: { target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void }) => (
+    <div data-testid="focus">
+      <p>Session for {target.roleId}</p>
+      <button type="button" onClick={() => next?.onNext()}>{next?.label}</button>
+      <button type="button" onClick={onClose}>✕ Close</button>
+    </div>
+  ),
+}));
 vi.mock("./FocusMode.tsx", async (orig) => {
   const real = await orig<typeof import("./FocusMode.tsx")>();
   return {
@@ -67,7 +77,7 @@ async function walk(after: Map<string, RoleScoreState>) {
   await userEvent.click(screen.getByRole("checkbox", { name: /Route planner/ }));
   await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
   view.rerender(<Host scores={after} />);
-  await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+  await userEvent.click(screen.getByRole("button", { name: "Continue" }));
   await userEvent.click(screen.getByRole("button", { name: "Continue" }));
   await userEvent.type(screen.getByRole("textbox"), "Pivot tables and dashboards");
   await userEvent.click(screen.getByRole("button", { name: "Continue" }));

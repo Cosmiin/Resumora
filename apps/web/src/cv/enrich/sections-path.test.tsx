@@ -7,6 +7,17 @@ import type { RoleScoreState } from "./useRoleScores.ts";
 
 // Task 5 (E6): the path start (1A) and the stops for projects and volunteering.
 
+// Each item's run of questions is replaced by a stub: these tests are about the path around it.
+vi.mock("./RoleRun.tsx", () => ({
+  RoleRun: ({ target, next, onClose, context }: { target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; context?: string }) => (
+    <div data-testid="focus">
+      <p>{context}</p>
+      <p>Session for {target.roleId}</p>
+      <button type="button" onClick={() => next?.onNext()}>{next?.label}</button>
+      <button type="button" onClick={onClose}>✕ Close</button>
+    </div>
+  ),
+}));
 vi.mock("./FocusMode.tsx", async (orig) => {
   const real = await orig<typeof import("./FocusMode.tsx")>();
   return {
@@ -106,10 +117,10 @@ describe("path start (1A)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
     expect(screen.getByText("Session for b")).toBeInTheDocument();
     expect(screen.getByText("Role 1 of 1")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByText("Session for p2")).toBeInTheDocument();
     expect(screen.getByText("Project 1 of 1")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByText("Session for v1")).toBeInTheDocument();
     expect(screen.getByText("Volunteering 1 of 1")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));

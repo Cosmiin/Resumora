@@ -220,6 +220,58 @@
 .fm-reasons small { display: block; font-size: var(--text-small); color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .fm-next-tip { font: 500 var(--text-coach-sm) / var(--leading-coach) var(--font-coach); color: var(--color-coach); }
 
+/* ── Flow B: one role's run. One column on every screen size, built for a phone first ── */
+.focus-mode.role-run { --fw: 640px; }
+.rr-col { max-width: var(--fw); min-width: 0; margin: var(--space-6) auto 0; }
+.rr-card { display: grid; justify-items: start; gap: var(--space-3); padding: var(--space-6); background: var(--color-paper); border-radius: var(--radius-sheet); box-shadow: var(--shadow-sheet); }
+.rr-where { font-size: var(--text-label); font-weight: var(--weight-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted); }
+.rr-big { margin: 0; font: var(--weight-display) var(--text-heading) / var(--leading-heading) var(--font-display); letter-spacing: var(--tracking-display); text-wrap: balance; overflow-wrap: anywhere; }
+.rr-big:focus, .rr-num:focus { outline: none; }
+.rr-lead { max-width: 52ch; }
+.rr-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
+.rr-scoreline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+.focus-mode .rr-link { padding-inline: 0; }
+.rr-prog { display: grid; gap: var(--space-2); margin-bottom: var(--space-6); }
+.rr-prog .fm-eyebrow { color: var(--color-ink); font-size: var(--text-base); }
+.role-run .fm-q { max-width: none; overflow-wrap: anywhere; }
+.focus-mode.role-run .answer-box, .role-run .fm-dump .answer-box, .role-run .fm-dump .fm-foot { max-width: none; }
+.rr-aboutline { margin: 0 0 var(--space-4); padding: var(--space-2) var(--space-4); border-left: 3px solid var(--color-highlight); background: var(--color-paper-veil); font-size: var(--text-small); overflow-wrap: anywhere; }
+.rr-num { margin: 0; font: var(--weight-display) 3rem / 1 var(--font-display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.rr-card .rr-line { margin-top: 0; }
+
+/* Approve once: the role as it will read, the changed pieces highlighted. */
+.rr-sheet { display: grid; gap: var(--space-3); margin: var(--space-4) 0; padding: var(--space-5); background: var(--color-paper); border-radius: var(--radius-sheet); box-shadow: var(--shadow-sheet); overflow-wrap: anywhere; }
+.rr-sheet-title { font: var(--weight-display) 1.25rem / 1.2 var(--font-display); letter-spacing: -0.01em; }
+.rr-sheet-meta { margin-top: calc(-1 * var(--space-2)); color: var(--color-muted); }
+.rr-sheet ul { display: grid; gap: var(--space-3); margin: 0; padding-left: var(--space-5); list-style: disc; }
+.rr-new { padding: 0 2px; background: linear-gradient(transparent 10%, var(--color-highlight) 10%, var(--color-highlight) 92%, transparent 92%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.rr-out { color: var(--color-muted); text-decoration: line-through; }
+.rr-chips { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); vertical-align: middle; }
+.rr-was { display: block; margin-top: var(--space-1); font-size: var(--text-small); color: var(--color-muted); }
+.rr-was s { text-decoration-color: var(--color-strike); }
+.rr-edit { display: grid; gap: var(--space-2); }
+.rr-edit textarea { width: 100%; box-sizing: border-box; padding: var(--space-3) var(--space-4); border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-field); background: var(--color-paper); color: var(--color-ink); font: inherit; resize: vertical; }
+@media (max-width: 600px) {
+  .rr-card { padding: var(--space-5); }
+  .rr-card .rr-actions { justify-self: stretch; }
+  .rr-actions > .fm-btn, .rr-actions > .ui-btn:not(.rr-link) { flex: 1 1 100%; }
+  .rr-num { font-size: 2.5rem; }
+}
+
+/* ── "Understand the score": the number, two bars, the ticks, a strong bullet ── */
+.se { display: grid; gap: var(--space-3); }
+.se-num b { font: var(--weight-display) 2.4rem / 1 var(--font-display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.se-num small { font-weight: var(--weight-bold); color: var(--color-muted); }
+.se-ticks { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.se-tick { display: flex; align-items: baseline; gap: var(--space-2); }
+.se-tick::before { content: "✓"; flex: none; width: 1em; font-weight: var(--weight-bold); color: var(--color-good); }
+.se-tick.is-no::before { content: "○"; color: var(--color-bad); }
+.se-tick.is-na { color: var(--color-muted); }
+.se-tick.is-na::before { content: "–"; color: var(--color-muted); }
+.se-sub { margin-top: var(--space-3); font: var(--weight-display) 1.125rem / 1.2 var(--font-display); }
+.se-line { font-size: var(--text-small); color: var(--color-muted); }
+.se-bullet { padding: var(--space-2) var(--space-4); border-left: 3px solid var(--color-highlight); background: var(--color-desk-soft); overflow-wrap: anywhere; }
+
 /* ── Narrow screens: the question and the reason only ─────────────────── */
 @media (max-width: 900px) {
   .focus-mode { --fw: 720px; }
