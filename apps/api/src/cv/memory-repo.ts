@@ -67,6 +67,9 @@ export function memoryCvRepo(opts: { now?: () => Date } = {}): CvRepo {
       if (!found) return null;
       return write(structuredClone(content), expectedVersion, "restore");
     },
+    async clearHistory() {
+      history = [];
+    },
     async snapshot(reason) {
       if (row) snapshot(row.content, reason);
     },

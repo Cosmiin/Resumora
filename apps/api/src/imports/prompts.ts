@@ -63,6 +63,7 @@ LANGUAGE
 
 WARNINGS
 - Add a short warning for anything you could not place, left empty because it was unclear, or had to leave out. If content does not fit the fields, report the omission instead of shortening it silently.
+- Start every warning with one tag saying what it is about, so the app can offer the right fields to correct: [name] for the first and last name, [contact] for email, phone or location, [languages] for a spoken language or its level, [certifications] for a certification's name, issuer or date, [other] for anything else. Use exactly one tag, in English and in square brackets, then the warning: "[languages] English is listed without a level."
 
 ${common}`;
 

@@ -164,3 +164,19 @@ Owner review of this flow (2026-11-11): parts 1 and 2 approved with no changes. 
 - Not in this flow: "Export" on My CV (the base CV has no export today; it belongs to the templates and export flow) and the "My CVs" navigation item.
 - Copy: the flow's keys moved from `en.ts` to `en-basecv.ts`, with `ro-basecv.ts` typed against it. The editor's own panel and field labels (`panel.*`, `edit.*`, `cv.*`) are still English only.
 - Codex deep review of the base CV flow found five points, all fixed with tests: the page behind stays locked only while a focus screen is open, also when an upload finishes over the open path; a thin role's second request for questions keeps the focus text; a save conflict while importing into an empty CV shows the page with the conflict banner, not the upload again; a CV counts as empty only with no contact details and no entries of any kind; the top bar's ways out stay clickable above the "score went up" moment.
+
+## Owner feedback on the base CV flow, 2026-11-11 (branch redesign/base-cv-feedback)
+
+Built by the forked session while the main session was on templates and export. The six points are in the workspace file base-cv-review-2026-11-11.md.
+
+- Remove my CV needs no database change: the CV row is emptied through the normal save (so a stale tab still gets the usual conflict), then its History and role scores are deleted, both of which a signed-in user may already delete for their own rows. Tailored CVs are separate rows and are not touched.
+- Remove also deletes the CV's History. The owner asked for everything belonging to the CV to go; a removed CV that could be restored from History would not be removed.
+- With the CV removed, My CV shows the upload start again (the same screen as a new account), including "write it from scratch".
+- Things to confirm: the reader now starts each one with a tag ([name], [contact], [languages], [certifications], [other]). The app shows the fields for that tag. The tag is part of the sentence, not a new field, so the stored format and older imports are unchanged (an untagged one counts as "other").
+- A general note ("other") has no fields to edit in place, so its two actions are "It's correct" and "I'll fix it on my CV". Raise with the owner if every note should be editable in place: that needs the reader to say exactly which line it means.
+- The name fields open pre-filled with the full name split at its last word. It is only a starting point: nothing is written until the person presses Save.
+- A confirmed item ticks off and stays visible, with "n of N confirmed" (owner was away; the default offered to them).
+- Confirming is not required before continuing. The owner asked for a way to act, not for a gate.
+- Upload result screen: two columns at full width, what needs the person on the right (confirmations first, then the buttons), the CV as found on the left. The counts and "Where each heading went" stay behind "Something is wrong or missing". On a phone it is one column with the confirmations first.
+- Focus step: every role, project and volunteering item stays listed with its score ("Checking this role…" until it is ready). Ticks start on the two most recent roles that are still below 80; once the person ticks or unticks anything, their choice is kept as scores arrive.
+- Not looked at in a browser: only one copy of the app can run at a time (the API port is fixed) and the main session was using it. Covered by tests only until the owner's review.

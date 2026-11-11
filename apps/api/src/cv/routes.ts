@@ -1,9 +1,10 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { CvContentSchema, MAX_CV_BYTES, mergeNewerNotes } from "@resumora/shared";
+import { CvContentSchema, MAX_CV_BYTES, emptyCv, mergeNewerNotes } from "@resumora/shared";
 import type { AppEnv } from "../app.ts";
 import { ApiError, errorBody } from "../errors.ts";
 import type { CvRepo, SaveResult } from "./repo.ts";
+import type { InsightsRepo } from "../enrich/repo.ts";
 
 const SaveBody = z.object({ content: CvContentSchema, version: z.number().int().nonnegative() });
 const RestoreBody = z.object({ version: z.number().int().nonnegative() });
@@ -36,7 +37,7 @@ export function saveResponse(c: Context<AppEnv>, result: SaveResult) {
   );
 }
 
-export function cvRoutes(repoFor: (c: Context<AppEnv>) => CvRepo) {
+export function cvRoutes(repoFor: (c: Context<AppEnv>) => CvRepo, insightsFor: (c: Context<AppEnv>) => InsightsRepo) {
   const app = new Hono<AppEnv>();
 
   app.get("/", async (c) => c.json(await repoFor(c).get()));
@@ -44,6 +45,22 @@ export function cvRoutes(repoFor: (c: Context<AppEnv>) => CvRepo) {
   app.put("/", async (c) => {
     const { content, version } = SaveBody.parse(await readJson(c));
     return saveResponse(c, await repoFor(c).save(content, version));
+  });
+
+  /**
+   * Removes the CV: the content becomes an empty CV, and its History and role scores go with it.
+   * Tailored CVs are separate copies and stay. Each step is safe to repeat, so a failed call can be sent again.
+   */
+  app.delete("/", async (c) => {
+    const { version } = RestoreBody.parse(await readJson(c));
+    const repo = repoFor(c);
+    const result = await repo.save(emptyCv(), version);
+    if (!result.ok) return saveResponse(c, result);
+    // After the save, which may itself have put the old CV into History.
+    await repo.clearHistory();
+    const insights = insightsFor(c);
+    await insights.remove((await insights.list()).map((r) => r.roleId));
+    return c.json({ content: emptyCv(), version: result.version, updatedAt: result.updatedAt });
   });
 
   app.get("/history", async (c) => c.json({ items: await repoFor(c).listHistory() }));

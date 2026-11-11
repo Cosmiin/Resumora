@@ -47,15 +47,17 @@ function Host({ scores, onClose = () => {}, dispatch = () => {} }: { scores: Map
 describe("the guided path (1A)", () => {
   const scores = new Map<string, RoleScoreState>([["a", ready(90)], ["b", ready(61)], ["c", { state: "scoring" }], ["d", ready(80)]]);
 
-  it("lists only roles below 80 (still scoring counts), in CV order, and starts with the first role's title", () => {
+  it("lists every role in CV order with its score, ticks the recent ones below 80 (still scoring counts), and starts with the first ticked", () => {
     render(<Host scores={scores} />);
     expect(screen.getByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
     const rows = screen.getAllByRole("checkbox");
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveAccessibleName(/Buyer, Buyer Co/);
-    expect(rows[1]).toHaveAccessibleName(/Clerk, Clerk Co/);
-    expect(rows.every((r) => (r as HTMLInputElement).checked)).toBe(true);
-    expect(screen.getByText("2 of 2 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toHaveAccessibleName(/Analyst, Analyst Co.*Score: 90 of 100/);
+    expect(rows[1]).toHaveAccessibleName(/Buyer, Buyer Co.*Score: 61 of 100/);
+    expect(rows[2]).toHaveAccessibleName(/Clerk, Clerk Co.*Checking this role…/);
+    expect(rows[3]).toHaveAccessibleName(/Driver, Driver Co.*Score: 80 of 100/);
+    expect(rows.map((r) => (r as HTMLInputElement).checked)).toEqual([false, true, true, false]);
+    expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start with Buyer" })).toBeInTheDocument();
   });
 
@@ -85,7 +87,10 @@ describe("the guided path (1A)", () => {
 
   it("with no role below 80, Continue goes to Key achievements", async () => {
     render(<Host scores={new Map([["a", ready(90)], ["b", ready(85)], ["c", ready(80)], ["d", ready(99)]])} />);
-    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    // Strong roles stay listed, unticked; the person may still tick one.
+    const rows = screen.getAllByRole("checkbox");
+    expect(rows).toHaveLength(4);
+    expect(rows.some((r) => (r as HTMLInputElement).checked)).toBe(false);
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getAllByText("Key achievements").length).toBeGreaterThan(0);
   });
@@ -253,11 +258,22 @@ describe("the end of the path (6B)", () => {
 });
 
 describe("whole-branch review fixes", () => {
-  it("opened before the stored scores arrive (from /cv?enrich=1), it still skips roles at 80 or more", async () => {
+  it("keeps every role listed while scores arrive, and a role the person ticked stays ticked", async () => {
+    const loading = new Map<string, RoleScoreState>([["a", { state: "scoring" }], ["b", { state: "scoring" }], ["c", { state: "scoring" }], ["d", { state: "scoring" }]]);
+    const view = render(<Host scores={loading} />);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
+    await userEvent.click(screen.getByRole("checkbox", { name: /Driver/ }));
+    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(85)], ["d", ready(80)]])} />);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
+    expect(screen.getByRole("checkbox", { name: /Driver/ })).toBeChecked();
+    expect(screen.getByText("3 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
+  });
+
+  it("opened before the stored scores arrive (from /cv?enrich=1), it still leaves roles at 80 or more unticked", async () => {
     const loading = new Map<string, RoleScoreState>([["a", { state: "scoring" }], ["b", { state: "scoring" }], ["c", { state: "scoring" }], ["d", { state: "scoring" }]]);
     const view = render(<Host scores={loading} />);
     view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(85)], ["d", ready(80)]])} />);
-    expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+    expect(screen.getAllByRole("checkbox").map((b) => (b as HTMLInputElement).checked)).toEqual([false, true, false, false]);
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
     expect(screen.getByText("Role 1 of 1")).toBeInTheDocument();
   });
@@ -285,8 +301,8 @@ describe("the focus step", () => {
   it("ticks the two most recent roles; the path visits only the ticked ones", async () => {
     render(<Host scores={scores} />);
     const boxes = screen.getAllByRole("checkbox");
-    expect(boxes.map((b) => (b as HTMLInputElement).checked)).toEqual([true, true, false]);
-    expect(screen.getByText("2 of 3 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
+    expect(boxes.map((b) => (b as HTMLInputElement).checked)).toEqual([true, true, false, false]);
+    expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("checkbox", { name: /Analyst/ }));
     await userEvent.click(screen.getByRole("checkbox", { name: /Clerk/ }));
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
