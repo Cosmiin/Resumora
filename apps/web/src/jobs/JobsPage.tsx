@@ -184,8 +184,8 @@ function JobsList({ userId }: { userId: string }) {
                             </div>
                           </div>
                           <div className="ui-row">
-                            {tailored ? <Link className="ui-btn ui-btn--sm" to={`${to}/cv`}>{t("job.tailor.open")}</Link>
-                              : ready && !job.positionClosed && (job.applicationStatus ?? "saved") === "saved"
+                            {/* "Tailored" can also be picked by hand, with no tailored CV behind it; the job page knows which. */}
+                            {ready && !job.positionClosed && (job.applicationStatus ?? "saved") === "saved"
                                 ? <Link className="ui-btn ui-btn--primary ui-btn--sm" to={to}>{t("job.tailor.button")}</Link>
                                 : <Link className="ui-btn ui-btn--sm" to={to}>{t("jobs.view")}</Link>}
                           </div>

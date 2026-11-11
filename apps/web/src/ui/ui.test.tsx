@@ -171,6 +171,23 @@ describe("Dialog", () => {
     expect(screen.getByRole("dialog", { name: "Delete your account?" })).toHaveTextContent("This can’t be undone.");
   });
 
+  it("closes itself when it is taken off the page while open, so focus returns to the opener", () => {
+    const proto = HTMLDialogElement.prototype as { showModal?: unknown; close?: unknown };
+    const before = { showModal: proto.showModal, close: proto.close };
+    const close = vi.fn();
+    proto.showModal = function (this: HTMLDialogElement) { this.setAttribute("open", ""); };
+    proto.close = close;
+    try {
+      const { unmount } = render(<Dialog open onClose={() => undefined} title="Before you tailor"><p>Body</p></Dialog>);
+      expect(close).not.toHaveBeenCalled();
+      unmount();
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      proto.showModal = before.showModal;
+      proto.close = before.close;
+    }
+  });
+
   it("closes on a click outside its box, not on a click on its own padding", () => {
     const onClose = vi.fn();
     render(

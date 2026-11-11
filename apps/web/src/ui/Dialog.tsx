@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 
 /**
  * A modal dialog for a task that needs the person's full attention (confirm a delete, pick a language).
@@ -21,6 +21,15 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
       else dialog.removeAttribute("open");
     }
   }, [open]);
+
+  // A dialog taken off the page while open never ran close(), so focus would not return to the opener.
+  // A layout effect cleans up while the element is still on the page.
+  useLayoutEffect(() => {
+    const dialog = ref.current;
+    return () => {
+      if (dialog?.open && typeof dialog.close === "function") dialog.close();
+    };
+  }, []);
 
   return (
     <dialog

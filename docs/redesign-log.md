@@ -178,3 +178,5 @@ Owner review of this flow (2026-11-11): parts 1 and 2 approved with no changes. 
 - The edit form keeps its old markup inside a sheet; only its colours and type are new.
 - Browser extension panel: the mockup's wording ("This looks like a job ad. Want to keep it?", "Save this job", "Saved to your jobs.") and the app's colours. It stays English only and uses system fonts.
 - Copy: `ro-jobs.ts` added, typed against `en-jobs.ts`.
+- Codex review (jobs): a dialog removed from the page while open now closes itself first, so keyboard focus returns to the button that opened it (fix is in the shared Dialog, so every dialog gets it).
+- Codex review (jobs): a list row marked "CV tailored" now leads to the job page ("View job"), not straight to the tailored CV. The status can be set by hand with no tailored CV behind it, and the list cannot tell the two apart; the job page can, and shows "Open tailored CV" when one exists. Differs from the mockup's row button: raise with the owner.

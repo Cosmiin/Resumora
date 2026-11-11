@@ -105,7 +105,9 @@ describe("jobs list", () => {
     expect((await row("Engineer")).getByRole("link", { name: "Tailor my CV" })).toHaveAttribute("href", "/jobs/one");
     const tailored = await row("Tailored one");
     expect(tailored.getByText("CV tailored")).toBeInTheDocument();
-    expect(tailored.getByRole("link", { name: "Open tailored CV" })).toHaveAttribute("href", "/jobs/t/cv");
+    // "Tailored" can be set by hand with no tailored CV, so the row leads to the job page, never straight to the CV.
+    expect(tailored.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/t");
+    expect(tailored.queryByRole("link", { name: "Open tailored CV" })).toBeNull();
     const applied = await row("Applied one");
     expect(applied.getByText("Applied")).toBeInTheDocument();
     expect(applied.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/a");
