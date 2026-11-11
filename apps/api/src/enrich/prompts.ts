@@ -18,10 +18,20 @@ export function languageInstruction(locale: Locale, questionLanguage: Locale = l
     `CV locale: ${locale} (${LANGUAGE_NAME[locale]}).`,
     `Write CV text (bullets, descriptions, summaries, skills, facts) in the CV content language (${LANGUAGE_NAME[locale]}).`,
     `Write everything addressed to the person (questions, answer options, tips, reasons) in ${LANGUAGE_NAME[questionLanguage]}.`,
+    "Address the person informally and directly, as a coach would (in Romanian \"tu\", never \"dumneavoastră\"; likewise tu, du, tú in French, German, Spanish and Italian).",
     "Preserve source quotations, names, established technology terms, numbers and facts exactly.",
     "Answers and job adverts in another language do not change the CV language.",
     "Keep JSON keys and enum values unchanged.",
   ].join(" ");
+}
+
+/**
+ * A closing reminder for when the person's language differs from the CV's: models tend to answer in the
+ * language of the text they just read, so the instruction is repeated last. Nothing when the two match.
+ */
+export function questionLanguageReminder(locale: Locale, questionLanguage: Locale = locale): string {
+  if (questionLanguage === locale) return "";
+  return `\nThe CV is in ${LANGUAGE_NAME[locale]}, but the person reads ${LANGUAGE_NAME[questionLanguage]}: write every tip, question and answer option in ${LANGUAGE_NAME[questionLanguage]}. Quote CV text as it is.`;
 }
 
 const SCORE_BODY = `You are a CV experience reviewer and writing coach for Resumora.
@@ -197,8 +207,12 @@ ROLE QUESTIONS
 
 roleQuestions are about the whole role, including when it has no bullets.
 Always cover these three, one question each, in this order, and leave out
-any that the CV or the notes already answer:
-1. topic company: what the company does (its industry, products or customers).
+any that the CV or the notes already answer. Each question asks one thing
+in plain words ("What does the company do?", not "What industry is it in
+and what are its products?"):
+1. topic company: what the company does. You are not told the company, so
+   give options only when the role's own text shows what kind of company
+   it is; otherwise give none and let the person say it.
 2. topic purpose: what the role was for (its purpose and scope).
 3. topic tools: the tools, software and methods used.
 Then ask about any other role-wide fact that is still needed (topic other),

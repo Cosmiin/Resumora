@@ -1,0 +1,985 @@
+{
+  "label": "after",
+  "when": "2026-11-11T06:08:03.250Z",
+  "commit": "38911ef",
+  "cases": [
+    {
+      "id": "en-cv--en-ad",
+      "what": "English CV, English ad, English interface",
+      "tailoredIn": "en",
+      "roles": [
+        {
+          "roleId": "en-r1",
+          "title": "Automation Specialist",
+          "company": "Logistica Nord SRL",
+          "period": "2022 – present",
+          "past": false,
+          "enrichQuestions": [
+            {
+              "text": "What does your company do?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "What was the primary purpose of your role as an Automation Specialist?",
+              "options": [
+                "Improving operational efficiency",
+                "Reducing manual data entry",
+                "Scaling internal business processes",
+                "Integrating disparate software systems"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Besides Zapier, Make, Google Sheets, and Airtable, what other tools or methods did you use?",
+              "options": [
+                "SQL for data manipulation",
+                "API documentation and testing tools",
+                "Project management software like Jira or Trello",
+                "Scripting languages like Python or JavaScript"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Who did you report to in this role?",
+              "options": [
+                "IT Manager",
+                "Operations Director",
+                "Head of Sales",
+                "Business Owner"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "What kind of workflows did you automate using Zapier and Make?",
+              "options": []
+            },
+            {
+              "text": "How did you use Google Sheets and Airtable in your automation projects?",
+              "options": []
+            },
+            {
+              "text": "What specific improvements did you implement for the sales or accounting teams?",
+              "options": []
+            },
+            {
+              "text": "Which applications did you integrate most frequently?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [
+            {
+              "text": "Your CV mentions integrations in Make. Did they use APIs or webhooks?",
+              "options": [
+                "Yes, both",
+                "Only APIs",
+                "Only webhooks",
+                "No"
+              ],
+              "kind": "confirm_inferred"
+            },
+            {
+              "text": "Have you used n8n for building workflows in this role?",
+              "options": [
+                "Yes, frequently",
+                "Yes, occasionally",
+                "No"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Did you implement error handling or logging when fixing automations?",
+              "options": [
+                "Yes, both",
+                "Only logging",
+                "Only error handling",
+                "No"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Did you write SQL queries to manage data in this role?",
+              "options": [
+                "Yes, frequently",
+                "Yes, occasionally",
+                "No"
+              ],
+              "kind": "options"
+            }
+          ],
+          "rewrites": [
+            {
+              "before": "Responsible for making automations in Zapier and Make",
+              "after": "Design and build business workflows using Make and Zapier.",
+              "inferred": true
+            }
+          ],
+          "hits": []
+        },
+        {
+          "roleId": "en-r2",
+          "title": "IT Support / Office Assistant",
+          "company": "Dental Clinic Zâmbet",
+          "period": "2019 – 2022",
+          "past": true,
+          "enrichQuestions": [
+            {
+              "text": "What was the primary purpose of your role in this office?",
+              "options": [
+                "General office administration",
+                "Technical IT support",
+                "Front desk reception",
+                "Operations support"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "What specific software or tools did you use most frequently?",
+              "options": [
+                "Microsoft Office Suite",
+                "Ticketing systems",
+                "Accounting software",
+                "Internal databases"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Who did you report to in this position?",
+              "options": [
+                "Office Manager",
+                "IT Manager",
+                "Business Owner",
+                "Department Head"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "What specific hardware or network tools did you support?",
+              "options": []
+            },
+            {
+              "text": "Which software or system did you use for managing appointments?",
+              "options": []
+            },
+            {
+              "text": "What was the primary purpose of the Excel reports you prepared?",
+              "options": []
+            },
+            {
+              "text": "What is one specific task you handled that isn't listed yet?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [
+            {
+              "text": "Did you use advanced Excel features like VLOOKUP, Pivot Tables, or Power Query for your reports?",
+              "options": [
+                "Yes, I used advanced formulas and Pivot Tables",
+                "I used basic formulas and data entry",
+                "I used Power Query for data transformation"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Did you manage any cloud-based software or web-based platforms while supporting the clinic's IT infrastructure?",
+              "options": [
+                "Yes, I managed cloud-based CRM or booking systems",
+                "I only managed local hardware and network",
+                "I managed web-based administrative tools"
+              ],
+              "kind": "options"
+            }
+          ],
+          "rewrites": [
+            {
+              "before": "Took care of computers, printers and the network",
+              "after": "Maintained IT infrastructure including computers, printers, and network connectivity.",
+              "inferred": false
+            },
+            {
+              "before": "Other tasks as needed",
+              "after": "Performed administrative tasks as required.",
+              "inferred": false
+            }
+          ],
+          "hits": []
+        },
+        {
+          "roleId": "en-r3",
+          "title": "Sales Assistant",
+          "company": "Electronics store",
+          "period": "2017 – 2019",
+          "past": true,
+          "enrichQuestions": [
+            {
+              "text": "What kind of products or services did the company sell?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "What was the primary purpose of your role beyond sales?",
+              "options": [
+                "Customer service and support",
+                "Inventory management",
+                "Visual merchandising",
+                "Cash handling"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "What tools or systems did you use for sales or inventory?",
+              "options": [
+                "POS system",
+                "Handheld barcode scanner",
+                "Excel for inventory",
+                "Internal stock database"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "What kind of products were you responsible for selling?",
+              "options": []
+            },
+            {
+              "text": "Did you follow specific visual merchandising guidelines or manage inventory while arranging shelves?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [],
+          "rewrites": [
+            {
+              "before": "Selling products to customers",
+              "after": "Communicated with customers to identify needs and facilitate sales in a retail environment.",
+              "inferred": true
+            },
+            {
+              "before": "Arranging the shelves",
+              "after": "Maintained inventory organization and product displays.",
+              "inferred": false
+            }
+          ],
+          "hits": []
+        }
+      ],
+      "problems": [],
+      "calls": 19
+    },
+    {
+      "id": "en-cv--ro-ad",
+      "what": "English CV, Romanian ad (language mismatch), Romanian interface",
+      "tailoredIn": "ro",
+      "roles": [
+        {
+          "roleId": "en-r1",
+          "title": "Automation Specialist",
+          "company": "Logistica Nord SRL",
+          "period": "2022 – present",
+          "past": false,
+          "enrichQuestions": [
+            {
+              "text": "Ce tip de activitate desfășoară compania unde ai lucrat ca Automation Specialist?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "Care a fost scopul principal al rolului tău în cadrul echipei?",
+              "options": [
+                "Reducerea timpului de lucru manual",
+                "Eliminarea erorilor umane",
+                "Scalarea proceselor interne",
+                "Îmbunătățirea fluxului de date"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Pe lângă Zapier și Make, ce alte instrumente sau metode ai utilizat?",
+              "options": [
+                "Scripturi (ex. Python, JavaScript)",
+                "API-uri REST",
+                "SQL pentru interogări",
+                "Instrumente de monitorizare"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce fel de fluxuri de lucru ai automatizat folosind Zapier și Make?",
+              "options": []
+            },
+            {
+              "text": "Cum ai utilizat Google Sheets și Airtable în cadrul proiectelor tale?",
+              "options": []
+            },
+            {
+              "text": "Ce procese specifice ai optimizat pentru departamentele de vânzări sau contabilitate?",
+              "options": []
+            },
+            {
+              "text": "Ce aplicații ai integrat cel mai des în activitatea ta?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [
+            {
+              "text": "Ai lucrat cu API-uri REST sau webhooks în cadrul integrărilor realizate în acest rol?",
+              "options": [
+                "Da, am folosit frecvent ambele",
+                "Doar webhooks",
+                "Doar API-uri REST",
+                "Nu am lucrat direct cu acestea"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Ai utilizat n8n pentru automatizări în acest rol, pe lângă Zapier și Make?",
+              "options": [
+                "Da, am folosit n8n",
+                "Nu, am folosit doar Zapier și Make"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Ai lucrat cu maparea datelor în format JSON în cadrul scenariilor tale de automatizare?",
+              "options": [
+                "Da, frecvent",
+                "Ocazional",
+                "Nu"
+              ],
+              "kind": "options"
+            }
+          ],
+          "rewrites": [
+            {
+              "before": "Responsible for making automations in Zapier and Make",
+              "after": "Proiectez și întrețin fluxuri de lucru utilizând Make și Zapier.",
+              "inferred": true
+            },
+            {
+              "before": "Fixed problems when the automations stopped working",
+              "after": "Monitorizez scenariile și gestionez erorile pentru a asigura funcționarea continuă a automatizărilor.",
+              "inferred": true
+            }
+          ],
+          "hits": []
+        },
+        {
+          "roleId": "en-r2",
+          "title": "IT Support / Office Assistant",
+          "company": "Dental Clinic Zâmbet",
+          "period": "2019 – 2022",
+          "past": true,
+          "enrichQuestions": [
+            {
+              "text": "Cu ce se ocupă compania la care ai lucrat?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "Care a fost scopul principal al rolului tău de IT Support / Office Assistant?",
+              "options": [
+                "Asigurarea suportului tehnic intern",
+                "Administrarea activității de birou",
+                "Suport administrativ pentru management",
+                "Coordonarea fluxului de clienți"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce instrumente sau software ai utilizat frecvent în activitatea ta?",
+              "options": [
+                "Microsoft Office Suite",
+                "Sisteme de ticketing IT",
+                "Software de contabilitate",
+                "Instrumente de administrare rețea"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Cui îi raportai direct în cadrul acestei companii?",
+              "options": [
+                "Managerului de birou",
+                "Directorului IT",
+                "Proprietarului companiei",
+                "Managerului de departament"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce activități de mentenanță ai realizat pentru computere și rețea?",
+              "options": []
+            },
+            {
+              "text": "Ce instrumente sau software ai utilizat pentru gestionarea programărilor?",
+              "options": []
+            },
+            {
+              "text": "Ce fel de rapoarte ai creat pentru manager?",
+              "options": []
+            },
+            {
+              "text": "Ce altă responsabilitate importantă ai avut în acest rol?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [
+            {
+              "text": "Ai folosit formule avansate sau tabele pivot în Excel pentru rapoartele tale?",
+              "options": [
+                "Da, am folosit frecvent tabele pivot și formule complexe",
+                "Am folosit formule de bază și funcții de sortare",
+                "Am creat rapoarte simple fără formule avansate"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Ai configurat sau depanat conexiuni de rețea între dispozitive în cadrul clinicii?",
+              "options": [
+                "Da, am configurat routere și conexiuni IP",
+                "Am gestionat doar conectarea perifericelor la rețea",
+                "Nu, m-am ocupat doar de mentenanța hardware"
+              ],
+              "kind": "options"
+            }
+          ],
+          "rewrites": [
+            {
+              "before": "Took care of computers, printers and the network",
+              "after": "Am asigurat mentenanța infrastructurii IT, incluzând rețeaua, stațiile de lucru și echipamentele periferice.",
+              "inferred": false
+            }
+          ],
+          "hits": []
+        },
+        {
+          "roleId": "en-r3",
+          "title": "Sales Assistant",
+          "company": "Electronics store",
+          "period": "2017 – 2019",
+          "past": true,
+          "enrichQuestions": [
+            {
+              "text": "Cu ce se ocupă compania la care ai lucrat?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "Care a fost scopul principal al rolului tău de Sales Assistant?",
+              "options": [
+                "Consilierea clienților",
+                "Gestionarea stocurilor",
+                "Operarea casei de marcat",
+                "Menținerea aspectului magazinului"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce instrumente sau sisteme ai folosit în activitatea ta zilnică?",
+              "options": [
+                "Sistem POS (casă de marcat)",
+                "Sistem de gestiune a stocurilor",
+                "Scaner de coduri de bare",
+                "Excel pentru inventar"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Cui îi raportai direct în cadrul acestui rol?",
+              "options": [
+                "Managerului de magazin",
+                "Supervizorului de tură",
+                "Proprietarului magazinului"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce fel de produse vindeai în acest rol?",
+              "options": []
+            },
+            {
+              "text": "Care a fost scopul principal al organizării rafturilor?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [],
+          "rewrites": [
+            {
+              "before": "Selling products to customers",
+              "after": "Am gestionat interacțiunile cu clienții și am oferit suport în procesul de vânzare.",
+              "inferred": false
+            },
+            {
+              "before": "Arranging the shelves",
+              "after": "Am organizat produsele pe rafturi pentru a menține ordinea în magazin.",
+              "inferred": false
+            }
+          ],
+          "hits": []
+        }
+      ],
+      "problems": [],
+      "calls": 19
+    },
+    {
+      "id": "ro-cv--ro-ad",
+      "what": "Romanian CV, Romanian ad, Romanian interface",
+      "tailoredIn": "ro",
+      "roles": [
+        {
+          "roleId": "ro-r1",
+          "title": "Specialist automatizări (no-code)",
+          "company": "Agenția Digitală Pixel",
+          "period": "2023 – present",
+          "past": false,
+          "enrichQuestions": [
+            {
+              "text": "Ce tip de clienți sau companii ai deservit în acest rol?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "Care a fost scopul principal al rolului tău în cadrul echipei?",
+              "options": [
+                "Optimizarea proceselor interne",
+                "Implementarea soluțiilor pentru clienți",
+                "Reducerea timpului de lucru manual",
+                "Scalarea operațiunilor clienților"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Pe lângă Make, n8n, HubSpot și Typeform, ce alte instrumente ai mai utilizat?",
+              "options": [
+                "Google Sheets / Airtable",
+                "Slack / Microsoft Teams",
+                "WordPress / Webflow",
+                "Stripe / PayPal"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce fel de procese ai automatizat folosind Make și n8n?",
+              "options": []
+            },
+            {
+              "text": "Cum ai integrat HubSpot și Typeform în fluxurile tale de lucru?",
+              "options": []
+            },
+            {
+              "text": "Ce tip de aplicații ai conectat cel mai des pentru clienții tăi?",
+              "options": []
+            },
+            {
+              "text": "Cum ai contribuit la automatizarea trimiterii emailurilor pentru echipa de marketing?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [
+            {
+              "text": "Ai lucrat cu API-uri REST sau webhook-uri pentru a conecta aplicațiile în Make și n8n?",
+              "options": [
+                "Da, am folosit frecvent ambele",
+                "Am folosit doar webhook-uri",
+                "Am folosit doar API-uri REST",
+                "Nu am lucrat cu ele"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Ai mapat date în format JSON în cadrul scenariilor tale de automatizare?",
+              "options": [
+                "Da, frecvent",
+                "Ocazional",
+                "Nu"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Ai documentat fluxurile de lucru create pentru clienți sau ai instruit utilizatorii finali?",
+              "options": [
+                "Da, ambele",
+                "Doar documentare",
+                "Doar instruire",
+                "Nu"
+              ],
+              "kind": "options"
+            }
+          ],
+          "rewrites": [
+            {
+              "before": "Responsabilă de automatizări în Make și n8n",
+              "after": "Construiesc și întrețin fluxuri de lucru în Make și n8n pentru clienți.",
+              "inferred": true
+            },
+            {
+              "before": "Rezolvam erorile din scenarii",
+              "after": "Gestionez erorile și monitorizez scenariile de automatizare.",
+              "inferred": true
+            },
+            {
+              "before": "Am ajutat echipa de marketing cu trimiterea de emailuri",
+              "after": "Automatizez campanii de email marketing pentru echipe de marketing.",
+              "inferred": true
+            }
+          ],
+          "hits": []
+        },
+        {
+          "roleId": "ro-r2",
+          "title": "Operator date / Asistent administrativ",
+          "company": "Firmă de curierat",
+          "period": "2020 – 2023",
+          "past": true,
+          "enrichQuestions": [
+            {
+              "text": "Ce activitate principală avea compania unde ai lucrat?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "Care a fost scopul principal al rolului tău în cadrul echipei?",
+              "options": [
+                "Suport administrativ pentru departament",
+                "Gestionarea bazei de date clienți",
+                "Asigurarea fluxului de documente",
+                "Suport operațional pentru vânzări"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce alte instrumente sau software-uri ai utilizat în afară de Excel?",
+              "options": [
+                "SAP",
+                "ERP intern",
+                "CRM",
+                "Platforme de e-mail"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Cui îi raportai activitatea ta zilnică?",
+              "options": [
+                "Managerului de departament",
+                "Team leader-ului",
+                "Administratorului firmei",
+                "Directorului operațional"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce tip de date gestionai și în ce platformă?",
+              "options": []
+            },
+            {
+              "text": "Pentru cine realizai aceste rapoarte și ce urmăreau ele?",
+              "options": []
+            },
+            {
+              "text": "Ce procese ai automatizat folosind macro-uri?",
+              "options": []
+            },
+            {
+              "text": "Ce fel de solicitări gestionai în corespondența cu clienții?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [
+            {
+              "text": "Ce limbaj sau instrument ai folosit pentru a crea acele macro-uri în Excel?",
+              "options": [
+                "VBA",
+                "Power Query",
+                "Office Scripts"
+              ],
+              "kind": "options"
+            }
+          ],
+          "rewrites": [
+            {
+              "before": "Introducere date în sistem",
+              "after": "Am gestionat introducerea datelor în sistemele interne.",
+              "inferred": false
+            },
+            {
+              "before": "Corespondență cu clienții",
+              "after": "Am asigurat corespondența cu clienții.",
+              "inferred": false
+            }
+          ],
+          "hits": []
+        },
+        {
+          "roleId": "ro-r3",
+          "title": "Recepționeră",
+          "company": "Hotel",
+          "period": "2018 – 2020",
+          "past": true,
+          "enrichQuestions": [
+            {
+              "text": "Ce fel de companie era aceasta?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "Care a fost scopul principal al rolului tău?",
+              "options": [
+                "Gestionarea fluxului de clienți",
+                "Suport administrativ pentru echipă",
+                "Coordonarea programărilor",
+                "Gestionarea apelurilor telefonice"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Ce instrumente sau software ai folosit pentru rezervări?",
+              "options": [
+                "Microsoft Excel",
+                "Software dedicat de rezervări",
+                "Agenda fizică",
+                "Sistem CRM"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Câți clienți primeai în medie pe zi sau săptămână?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [],
+          "rewrites": [],
+          "hits": []
+        }
+      ],
+      "problems": [],
+      "calls": 21
+    },
+    {
+      "id": "ro-cv--en-ad",
+      "what": "Romanian CV, English ad (language mismatch), English interface",
+      "tailoredIn": "en",
+      "roles": [
+        {
+          "roleId": "ro-r1",
+          "title": "Specialist automatizări (no-code)",
+          "company": "Agenția Digitală Pixel",
+          "period": "2023 – present",
+          "past": false,
+          "enrichQuestions": [
+            {
+              "text": "What is the primary purpose of your role in the company?",
+              "options": [
+                "Optimizing internal operations",
+                "Building client solutions",
+                "Scaling marketing efforts",
+                "Improving data management"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Who did you work with most closely in this role?",
+              "options": [
+                "Marketing teams",
+                "Sales departments",
+                "External clients",
+                "Technical developers"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "What kind of workflows did you automate using Make and n8n?",
+              "options": []
+            },
+            {
+              "text": "What was your main task when working with HubSpot and Typeform?",
+              "options": []
+            },
+            {
+              "text": "What was the goal of connecting these client applications?",
+              "options": []
+            },
+            {
+              "text": "What was your specific contribution to the email marketing process?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [
+            {
+              "text": "In your Make and n8n workflows, did you work with REST APIs and webhooks?",
+              "options": [
+                "Yes, frequently",
+                "Occasionally",
+                "No"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "When resolving errors in your scenarios, did you implement logging or monitoring to track failures?",
+              "options": [
+                "Yes, I set up automated alerts",
+                "I used manual logs",
+                "No, I only fixed errors as they appeared"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Did you use Airtable or SQL databases to store and manage data for your automations?",
+              "options": [
+                "Yes, I used Airtable",
+                "Yes, I used SQL",
+                "No, I used other tools"
+              ],
+              "kind": "options"
+            }
+          ],
+          "rewrites": [
+            {
+              "before": "Responsabilă de automatizări în Make și n8n",
+              "after": "Build and maintain business workflows using Make and n8n.",
+              "inferred": true
+            },
+            {
+              "before": "Rezolvam erorile din scenarii",
+              "after": "Implement error handling and monitoring for automation scenarios.",
+              "inferred": true
+            },
+            {
+              "before": "Am ajutat echipa de marketing cu trimiterea de emailuri",
+              "after": "Support marketing teams by automating email communication workflows.",
+              "inferred": true
+            }
+          ],
+          "hits": []
+        },
+        {
+          "roleId": "ro-r2",
+          "title": "Operator date / Asistent administrativ",
+          "company": "Firmă de curierat",
+          "period": "2020 – 2023",
+          "past": true,
+          "enrichQuestions": [
+            {
+              "text": "What was the main purpose and scope of your role as an administrative assistant?",
+              "options": [
+                "Supporting daily office operations",
+                "Managing data accuracy for the team",
+                "Facilitating communication with clients",
+                "Streamlining administrative workflows"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Besides Excel, what other tools or software did you use in your daily work?",
+              "options": [
+                "ERP systems",
+                "CRM software",
+                "Email management tools",
+                "Internal databases"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "Who did you report to in this role?",
+              "options": [
+                "Office Manager",
+                "Department Head",
+                "Business Owner",
+                "Team Lead"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "What kind of data did you enter into the system?",
+              "options": []
+            },
+            {
+              "text": "What was the purpose of the reports you created in Excel?",
+              "options": []
+            },
+            {
+              "text": "What specific task did your macros or tables automate or improve?",
+              "options": []
+            },
+            {
+              "text": "What was the primary goal of your correspondence with clients?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [
+            {
+              "text": "Did you use VBA or Google Apps Script to create those macros in Excel?",
+              "options": [
+                "Yes, I used VBA",
+                "Yes, I used Google Apps Script",
+                "No, I used built-in Excel features only"
+              ],
+              "kind": "options"
+            },
+            {
+              "text": "Did you use any formulas like VLOOKUP, INDEX/MATCH, or QUERY to process data in your reports?",
+              "options": [
+                "Yes, I used advanced formulas",
+                "I used basic formulas only",
+                "I used Pivot Tables mostly"
+              ],
+              "kind": "options"
+            }
+          ],
+          "rewrites": [
+            {
+              "before": "Introducere date în sistem",
+              "after": "Managed data entry and maintained records within internal systems.",
+              "inferred": false
+            },
+            {
+              "before": "Corespondență cu clienții",
+              "after": "Handled written correspondence with clients.",
+              "inferred": false
+            }
+          ],
+          "hits": []
+        },
+        {
+          "roleId": "ro-r3",
+          "title": "Recepționeră",
+          "company": "Hotel",
+          "period": "2018 – 2020",
+          "past": true,
+          "enrichQuestions": [
+            {
+              "text": "What kind of company were you working for?",
+              "options": [],
+              "kind": "role"
+            },
+            {
+              "text": "What was the main purpose of your role beyond greeting clients?",
+              "options": [
+                "Managing office supplies",
+                "Handling incoming calls",
+                "Coordinating schedules",
+                "Managing client database"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "What software or tools did you use for reservations and communication?",
+              "options": [
+                "Microsoft Excel",
+                "Booking software",
+                "Outlook",
+                "Internal CRM"
+              ],
+              "kind": "role"
+            },
+            {
+              "text": "How many reservations did you typically handle on a daily or weekly basis?",
+              "options": []
+            }
+          ],
+          "tailorQuestions": [],
+          "rewrites": [],
+          "hits": []
+        }
+      ],
+      "problems": [],
+      "calls": 21
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
 import { improveBulletSystemPrompt, improveBulletUserMessage } from "./focus-prompts.ts";
+import { questionLanguageReminder } from "./prompts.ts";
 import { checkProposal, squash } from "./rewrite.ts";
 import { aiError, gradeBullets, scoreRole, type ScoreDeps } from "./score.ts";
 
@@ -33,7 +34,7 @@ export async function improveBullet(
       task: "enrich_improve_bullet",
       schema: ImproveSchema,
       system: improveBulletSystemPrompt(content.locale, deps.questionLanguage),
-      user: improveBulletUserMessage(role, input.bulletId),
+      user: improveBulletUserMessage(role, input.bulletId) + questionLanguageReminder(content.locale, deps.questionLanguage),
       maxOutputTokens: 600,
     };
     let answer = await callModel(deps.model, request);

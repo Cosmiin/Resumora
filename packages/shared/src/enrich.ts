@@ -266,7 +266,7 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
     bullets.length === 0 ? null : Math.round(bullets.reduce((sum, b) => sum + b.score, 0) / bullets.length);
 
   const roleQuestions: RoleQuestion[] = (model.roleQuestions ?? []).slice(0, MAX_ROLE_QUESTIONS).map((q, i) => ({
-    id: `rq${i + 1}`, text: q.text, options: q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
+    id: `rq${i + 1}`, text: q.text, options: q.topic === "company" ? [] : q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
   }));
   const thin = role.bullets.length <= 1 || model.thin === true;
   return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions, thin };

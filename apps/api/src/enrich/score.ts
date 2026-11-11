@@ -14,7 +14,7 @@ import {
 import { AiInputRejectedError, AiOutputTooLongError, AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
-import { scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
+import { questionLanguageReminder, scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
 import type { InsightsRepo } from "./repo.ts";
 
 export type ScoreDeps = {
@@ -90,7 +90,7 @@ export async function scoreRole(
           task: "enrich_score",
           schema: ModelScoreSchema,
           system: scoreSystemPrompt(content.locale, wanted),
-          user: scoreUserMessage(role, undefined, found!.kind),
+          user: scoreUserMessage(role, undefined, found!.kind) + questionLanguageReminder(content.locale, wanted),
           maxOutputTokens: Math.min(4000, 600 + 180 * role.bullets.length),
         });
         result = { ...buildRoleResult(role, answer, input.fingerprint), questionLanguage: wanted };

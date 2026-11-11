@@ -121,7 +121,9 @@ describe("buildRoleResult", () => {
     expect(MAX_ROLE_QUESTIONS).toBe(8);
     const result = buildRoleResult(role([]), { ...model([]), roleQuestions }, "fp");
     expect(result.roleQuestions).toHaveLength(8);
-    expect(result.roleQuestions[0]).toEqual({ id: "rq1", text: "Question 1?", options: ["No", "20+"], kind: "role", topic: "company" });
+    // The company question carries no options: the model is not told the employer, so its guesses would be noise.
+    expect(result.roleQuestions[0]).toEqual({ id: "rq1", text: "Question 1?", options: [], kind: "role", topic: "company" });
+    expect(result.roleQuestions[1]).toEqual({ id: "rq2", text: "Question 2?", options: ["No", "20+"], kind: "role", topic: "purpose" });
     expect(result.roleQuestions.map((q) => q.topic)).toEqual(topics);
     expect(RoleResultSchema.parse(result)).toEqual(result);
     expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions }).success).toBe(true);

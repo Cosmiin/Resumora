@@ -99,3 +99,12 @@ Review list:
 ## Phase 2 approved, 2026-11-11
 
 Owner approved the six flow mockups. Foundation branch merged into main. Phase 3 starts with the public pages and account flow.
+
+## Phase 4: prompt rework (branch `redesign/prompts`)
+
+- Map of every prompt as it stood: `prompt-map.md` in the workspace folder (2026-11-11). It supersedes the tailoring part of the 10 November map.
+- Golden set: `apps/api/eval/golden/` (4 cases from the two fictional weak CVs and two ads, two with a language mismatch). `GOLDEN_LABEL=before|after npm run eval:golden` runs the prompts of the checkout and rebuilds `REPORT.md`. Saved runs are judged again with the current checks each time, so both columns are measured the same way.
+- Rework: tailoring questions and rewrites, enrichment scoring and improve-bullet open with a short list of principles. New behaviour in code: questions follow the interface language (header `x-interface-language`, sent by the web app; absent = the CV's language, as before); "other" options are removed in six languages in both flows; single-role enrichment prompts get the role's period; focus roles change only the number of questions; the fact check of a role's rewrite no longer reads notes saved for other jobs; the "what does the company do" question carries no guessed options (the model is not told the employer).
+- Stored enrichment scores are recomputed once (score policy 4 → 5), because the wording that produces them changed.
+- Result on the golden set: 59 flagged patterns before, 0 after. The check is a word search; what a reader still finds is listed at the top of the report copy in the workspace.
+- Not done: language detection for German, French and Spanish CVs (changes the shared CV structure, needs the owner's approval); a past-tense check in code for languages other than English.

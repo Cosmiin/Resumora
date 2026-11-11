@@ -133,7 +133,7 @@ export async function runCase(golden: GoldenCase, model: (calls: AiCallLog[]) =>
   const insights = memoryInsightsRepo(userId);
   for (const role of golden.cv.experience) {
     try {
-      const result = await scoreRole({ cv, insights, model: runModel, userId, ...({ interfaceLanguage: golden.interfaceLanguage }) } as Parameters<typeof scoreRole>[0],
+      const result = await scoreRole({ cv, insights, model: runModel, userId, questionLanguage: golden.interfaceLanguage },
         { roleId: role.id, fingerprint: fingerprint(role, golden.cv.locale) }) as unknown as { roleQuestions?: LooseQuestion[]; bullets?: LooseQuestion[] };
       const target = byRole.get(role.id)!;
       for (const q of [...(result.roleQuestions ?? []), ...(result.bullets ?? [])]) {
