@@ -129,6 +129,21 @@ describe("job endpoints", () => {
     expect(await memoryTailorRepo("user-a", scores).getScore(id, "base")).toBeNull();
   });
 
+  it("lists each job with its application status and the ad's own closed flag", async () => {
+    const open = await create();
+    clock = new Date(clock.getTime() + 1000);
+    const closed = await create({ ...body, url: "https://example.test/jobs/closed" });
+    await store.admin.finish(open, extracted);
+    await store.admin.finish(closed, { ...extracted, positionClosed: true });
+    expect((await patch(open, 1, extracted, { applicationStatus: "tailored" })).status).toBe(200);
+    const list = (await (await get()).json()) as JobListPage;
+    expect(list.items.map(({ id, applicationStatus, positionClosed }) => ({ id, applicationStatus, positionClosed }))).toEqual([
+      { id: closed, applicationStatus: "saved", positionClosed: true },
+      { id: open, applicationStatus: "tailored", positionClosed: false },
+    ]);
+    listFields(list);
+  });
+
   it("round-trips application status and preserves it when omitted", async () => {
     const id = await create();
     await store.admin.finish(id, extracted);

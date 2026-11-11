@@ -18,17 +18,20 @@ type Row = {
   extracted: unknown;
   edited_by_user: boolean;
   application_status: string;
+  /** In lists: the ad's own "no longer open" flag, read out of the extraction. */
+  position_closed?: unknown;
   version: number;
   updated_at: string;
 };
-const LIST_COLUMNS = "id, status, error_code, title, company, location, source, url, created_at";
-const COLUMNS = `${LIST_COLUMNS}, raw_text, extracted, edited_by_user, application_status, version, updated_at`;
+const LIST_COLUMNS = "id, status, error_code, title, company, location, source, url, created_at, application_status, position_closed:extracted->positionClosed";
+const COLUMNS = `${LIST_COLUMNS}, raw_text, extracted, edited_by_user, version, updated_at`;
 
 function toListItem(row: Row) {
   const parsed = JobListItemSchema.safeParse({
     id: row.id, status: row.status, errorCode: row.error_code,
     title: row.title, company: row.company, location: row.location,
     source: row.source, url: row.url, createdAt: row.created_at,
+    applicationStatus: row.application_status, positionClosed: row.position_closed === true,
   });
   if (!parsed.success) throw new Error(`stored job ${row.id} has an unexpected shape`);
   return parsed.data;

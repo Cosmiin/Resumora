@@ -74,6 +74,10 @@ export const JobListItemSchema = z.object({
   source: JobSourceSchema,
   url: z.string(),
   createdAt: z.string(),
+  /** Where the person is with this job; the list shows "CV tailored" from it. */
+  applicationStatus: applicationStatus.optional(),
+  /** True when the ad itself says the position is no longer open. */
+  positionClosed: z.boolean().optional(),
 });
 export type JobListItem = z.infer<typeof JobListItemSchema>;
 

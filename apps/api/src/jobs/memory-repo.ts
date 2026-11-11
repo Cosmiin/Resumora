@@ -16,6 +16,7 @@ function toListItem(row: Row): JobListItem {
     id: row.id, status: row.status, errorCode: row.errorCode,
     title: row.title, company: row.company, location: row.location,
     source: row.source, url: row.url, createdAt: row.createdAt,
+    applicationStatus: row.applicationStatus, positionClosed: row.extracted?.positionClosed === true,
   };
 }
 

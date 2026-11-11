@@ -27,17 +27,18 @@ function renderJobs(path = "/jobs") {
   </QueryClientProvider>);
   return router;
 }
-async function openDialog(paste = true) {
-  const opener = (await screen.findAllByRole("button", { name: "+ Add job" }))[0]!;
+async function openDialog() {
+  const opener = (await screen.findAllByRole("button", { name: "Add a job by hand" }))[0]!;
   await userEvent.click(opener);
-  if (paste) await userEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
   return opener;
 }
+/** Escape on a native dialog arrives as its cancel event. */
+const pressEscape = () => fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
 function fillDialog(url = "https://example.com/jobs/2", text = "x".repeat(200)) {
   fireEvent.change(screen.getByLabelText("Link to the job ad"), { target: { value: url } });
-  fireEvent.change(screen.getByLabelText("Job description"), { target: { value: text } });
+  fireEvent.change(screen.getByLabelText("Paste the text of the job ad"), { target: { value: text } });
 }
-const submit = () => userEvent.click(screen.getByRole("button", { name: "Add job" }));
+const submit = () => userEvent.click(screen.getByRole("button", { name: "Add this job" }));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -60,21 +61,60 @@ describe.each([["/cv", "Jobs", "/jobs"], ["/jobs", "My CV", "/cv"]])("navigation
   });
 });
 describe("jobs list", () => {
-  it("lists jobs, hosts, dates and badges with the active Jobs navigation", async () => {
+  it("lists each job with its place, how long ago it was saved and what is happening to it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-20T12:00:00Z"));
     vi.mocked(listJobs).mockResolvedValue(page([job,
       { ...job, id: "two", title: null, company: null, location: null, status: "queued" },
       { ...job, id: "three", title: "Designer", status: "processing" },
       { ...job, id: "four", title: "Writer", status: "failed" },
     ]));
     renderJobs();
-    expect(await screen.findByRole("link", { name: /Engineer/ })).toHaveAttribute("href", "/jobs/one");
-    expect(within(screen.getByRole("link", { name: /Engineer/ })).getByText("Acme · London")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /example.com/ })).toHaveAttribute("href", "/jobs/two");
-    expect(screen.getAllByText("Reading job…")).toHaveLength(2);
-    expect(screen.getByText("Failed")).toBeInTheDocument();
-    expect(screen.getAllByText("5 Nov")).toHaveLength(4);
+    expect(await screen.findByRole("link", { name: "Engineer" })).toHaveAttribute("href", "/jobs/one");
+    expect(screen.getAllByText("Acme, London")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "A job you just saved" })).toHaveAttribute("href", "/jobs/two");
+    expect(screen.getByRole("link", { name: "Designer" })).toHaveAttribute("href", "/jobs/three");
+    expect(screen.getAllByText("Reading the ad. About a minute.")).toHaveLength(2);
+    expect(screen.getByText("Couldn't read")).toBeInTheDocument();
+    // A job still being read shows no date; the other two do.
+    expect(screen.getAllByText("Saved on 5 Nov")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Jobs" })).toHaveAttribute("aria-current", "page");
     expect(listJobs).toHaveBeenCalledWith(undefined);
+  });
+
+  it.each([
+    ["2026-11-05T15:00:00Z", "Saved today"], ["2026-11-06T09:00:00Z", "Saved yesterday"],
+    ["2026-11-08T09:00:00Z", "Saved 3 days ago"], ["2026-11-11T09:00:00Z", "Saved 6 days ago"], ["2026-11-12T09:00:00Z", "Saved on 5 Nov"],
+  ])("at %s a job saved on 5 November says %s", async (now, text) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(now));
+    renderJobs();
+    expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+
+  it("says where each job stands and offers the next step for it", async () => {
+    vi.mocked(listJobs).mockResolvedValue(page([
+      { ...job, applicationStatus: "saved" },
+      { ...job, id: "t", title: "Tailored one", applicationStatus: "tailored" },
+      { ...job, id: "a", title: "Applied one", applicationStatus: "applied" },
+      { ...job, id: "c", title: "Closed one", positionClosed: true },
+      { ...job, id: "f", title: "Failed one", status: "failed" },
+    ]));
+    renderJobs();
+    const row = async (title: string) => within((await screen.findByRole("link", { name: title })).closest("li")!);
+    expect((await row("Engineer")).getByRole("link", { name: "Tailor my CV" })).toHaveAttribute("href", "/jobs/one");
+    const tailored = await row("Tailored one");
+    expect(tailored.getByText("CV tailored")).toBeInTheDocument();
+    expect(tailored.getByRole("link", { name: "Open tailored CV" })).toHaveAttribute("href", "/jobs/t/cv");
+    const applied = await row("Applied one");
+    expect(applied.getByText("Applied")).toBeInTheDocument();
+    expect(applied.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/a");
+    const closed = await row("Closed one");
+    expect(closed.getByText("No longer open")).toBeInTheDocument();
+    expect(closed.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/c");
+    expect((await row("Failed one")).getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/f");
+    expect(screen.getAllByText("CV tailored")).toHaveLength(1);
+    expect(screen.getAllByText("No longer open")).toHaveLength(1);
   });
 
   it("appends more jobs, deduplicates against refreshed first-page rows and ends pagination", async () => {
@@ -148,14 +188,14 @@ describe("jobs list", () => {
     expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
   });
 
-  it("shows an empty state and lets its Add button open the dialog", async () => {
+  it("shows an empty state that points to the extension and lets its own button open the dialog", async () => {
     vi.mocked(listJobs).mockResolvedValue(page([]));
     renderJobs();
     expect(await screen.findByText("No jobs yet")).toBeInTheDocument();
-    const buttons = screen.getAllByRole("button", { name: "+ Add job" });
+    expect(screen.getByRole("link", { name: "Show me how" })).toHaveAttribute("href", "/account/extension");
+    const buttons = screen.getAllByRole("button", { name: "Add a job by hand" });
     expect(buttons).toHaveLength(2);
     await userEvent.click(buttons[1]!);
-    await userEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(buttons[1]).toHaveFocus();
   });
@@ -163,7 +203,7 @@ describe("jobs list", () => {
   it("shows a list error and retries", async () => {
     vi.mocked(listJobs).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(page([job]));
     renderJobs();
-    expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong loading your jobs. Reload the page.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't load your jobs. They are safe; this is a connection problem.");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("link", { name: /Engineer/ })).toBeInTheDocument();
   });
@@ -204,7 +244,7 @@ describe("jobs polling", () => {
     expect(screen.getByRole("link", { name: /Engineer/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Older job/ })).toBeInTheDocument();
     const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("Something went wrong loading your jobs.");
+    expect(status).toHaveTextContent("We couldn't load your jobs.");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     failing = false;
@@ -214,7 +254,7 @@ describe("jobs polling", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Engineer/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Older job/ })).toBeInTheDocument();
-    expect(screen.queryByText("Reading job…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reading the ad. About a minute.")).not.toBeInTheDocument();
   });
 
   it.each([0, 1])("polls all loaded pages while page %i has busy jobs, then stops when ready", async (busyPage) => {
@@ -227,11 +267,11 @@ describe("jobs polling", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Load more" })); });
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-    expect(screen.getByText("Reading job…")).toBeInTheDocument();
+    expect(screen.getByText("Reading the ad. About a minute.")).toBeInTheDocument();
     ready = true;
     await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
     expect(listJobs).toHaveBeenCalledTimes(4);
-    expect(screen.queryByText("Reading job…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reading the ad. About a minute.")).not.toBeInTheDocument();
     expect(screen.getByText("Older job")).toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
     expect(listJobs).toHaveBeenCalledTimes(4);
@@ -247,11 +287,10 @@ describe("jobs polling", () => {
     const calls = vi.mocked(listJobs).mock.calls.length;
     await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
     expect(listJobs).toHaveBeenCalledTimes(calls);
-    fireEvent.click(screen.getByRole("button", { name: "+ Add job" }));
-    fireEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add a job by hand" }));
     fillDialog();
     vi.mocked(createJob).mockResolvedValue({ id: "new", existing: false });
-    await act(async () => { fireEvent.submit(screen.getByRole("button", { name: "Add job" }).closest("form")!); });
+    await act(async () => { fireEvent.submit(screen.getByRole("button", { name: "Add this job" }).closest("form")!); });
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(screen.queryByText("Still reading. Reload the page to check again.")).not.toBeInTheDocument();
     const afterAdd = vi.mocked(listJobs).mock.calls.length;
@@ -261,63 +300,26 @@ describe("jobs polling", () => {
 });
 
 describe("Add job dialog", () => {
-  it("leads with the extension guide and toggles the development install steps", async () => {
-    renderJobs(); await openDialog(false);
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText("Save jobs with the Resumora extension")).toBeVisible();
-    expect(within(dialog).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-      "Install the Resumora extension for Chrome.",
-      "Sign in with your Resumora account.",
-      "Click the Resumora icon on any job ad, LinkedIn included, then click Capture.",
-    ]);
-    expect(within(dialog).queryByText("Soon")).not.toBeInTheDocument();
-    expect(within(dialog).queryByText(/Soon a link alone/)).not.toBeInTheDocument();
-    const toggle = screen.getByRole("button", { name: "How to install (dev)" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    const steps = document.getElementById(toggle.getAttribute("aria-controls")!);
-    expect(steps).toBeVisible();
-    expect(within(steps!).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-      "Run npm run build -w apps/extension.",
-      "Open chrome://extensions and turn on Developer mode.",
-      "Click Load unpacked and choose the apps/extension/dist folder.",
-      "Pin the Resumora icon to the toolbar.",
-    ]);
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(within(dialog).getAllByRole("listitem")).toHaveLength(3);
-  });
-
-  it("starts with the paste form collapsed and keeps fields when toggled", async () => {
-    renderJobs(); await openDialog(false);
-    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
-    expect(screen.queryByLabelText("Link to the job ad")).not.toBeInTheDocument();
-    const toggle = screen.getByRole("button", { name: "Or paste it yourself" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBeVisible();
-    expect(screen.getByLabelText("Link to the job ad")).toHaveFocus();
-    fillDialog();
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveFocus();
-    expect(screen.queryByLabelText("Link to the job ad")).not.toBeInTheDocument();
-    await userEvent.click(toggle);
-    expect(screen.getByLabelText("Job description")).toHaveValue("x".repeat(200));
+  it("asks for the ad's link and its text at once, with nothing about the extension in it", async () => {
+    renderJobs(); await openDialog();
+    const dialog = screen.getByRole("dialog", { name: "Add a job by hand" });
+    expect(within(dialog).getByLabelText("Link to the job ad")).toHaveFocus();
+    expect(within(dialog).getByLabelText("Paste the text of the job ad")).toHaveValue("");
+    expect(within(dialog).getByText("0 of at least 200 characters")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/extension/i)).not.toBeInTheDocument();
+    expect(within(dialog).getAllByRole("button").map((button) => button.textContent)).toEqual(["Cancel", "Add this job"]);
   });
 
   it.each(["https://example.com/job/1", "http://example.com/job/1"])("opens ready to paste for add=%s", async (url) => {
     const router = renderJobs("/jobs?keep=one&add=" + encodeURIComponent(url) + "&keep=two");
-    expect(await screen.findByRole("dialog", { name: "Add a job" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Or paste it yourself" })).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByRole("dialog", { name: "Add a job by hand" })).toBeInTheDocument();
     expect(screen.getByLabelText("Link to the job ad")).toHaveValue(url);
-    expect(screen.getByLabelText("Job description")).toHaveFocus();
+    expect(screen.getByLabelText("Paste the text of the job ad")).toHaveFocus();
     expect(router.state.location.search).toBe("?keep=one&keep=two");
     expect(router.state.historyAction).toBe("REPLACE");
-    await userEvent.keyboard("{Escape}");
-    expect(screen.getByRole("button", { name: "+ Add job" })).toHaveFocus();
+    pressEscape();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Add a job by hand" })).toHaveFocus();
     await openDialog();
     expect(screen.getByLabelText("Link to the job ad")).toHaveValue("");
   });
@@ -331,26 +333,20 @@ describe("Add job dialog", () => {
   });
 
   it("opens ready to paste when an add link arrives while the dialog is open", async () => {
-    const router = renderJobs(); await openDialog(false);
+    const router = renderJobs(); await openDialog();
     await act(async () => { await router.navigate("/jobs?add=https%3A%2F%2Fexample.com%2Fjob%2F1"); });
-    expect(screen.getByRole("button", { name: "Or paste it yourself" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByLabelText("Link to the job ad")).toHaveValue("https://example.com/job/1");
-    expect(screen.getByLabelText("Job description")).toHaveFocus();
+    expect(screen.getByLabelText("Paste the text of the job ad")).toHaveFocus();
     expect(router.state.location.search).toBe("");
   });
 
-  it("focuses the link, makes the page inert, traps focus and returns it on Escape", async () => {
+  it("focuses the link, and Escape closes it and returns focus to the button that opened it", async () => {
     renderJobs();
     const opener = await openDialog();
-    const dialog = screen.getByRole("dialog", { name: "Add a job" });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("dialog", { name: "Add a job by hand" })).toBeInTheDocument();
     expect(screen.getByLabelText("Link to the job ad")).toHaveFocus();
-    expect(screen.getByRole("main", { hidden: true })).toHaveAttribute("inert");
-    screen.getByRole("button", { name: "Add job" }).focus();
-    await userEvent.tab();
-    expect(within(dialog).getByRole("button", { name: "Close" })).toHaveFocus();
-    await userEvent.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    pressEscape();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(opener).toHaveFocus();
   });
 
@@ -376,16 +372,15 @@ describe("Add job dialog", () => {
     renderJobs(); const opener = await openDialog(); fillDialog(undefined, ` ${"x".repeat(200)} `);
     await submit();
     expect(createJob).toHaveBeenCalledWith("https://example.com/jobs/2", ` ${"x".repeat(200)} `);
-    expect(screen.getByRole("button", { name: "Add job" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add this job" })).toBeDisabled();
     vi.mocked(listJobs).mockResolvedValue(page([job, { ...job, id: "new", title: null, status: "queued" }]));
     await act(async () => finish({ id: "new", existing: false }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(await screen.findByText("Reading job…")).toBeInTheDocument();
+    expect(await screen.findByText("Reading the ad. About a minute.")).toBeInTheDocument();
     expect(opener).toHaveFocus();
     await userEvent.click(opener);
-    await userEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
     expect(screen.getByLabelText("Link to the job ad")).toHaveValue("");
-    expect(screen.getByLabelText("Job description")).toHaveValue("");
+    expect(screen.getByLabelText("Paste the text of the job ad")).toHaveValue("");
   });
 
   it("shows a newly added job when the initial list request is still pending", async () => {
@@ -402,18 +397,17 @@ describe("Add job dialog", () => {
     await act(async () => finishList(page([job])));
     expect(await screen.findByRole("link", { name: /New job/ })).toHaveAttribute("href", "/jobs/new");
     expect(listJobs).toHaveBeenCalledTimes(2);
-    expect(screen.getByText("Reading job…")).toBeInTheDocument();
+    expect(screen.getByText("Reading the ad. About a minute.")).toBeInTheDocument();
   });
 
-  it("keeps focus on Add job when a successful first add removes the empty state", async () => {
+  it("moves focus to the heading's button when a successful first add removes the empty state", async () => {
     vi.mocked(listJobs).mockResolvedValueOnce(page([])).mockResolvedValue(page([job]));
     vi.mocked(createJob).mockResolvedValue({ id: "one", existing: false });
     renderJobs(); await screen.findByText("No jobs yet");
-    await userEvent.click(screen.getAllByRole("button", { name: "+ Add job" })[1]!);
-    await userEvent.click(screen.getByRole("button", { name: "Or paste it yourself" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Add a job by hand" })[1]!);
     fillDialog(); await submit();
     await screen.findByRole("link", { name: /Engineer/ });
-    expect(screen.getByRole("button", { name: "+ Add job" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Add a job by hand" })).toHaveFocus();
   });
   it("keeps a duplicate open with a link to the existing job", async () => {
     vi.mocked(createJob).mockResolvedValue({ id: "one", existing: true });
@@ -432,14 +426,14 @@ describe("Add job dialog", () => {
     vi.mocked(createJob).mockRejectedValue(new ApiClientError(400, code, "server message"));
     renderJobs(); await openDialog(); fillDialog(); await submit();
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
-    expect(screen.getByLabelText("Job description")).toHaveValue("x".repeat(200));
+    expect(screen.getByLabelText("Paste the text of the job ad")).toHaveValue("x".repeat(200));
     expect(screen.getByLabelText("Link to the job ad")).toHaveValue("https://example.com/jobs/2");
   });
 
-  it.each(["Close", "backdrop"]) ("closes with %s", async (method) => {
+  it.each(["Cancel", "a click outside it"]) ("closes with %s", async (method) => {
     renderJobs(); const opener = await openDialog();
-    if (method === "Close") await userEvent.click(screen.getByRole("button", { name: "Close" }));
-    else fireEvent.click(screen.getByRole("dialog").parentElement!);
+    if (method === "Cancel") await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    else fireEvent.click(screen.getByRole("dialog"), { clientX: 5000, clientY: 5000 });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(opener).toHaveFocus();
   });

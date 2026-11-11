@@ -27,7 +27,7 @@ export function JobSummary({ extracted, rawText, salaryStated }: {
     </section>}
     {extracted.benefits.length > 0 && <section className="sec">
       <h2>{t("job.benefits.title", { n: extracted.benefits.length })}</h2>
-      <p>{extracted.benefits.join(" · ")}</p>
+      <p>{extracted.benefits.join(", ")}</p>
     </section>}
     <div className="job-read">
       <p className="jobs-note">{t("job.read.line", {

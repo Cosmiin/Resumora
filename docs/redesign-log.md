@@ -164,3 +164,17 @@ Owner review of this flow (2026-11-11): parts 1 and 2 approved with no changes. 
 - Not in this flow: "Export" on My CV (the base CV has no export today; it belongs to the templates and export flow) and the "My CVs" navigation item.
 - Copy: the flow's keys moved from `en.ts` to `en-basecv.ts`, with `ro-basecv.ts` typed against it. The editor's own panel and field labels (`panel.*`, `edit.*`, `cv.*`) are still English only.
 - Codex deep review of the base CV flow found five points, all fixed with tests: the page behind stays locked only while a focus screen is open, also when an upload finishes over the open path; a thin role's second request for questions keeps the focus text; a save conflict while importing into an empty CV shows the page with the conflict banner, not the upload again; a CV counts as empty only with no contact details and no entries of any kind; the top bar's ways out stay clickable above the "score went up" moment.
+
+## Phase 3, flow 3: jobs (branch `redesign/jobs`, on top of `redesign/base-cv`)
+
+- Job list: one sheet with a row per job (title, company and place, how long ago it was saved, what is happening to it) and one next step per row: "Tailor my CV", "Open tailored CV" or "View job". The list now gets each job's application status and the ad's own "no longer open" flag from the server (two optional fields on a list item, read from columns that already exist; no database change).
+- Not shown from the mockup: the "New" pill and the pill about the ad's language. Neither is stored for a job today; the language belongs to the tailoring flow's language check.
+- The search box stays (the mockup has none): it already worked and a long list needs it.
+- "Add a job by hand" asks for the ad's link and its text, as before (the server needs the link to recognise a job that is already saved). The extension how-to and the developer install steps left the dialog; the empty list points to Account > Browser extension instead ("Show me how").
+- Job page: must-haves in ad order with a dot per line (filled: on the CV, half: partly, empty: missing) and the CV's own words behind a line; the keywords the match already identifies, as a bar and chips; nice-to-haves as chips; one sentence saying how many must-haves the CV shows. Everything else the page knew (in short, duties, benefits, the original ad with the requirements marked, application status, edit, remove, how the match is scored) sits under "More about this job".
+- One main action in the page head: start tailoring, continue an open run, or open the tailored CV. A job that is still being read, could not be read or has no text shows what is going on and no tailor button (it used to show a button that explained itself when pressed).
+- "Read it again" on a job that could not be read is not built: the server has no way to read a saved job again. The page offers "Remove this job" and the link to the ad.
+- "Before you tailor" and "Remove this job?" are the kit's dialog now (the browser's own modal dialog: focus stays inside, Escape closes).
+- The edit form keeps its old markup inside a sheet; only its colours and type are new.
+- Browser extension panel: the mockup's wording ("This looks like a job ad. Want to keep it?", "Save this job", "Saved to your jobs.") and the app's colours. It stays English only and uses system fonts.
+- Copy: `ro-jobs.ts` added, typed against `en-jobs.ts`.
