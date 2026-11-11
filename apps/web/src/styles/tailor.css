@@ -155,3 +155,16 @@
 .tailor-doc li.is-hidden > :not(.tailor-hide) { opacity: 0.5; }
 .tailor-hide { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; margin-block-start: 4px; font-size: 0.9em; }
 .tailor-hide input { width: auto; margin: 0; flex: none; }
+
+/* A question about a role (layout A): both columns larger, filling the screen. On the role's sheet the line the
+   question is about is lit; the other lines are blurred. */
+.tailor-focus:has(.fm-grid.has-sheet):not(.is-done) { --fw: 1300px; }
+.tailor-focus:has(.fm-grid.has-sheet):not(.is-done) .fm-bar { max-width: var(--fw); }
+.tailor-focus:not(.is-done) .fm-grid.has-sheet { grid-template-columns: minmax(0, 540px) minmax(0, 1fr); gap: var(--space-8) 56px; }
+.tailor-focus:not(.is-done) .has-sheet .fm-q { font-size: clamp(1.6rem, 2.6vw, 2.125rem); }
+.tailor-focus:not(.is-done) .has-sheet .fm-left { padding: var(--space-7) 34px; font-size: 1.0625rem; }
+.tailor-focus:not(.is-done) .has-sheet .fm-role { font-size: 1.5rem; }
+.tailor-focus:not(.is-done) .has-sheet .fm-bullets { gap: var(--space-3); }
+.tailor-focus:not(.is-done) .fm-bullets.has-current .fm-bullet:not(.is-current) { color: var(--color-ink); opacity: 0.42; filter: blur(1.3px); }
+.tailor-focus:not(.is-done) .fm-bullets.has-current .fm-bullet.is-current { margin: var(--space-1) -14px; padding: 12px 14px 12px 34px; border-radius: 10px; background: color-mix(in srgb, var(--color-highlight) 50%, transparent); box-shadow: inset 4px 0 var(--color-coach); font-size: 1.1875rem; font-weight: var(--weight-semibold); }
+.tailor-focus:not(.is-done) .fm-bullets.has-current .fm-bullet.is-current::before { left: 18px; top: calc(12px + 0.62em); background: var(--color-ink); }
