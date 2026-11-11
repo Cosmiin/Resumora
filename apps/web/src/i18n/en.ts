@@ -1,6 +1,7 @@
 import { enrichSectionsEn } from "./en-enrich.ts";
 import { jobsEn } from "./en-jobs.ts";
 import { tailorEn } from "./en-tailor.ts";
+import { cvsEn } from "./en-cvs.ts";
 import { uiEn } from "./en-ui.ts";
 import { publicEn } from "./en-public.ts";
 import { accountEn } from "./en-account.ts";
@@ -288,6 +289,7 @@ export const en = {
   ...enrichSectionsEn,
   ...jobsEn,
   ...tailorEn,
+  ...cvsEn,
   ...uiEn,
   ...publicEn,
   ...accountEn,

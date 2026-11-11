@@ -28,6 +28,7 @@ function renderDone(over: { final?: MatchScore; base?: MatchScore; job?: JobExtr
     { path: "/jobs/:id/tailor", element: <DoneScreen jobId="one" docId="cv1" base={over.base ?? base} final={over.final ?? final}
       job={over.job === undefined ? job : over.job} onAnswers={over.onAnswers} /> },
     { path: "/jobs/:id/cv", element: <p>CV page</p> },
+    { path: "/jobs/:id/cv/template", element: <p>Template page</p> },
   ], { initialEntries: ["/jobs/one/tailor"] });
   render(<RouterProvider router={router} />);
   return router;
@@ -99,8 +100,8 @@ describe("the finish screen", () => {
   });
 
   it.each([
+    ["Choose a template", "/jobs/one/cv/template?cv=cv1"],
     ["Open the CV", "/jobs/one/cv?cv=cv1"],
-    ["Export PDF or Word", "/jobs/one/cv?cv=cv1&export=1"],
     ["Write a cover letter", "/jobs/one/cv?cv=cv1&tab=letter"],
   ])("once marked as ready, %s goes to %s", async (name, to) => {
     const user = userEvent.setup();

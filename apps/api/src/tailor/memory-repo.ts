@@ -52,6 +52,14 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       return [...docs.cvs.values()].filter((cv) => cv.userId === userId && cv.jobId === jobId)
         .map(({ id, language, translatedFrom, updatedAt }) => ({ id, language, translatedFrom, updatedAt }));
     },
+    async listAllTailoredCvs() {
+      const newest = (id: string) => [...docs.runs.values()].reverse().find((run) => run.tailoredCvId === id && run.userId === userId);
+      return [...docs.cvs.values()].filter((cv) => cv.userId === userId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map(({ id, jobId, language, template, translatedFrom, updatedAt }) => {
+          const run = newest(id);
+          return { id, jobId, language, template, translatedFrom, updatedAt, inProgress: !!run && run.status !== "done" };
+        });
+    },
     async readTailoredCv(id) {
       const cv = docs.cvs.get(id);
       return cv && cv.userId === userId ? structuredClone(cv) : null;

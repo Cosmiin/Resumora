@@ -45,6 +45,8 @@ export interface TailorRepo {
   saveTailoredCv(id: string, expectedVersion: number, changes: { content: CvContent; review: Review; score: MatchScore | null }): Promise<"ok" | "conflict">;
   /** The job's tailored CVs (all languages), oldest first. */
   listTailoredCvs(jobId: string): Promise<TailoredCvSummary[]>;
+  /** Every tailored CV the person has, newest change first, each with whether its newest run is still open. */
+  listAllTailoredCvs(): Promise<TailoredCvListItem[]>;
   /** The whole row, for the editor; null when gone. */
   readTailoredCv(id: string): Promise<TailoredCv | null>;
   /** An editor save: content only, with the version check. null when gone. */
@@ -76,6 +78,8 @@ export type NewTranslation = Pick<TailoredCv, "jobId" | "language" | "content" |
   at: string;
 };
 export type TailoredCvSummary =Pick<TailoredCv, "id" | "language" | "translatedFrom" | "updatedAt">;
+/** One row of "My CVs": `inProgress` while the CV's newest run has not finished. */
+export type TailoredCvListItem = Pick<TailoredCv, "id" | "jobId" | "language" | "template" | "translatedFrom" | "updatedAt"> & { inProgress: boolean };
 export type StoredTailoredCv = { id: string; jobId: string; content: CvContent; review: Review | null; version: number };
 
 export type RunChanges = Partial<Pick<TailorRun, "questions" | "answers" | "proposals" | "status" | "currentSection" | "currentRoleId" | "errorCode">>;

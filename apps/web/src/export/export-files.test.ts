@@ -48,7 +48,7 @@ afterEach(() => {
 
 describe("exportFile", () => {
   it("downloads the CV PDF under the export file name, with no photo when the CV has none", async () => {
-    await expect(exportFile("cv", "pdf", { cv, job, template: "modern" })).resolves.toEqual({ pages: 1, fits: true });
+    await expect(exportFile("cv", "pdf", { cv, job, template: "modern" })).resolves.toMatchObject({ pages: 1, fits: true, tightened: false });
     expect(pdf.fitCvPdf).toHaveBeenCalledWith(content, "modern", undefined);
     expect(clicked).toEqual([{ href: "blob:file", download: "Stefan_Ionescu_Bolt_Senior_Backend_Engineer.pdf" }]);
     expect(download).not.toHaveBeenCalled();
@@ -115,7 +115,7 @@ describe("exportFile", () => {
     if (failure === "encode") vi.mocked(HTMLCanvasElement.prototype.toBlob).mockImplementation((callback) => callback(null));
     if (failure === "encode throws") vi.mocked(HTMLCanvasElement.prototype.toBlob).mockImplementation(() => { throw new Error("encode failed"); });
     for (const format of ["pdf", "docx"] as const) {
-      await expect(exportFile("cv", format, { cv: withPhoto, job, template: "classic" })).resolves.toEqual({ pages: 1, fits: true });
+      await expect(exportFile("cv", format, { cv: withPhoto, job, template: "classic" })).resolves.toMatchObject({ pages: 1, fits: true, tightened: false });
       expect(pdf.fitCvPdf.mock.lastCall![2]).toBeUndefined();
       if (format === "docx") expect(docx.buildCvDocx.mock.lastCall![2]).toBeUndefined();
     }
@@ -146,7 +146,7 @@ describe("exportFile", () => {
     const date = new Date("2026-11-08T12:00:00Z");
     const step = { tight: true, fontSize: 9.5 };
     pdf.fitCvPdf.mockResolvedValue({ blob: new Blob(["measured"]), step, pages: 3, fits: false });
-    await expect(exportFile("cv", "docx", { cv, job, template: "compact" })).resolves.toEqual({ pages: 3, fits: false });
+    await expect(exportFile("cv", "docx", { cv, job, template: "compact" })).resolves.toMatchObject({ pages: 3, fits: false });
     expect(pdf.fitCvPdf).toHaveBeenCalledWith(content, "compact", undefined);
     expect(docx.buildCvDocx).toHaveBeenCalledWith(content, "compact", undefined, step);
     await exportFile("letter", "docx", { cv, job, template: "classic", date });

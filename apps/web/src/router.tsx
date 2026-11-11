@@ -10,6 +10,9 @@ import { ResetPasswordPage } from "./auth/ResetPasswordPage.tsx";
 import { RequireAuth } from "./auth/RequireAuth.tsx";
 import { SignUpPage } from "./auth/SignUpPage.tsx";
 import { CvPage } from "./cv/CvPage.tsx";
+import { ExportPage } from "./cvs/ExportPage.tsx";
+import { MyCvsPage } from "./cvs/MyCvsPage.tsx";
+import { TemplatePage } from "./cvs/TemplatePage.tsx";
 import { JobsPage } from "./jobs/JobsPage.tsx";
 import { JobPage } from "./jobs/JobPage.tsx";
 import { HomePage } from "./public/HomePage.tsx";
@@ -27,10 +30,15 @@ export const routes: RouteObject[] = [
     element: <RequireAuth />,
     children: [
       { path: "/cv", element: <CvPage /> },
+      { path: "/cv/template", element: <TemplatePage /> },
+      { path: "/cv/export", element: <ExportPage /> },
+      { path: "/cvs", element: <MyCvsPage /> },
       { path: "/jobs", element: <JobsPage /> },
       { path: "/jobs/:id", element: <JobPage /> },
       { path: "/jobs/:id/tailor", element: <TailorFlow /> },
       { path: "/jobs/:id/cv", element: <TailoredCvPage /> },
+      { path: "/jobs/:id/cv/template", element: <TemplatePage /> },
+      { path: "/jobs/:id/cv/export", element: <ExportPage /> },
       {
         path: "/account",
         element: <AccountLayout />,

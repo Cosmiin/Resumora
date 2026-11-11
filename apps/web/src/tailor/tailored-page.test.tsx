@@ -72,10 +72,17 @@ const editView = async () => {
 };
 
 describe("TailoredCvPage", () => {
-  it("opens on the Cover letter tab with ?tab=letter, and with the Export menu open with ?export=1 (from the done screen)", async () => {
-    renderPage("/jobs/job-1/cv?cv=tc-1&tab=letter&export=1");
+  it("opens on the Cover letter tab with ?tab=letter", async () => {
+    renderPage("/jobs/job-1/cv?cv=tc-1&tab=letter");
     expect(await screen.findByRole("tab", { name: "Cover letter" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("button", { name: "Export ▾" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("links to this CV's template page and download page, naming the template it has", async () => {
+    renderPage();
+    const bar = await screen.findByRole("group", { name: "This tailored CV" });
+    expect(within(bar).getByRole("link", { name: "Template: Classic" })).toHaveAttribute("href", "/jobs/job-1/cv/template?cv=tc-1");
+    expect(within(bar).getByRole("link", { name: "Export" })).toHaveAttribute("href", "/jobs/job-1/cv/export?cv=tc-1");
+    expect(screen.queryByText(/Score/)).toBeNull();
   });
 
   it("opens editable by clicking, like the base CV, with Show changes as an option", async () => {
@@ -88,9 +95,8 @@ describe("TailoredCvPage", () => {
     expect(screen.getByRole("textbox", { name: "Summary" })).toBeInTheDocument();
   });
 
-  it("shows the score lift, tabs and toolbar, and highlights changed and inferred items", async () => {
+  it("shows the tabs, and highlights changed and inferred items", async () => {
     renderPage();
-    expect(await screen.findByText("Score 62 → 71 · Strong")).toBeInTheDocument();
     await changesView();
     expect(screen.getByRole("tab", { name: "CV", selected: true })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Cover letter" })).toBeInTheDocument();
@@ -157,34 +163,11 @@ describe("TailoredCvPage", () => {
     expect(screen.getByRole("textbox", { name: "Summary" })).toHaveTextContent("Original summary.");
   });
 
-  it("switches the template live and saves it through the PATCH", async () => {
+  it("shows the CV in the template it was saved with", async () => {
+    tailoredApi.getTailored.mockResolvedValue({ ...tailored, template: "compact" });
     renderPage();
-    const select = await screen.findByRole("combobox", { name: "Template" });
-    expect(select).toHaveValue("classic");
-    expect(cvPage()).toHaveClass("cv-template-classic");
-    await userEvent.selectOptions(select, "modern");
-    expect(cvPage()).toHaveClass("cv-template-modern");
-    expect(tailoredApi.setTemplate).toHaveBeenCalledWith("tc-1", "modern");
-    expect(tailoredApi.saveTailored).not.toHaveBeenCalled();
-  });
-
-  it("goes back to the last saved template when two quick picks both fail", async () => {
-    tailoredApi.setTemplate.mockRejectedValue(new Error("offline"));
-    renderPage();
-    const select = await screen.findByRole("combobox", { name: "Template" });
-    await userEvent.selectOptions(select, "modern");
-    await userEvent.selectOptions(select, "compact");
-    expect(await screen.findByRole("alert")).toBeInTheDocument();
-    await waitFor(() => expect(tailoredApi.setTemplate).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Template" })).toHaveValue("classic"));
-  });
-
-  it("goes back to the saved template when the PATCH fails", async () => {
-    tailoredApi.setTemplate.mockRejectedValue(new Error("offline"));
-    renderPage();
-    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Template" }), "compact");
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't change the template");
-    expect(screen.getByRole("combobox", { name: "Template" })).toHaveValue("classic");
-    expect(cvPage()).toHaveClass("cv-template-classic");
+    await screen.findByRole("link", { name: "Template: Compact" });
+    expect(cvPage()).toHaveClass("cv-template-compact");
+    expect(tailoredApi.setTemplate).not.toHaveBeenCalled();
   });
 });

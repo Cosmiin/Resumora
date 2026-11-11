@@ -34,7 +34,8 @@ export function DoneScreen({ jobId, docId, base, final, job, onAnswers }: Props)
     return () => { live = false; };
   }, [docId]);
 
-  const page = `/jobs/${encodeURIComponent(jobId)}/cv${docId ? `?cv=${encodeURIComponent(docId)}` : ""}`;
+  const query = docId ? `?cv=${encodeURIComponent(docId)}` : "";
+  const page = `/jobs/${encodeURIComponent(jobId)}/cv${query}`;
   const to = (param: string) => `${page}${docId ? "&" : "?"}${param}`;
   const musts = mustHaves(final, job);
   const open = musts.filter((must) => !must.met).length;
@@ -48,8 +49,8 @@ export function DoneScreen({ jobId, docId, base, final, job, onAnswers }: Props)
       <p className="ui-notice ui-notice--good" role="status">{t("tailor.finish.ready")}</p>
       <p className="ui-coach">{t("tailor.finish.readyNext")}</p>
       <nav aria-label={t("tailor.done.next")} className="ui-row">
-        <Link className="ui-btn ui-btn--primary" to={page}>{t("tailor.finish.open")}</Link>
-        <Link className="ui-btn" to={to("export=1")}>{t("tailor.done.export")}</Link>
+        <Link className="ui-btn ui-btn--primary" to={`/jobs/${encodeURIComponent(jobId)}/cv/template${query}`}>{t("cvs.template.title")}</Link>
+        <Link className="ui-btn" to={page}>{t("tailor.finish.open")}</Link>
         <Link className="ui-btn ui-btn--quiet" to={to("tab=letter")}>{t("tailor.done.letter")}</Link>
       </nav>
     </section>;

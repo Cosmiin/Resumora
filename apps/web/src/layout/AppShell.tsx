@@ -32,6 +32,9 @@ export function AppShell(props: {
             <NavLink to="/jobs" onClick={guard}>
               {t("shell.nav.jobs")}
             </NavLink>
+            <NavLink to="/cvs" onClick={guard}>
+              {t("shell.nav.cvs")}
+            </NavLink>
             <NavLink to="/account" onClick={guard}>
               {t("shell.nav.account")}
             </NavLink>

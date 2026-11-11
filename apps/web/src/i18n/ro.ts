@@ -5,6 +5,7 @@ import { accountRo } from "./ro-account.ts";
 import { basecvRo } from "./ro-basecv.ts";
 import { jobsRo } from "./ro-jobs.ts";
 import { tailorRo } from "./ro-tailor.ts";
+import { cvsRo } from "./ro-cvs.ts";
 
 /**
  * Romanian UI copy. Each rebuilt flow adds its own `ro-<flow>.ts` with exactly the keys of its
@@ -17,4 +18,5 @@ export const ro: Partial<Record<MessageKey, string>> = {
   ...basecvRo,
   ...jobsRo,
   ...tailorRo,
+  ...cvsRo,
 };

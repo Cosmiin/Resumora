@@ -208,3 +208,19 @@ Branch `redesign/tailoring`, on top of `redesign/jobs`, in the same folder as th
 - Codex review (tailoring): "Change my answer" on the finish screen lists every finished item (roles, projects, volunteering), and appears for a CV that has only projects.
 - Codex review (tailoring): the person's own rewording is never applied to a flagged suggestion (older runs only; today's runs have none).
 - The count on a keyword bar ("4 of 8") stays on one line; the label wraps beside it (seen at phone width).
+
+## Phase 3, flow 5: templates and export (2026-11-11)
+
+Branch `redesign/templates-export`, on top of `redesign/tailoring`, same folder.
+
+- "My CVs" is a new page and a new item in the top navigation: the base CV, then every tailored CV with its job, its state (Ready or In progress), language, template and when it last changed. The server gained one read for it (every tailored CV of the signed-in person, with whether its newest tailoring run is still open); no database change.
+- Not shown from the mockup on My CVs: "exported today" (exports happen in the browser and are not recorded) and "In progress: role 1 of 2" (the row says "In progress" only). A translated copy of a tailored CV is its own row, told apart by its language.
+- "Choose a template" is a page of its own, for the base CV and for each tailored CV: the three templates beside the person's real CV in the one picked. Nothing is saved until "Use this template", which then goes to the download page.
+- Templates for the base CV: the base CV has no template of its own in the database, so using one there sets the person's default (the page says so). For a tailored CV the template is saved on that CV, and a tick box also makes it the default.
+- "Download your CV" is a page of its own, replacing the Export dropdown: PDF and Word, the template with "Change template", the file name once downloaded, and a plain message if the file could not be made. It keeps what the dropdown did: the warning about AI guesses not checked yet with the way to check them, the cover letter's files when there is a letter, and the "still over two pages" message.
+- New on the download page: "we tightened the spacing to fit, no text was removed", shown when the export had to tighten (the export already knew this and did not say it).
+- The base CV can be exported now (it could not before): "Export" beside "Enrich my CV" on the My CV page, and from My CVs. One line was added to the My CV page's file, which the base CV feedback work also edits; the other session was told.
+- The tailored CV's page keeps the editor and gets the new toolbar: CV | Cover letter, "Template: Classic" (opens the template page), Language, Re-tailor, Export (opens the download page). The score line is gone, in line with the decision that tailoring shows no score. The template dropdown is gone; the template page replaces it.
+- The finish screen of tailoring now offers "Choose a template" first, as in the mockup, then "Open the CV" and "Write a cover letter".
+- Romanian: My CVs, templates, download, and the tailored CV's page with its cover letter panel. Still English only: the editor's own panel labels (as on the base CV page).
+- Not rebuilt in this flow: the cover letter tab's layout and the guided check of AI guesses keep their structure and take the new colours and buttons only.

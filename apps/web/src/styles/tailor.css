@@ -101,8 +101,8 @@
 /* Tailored CV (editor) */
 .tailored-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--old-space-3); margin-block-end: var(--old-space-3); }
 .tailored-tabs { display: flex; gap: var(--old-space-1); }
-.tailored-tabs [aria-selected="true"] { border-color: var(--border-selected); background: var(--surface-selected); }
-.tailored-score { font-weight: 600; margin-inline-end: auto; }
+.tailored-tabs [aria-selected="true"] { background: var(--color-ink); color: var(--color-paper); }
+.tailored-bar > .tailored-tabs { margin-inline-end: auto; }
 .tailored-view { margin-block-end: var(--old-space-3); }
 .letter-tab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(14rem, 18rem); gap: var(--old-space-5); align-items: start; }
 @media (max-width: 52rem) { .letter-tab { grid-template-columns: minmax(0, 1fr); } }
@@ -131,18 +131,13 @@
 /* The global `input { width: 100% }` stretched each checkbox across the row, away from its label. */
 .retailor-sections input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; padding: 0; }
 @media print { .tailored-redo { display: none; } }
-.tailored-template { display: inline-flex; align-items: center; gap: var(--old-space-2); }
 .tailored-menu { position: relative; }
 .tailored-menu-pop { position: absolute; inset-inline-end: 0; z-index: 5; min-width: 18rem; margin-block-start: var(--old-space-1);
-  padding: var(--old-space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-card); }
+  padding: var(--space-4); border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-block); background: var(--color-paper); box-shadow: var(--shadow-sheet); }
 .tailored-menu-pop ul { display: grid; gap: var(--old-space-2); margin: 0; padding: 0; list-style: none; }
 .tailored-menu-pop li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--old-space-2); }
 .tailored-menu-pop li > span:first-child { margin-inline-end: auto; }
 .tailored-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--old-space-2); flex-basis: 100%; }
-.export-warning { margin-block-end: var(--old-space-2); padding: var(--old-space-2); border-inline-start: 3px solid var(--color-warning, #b7791f); }
-.export-warning p { margin: 0 0 var(--old-space-1); }
-.export-warning ul { display: block; padding-inline-start: var(--old-space-4); list-style: disc; }
-.export-choices { display: grid; gap: var(--old-space-2); }
 /* FinalA: the tick for a final touch with nothing to change, and a moved section in the new order. */
 .tailor-doc li.is-moved { font-weight: 600; }
 /* GuideA: the guided review dims the page and glows the guess in place, with a small card above it. */
