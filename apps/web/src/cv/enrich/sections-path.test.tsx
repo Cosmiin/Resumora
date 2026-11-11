@@ -75,20 +75,21 @@ function Path({ cv = full, s = scores, onClose = () => {} }: { cv?: CvContent; s
 }
 
 describe("path start (1A)", () => {
-  it("groups roles, then projects and volunteering, listing only items below 80, and a quick-pass row", () => {
+  it("groups roles, then projects and volunteering, listing every item, and a quick-pass row", () => {
     render(<Path />);
     expect(screen.getByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
     const boxes = screen.getAllByRole("checkbox");
-    expect(boxes).toHaveLength(3);
-    // The role starts ticked; projects and volunteering are offered under their own label, unticked.
-    expect(boxes[0]).toHaveAccessibleName(/Buyer/);
-    expect(boxes[0]).toBeChecked();
+    expect(boxes).toHaveLength(5);
+    // The role below 80 starts ticked; the strong one, the projects and volunteering are listed unticked.
+    expect(boxes[0]).not.toBeChecked();
+    expect(boxes[1]).toHaveAccessibleName(/Buyer/);
+    expect(boxes[1]).toBeChecked();
     expect(screen.getByText("Projects and volunteering")).toBeInTheDocument();
-    expect(boxes[1]).toHaveAccessibleName(/Chess bot/);
-    expect(boxes[1]).not.toBeChecked();
-    expect(boxes[2]).toHaveAccessibleName(/Food bank helper/);
-    expect(boxes[2]).not.toBeChecked();
-    expect(screen.getByText("1 of 3 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
+    expect(boxes[3]).toHaveAccessibleName(/Chess bot/);
+    expect(boxes[3]).not.toBeChecked();
+    expect(boxes[4]).toHaveAccessibleName(/Food bank helper/);
+    expect(boxes[4]).not.toBeChecked();
+    expect(screen.getByText("1 of 5 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
     // Only lighter items with no lines yet are counted (Q3): the Git course has lines.
     expect(screen.getByText("After that, a quick pass with no questions: Courses & training (2), Awards and honors (1), Interests (3).")).toBeInTheDocument();
   });
@@ -125,7 +126,7 @@ describe("path start (1A)", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     unmount();
     render(<Path s={new Map(scores).set("b", ready(84))} />);
-    expect(screen.queryByRole("checkbox", { name: /Buyer/ })).toBeNull();
+    expect(screen.getByRole("checkbox", { name: /Buyer/ })).not.toBeChecked();
     await userEvent.click(screen.getByRole("button", { name: "Start with Chess bot" }));
     expect(screen.getByText("Session for p2")).toBeInTheDocument();
   });

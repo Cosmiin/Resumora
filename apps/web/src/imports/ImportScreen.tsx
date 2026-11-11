@@ -11,6 +11,8 @@ import { PathSteps } from "../cv/enrich/PathStart.tsx";
 import { Skeleton } from "../ui/Page.tsx";
 import { applyImport, getImport } from "./imports-api.ts";
 import { ImportSummary } from "./ImportSummary.tsx";
+import { ConfirmList } from "./ConfirmList.tsx";
+import type { CvContent } from "@resumora/shared";
 
 export const POLL_MS = 2000;
 /**
@@ -81,6 +83,12 @@ export function ImportScreen(props: {
     });
   }
 
+  /** A correction made on a "thing to confirm": it goes into the CV being imported, saved when the import is used. */
+  function change(fn: (cv: CvContent) => CvContent) {
+    const base = edited ?? imp?.result;
+    if (base) setEdited({ ...base, content: fn(base.content) });
+  }
+
   /** If the import was already applied (a retry of the moves is pending), the editor must hear about it. */
   function close() {
     if (appliedRef.current && imp?.result) onApplied({ content: imp.result.content, ...appliedRef.current }, "cv");
@@ -115,15 +123,16 @@ export function ImportScreen(props: {
   const cv = result?.content;
   const roles = cv?.experience ?? [];
   const name = cv?.basics.fullName.trim() ?? "";
-  // Anything that needs a look opens the details without being asked.
-  const needsLook = !!result && (result.isScan || result.unsourcedLines.length > 0 || result.warnings.some((w) => w !== SCAN_WARNING));
+  const confirms = result?.warnings.filter((w) => w !== SCAN_WARNING) ?? [];
+  // Lines we could not place open the details without being asked; things to confirm have their own list.
+  const needsLook = !!result && (result.isScan || result.unsourcedLines.length > 0);
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={t("import.title")}
-      className="ui-page focus-mode fm-path import-screen"
+      className={`ui-page focus-mode fm-path import-screen${result ? " is-wide" : ""}`}
       ref={screenRef}
       tabIndex={-1}
       onKeyDown={(e) => e.key === "Escape" && close()}
@@ -147,43 +156,50 @@ export function ImportScreen(props: {
           <>
             <h2 className="fm-q is-big">{t(roles.length === 0 ? "import.found.none" : roles.length === 1 ? "import.found.one" : "import.found.many", { n: roles.length })}</h2>
             <p className="fm-lead">{t("import.found.line")}</p>
-            {result.isScan && <p role="alert" className="ui-notice import-gap">{t("import.scan")}</p>}
-            <div className="import-found">
-              {name && <p className="import-name" lang={cv.locale}>{name}</p>}
-              {cv.basics.location.trim() && <p className="ui-muted" lang={cv.locale}>{cv.basics.location}</p>}
-              {roles.length > 0 && (
-                <ul className="import-roles" lang={cv.locale}>
-                  {roles.map((r) => (
-                    <li key={r.id}>
-                      <span><b>{r.title.trim() || t("import.found.untitled")}</b>{r.company.trim() ? `, ${r.company.trim()}` : ""}</span>
-                      <span className="ui-muted ui-small" lang="">
-                        {[formatRange(r.startDate, r.endDate, r.current, cv.locale), t(r.bullets.length === 1 ? "import.found.bullet" : "import.found.bullets", { n: r.bullets.length })].filter(Boolean).join(", ")}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="import-found-note">{t(`import.found.lang.${cv.locale}`)}</p>
-            </div>
-            <details className="import-details" open={needsLook || undefined}>
-              <summary>{t("import.found.fix")}</summary>
-              <ImportSummary result={result} onMove={move} />
-              <div className="import-page"><CvDocument content={cv} showUnsorted /></div>
-            </details>
-            {replaces && <p className="fm-fine">{t("import.summary.kept")}</p>}
-            {roles.length > 0 && <p className="ui-coach import-next">{t("import.found.next")}</p>}
-            {applyFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.applyError")}</p>}
-            {movesFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.movesError")}</p>}
-            {!canApply && <p aria-live="polite" className="fm-fine">{t("import.waitingSave")}</p>}
-            <div className="fm-foot">
-              {roles.length > 0 ? (
-                <>
-                  <button type="button" className="fm-ghost" disabled={!canApply || applying} onClick={() => void apply("cv")}>{t("import.skip")}</button>
-                  <button type="button" className="fm-btn" disabled={!canApply || applying} onClick={() => void apply("questions")}>{t("import.start")}</button>
-                </>
-              ) : (
-                <button type="button" className="fm-btn" disabled={!canApply || applying} onClick={() => void apply("cv")}>{t("import.apply")}</button>
-              )}
+            <div className="import-cols">
+              <div className="import-right">
+                {result.isScan && <p role="alert" className="ui-notice import-gap">{t("import.scan")}</p>}
+                <div inert={applying}><ConfirmList warnings={confirms} cv={cv} onChange={change} /></div>
+                {roles.length > 0 && <p className="ui-coach import-next">{t("import.found.next")}</p>}
+                {replaces && <p className="fm-fine">{t("import.summary.kept")}</p>}
+                {applyFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.applyError")}</p>}
+                {movesFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("import.movesError")}</p>}
+                {!canApply && <p aria-live="polite" className="fm-fine">{t("import.waitingSave")}</p>}
+                <div className="fm-foot">
+                  {roles.length > 0 ? (
+                    <>
+                      <button type="button" className="fm-ghost" disabled={!canApply || applying} onClick={() => void apply("cv")}>{t("import.skip")}</button>
+                      <button type="button" className="fm-btn" disabled={!canApply || applying} onClick={() => void apply("questions")}>{t("import.start")}</button>
+                    </>
+                  ) : (
+                    <button type="button" className="fm-btn" disabled={!canApply || applying} onClick={() => void apply("cv")}>{t("import.apply")}</button>
+                  )}
+                </div>
+              </div>
+              <div className="import-left">
+                <div className="import-found">
+                  {name && <p className="import-name" lang={cv.locale}>{name}</p>}
+                  {cv.basics.location.trim() && <p className="ui-muted" lang={cv.locale}>{cv.basics.location}</p>}
+                  {roles.length > 0 && (
+                    <ul className="import-roles" lang={cv.locale}>
+                      {roles.map((r) => (
+                        <li key={r.id}>
+                          <span><b>{r.title.trim() || t("import.found.untitled")}</b>{r.company.trim() ? `, ${r.company.trim()}` : ""}</span>
+                          <span className="ui-muted ui-small" lang="">
+                            {[formatRange(r.startDate, r.endDate, r.current, cv.locale), t(r.bullets.length === 1 ? "import.found.bullet" : "import.found.bullets", { n: r.bullets.length })].filter(Boolean).join(", ")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="import-found-note">{t(`import.found.lang.${cv.locale}`)}</p>
+                </div>
+                <details className="import-details" open={needsLook || undefined}>
+                  <summary>{t("import.found.fix")}</summary>
+                  <ImportSummary result={result} onMove={move} />
+                  <div className="import-page"><CvDocument content={cv} showUnsorted /></div>
+                </details>
+              </div>
             </div>
           </>
         )}

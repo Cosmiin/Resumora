@@ -3,7 +3,8 @@ import { emptyCv, type CvContent, type CvResponse, type SaveResponse, type Secti
 import type { TemplateId } from "./page/templates.ts";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
-import { getCv, restoreHistory, saveCv } from "./cv-api.ts";
+import { getCv, removeCv, restoreHistory, saveCv } from "./cv-api.ts";
+import { Dialog } from "../ui/Dialog.tsx";
 import { conflictFrom, isConflict, useAutosave, useWaitForSave, type SaveStatus } from "./useAutosave.ts";
 import { ConflictBanner } from "./ConflictBanner.tsx";
 import { HistoryPanel } from "./HistoryPanel.tsx";
@@ -69,6 +70,10 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   const [questionsWaiting, setQuestionsWaiting] = useState(false);
   // With no CV yet the page starts with the upload; "write it from scratch" opens the empty page instead.
   const [fromScratch, setFromScratch] = useState(false);
+  // "Remove my CV": asked first, since the CV, its history and its scores all go.
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeFailed, setRemoveFailed] = useState(false);
   const startTemplate = useStartTemplate(!isTailored);
   const dialogOpen = historyOpen || importId !== null;
   const [preview, setPreview] = useState<{ content: CvContent; createdAt: string } | null>(null);
@@ -170,6 +175,30 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
     closeHistory();
   }
 
+  async function remove() {
+    setRemoving(true);
+    setRemoveFailed(false);
+    try {
+      await waitForSave();
+      autosave.reset(await removeCv(autosave.currentVersion()));
+      clearOpened();
+      setQuestionsWaiting(false);
+      // An open History preview is of the CV that is now gone.
+      setHistoryOpen(false);
+      setPreview(null);
+      // Back to the start: with no CV, the next step is to import one.
+      setFromScratch(false);
+      setRemoveOpen(false);
+    } catch (err) {
+      if (isConflict(err)) {
+        autosave.reportConflict(conflictFrom(err));
+        setRemoveOpen(false);
+      } else setRemoveFailed(true);
+    } finally {
+      setRemoving(false);
+    }
+  }
+
   // Save warnings sit above the page. Only one copy is ever rendered.
   const notices = (autosave.problem || conflict) && (
     <>
@@ -196,6 +225,11 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
           <button ref={historyButton} type="button" className="secondary" onClick={openHistory}>
             {t("history.open")}
           </button>
+          {!isBlankCv(content) && (
+            <button type="button" className="secondary" onClick={() => { setRemoveFailed(false); setRemoveOpen(true); }}>
+              {t("cv.remove.open")}
+            </button>
+          )}
         </>
       )}
     </>
@@ -334,6 +368,17 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
         )}
       </div>
       </FocusOpenProvider>
+      {!isTailored && (
+        <Dialog open={removeOpen} onClose={() => { if (!removing) setRemoveOpen(false); }} title={t("cv.remove.title")}>
+          <p>{t("cv.remove.line")}</p>
+          <p className="ui-small ui-muted">{t("cv.remove.kept")}</p>
+          {removeFailed && <p role="alert" className="ui-notice ui-notice--bad">{t("cv.remove.error")}</p>}
+          <div className="ui-dialog-actions">
+            <button type="button" className="ui-btn ui-btn--quiet" disabled={removing} onClick={() => setRemoveOpen(false)}>{t("cv.remove.cancel")}</button>
+            <button type="button" className="ui-btn ui-btn--danger" disabled={removing} onClick={() => void remove()}>{t("cv.remove.confirm")}</button>
+          </div>
+        </Dialog>
+      )}
       {pathOpen && !focusTarget && !historyOpen && !isTailored && (
         <EnrichPath cv={content} dispatch={dispatch} scores={roleScores.scores} waitForSave={waitForSave} onClose={closePath} />
       )}

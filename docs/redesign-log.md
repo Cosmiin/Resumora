@@ -227,3 +227,21 @@ Branch `redesign/templates-export`, on top of `redesign/tailoring`, same folder.
 - Codex review (templates and export): "Template" and "Export" on a CV's page, and "Export" on the My CV page, ask before leaving while an edit is still being saved, like the top navigation does. The pages they open read the saved CV, so leaving early lost the edit.
 - Codex review (templates and export): the server reads each tailored CV together with only its newest tailoring run, in one query. The first version asked for all runs of all CVs and would have gone wrong for someone with very many (a failed list near 500 CVs, wrong "In progress" past 1,000 runs).
 - Codex review (templates and export): My CVs keeps the list on screen when a later refresh fails; the error with "Try again" shows only when there is nothing to show.
+
+## Owner feedback on the base CV flow, 2026-11-11 (branch redesign/base-cv-feedback)
+
+Built by the forked session while the main session was on templates and export. The six points are in the workspace file base-cv-review-2026-11-11.md.
+
+- Remove my CV needs no database change: the CV row is emptied through the normal save (so a stale tab still gets the usual conflict), then its History and role scores are deleted, both of which a signed-in user may already delete for their own rows. Tailored CVs are separate rows and are not touched.
+- Remove also deletes the CV's History. The owner asked for everything belonging to the CV to go; a removed CV that could be restored from History would not be removed.
+- With the CV removed, My CV shows the upload start again (the same screen as a new account), including "write it from scratch".
+- Things to confirm: the reader now starts each one with a tag ([name], [contact], [languages], [certifications], [other]). The app shows the fields for that tag. The tag is part of the sentence, not a new field, so the stored format and older imports are unchanged (an untagged one counts as "other").
+- A general note ("other") has no fields to edit in place, so its two actions are "It's correct" and "I'll fix it on my CV". Raise with the owner if every note should be editable in place: that needs the reader to say exactly which line it means.
+- The name fields open pre-filled with the full name split at its last word. It is only a starting point: nothing is written until the person presses Save.
+- A confirmed item ticks off and stays visible, with "n of N confirmed" (owner was away; the default offered to them).
+- Confirming is not required before continuing. The owner asked for a way to act, not for a gate.
+- Upload result screen: two columns at full width, what needs the person on the right (confirmations first, then the buttons), the CV as found on the left. The counts and "Where each heading went" stay behind "Something is wrong or missing". On a phone it is one column with the confirmations first.
+- Focus step: every role, project and volunteering item stays listed with its score ("Checking this role…" until it is ready). Ticks start on the two most recent roles that are still below 80; once the person ticks or unticks anything, their choice is kept as scores arrive.
+- Not looked at in a browser: only one copy of the app can run at a time (the API port is fixed) and the main session was using it. Covered by tests only until the owner's review.
+- Codex review (feedback branch), fixed: a second try at Remove my CV after a half-finished first one now finishes the cleanup; removing closes an open History preview; identical "things to confirm" are separate items; two correction forms open at once no longer overwrite each other (only changed fields are written); a section moved into Certifications while its form is open no longer crashes it; corrections are locked while the import is being used.
+- Codex review, not changed: a score request already in flight when the CV is removed can store one score for a role that no longer exists. The scoring step already deletes such leftovers the next time any role is scored, so it cleans itself up.

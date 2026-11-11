@@ -60,7 +60,11 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   const lights = fixed?.lights ?? light;
   const before = fixed?.before ?? new Map<string, number | null>();
   const [stage, setStage] = useState<Stage>({ kind: "start" });
-  const items = below.map((id) => findScored(cv, id)).filter((p) => p !== undefined);
+  // The focus step lists every role, strong or not, so the list never shrinks while scores arrive.
+  const items = scoredItems(cv).map((p) => {
+    const s = scores.get(p.item.id);
+    return { ...p, score: scoreOf(s), scoring: s?.state === "scoring", strong: !belowTarget(s) };
+  });
   const quick = LIGHT_SECTIONS.map((section) => ({ section, count: light.filter((l) => l.section === section).length })).filter((q) => q.count > 0);
   const afterRoles = () => setStage(lights.length ? { kind: "light", index: 0 } : { kind: "achievements" });
   // 5A: the skills the path added, so Undo removes exactly those.

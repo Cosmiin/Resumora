@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   listHistory: vi.fn(),
   getHistoryItem: vi.fn(),
   restoreHistory: vi.fn(),
+  removeCv: vi.fn(),
 }));
 vi.mock("./cv-api.ts", () => api);
 const importsApi = vi.hoisted(() => ({ startImport: vi.fn(), getImport: vi.fn(), applyImport: vi.fn() }));
@@ -270,5 +271,48 @@ describe("CV editor", () => {
     const [content] = api.saveCv.mock.lastCall!;
     expect(content.professionalSkills).toEqual([{ id: "s1", name: "Management" }]);
     expect(content.unclearSkills).toEqual([]);
+  });
+});
+
+describe("Remove my CV", () => {
+  it("asks first, then removes the CV and goes back to the upload start", async () => {
+    const user = userEvent.setup();
+    withCv({ basics });
+    api.removeCv.mockResolvedValue({ content: emptyCv(), version: 2, updatedAt: "2026-11-04T10:02:00Z" });
+    renderPage();
+    await screen.findByRole("textbox", { name: "Summary" });
+    await user.click(screen.getByRole("button", { name: "Remove my CV" }));
+    const dialog = screen.getByRole("dialog", { name: "Remove your CV?" });
+    expect(dialog).toHaveTextContent("CVs you already tailored for a job stay as they are.");
+    expect(api.removeCv).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Remove my CV" }));
+    await waitFor(() => expect(api.removeCv).toHaveBeenCalledWith(1));
+    // With no CV, the next step is to import one.
+    expect(await screen.findByRole("heading", { name: "Start with the CV you have" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Summary" })).toBeNull();
+  });
+
+  it("Keep my CV changes nothing", async () => {
+    const user = userEvent.setup();
+    withCv({ basics });
+    renderPage();
+    await screen.findByRole("textbox", { name: "Summary" });
+    await user.click(screen.getByRole("button", { name: "Remove my CV" }));
+    await user.click(screen.getByRole("button", { name: "Keep my CV" }));
+    expect(api.removeCv).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "Summary" })).toBeInTheDocument();
+  });
+
+  it("says so when it could not be removed, and keeps the CV", async () => {
+    const user = userEvent.setup();
+    withCv({ basics });
+    api.removeCv.mockRejectedValue(new Error("network"));
+    renderPage();
+    await screen.findByRole("textbox", { name: "Summary" });
+    await user.click(screen.getByRole("button", { name: "Remove my CV" }));
+    const dialog = screen.getByRole("dialog", { name: "Remove your CV?" });
+    await user.click(within(dialog).getByRole("button", { name: "Remove my CV" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("We couldn't remove your CV. Try again.");
+    expect(screen.getByRole("textbox", { name: "Summary" })).toBeInTheDocument();
   });
 });

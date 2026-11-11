@@ -7,6 +7,25 @@
 .import-roles > li { display: flex; flex-wrap: wrap; gap: 2px var(--space-3); align-items: baseline; justify-content: space-between; padding: var(--space-3) 0; border-bottom: 1px solid var(--color-line); }
 .import-roles > li:last-child { border-bottom: 0; }
 .import-found-note { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-line); font-size: var(--text-small); color: var(--color-muted); }
+/* The result uses the width: what needs the person on the right, the CV as found on the left for reference. */
+.focus-mode.import-screen.is-wide { --fw: 1100px; }
+.import-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-7); align-items: start; margin-top: var(--space-6); }
+.import-left { grid-column: 1; grid-row: 1; }
+.import-right { grid-column: 2; grid-row: 1; }
+.import-cols .import-found { margin-top: 0; }
+.import-right > :first-child { margin-top: 0; }
+.import-confirm { padding: var(--space-6); border-radius: var(--radius-block); background: var(--color-paper); box-shadow: var(--shadow-sheet); }
+.import-confirm h3 { margin: 0; font-size: var(--text-base); font-weight: var(--weight-bold); }
+.import-confirm > ul { margin-top: var(--space-4); display: grid; gap: var(--space-4); }
+.import-confirm > ul > li { display: grid; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--color-line); }
+.import-confirm > ul > li.is-done > p { color: var(--color-muted); }
+.import-confirm-form { display: grid; gap: var(--space-3); }
+.import-confirm-form label { display: grid; gap: var(--space-1); }
+.import-confirm-bad { color: var(--color-bad); }
+@media (max-width: 899px) {
+  .import-cols { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+  .import-left, .import-right { grid-column: 1; grid-row: auto; }
+}
 .import-gap { margin-top: var(--space-4); }
 .import-next { margin-top: var(--space-6); }
 .import-details { margin-top: var(--space-4); }

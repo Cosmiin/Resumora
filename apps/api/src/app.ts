@@ -81,7 +81,7 @@ export function createApp(deps: AppDeps) {
     await next();
   });
 
-  app.route("/v1/cv", cvRoutes((c) => deps.cvRepo(c.get("user"))));
+  app.route("/v1/cv", cvRoutes((c) => deps.cvRepo(c.get("user")), (c) => deps.insightsRepo(c.get("user"))));
   app.route(
     "/v1/imports",
     importRoutes({ repoFor: (c) => deps.importRepo(c.get("user")), cvRepoFor: (c) => deps.cvRepo(c.get("user")), queue: deps.queue, now: deps.now ?? (() => new Date()) }),

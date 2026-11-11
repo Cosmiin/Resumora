@@ -10,7 +10,13 @@ import { formatRange } from "../page/blocks.ts";
 import { AnswerBox, type Via } from "./AnswerBox.tsx";
 import { FocusBar } from "./FocusBar.tsx";
 
-export type PathItem = { item: Experience; kind: ScoredKind };
+export type PathItem = {
+  item: Experience; kind: ScoredKind;
+  /** The role's score once known, and whether it is still being worked out. */
+  score?: number | null; scoring?: boolean;
+  /** True once the score is at the target: listed, but not ticked unless the person ticks it. */
+  strong?: boolean;
+};
 
 type Props = {
   /** The scored items the path can visit, in path order: roles first, then projects and volunteering. */
@@ -48,10 +54,12 @@ export function PathStart({ items, quick, locale, speech, onStart, onNotNow }: P
   }, [onNotNow]);
   const roles = items.filter((p) => p.kind === "role");
   const others = items.filter((p) => p.kind !== "role");
-  // Ticks are kept by id, so an item whose score arrives late (and joins the list) starts unticked.
+  // Every role stays listed. Until the person ticks something themselves, the most recent ones that still
+  // need work are ticked; with no role on the list, the first projects or volunteering roles instead.
   const [picked, setPicked] = useState<ReadonlySet<string> | null>(null);
-  // With no role on the list, the first projects or volunteering roles are ticked instead.
-  const chosen = picked ?? new Set((roles.length ? roles : others).slice(0, TICKED_ROLES).map((p) => p.item.id));
+  const open = (list: readonly PathItem[]) => list.filter((p) => !p.strong);
+  const chosen = picked ?? new Set((open(roles).length ? open(roles) : open(others)).slice(0, TICKED_ROLES).map((p) => p.item.id));
+  const needWork = items.some((p) => !p.strong);
   const toggle = (id: string) => {
     const next = new Set(chosen);
     if (!next.delete(id)) next.add(id);
@@ -68,6 +76,8 @@ export function PathStart({ items, quick, locale, speech, onStart, onNotNow }: P
       label={<>
         <span><b>{p.item.title.trim() || nameOf(p)}</b>{p.item.company.trim() ? `, ${p.item.company.trim()}` : ""}</span>
         <small>{formatRange(p.item.startDate, p.item.endDate, p.item.current, locale)}</small>
+        {p.score != null ? <small className="fm-rolescore">{t("enrich.path.score", { n: p.score })}</small>
+          : p.scoring ? <small className="fm-rolescore">{t("enrich.path.scoring")}</small> : null}
       </>} />
   );
 
@@ -77,7 +87,7 @@ export function PathStart({ items, quick, locale, speech, onStart, onNotNow }: P
       <section className="fm-path-start">
         <PathSteps current={1} />
         <h2 className="fm-q is-big" id="fm-step-title">{t("enrich.path.title")}</h2>
-        <p className="fm-lead">{t(items.length ? "enrich.path.line" : "enrich.path.noRoles")}</p>
+        <p className="fm-lead">{t(needWork ? "enrich.path.line" : "enrich.path.noRoles")}</p>
         {items.length > 0 && (
           <>
             <fieldset className="fm-pickset">

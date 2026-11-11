@@ -1,4 +1,4 @@
-import { CATEGORY, missingCategories, SCAN_WARNING, type ImportResult, type MoveTarget } from "@resumora/shared";
+import { CATEGORY, missingCategories, type ImportResult, type MoveTarget } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 import { HeadingMap } from "./HeadingMap.tsx";
 
@@ -9,7 +9,6 @@ export function ImportSummary(props: {
 }) {
   const { result, onMove } = props;
   const { content: cv, sourceHeadings, unsourcedLines } = result;
-  const warnings = result.warnings.filter((w) => w !== SCAN_WARNING);
   const flags = missingCategories(cv).filter((f, i, all) => all.findIndex((o) => o.key === f.key) === i);
   const unsorted = cv.unclearSkills;
   const skills = cv.technicalSkills.length + cv.professionalSkills.length + unsorted.length;
@@ -54,13 +53,6 @@ export function ImportSummary(props: {
           <h3>{t(unsorted.length === 1 ? "import.summary.sortOne" : "import.summary.sortMany", { n: unsorted.length })}</h3>
           <ul className="import-chips">{unsorted.map((s) => <li key={s.id}>{s.name}</li>)}</ul>
           <p>{t("import.summary.sortHint")}</p>
-        </section>
-      )}
-
-      {warnings.length > 0 && (
-        <section className="import-note import-note-warn">
-          <h3>{t(warnings.length === 1 ? "import.summary.confirmOne" : "import.summary.confirmMany", { n: warnings.length })}</h3>
-          <ul>{warnings.map((w) => <li key={w}>{w}</li>)}</ul>
         </section>
       )}
     </aside>

@@ -34,6 +34,11 @@ export function restoreHistory(id: string, version: number): Promise<SaveRespons
   });
 }
 
+/** Removes the CV with its History and role scores; answers with the empty CV now stored. */
+export function removeCv(version: number): Promise<CvResponse> {
+  return apiFetch("/v1/cv", { method: "DELETE", json: { version }, schema: CvResponseSchema });
+}
+
 export function saveCv(content: CvContent, version: number): Promise<SaveResponse> {
   return apiFetch("/v1/cv", { method: "PUT", json: { content, version }, schema: SaveResponseSchema });
 }
