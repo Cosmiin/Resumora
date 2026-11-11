@@ -14,6 +14,11 @@
   padding-block: 18px;
 }
 .shell-brand {
+  /* Tall enough to tap, while the name itself stays its own size. */
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--control-h-sm);
   color: var(--color-ink);
   font: var(--weight-display) 1.5rem / 1 var(--font-display);
   letter-spacing: -0.02em;

@@ -21,8 +21,10 @@
 .home-hero-actions {
   margin-top: 30px;
 }
+/* On the yellow desk, small print is ink, not grey: grey looks washed out on a color. */
 .home-hero-note {
   margin-top: var(--space-3);
+  font-size: var(--text-small);
 }
 .home-cap {
   font-size: var(--text-label);
@@ -156,6 +158,9 @@
   padding: var(--space-5);
   border-radius: var(--radius-block);
   background: var(--color-desk);
+}
+.home-panel > .home-cap {
+  color: var(--color-ink);
 }
 .home-panel-card {
   display: grid;

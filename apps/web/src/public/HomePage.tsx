@@ -38,7 +38,7 @@ export function HomePage() {
                 {t("home.hero.login")}
               </ButtonLink>
             </div>
-            <p className="ui-muted home-hero-note">{t("home.hero.note")}</p>
+            <p className="home-hero-note">{t("home.hero.note")}</p>
           </div>
           {/* One real example of what the product does: a vague line, a question, the answer, the line it becomes. */}
           <div className="home-demo">
