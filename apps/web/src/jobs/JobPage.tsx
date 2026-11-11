@@ -12,7 +12,8 @@ import { Skeleton } from "../ui/Page.tsx";
 import { deleteJob, getJob, getJobScore, patchJob, scoreJob } from "./jobs-api.ts";
 import { JobSummary } from "./JobSummary.tsx";
 import { JobEditForm } from "./JobEditForm.tsx";
-import { Keywords, MustHaves, NiceToHave, mustCount } from "./JobMatch.tsx";
+import { Keywords, MatchNumber, MustHaves, NiceToHave, mustCount } from "./JobMatch.tsx";
+import { JobScoreHow } from "./JobScoreCard.tsx";
 import { TailorGate } from "./TailorGate.tsx";
 import { getRun } from "../tailor/tailor-api.ts";
 import { remembered } from "../tailor/TailorFlow.tsx";
@@ -201,22 +202,31 @@ function JobView({ id, userId }: { id: string; userId: string }) {
               {original}
             </div>
           </div>
-          {tailor}
         </div>
         {extracted.positionClosed === true && <p role="status" className="ui-notice job-closed">{t("job.positionClosed")}</p>}
+        {/* The answer first: the match, what the coach says about it, and the page's one main action. */}
+        <section className="job-band" aria-label={t("job.band.label")}>
+          {base && <MatchNumber score={base} />}
+          {((musts && musts.total > 0 && !tailored && !run) || (base && base.total !== null)) && (
+            <div className="job-band-say">
+              {musts && musts.total > 0 && !tailored && !run && (
+                <p className="ui-coach job-coach">{t(musts.met === musts.total ? "job.coach.all" : musts.met === 0 ? "job.coach.none" : "job.coach.some", { n: musts.met, total: musts.total })}</p>
+              )}
+              {base && base.total !== null && <JobScoreHow score={base} />}
+            </div>
+          )}
+          {tailor}
+        </section>
         <div className="job-cols">
+          <div className="ui-stack">
           <MustHaves requirements={extracted.requirements} score={base}
             state={<div className="ui-row"><p className="ui-small ui-muted">{t(score.isPending || scoring === "busy" ? "job.score.checking"
               : score.isError ? "job.score.loadError" : scoring === "failed" ? "job.score.computeError" : "job.score.pending")}</p>
-              {!score.isPending && <button type="button" className="ui-btn ui-btn--sm" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button>}</div>} />
-          <div className="ui-stack">
-            <Keywords score={base} />
-            <NiceToHave requirements={extracted.requirements} score={base} />
+              {!score.isPending && <button type="button" className="ui-btn ui-btn--sm" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button>}</div>}>
+            <NiceToHave inside requirements={extracted.requirements} score={base} />
+          </MustHaves>
+          <Keywords score={base} />
           </div>
-        </div>
-        {musts && musts.total > 0 && !tailored && !run && (
-          <p className="ui-coach job-coach">{t(musts.met === musts.total ? "job.coach.all" : musts.met === 0 ? "job.coach.none" : "job.coach.some", { n: musts.met, total: musts.total })}</p>
-        )}
         <section className="job-more ui-stack">
           <h2 className="ui-heading">{t("job.more.title")}</h2>
           {extracted.summary.trim() && <div className="sec"><h3>{t("job.inShort")}</h3><p>{extracted.summary}</p></div>}
@@ -235,6 +245,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           </div>
           <p className="ui-small ui-muted">{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</p>
         </section>
+        </div>
       </> : job?.status === "needs_text" ? <div className="ui-stack jobs-narrow">
         <p className="ui-notice">{t("job.tailor.needsText")}</p><div className="ui-row">{removeButton}{original}</div>
       </div> : null}

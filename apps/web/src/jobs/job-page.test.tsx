@@ -277,7 +277,7 @@ describe("job page", () => {
   it("shows the must-haves, the nice-to-haves, then In short, duties, benefits and the counts line, in that order", async () => {
     renderJob(); await ready();
     expect(screen.getAllByRole("heading").map((heading) => heading.textContent)).toEqual(
-      ["Engineer", "Must-haves", "Nice to have", "More about this job", "In short", "What you'll do (1)", "Benefits (1)"]);
+      ["Engineer", "Must-haves", "Nice to have", "About this job", "In short", "What you'll do (1)", "Benefits (1)"]);
     expect(screen.getByText("Build useful tools.")).toBeInTheDocument();
     expect(screen.getAllByText("Strong SQL skills")).toHaveLength(1);
     expect(within(screen.getByRole("list", { name: "Must-haves" })).getAllByRole("listitem").map((line) => line.textContent)).toEqual(["Strong SQL skills"]);
@@ -299,8 +299,13 @@ describe("job page", () => {
     renderJob(); await ready();
     expect(await screen.findByText("Your match: 62 of 100")).toBeInTheDocument();
     expect(screen.getByText("Fair")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Met" })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Already on your CV · 1" })).getByText("Strong SQL skills")).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Missing" })).toBeNull();
+    // The match, the coach's sentence and the main action share the strip under the title.
+    const band = screen.getByRole("region", { name: "Your match with this job" });
+    expect(within(band).getByText("Your match: 62 of 100")).toBeInTheDocument();
+    expect(within(band).getByRole("button", { name: "How is this scored?" })).toBeInTheDocument();
+    expect(within(band).getByRole("button", { name: "Tailor my CV" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Strong SQL skills/ }));
     expect(screen.getByText("Wrote SQL daily")).toBeInTheDocument();
     expect(screen.getByText("German").closest("li")).toHaveTextContent("German (not on your CV yet)");
@@ -322,11 +327,11 @@ describe("job page", () => {
     expect(screen.queryByRole("button", { name: /Show \d+ more/ })).toBeNull();
   });
 
-  it("joins benefits on one line and counts several of each", async () => {
+  it("shows each benefit as a tag and counts several of each", async () => {
     vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, salary: null,
       responsibilities: ["Build reports", "Run audits"], benefits: ["Meal allowance", "Private medical care"] } });
     renderJob(); await ready();
-    expect(screen.getByText("Meal allowance, Private medical care")).toBeInTheDocument();
+    expect(screen.getByText("Meal allowance").closest("ul")).toContainElement(screen.getByText("Private medical care"));
     expect(screen.getByText("Read from the ad: 2 requirements, 2 duties, 2 benefits, salary not stated")).toBeInTheDocument();
   });
 

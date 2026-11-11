@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { JobExtraction, MatchScore } from "@resumora/shared";
-import { Keywords, MustHaves, NiceToHave, mustCount } from "./JobMatch.tsx";
+import { Keywords, MatchNumber, MustHaves, NiceToHave, mustCount } from "./JobMatch.tsx";
+import { JobScoreHow } from "./JobScoreCard.tsx";
 
 const requirements: JobExtraction["requirements"] = [
   { text: "SQL", kind: "must", category: "skill" },
@@ -29,40 +30,51 @@ const score: MatchScore = {
 const next = "If you have it, tailoring will ask about it. If not, mention related experience or treat it as a gap.";
 const lines = () => within(screen.getByRole("list", { name: "Must-haves" })).getAllByRole("listitem");
 
+const group = (name: string) => within(screen.getByRole("list", { name })).getAllByRole("listitem");
+
 describe("must-haves", () => {
-  it("lists only the must-haves, in ad order, each once, with the match total and band under them", () => {
+  it("lists only the must-haves, each once, sorted so the gaps come first", () => {
     render(<MustHaves requirements={requirements} score={score} />);
-    expect(lines().map((line) => line.textContent)).toEqual(["SQL (on your CV)", "Reporting (partly on your CV)", "German"]);
+    expect(group("Not on your CV yet · 1").map((line) => line.textContent)).toEqual(["German"]);
+    expect(group("Partly on your CV · 1").map((line) => line.textContent)).toEqual(["Reporting"]);
+    expect(group("Already on your CV · 1").map((line) => line.textContent)).toEqual(["SQL"]);
+    expect(group("Already on your CV · 1")[0]).toHaveClass("is-has");
     expect(screen.getAllByText("SQL")).toHaveLength(1);
     expect(screen.queryByText("French")).toBeNull();
-    expect(screen.getByText("Your match: 55 of 100")).toBeInTheDocument();
-    expect(screen.getByText("Fair")).toBeInTheDocument();
+    // The total sits in the strip on top of the page, not under the list.
+    expect(screen.queryByText(/Your match/)).toBeNull();
   });
 
-  it("marks met, partly met and missing with a named dot", () => {
+  it("marks partly met and missing with a named dot", () => {
     render(<MustHaves requirements={requirements} score={score} />);
-    expect(within(lines()[0]!).getByRole("img", { name: "Met" })).toHaveClass("is-met");
-    expect(within(lines()[1]!).getByRole("img", { name: "Partly met" })).toHaveClass("is-partial");
-    expect(within(lines()[2]!).getByRole("img", { name: "Missing" })).not.toHaveClass("is-met");
-    expect(screen.getAllByRole("img")).toHaveLength(3);
+    expect(within(group("Partly on your CV · 1")[0]!).getByRole("img", { name: "Partly met" })).toHaveClass("is-partial");
+    expect(within(group("Not on your CV yet · 1")[0]!).getByRole("img", { name: "Missing" })).not.toHaveClass("is-partial");
+    expect(screen.getAllByRole("img")).toHaveLength(2);
   });
 
-  it("opens a line to the CV's own words, and a missing must-have to what tailoring will do about it", async () => {
+  it("opens a tag to the CV's own words, and a missing must-have to what tailoring will do about it", async () => {
     render(<MustHaves requirements={requirements} score={score} />);
     expect(screen.queryByText("Built SQL reports")).toBeNull();
     expect(screen.queryByText(next)).toBeNull();
-    const sql = within(lines()[0]!).getByRole("button");
+    const sql = screen.getByRole("button", { name: "SQL" });
     expect(sql).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(sql);
     expect(sql).toHaveAttribute("aria-expanded", "true");
-    expect(within(lines()[0]!).getByText("Built SQL reports")).toBeInTheDocument();
+    expect(screen.getByText("Built SQL reports")).toBeInTheDocument();
     // Partly met with nothing to quote: nothing to open.
-    expect(within(lines()[1]!).queryByRole("button")).toBeNull();
-    await userEvent.click(within(lines()[2]!).getByRole("button"));
-    expect(within(lines()[2]!).getByText(next)).toBeInTheDocument();
+    expect(within(group("Partly on your CV · 1")[0]!).queryByRole("button")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /German/ }));
+    expect(within(group("Not on your CV yet · 1")[0]!).getByText(next)).toBeInTheDocument();
     expect(screen.getAllByText(next)).toHaveLength(1);
     await userEvent.click(sql);
     expect(screen.queryByText("Built SQL reports")).toBeNull();
+  });
+
+  it("puts what it is given at the end of the sheet", () => {
+    render(<MustHaves requirements={requirements} score={score}><NiceToHave inside requirements={requirements} score={score} /></MustHaves>);
+    const sheet = screen.getByRole("heading", { name: "Must-haves" }).closest("section")!;
+    expect(within(sheet).getByRole("heading", { name: "Nice to have", level: 3 })).toBeInTheDocument();
+    expect(within(sheet).getByText("French")).toBeInTheDocument();
   });
 
   it("shows the same list without marks while there is no score, with the state line", () => {
@@ -79,7 +91,6 @@ describe("must-haves", () => {
     expect(screen.getByText("You edited this job after it was scored, so the match marks are hidden.")).toBeInTheDocument();
     expect(lines()).toHaveLength(2);
     expect(screen.queryByRole("img")).toBeNull();
-    expect(screen.getByText("Your match: 55 of 100")).toBeInTheDocument();
   });
 
   it("shows an inferred match as partly met until it is confirmed", () => {
@@ -97,10 +108,23 @@ describe("must-haves", () => {
     expect(screen.queryByRole("button", { name: "How is this scored?" })).toBeNull();
   });
 
-  it("keeps How is this scored? under the list, toggling the points and the cap", async () => {
-    render(<MustHaves requirements={requirements} score={score} />);
+});
+
+describe("the match on top", () => {
+  it("shows the total as a number with its band, read aloud as one sentence", () => {
+    render(<MatchNumber score={score} />);
+    expect(screen.getByText("Your match: 55 of 100")).toBeInTheDocument();
+    expect(screen.getByText("Fair")).toBeInTheDocument();
+  });
+
+  it("shows nothing when the ad had nothing to score", () => {
+    const { container } = render(<MatchNumber score={{ ...score, total: null, band: null }} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("How is this scored? toggles the points and the cap", async () => {
+    render(<JobScoreHow score={score} />);
     const toggle = screen.getByRole("button", { name: "How is this scored?" });
-    expect(toggle.compareDocumentPosition(screen.getByRole("list")) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(toggle);
     for (const text of ["Requirements coverage", "25 / 50 points", "30 / 30 points", "0 / 20 points", "Not scored",
