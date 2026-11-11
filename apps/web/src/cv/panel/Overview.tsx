@@ -24,6 +24,7 @@ type Props = {
   part?: "contents" | "coach";
   /** Contents only: scroll the page to a section. */
   onJump?(key: SectionKey): void;
+  onRetry?(roleId: string): void;
 };
 
 const CUSTOM = "custom";
@@ -38,7 +39,7 @@ function Eye({ on }: { on: boolean }) {
 }
 
 /** The panel's home view: what is missing, the sections on the CV (order, hide) and a way to add more. */
-export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, onEnrich, tailored = false, part, onJump }: Props) {
+export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, onEnrich, tailored = false, part, onJump, onRetry }: Props) {
   const layout = normalizeLayout(cv.layout);
   const nameOf = (key: SectionKey) => layout.titles[key] || CATEGORY[key].label[cv.locale];
   const saved = sectionsOnCv(cv);
@@ -71,7 +72,8 @@ export function Overview({ cv, dispatch, onFocusField, opened, onOpen, scores, o
   };
 
   const roles = scores && (
-    <RoleScoreList items={scoredItems(cv)} scores={scores} onOpen={(id, list) => onFocusField(`${list}-${id}-title`)} />
+    <RoleScoreList items={scoredItems(cv)} scores={scores} onOpen={(id, list) => onFocusField(`${list}-${id}-title`)}
+      expandable={part === "contents"} onRetry={onRetry} />
   );
 
   return (

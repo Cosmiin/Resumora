@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { scoredItems, type CvContent } from "@resumora/shared";
 import { getPreferences, preferencesKey, savePreferences } from "../account/account-api.ts";
@@ -7,6 +7,8 @@ import { t } from "../i18n/t.ts";
 import { averageScore, belowTarget } from "./enrich/EnrichPath.tsx";
 import type { RoleScoreState } from "./enrich/useRoleScores.ts";
 import { TEMPLATES, type TemplateId } from "./page/templates.ts";
+import { SCORED_LIST } from "./edit/lists.ts";
+import { roleName } from "./edit/sections/RoleItem.tsx";
 
 /** A CV with nothing in it yet: the flow starts with an upload instead of an empty page. */
 export function isBlankCv(cv: CvContent): boolean {
@@ -37,17 +39,21 @@ type Props = {
   template: TemplateId | undefined;
   onTemplate(id: TemplateId): void;
   templateFailed: boolean;
+  /** Opens one role's questions. With it, the roles that still have questions are listed with a button each. */
+  onAnswer?(roleId: string): void;
 };
 
 /** Beside the base CV: its strength, the template its copies start with, and its language. */
-export function CvFacts({ cv, scores, template, onTemplate, templateFailed }: Props) {
+export function CvFacts({ cv, scores, template, onTemplate, templateFailed, onAnswer }: Props) {
   const id = useId();
   const items = scoredItems(cv);
   const strength = averageScore(new Map(items.map(({ item }) => {
     const s = scores.get(item.id);
     return [item.id, s?.state === "ready" ? (s.result?.score ?? null) : null];
   })));
-  const waiting = items.filter(({ item }) => scores.get(item.id)?.state === "ready" && belowTarget(scores.get(item.id))).length;
+  const waitingItems = items.filter(({ item }) => scores.get(item.id)?.state === "ready" && belowTarget(scores.get(item.id)));
+  const waiting = waitingItems.length;
+  const [all, setAll] = useState(false);
   return (
     <div className="cv-facts">
       <div className="cv-fact">
@@ -56,6 +62,22 @@ export function CvFacts({ cv, scores, template, onTemplate, templateFailed }: Pr
         <p className="cv-fact-note">
           {strength === null ? t("cv.facts.noScore") : waiting === 0 ? t("cv.facts.clear") : t(waiting === 1 ? "cv.facts.waitingOne" : "cv.facts.waiting", { n: waiting })}
         </p>
+        {onAnswer && waiting > 0 && (
+          <ul className="cv-fact-todo">
+            {(all ? waitingItems : waitingItems.slice(0, 3)).map(({ item, kind }) => {
+              const name = roleName(item, SCORED_LIST[kind]);
+              return (
+                <li key={item.id}>
+                  <span>{name}</span>
+                  <button type="button" className="ui-btn ui-btn--sm" aria-label={t("cv.facts.answerNamed", { name })} onClick={() => onAnswer(item.id)}>{t("cv.facts.answer")}</button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {onAnswer && !all && waiting > 3 && (
+          <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm cv-fact-all" onClick={() => setAll(true)}>{t("cv.facts.showAll", { n: waiting })}</button>
+        )}
       </div>
       <div className="cv-fact">
         <label className="cv-fact-label" htmlFor={id}>{t("cv.facts.template")}</label>

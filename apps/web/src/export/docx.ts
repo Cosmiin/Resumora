@@ -2,7 +2,7 @@ import {
   CATEGORY, formatYearMonth, normalizeLayout, withoutHidden, type CvContent, type SectionKey,
 } from "@resumora/shared";
 import { Document, HeadingLevel, HorizontalPositionAlign, HorizontalPositionRelativeFrom, ImageRun, Packer, Paragraph, TextRun, TextWrappingType, VerticalPositionRelativeFrom, type IParagraphOptions } from "docx";
-import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
+import { formatRange, languageLabel, SKILL_GROUPS } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 import { fitSteps, type FitStep } from "./fit.ts";
 
@@ -143,7 +143,8 @@ export function buildCvDocx(
       { label: SKILL_GROUPS[content.locale].professional, items: content.professionalSkills },
     ].filter((row) => row.items.length > 0).map((row) =>
       paragraph(`${row.label}: ${row.items.map((item) => item.name).join(", ")}`)),
-    languages: content.languages.flatMap((item) => entry(item.name, item.level)),
+    // One line: "Romanian (Native) · English (C1)".
+    languages: content.languages.length ? [paragraph(join(content.languages.map(languageLabel)))] : [],
     certifications: content.certifications.flatMap((item) => entry(item.name, date(item.date), item.issuer)),
     projects: roles(content.projects),
     volunteering: roles(content.volunteering),

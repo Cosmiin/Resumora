@@ -3,7 +3,7 @@ import { Document, Image, Page, pdf, StyleSheet, Text, View } from "@react-pdf/r
 import {
   CATEGORY, formatYearMonth, normalizeLayout, withoutHidden, type CvContent, type SectionKey,
 } from "@resumora/shared";
-import { formatRange, SKILL_GROUPS } from "../cv/page/blocks.ts";
+import { formatRange, languageLabel, SKILL_GROUPS } from "../cv/page/blocks.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 import type { ExportPhoto, LetterDocxInput, LetterHeader } from "./docx.ts";
 import { fitSteps, fitToPages, pdfPageCount, type FitStep } from "./fit.ts";
@@ -96,7 +96,8 @@ export function buildCvPdf(
         {row.items.map((item) => item.name).join(", ")}
       </Text>
     )),
-    languages: content.languages.map((item) => entry(item.id, item.name, "", item.level)),
+    // One line: "Romanian (Native) · English (C1)".
+    languages: content.languages.length ? [paragraph(join(content.languages.map(languageLabel)))] : [],
     certifications: content.certifications.map((item) => entry(
       item.id, item.name, formatRange(item.date, "", false, content.locale), item.issuer,
     )),

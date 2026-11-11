@@ -27,3 +27,10 @@ export function formatRange(start: string, end: string, current: boolean, locale
   return [formatDate(start, locale), to].filter(Boolean).join(" – ");
 }
 
+
+/** A language as every CV shows it: "English (C1)", or the name alone when no level is given. */
+export function languageLabel(language: { name: string; level: string }): string {
+  const name = language.name.trim();
+  const level = language.level.trim();
+  return level ? `${name} (${level})` : name;
+}

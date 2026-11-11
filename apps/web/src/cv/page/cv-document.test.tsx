@@ -251,4 +251,12 @@ describe("CV role score", () => {
     expect(screen.getByText("Profesionale")).toBeInTheDocument();
     expect(screen.queryByText("Technical")).toBeNull();
   });
+
+  // Owner review, point 4: languages read on one line, the level in parentheses; no level, no parentheses.
+  it("puts the languages on one line with each level in parentheses", () => {
+    const { container } = render(<CvDocument content={{ ...emptyCv(), languages: [
+      { id: "l1", name: "Romanian", level: "Native" }, { id: "l2", name: "English", level: "C1" }, { id: "l3", name: "German", level: " " },
+    ] }} />);
+    expect(container.querySelector(".cv-langs")?.textContent).toBe("Romanian (Native) · English (C1) · German");
+  });
 });

@@ -140,6 +140,8 @@ describe("EditablePage", () => {
     render(<Harness initial={cv} />);
     const level = screen.getByRole("textbox", { name: "Language level" });
     await userEvent.click(level);
+    // On one line the order is name, level, remove, then Add.
+    await userEvent.tab();
     await userEvent.tab();
     const add = screen.getByRole("button", { name: "+ Add item" });
     expect(add).toHaveFocus();

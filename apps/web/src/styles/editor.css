@@ -84,28 +84,36 @@
 
 /* Wide screens: contents on the left, a larger page in the middle, the helper panel on the right. */
 .cv-outline { display: none; }
-@media (min-width: 1360px) {
+@media (min-width: 1460px) {
   .editor-workspace { gap: 28px; }
-  .cv-outline { display: block; flex: none; width: 230px; box-sizing: border-box; position: sticky; top: 28px; max-height: calc(100vh - 56px); overflow-y: auto; padding: 6px 2px; font-size: 14px; }
+  .cv-outline { display: block; flex: none; width: 320px; box-sizing: border-box; position: sticky; top: 28px; max-height: calc(100vh - 56px); overflow: hidden auto; padding: 6px 2px; font-size: 17px; color: var(--color-ink); font-family: var(--font-body); }
+  .cv-outline .p-sub { font-size: 13px; }
+  .cv-outline :is(.sec-row .name, .sec-row .sec-jump, .role-open, .add-sec select) { font-size: 17px; }
+  .cv-outline .btn { font-size: 15px; }
+  .cv-outline .fine { font-size: 14px; color: var(--color-muted); }
   .cv-outline :is(.sec-row, .role-open):hover { background: var(--color-paper); }
-  .cv-outline { overflow-x: hidden; }
-  .cv-outline .role-open { width: 100%; box-sizing: border-box; }
-  .cv-outline .rband { display: none; } /* the number says it; the column is narrow */
-  .cv-outline .add-sec select { font-size: 14px; }
-  .cv-head { max-width: 1354px; }
-  .cv-waiting { max-width: 1306px; }
+  /* Role names are shown in full, on two lines when needed, with the word for the score beside them. */
+  .cv-outline .role-open { width: 100%; box-sizing: border-box; padding: 8px 6px; align-items: flex-start; }
+  .cv-outline .role-open .rname { white-space: normal; overflow: visible; }
+  .cv-outline .role-open .rband { font-size: 14px; color: var(--color-muted); padding-top: 2px; }
+  .cv-outline .role-explain { font-size: 15px; }
+  .cv-outline .role-why { font-size: 15px; }
+  .cv-outline .role-why :is(.score-meta span, .tips, .stand-out-hint) { font-size: 14px; }
+  .cv-outline .role-why .score-meta strong { font-size: 16px; }
+  .cv-head { max-width: 1444px; }
+  .cv-waiting { max-width: 1396px; }
 }
-@media (min-width: 1500px) {
+@media (min-width: 1600px) {
   .editor-workspace .cv-page { zoom: 1.15; }
   .stage { flex-basis: 782px; }
-  .cv-head { max-width: 1456px; }
-  .cv-waiting { max-width: 1408px; }
+  .cv-head { max-width: 1546px; }
+  .cv-waiting { max-width: 1498px; }
 }
-@media (min-width: 1700px) {
+@media (min-width: 1800px) {
   .editor-workspace .cv-page { zoom: 1.3; }
   .stage { flex-basis: 884px; }
-  .cv-head { max-width: 1558px; }
-  .cv-waiting { max-width: 1510px; }
+  .cv-head { max-width: 1648px; }
+  .cv-waiting { max-width: 1600px; }
 }
 
 /* On narrow screens the panel becomes a bottom sheet (see .sheet below). */

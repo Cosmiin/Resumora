@@ -84,4 +84,17 @@ describe("isBlankCv", () => {
     expect(isBlankCv({ ...emptyCv(), basics: { ...emptyCv().basics, email: "ana@example.com" } })).toBe(false);
     expect(isBlankCv({ ...emptyCv(), interests: [{ id: "i", name: "Chess" }] })).toBe(false);
   });
+
+  // Owner review, point 5: the waiting roles are named, each with its own way into its questions.
+  it("lists the roles that still have questions, with an Answer button each", async () => {
+    const onAnswer = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <CvFacts cv={cv} scores={new Map([["a", ready(90)], ["b", ready(60)], ["c", ready(72)]])} template="classic" onTemplate={() => {}} templateFailed={false} onAnswer={onAnswer} />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByRole("button", { name: "Answer the questions for Role a" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Answer the questions for Role c" }));
+    expect(onAnswer).toHaveBeenCalledWith("c");
+  });
 });

@@ -112,3 +112,11 @@
 .sugg .grp { margin-inline-start: 8px; font-size: 11.5px; color: var(--sage-600); }
 .sugg .ev { grid-column: 1 / -1; font-size: 12px; color: var(--sage-600); font-style: italic; }
 .sugg.sort-pick { grid-template-columns: auto 1fr; cursor: pointer; }
+
+/* Role list: what the number means, and a role's score card under its row (Contents column). */
+.role-explain { margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: var(--color-ink); }
+.role-why { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 4px 0 12px; font-size: 14px; }
+.role-why .score-card { background: var(--color-paper); }
+.role-weak { margin: 0; line-height: 1.45; }
+.role-goto { justify-self: start; padding: 0; border: 0; border-radius: 4px; background: none; font: inherit; color: var(--color-coach); text-decoration: underline; cursor: pointer; }
+.role-goto:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }

@@ -85,3 +85,9 @@
 .map tr.other td { background: var(--marigold-100); }
 .map select { display: block; margin-top: 4px; font: inherit; font-size: 0.8rem; padding: 3px 6px; border-radius: 7px; border: 1px solid var(--marigold-600); background: var(--white); color: var(--pine-800); min-height: 32px; }
 .import-note-flags { background: var(--surface-sunken); border-color: var(--border-subtle); color: inherit; }
+
+/* Under the CV strength: the roles that still have questions, each with its own way in. */
+.cv-fact-todo { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; }
+.cv-fact-todo li { display: flex; gap: var(--space-3); align-items: center; justify-content: space-between; padding-block: var(--space-2); border-top: 1px solid var(--color-line); }
+.cv-fact-todo span { min-width: 0; overflow-wrap: anywhere; font-size: var(--text-small); }
+.cv-fact-all { justify-self: start; }

@@ -101,6 +101,16 @@ const ListRow = memo(function ListRow({
       dispatch={dispatch}
     />
   );
+  // Languages read on one line: "Romanian (Native) · English (C1)".
+  if (list === "languages") {
+    return (
+      <span className="cv-lang" data-item={item.id} role="group" aria-label={mainText || t(main.label)}>
+        {field(main, "cv-item-title")}
+        <span className="cv-lang-level">({field(details[0]!, "cv-item-sub")})</span>
+        <RemoveButton name={mainText || t(main.label)} onClick={remove} />
+      </span>
+    );
+  }
   return (
     <div className={hidden ? "cv-line is-hidden" : "cv-line"} data-item={item.id} role="group" aria-label={mainText || t(main.label)}>
       <div className="cv-item-head">
@@ -172,8 +182,8 @@ export function SimpleListEdit({
     [list],
   );
   return (
-    <div ref={root}>
-      <DragList items={items} onMove={move} label={label}>
+    <div ref={root} className={list === "languages" ? "cv-lang-list" : undefined}>
+      <DragList items={items} onMove={move} label={label} wrap={list === "languages"} rowClassName={list === "languages" ? "cv-lang-row" : undefined}>
         {(item) => <ListRow list={list} item={item} locale={locale} dispatch={dispatch} />}
       </DragList>
       <AddButton label={t("edit.add.item")} onClick={add} />

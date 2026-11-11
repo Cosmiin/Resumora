@@ -104,7 +104,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   const [showChanges, setShowChanges] = useState(false);
   const phone = useMediaQuery("(max-width: 899px)");
   // Wide screens: contents left of the page, the page larger, the helper panel right.
-  const wide = useMediaQuery("(min-width: 1360px)");
+  const wide = useMediaQuery("(min-width: 1460px)");
   const [sheet, setSheet] = useState<SheetState>("peek");
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   // 1A: the guided path. "/cv?enrich=1" (Enrich first, from a job) opens it too; the parameter is then removed.
@@ -255,7 +255,8 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       tailored={isTailored}
       coachOnly={wide}
       top={isTailored ? undefined : (
-        <CvFacts cv={content} scores={roleScores.scores} template={startTemplate.template} onTemplate={startTemplate.choose} templateFailed={startTemplate.failed} />
+        <CvFacts cv={content} scores={roleScores.scores} template={startTemplate.template} onTemplate={startTemplate.choose} templateFailed={startTemplate.failed}
+          onAnswer={(roleId) => setFocusTarget({ roleId, mode: "improve" })} />
       )}
     />
   );
@@ -339,7 +340,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       <div className="editor-workspace" inert={importId !== null || covered}>
         {wide && !historyOpen && (
           <nav className="cv-outline" aria-label={t("cv.contents.title")}>
-            <Overview cv={content} dispatch={dispatch} onFocusField={focusField} opened={opened} onOpen={onOpen} scores={scores} tailored={isTailored} part="contents"
+            <Overview cv={content} dispatch={dispatch} onFocusField={focusField} opened={opened} onOpen={onOpen} scores={scores} tailored={isTailored} part="contents" onRetry={retry}
               onJump={(key) => pageRef.current?.querySelector(`[data-section="${key}"]`)?.scrollIntoView?.({ behavior: "smooth", block: "start" })} />
           </nav>
         )}

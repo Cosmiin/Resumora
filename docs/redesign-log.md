@@ -254,3 +254,11 @@ Built by the forked session while the main session was on templates and export. 
 - The sheet grows with the screen: 15% larger from 1500 px, 30% from 1700 px (the browser's zoom on the sheet only, so every template scales the same way).
 - Differs from the chosen mockup: roles are listed under the sections, not nested under "Experience" (the section list is a drag-to-reorder list); the template stays a dropdown, not three pictures (the template page already shows them).
 - The tailored CV's page uses the same editor and gets the same three columns.
+- Owner feedback 2 to 5 (My CV), options shown on `mockups/phase3/my-cv-fixes.html` in the workspace; the owner's picks:
+  - 2, Contents column: "Large, full names". 320 px wide, 17 px text, role names wrap and the word for the score (Clear, A good start) shows beside each. The three columns now start at 1460 px (was 1360), the larger sheet at 1600 and 1800.
+  - 3, the scores: "Click a score to see why". A sentence above the roles says what the number is; in Contents a role opens its score card under its row (weakest line, what to fix, "Improve this role") with "Go to this role on the page". Below 1460 px a role still moves the cursor to it, which shows the same card in the panel.
+  - 5, "N roles still have questions waiting": the roles are listed under the CV strength with an "Answer" button each, which opens that role's questions directly (first three, then "Show all").
+  - 4, languages: one line, "Romanian (Native) · English (C1)", on the page, in the read-only view, and in the PDF and Word files. A language with no level shows its name only (on the editable page the empty level stays as a placeholder to type in).
+- Differs from the picked mockup: the button in a role's score card says "Improve this role" or "Make it stand out" (the card's own words), not "Answer 2 questions": the number of questions is not known before they are asked.
+- Noted, not changed: a role reads "Clear" from 75 but keeps "questions waiting" until 80. Raise with the owner.
+- Owner feedback 6, open: the enrichment flow is confusing (role questions, then bullet questions, then the role's description, with no signpost). To be redesigned after these fixes.

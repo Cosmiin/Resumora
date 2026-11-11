@@ -8,7 +8,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { t } from "../../i18n/t.ts";
 import { DragGrip } from "./DragGrip.tsx";
@@ -23,6 +23,8 @@ type Props<T extends { id: string }> = {
   children(item: T): ReactNode;
   /** Class for each row wrapper (default: the page's margin grip). */
   rowClassName?: string;
+  /** The rows sit side by side and wrap (languages), so a dragged row may move sideways too. */
+  wrap?: boolean;
 };
 
 type RowProps = {
@@ -65,7 +67,7 @@ function Row({ id, name, index, hintId, pressed, onKey, onBlur, className, child
  * A vertical list whose items can be reordered by dragging (pointer, touch) or
  * from the keyboard on each item's grip. No dnd-kit keyboard sensor: ours announces moves.
  */
-export function DragList<T extends { id: string }>({ items, onMove, label, children, rowClassName = "drag-row" }: Props<T>) {
+export function DragList<T extends { id: string }>({ items, onMove, label, children, rowClassName = "drag-row", wrap = false }: Props<T>) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -147,7 +149,7 @@ export function DragList<T extends { id: string }>({ items, onMove, label, child
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-      <SortableContext items={items} strategy={verticalListSortingStrategy}>
+      <SortableContext items={items} strategy={wrap ? rectSortingStrategy : verticalListSortingStrategy}>
         <span id={hintId} hidden>
           {t("edit.dragHint")}
         </span>

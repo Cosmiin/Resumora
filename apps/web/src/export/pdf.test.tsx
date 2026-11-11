@@ -240,7 +240,7 @@ describe("buildCvPdf", () => {
     for (const value of [
       "Experienced engineer building useful products.", "Example University", "BSc, Computer Science",
       "Graduated with distinction.", "Won ten customers.", "Technical: TypeScript",
-      "Professional: Team leadership", "Romanian", "Native", "Cloud certification", "Cloud Institute",
+      "Professional: Team leadership", "Romanian (Native)", "Cloud certification", "Cloud Institute",
       "Public project", "https://project.example.com", "Open source toolkit.", "Used by 40 teams.", "Volunteer mentor",
       "Community award", "Local council", "Recognised for mentoring.", "Architecture course",
       "Learning Institute", "Event-driven design", "Cost modelling", "Crossed the Fagaras ridge", "Chess", "Engineering article", "Tech Journal", "https://article.example.com",
