@@ -394,7 +394,8 @@ export function useFocusSession(opts: Options): {
       const o = current.current;
       const role = findScored(o.cv, o.roleId)?.item;
       if (role) {
-        const fresh = await scoreRole(o.roleId, fingerprint(role, o.cv.locale), true);
+        const print = fingerprint(role, o.cv.locale);
+        const fresh = o.focus ? await scoreRole(o.roleId, print, true, o.focus) : await scoreRole(o.roleId, print, true);
         const now = findScored(current.current.cv, o.roleId)?.item;
         if (now && fresh.fingerprint === fingerprint(now, current.current.cv.locale)) s.result = unasked(fresh, s.asked);
       }

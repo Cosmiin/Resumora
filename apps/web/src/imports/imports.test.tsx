@@ -482,3 +482,35 @@ describe("the start of the base CV flow", () => {
     expect(screen.getByRole("textbox", { name: "Full name" })).toHaveValue("Ana Popescu");
   });
 });
+
+describe("review fixes for the start of the flow", () => {
+  it("a conflict while importing into an empty CV shows the page with the conflict banner, not the upload again", async () => {
+    cvApi.getCv.mockResolvedValue({ content: emptyCv(), version: 1, updatedAt: "2026-11-04T10:00:00Z" });
+    importsApi.getImport.mockResolvedValue(ready);
+    importsApi.applyImport.mockRejectedValue(
+      new ApiClientError(409, "version_conflict", "Saved elsewhere", { current: { version: 9, updatedAt: "2026-11-04T10:09:00Z" } }),
+    );
+    renderPage();
+    await chooseFile(pdf());
+    await user.click(await useThisCv(await screen.findByRole("dialog", { name: "Import your CV" })));
+    expect(await screen.findByText("This CV was saved in another tab or device.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Start with the CV you have" })).toBeNull();
+  });
+
+  it("the page scrolls again after the path and an import that opened over it have both closed", async () => {
+    let finishUpload!: (v: ImportResponse) => void;
+    importsApi.startImport.mockReturnValue(new Promise((done) => { finishUpload = done; }));
+    importsApi.getImport.mockResolvedValue(ready);
+    renderPage();
+    await chooseFile(pdf());
+    await user.click(await screen.findByRole("button", { name: "Enrich my CV" }));
+    await screen.findByRole("heading", { name: "What should we focus on?" });
+    await act(async () => finishUpload(imp("queued")));
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
+    expect(document.body.style.overflow).toBe("hidden");
+    await user.click(within(screen.getByRole("dialog", { name: "Enrich your CV" })).getByRole("button", { name: "Save and exit" }));
+    expect(document.body.style.overflow).toBe("hidden");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(document.body.style.overflow).toBe("");
+  });
+});

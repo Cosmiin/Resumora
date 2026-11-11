@@ -10,10 +10,10 @@ import { TEMPLATES, type TemplateId } from "./page/templates.ts";
 
 /** A CV with nothing in it yet: the flow starts with an upload instead of an empty page. */
 export function isBlankCv(cv: CvContent): boolean {
-  const { fullName, summary } = cv.basics;
-  return ![fullName, summary].some((s) => s.trim()) && cv.experience.length + cv.education.length + cv.projects.length
-    + cv.volunteering.length + cv.technicalSkills.length + cv.professionalSkills.length + cv.unclearSkills.length + cv.languages.length
-    + cv.certifications.length + cv.custom.length === 0;
+  const { fullName, summary, email, phone, location, website, linkedin, titles } = cv.basics;
+  const lists = [cv.experience, cv.education, cv.projects, cv.volunteering, cv.technicalSkills, cv.professionalSkills, cv.unclearSkills,
+    cv.languages, cv.certifications, cv.custom, cv.achievements, cv.courses, cv.awards, cv.publications, cv.interests];
+  return ![fullName, summary, email, phone, location, website, linkedin, ...titles].some((s) => s.trim()) && lists.every((list) => list.length === 0);
 }
 
 /**

@@ -81,5 +81,7 @@ describe("isBlankCv", () => {
     expect(isBlankCv({ ...emptyCv(), basics: { ...emptyCv().basics, fullName: "Ana" } })).toBe(false);
     expect(isBlankCv(cv)).toBe(false);
     expect(isBlankCv({ ...emptyCv(), technicalSkills: [{ id: "s", name: "SQL" }] })).toBe(false);
+    expect(isBlankCv({ ...emptyCv(), basics: { ...emptyCv().basics, email: "ana@example.com" } })).toBe(false);
+    expect(isBlankCv({ ...emptyCv(), interests: [{ id: "i", name: "Chess" }] })).toBe(false);
   });
 });

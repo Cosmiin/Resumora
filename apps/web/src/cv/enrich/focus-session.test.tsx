@@ -1022,3 +1022,17 @@ describe("a session opened with what the person wants their CV to bring out", ()
     expect(h.result.current.step.kind).toBe("question");
   });
 });
+
+describe("a thin role opened with a focus", () => {
+  it("asks again after the box with the same focus", async () => {
+    const r = role(1);
+    api.scoreRole.mockResolvedValue({ ...score(r), roleQuestions });
+    const h = mount({ focus: "Move into automation" }, r);
+    await settle();
+    expect(h.result.current.step).toEqual({ kind: "brainDump" });
+    await submit(h, "I ran the tools team");
+    await settle();
+    expect(api.scoreRole).toHaveBeenCalledTimes(2);
+    expect(api.scoreRole).toHaveBeenLastCalledWith("r", fingerprint(r, "en"), true, "Move into automation");
+  });
+});

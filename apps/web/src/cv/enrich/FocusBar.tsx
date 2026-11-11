@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { t } from "../../i18n/t.ts";
 
+/** How many focus screens are open, and what the page's scrolling was before the first one. */
+const lock = { open: 0, before: "" };
+
 /** The top bar of every focus screen: where you are, and the ways out. No app navigation. */
 export function FocusBar({ context, name, onClose, skip, closeLabel }: {
   context?: string; name?: string; onClose(): void; skip?: { label: string; onSkip(): void };
@@ -9,10 +12,12 @@ export function FocusBar({ context, name, onClose, skip, closeLabel }: {
 }) {
   // A focus screen covers the page: only the screen scrolls while it is open.
   useEffect(() => {
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (lock.open++ === 0) {
+      lock.before = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
     return () => {
-      document.body.style.overflow = overflow;
+      if (--lock.open === 0) document.body.style.overflow = lock.before;
     };
   }, []);
   return (

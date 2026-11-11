@@ -251,7 +251,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   );
 
   // No CV yet: the flow starts with the upload.
-  if (!isTailored && !fromScratch && !pathOpen && isBlankCv(content)) {
+  if (!isTailored && !fromScratch && !pathOpen && !conflict && isBlankCv(content)) {
     return (
       <AppShell inert={importId !== null}>
         <main className="ui-page cv-start-page">
