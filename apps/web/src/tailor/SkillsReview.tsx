@@ -47,29 +47,29 @@ export function SkillsReview({ proposals, cv = null, busy, onAccept, removed = 0
         {p.reason && <p className="tailor-reason">{p.reason}</p>}
       </div>
       {p.inferred ? <span className="tailor-item-actions">
-        <button type="button" className="secondary" aria-pressed={guess[key] === true} aria-label={t("tailor.review.keepNamed", { text: p.text })}
+        <button type="button" className="ui-btn ui-btn--sm" aria-pressed={guess[key] === true} aria-label={t("tailor.review.keepNamed", { text: p.text })}
           onClick={() => setGuess((state) => ({ ...state, [key]: true }))}>{t("tailor.review.keep")}</button>
-        <button type="button" className="secondary" aria-pressed={guess[key] === false} aria-label={t("tailor.review.removeNamed", { text: p.text })}
+        <button type="button" className="ui-btn ui-btn--sm" aria-pressed={guess[key] === false} aria-label={t("tailor.review.removeNamed", { text: p.text })}
           onClick={() => setGuess((state) => ({ ...state, [key]: false }))}>{t("tailor.review.remove")}</button>
       </span> : <span className="tailor-item-actions">
-        <button type="button" className="secondary" aria-pressed={!!undone[key]} aria-label={t("tailor.skills.undoNamed", { text: p.text })}
+        <button type="button" className="ui-btn ui-btn--sm" aria-pressed={!!undone[key]} aria-label={t("tailor.skills.undoNamed", { text: p.text })}
           onClick={() => setUndone((state) => ({ ...state, [key]: !state[key] }))}>{t("tailor.skills.undo")}</button>
       </span>}
     </li>;
   };
 
-  return <section className="tailor-card" aria-labelledby="tailor-skills-title">
-    <h2 id="tailor-skills-title">{t("tailor.review.title", { section: t("tailor.section.skills") })}</h2>
+  return <section className="ui-sheet tailor-card" aria-labelledby="tailor-skills-title">
+    <h2 className="ui-heading ui-heading--lg" id="tailor-skills-title">{t("tailor.review.title", { section: t("tailor.section.skills") })}</h2>
     {changes.length === 0 ? <p>{t("tailor.review.none")}</p> : <>
-      <p className="tailor-eyebrow">{t("tailor.skills.batch", { n: batch + 1, total: batches })}</p>
+      <p className="ui-label">{t("tailor.skills.batch", { n: batch + 1, total: batches })}</p>
       <ul className="tailor-items">{shown.map(row)}</ul>
     </>}
     {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
-    <div className="fm-foot">
-      {batch > 0 && <button type="button" className="fm-ghost" onClick={() => setBatch(batch - 1)}>
+    <div className="tailor-foot">
+      {batch > 0 && <button type="button" className="ui-btn ui-btn--quiet" onClick={() => setBatch(batch - 1)}>
         <span aria-hidden="true">← </span>{t("tailor.skills.back")}</button>}
-      {last ? <button type="button" className="fm-btn" disabled={busy} onClick={accept}>{t(busy ? "tailor.review.saving" : "tailor.skills.save")}</button>
-        : <button type="button" className="fm-btn" onClick={() => setBatch(batch + 1)}>{t("tailor.skills.next")}</button>}
+      {last ? <button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={accept}>{t(busy ? "tailor.review.saving" : "tailor.skills.save")}</button>
+        : <button type="button" className="ui-btn ui-btn--primary" onClick={() => setBatch(batch + 1)}>{t("tailor.skills.next")}</button>}
     </div>
   </section>;
 }

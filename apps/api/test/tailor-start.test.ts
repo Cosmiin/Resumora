@@ -78,6 +78,29 @@ describe("POST /v1/jobs/:id/tailor", () => {
     expect(cv.baseSnapshotAt).toEqual(expect.any(String));
   });
 
+  it("starts in the language picked on the language step, whatever the default would be", async () => {
+    const jobId = await readyJob();
+    const res = await start(jobId, { language: "de" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { tailoredCvId: string; language: string };
+    expect(body.language).toBe("de");
+    expect(docs.cvs.get(body.tailoredCvId)).toMatchObject({ language: "de", tone: "neutral" });
+    await expectError(await start(jobId, { language: "nl" }), 400, "invalid_content");
+  });
+
+  it("tells the language step the CV's language, the ad's and the one a start would use", async () => {
+    const languages = (jobId: string, token = "token-a") =>
+      app.request(`/v1/jobs/${jobId}/tailor-language`, { headers: { authorization: `Bearer ${token}` } });
+    const clear = await languages(await readyJob());
+    expect(clear.status).toBe(200);
+    expect(await clear.json()).toEqual({ cv: "ro", ad: "en", chosen: "en" });
+    // An ad in a language outside the six: unclear, so the CV's language is the starting choice.
+    expect(await (await languages(await readyJob(dutch))).json()).toEqual({ cv: "ro", ad: null, chosen: "ro" });
+    expect(docs.cvs.size).toBe(0);
+    await expectError(await languages(crypto.randomUUID()), 404, "job_not_found");
+    await expectError(await languages(await readyJob(english, "user-b")), 404, "job_not_found");
+  });
+
   it("returns the same run and tailored CV for a second start, even at the same moment (Review focus 1)", async () => {
     const jobId = await readyJob();
     const [one, two] = await Promise.all([start(jobId), start(jobId)]);

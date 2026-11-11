@@ -80,22 +80,22 @@ export function SteeringStep({ jobId, roles, busy, onStart, initial, startLabel,
           onChange={(value, how) => { setInstruction(value.slice(0, MAX)); setVia(how); }} />
       </div>
     </div>
-    <div className="fm-foot">
-      <button type="button" className="fm-ghost" onClick={() => setScreen("tone")}>{t("tailor.steer.backTone", { tone: t(`tailor.tone.${tone}`) })}</button>
-      {onCancel && <button type="button" className="fm-ghost" onClick={onCancel}>{t("tailor.back.resume")}</button>}
-      <button type="button" className="fm-btn" disabled={busy} onClick={start}>{startLabel ?? t("tailor.steer.start")}</button>
+    <div className="tailor-foot">
+      <button type="button" className="ui-btn ui-btn--quiet" onClick={() => setScreen("tone")}>{t("tailor.steer.backTone", { tone: t(`tailor.tone.${tone}`) })}</button>
+      {onCancel && <button type="button" className="ui-btn ui-btn--quiet" onClick={onCancel}>{t("tailor.back.resume")}</button>}
+      <button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={start}>{startLabel ?? t("tailor.steer.start")}</button>
     </div>
   </section>;
 }
 
 /** Changing the steering of a started run: it redoes every step, so it asks first. */
 export function SteerConfirm({ busy, onCancel, onRedo }: { busy: boolean; onCancel(): void; onRedo(): void }) {
-  return <section className="tailor-card" role="alertdialog" aria-labelledby="steer-confirm" aria-describedby="steer-confirm-text">
-    <h2 id="steer-confirm">{t("tailor.steer.confirm.title")}</h2>
+  return <section className="ui-sheet tailor-card" role="alertdialog" aria-labelledby="steer-confirm" aria-describedby="steer-confirm-text">
+    <h2 className="ui-heading ui-heading--lg" id="steer-confirm">{t("tailor.steer.confirm.title")}</h2>
     <p id="steer-confirm-text">{t("tailor.steer.confirm.text")}</p>
-    <div className="fm-foot">
-      <button type="button" className="fm-ghost" disabled={busy} onClick={onCancel}>{t("tailor.steer.confirm.cancel")}</button>
-      <button type="button" className="fm-btn" disabled={busy} onClick={onRedo}>{t("tailor.steer.confirm.redo")}</button>
+    <div className="tailor-foot">
+      <button type="button" className="ui-btn ui-btn--quiet" disabled={busy} onClick={onCancel}>{t("tailor.steer.confirm.cancel")}</button>
+      <button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={onRedo}>{t("tailor.steer.confirm.redo")}</button>
     </div>
   </section>;
 }

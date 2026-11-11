@@ -27,6 +27,6 @@ export function ToneStep({ jobId, tone, onTone, onNext }: Props) {
       </button>)}
       <p className="fm-fine tailor-tones-note">{t("tailor.steer.toneNote")}</p>
     </div>
-    <div className="fm-foot"><button type="button" className="fm-btn" onClick={onNext}>{t("tailor.steer.next")}</button></div>
+    <div className="tailor-foot"><button type="button" className="ui-btn ui-btn--primary" onClick={onNext}>{t("tailor.steer.next")}</button></div>
   </section>;
 }

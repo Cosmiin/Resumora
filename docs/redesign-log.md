@@ -180,3 +180,27 @@ Owner review of this flow (2026-11-11): parts 1 and 2 approved with no changes. 
 - Copy: `ro-jobs.ts` added, typed against `en-jobs.ts`.
 - Codex review (jobs): a dialog removed from the page while open now closes itself first, so keyboard focus returns to the button that opened it (fix is in the shared Dialog, so every dialog gets it).
 - Codex review (jobs): a list row marked "CV tailored" now leads to the job page ("View job"), not straight to the tailored CV. The status can be set by hand with no tailored CV behind it, and the list cannot tell the two apart; the job page can, and shows "Open tailored CV" when one exists. Differs from the mockup's row button: raise with the owner.
+
+## Phase 3, flow 4: tailoring (2026-11-11)
+
+Branch `redesign/tailoring`, on top of `redesign/jobs`, in the same folder as the jobs flow (no new worktree: the tailoring branch contains the jobs flow, so one running app shows both).
+
+- Five steps in the step line: Language, Keywords, Roles, Summary and skills, Finish. The engine's own steps sit inside them: Experience and Projects & volunteering under Roles; Skills, Summary, the lighter sections (achievements, courses, publications, interests, languages) and "Order and headline" under Summary and skills.
+- Language step (new): the CV's language next to the ad's, and a choice of six languages. The server gained a small read ("which languages would this start in") and the start accepts the picked language; no database change. The choice starts on the person's default from Account.
+- The mockup's sentence "we translate what you keep and write new bullets in that language" is not shown: I could not confirm the engine translates lines it leaves unchanged. The step only says employers usually expect the ad's language.
+- Keywords step (new): the keywords the match already identifies, as a bar and two lists, and the roles tailoring will go through. Not shown from the mockup: the per-role "2 questions, 4 bullets" pills, because nothing is known about a role's questions before they are asked.
+- Someone who opens tailoring without having seen the job page first gets the match worked out there and then (it used to be worked out only on the job page).
+- Tone and the extra questions (what draws you, fit, which roles to lean on, anything else) are not in the mockup. They are kept as an optional link on the keywords step and under "Look back at" once tailoring runs; tailoring starts without them (neutral tone). Raise with the owner: keep, move or drop.
+- Questions are answered on the focus screen, like enrichment: the role's sheet beside the question with the line it is about marked, what the ad asks for behind the question (from the gap the question was written for) with "Not in your CV yet" or "Only partly", and "Why I ask" (the reason the engine already writes for every question).
+- Not built from the mockup: the "Questions done for this role" screen between the last question and the suggestions. The suggestions follow directly.
+- "Skip this role" while its questions are open leaves the role as it is and moves on, with no rewriting. On the suggestions list it keeps every line as it is.
+- The way out of the focus screen says "Back to the job", not "Save and exit": answers of the role in progress are held in the browser until its last question and would be lost.
+- Suggested changes are a list (owner's decision): each line as it is now against the suggestion, with Keep, Use new and Edit, and "This bullet already fits the job" for a line with no suggestion. "Accept all for this role" fills in the undecided ones. A line left undecided takes the suggestion, as before; the screen says so.
+- Edit is new on the server: a kept line can carry the person's own wording (bullets, descriptions, the summary). It is written as typed.
+- The line under each suggestion is the reason the engine writes. Today it exists mostly for guesses and reads like a note about "the candidate". Raise with the owner: it needs a prompt pass to speak to the person.
+- The celebration between roles (score counting up, confetti) and the score in the step line are gone: tailoring shows keyword and must-have coverage, no score (decision of 2026-11-11).
+- "Look back at" under the step line opens the finished steps (a finished role's answers can be changed, which redoes that role) and the tone and questions. It replaces the old clickable step bar.
+- Skills, Summary and the lighter sections keep their own review screens (skills five at a time, the summary phrase by phrase) in the new look. The mockup's single "Summary and skills" screen is not built: the engine asks and rewrites them as separate steps.
+- Finish: keywords now on the CV against the start, must-haves with a dot each, "Not covered" with "Change my answer" (opens the finished roles), and "Mark as ready" or "Mark as ready anyway". Marking ready is a step on this screen only: nothing new is stored (the job already shows "CV tailored" when tailoring ends). The mockup's reason per uncovered must-have ("You answered No...") is not shown: the engine does not record which answer left it uncovered.
+- "Choose a template" on the ready screen comes with flow 6; until then the screen offers Open the CV, Export and Write a cover letter.
+- Romanian: the whole tailoring flow. The tailored CV's own page, the cover letter and export stay English until flow 6.

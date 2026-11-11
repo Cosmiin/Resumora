@@ -56,16 +56,17 @@ beforeEach(() => {
 });
 
 describe("going back (BackA)", () => {
-  it("opens a finished role from the step bar, edits an answer in place and updates only that role", async () => {
+  it("opens a finished role from Look back at, edits an answer in place and updates only that role", async () => {
     const user = userEvent.setup();
     vi.mocked(redoRole).mockResolvedValue({ proposals: [{ itemId: "r2-b", field: "text", text: "Checked 12 sheets a day", inferred: false, flags: [] }], removed: 0 });
     vi.mocked(acceptRole).mockResolvedValue({ run: run(), score: score(74) });
     renderFlow();
     expect(await screen.findByText("Advanced Excel")).toBeTruthy();
 
-    const steps = screen.getByRole("navigation", { name: "Tailoring steps" });
-    expect(within(steps).queryByRole("button", { name: "Summary" })).toBeNull();
-    await user.click(within(steps).getByRole("button", { name: "Experience" }));
+    // "Look back at": the steps already finished, under the step line.
+    expect(screen.getByText("Look back at:")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Summary" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Experience" }));
     const roles = screen.getByRole("list", { name: "Finished roles" });
     expect(within(roles).getByRole("button", { name: /Business Analyst/ })).toBeTruthy();
     await user.click(within(roles).getByRole("button", { name: /Data Clerk/ }));
@@ -79,8 +80,9 @@ describe("going back (BackA)", () => {
     await user.click(screen.getByRole("button", { name: "Update this role" }));
     expect(redoRole).toHaveBeenCalledWith("run1", "r2", [{ questionId: "q2", value: "12 a day", via: "typed" }]);
 
-    expect(await screen.findByText("12", { selector: "mark" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Use the new version" }));
+    expect(await screen.findByText("Checked 12 sheets a day")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Use new" }));
+    await user.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(acceptRole).toHaveBeenCalledWith("run1", "r2", { decisions: [{ itemId: "r2-b", keep: true }], inferred: [], flags: [] });
     // Back where the person was: the Skills review, not redone.
     expect(await screen.findByText("Advanced Excel")).toBeTruthy();
@@ -94,7 +96,7 @@ describe("going back (BackA)", () => {
     renderFlow();
     expect(await screen.findByText("Advanced Excel")).toBeTruthy();
 
-    await user.click(within(screen.getByRole("navigation", { name: "Tailoring steps" })).getByRole("button", { name: "Tone and questions" }));
+    await user.click(screen.getByRole("button", { name: "Tone and questions" }));
     await user.click(await screen.findByRole("button", { name: /^Confident/ }));
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -112,7 +114,7 @@ describe("going back (BackA)", () => {
     const user = userEvent.setup();
     renderFlow();
     expect(await screen.findByText("Advanced Excel")).toBeTruthy();
-    await user.click(within(screen.getByRole("navigation", { name: "Tailoring steps" })).getByRole("button", { name: "Tone and questions" }));
+    await user.click(screen.getByRole("button", { name: "Tone and questions" }));
     await user.click(await screen.findByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));

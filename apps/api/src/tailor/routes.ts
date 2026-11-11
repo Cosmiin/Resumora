@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { AnswerSchema, stepOf, SteeringSchema, TailorSectionSchema } from "@resumora/shared";
+import { AnswerSchema, stepOf, SteeringSchema, TailorLanguageSchema, TailorSectionSchema } from "@resumora/shared";
 import type { Preferences } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { AppEnv } from "../app.ts";
@@ -14,7 +14,7 @@ import { finishedRole, RedoBodySchema, redoRole } from "./redo.ts";
 import type { TailorRepo } from "./repo.ts";
 import { restartWithSteering } from "./retailor.ts";
 import { runSectionPass } from "./section-pass.ts";
-import { jobNotFound, startTailoring } from "./start.ts";
+import { jobNotFound, startTailoring, tailorLanguages } from "./start.ts";
 import { toneExamples } from "./tone-examples.ts";
 
 const AnswersBodySchema = z.object({ answers: z.array(AnswerSchema).min(1).max(MAX_RUN_QUESTIONS) });
@@ -39,13 +39,23 @@ export function tailorRoutes(deps: {
   app.post("/jobs/:id/tailor", async (c) => {
     const id = c.req.param("id");
     // The full steering (round 2); the old { tone, instruction } body is a subset of it.
-    const { instruction, ...steering } = SteeringSchema.parse(await c.req.json().catch(() => ({})));
+    // `language`: the one picked on the language step; without it the person's default decides.
+    const { instruction, language, ...steering } = SteeringSchema.extend({ language: TailorLanguageSchema.optional() })
+      .parse(await c.req.json().catch(() => ({})));
     if (!isUuid(id)) throw jobNotFound();
     const result = await startTailoring(
       { jobs: deps.jobsFor(c), cv: deps.cvFor(c), tailor: deps.tailorFor(c), now: deps.now, preferences: deps.preferencesFor && (() => deps.preferencesFor!(c)) },
-      id, { ...steering, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) },
+      id, { ...steering, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) }, language,
     );
     return c.json(result);
+  });
+
+  /** The language step: the CV's language, the ad's, and the one tailoring would start in. */
+  app.get("/jobs/:id/tailor-language", async (c) => {
+    const id = c.req.param("id");
+    if (!isUuid(id)) throw jobNotFound();
+    return c.json(await tailorLanguages(
+      { jobs: deps.jobsFor(c), cv: deps.cvFor(c), preferences: deps.preferencesFor && (() => deps.preferencesFor!(c)) }, id));
   });
 
   /** The steering screen's tone cards: one of the person's bullets in each tone (cached on the job). */

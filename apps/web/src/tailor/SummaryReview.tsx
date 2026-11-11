@@ -50,13 +50,13 @@ function GuessItem({ span, choice, onChoose }: { span: Span; choice?: GuessChoic
       setEditing(false);
     }}>
       <input aria-label={t("tailor.summaryReview.editLabel", named)} value={draft} onChange={(event) => setDraft(event.target.value)} />
-      <button type="submit" className="secondary" disabled={!draft.trim()}>{t("tailor.summaryReview.save")}</button>
+      <button type="submit" className="ui-btn ui-btn--sm" disabled={!draft.trim()}>{t("tailor.summaryReview.save")}</button>
     </form> : <span className="tailor-item-actions">
-      <button type="button" className="secondary" aria-pressed={choice?.keep === true && choice.text === undefined}
+      <button type="button" className="ui-btn ui-btn--sm" aria-pressed={choice?.keep === true && choice.text === undefined}
         aria-label={t("tailor.summaryReview.keepNamed", named)} onClick={() => onChoose({ keep: true })}>{t("tailor.review.keep")}</button>
-      <button type="button" className="secondary" aria-pressed={choice?.text !== undefined}
+      <button type="button" className="ui-btn ui-btn--sm" aria-pressed={choice?.text !== undefined}
         aria-label={t("tailor.summaryReview.editNamed", named)} onClick={() => setEditing(true)}>{t("tailor.summaryReview.edit")}</button>
-      <button type="button" className="secondary" aria-pressed={choice?.keep === false}
+      <button type="button" className="ui-btn ui-btn--sm" aria-pressed={choice?.keep === false}
         aria-label={t("tailor.review.removeNamed", named)} onClick={() => onChoose({ keep: false })}>{t("tailor.review.remove")}</button>
     </span>}
   </li>;
@@ -81,8 +81,8 @@ export function SummaryReview({ proposals, before, busy, onAccept, removed = 0 }
     onAccept({ decisions: proposal.inferred ? [] : [{ itemId: "summary", keep: true }], inferred, flags: [] });
   }
 
-  return <section className="tailor-card" aria-labelledby="tailor-summary-title">
-    <h2 id="tailor-summary-title">{t("tailor.summaryReview.title")}</h2>
+  return <section className="ui-sheet tailor-card" aria-labelledby="tailor-summary-title">
+    <h2 className="ui-heading ui-heading--lg" id="tailor-summary-title">{t("tailor.summaryReview.title")}</h2>
     {proposal ? <>
       <div className="tailor-doc">{whole
         ? <p><mark className="tailor-guess">{proposal.text}</mark></p>
@@ -95,10 +95,10 @@ export function SummaryReview({ proposals, before, busy, onAccept, removed = 0 }
       </ul>}
     </> : <p>{t("tailor.summaryReview.nothing")}</p>}
     {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
-    <div className="fm-foot">
-      {proposal && <button type="button" className="fm-ghost" disabled={busy}
+    <div className="tailor-foot">
+      {proposal && <button type="button" className="ui-btn ui-btn--quiet" disabled={busy}
         onClick={() => onAccept({ decisions: [{ itemId: "summary", keep: false }], inferred: [], flags: [] })}>{t("tailor.summaryReview.original")}</button>}
-      <button type="button" className="fm-btn" disabled={busy} onClick={use}>
+      <button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={use}>
         {t(busy ? "tailor.review.saving" : proposal ? "tailor.summaryReview.use" : "tailor.roleReview.continue")}</button>
     </div>
   </section>;

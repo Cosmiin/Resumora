@@ -144,8 +144,8 @@ export function LayoutReview({ section, proposals, cv, busy, onAccept, removed =
     onAccept({ decisions: pick(false), inferred: keep ? [] : pick(true), flags: [] });
   }
 
-  return <section className="tailor-card" aria-labelledby="tailor-final-title">
-    <h2 id="tailor-final-title">{t(`tailor.section.${section}`)}</h2>
+  return <section className="ui-sheet tailor-card" aria-labelledby="tailor-final-title">
+    <h2 className="ui-heading ui-heading--lg" id="tailor-final-title">{t(`tailor.section.${section}`)}</h2>
     {section === "layout" ? <LayoutBody proposals={changes} cv={cv} />
       : LISTED.includes(section) ? <ListedBody section={section} changes={changes} cv={cv} hide={hide}
         onHide={(itemId, hidden) => setHide((state) => ({ ...state, [itemId]: hidden }))} />
@@ -157,10 +157,10 @@ export function LayoutReview({ section, proposals, cv, busy, onAccept, removed =
       })}</li>)}
     </ul>}
     {removed > 0 && <p className="tailor-reason">{t(removed === 1 ? "tailor.review.removedOne" : "tailor.review.removedMany", { n: removed })}</p>}
-    <div className="fm-foot">
-      <button type="button" className="fm-ghost" disabled={busy} onClick={() => decide(false)}>
+    <div className="tailor-foot">
+      <button type="button" className="ui-btn ui-btn--quiet" disabled={busy} onClick={() => decide(false)}>
         {t(both ? "tailor.final.undoBoth" : "tailor.roleReview.keepOriginal")}</button>
-      <button type="button" className="fm-btn" disabled={busy} onClick={() => decide(true)}>
+      <button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={() => decide(true)}>
         {t(busy ? "tailor.review.saving" : "tailor.roleReview.useNew")}</button>
     </div>
   </section>;

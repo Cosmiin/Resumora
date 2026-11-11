@@ -9,14 +9,14 @@ export const roleName = (role: Role, locale: Locale) => [role.title.trim() || t(
 
 /** Going back (BackA) in Experience: the roles already tailored, each one opens its answers. */
 export function FinishedRoles({ roles, locale, onPick, onClose }: { roles: Role[]; locale: Locale; onPick(roleId: string): void; onClose(): void }) {
-  return <section className="tailor-card">
-    <h2 id="finished-roles">{t("tailor.back.roles")}</h2>
+  return <section className="ui-sheet tailor-card">
+    <h2 className="ui-heading ui-heading--lg" id="finished-roles">{t("tailor.back.roles")}</h2>
     <ul className="tailor-back-list" aria-labelledby="finished-roles">
       {roles.map((role) => <li key={role.id}>
         <button type="button" className="tailor-pill" onClick={() => onPick(role.id)}>{roleName(role, locale)}</button>
       </li>)}
     </ul>
-    <div className="fm-foot"><button type="button" className="fm-ghost" onClick={onClose}>{t("tailor.back.resume")}</button></div>
+    <div className="tailor-foot"><button type="button" className="ui-btn ui-btn--quiet" onClick={onClose}>{t("tailor.back.resume")}</button></div>
   </section>;
 }
 
@@ -46,9 +46,9 @@ export function YourAnswers({ title, questions, answers, busy, locale, onUpdate,
       : { questionId: question.id, value: null, via: "skip" };
   }));
 
-  return <section className="tailor-card" aria-labelledby="your-answers">
-    <p className="tailor-eyebrow">{title}</p>
-    <h2 id="your-answers">{t("tailor.back.answers")}</h2>
+  return <section className="ui-sheet tailor-card" aria-labelledby="your-answers">
+    <p className="ui-label">{title}</p>
+    <h2 className="ui-heading ui-heading--lg" id="your-answers">{t("tailor.back.answers")}</h2>
     {questions.length === 0 && <p>{t("tailor.back.none")}</p>}
     {questions.map((question, i) => <div key={question.id} className="tailor-back-answer">
       <p className="tailor-steer-q">{question.text}</p>
@@ -58,9 +58,9 @@ export function YourAnswers({ title, questions, answers, busy, locale, onUpdate,
           onChange={(value, via) => setDrafts((all) => all.map((draft, j) => (j === i ? { ...draft, value, via } : draft)))} />
         : <p>{drafts[i]!.value || t("tailor.back.skipped")}</p>}
     </div>)}
-    <div className="fm-foot">
-      <button type="button" className="fm-ghost" onClick={onClose}>{t("tailor.back.resume")}</button>
-      {onUpdate && <button type="button" className="fm-btn" disabled={busy} onClick={update}>{t("tailor.back.update")}</button>}
+    <div className="tailor-foot">
+      <button type="button" className="ui-btn ui-btn--quiet" onClick={onClose}>{t("tailor.back.resume")}</button>
+      {onUpdate && <button type="button" className="ui-btn ui-btn--primary" disabled={busy} onClick={update}>{t("tailor.back.update")}</button>}
     </div>
   </section>;
 }

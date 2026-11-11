@@ -127,7 +127,7 @@ export function CoverLetterTab({ cv, job, letter, onLetter, today = new Date() }
         {writing === "error" && <p role="alert" className="form-error">{t("letter.error")}</p>}
         {flags.length > 0 && (
           <div className="letter-flags" role="status">
-            <p className="tailor-eyebrow">{t("letter.flags")}</p>
+            <p className="ui-label">{t("letter.flags")}</p>
             <ul>{flags.map((flag, i) => <li key={i}>{flag.detail}</li>)}</ul>
           </div>
         )}
