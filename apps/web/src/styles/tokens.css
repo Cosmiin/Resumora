@@ -85,56 +85,58 @@
   --focus-gap: 3px;
 }
 
-/* ---- Old look. Used only by screens not yet rebuilt; each rebuilt flow deletes what it no longer needs.
+/* ---- Old token names. Used only by screens not yet rebuilt; each rebuilt flow deletes what it no longer needs.
+        Their values were changed to the new palette and type (2026-11-11) so those screens no longer look like a
+        different product while they wait. The names still say pine, sage and marigold; the values do not.
         Nothing new may use these. Names that clashed with the new tokens carry an --old- prefix. ---- */
 :root {
   /* Pine — primary. 600 is the prototype accent #17695d, 800 its ink #173b39 */
-  --pine-50: #f1f8f4;
-  --pine-100: #e4efe7;
-  --pine-200: #c5dfd1;
-  --pine-300: #9cc8b3;
-  --pine-400: #5fa48d;
-  --pine-500: #2a8270;
-  --pine-600: #17695d;
-  --pine-700: #105649;
-  --pine-800: #173b39;
-  --pine-900: #0f2826;
+  --pine-50: #fffbe0;
+  --pine-100: #fff7cc;
+  --pine-200: #e4e0cf;
+  --pine-300: #9fb0e6;
+  --pine-400: #2446b0;
+  --pine-500: #2446b0;
+  --pine-600: #24272e;
+  --pine-700: #3a3f4a;
+  --pine-800: #24272e;
+  --pine-900: #15171b;
   /* Sage neutrals */
   --white: #ffffff;
-  --sage-25: #f9fbf9;
-  --sage-50: #f4f7f4;
-  --sage-100: #eaf0eb;
-  --sage-150: #e7eeea;
-  --sage-200: #d8e3df;
-  --sage-300: #bdcec7;
-  --sage-400: #a5bcb0;
-  --sage-500: #7d948f;
-  --sage-600: #536b69;
+  --sage-25: #fff7cc;
+  --sage-50: #fff0a8;
+  --sage-100: #fff7cc;
+  --sage-150: #f6eeb9;
+  --sage-200: #e4e0cf;
+  --sage-300: #cfc9ad;
+  --sage-400: #a39d80;
+  --sage-500: #6b6f7a;
+  --sage-600: #535966;
   /* Marigold — warmth, attention, celebration, focus */
-  --marigold-50: #fffaf0;
-  --marigold-100: #fff5e6;
-  --marigold-200: #ebd5b1;
-  --marigold-300: #f6cf7a;
-  --marigold-500: #e9a23b;
-  --marigold-600: #b87a24;
-  --marigold-800: #83511b;
+  --marigold-50: #fff7e6;
+  --marigold-100: #ffe9c7;
+  --marigold-200: #f0d9a8;
+  --marigold-300: #ffe14d;
+  --marigold-500: #ffe14d;
+  --marigold-600: #2446b0;
+  --marigold-800: #24272e;
   /* Rose — confirmed gaps, destructive */
-  --rose-50: #fff0f0;
-  --rose-200: #ecc9c9;
-  --rose-400: #c9686c;
-  --rose-600: #9a4145;
-  --rose-700: #7f3236;
+  --rose-50: #fbe3e4;
+  --rose-200: #f0c4c6;
+  --rose-400: #c7323a;
+  --rose-600: #a3262d;
+  --rose-700: #7f1d23;
   /* Sky — information, "you have this elsewhere" */
-  --sky-50: #e9f0fa;
-  --sky-200: #cddbed;
-  --sky-600: #355d8c;
+  --sky-50: #e6ecfb;
+  --sky-200: #c5d1f3;
+  --sky-600: #2446b0;
 
   /* Semantic — surfaces */
   --surface-page: var(--sage-50);
   --surface-card: var(--white);
   --surface-sunken: var(--sage-100);
   --surface-hero: var(--pine-100);
-  --surface-selected: var(--pine-100);
+  --surface-selected: #fff7cc;
   --surface-hover: var(--sage-50);
   --surface-inverse: var(--pine-800);
   --surface-document: var(--white);
@@ -142,26 +144,26 @@
   --text-strong: var(--pine-800);
   --text-body: var(--pine-800);
   --text-muted: var(--sage-600);
-  --text-accent: var(--pine-600);
+  --text-accent: var(--pine-500);
   --text-on-primary: var(--white);
   --text-on-inverse: var(--white);
-  --text-document: #172b29;
+  --text-document: #24272e;
   /* Borders */
   --border-subtle: var(--sage-200);
-  --border-field: var(--sage-300);
+  --border-field: var(--pine-800);
   --border-strong: var(--sage-400);
   --border-selected: var(--pine-600);
   /* Actions */
   --action-primary: var(--pine-600);
   --action-primary-hover: var(--pine-700);
   --action-primary-press: var(--pine-800);
-  --action-secondary-hover: #f1f5f1;
+  --action-secondary-hover: #ffe14d;
   --action-danger: var(--rose-600);
   --focus-ring: var(--marigold-600);
   /* Status — text always paired with colour */
-  --status-good-bg: var(--pine-100);
-  --status-good-fg: #155c46;
-  --status-good-border: #bdd8c9;
+  --status-good-bg: #ddf2e6;
+  --status-good-fg: #14553a;
+  --status-good-border: #b7dcc6;
   --status-warn-bg: var(--marigold-100);
   --status-warn-fg: var(--marigold-800);
   --status-warn-border: var(--marigold-200);
@@ -171,7 +173,7 @@
   --status-info-bg: var(--sky-50);
   --status-info-fg: var(--sky-600);
   --status-info-border: var(--sky-200);
-  --status-neutral-bg: #f6f8f5;
+  --status-neutral-bg: #fffbe6;
   --status-neutral-fg: var(--sage-600);
   --status-neutral-border: var(--sage-200);
   /* Match / keyword states (PRD §7) */
@@ -181,8 +183,8 @@
   --match-confirm: var(--status-warn-fg);
   --match-gap: var(--status-neutral-fg);
   /* Score ring */
-  --score-track: var(--pine-200);
-  --score-fill: var(--pine-600);
+  --score-track: #e4e0cf;
+  --score-fill: #2446b0;
 }
 
 :root {
@@ -215,11 +217,11 @@
   /* Radii */
   --radius-xs: 3px;
   --radius-sm: 6px;
-  --radius-field: 7px;
+  --radius-field: 10px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  --radius-card: 14px;
-  --radius-dialog: 15px;
+  --radius-card: 16px;
+  --radius-dialog: 16px;
   --radius-hero: 18px;
   --radius-pill: 999px;
   --bp-tablet: 1100px;
@@ -227,16 +229,16 @@
 }
 
 :root {
-  --old-font-display: "Newsreader Variable", Georgia, serif;
-  --font-sans: "Instrument Sans Variable", system-ui, sans-serif;
-  --shadow-page: 0 1px 2px rgb(15 40 38 / 0.06), 0 12px 40px rgb(15 40 38 / 0.08);
+  --old-font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  --shadow-page: 0 1px 2px rgb(60 50 0 / 0.08), 0 10px 28px rgb(60 50 0 / 0.12);
   --outline-selected: 2px solid var(--pine-600);
   --surface-selected-block: var(--pine-50);
   --font-document: "Source Serif 4", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   --weight-regular: 400;
-  --weight-medium: 500;
-  --old-weight-semibold: 650;
+  --weight-medium: 700;
+  --old-weight-semibold: 700;
   --weight-bold: 700;
   --weight-heavy: 750;
   /* Scale (px at 16px root) — derived from prototype rem values */
@@ -255,9 +257,9 @@
   --leading-snug: 1.3;
   --leading-body: 1.6;
   --leading-document: 1.55;
-  --tracking-display: -0.045em;
-  --tracking-heading: -0.02em;
-  --tracking-stat: -0.05em;
+  --tracking-display: -0.025em;
+  --tracking-heading: -0.015em;
+  --tracking-stat: -0.03em;
   --tracking-eyebrow: 0.14em;
   --tracking-nav-group: 0.12em;
   /* Semantic */
@@ -272,14 +274,14 @@
 
 :root {
   --shadow-none: none;
-  --shadow-card: 0 1px 2px rgba(23, 59, 57, 0.04);
-  --shadow-raised: 0 4px 16px rgba(23, 59, 57, 0.08);
-  --shadow-document: 0 9px 24px rgba(23, 59, 57, 0.035);
-  --shadow-paper: 0 14px 40px rgba(23, 59, 57, 0.08);
+  --shadow-card: 0 1px 2px rgb(60 50 0 / 0.06);
+  --shadow-raised: 0 1px 2px rgb(60 50 0 / 0.08), 0 10px 28px rgb(60 50 0 / 0.12);
+  --shadow-document: 0 1px 2px rgb(60 50 0 / 0.08), 0 10px 28px rgb(60 50 0 / 0.12);
+  --shadow-paper: 0 2px 6px rgb(60 50 0 / 0.1), 0 18px 44px rgb(60 50 0 / 0.18);
   --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.13);
-  --shadow-press: 0 2px 0 var(--pine-800);
-  --shadow-press-secondary: 0 2px 0 var(--sage-300);
-  --backdrop: rgba(23, 59, 57, 0.33);
+  --shadow-press: 0 0 0 transparent;
+  --shadow-press-secondary: 0 0 0 transparent;
+  --backdrop: rgb(36 39 46 / 0.45);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); /* @kind other */
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* @kind other */
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
