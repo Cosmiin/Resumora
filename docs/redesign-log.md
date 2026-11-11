@@ -268,3 +268,18 @@ Built by the forked session while the main session was on templates and export. 
   - CV strength: the most recent role counts 3 times, the one before twice, the rest once.
   - Showing it: a number and one next step; the two bars and the checks only behind "Understand the score". No score between questions.
   - International scope and kind of contract were dropped as parameters. Progression, notable projects and recognition may be asked about but are not scored.
+- Enrichment flow B built (stages 2 to 4 of the plan; `cv/enrich/run.ts`, `useRoleRun.ts`, `RoleRun.tsx`, `ScoreExplain.tsx`). Choices and differences from `enrich-b-design.html`:
+  - The score policy is `score/7`: the reviewer prompt now asks one question per conditional parameter, so every role is scored again once, the next time its owner opens the CV.
+  - One column on every screen size. The role's sheet beside the question is not in the run (it carried bullet scores, and no score shows between the first and last screen); a question about a line shows that line above it.
+  - Question screens keep "Back" and "Skip" (the mock-up shows neither). The link "Questions not specific enough? Describe it in your own words" is not in the run; the box under the options takes typed or spoken words as before.
+  - "About 3 minutes" is worked out as half a minute a question.
+  - A run stays at six when a follow-up arrives: it takes the place of the last question still to come, which waits behind "A few more questions". If nothing is left to displace, the follow-up itself waits there.
+  - Not in the plan's notes: after the last question, the weak lines (below 80) that had no question are rewritten too, with the role's answers in view. Without it, an answer about tools or team size could only reach a line that happened to have its own question. Raise with the owner.
+  - The role's description is proposed once per opened role, not again in "A few more questions". A role that already has one gets a new proposal only when the run brought answers (seen in the browser: with no answers it only reworded a good description).
+  - New bullets from a thin role's answers: the prompt now says that what the company does and what the role was for belong in the description, not in a bullet (seen in the browser: the company answer came back as a bullet).
+  - When the answers change no text (every piece kept, or only "No" answers), the run asks for the score again so "No one reported to me" counts, and hands it to the editor so My CV shows the same number.
+  - Approval screen: it has a heading and one sentence the mock-up lacks; a new bullet's button reads "Leave it out" instead of "Keep mine"; a piece set aside offers "Use the new text".
+  - Role done: outside the guided path the main button is "Back to my CV" and "Finish for now" is not shown; in the path the last role's button is "Continue". The sentence names up to three things the new score shows on the page (company, what you did, what changed).
+  - "Understand the score": all ten parameters have their own tick (the mock-up groups "Tools, results, scale"), and the strong bullet is shown whole with its five checks, not split into underlined parts: the app does not know which words are the tool or the result.
+  - Contents column: a clicked role no longer shows "Weakest line"; "Go to this role on the page" stays. The button counts the questions a run would ask ("Answer 3 questions"); with none to ask but a next step, it says "Improve this role".
+  - The ✨ button on one bullet and "Make it stand out" still open the old single-bullet flow, unchanged.

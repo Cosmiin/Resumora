@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { band, type Experience, type ScoredKind } from "@resumora/shared";
+import { CONDITIONAL_PARAMETERS, CORE_PARAMETERS, band, type Experience, type RoleResult, type ScoredKind } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { SCORED_LIST, type RoleList } from "../edit/lists.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { useOpenFocus } from "./focus-context.ts";
-import { ScoreCard } from "./ScoreCard.tsx";
+import { RUN_MAX, buildRun, questionKey } from "./run.ts";
+import { ScoreExplain } from "./ScoreExplain.tsx";
+import { issueTip } from "./tips.ts";
 import { ScorePillBadge } from "./ScorePill.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
@@ -14,7 +16,7 @@ type Props = {
   scores: ReadonlyMap<string, RoleScoreState>;
   /** Put the cursor in the item's title, so the panel switches to that item's tools. */
   onOpen(itemId: string, list: RoleList): void;
-  /** Contents column: a row opens the role's score card under it (why this score, what to fix, a way to act). */
+  /** Contents column: a row opens the role's number, its one next step with a button, and "Understand the score". */
   expandable?: boolean;
   onRetry?(roleId: string): void;
 };
@@ -32,6 +34,59 @@ function nameOf(name: string, s: RoleScoreState): string {
   return `${name}, ${labelOf(s) || t("enrich.pill.scoring")}`;
 }
 
+/**
+ * The one next step of a role: the first thing a recruiter looks for that the page does not show, then one that may
+ * apply, then the score's own tip. Null when there is nothing to add.
+ */
+export function nextStepOf(result: RoleResult): string | null {
+  const marks = result.coverage?.marks;
+  const missing = marks && (CORE_PARAMETERS.find((p) => marks[p] !== "shown") ?? CONDITIONAL_PARAMETERS.find((p) => marks[p] === "applies" || marks[p] === "unknown"));
+  if (missing) return t(`enrich.next.${missing}`);
+  return result.nextStep ? issueTip(result.nextStep.issue, result.nextStep.tip) : null;
+}
+
+/** A role's score, clicked: the number, one next step with its button, and the way to the score's explanation. */
+function RoleNext({ role, name, state, onAnswer, onRetry }: { role: Experience; name: string; state: RoleScoreState; onAnswer(): void; onRetry(): void }) {
+  const [explain, setExplain] = useState(false);
+  const result = state.result;
+  const n = result?.score ?? null;
+  if (state.state === "unavailable" && (!result || n === null)) {
+    return (
+      <p className="role-next">
+        {t("enrich.card.unavailable")} <button type="button" className="ui-btn ui-btn--sm" onClick={onRetry}>{t("enrich.card.tryAgain")}</button>
+      </p>
+    );
+  }
+  if (state.state === "none" || !result || n === null) {
+    return (
+      <>
+        <p className="role-next">{t(state.state === "none" ? "enrich.pill.noBullets" : "enrich.card.scoring")}</p>
+        {state.state === "none" && <button type="button" className="ui-btn ui-btn--primary ui-btn--sm role-answer" onClick={onAnswer}>{t("enrich.card.improve")}</button>}
+      </>
+    );
+  }
+  const next = nextStepOf(result);
+  const answered = new Set(role.notes.map((note) => questionKey(note.question)));
+  const questions = Math.min(RUN_MAX, buildRun(result, { thin: role.bullets.length <= 1 || result.thin, answered }).length);
+  return (
+    <>
+      <p className="role-num"><b>{n}</b> <span>{name}</span></p>
+      {state.state !== "ready" && <p className="fine">{t("enrich.card.previous")}</p>}
+      {state.state === "unavailable" && <button type="button" className="ui-btn ui-btn--sm role-answer" onClick={onRetry}>{t("enrich.card.tryAgain")}</button>}
+      <p className="role-next">{next === null ? t("enrich.next.none") : t("enrich.next.line", { step: next })}</p>
+      <div className="role-acts">
+        {(questions > 0 || next !== null) && (
+          <button type="button" className="ui-btn ui-btn--primary ui-btn--sm" onClick={onAnswer}>
+            {questions === 0 ? t("enrich.card.improve") : t(questions === 1 ? "enrich.next.answerOne" : "enrich.next.answer", { n: questions })}
+          </button>
+        )}
+        <button type="button" className="role-goto" onClick={() => setExplain(true)}>{t("enrich.explain.open")}</button>
+      </div>
+      <ScoreExplain open={explain} onClose={() => setExplain(false)} name={name} role={role} result={result} />
+    </>
+  );
+}
+
 function Rows({ items, scores, onOpen, expandable, onRetry }: Props) {
   const openFocus = useOpenFocus();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -44,8 +99,6 @@ function Rows({ items, scores, onOpen, expandable, onRetry }: Props) {
         const list = SCORED_LIST[kind];
         const name = roleName(item, list);
         const open = inline && openId === item.id;
-        const step = state.result?.nextStep;
-        const weak = step ? item.bullets.find((b) => b.id === step.bulletId)?.text.trim() : undefined;
         return (
           <li key={item.id}>
             <button type="button" className="role-open" aria-label={nameOf(name, state)} aria-expanded={inline ? open : undefined}
@@ -56,8 +109,7 @@ function Rows({ items, scores, onOpen, expandable, onRetry }: Props) {
             </button>
             {open && openFocus && (
               <div className="role-why">
-                {weak && <p className="role-weak"><b>{t("cv.roles.weakest")}</b> “{weak}”</p>}
-                <ScoreCard role={item} score={state} onImprove={(mode) => openFocus({ roleId: item.id, mode })} onRetry={() => onRetry?.(item.id)} />
+                <RoleNext role={item} name={name} state={state} onAnswer={() => openFocus({ roleId: item.id, mode: "improve" })} onRetry={() => onRetry?.(item.id)} />
                 <button type="button" className="role-goto" onClick={() => onOpen(item.id, list)}>{t("cv.roles.goTo")}</button>
               </div>
             )}

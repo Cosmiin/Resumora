@@ -117,6 +117,11 @@
 .role-explain { margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: var(--color-ink); }
 .role-why { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 4px 0 12px; font-size: 14px; }
 .role-why .score-card { background: var(--color-paper); }
-.role-weak { margin: 0; line-height: 1.45; }
+.role-num { margin: 0; display: flex; align-items: baseline; gap: 8px; }
+.role-num b { font: var(--weight-display) 1.6rem / 1 var(--font-display); font-variant-numeric: tabular-nums; }
+.role-num span { font-weight: 700; overflow-wrap: anywhere; }
+.role-next { margin: 0; font: 500 var(--text-coach-sm) / var(--leading-coach) var(--font-coach); color: var(--color-coach); }
+.role-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.role-why .fine { margin: 0; }
 .role-goto { justify-self: start; padding: 0; border: 0; border-radius: 4px; background: none; font: inherit; color: var(--color-coach); text-decoration: underline; cursor: pointer; }
 .role-goto:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
