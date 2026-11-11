@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BRAIN_DUMP_QUESTION, type Question, type RoleQuestion, type RoleResult, type RoleTopic } from "@resumora/shared";
-import { RUN_MAX, buildRun, questionKey, splitRun } from "./run.ts";
+import { RUN_MAX, buildRun, gapItems, questionKey, splitRun } from "./run.ts";
 
 const rq = (id: string, topic: RoleTopic, text = `About ${id}?`): RoleQuestion => ({ id, text, options: [], kind: "role", topic });
 const lq = (bulletId: string, text = `Line ${bulletId}?`): Question => ({ bulletId, text, options: [], kind: "detail" });
@@ -48,5 +48,29 @@ describe("the questions of a role, in the order a run asks them", () => {
   it("no score yet means nothing to ask (a thin role still gets its box)", () => {
     expect(buildRun(undefined, { thin: false, answered: none })).toEqual([]);
     expect(keys(buildRun(undefined, { thin: true, answered: none }))).toEqual(["box"]);
+  });
+});
+
+// Owner review: a role below 80 must always have something to ask.
+describe("the app's own questions for what the page still does not show", () => {
+  const g = (id: string, score: number, impact: "missing" | "specific") => ({
+    id, score, contribution: "specific" as const, clarity: "specific" as const, specificity: "specific" as const, impact,
+    issue: "none" as const, tip: null, question: null,
+  });
+  const marks = { company: "shown", purpose: "shown", actions: "shown", tools: "applies", results: "applies", scale: "shown", leadership: "na", seniority: "na", people: "na", domain: "na" } as const;
+  const scored: RoleResult = { ...result([], []), bullets: [g("b1", 80, "missing"), g("b2", 100, "specific"), g("b3", 80, "missing")], coverage: { score: 60, marks, shape: { amount: true, repeats: true, order: false } } };
+  const bullets = [{ id: "b1", text: "One" }, { id: "b2", text: "Two" }, { id: "b3", text: "Three" }];
+  const ask = { results: "Result?", tools: "Tool?", scale: "Size?" };
+
+  it("asks for a result of the best line that has none, and for a tool of another line; nothing for what is shown", () => {
+    const items = gapItems(scored, bullets, ask);
+    expect(items.map((i) => [i.key, i.kind === "line" ? i.question.bulletId : "", i.kind === "line" ? i.question.text : ""])).toEqual([
+      ["gap:results", "b1", "Result?"], ["gap:tools", "b2", "Tool?"],
+    ]);
+  });
+
+  it("asks nothing when the page shows all three, or when the score has no marks", () => {
+    expect(gapItems({ ...scored, coverage: { ...scored.coverage!, marks: { ...marks, tools: "shown", results: "shown" } } }, bullets, ask)).toEqual([]);
+    expect(gapItems(result([], []), bullets, ask)).toEqual([]);
   });
 });

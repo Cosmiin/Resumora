@@ -118,6 +118,48 @@ describe("the start of a role", () => {
   });
 });
 
+// Owner review: a role below 80 must never be a dead end ("No questions about this role right now").
+describe("a role below 80 with no question left", () => {
+  const answeredNotes = [
+    { id: "n1", question: "What does Nordlane Logistics do?", answer: "Parcel delivery", via: ["type" as const], askedAt: "2026-11-11T10:00:00.000Z" },
+    { id: "n2", question: "Did anyone report to you in this role?", answer: "No", via: ["type" as const], askedAt: "2026-11-11T10:00:00.000Z" },
+    { id: "n3", question: "What changed after you trained them?", answer: "Fewer planning mistakes", via: ["type" as const], askedAt: "2026-11-11T10:00:00.000Z" },
+  ];
+  const spentRole: Experience = { ...role, notes: answeredNotes };
+
+  it("asks for new questions, and offers them", async () => {
+    const fresh: RoleResult = { ...result, fingerprint: fingerprint(spentRole, "en"), roleQuestions: [],
+      questions: [{ bulletId: "b2", text: "Who uses the weekly report?", options: ["Depot managers", "The planning team"], kind: "detail" }] };
+    api.scoreRole.mockResolvedValue(fresh);
+    render(<Harness initialRole={spentRole} />);
+    expect(await screen.findByText("1 short question, about a minute. Then I show you what it changed.")).toBeInTheDocument();
+    // Asked again on purpose: the stored result had nothing left to ask.
+    expect(api.scoreRole).toHaveBeenCalledWith("r1", fingerprint(spentRole, "en"), true);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByRole("heading", { name: "Who uses the weekly report?" })).toBeInTheDocument();
+  });
+
+  it("with no new question either, asks about what the page lacks and the line's question again with the earlier answer, then rewrites the weak lines", async () => {
+    render(<Harness initialRole={spentRole} />);
+    // The page names no tool (the marks say so): the app asks for one itself, of the best line. Then the line's own question again.
+    expect(await screen.findByText("2 short questions, about a minute. Then I show you what they changed.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByRole("heading", { name: "Which tool or software did you use for this?" })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByText(/Cut late deliveries from 9% to 4% in a year\./)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(screen.getByRole("heading", { name: "What changed after you trained them?" })).toBeInTheDocument();
+    const box = screen.getByRole("textbox");
+    expect(box).toHaveValue("Fewer planning mistakes");
+    await userEvent.type(box, ", from about ten a week to five");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText(NEW_B1)).toBeInTheDocument();
+    expect(screen.getByText(NEW_B2)).toBeInTheDocument();
+    expect(api.improveBullet).toHaveBeenCalledTimes(2);
+    // The page does not say what the company does, and an answer about it is saved: a description is proposed.
+    expect(screen.getByText(NEW_DESCRIPTION)).toBeInTheDocument();
+  });
+});
+
 describe("the run of questions", () => {
   it("asks one question per screen, saves each answer as a note, and changes nothing on the page", async () => {
     const actions: CvAction[] = [];
@@ -320,9 +362,11 @@ describe("approve once", () => {
 
   it("a role that has a description and got no answers is not given a reworded one", async () => {
     render(<Harness initialRole={{ ...role, description: "Nordlane delivers parcels." }} roleResult={{ ...result, roleQuestions: [], questions: [] }} />);
-    expect(screen.getByText("No questions about this role right now.")).toBeInTheDocument();
+    // New questions are asked for first (none come back here). The page names no tool, so the app asks for one itself; it is skipped.
+    expect(await screen.findByText("1 short question, about a minute. Then I show you what it changed.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Start" }));
-    expect(await screen.findByText("Nothing changed for this role.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(await screen.findByText("Nothing changed for this role. “Understand the score” shows what is still missing.")).toBeInTheDocument();
     expect(api.roleDescription).not.toHaveBeenCalled();
     expect(api.improveBullet).not.toHaveBeenCalled();
   });
@@ -365,7 +409,7 @@ describe("role done", () => {
     expect(screen.getByText("6 short questions, about 3 minutes. Then I show you what they changed.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Start" }));
     for (let i = 0; i < 6; i++) await userEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(await screen.findByText("Nothing changed for this role.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing changed for this role. “Understand the score” shows what is still missing.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "A few more questions" }));
     expect(screen.getByText("Question 1 of 1 · about a line")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Extra 7?" })).toBeInTheDocument();

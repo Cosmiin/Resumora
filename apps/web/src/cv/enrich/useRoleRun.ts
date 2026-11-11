@@ -8,7 +8,8 @@ import type { CvAction } from "../edit/cvReducer.ts";
 import { roleListOf } from "../edit/lists.ts";
 import type { Via } from "./AnswerBox.tsx";
 import { brainDump, improveBullet, roleDescription, roleFacts, scoreRole } from "./enrich-api.ts";
-import { RUN_MAX, buildRun, itemQuestion, questionKey, splitRun, type RunItem } from "./run.ts";
+import { t } from "../../i18n/t.ts";
+import { RUN_MAX, buildRun, gapItems, itemQuestion, questionKey, splitRun, type RunItem } from "./run.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 /** One piece of the role that the answers changed: its description, one of its bullets, or a new bullet. */
@@ -84,18 +85,20 @@ export function useRoleRun(opts: Options) {
     const asked = new Set(role?.notes.map((note) => questionKey(note.question)));
     const thin = isThin(role, result);
     const run = splitRun(result ? buildRun(result, { thin, answered: asked }) : []);
+    // Below 80 with every stored question already answered: new questions are asked for, so the role can still be improved.
+    const spent = result !== undefined && run.items.length === 0 && (result.score ?? 0) < CLEAR_AT;
     const view: View = {
-      step: { kind: "start" }, ...run, ready: result !== undefined, busy: false, answers: {},
+      step: { kind: "start" }, ...run, ready: result !== undefined && !spent, busy: false, answers: {},
       before: result?.score ?? null, applied: 0, answered: 0, own: null, rescored: false, timedOut: false,
     };
-    return { view, result, asked, thin, print };
+    return { view, result, asked, thin, print, spent };
   });
   const [view, setView] = useState<View>(initial.view);
   const current = useRef(opts);
   const session = useRef({
     view, alive: true, closed: false, notesChanged: false, loadStarted: false,
     result: initial.result, asked: initial.asked, thin: initial.thin, printAtOpen: initial.print,
-    cursor: 0, finishing: 0, boxRescored: false, described: false,
+    cursor: 0, finishing: 0, boxRescored: false, described: false, spent: initial.spent,
     held: new Map<string, Promise<Held>>(), tokens: new Map<string, number>(), changed: new Set<string>(),
   });
   useEffect(() => { current.current = opts; });
@@ -148,7 +151,7 @@ export function useRoleRun(opts: Options) {
       try {
         result = await saved((_, print) => {
           const o = current.current;
-          return o.focus ? scoreRole(o.roleId, print, true, o.focus) : scoreRole(o.roleId, print);
+          return o.focus ? scoreRole(o.roleId, print, true, o.focus) : s.spent ? scoreRole(o.roleId, print, true) : scoreRole(o.roleId, print);
         });
       } catch { /* No questions from this call: the stored ones, if they are for this text. */ }
       if (!s.alive || s.closed) return;
@@ -161,7 +164,19 @@ export function useRoleRun(opts: Options) {
       s.result = result;
       s.printAtOpen = print;
       s.thin = isThin(role, result);
-      update({ ...splitRun(buildRun(result, { thin: s.thin, answered: s.asked })), ready: true, before: result?.score ?? null });
+      let all = buildRun(result, { thin: s.thin, answered: s.asked });
+      const answers: View["answers"] = {};
+      // Still below 80 and nothing new to ask: the app asks about what the page still does not show (a result, a
+      // tool, a size), then the lines' own questions once more. An earlier answer comes back in its box to add to.
+      if (s.spent && all.length === 0 && result) {
+        const gaps = gapItems(result, role?.bullets ?? [], { results: t("enrich.run.gap.results"), tools: t("enrich.run.gap.tools"), scale: t("enrich.run.gap.scale") });
+        all = [...gaps, ...buildRun({ ...result, roleQuestions: [] }, { thin: false, answered: new Set() })];
+        for (const item of all) {
+          const note = role?.notes.find((n) => questionKey(n.question) === questionKey(itemQuestion(item)));
+          if (note) answers[item.key] = { noteId: note.id, text: note.answer };
+        }
+      }
+      update({ ...splitRun(all), answers, ready: true, before: result?.score ?? null });
     })();
   }, [saved, update]);
 
@@ -245,8 +260,10 @@ export function useRoleRun(opts: Options) {
     const role = findScored(o.cv, o.roleId)?.item;
     if (!role) return;
     if (retry) for (const [id, task] of [...s.held]) if ((await task) === "error") hold(id, false);
+    // Nothing left to ask, but earlier answers are saved with the role: they are used now.
+    const fromEarlier = (s.spent || s.view.items.length === 0) && role.notes.length > 0;
     // The role's answers (tools, people, scale) belong in its lines too: the weak lines not asked about are rewritten with them in view.
-    if (s.view.answered > 0) {
+    if (s.view.answered > 0 || fromEarlier) {
       const grades = new Map(s.result?.bullets.map((b) => [b.id, b.score]));
       for (const b of role.bullets) if (b.text.trim() !== "" && !s.held.has(b.id) && (grades.get(b.id) ?? 0) < CLEAR_AT) hold(b.id, false);
     }
@@ -257,7 +274,9 @@ export function useRoleRun(opts: Options) {
       ? saved((_, print) => brainDump({ roleId: o.roleId, fingerprint: print, source: "answers" })).then((a) => { added = a?.proposals ?? []; }).catch(() => { failed = true; })
       : null;
     // A description the role already has is only written again when this run brought answers: no answers, no reason to reword it.
-    const describe = s.described || (role.description.trim() !== "" && s.view.answered === 0) ? null
+    const marks = s.result?.coverage?.marks;
+    const contextMissing = fromEarlier && !!marks && (marks.company !== "shown" || marks.purpose !== "shown");
+    const describe = s.described || (role.description.trim() !== "" && s.view.answered === 0 && !contextMissing) ? null
       : saved((_, print) => roleDescription({ roleId: o.roleId, fingerprint: print })).then((a) => { description = a?.text ?? ""; s.described = true; }).catch(() => { failed = true; });
     await Promise.all([dump, describe, ...s.held.values()]);
     if (stale()) return;

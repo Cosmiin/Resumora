@@ -45,3 +45,34 @@ export function buildRun(result: RoleResult | undefined, opts: { thin: boolean; 
 export function splitRun(all: readonly RunItem[]): { items: RunItem[]; rest: RunItem[] } {
   return { items: all.slice(0, RUN_MAX), rest: all.slice(RUN_MAX) };
 }
+
+/** What the page can still be missing that a question about one line can add. */
+export const GAPS = ["results", "tools", "scale"] as const;
+export type Gap = (typeof GAPS)[number];
+
+/**
+ * The app's own questions, for a role below 80 that the reviewer has nothing left to ask about: one per thing the
+ * page still does not show (a result, a tool, a size), each put to one line so its answer has a place to go.
+ * A result is asked of the best line that has none; the others of the best lines not yet used.
+ */
+export function gapItems(result: RoleResult, bullets: readonly { id: string; text: string }[], ask: Record<Gap, string>): RunItem[] {
+  const marks = result.coverage?.marks;
+  if (!marks) return [];
+  const grades = new Map(result.bullets.map((b) => [b.id, b]));
+  const real = bullets.filter((b) => {
+    const g = grades.get(b.id);
+    return b.text.trim() !== "" && !!g && g.issue !== "example" && g.issue !== "duplicate";
+  });
+  const used = new Set<string>();
+  const best = (list: typeof real) => [...list].sort((a, b) => grades.get(b.id)!.score - grades.get(a.id)!.score)[0];
+  const items: RunItem[] = [];
+  for (const gap of GAPS) {
+    if (marks[gap] === "shown") continue;
+    const free = real.filter((b) => !used.has(b.id));
+    const line = (gap === "results" ? best(free.filter((b) => grades.get(b.id)!.impact !== "specific")) : undefined) ?? best(free) ?? best(real);
+    if (!line) continue;
+    used.add(line.id);
+    items.push({ key: `gap:${gap}`, kind: "line", question: { bulletId: line.id, text: ask[gap], options: [], kind: gap === "results" ? "result" : "detail" } });
+  }
+  return items;
+}
