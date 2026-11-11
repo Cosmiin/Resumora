@@ -262,3 +262,9 @@ Built by the forked session while the main session was on templates and export. 
 - Differs from the picked mockup: the button in a role's score card says "Improve this role" or "Make it stand out" (the card's own words), not "Answer 2 questions": the number of questions is not known before they are asked.
 - Noted, not changed: a role reads "Clear" from 75 but keeps "questions waiting" until 80. Raise with the owner.
 - Owner feedback 6, open: the enrichment flow is confusing (role questions, then bullet questions, then the role's description, with no signpost). To be redesigned after these fixes.
+- Owner feedback 6, decided (pages in `mockups/phase3/` in the workspace: `enrich-flow-variants.html`, `score-model.html`, `enrich-b-design.html`; plan in `enrich-b-score-plan-2026-11-11.md`):
+  - Flow: B, answer all of a role's questions in one run (at most 6), then approve once on the role's sheet. Must work well on phones.
+  - Score: a bullet has five checks (what you did 30, clear 20, specific 20, result 20, concise 10). A role is 60% Lines (its bullets) and 40% Coverage (six core parameters shown on the page, four that count when they apply, and the role's shape). Tools are written inside bullets, never as a keyword line.
+  - CV strength: the most recent role counts 3 times, the one before twice, the rest once.
+  - Showing it: a number and one next step; the two bars and the checks only behind "Understand the score". No score between questions.
+  - International scope and kind of contract were dropped as parameters. Progression, notable projects and recognition may be asked about but are not scored.
