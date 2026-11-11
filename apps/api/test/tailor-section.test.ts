@@ -287,6 +287,18 @@ describe("section pass", () => {
     expect(body.proposals).toEqual([expect.objectContaining({ text: "Led payroll for 40 staff", inferred: true, reason: "Ran payroll for 40 staff", flags: [] })]);
   });
 
+  it("a guessed line keeps the phrases it guessed, each with its why; a phrase not in the line is left out", async () => {
+    const based = reword("Led payroll for 40 staff", { inferred: true, reason: "Ran payroll for 40 staff", guesses: [
+      { text: "Led payroll", reason: "Your line says you ran payroll; it does not say you led it." },
+      { text: "for 90 staff", reason: "Not in the line." },
+    ] });
+    replies = [proposals(based), { results: [] }];
+    const body = await (await runSection()).res.json() as { proposals: Proposal[] };
+    expect(body.proposals[0]).toMatchObject({ inferred: true,
+      inferredParts: [{ text: "Led payroll", reason: "Your line says you ran payroll; it does not say you led it." }] });
+    expect(body.proposals[0]!.guesses).toBeUndefined();
+  });
+
   it("states the truth rule in the section prompt", async () => {
     replies = [proposals()];
     await runSection();

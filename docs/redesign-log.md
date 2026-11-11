@@ -343,3 +343,6 @@ Built by the forked session while the main session was on templates and export. 
   - Not in stage 1: set up on one screen (language, keywords and tone are still separate screens in the app's normal layout, before the room), clicking stops on the map, last touches on one page, the result on the job's page with "See what changed". "Look back at" stays as a line of links above the stop.
   - On a phone the map is reduced to the current stop.
   - Not seen in the browser.
+- Tailoring review, owner feedback 21: the map on the left is liked ("feels great"). The side by side review inside the room is "incredibly busy" and needs another design. Options to be shown before anything is built.
+- Tailoring review, owner feedback 22: the "Please check this one" box does not say what the guess is or why it was made. The owner wants to understand what was guessed and on what basis.
+- Built feedback 22: for a guessed line, tailoring now asks the AI for each phrase it guessed, copied exactly from the new line, with one plain sentence saying what it assumed and what made it assume it. The review's "Please check this one" box lists them ("My guess: “…”", then the why) and ends with "Use the new line only if this is true." A guess without named phrases (older runs, or the AI left them out) keeps the general sentence. Not tried with a real AI call.

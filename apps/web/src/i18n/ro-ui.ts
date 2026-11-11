@@ -20,6 +20,8 @@ export const uiRo: Record<keyof typeof uiEn, string> = {
   "ui.diff.usingNew": "Folosești propunerea",
   "ui.diff.usingEdit": "Folosești varianta editată",
   "ui.diff.checkTitle": "Te rog verifică rândul acesta",
+  "ui.diff.guess": "Presupunerea mea:",
+  "ui.diff.checkAsk": "Folosește rândul nou doar dacă este adevărat.",
   "ui.diff.checkText": "O parte din rândul acesta este presupunerea mea: nu apare în CV-ul sau în răspunsurile tale. Folosește-l doar dacă este adevărat.",
   "ui.diff.noChange": "Punctul acesta se potrivește deja cu jobul. Nu propunem nicio schimbare.",
 };

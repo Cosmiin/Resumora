@@ -134,6 +134,8 @@ export const ProposalSchema = z.object({
   flags: z.array(FlagSchema),
   /** Where the CV shows it: a new skill's reason, or why the AI guessed an inferred change. */
   reason: z.string().optional(),
+  /** An inferred line's guessed phrases, exactly as they stand in `text`, each with what was assumed and why. Shown, never decided one by one. */
+  inferredParts: z.array(z.object({ text: z.string(), reason: z.string() })).optional(),
   /** Guessed spans inside a summary, each with why the AI guessed it. */
   guesses: z.array(z.object({ text: z.string(), reason: z.string() })).optional(),
 });

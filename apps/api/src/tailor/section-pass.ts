@@ -183,12 +183,17 @@ export async function passProposals(
       const spans = p.itemId === "summary" ? placeGuesses(p.text.trim(), (guesses ?? []).map((g) => ({ text: g.text, reason: g.reason.trim() })))
         .map((g) => ({ text: g.text, reason: g.reason })) : [];
       const guessed = spans.length > 0 ? { inferred: false, guesses: spans } : {};
+      // Elsewhere an inferred line names the phrases it guessed, each with its why: shown beside the line.
+      const parts = p.itemId !== "summary" && p.inferred
+        ? placeGuesses(p.text.trim(), (guesses ?? []).map((g) => ({ text: g.text, reason: g.reason.trim() }))).filter((g) => g.reason)
+          .map((g) => ({ text: g.text, reason: g.reason })) : [];
+      const partly = parts.length > 0 ? { inferredParts: parts } : {};
       // An order that changes nothing is no change, so a section with nothing else passes with a tick.
       const same = (a: string) => a.split(",").map((id) => id.trim()).join(",");
       if (p.itemId === "order" && field && same(p.text) === same(items.get("order")!.fields.order ?? "")) continue;
       // A hide or an order is never a guess: it names no fact, and the person decides it on the screen.
       if (field && p.text.trim() && notText({ field })) kept.push({ ...p, field, text: p.text.trim(), inferred: false, flags: [] });
-      else if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why, ...guessed });
+      else if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why, ...guessed, ...partly });
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });

@@ -18,6 +18,8 @@ export const uiEn = {
   "ui.diff.usingNew": "Using new",
   "ui.diff.usingEdit": "Using your edit",
   "ui.diff.checkTitle": "Please check this one",
+  "ui.diff.guess": "My guess:",
+  "ui.diff.checkAsk": "Use the new line only if this is true.",
   "ui.diff.checkText": "Part of this line is my guess: it is not written in your CV or your answers. Use it only if it is true.",
   "ui.diff.noChange": "This bullet already fits the job. No change suggested.",
 } as const;

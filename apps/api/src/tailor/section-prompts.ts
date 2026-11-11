@@ -43,7 +43,7 @@ Principles, most important first:
 3. Respect the item's time and kind of work. Use the job's words only where they describe what the person did there. Do not force a job keyword onto an item it doesn't fit.
 4. A change must be a real improvement: clearer, more specific, or closer to the job with the facts given. If you would only swap words, leave the item out.
 5. A role that has ended stays in the past tense. Only a current role uses the present tense.
-6. Mark what you inferred. Set inferred to true for any wording or skill that is a reasonable inference rather than stated, and set reason to one short line naming what it rests on (the bullet, note or answer). Set reason to null when inferred is false. Set guesses to null, except in the summary.
+6. Mark what you inferred. Set inferred to true for any wording or skill that is a reasonable inference rather than stated, and set reason to one short line naming what it rests on (the bullet, note or answer). Set reason to null when inferred is false. When inferred is true outside the summary, also fill guesses with one entry per phrase you inferred: text is the phrase copied exactly from your new wording, and reason is one plain sentence to the person saying what you assumed and what made you assume it, naming the bullet, note, answer or job requirement ("The ad asks for process maps and your line mentions analysing processes, but nothing says you drew maps."). Otherwise set guesses to null, except in the summary.
 7. Write in the requested language and in the tone given under "steering". Follow the rest of the steering when it doesn't break these principles.
 
 How to fill the answer:

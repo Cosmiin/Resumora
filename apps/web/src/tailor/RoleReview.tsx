@@ -86,7 +86,7 @@ export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers,
         // While the role is being saved the rows are frozen: a decision made then would not be part of what was sent.
         : <fieldset className="tailor-diffs" disabled={busy}>
           {open.map((line) => <DiffRow key={line.id} oldText={line.old.trim() || t("tailor.review.empty")} newText={line.proposal!.text}
-            reason={line.proposal!.reason} inferred={line.proposal!.inferred} textLang={locale}
+            reason={line.proposal!.reason} inferred={line.proposal!.inferred} guesses={line.proposal!.inferredParts} textLang={locale}
             decision={standing(line)} onDecide={(decision) => decide(line.id, decision)} />)}
           {fits.length > 0 && <div className="tailor-fits">
             <p className="ui-label">{t("tailor.roleReview.fits")}</p>

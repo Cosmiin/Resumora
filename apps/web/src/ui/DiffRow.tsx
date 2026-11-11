@@ -15,6 +15,8 @@ type Props = {
   reason?: string;
   /** The suggestion contains a fact that is not written on the CV; the person must confirm it. */
   inferred?: boolean;
+  /** The guessed phrases of the suggestion, each with what was assumed and why. Without them the row says only that part is a guess. */
+  guesses?: { text: string; reason: string }[];
   /** Language of the CV text, so screen readers pronounce it correctly. */
   textLang: string;
   decision: DiffDecision | null;
@@ -26,7 +28,7 @@ type Props = {
  * suggestion (the new words marked). The person picks a side, or edits the suggestion. A guess says so in a
  * sentence and asks for a yes.
  */
-export function DiffRow({ oldText, newText, reason, inferred = false, textLang, decision, onDecide }: Props) {
+export function DiffRow({ oldText, newText, reason, inferred = false, guesses = [], textLang, decision, onDecide }: Props) {
   const t = useT();
   const [draft, setDraft] = useState<string | null>(null);
   const editId = useId();
@@ -104,10 +106,24 @@ export function DiffRow({ oldText, newText, reason, inferred = false, textLang, 
         </div>
       </div>
       {inferred && (
-        <p className="ui-diff-check">
+        <div className="ui-diff-check">
           <b>{t("ui.diff.checkTitle")}</b>
-          <span>{t("ui.diff.checkText")}</span>
-        </p>
+          {guesses.length === 0 ? (
+            <span>{t("ui.diff.checkText")}</span>
+          ) : (
+            <ul>
+              {guesses.map((guess) => (
+                <li key={guess.text}>
+                  <span>
+                    {t("ui.diff.guess")} <q lang={textLang}>{guess.text}</q>
+                  </span>
+                  <span>{guess.reason}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {guesses.length > 0 && <span>{t("ui.diff.checkAsk")}</span>}
+        </div>
       )}
       {draft === null && (
         <p className="ui-diff-more">

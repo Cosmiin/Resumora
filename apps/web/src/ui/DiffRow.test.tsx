@@ -81,6 +81,16 @@ describe("DiffRow", () => {
     expect(screen.queryByRole("button", { name: "Use this" })).toBeNull();
   });
 
+  it("a guess that names its phrases says what was guessed and why", () => {
+    render(<DiffRow textLang="en" oldText={OLD} newText={NEW} inferred decision={null} onDecide={() => undefined}
+      guesses={[{ text: "Design data tables", reason: "The ad asks for data models; your line only says you worked with the tools." }]} />);
+    const box = screen.getByText("Please check this one").parentElement!;
+    expect(box).toHaveTextContent("My guess: Design data tables");
+    expect(box).toHaveTextContent("The ad asks for data models; your line only says you worked with the tools.");
+    expect(box).toHaveTextContent("Use the new line only if this is true.");
+    expect(screen.queryByText(/Part of this line is my guess/)).toBeNull();
+  });
+
   it("offers nothing when there is no real improvement", () => {
     render(<DiffRow textLang="en" oldText={OLD} newText={null} decision={null} onDecide={() => undefined} />);
     expect(screen.getByText("This bullet already fits the job. No change suggested.")).toBeInTheDocument();
