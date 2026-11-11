@@ -1,4 +1,4 @@
-import { runItems, runSections, type Steering, type TailorLanguage, type TailorRun } from "@resumora/shared";
+import { DEFAULT_PREFERENCES, runItems, runSections, type Preferences, type Steering, type TailorLanguage, type TailorRun } from "@resumora/shared";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
@@ -14,7 +14,7 @@ export type StartResult = { run: TailorRun; tailoredCvId: string; language: Tail
  * The unique (job_id, language) row makes a second start at the same moment reuse the first document.
  */
 export async function startTailoring(
-  deps: { jobs: JobRepo; cv: CvRepo; tailor: TailorRepo; now(): Date },
+  deps: { jobs: JobRepo; cv: CvRepo; tailor: TailorRepo; now(): Date; preferences?(): Promise<Preferences> },
   jobId: string,
   steering: Steering,
 ): Promise<StartResult> {
@@ -23,7 +23,10 @@ export async function startTailoring(
   if (job.status !== "ready" || !job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
   const base = (await deps.cv.get()).content;
   const adText = [job.extracted.summary, ...job.extracted.responsibilities].filter(Boolean).join("\n");
-  const language = detectAdLanguage(adText) ?? base.locale;
+  // The person's defaults (Account → Preferences): which language a new tailored CV starts in, and its template.
+  const preferences = deps.preferences ? await deps.preferences() : DEFAULT_PREFERENCES;
+  const wanted = preferences.tailoringLanguage;
+  const language = wanted === "job" ? (detectAdLanguage(adText) ?? base.locale) : wanted === "cv" ? base.locale : wanted;
 
   // Experience, then Projects & volunteering, one item at a time in CV order (the step only when the CV has some).
   const sections = runSections(base);
@@ -34,6 +37,7 @@ export async function startTailoring(
     const created = await deps.tailor.createTailoredCv({
       jobId, language, content: base, baseSnapshotAt: deps.now().toISOString(),
       tone: steering.tone ?? "neutral", instruction: steering.instruction ?? null, steering,
+      template: preferences.defaultTemplate,
     });
     if (created !== "exists") {
       const run = await deps.tailor.createRun({ jobId, tailoredCvId: created, kind: "tailor", sections, currentSection: sections[0]!, ...items });

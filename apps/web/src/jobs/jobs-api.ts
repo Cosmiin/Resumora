@@ -15,13 +15,19 @@ export function listJobs(cursor?: string): Promise<JobListPage> {
   return apiFetch(`/v1/jobs?limit=50${query}`, { schema: JobListPageSchema });
 }
 
+/** The newest job the browser extension saved, or null when it hasn't saved one. */
+export async function getLastExtensionJob(): Promise<JobListPage["items"][number] | null> {
+  const page = await apiFetch("/v1/jobs?limit=1&source=extension", { schema: JobListPageSchema });
+  return page.items[0] ?? null;
+}
+
 export function getJob(id: string): Promise<Job> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(id)}`, { schema: JobSchema });
 }
 
 export function createJob(url: string, pageText: string): Promise<{ id: string; existing: boolean }> {
   return apiFetch("/v1/jobs", {
-    method: "POST", json: { url, pageText }, schema: CreateJobResponseSchema,
+    method: "POST", json: { url, pageText, source: "link" }, schema: CreateJobResponseSchema,
   });
 }
 

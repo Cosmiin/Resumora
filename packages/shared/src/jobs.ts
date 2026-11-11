@@ -42,6 +42,8 @@ export const CreateJobBodySchema = z.object({
   url: z.url({ protocol: /^https?$/ }).max(2048),
   pageText: z.string().trim().min(200).max(60000).optional(),
   jsonLd: z.array(z.unknown()).max(20).optional(),
+  /** Who is sending the page: the web app sends "link"; the extension sends nothing. */
+  source: JobSourceSchema.optional(),
 });
 export type CreateJobBody = z.infer<typeof CreateJobBodySchema>;
 
@@ -57,6 +59,8 @@ export type JobPatch = z.infer<typeof JobPatchSchema>;
 export const JobListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().max(200).optional(),
+  /** Only jobs that arrived this way. */
+  source: JobSourceSchema.optional(),
 });
 export type JobListQuery = z.infer<typeof JobListQuerySchema>;
 

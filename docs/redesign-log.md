@@ -99,3 +99,41 @@ Review list:
 ## Phase 2 approved, 2026-11-11
 
 Owner approved the six flow mockups. Foundation branch merged into main. Phase 3 starts with the public pages and account flow.
+
+## Phase 3, flow 1: public pages and account (branch `redesign/public-account`)
+
+Owner decisions (2026-11-11):
+- "Export all my data" and "Delete my account": approved. Two new API actions, no schema change. Delete uses the service role key on the server, only for the caller's own id.
+- Name, default template and default tailoring language: new table `user_preferences` (migration `20261111100000_user_preferences.sql`), SQL shown to and approved by the owner before it was applied locally.
+- Extension page: honest version. No "Connected" badge, no Disconnect button; it shows the install steps and the last job the extension saved.
+
+Choices made while building:
+- Routes: `/` homepage (signed-in visitors go to `/cv`), `/signup`, `/login`, `/forgot-password`, `/reset-password`, `/account/{profile,preferences,data,extension}`.
+- The top bar is new on every signed-in page; the pages under it (CV, jobs, tailoring) keep the old look until their own flow is rebuilt. "My CVs" joins the navigation with flow 6, when the page exists.
+- Sign out moved from the old account menu to the profile page, as in the mockup.
+- The name typed at sign-up travels with the login (user metadata), because preferences can only be saved once signed in. The profile shows it until a name is saved.
+- Export is one JSON file downloaded at once (table rows as stored, uploaded files as base64), so the mockup line "the file will wait for you here" was replaced.
+- A reset link that no longer works gets its own message and a way to ask for a new one (error state the mockup did not draw).
+- Jobs added by hand in the web app are now labelled `link`, not `extension`, so "last job saved from the extension" is true.
+- Italian is offered as a tailoring language (the engine supports six; the mockup listed five).
+- Extension download: `npm run package -w @resumora/extension` builds the zip into `apps/web/public/downloads/` (not committed). It must be run before the web app is deployed, or the download button has no file.
+- The default template and tailoring language are saved now; tailoring and export start reading them when flows 5 and 6 are rebuilt.
+
+Codex deep review of this flow (two reads: server side, web side) and what changed because of it:
+- No way found for one user to read, change, export or delete another user's data.
+- Export: files are listed with one-hour download links instead of being packed into the file (many photos would exceed what one request may hold); the login's email, sign-up date and details are now included. The page says so.
+- Preferences are cached per person, so a second person signing in on the same device never sees the first one's.
+- Tailoring now starts from the saved defaults (language and template). The base CV preview still uses the classic template until flow 3 rebuilds that screen.
+- Profile: a failed email change no longer claims "nothing was changed" when the name was saved; typing during a save is kept; a failed background refresh no longer discards what is being typed.
+- Email change copy now says both addresses get a confirmation link (the project is set to confirm both).
+- The page a person was heading to survives a detour through sign up or password reset.
+- The extension page asks the server for the newest extension job (new `source` filter on the job list) instead of looking only at the newest 50 jobs.
+- After deleting an account, the "go to the homepage" request is used once only.
+
+Open for the owner:
+- For up to an hour after deleting an account, the still-valid session could upload a file into that user's own storage folder, and it would stay. Closing it means changing the storage access rules (a check that the user still exists), which needs approval.
+
+Owner review of this flow (2026-11-11): parts 1 and 2 approved with no changes. Decisions from the same review:
+- CV language detection stays English and Romanian only for now.
+- Close the gap after account deletion, kept simple: one rule on file storage that requires the account to still exist (`20261111120000_deleted_account_files.sql`).
+- The golden examples report is accepted for now; the owner will test the prompts more deeply later.

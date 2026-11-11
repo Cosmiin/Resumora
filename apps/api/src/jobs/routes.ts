@@ -56,7 +56,7 @@ export function jobRoutes(deps: {
       throw new ApiError(429, "job_limit", `You can add up to ${JOBS_PER_DAY} jobs per day.`);
     }
     const created = await repo.create({
-      id: crypto.randomUUID(), source: "extension", url: body.url, urlNormalized,
+      id: crypto.randomUUID(), source: body.source ?? "extension", url: body.url, urlNormalized,
       rawText: body.pageText.slice(0, 30_000), jsonLd: findJobPosting(body.jsonLd ?? []),
     });
     if (created.existing) return c.json({ id: created.id, existing: true });
@@ -73,10 +73,10 @@ export function jobRoutes(deps: {
     const invalid = () => new ApiError(400, "invalid_request", "Something went wrong loading your jobs. Reload the page.");
     const parsed = JobListQuerySchema.safeParse(c.req.query());
     if (!parsed.success) throw invalid();
-    const { limit, cursor } = parsed.data;
+    const { limit, cursor, source } = parsed.data;
     const after = cursor === undefined ? null : decodeJobCursor(cursor);
     if (cursor !== undefined && !after) throw invalid();
-    const { items, next } = await deps.repoFor(c).list({ limit, after });
+    const { items, next } = await deps.repoFor(c).list({ limit, after, source });
     return c.json({ items, nextCursor: next ? encodeJobCursor(next) : null });
   });
 

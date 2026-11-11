@@ -695,3 +695,140 @@ select.ui-input {
 .ui-tag {
   width: fit-content;
 }
+
+/* ---------- Page frame and text styles for rebuilt screens ---------- */
+.ui-page {
+  min-height: 100vh;
+  background: var(--color-desk);
+  color: var(--color-ink);
+  font: var(--weight-regular) var(--text-base) / var(--leading-base) var(--font-body);
+  accent-color: var(--color-coach);
+}
+/* Resets carry no weight of their own (:where), so any class may set its own spacing. */
+:where(.ui-page :is(h1, h2, h3, p, ul, ol, dl, dd, fieldset, legend)) {
+  margin: 0;
+  padding: 0;
+}
+:where(.ui-page :is(ul, ol)) {
+  list-style: none;
+}
+:where(.ui-page a:not(.ui-btn)) {
+  color: var(--color-coach);
+  text-underline-offset: 4px;
+}
+.ui-page a:focus-visible {
+  outline: var(--focus-width) solid var(--color-coach);
+  outline-offset: var(--focus-gap);
+}
+.ui-wrap {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-inline: max(var(--gutter), env(safe-area-inset-left, 0px)) max(var(--gutter), env(safe-area-inset-right, 0px));
+}
+.ui-main {
+  padding-block: var(--space-2) var(--space-10);
+}
+.ui-title {
+  font: var(--weight-display) var(--text-title) / var(--leading-tight) var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-wrap: balance;
+}
+.ui-heading {
+  font: var(--weight-display) var(--text-heading) / var(--leading-heading) var(--font-display);
+  letter-spacing: -0.015em;
+}
+.ui-heading--lg {
+  font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+  line-height: 1.1;
+}
+.ui-lead {
+  max-width: 60ch;
+}
+.ui-muted {
+  color: var(--color-muted);
+}
+.ui-small {
+  font-size: var(--text-small);
+}
+.ui-label {
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+}
+.ui-stack {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+.ui-stack--s {
+  gap: var(--space-2);
+}
+.ui-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+.ui-row--between {
+  justify-content: space-between;
+}
+
+/* ---------- Notice, pill, skeleton ---------- */
+.ui-notice {
+  margin: 0;
+  padding: 14px 18px;
+  border-radius: var(--radius-block);
+  background: var(--color-warn-soft);
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+}
+.ui-notice--bad {
+  background: var(--color-bad-soft);
+  color: var(--color-bad);
+}
+.ui-notice--good {
+  background: var(--color-good-soft);
+  color: #14553a;
+}
+.ui-notice--info {
+  background: var(--color-coach-soft);
+  color: #1b3688;
+}
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-desk-soft);
+  font-size: var(--text-label);
+  font-weight: var(--weight-bold);
+}
+.ui-pill--good {
+  background: var(--color-good-soft);
+  color: #14553a;
+}
+.ui-pill--warn {
+  background: var(--color-warn-soft);
+}
+.ui-pill--bad {
+  background: var(--color-bad-soft);
+  color: var(--color-bad);
+}
+.ui-skeleton {
+  min-height: 22px;
+  border-radius: var(--radius-field);
+  background: linear-gradient(90deg, #f1eedf 25%, #faf8ee 50%, #f1eedf 75%);
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s linear infinite;
+}
+@keyframes ui-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton {
+    animation: none;
+  }
+}

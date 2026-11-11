@@ -11,6 +11,8 @@ export type NewTailoredCv = {
   tone: Tone;
   instruction: string | null;
   steering: Steering;
+  /** The person's default template; classic when they never chose one. */
+  template?: "classic" | "modern" | "compact";
 };
 
 export type NewRun = {

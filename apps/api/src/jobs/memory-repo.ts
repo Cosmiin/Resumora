@@ -51,8 +51,8 @@ export function memoryJobs(opts: { now?: () => Date }) {
     async countRunsSince(iso) {
       return runs.filter((run) => run.userId === userId && run.createdAt >= iso).length;
     },
-    async list({ limit, after }) {
-      const page = [...rows.values()].filter((row) => row.userId === userId && (!after
+    async list({ limit, after, source }) {
+      const page = [...rows.values()].filter((row) => row.userId === userId && (!source || row.source === source) && (!after
         || row.createdAt < after.createdAt || (row.createdAt === after.createdAt && row.id < after.id)))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
         .slice(0, limit + 1);

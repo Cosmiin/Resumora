@@ -165,6 +165,13 @@ describe("job endpoints", () => {
     expect(store.rows.get(result.id)).toMatchObject({ status: "queued", source: "extension", rawText: body.pageText, jsonLd: null });
   });
 
+  it("labels a job sent by the web app as a link", async () => {
+    const res = await post({ ...body, source: "link" });
+    expect(res.status).toBe(202);
+    const result = (await res.json()) as { id: string };
+    expect(store.rows.get(result.id)).toMatchObject({ source: "link" });
+  });
+
   it("trims page text, caps stored text, and selects the JobPosting", async () => {
     const posting = { "@type": "JobPosting", title: "Engineer" };
     const res = await post({ ...body, pageText: `  ${"x".repeat(60_000)}  `, jsonLd: [{ "@type": "Organization" }, { "@graph": [posting] }] });
@@ -266,6 +273,18 @@ describe("job endpoints", () => {
     await error(await patch(other), 404, "not_found");
     await error(await remove(other), 404, "not_found");
     expect(store.rows.has(other)).toBe(true);
+  });
+
+  it("lists only the jobs that came from one source when asked", async () => {
+    const byHand = ((await (await post({ ...body, source: "link" })).json()) as { id: string }).id;
+    clock = new Date(clock.getTime() + 1000);
+    const fromExtension = await create({ ...body, url: "https://example.test/jobs/from-extension" });
+    const request = (query: string) => app.request(`/v1/jobs?${query}`, { headers: { authorization: "Bearer token-a" } });
+    const extension = await (await request("limit=1&source=extension")).json() as JobListPage;
+    expect(extension.items.map((job) => job.id)).toEqual([fromExtension]);
+    const link = await (await request("source=link")).json() as JobListPage;
+    expect(link.items.map((job) => job.id)).toEqual([byHand]);
+    expect((await request("source=email")).status).toBe(400);
   });
 
   it("follows list cursors and keeps other users and private fields off every page", async () => {
