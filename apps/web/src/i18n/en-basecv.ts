@@ -398,6 +398,7 @@ export const basecvEn = {
   "enrich.explain.check.concise": "Concise",
   "enrich.next.line": "Next: {step}",
   "enrich.next.none": "Nothing to add here right now.",
+  "enrich.next.more": "Not at 100 yet. I can look for what would still raise it.",
   "enrich.next.answerOne": "Answer 1 question",
   "enrich.next.answer": "Answer {n} questions",
   "enrich.next.company": "say what the company does, in one line.",

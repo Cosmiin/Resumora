@@ -14,7 +14,7 @@ import {
 import { AiInputRejectedError, AiOutputTooLongError, AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
-import { focusNote, questionLanguageReminder, scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
+import { focusNote, moreNote, questionLanguageReminder, scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
 import type { InsightsRepo } from "./repo.ts";
 
 export type ScoreDeps = {
@@ -60,9 +60,10 @@ const notSaved = () => new ApiError(409, "not_saved", "Your latest changes aren'
 export async function scoreRole(
   deps: ScoreDeps,
   /** fresh: skip the stored result and ask the model again, with the notes in view (after "Tell us about…"). */
-  input: { roleId: string; fingerprint: string; fresh?: boolean; /** What the person wants their CV to bring out: asks again, with it in view. */ focus?: string },
+  input: { roleId: string; fingerprint: string; fresh?: boolean; /** What the person wants their CV to bring out: asks again, with it in view. */ focus?: string;
+    /** Everything asked so far is answered: asks again, for a question with options for all that is still short of 100. */ more?: boolean },
 ): Promise<RoleResult> {
-  const fresh = input.fresh || !!input.focus?.trim();
+  const fresh = input.fresh || input.more || !!input.focus?.trim();
   const { content } = await deps.cv.get();
   // Roles, projects and volunteering are all scored; a cached row for anything else is stale.
   const present = new Set(scoredItems(content).map(({ item }) => item.id));
@@ -91,11 +92,15 @@ export async function scoreRole(
           task: "enrich_score",
           schema: ModelScoreSchema,
           system: scoreSystemPrompt(content.locale, wanted),
-          user: scoreUserMessage(role, undefined, found!.kind) + focusNote(input.focus) + questionLanguageReminder(content.locale, wanted),
+          user: scoreUserMessage(role, undefined, found!.kind) + focusNote(input.focus) + moreNote(input.more) + questionLanguageReminder(content.locale, wanted),
           // score/6 and score/7 made the answer longer: a concise grade per bullet, the coverage marks and up to four more role questions.
           maxOutputTokens: Math.min(5000, 1000 + 200 * role.bullets.length),
         });
         result = { ...buildRoleResult(role, answer, input.fingerprint), questionLanguage: wanted };
+        // Asking for more questions must not move the score: the stored grades stay, only the questions are new.
+        if (input.more && cached && cached.fingerprint === input.fingerprint && cached.policy === SCORE_POLICY) {
+          result = { ...cached, questions: result.questions, roleQuestions: result.roleQuestions, questionLanguage: wanted };
+        }
       } catch (err) {
         aiError(err);
       }

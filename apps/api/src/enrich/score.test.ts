@@ -432,6 +432,38 @@ describe("projects and volunteering are scored like roles", () => {
   });
 });
 
+describe("scoreRole asked for more questions", () => {
+  it("asks the model again, for a question with options for all that is still short of 100", async () => {
+    const role = roleWith(["Prepared payroll files."]);
+    await save(role);
+    await insights.put(role.id, buildRoleResult(role, allSpecific(role), fp(role)));
+    const model = fakeModel(() => allSpecific(role));
+    await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: fp(role), more: true });
+    expect(model.requests).toHaveLength(1);
+    const sent = JSON.stringify(model.requests[0]);
+    expect(sent).toContain("as close to 100 as it can go");
+    expect(sent).toContain("3 or 4 answer options the person can pick");
+  });
+
+  it("keeps the stored grades and score, and takes only the new questions", async () => {
+    const role = roleWith(["Prepared payroll files.", "Answered staff questions."]);
+    await save(role);
+    const stored = buildRoleResult(role, allSpecific(role), fp(role));
+    await insights.put(role.id, stored);
+    // The model grades lower this time and asks about the first bullet.
+    const model = fakeModel(() => {
+      const answer = allSpecific(role);
+      Object.assign(answer.bullets[0]!, { impact: "missing", issue: "impact", question: "How many payroll files a month?", options: ["Under 50", "50–200", "200+"] });
+      return answer;
+    });
+    const result = await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: fp(role), more: true });
+    expect(result.score).toBe(stored.score);
+    expect(result.bullets).toEqual(stored.bullets);
+    expect(result.questions).toEqual([{ bulletId: role.bullets[0]!.id, text: "How many payroll files a month?", options: ["Under 50", "50–200", "200+"], kind: "result" }]);
+    expect((await insights.get(role.id))?.score).toBe(stored.score);
+  });
+});
+
 describe("scoreRole with what the person wants their CV to bring out", () => {
   it("asks the model again with the goal in view, even when a stored result exists", async () => {
     const role = roleWith(["Prepared payroll files."]);

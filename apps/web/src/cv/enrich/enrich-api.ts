@@ -31,9 +31,10 @@ export async function getScores(): Promise<RoleResult[]> {
  * Scores one role of the saved CV. 409 `not_saved`: the role isn't saved yet, or its text has moved on.
  * fresh: ask the AI again with the notes in view (after "Tell us about…"), instead of the stored result.
  * focus: what the person wants their CV to bring out; the questions are chosen with it in view.
+ * more: every earlier question is answered; ask for more, each with options, for all that is still short of 100.
  */
-export function scoreRole(roleId: string, fingerprint: string, fresh?: boolean, focus?: string): Promise<RoleResult> {
-  const json = { roleId, fingerprint, ...(fresh ? { fresh } : {}), ...(focus ? { focus } : {}) };
+export function scoreRole(roleId: string, fingerprint: string, fresh?: boolean, focus?: string, more?: boolean): Promise<RoleResult> {
+  const json = { roleId, fingerprint, ...(fresh ? { fresh } : {}), ...(focus ? { focus } : {}), ...(more ? { more } : {}) };
   return apiFetch("/v1/enrich/score", { method: "POST", json, schema: RoleResultSchema });
 }
 

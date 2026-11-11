@@ -85,8 +85,8 @@ export function useRoleRun(opts: Options) {
     const asked = new Set(role?.notes.map((note) => questionKey(note.question)));
     const thin = isThin(role, result);
     const run = splitRun(result ? buildRun(result, { thin, answered: asked }) : []);
-    // Below 80 with every stored question already answered: new questions are asked for, so the role can still be improved.
-    const spent = result !== undefined && run.items.length === 0 && (result.score ?? 0) < CLEAR_AT;
+    // Below 100 with every stored question already answered: more are asked for, so the role can still be improved.
+    const spent = result !== undefined && run.items.length === 0 && (result.score ?? 0) < 100;
     const view: View = {
       step: { kind: "start" }, ...run, ready: result !== undefined && !spent, busy: false, answers: {},
       before: result?.score ?? null, applied: 0, answered: 0, own: null, rescored: false, timedOut: false,
@@ -98,7 +98,7 @@ export function useRoleRun(opts: Options) {
   const session = useRef({
     view, alive: true, closed: false, notesChanged: false, loadStarted: false,
     result: initial.result, asked: initial.asked, thin: initial.thin, printAtOpen: initial.print,
-    cursor: 0, finishing: 0, boxRescored: false, described: false, spent: initial.spent,
+    cursor: 0, finishing: 0, boxRescored: false, described: false, spent: initial.spent, roleAnswered: false,
     held: new Map<string, Promise<Held>>(), tokens: new Map<string, number>(), changed: new Set<string>(),
   });
   useEffect(() => { current.current = opts; });
@@ -151,7 +151,7 @@ export function useRoleRun(opts: Options) {
       try {
         result = await saved((_, print) => {
           const o = current.current;
-          return o.focus ? scoreRole(o.roleId, print, true, o.focus) : s.spent ? scoreRole(o.roleId, print, true) : scoreRole(o.roleId, print);
+          return o.focus ? scoreRole(o.roleId, print, true, o.focus) : s.spent ? scoreRole(o.roleId, print, true, undefined, true) : scoreRole(o.roleId, print);
         });
       } catch { /* No questions from this call: the stored ones, if they are for this text. */ }
       if (!s.alive || s.closed) return;
@@ -265,7 +265,9 @@ export function useRoleRun(opts: Options) {
     // The role's answers (tools, people, scale) belong in its lines too: the weak lines not asked about are rewritten with them in view.
     if (s.view.answered > 0 || fromEarlier) {
       const grades = new Map(s.result?.bullets.map((b) => [b.id, b.score]));
-      for (const b of role.bullets) if (b.text.trim() !== "" && !s.held.has(b.id) && (grades.get(b.id) ?? 0) < CLEAR_AT) hold(b.id, false);
+      // An answer about the whole role (a tool, the team, the scale) may belong in any line that is not complete yet.
+      const upTo = s.roleAnswered ? 100 : CLEAR_AT;
+      for (const b of role.bullets) if (b.text.trim() !== "" && !s.held.has(b.id) && (grades.get(b.id) ?? 0) < upTo) hold(b.id, false);
     }
     let added: { id: string; text: string }[] = [];
     let description = "";
@@ -387,6 +389,7 @@ export function useRoleRun(opts: Options) {
       } });
       update({ answers: { ...s.view.answers, [item.key]: { noteId, text: value } }, answered: s.view.answered + 1 });
       // An answer about a line: its rewrite is prepared now and held. Only a first answer can bring a follow-up.
+      if (item.kind === "role") s.roleAnswered = true;
       if (item.kind === "line") hold(item.question.bulletId, !item.followUp);
       // An answer changed after Back: the rewrites already held were written with the old one, so they are made again.
       else if (earlier && earlier.text !== value) for (const id of [...s.held.keys()]) hold(id, false);
@@ -453,6 +456,7 @@ export function useRoleRun(opts: Options) {
       s.held = new Map();
       s.tokens = new Map();
       s.changed = new Set();
+      s.roleAnswered = false;
       s.finishing++;
       update({ ...splitRun(more), answers: {}, before: newest?.score ?? s.view.before, applied: 0, answered: 0, own: null, rescored: false, timedOut: false });
       show(0);

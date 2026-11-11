@@ -133,8 +133,8 @@ describe("a role below 80 with no question left", () => {
     api.scoreRole.mockResolvedValue(fresh);
     render(<Harness initialRole={spentRole} />);
     expect(await screen.findByText("1 short question, about a minute. Then I show you what it changed.")).toBeInTheDocument();
-    // Asked again on purpose: the stored result had nothing left to ask.
-    expect(api.scoreRole).toHaveBeenCalledWith("r1", fingerprint(spentRole, "en"), true);
+    // Asked for more on purpose: the stored result had nothing left to ask.
+    expect(api.scoreRole).toHaveBeenCalledWith("r1", fingerprint(spentRole, "en"), true, undefined, true);
     await userEvent.click(screen.getByRole("button", { name: "Start" }));
     expect(screen.getByRole("heading", { name: "Who uses the weekly report?" })).toBeInTheDocument();
   });

@@ -373,6 +373,24 @@ export function focusNote(focus?: string): string {
   ].join("\n");
 }
 
+/**
+ * The person has answered everything asked so far and wants the role as close to 100 as it can go: the reviewer
+ * is asked for a question, with options to pick, for everything still short of it. Never changes the grades.
+ */
+export function moreNote(more?: boolean): string {
+  if (!more) return "";
+  return [
+    "",
+    "The person has already answered your earlier questions (they are in the role notes) and wants to bring this role as close to 100 as it can go.",
+    "Grade the bullets and mark coverage exactly as you would without this request. Then ask more than you usually would:",
+    "- For every bullet with a grade that is not specific, return one question for the single fact that would make it specific. If the notes already hold an answer about that bullet, ask for a different, more concrete fact: a quantity as a range, how often, for whom, with which tool, or what changed.",
+    "- For every coverage item you mark applies or unknown, return one role question for it.",
+    "- Never repeat a question that is in the notes word for word.",
+    "- Give every question 3 or 4 answer options the person can pick, drawn from this role's own words and the usual work of such a role. Quantities only as ranges. For a yes-or-no check, the first option is \"No\" in the person's language. Only the question about what the company does may have no options.",
+    "- Return no questions only when every grade is specific and every coverage item is shown or na.",
+  ].join("\n");
+}
+
 /** The role as the model sees it: context for the title, description and period, bullets to grade. No company. */
 export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes"> & Partial<Pick<Experience, "startDate" | "endDate" | "current">>, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));

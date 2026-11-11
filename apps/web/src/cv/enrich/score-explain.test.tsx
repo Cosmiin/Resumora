@@ -89,8 +89,16 @@ describe("a role's score, clicked in the Contents column", () => {
     expect(nextStepOf({ ...result, coverage: { ...result.coverage!, marks: { ...marks, people: "na" } }, nextStep: null })).toBeNull();
   });
 
-  it("with nothing to add, says so and offers no button", async () => {
+  // Owner review: below 100 a role can always be worked on, even with no step to name.
+  it("below 100 with no step to name, offers to look for what would still raise it", async () => {
     list({ coverage: { ...result.coverage!, marks: { ...marks, people: "na" } }, nextStep: null, roleQuestions: [] });
+    await userEvent.click(screen.getByRole("button", { name: /Operations Analyst/ }));
+    expect(screen.getByText("Not at 100 yet. I can look for what would still raise it.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Improve this role" })).toBeInTheDocument();
+  });
+
+  it("at 100 with nothing to add, says so and offers no button", async () => {
+    list({ score: 100, coverage: { ...result.coverage!, marks: { ...marks, people: "na" } }, nextStep: null, roleQuestions: [] });
     await userEvent.click(screen.getByRole("button", { name: /Operations Analyst/ }));
     expect(screen.getByText("Nothing to add here right now.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Answer|Improve/ })).toBeNull();

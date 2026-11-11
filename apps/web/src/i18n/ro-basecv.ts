@@ -400,6 +400,7 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.explain.check.concise": "Concis",
   "enrich.next.line": "Urmează: {step}",
   "enrich.next.none": "Nimic de adăugat aici acum.",
+  "enrich.next.more": "Încă nu e la 100. Pot căuta ce l-ar mai ridica.",
   "enrich.next.answerOne": "Răspunde la 1 întrebare",
   "enrich.next.answer": "Răspunde la {n} întrebări",
   "enrich.next.company": "spune ce face compania, într-un rând.",

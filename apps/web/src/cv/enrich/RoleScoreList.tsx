@@ -73,9 +73,9 @@ function RoleNext({ role, name, state, onAnswer, onRetry }: { role: Experience; 
       <p className="role-num"><b>{n}</b> <span>{name}</span></p>
       {state.state !== "ready" && <p className="fine">{t("enrich.card.previous")}</p>}
       {state.state === "unavailable" && <button type="button" className="ui-btn ui-btn--sm role-answer" onClick={onRetry}>{t("enrich.card.tryAgain")}</button>}
-      <p className="role-next">{next === null ? t("enrich.next.none") : t("enrich.next.line", { step: next })}</p>
+      <p className="role-next">{next !== null ? t("enrich.next.line", { step: next }) : t(n < 100 ? "enrich.next.more" : "enrich.next.none")}</p>
       <div className="role-acts">
-        {(questions > 0 || next !== null) && (
+        {(questions > 0 || next !== null || n < 100) && (
           <button type="button" className="ui-btn ui-btn--primary ui-btn--sm" onClick={onAnswer}>
             {questions === 0 ? t("enrich.card.improve") : t(questions === 1 ? "enrich.next.answerOne" : "enrich.next.answer", { n: questions })}
           </button>

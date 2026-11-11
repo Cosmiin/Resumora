@@ -29,8 +29,9 @@ const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
 /**
  * fresh: ask the model again with the notes in view, instead of returning the stored result.
  * focus: what the person wants their CV to bring out; the model is asked again with it in view.
+ * more: every earlier question is answered; the model is asked for more, each with options to pick.
  */
-const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), focus: z.string().trim().max(MAX_FOCUS).optional() });
+const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), focus: z.string().trim().max(MAX_FOCUS).optional(), more: z.boolean().optional() });
 const BrainDumpBody = ScoreBody.extend({ source: z.enum(["ramble", "answers"]).default("ramble") });
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */
