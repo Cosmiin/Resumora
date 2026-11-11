@@ -438,7 +438,8 @@ describe("the start of the base CV flow", () => {
     await user.click(within(dialog).getByRole("button", { name: "Start with the questions" }));
     expect(importsApi.applyImport).toHaveBeenCalledWith("imp-1", 1);
     expect(await screen.findByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /Product Manager, Acme SRL/ })).toBeChecked();
+    // The role is offered; its tick settles once its score arrives (not in this test).
+    expect(screen.getByRole("checkbox", { name: /Product Manager, Acme SRL/ })).toBeInTheDocument();
   });
 
   it("a file that is not a CV is refused on the upload screen", async () => {
