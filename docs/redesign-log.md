@@ -99,3 +99,22 @@ Review list:
 ## Phase 2 approved, 2026-11-11
 
 Owner approved the six flow mockups. Foundation branch merged into main. Phase 3 starts with the public pages and account flow.
+
+## Phase 3, flow 1: public pages and account (branch `redesign/public-account`)
+
+Owner decisions (2026-11-11):
+- "Export all my data" and "Delete my account": approved. Two new API actions, no schema change. Delete uses the service role key on the server, only for the caller's own id.
+- Name, default template and default tailoring language: new table `user_preferences` (migration `20261111100000_user_preferences.sql`), SQL shown to and approved by the owner before it was applied locally.
+- Extension page: honest version. No "Connected" badge, no Disconnect button; it shows the install steps and the last job the extension saved.
+
+Choices made while building:
+- Routes: `/` homepage (signed-in visitors go to `/cv`), `/signup`, `/login`, `/forgot-password`, `/reset-password`, `/account/{profile,preferences,data,extension}`.
+- The top bar is new on every signed-in page; the pages under it (CV, jobs, tailoring) keep the old look until their own flow is rebuilt. "My CVs" joins the navigation with flow 6, when the page exists.
+- Sign out moved from the old account menu to the profile page, as in the mockup.
+- The name typed at sign-up travels with the login (user metadata), because preferences can only be saved once signed in. The profile shows it until a name is saved.
+- Export is one JSON file downloaded at once (table rows as stored, uploaded files as base64), so the mockup line "the file will wait for you here" was replaced.
+- A reset link that no longer works gets its own message and a way to ask for a new one (error state the mockup did not draw).
+- Jobs added by hand in the web app are now labelled `link`, not `extension`, so "last job saved from the extension" is true.
+- Italian is offered as a tailoring language (the engine supports six; the mockup listed five).
+- Extension download: `npm run package -w @resumora/extension` builds the zip into `apps/web/public/downloads/` (not committed). It must be run before the web app is deployed, or the download button has no file.
+- The default template and tailoring language are saved now; tailoring and export start reading them when flows 5 and 6 are rebuilt.

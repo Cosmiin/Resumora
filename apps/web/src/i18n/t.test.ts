@@ -20,11 +20,12 @@ describe("interface language", () => {
   });
 
   it("falls back to English for copy Romanian doesn't have yet", () => {
-    expect(translate("ro", "app.signOut")).toBe("Sign out");
+    expect(translate("ro", "app.loading")).toBe("Loading…");
   });
 
   it("fills placeholders in either language", () => {
-    expect(translate("en", "nav.account", { email: "a@example.com" })).toBe("Account: a@example.com");
+    expect(translate("en", "signup.sent.text", { email: "a@example.com" })).toBe("We sent a confirmation link to a@example.com. Open it, then log in.");
+    expect(translate("ro", "signup.sent.text", { email: "a@example.com" })).toBe("Am trimis un link de confirmare la a@example.com. Deschide-l, apoi intră în cont.");
   });
 
   it("has the same keys in both kit dictionaries, none empty", () => {

@@ -15,6 +15,8 @@ import type { ModelDeps } from "./ai/call-model.ts";
 import type { VoiceDeps } from "./ai/voice-session.ts";
 import type { InsightsRepo } from "./enrich/repo.ts";
 import { enrichRoutes } from "./enrich/routes.ts";
+import type { AccountAdmin, AccountRepo } from "./account/repo.ts";
+import { accountRoutes } from "./account/routes.ts";
 
 export type AppDeps = {
   /** The only browser origin allowed to call the API cross-origin. */
@@ -26,6 +28,8 @@ export type AppDeps = {
   jobRepo(user: AuthUser): JobRepo;
   tailorRepo?(user: AuthUser): TailorRepo;
   insightsRepo(user: AuthUser): InsightsRepo;
+  /** Preferences, data export and account deletion. `admin` has service role access and is used only to delete the caller. */
+  account?: { repo(user: AuthUser): AccountRepo; admin(): AccountAdmin };
   /** Model access for request handlers, logging each call as this user. */
   model(user: AuthUser): ModelDeps;
   /** Live voice sessions (OpenAI key and logging). */
@@ -116,6 +120,21 @@ export function createApp(deps: AppDeps) {
         return deps.tailorRepo(c.get("user"));
       },
       modelFor: (c) => deps.model(c.get("user")),
+      now: deps.now ?? (() => new Date()),
+    }),
+  );
+
+  app.route(
+    "/v1/account",
+    accountRoutes({
+      repoFor: (c) => {
+        if (!deps.account) throw new Error("Account repository is not configured");
+        return deps.account.repo(c.get("user"));
+      },
+      admin: () => {
+        if (!deps.account) throw new Error("Account repository is not configured");
+        return deps.account.admin();
+      },
       now: deps.now ?? (() => new Date()),
     }),
   );

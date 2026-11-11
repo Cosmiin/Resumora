@@ -3,7 +3,7 @@ import type { JobMessage } from "./jobs/repo.ts";
 export type Env = {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
-  /** Used only by the import queue consumer and the ai_calls log. Never sent to the browser. */
+  /** Used only by the queue consumers, the ai_calls log and deleting the caller's own account. Never sent to the browser. */
   SUPABASE_SERVICE_ROLE_KEY: string;
   APP_ORIGIN: string;
   OPENROUTER_API_KEY: string;

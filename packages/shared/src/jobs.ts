@@ -42,6 +42,8 @@ export const CreateJobBodySchema = z.object({
   url: z.url({ protocol: /^https?$/ }).max(2048),
   pageText: z.string().trim().min(200).max(60000).optional(),
   jsonLd: z.array(z.unknown()).max(20).optional(),
+  /** Who is sending the page: the web app sends "link"; the extension sends nothing. */
+  source: JobSourceSchema.optional(),
 });
 export type CreateJobBody = z.infer<typeof CreateJobBodySchema>;
 

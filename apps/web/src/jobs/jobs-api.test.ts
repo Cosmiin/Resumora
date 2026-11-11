@@ -100,7 +100,7 @@ describe("createJob", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/v1/jobs", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ url: item.url, pageText }),
+      body: JSON.stringify({ url: item.url, pageText, source: "link" }),
     }));
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
     expect(new Headers(init.headers).get("content-type")).toBe("application/json");

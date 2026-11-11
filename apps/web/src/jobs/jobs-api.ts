@@ -21,7 +21,7 @@ export function getJob(id: string): Promise<Job> {
 
 export function createJob(url: string, pageText: string): Promise<{ id: string; existing: boolean }> {
   return apiFetch("/v1/jobs", {
-    method: "POST", json: { url, pageText }, schema: CreateJobResponseSchema,
+    method: "POST", json: { url, pageText, source: "link" }, schema: CreateJobResponseSchema,
   });
 }
 

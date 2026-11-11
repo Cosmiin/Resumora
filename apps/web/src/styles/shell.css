@@ -1,0 +1,92 @@
+/* The top bar shared by the public pages and the signed-in app ("Coach's Page", see DESIGN.md).
+   It sets its own background and fonts, so it also looks right above screens that still use the old look. */
+.shell-band {
+  background: var(--color-desk);
+  color: var(--color-ink);
+  font: var(--weight-regular) var(--text-base) / var(--leading-base) var(--font-body);
+}
+.shell-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-6);
+  padding-block: 18px;
+}
+.shell-brand {
+  color: var(--color-ink);
+  font: var(--weight-display) 1.5rem / 1 var(--font-display);
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+/* The highlighter stroke under the name. */
+.shell-brand::after {
+  content: "";
+  display: block;
+  height: 7px;
+  margin-top: 1px;
+  border-radius: 4px;
+  background: var(--color-highlight);
+  box-shadow: 0 0 0 1px rgb(36 39 46 / 0.08);
+}
+.shell-brand:focus-visible,
+.shell-nav a:focus-visible,
+.shell-lang button:focus-visible {
+  outline: var(--focus-width) solid var(--color-coach);
+  outline-offset: var(--focus-gap);
+}
+.shell-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) 6px;
+}
+.shell-nav a:not(.ui-btn) {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h-sm);
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+.shell-nav a:not(.ui-btn):hover {
+  background: var(--color-paper-veil);
+}
+.shell-nav a[aria-current="page"] {
+  background: var(--color-paper);
+  box-shadow: var(--shadow-sheet);
+}
+.shell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.shell-actions:empty {
+  display: none;
+}
+
+/* EN / RO in the public header */
+.shell-lang {
+  display: inline-flex;
+  gap: 2px;
+}
+.shell-lang button {
+  min-height: var(--control-h-sm);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink);
+  font: var(--weight-semibold) var(--text-base) / 1.2 var(--font-body);
+  cursor: pointer;
+}
+.shell-lang button:hover {
+  background: var(--color-paper-veil);
+}
+.shell-lang button[aria-pressed="true"] {
+  background: var(--color-paper);
+  box-shadow: var(--shadow-sheet);
+}

@@ -94,7 +94,6 @@
 .jobs-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--old-space-4); margin-top: var(--old-space-4); }
 .add-job-dialog a { color: var(--text-accent); }
 .jobs-page :focus-visible, .add-job-dialog :focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-offset); }
-.app-nav { display: flex; gap: var(--old-space-5); }
 @media (max-width: 760px) {
   .jobs-page { padding: var(--old-space-8) var(--old-space-5); }
   .job-row { flex-wrap: wrap; padding: var(--old-space-5); gap: var(--old-space-4); }

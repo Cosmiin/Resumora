@@ -56,7 +56,7 @@ export function jobRoutes(deps: {
       throw new ApiError(429, "job_limit", `You can add up to ${JOBS_PER_DAY} jobs per day.`);
     }
     const created = await repo.create({
-      id: crypto.randomUUID(), source: "extension", url: body.url, urlNormalized,
+      id: crypto.randomUUID(), source: body.source ?? "extension", url: body.url, urlNormalized,
       rawText: body.pageText.slice(0, 30_000), jsonLd: findJobPosting(body.jsonLd ?? []),
     });
     if (created.existing) return c.json({ id: created.id, existing: true });

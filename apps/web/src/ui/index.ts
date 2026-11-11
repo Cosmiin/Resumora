@@ -10,3 +10,4 @@ export { ToastProvider, useToast } from "./Toast.tsx";
 export { Progress, Stepper } from "./Progress.tsx";
 export { DiffRow, type DiffDecision } from "./DiffRow.tsx";
 export { LanguageSwitch } from "./LanguageSwitch.tsx";
+export { Page, Notice, Pill, Skeleton, ButtonLink, ButtonAnchor } from "./Page.tsx";

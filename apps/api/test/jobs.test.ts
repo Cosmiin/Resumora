@@ -165,6 +165,13 @@ describe("job endpoints", () => {
     expect(store.rows.get(result.id)).toMatchObject({ status: "queued", source: "extension", rawText: body.pageText, jsonLd: null });
   });
 
+  it("labels a job sent by the web app as a link", async () => {
+    const res = await post({ ...body, source: "link" });
+    expect(res.status).toBe(202);
+    const result = (await res.json()) as { id: string };
+    expect(store.rows.get(result.id)).toMatchObject({ source: "link" });
+  });
+
   it("trims page text, caps stored text, and selects the JobPosting", async () => {
     const posting = { "@type": "JobPosting", title: "Engineer" };
     const res = await post({ ...body, pageText: `  ${"x".repeat(60_000)}  `, jsonLd: [{ "@type": "Organization" }, { "@graph": [posting] }] });
