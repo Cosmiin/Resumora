@@ -337,8 +337,8 @@ describe("score prompt", () => {
     const prompt = scoreSystemPrompt("en");
     const at = (text: string) => prompt.indexOf(text);
     expect(at("one question for each of leadership, seniority, people and domain")).toBeGreaterThan(at("topic tools: the tools"));
-    expect(prompt).toContain('marked unknown: a quick check. Word it so that "No" is a full answer');
-    expect(prompt).toContain('give "No", in the\n  language of the questions, as the first option');
+    expect(prompt).toContain('marked unknown: a quick check. Ask whether it happened, so that "No" is\n  a full answer');
+    expect(prompt).toContain('in the language of the questions, as the first option: that one word');
     expect(prompt).toContain("marked applies: ask for the fact itself");
     expect(prompt).toContain("Never ask one for a parameter you mark shown or na.");
     expect(at("Then any other role-wide fact that is still needed (topic other).")).toBeGreaterThan(at("marked applies"));

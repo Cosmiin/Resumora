@@ -219,9 +219,11 @@ export function useRoleRun(opts: Options) {
     if (applied > 0 || s.view.answered === 0) return;
     const run = s.finishing;
     void saved((_, print) => scoreRole(current.current.roleId, print, true)).then((result) => {
-      if (!result || !s.alive || s.closed || s.finishing !== run) return;
-      s.result = result;
+      if (!result || s.finishing !== run) return;
+      // Leaving before the score comes back must not lose it: My CV shows it either way.
       current.current.onScore?.(result);
+      if (!s.alive || s.closed) return;
+      s.result = result;
       update({ own: result });
     }).catch(() => undefined).finally(() => {
       if (s.finishing === run) update({ rescored: true });
@@ -327,7 +329,8 @@ export function useRoleRun(opts: Options) {
   const arrived = entry?.state === "ready" && entry.result?.fingerprint === print ? entry.result : undefined;
   const done = view.step.kind === "done";
   // The newest score after the run: for the changed text, or the one the run asked for itself.
-  const newest = !done ? undefined : view.applied > 0 ? (arrived && print !== session.current.printAtOpen ? arrived : undefined) : view.own ?? undefined;
+  const newest = !done ? undefined : view.applied > 0 ? (arrived && print !== session.current.printAtOpen ? arrived : undefined)
+    : view.own ?? (arrived && arrived.score !== view.before ? arrived : undefined);
   const waiting = done && !newest && (view.applied > 0 ? !view.timedOut : view.answered > 0 && !view.rescored);
   const more = done ? remaining(role, newest ?? (view.applied === 0 ? session.current.result : undefined), view.rest, session.current.asked, session.current.changed) : [];
   const result = newest ?? (done && view.applied > 0 ? undefined : session.current.result);
@@ -357,7 +360,8 @@ export function useRoleRun(opts: Options) {
       const value = text.trim().slice(0, MAX_LONG_TEXT);
       if (!item || !value) return;
       const o = current.current;
-      const noteId = s.view.answers[item.key]?.noteId ?? newId();
+      const earlier = s.view.answers[item.key];
+      const noteId = earlier?.noteId ?? newId();
       s.notesChanged = true;
       o.dispatch({ type: "setNote", roleId: o.roleId, note: {
         id: noteId, question: itemQuestion(item), answer: value, via: via.length ? via : ["type"], askedAt: new Date().toISOString(),
@@ -365,6 +369,8 @@ export function useRoleRun(opts: Options) {
       update({ answers: { ...s.view.answers, [item.key]: { noteId, text: value } }, answered: s.view.answered + 1 });
       // An answer about a line: its rewrite is prepared now and held. Only a first answer can bring a follow-up.
       if (item.kind === "line") hold(item.question.bulletId, !item.followUp);
+      // An answer changed after Back: the rewrites already held were written with the old one, so they are made again.
+      else if (earlier && earlier.text !== value) for (const id of [...s.held.keys()]) hold(id, false);
       if (item.kind === "box" && !s.boxRescored) {
         s.boxRescored = true;
         void afterBox();
@@ -424,7 +430,7 @@ export function useRoleRun(opts: Options) {
       if (!available() || s.view.step.kind !== "done" || more.length === 0) return;
       s.result = newest ?? s.result;
       s.printAtOpen = print;
-      s.thin = false;
+      s.thin = isThin(role, newest ?? s.result);
       s.held = new Map();
       s.tokens = new Map();
       s.changed = new Set();

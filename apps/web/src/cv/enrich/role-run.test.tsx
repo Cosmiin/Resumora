@@ -168,6 +168,34 @@ describe("the run of questions", () => {
     expect(screen.getByText("Question 2 of 3 · about the role")).toBeInTheDocument();
   });
 
+  it("with one role answer and one line answer, the line asked about and the weak line each get one rewrite", async () => {
+    const lineFirst: RoleResult = { ...result, roleQuestions: [result.roleQuestions[0]!] };
+    render(<Harness roleResult={lineFirst} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.type(screen.getByLabelText("Your answer"), "Parcels");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await answer("Fewer planning mistakes");
+    await screen.findByRole("heading", { name: "Here is the role as it will read" });
+    const calls = api.improveBullet.mock.calls.length;
+    expect(calls).toBe(2);
+  });
+
+  it("leaving before the score comes back still hands it to the editor", async () => {
+    let give!: (r: RoleResult) => void;
+    const onScore = vi.fn();
+    api.improveBullet.mockResolvedValue({ needsDetail: true, nextQuestion: null });
+    api.roleDescription.mockResolvedValue({ text: "", keywords: [] });
+    render(<Harness onScore={onScore} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    api.scoreRole.mockReturnValue(new Promise<RoleResult>((done) => { give = done; }));
+    await answer("No");
+    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Back to my CV" }));
+    await act(async () => give({ ...result, score: 74 }));
+    expect(onScore).toHaveBeenCalledWith(expect.objectContaining({ score: 74 }));
+  });
+
   it("an answer too thin to use brings one follow-up straight after the question on screen", async () => {
     let give!: (a: unknown) => void;
     api.improveBullet.mockImplementation(({ bulletId }: { bulletId: string }) => (bulletId === "b1"

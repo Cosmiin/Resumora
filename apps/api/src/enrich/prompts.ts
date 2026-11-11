@@ -236,10 +236,10 @@ Then at most 5 more, in this order.
 First, one question for each of leadership, seniority, people and domain
 that you mark unknown or applies in coverage (see COVERAGE), with that
 name as its topic:
-- marked unknown: a quick check. Word it so that "No" is a full answer
-  ("Did anyone report to you in this role?"), and give "No", in the
-  language of the questions, as the first option, then the likely
-  answers ("1–5 people", "6–20", "20+").
+- marked unknown: a quick check. Ask whether it happened, so that "No" is
+  a full answer ("Did anyone report to you in this role?"), and give "No",
+  in the language of the questions, as the first option: that one word and
+  nothing after it. Then the likely answers ("1–5 people", "6–20", "20+").
 - marked applies: ask for the fact itself ("Who did you report to?").
 Never ask one for a parameter you mark shown or na.
 Then any other role-wide fact that is still needed (topic other).
