@@ -127,6 +127,8 @@ function fieldsFor(topic: ConfirmTopic, cv: CvContent): { fields: Field[]; apply
 function ConfirmForm(props: { topic: ConfirmTopic; cv: CvContent; onSave(change: (cv: CvContent) => CvContent): void; onCancel(): void }) {
   const { fields, apply } = fieldsFor(props.topic, props.cv);
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, f.value])));
+  // What the CV held when the form opened: a field counts as changed against this, not against a later save by another form.
+  const [opened] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, f.stored ?? f.value])));
   // A field that joined the list after the form opened (a section moved into it) shows the CV's value.
   const valueOf = (f: Field) => values[f.key] ?? f.value;
   const badDate = fields.some((f) => f.date && !DATE.test(valueOf(f).trim()));
@@ -134,7 +136,7 @@ function ConfirmForm(props: { topic: ConfirmTopic; cv: CvContent; onSave(change:
     <form className="import-confirm-form" onSubmit={(e) => {
       e.preventDefault();
       if (badDate) return;
-      props.onSave(apply(Object.fromEntries(fields.filter((f) => valueOf(f) !== (f.stored ?? f.value)).map((f) => [f.key, valueOf(f)]))));
+      props.onSave(apply(Object.fromEntries(fields.filter((f) => valueOf(f) !== (opened[f.key] ?? f.stored ?? f.value)).map((f) => [f.key, valueOf(f)]))));
     }}>
       {fields.map((f) => (
         <label key={f.key}>
