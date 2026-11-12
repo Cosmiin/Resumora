@@ -95,7 +95,6 @@ describe("jobs list", () => {
   it("says where each job stands and offers the next step for it", async () => {
     vi.mocked(listJobs).mockResolvedValue(page([
       { ...job, applicationStatus: "saved" },
-      { ...job, id: "t", title: "Tailored one", applicationStatus: "tailored" },
       { ...job, id: "a", title: "Applied one", applicationStatus: "applied" },
       { ...job, id: "c", title: "Closed one", positionClosed: true },
       { ...job, id: "f", title: "Failed one", status: "failed" },
@@ -103,11 +102,6 @@ describe("jobs list", () => {
     renderJobs();
     const row = async (title: string) => within((await screen.findByRole("link", { name: title })).closest("li")!);
     expect((await row("Engineer")).getByRole("link", { name: "Tailor my CV" })).toHaveAttribute("href", "/jobs/one");
-    const tailored = await row("Tailored one");
-    expect(tailored.getByText("CV tailored")).toBeInTheDocument();
-    // "Tailored" can be set by hand with no tailored CV, so the row leads to the job page, never straight to the CV.
-    expect(tailored.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/t");
-    expect(tailored.queryByRole("link", { name: "Open tailored CV" })).toBeNull();
     const applied = await row("Applied one");
     expect(applied.getByText("Applied")).toBeInTheDocument();
     expect(applied.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/a");
@@ -115,7 +109,8 @@ describe("jobs list", () => {
     expect(closed.getByText("No longer open")).toBeInTheDocument();
     expect(closed.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/c");
     expect((await row("Failed one")).getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/f");
-    expect(screen.getAllByText("CV tailored")).toHaveLength(1);
+    // The application status never says a CV was tailored.
+    expect(screen.queryByText("CV tailored")).toBeNull();
     expect(screen.getAllByText("No longer open")).toHaveLength(1);
   });
 

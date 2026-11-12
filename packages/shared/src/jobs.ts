@@ -38,7 +38,8 @@ export type JobSource = z.infer<typeof JobSourceSchema>;
 export const JobErrorCodeSchema = z.enum(["fetch_blocked", "page_empty", "not_a_job", "ai_failed"]);
 export type JobErrorCode = z.infer<typeof JobErrorCodeSchema>;
 
-const applicationStatus = z.enum(["saved", "tailored", "applied", "interview", "offer", "rejected"]);
+/** How the application is going, set by the person. `saved` is shown as "Not applied". */
+const applicationStatus = z.enum(["saved", "applied", "interview", "offer", "rejected"]);
 
 export const CreateJobBodySchema = z.object({
   url: z.url({ protocol: /^https?$/ }).max(2048),
@@ -76,7 +77,7 @@ export const JobListItemSchema = z.object({
   source: JobSourceSchema,
   url: z.string(),
   createdAt: z.string(),
-  /** Where the person is with this job; the list shows "CV tailored" from it. */
+  /** Where the person is with this application. */
   applicationStatus: applicationStatus.optional(),
   /** True when the ad itself says the position is no longer open. */
   positionClosed: z.boolean().optional(),

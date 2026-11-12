@@ -234,7 +234,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           <label className="job-application-status"><span className="ui-label">{t("job.status.title")}</span>
             <select className="ui-input" value={job.applicationStatus} disabled={statusSaving}
               onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>
-              {(["saved", "tailored", "applied", "interview", "offer", "rejected"] as const).map((status) =>
+              {(["saved", "applied", "interview", "offer", "rejected"] as const).map((status) =>
                 <option value={status} key={status}>{t(`job.status.${status}`)}</option>)}
             </select>
           </label>

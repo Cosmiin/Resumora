@@ -128,11 +128,16 @@ describe("JobPatchBodySchema", () => {
   });
 
   it("accepts all optional application statuses", () => {
-    for (const applicationStatus of ["saved", "tailored", "applied", "interview", "offer", "rejected"]) {
+    for (const applicationStatus of ["saved", "applied", "interview", "offer", "rejected"]) {
       const patch = { version: 1, extracted: extraction, applicationStatus };
       expect(JobPatchSchema.parse(patch)).toEqual(patch);
       expect(JobPatchBodySchema.parse(patch)).toEqual(patch);
     }
+  });
+
+  it("rejects the old status tailored", () => {
+    const patch = { version: 1, extracted: extraction, applicationStatus: "tailored" };
+    expect(JobPatchSchema.safeParse(patch).success).toBe(false);
   });
 
   it("ignores old thoughts and other unknown fields", () => {
@@ -203,10 +208,11 @@ describe("job response schemas", () => {
       ...listItem, rawText: null, extracted: null, editedByUser: false, version: 1, updatedAt: listItem.createdAt,
       applicationStatus: "saved",
     };
-    for (const applicationStatus of ["saved", "tailored", "applied", "interview", "offer", "rejected"]) {
+    for (const applicationStatus of ["saved", "applied", "interview", "offer", "rejected"]) {
       expect(JobSchema.parse({ ...job, applicationStatus })).toEqual({ ...job, applicationStatus });
     }
     expect(JobSchema.safeParse({ ...job, applicationStatus: "hired" }).success).toBe(false);
+    expect(JobSchema.safeParse({ ...job, applicationStatus: "tailored" }).success).toBe(false);
   });
 });
 

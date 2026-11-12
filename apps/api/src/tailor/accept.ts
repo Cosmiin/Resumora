@@ -83,7 +83,7 @@ function apply(cv: CvContent, p: Proposal, section: TailorSection): void {
 
 /**
  * Accepts the current section: writes the kept proposals into the tailored CV, records the review,
- * saves Score 2, and moves the run on (done after `layout`, which also marks a saved job as tailored).
+ * saves Score 2, and moves the run on (done after `layout`). The job's application status is never touched.
  */
 export async function acceptSection(
   deps: { model: ModelDeps; tailor: TailorRepo; cv: CvRepo; jobs: JobRepo; now(): Date },
@@ -205,15 +205,5 @@ export async function acceptSection(
     currentSection: next, status: next ? "running" : "done", ...(roleId || isRoleSection(next) ? { currentRoleId } : {}),
   });
   if (!updated) throw jobNotFound();
-  if (!next) await markTailored(deps.jobs, run.jobId);
   return { run: updated, score };
-}
-
-/** Moves a saved job to tailored; a concurrent job edit gets one retry. */
-async function markTailored(jobs: JobRepo, jobId: string): Promise<void> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const job = await jobs.get(jobId);
-    if (!job?.extracted || job.applicationStatus !== "saved") return;
-    if (await jobs.patch(jobId, job.version, job.extracted, { applicationStatus: "tailored" }) !== "conflict") return;
-  }
 }

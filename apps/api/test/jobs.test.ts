@@ -135,11 +135,11 @@ describe("job endpoints", () => {
     const closed = await create({ ...body, url: "https://example.test/jobs/closed" });
     await store.admin.finish(open, extracted);
     await store.admin.finish(closed, { ...extracted, positionClosed: true });
-    expect((await patch(open, 1, extracted, { applicationStatus: "tailored" })).status).toBe(200);
+    expect((await patch(open, 1, extracted, { applicationStatus: "interview" })).status).toBe(200);
     const list = (await (await get()).json()) as JobListPage;
     expect(list.items.map(({ id, applicationStatus, positionClosed }) => ({ id, applicationStatus, positionClosed }))).toEqual([
       { id: closed, applicationStatus: "saved", positionClosed: true },
-      { id: open, applicationStatus: "tailored", positionClosed: false },
+      { id: open, applicationStatus: "interview", positionClosed: false },
     ]);
     listFields(list);
   });
@@ -169,6 +169,8 @@ describe("job endpoints", () => {
     const id = await create();
     await store.admin.finish(id, extracted);
     await error(await patch(id, 1, extracted, { applicationStatus: "invalid" }), 400, "invalid_content");
+    // A tab opened before "tailored" stopped being a status gets the same answer.
+    await error(await patch(id, 1, extracted, { applicationStatus: "tailored" }), 400, "invalid_content");
     expect(await (await get(id)).json()).toMatchObject({ applicationStatus: "saved", version: 1 });
   });
   it("creates a queued extension job and sends one message", async () => {

@@ -168,7 +168,6 @@ function JobsList({ userId }: { userId: string }) {
                           </li>
                         );
                       }
-                      const tailored = job.applicationStatus === "tailored";
                       const ready = job.status === "ready";
                       return (
                         <li key={job.id}>
@@ -177,14 +176,12 @@ function JobsList({ userId }: { userId: string }) {
                             <p className="ui-muted">{place}</p>
                             <div className="ui-row">
                               {job.status === "failed" && <span className="ui-pill ui-pill--bad">{t("jobs.badge.failed")}</span>}
-                              {tailored && <span className="ui-pill ui-pill--good">{t("jobs.pill.tailored")}</span>}
-                              {job.applicationStatus && !["saved", "tailored"].includes(job.applicationStatus) && <span className="ui-pill">{t(`job.status.${job.applicationStatus}`)}</span>}
+                              {job.applicationStatus && job.applicationStatus !== "saved" && <span className="ui-pill">{t(`job.status.${job.applicationStatus}`)}</span>}
                               {job.positionClosed && <span className="ui-pill ui-pill--warn">{t("jobs.pill.closed")}</span>}
                               <time className="ui-muted ui-small" dateTime={job.createdAt}>{saved(job)}</time>
                             </div>
                           </div>
                           <div className="ui-row">
-                            {/* "Tailored" can also be picked by hand, with no tailored CV behind it; the job page knows which. */}
                             {ready && !job.positionClosed && (job.applicationStatus ?? "saved") === "saved"
                                 ? <Link className="ui-btn ui-btn--primary ui-btn--sm" to={to}>{t("job.tailor.button")}</Link>
                                 : <Link className="ui-btn ui-btn--sm" to={to}>{t("jobs.view")}</Link>}

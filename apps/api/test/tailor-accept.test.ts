@@ -244,7 +244,7 @@ describe("accept section", () => {
     expect(Object.keys(tailored().review!.summary as object)).toEqual(["summary"]);
   });
 
-  it("runs the layout step after Languages, then ends done with the job tailored", async () => {
+  it("runs the layout step after Languages, then ends done and leaves the application status alone", async () => {
     const runId = await start();
     for (const section of ["experience", "skills", "summary", "achievements", "languages"]) {
       expect((await accept(runId, section)).status).toBe(200);
@@ -265,7 +265,7 @@ describe("accept section", () => {
     expect((await done.json() as { run: TailorRun }).run).toMatchObject({ status: "done", currentSection: null });
     expect(tailored().content.layout.order).toEqual(order);
     expect(tailored().content.basics.titles).toEqual(["Payroll Lead"]);
-    expect((await jobs.repoFor("user-a").get(jobId))!.applicationStatus).toBe("tailored");
+    expect((await jobs.repoFor("user-a").get(jobId))!.applicationStatus).toBe("saved");
   });
 
   it("drops a headline with words the CV doesn't have and an order that isn't a reordering", async () => {

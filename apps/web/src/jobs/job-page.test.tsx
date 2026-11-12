@@ -231,10 +231,10 @@ describe("job page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tailor my CV" }));
     expect(await screen.findByText("Not scored yet")).toBeInTheDocument();
   });
-  it("offers all six statuses and saves the selected status", async () => {
+  it("offers the five application statuses and saves the selected status", async () => {
     const { client } = renderJob(); await ready();
     const select = screen.getByRole("combobox", { name: "Application status" });
-    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual(["Saved", "Tailored", "Applied", "Interview", "Offer", "Rejected"]);
+    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual(["Not applied", "Applied", "Interview", "Offer", "Rejected"]);
     await userEvent.selectOptions(select, "applied");
     await waitFor(() => expect(client.getQueryData(["job", "u1", "one"])).toMatchObject({ applicationStatus: "applied", version: 2 }));
     expect(patchJob).toHaveBeenCalledWith("one", 1, job.extracted, { applicationStatus: "applied" });
