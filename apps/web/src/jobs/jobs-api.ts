@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  JobListPageSchema, JobSchema, MatchScoreSchema,
-  type Job, type JobExtraction, type JobListPage, type JobPatch,
+  JobListPageSchema, JobSchema, JobScoreSchema,
+  type Job, type JobExtraction, type JobListPage, type JobPatch, type JobScore,
 } from "@resumora/shared";
 import { ApiClientError, apiFetch, authedFetch, errorOf } from "../lib/api.ts";
 
@@ -31,17 +31,15 @@ export function createJob(url: string, pageText: string): Promise<{ id: string; 
   });
 }
 
-export function getJobScore(id: string) {
-  return apiFetch(`/v1/jobs/${encodeURIComponent(id)}/score`, {
-    schema: z.object({ base: MatchScoreSchema.nullable(), tailored: MatchScoreSchema.nullable() }),
-  });
+/** The job's scores. `cvId` picks one of its tailored CVs; without it the API answers for the one saved last. */
+export function getJobScore(id: string, cvId?: string): Promise<JobScore> {
+  const query = cvId ? `?cv=${encodeURIComponent(cvId)}` : "";
+  return apiFetch(`/v1/jobs/${encodeURIComponent(id)}/score${query}`, { schema: JobScoreSchema });
 }
 
 /** Computes Score 1 when the job has none yet (never rescores). */
-export function scoreJob(id: string) {
-  return apiFetch(`/v1/jobs/${encodeURIComponent(id)}/score`, {
-    method: "POST", schema: z.object({ base: MatchScoreSchema.nullable(), tailored: MatchScoreSchema.nullable() }),
-  });
+export function scoreJob(id: string): Promise<JobScore> {
+  return apiFetch(`/v1/jobs/${encodeURIComponent(id)}/score`, { method: "POST", schema: JobScoreSchema });
 }
 
 export function patchJob(

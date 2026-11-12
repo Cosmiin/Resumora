@@ -53,7 +53,7 @@ beforeEach(() => {
   vi.mocked(startTailoring).mockResolvedValue({ run: makeRun(), language: "en" });
   vi.mocked(getLanguages).mockResolvedValue({ cv: "en", ad: "en", chosen: "en" });
   vi.mocked(getJob).mockRejectedValue(new Error("offline"));
-  vi.mocked(scoreJob).mockResolvedValue({ base: null, tailored: null });
+  vi.mocked(scoreJob).mockResolvedValue({ base: null, tailored: null, tailoredCvId: null, stale: false, hasTailoredCv: false });
   vi.mocked(sendAnswers).mockResolvedValue(undefined);
   vi.mocked(askQuestions).mockResolvedValue([]);
   vi.mocked(runSection).mockResolvedValue({ proposals: [], questions: [] });

@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
-import { emptyCv, type Experience, type Job, type JobListPage, type MatchScore } from "@resumora/shared";
+import { emptyCv, type Experience, type Job, type JobListPage, type JobScore, type MatchScore, type TailoredCv } from "@resumora/shared";
 
 const auth = vi.hoisted(() => ({ getSession: vi.fn(), onAuthStateChange: vi.fn(), signOut: vi.fn() }));
 vi.mock("../lib/supabase.ts", () => ({ supabase: { auth } }));
@@ -11,6 +11,10 @@ vi.mock("./jobs-api.ts", () => ({ getJob: vi.fn(), getJobScore: vi.fn(), scoreJo
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
 vi.mock("../tailor/tailor-api.ts", async (original) => ({ ...(await original<object>()), getRun: vi.fn() }));
 import { getRun } from "../tailor/tailor-api.ts";
+vi.mock("../tailor/tailored-api.ts", async (original) => ({ ...(await original<object>()), listTailored: vi.fn(), getTailored: vi.fn() }));
+vi.mock("../account/account-api.ts", async (original) => ({ ...(await original<object>()), getPreferences: vi.fn() }));
+import { getTailored, listTailored } from "../tailor/tailored-api.ts";
+import { getPreferences } from "../account/account-api.ts";
 vi.mock("../cv/enrich/useRoleScores.ts", () => ({ useRoleScores: vi.fn() }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 import { getCv } from "../cv/cv-api.ts";
@@ -46,6 +50,8 @@ const role: Experience = { id: "role", company: "Acme", title: "Engineer", locat
   current: true, description: "", bullets: [], notes: [], facts: { items: ["Built reports"], fromNotes: "", updatedAt: "2026-11-05T10:00:00Z" } };
 const match: MatchScore = { policy: "match/1", total: 80, band: "strong", capped: false, labels: [],
   parts: { requirements: null, keywords: null, seniority: null, langEdu: null } };
+/** The score answer: nothing scored and not tailored, unless the test says otherwise. */
+const scores = (over: Partial<JobScore> = {}): JobScore => ({ base: null, tailored: null, tailoredCvId: null, stale: false, hasTailoredCv: false, ...over });
 const roleScores = (score: number) => ({ scores: new Map([["role", { state: "ready" as const,
   result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } }]]), retry: vi.fn(), put: vi.fn() });
 const ready = () => screen.findByRole("heading", { name: "Engineer", level: 1 });
@@ -55,7 +61,7 @@ beforeEach(() => {
   auth.getSession.mockResolvedValue({ data: { session: { access_token: "t", user: { id: "u1", email: "ana@example.com" } } } });
   auth.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   vi.mocked(getJob).mockResolvedValue(job);
-  vi.mocked(getJobScore).mockResolvedValue({ base: null, tailored: null });
+  vi.mocked(getJobScore).mockResolvedValue(scores());
   vi.mocked(patchJob).mockImplementation(async (_id, version, extracted, changes) => ({ ...job, extracted, ...changes, version: version + 1 }));
   vi.mocked(getCv).mockResolvedValue({ content: { ...emptyCv(), experience: [role] }, version: 1, updatedAt: job.updatedAt });
   vi.mocked(useRoleScores).mockReturnValue(roleScores(80));
@@ -127,7 +133,7 @@ describe("job page", () => {
     expect(screen.queryByRole("button", { name: "Enrich first" })).not.toBeInTheDocument();
   });
   it("computes a missing Score 1 when Try again is clicked, and says so when that fails", async () => {
-    vi.mocked(scoreJob).mockRejectedValueOnce(new Error("ai")).mockResolvedValueOnce({ base: match, tailored: null });
+    vi.mocked(scoreJob).mockRejectedValueOnce(new Error("ai")).mockResolvedValueOnce(scores({ base: match }));
     renderJob(); await ready();
     await screen.findByText("Your match score isn't available yet.");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -151,7 +157,7 @@ describe("job page", () => {
     };
 
     it("offers Open tailored CV and Tailor again once a tailored CV exists", async () => {
-      vi.mocked(getJobScore).mockResolvedValue({ base: { ...match, total: 62, band: "fair" }, tailored: { ...match, total: 78 } });
+      vi.mocked(getJobScore).mockResolvedValue(scores({ base: { ...match, total: 62, band: "fair" }, tailored: { ...match, total: 78 } }));
       renderJob(); await ready();
       const tailor = await box();
       expect(tailor).toHaveTextContent("62 → 78");
@@ -167,7 +173,7 @@ describe("job page", () => {
         sections: ["experience", "skills", "summary", "achievements", "languages", "layout"], status: "waiting_user",
         currentSection: "summary", questions: null, answers: null, proposals: null, errorCode: null,
         createdAt: job.createdAt, updatedAt: job.updatedAt });
-      vi.mocked(getJobScore).mockResolvedValue({ base: match, tailored: match });
+      vi.mocked(getJobScore).mockResolvedValue(scores({ base: match, tailored: match }));
       const { router } = renderJob(); await ready();
       const tailor = await box();
       expect(tailor).toHaveTextContent("Tailoring in progress: step 3 of 6, Summary");
@@ -188,8 +194,108 @@ describe("job page", () => {
     });
   });
 
+  describe("a tailored job", () => {
+    const seven = Array.from({ length: 7 }, (_, index) => ({ text: `Must ${index + 1}`, kind: "must" as const, category: "skill" as const }));
+    const marks = (met: number): MatchScore["labels"] => seven.map((_, index) => (
+      { ref: `r${index}`, kind: "requirement", status: index < met ? "met" : "missing", evidence: null, inferred: false }));
+    const content = { ...emptyCv("en"), basics: { ...emptyCv("en").basics, fullName: "Ana Pop" },
+      experience: [{ ...role, bullets: [{ id: "b1", text: "Ran payroll for 40 staff" }] }] };
+    const tailoredCv: TailoredCv = {
+      id: "cv1", userId: "u1", jobId: "one", language: "en", translatedFrom: null, content, baseSnapshot: content,
+      baseSnapshotAt: job.updatedAt, template: "modern", tone: null, instruction: null, review: null, score: null, coverLetter: null,
+      version: 3, createdAt: job.createdAt, updatedAt: job.updatedAt,
+    };
+    const tailored = (met = 6) => scores({ base: { ...match, total: 69, labels: marks(3) }, tailored: { ...match, total: 84, labels: marks(met) },
+      tailoredCvId: "cv1", hasTailoredCv: true });
+    /** The score strip of the tailored layout, once the score answer has arrived. */
+    const band = async () => (await screen.findByText("Latest score, from your tailored CV")).closest("section") as HTMLElement;
+
+    beforeEach(() => {
+      vi.mocked(getJob).mockResolvedValue({ ...job, extracted: { ...job.extracted!, requirements: seven } });
+      vi.mocked(getJobScore).mockResolvedValue(tailored());
+      vi.mocked(getPreferences).mockResolvedValue({ displayName: null, defaultTemplate: "classic", tailoringLanguage: "job" } as Awaited<ReturnType<typeof getPreferences>>);
+      vi.mocked(listTailored).mockResolvedValue([{ id: "cv1", language: "en", translatedFrom: null, updatedAt: job.updatedAt }]);
+      vi.mocked(getTailored).mockResolvedValue(tailoredCv);
+    });
+
+    it("shows the tailored CV's score, never the base one, with the CV's four links", async () => {
+      renderJob(); await ready();
+      const strip = within(await band());
+      expect(strip.getByText("Your match: 84 of 100")).toBeInTheDocument();
+      expect(strip.getByText("Latest score, from your tailored CV")).toBeInTheDocument();
+      expect(screen.queryByText(/69/)).toBeNull();
+      expect(screen.getByText("Tailored CV")).toHaveClass("ui-pill");
+      expect(strip.getByRole("link", { name: "Edit CV" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv1");
+      expect(strip.getByRole("link", { name: "Export" })).toHaveAttribute("href", "/jobs/one/cv/export?cv=cv1");
+      expect(strip.getByRole("link", { name: "Tailor again" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv1&retailor=1");
+      expect(await screen.findByText(/Template: Modern/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/template?cv=cv1");
+      // The old main action of a tailored job is gone with the old layout.
+      expect(screen.queryByRole("link", { name: "Open tailored CV" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Tailor my CV" })).toBeNull();
+    });
+
+    it("keeps the job folded behind one row, and opens it with the must-haves ticked from the tailored score", async () => {
+      renderJob(); await ready();
+      const fold = await screen.findByRole("button", { name: /^The job: must-haves, nice-to-haves, keywords and the full ad/ });
+      expect(fold).toHaveAttribute("aria-expanded", "false");
+      expect(fold).toHaveTextContent("Show");
+      expect(screen.queryByRole("heading", { name: "Must-haves" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "About this job" })).toBeNull();
+      await userEvent.click(fold);
+      expect(fold).toHaveAttribute("aria-expanded", "true");
+      expect(fold).toHaveTextContent("Hide");
+      // Six are met in the tailored score; the base score had three.
+      expect(within(screen.getByRole("list", { name: "Already on your CV · 6" })).getByText("Must 6")).toBeInTheDocument();
+      expect(within(screen.getByRole("list", { name: "Not on your CV yet · 1" })).getByText("Must 7")).toBeInTheDocument();
+      const about = screen.getByRole("heading", { name: "About this job" }).closest("section")!;
+      expect(within(about).getByRole("button", { name: "Edit" })).toBeInTheDocument();
+      // The application status lives in the header in this layout, not in About this job.
+      expect(within(about).queryByRole("combobox")).toBeNull();
+    });
+
+    it.each([
+      [6, "6 of 7 must-haves covered. Still open: Must 7."],
+      [7, "All 7 must-haves covered."],
+      [3, "3 of 7 must-haves covered. Still open: Must 4, Must 5 and 2 more."],
+    ])("says what the tailored CV covers: %s of 7", async (met, line) => {
+      vi.mocked(getJobScore).mockResolvedValue(tailored(met));
+      renderJob(); await ready();
+      expect(within(await band()).getByText(line)).toBeInTheDocument();
+    });
+
+    it("shows the tailored CV itself, read-only", async () => {
+      renderJob(); await ready();
+      const cv = (await screen.findByText("Ran payroll for 40 staff")).closest(".cvs-preview") as HTMLElement;
+      expect(within(cv).getByText("Ana Pop")).toBeInTheDocument();
+      expect(cv.querySelector("input, textarea, select, button, [contenteditable]")).toBeNull();
+      expect(getTailored).toHaveBeenCalledWith("cv1");
+    });
+
+    it("saves a change of the application status from the header", async () => {
+      renderJob(); await ready(); await band();
+      const select = screen.getByRole("combobox", { name: "Application status" });
+      expect(select.closest(".jobs-head")).not.toBeNull();
+      await userEvent.selectOptions(select, "applied");
+      await waitFor(() => expect(patchJob).toHaveBeenCalledWith("one", 1, expect.anything(), { applicationStatus: "applied" }));
+      await waitFor(() => expect(select).toHaveValue("applied"));
+    });
+
+    it("keeps the score and the buttons when the CV fails to load, with a way to try again", async () => {
+      vi.mocked(getTailored).mockRejectedValueOnce(new Error("down"));
+      renderJob(); await ready();
+      expect(await screen.findByText("We couldn't load your tailored CV. Nothing has changed.")).toBeInTheDocument();
+      const strip = within(await band());
+      expect(strip.getByText("Your match: 84 of 100")).toBeInTheDocument();
+      expect(strip.getByRole("link", { name: "Edit CV" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv1");
+      expect(screen.getByRole("button", { name: /^The job:/ })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(await screen.findByText("Ran payroll for 40 staff")).toBeInTheDocument();
+    });
+  });
+
   it.each([false, true])("warns about tailored CV deletion only when one exists: %s", async (tailored) => {
-    vi.mocked(getJobScore).mockResolvedValue({ base: match, tailored: tailored ? match : null });
+    vi.mocked(getJobScore).mockResolvedValue(scores({ base: match, tailored: tailored ? match : null }));
     renderJob(); await ready();
     await userEvent.click(screen.getByRole("button", { name: "Remove this job" }));
     const dialog = within(screen.getByRole("dialog", { name: "Remove this job?" }));
@@ -290,12 +396,12 @@ describe("job page", () => {
   });
 
   it("marks the must-haves and nice-to-haves from the base match, shows the keywords and says how much the CV covers", async () => {
-    vi.mocked(getJobScore).mockResolvedValue({ base: { ...match, total: 62, band: "fair", labels: [
+    vi.mocked(getJobScore).mockResolvedValue(scores({ base: { ...match, total: 62, band: "fair", labels: [
       { ref: "r0", kind: "requirement", status: "met", evidence: "Wrote SQL daily", inferred: false },
       { ref: "r1", kind: "requirement", status: "missing", evidence: null, inferred: false },
       { ref: "k:SQL", kind: "keyword", status: "met", evidence: "SQL", inferred: false },
       { ref: "k:dbt", kind: "keyword", status: "missing", evidence: null, inferred: false },
-    ] }, tailored: null });
+    ] } }));
     renderJob(); await ready();
     expect(await screen.findByText("Your match: 62 of 100")).toBeInTheDocument();
     expect(screen.getByText("Fair")).toBeInTheDocument();

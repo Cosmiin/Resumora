@@ -93,8 +93,28 @@
 .gate-meter i { position: absolute; inset: 0 auto 0 0; border-radius: var(--radius-pill); background: var(--color-coach); }
 .gate-meter b { position: absolute; top: -6px; bottom: -6px; width: 3px; background: var(--color-ink); }
 
+/* ---- A tailored job: the latest score, the job folded into one row, then the tailored CV ---- */
+.job-page .jobs-head > .job-application-status { flex: 0 1 240px; }
+.job-score-latest { flex: 0 1 260px; display: grid; gap: var(--space-2); }
+.job-score-latest p { margin: 0; }
+.job-band--tailored > .job-coach { flex: 1 1 320px; min-width: 0; margin: 0; }
+.job-fold { width: 100%; min-height: 48px; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-5); border: 2px dashed var(--color-ink); border-radius: var(--radius-block); background: var(--color-paper-veil); color: inherit; font: var(--weight-bold) 1rem var(--font-body); text-align: left; cursor: pointer; }
+.job-fold span:last-child { text-decoration: underline; text-underline-offset: 4px; }
+.job-fold-body { margin-top: var(--space-5); }
+.job-cvbar { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; justify-content: space-between; margin: var(--space-6) 0 var(--space-3); }
+.job-cvbar p { margin: 0; }
+.job-cvbar a { display: inline-block; padding: var(--space-3) 0; }
+.job-cv { margin-inline: auto; }
+
 @media (max-width: 900px) {
   .job-cols { grid-template-columns: minmax(0, 1fr); }
+  /* One column: the number, what the coach says, then the buttons, each as wide as the page. */
+  .job-band--tailored { flex-direction: column; align-items: stretch; padding: var(--space-5); }
+  .job-band--tailored > .job-score-latest, .job-band--tailored > .job-coach { flex: 0 0 auto; }
+  .job-band--tailored > .job-tailor { margin-left: 0; justify-items: stretch; }
+  .job-band--tailored .ui-row { display: grid; gap: var(--space-2); }
+  .job-band--tailored .ui-btn { width: 100%; min-height: 44px; }
+  .job-page .jobs-head > .job-application-status { flex: 1 1 100%; max-width: none; }
   .jobs-list > li { grid-template-columns: minmax(0, 1fr); }
   .job-more { padding: var(--space-5); }
 }

@@ -22,6 +22,8 @@ Release order: the API from Task 1 must be live before Task 1's migration runs o
 - R8 (Task 2): a new or refreshed translation sets `score_stale = true`. Without it, a re-translated copy that had been re-checked earlier would show its old number as current.
 - R9 (Task 2): "content differs" is decided after reading both sides through the stored-CV schema (`sameCv` in `tailor/repo.ts`), because Postgres reorders JSON keys. The Supabase editor save now reads the stored content first: one extra query per save.
 
+- R10 (Task 3): `summaries` runs 3 queries, plus a 4th when the page has a tailored job. The 4th (the chosen copies' score history) is the only one that can hit PostgREST's 1000-row cap; a copy the cut-off result did not reach shows its own `score` column, which holds the same number since R7. `tailoredLanguages` is sorted by code (`["en", "ro"]`).
+
 ## Tasks
 
 ## Task 1: Application status keeps five values — done
@@ -35,3 +37,8 @@ session: Build tailored job flow · builder: claude
 commit: b3825d1 (base 217716b) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 migration for the owner: `20261112000100_tailored_score_stale.sql` (one boolean column on `tailored_cvs`; no RLS change). New route `POST /v1/tailored/:id/score`: ownership through RLS, like `PUT /v1/tailored/:id`.
 open: (a) the new Supabase queries (`scoreCopies`, `hasTailoredCv`, the editor-save compare) are covered by the memory repo's tests and the typecheck only; exercise them against the real database in the preview check. (b) For the owner: starting a re-tailor resets the copy to the base wording and a guided-review decision changes its wording, both without a new score and without setting the flag (the plan sets it on hand edits only). Until the next accept the page shows the previous number as current.
+
+## Task 3: The Jobs list carries each job's latest score and tailored languages (API) — done
+session: Build tailored job flow · builder: claude
+commit: 4dd9def (base b3825d1) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: the `summaries` queries (embedded tables with per-job limits) ran only against a stubbed fetch; the reviewer checked their syntax against the schema. Exercise `GET /v1/jobs` against the real local database in the preview check.

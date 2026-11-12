@@ -41,12 +41,13 @@ export type CvDoc = {
 
 /**
  * Loads the CV for `/cv/...` (the base CV) or `/jobs/:id/cv/...` (`?cv=<id>` picks a language copy, as on the
- * tailored CV's page). `saveTemplate` stores the pick: on the tailored CV, or as the default for the base CV.
+ * tailored CV's page). `cvId`, when given, picks the copy instead of `?cv=` (the job page shows the copy its score is
+ * about). `saveTemplate` stores the pick: on the tailored CV, or as the default for the base CV.
  */
-export function useCvDoc() {
+export function useCvDoc(cvId?: string) {
   const { id: jobId } = useParams();
   const [search] = useSearchParams();
-  const wanted = search.get("cv");
+  const wanted = cvId ?? search.get("cv");
   const userId = useAuth().session?.user.id ?? "anonymous";
   const client = useQueryClient();
   const key = ["cv-doc", userId, jobId ?? "base", wanted];
