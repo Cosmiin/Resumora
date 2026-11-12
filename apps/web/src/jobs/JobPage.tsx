@@ -244,7 +244,9 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         {extracted.positionClosed === true && <p role="status" className="ui-notice job-closed">{t("job.positionClosed")}</p>}
         {isTailored && score.data ? (
           <TailoredJobView jobPath={jobPath} requirements={extracted.requirements} score={score.data} runStep={runStep}
-            onScore={(next) => queryClient.setQueryData(scoreKey, next)}
+            // A Re-check answers for the copy on screen when it started. While another copy's score is still loading,
+            // that is not the copy this address names, so the answer isn't kept under it (the server has saved it).
+            onScore={(next) => { if (!score.isPlaceholderData) queryClient.setQueryData(scoreKey, next); }}
             details={<><div className="ui-stack">{mustHaves(score.data.tailored)}</div>{about(score.data.tailored)}</>} />
         ) : <>
         {/* The answer first: the match, what the coach says about it, and the page's one main action. */}

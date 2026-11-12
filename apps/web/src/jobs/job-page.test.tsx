@@ -328,6 +328,27 @@ describe("job page", () => {
         expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/template?cv=cv2");
       });
 
+      it("never shows one copy's Re-check answer under the other copy's address", async () => {
+        // English was edited since its score. Its Re-check starts in the moment after Romanian was chosen, while Romanian's score is still on the way.
+        let roArrives: (score: JobScore) => void = () => {};
+        let checked: (score: JobScore) => void = () => {};
+        const ro: JobScore = { ...tailored(), tailored: { ...match, total: 80, labels: marks(5) }, tailoredCvId: "cv2" };
+        vi.mocked(getJobScore).mockImplementation((_id, cvId) => (cvId === "cv2"
+          ? new Promise<JobScore>((resolve) => { roArrives = resolve; }) : Promise.resolve({ ...tailored(), stale: true })));
+        vi.mocked(recheckScore).mockReturnValue(new Promise((resolve) => { checked = resolve; }));
+        const { router } = renderJob(); await ready();
+        await userEvent.click(await screen.findByRole("button", { name: "Romanian" }));
+        expect(router.state.location.search).toBe("?cv=cv2");
+        await userEvent.click(within(await band()).getByRole("button", { name: "Re-check" }));
+        expect(recheckScore).toHaveBeenCalledWith("cv1");
+        await act(async () => { roArrives(ro); });
+        expect(await screen.findByText("Your match: 80 of 100")).toBeInTheDocument();
+        await act(async () => { checked({ ...tailored(7), tailored: { ...match, total: 88, labels: marks(7) } }); });
+        expect(screen.getByText("Your match: 80 of 100")).toBeInTheDocument();
+        expect(screen.queryByText("Your match: 88 of 100")).toBeNull();
+        expect(await screen.findByText("A făcut salarizarea pentru 40 de angajați")).toBeInTheDocument();
+      });
+
       it("opens on the copy ?cv= names", async () => {
         renderJob("/jobs/one?cv=cv2"); await ready();
         expect(await screen.findByText("A făcut salarizarea pentru 40 de angajați")).toBeInTheDocument();
