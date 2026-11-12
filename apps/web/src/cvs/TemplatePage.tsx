@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { CvDocument } from "../cv/page/CvDocument.tsx";
 import { TEMPLATES, type TemplateId } from "../cv/page/templates.ts";
 import { useT } from "../i18n/t.ts";
@@ -21,12 +21,15 @@ export function DocCrumb({ doc }: { doc: CvDoc }) {
 /** What every page about one CV shows while it loads, when it fails, and when the job has no tailored CV. */
 export function DocState({ state, onRetry }: { state: "loading" | "error" | "none"; onRetry(): void }) {
   const t = useT();
+  // The way back: a tailored CV's pages sit under its job, the base CV's under My CV.
+  const { id: jobId } = useParams();
   return <AppShell><main className="ui-page cvs-page"><div className="ui-wrap ui-main">
     {state === "loading" ? <div className="ui-stack" aria-busy="true"><p role="status" className="ui-sr">{t("cvs.loading")}</p>
       <Skeleton width="40%" height="40px" /><Skeleton height="220px" /></div>
       : <div className="ui-stack"><p role="alert" className="ui-notice ui-notice--bad">{t(state === "error" ? "cvs.loadError" : "tailored.none")}</p>
         <p className="ui-row">{state === "error" && <button type="button" className="ui-btn" onClick={onRetry}>{t("tailor.retry")}</button>}
-          <Link className="ui-btn ui-btn--quiet" to="/cvs">{t("cvs.toAll")}</Link></p></div>}
+          {jobId ? <Link className="ui-btn ui-btn--quiet" to={`/jobs/${encodeURIComponent(jobId)}`}>{t("cvs.toJob")}</Link>
+            : <Link className="ui-btn ui-btn--quiet" to="/cv">{t("cvs.toBase")}</Link>}</p></div>}
   </div></main></AppShell>;
 }
 

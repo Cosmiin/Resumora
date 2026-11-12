@@ -1,26 +1,13 @@
 import { useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
-import { TailorLanguageSchema, TailoredCvSchema, type JobExtraction, type TailoredCv } from "@resumora/shared";
+import type { JobExtraction, TailoredCv } from "@resumora/shared";
 import { getPreferences, preferencesKey, savePreferences } from "../account/account-api.ts";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { getCv } from "../cv/cv-api.ts";
 import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 import type { ExportCv } from "../export/export-files.ts";
 import { getJob } from "../jobs/jobs-api.ts";
-import { apiFetch } from "../lib/api.ts";
 import { getTailored, listTailored, setTemplate } from "../tailor/tailored-api.ts";
-
-const ListItemSchema = z.object({
-  id: z.string(), jobId: z.string(), language: TailorLanguageSchema, template: TailoredCvSchema.shape.template,
-  translatedFrom: z.string().nullable(), updatedAt: z.string(), inProgress: z.boolean(), jobTitle: z.string(), company: z.string().nullable(),
-});
-export type TailoredListItem = z.infer<typeof ListItemSchema>;
-
-/** Every tailored CV the person has, with the job it was made for. */
-export async function listAllTailored(): Promise<TailoredListItem[]> {
-  return (await apiFetch("/v1/tailored", { schema: z.object({ items: z.array(ListItemSchema) }) })).items;
-}
 
 /** "Role, Company": how a tailored CV is named everywhere. */
 export const jobName = (title: string | undefined, company: string | null | undefined) => [title?.trim(), company?.trim()].filter(Boolean).join(", ");

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router";
+import { readdirSync, readFileSync } from "node:fs";
 import { emptyCv, type TailoredCv } from "@resumora/shared";
 
 const account = vi.hoisted(() => ({ getPreferences: vi.fn(), savePreferences: vi.fn(), preferencesKey: (id?: string) => ["account", "preferences", id] }));
@@ -16,11 +17,9 @@ vi.mock("../lib/supabase.ts", () => ({ supabase: {} }));
 vi.mock("../auth/AuthProvider.tsx", () => ({ useAuth: () => ({ loading: false, session: { user: { id: "user-a" } } }) }));
 const files = vi.hoisted(() => ({ exportFile: vi.fn() }));
 vi.mock("../export/export-files.ts", async (original) => ({ ...(await original<typeof import("../export/export-files.ts")>()), exportFile: files.exportFile }));
-const list = vi.hoisted(() => ({ listAllTailored: vi.fn() }));
-vi.mock("./useCvDoc.ts", async (original) => ({ ...(await original<typeof import("./useCvDoc.ts")>()), listAllTailored: list.listAllTailored }));
 
+import { routes } from "../router.tsx";
 import { ExportPage } from "./ExportPage.tsx";
-import { MyCvsPage } from "./MyCvsPage.tsx";
 import { TemplatePage } from "./TemplatePage.tsx";
 
 const content = { ...emptyCv("en"), basics: { ...emptyCv("en").basics, fullName: "Ana Pop", summary: "Payroll lead." } };
@@ -30,13 +29,10 @@ const tailored = (over: Partial<TailoredCv> = {}): TailoredCv => ({
   baseSnapshotAt: "2026-11-08T09:00:00Z", template: "modern", tone: "neutral", instruction: null, review: null, score: null,
   coverLetter: null, version: 3, createdAt: "2026-11-08T09:00:00Z", updatedAt: "2026-11-08T09:30:00Z", ...over,
 });
-const item = (over = {}) => ({ id: "tc-1", jobId: "job-1", language: "en", template: "modern", translatedFrom: null,
-  updatedAt: "2026-11-10T09:30:00Z", inProgress: false, jobTitle: "Payroll Lead", company: "Beta", ...over });
 
 function open(entry: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter([
-    { path: "/cvs", element: <MyCvsPage /> },
     { path: "/cv/template", element: <TemplatePage /> },
     { path: "/cv/export", element: <ExportPage /> },
     { path: "/jobs/:id/cv/template", element: <TemplatePage /> },
@@ -56,67 +52,7 @@ beforeEach(() => {
   tailoredApi.listTailored.mockResolvedValue([{ id: "tc-1", language: "en", translatedFrom: null, updatedAt: "2026-11-10T09:30:00Z" }]);
   tailoredApi.getTailored.mockResolvedValue(tailored());
   tailoredApi.setTemplate.mockImplementation(async (_id: string, template: string) => ({ template }));
-  list.listAllTailored.mockResolvedValue([item(), item({ id: "tc-2", jobId: "job-2", language: "ro", jobTitle: "Analist", company: null, inProgress: true })]);
   files.exportFile.mockResolvedValue({ name: "Ana_Pop_Beta_Payroll_Lead.pdf", pages: 1, fits: true, tightened: false });
-});
-
-describe("My CVs", () => {
-  it("lists the base CV and every tailored CV, each with its next steps", async () => {
-    open("/cvs");
-    const base = await screen.findByRole("region", { name: "Base CV" });
-    expect(within(base).getByText("Ana Pop")).toBeInTheDocument();
-    expect(within(base).getByText("English · Classic · updated Nov 9, 2026")).toBeInTheDocument();
-    expect(within(base).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/cv");
-    expect(within(base).getByRole("link", { name: "Template" })).toHaveAttribute("href", "/cv/template");
-    expect(within(base).getByRole("link", { name: "Export" })).toHaveAttribute("href", "/cv/export");
-
-    const rows = within(screen.getByRole("list", { name: "Tailored to a job" })).getAllByRole("listitem");
-    expect(rows).toHaveLength(2);
-    expect(within(rows[0]!).getByText("Payroll Lead, Beta")).toBeInTheDocument();
-    expect(within(rows[0]!).getByText("Ready")).toBeInTheDocument();
-    expect(within(rows[0]!).getByText("English · Modern · updated Nov 10, 2026")).toBeInTheDocument();
-    expect(within(rows[0]!).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/jobs/job-1/cv?cv=tc-1");
-    expect(within(rows[0]!).getByRole("link", { name: "Template" })).toHaveAttribute("href", "/jobs/job-1/cv/template?cv=tc-1");
-    expect(within(rows[0]!).getByRole("link", { name: "Export" })).toHaveAttribute("href", "/jobs/job-1/cv/export?cv=tc-1");
-    // Still being tailored: one step, to go on with it.
-    expect(within(rows[1]!).getByText("Analist")).toBeInTheDocument();
-    expect(within(rows[1]!).getByText("In progress")).toBeInTheDocument();
-    expect(within(rows[1]!).getByRole("link", { name: "Continue tailoring" })).toHaveAttribute("href", "/jobs/job-2/tailor");
-    expect(within(rows[1]!).queryByRole("link", { name: "Export" })).toBeNull();
-  });
-
-  it("says so when nothing is tailored yet, and points to Jobs", async () => {
-    list.listAllTailored.mockResolvedValue([]);
-    open("/cvs");
-    expect(await screen.findByText(/Nothing tailored yet/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Go to Jobs" })).toHaveAttribute("href", "/jobs");
-  });
-
-  it("starts with an upload when there is no CV at all", async () => {
-    cvApi.getCv.mockResolvedValue({ content: emptyCv("en"), version: 1, updatedAt: "2026-11-09T08:00:00Z" });
-    list.listAllTailored.mockResolvedValue([]);
-    open("/cvs");
-    expect(await screen.findByRole("heading", { name: "No CVs yet" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Upload my CV" })).toHaveAttribute("href", "/cv");
-  });
-
-  it("keeps the list on screen when a later refresh fails", async () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const router = createMemoryRouter([{ path: "/cvs", element: <MyCvsPage /> }], { initialEntries: ["/cvs"] });
-    render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
-    await screen.findByRole("region", { name: "Base CV" });
-    list.listAllTailored.mockRejectedValue(new Error("offline"));
-    await client.refetchQueries();
-    expect(screen.getByRole("region", { name: "Base CV" })).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).toBeNull();
-  });
-
-  it("offers a retry when the list cannot be loaded", async () => {
-    list.listAllTailored.mockRejectedValueOnce(new Error("offline"));
-    open("/cvs");
-    await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
-    expect(await screen.findByRole("region", { name: "Base CV" })).toBeInTheDocument();
-  });
 });
 
 describe("the template page", () => {
@@ -171,6 +107,40 @@ describe("the template page", () => {
     tailoredApi.listTailored.mockResolvedValue([]);
     open("/jobs/job-1/cv/template");
     expect(await screen.findByRole("alert")).toHaveTextContent("This job has no tailored CV yet.");
+    expect(screen.getByRole("link", { name: "Back to the job" })).toHaveAttribute("href", "/jobs/job-1");
+  });
+
+  it("leads back to My CV when the base CV cannot be loaded", async () => {
+    cvApi.getCv.mockRejectedValue(new Error("offline"));
+    open("/cv/template");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to my CV" })).toHaveAttribute("href", "/cv");
+    expect(screen.queryByRole("link", { name: "Back to the job" })).toBeNull();
+  });
+});
+
+describe("My CVs is gone", () => {
+  it("sends /cvs to Jobs", async () => {
+    const all = (list: RouteObject[]): RouteObject[] => list.flatMap((route) => [route, ...all(route.children ?? [])]);
+    const cvs = all(routes).find((route) => route.path === "/cvs")!;
+    const router = createMemoryRouter([cvs, { path: "/jobs", element: <p>The jobs list</p> }], { initialEntries: ["/cvs"] });
+    render(<RouterProvider router={router} />);
+    expect(await screen.findByText("The jobs list")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/jobs");
+  });
+
+  it("has no My CVs entry in the menu", async () => {
+    open("/cv/template");
+    const menu = within(await screen.findByRole("navigation", { name: "Main" }));
+    expect(menu.getAllByRole("link").map((link) => link.textContent)).toEqual(["My CV", "Jobs", "Account"]);
+  });
+
+  it("leaves no link to /cvs in the app's code outside the redirect", () => {
+    // Paths are from the web app's folder, where the tests run.
+    const sources = readdirSync("src", { recursive: true, encoding: "utf8" }).map((file) => file.replaceAll("\\", "/"))
+      .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file));
+    expect(sources.length).toBeGreaterThan(50);
+    expect(sources.filter((file) => /["'`]\/cvs["'`/?#]/.test(readFileSync(`src/${file}`, "utf8")))).toEqual(["router.tsx"]);
   });
 });
 
@@ -181,8 +151,9 @@ describe("the download page", () => {
     await user.click(await screen.findByRole("button", { name: "Download PDF" }));
     expect(files.exportFile).toHaveBeenCalledWith("cv", "pdf", { cv: tailored(), job: { title: "Payroll Lead", company: "Beta" }, template: "modern" });
     expect(await screen.findByText("Downloaded: Ana_Pop_Beta_Payroll_Lead.pdf")).toBeInTheDocument();
-    expect(screen.getByText("Good luck with this one. Your tailored CV stays in My CVs.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Go to My CVs" })).toHaveAttribute("href", "/cvs");
+    expect(screen.getByText("Good luck with this one.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to the job" })).toHaveAttribute("href", "/jobs/job-1");
+    expect(screen.queryByText(/My CVs/)).toBeNull();
     expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/job-1/cv/template?cv=tc-1");
     // No cover letter yet: no cover letter files.
     expect(screen.queryByText("Cover letter")).toBeNull();
@@ -192,7 +163,9 @@ describe("the download page", () => {
     open("/cv/export");
     await userEvent.click(await screen.findByRole("button", { name: "Download Word" }));
     expect(files.exportFile).toHaveBeenCalledWith("cv", "docx", { cv: { content, language: "en", coverLetter: null }, job: null, template: "classic" });
-    expect(await screen.findByText("Done. Your base CV stays in My CVs.")).toBeInTheDocument();
+    expect(await screen.findByText("Done.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to my CV" })).toHaveAttribute("href", "/cv");
+    expect(screen.queryByText(/My CVs/)).toBeNull();
   });
 
   it("says when the spacing was tightened to fit, and when even that left it over two pages", async () => {
