@@ -4,7 +4,7 @@ import { createApp, type AppDeps } from "../src/app.ts";
 import { memoryJobs } from "../src/jobs/memory-repo.ts";
 import { JOBS_PER_DAY, type JobMessage } from "../src/jobs/repo.ts";
 
-import { memoryTailorRepo, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
+import { memoryTailorDocs, memoryTailorRepo, type MemoryTailorDocs, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
 import { fakeModel } from "../src/tailor/fake-model.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
 import { emptyCv } from "@resumora/shared";
@@ -80,19 +80,152 @@ function jobFields(value: unknown) {
   expect(JSON.stringify(value)).not.toMatch(/"(raw_text|jsonLd|json_ld)"\s*:/);
 }
 
+describe("the score of one tailored copy", () => {
+  type Answer = { base: MatchScore | null; tailored: MatchScore | null; tailoredCvId: string | null; stale: boolean; hasTailoredCv: boolean };
+  let docs: MemoryTailorDocs;
+  let model: ReturnType<typeof fakeModel>;
+  const tailor = (user = "user-a") => memoryTailorRepo(user, scores, docs);
+  const scoreOf = (total: number): MatchScore => ({ ...score, total });
+  const headers = (token = "token-a") => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
+  const read = async (jobId: string, cv?: string, token = "token-a") =>
+    await (await app.request(`/v1/jobs/${jobId}/score${cv ? `?cv=${cv}` : ""}`, { headers: headers(token) })).json() as Answer;
+  const put = (cvId: string, content: unknown, expectedVersion: number, token = "token-a") =>
+    app.request(`/v1/tailored/${cvId}`, { method: "PUT", headers: headers(token), body: JSON.stringify({ content, expectedVersion }) });
+  const recheck = (cvId: string, token = "token-a") => app.request(`/v1/tailored/${cvId}/score`, { method: "POST", headers: headers(token) });
+
+  beforeEach(() => {
+    docs = memoryTailorDocs();
+    model = fakeModel(() => ({ labels: [], cvSeniority: "mid" }));
+    app = createApp({ ...deps, tailorRepo: (user) => memoryTailorRepo(user.id, scores, docs), model: () => model.deps });
+  });
+
+  /** A ready job with an English copy (saved first, score 84) and a Romanian one (saved last, no score yet). */
+  async function twoCopies(token = "token-a", url = body.url) {
+    const jobId = await create({ ...body, url }, token);
+    await store.admin.finish(jobId, extracted);
+    const repo = tailor(USERS[token]);
+    const en = await repo.createTailoredCv({
+      jobId, language: "en", content: emptyCv("en"), baseSnapshotAt: clock.toISOString(), tone: "neutral", instruction: null, steering: {},
+    });
+    const ro = await repo.saveTranslation({
+      jobId, language: "ro", content: emptyCv("ro"), coverLetter: null, template: "classic", tone: "neutral", instruction: null,
+      translatedFrom: en, at: "2026-11-06T10:00:00.000Z",
+    });
+    docs.cvs.get(en)!.updatedAt = "2026-11-05T10:00:00.000Z";
+    await repo.saveScore(jobId, "tailored", en, scoreOf(84));
+    return { jobId, en, ro };
+  }
+
+  it("answers for the copy asked for, and for the copy saved last when none is named", async () => {
+    const { jobId, en, ro } = await twoCopies();
+    await tailor().saveScore(jobId, "tailored", ro, scoreOf(80));
+    expect(await read(jobId, ro)).toMatchObject({ tailored: { total: 80 }, tailoredCvId: ro, stale: false });
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, tailoredCvId: en, stale: false });
+    expect(await read(jobId)).toMatchObject({ tailored: { total: 80 }, tailoredCvId: ro });
+    docs.cvs.get(en)!.updatedAt = "2026-11-07T10:00:00.000Z";
+    expect(await read(jobId)).toMatchObject({ tailored: { total: 84 }, tailoredCvId: en });
+  });
+
+  it("shows no score for a copy that has none, never another copy's", async () => {
+    const { jobId, en, ro } = await twoCopies();
+    expect(await read(jobId, ro)).toMatchObject({ tailored: null, tailoredCvId: ro, stale: true });
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, tailoredCvId: en, stale: false });
+  });
+
+  it("falls back to the copy's own stored score when it has no score history", async () => {
+    const { jobId, ro } = await twoCopies();
+    docs.cvs.get(ro)!.score = scoreOf(71);
+    expect(await read(jobId, ro)).toMatchObject({ tailored: { total: 71 }, tailoredCvId: ro, stale: false });
+  });
+
+  it("treats ?cv= naming another job's or another person's CV as absent", async () => {
+    const { jobId, ro } = await twoCopies();
+    const other = await twoCopies("token-a", "https://example.test/jobs/other");
+    await tailor().saveScore(other.jobId, "tailored", other.ro, scoreOf(33));
+    const theirs = await twoCopies("token-b", "https://example.test/jobs/theirs");
+    await tailor("user-b").saveScore(theirs.jobId, "tailored", theirs.ro, scoreOf(22));
+    const absent = await read(jobId);
+    expect(absent).toMatchObject({ tailored: null, tailoredCvId: ro });
+    for (const cv of [other.ro, other.en, theirs.ro, theirs.en, "not-an-id"]) {
+      const answer = await read(jobId, cv);
+      expect(answer).toEqual(absent);
+      expect(JSON.stringify(answer)).not.toContain(cv);
+    }
+  });
+
+  it("marks the score out of date after a hand edit that changes the content, not after saving the same content", async () => {
+    const { jobId, en } = await twoCopies();
+    const same = await put(en, emptyCv("en"), 1);
+    expect(same.status).toBe(200);
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, stale: false });
+    const edited = { ...emptyCv("en"), basics: { ...emptyCv("en").basics, fullName: "Ana Pop" } };
+    // An edit that loses the version check saves nothing, so it changes nothing.
+    expect((await put(en, edited, 1)).status).toBe(409);
+    expect((await read(jobId, en)).stale).toBe(false);
+    expect((await put(en, edited, 2)).status).toBe(200);
+    // The old number stays; only the flag changes.
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, stale: true });
+  });
+
+  it("Re-check scores the copy as it stands, clears the flag and answers with the new score", async () => {
+    const { jobId, en, ro } = await twoCopies();
+    await put(en, { ...emptyCv("en"), basics: { ...emptyCv("en").basics, fullName: "Ana Pop" } }, 1);
+    expect((await read(jobId, en)).stale).toBe(true);
+
+    const res = await recheck(en);
+    expect(res.status).toBe(200);
+    const answer = await res.json() as Answer;
+    expect(model.logged.map((call) => call.task)).toEqual(["tailor_score"]);
+    const stored = await tailor().getScore(jobId, "tailored", en);
+    expect(stored).not.toEqual(scoreOf(84));
+    expect(answer).toMatchObject({ tailored: stored, tailoredCvId: en, stale: false });
+    expect(await read(jobId, en)).toEqual(answer);
+    // The copy keeps its version (an open editor isn't thrown off) and its own stored score follows.
+    expect(docs.cvs.get(en)).toMatchObject({ version: 2, score: stored });
+    // The other copy is untouched.
+    expect(await read(jobId, ro)).toMatchObject({ tailored: null, stale: true });
+  });
+
+  it("Re-check answers like PUT for a CV that isn't the caller's, and with the scoring error when the AI fails", async () => {
+    const { jobId, en } = await twoCopies();
+    const theirs = await put(en, emptyCv("en"), 1, "token-b");
+    await error(await recheck(en, "token-b"), theirs.status, "not_found");
+    await error(await recheck("not-an-id"), 404, "not_found");
+    model = fakeModel(() => ({}), 500);
+    await error(await recheck(en), 502, "ai_failed");
+    // The old number stays.
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, stale: false });
+  });
+
+  it("says a job is tailored only once a tailor, retailor or section run is done", async () => {
+    const { jobId, en } = await twoCopies();
+    const repo = tailor();
+    const run = await repo.createRun({ jobId, tailoredCvId: en, kind: "tailor", sections: ["summary"], currentSection: "summary" });
+    expect((await read(jobId)).hasTailoredCv).toBe(false);
+    for (const kind of ["translate", "cover_letter"] as const) {
+      const other = await repo.createRun({ jobId, tailoredCvId: en, kind, sections: [], currentSection: null });
+      await repo.updateRun(other.id, { status: "done" });
+    }
+    expect((await read(jobId)).hasTailoredCv).toBe(false);
+    await repo.updateRun(run.id, { status: "done", currentSection: null });
+    expect((await read(jobId)).hasTailoredCv).toBe(true);
+  });
+});
+
 describe("job endpoints", () => {
   it("returns the base score, null before scoring, and 404 for another user's job", async () => {
     const id = await create();
     const request = (jobId: string, token = "token-a") => app.request(`/v1/jobs/${jobId}/score`, { headers: { authorization: `Bearer ${token}` } });
     const empty = await request(id);
     expect(empty.status).toBe(200);
-    expect(await empty.json()).toEqual({ base: null, tailored: null });
+    const none = { tailored: null, tailoredCvId: null, stale: false, hasTailoredCv: false };
+    expect(await empty.json()).toEqual({ base: null, ...none });
     await memoryTailorRepo("user-a", scores).saveScore(id, "base", null, score);
+    // A tailored score with no tailored CV of this job behind it is never shown.
     await memoryTailorRepo("user-a", scores).saveScore(id, "tailored", "cv-a", score);
     const res = await request(id);
     expect(res.status).toBe(200);
-    // Score 2 is the newest tailored score of any of the job's tailored CVs (Task 16, R13).
-    expect(await res.json()).toEqual({ base: score, tailored: score });
+    expect(await res.json()).toEqual({ base: score, ...none });
     await error(await request(id, "token-b"), 404, "not_found");
     await error(await request(crypto.randomUUID()), 404, "not_found");
     await error(await request("invalid"), 404, "not_found");
@@ -111,7 +244,7 @@ describe("job endpoints", () => {
     const res = await score1(id);
     expect(res.status).toBe(200);
     const body = await res.json() as { base: MatchScore; tailored: null };
-    expect(body).toMatchObject({ base: { policy: "match/1" }, tailored: null });
+    expect(body).toMatchObject({ base: { policy: "match/1" }, tailored: null, tailoredCvId: null, stale: false, hasTailoredCv: false });
     expect(await memoryTailorRepo("user-a", scores).getScore(id, "base")).toEqual(body.base);
     expect(model.logged.map((call) => call.task)).toEqual(["tailor_score"]);
     expect((await score1(id)).status).toBe(200);

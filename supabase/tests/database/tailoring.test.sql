@@ -2,7 +2,7 @@
 -- Run with `npm run db:test` (local stack must be running).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(76);
+select plan(78);
 
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'a@example.test'),
@@ -28,6 +28,9 @@ select lives_ok(
      values ('bbbbbbbb-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001',
              'en', '{}', '{}', now()) $$,
   'a user can create their own tailored CV');
+select has_column('public', 'tailored_cvs', 'score_stale', 'a tailored CV records whether it changed since its score');
+select is((select score_stale from public.tailored_cvs where id = 'bbbbbbbb-0000-0000-0000-000000000001'), false,
+  'a new tailored CV has not changed since its score');
 select results_eq(
   $$ select user_id, template, version from public.tailored_cvs $$,
   $$ values ('11111111-1111-1111-1111-111111111111'::uuid, 'classic'::text, 1) $$,

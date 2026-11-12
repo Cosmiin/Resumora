@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   applyGuesses, CvContentSchema, findScored, isLightTailorSection, isRoleSection, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId, scoredItems, stepOrder, withoutHidden,
-  type CvContent, type Job, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
+  type CvContent, type Job, type JobExtraction, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
@@ -79,6 +79,26 @@ function apply(cv: CvContent, p: Proposal, section: TailorSection): void {
     const item = [...cv.technicalSkills, ...cv.professionalSkills, ...cv.awards, ...cv.languages].find((i) => i.id === p.itemId);
     if (item) (item as Record<string, unknown>)[p.field] = p.text;
   }
+}
+
+/** Score 2 for a tailored CV as it stands: its kept guesses count as such, and its previous labels keep the result steady. */
+export async function scoreTailored(
+  deps: { model: ModelDeps; tailor: TailorRepo },
+  input: { userId: string; cv: { id: string; jobId: string; content: CvContent; review: Review | null; score: MatchScore | null }; job: JobExtraction },
+): Promise<MatchScore> {
+  const { cv, job } = input;
+  const keptInferredTexts = Object.values(cv.review ?? {}).flatMap((items) => Object.values(items as Record<string, ItemReview>))
+    .filter((item) => item.inferred && item.kept).map((item) => item.text);
+  const previous = cv.score ?? await deps.tailor.getScore(cv.jobId, "tailored", cv.id)
+    ?? await deps.tailor.getScore(cv.jobId, "base");
+  const sameRequirements = previous?.requirementTexts !== undefined
+    && previous.requirementTexts.length === job.requirements.length
+    && previous.requirementTexts.every((text, index) => text === job.requirements[index]!.text);
+  return scoreMatch({ model: deps.model }, {
+    // Items hidden for this job are not on the CV the recruiter sees, so they do not count.
+    userId: input.userId, cv: withoutHidden(cv.content), job, keptInferred: new Set(), keptInferredTexts,
+    previous: previous?.labels.filter((label) => label.kind === "keyword" || sameRequirements),
+  });
 }
 
 /**
@@ -166,17 +186,8 @@ export async function acceptSection(
   const others = roleId ? Object.fromEntries(Object.entries((doc.review?.[section] ?? {}) as Record<string, ItemReview>)
     .filter(([key]) => !ids.has(key))) : {};
   const review: Review = { ...(doc.review ?? {}), [section]: { ...others, ...state } };
-  const keptInferredTexts = Object.values(review).flatMap((items) => Object.values(items as Record<string, ItemReview>))
-    .filter((item) => item.inferred && item.kept).map((item) => item.text);
-  const previous = doc.score ?? await deps.tailor.getScore(run.jobId, "tailored", doc.id)
-    ?? await deps.tailor.getScore(run.jobId, "base");
-  const sameRequirements = previous?.requirementTexts !== undefined
-    && previous.requirementTexts.length === input.job.extracted.requirements.length
-    && previous.requirementTexts.every((text, index) => text === input.job.extracted!.requirements[index]!.text);
-  const score = await scoreMatch({ model: deps.model }, {
-    // Items hidden for this job are not on the CV the recruiter sees, so they do not count.
-    userId: input.userId, cv: withoutHidden(parsed.data), job: input.job.extracted, keptInferred: new Set(), keptInferredTexts,
-    previous: previous?.labels.filter((label) => label.kind === "keyword" || sameRequirements),
+  const score = await scoreTailored(deps, {
+    userId: input.userId, cv: { id: doc.id, jobId: run.jobId, content: parsed.data, review, score: doc.score }, job: input.job.extracted,
   });
   if (await deps.tailor.saveTailoredCv(doc.id, doc.version, { content: parsed.data, review, score }) === "conflict") {
     throw new ApiError(409, "version_conflict", "This tailored CV was saved somewhere else first.");

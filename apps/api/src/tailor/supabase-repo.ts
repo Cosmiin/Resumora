@@ -6,7 +6,7 @@ import {
 import { storedCv } from "../cv/supabase-repo.ts";
 import { ApiError } from "../errors.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
-import type { TailorRepo } from "./repo.ts";
+import { sameCv, TAILORING_KINDS, type TailorRepo } from "./repo.ts";
 import { withColumns } from "./steering.ts";
 
 const ToneExamplesSchema = z.object({ bullet: z.string(), examples: z.record(ToneSchema, z.string()) });
@@ -27,6 +27,21 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
         total: score.total, band: score.band,
       });
       if (error) throw new Error(`match_scores insert failed: ${error.message}`);
+      if (target !== "tailored" || !tailoredCvId) return;
+      const copy = await db.from("tailored_cvs").update({ score, score_stale: false }).eq("id", tailoredCvId);
+      if (copy.error) throw new Error(`tailored_cvs update failed: ${copy.error.message}`);
+    },
+    async scoreCopies(jobId) {
+      const { data, error } = await db.from("tailored_cvs").select("id, score, score_stale")
+        .eq("job_id", jobId).order("updated_at", { ascending: false });
+      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
+      return data.map((row) => ({ id: row.id, score: MatchScoreSchema.nullable().parse(row.score), scoreStale: row.score_stale === true }));
+    },
+    async hasTailoredCv(jobId) {
+      const { data, error } = await db.from("tailor_runs").select("id")
+        .eq("job_id", jobId).eq("status", "done").in("kind", TAILORING_KINDS).limit(1);
+      if (error) throw new Error(`tailor_runs select failed: ${error.message}`);
+      return data.length > 0;
     },
     async getScore(jobId, target, tailoredCvId) {
       let query = db.from("match_scores").select("policy, labels, parts, total, band")
@@ -118,7 +133,12 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
     },
     async saveTailoredContent(id, expectedVersion, content) {
       const updatedAt = new Date().toISOString();
-      const { data, error } = await db.from("tailored_cvs").update({ content, version: expectedVersion + 1, updated_at: updatedAt })
+      // A hand edit makes the score out of date; saving the same content again doesn't.
+      const before = await db.from("tailored_cvs").select("content").eq("id", id).maybeSingle();
+      if (before.error) throw new Error(`tailored_cvs select failed: ${before.error.message}`);
+      const edited = !!before.data && !sameCv(before.data.content, content);
+      const { data, error } = await db.from("tailored_cvs")
+        .update({ content, version: expectedVersion + 1, updated_at: updatedAt, ...(edited ? { score_stale: true } : {}) })
         .eq("id", id).eq("version", expectedVersion).select("version, updated_at");
       if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
       if (data[0]) return { ok: true, version: data[0].version, updatedAt: data[0].updated_at };
@@ -130,7 +150,8 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const fields = {
         translated_from: input.translatedFrom, content: input.content, base_snapshot: input.content, base_snapshot_at: input.at,
         cover_letter: input.coverLetter, template: input.template, tone: input.tone, instruction: input.instruction,
-        review: null, score: null, updated_at: input.at,
+        // The new wording has no score yet, whatever the copy's score history says.
+        review: null, score: null, score_stale: true, updated_at: input.at,
       };
       // Two tries: a copy created by a concurrent call between the read and the insert is refreshed instead.
       for (let attempt = 0; attempt < 2; attempt++) {

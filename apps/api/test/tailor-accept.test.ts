@@ -168,6 +168,19 @@ describe("accept section", () => {
     expect(model.logged.at(-1)?.task).toBe("tailor_score");
   });
 
+  it("makes the score current again when a suggestion is accepted after a hand edit", async () => {
+    const runId = await start();
+    const doc = tailored();
+    const headers = { authorization: "Bearer token-a", "content-type": "application/json" };
+    const edited = { ...doc.content, basics: { ...doc.content.basics, summary: "Payroll lead." } };
+    const save = await app.request(`/v1/tailored/${doc.id}`, { method: "PUT", headers, body: JSON.stringify({ content: edited, expectedVersion: doc.version }) });
+    expect(save.status).toBe(200);
+    const stale = async () => (await (await app.request(`/v1/jobs/${jobId}/score`, { headers })).json() as { stale: boolean }).stale;
+    expect(await stale()).toBe(true);
+    expect((await accept(runId, "experience")).status).toBe(200);
+    expect(await stale()).toBe(false);
+  });
+
   it("writes a kept line with the person's own rewording, and ignores a rewording on a line they did not keep", async () => {
     const runId = await start();
     await run(runId, "experience", reword(first.id, "Ran accurate payroll for 40 staff"), reword(second.id, "Filed payroll taxes"));

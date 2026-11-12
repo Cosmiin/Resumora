@@ -1,5 +1,5 @@
 import type { CvContent, MatchScore, Steering, TailorRun, TailoredCv } from "@resumora/shared";
-import type { ScoreTarget, TailorRepo, ToneExamples } from "./repo.ts";
+import { sameCv, TAILORING_KINDS, type ScoreTarget, type TailorRepo, type ToneExamples } from "./repo.ts";
 import { withColumns } from "./steering.ts";
 
 export type MemoryTailorDocs = {
@@ -9,8 +9,11 @@ export type MemoryTailorDocs = {
   steering: Map<string, Steering>;
   /** jobs.tone_examples, by job id. */
   toneExamples: Map<string, ToneExamples>;
+  /** tailored_cvs.score_stale: the ids of the copies edited by hand since their score. */
+  scoreStale: Set<string>;
 };
-export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map(), steering: new Map(), toneExamples: new Map() });
+export const memoryTailorDocs = (): MemoryTailorDocs =>
+  ({ cvs: new Map(), runs: new Map(), steering: new Map(), toneExamples: new Map(), scoreStale: new Set() });
 
 export type MemoryTailorStore = Map<string, {
   userId: string;
@@ -68,6 +71,7 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       const cv = docs.cvs.get(id);
       if (!cv || cv.userId !== userId) return null;
       if (cv.version !== expectedVersion) return { ok: false, version: cv.version, updatedAt: cv.updatedAt };
+      if (!sameCv(cv.content, content)) docs.scoreStale.add(id);
       Object.assign(cv, { content: structuredClone(content), version: cv.version + 1, updatedAt: new Date().toISOString() });
       return { ok: true, version: cv.version, updatedAt: cv.updatedAt };
     },
@@ -79,6 +83,8 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       if (existing) {
         if (existing.userId !== userId || existing.translatedFrom === null) return "language_taken";
         Object.assign(existing, fields, { version: existing.version + 1 });
+        // The refreshed wording has no score yet, whatever the copy's score history says.
+        docs.scoreStale.add(existing.id);
         return existing.id;
       }
       const id = crypto.randomUUID();
@@ -140,6 +146,20 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       const key = JSON.stringify([userId, jobId, target, tailoredCvId]);
       store.delete(key);
       store.set(key, { userId, jobId, target, tailoredCvId, score: structuredClone(score) });
+      const cv = target === "tailored" && tailoredCvId ? docs.cvs.get(tailoredCvId) : undefined;
+      if (cv && cv.userId === userId) {
+        cv.score = structuredClone(score);
+        docs.scoreStale.delete(cv.id);
+      }
+    },
+    async scoreCopies(jobId) {
+      return [...docs.cvs.values()].filter((cv) => cv.userId === userId && cv.jobId === jobId)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map((cv) => ({ id: cv.id, score: structuredClone(cv.score), scoreStale: docs.scoreStale.has(cv.id) }));
+    },
+    async hasTailoredCv(jobId) {
+      return [...docs.runs.values()].some((run) => run.userId === userId && run.jobId === jobId
+        && run.status === "done" && TAILORING_KINDS.includes(run.kind));
     },
     async getScore(jobId, target, tailoredCvId) {
       const row = [...store.values()].reverse().find((row) =>
