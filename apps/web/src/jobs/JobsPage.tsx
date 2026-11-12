@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import type { JobListItem, JobListPage } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
@@ -7,6 +7,8 @@ import { AppShell } from "../layout/AppShell.tsx";
 import { useT } from "../i18n/t.ts";
 import { getLanguage } from "../i18n/language.ts";
 import { Skeleton } from "../ui/Page.tsx";
+import { remembered } from "../tailor/flow-phase.ts";
+import { fetchOpenRun } from "../tailor/open-run.ts";
 import { listJobs } from "./jobs-api.ts";
 import { AddJobDialog } from "./AddJobDialog.tsx";
 
@@ -53,6 +55,11 @@ function JobsList({ userId }: { userId: string }) {
   });
   const rows = uniqueJobs(query.data?.pages ?? []);
   const busy = rows.some(isReading);
+  // Unfinished tailoring runs: asked only for the jobs this browser remembers a run for, so most lists ask for none.
+  const withRun = rows.filter((job) => remembered(job.id));
+  const runs = useQueries({ queries: withRun.map((job) => (
+    { queryKey: ["job-tailor-run", userId, job.id], gcTime: 0, queryFn: () => fetchOpenRun(job.id) })) });
+  const runOf = new Map(withRun.map((job, index) => [job.id, runs[index]?.data ?? null]));
 
   useEffect(() => {
     const add = searchParams.get("add");
@@ -153,44 +160,61 @@ function JobsList({ userId }: { userId: string }) {
                 </label>
               )}
               {jobs.length === 0 ? <p className="ui-notice">{t("jobs.noMatch", { q: search.trim() })}</p> : (
-                <div className="ui-sheet">
-                  <ul className="jobs-list">
-                    {jobs.map((job) => {
-                      const to = `/jobs/${job.id}`;
-                      const place = [job.company, job.location].filter(Boolean).join(", ") || hostOf(job);
-                      if (isReading(job)) {
+                <>
+                  <div className="ui-sheet jobs-table">
+                    {/* Column names for the eye only; each cell says its own name to a screen reader. */}
+                    <div className="jobs-row jobs-head-row" aria-hidden="true">
+                      <span>{t("jobs.col.job")}</span><span>{t("jobs.col.score")}</span><span>{t("jobs.col.cv")}</span>
+                      <span>{t("jobs.col.application")}</span><span></span>
+                    </div>
+                    <ul className="jobs-list">
+                      {jobs.map((job) => {
+                        const to = `/jobs/${job.id}`;
+                        const reading = isReading(job);
+                        const ready = job.status === "ready";
+                        const run = runOf.get(job.id) ?? null;
+                        const languages = job.tailoredLanguages ?? [];
+                        // The CV column, first match wins: tailoring under way, a tailored CV, the base CV, the ad still being read.
+                        const cvState = run ? <span className="ui-small">{t("jobs.cv.tailoring", { n: run.sections.indexOf(run.currentSection!) + 1, total: run.sections.length })}</span>
+                          : languages.length > 0 ? <><span className="ui-pill ui-pill--good">{t("jobs.pill.tailored")}</span><span className="ui-small">{languages.map((code) => code.toUpperCase()).join(", ")}</span></>
+                          : ready ? <span className="ui-small">{t("jobs.cv.base")}</span>
+                          : reading ? <><span className="jobs-spinner" aria-hidden="true" /><span className="ui-small ui-muted">{t("jobs.cv.reading")}</span></>
+                          : job.status === "failed" ? <span className="ui-pill ui-pill--bad">{t("jobs.badge.failed")}</span> : null;
                         return (
-                          <li key={job.id}>
-                            <div className="ui-stack ui-stack--s">
-                              <Link className="job-title" to={to}>{job.title || t("jobs.reading.title")}</Link>
-                              <p className="ui-row ui-muted"><span className="jobs-spinner" aria-hidden="true" />{t("jobs.badge.reading")}</p>
+                          <li key={job.id} className="jobs-row">
+                            <div className="jobs-cell-job">
+                              <Link className="job-title" to={to}>{job.title || (reading ? t("jobs.reading.title") : hostOf(job))}</Link>
+                              {!reading && <p className="ui-muted">{[job.company, job.location].filter(Boolean).join(", ") || hostOf(job)}</p>}
+                              {!reading && (
+                                <div className="ui-row">
+                                  {job.positionClosed && <span className="ui-pill ui-pill--warn">{t("jobs.pill.closed")}</span>}
+                                  <time className="ui-muted ui-small" dateTime={job.createdAt}>{saved(job)}</time>
+                                </div>
+                              )}
+                            </div>
+                            <p className="jobs-cell-score">
+                              <span className="ui-sr">{t("jobs.col.score")}</span>{" "}
+                              <span className={job.score == null ? "jobs-num is-none" : "jobs-num"}>{job.score ?? "–"}</span>
+                            </p>
+                            <div className="jobs-cell-meta">
+                              <div className="jobs-cell-cv">{cvState && <><span className="ui-sr">{t("jobs.col.cv")}</span>{" "}{cvState}</>}</div>
+                              <div className="jobs-cell-app">
+                                {ready && <><span className="ui-sr">{t("jobs.col.application")}</span>{" "}
+                                  <span className="ui-pill">{t(`job.status.${job.applicationStatus ?? "saved"}`)}</span></>}
+                              </div>
+                            </div>
+                            <div className="jobs-cell-act">
+                              {run ? <Link className="ui-btn ui-btn--primary ui-btn--sm" to={`${to}/tailor`}>{t("jobs.continue")}</Link>
+                                : ready ? <Link className="ui-btn ui-btn--sm" to={to}>{t("jobs.open")}</Link>
+                                : !reading ? <Link className="ui-btn ui-btn--sm" to={to}>{t("jobs.view")}</Link> : null}
                             </div>
                           </li>
                         );
-                      }
-                      const ready = job.status === "ready";
-                      return (
-                        <li key={job.id}>
-                          <div className="ui-stack ui-stack--s">
-                            <Link className="job-title" to={to}>{job.title || hostOf(job)}</Link>
-                            <p className="ui-muted">{place}</p>
-                            <div className="ui-row">
-                              {job.status === "failed" && <span className="ui-pill ui-pill--bad">{t("jobs.badge.failed")}</span>}
-                              {job.applicationStatus && job.applicationStatus !== "saved" && <span className="ui-pill">{t(`job.status.${job.applicationStatus}`)}</span>}
-                              {job.positionClosed && <span className="ui-pill ui-pill--warn">{t("jobs.pill.closed")}</span>}
-                              <time className="ui-muted ui-small" dateTime={job.createdAt}>{saved(job)}</time>
-                            </div>
-                          </div>
-                          <div className="ui-row">
-                            {ready && !job.positionClosed && (job.applicationStatus ?? "saved") === "saved"
-                                ? <Link className="ui-btn ui-btn--primary ui-btn--sm" to={to}>{t("job.tailor.button")}</Link>
-                                : <Link className="ui-btn ui-btn--sm" to={to}>{t("jobs.view")}</Link>}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
+                      })}
+                    </ul>
+                  </div>
+                  <p className="ui-small ui-muted jobs-note">{t("jobs.scoreNote")}</p>
+                </>
               )}
               {pollStopped && busy && <p className="ui-notice jobs-note">{t("jobs.stillReading")}</p>}
               {!q && query.hasNextPage && <button type="button" className="ui-btn jobs-load-more" disabled={query.isFetchingNextPage}

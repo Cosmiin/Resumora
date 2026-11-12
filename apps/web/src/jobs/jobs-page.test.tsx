@@ -9,6 +9,12 @@ const auth = vi.hoisted(() => ({ getSession: vi.fn(), onAuthStateChange: vi.fn()
 vi.mock("../lib/supabase.ts", () => ({ supabase: { auth } }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: () => new Promise(() => {}) }));
 vi.mock("./jobs-api.ts", () => ({ listJobs: vi.fn(), createJob: vi.fn() }));
+vi.mock("../tailor/tailor-api.ts", async (original) => ({ ...(await original<object>()), getRun: vi.fn() }));
+import { getRun } from "../tailor/tailor-api.ts";
+import { readFileSync } from "node:fs";
+// The stylesheet as text: the test run doesn't apply CSS, so the layout rules are checked by reading them.
+// The path is from the web app's folder, where the tests run.
+const jobsCss = readFileSync("src/styles/jobs.css", "utf8");
 import { AuthProvider } from "../auth/AuthProvider.tsx";
 import { routes } from "../router.tsx";
 import { setUnsavedChanges } from "../cv/unsaved.ts";
@@ -74,7 +80,7 @@ describe("jobs list", () => {
     expect(screen.getAllByText("Acme, London")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "A job you just saved" })).toHaveAttribute("href", "/jobs/two");
     expect(screen.getByRole("link", { name: "Designer" })).toHaveAttribute("href", "/jobs/three");
-    expect(screen.getAllByText("Reading the ad. About a minute.")).toHaveLength(2);
+    expect(screen.getAllByText("Reading the ad")).toHaveLength(2);
     expect(screen.getByText("Couldn't read")).toBeInTheDocument();
     // A job still being read shows no date; the other two do.
     expect(screen.getAllByText("Saved on 5 Nov")).toHaveLength(2);
@@ -101,17 +107,130 @@ describe("jobs list", () => {
     ]));
     renderJobs();
     const row = async (title: string) => within((await screen.findByRole("link", { name: title })).closest("li")!);
-    expect((await row("Engineer")).getByRole("link", { name: "Tailor my CV" })).toHaveAttribute("href", "/jobs/one");
+    const first = await row("Engineer");
+    expect(first.getByRole("link", { name: "Open" })).toHaveAttribute("href", "/jobs/one");
+    expect(first.getByText("Not applied")).toHaveClass("ui-pill");
+    expect(first.queryByRole("link", { name: "Tailor my CV" })).toBeNull();
     const applied = await row("Applied one");
-    expect(applied.getByText("Applied")).toBeInTheDocument();
-    expect(applied.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/a");
+    expect(applied.getByText("Applied")).toHaveClass("ui-pill");
+    expect(applied.getByRole("link", { name: "Open" })).toHaveAttribute("href", "/jobs/a");
     const closed = await row("Closed one");
     expect(closed.getByText("No longer open")).toBeInTheDocument();
-    expect(closed.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/c");
-    expect((await row("Failed one")).getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/f");
+    expect(closed.getByRole("link", { name: "Open" })).toHaveAttribute("href", "/jobs/c");
+    // A job that couldn't be read keeps its own action and has no application status to show.
+    const failed = await row("Failed one");
+    expect(failed.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/f");
+    expect(failed.getByText("Couldn't read")).toBeInTheDocument();
+    expect(failed.queryByText("Not applied")).toBeNull();
     // The application status never says a CV was tailored.
     expect(screen.queryByText("CV tailored")).toBeNull();
     expect(screen.getAllByText("No longer open")).toHaveLength(1);
+  });
+
+  describe("score, CV and application", () => {
+    const row = async (title: string) => (await screen.findByRole("link", { name: title })).closest("li")!;
+    const run = { id: "run1", userId: "u1", jobId: "one", tailoredCvId: "cv1", kind: "tailor" as const,
+      sections: ["experience" as const, "skills" as const, "summary" as const, "achievements" as const, "languages" as const],
+      status: "waiting_user" as const, currentSection: "skills" as const, questions: null, answers: null, proposals: null, errorCode: null,
+      createdAt: job.createdAt, updatedAt: job.createdAt };
+    afterEach(() => localStorage.clear());
+
+    it("shows each job's score, whether it has a tailored CV, and how the application stands", async () => {
+      vi.mocked(listJobs).mockResolvedValue(page([
+        { ...job, score: 84, tailoredLanguages: ["en", "ro"], applicationStatus: "applied" },
+        { ...job, id: "b", title: "Lead", score: 78, tailoredLanguages: ["en"], applicationStatus: "saved" },
+        { ...job, id: "c", title: "Manager", score: 61, tailoredLanguages: [], applicationStatus: "saved" },
+        { ...job, id: "d", title: "Designer", score: null, tailoredLanguages: [], status: "processing" },
+      ]));
+      renderJobs();
+      const one = within(await row("Engineer"));
+      expect(one.getByText("84")).toBeInTheDocument();
+      expect(one.getByText("Tailored CV")).toHaveClass("ui-pill");
+      expect(one.getByText("EN, RO")).toBeInTheDocument();
+      expect(one.getByText("Applied")).toHaveClass("ui-pill");
+      expect(one.getByRole("link", { name: "Open" })).toHaveAttribute("href", "/jobs/one");
+      const two = within(await row("Lead"));
+      expect(two.getByText("78")).toBeInTheDocument();
+      expect(two.getByText("Tailored CV")).toBeInTheDocument();
+      expect(two.getByText("EN")).toBeInTheDocument();
+      expect(two.getByText("Not applied")).toHaveClass("ui-pill");
+      const three = within(await row("Manager"));
+      expect(three.getByText("61")).toBeInTheDocument();
+      expect(three.getByText("Base CV")).toBeInTheDocument();
+      expect(three.queryByText("Tailored CV")).toBeNull();
+      expect(three.getByText("Not applied")).toBeInTheDocument();
+      const four = within(await row("Designer"));
+      expect(four.getByText("–")).toBeInTheDocument();
+      expect(four.getByText("Reading the ad")).toBeInTheDocument();
+      expect(four.queryByText("Not applied")).toBeNull();
+      expect(four.queryByText("Base CV")).toBeNull();
+      expect(four.queryByRole("link", { name: "Open" })).toBeNull();
+      // Said once, under the list.
+      expect(screen.getAllByText("Score: from the tailored CV when the job has one, otherwise from your base CV.")).toHaveLength(1);
+      // No job here has a run this browser remembers, so nothing asks for one.
+      expect(getRun).not.toHaveBeenCalled();
+    });
+
+    it("names each cell for a screen reader and hides the header row from it", async () => {
+      vi.mocked(listJobs).mockResolvedValue(page([{ ...job, score: 84, tailoredLanguages: ["en"], applicationStatus: "applied" }]));
+      renderJobs();
+      const li = await row("Engineer");
+      const score = within(li).getByText("84").parentElement!;
+      expect(within(score).getByText("Score")).toHaveClass("ui-sr");
+      expect(score).toHaveTextContent(/^Score\s*84$/);
+      expect(within(li).getByText("CV")).toHaveClass("ui-sr");
+      expect(within(li).getByText("Application")).toHaveClass("ui-sr");
+      const head = document.querySelector(".jobs-head-row")!;
+      expect(head).toHaveAttribute("aria-hidden", "true");
+      expect([...head.children].map((cell) => cell.textContent)).toEqual(["Job", "Score", "CV", "Application", ""]);
+    });
+
+    it("shows an unfinished run this browser remembers with Continue, and asks for no other job's run", async () => {
+      localStorage.setItem("resumora.tailorRun.one", "run1");
+      vi.mocked(getRun).mockResolvedValue(run);
+      vi.mocked(listJobs).mockResolvedValue(page([{ ...job, score: 69, tailoredLanguages: [] },
+        { ...job, id: "b", title: "Lead", score: 78, tailoredLanguages: ["en"] }]));
+      renderJobs();
+      const one = within(await row("Engineer"));
+      expect(await one.findByText("Tailoring, step 2 of 5")).toBeInTheDocument();
+      const go = one.getByRole("link", { name: "Continue" });
+      expect(go).toHaveAttribute("href", "/jobs/one/tailor");
+      expect(go).toHaveClass("ui-btn--primary");
+      expect(one.queryByRole("link", { name: "Open" })).toBeNull();
+      expect(one.queryByText("Base CV")).toBeNull();
+      expect(within(await row("Lead")).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/jobs/b");
+      expect(getRun).toHaveBeenCalledTimes(1);
+      expect(getRun).toHaveBeenCalledWith("run1");
+    });
+
+    it("treats a remembered run that is finished or gone as no run", async () => {
+      localStorage.setItem("resumora.tailorRun.one", "run1");
+      vi.mocked(getRun).mockRejectedValue(new ApiClientError(404, "not_found", "Gone"));
+      vi.mocked(listJobs).mockResolvedValue(page([{ ...job, score: 69, tailoredLanguages: [] }]));
+      renderJobs();
+      const one = within(await row("Engineer"));
+      await waitFor(() => expect(getRun).toHaveBeenCalled());
+      expect(await one.findByText("Base CV")).toBeInTheDocument();
+      expect(one.getByRole("link", { name: "Open" })).toBeInTheDocument();
+      expect(one.queryByRole("link", { name: "Continue" })).toBeNull();
+    });
+
+    it("lets a 120-character title wrap, in rows that can't grow wider than the page", async () => {
+      const long = `${"Senior Staff Principal ".repeat(5)}Eng`.padEnd(120, "x");
+      expect(long).toHaveLength(120);
+      vi.mocked(listJobs).mockResolvedValue(page([{ ...job, title: long, score: 61, tailoredLanguages: [] }]));
+      renderJobs();
+      const title = await screen.findByRole("link", { name: long });
+      expect(title).toHaveClass("job-title");
+      expect(title.closest("li")).toHaveClass("jobs-row");
+      const rule = (selector: string) => jobsCss.split("}").filter((part) => part.trim().startsWith(`${selector} {`)).join("\n");
+      expect(rule(".jobs-page .job-title")).toContain("overflow-wrap: anywhere");
+      expect(jobsCss).not.toMatch(/\.job-title[^{]*\{[^}]*nowrap/);
+      // Every track that holds text may shrink to nothing, on desktop and in the phone card.
+      const tracks = [...jobsCss.matchAll(/\.jobs-row \{[^}]*grid-template-columns: ([^;]+);/g)].map((match) => match[1]!);
+      expect(tracks).toHaveLength(2);
+      for (const track of tracks) expect(track.replaceAll(/minmax\(0, [^)]+\)|\d+px/g, "").trim()).toBe("");
+    });
   });
 
   it("appends more jobs, deduplicates against refreshed first-page rows and ends pagination", async () => {
@@ -251,7 +370,7 @@ describe("jobs polling", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Engineer/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Older job/ })).toBeInTheDocument();
-    expect(screen.queryByText("Reading the ad. About a minute.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reading the ad")).not.toBeInTheDocument();
   });
 
   it.each([0, 1])("polls all loaded pages while page %i has busy jobs, then stops when ready", async (busyPage) => {
@@ -264,11 +383,11 @@ describe("jobs polling", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Load more" })); });
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-    expect(screen.getByText("Reading the ad. About a minute.")).toBeInTheDocument();
+    expect(screen.getByText("Reading the ad")).toBeInTheDocument();
     ready = true;
     await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
     expect(listJobs).toHaveBeenCalledTimes(4);
-    expect(screen.queryByText("Reading the ad. About a minute.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reading the ad")).not.toBeInTheDocument();
     expect(screen.getByText("Older job")).toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(9000); });
     expect(listJobs).toHaveBeenCalledTimes(4);
@@ -373,7 +492,7 @@ describe("Add job dialog", () => {
     vi.mocked(listJobs).mockResolvedValue(page([job, { ...job, id: "new", title: null, status: "queued" }]));
     await act(async () => finish({ id: "new", existing: false }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(await screen.findByText("Reading the ad. About a minute.")).toBeInTheDocument();
+    expect(await screen.findByText("Reading the ad")).toBeInTheDocument();
     expect(opener).toHaveFocus();
     await userEvent.click(opener);
     expect(screen.getByLabelText("Link to the job ad")).toHaveValue("");
@@ -394,7 +513,7 @@ describe("Add job dialog", () => {
     await act(async () => finishList(page([job])));
     expect(await screen.findByRole("link", { name: /New job/ })).toHaveAttribute("href", "/jobs/new");
     expect(listJobs).toHaveBeenCalledTimes(2);
-    expect(screen.getByText("Reading the ad. About a minute.")).toBeInTheDocument();
+    expect(screen.getByText("Reading the ad")).toBeInTheDocument();
   });
 
   it("moves focus to the heading's button when a successful first add removes the empty state", async () => {

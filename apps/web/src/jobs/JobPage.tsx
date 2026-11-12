@@ -16,8 +16,7 @@ import { Keywords, MatchNumber, MustHaves, NiceToHave, mustCount } from "./JobMa
 import { JobScoreHow } from "./JobScoreCard.tsx";
 import { TailorGate } from "./TailorGate.tsx";
 import { TailoredJobView } from "./TailoredJobView.tsx";
-import { getRun } from "../tailor/tailor-api.ts";
-import { remembered } from "../tailor/TailorFlow.tsx";
+import { fetchOpenRun } from "../tailor/open-run.ts";
 
 export function JobPage() {
   const userId = useAuth().session?.user.id ?? "anonymous";
@@ -53,14 +52,7 @@ function JobView({ id, userId }: { id: string; userId: string }) {
     enabled: query.data?.status === "ready", placeholderData: keepPreviousData,
   });
   // An unfinished tailoring run this browser remembers (the flow forgets it when the run is done).
-  const openRun = useQuery({
-    queryKey: ["job-tailor-run", userId, id], gcTime: 0,
-    queryFn: async () => {
-      const stored = remembered(id);
-      const run = stored ? await getRun(stored).catch(() => null) : null;
-      return run && run.status !== "done" && run.currentSection ? run : null;
-    },
-  });
+  const openRun = useQuery({ queryKey: ["job-tailor-run", userId, id], gcTime: 0, queryFn: () => fetchOpenRun(id) });
   const [scoring, setScoring] = useState<"idle" | "busy" | "failed">("idle");
   /** Try again: a ready job with no Score 1 (saved before scoring, or scoring failed once) gets one computed now. */
   async function retryScore() {
