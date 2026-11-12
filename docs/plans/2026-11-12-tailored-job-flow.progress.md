@@ -85,3 +85,36 @@ open: (a) not yet seen in a browser: the desktop columns and the phone cards wer
 session: Build tailored job flow, part 2 · builder: claude
 commit: a603305 (base 0a73423) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: (a) the API route `GET /v1/tailored` is no longer called by the web; it stays, removing it is the owner's call (plan, Task 7). (b) R20: the shortened after-export lines. (c) The new "Template" link in the base CV's header has no test of its own (the plan lists none); check it in the preview.
+
+- R22 (end of run): the owner said yes to R3 on 2026-11-12 ("please put it on the local database now", and the same pick on the decision page). Both migrations were applied to the shared local database when this branch's preview started. Until this branch is merged, the last step of a tailoring run fails on the other branches' local servers.
+- R23 (fix round): the Supabase job repo reads a stored application status of `tailored` as `saved` (`storedStatus` in `apps/api/src/jobs/supabase-repo.ts`, a file no task listed). The API is released before the status migration runs, and without this every read of such a row failed.
+
+## End of run (2026-11-12)
+
+**Whole-branch review** (Opus, base `5533085`): 1 finding, medium, confirmed against the code. Between the API release and the status migration, a row that still says `tailored` failed the new five-value check on every read, so the Jobs list (one such row fails the page) and that job's pages answered 500. Fixed in `ee7acd8` (R23), with a test. A second whole-branch review was not needed: the fix touches no shared type, migration, RLS or file of two tasks.
+
+**Security review** (Opus, one run per threat, base `5533085`):
+- user A reads or changes user B's data: pass, no findings. Every new query uses the caller's client, so RLS applies.
+- login checks on the changed routes: pass, no findings. All five routes sit behind the `/v1/*` check.
+- input validation: pass, no findings.
+- guessable or changeable ids: pass, 2 low findings in the web, both display only. (1) A Re-check started in the moment after another language was chosen could put its answer under the other copy's address: fixed in `ee7acd8`, with a test. (2) Left open, see below.
+
+**Fix round:** `ee7acd8` (base `78aec10`), reviewed alone by a fresh Opus agent: pass, 1 low finding left open, see below. Fix rounds: 1. Whole-branch reviews: 1.
+
+**Checks on `ee7acd8`:** typecheck clean, lint clean, tests 446 + 824 (4 skipped) + 229 + 1106 pass, database tests 259 pass (run after the local migration).
+
+**Preview check** (the owner's Chrome, local database, this branch's server):
+- Jobs list, desktop: the columns Job, Score, CV, Application and the Open button line up; 375 px: one card per job, round score badge, pills on one line, Open at full width (283 x 44). No sideways scrolling at either width, nothing overlapping.
+- Tailored job page, desktop and 375 px: score band, coach line, the three buttons (44 px high on the phone, full width), the folded job row (opens, one column on the phone), the template line, the CV read-only. No sideways scrolling.
+- Real API paths that had only run against stand-ins: `GET /v1/jobs` gives score 94 and `["en"]` for the tailored job; `GET /v1/jobs/:id/score` gives the same answer with no `?cv=`, with the copy's id, with an unknown id and with junk; an editor save with changed text sets `stale: true` and keeps the number; Re-check from the page took about 6 seconds, read "Checking" while disabled, cleared the notice and wrote the copy's `score`; a save with identical text leaves `stale` false; Re-check with an unknown id answers 404 and without a login 401.
+- `/cvs` lands on Jobs; the menu reads My CV, Jobs, Account; the base CV's header has Template and Export; the dropdown has the five statuses.
+- Not seen live: the language switch (the local job has one copy; creating a second would add data and an AI call) and the Continue tailoring state. Both are covered by tests only.
+
+**Open, for the owner:**
+1. Layout switch (Task 4, open b), measured: a tailored job's page shows the old layout with a "Tailor my CV" button from the moment the job arrives until its score arrives, then switches. Locally that is about 40 ms. On the hosted API it lasts as long as the score request. Not changed: holding a skeleton there would also change how an untailored job's page loads, which the plan says stays as it is.
+2. "Try again" for a missing base score stores its answer under the current address; on a tailored job with no base score and `?cv=` naming a copy other than the one saved last, the page can show the other copy until the next load (security review, low).
+3. Pressing the language button that is already pressed and then Re-check within a split second drops that Re-check's answer from the page; the server has saved it and the next load shows it (fix review, low).
+4. From the tasks: R18 (a `needs_text` job shows nothing in the CV column), R20 (the shortened after-export lines), R16 (the copies list is requested twice on a tailored job's page), Task 2 open b (a re-tailor or a guided-review decision changes the wording without setting the edited flag), Task 7 open a (`GET /v1/tailored` is unused by the web now).
+5. Not done, each needs the owner's yes: pushing the branch, a PR, either migration on the hosted database (the API first, then the status migration).
+
+**Cost line:** weekly usage 28 % (all models) and 55 % (Fable) when first read after Task 6, 30 % and 58 % at the end; the start of the part was not read. Review agents: 9 (3 Sonnet per task, 6 Opus: 1 whole branch, 4 security, 1 fix). Guard denials: 0. Claude context used: 45 % of the session's window.
