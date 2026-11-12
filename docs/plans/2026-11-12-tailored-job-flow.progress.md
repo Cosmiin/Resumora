@@ -69,3 +69,19 @@ Next: Task 5, then 6, then 7, each through the `claude-build` per-task steps. Ba
 session: Build tailored job flow, part 2 · builder: claude
 commit: 7e3d627 (base 32992bf) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: (a) not yet seen in a browser. (b) A failed Re-check replaces the "Edited since last score" text with "Couldn't check the score." and the button reads "Try again" until it succeeds. (c) Two editor typing tests (`src/cv/editor.test.tsx`, "keeps every character typed…") timed out once at 5 s in a full run under load and passed alone and in the run before; not touched by this branch.
+
+- R17 (Task 6): the list's reading text is the plan's "Reading the ad" (new key `jobs.cv.reading`); the old "Reading the ad. About a minute." string is removed. The row keeps the "saved … ago" date and the "No longer open" pill under the title: the columns had room for both.
+- R18 (Task 6): a `needs_text` job shows nothing in the CV column. The plan says "the text the row shows today", and today the row shows none for that state. A `failed` job keeps its "Couldn't read" pill there. Both keep "View job" as their action.
+- R19 (Task 6): the layout rules can't be run in the tests (the test run applies no CSS), so the "no sideways scroll" test reads `styles/jobs.css` as text and checks the title's wrapping and the row's column tracks.
+- R20 (Task 7): the after-export lines said "Your tailored CV stays in My CVs." / "Your base CV stays in My CVs.", which is no longer true. The plan gives no new wording, so the second sentence is cut: "Good luck with this one." and "Done.". For the owner to reword if wanted.
+- R21 (Task 7): the missing / error state has no CV loaded, so it picks its way back from the address: a page under `/jobs/:id/...` offers "Back to the job", `/cv/...` offers "Back to my CV".
+
+## Task 6: Jobs list: score, CV and application; cards on a phone (web) — done
+session: Build tailored job flow, part 2 · builder: claude
+commit: 0a73423 (base f265df3) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: (a) not yet seen in a browser: the desktop columns and the phone cards were checked by reading the CSS only. (b) R18: say if a `needs_text` job should name its state in the CV column.
+
+## Task 7: Remove My CVs (web) — done
+session: Build tailored job flow, part 2 · builder: claude
+commit: a603305 (base 0a73423) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: (a) the API route `GET /v1/tailored` is no longer called by the web; it stays, removing it is the owner's call (plan, Task 7). (b) R20: the shortened after-export lines. (c) The new "Template" link in the base CV's header has no test of its own (the plan lists none); check it in the preview.
