@@ -81,6 +81,10 @@ export const JobListItemSchema = z.object({
   applicationStatus: applicationStatus.optional(),
   /** True when the ad itself says the position is no longer open. */
   positionClosed: z.boolean().optional(),
+  /** The list's score: the tailored CV's when the job is tailored, otherwise the base CV's; null when not scored. */
+  score: z.number().nullable().optional(),
+  /** The language codes the job has a tailored CV in; empty until a tailoring run is done. */
+  tailoredLanguages: z.array(z.string()).optional(),
 });
 export type JobListItem = z.infer<typeof JobListItemSchema>;
 

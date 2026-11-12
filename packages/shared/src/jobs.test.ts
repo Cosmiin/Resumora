@@ -175,6 +175,11 @@ describe("job response schemas", () => {
       .toEqual({ items: [listItem], nextCursor: "next" });
     expect(JobListPageSchema.parse({ items: [], nextCursor: null })).toEqual({ items: [], nextCursor: null });
     expect(JobListPageSchema.safeParse({ items: [listItem] }).success).toBe(false);
+    // The list's score and tailored languages; an answer without them (an older API) still parses.
+    const scored = { ...listItem, score: 84, tailoredLanguages: ["en", "ro"] };
+    expect(JobListItemSchema.parse(scored)).toEqual(scored);
+    expect(JobListItemSchema.parse({ ...listItem, score: null, tailoredLanguages: [] })).toMatchObject({ score: null, tailoredLanguages: [] });
+    expect(JobListItemSchema.safeParse({ ...listItem, score: "84" }).success).toBe(false);
   });
 
   it("accepts queued list items and full jobs before extraction", () => {

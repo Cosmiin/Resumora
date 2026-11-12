@@ -5,6 +5,7 @@ import { memoryJobs } from "../src/jobs/memory-repo.ts";
 import { JOBS_PER_DAY, type JobMessage } from "../src/jobs/repo.ts";
 
 import { memoryTailorDocs, memoryTailorRepo, type MemoryTailorDocs, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
+import { supabaseTailorRepo } from "../src/tailor/supabase-repo.ts";
 import { fakeModel } from "../src/tailor/fake-model.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
 import { emptyCv } from "@resumora/shared";
@@ -209,6 +210,94 @@ describe("the score of one tailored copy", () => {
     expect((await read(jobId)).hasTailoredCv).toBe(false);
     await repo.updateRun(run.id, { status: "done", currentSection: null });
     expect((await read(jobId)).hasTailoredCv).toBe(true);
+  });
+
+  /** Marks the job tailored: one finished tailoring run. */
+  async function finishRun(jobId: string, cvId: string, user = "user-a") {
+    const run = await tailor(user).createRun({ jobId, tailoredCvId: cvId, kind: "tailor", sections: ["summary"], currentSection: "summary" });
+    await tailor(user).updateRun(run.id, { status: "done", currentSection: null });
+  }
+  const listed = async (token = "token-a") => {
+    const page = await (await app.request("/v1/jobs", { headers: headers(token) })).json() as JobListPage;
+    return new Map(page.items.map((item) => [item.id, { score: item.score, tailoredLanguages: item.tailoredLanguages }]));
+  };
+
+  it("lists each job with its latest score and the languages it has a tailored CV in", async () => {
+    // Tailored: base 69, its only copy 84.
+    const tailoredJob = await create();
+    await store.admin.finish(tailoredJob, extracted);
+    const en = await tailor().createTailoredCv({
+      jobId: tailoredJob, language: "en", content: emptyCv("en"), baseSnapshotAt: clock.toISOString(), tone: "neutral", instruction: null, steering: {},
+    });
+    await tailor().saveScore(tailoredJob, "base", null, scoreOf(69));
+    await tailor().saveScore(tailoredJob, "tailored", en, scoreOf(84));
+    await finishRun(tailoredJob, en);
+    // Not tailored, scored 61.
+    const scoredJob = await create({ ...body, url: "https://example.test/jobs/scored" });
+    await store.admin.finish(scoredJob, extracted);
+    await tailor().saveScore(scoredJob, "base", null, scoreOf(61));
+    // Still being read.
+    const readingJob = await create({ ...body, url: "https://example.test/jobs/reading" });
+
+    const list = await listed();
+    expect(list.get(tailoredJob)).toEqual({ score: 84, tailoredLanguages: ["en"] });
+    expect(list.get(scoredJob)).toEqual({ score: 61, tailoredLanguages: [] });
+    expect(list.get(readingJob)).toEqual({ score: null, tailoredLanguages: [] });
+  });
+
+  it("lists a job with two copies under the score of the copy saved last, with both languages", async () => {
+    const { jobId, en, ro } = await twoCopies();
+    await tailor().saveScore(jobId, "base", null, scoreOf(69));
+    await tailor().saveScore(jobId, "tailored", ro, scoreOf(80));
+    await finishRun(jobId, en);
+    expect((await listed()).get(jobId)).toEqual({ score: 80, tailoredLanguages: ["en", "ro"] });
+  });
+
+  it("lists a job whose tailoring isn't done under its base score, as not tailored", async () => {
+    const { jobId } = await twoCopies();
+    await tailor().saveScore(jobId, "base", null, scoreOf(69));
+    expect((await listed()).get(jobId)).toEqual({ score: 69, tailoredLanguages: [] });
+  });
+
+  it("never lists another person's scores or tailored CVs", async () => {
+    const { jobId, en } = await twoCopies();
+    await tailor().saveScore(jobId, "base", null, scoreOf(69));
+    await finishRun(jobId, en);
+    const theirs = await create({ ...body, url: "https://example.test/jobs/theirs" }, "token-b");
+    expect([...(await listed("token-b"))]).toEqual([[theirs, { score: null, tailoredLanguages: [] }]]);
+    // Even asked by id, the other person's job gives nothing away.
+    expect((await tailor("user-b").summaries([jobId])).get(jobId)).toEqual({ score: null, tailoredLanguages: [] });
+  });
+
+  it("asks the database the same number of questions for 20 jobs as for 1", async () => {
+    const env = { SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "public-key" };
+    const idsIn = (url: URL, column: string) => (url.searchParams.get(column) ?? "").replace(/^in\.\(|\)$/g, "").split(",").map((id) => id.replace(/"/g, ""));
+    let calls = 0;
+    // Every job is tailored and has one English copy scored 84 in its own column and 88 in its history.
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      calls++;
+      const url = new URL(input);
+      const table = url.pathname.split("/").pop();
+      const select = url.searchParams.get("select") ?? "";
+      if (table === "jobs" && select.includes("tailor_runs")) return Response.json(idsIn(url, "id").map((id) => ({ id, tailor_runs: [{ id: "run" }] })));
+      if (table === "jobs") return Response.json(idsIn(url, "id").map((id) => ({ id, match_scores: [{ total: 69 }] })));
+      if (table === "tailored_cvs") return Response.json(idsIn(url, "job_id").map((jobId) => ({ id: `cv-${jobId}`, job_id: jobId, language: "en", total: 84 })));
+      return Response.json(idsIn(url, "tailored_cv_id").filter((id) => id !== "cv-job-0").map((id) => ({ tailored_cv_id: id, total: 88 })));
+    }));
+    try {
+      const repo = supabaseTailorRepo(env, { id: "a", token: "user-token" });
+      const one = await repo.summaries(["job-0"]);
+      const forOne = calls;
+      calls = 0;
+      const many = await repo.summaries(Array.from({ length: 20 }, (_, index) => `job-${index}`));
+      expect(calls).toBe(forOne);
+      // A copy with no score history falls back to its own stored score.
+      expect(one.get("job-0")).toEqual({ score: 84, tailoredLanguages: ["en"] });
+      expect(many.get("job-19")).toEqual({ score: 88, tailoredLanguages: ["en"] });
+      expect(many.size).toBe(20);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

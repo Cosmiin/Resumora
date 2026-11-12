@@ -77,7 +77,9 @@ export function jobRoutes(deps: {
     const after = cursor === undefined ? null : decodeJobCursor(cursor);
     if (cursor !== undefined && !after) throw invalid();
     const { items, next } = await deps.repoFor(c).list({ limit, after, source });
-    return c.json({ items, nextCursor: next ? encodeJobCursor(next) : null });
+    // One call for the whole page: each job's list score and the languages it has a tailored CV in.
+    const summaries = await deps.tailorRepoFor(c).summaries(items.map((item) => item.id));
+    return c.json({ items: items.map((item) => ({ ...item, ...summaries.get(item.id) })), nextCursor: next ? encodeJobCursor(next) : null });
   });
 
   app.get("/:id", async (c) => {

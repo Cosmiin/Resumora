@@ -6,7 +6,7 @@ import {
 import { storedCv } from "../cv/supabase-repo.ts";
 import { ApiError } from "../errors.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
-import { sameCv, TAILORING_KINDS, type TailorRepo } from "./repo.ts";
+import { sameCv, TAILORING_KINDS, type JobSummary, type TailorRepo } from "./repo.ts";
 import { withColumns } from "./steering.ts";
 
 const ToneExamplesSchema = z.object({ bullet: z.string(), examples: z.record(ToneSchema, z.string()) });
@@ -42,6 +42,47 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
         .eq("job_id", jobId).eq("status", "done").in("kind", TAILORING_KINDS).limit(1);
       if (error) throw new Error(`tailor_runs select failed: ${error.message}`);
       return data.length > 0;
+    },
+    async summaries(jobIds) {
+      const out = new Map<string, JobSummary>(jobIds.map((id) => [id, { score: null, tailoredLanguages: [] }]));
+      if (jobIds.length === 0) return out;
+      // Three queries for the whole page. Each returns at most one row per job, or one per tailored CV
+      // (a job has one per language), however long the run and score histories are.
+      const [done, copies, base] = await Promise.all([
+        db.from("jobs").select("id, tailor_runs!inner(id)").in("id", jobIds)
+          .eq("tailor_runs.status", "done").in("tailor_runs.kind", TAILORING_KINDS).limit(1, { referencedTable: "tailor_runs" }),
+        db.from("tailored_cvs").select("id, job_id, language, total:score->total").in("job_id", jobIds)
+          .order("updated_at", { ascending: false }),
+        db.from("jobs").select("id, match_scores(total)").in("id", jobIds).eq("match_scores.target", "base")
+          .order("created_at", { referencedTable: "match_scores", ascending: false }).limit(1, { referencedTable: "match_scores" }),
+      ]);
+      if (done.error) throw new Error(`tailor_runs select failed: ${done.error.message}`);
+      if (copies.error) throw new Error(`tailored_cvs select failed: ${copies.error.message}`);
+      if (base.error) throw new Error(`match_scores select failed: ${base.error.message}`);
+
+      for (const row of base.data) out.get(row.id)!.score = (row.match_scores as { total: number | null }[])[0]?.total ?? null;
+      const tailored = new Set(done.data.map((row) => row.id as string));
+      // The copy saved last of each tailored job: the rows come newest first.
+      const chosen = new Map<string, { id: string; total: number | null }>();
+      for (const row of copies.data) {
+        if (!tailored.has(row.job_id)) continue;
+        out.get(row.job_id)!.tailoredLanguages.push(row.language);
+        if (!chosen.has(row.job_id)) chosen.set(row.job_id, { id: row.id, total: (row.total as number | null) ?? null });
+      }
+      if (chosen.size === 0) return out;
+      // A fourth query: the chosen copies' score history, newest first. PostgREST returns at most 1000 rows
+      // (max_rows); a copy the cut-off result did not reach keeps its own stored score, which is the same number.
+      const history = await db.from("match_scores").select("tailored_cv_id, total").eq("target", "tailored")
+        .in("tailored_cv_id", [...chosen.values()].map((copy) => copy.id)).order("created_at", { ascending: false });
+      if (history.error) throw new Error(`match_scores select failed: ${history.error.message}`);
+      const latest = new Map<string, number | null>();
+      for (const row of history.data) if (!latest.has(row.tailored_cv_id)) latest.set(row.tailored_cv_id, row.total);
+      for (const [jobId, copy] of chosen) {
+        const summary = out.get(jobId)!;
+        summary.score = latest.has(copy.id) ? latest.get(copy.id)! : copy.total;
+        summary.tailoredLanguages.sort();
+      }
+      return out;
     },
     async getScore(jobId, target, tailoredCvId) {
       let query = db.from("match_scores").select("policy, labels, parts, total, band")

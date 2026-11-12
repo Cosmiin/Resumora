@@ -6,6 +6,8 @@ export type ScoreTarget = "base" | "tailored";
 /** A run of one of these kinds, once done, is what makes a job "tailored". */
 export const TAILORING_KINDS: TailorRun["kind"][] = ["tailor", "retailor", "section"];
 
+export type JobSummary = { score: number | null; tailoredLanguages: string[] };
+
 /** What the score answer needs from one tailored CV. */
 export type ScoreCopy = { id: string; score: MatchScore | null; scoreStale: boolean };
 
@@ -61,6 +63,11 @@ export interface TailorRepo {
   scoreCopies(jobId: string): Promise<ScoreCopy[]>;
   /** True once a tailor, retailor or section run of the job is done. */
   hasTailoredCv(jobId: string): Promise<boolean>;
+  /**
+   * What the Jobs list shows for each job, in a fixed number of queries: a tailored job has its languages and the
+   * score `jobScore` picks (the copy saved last, its own newest score); any other job has its base score.
+   */
+  summaries(jobIds: string[]): Promise<Map<string, JobSummary>>;
   findTailoredCvId(jobId: string, language: TailorLanguage): Promise<string | null>;
   /** The steering every tailoring step needs; `steering` already carries the tone and instruction columns. */
   getSteering(tailoredCvId: string): Promise<{ language: TailorLanguage; tone: Tone | null; instruction: string | null; steering: Steering } | null>;
