@@ -42,6 +42,11 @@ export function scoreJob(id: string): Promise<JobScore> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(id)}/score`, { method: "POST", schema: JobScoreSchema });
 }
 
+/** Re-check: scores the tailored CV as it stands now and answers with the job's scores for that copy. */
+export function recheckScore(cvId: string): Promise<JobScore> {
+  return apiFetch(`/v1/tailored/${encodeURIComponent(cvId)}/score`, { method: "POST", schema: JobScoreSchema });
+}
+
 export function patchJob(
   id: string, version: number, extracted: JobExtraction,
   changes: Pick<JobPatch, "applicationStatus"> = {},

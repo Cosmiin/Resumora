@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Job, JobListPage, MatchScore } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
@@ -47,9 +47,10 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   // ?cv= names the tailored CV the score is about; without it the API answers for the one saved last.
   const cv = useSearchParams()[0].get("cv");
   const scoreKey = ["job-score", userId, id, cv];
+  // Choosing another language copy changes the key; the previous answer stays on screen until the new one arrives.
   const score = useQuery({
     queryKey: scoreKey, queryFn: () => (cv ? getJobScore(id, cv) : getJobScore(id)), gcTime: 0,
-    enabled: query.data?.status === "ready",
+    enabled: query.data?.status === "ready", placeholderData: keepPreviousData,
   });
   // An unfinished tailoring run this browser remembers (the flow forgets it when the run is done).
   const openRun = useQuery({
@@ -127,12 +128,13 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const jobPath = `/jobs/${encodeURIComponent(id)}`;
   const run = openRun.data;
   const tailored = score.data?.tailored;
+  const runStep = run ? t("job.tailor.step", { n: run.sections.indexOf(run.currentSection!) + 1, total: run.sections.length,
+    section: t(`tailor.section.${run.currentSection!}`) }) : null;
   // The one main action of the page: continue a run, open the tailored CV, or start tailoring.
   const tailor = !job ? null : run ? (
     <div className="job-tailor">
       <Link className="ui-btn ui-btn--primary" to={`${jobPath}/tailor`}>{t("job.tailor.continue")}</Link>
-      <p className="ui-small ui-muted">{t("job.tailor.step", { n: run.sections.indexOf(run.currentSection!) + 1, total: run.sections.length,
-        section: t(`tailor.section.${run.currentSection!}`) })}</p>
+      <p className="ui-small ui-muted">{runStep}</p>
     </div>
   ) : tailored ? (
     <div className="job-tailor">
@@ -249,7 +251,8 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         {isTailored && statusAlert}
         {extracted.positionClosed === true && <p role="status" className="ui-notice job-closed">{t("job.positionClosed")}</p>}
         {isTailored && score.data ? (
-          <TailoredJobView jobPath={jobPath} requirements={extracted.requirements} score={score.data}
+          <TailoredJobView jobPath={jobPath} requirements={extracted.requirements} score={score.data} runStep={runStep}
+            onScore={(next) => queryClient.setQueryData(scoreKey, next)}
             details={<><div className="ui-stack">{mustHaves(score.data.tailored)}</div>{about(score.data.tailored)}</>} />
         ) : <>
         {/* The answer first: the match, what the coach says about it, and the page's one main action. */}

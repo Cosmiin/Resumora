@@ -1,30 +1,48 @@
 import { useState, type ReactNode } from "react";
-import { Link } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Link, useParams, useSearchParams } from "react-router";
 import type { JobExtraction, JobScore } from "@resumora/shared";
+import { useAuth } from "../auth/AuthProvider.tsx";
 import { CvDocument } from "../cv/page/CvDocument.tsx";
 import { getTemplate } from "../cv/page/templates.ts";
 import { useCvDoc } from "../cvs/useCvDoc.ts";
 import { useT } from "../i18n/t.ts";
+import { listTailored } from "../tailor/tailored-api.ts";
 import { Skeleton } from "../ui/Page.tsx";
+import { recheckScore } from "./jobs-api.ts";
 import { MatchNumber, mustCount, openMusts } from "./JobMatch.tsx";
 import "../styles/cvs.css";
 
 /**
  * A tailored job's page under its header: the tailored CV's latest score with the CV's actions, the job
- * itself folded into one row, then the tailored CV, read-only.
+ * itself folded into one row, then the tailored CV, read-only. A job with copies in several languages gets
+ * a switch that puts the chosen copy in `?cv=`; the score answer, and with it everything here, follows.
  */
-export function TailoredJobView({ jobPath, requirements, score, details }: {
+export function TailoredJobView({ jobPath, requirements, score, onScore, runStep, details }: {
   jobPath: string;
   requirements: JobExtraction["requirements"];
   /** The score answer for the copy on screen (`tailoredCvId`). */
   score: JobScore;
+  /** A Re-check answered: the new score answer for the copy that was on screen when it started. */
+  onScore: (next: JobScore) => void;
+  /** The step line of an unfinished tailoring run; absent when none is under way. */
+  runStep?: string | null;
   /** The must-haves and About this job, shown while the job row is open. */
   details: ReactNode;
 }) {
   const t = useT();
+  const userId = useAuth().session?.user.id ?? "anonymous";
+  const { id: jobId = "" } = useParams();
+  const [search, setSearch] = useSearchParams();
   const [open, setOpen] = useState(false);
+  // Re-check, remembered with its copy so one copy's "checking" or failure never shows on another.
+  const [check, setCheck] = useState<{ cv: string; state: "busy" | "failed" } | null>(null);
   const cvId = score.tailoredCvId ?? undefined;
   const { doc } = useCvDoc(cvId);
+  const copies = useQuery({ queryKey: ["job-tailored-list", userId, jobId], queryFn: () => listTailored(jobId), gcTime: 0 }).data ?? [];
+  // The pressed language is the one just chosen, even while its score is still on the way.
+  const wanted = search.get("cv");
+  const shown = copies.some((copy) => copy.id === wanted) ? wanted : cvId;
   const tailored = score.tailored;
   const musts = mustCount(requirements, tailored);
   const stillOpen = openMusts(requirements, tailored);
@@ -32,6 +50,18 @@ export function TailoredJobView({ jobPath, requirements, score, details }: {
   const page = `${jobPath}/cv`;
   const query = cvId ? `?cv=${encodeURIComponent(cvId)}` : "";
   const links = doc.data?.links ?? { open: page + query, template: `${page}/template${query}`, export: `${page}/export${query}` };
+  const checking = check && check.cv === cvId ? check.state : "idle";
+
+  async function recheck() {
+    if (!cvId || checking === "busy") return;
+    setCheck({ cv: cvId, state: "busy" });
+    try {
+      onScore(await recheckScore(cvId));
+      setCheck(null);
+    } catch {
+      setCheck({ cv: cvId, state: "failed" });
+    }
+  }
 
   return <>
     <section className="job-band job-band--tailored" aria-label={t("job.band.label")}>
@@ -43,6 +73,15 @@ export function TailoredJobView({ jobPath, requirements, score, details }: {
           </div>
         )}
         <p className="ui-small ui-muted">{t("job.tailored.latest")}</p>
+        {score.stale && cvId && (
+          <div className="job-score-stale">
+            {checking === "failed" ? <p role="alert" className="ui-small">{t("job.tailored.recheckError")}</p>
+              : <p className="ui-small">{t(tailored ? "job.tailored.edited" : "job.tailored.noScore")}</p>}
+            <button type="button" className="ui-btn ui-btn--sm" disabled={checking === "busy"} onClick={() => void recheck()}>
+              {t(checking === "busy" ? "job.tailored.checking" : checking === "failed" ? "jobs.retry" : "job.tailored.recheck")}
+            </button>
+          </div>
+        )}
       </div>
       {musts && musts.total > 0 && (
         <p className="ui-coach job-coach">{musts.met === musts.total ? t("job.tailored.coach.all", { total: musts.total })
@@ -50,10 +89,14 @@ export function TailoredJobView({ jobPath, requirements, score, details }: {
             + (stillOpen.length > 2 ? t("job.tailored.coach.more", { n: stillOpen.length - 2 }) : "") })}</p>
       )}
       <div className="job-tailor">
-        <Link className="ui-btn ui-btn--primary" to={links.open}>{t("job.tailored.edit")}</Link>
+        {runStep ? <>
+          <Link className="ui-btn ui-btn--primary" to={`${jobPath}/tailor`}>{t("job.tailor.continue")}</Link>
+          <p className="ui-small ui-muted">{runStep}</p>
+        </> : <Link className="ui-btn ui-btn--primary" to={links.open}>{t("job.tailored.edit")}</Link>}
         <div className="ui-row">
+          {runStep && <Link className="ui-btn" to={links.open}>{t("job.tailored.edit")}</Link>}
           <Link className="ui-btn" to={links.export}>{t("job.tailored.export")}</Link>
-          <Link className="ui-btn" to={`${links.open}${links.open.includes("?") ? "&" : "?"}retailor=1`}>{t("job.tailor.again")}</Link>
+          {!runStep && <Link className="ui-btn" to={`${links.open}${links.open.includes("?") ? "&" : "?"}retailor=1`}>{t("job.tailor.again")}</Link>}
         </div>
       </div>
     </section>
@@ -64,6 +107,14 @@ export function TailoredJobView({ jobPath, requirements, score, details }: {
     {open && <div className="job-cols job-fold-body">{details}</div>}
 
     <div className="job-cvbar">
+      {copies.length > 1 && (
+        <div className="job-lang" role="group" aria-label={t("job.tailored.language")}>
+          {copies.map((copy) => (
+            <button type="button" key={copy.id} aria-pressed={copy.id === shown}
+              onClick={() => setSearch({ cv: copy.id }, { replace: true })}>{t(`tailored.lang.${copy.language}`)}</button>
+          ))}
+        </div>
+      )}
       <p className="ui-small">
         {doc.data && <>{t("job.tailored.template", { name: t(getTemplate(doc.data.template).label) })} · </>}
         <Link to={links.template}>{t("job.tailored.changeTemplate")}</Link>

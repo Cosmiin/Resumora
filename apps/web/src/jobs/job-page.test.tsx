@@ -7,7 +7,7 @@ import { emptyCv, type Experience, type Job, type JobListPage, type JobScore, ty
 
 const auth = vi.hoisted(() => ({ getSession: vi.fn(), onAuthStateChange: vi.fn(), signOut: vi.fn() }));
 vi.mock("../lib/supabase.ts", () => ({ supabase: { auth } }));
-vi.mock("./jobs-api.ts", () => ({ getJob: vi.fn(), getJobScore: vi.fn(), scoreJob: vi.fn(), patchJob: vi.fn(), deleteJob: vi.fn(), listJobs: vi.fn(), createJob: vi.fn() }));
+vi.mock("./jobs-api.ts", () => ({ getJob: vi.fn(), getJobScore: vi.fn(), scoreJob: vi.fn(), recheckScore: vi.fn(), patchJob: vi.fn(), deleteJob: vi.fn(), listJobs: vi.fn(), createJob: vi.fn() }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: vi.fn() }));
 vi.mock("../tailor/tailor-api.ts", async (original) => ({ ...(await original<object>()), getRun: vi.fn() }));
 import { getRun } from "../tailor/tailor-api.ts";
@@ -23,7 +23,7 @@ import { useVoice } from "../cv/enrich/useVoice.ts";
 import { AuthProvider } from "../auth/AuthProvider.tsx";
 import { routes } from "../router.tsx";
 import { ApiClientError } from "../lib/api.ts";
-import { deleteJob, getJob, getJobScore, listJobs, patchJob, scoreJob } from "./jobs-api.ts";
+import { deleteJob, getJob, getJobScore, listJobs, patchJob, recheckScore, scoreJob } from "./jobs-api.ts";
 
 const job: Job = {
   id: "one", title: "Engineer", company: "Acme", location: "London", status: "ready",
@@ -291,6 +291,143 @@ describe("job page", () => {
       expect(screen.getByRole("button", { name: /^The job:/ })).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "Try again" }));
       expect(await screen.findByText("Ran payroll for 40 staff")).toBeInTheDocument();
+    });
+
+    describe("with a copy in a second language", () => {
+      const roCv: TailoredCv = { ...tailoredCv, id: "cv2", language: "ro", translatedFrom: "cv1",
+        content: { ...content, experience: [{ ...role, bullets: [{ id: "b1", text: "A făcut salarizarea pentru 40 de angajați" }] }] } };
+      beforeEach(() => {
+        vi.mocked(listTailored).mockResolvedValue([{ id: "cv1", language: "en", translatedFrom: null, updatedAt: job.updatedAt },
+          { id: "cv2", language: "ro", translatedFrom: "cv1", updatedAt: job.updatedAt }]);
+        vi.mocked(getTailored).mockImplementation(async (id) => (id === "cv2" ? roCv : tailoredCv));
+        vi.mocked(getJobScore).mockImplementation(async (_id, cvId) => (cvId === "cv2"
+          ? { ...tailored(), tailored: { ...match, total: 80, labels: marks(5) }, tailoredCvId: "cv2" } : tailored()));
+      });
+
+      it("switches the copy: ?cv=, the score, the CV and the links follow", async () => {
+        const { router } = renderJob(); await ready();
+        const group = within(await screen.findByRole("group", { name: "CV language" }));
+        expect(group.getAllByRole("button").map((button) => button.textContent)).toEqual(["English", "Romanian"]);
+        expect(group.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
+        expect(group.getByRole("button", { name: "Romanian" })).toHaveAttribute("aria-pressed", "false");
+        expect(await screen.findByText("Ran payroll for 40 staff")).toBeInTheDocument();
+
+        await userEvent.click(group.getByRole("button", { name: "Romanian" }));
+        expect(router.state.location.search).toBe("?cv=cv2");
+        expect(router.state.historyAction).toBe("REPLACE");
+        expect(screen.getByRole("button", { name: "Romanian" })).toHaveAttribute("aria-pressed", "true");
+        expect(await screen.findByText("Your match: 80 of 100")).toBeInTheDocument();
+        expect(getJobScore).toHaveBeenLastCalledWith("one", "cv2");
+        expect(await screen.findByText("A făcut salarizarea pentru 40 de angajați")).toBeInTheDocument();
+        expect(screen.queryByText("Ran payroll for 40 staff")).toBeNull();
+        const strip = within(await band());
+        expect(strip.getByText("5 of 7 must-haves covered. Still open: Must 6, Must 7.")).toBeInTheDocument();
+        expect(strip.getByRole("link", { name: "Edit CV" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv2");
+        expect(strip.getByRole("link", { name: "Export" })).toHaveAttribute("href", "/jobs/one/cv/export?cv=cv2");
+        expect(strip.getByRole("link", { name: "Tailor again" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv2&retailor=1");
+        expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/template?cv=cv2");
+      });
+
+      it("opens on the copy ?cv= names", async () => {
+        renderJob("/jobs/one?cv=cv2"); await ready();
+        expect(await screen.findByText("A făcut salarizarea pentru 40 de angajați")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Romanian" })).toHaveAttribute("aria-pressed", "true");
+        expect(within(await band()).getByText("Your match: 80 of 100")).toBeInTheDocument();
+      });
+    });
+
+    it("shows no language switch for a job with one copy", async () => {
+      renderJob(); await ready();
+      expect(await screen.findByText("Ran payroll for 40 staff")).toBeInTheDocument();
+      await waitFor(() => expect(listTailored).toHaveBeenCalled());
+      expect(screen.queryByRole("group", { name: "CV language" })).toBeNull();
+    });
+
+    describe("edited since the last score", () => {
+      const rechecked: JobScore = { ...tailored(7), tailored: { ...match, total: 88, labels: marks(7) } };
+      beforeEach(() => { vi.mocked(getJobScore).mockResolvedValue({ ...tailored(), stale: true }); });
+
+      it("says so next to the number, and Re-check puts the new score on the page", async () => {
+        vi.mocked(recheckScore).mockResolvedValue(rechecked);
+        renderJob(); await ready();
+        const strip = within(await band());
+        expect(strip.getByText("Your match: 84 of 100")).toBeInTheDocument();
+        expect(strip.getByText("Edited since last score")).toBeInTheDocument();
+        await userEvent.click(strip.getByRole("button", { name: "Re-check" }));
+        expect(recheckScore).toHaveBeenCalledWith("cv1");
+        expect(await strip.findByText("Your match: 88 of 100")).toBeInTheDocument();
+        expect(strip.getByText("All 7 must-haves covered.")).toBeInTheDocument();
+        expect(strip.queryByText("Edited since last score")).toBeNull();
+        expect(strip.queryByRole("button", { name: "Re-check" })).toBeNull();
+        expect(screen.queryByText(/84/)).toBeNull();
+      });
+
+      it("keeps the old number when the check fails, and Try again repeats it", async () => {
+        vi.mocked(recheckScore).mockRejectedValueOnce(new ApiClientError(502, "ai_failed", "down")).mockResolvedValue(rechecked);
+        renderJob(); await ready();
+        const strip = within(await band());
+        await userEvent.click(strip.getByRole("button", { name: "Re-check" }));
+        expect(await strip.findByText("Couldn't check the score.")).toBeInTheDocument();
+        expect(strip.getByText("Your match: 84 of 100")).toBeInTheDocument();
+        await userEvent.click(strip.getByRole("button", { name: "Try again" }));
+        expect(await strip.findByText("Your match: 88 of 100")).toBeInTheDocument();
+        expect(recheckScore).toHaveBeenCalledTimes(2);
+        expect(strip.queryByText("Couldn't check the score.")).toBeNull();
+      });
+
+      it("disables the button and reads Checking while the check runs; a second click sends nothing", async () => {
+        let finish: (score: JobScore) => void = () => {};
+        vi.mocked(recheckScore).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+        renderJob(); await ready();
+        const strip = within(await band());
+        await userEvent.click(strip.getByRole("button", { name: "Re-check" }));
+        const busy = strip.getByRole("button", { name: "Checking" });
+        expect(busy).toBeDisabled();
+        fireEvent.click(busy);
+        expect(recheckScore).toHaveBeenCalledTimes(1);
+        await act(async () => { finish(rechecked); });
+        expect(await strip.findByText("Your match: 88 of 100")).toBeInTheDocument();
+      });
+
+      it("a copy with no score shows a dash, No score yet and Re-check", async () => {
+        vi.mocked(getJobScore).mockResolvedValue(scores({ base: { ...match, total: 69, labels: marks(3) }, tailored: null,
+          tailoredCvId: "cv1", stale: true, hasTailoredCv: true }));
+        renderJob(); await ready();
+        const strip = within(await band());
+        expect(strip.getByText("–")).toBeInTheDocument();
+        expect(strip.getByText("No score yet")).toBeInTheDocument();
+        expect(strip.queryByText("Edited since last score")).toBeNull();
+        expect(strip.getByRole("button", { name: "Re-check" })).toBeEnabled();
+        expect(screen.queryByText(/69/)).toBeNull();
+      });
+    });
+
+    it("shows no edited notice or Re-check while the score is current", async () => {
+      renderJob(); await ready();
+      const strip = within(await band());
+      expect(strip.queryByText("Edited since last score")).toBeNull();
+      expect(strip.queryByRole("button", { name: "Re-check" })).toBeNull();
+    });
+
+    it("tailoring again in progress: Continue tailoring is the main button, Edit CV stays, Tailor again goes", async () => {
+      localStorage.setItem("resumora.tailorRun.one", "run1");
+      vi.mocked(getRun).mockResolvedValue({ id: "run1", userId: "u1", jobId: "one", tailoredCvId: "cv1", kind: "retailor",
+        sections: ["experience", "skills", "summary", "achievements", "languages", "layout"], status: "waiting_user",
+        currentSection: "summary", questions: null, answers: null, proposals: null, errorCode: null,
+        createdAt: job.createdAt, updatedAt: job.updatedAt });
+      const { router } = renderJob(); await ready();
+      const strip = within(await band());
+      const go = await strip.findByRole("link", { name: "Continue tailoring" });
+      expect(go).toHaveClass("ui-btn--primary");
+      expect(strip.getByText("Tailoring in progress: step 3 of 6, Summary")).toBeInTheDocument();
+      const edit = strip.getByRole("link", { name: "Edit CV" });
+      expect(edit).toHaveAttribute("href", "/jobs/one/cv?cv=cv1");
+      expect(edit).not.toHaveClass("ui-btn--primary");
+      expect(strip.getByRole("link", { name: "Export" })).toBeInTheDocument();
+      expect(strip.queryByRole("link", { name: "Tailor again" })).toBeNull();
+      await userEvent.click(go);
+      expect(router.state.location.pathname).toBe("/jobs/one/tailor");
+      localStorage.clear();
     });
   });
 
