@@ -24,6 +24,11 @@ Release order: the API from Task 1 must be live before Task 1's migration runs o
 
 - R10 (Task 3): `summaries` runs 3 queries, plus a 4th when the page has a tailored job. The 4th (the chosen copies' score history) is the only one that can hit PostgREST's 1000-row cap; a copy the cut-off result did not reach shows its own `score` column, which holds the same number since R7. `tailoredLanguages` is sorted by code (`["en", "ro"]`).
 
+- R11 (Task 4): scope widened by `apps/web/src/jobs/JobMatch.tsx` (new exported `openMusts`, the "still open" texts of the coach line) and `apps/web/src/tailor/tailor-flow.test.tsx` (its `scoreJob` fixture needs the new fields).
+- R12 (Task 4): `JobPage` already reads `?cv=` from the job URL and passes it to `getJobScore`; the score query key is `["job-score", userId, id, cv]`. Task 5's language switch only has to set `?cv=`.
+- R13 (Task 4): the four links are the loaded doc's `links`; before the CV has loaded, or when it failed, `TailoredJobView` builds the same addresses from `tailoredCvId`, so the buttons work in both acceptance cases.
+- R14 (Task 4): `JobPage` keeps the header and builds the must-haves and About this job as two small functions (`mustHaves(marks)`, `about(marks)`) used by both layouts; `TailoredJobView` gets them as `details`.
+
 ## Tasks
 
 ## Task 1: Application status keeps five values — done
@@ -42,3 +47,17 @@ open: (a) the new Supabase queries (`scoreCopies`, `hasTailoredCv`, the editor-s
 session: Build tailored job flow · builder: claude
 commit: 4dd9def (base b3825d1) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: the `summaries` queries (embedded tables with per-job limits) ran only against a stubbed fetch; the reviewer checked their syntax against the schema. Exercise `GET /v1/jobs` against the real local database in the preview check.
+
+## Task 4: Tailored job page: the CV, the latest score, folded job details (web) — done
+session: Build tailored job flow · builder: claude
+commit: 2e9a279 (base 4dd9def) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: (a) not yet seen in a browser: the phone layout rules were checked by reading the CSS only. (b) For the preview check: a ready job shows today's layout until its score answer arrives, so a tailored job's page starts as the old layout (with "Tailor my CV") and then switches. The old page had the same button swap; now the whole lower page swaps. If it looks bad, hold the area under the header as a skeleton while the score loads.
+
+## Hand-over after Task 4 (2026-11-12)
+
+Next: Task 5, then 6, then 7, each through the `claude-build` per-task steps. Base for Task 5: `2e9a279` (plus the commit of this file).
+- The plan's line numbers are from `5533085`; `JobPage.tsx` changed a lot in Task 4, so find the places by name: the unfinished-run query is `openRun` (query key `job-tailor-run`), the status handler is `changeStatus`, the tailored branch renders `TailoredJobView`.
+- Tests: `npm run typecheck`, `npm run lint` and `npm test` from the worktree root (about a minute). The web tests of the tailored page live in the `describe("a tailored job")` block of `apps/web/src/jobs/job-page.test.tsx`; its `band()` helper waits for the score answer before looking at the page.
+- Database: never `npm run db:test` or `npx supabase migration up` here before the owner decides R3. To check SQL, run the migration files plus the pgTAP file through `docker exec -i supabase_db_resumora psql -U postgres -d postgres` inside `begin; ... rollback;`.
+- After Task 7: the preview check at 375 px and at desktop width (needs R3 decided, and a `resumora-tailored-job` entry in the workspace `.claude/launch.json` using `tools/dev-worktree.ps1`; stop older dev servers first; no secret copies, no `db:reset`), then the end-of-run steps: full tests once, one whole-branch review on Opus (base `5533085`, brief = all seven task sections), a security review on Opus, one run per threat, because the branch adds a route and two migrations (user A reads or changes user B's data; login checks on the changed routes; input validation; guessable or changeable ids), the cost line, the final report.
+- Ask the owner before: pushing, a PR, any migration on the hosted database, the local migration (R3), anything the guard denies.
