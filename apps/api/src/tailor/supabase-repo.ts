@@ -139,21 +139,6 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
       return data.length > 0 ? "ok" : "conflict";
     },
-    async listAllTailoredCvs() {
-      // One query: each CV with only its newest run, so the list never depends on how many runs or CVs there are.
-      const { data, error } = await db.from("tailored_cvs")
-        .select("id, job_id, language, template, translated_from, updated_at, tailor_runs(status, created_at)")
-        .order("updated_at", { ascending: false })
-        .order("created_at", { referencedTable: "tailor_runs", ascending: false })
-        .limit(1, { referencedTable: "tailor_runs" });
-      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
-      return data.map((row) => {
-        const newest = (row.tailor_runs as { status: string }[] | null)?.[0];
-        return { id: row.id, jobId: row.job_id, language: TailorLanguageSchema.parse(row.language),
-          template: TailoredCvSchema.shape.template.parse(row.template), translatedFrom: row.translated_from, updatedAt: row.updated_at,
-          inProgress: !!newest && newest.status !== "done" };
-      });
-    },
     async listTailoredCvs(jobId) {
       const { data, error } = await db.from("tailored_cvs").select("id, language, translated_from, updated_at")
         .eq("job_id", jobId).order("created_at", { ascending: true });

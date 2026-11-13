@@ -41,17 +41,6 @@ export function tailoredRoutes(deps: {
     return c.json({ items: await deps.tailorFor(c).listTailoredCvs(jobId) });
   });
 
-  /** "My CVs": every tailored CV with the job it was made for. */
-  app.get("/tailored", async (c) => {
-    const items = await deps.tailorFor(c).listAllTailoredCvs();
-    const jobs = deps.jobsFor(c);
-    const found = new Map(await Promise.all([...new Set(items.map((item) => item.jobId))].map(async (jobId) => [jobId, await jobs.get(jobId)] as const)));
-    return c.json({ items: items.flatMap((item) => {
-      const job = found.get(item.jobId);
-      return job ? [{ ...item, jobTitle: job.extracted?.title ?? "", company: job.extracted?.company ?? null }] : [];
-    }) });
-  });
-
   app.get("/tailored/:id", async (c) => {
     const cv = await deps.tailorFor(c).readTailoredCv(id(c));
     if (!cv) throw notFound();

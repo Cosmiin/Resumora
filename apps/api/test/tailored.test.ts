@@ -68,19 +68,11 @@ describe("tailored CV read and save", () => {
     expect(await res.json()).toEqual({ items: [{ id, language: "en", translatedFrom: null, updatedAt: expect.any(String) }] });
   });
 
-  it("lists every tailored CV the person has with its job, and whether tailoring is still open; never another person's", async () => {
-    const first = await tailoredCv();
-    const second = await tailoredCv();
-    // The second one's tailoring is finished.
-    for (const run of docs.runs.values()) if (run.tailoredCvId === second.id) run.status = "done";
-    const res = await app.request("/v1/tailored", { headers: auth() });
-    expect(res.status).toBe(200);
-    const { items } = await res.json() as { items: Array<Record<string, unknown>> };
-    expect(items).toHaveLength(2);
-    expect(items.find((item) => item.id === first.id)).toEqual({ id: first.id, jobId: first.jobId, language: "en", template: "classic",
-      translatedFrom: null, updatedAt: expect.any(String), inProgress: true, jobTitle: job.title, company: job.company });
-    expect(items.find((item) => item.id === second.id)).toMatchObject({ jobId: second.jobId, inProgress: false });
-    expect(await (await app.request("/v1/tailored", { headers: auth("token-b") })).json()).toEqual({ items: [] });
+  it("has no list of every tailored CV any more: GET /v1/tailored is an unknown address", async () => {
+    await tailoredCv();
+    await expectError(await app.request("/v1/tailored", { headers: auth() }), 404, "not_found");
+    const unknown = await app.request("/v1/no-such-address", { headers: auth() });
+    expect((await app.request("/v1/tailored", { headers: auth() })).status).toBe(unknown.status);
     expect((await app.request("/v1/tailored")).status).toBe(401);
   });
 
