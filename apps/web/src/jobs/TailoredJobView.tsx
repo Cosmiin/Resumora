@@ -134,7 +134,7 @@ export function TailoredJobView({ jobPath, requirements, score, onScore, runStep
       </div>
       {file.done?.tightened && file.done.fits !== false && <p className="ui-notice ui-notice--info" role="status">{t("cvs.export.tightened")}</p>}
       {file.done?.fits === false && <p className="ui-notice" role="status">{t("export.tooLong", { pages: file.done.pages ?? 0 })}</p>}
-      {file.done && <p className="ui-notice ui-notice--good" role="status">{t("cvs.export.done", { name: file.done.name })}</p>}
+      {file.done && <p className="ui-notice ui-notice--good job-export-file" role="status">{t("cvs.export.done", { name: file.done.name })}</p>}
       {file.failed && <p className="ui-notice ui-notice--bad" role="alert">{t("cvs.export.failed")}</p>}
     </Dialog>
 

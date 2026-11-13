@@ -132,6 +132,7 @@ The owner answered the open points on 13 Nov; the answers reached this build thr
 - R28 (Task 10): "a re-tailor that puts the copy back to the base wording" is `restartWithSteering` (changing the tone or the extra answers). A re-tailor of picked steps (`POST /v1/tailored/:id/retailor`, the "Tailor again" button) changes no wording when it starts, so it sets no mark; each step it accepts saves a new score. Tests are in `apps/api/test/tailor-redo.test.ts`, where the steering restart is tested, not in `tailor-retailor.test.ts` as first listed.
 - R29 (Task 10): the mark is set through an optional `scoreStale: true` on the repo's `saveTailoredCv`; a review decision sets it only when the content really changed (`sameCv`), so Keep leaves it alone.
 - R30 (Task 11): the placeholder shows while `score.isLoading` (first fetch, no answer yet). In `job-page.test.tsx` the helper `ready()` now waits for that first answer, because 18 existing tests looked at the untailored layout the instant the header appeared; `header()` is the old behaviour.
+- R31 (Task 13, a fix to Task 9): on a 375 px screen the export dialog's "Downloaded: …" line made the dialog scroll sideways, because the file's name has no spaces to break at. The line now carries the class `job-export-file` with `overflow-wrap: anywhere` (`TailoredJobView.tsx`, `jobs.css`). Seen fixed in the browser; a layout rule, so no unit test.
 
 ## Task 8: A job that needs its text says so in the Jobs list — done
 session: Build tailored job flow, part 2 · builder: claude
@@ -161,3 +162,33 @@ Four tasks were built in this session, so the rest goes to a fresh one, as the s
 - Checks on `8b62b47`: typecheck clean, lint clean, tests 446 + 829 (4 skipped) + 229 + 1116 pass. Two editor typing tests and one export-fitting test time out at 5 s when the machine is busy; they pass when the web suite runs alone.
 - End of run: full tests once; one whole-branch review on Opus for Tasks 8 to 13 (base `c0a7cff`); a security review, because Task 10 changes what two routes write and Task 12 removes a route; progress blocks; the cost line.
 - Ask the owner before the push. Another session relayed that the owner approved pushing to PR 60; the owner has not said it to the build session itself. No migration on the hosted database, no merge.
+
+## Task 12: Remove the unused list of all tailored CVs (API) — done
+session: Build tailored job flow, part 3 · builder: claude
+commit: 7a497ee (base 8bd2f64) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+searched again on 13 Nov before removing: nothing in the repo calls `GET /v1/tailored` or `listAllTailoredCvs` (web, `apps/extension` and the rest; the extension has no mention of tailored CVs at all). A route is gone, for the owner: `GET /v1/tailored` now answers 404 like any unknown address (401 without a login). No migration, no RLS change.
+open: none
+
+## Task 13: Preview check of the follow-up — done
+session: Build tailored job flow, part 3 · builder: claude
+commit: (the R31 fix and this block, see the log) · reviews: covered by the whole-branch review · fix rounds: 1 (R31) · guard denials: 0
+
+Where: the owner's Chrome (Claude in Chrome), this branch's server (launch entry `resumora-tailored-job`), local database, 13 Nov. Docker Desktop and the local database were not running; started both (no reset; `supabase migration up` found nothing to add). Desktop width = the Chrome window as it was (2276 px wide page); 375 px = a 375 px frame of the same address inside the tab, as last time.
+
+The local account has one job (Lifecycle Operations Lead) with two copies already: English (original, score 94) and Romanian (translated from it today, score 69). So no second-language copy was created and no AI call was made in this check.
+
+Seen, at both widths unless said:
+- Placeholder (Task 11): opening the job shows the header (title, facts) with the loading bars under it, then the tailored layout. "Tailor my CV" never showed in between. 375 px: the same, page 351 px wide inside a 372 px frame.
+- Language switch: English and Romanian buttons above the CV. Romanian → English changed the score 69 → 94, the coach line and the CV; the address got `?cv=`. The old score and CV stayed on screen until the new score arrived; for about 80 ms after that the CV area showed its loading bars until the new CV arrived (never the other copy's CV under the new number).
+- Export dialog (Task 9): "Download your CV", Download PDF, Download Word, Close; buttons 44 px high. While a file is made both buttons and Close are off and the pressed one reads "Preparing the PDF…" / "Preparing the Word file…"; then the tightened-spacing notice and "Downloaded: {name}". Real files landed in the Downloads folder: a PDF (262,597 bytes, starts with %PDF) and a Word file (254,700 bytes, a zip holding `word/document.xml` and the photo).
+- Found and fixed (R31): at 375 px the "Downloaded: …" line made the dialog scroll sideways. After the fix the name wraps and nothing scrolls sideways.
+- Jobs list: desktop columns (score 69, "Tailored CV" with EN, RO, "Not applied", Open); 375 px a card, title wraps inside it, Open 44 px high. No sideways scrolling.
+- No sideways scrolling and nothing overlapping on the job page or the list at either width (no element reaches past the frame's right edge).
+
+Not seen in the browser, with the reason:
+- "Can't be tailored yet" (Task 8): the local account has no job that needs its text. Covered by the unit tests only.
+- "Edited since last score" after a guided-review decision (Task 10): neither copy has an unchecked AI guess, so the guided review has nothing to open. Sending a decision straight to the API for an already checked item was refused by this session's permission check, and I left it there. Covered by the API tests only.
+- Continue tailoring: needs an unfinished tailoring run. The local data has none, and starting one ("Tailor again") creates a new run and asks the AI for proposals, which nobody approved. Covered by the unit tests only.
+
+Left behind on this machine: four test downloads in the Downloads folder (two PDFs ending in "(4)" and "(5)", two Word files), and Docker Desktop running.
+open: the three checks above, for the owner to do or to approve the data they need.
