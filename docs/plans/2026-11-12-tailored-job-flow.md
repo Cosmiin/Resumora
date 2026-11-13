@@ -300,7 +300,7 @@ tests: normal
 ## Task 10: The edited mark also covers re-tailoring and review decisions (API)
 
 ---
-files: [apps/api/src/tailor/repo.ts, apps/api/src/tailor/supabase-repo.ts, apps/api/src/tailor/memory-repo.ts, apps/api/src/tailor/retailor.ts, apps/api/src/tailor/review-item.ts, apps/api/test/tailored.test.ts, apps/api/test/tailor-retailor.test.ts, apps/api/test/jobs.test.ts]
+files: [apps/api/src/tailor/repo.ts, apps/api/src/tailor/supabase-repo.ts, apps/api/src/tailor/memory-repo.ts, apps/api/src/tailor/retailor.ts, apps/api/src/tailor/review-item.ts, apps/api/test/tailored.test.ts, apps/api/test/tailor-redo.test.ts, apps/api/test/jobs.test.ts]
 new_files: []
 deps: false
 size: 60
@@ -308,7 +308,7 @@ tests: normal
 ---
 
 **Goal:** Task 2, open b. `score_stale` ("Edited since last score") is set whenever the copy's wording changes without a new score:
-- when a re-tailor puts the copy back to the base wording before its steps are accepted again;
+- when a re-tailor puts the copy back to the base wording before its steps are accepted again. In the code that is `restartWithSteering` (`POST /v1/tailor-runs/:id/steering`: changing the tone or the extra answers redoes every step from the base wording). A re-tailor of picked steps (`POST /v1/tailored/:id/retailor`) changes no wording when it starts, only when a step is accepted, and an accepted step saves a new score; it sets no mark;
 - when a guided-review decision changes the copy's content (Remove or Edit; Keep changes no wording and leaves the mark alone).
 It clears as today when a tailored score is saved (an accepted step, Re-check). No migration: the column exists.
 
