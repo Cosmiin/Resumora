@@ -4,7 +4,8 @@ import { createApp, type AppDeps } from "../src/app.ts";
 import { memoryJobs } from "../src/jobs/memory-repo.ts";
 import { JOBS_PER_DAY, type JobMessage } from "../src/jobs/repo.ts";
 
-import { memoryTailorRepo, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
+import { memoryTailorDocs, memoryTailorRepo, type MemoryTailorDocs, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
+import { supabaseTailorRepo } from "../src/tailor/supabase-repo.ts";
 import { fakeModel } from "../src/tailor/fake-model.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
 import { emptyCv } from "@resumora/shared";
@@ -80,19 +81,259 @@ function jobFields(value: unknown) {
   expect(JSON.stringify(value)).not.toMatch(/"(raw_text|jsonLd|json_ld)"\s*:/);
 }
 
+describe("the score of one tailored copy", () => {
+  type Answer = { base: MatchScore | null; tailored: MatchScore | null; tailoredCvId: string | null; stale: boolean; hasTailoredCv: boolean };
+  let docs: MemoryTailorDocs;
+  let model: ReturnType<typeof fakeModel>;
+  const tailor = (user = "user-a") => memoryTailorRepo(user, scores, docs);
+  const scoreOf = (total: number): MatchScore => ({ ...score, total });
+  const headers = (token = "token-a") => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
+  const read = async (jobId: string, cv?: string, token = "token-a") =>
+    await (await app.request(`/v1/jobs/${jobId}/score${cv ? `?cv=${cv}` : ""}`, { headers: headers(token) })).json() as Answer;
+  const put = (cvId: string, content: unknown, expectedVersion: number, token = "token-a") =>
+    app.request(`/v1/tailored/${cvId}`, { method: "PUT", headers: headers(token), body: JSON.stringify({ content, expectedVersion }) });
+  const recheck = (cvId: string, token = "token-a") => app.request(`/v1/tailored/${cvId}/score`, { method: "POST", headers: headers(token) });
+
+  beforeEach(() => {
+    docs = memoryTailorDocs();
+    model = fakeModel(() => ({ labels: [], cvSeniority: "mid" }));
+    app = createApp({ ...deps, tailorRepo: (user) => memoryTailorRepo(user.id, scores, docs), model: () => model.deps });
+  });
+
+  /** A ready job with an English copy (saved first, score 84) and a Romanian one (saved last, no score yet). */
+  async function twoCopies(token = "token-a", url = body.url) {
+    const jobId = await create({ ...body, url }, token);
+    await store.admin.finish(jobId, extracted);
+    const repo = tailor(USERS[token]);
+    const en = await repo.createTailoredCv({
+      jobId, language: "en", content: emptyCv("en"), baseSnapshotAt: clock.toISOString(), tone: "neutral", instruction: null, steering: {},
+    });
+    const ro = await repo.saveTranslation({
+      jobId, language: "ro", content: emptyCv("ro"), coverLetter: null, template: "classic", tone: "neutral", instruction: null,
+      translatedFrom: en, at: "2026-11-06T10:00:00.000Z",
+    });
+    docs.cvs.get(en)!.updatedAt = "2026-11-05T10:00:00.000Z";
+    await repo.saveScore(jobId, "tailored", en, scoreOf(84));
+    return { jobId, en, ro };
+  }
+
+  it("answers for the copy asked for, and for the copy saved last when none is named", async () => {
+    const { jobId, en, ro } = await twoCopies();
+    await tailor().saveScore(jobId, "tailored", ro, scoreOf(80));
+    expect(await read(jobId, ro)).toMatchObject({ tailored: { total: 80 }, tailoredCvId: ro, stale: false });
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, tailoredCvId: en, stale: false });
+    expect(await read(jobId)).toMatchObject({ tailored: { total: 80 }, tailoredCvId: ro });
+    docs.cvs.get(en)!.updatedAt = "2026-11-07T10:00:00.000Z";
+    expect(await read(jobId)).toMatchObject({ tailored: { total: 84 }, tailoredCvId: en });
+  });
+
+  it("shows no score for a copy that has none, never another copy's", async () => {
+    const { jobId, en, ro } = await twoCopies();
+    expect(await read(jobId, ro)).toMatchObject({ tailored: null, tailoredCvId: ro, stale: true });
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, tailoredCvId: en, stale: false });
+  });
+
+  it("falls back to the copy's own stored score when it has no score history", async () => {
+    const { jobId, ro } = await twoCopies();
+    docs.cvs.get(ro)!.score = scoreOf(71);
+    expect(await read(jobId, ro)).toMatchObject({ tailored: { total: 71 }, tailoredCvId: ro, stale: false });
+  });
+
+  it("treats ?cv= naming another job's or another person's CV as absent", async () => {
+    const { jobId, ro } = await twoCopies();
+    const other = await twoCopies("token-a", "https://example.test/jobs/other");
+    await tailor().saveScore(other.jobId, "tailored", other.ro, scoreOf(33));
+    const theirs = await twoCopies("token-b", "https://example.test/jobs/theirs");
+    await tailor("user-b").saveScore(theirs.jobId, "tailored", theirs.ro, scoreOf(22));
+    const absent = await read(jobId);
+    expect(absent).toMatchObject({ tailored: null, tailoredCvId: ro });
+    for (const cv of [other.ro, other.en, theirs.ro, theirs.en, "not-an-id"]) {
+      const answer = await read(jobId, cv);
+      expect(answer).toEqual(absent);
+      expect(JSON.stringify(answer)).not.toContain(cv);
+    }
+  });
+
+  it("marks the score out of date after a hand edit that changes the content, not after saving the same content", async () => {
+    const { jobId, en } = await twoCopies();
+    const same = await put(en, emptyCv("en"), 1);
+    expect(same.status).toBe(200);
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, stale: false });
+    const edited = { ...emptyCv("en"), basics: { ...emptyCv("en").basics, fullName: "Ana Pop" } };
+    // An edit that loses the version check saves nothing, so it changes nothing.
+    expect((await put(en, edited, 1)).status).toBe(409);
+    expect((await read(jobId, en)).stale).toBe(false);
+    expect((await put(en, edited, 2)).status).toBe(200);
+    // The old number stays; only the flag changes.
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, stale: true });
+  });
+
+  it("Re-check scores the copy as it stands, clears the flag and answers with the new score", async () => {
+    const { jobId, en, ro } = await twoCopies();
+    await put(en, { ...emptyCv("en"), basics: { ...emptyCv("en").basics, fullName: "Ana Pop" } }, 1);
+    expect((await read(jobId, en)).stale).toBe(true);
+
+    const res = await recheck(en);
+    expect(res.status).toBe(200);
+    const answer = await res.json() as Answer;
+    expect(model.logged.map((call) => call.task)).toEqual(["tailor_score"]);
+    const stored = await tailor().getScore(jobId, "tailored", en);
+    expect(stored).not.toEqual(scoreOf(84));
+    expect(answer).toMatchObject({ tailored: stored, tailoredCvId: en, stale: false });
+    expect(await read(jobId, en)).toEqual(answer);
+    // The copy keeps its version (an open editor isn't thrown off) and its own stored score follows.
+    expect(docs.cvs.get(en)).toMatchObject({ version: 2, score: stored });
+    // The other copy is untouched.
+    expect(await read(jobId, ro)).toMatchObject({ tailored: null, stale: true });
+  });
+
+  it("Re-check answers like PUT for a CV that isn't the caller's, and with the scoring error when the AI fails", async () => {
+    const { jobId, en } = await twoCopies();
+    const theirs = await put(en, emptyCv("en"), 1, "token-b");
+    await error(await recheck(en, "token-b"), theirs.status, "not_found");
+    await error(await recheck("not-an-id"), 404, "not_found");
+    model = fakeModel(() => ({}), 500);
+    await error(await recheck(en), 502, "ai_failed");
+    // The old number stays.
+    expect(await read(jobId, en)).toMatchObject({ tailored: { total: 84 }, stale: false });
+  });
+
+  it("says a job is tailored only once a tailor, retailor or section run is done", async () => {
+    const { jobId, en } = await twoCopies();
+    const repo = tailor();
+    const run = await repo.createRun({ jobId, tailoredCvId: en, kind: "tailor", sections: ["summary"], currentSection: "summary" });
+    expect((await read(jobId)).hasTailoredCv).toBe(false);
+    for (const kind of ["translate", "cover_letter"] as const) {
+      const other = await repo.createRun({ jobId, tailoredCvId: en, kind, sections: [], currentSection: null });
+      await repo.updateRun(other.id, { status: "done" });
+    }
+    expect((await read(jobId)).hasTailoredCv).toBe(false);
+    await repo.updateRun(run.id, { status: "done", currentSection: null });
+    expect((await read(jobId)).hasTailoredCv).toBe(true);
+  });
+
+  /** Marks the job tailored: one finished tailoring run. */
+  async function finishRun(jobId: string, cvId: string, user = "user-a") {
+    const run = await tailor(user).createRun({ jobId, tailoredCvId: cvId, kind: "tailor", sections: ["summary"], currentSection: "summary" });
+    await tailor(user).updateRun(run.id, { status: "done", currentSection: null });
+  }
+  const listed = async (token = "token-a") => {
+    const page = await (await app.request("/v1/jobs", { headers: headers(token) })).json() as JobListPage;
+    return new Map(page.items.map((item) => [item.id, { score: item.score, tailoredLanguages: item.tailoredLanguages }]));
+  };
+
+  it("lists each job with its latest score and the languages it has a tailored CV in", async () => {
+    // Tailored: base 69, its only copy 84.
+    const tailoredJob = await create();
+    await store.admin.finish(tailoredJob, extracted);
+    const en = await tailor().createTailoredCv({
+      jobId: tailoredJob, language: "en", content: emptyCv("en"), baseSnapshotAt: clock.toISOString(), tone: "neutral", instruction: null, steering: {},
+    });
+    await tailor().saveScore(tailoredJob, "base", null, scoreOf(69));
+    await tailor().saveScore(tailoredJob, "tailored", en, scoreOf(84));
+    await finishRun(tailoredJob, en);
+    // Not tailored, scored 61.
+    const scoredJob = await create({ ...body, url: "https://example.test/jobs/scored" });
+    await store.admin.finish(scoredJob, extracted);
+    await tailor().saveScore(scoredJob, "base", null, scoreOf(61));
+    // Still being read.
+    const readingJob = await create({ ...body, url: "https://example.test/jobs/reading" });
+
+    const list = await listed();
+    expect(list.get(tailoredJob)).toEqual({ score: 84, tailoredLanguages: ["en"] });
+    expect(list.get(scoredJob)).toEqual({ score: 61, tailoredLanguages: [] });
+    expect(list.get(readingJob)).toEqual({ score: null, tailoredLanguages: [] });
+  });
+
+  it("lists a job with two copies under the score of the copy saved last, with both languages", async () => {
+    const { jobId, en, ro } = await twoCopies();
+    await tailor().saveScore(jobId, "base", null, scoreOf(69));
+    await tailor().saveScore(jobId, "tailored", ro, scoreOf(80));
+    await finishRun(jobId, en);
+    expect((await listed()).get(jobId)).toEqual({ score: 80, tailoredLanguages: ["en", "ro"] });
+  });
+
+  it("lists a job whose tailoring isn't done under its base score, as not tailored", async () => {
+    const { jobId } = await twoCopies();
+    await tailor().saveScore(jobId, "base", null, scoreOf(69));
+    expect((await listed()).get(jobId)).toEqual({ score: 69, tailoredLanguages: [] });
+  });
+
+  it("never lists another person's scores or tailored CVs", async () => {
+    const { jobId, en } = await twoCopies();
+    await tailor().saveScore(jobId, "base", null, scoreOf(69));
+    await finishRun(jobId, en);
+    const theirs = await create({ ...body, url: "https://example.test/jobs/theirs" }, "token-b");
+    expect([...(await listed("token-b"))]).toEqual([[theirs, { score: null, tailoredLanguages: [] }]]);
+    // Even asked by id, the other person's job gives nothing away.
+    expect((await tailor("user-b").summaries([jobId])).get(jobId)).toEqual({ score: null, tailoredLanguages: [] });
+  });
+
+  it("the Supabase save writes the edited mark only when asked to", async () => {
+    const env = { SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "public-key" };
+    const sent: Array<Record<string, unknown>> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_input: string, init?: RequestInit) => {
+      sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return Response.json([{ id: "cv" }]);
+    }));
+    try {
+      const repo = supabaseTailorRepo(env, { id: "a", token: "user-token" });
+      const changes = { content: emptyCv("en"), review: {}, score: null };
+      expect(await repo.saveTailoredCv("cv", 1, changes)).toBe("ok");
+      expect(await repo.saveTailoredCv("cv", 2, { ...changes, scoreStale: true })).toBe("ok");
+      expect(sent[0]).not.toHaveProperty("score_stale");
+      expect(sent[1]).toMatchObject({ score_stale: true, version: 3 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("asks the database the same number of questions for 20 jobs as for 1", async () => {
+    const env = { SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "public-key" };
+    const idsIn = (url: URL, column: string) => (url.searchParams.get(column) ?? "").replace(/^in\.\(|\)$/g, "").split(",").map((id) => id.replace(/"/g, ""));
+    let calls = 0;
+    // Every job is tailored and has one English copy scored 84 in its own column and 88 in its history.
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      calls++;
+      const url = new URL(input);
+      const table = url.pathname.split("/").pop();
+      const select = url.searchParams.get("select") ?? "";
+      if (table === "jobs" && select.includes("tailor_runs")) return Response.json(idsIn(url, "id").map((id) => ({ id, tailor_runs: [{ id: "run" }] })));
+      if (table === "jobs") return Response.json(idsIn(url, "id").map((id) => ({ id, match_scores: [{ total: 69 }] })));
+      if (table === "tailored_cvs") return Response.json(idsIn(url, "job_id").map((jobId) => ({ id: `cv-${jobId}`, job_id: jobId, language: "en", total: 84 })));
+      return Response.json(idsIn(url, "tailored_cv_id").filter((id) => id !== "cv-job-0").map((id) => ({ tailored_cv_id: id, total: 88 })));
+    }));
+    try {
+      const repo = supabaseTailorRepo(env, { id: "a", token: "user-token" });
+      const one = await repo.summaries(["job-0"]);
+      const forOne = calls;
+      calls = 0;
+      const many = await repo.summaries(Array.from({ length: 20 }, (_, index) => `job-${index}`));
+      expect(calls).toBe(forOne);
+      // A copy with no score history falls back to its own stored score.
+      expect(one.get("job-0")).toEqual({ score: 84, tailoredLanguages: ["en"] });
+      expect(many.get("job-19")).toEqual({ score: 88, tailoredLanguages: ["en"] });
+      expect(many.size).toBe(20);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("job endpoints", () => {
   it("returns the base score, null before scoring, and 404 for another user's job", async () => {
     const id = await create();
     const request = (jobId: string, token = "token-a") => app.request(`/v1/jobs/${jobId}/score`, { headers: { authorization: `Bearer ${token}` } });
     const empty = await request(id);
     expect(empty.status).toBe(200);
-    expect(await empty.json()).toEqual({ base: null, tailored: null });
+    const none = { tailored: null, tailoredCvId: null, stale: false, hasTailoredCv: false };
+    expect(await empty.json()).toEqual({ base: null, ...none });
     await memoryTailorRepo("user-a", scores).saveScore(id, "base", null, score);
+    // A tailored score with no tailored CV of this job behind it is never shown.
     await memoryTailorRepo("user-a", scores).saveScore(id, "tailored", "cv-a", score);
     const res = await request(id);
     expect(res.status).toBe(200);
-    // Score 2 is the newest tailored score of any of the job's tailored CVs (Task 16, R13).
-    expect(await res.json()).toEqual({ base: score, tailored: score });
+    expect(await res.json()).toEqual({ base: score, ...none });
     await error(await request(id, "token-b"), 404, "not_found");
     await error(await request(crypto.randomUUID()), 404, "not_found");
     await error(await request("invalid"), 404, "not_found");
@@ -111,7 +352,7 @@ describe("job endpoints", () => {
     const res = await score1(id);
     expect(res.status).toBe(200);
     const body = await res.json() as { base: MatchScore; tailored: null };
-    expect(body).toMatchObject({ base: { policy: "match/1" }, tailored: null });
+    expect(body).toMatchObject({ base: { policy: "match/1" }, tailored: null, tailoredCvId: null, stale: false, hasTailoredCv: false });
     expect(await memoryTailorRepo("user-a", scores).getScore(id, "base")).toEqual(body.base);
     expect(model.logged.map((call) => call.task)).toEqual(["tailor_score"]);
     expect((await score1(id)).status).toBe(200);
@@ -135,11 +376,11 @@ describe("job endpoints", () => {
     const closed = await create({ ...body, url: "https://example.test/jobs/closed" });
     await store.admin.finish(open, extracted);
     await store.admin.finish(closed, { ...extracted, positionClosed: true });
-    expect((await patch(open, 1, extracted, { applicationStatus: "tailored" })).status).toBe(200);
+    expect((await patch(open, 1, extracted, { applicationStatus: "interview" })).status).toBe(200);
     const list = (await (await get()).json()) as JobListPage;
     expect(list.items.map(({ id, applicationStatus, positionClosed }) => ({ id, applicationStatus, positionClosed }))).toEqual([
       { id: closed, applicationStatus: "saved", positionClosed: true },
-      { id: open, applicationStatus: "tailored", positionClosed: false },
+      { id: open, applicationStatus: "interview", positionClosed: false },
     ]);
     listFields(list);
   });
@@ -169,6 +410,8 @@ describe("job endpoints", () => {
     const id = await create();
     await store.admin.finish(id, extracted);
     await error(await patch(id, 1, extracted, { applicationStatus: "invalid" }), 400, "invalid_content");
+    // A tab opened before "tailored" stopped being a status gets the same answer.
+    await error(await patch(id, 1, extracted, { applicationStatus: "tailored" }), 400, "invalid_content");
     expect(await (await get(id)).json()).toMatchObject({ applicationStatus: "saved", version: 1 });
   });
   it("creates a queued extension job and sends one message", async () => {

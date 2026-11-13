@@ -5,32 +5,17 @@ import type { tailorRo } from "./ro-tailor.ts";
 /** The tailored CV's page, the cover letter and export: the keys of `en-tailor.ts` the tailoring flow's file leaves out. */
 type TailoredPageKey = Exclude<keyof typeof tailorEn, keyof typeof tailorRo>;
 
-/** Romanian copy for My CVs, templates, download and the tailored CV's page. The type makes a missing or extra key a compile error. */
+/** Romanian copy for templates, download and the tailored CV's page. The type makes a missing or extra key a compile error. */
 export const cvsRo: Record<keyof typeof cvsEn | TailoredPageKey, string> = {
-  "shell.nav.cvs": "CV-urile mele",
-  "cvs.title": "CV-urile mele",
-  "cvs.lead": "CV-ul tău de bază și fiecare variantă adaptată unui job.",
   "cvs.loading": "Se încarcă CV-urile…",
   "cvs.loadError": "N-am putut încărca. Nimic nu s-a schimbat. Încearcă din nou.",
   "cvs.base": "CV de bază",
-  "cvs.tailored": "Adaptate unui job",
   "cvs.tailoredFor": "CV adaptat pentru",
   "cvs.untitledJob": "Job fără titlu",
-  "cvs.unnamed": "CV-ul meu",
-  "cvs.updated": "actualizat {day}",
-  "cvs.ready": "Gata",
-  "cvs.inProgress": "În lucru",
-  "cvs.open": "Deschide",
   "cvs.template": "Șablon",
   "cvs.export": "Exportă",
-  "cvs.continue": "Continuă adaptarea",
-  "cvs.noTailored": "Încă n-ai adaptat nimic. Salvează un job, apoi adaptează-ți CV-ul pentru el.",
-  "cvs.toJobs": "Mergi la Joburi",
-  "cvs.toAll": "Mergi la CV-urile mele",
-  "cvs.snapshot": "Un CV adaptat păstrează CV-ul de bază așa cum era în ziua în care l-ai început.",
-  "cvs.empty.title": "Încă nu ai niciun CV",
-  "cvs.empty.text": "Încarcă CV-ul pe care îl ai. CV-ul de bază și fiecare variantă adaptată vor apărea aici.",
-  "cvs.empty.upload": "Încarcă CV-ul",
+  "cvs.toJob": "Înapoi la job",
+  "cvs.toBase": "Înapoi la CV-ul meu",
 
   "cvs.template.title": "Alege un șablon",
   "cvs.template.lead": "Același conținut, alt aspect. Previzualizarea este chiar CV-ul tău.",
@@ -58,8 +43,8 @@ export const cvsRo: Record<keyof typeof cvsEn | TailoredPageKey, string> = {
   "cvs.export.tightened": "CV-ul depășea două pagini, așa că am strâns puțin spațierea ca să încapă. Niciun text n-a fost eliminat.",
   "cvs.export.done": "Descărcat: {name}",
   "cvs.export.failed": "Fișierul n-a putut fi creat. CV-ul tău e în siguranță. Încearcă din nou sau încearcă celălalt format.",
-  "cvs.export.luck": "Succes cu acesta. CV-ul adaptat rămâne în CV-urile mele.",
-  "cvs.export.luckBase": "Gata. CV-ul de bază rămâne în CV-urile mele.",
+  "cvs.export.luck": "Succes cu acesta.",
+  "cvs.export.luckBase": "Gata. CV-ul tău de bază rămâne în „CV-ul meu”.",
 
   "tailored.toolbar": "Acest CV adaptat",
   "tailored.templateLink": "Șablon: {name}",

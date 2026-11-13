@@ -128,11 +128,16 @@ describe("JobPatchBodySchema", () => {
   });
 
   it("accepts all optional application statuses", () => {
-    for (const applicationStatus of ["saved", "tailored", "applied", "interview", "offer", "rejected"]) {
+    for (const applicationStatus of ["saved", "applied", "interview", "offer", "rejected"]) {
       const patch = { version: 1, extracted: extraction, applicationStatus };
       expect(JobPatchSchema.parse(patch)).toEqual(patch);
       expect(JobPatchBodySchema.parse(patch)).toEqual(patch);
     }
+  });
+
+  it("rejects the old status tailored", () => {
+    const patch = { version: 1, extracted: extraction, applicationStatus: "tailored" };
+    expect(JobPatchSchema.safeParse(patch).success).toBe(false);
   });
 
   it("ignores old thoughts and other unknown fields", () => {
@@ -170,6 +175,11 @@ describe("job response schemas", () => {
       .toEqual({ items: [listItem], nextCursor: "next" });
     expect(JobListPageSchema.parse({ items: [], nextCursor: null })).toEqual({ items: [], nextCursor: null });
     expect(JobListPageSchema.safeParse({ items: [listItem] }).success).toBe(false);
+    // The list's score and tailored languages; an answer without them (an older API) still parses.
+    const scored = { ...listItem, score: 84, tailoredLanguages: ["en", "ro"] };
+    expect(JobListItemSchema.parse(scored)).toEqual(scored);
+    expect(JobListItemSchema.parse({ ...listItem, score: null, tailoredLanguages: [] })).toMatchObject({ score: null, tailoredLanguages: [] });
+    expect(JobListItemSchema.safeParse({ ...listItem, score: "84" }).success).toBe(false);
   });
 
   it("accepts queued list items and full jobs before extraction", () => {
@@ -203,10 +213,11 @@ describe("job response schemas", () => {
       ...listItem, rawText: null, extracted: null, editedByUser: false, version: 1, updatedAt: listItem.createdAt,
       applicationStatus: "saved",
     };
-    for (const applicationStatus of ["saved", "tailored", "applied", "interview", "offer", "rejected"]) {
+    for (const applicationStatus of ["saved", "applied", "interview", "offer", "rejected"]) {
       expect(JobSchema.parse({ ...job, applicationStatus })).toEqual({ ...job, applicationStatus });
     }
     expect(JobSchema.safeParse({ ...job, applicationStatus: "hired" }).success).toBe(false);
+    expect(JobSchema.safeParse({ ...job, applicationStatus: "tailored" }).success).toBe(false);
   });
 });
 

@@ -1,5 +1,5 @@
 import type { CvContent, MatchScore, Steering, TailorRun, TailoredCv } from "@resumora/shared";
-import type { ScoreTarget, TailorRepo, ToneExamples } from "./repo.ts";
+import { sameCv, TAILORING_KINDS, type JobSummary, type ScoreTarget, type TailorRepo, type ToneExamples } from "./repo.ts";
 import { withColumns } from "./steering.ts";
 
 export type MemoryTailorDocs = {
@@ -9,8 +9,11 @@ export type MemoryTailorDocs = {
   steering: Map<string, Steering>;
   /** jobs.tone_examples, by job id. */
   toneExamples: Map<string, ToneExamples>;
+  /** tailored_cvs.score_stale: the ids of the copies edited by hand since their score. */
+  scoreStale: Set<string>;
 };
-export const memoryTailorDocs = (): MemoryTailorDocs => ({ cvs: new Map(), runs: new Map(), steering: new Map(), toneExamples: new Map() });
+export const memoryTailorDocs = (): MemoryTailorDocs =>
+  ({ cvs: new Map(), runs: new Map(), steering: new Map(), toneExamples: new Map(), scoreStale: new Set() });
 
 export type MemoryTailorStore = Map<string, {
   userId: string;
@@ -22,6 +25,8 @@ export type MemoryTailorStore = Map<string, {
 
 export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new Map(), docs = memoryTailorDocs()): TailorRepo {
   const ownRun = (run: TailorRun | undefined) => (run && run.userId === userId ? structuredClone(run) : null);
+  const tailored = (jobId: string) => [...docs.runs.values()].some((run) => run.userId === userId && run.jobId === jobId
+    && run.status === "done" && TAILORING_KINDS.includes(run.kind));
   return {
     async findTailoredCvId(jobId, language) {
       return [...docs.cvs.values()].find((cv) => cv.userId === userId && cv.jobId === jobId && cv.language === language)?.id ?? null;
@@ -52,14 +57,6 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       return [...docs.cvs.values()].filter((cv) => cv.userId === userId && cv.jobId === jobId)
         .map(({ id, language, translatedFrom, updatedAt }) => ({ id, language, translatedFrom, updatedAt }));
     },
-    async listAllTailoredCvs() {
-      const newest = (id: string) => [...docs.runs.values()].reverse().find((run) => run.tailoredCvId === id && run.userId === userId);
-      return [...docs.cvs.values()].filter((cv) => cv.userId === userId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .map(({ id, jobId, language, template, translatedFrom, updatedAt }) => {
-          const run = newest(id);
-          return { id, jobId, language, template, translatedFrom, updatedAt, inProgress: !!run && run.status !== "done" };
-        });
-    },
     async readTailoredCv(id) {
       const cv = docs.cvs.get(id);
       return cv && cv.userId === userId ? structuredClone(cv) : null;
@@ -68,6 +65,7 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       const cv = docs.cvs.get(id);
       if (!cv || cv.userId !== userId) return null;
       if (cv.version !== expectedVersion) return { ok: false, version: cv.version, updatedAt: cv.updatedAt };
+      if (!sameCv(cv.content, content)) docs.scoreStale.add(id);
       Object.assign(cv, { content: structuredClone(content), version: cv.version + 1, updatedAt: new Date().toISOString() });
       return { ok: true, version: cv.version, updatedAt: cv.updatedAt };
     },
@@ -79,6 +77,8 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       if (existing) {
         if (existing.userId !== userId || existing.translatedFrom === null) return "language_taken";
         Object.assign(existing, fields, { version: existing.version + 1 });
+        // The refreshed wording has no score yet, whatever the copy's score history says.
+        docs.scoreStale.add(existing.id);
         return existing.id;
       }
       const id = crypto.randomUUID();
@@ -105,7 +105,9 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     async saveTailoredCv(id, expectedVersion, changes) {
       const cv = docs.cvs.get(id);
       if (!cv || cv.userId !== userId || cv.version !== expectedVersion) return "conflict";
-      Object.assign(cv, structuredClone(changes), { version: cv.version + 1, updatedAt: new Date().toISOString() });
+      const { scoreStale, ...saved } = changes;
+      Object.assign(cv, structuredClone(saved), { version: cv.version + 1, updatedAt: new Date().toISOString() });
+      if (scoreStale) docs.scoreStale.add(id);
       return "ok";
     },
     async latestRun(tailoredCvId) {
@@ -140,6 +142,31 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
       const key = JSON.stringify([userId, jobId, target, tailoredCvId]);
       store.delete(key);
       store.set(key, { userId, jobId, target, tailoredCvId, score: structuredClone(score) });
+      const cv = target === "tailored" && tailoredCvId ? docs.cvs.get(tailoredCvId) : undefined;
+      if (cv && cv.userId === userId) {
+        cv.score = structuredClone(score);
+        docs.scoreStale.delete(cv.id);
+      }
+    },
+    async scoreCopies(jobId) {
+      return [...docs.cvs.values()].filter((cv) => cv.userId === userId && cv.jobId === jobId)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map((cv) => ({ id: cv.id, score: structuredClone(cv.score), scoreStale: docs.scoreStale.has(cv.id) }));
+    },
+    async hasTailoredCv(jobId) {
+      return tailored(jobId);
+    },
+    async summaries(jobIds) {
+      const newest = (jobId: string, target: ScoreTarget, tailoredCvId: string | null) => [...store.values()].reverse().find((row) =>
+        row.userId === userId && row.jobId === jobId && row.target === target && row.tailoredCvId === tailoredCvId)?.score;
+      return new Map(jobIds.map((jobId): [string, JobSummary] => {
+        const copies = [...docs.cvs.values()].filter((cv) => cv.userId === userId && cv.jobId === jobId)
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        const copy = tailored(jobId) ? copies[0] : undefined;
+        if (!copy) return [jobId, { score: newest(jobId, "base", null)?.total ?? null, tailoredLanguages: [] }];
+        return [jobId, { score: (newest(jobId, "tailored", copy.id) ?? copy.score)?.total ?? null,
+          tailoredLanguages: copies.map((cv) => cv.language).sort() }];
+      }));
     },
     async getScore(jobId, target, tailoredCvId) {
       const row = [...store.values()].reverse().find((row) =>

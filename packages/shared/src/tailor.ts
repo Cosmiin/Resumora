@@ -91,6 +91,20 @@ export const MatchScoreSchema = z.object({
 });
 export type MatchScore = z.infer<typeof MatchScoreSchema>;
 
+/** A job's scores: the base CV's, and the one tailored copy named by `tailoredCvId`. */
+export const JobScoreSchema = z.object({
+  base: MatchScoreSchema.nullable(),
+  /** The copy's own newest score; never another copy's. */
+  tailored: MatchScoreSchema.nullable(),
+  /** The tailored CV the score belongs to; null when the job has none. */
+  tailoredCvId: z.string().nullable(),
+  /** True when the copy was edited by hand since its score, or has no score at all. */
+  stale: z.boolean(),
+  /** True once a tailor, retailor or section run of this job is done. */
+  hasTailoredCv: z.boolean(),
+});
+export type JobScore = z.infer<typeof JobScoreSchema>;
+
 export const QuestionSchema = z.object({
   id: z.string(),
   section: TailorSectionSchema,

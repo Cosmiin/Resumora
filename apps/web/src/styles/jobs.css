@@ -6,9 +6,19 @@
 .jobs-narrow { max-width: 720px; }
 .jobs-rule { width: 100%; margin: var(--space-2) 0; border: 0; border-top: 1px solid var(--color-line); }
 .jobs-search { display: grid; gap: var(--space-2); max-width: 420px; margin-bottom: var(--space-5); }
-.jobs-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-6); align-items: center; padding: 18px 0; border-bottom: 1px solid var(--color-line); }
-.jobs-list > li:first-child { padding-top: 0; }
+/* The list: one row per job with the columns Job, Score, CV, Application and the row's action. On a phone each row is a card (see the end of the next block). */
+.jobs-row { display: grid; grid-template-columns: minmax(0, 2.3fr) 72px minmax(0, 1.3fr) minmax(0, 1.1fr) 112px; gap: var(--space-2) var(--space-5); align-items: center; }
+.jobs-head-row { padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-line); font: var(--weight-bold) var(--text-label) / 1.4 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); }
+.jobs-list > li { padding: 18px 0; border-bottom: 1px solid var(--color-line); }
 .jobs-list > li:last-child { border-bottom: 0; padding-bottom: 0; }
+.jobs-cell-job { min-width: 0; display: grid; gap: var(--space-1); justify-items: start; }
+.jobs-cell-job p, .jobs-cell-score { margin: 0; }
+.jobs-num { font: var(--weight-display) 1.75rem / 1 var(--font-display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.jobs-num.is-none { font-size: 1.125rem; color: var(--color-muted); }
+/* CV and Application are two columns here and one wrapping line in the phone card. */
+.jobs-cell-meta { display: contents; }
+.jobs-cell-cv, .jobs-cell-app { min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); align-items: center; }
+.jobs-cell-act { justify-self: end; }
 .jobs-page .job-title { font: var(--weight-display) 1.25rem / 1.2 var(--font-display); letter-spacing: -0.01em; color: var(--color-ink); text-decoration: none; overflow-wrap: anywhere; }
 .jobs-page a.job-title:hover, .jobs-list > li:hover a.job-title { text-decoration: underline; text-underline-offset: 4px; }
 /* The whole row opens the job: the title's link is stretched over it, and the row's button stays on top. */
@@ -93,10 +103,55 @@
 .gate-meter i { position: absolute; inset: 0 auto 0 0; border-radius: var(--radius-pill); background: var(--color-coach); }
 .gate-meter b { position: absolute; top: -6px; bottom: -6px; width: 3px; background: var(--color-ink); }
 
+/* ---- A tailored job: the latest score, the job folded into one row, then the tailored CV ---- */
+.job-page .jobs-head > .job-application-status { flex: 0 1 240px; }
+.job-score-latest { flex: 0 1 260px; display: grid; gap: var(--space-2); }
+.job-score-latest p { margin: 0; }
+.job-band--tailored > .job-coach { flex: 1 1 320px; min-width: 0; margin: 0; }
+.job-fold { width: 100%; min-height: 48px; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-5); border: 2px dashed var(--color-ink); border-radius: var(--radius-block); background: var(--color-paper-veil); color: inherit; font: var(--weight-bold) 1rem var(--font-body); text-align: left; cursor: pointer; }
+.job-fold span:last-child { text-decoration: underline; text-underline-offset: 4px; }
+.job-fold-body { margin-top: var(--space-5); }
+.job-cvbar { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; justify-content: space-between; margin: var(--space-6) 0 var(--space-3); }
+.job-cvbar p { margin: 0; }
+.job-cvbar a { display: inline-block; padding: var(--space-3) 0; }
+.job-cv { margin-inline: auto; }
+/* The score may be older than the CV: the note and Re-check sit with the number. */
+.job-score-stale { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center; }
+/* The export dialog: the two downloads side by side, one under the other when the dialog is narrow. */
+.job-export { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); }
+.job-export .ui-btn { flex: 1 1 200px; min-height: 44px; }
+/* The file's name has no spaces: let it break, or it widens the dialog past a phone's screen. */
+.job-export-file { overflow-wrap: anywhere; }
+/* One button per language copy of the tailored CV. */
+.job-lang { display: inline-flex; flex-wrap: wrap; max-width: 100%; overflow: hidden; border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-block); background: var(--color-paper); }
+.job-lang button { min-height: 44px; padding: 0 var(--space-5); border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--color-ink); font: var(--weight-bold) var(--text-small) / 1.2 var(--font-body); cursor: pointer; }
+.job-lang button:hover { background: var(--color-highlight); }
+.job-lang button[aria-pressed="true"] { background: var(--color-ink); color: var(--color-on-ink); }
+.job-lang button:focus-visible { outline: var(--focus-width) solid var(--color-coach); outline-offset: calc(-1 * var(--focus-width)); }
+
 @media (max-width: 900px) {
   .job-cols { grid-template-columns: minmax(0, 1fr); }
-  .jobs-list > li { grid-template-columns: minmax(0, 1fr); }
+  /* One column: the number, what the coach says, then the buttons, each as wide as the page. */
+  .job-band--tailored { flex-direction: column; align-items: stretch; padding: var(--space-5); }
+  .job-band--tailored > .job-score-latest, .job-band--tailored > .job-coach { flex: 0 0 auto; }
+  .job-band--tailored > .job-tailor { margin-left: 0; justify-items: stretch; }
+  .job-band--tailored .ui-row { display: grid; gap: var(--space-2); }
+  .job-band--tailored .ui-btn { width: 100%; min-height: 44px; }
+  .job-page .jobs-head > .job-application-status { flex: 1 1 100%; max-width: none; }
   .job-more { padding: var(--space-5); }
+  /* The list as cards: the score in a round badge in front, the title and company, the CV and Application on one line, then the action. */
+  .jobs-table.ui-sheet { padding: 0; border-radius: 0; background: none; box-shadow: none; }
+  .jobs-head-row { display: none; }
+  .jobs-list { display: grid; gap: var(--space-3); }
+  .jobs-row { grid-template-columns: 56px minmax(0, 1fr); grid-template-areas: "score job" "meta meta" "act act"; gap: var(--space-3) var(--space-4); align-items: start; }
+  .jobs-list > li, .jobs-list > li:last-child { padding: var(--space-5); border-bottom: 0; border-radius: var(--radius-block); background: var(--color-paper); box-shadow: var(--shadow-sheet); }
+  .jobs-cell-job { grid-area: job; }
+  .jobs-cell-score { grid-area: score; width: 56px; height: 56px; display: grid; place-items: center; border: 3px solid var(--color-ink); border-radius: 50%; background: var(--color-desk-soft); }
+  .jobs-num { font-size: 1.375rem; }
+  .jobs-cell-meta { grid-area: meta; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; }
+  .jobs-cell-cv:empty, .jobs-cell-app:empty, .jobs-cell-act:empty { display: none; }
+  .jobs-cell-act { grid-area: act; justify-self: stretch; }
+  .jobs-cell-act .ui-btn { width: 100%; min-height: 44px; }
 }
 
 /* ---- Edit form (old look, still to be rebuilt) ---- */

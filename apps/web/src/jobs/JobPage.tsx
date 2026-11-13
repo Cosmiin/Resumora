@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router";
-import type { Job, JobListPage } from "@resumora/shared";
+import { keepPreviousData, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import type { Job, JobListPage, MatchScore } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { AppShell } from "../layout/AppShell.tsx";
 import { ApiClientError } from "../lib/api.ts";
@@ -15,8 +15,8 @@ import { JobEditForm } from "./JobEditForm.tsx";
 import { Keywords, MatchNumber, MustHaves, NiceToHave, mustCount } from "./JobMatch.tsx";
 import { JobScoreHow } from "./JobScoreCard.tsx";
 import { TailorGate } from "./TailorGate.tsx";
-import { getRun } from "../tailor/tailor-api.ts";
-import { remembered } from "../tailor/TailorFlow.tsx";
+import { TailoredJobView } from "./TailoredJobView.tsx";
+import { fetchOpenRun } from "../tailor/open-run.ts";
 
 export function JobPage() {
   const userId = useAuth().session?.user.id ?? "anonymous";
@@ -43,26 +43,23 @@ function JobView({ id, userId }: { id: string; userId: string }) {
     refetchInterval: (q) => !pollStopped && Date.now() < pollUntil
       && (q.state.data?.status === "queued" || q.state.data?.status === "processing") ? 3000 : false,
   });
+  // ?cv= names the tailored CV the score is about; without it the API answers for the one saved last.
+  const cv = useSearchParams()[0].get("cv");
+  const scoreKey = ["job-score", userId, id, cv];
+  // Choosing another language copy changes the key; the previous answer stays on screen until the new one arrives.
   const score = useQuery({
-    queryKey: ["job-score", userId, id], queryFn: () => getJobScore(id), gcTime: 0,
-    enabled: query.data?.status === "ready",
+    queryKey: scoreKey, queryFn: () => (cv ? getJobScore(id, cv) : getJobScore(id)), gcTime: 0,
+    enabled: query.data?.status === "ready", placeholderData: keepPreviousData,
   });
   // An unfinished tailoring run this browser remembers (the flow forgets it when the run is done).
-  const openRun = useQuery({
-    queryKey: ["job-tailor-run", userId, id], gcTime: 0,
-    queryFn: async () => {
-      const stored = remembered(id);
-      const run = stored ? await getRun(stored).catch(() => null) : null;
-      return run && run.status !== "done" && run.currentSection ? run : null;
-    },
-  });
+  const openRun = useQuery({ queryKey: ["job-tailor-run", userId, id], gcTime: 0, queryFn: () => fetchOpenRun(id) });
   const [scoring, setScoring] = useState<"idle" | "busy" | "failed">("idle");
   /** Try again: a ready job with no Score 1 (saved before scoring, or scoring failed once) gets one computed now. */
   async function retryScore() {
     if (!score.isSuccess || score.data.base) { void score.refetch(); return; }
     setScoring("busy");
     try {
-      queryClient.setQueryData(["job-score", userId, id], await scoreJob(id));
+      queryClient.setQueryData(scoreKey, await scoreJob(id));
       setScoring("idle");
     } catch {
       setScoring("failed");
@@ -123,12 +120,13 @@ function JobView({ id, userId }: { id: string; userId: string }) {
   const jobPath = `/jobs/${encodeURIComponent(id)}`;
   const run = openRun.data;
   const tailored = score.data?.tailored;
+  const runStep = run ? t("job.tailor.step", { n: run.sections.indexOf(run.currentSection!) + 1, total: run.sections.length,
+    section: t(`tailor.section.${run.currentSection!}`) }) : null;
   // The one main action of the page: continue a run, open the tailored CV, or start tailoring.
   const tailor = !job ? null : run ? (
     <div className="job-tailor">
       <Link className="ui-btn ui-btn--primary" to={`${jobPath}/tailor`}>{t("job.tailor.continue")}</Link>
-      <p className="ui-small ui-muted">{t("job.tailor.step", { n: run.sections.indexOf(run.currentSection!) + 1, total: run.sections.length,
-        section: t(`tailor.section.${run.currentSection!}`) })}</p>
+      <p className="ui-small ui-muted">{runStep}</p>
     </div>
   ) : tailored ? (
     <div className="job-tailor">
@@ -159,6 +157,43 @@ function JobView({ id, userId }: { id: string; userId: string }) {
       + (salary.currency ? ` ${salary.currency}` : "") + (salary.period ? ` / ${t(`job.period.${salary.period}`)}` : "") : null;
   const base = score.data?.base ?? null;
   const musts = extracted ? mustCount(extracted.requirements, base) : null;
+  // A job is tailored once a tailoring run is done; only then the page turns into the tailored CV's page.
+  const isTailored = score.data?.hasTailoredCv === true;
+  const statusSelect = job && (
+    <label className="job-application-status"><span className="ui-label">{t("job.status.title")}</span>
+      <select className="ui-input" value={job.applicationStatus} disabled={statusSaving}
+        onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>
+        {(["saved", "applied", "interview", "offer", "rejected"] as const).map((status) =>
+          <option value={status} key={status}>{t(`job.status.${status}`)}</option>)}
+      </select>
+    </label>
+  );
+  const statusAlert = statusError && <p role="alert" className="ui-notice ui-notice--bad">{statusError}</p>;
+  /** The must-haves, marked from the given score. */
+  const mustHaves = (marks: MatchScore | null) => extracted && (
+    <MustHaves requirements={extracted.requirements} score={marks}
+      state={<div className="ui-row"><p className="ui-small ui-muted">{t(score.isPending || scoring === "busy" ? "job.score.checking"
+        : score.isError ? "job.score.loadError" : scoring === "failed" ? "job.score.computeError" : "job.score.pending")}</p>
+        {!score.isPending && <button type="button" className="ui-btn ui-btn--sm" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button>}</div>}>
+      <NiceToHave inside requirements={extracted.requirements} score={marks} />
+    </MustHaves>
+  );
+  /** About this job, its keywords marked from the given score. The tailored page has the application status in its header. */
+  const about = (marks: MatchScore | null) => job && extracted && (
+    <section className="job-more ui-stack">
+      <h2 className="ui-heading">{t("job.more.title")}</h2>
+      {extracted.summary.trim() && <div className="sec"><h3>{t("job.inShort")}</h3><p>{extracted.summary}</p></div>}
+      <JobSummary extracted={extracted} rawText={job.rawText} salaryStated={salaryText !== null}
+        keywords={<Keywords inside score={marks} terms={extracted.keywords} />} />
+      {!isTailored && statusSelect}
+      {!isTailored && statusAlert}
+      <div className="ui-row">
+        <button type="button" className="ui-btn" disabled={statusSaving} onClick={() => setEditing(true)}>{t("job.edit")}</button>
+        {removeButton}
+      </div>
+      <p className="ui-small ui-muted">{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</p>
+    </section>
+  );
 
   return <AppShell>
     <main className="ui-page jobs-page job-page">
@@ -199,11 +234,28 @@ function JobView({ id, userId }: { id: string; userId: string }) {
               {extracted.seniority !== "unknown" && <span className="ui-pill">{t(`job.seniority.${extracted.seniority}`)}</span>}
               {salaryText !== null && <span className="ui-pill">{salaryText}</span>}
               {applyByText && <span className="ui-pill">{t("job.applyBy", { date: applyByText })}</span>}
+              {isTailored && <span className="ui-pill ui-pill--good">{t("jobs.pill.tailored")}</span>}
               {original}
             </div>
           </div>
+          {isTailored && statusSelect}
         </div>
+        {isTailored && statusAlert}
         {extracted.positionClosed === true && <p role="status" className="ui-notice job-closed">{t("job.positionClosed")}</p>}
+        {score.isLoading ? (
+          // The first score answer decides which page this is (the tailored CV's, or the job's own), so nothing of
+          // either shows before it arrives. A language switch keeps the previous answer and never gets here.
+          <div className="ui-sheet ui-stack" aria-busy="true">
+            <span className="ui-sr" role="status">{t("app.loading")}</span>
+            <Skeleton width="60%" height="28px" /><Skeleton /><Skeleton width="80%" />
+          </div>
+        ) : isTailored && score.data ? (
+          <TailoredJobView jobPath={jobPath} requirements={extracted.requirements} score={score.data} runStep={runStep}
+            // A Re-check answers for the copy on screen when it started. While another copy's score is still loading,
+            // that is not the copy this address names, so the answer isn't kept under it (the server has saved it).
+            onScore={(next) => { if (!score.isPlaceholderData) queryClient.setQueryData(scoreKey, next); }}
+            details={<><div className="ui-stack">{mustHaves(score.data.tailored)}</div>{about(score.data.tailored)}</>} />
+        ) : <>
         {/* The answer first: the match, what the coach says about it, and the page's one main action. */}
         <section className="job-band" aria-label={t("job.band.label")}>
           {base && <MatchNumber score={base} />}
@@ -218,34 +270,10 @@ function JobView({ id, userId }: { id: string; userId: string }) {
           {tailor}
         </section>
         <div className="job-cols">
-          <div className="ui-stack">
-          <MustHaves requirements={extracted.requirements} score={base}
-            state={<div className="ui-row"><p className="ui-small ui-muted">{t(score.isPending || scoring === "busy" ? "job.score.checking"
-              : score.isError ? "job.score.loadError" : scoring === "failed" ? "job.score.computeError" : "job.score.pending")}</p>
-              {!score.isPending && <button type="button" className="ui-btn ui-btn--sm" disabled={scoring === "busy"} onClick={() => void retryScore()}>{t("jobs.retry")}</button>}</div>}>
-            <NiceToHave inside requirements={extracted.requirements} score={base} />
-          </MustHaves>
-          </div>
-        <section className="job-more ui-stack">
-          <h2 className="ui-heading">{t("job.more.title")}</h2>
-          {extracted.summary.trim() && <div className="sec"><h3>{t("job.inShort")}</h3><p>{extracted.summary}</p></div>}
-          <JobSummary extracted={extracted} rawText={job.rawText} salaryStated={salaryText !== null}
-            keywords={<Keywords inside score={base} terms={extracted.keywords} />} />
-          <label className="job-application-status"><span className="ui-label">{t("job.status.title")}</span>
-            <select className="ui-input" value={job.applicationStatus} disabled={statusSaving}
-              onChange={(event) => void changeStatus(event.target.value as Job["applicationStatus"])}>
-              {(["saved", "tailored", "applied", "interview", "offer", "rejected"] as const).map((status) =>
-                <option value={status} key={status}>{t(`job.status.${status}`)}</option>)}
-            </select>
-          </label>
-          {statusError && <p role="alert" className="ui-notice ui-notice--bad">{statusError}</p>}
-          <div className="ui-row">
-            <button type="button" className="ui-btn" disabled={statusSaving} onClick={() => setEditing(true)}>{t("job.edit")}</button>
-            {removeButton}
-          </div>
-          <p className="ui-small ui-muted">{t(job.editedByUser ? "job.editedByYou" : "job.readByAi")}</p>
-        </section>
+          <div className="ui-stack">{mustHaves(base)}</div>
+          {about(base)}
         </div>
+        </>}
       </> : job?.status === "needs_text" ? <div className="ui-stack jobs-narrow">
         <p className="ui-notice">{t("job.tailor.needsText")}</p><div className="ui-row">{removeButton}{original}</div>
       </div> : null}

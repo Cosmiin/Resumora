@@ -174,6 +174,26 @@ describe("changing steering after Experience", () => {
     expect(tailored().content.experience[0]!.bullets[0]!.text).toBe("Ran payroll");
   });
 
+  it("marks the copy as edited since its score when the wording goes back to Base, until a step is accepted again", async () => {
+    const answer = async () => await (await app.request(`/v1/jobs/${jobId}/score`, { headers: { authorization: "Bearer token-a" } })).json() as
+      { stale: boolean; tailored: { total: number | null } | null };
+    const runId = await start();
+    await tailorRole(runId, one.id, "Weekly", one.bullets[0]!.id, "Ran payroll every week");
+    const before = await answer();
+    expect(before.stale).toBe(false);
+    expect(before.tailored).not.toBeNull();
+
+    const { run } = await (await post(`/v1/tailor-runs/${runId}/steering`, { tone: "confident" })).json() as { run: TailorRun };
+    // The number on the page is still the one from before the reset; the mark says it no longer matches the wording.
+    expect(await answer()).toMatchObject({ stale: true, tailored: before.tailored });
+
+    proposals(reword(one.bullets[0]!.id, "Ran payroll every week, on time"));
+    expect((await post(`/v1/tailor-runs/${run.id}/sections/experience/run`, { roleId: one.id })).status).toBe(200);
+    replies.push(scoreReply);
+    expect((await post(`/v1/tailor-runs/${run.id}/sections/experience/accept`, { roleId: one.id, decisions: [{ itemId: one.bullets[0]!.id, keep: true }] })).status).toBe(200);
+    expect((await answer()).stale).toBe(false);
+  });
+
   it("from a one-section re-tailor still redoes every step, clears the old review, and the stored steering can be read", async () => {
     const runId = await start();
     await tailorRole(runId, one.id, "Weekly", one.bullets[0]!.id, "Ran payroll every week");

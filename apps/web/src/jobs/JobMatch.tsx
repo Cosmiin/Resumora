@@ -25,6 +25,12 @@ export function mustCount(requirements: Requirements, score: MatchScore | null):
   return { met: musts.filter(({ index }) => statusOf(labelFor(score, index)) === "met").length, total: musts.length };
 }
 
+/** The must-haves the CV doesn't fully show yet, in ad order. Empty when there are no usable marks. */
+export function openMusts(requirements: Requirements, score: MatchScore | null): string[] {
+  if (!marksUsable(requirements, score)) return [];
+  return requirements.flatMap((r, index) => (r.kind === "must" && statusOf(labelFor(score, index)) !== "met" ? [r.text] : []));
+}
+
 type MustProps = {
   requirements: Requirements;
   /** The base match, or null while it is loading or failed. */
