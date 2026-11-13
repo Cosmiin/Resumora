@@ -14,6 +14,8 @@ import { getRun } from "../tailor/tailor-api.ts";
 vi.mock("../tailor/tailored-api.ts", async (original) => ({ ...(await original<object>()), listTailored: vi.fn(), getTailored: vi.fn() }));
 vi.mock("../account/account-api.ts", async (original) => ({ ...(await original<object>()), getPreferences: vi.fn() }));
 import { getTailored, listTailored } from "../tailor/tailored-api.ts";
+vi.mock("../export/export-files.ts", async (original) => ({ ...(await original<object>()), exportFile: vi.fn() }));
+import { exportFile } from "../export/export-files.ts";
 import { getPreferences } from "../account/account-api.ts";
 vi.mock("../cv/enrich/useRoleScores.ts", () => ({ useRoleScores: vi.fn() }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
@@ -226,7 +228,8 @@ describe("job page", () => {
       expect(screen.queryByText(/69/)).toBeNull();
       expect(screen.getByText("Tailored CV")).toHaveClass("ui-pill");
       expect(strip.getByRole("link", { name: "Edit CV" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv1");
-      expect(strip.getByRole("link", { name: "Export" })).toHaveAttribute("href", "/jobs/one/cv/export?cv=cv1");
+      expect(strip.getByRole("button", { name: "Export" })).toBeInTheDocument();
+      expect(strip.queryByRole("link", { name: "Export" })).toBeNull();
       expect(strip.getByRole("link", { name: "Tailor again" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv1&retailor=1");
       expect(await screen.findByText(/Template: Modern/)).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/template?cv=cv1");
@@ -323,7 +326,7 @@ describe("job page", () => {
         const strip = within(await band());
         expect(strip.getByText("5 of 7 must-haves covered. Still open: Must 6, Must 7.")).toBeInTheDocument();
         expect(strip.getByRole("link", { name: "Edit CV" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv2");
-        expect(strip.getByRole("link", { name: "Export" })).toHaveAttribute("href", "/jobs/one/cv/export?cv=cv2");
+        expect(strip.getByRole("button", { name: "Export" })).toBeEnabled();
         expect(strip.getByRole("link", { name: "Tailor again" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv2&retailor=1");
         expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/template?cv=cv2");
       });
@@ -354,6 +357,90 @@ describe("job page", () => {
         expect(await screen.findByText("A făcut salarizarea pentru 40 de angajați")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Romanian" })).toHaveAttribute("aria-pressed", "true");
         expect(within(await band()).getByText("Your match: 80 of 100")).toBeInTheDocument();
+      });
+    });
+
+    describe("exporting from the job page", () => {
+      const file = { name: "Ana_Pop_Acme_Engineer.pdf", pages: 1, fits: true, tightened: false };
+      /** The dialog, opened once the CV has loaded. */
+      const openExport = async () => {
+        await screen.findByText("Ran payroll for 40 staff");
+        await userEvent.click(within(await band()).getByRole("button", { name: "Export" }));
+        return within(screen.getByRole("dialog", { name: "Download your CV" }));
+      };
+
+      it("opens a small dialog with the two downloads, and Download PDF makes the file from the copy on screen", async () => {
+        vi.mocked(exportFile).mockResolvedValue(file);
+        renderJob(); await ready();
+        const dialog = await openExport();
+        expect(dialog.getAllByRole("button").map((button) => button.textContent)).toEqual(["Download PDF", "Download Word", "Close"]);
+        expect(dialog.queryByRole("link")).toBeNull();
+        await userEvent.click(dialog.getByRole("button", { name: "Download PDF" }));
+        expect(exportFile).toHaveBeenCalledWith("cv", "pdf", { cv: tailoredCv, job: expect.objectContaining({ title: "Engineer", requirements: seven }), template: "modern" });
+        expect(await dialog.findByText("Downloaded: Ana_Pop_Acme_Engineer.pdf")).toBeInTheDocument();
+        await userEvent.click(dialog.getByRole("button", { name: "Close" }));
+        expect(screen.queryByRole("dialog", { name: "Download your CV" })).toBeNull();
+      });
+
+      it("exports the language copy that was chosen", async () => {
+        const roCv: TailoredCv = { ...tailoredCv, id: "cv2", language: "ro", translatedFrom: "cv1",
+          content: { ...content, experience: [{ ...role, bullets: [{ id: "b1", text: "A făcut salarizarea pentru 40 de angajați" }] }] } };
+        vi.mocked(listTailored).mockResolvedValue([{ id: "cv1", language: "en", translatedFrom: null, updatedAt: job.updatedAt },
+          { id: "cv2", language: "ro", translatedFrom: "cv1", updatedAt: job.updatedAt }]);
+        vi.mocked(getTailored).mockImplementation(async (id) => (id === "cv2" ? roCv : tailoredCv));
+        vi.mocked(getJobScore).mockImplementation(async (_id, cvId) => (cvId === "cv2" ? { ...tailored(), tailoredCvId: "cv2" } : tailored()));
+        vi.mocked(exportFile).mockResolvedValue({ ...file, name: "Ana_Pop_Acme_Engineer.docx" });
+        renderJob(); await ready();
+        await userEvent.click(await screen.findByRole("button", { name: "Romanian" }));
+        await screen.findByText("A făcut salarizarea pentru 40 de angajați");
+        await userEvent.click(within(await band()).getByRole("button", { name: "Export" }));
+        await userEvent.click(within(screen.getByRole("dialog", { name: "Download your CV" })).getByRole("button", { name: "Download Word" }));
+        expect(exportFile).toHaveBeenCalledWith("cv", "docx", expect.objectContaining({ cv: roCv, template: "modern" }));
+      });
+
+      it("disables both downloads while a file is being made; a second click sends nothing", async () => {
+        let made: (result: typeof file) => void = () => {};
+        vi.mocked(exportFile).mockReturnValue(new Promise((resolve) => { made = resolve; }));
+        renderJob(); await ready();
+        const dialog = await openExport();
+        await userEvent.click(dialog.getByRole("button", { name: "Download PDF" }));
+        const busy = dialog.getByRole("button", { name: "Preparing the PDF…" });
+        expect(busy).toBeDisabled();
+        expect(dialog.getByRole("button", { name: "Download Word" })).toBeDisabled();
+        fireEvent.click(busy);
+        fireEvent.click(dialog.getByRole("button", { name: "Download Word" }));
+        expect(exportFile).toHaveBeenCalledTimes(1);
+        await act(async () => { made(file); });
+        expect(await dialog.findByText("Downloaded: Ana_Pop_Acme_Engineer.pdf")).toBeInTheDocument();
+        expect(dialog.getByRole("button", { name: "Download Word" })).toBeEnabled();
+      });
+
+      it("says so when the file can't be made, and the downloads work again", async () => {
+        vi.mocked(exportFile).mockRejectedValueOnce(new Error("no fonts")).mockResolvedValue(file);
+        renderJob(); await ready();
+        const dialog = await openExport();
+        await userEvent.click(dialog.getByRole("button", { name: "Download Word" }));
+        expect(await dialog.findByRole("alert")).toHaveTextContent("The file couldn't be created. Your CV is safe. Try again, or try the other format.");
+        await userEvent.click(dialog.getByRole("button", { name: "Download PDF" }));
+        expect(await dialog.findByText("Downloaded: Ana_Pop_Acme_Engineer.pdf")).toBeInTheDocument();
+        expect(dialog.queryByRole("alert")).toBeNull();
+      });
+
+      it("keeps Export disabled until the CV has loaded, and when it failed to load", async () => {
+        let arrives: (cv: TailoredCv) => void = () => {};
+        vi.mocked(getTailored).mockReturnValueOnce(new Promise((resolve) => { arrives = resolve; }));
+        renderJob(); await ready();
+        const strip = within(await band());
+        expect(strip.getByRole("button", { name: "Export" })).toBeDisabled();
+        await act(async () => { arrives(tailoredCv); });
+        await waitFor(() => expect(strip.getByRole("button", { name: "Export" })).toBeEnabled());
+      });
+
+      it("keeps Export disabled when the CV failed to load", async () => {
+        vi.mocked(getTailored).mockRejectedValue(new Error("down"));
+        renderJob(); await ready();
+        expect(await screen.findByText("We couldn't load your tailored CV. Nothing has changed.")).toBeInTheDocument();
+        expect(within(await band()).getByRole("button", { name: "Export" })).toBeDisabled();
       });
     });
 
@@ -444,7 +531,7 @@ describe("job page", () => {
       const edit = strip.getByRole("link", { name: "Edit CV" });
       expect(edit).toHaveAttribute("href", "/jobs/one/cv?cv=cv1");
       expect(edit).not.toHaveClass("ui-btn--primary");
-      expect(strip.getByRole("link", { name: "Export" })).toBeInTheDocument();
+      expect(strip.getByRole("button", { name: "Export" })).toBeInTheDocument();
       expect(strip.queryByRole("link", { name: "Tailor again" })).toBeNull();
       await userEvent.click(go);
       expect(router.state.location.pathname).toBe("/jobs/one/tailor");

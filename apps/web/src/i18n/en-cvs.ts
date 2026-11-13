@@ -37,7 +37,7 @@ export const cvsEn = {
   "cvs.export.done": "Downloaded: {name}",
   "cvs.export.failed": "The file couldn't be created. Your CV is safe. Try again, or try the other format.",
   "cvs.export.luck": "Good luck with this one.",
-  "cvs.export.luckBase": "Done.",
+  "cvs.export.luckBase": "Done. Your base CV stays in My CV.",
 
   "tailored.toolbar": "This tailored CV",
   "tailored.templateLink": "Template: {name}",

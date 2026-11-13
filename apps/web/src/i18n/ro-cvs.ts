@@ -44,7 +44,7 @@ export const cvsRo: Record<keyof typeof cvsEn | TailoredPageKey, string> = {
   "cvs.export.done": "Descărcat: {name}",
   "cvs.export.failed": "Fișierul n-a putut fi creat. CV-ul tău e în siguranță. Încearcă din nou sau încearcă celălalt format.",
   "cvs.export.luck": "Succes cu acesta.",
-  "cvs.export.luckBase": "Gata.",
+  "cvs.export.luckBase": "Gata. CV-ul tău de bază rămâne în „CV-ul meu”.",
 
   "tailored.toolbar": "Acest CV adaptat",
   "tailored.templateLink": "Șablon: {name}",

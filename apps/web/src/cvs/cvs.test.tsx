@@ -163,7 +163,7 @@ describe("the download page", () => {
     open("/cv/export");
     await userEvent.click(await screen.findByRole("button", { name: "Download Word" }));
     expect(files.exportFile).toHaveBeenCalledWith("cv", "docx", { cv: { content, language: "en", coverLetter: null }, job: null, template: "classic" });
-    expect(await screen.findByText("Done.")).toBeInTheDocument();
+    expect(await screen.findByText("Done. Your base CV stays in My CV.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to my CV" })).toHaveAttribute("href", "/cv");
     expect(screen.queryByText(/My CVs/)).toBeNull();
   });
