@@ -242,7 +242,14 @@ function JobView({ id, userId }: { id: string; userId: string }) {
         </div>
         {isTailored && statusAlert}
         {extracted.positionClosed === true && <p role="status" className="ui-notice job-closed">{t("job.positionClosed")}</p>}
-        {isTailored && score.data ? (
+        {score.isLoading ? (
+          // The first score answer decides which page this is (the tailored CV's, or the job's own), so nothing of
+          // either shows before it arrives. A language switch keeps the previous answer and never gets here.
+          <div className="ui-sheet ui-stack" aria-busy="true">
+            <span className="ui-sr" role="status">{t("app.loading")}</span>
+            <Skeleton width="60%" height="28px" /><Skeleton /><Skeleton width="80%" />
+          </div>
+        ) : isTailored && score.data ? (
           <TailoredJobView jobPath={jobPath} requirements={extracted.requirements} score={score.data} runStep={runStep}
             // A Re-check answers for the copy on screen when it started. While another copy's score is still loading,
             // that is not the copy this address names, so the answer isn't kept under it (the server has saved it).

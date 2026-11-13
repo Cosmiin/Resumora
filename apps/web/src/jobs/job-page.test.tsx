@@ -56,7 +56,14 @@ const match: MatchScore = { policy: "match/1", total: 80, band: "strong", capped
 const scores = (over: Partial<JobScore> = {}): JobScore => ({ base: null, tailored: null, tailoredCvId: null, stale: false, hasTailoredCv: false, ...over });
 const roleScores = (score: number) => ({ scores: new Map([["role", { state: "ready" as const,
   result: { roleId: "role", policy: "score/2", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } }]]), retry: vi.fn(), put: vi.fn() });
-const ready = () => screen.findByRole("heading", { name: "Engineer", level: 1 });
+/** The job's header, which shows as soon as the job has loaded. */
+const header = () => screen.findByRole("heading", { name: "Engineer", level: 1 });
+/** The job's page once its first score answer is back too: until then a placeholder stands under the header. */
+const ready = async () => {
+  const heading = await header();
+  await waitFor(() => expect(document.querySelector("main [aria-busy='true']")).toBeNull());
+  return heading;
+};
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -146,6 +153,54 @@ describe("job page", () => {
     expect(scoreJob).toHaveBeenCalledTimes(2);
     expect(screen.queryByText("Your match score isn't available yet.")).toBeNull();
     expect(screen.getByText("Your match: 80 of 100")).toBeInTheDocument();
+  });
+
+  describe("while the score answer loads for the first time", () => {
+    let arrives: (score: JobScore) => void;
+    let fails: (error: Error) => void;
+    beforeEach(() => {
+      vi.mocked(getJobScore).mockReturnValue(new Promise<JobScore>((resolve, reject) => { arrives = resolve; fails = reject; }));
+    });
+    /** The page under its header, before the answer: a placeholder, and nothing of either layout. */
+    const expectPlaceholder = () => {
+      const main = screen.getByRole("main");
+      expect(within(main).getByRole("status")).toHaveTextContent("Loading…");
+      expect(main.querySelector("[aria-busy='true']")).not.toBeNull();
+      expect(screen.queryByRole("button", { name: "Tailor my CV" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Must-haves" })).toBeNull();
+      expect(main.querySelector(".job-band")).toBeNull();
+      // The header is already there.
+      expect(screen.getByRole("heading", { name: "Engineer", level: 1 })).toBeInTheDocument();
+      expect(screen.getByText("Hybrid")).toHaveClass("ui-pill");
+    };
+
+    it("shows a placeholder under the header, then today's layout for a job that isn't tailored", async () => {
+      renderJob(); await header();
+      expectPlaceholder();
+      await act(async () => { arrives(scores({ base: match })); });
+      expect(await screen.findByRole("button", { name: "Tailor my CV" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Must-haves" })).toBeInTheDocument();
+      expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("then the tailored layout for a tailored job, without the untailored one in between", async () => {
+      vi.mocked(getPreferences).mockResolvedValue({ displayName: null, defaultTemplate: "classic", tailoringLanguage: "job" } as Awaited<ReturnType<typeof getPreferences>>);
+      vi.mocked(listTailored).mockResolvedValue([]);
+      renderJob(); await header();
+      expectPlaceholder();
+      await act(async () => { arrives(scores({ base: match, tailored: { ...match, total: 84 }, tailoredCvId: "cv1", hasTailoredCv: true })); });
+      expect(await screen.findByText("Latest score, from your tailored CV")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Tailor my CV" })).toBeNull();
+    });
+
+    it("falls back to today's layout with the load error when the answer fails", async () => {
+      renderJob(); await header();
+      expectPlaceholder();
+      await act(async () => { fails(new Error("offline")); });
+      expect(await screen.findByText("Couldn't load your match score.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Tailor my CV" })).toBeInTheDocument();
+    });
   });
 
   describe("reopening a tailored CV", () => {
@@ -429,7 +484,8 @@ describe("job page", () => {
       it("keeps Export disabled until the CV has loaded, and when it failed to load", async () => {
         let arrives: (cv: TailoredCv) => void = () => {};
         vi.mocked(getTailored).mockReturnValueOnce(new Promise((resolve) => { arrives = resolve; }));
-        renderJob(); await ready();
+        // The CV area is still loading here, so wait for the header and the score strip, not for a settled page.
+        renderJob(); await header();
         const strip = within(await band());
         expect(strip.getByRole("button", { name: "Export" })).toBeDisabled();
         await act(async () => { arrives(tailoredCv); });
