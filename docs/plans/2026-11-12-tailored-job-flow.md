@@ -247,3 +247,116 @@ tests: light
 - The menu has no My CVs entry, and no `to="/cvs"` or `"/cvs"` link target is left in `apps/web/src` outside the redirect.
 
 **Out of scope:** the API route `GET /v1/tailored`, which the web no longer calls after this task. It stays; removing it is listed as open for the owner.
+
+# Follow-up (2026-11-13): the owner's answers to the open points
+
+Base `c0a7cff` (pushed, draft PR 60). One lane, Tasks 8 to 13 in order; Tasks 9 and 11 both touch `TailoredJobView.tsx` or `JobPage.tsx` and `job-page.test.tsx`. Builder: Claude with `claude-build`. Rules of the first part still hold. Not in this run, by the owner's decision: Open items 2 and 3 of the end-of-run list and R16; any migration on the hosted database; a merge.
+
+## Task 8: A job that needs its text says so in the Jobs list
+
+---
+files: [apps/web/src/jobs/JobsPage.tsx, apps/web/src/i18n/en-jobs.ts, apps/web/src/i18n/ro-jobs.ts, apps/web/src/jobs/jobs-page.test.tsx]
+new_files: []
+deps: false
+size: 15
+tests: light
+---
+
+**Goal:** settles R18. In the Jobs list's CV column a job with status `needs_text` shows the text "Can't be tailored yet" (Romanian: the same meaning, without the word for "ad"). The label never calls the job an "ad". A `failed` job keeps its "Couldn't read" pill. Both keep "View job" as their action and show no application status.
+
+**Acceptance tests:**
+- A `needs_text` job's row shows "Can't be tailored yet", the action "View job", no "Base CV" and no application pill.
+- A `failed` job's row still shows "Couldn't read".
+
+**Out of scope:** the job's own page; any other list text.
+
+## Task 9: Export from the tailored job's page
+
+---
+files: [apps/web/src/jobs/TailoredJobView.tsx, apps/web/src/styles/jobs.css, apps/web/src/i18n/en-jobs.ts, apps/web/src/i18n/ro-jobs.ts, apps/web/src/i18n/en-cvs.ts, apps/web/src/i18n/ro-cvs.ts, apps/web/src/jobs/job-page.test.tsx, apps/web/src/cvs/cvs.test.tsx]
+new_files: []
+deps: false
+size: 110
+tests: normal
+---
+
+**Goal:** the owner: "the export should happen also on the job page, we don't need to go on a separate page ... just have the options to download as PDF or Word. That's it."
+- On the tailored job's page, "Export" is a button that opens a small dialog (the shared `Dialog`) with two buttons, "Download PDF" and "Download Word", and nothing else to choose. They export the copy on screen (the one the language switch shows) with the existing `exportFile("cv", format, { cv, job, template })`, in the template saved on that copy.
+- While a file is being made, both buttons are disabled and the pressed one reads the existing working text. After it: the existing "Downloaded: {name}" line, and the existing notices when the spacing was tightened or the CV is over two pages. When it fails: the existing "The file couldn't be created…" line; the dialog stays open for another try.
+- Export is disabled until the copy's CV has loaded (the dialog needs its content).
+- The separate export page stays as it is for the base CV and for existing links to a tailored CV's export (the tailored CV's own page links to it, and it is where the cover letter's files are).
+- The base CV's after-export line reads "Done. Your base CV stays in My CV." (replaces R20's cut for the base CV; the tailored line stays "Good luck with this one.").
+
+**Acceptance tests:**
+- Export opens a dialog with exactly the two download buttons; no link to the export page is left in the score band.
+- Download PDF calls the export with the copy on screen, its job and its template, then shows "Downloaded: {name}". With two language copies and the second one chosen, the export gets the second copy.
+- While the file is being made both buttons are disabled; a second click sends nothing.
+- The export fails: the failure line shows and the buttons work again.
+- Before the CV has loaded, and when it failed to load, Export is disabled.
+- The base CV's export page shows "Done. Your base CV stays in My CV." after a download.
+
+**Out of scope:** the cover letter's files, the AI-guess warning and the template choice in the dialog; changing the export page's layout.
+
+## Task 10: The edited mark also covers re-tailoring and review decisions (API)
+
+---
+files: [apps/api/src/tailor/repo.ts, apps/api/src/tailor/supabase-repo.ts, apps/api/src/tailor/memory-repo.ts, apps/api/src/tailor/retailor.ts, apps/api/src/tailor/review-item.ts, apps/api/test/tailored.test.ts, apps/api/test/tailor-retailor.test.ts, apps/api/test/jobs.test.ts]
+new_files: []
+deps: false
+size: 60
+tests: normal
+---
+
+**Goal:** Task 2, open b. `score_stale` ("Edited since last score") is set whenever the copy's wording changes without a new score:
+- when a re-tailor puts the copy back to the base wording before its steps are accepted again;
+- when a guided-review decision changes the copy's content (Remove or Edit; Keep changes no wording and leaves the mark alone).
+It clears as today when a tailored score is saved (an accepted step, Re-check). No migration: the column exists.
+
+**Acceptance tests:**
+- A review decision Remove or Edit on a copy with a current score → `GET /v1/jobs/:id/score` has `stale: true` and still the old number. Keep → `stale` stays false.
+- A re-tailor that resets the copy to the base wording → `stale: true`. Accepting a step afterwards → `stale: false`.
+- The Supabase repo's save writes `score_stale: true` only when asked to.
+
+**Out of scope:** scoring logic; re-scoring by itself; the web (it already shows the mark).
+
+## Task 11: A placeholder while the first score answer loads (web)
+
+---
+files: [apps/web/src/jobs/JobPage.tsx, apps/web/src/jobs/job-page.test.tsx]
+new_files: []
+deps: false
+size: 40
+tests: normal
+---
+
+**Goal:** end-of-run open item 1. While a ready job's score answer is loading for the first time, the area under the header shows the page's loading placeholder instead of the untailored layout with "Tailor my CV". When the answer arrives the page shows the tailored or the untailored layout. The owner accepted that an untailored job's page shows the placeholder for that moment too. Unchanged: the header (title, facts, status), a language switch keeps the previous answer on screen (R15), and a score answer that fails to load shows the untailored layout with its existing "Couldn't load your match score" state and Try again.
+
+**Acceptance tests:**
+- While the score answer is on its way: the header and a loading placeholder show; no "Tailor my CV", no must-haves, no score band.
+- It arrives with `hasTailoredCv: true` → the tailored layout; with false → today's layout.
+- It fails → today's layout with the load error and Try again.
+- Choosing another language keeps the first copy's score and CV on screen until the second arrives (existing test stays green).
+
+**Out of scope:** jobs that are still being read, failed or need text; the Jobs list.
+
+## Task 12: Remove the unused list of all tailored CVs (API)
+
+---
+files: [apps/api/src/tailor/tailored-routes.ts, apps/api/src/tailor/repo.ts, apps/api/src/tailor/supabase-repo.ts, apps/api/src/tailor/memory-repo.ts, apps/api/test/tailored.test.ts]
+new_files: []
+deps: false
+size: 60
+tests: light
+---
+
+**Goal:** Task 7, open a. `GET /v1/tailored` (every tailored CV of the person, for the removed My CVs page) has no caller left: not the web, not the browser extension (`apps/extension`), nothing else in the repo (checked 2026-11-13). Remove the route, the repo function `listAllTailoredCvs` in all three repo files and its `TailoredCvListItem` type, and its test. `GET /v1/jobs/:id/tailored` and every `/v1/tailored/:id...` route stay.
+
+**Acceptance tests:**
+- `GET /v1/tailored` answers 404 like any unknown address (with a login).
+- `GET /v1/jobs/:id/tailored` still lists the job's copies (existing test).
+
+**Out of scope:** any other route.
+
+## Task 13: Preview check of the follow-up
+
+No code. In the owner's Chrome (not the built-in browser pane), local database, desktop width and 375 px: the language switch (the owner approved creating one second-language test copy locally and the one AI call it needs) and the Continue tailoring state, plus Tasks 8 to 11: the list label, the export dialog, the edited mark after a review decision, the placeholder. No sideways scrolling, nothing overlapping.
