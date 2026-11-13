@@ -171,7 +171,7 @@ open: none
 
 ## Task 13: Preview check of the follow-up — done
 session: Build tailored job flow, part 3 · builder: claude
-commit: (the R31 fix and this block, see the log) · reviews: covered by the whole-branch review · fix rounds: 1 (R31) · guard denials: 0
+commit: 519caf2 (base 7a497ee) · reviews: covered by the whole-branch review · fix rounds: 1 (R31) · guard denials: 0
 
 Where: the owner's Chrome (Claude in Chrome), this branch's server (launch entry `resumora-tailored-job`), local database, 13 Nov. Docker Desktop and the local database were not running; started both (no reset; `supabase migration up` found nothing to add). Desktop width = the Chrome window as it was (2276 px wide page); 375 px = a 375 px frame of the same address inside the tab, as last time.
 
@@ -192,3 +192,19 @@ Not seen in the browser, with the reason:
 
 Left behind on this machine: four test downloads in the Downloads folder (two PDFs ending in "(4)" and "(5)", two Word files), and Docker Desktop running.
 open: the three checks above, for the owner to do or to approve the data they need.
+
+## End of run, follow-up (2026-11-13)
+
+Tip `519caf2` (plus this block's commit), base `c0a7cff`. Nothing pushed yet: waiting for the owner's yes.
+
+- Checks on `519caf2`: typecheck clean, lint clean. Tests: shared 446, API 829 (4 skipped), extension 229, web 1116, all pass. In the full run, while two review agents and Docker were working, 8 web tests timed out at 5 s (the six editor typing tests and two Jobs list paging tests); the web suite alone on a quiet machine: 81 files, 1116 tests, all pass.
+- Whole-branch review (fresh Opus agent, effort high, `c0a7cff..519caf2`, brief = Tasks 8 to 13 plus R24 to R31): no findings, verdict pass. One whole-branch review used of the two allowed.
+- Security review (fresh Opus agent, effort high, the API changes since `c0a7cff`): no findings, verdict pass. It checked cross-user access on `PATCH /v1/tailored/:id/review` and `POST /v1/tailor-runs/:id/steering`, that `score_stale` can only be written on the caller's own row (row-level security on the update, the same check in the memory repo), the login check in front of every `/v1` route, the removed address falling through to the plain not-found answer, and the two bodies' validation. No migration and no policy changed in this range.
+- Fix rounds: one, from the preview check (R31), covered by the whole-branch review.
+
+Open, for the owner:
+1. Three things were not seen in a browser because the local data has no such case (Task 13 block): the "Can't be tailored yet" label, "Edited since last score" after a guided-review decision, and Continue tailoring. They have unit or API tests.
+2. R28, still to confirm: "Tailor again" on picked steps sets no edited mark when it starts.
+3. The push to `feat/tailored-job-flow` (PR 60 stays a draft). Not in this run: a migration on the hosted database, a merge.
+
+Cost: weekly usage 35% → 36% (all models), 67% → 69% (Fable) over this session · review agents: 3 (1 Sonnet, 2 Opus) · guard denials: 0 · one refusal by the session's permission check (a review decision sent straight to the API) · context used: about 235k of 1M tokens (23%).
