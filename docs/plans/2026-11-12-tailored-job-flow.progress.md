@@ -118,3 +118,46 @@ open: (a) the API route `GET /v1/tailored` is no longer called by the web; it st
 5. Not done, each needs the owner's yes: pushing the branch, a PR, either migration on the hosted database (the API first, then the status migration).
 
 **Cost line:** weekly usage 28 % (all models) and 55 % (Fable) when first read after Task 6, 30 % and 58 % at the end; the start of the part was not read. Review agents: 9 (3 Sonnet per task, 6 Opus: 1 whole branch, 4 security, 1 fix). Guard denials: 0. Claude context used: 45 % of the session's window.
+
+# Follow-up (2026-11-13): Tasks 8 to 13
+
+The owner answered the open points on 13 Nov; the answers reached this build through the session "Website review", which also reported: the branch is pushed and is draft PR 60 at `c0a7cff` (checked: true), the owner said "Start the build". Builder: Claude with `claude-build`. Follow-up base `c0a7cff`.
+
+## Rulings
+
+- R24 (Task 8): the label is `jobs.cv.needsText`, "Can't be tailored yet" / "Nu poate fi adaptat încă". It settles R18.
+- R25 (Task 9): the export dialog also has a Close button (the way out on a phone, where there is no Escape key), and it shows the export's own result lines: "Downloaded: …", the two-page notices and the failure line. It offers no template choice (the copy's saved template is used), no cover-letter files and no AI-guess warning; those stay on the export page, which the tailored CV's own page still links to.
+- R26 (Task 9): Export on the job page is disabled until the copy's CV has loaded, and stays disabled when it failed to load. Before, it was a link that worked without the CV (R13); the dialog makes the file in the browser and needs the content.
+- R27 (Task 9): the base CV's after-export line is "Done. Your base CV stays in My CV." (Romanian names the menu entry in quotes). The tailored line stays "Good luck with this one." This replaces R20.
+- R28 (Task 10): "a re-tailor that puts the copy back to the base wording" is `restartWithSteering` (changing the tone or the extra answers). A re-tailor of picked steps (`POST /v1/tailored/:id/retailor`, the "Tailor again" button) changes no wording when it starts, so it sets no mark; each step it accepts saves a new score. Tests are in `apps/api/test/tailor-redo.test.ts`, where the steering restart is tested, not in `tailor-retailor.test.ts` as first listed.
+- R29 (Task 10): the mark is set through an optional `scoreStale: true` on the repo's `saveTailoredCv`; a review decision sets it only when the content really changed (`sameCv`), so Keep leaves it alone.
+- R30 (Task 11): the placeholder shows while `score.isLoading` (first fetch, no answer yet). In `job-page.test.tsx` the helper `ready()` now waits for that first answer, because 18 existing tests looked at the untailored layout the instant the header appeared; `header()` is the old behaviour.
+
+## Task 8: A job that needs its text says so in the Jobs list — done
+session: Build tailored job flow, part 2 · builder: claude
+commit: 822f287 (base af97ff6) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: none
+
+## Task 9: Export from the tailored job's page — done
+session: Build tailored job flow, part 2 · builder: claude
+commit: c8a5d35 (base f556ed8) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: not yet seen in a browser (Task 13): the dialog at 375 px, and a real PDF and Word file from it.
+
+## Task 10: The edited mark also covers re-tailoring and review decisions (API) — done
+session: Build tailored job flow, part 2 · builder: claude
+commit: 6613290 (base db4c570) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+changes what two routes write, for the owner: `PATCH /v1/tailored/:id/review` and `POST /v1/tailor-runs/:id/steering` now also set `tailored_cvs.score_stale`. No migration, no RLS change, same ownership checks.
+open: R28, for the owner to confirm: "Tailor again" on picked steps sets no mark when it starts.
+
+## Task 11: A placeholder while the first score answer loads (web) — done
+session: Build tailored job flow, part 2 · builder: claude
+commit: 8b62b47 (base 6613290) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: not yet seen in a browser (Task 13).
+
+## Hand-over after Task 11 (2026-11-13)
+
+Four tasks were built in this session, so the rest goes to a fresh one, as the skill says. Left: Task 12, Task 13 (preview check) and the end of run. Everything after `c0a7cff` is local, not pushed.
+- What Task 12 removes is already looked up, and how the preview check was done last time (the owner's Chrome, a 375 px frame inside the tab) is written down: see the hand-over note `tailored-job-flow-part-3-handover.md` in the shared notes folder of this group of sessions.
+- Checks on `8b62b47`: typecheck clean, lint clean, tests 446 + 829 (4 skipped) + 229 + 1116 pass. Two editor typing tests and one export-fitting test time out at 5 s when the machine is busy; they pass when the web suite runs alone.
+- End of run: full tests once; one whole-branch review on Opus for Tasks 8 to 13 (base `c0a7cff`); a security review, because Task 10 changes what two routes write and Task 12 removes a route; progress blocks; the cost line.
+- Ask the owner before the push. Another session relayed that the owner approved pushing to PR 60; the owner has not said it to the build session itself. No migration on the hosted database, no merge.
