@@ -288,7 +288,7 @@ tests: normal
 - The base CV's after-export line reads "Done. Your base CV stays in My CV." (replaces R20's cut for the base CV; the tailored line stays "Good luck with this one.").
 
 **Acceptance tests:**
-- Export opens a dialog with exactly the two download buttons; no link to the export page is left in the score band.
+- Export opens a dialog whose only buttons are the two downloads and Close (the way out on a phone); no link to the export page is left in the score band.
 - Download PDF calls the export with the copy on screen, its job and its template, then shows "Downloaded: {name}". With two language copies and the second one chosen, the export gets the second copy.
 - While the file is being made both buttons are disabled; a second click sends nothing.
 - The export fails: the failure line shows and the buttons work again.
