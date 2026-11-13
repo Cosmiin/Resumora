@@ -195,7 +195,7 @@ open: the three checks above, for the owner to do or to approve the data they ne
 
 ## End of run, follow-up (2026-11-13)
 
-Tip `519caf2` (plus this block's commit), base `c0a7cff`. Nothing pushed yet: waiting for the owner's yes.
+Tip `519caf2` (plus this block's commit, `240f6ee`), base `c0a7cff`. Pushed on 13 Nov after the owner said "Yes, push" in the build session; PR 60 is still a draft.
 
 - Checks on `519caf2`: typecheck clean, lint clean. Tests: shared 446, API 829 (4 skipped), extension 229, web 1116, all pass. In the full run, while two review agents and Docker were working, 8 web tests timed out at 5 s (the six editor typing tests and two Jobs list paging tests); the web suite alone on a quiet machine: 81 files, 1116 tests, all pass.
 - Whole-branch review (fresh Opus agent, effort high, `c0a7cff..519caf2`, brief = Tasks 8 to 13 plus R24 to R31): no findings, verdict pass. One whole-branch review used of the two allowed.
@@ -205,6 +205,6 @@ Tip `519caf2` (plus this block's commit), base `c0a7cff`. Nothing pushed yet: wa
 Open, for the owner:
 1. Three things were not seen in a browser because the local data has no such case (Task 13 block): the "Can't be tailored yet" label, "Edited since last score" after a guided-review decision, and Continue tailoring. They have unit or API tests.
 2. R28, still to confirm: "Tailor again" on picked steps sets no edited mark when it starts.
-3. The push to `feat/tailored-job-flow` (PR 60 stays a draft). Not in this run: a migration on the hosted database, a merge.
+3. Not in this run: a migration on the hosted database, a merge. (The push is done.)
 
 Cost: weekly usage 35% → 36% (all models), 67% → 69% (Fable) over this session · review agents: 3 (1 Sonnet, 2 Opus) · guard denials: 0 · one refusal by the session's permission check (a review decision sent straight to the API) · context used: about 235k of 1M tokens (23%).
