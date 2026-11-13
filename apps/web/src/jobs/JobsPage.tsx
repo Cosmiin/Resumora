@@ -179,7 +179,8 @@ function JobsList({ userId }: { userId: string }) {
                           : languages.length > 0 ? <><span className="ui-pill ui-pill--good">{t("jobs.pill.tailored")}</span><span className="ui-small">{languages.map((code) => code.toUpperCase()).join(", ")}</span></>
                           : ready ? <span className="ui-small">{t("jobs.cv.base")}</span>
                           : reading ? <><span className="jobs-spinner" aria-hidden="true" /><span className="ui-small ui-muted">{t("jobs.cv.reading")}</span></>
-                          : job.status === "failed" ? <span className="ui-pill ui-pill--bad">{t("jobs.badge.failed")}</span> : null;
+                          : job.status === "failed" ? <span className="ui-pill ui-pill--bad">{t("jobs.badge.failed")}</span>
+                          : job.status === "needs_text" ? <span className="ui-small">{t("jobs.cv.needsText")}</span> : null;
                         return (
                           <li key={job.id} className="jobs-row">
                             <div className="jobs-cell-job">

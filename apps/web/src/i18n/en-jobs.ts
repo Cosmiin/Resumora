@@ -9,6 +9,7 @@ export const jobsEn = {
   "jobs.loadMore": "Load more",
   "jobs.cv.reading": "Reading the ad",
   "jobs.cv.base": "Base CV",
+  "jobs.cv.needsText": "Can't be tailored yet",
   "jobs.cv.tailoring": "Tailoring, step {n} of {total}",
   "jobs.col.job": "Job",
   "jobs.col.score": "Score",

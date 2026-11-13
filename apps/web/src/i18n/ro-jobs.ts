@@ -12,6 +12,7 @@ export const jobsRo: Record<keyof typeof jobsEn, string> = {
   "jobs.loadMore": "Încarcă mai multe",
   "jobs.cv.reading": "Citim anunțul",
   "jobs.cv.base": "CV de bază",
+  "jobs.cv.needsText": "Nu poate fi adaptat încă",
   "jobs.cv.tailoring": "Adaptare, pasul {n} din {total}",
   "jobs.col.job": "Job",
   "jobs.col.score": "Scor",

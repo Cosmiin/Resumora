@@ -171,6 +171,23 @@ describe("jobs list", () => {
       expect(getRun).not.toHaveBeenCalled();
     });
 
+    it("says a job that still needs its text can't be tailored yet, and keeps Couldn't read for a failed one", async () => {
+      vi.mocked(listJobs).mockResolvedValue(page([
+        { ...job, id: "n", title: "Needs text", status: "needs_text", score: null, tailoredLanguages: [] },
+        { ...job, id: "f", title: "Failed one", status: "failed", score: null, tailoredLanguages: [] },
+      ]));
+      renderJobs();
+      const needs = within(await row("Needs text"));
+      expect(needs.getByText("Can't be tailored yet")).toBeInTheDocument();
+      expect(needs.getByRole("link", { name: "View job" })).toHaveAttribute("href", "/jobs/n");
+      expect(needs.queryByText("Base CV")).toBeNull();
+      expect(needs.queryByText("Not applied")).toBeNull();
+      expect(needs.queryByText(/\bad\b/i)).toBeNull();
+      const failed = within(await row("Failed one"));
+      expect(failed.getByText("Couldn't read")).toBeInTheDocument();
+      expect(failed.queryByText("Can't be tailored yet")).toBeNull();
+    });
+
     it("names each cell for a screen reader and hides the header row from it", async () => {
       vi.mocked(listJobs).mockResolvedValue(page([{ ...job, score: 84, tailoredLanguages: ["en"], applicationStatus: "applied" }]));
       renderJobs();
