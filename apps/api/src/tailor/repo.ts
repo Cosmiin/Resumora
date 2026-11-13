@@ -77,8 +77,12 @@ export interface TailorRepo {
   createTailoredCv(input: NewTailoredCv): Promise<string | "exists">;
   /** The tailored CV's content, review state and version; null when gone. */
   getTailoredCv(id: string): Promise<StoredTailoredCv | null>;
-  /** Saves when the version still matches, then bumps it. */
-  saveTailoredCv(id: string, expectedVersion: number, changes: { content: CvContent; review: Review; score: MatchScore | null }): Promise<"ok" | "conflict">;
+  /**
+   * Saves when the version still matches, then bumps it. `scoreStale: true` also marks the copy as edited since its
+   * last score: for a save that changes the wording without scoring it (a review decision, a reset to the Base wording).
+   */
+  saveTailoredCv(id: string, expectedVersion: number,
+    changes: { content: CvContent; review: Review; score: MatchScore | null; scoreStale?: true }): Promise<"ok" | "conflict">;
   /** The job's tailored CVs (all languages), oldest first. */
   listTailoredCvs(jobId: string): Promise<TailoredCvSummary[]>;
   /** Every tailored CV the person has, newest change first, each with whether its newest run is still open. */

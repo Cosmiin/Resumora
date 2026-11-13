@@ -113,7 +113,9 @@ export function memoryTailorRepo(userId: string, store: MemoryTailorStore = new 
     async saveTailoredCv(id, expectedVersion, changes) {
       const cv = docs.cvs.get(id);
       if (!cv || cv.userId !== userId || cv.version !== expectedVersion) return "conflict";
-      Object.assign(cv, structuredClone(changes), { version: cv.version + 1, updatedAt: new Date().toISOString() });
+      const { scoreStale, ...saved } = changes;
+      Object.assign(cv, structuredClone(saved), { version: cv.version + 1, updatedAt: new Date().toISOString() });
+      if (scoreStale) docs.scoreStale.add(id);
       return "ok";
     },
     async latestRun(tailoredCvId) {

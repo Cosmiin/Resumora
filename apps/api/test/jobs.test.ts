@@ -269,6 +269,25 @@ describe("the score of one tailored copy", () => {
     expect((await tailor("user-b").summaries([jobId])).get(jobId)).toEqual({ score: null, tailoredLanguages: [] });
   });
 
+  it("the Supabase save writes the edited mark only when asked to", async () => {
+    const env = { SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "public-key" };
+    const sent: Array<Record<string, unknown>> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_input: string, init?: RequestInit) => {
+      sent.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return Response.json([{ id: "cv" }]);
+    }));
+    try {
+      const repo = supabaseTailorRepo(env, { id: "a", token: "user-token" });
+      const changes = { content: emptyCv("en"), review: {}, score: null };
+      expect(await repo.saveTailoredCv("cv", 1, changes)).toBe("ok");
+      expect(await repo.saveTailoredCv("cv", 2, { ...changes, scoreStale: true })).toBe("ok");
+      expect(sent[0]).not.toHaveProperty("score_stale");
+      expect(sent[1]).toMatchObject({ score_stale: true, version: 3 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("asks the database the same number of questions for 20 jobs as for 1", async () => {
     const env = { SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "public-key" };
     const idsIn = (url: URL, column: string) => (url.searchParams.get(column) ?? "").replace(/^in\.\(|\)$/g, "").split(",").map((id) => id.replace(/"/g, ""));

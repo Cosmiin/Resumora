@@ -134,7 +134,7 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
     async saveTailoredCv(id, expectedVersion, changes) {
       const { data, error } = await db.from("tailored_cvs").update({
         content: changes.content, review: changes.review, score: changes.score,
-        version: expectedVersion + 1, updated_at: new Date().toISOString(),
+        version: expectedVersion + 1, updated_at: new Date().toISOString(), ...(changes.scoreStale ? { score_stale: true } : {}),
       }).eq("id", id).eq("version", expectedVersion).select("id");
       if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
       return data.length > 0 ? "ok" : "conflict";

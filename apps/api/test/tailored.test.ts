@@ -168,6 +168,38 @@ describe("PATCH /v1/tailored/:id/review (guided review)", () => {
     expect(cv.version).toBe(version + 1);
   });
 
+  describe("the edited mark (score_stale)", () => {
+    const scored = { policy: "match/1" as const, total: 84, band: "strong" as const, capped: false, labels: [],
+      parts: { requirements: null, keywords: null, seniority: null, langEdu: null } };
+    /** A seeded copy whose score is current, and how its job's score answer reads. */
+    async function current() {
+      const { id, version } = await seeded();
+      const jobId = docs.cvs.get(id)!.jobId;
+      await memoryTailorRepo("user-a", new Map(), docs).saveScore(jobId, "tailored", id, scored);
+      const answer = async () => await (await app.request(`/v1/jobs/${jobId}/score`, { headers: auth() })).json() as { stale: boolean; tailored: { total: number } | null };
+      expect(await answer()).toMatchObject({ stale: false, tailored: { total: 84 } });
+      return { id, version, answer };
+    }
+
+    it("Remove changes the wording, so the score reads as edited since, with its old number", async () => {
+      const { id, version, answer } = await current();
+      expect((await review(id, { section: "experience", key: bullet, action: "remove", version })).status).toBe(200);
+      expect(await answer()).toMatchObject({ stale: true, tailored: { total: 84 } });
+    });
+
+    it("Edit changes the wording too", async () => {
+      const { id, version, answer } = await current();
+      expect((await review(id, { section: "summary", key: "summary#0", action: "edit", text: "who led teams abroad", version })).status).toBe(200);
+      expect(await answer()).toMatchObject({ stale: true, tailored: { total: 84 } });
+    });
+
+    it("Keep changes no wording and leaves the mark alone", async () => {
+      const { id, version, answer } = await current();
+      expect((await review(id, { section: "skills", key: "new-skill:BPMN", action: "keep", version })).status).toBe(200);
+      expect(await answer()).toMatchObject({ stale: false, tailored: { total: 84 } });
+    });
+  });
+
   it("Remove and Edit work on a guessed project bullet too (E6 Task 9)", async () => {
     const { id, version } = await seeded();
     const project = { ...role, id: "00000000-0000-4000-8000-0000000000a2", title: "Payroll checker", company: "Personal project", url: "",
