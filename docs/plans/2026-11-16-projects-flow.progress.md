@@ -27,5 +27,5 @@ open: Ruling: `sections-path.test.tsx` (outside the scope list) was brought back
 
 ## Task 6: Tailoring a project — done
 session: Build projects flow (Tasks 1–4, continued here for 5–6) · builder: claude
-commit: SHA6 (base 9f0a78b) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+commit: 086285b (base 9f0a78b) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: Ruling: three older API tests outside the scope list (`test/tailor-projects.test.ts` ×2, `test/tailor-questions.test.ts` ×1) expected tailoring questions about a project; they now check that a project gets none (the volunteering cases are unchanged). The two-bullet cap is applied after the "removed" count, so dropped extra bullets are not reported as failed checks.
