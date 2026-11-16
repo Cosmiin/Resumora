@@ -1,6 +1,7 @@
 import {
   MAX_ACHIEVEMENTS,
   MAX_BULLETS,
+  MAX_PROJECT_BULLETS,
   MAX_ITEMS,
   MAX_JOB_NOTES,
   MAX_NOTES,
@@ -67,6 +68,8 @@ export type CvAction =
   | { type: "addCustomSection"; id: string; title: string }
   | { type: "replaceBullet"; roleId: string; bulletId: string; text: string }
   | { type: "addBullets"; roleId: string; texts: string[] }
+  /** A project's approved lines: every bullet is replaced by these (new ids, at most two). Projects only. */
+  | { type: "setProjectLines"; itemId: string; texts: string[] }
   /** Lines picked for a course, award, publication or interest in the guided path (3B). */
   | { type: "addLines"; list: LineList; itemId: string; texts: string[] }
   /** Hides a course, award, publication or interest on this CV (kept in the data), or shows it again. */
@@ -313,6 +316,11 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (!bullets || !action.texts.length || bullets.length >= MAX_BULLETS) return cv;
       const added = action.texts.slice(0, MAX_BULLETS - bullets.length).map((text) => ({ id: newId(), text }));
       return withBullets(cv, owner, [...bullets, ...added]);
+    }
+    case "setProjectLines": {
+      const texts = action.texts.map((text) => text.trim()).filter(Boolean).slice(0, MAX_PROJECT_BULLETS);
+      if (!texts.length || !cv.projects.some((p) => p.id === action.itemId)) return cv;
+      return { ...cv, projects: cv.projects.map((p) => (p.id === action.itemId ? { ...p, bullets: texts.map((text) => ({ id: newId(), text })) } : p)) };
     }
     case "addLines": {
       const owner = { list: action.list, itemId: action.itemId };

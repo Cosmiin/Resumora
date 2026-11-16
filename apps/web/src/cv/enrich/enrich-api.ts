@@ -2,6 +2,10 @@ import { z } from "zod";
 import {
   BrainDumpAnswerSchema,
   ItemLinesAnswerSchema,
+  ProjectQuestionsAnswerSchema,
+  ProjectWriteAnswerSchema,
+  type ProjectQuestionsAnswer,
+  type ProjectWriteAnswer,
   type ItemLinesAnswer,
   type ItemLinesBody,
   ImproveAnswerSchema,
@@ -164,4 +168,14 @@ export function suggestAchievements(): Promise<AchievementsAnswer> {
 /** Suggested lines for one saved course, award, publication or interest (3B); none means skip the picks. */
 export function itemLines(input: ItemLinesBody): Promise<ItemLinesAnswer> {
   return apiFetch("/v1/enrich/item-lines", { method: "POST", json: input, schema: ItemLinesAnswerSchema });
+}
+
+/** Up to 6 questions about one saved project, each with options to tick. */
+export function projectQuestions(projectId: string): Promise<ProjectQuestionsAnswer> {
+  return apiFetch("/v1/enrich/project-questions", { method: "POST", json: { projectId }, schema: ProjectQuestionsAnswerSchema });
+}
+
+/** One description sentence, at most two bullets and the extra tools for one saved project, from its own text and answers. */
+export function projectWrite(projectId: string): Promise<ProjectWriteAnswer> {
+  return apiFetch("/v1/enrich/project-write", { method: "POST", json: { projectId }, schema: ProjectWriteAnswerSchema });
 }

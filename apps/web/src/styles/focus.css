@@ -175,6 +175,14 @@
 .improve-btn:hover { transform: scale(1.08); }
 .improve-btn:focus-visible { outline: var(--focus-width) solid var(--color-coach); outline-offset: 2px; }
 @media (hover: none) { .improve-btn { opacity: 0.75; } }
+/* ✨ beside a project's name: always shown (a project has no score pill to open its flow). */
+.project-describe {
+  flex: none; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 1px solid var(--color-line);
+  border-radius: 50%; background: var(--color-paper); font-size: 13px; cursor: pointer;
+}
+.project-describe:hover { transform: scale(1.08); }
+.project-describe:focus-visible { outline: var(--focus-width) solid var(--color-coach); outline-offset: 2px; }
+.rr-tools { display: grid; gap: var(--space-2); }
 .stand-out-hint { margin: 0; font-size: var(--text-small); font-weight: var(--weight-bold); color: #14553a; }
 
 /* How should we introduce this role? */

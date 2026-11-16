@@ -26,6 +26,7 @@ import { useRoleScores } from "./enrich/useRoleScores.ts";
 import { FocusOpenProvider, type FocusTarget } from "./enrich/focus-context.ts";
 import { FocusMode } from "./enrich/FocusMode.tsx";
 import { RoleRun } from "./enrich/RoleRun.tsx";
+import { ProjectRun, isProjectTarget } from "./enrich/ProjectRun.tsx";
 import { EnrichPath } from "./enrich/EnrichPath.tsx";
 import { PathSteps } from "./enrich/PathStart.tsx";
 import { CvFacts, isBlankCv, useStartTemplate } from "./CvFacts.tsx";
@@ -396,7 +397,11 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
         <EnrichPath cv={content} dispatch={dispatch} scores={roleScores.scores} waitForSave={waitForSave} onClose={closePath} onScore={roleScores.put} />
       )}
       {/* A whole role to improve gets the run of questions; one bullet (✨) and "Make it stand out" keep the short flow. */}
-      {focusTarget && !focusTarget.bulletId && focusTarget.mode === "improve" && !historyOpen && !isTailored && (
+      {/* A project gets its own short flow instead of the role run. */}
+      {focusTarget && isProjectTarget(content, focusTarget) && !historyOpen && !isTailored && (
+        <ProjectRun key={focusTarget.roleId} target={focusTarget} cv={content} dispatch={dispatch} waitForSave={waitForSave} onClose={closeFocus} />
+      )}
+      {focusTarget && !focusTarget.bulletId && focusTarget.mode === "improve" && !isProjectTarget(content, focusTarget) && !historyOpen && !isTailored && (
         <RoleRun key={focusTarget.roleId} target={focusTarget} cv={content} dispatch={dispatch} scores={roleScores.scores} waitForSave={waitForSave} onClose={closeFocus} onScore={roleScores.put} />
       )}
       {focusTarget && (focusTarget.bulletId || focusTarget.mode !== "improve") && !historyOpen && !isTailored && (

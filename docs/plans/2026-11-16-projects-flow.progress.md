@@ -12,5 +12,10 @@ open: The database's AI-call log only accepts listed task names; `project_questi
 
 ## Task 3: Project writer (API) — done
 session: Build projects flow (Tasks 1–4) · builder: claude
-commit: SHA3 (base 7e8f906) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+commit: b584283 (base 7e8f906) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: Ruling: the tense check (retry, then drop) looks at the bullets only. The English check calls any line that doesn't open with a past verb "present", so it would wrongly reject a description like "A Make flow that…"; the prompt asks for the description to name the thing, not open with a verb. Reviewer (low): a Romanian description opening with a present verb would get through.
+
+## Task 4: The project run (web) — done
+session: Build projects flow (Tasks 1–4) · builder: claude
+commit: SHA4 (base b584283) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
+open: Ruling: after Task 1 no project had a button to open a run any more (it used to be the score pill), so a ✨ "Describe this project" button sits beside each project's name (`RoleItem.tsx`, outside the scope list). Fix round (reviewer, low): the questions are asked only after the CV is saved, so a project added a moment ago is found. Not checked in the running app (no secrets in the worktree); covered by tests only.
