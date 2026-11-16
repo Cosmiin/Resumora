@@ -26,3 +26,11 @@ rename would still be offered. Fixed (both now count) and reviewed on its own.
   role run (flow B) offers Yes / Edit.
 
 Cost line: review agents 4 (2 Sonnet, 2 Opus) · guard denials 0 · no Codex.
+
+## Published on 2026-11-17 (owner asked)
+- Worker `resumora-api` and the Pages project `resumora` (https://resumora.pages.dev), from a local build of
+  `feat/go-live` + `feat/mobile-fluid` + this branch (merge `f09b746`, on no branch, not pushed), so the live site
+  keeps both open PRs' changes. No database change.
+- Checked in the owner's Chrome: Staffing Manager · Robert Half shows the proposal with Yes / Edit.
+- Seen: Elias Custom Metal Fabrication (small firm) also got a proposal, "manufactures custom metal products",
+  read from the name rather than known. Open, for the owner.
