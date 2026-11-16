@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { LIGHT_SECTIONS, findScored, newId, scoredItems, type CvContent, type LightSection, type RoleResult, type ScoredKind, type SkillGroup } from "@resumora/shared";
+import { LIGHT_SECTIONS, findScored, gradedItems, newId, type CvContent, type LightSection, type RoleResult, type ScoredKind, type SkillGroup } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { AchievementsPick } from "./AchievementsPick.tsx";
@@ -54,8 +54,8 @@ type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "ligh
 export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore }: Props) {
   // The roles below 80 and each role's score are read live on the start screen (stored scores may still be
   // loading, e.g. from "/cv?enrich=1") and fixed when the path starts.
-  // Roles, then projects, then volunteering (CV order within each), each below 80.
-  const below = scoredItems(cv).filter(({ item }) => belowTarget(scores.get(item.id))).map(({ item }) => item.id);
+  // Roles, then volunteering (CV order within each), each below 80. Projects have no score.
+  const below = gradedItems(cv).filter(({ item }) => belowTarget(scores.get(item.id))).map(({ item }) => item.id);
   const light = lightStops(cv);
   const [fixed, setFixed] = useState<{ stops: string[]; lights: typeof light; before: Map<string, number | null> } | null>(null);
   const stops = fixed?.stops ?? below;
@@ -63,7 +63,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   const before = fixed?.before ?? new Map<string, number | null>();
   const [stage, setStage] = useState<Stage>({ kind: "start" });
   // The focus step lists every role, strong or not, so the list never shrinks while scores arrive.
-  const items = scoredItems(cv).map((p) => {
+  const items = gradedItems(cv).map((p) => {
     const s = scores.get(p.item.id);
     return { ...p, score: scoreOf(s), scoring: s?.state === "scoring", waiting: s?.state === "scoring" || s?.state === "previous", strong: !belowTarget(s) };
   });
@@ -77,7 +77,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   if (stage.kind === "start") {
     return <PathStart items={items} quick={quick} locale={cv.locale} onNotNow={onClose}
       onStart={(chosen) => {
-        setFixed({ stops: chosen, lights: light, before: new Map(scoredItems(cv).map(({ item }) => [item.id, scoreOf(scores.get(item.id))])) });
+        setFixed({ stops: chosen, lights: light, before: new Map(gradedItems(cv).map(({ item }) => [item.id, scoreOf(scores.get(item.id))])) });
         if (chosen.length) setStage({ kind: "role", index: 0 });
         else setStage(light.length ? { kind: "light", index: 0 } : { kind: "achievements" });
       }} />;
@@ -162,7 +162,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
 }
 
 /**
- * The CV's strength: the average of every score given (roles, projects and volunteering with a score), rounded;
+ * The CV's strength: the average of every score given (roles and volunteering with a score; projects have none), rounded;
  * null when none has one. With weights, a recent role counts more than the rest.
  */
 export function averageScore(scores: ReadonlyMap<string, number | null>, weights?: ReadonlyMap<string, number>): number | null {
@@ -189,9 +189,9 @@ function EndStop({ cv, scores, waitForSave, before, stops, lights, achievementsA
   lights: { section: LightSection; itemId: string }[]; achievementsAdded: number; skillsAdded: number; notice: ReactNode; dispatch(a: CvAction): void; onClose(): void; onImprove(roleId: string): void;
 }) {
   const navigate = useNavigate();
-  // Q1: every scored item counts (projects and volunteering only when the CV has them). One still being scored
+  // Q1: every graded item counts (volunteering only when the CV has it; projects never). One still being scored
   // (or waiting for it) would give a wrong average: wait for it.
-  const scored = scoredItems(cv);
+  const scored = gradedItems(cv);
   const settled = scored.every(({ item }) => !["scoring", "previous"].includes(scores.get(item.id)?.state ?? ""));
   const now = new Map(scored.map(({ item }) => [item.id, scoreOf(scores.get(item.id))]));
   const weights = strengthWeights(cv);

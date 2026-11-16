@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router";
 import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
-// The result screen has one row per item (roles, projects and volunteering), then what else the path added.
+// The result screen has one row per graded item (roles and volunteering; projects have no score), then what else the path added.
 
 // Each item's run of questions is replaced by a stub: these tests are about the path around it.
 vi.mock("./RoleRun.tsx", () => ({
@@ -47,7 +47,7 @@ const ready = (score: number): RoleScoreState => ({
 const base: CvContent = {
   ...emptyCv(),
   experience: [item("a", "Analyst"), item("b", "Buyer")],
-  projects: [{ ...item("p", "Route planner", "Personal project"), url: "" }],
+  volunteering: [item("p", "Food bank helper")],
   courses: [{ id: "c1", name: "Excel", provider: "Udemy", date: "" }, { id: "c2", name: "SQL", provider: "", date: "" }],
   interests: [{ id: "i1", name: "Chess" }],
 };
@@ -71,10 +71,10 @@ beforeEach(() => {
   api.itemLines.mockResolvedValue({ lines: ["Pivot tables.", "Dashboards.", "Macros."] });
 });
 
-/** Roles and the project, two lines on the first course, skip the rest, one Key achievement. */
+/** Roles and the volunteering item, two lines on the first course, skip the rest, one Key achievement. */
 async function walk(after: Map<string, RoleScoreState>) {
   const view = render(<Host scores={start} />);
-  await userEvent.click(screen.getByRole("checkbox", { name: /Route planner/ }));
+  await userEvent.click(screen.getByRole("checkbox", { name: /Food bank helper/ }));
   await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
   view.rerender(<Host scores={after} />);
   await userEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -92,16 +92,16 @@ async function walk(after: Map<string, RoleScoreState>) {
 }
 
 describe("the result of the path", () => {
-  it("rows in order: roles, projects and volunteering, then sections with lines added and Key achievements", async () => {
+  it("rows in order: roles and volunteering, then sections with lines added and Key achievements", async () => {
     await walk(new Map([["a", ready(90)], ["b", ready(82)], ["p", ready(86)]]));
     expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
-    // Q1: the project counts toward the average when the CV has one: the latest role counts 3 times, the next twice: (270 + 122 + 50) / 6 → (270 + 164 + 86) / 6.
+    // Q1: volunteering counts toward the average when the CV has it: the latest role counts 3 times, the next twice: (270 + 122 + 50) / 6 → (270 + 164 + 86) / 6.
     expect(screen.getByText("From 74 to 87 out of 100.")).toBeInTheDocument();
     const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent);
     expect(rows).toEqual([
       "0Analyst, Analyst Co already reads clearly, so it had no questions.at 90",
       "+21Buyer, Buyer Cofrom 61 to 82",
-      "+36Route planner, Personal projectfrom 50 to 86",
+      "+36Food bank helper, Food bank helper Cofrom 50 to 86",
       "+Courses & training: 2 lines added", "+Key achievements: 1 added", "+Skills: 1 added",
     ]);
     // Interests had nothing added: no row.
@@ -112,12 +112,12 @@ describe("the result of the path", () => {
   it("below 80 over every scored item: names the lowest item of any kind, and not saved as enriched", async () => {
     await walk(new Map([["a", ready(90)], ["b", ready(82)], ["p", ready(30)]]));
     expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
-    expect(screen.getByText("Route planner is at 30. One more pass would lift it.")).toBeInTheDocument();
+    expect(screen.getByText("Food bank helper is at 30. One more pass would lift it.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Answer more questions" })).toBeInTheDocument();
     expect(dispatched.some((a) => a.type === "markEnriched")).toBe(false);
   });
 
-  it("waits for a project still being scored before deciding", async () => {
+  it("waits for a volunteering item still being scored before deciding", async () => {
     await walk(new Map([["a", ready(90)], ["b", ready(82)], ["p", { state: "scoring" }]]));
     expect(await screen.findByText("Checking your scores…")).toBeInTheDocument();
     expect(dispatched.some((a) => a.type === "markEnriched")).toBe(false);

@@ -368,3 +368,22 @@ describe("the focus step", () => {
     ]);
   });
 });
+
+describe("projects leave the score", () => {
+  const withProject: CvContent = { ...cv, projects: [{ ...role("p", "Forecast app"), url: "" }] };
+  const scores = new Map<string, RoleScoreState>([["a", ready(40)], ["b", ready(61)], ["c", ready(70)], ["d", ready(80)], ["p", ready(10)]]);
+
+  it("the focus step lists no project and its strength ignores a project's old score", async () => {
+    api.suggestAchievements.mockResolvedValue({ suggestions: [] });
+    api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
+    render(<MemoryRouter><EnrichPath cv={withProject} dispatch={() => {}} scores={scores} waitForSave={() => Promise.resolve()} onClose={() => {}} /></MemoryRouter>);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
+    expect(screen.queryByText(/Forecast app/)).toBeNull();
+    await userEvent.click(screen.getByRole("checkbox", { name: /Analyst/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Buyer/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("heading", { name: "Here is where your CV stands" });
+    const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent ?? "");
+    expect(rows.some((r) => r.includes("Forecast app"))).toBe(false);
+  });
+});
