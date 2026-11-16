@@ -88,6 +88,12 @@ describe("pickBudget", () => {
     expect(pickBudget({ items, weights: new Map(), asked: new Set() }).map((b) => b.kind)).toEqual(["role", "line"]);
   });
 
+  it("keeps the same wording on two different lines, but not twice on one line", () => {
+    const items = [{ id: "a", result: result("a", { bullets: [grade("b1", 50), grade("b2", 50)],
+      questions: [lineQ("b1", "What changed?"), lineQ("b2", "What changed?"), lineQ("b2", "What  changed?")] }) }];
+    expect(pickBudget({ items, weights: new Map(), asked: new Set() }).map((b) => b.kind === "line" && b.question.bulletId)).toEqual(["b1", "b2"]);
+  });
+
   it("returns nothing when no role has a score", () => {
     expect(pickBudget({ items: [{ id: "a", result: undefined }], weights: new Map(), asked: new Set() })).toEqual([]);
   });

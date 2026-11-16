@@ -75,11 +75,12 @@ export function pickBudget(input: {
   input.items.forEach(({ id, result }, roleIndex) => {
     if (!result) return;
     const weight = input.weights.get(id) ?? 1;
+    // A role question is asked once per role; a line question once per line (two lines may share a wording).
     const seen = new Set<string>();
-    const fresh = (text: string) => {
+    const fresh = (text: string, line = "") => {
       const key = questionKey(text);
-      if (key === "" || input.asked.has(key) || seen.has(key)) return false;
-      seen.add(key);
+      if (key === "" || input.asked.has(key) || seen.has(`${line}\u0000${key}`)) return false;
+      seen.add(`${line}\u0000${key}`);
       return true;
     };
     let within = 0;
@@ -88,7 +89,7 @@ export function pickBudget(input: {
       candidates.push({ item: { roleId: id, kind: "role", question }, value: ROLE_QUESTION_VALUE * weight, order: roleIndex * 1000 + within++ });
     }
     for (const question of result.questions) {
-      if (!fresh(question.text)) continue;
+      if (!fresh(question.text, question.bulletId)) continue;
       const score = result.bullets.find((b) => b.id === question.bulletId)?.score ?? 0;
       candidates.push({ item: { roleId: id, kind: "line", question }, value: (100 - score) * weight, order: roleIndex * 1000 + 500 + within++ });
     }
