@@ -1,13 +1,12 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { MAX_FOCUS, type Experience, type Locale, type ScoredKind } from "@resumora/shared";
+import type { Experience, Locale, ScoredKind } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { Checkbox } from "../../ui/fields.tsx";
 import { Stepper } from "../../ui/Progress.tsx";
 import { SCORED_LIST, type LineList } from "../edit/lists.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { formatRange } from "../page/blocks.ts";
-import { AnswerBox, type Via } from "./AnswerBox.tsx";
 import { FocusBar } from "./FocusBar.tsx";
 
 export type PathItem = {
@@ -27,10 +26,8 @@ type Props = {
   quick: readonly { section: LineList; count: number }[];
   /** The CV's language, for the dates. */
   locale: Locale;
-  /** The language the person reads and speaks to the app in. */
-  speech: Locale;
-  /** The ids chosen, in path order, and what the person wants their CV to bring out (may be empty). */
-  onStart(chosen: string[], focus: string): void;
+  /** The ids chosen, in path order. */
+  onStart(chosen: string[]): void;
   onNotNow(): void;
 };
 
@@ -45,8 +42,8 @@ export function PathSteps({ current }: { current: number }) {
 
 const nameOf = ({ item, kind }: PathItem) => roleName(item, SCORED_LIST[kind]);
 
-/** The focus step: which roles get the questions, and anything the person wants their CV to bring out. */
-export function PathStart({ items, quick, locale, speech, onStart, onNotNow }: Props) {
+/** The focus step: which roles get the questions. */
+export function PathStart({ items, quick, locale, onStart, onNotNow }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onNotNow();
@@ -79,9 +76,6 @@ export function PathStart({ items, quick, locale, speech, onStart, onNotNow }: P
   }
   const needWork = items.some((p) => !p.strong);
   const toggle = (id: string) => setByHand(new Map(byHand).set(id, !chosen.has(id)));
-  const [focus, setFocus] = useState<{ value: string; via: Via[] }>({ value: "", via: [] });
-  const [voiceBusy, setVoiceBusy] = useState(false);
-  const focusId = useId();
   const picks = items.filter((p) => chosen.has(p.item.id));
   const first = picks[0];
 
@@ -122,24 +116,9 @@ export function PathStart({ items, quick, locale, speech, onStart, onNotNow }: P
             {t("enrich.path.quick", { sections: quick.map((q) => `${t(`enrich.path.section.${q.section}`)} (${q.count})`).join(", ") })}
           </p>
         )}
-        <div className="fm-focus-text">
-          <p className="ui-coach" id={focusId}>{t("enrich.path.focusQuestion")}</p>
-          <AnswerBox
-            question={{ bulletId: "focus", text: t("enrich.path.focusQuestion"), options: [], kind: "detail" }}
-            value={focus.value}
-            via={focus.via}
-            onChange={(value, via) => setFocus({ value: value.slice(0, MAX_FOCUS), via })}
-            locale={speech}
-            plain
-            label={t("enrich.path.focusQuestion")}
-            placeholder={t("enrich.path.focusPlaceholder")}
-            onBusyChange={setVoiceBusy}
-          />
-          <p className="fm-fine">{t("enrich.path.focusOptional")}</p>
-        </div>
         <div className="fm-foot">
           <button type="button" className="fm-ghost" onClick={onNotNow}>{t("enrich.path.notNow")}</button>
-          <button type="button" className="fm-btn" disabled={voiceBusy || (!auto.done && picks.length === 0)} onClick={() => onStart(picks.map((p) => p.item.id), focus.value.trim())}>
+          <button type="button" className="fm-btn" disabled={!auto.done && picks.length === 0} onClick={() => onStart(picks.map((p) => p.item.id))}>
             {first ? t("enrich.path.start", { title: nameOf(first) }) : t("enrich.focus.continue")}
           </button>
         </div>

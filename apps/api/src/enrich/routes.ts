@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
-import { ItemLinesBodySchema, MAX_FOCUS, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
+import { ItemLinesBodySchema, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
 import { z } from "zod";
 import type { AppEnv } from "../app.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -28,10 +28,10 @@ const ScoreBody = z.object({ roleId: z.string().min(1).max(64), fingerprint: z.s
 const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
 /**
  * fresh: ask the model again with the notes in view, instead of returning the stored result.
- * focus: what the person wants their CV to bring out; the model is asked again with it in view.
  * more: every earlier question is answered; the model is asked for more, each with options to pick.
+ * Any other field (such as an older client's `focus`) is dropped by the schema and has no effect.
  */
-const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), focus: z.string().trim().max(MAX_FOCUS).optional(), more: z.boolean().optional() });
+const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), more: z.boolean().optional() });
 const BrainDumpBody = ScoreBody.extend({ source: z.enum(["ramble", "answers"]).default("ramble") });
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */

@@ -17,7 +17,25 @@ describe("startsInPresentTense", () => {
     expect(startsInPresentTense(text, "en")).toBe(false);
   });
 
-  it.each(["ro", "fr", "de", "es", "it"] as const)("skips tense checks for %s", (locale) => {
+  it.each([
+    "Coordonez fluxul de lucru pentru ordinele de achiziție.", "Efectuez raportarea financiară de final de lună.",
+    "Colaborez cu departamentul de contabilitate.", "Gestionez bugetul echipei.", "Pregătesc rapoartele lunare.",
+    "Coordonează fluxul de lucru.", "Gestionează bugetul.", "Pregătește rapoartele.", "  COORDONEZ fluxul",
+    "Verific documentația financiară.", "Conduc echipa de vânzări.", "Asigur conformitatea documentelor.",
+    "Susţin echipa de vânzări.", "Pregăteşte rapoartele.",
+  ])("recognises a Romanian present-tense opening: %s", (text) => {
+    expect(startsInPresentTense(text, "ro")).toBe(true);
+  });
+
+  it.each([
+    "Am coordonat fluxul de lucru.", "am efectuat raportarea.", "Coordonarea fluxului de lucru.",
+    "Philip Morris International este o companie din industria tutunului.", "Responsabil de bugetul echipei.",
+    "Rapoarte lunare pentru 15 departamente.", "Lucrul cu SAP și Excel.", "",
+  ])("accepts a Romanian opening that is not in the present: %s", (text) => {
+    expect(startsInPresentTense(text, "ro")).toBe(false);
+  });
+
+  it.each(["fr", "de", "es", "it"] as const)("skips tense checks for %s", (locale) => {
     expect(startsInPresentTense("Validate compliance with legal teams", locale)).toBe(false);
     expect(startsInPresentTense("Ensured compliance", locale)).toBe(false);
   });

@@ -180,9 +180,9 @@ describe("job changes the re-tailor notice reads", () => {
     await own.admin.finish(id, job);
     const before = (await repoA.get(id))!;
     clock = new Date("2026-11-08T11:00:00Z");
-    expect(await repoA.patch(id, before.version, job, { applicationStatus: "tailored" })).toBe("ok");
+    expect(await repoA.patch(id, before.version, job, { applicationStatus: "applied" })).toBe("ok");
     const afterStatus = (await repoA.get(id))!;
-    expect(afterStatus).toMatchObject({ applicationStatus: "tailored", updatedAt: before.updatedAt, editedByUser: false });
+    expect(afterStatus).toMatchObject({ applicationStatus: "applied", updatedAt: before.updatedAt, editedByUser: false });
     clock = new Date("2026-11-08T12:00:00Z");
     expect(await repoA.patch(id, afterStatus.version, { ...job, title: "Payroll Manager" })).toBe("ok");
     expect((await repoA.get(id))!).toMatchObject({ updatedAt: "2026-11-08T12:00:00.000Z", editedByUser: true });

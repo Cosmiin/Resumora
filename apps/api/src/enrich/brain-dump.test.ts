@@ -106,6 +106,19 @@ describe("POST /v1/enrich/brain-dump", () => {
     expect((await cv.getHistory(history[0]!.id))?.content).toEqual(saved.content);
   });
 
+  it.each([
+    { current: false, endDate: "2019-06", kept: ["Am coordonat fluxul de lucru pentru ordinele de achiziție."] },
+    { current: true, endDate: "", kept: ["Am coordonat fluxul de lucru pentru ordinele de achiziție.", "Coordonez raportarea financiară lunară."] },
+  ])("a Romanian role keeps only lines in its own tense (current: $current)", async ({ current, endDate, kept }) => {
+    Object.assign(role, { current, endDate });
+    await cv.save({ ...emptyCv("ro"), experience: [role] }, (await cv.get()).version);
+    await insights.put(role.id, buildRoleResult(role, allSpecific(role), fingerprint(role, "ro")));
+    answer(["Am coordonat fluxul de lucru pentru ordinele de achiziție.", "Coordonez raportarea financiară lunară."]);
+    const res = await post({ roleId: role.id, fingerprint: fingerprint(role, "ro") });
+    expect(res.status).toBe(200);
+    expect(BrainDumpAnswerSchema.parse(await res.json()).proposals.map((p) => p.text)).toEqual(kept);
+  });
+
   it("keeps four proposals when all pass", async () => {
     expect((await result()).proposals).toEqual(texts.map((text, i) => ({ id: `new${i + 1}`, text, score: 100 })));
     expect(model.requests).toHaveLength(2);

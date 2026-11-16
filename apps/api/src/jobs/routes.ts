@@ -3,7 +3,7 @@ import { z } from "zod";
 import { CreateJobBodySchema, JobListQuerySchema, JobPatchBodySchema, findJobPosting, normalizeJobUrl } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
-import type { TailorRepo } from "../tailor/repo.ts";
+import { jobScore, type TailorRepo } from "../tailor/repo.ts";
 import { scoreMatch } from "../tailor/score.ts";
 import type { AppEnv } from "../app.ts";
 import { ApiError } from "../errors.ts";
@@ -77,7 +77,9 @@ export function jobRoutes(deps: {
     const after = cursor === undefined ? null : decodeJobCursor(cursor);
     if (cursor !== undefined && !after) throw invalid();
     const { items, next } = await deps.repoFor(c).list({ limit, after, source });
-    return c.json({ items, nextCursor: next ? encodeJobCursor(next) : null });
+    // One call for the whole page: each job's list score and the languages it has a tailored CV in.
+    const summaries = await deps.tailorRepoFor(c).summaries(items.map((item) => item.id));
+    return c.json({ items: items.map((item) => ({ ...item, ...summaries.get(item.id) })), nextCursor: next ? encodeJobCursor(next) : null });
   });
 
   app.get("/:id", async (c) => {
@@ -90,9 +92,8 @@ export function jobRoutes(deps: {
   app.get("/:id/score", async (c) => {
     const id = c.req.param("id");
     if (!isUuid(id) || !(await deps.repoFor(c).get(id))) throw notFound();
-    const tailor = deps.tailorRepoFor(c);
-    const [base, tailored] = await Promise.all([tailor.getScore(id, "base"), tailor.getScore(id, "tailored")]);
-    return c.json({ base, tailored });
+    // ?cv= picks one of the job's tailored CVs; anything else counts as absent.
+    return c.json(await jobScore(deps.tailorRepoFor(c), id, c.req.query("cv")));
   });
 
   /** Score 1 for a ready job that has none yet (saved before scoring existed, or scoring failed once); never rescores. */
@@ -102,14 +103,13 @@ export function jobRoutes(deps: {
     if (!job) throw notFound();
     if (job.status !== "ready" || !job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
     const tailor = deps.tailorRepoFor(c);
-    let base = await tailor.getScore(id, "base");
-    if (!base) {
-      base = await scoreMatch({ model: deps.modelFor(c) }, {
+    if (!(await tailor.getScore(id, "base"))) {
+      const base = await scoreMatch({ model: deps.modelFor(c) }, {
         userId: c.get("user").id, cv: (await deps.cvFor(c).get()).content, job: job.extracted, keptInferred: new Set(),
       });
       await tailor.saveScore(id, "base", null, base);
     }
-    return c.json({ base, tailored: await tailor.getScore(id, "tailored") });
+    return c.json(await jobScore(tailor, id));
   });
 
   app.patch("/:id", async (c) => {

@@ -10,6 +10,15 @@ const LANGUAGE_NAME: Record<Locale, string> = {
 };
 
 /**
+ * How a role's lines open in Romanian (owner's pick, 2026-11-16). Every prompt that writes a role's lines,
+ * in enrichment and in tailoring, carries this same sentence.
+ */
+export const ROMANIAN_TENSE = "In Romanian, a line of a role that has ended starts with \"Am\" and the past participle (\"Am coordonat…\", \"Am efectuat…\"), never the present (\"Coordonez…\", \"Efectuez…\"); a line of the current role uses the present (\"Coordonez…\").";
+
+/** "No first person", worded so the Romanian "Am coordonat…" is not taken for it. */
+export const NO_FIRST_PERSON = "No first person pronouns (I, me, my; eu, meu, mea). The Romanian \"Am coordonat…\" is the expected form, not a pronoun.";
+
+/**
  * Which language to write in. CV text stays in the CV's language. What is said to the person (questions,
  * answer options, tips) is in the language they use the app in; without one, in the CV's language.
  */
@@ -356,21 +365,6 @@ export function periodLine(role: Partial<Pick<Experience, "startDate" | "endDate
   // A role that isn't current has ended, even when its end date was left empty.
   const end = role.current ? "present" : role.endDate || "end date not given";
   return [`Role period (context only, not graded): ${role.startDate} – ${end}, ${role.current ? "current" : "ended"}.`];
-}
-
-/**
- * What the person said they want their CV to bring out. It steers which questions are asked, never the grades,
- * and it is a goal, not something that happened in this role.
- */
-export function focusNote(focus?: string): string {
-  const text = focus?.trim();
-  if (!text) return "";
-  return [
-    "",
-    `What the person wants this CV to bring out (their own words; a goal, not a fact about this role): ${JSON.stringify(text)}`,
-    "Grade the bullets exactly as you would without it. Use it only to choose which questions to ask: prefer the missing facts that serve this goal.",
-    "Do not assume that anything in it happened in this role, and do not repeat it back in a tip or a question.",
-  ].join("\n");
 }
 
 /**

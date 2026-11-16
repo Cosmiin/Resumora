@@ -48,9 +48,10 @@ export async function restartWithSteering(
   const doc = run.tailoredCvId ? await deps.tailor.readTailoredCv(run.tailoredCvId) : null;
   if (!doc) throw jobNotFound();
   const base = (await deps.cv.get()).content;
-  // Back to the Base wording with no review: every step is accepted again. Until then the score is Score 1.
+  // Back to the Base wording with no review: every step is accepted again. Until then the score is Score 1,
+  // and the copy is marked as edited since its last tailored score (the next accepted step saves a new one).
   const score = await deps.tailor.getScore(run.jobId, "base");
-  if (await deps.tailor.saveTailoredCv(doc.id, doc.version, { content: base, review: {}, score }) === "conflict") {
+  if (await deps.tailor.saveTailoredCv(doc.id, doc.version, { content: base, review: {}, score, scoreStale: true }) === "conflict") {
     throw new ApiError(409, "version_conflict", "This tailored CV was saved somewhere else first.");
   }
   // Stored only once the reset went through, so a conflict leaves the old steering with the old wording.

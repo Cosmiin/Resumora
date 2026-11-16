@@ -14,8 +14,6 @@ export const CONCISE_CHARS = { partial: 220, missing: 300 } as const;
 export const CLEAR_AT = 80;
 
 export const MAX_QUESTIONS = 20;
-/** The longest "what should your CV bring out" text the enrichment path sends with a score request. */
-export const MAX_FOCUS = 600;
 /** Company, purpose and tools, plus at most 5 more. */
 export const MAX_ROLE_QUESTIONS = 8;
 

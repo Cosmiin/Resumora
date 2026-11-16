@@ -1,4 +1,4 @@
-import { hasUnknownNumber, startsInPresentTense, type Locale, type Proposal, type TailorFlag as Flag } from "@resumora/shared";
+import { hasUnknownNumber, pastTenseNote, startsInPresentTense, type Locale, type Proposal, type TailorFlag as Flag } from "@resumora/shared";
 
 /** Fields that name the employer, the role or its dates: tailoring never changes them. */
 export const ENTITY_FIELDS = ["company", "title", "startDate", "endDate"] as const;
@@ -56,7 +56,7 @@ export function checkProposal(proposal: Proposal, ctx: CheckContext): Flag[] {
   if (proposal.inferred && !proposal.reason?.trim()) flags.push({ rule: "guess", detail: "A guess without a reason" });
   if (ctx.pastRole && ctx.locale && (proposal.field === "text" || proposal.field === "description") &&
     startsInPresentTense(proposal.text, ctx.locale)) {
-    flags.push({ rule: "tense", detail: "The role has ended: start with a past-tense verb." });
+    flags.push({ rule: "tense", detail: pastTenseNote(ctx.locale) });
   }
   return flags;
 }

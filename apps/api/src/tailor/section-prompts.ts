@@ -1,4 +1,5 @@
 import type { JobExtraction, Proposal, TailorLanguage, TailorSection } from "@resumora/shared";
+import { ROMANIAN_TENSE } from "../enrich/prompts.ts";
 
 /** Final touches for awards, courses, publications and interests: lines reworded, most relevant first, unrelated ones hidden. */
 const LIGHT_RULES = `Each line under an item is its own item: itemId = the line's id, field "text". Reword lines with the job's keywords inside natural sentences.
@@ -42,7 +43,7 @@ Principles, most important first:
 2. Each item on its own. When items has "edit" and "context", change only the items under "edit"; "context" is read-only evidence. A note or answer is true for its role's period, not for today.
 3. Respect the item's time and kind of work. Use the job's words only where they describe what the person did there. Do not force a job keyword onto an item it doesn't fit.
 4. A change must be a real improvement: clearer, more specific, or closer to the job with the facts given. If you would only swap words, leave the item out.
-5. A role that has ended stays in the past tense. Only a current role uses the present tense.
+5. A role that has ended stays in the past tense. Only a current role uses the present tense. ${ROMANIAN_TENSE}
 6. Mark what you inferred. Set inferred to true for any wording or skill that is a reasonable inference rather than stated, and set reason to one short line (at most 12 words) naming what it rests on (the bullet, note or answer). Set reason to null when inferred is false. When inferred is true outside the summary, also fill guesses with one entry per thing you inferred: text is only the few words that carry the guess (2 to 5 words, never the whole line or clause), copied exactly from your new wording, and reason is one short sentence to the person, at most 20 words, in this shape: 'Your line says "<their own words>", so I inferred this.' Quote the note, the answer or the job requirement instead when that is what you rest on. Otherwise set guesses to null, except in the summary.
 7. Write in the requested language and in the tone given under "steering". Follow the rest of the steering when it doesn't break these principles.
 

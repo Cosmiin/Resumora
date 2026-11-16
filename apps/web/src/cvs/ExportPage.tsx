@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useParams } from "react-router";
 import { getTemplate } from "../cv/page/templates.ts";
 import { exportFile, unreviewedItems, type ExportFormat, type ExportKind, type ExportResult } from "../export/export-files.ts";
 import { useT } from "../i18n/t.ts";
@@ -14,6 +14,7 @@ type Busy = `${ExportKind}:${ExportFormat}`;
 export function ExportPage() {
   const t = useT();
   const { doc } = useCvDoc();
+  const { id: jobId } = useParams();
   const [busy, setBusy] = useState<Busy | null>(null);
   const [done, setDone] = useState<ExportResult | null>(null);
   const [failed, setFailed] = useState(false);
@@ -71,7 +72,9 @@ export function ExportPage() {
         </div>
         {done && <>
           <p className="ui-coach cvs-after">{t(current.kind === "tailored" ? "cvs.export.luck" : "cvs.export.luckBase")}</p>
-          <p className="ui-row"><Link className="ui-btn" to="/cvs">{t("cvs.toAll")}</Link></p>
+          <p className="ui-row">{current.kind === "tailored" && jobId
+            ? <Link className="ui-btn" to={`/jobs/${encodeURIComponent(jobId)}`}>{t("cvs.toJob")}</Link>
+            : <Link className="ui-btn" to="/cv">{t("cvs.toBase")}</Link>}</p>
         </>}
       </div>
     </main>

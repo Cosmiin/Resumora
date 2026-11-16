@@ -77,6 +77,19 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(retry).toEqual([first[0], { ...first[1], content: first[1]!.content + "\nThe role has ended: start with a past-tense verb." }]);
   });
 
+  it("retries a Romanian present-tense bullet for a past role, asking for the \"Am …\" form", async () => {
+    const text = "Am coordonat fluxul de lucru pentru ordinele de achiziție.";
+    const replies = [{ text: "Coordonez fluxul de lucru pentru ordinele de achiziție.", nextQuestion: null }, { text, nextQuestion: null }, grade];
+    model = fakeModel(() => replies.shift());
+    await cv.save({ ...emptyCv("ro"), experience: [role] }, (await cv.get()).version);
+    await insights.put(role.id, buildRoleResult(role, initial, fingerprint(role, "ro")));
+    const res = await post({ ...input(), fingerprint: fingerprint(role, "ro") });
+    expect(res.status).toBe(200);
+    expect(ImproveAnswerSchema.parse(await res.json())).toMatchObject({ proposal: { text } });
+    const retry = model.requests[1]!.messages as { role: string; content: string }[];
+    expect(retry[1]!.content).toContain("The role has ended: start with \"Am\" and the past participle (\"Am coordonat…\").");
+  });
+
   it("needs detail without a proposal when both answers for a past role use present tense", async () => {
     model = fakeModel(() => ({ text: "Validate compliance with legal teams.", nextQuestion }));
     const res = await post();

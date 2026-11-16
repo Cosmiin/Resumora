@@ -29,8 +29,6 @@ type Props = {
   context?: string;
   /** In the guided path, the last screen moves on ("Next role") instead of going back to the CV. */
   next?: { label: string; onNext(): void };
-  /** What the person wants their CV to bring out: the role's questions are asked with it in view. */
-  focus?: string;
   /** A score the run asked for itself, so the editor shows the same number. */
   onScore?(result: RoleResult): void;
 };
@@ -40,8 +38,8 @@ type Props = {
  * once, and the score before and after. One column on every screen size; no score is shown between the first
  * screen and the last.
  */
-export function RoleRun({ target, cv, dispatch, scores, waitForSave, onClose, context, next, focus, onScore }: Props) {
-  const run = useRoleRun({ cv, roleId: target.roleId, scores, dispatch, waitForSave, onClose, focus, onScore });
+export function RoleRun({ target, cv, dispatch, scores, waitForSave, onClose, context, next, onScore }: Props) {
+  const run = useRoleRun({ cv, roleId: target.roleId, scores, dispatch, waitForSave, onClose, onScore });
   const { step, items, busy } = run;
   const root = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);

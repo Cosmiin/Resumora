@@ -11,7 +11,6 @@ import { RequireAuth } from "./auth/RequireAuth.tsx";
 import { SignUpPage } from "./auth/SignUpPage.tsx";
 import { CvPage } from "./cv/CvPage.tsx";
 import { ExportPage } from "./cvs/ExportPage.tsx";
-import { MyCvsPage } from "./cvs/MyCvsPage.tsx";
 import { TemplatePage } from "./cvs/TemplatePage.tsx";
 import { JobsPage } from "./jobs/JobsPage.tsx";
 import { JobPage } from "./jobs/JobPage.tsx";
@@ -32,7 +31,8 @@ export const routes: RouteObject[] = [
       { path: "/cv", element: <CvPage /> },
       { path: "/cv/template", element: <TemplatePage /> },
       { path: "/cv/export", element: <ExportPage /> },
-      { path: "/cvs", element: <MyCvsPage /> },
+      // My CVs is gone: a tailored CV lives on its job's page. Old links land on Jobs.
+      { path: "/cvs", element: <Navigate to="/jobs" replace /> },
       { path: "/jobs", element: <JobsPage /> },
       { path: "/jobs/:id", element: <JobPage /> },
       { path: "/jobs/:id/tailor", element: <TailorFlow /> },

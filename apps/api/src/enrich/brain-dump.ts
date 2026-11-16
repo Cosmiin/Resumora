@@ -1,4 +1,4 @@
-import { BRAIN_DUMP_QUESTION, MAX_BULLETS, SCORE_POLICY, findScored, fingerprint, mergeGrades, repeatKey, type BrainDumpAnswer } from "@resumora/shared";
+import { BRAIN_DUMP_QUESTION, MAX_BULLETS, SCORE_POLICY, findScored, fingerprint, mergeGrades, repeatKey, startsInPresentTense, type BrainDumpAnswer } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
@@ -50,6 +50,8 @@ export async function brainDump(
       maxOutputTokens: 1200,
     });
     const seen = new Set(role.bullets.map((b) => repeatKey(b.text)));
+    // A role that has ended: a line opening in the present ("Coordonez…") is left out; the others are kept.
+    const pastRole = !role.current && role.endDate !== "";
     const usedIds = new Set(role.bullets.map((b) => b.id));
     const survivors: { id: string; text: string }[] = [];
     let nextId = 1;
@@ -57,6 +59,7 @@ export async function brainDump(
       const text = squash(raw);
       const key = repeatKey(text);
       if (checkProposal(role, "new", text) !== "ok" || seen.has(key)) continue;
+      if (pastRole && startsInPresentTense(text, content.locale)) continue;
       seen.add(key);
       while (usedIds.has(`new${nextId}`)) nextId++;
       const id = `new${nextId++}`;

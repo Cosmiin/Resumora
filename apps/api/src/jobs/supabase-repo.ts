@@ -26,12 +26,18 @@ type Row = {
 const LIST_COLUMNS = "id, status, error_code, title, company, location, source, url, created_at, application_status, position_closed:extracted->positionClosed";
 const COLUMNS = `${LIST_COLUMNS}, raw_text, extracted, edited_by_user, version, updated_at`;
 
+/**
+ * The application status as the app knows it. "tailored" was a status until 2026-11-12; a row the status migration
+ * hasn't reached yet (the API is released before that migration runs) still holds it, and reads as "saved".
+ */
+const storedStatus = (value: string) => (value === "tailored" ? "saved" : value);
+
 function toListItem(row: Row) {
   const parsed = JobListItemSchema.safeParse({
     id: row.id, status: row.status, errorCode: row.error_code,
     title: row.title, company: row.company, location: row.location,
     source: row.source, url: row.url, createdAt: row.created_at,
-    applicationStatus: row.application_status, positionClosed: row.position_closed === true,
+    applicationStatus: storedStatus(row.application_status), positionClosed: row.position_closed === true,
   });
   if (!parsed.success) throw new Error(`stored job ${row.id} has an unexpected shape`);
   return parsed.data;
@@ -91,7 +97,7 @@ export function supabaseJobRepo(env: SupabaseEnv, user: AuthUser): JobRepo {
       const row = data as Row;
       const parsed = JobSchema.safeParse({
         ...toListItem(row), rawText: row.raw_text, extracted: row.extracted, editedByUser: row.edited_by_user,
-        applicationStatus: row.application_status,
+        applicationStatus: storedStatus(row.application_status),
         version: row.version, updatedAt: row.updated_at,
       });
       if (!parsed.success) throw new Error(`stored job ${row.id} has an unexpected shape`);

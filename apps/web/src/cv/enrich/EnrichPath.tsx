@@ -12,7 +12,6 @@ import { useNavigate } from "react-router";
 import { FocusBar } from "./FocusBar.tsx";
 import { LightStop } from "./FocusMode.tsx";
 import { RoleRun } from "./RoleRun.tsx";
-import { getLanguage } from "../../i18n/language.ts";
 import { issueTip } from "./tips.ts";
 import { PathStart } from "./PathStart.tsx";
 import { SCORED_LIST, type LineList } from "../edit/lists.ts";
@@ -48,7 +47,7 @@ type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "ligh
 
 /**
  * One guided path through the CV. It opens on the focus step: the roles, projects and volunteering below 80 are
- * offered, the person ticks the ones to work on and may say what the CV should bring out. Each ticked one gets its
+ * offered and the person ticks the ones to work on. Each ticked one gets its
  * own run of questions (in CV order), then one stop per lighter item with no lines yet, then Key achievements,
  * Skills and the result. "Save and exit" closes it; opening it again offers the roles still below 80.
  */
@@ -58,7 +57,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   // Roles, then projects, then volunteering (CV order within each), each below 80.
   const below = scoredItems(cv).filter(({ item }) => belowTarget(scores.get(item.id))).map(({ item }) => item.id);
   const light = lightStops(cv);
-  const [fixed, setFixed] = useState<{ stops: string[]; lights: typeof light; before: Map<string, number | null>; focus: string } | null>(null);
+  const [fixed, setFixed] = useState<{ stops: string[]; lights: typeof light; before: Map<string, number | null> } | null>(null);
   const stops = fixed?.stops ?? below;
   const lights = fixed?.lights ?? light;
   const before = fixed?.before ?? new Map<string, number | null>();
@@ -76,9 +75,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   const [achievementsAdded, setAchievementsAdded] = useState(0);
 
   if (stage.kind === "start") {
-    return <PathStart items={items} quick={quick} locale={cv.locale} speech={getLanguage()} onNotNow={onClose}
-      onStart={(chosen, focus) => {
-        setFixed({ stops: chosen, lights: light, focus, before: new Map(scoredItems(cv).map(({ item }) => [item.id, scoreOf(scores.get(item.id))])) });
+    return <PathStart items={items} quick={quick} locale={cv.locale} onNotNow={onClose}
+      onStart={(chosen) => {
+        setFixed({ stops: chosen, lights: light, before: new Map(scoredItems(cv).map(({ item }) => [item.id, scoreOf(scores.get(item.id))])) });
         if (chosen.length) setStage({ kind: "role", index: 0 });
         else setStage(light.length ? { kind: "light", index: 0 } : { kind: "achievements" });
       }} />;
@@ -99,7 +98,6 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         waitForSave={waitForSave}
         onClose={onClose}
         onScore={onScore}
-        focus={fixed?.focus || undefined}
         context={t(OF_KEY[kind], { n: ofKind.indexOf(roleId) + 1, total: ofKind.length })}
         next={{
           label: t(!last && nextKind === "role" ? "enrich.run.done.nextRole" : "enrich.focus.continue"),

@@ -6,7 +6,8 @@ import { readJson, saveResponse } from "../cv/routes.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import type { CvRepo } from "../cv/repo.ts";
-import type { TailorRepo } from "./repo.ts";
+import { jobScore, type TailorRepo } from "./repo.ts";
+import { scoreTailored } from "./accept.ts";
 import { RetailorBodySchema, startRetailor } from "./retailor.ts";
 import { TranslateBodySchema, translateTailored } from "./translate.ts";
 import { editCoverLetter, LetterBodySchema, LetterEditSchema, writeCoverLetter } from "./letter.ts";
@@ -19,7 +20,7 @@ const TemplateBody = z.object({ template: TailoredCvSchema.shape.template });
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
 const notFound = () => new ApiError(404, "not_found", "This tailored CV no longer exists.");
 
-/** Mounted at /v1: GET /jobs/:id/tailored, and GET/PUT/PATCH /tailored/:id. RLS keeps other users' rows invisible (404). */
+/** Mounted at /v1: GET /jobs/:id/tailored, GET/PUT/PATCH /tailored/:id and POST /tailored/:id/score. RLS keeps other users' rows invisible (404). */
 export function tailoredRoutes(deps: {
   jobsFor(c: Context<AppEnv>): JobRepo;
   cvFor(c: Context<AppEnv>): CvRepo;
@@ -40,17 +41,6 @@ export function tailoredRoutes(deps: {
     return c.json({ items: await deps.tailorFor(c).listTailoredCvs(jobId) });
   });
 
-  /** "My CVs": every tailored CV with the job it was made for. */
-  app.get("/tailored", async (c) => {
-    const items = await deps.tailorFor(c).listAllTailoredCvs();
-    const jobs = deps.jobsFor(c);
-    const found = new Map(await Promise.all([...new Set(items.map((item) => item.jobId))].map(async (jobId) => [jobId, await jobs.get(jobId)] as const)));
-    return c.json({ items: items.flatMap((item) => {
-      const job = found.get(item.jobId);
-      return job ? [{ ...item, jobTitle: job.extracted?.title ?? "", company: job.extracted?.company ?? null }] : [];
-    }) });
-  });
-
   app.get("/tailored/:id", async (c) => {
     const cv = await deps.tailorFor(c).readTailoredCv(id(c));
     if (!cv) throw notFound();
@@ -63,6 +53,19 @@ export function tailoredRoutes(deps: {
     const result = await deps.tailorFor(c).saveTailoredContent(tailoredId, expectedVersion, content);
     if (!result) throw notFound();
     return saveResponse(c, result);
+  });
+
+  /** Re-check: scores the copy as it stands now. Nothing else re-scores a copy edited by hand. */
+  app.post("/tailored/:id/score", async (c) => {
+    const tailor = deps.tailorFor(c);
+    const cv = await tailor.readTailoredCv(id(c));
+    if (!cv) throw notFound();
+    const job = await deps.jobsFor(c).get(cv.jobId);
+    if (!job) throw jobNotFound();
+    if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
+    const score = await scoreTailored({ model: deps.modelFor(c), tailor }, { userId: c.get("user").id, cv, job: job.extracted });
+    await tailor.saveScore(cv.jobId, "tailored", cv.id, score);
+    return c.json(await jobScore(tailor, cv.jobId, cv.id));
   });
 
   app.patch("/tailored/:id", async (c) => {

@@ -6,7 +6,7 @@ import {
 import { storedCv } from "../cv/supabase-repo.ts";
 import { ApiError } from "../errors.ts";
 import type { AuthUser, Env, SupabaseEnv } from "../env.ts";
-import type { TailorRepo } from "./repo.ts";
+import { sameCv, TAILORING_KINDS, type JobSummary, type TailorRepo } from "./repo.ts";
 import { withColumns } from "./steering.ts";
 
 const ToneExamplesSchema = z.object({ bullet: z.string(), examples: z.record(ToneSchema, z.string()) });
@@ -27,6 +27,62 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
         total: score.total, band: score.band,
       });
       if (error) throw new Error(`match_scores insert failed: ${error.message}`);
+      if (target !== "tailored" || !tailoredCvId) return;
+      const copy = await db.from("tailored_cvs").update({ score, score_stale: false }).eq("id", tailoredCvId);
+      if (copy.error) throw new Error(`tailored_cvs update failed: ${copy.error.message}`);
+    },
+    async scoreCopies(jobId) {
+      const { data, error } = await db.from("tailored_cvs").select("id, score, score_stale")
+        .eq("job_id", jobId).order("updated_at", { ascending: false });
+      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
+      return data.map((row) => ({ id: row.id, score: MatchScoreSchema.nullable().parse(row.score), scoreStale: row.score_stale === true }));
+    },
+    async hasTailoredCv(jobId) {
+      const { data, error } = await db.from("tailor_runs").select("id")
+        .eq("job_id", jobId).eq("status", "done").in("kind", TAILORING_KINDS).limit(1);
+      if (error) throw new Error(`tailor_runs select failed: ${error.message}`);
+      return data.length > 0;
+    },
+    async summaries(jobIds) {
+      const out = new Map<string, JobSummary>(jobIds.map((id) => [id, { score: null, tailoredLanguages: [] }]));
+      if (jobIds.length === 0) return out;
+      // Three queries for the whole page. Each returns at most one row per job, or one per tailored CV
+      // (a job has one per language), however long the run and score histories are.
+      const [done, copies, base] = await Promise.all([
+        db.from("jobs").select("id, tailor_runs!inner(id)").in("id", jobIds)
+          .eq("tailor_runs.status", "done").in("tailor_runs.kind", TAILORING_KINDS).limit(1, { referencedTable: "tailor_runs" }),
+        db.from("tailored_cvs").select("id, job_id, language, total:score->total").in("job_id", jobIds)
+          .order("updated_at", { ascending: false }),
+        db.from("jobs").select("id, match_scores(total)").in("id", jobIds).eq("match_scores.target", "base")
+          .order("created_at", { referencedTable: "match_scores", ascending: false }).limit(1, { referencedTable: "match_scores" }),
+      ]);
+      if (done.error) throw new Error(`tailor_runs select failed: ${done.error.message}`);
+      if (copies.error) throw new Error(`tailored_cvs select failed: ${copies.error.message}`);
+      if (base.error) throw new Error(`match_scores select failed: ${base.error.message}`);
+
+      for (const row of base.data) out.get(row.id)!.score = (row.match_scores as { total: number | null }[])[0]?.total ?? null;
+      const tailored = new Set(done.data.map((row) => row.id as string));
+      // The copy saved last of each tailored job: the rows come newest first.
+      const chosen = new Map<string, { id: string; total: number | null }>();
+      for (const row of copies.data) {
+        if (!tailored.has(row.job_id)) continue;
+        out.get(row.job_id)!.tailoredLanguages.push(row.language);
+        if (!chosen.has(row.job_id)) chosen.set(row.job_id, { id: row.id, total: (row.total as number | null) ?? null });
+      }
+      if (chosen.size === 0) return out;
+      // A fourth query: the chosen copies' score history, newest first. PostgREST returns at most 1000 rows
+      // (max_rows); a copy the cut-off result did not reach keeps its own stored score, which is the same number.
+      const history = await db.from("match_scores").select("tailored_cv_id, total").eq("target", "tailored")
+        .in("tailored_cv_id", [...chosen.values()].map((copy) => copy.id)).order("created_at", { ascending: false });
+      if (history.error) throw new Error(`match_scores select failed: ${history.error.message}`);
+      const latest = new Map<string, number | null>();
+      for (const row of history.data) if (!latest.has(row.tailored_cv_id)) latest.set(row.tailored_cv_id, row.total);
+      for (const [jobId, copy] of chosen) {
+        const summary = out.get(jobId)!;
+        summary.score = latest.has(copy.id) ? latest.get(copy.id)! : copy.total;
+        summary.tailoredLanguages.sort();
+      }
+      return out;
     },
     async getScore(jobId, target, tailoredCvId) {
       let query = db.from("match_scores").select("policy, labels, parts, total, band")
@@ -78,25 +134,10 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
     async saveTailoredCv(id, expectedVersion, changes) {
       const { data, error } = await db.from("tailored_cvs").update({
         content: changes.content, review: changes.review, score: changes.score,
-        version: expectedVersion + 1, updated_at: new Date().toISOString(),
+        version: expectedVersion + 1, updated_at: new Date().toISOString(), ...(changes.scoreStale ? { score_stale: true } : {}),
       }).eq("id", id).eq("version", expectedVersion).select("id");
       if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
       return data.length > 0 ? "ok" : "conflict";
-    },
-    async listAllTailoredCvs() {
-      // One query: each CV with only its newest run, so the list never depends on how many runs or CVs there are.
-      const { data, error } = await db.from("tailored_cvs")
-        .select("id, job_id, language, template, translated_from, updated_at, tailor_runs(status, created_at)")
-        .order("updated_at", { ascending: false })
-        .order("created_at", { referencedTable: "tailor_runs", ascending: false })
-        .limit(1, { referencedTable: "tailor_runs" });
-      if (error) throw new Error(`tailored_cvs select failed: ${error.message}`);
-      return data.map((row) => {
-        const newest = (row.tailor_runs as { status: string }[] | null)?.[0];
-        return { id: row.id, jobId: row.job_id, language: TailorLanguageSchema.parse(row.language),
-          template: TailoredCvSchema.shape.template.parse(row.template), translatedFrom: row.translated_from, updatedAt: row.updated_at,
-          inProgress: !!newest && newest.status !== "done" };
-      });
     },
     async listTailoredCvs(jobId) {
       const { data, error } = await db.from("tailored_cvs").select("id, language, translated_from, updated_at")
@@ -118,7 +159,12 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
     },
     async saveTailoredContent(id, expectedVersion, content) {
       const updatedAt = new Date().toISOString();
-      const { data, error } = await db.from("tailored_cvs").update({ content, version: expectedVersion + 1, updated_at: updatedAt })
+      // A hand edit makes the score out of date; saving the same content again doesn't.
+      const before = await db.from("tailored_cvs").select("content").eq("id", id).maybeSingle();
+      if (before.error) throw new Error(`tailored_cvs select failed: ${before.error.message}`);
+      const edited = !!before.data && !sameCv(before.data.content, content);
+      const { data, error } = await db.from("tailored_cvs")
+        .update({ content, version: expectedVersion + 1, updated_at: updatedAt, ...(edited ? { score_stale: true } : {}) })
         .eq("id", id).eq("version", expectedVersion).select("version, updated_at");
       if (error) throw new Error(`tailored_cvs update failed: ${error.message}`);
       if (data[0]) return { ok: true, version: data[0].version, updatedAt: data[0].updated_at };
@@ -130,7 +176,8 @@ export function supabaseTailorRepo(env: SupabaseEnv, user: AuthUser): TailorRepo
       const fields = {
         translated_from: input.translatedFrom, content: input.content, base_snapshot: input.content, base_snapshot_at: input.at,
         cover_letter: input.coverLetter, template: input.template, tone: input.tone, instruction: input.instruction,
-        review: null, score: null, updated_at: input.at,
+        // The new wording has no score yet, whatever the copy's score history says.
+        review: null, score: null, score_stale: true, updated_at: input.at,
       };
       // Two tries: a copy created by a concurrent call between the read and the insert is refreshed instead.
       for (let attempt = 0; attempt < 2; attempt++) {

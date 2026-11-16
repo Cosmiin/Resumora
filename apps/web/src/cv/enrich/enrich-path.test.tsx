@@ -8,12 +8,12 @@ import type { RoleScoreState } from "./useRoleScores.ts";
 
 // Each role's run of questions is replaced by a stub: these tests are about the path around it.
 vi.mock("./RoleRun.tsx", () => ({
-  RoleRun: ({ target, next, onClose, context, focus }: {
-    target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; context?: string; focus?: string;
+  RoleRun: ({ target, next, onClose, context, ...rest }: {
+    target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; context?: string;
   }) => (
     <div data-testid="focus">
       <p>{context}</p>
-      {focus && <p>Focus: {focus}</p>}
+      {"focus" in rest && <p>Has a focus prop</p>}
       <p>Session for {target.roleId}</p>
       <button type="button" onClick={() => next?.onNext()}>{next?.label}</button>
       <button type="button" onClick={onClose}>✕ Close</button>
@@ -342,13 +342,13 @@ describe("the focus step", () => {
     expect(screen.getAllByText("Key achievements").length).toBeGreaterThan(0);
   });
 
-  it("hands what the person wants their CV to bring out to every role's questions", async () => {
+  it("the focus step asks nothing beyond the roles: no text box, and no goal text reaches a role's questions", async () => {
     render(<Host scores={scores} />);
-    await userEvent.type(screen.getByRole("textbox", { name: "Is there anything you want your CV to bring out?" }), "  Move into automation  ");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByText(/bring out/i)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Start with Analyst" }));
-    expect(screen.getByText("Focus: Move into automation")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Next role" }));
-    expect(screen.getByText("Focus: Move into automation")).toBeInTheDocument();
+    expect(screen.getByText("Session for a")).toBeInTheDocument();
+    expect(screen.queryByText("Has a focus prop")).toBeNull();
   });
 
   it("the result says which roles were offered and not chosen", async () => {

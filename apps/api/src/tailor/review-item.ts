@@ -2,7 +2,7 @@ import { z } from "zod";
 import { applyGuesses, CvContentSchema, MAX_TEXT, scoredItems, type CvContent, type TailoredCv } from "@resumora/shared";
 import { ApiError } from "../errors.ts";
 import type { ItemReview } from "./accept.ts";
-import type { TailorRepo } from "./repo.ts";
+import { sameCv, type TailorRepo } from "./repo.ts";
 
 export const ReviewItemBodySchema = z.object({
   section: z.string().min(1).max(40),
@@ -84,6 +84,8 @@ export async function reviewItem(tailor: TailorRepo, id: string, body: ReviewIte
   // Same limits as the editor's save (an edited phrase can make the summary too long).
   const parsed = CvContentSchema.safeParse(content);
   if (!parsed.success) throw new ApiError(400, "invalid_content", "This text is too long for the CV.");
-  if (await tailor.saveTailoredCv(doc.id, doc.version, { content: parsed.data, review, score: doc.score }) === "conflict") throw conflict();
+  // A decision that changes the wording (Remove, Edit) leaves the score older than the text; Keep changes none.
+  const reworded = !sameCv(doc.content, parsed.data);
+  if (await tailor.saveTailoredCv(doc.id, doc.version, { content: parsed.data, review, score: doc.score, ...(reworded ? { scoreStale: true as const } : {}) }) === "conflict") throw conflict();
   return tailor.readTailoredCv(doc.id);
 }

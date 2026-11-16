@@ -319,6 +319,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
             <p className="ui-lead">{t("cv.head.line")}</p>
           </div>
           <div className="ui-row">
+            <LeaveLink className="ui-btn" to="/cv/template">{t("cvs.template")}</LeaveLink>
             <LeaveLink className="ui-btn" to="/cv/export">{t("cvs.export")}</LeaveLink>
             <button type="button" className="ui-btn enrich-open" onClick={() => setPathOpen(true)}>{t("enrich.path.open")}</button>
           </div>

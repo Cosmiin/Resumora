@@ -52,6 +52,23 @@ describe("supabaseJobRepo error mapping", () => {
     );
   });
 
+  // Release order: the API goes live before the status migration runs, so for a while it reads rows that still say "tailored".
+  it("reads a stored application status of 'tailored' as 'saved', in the list and for one job", async () => {
+    const row = {
+      id: "00000000-0000-4000-8000-000000000001", status: "queued", error_code: null, title: null, company: null, location: null,
+      source: "link", url: input.url, created_at: "2026-11-05T10:00:00+00:00", application_status: "tailored", position_closed: null,
+    };
+    const full = { ...row, raw_text: null, extracted: null, edited_by_user: false, version: 1, updated_at: "2026-11-05T10:00:00+00:00" };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(response([row])).mockResolvedValueOnce(response([full]))
+      .mockResolvedValueOnce(response([{ ...row, application_status: "applied" }])).mockResolvedValueOnce(response([{ ...row, application_status: "bogus" }])));
+    const repo = supabaseJobRepo(env, user);
+    expect((await repo.list({ limit: 10, after: null })).items.map((job) => job.applicationStatus)).toEqual(["saved"]);
+    expect((await repo.get(row.id))?.applicationStatus).toBe("saved");
+    // Every other value is read as stored, and one the app doesn't know still fails loudly.
+    expect((await repo.list({ limit: 10, after: null })).items.map((job) => job.applicationStatus)).toEqual(["applied"]);
+    await expect(repo.list({ limit: 10, after: null })).rejects.toThrow("has an unexpected shape");
+  });
+
   it("maps the database job_limit message to the public 429 error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ message: "job_limit", code: "P0001" }, 400)));
     const error = await supabaseJobRepo(env, user).create(input).catch((e: unknown) => e);

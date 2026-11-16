@@ -68,19 +68,11 @@ describe("tailored CV read and save", () => {
     expect(await res.json()).toEqual({ items: [{ id, language: "en", translatedFrom: null, updatedAt: expect.any(String) }] });
   });
 
-  it("lists every tailored CV the person has with its job, and whether tailoring is still open; never another person's", async () => {
-    const first = await tailoredCv();
-    const second = await tailoredCv();
-    // The second one's tailoring is finished.
-    for (const run of docs.runs.values()) if (run.tailoredCvId === second.id) run.status = "done";
-    const res = await app.request("/v1/tailored", { headers: auth() });
-    expect(res.status).toBe(200);
-    const { items } = await res.json() as { items: Array<Record<string, unknown>> };
-    expect(items).toHaveLength(2);
-    expect(items.find((item) => item.id === first.id)).toEqual({ id: first.id, jobId: first.jobId, language: "en", template: "classic",
-      translatedFrom: null, updatedAt: expect.any(String), inProgress: true, jobTitle: job.title, company: job.company });
-    expect(items.find((item) => item.id === second.id)).toMatchObject({ jobId: second.jobId, inProgress: false });
-    expect(await (await app.request("/v1/tailored", { headers: auth("token-b") })).json()).toEqual({ items: [] });
+  it("has no list of every tailored CV any more: GET /v1/tailored is an unknown address", async () => {
+    await tailoredCv();
+    await expectError(await app.request("/v1/tailored", { headers: auth() }), 404, "not_found");
+    const unknown = await app.request("/v1/no-such-address", { headers: auth() });
+    expect((await app.request("/v1/tailored", { headers: auth() })).status).toBe(unknown.status);
     expect((await app.request("/v1/tailored")).status).toBe(401);
   });
 
@@ -166,6 +158,38 @@ describe("PATCH /v1/tailored/:id/review (guided review)", () => {
     expect(cv.content.experience[0]!.bullets[0]!.text).toBe("Moved payroll");
     expect(cv.review!.experience).toEqual({ [bullet]: { kept: false, inferred: true, reviewed: true, text: "Led the payroll migration", reason: "From your notes." } });
     expect(cv.version).toBe(version + 1);
+  });
+
+  describe("the edited mark (score_stale)", () => {
+    const scored = { policy: "match/1" as const, total: 84, band: "strong" as const, capped: false, labels: [],
+      parts: { requirements: null, keywords: null, seniority: null, langEdu: null } };
+    /** A seeded copy whose score is current, and how its job's score answer reads. */
+    async function current() {
+      const { id, version } = await seeded();
+      const jobId = docs.cvs.get(id)!.jobId;
+      await memoryTailorRepo("user-a", new Map(), docs).saveScore(jobId, "tailored", id, scored);
+      const answer = async () => await (await app.request(`/v1/jobs/${jobId}/score`, { headers: auth() })).json() as { stale: boolean; tailored: { total: number } | null };
+      expect(await answer()).toMatchObject({ stale: false, tailored: { total: 84 } });
+      return { id, version, answer };
+    }
+
+    it("Remove changes the wording, so the score reads as edited since, with its old number", async () => {
+      const { id, version, answer } = await current();
+      expect((await review(id, { section: "experience", key: bullet, action: "remove", version })).status).toBe(200);
+      expect(await answer()).toMatchObject({ stale: true, tailored: { total: 84 } });
+    });
+
+    it("Edit changes the wording too", async () => {
+      const { id, version, answer } = await current();
+      expect((await review(id, { section: "summary", key: "summary#0", action: "edit", text: "who led teams abroad", version })).status).toBe(200);
+      expect(await answer()).toMatchObject({ stale: true, tailored: { total: 84 } });
+    });
+
+    it("Keep changes no wording and leaves the mark alone", async () => {
+      const { id, version, answer } = await current();
+      expect((await review(id, { section: "skills", key: "new-skill:BPMN", action: "keep", version })).status).toBe(200);
+      expect(await answer()).toMatchObject({ stale: false, tailored: { total: 84 } });
+    });
   });
 
   it("Remove and Edit work on a guessed project bullet too (E6 Task 9)", async () => {

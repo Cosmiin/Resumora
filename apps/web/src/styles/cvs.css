@@ -1,22 +1,11 @@
-/* My CVs, the template gallery and the download page ("Coach's Page"). */
+/* The template gallery and the download page ("Coach's Page"). */
 
 .cvs-crumb { margin-bottom: var(--space-2); }
 .cvs-narrow { max-width: 760px; }
-.cvs-mid { max-width: 900px; }
 .cvs-page .cvs-lead { margin-bottom: var(--space-6); }
 .cvs-page .cvs-gap { margin-bottom: var(--space-4); }
 .cvs-after { margin-top: var(--space-5); margin-bottom: var(--space-3); }
 .cvs-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: var(--space-4); margin-bottom: var(--space-6); }
-
-/* My CVs: one row per CV, its next steps on the right. */
-.cvs-group + .cvs-group { margin-top: var(--space-6); }
-.cvs-group > .ui-heading { margin-bottom: var(--space-3); }
-.cvs-list { margin: 0; padding: 0; list-style: none; }
-.cvs-list > li { padding: var(--space-4) 0; border-bottom: 1px solid var(--color-line); }
-.cvs-list > li:first-child { padding-top: 0; }
-.cvs-list > li:last-child { padding-bottom: 0; border-bottom: 0; }
-.cvs-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-5); align-items: center; }
-.cvs-name { font-weight: var(--weight-bold); }
 
 /* Template gallery: the choices on the left, the person's own CV in the picked template on the right. */
 .cvs-gallery { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 40px; align-items: start; }
@@ -46,5 +35,5 @@
 @media (prefers-reduced-motion: reduce) { .cvs-spinner { animation: none; } }
 
 @media (max-width: 900px) {
-  .cvs-gallery, .cvs-formats, .cvs-row { grid-template-columns: minmax(0, 1fr); }
+  .cvs-gallery, .cvs-formats { grid-template-columns: minmax(0, 1fr); }
 }
