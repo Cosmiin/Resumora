@@ -12,11 +12,12 @@ const fp = fingerprint(role, "en");
 let store: MemoryInsightsStore;
 let model: ReturnType<typeof fakeModel>;
 let app: ReturnType<typeof createApp>;
+let savedCv: ReturnType<typeof memoryCvRepo>;
 
 beforeEach(async () => {
   store = new Map();
   model = fakeModel(() => allSpecific(role));
-  const cv = memoryCvRepo();
+  const cv = (savedCv = memoryCvRepo());
   await cv.save({ ...emptyCv("en"), experience: [role] }, 0);
   app = createApp({
     appOrigin: "http://127.0.0.1:5173",
@@ -155,5 +156,24 @@ describe("/v1/enrich", () => {
 
   it("400 for a malformed body", async () => {
     expect((await score({ roleId: 5 })).status).toBe(400);
+  });
+});
+
+describe("POST /v1/enrich/project-questions", () => {
+  const post = (body: unknown) => app.request("/v1/enrich/project-questions", { method: "POST", headers: auth, body: JSON.stringify(body) });
+  const project = { ...roleWith(["Built a planner."], { title: "Route planner", company: "Personal project" }), url: "" };
+
+  it("400 for a malformed body, 409 for an id not saved as a project", async () => {
+    expect((await post({})).status).toBe(400);
+    expect((await post({ projectId: "p1", extra: true })).status).toBe(400);
+    expect((await post({ projectId: role.id })).status).toBe(409);
+  });
+
+  it("returns the questions for a saved project", async () => {
+    await savedCv.save({ ...emptyCv("en"), experience: [role], projects: [project] }, (await savedCv.get()).version);
+    model = fakeModel(() => ({ questions: [{ topic: "tools", text: "Which tools did you use?", options: ["Python", "Excel"] }] }));
+    const res = await post({ projectId: project.id });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ questions: [{ id: "pq1", topic: "tools", text: "Which tools did you use?", options: ["Python", "Excel"] }] });
   });
 });
