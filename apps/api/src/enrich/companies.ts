@@ -5,7 +5,7 @@ import { languageInstruction, questionLanguageReminder } from "./prompts.ts";
 import { aiError, type ScoreDeps } from "./score.ts";
 
 const ModelSchema = z.object({
-  companies: z.array(z.object({ key: z.string(), proposal: z.string().nullable() })).max(60),
+  companies: z.array(z.object({ key: z.string(), proposal: z.string().nullable() })).max(100),
 });
 
 /** One entry per company the CV names (roles and volunteering), keyed so that spellings of one company meet. */

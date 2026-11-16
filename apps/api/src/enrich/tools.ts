@@ -5,7 +5,7 @@ import { languageInstruction } from "./prompts.ts";
 import { aiError, type ScoreDeps } from "./score.ts";
 
 const ModelSchema = z.object({
-  roles: z.array(z.object({ roleId: z.string(), tools: z.array(z.string()).max(20) })).max(60),
+  roles: z.array(z.object({ roleId: z.string(), tools: z.array(z.string()).max(40) })).max(100),
 });
 const MAX_TOOL_LENGTH = 40;
 

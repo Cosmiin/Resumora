@@ -39,14 +39,14 @@ export function toolShown(role: Pick<Experience, "title" | "description" | "bull
 
 /** POST /v1/enrich/companies: what each company does, when the AI knows it for sure. Keys are `companyKey`s. */
 export const CompaniesAnswerSchema = z.object({
-  companies: z.array(z.object({ key: z.string().max(200), proposal: z.string().max(MAX_PROPOSAL).nullable() }).strict()).max(40),
+  companies: z.array(z.object({ key: z.string().max(200), proposal: z.string().max(MAX_PROPOSAL).nullable() }).strict()).max(80),
 }).strict();
 export type CompaniesAnswer = z.infer<typeof CompaniesAnswerSchema>;
 
 /** POST /v1/enrich/tools: the tools each role likely used, those its text names first. */
 export const MAX_ROLE_TOOLS = 8;
 export const ToolsAnswerSchema = z.object({
-  roles: z.array(z.object({ roleId: z.string().max(64), tools: z.array(z.string().min(1).max(40)).max(MAX_ROLE_TOOLS) }).strict()).max(40),
+  roles: z.array(z.object({ roleId: z.string().max(64), tools: z.array(z.string().min(1).max(40)).max(MAX_ROLE_TOOLS) }).strict()).max(80),
 }).strict();
 export type ToolsAnswer = z.infer<typeof ToolsAnswerSchema>;
 
