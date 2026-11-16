@@ -69,6 +69,17 @@ describe("/v1/enrich", () => {
     expect((await score({ roleId: role.id, fingerprint: fp, fresh: "yes" })).status).toBe(400);
   });
 
+  it("POST /score ignores an old client's focus text: the stored result, no model call, no goal in any prompt", async () => {
+    expect((await score({ roleId: role.id, fingerprint: fp })).status).toBe(200);
+    const calls = model.requests.length;
+    expect((await score({ roleId: role.id, fingerprint: fp, focus: "Move into automation work" })).status).toBe(200);
+    expect(model.requests).toHaveLength(calls);
+    expect((await score({ roleId: role.id, fingerprint: fp, fresh: true, focus: "Move into automation work" })).status).toBe(200);
+    const sent = JSON.stringify(model.requests);
+    expect(sent).not.toContain("Move into automation work");
+    expect(sent).not.toContain("bring out");
+  });
+
   it("GET /scores is scoped to the signed-in user", async () => {
     await score({ roleId: role.id, fingerprint: fp });
     expect(await memoryInsightsRepo("user-1", store).list()).toHaveLength(1);

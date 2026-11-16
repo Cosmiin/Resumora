@@ -463,26 +463,3 @@ describe("scoreRole asked for more questions", () => {
     expect((await insights.get(role.id))?.score).toBe(stored.score);
   });
 });
-
-describe("scoreRole with what the person wants their CV to bring out", () => {
-  it("asks the model again with the goal in view, even when a stored result exists", async () => {
-    const role = roleWith(["Prepared payroll files."]);
-    await save(role);
-    await insights.put(role.id, buildRoleResult(role, allSpecific(role), fp(role)));
-    const model = fakeModel(() => allSpecific(role));
-    await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: fp(role), focus: "  Move into automation work  " });
-    expect(model.requests).toHaveLength(1);
-    const sent = JSON.stringify(model.requests[0]);
-    expect(sent).toContain("Move into automation work");
-    expect(sent).toContain("a goal, not a fact about this role");
-  });
-
-  it("an empty focus returns the stored result without a model call", async () => {
-    const role = roleWith(["Prepared payroll files."]);
-    await save(role);
-    await insights.put(role.id, buildRoleResult(role, allSpecific(role), fp(role)));
-    const model = fakeModel(() => allSpecific(role));
-    await scoreRole({ cv, insights, model: model.deps, userId: "user-1" }, { roleId: role.id, fingerprint: fp(role), focus: "   " });
-    expect(model.requests).toHaveLength(0);
-  });
-});

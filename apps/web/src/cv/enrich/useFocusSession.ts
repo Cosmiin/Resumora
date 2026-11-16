@@ -35,8 +35,6 @@ type Options = {
   cv: CvContent; roleId: string; bulletId?: string; mode: FocusMode;
   scores: Map<string, RoleScoreState>; dispatch: (a: CvAction) => void;
   waitForSave: () => Promise<void>; onClose: () => void;
-  /** What the person wants their CV to bring out: the session opens by asking for questions with it in view. */
-  focus?: string;
 };
 /** Steps the user answers in words. Each one shown is kept in the history, so Back can return to it. */
 type TextStep = Extract<FocusStep, { kind: "role" | "brainDump" | "question" | "needsDetail" }>;
@@ -152,7 +150,7 @@ export function useFocusSession(opts: Options): {
     const stored = opts.scores.get(opts.roleId)?.result;
     const result = stored && unasked(stored, asked);
     const queue = buildQueue(role, result, opts);
-    const fresh = role && result?.fingerprint === fingerprint(role, opts.cv.locale) && !opts.focus;
+    const fresh = role && result?.fingerprint === fingerprint(role, opts.cv.locale);
     const start: Pick<View, "step" | "position"> = fresh ? firstStep(role, result, queue, counts, asked, completed)
       : { position: 0, step: { kind: "scoring", source: "opening" } };
     const history: Entry[] = isText(start.step) ? [{ step: start.step, question: questionText(start.step, result) }] : [];
@@ -213,9 +211,7 @@ export function useFocusSession(opts: Options): {
       return;
     }
     const entry = o.scores.get(o.roleId);
-    // With a focus, the session's own result (asked with it in view) wins while it is for the same text.
-    const own = o.focus && role && s.result?.fingerprint === fingerprint(role, o.cv.locale);
-    const result = !own && entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)
+    const result = entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)
       ? entry.result : session.current.result;
     for (const id of queue.slice(0, position)) s.completed.add(id);
     update({ queue, busy: false, ...bulletStep(role, queue, position, result, s.counts, s.asked, s.completed, next) });
@@ -308,17 +304,14 @@ export function useFocusSession(opts: Options): {
         if (!s.alive || s.closed) return;
         const o = current.current;
         const role = findScored(o.cv, o.roleId)?.item;
-        if (role) result = o.focus ? await scoreRole(o.roleId, fingerprint(role, o.cv.locale), true, o.focus) : await scoreRole(o.roleId, fingerprint(role, o.cv.locale));
+        if (role) result = await scoreRole(o.roleId, fingerprint(role, o.cv.locale));
       } catch { /* No role questions: continue with bullets or free talk. */ }
       if (!s.alive || s.closed) return;
       const o = current.current;
       const role = findScored(o.cv, o.roleId)?.item;
       if (role && result?.fingerprint !== fingerprint(role, o.cv.locale)) result = undefined;
       const entry = o.scores.get(o.roleId);
-      // With a focus, the answer just asked for is the one to use; the stored one was made without it.
-      if (!(o.focus && result) && entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)) result = entry.result;
-      // Asked without a focus because that call failed: the stored result still gives the role its questions.
-      if (!result && o.focus && role && s.result?.fingerprint === fingerprint(role, o.cv.locale)) result = s.result;
+      if (entry?.state === "ready" && role && entry.result?.fingerprint === fingerprint(role, o.cv.locale)) result = entry.result;
       if (result) result = unasked(result, s.asked);
       s.result = result ?? s.result;
       const queue = buildQueue(role, result, o);
@@ -395,7 +388,7 @@ export function useFocusSession(opts: Options): {
       const role = findScored(o.cv, o.roleId)?.item;
       if (role) {
         const print = fingerprint(role, o.cv.locale);
-        const fresh = o.focus ? await scoreRole(o.roleId, print, true, o.focus) : await scoreRole(o.roleId, print, true);
+        const fresh = await scoreRole(o.roleId, print, true);
         const now = findScored(current.current.cv, o.roleId)?.item;
         if (now && fresh.fingerprint === fingerprint(now, current.current.cv.locale)) s.result = unasked(fresh, s.asked);
       }

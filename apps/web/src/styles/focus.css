@@ -196,9 +196,6 @@
 .fm-rolepick small { font-size: var(--text-small); color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .fm-rolepick .fm-rolescore { flex-basis: 100%; }
 .fm-group-label { margin: var(--space-4) 0 var(--space-2); font-size: var(--text-label); font-weight: var(--weight-bold); color: var(--color-muted); }
-.fm-focus-text { margin-top: var(--space-6); padding: var(--space-6); border-radius: var(--radius-block); background: var(--color-paper-veil); }
-.fm-focus-text > label { display: block; margin-bottom: var(--space-3); font: var(--weight-semibold) var(--text-coach) / var(--leading-coach) var(--font-coach); color: var(--color-coach); }
-.fm-focus-text .answer-box { max-width: none; }
 .fm-path-start .fm-foot { justify-content: space-between; }
 
 /* The skills the path added, with Undo */

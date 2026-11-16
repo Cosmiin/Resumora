@@ -34,8 +34,6 @@ type Options = {
   cv: CvContent; roleId: string;
   scores: ReadonlyMap<string, RoleScoreState>; dispatch: (a: CvAction) => void;
   waitForSave: () => Promise<void>; onClose: () => void;
-  /** What the person wants their CV to bring out: the questions are asked for with it in view. */
-  focus?: string;
   /** A score the run asked for itself (answers that changed no text), so the editor shows the same number. */
   onScore?: (result: RoleResult) => void;
 };
@@ -80,8 +78,8 @@ export function useRoleRun(opts: Options) {
     const role = findScored(opts.cv, opts.roleId)?.item;
     const entry = opts.scores.get(opts.roleId);
     const print = role ? fingerprint(role, opts.cv.locale) : "";
-    // A current score has the questions already. With a focus they are asked for again, with it in view.
-    const result = role && entry?.state === "ready" && entry.result?.fingerprint === print && !opts.focus ? entry.result : undefined;
+    // A current score has the questions already.
+    const result = role && entry?.state === "ready" && entry.result?.fingerprint === print ? entry.result : undefined;
     const asked = new Set(role?.notes.map((note) => questionKey(note.question)));
     const thin = isThin(role, result);
     const run = splitRun(result ? buildRun(result, { thin, answered: asked }) : []);
@@ -141,7 +139,7 @@ export function useRoleRun(opts: Options) {
     update({ busy: false, step: { kind: "question", index } });
   }, [update]);
 
-  // The questions, when the stored score is not current (or a focus is given): asked for once, on the first screen.
+  // The questions, when the stored score is not current: asked for once, on the first screen.
   useEffect(() => {
     const s = session.current;
     if (s.view.ready || s.loadStarted) return;
@@ -151,7 +149,7 @@ export function useRoleRun(opts: Options) {
       try {
         result = await saved((_, print) => {
           const o = current.current;
-          return o.focus ? scoreRole(o.roleId, print, true, o.focus) : s.spent ? scoreRole(o.roleId, print, true, undefined, true) : scoreRole(o.roleId, print);
+          return s.spent ? scoreRole(o.roleId, print, true, true) : scoreRole(o.roleId, print);
         });
       } catch { /* No questions from this call: the stored ones, if they are for this text. */ }
       if (!s.alive || s.closed) return;
@@ -311,10 +309,7 @@ export function useRoleRun(opts: Options) {
     update({ busy: true, step: { kind: "thinking" } });
     let fresh: RoleResult | undefined;
     try {
-      fresh = await saved((_, print) => {
-        const o = current.current;
-        return o.focus ? scoreRole(o.roleId, print, true, o.focus) : scoreRole(o.roleId, print, true);
-      });
+      fresh = await saved((_, print) => scoreRole(current.current.roleId, print, true));
     } catch { /* The questions it already had stay. */ }
     if (!s.alive || s.closed) return;
     const o = current.current;

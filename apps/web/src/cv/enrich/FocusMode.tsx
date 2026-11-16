@@ -30,8 +30,6 @@ type Props = {
   context?: string;
   /** In the guided path, "That's all for this role" moves on ("Next role") instead of going back to the CV. */
   next?: { label: string; onNext(): void };
-  /** What the person wants their CV to bring out (the path's focus step): the role's questions are asked with it in view. */
-  focus?: string;
 };
 
 const FOCUSABLE = 'button:not(:disabled), textarea:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
@@ -82,7 +80,7 @@ export function useFocusFrame(root: RefObject<HTMLDivElement | null>, onClose: (
 }
 
 /** Full-screen focus mode: one step at a time, with the role on paper beside it. */
-export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, context, next, focus }: Props) {
+export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, context, next }: Props) {
   // The session always closes the same way (saving the role's facts); only where it goes next differs.
   const moving = useRef(false);
   const leave = useRef({ onClose, next });
@@ -94,7 +92,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     if (moving.current && then) then.onNext();
     else close();
   });
-  const session = useFocusSession({ cv, roleId: target.roleId, bulletId: target.bulletId, mode: target.mode, scores, dispatch, waitForSave, onClose: finish, focus });
+  const session = useFocusSession({ cv, roleId: target.roleId, bulletId: target.bulletId, mode: target.mode, scores, dispatch, waitForSave, onClose: finish });
   const { step, queue, position, busy } = session;
   const root = useRef<HTMLDivElement>(null);
   const right = useRef<HTMLDivElement>(null);
