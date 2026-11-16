@@ -17,6 +17,7 @@ export * from "./tailor.ts";
 export * from "./account.ts";
 export * from "./role-description.ts";
 export * from "./projects.ts";
+export * from "./enrich-path.ts";
 export type { Flag } from "./flags.ts";
 export type { Flag as TailorFlag } from "./tailor.ts";
 export { QuestionSchema, type Question } from "./enrich.ts";

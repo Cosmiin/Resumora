@@ -1,4 +1,4 @@
-import { BRAIN_DUMP_QUESTION, CONDITIONAL_TOPICS, type Question, type RoleQuestion, type RoleResult } from "@resumora/shared";
+import { BRAIN_DUMP_QUESTION, CONDITIONAL_TOPICS, questionKey, type Question, type RoleQuestion, type RoleResult } from "@resumora/shared";
 
 /** A role's questions are answered in one run of at most this many; the rest wait behind "A few more questions". */
 export const RUN_MAX = 6;
@@ -11,8 +11,8 @@ export type RunItem =
   | { key: string; kind: "role"; question: RoleQuestion }
   | { key: string; kind: "line"; question: Question; followUp?: true };
 
-/** Two questions are the same when their words are, whatever the spacing or capitals. */
-export const questionKey = (text: string) => text.trim().replace(/\s+/g, " ").toLowerCase();
+// Two questions are the same when their words are, whatever the spacing or capitals (shared with the short path).
+export { questionKey };
 
 /** The text an item's answer is saved under. */
 export const itemQuestion = (item: RunItem) => (item.kind === "box" ? BRAIN_DUMP_QUESTION : item.question.text);
