@@ -40,4 +40,29 @@ npm run lint && npm run typecheck && npm test
 npm run db:test           # database tests (needs db:start)
 ```
 
+## Going live
+
+The live site is https://resumora.pages.dev. It has three parts: the website on Cloudflare Pages (project `resumora`), the API as a Cloudflare Worker (`resumora-api`, with the queues `resumora-imports` and `resumora-jobs`), and the hosted Supabase project.
+
+The browser only talks to the website's address: `apps/web/functions/v1` forwards every `/v1/*` request to the Worker through the `API` binding in `apps/web/wrangler.jsonc`.
+
+Publish in this order, from a checkout of `main`:
+
+```sh
+npx supabase db push --remote --dry-run       # database: lists new migrations; drop --dry-run to apply (needs `supabase link`)
+(cd apps/api && npx wrangler deploy)          # API
+
+# Website. The values below are public browser values (hosted Supabase URL and anon key).
+export VITE_SUPABASE_URL=https://<project>.supabase.co VITE_SUPABASE_ANON_KEY=<anon key>
+export VITE_HOSTED_SUPABASE_URL=$VITE_SUPABASE_URL VITE_HOSTED_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+export VITE_HOSTED_WEB_URL=https://resumora.pages.dev VITE_HOSTED_API_URL=https://resumora.pages.dev
+npm run package -w @resumora/extension        # the extension download offered by the site
+npm run build -w apps/web
+(cd apps/web && npx wrangler pages deploy --branch main)
+```
+
+Shell variables win over `apps/web/.env.local`, so a local file never leaks into a live build.
+
+The Worker reads its settings (the names in `apps/api/.dev.vars.example`) from Worker secrets: set them with `npx wrangler secret put <NAME>` in `apps/api`. `APP_ORIGIN` is the website's address. They survive later deploys.
+
 See [AGENTS.md](AGENTS.md) for conventions.
