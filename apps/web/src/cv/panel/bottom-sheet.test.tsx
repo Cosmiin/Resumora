@@ -157,4 +157,26 @@ describe("bottom sheet on phones", () => {
     expect(grip).toHaveAttribute("aria-expanded", "false");
     now.mockRestore();
   });
+
+  it("a fast short drag that stops before the finger lifts is not a flick", async () => {
+    renderPage();
+    const grip = await screen.findByRole("button", { name: "Panel size" });
+    const now = vi.spyOn(performance, "now");
+    now.mockReturnValue(0);
+    fireEvent.pointerDown(grip, { clientY: 300, pointerId: 1 });
+    now.mockReturnValue(20);
+    fireEvent.pointerMove(grip, { clientY: 270, pointerId: 1 });
+    now.mockReturnValue(1000);
+    fireEvent.pointerUp(grip, { clientY: 270, pointerId: 1 });
+    expect(grip).toHaveAttribute("aria-expanded", "false");
+    // The same drag, let go while still moving, opens the sheet.
+    now.mockReturnValue(2000);
+    fireEvent.pointerDown(grip, { clientY: 300, pointerId: 1 });
+    now.mockReturnValue(2020);
+    fireEvent.pointerMove(grip, { clientY: 270, pointerId: 1 });
+    now.mockReturnValue(2030);
+    fireEvent.pointerUp(grip, { clientY: 270, pointerId: 1 });
+    expect(grip).toHaveAttribute("aria-expanded", "true");
+    now.mockRestore();
+  });
 });

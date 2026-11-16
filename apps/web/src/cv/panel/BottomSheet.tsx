@@ -11,6 +11,8 @@ const DRAG_DISTANCE = 40;
 const TAP_SLOP = 8;
 /** A release faster than this (px per ms) is a flick: its direction decides, however short. */
 const FLICK_SPEED = 0.5;
+/** A flick ends with the finger still moving: its last move is at most this long (ms) before the release. */
+const FLICK_PAUSE = 100;
 /** How much of a short sheet shows, above the phone's own bottom inset. The same 176 as `--sheet-peek` in editor.css. */
 const PEEK_HEIGHT = 176;
 /** A click that belongs to a drag arrives at once; after this long (ms) the next click is its own. */
@@ -75,7 +77,9 @@ export function BottomSheet({ state, onStateChange, children }: Props) {
       swallowClick.current = true;
       setTimeout(() => (swallowClick.current = false), CLICK_AFTER_DRAG);
     }
-    const speed = d.moved && d.lastT > d.prevT ? (d.lastY - d.prevY) / (d.lastT - d.prevT) : 0;
+    // A finger that stopped before lifting is not a flick, however fast it moved earlier.
+    const stillMoving = performance.now() - d.lastT < FLICK_PAUSE;
+    const speed = d.moved && stillMoving && d.lastT > d.prevT ? (d.lastY - d.prevY) / (d.lastT - d.prevT) : 0;
     const flick = Math.abs(speed) > FLICK_SPEED;
     if (Math.abs(dy) > DRAG_DISTANCE || flick) onStateChange((flick ? speed : dy) < 0 ? "full" : "peek");
   }
