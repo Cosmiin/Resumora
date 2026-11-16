@@ -10,6 +10,15 @@ const LANGUAGE_NAME: Record<Locale, string> = {
 };
 
 /**
+ * How a role's lines open in Romanian (owner's pick, 2026-11-16). Every prompt that writes a role's lines,
+ * in enrichment and in tailoring, carries this same sentence.
+ */
+export const ROMANIAN_TENSE = "In Romanian, a line of a role that has ended starts with \"Am\" and the past participle (\"Am coordonat…\", \"Am efectuat…\"), never the present (\"Coordonez…\", \"Efectuez…\"); a line of the current role uses the present (\"Coordonez…\").";
+
+/** "No first person", worded so the Romanian "Am coordonat…" is not taken for it. */
+export const NO_FIRST_PERSON = "No first person pronouns (I, me, my; eu, meu, mea). The Romanian \"Am coordonat…\" is the expected form, not a pronoun.";
+
+/**
  * Which language to write in. CV text stays in the CV's language. What is said to the person (questions,
  * answer options, tips) is in the language they use the app in; without one, in the CV's language.
  */

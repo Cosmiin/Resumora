@@ -1,9 +1,9 @@
 import { notePeriod, type Experience, type Locale } from "@resumora/shared";
-import { languageInstruction } from "./prompts.ts";
+import { NO_FIRST_PERSON, ROMANIAN_TENSE, languageInstruction } from "./prompts.ts";
 
-// Prompts for the streamed rewrites. The rules are the spec's "Rewrite rules", word for word, plus one
-// line for Romanian, where rewrites sometimes opened in the first person ("Am scanat…"), and one from the
-// rules of enrichment flow B: facts add words, not lines.
+// Prompts for the streamed rewrites. The rules are the spec's "Rewrite rules", word for word, plus the shared
+// Romanian tense rule ("Am coordonat…" for an ended role, owner's pick 2026-11-16; it replaces "never with Am …"),
+// and one from the rules of enrichment flow B: facts add words, not lines.
 
 const RULES = `REWRITE RULES
 
@@ -12,8 +12,8 @@ const RULES = `REWRITE RULES
 - Start with a verb, using past tense for past roles and present tense for the current role.
 - Keep each bullet to 2 lines or less (≤ 220 characters).
 - A known fact adds a few words to the bullet it belongs to, never a new line. Name a tool inside the bullet where it was used.
-- No first person.
-- For Romanian, start with a past participle or a noun ("Coordonat…", "Coordonarea…"), never with "Am …".
+- ${NO_FIRST_PERSON}
+- ${ROMANIAN_TENSE}
 - Keep tool, product and domain names exactly as written.
 - One result per bullet. Do not merge unrelated bullets. A rewrite may propose a new bullet (replaces: null) only when it comes from a note.
 - Bullets already scoring 100 are not rewritten.

@@ -14,13 +14,19 @@ const proposal = (text: string, over: Partial<Proposal> = {}): Proposal =>
 const rules = (p: Proposal) => checkProposal(p, ctx).map((flag) => flag.rule);
 
 describe("checkProposal", () => {
-  it.each(["text", "description"])("flags present tense in a past role's %s only for English", (field) => {
+  it.each(["text", "description"])("flags present tense in a past role's %s for English and Romanian", (field) => {
     const p = proposal("Coordinate partner onboarding", { field });
     expect(checkProposal(p, { sources: [], pastRole: true, locale: "en" })).toEqual([
       { rule: "tense", detail: "The role has ended: start with a past-tense verb." },
     ]);
     expect(checkProposal(p, { sources: [], pastRole: false, locale: "en" })).toEqual([]);
-    expect(checkProposal(p, { sources: [], pastRole: true, locale: "ro" })).toEqual([]);
+    expect(checkProposal(p, { sources: [], pastRole: true, locale: "fr" })).toEqual([]);
+    const ro = proposal("Coordonez integrarea partenerilor", { field });
+    expect(checkProposal(ro, { sources: [], pastRole: true, locale: "ro" })).toEqual([
+      { rule: "tense", detail: "The role has ended: start with \"Am\" and the past participle (\"Am coordonat…\")." },
+    ]);
+    expect(checkProposal(ro, { sources: [], pastRole: false, locale: "ro" })).toEqual([]);
+    expect(checkProposal(proposal("Am coordonat integrarea partenerilor", { field }), { sources: [], pastRole: true, locale: "ro" })).toEqual([]);
     expect(checkProposal(proposal("Coordinated partner onboarding", { field }), { sources: [], pastRole: true, locale: "en" })).toEqual([]);
   });
 

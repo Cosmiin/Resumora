@@ -1,4 +1,4 @@
-import { findScored, fingerprint, isAllowedOption, mergeGrades, repeatKey, startsInPresentTense, type ImproveAnswer } from "@resumora/shared";
+import { findScored, fingerprint, isAllowedOption, mergeGrades, pastTenseNote, repeatKey, startsInPresentTense, type ImproveAnswer } from "@resumora/shared";
 import { z } from "zod";
 import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
@@ -41,7 +41,7 @@ export async function improveBullet(
     const pastRole = !role.current && role.endDate !== "";
     if (pastRole && answer.text !== null && startsInPresentTense(answer.text, content.locale)) {
       answer = await callModel(deps.model, {
-        ...request, user: `${request.user}\nThe role has ended: start with a past-tense verb.`,
+        ...request, user: `${request.user}\n${pastTenseNote(content.locale)}`,
       });
     }
     const question = answer.nextQuestion;
