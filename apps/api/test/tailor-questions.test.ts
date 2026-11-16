@@ -294,7 +294,8 @@ describe("job questions", () => {
     expect(sent).not.toHaveProperty("cv");
   });
 
-  it.each(["experience", "project", "volunteering"] as const)("sends only the current %s item, its period and notes; Skills still sees every role", async (kind) => {
+  // A project gets no tailoring questions (src/tailor/questions.test.ts).
+  it.each(["experience", "volunteering"] as const)("sends only the current %s item, its period and notes; Skills still sees every role", async (kind) => {
     const roles = ["Northwind Traders", "Contoso Labs", "Fabrikam Ltd"].map((company, index) => roleWith([
       `Handled ${company} accounts`,
     ], { company, title: `Analyst ${index}`, startDate: `200${index}-01`, endDate: `200${index + 1}-12`, notes: [
@@ -304,7 +305,7 @@ describe("job questions", () => {
     const a = roles[0]!, b = roles[1]!, c = roles[2]!;
     const section = kind === "experience" ? "experience" : "projects";
     const content: CvContent = { ...emptyCv("ro"), experience: kind === "experience" ? roles : [a, c],
-      projects: kind === "project" ? [{ ...b, url: "" }] : [], volunteering: kind === "volunteering" ? [b] : [] };
+      projects: [], volunteering: kind === "volunteering" ? [b] : [] };
     await cv.save(content, 1);
     const repo = memoryTailorRepo("user-a", scores, docs);
     await repo.saveScore(jobId, "base", null, { ...score, labels: [

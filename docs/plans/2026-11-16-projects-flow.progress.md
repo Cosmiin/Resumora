@@ -22,5 +22,10 @@ open: Ruling: after Task 1 no project had a button to open a run any more (it us
 
 ## Task 5: Projects in the guided path — done
 session: Build projects flow (Tasks 1–4, continued here for 5–6) · builder: claude
-commit: SHA5 (base cc4e2c5) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
+commit: 9f0a78b (base cc4e2c5) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
 open: Ruling: `sections-path.test.tsx` (outside the scope list) was brought back to projects in the path, as To do / Done. The path's volunteering group now has its own label ("Volunteering"). The old "Projects and volunteering" label is unused in the path but still shows in the panel's score list (`enrich.roles.other`), which now lists only volunteering. Fix round (reviewer, low): while the roles' scores load, the to-do project ticks alone can't start the path. A jobs-page test timed out once under full-suite load and passes alone (file not touched by this branch).
+
+## Task 6: Tailoring a project — done
+session: Build projects flow (Tasks 1–4, continued here for 5–6) · builder: claude
+commit: SHA6 (base 9f0a78b) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: Ruling: three older API tests outside the scope list (`test/tailor-projects.test.ts` ×2, `test/tailor-questions.test.ts` ×1) expected tailoring questions about a project; they now check that a project gets none (the volunteering cases are unchanged). The two-bullet cap is applied after the "removed" count, so dropped extra bullets are not reported as failed checks.

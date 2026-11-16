@@ -1,0 +1,37 @@
+import { describe, expect, it } from "vitest";
+import { emptyCv, type CvContent, type JobExtraction } from "@resumora/shared";
+import { fakeModel, roleWith } from "../enrich/fake-model.ts";
+import { memoryTailorRepo } from "./memory-repo.ts";
+import { askQuestions } from "./questions.ts";
+
+const job: JobExtraction = {
+  title: "AI Engineer", company: "Cedar", location: null, workMode: "remote", employmentType: "full_time",
+  seniority: "mid", salary: null, isJobPosting: true, applyBy: null, benefits: [],
+  summary: "Build LLM integrations.", requirements: [], responsibilities: ["Agentic development"],
+};
+
+async function ask(cv: CvContent, itemId: string) {
+  const tailor = memoryTailorRepo("user-a");
+  const tailoredCvId = await tailor.createTailoredCv({
+    jobId: "job-a", language: "en", content: cv, baseSnapshotAt: "2026-11-10T10:00:00Z", tone: "neutral", instruction: null, steering: {},
+  });
+  const run = await tailor.createRun({ jobId: "job-a", tailoredCvId, kind: "tailor", sections: ["projects"], currentSection: "projects", currentRoleId: itemId });
+  const model = fakeModel(() => ({ questions: [] }));
+  const questions = await askQuestions({ model: model.deps, tailor }, { userId: "user-a", run, job, cv, section: "projects", roleId: itemId });
+  return { questions, model };
+}
+
+describe("tailoring questions in Projects & volunteering", () => {
+  it("asks nothing about a project, without calling the model", async () => {
+    const project = { ...roleWith(["Built agents with the Claude API."]), url: "" };
+    const { questions, model } = await ask({ ...emptyCv("en"), projects: [project] }, project.id);
+    expect(questions).toEqual([]);
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it("still asks the model about a volunteering role", async () => {
+    const helper = roleWith(["Sorted parcels."]);
+    const { model } = await ask({ ...emptyCv("en"), volunteering: [helper] }, helper.id);
+    expect(model.requests).toHaveLength(1);
+  });
+});

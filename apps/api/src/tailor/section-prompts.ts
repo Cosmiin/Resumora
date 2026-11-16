@@ -14,12 +14,20 @@ A role that has ended keeps past tense; only a current role uses present tense.
 Reword bullets with the job's exact keywords inside natural sentences. Condense old or less relevant roles to 1-2 short bullets' worth of wording.
 Never remove a role, a bullet's facts, or change company, title or dates.
 Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; a role's own wording is itemId = the role's id, field "description". Never return a role's bullets as one field.`,
-  projects: `The item under "edit" is a project or a volunteering role (its "kind" says which). Tailor it like a role.
-Use only this item's own bullets, notes, facts and answers.
-A role that has ended keeps past tense; only a current role uses present tense.
-Reorder its bullets so the most relevant come first (return proposals in that order).
-Reword bullets with the job's exact keywords inside natural sentences.
-Never remove the item or a bullet's facts, and never change its name (title), organisation (company), dates or link.
+  projects: `The item under "edit" is a project or a volunteering role (its "kind" says which).
+A volunteering role: tailor it like a role.
+- Use only this item's own bullets, notes, facts and answers.
+- A role that has ended keeps past tense; only a current role uses present tense.
+- Reorder its bullets so the most relevant come first (return proposals in that order).
+- Reword bullets with the job's exact keywords inside natural sentences.
+- Never remove the item or a bullet's facts, and never change its name (title), organisation (company), dates or link.
+A project: a short place on the CV that proves skills, not a job.
+- Reword its description and at most two bullets toward the job's exact keywords, leading with what the job wants. Never propose more than two bullets.
+- Use only the project's own lines, notes and answers.
+- A job keyword may be used only when it is the same thing in other words or a direct part of what the person said ("built agents with the Claude API" supports "LLM integration" and "agentic development"); never a different tool (TypeScript never becomes Java).
+- A job keyword the project doesn't support is left out.
+- An ended project keeps past tense; only an ongoing one uses present tense.
+- Never change its name (title), organisation (company), dates or link.
 Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; the item's own wording is itemId = its id, field "description". Never return its bullets as one field.`,
   skills: `Reword skill names toward the job's exact keywords, most relevant first (return proposals in that order).
 You may add job-relevant skills the CV, notes or answers support, as itemId "new-skill", field "name", with inferred true.
