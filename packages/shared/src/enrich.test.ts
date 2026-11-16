@@ -368,14 +368,14 @@ describe("fingerprint", () => {
     expect(fingerprint(role(["one", "twO"]), "en")).not.toBe(fp);
     expect(fingerprint(role(["one", "two"], { description: "x" }), "en")).not.toBe(fp);
     expect(fingerprint(role(["one", "two"], { title: "Other" }), "en")).not.toBe(fp);
+    // The company proposal is written from the company and its location.
+    expect(fingerprint(role(["one", "two"], { company: "Nordlane Logistics" }), "en")).not.toBe(fp);
+    expect(fingerprint(role(["one", "two"], { location: "Cluj" }), "en")).not.toBe(fp);
     expect(fingerprint(base, "ro")).not.toBe(fp);
   });
   it("changes when a bullet keeps its text but gets a new id", () => {
     const retyped = { ...base, bullets: [base.bullets[0]!, { id: "b9", text: "two" }] };
     expect(fingerprint(retyped, "en")).not.toBe(fp);
-  });
-  it("ignores the company", () => {
-    expect(fingerprint(role(["one", "two"], { company: "Z" }), "en")).toBe(fp);
   });
   it("changes with the role's period, because questions are written for the time the work happened", () => {
     expect(fingerprint(role(["one", "two"], { startDate: "2000", endDate: "", current: true }), "en")).not.toBe(fp);
