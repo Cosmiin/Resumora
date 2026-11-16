@@ -236,9 +236,16 @@ Always cover these three, one question each, in this order, and leave out
 any that the CV or the notes already answer. Each question asks one thing
 in plain words ("What does the company do?", not "What industry is it in
 and what are its products?"):
-1. topic company: what the company does. You are not told the company, so
-   give options only when the role's own text shows what kind of company
-   it is; otherwise give none and let the person say it.
+1. topic company: what the company does. You are told the company's name
+   and location. When you recognise this specific company and are sure
+   what it does, put one plain sentence in proposal, in the language of
+   the questions: what it does (its industry, products or customers), at
+   most 200 characters. When the name is generic, could belong to several
+   companies, or you are not sure, set proposal to null: a wrong guess is
+   worse than none. Give no options on this question.
+   Knowing the company yourself does not mean the CV shows it: mark
+   company in coverage only from the role's own text and notes, and
+   still ask this question, with your proposal for the person to confirm.
 2. topic purpose: what the role was for (its purpose and scope).
 3. topic tools: the tools, software and methods used.
 Then at most 5 more, in this order.
@@ -254,6 +261,7 @@ Never ask one for a parameter you mark shown or na.
 Then any other role-wide fact that is still needed (topic other).
 Return [] if nothing is needed.
 Never ask about something the CV or the notes already answer.
+Set proposal to null on every role question except topic company.
 
 Set thin to true when the role gives too little information to infer
 plausible skills or achievements (for example one short or vague bullet);
@@ -385,13 +393,19 @@ export function moreNote(more?: boolean): string {
   ].join("\n");
 }
 
-/** The role as the model sees it: context for the title, description and period, bullets to grade. No company. */
-export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes"> & Partial<Pick<Experience, "startDate" | "endDate" | "current">>, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
+/** `Company (context only, not graded): "Acme"`, or nothing when the field is empty. */
+const contextLine = (label: string, value?: string): string[] =>
+  value?.trim() ? [`${label} (context only, not graded): ${JSON.stringify(value.trim())}`] : [];
+
+/** The role as the model sees it: context for the title, company, location, description and period, bullets to grade. */
+export function scoreUserMessage(role: Pick<Experience, "title" | "description" | "bullets" | "notes"> & Partial<Pick<Experience, "company" | "location" | "startDate" | "endDate" | "current">>, gradeOnly?: readonly string[], kind: ScoredKind = "role"): string {
   const bullets = role.bullets.map((b) => ({ id: b.id, text: b.text }));
   return [
     ...kindNote(kind),
     "<experience>",
     `Role title (context only, not graded): ${JSON.stringify(role.title)}`,
+    ...contextLine("Company", role.company),
+    ...contextLine("Location", role.location),
     `Role description (context only, not graded): ${JSON.stringify(role.description)}`,
     ...periodLine(role),
     "Bullets to grade (JSON, each { id, text }):",
