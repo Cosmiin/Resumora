@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PROJECT_TOPICS, ProjectQuestionSchema, ProjectQuestionsAnswerSchema, ProjectQuestionsBodySchema } from "./index.ts";
+import { PROJECT_TOPICS, ProjectQuestionSchema, ProjectQuestionsAnswerSchema, ProjectQuestionsBodySchema, ProjectWriteAnswerSchema, ProjectWriteBodySchema } from "./index.ts";
 
 describe("project question shapes", () => {
   const question = { id: "pq1", topic: "tools", text: "Which tools did you use?", options: ["Make", "Airtable"] };
@@ -26,5 +26,21 @@ describe("project question shapes", () => {
   it("holds at most 6 questions", () => {
     expect(ProjectQuestionsAnswerSchema.safeParse({ questions: Array(6).fill(question) }).success).toBe(true);
     expect(ProjectQuestionsAnswerSchema.safeParse({ questions: Array(7).fill(question) }).success).toBe(false);
+  });
+});
+
+describe("project writer shapes", () => {
+  it("takes a project id only", () => {
+    expect(ProjectWriteBodySchema.safeParse({ projectId: "p1" }).success).toBe(true);
+    expect(ProjectWriteBodySchema.safeParse({ projectId: "p1", answers: [] }).success).toBe(false);
+  });
+
+  it("answers one description (may be empty), at most two bullets and at most 12 extra tools", () => {
+    const ok = { description: "", bullets: ["Built it.", "Shipped it."], extraTools: ["Make"] };
+    expect(ProjectWriteAnswerSchema.safeParse(ok).success).toBe(true);
+    expect(ProjectWriteAnswerSchema.safeParse({ ...ok, description: "x".repeat(201) }).success).toBe(false);
+    expect(ProjectWriteAnswerSchema.safeParse({ ...ok, bullets: ["a", "b", "c"] }).success).toBe(false);
+    expect(ProjectWriteAnswerSchema.safeParse({ ...ok, extraTools: Array(13).fill("Make") }).success).toBe(false);
+    expect(ProjectWriteAnswerSchema.safeParse({ ...ok, extraTools: ["x".repeat(61)] }).success).toBe(false);
   });
 });

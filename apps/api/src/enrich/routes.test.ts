@@ -177,3 +177,22 @@ describe("POST /v1/enrich/project-questions", () => {
     expect(await res.json()).toEqual({ questions: [{ id: "pq1", topic: "tools", text: "Which tools did you use?", options: ["Python", "Excel"] }] });
   });
 });
+
+describe("POST /v1/enrich/project-write", () => {
+  const post = (body: unknown) => app.request("/v1/enrich/project-write", { method: "POST", headers: auth, body: JSON.stringify(body) });
+  const project = { ...roleWith([], { title: "Route planner", company: "Personal project", description: "A Python route planner.", current: true, endDate: "" }), url: "" };
+
+  it("400 for a malformed body, 409 for an id not saved as a project", async () => {
+    expect((await post({})).status).toBe(400);
+    expect((await post({ projectId: "p1", extra: true })).status).toBe(400);
+    expect((await post({ projectId: role.id })).status).toBe(409);
+  });
+
+  it("returns the lines for a saved project", async () => {
+    await savedCv.save({ ...emptyCv("en"), experience: [role], projects: [project] }, (await savedCv.get()).version);
+    model = fakeModel(() => ({ description: "A Python route planner for deliveries.", bullets: ["Plans routes in Python."], extraTools: [] }));
+    const res = await post({ projectId: project.id });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ description: "A Python route planner for deliveries.", bullets: ["Plans routes in Python."], extraTools: [] });
+  });
+});
