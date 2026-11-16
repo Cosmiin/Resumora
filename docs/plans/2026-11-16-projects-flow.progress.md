@@ -17,5 +17,5 @@ open: Ruling: the tense check (retry, then drop) looks at the bullets only. The 
 
 ## Task 4: The project run (web) — done
 session: Build projects flow (Tasks 1–4) · builder: claude
-commit: SHA4 (base b584283) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
+commit: 916e70d (base b584283) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
 open: Ruling: after Task 1 no project had a button to open a run any more (it used to be the score pill), so a ✨ "Describe this project" button sits beside each project's name (`RoleItem.tsx`, outside the scope list). Fix round (reviewer, low): the questions are asked only after the CV is saved, so a project added a moment ago is found. Not checked in the running app (no secrets in the worktree); covered by tests only.
