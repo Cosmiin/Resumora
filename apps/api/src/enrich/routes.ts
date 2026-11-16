@@ -19,6 +19,8 @@ import { itemLines } from "./item-lines.ts";
 import { projectQuestions } from "./project-questions.ts";
 import { projectWrite } from "./project-write.ts";
 import { suggestAchievements } from "./achievements.ts";
+import { suggestCompanies } from "./companies.ts";
+import { suggestTools } from "./tools.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
 import { checkSummary, rewriteEvents } from "./rewrite.ts";
@@ -103,6 +105,21 @@ export function enrichRoutes(deps: {
       throw err;
     }
   });
+
+  // The short path's companies and tools screens: one call each for the whole CV.
+  for (const [path, run, name] of [["/companies", suggestCompanies, "companies"], ["/tools", suggestTools, "tools"]] as const) {
+    app.post(path, async (c) => {
+      const user = c.get("user");
+      try {
+        return c.json(await run({ cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") }));
+      } catch (err) {
+        if (err instanceof ApiError && err.status >= 500) {
+          console.error(JSON.stringify({ msg: `${name} failed`, code: err.code, requestId: c.get("requestId") }));
+        }
+        throw err;
+      }
+    });
+  }
 
   app.post("/achievements", async (c) => {
     const user = c.get("user");
