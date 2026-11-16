@@ -78,3 +78,7 @@ Writer, if every question is skipped (five bullets become two; on approval the o
 
 ## Whole-branch review (Opus, base 80998ba)
 review 1: pass, two low findings, both fixed in "Whole-branch review fixes": (1) the Start button's rule for roles had changed by accident in Task 5's fix round; restored (only the automatic project ticks are held while scores load). (2) For Romanian, the tense check now covers the description too (the Romanian check looks at verb endings, so "Automatizare de facturi…" is not misread). Fix-only review (Opus): pass.
+review 2 (Opus, final): pass, one low finding left Open: if no new bullet is kept on the approval screen (the person turns both off, or the writer returns none), Apply keeps the project's old bullets, so an imported project with 5 bullets keeps them and stays "To do". Replacing them with nothing would delete the person's lines without asking. Owner's call which way.
+
+## Cost line
+Claude only, no Codex · 11 review agents (8 Sonnet per task incl. 2 fix-round re-reviews; 3 Opus: whole-branch ×2 + fix-only ×1) + 1 Sonnet stand-in for the golden examples · guard denials: 0 · weekly usage: not measured.
