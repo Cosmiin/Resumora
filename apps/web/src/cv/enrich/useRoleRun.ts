@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  CLEAR_AT, MAX_LONG_TEXT, MAX_TEXT, findScored, fingerprint, newId, notesHash,
+  CLEAR_AT, MAX_LONG_TEXT, findScored, fingerprint, newId, notesHash,
   type CvContent, type Experience, type RoleResult,
 } from "@resumora/shared";
 import { ApiClientError } from "../../lib/api-error.ts";
@@ -11,12 +11,9 @@ import { brainDump, improveBullet, roleDescription, roleFacts, scoreRole } from 
 import { t } from "../../i18n/t.ts";
 import { RUN_MAX, buildRun, gapItems, itemQuestion, questionKey, splitRun, type RunItem } from "./run.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
+import { changeActions, type Change } from "./prepare.ts";
 
-/** One piece of the role that the answers changed: its description, one of its bullets, or a new bullet. */
-export type Change =
-  | { id: string; kind: "description"; before: string; after: string }
-  | { id: string; kind: "bullet"; bulletId: string; before: string; after: string }
-  | { id: string; kind: "new"; before: ""; after: string };
+export type { Change };
 
 export type RunStep =
   /** The first screen of a role. Its questions may still be loading (`ready` is false). */
@@ -408,29 +405,11 @@ export function useRoleRun(opts: Options) {
       const o = current.current;
       const now = findScored(o.cv, o.roleId)?.item;
       if (!now) return;
-      const texts = new Map(decisions.map((d) => [d.id, d.text.trim()]));
-      const fresh: string[] = [];
-      let applied = 0;
-      for (const change of step.changes) {
-        const text = texts.get(change.id);
-        if (!text) continue;
-        if (change.kind === "description") {
-          const list = roleListOf(o.cv, o.roleId);
-          if (!list || squash(text) === squash(now.description)) continue;
-          o.dispatch({ type: "setItemField", list, itemId: o.roleId, field: "description", value: text.slice(0, MAX_LONG_TEXT) });
-          applied++;
-        } else if (change.kind === "bullet") {
-          const bullet = now.bullets.find((b) => b.id === change.bulletId);
-          if (!bullet || squash(text) === squash(bullet.text)) continue;
-          o.dispatch({ type: "replaceBullet", roleId: o.roleId, bulletId: change.bulletId, text: text.slice(0, MAX_TEXT) });
-          s.changed.add(change.bulletId);
-          applied++;
-        } else fresh.push(text.slice(0, MAX_TEXT));
-      }
-      if (fresh.length) {
-        o.dispatch({ type: "addBullets", roleId: o.roleId, texts: fresh });
-        applied += fresh.length;
-      }
+      const list = roleListOf(o.cv, o.roleId);
+      if (!list) return;
+      const { actions, applied, changedBullets } = changeActions(o.cv, o.roleId, list, step.changes, decisions);
+      for (const action of actions) o.dispatch(action);
+      for (const id of changedBullets) s.changed.add(id);
       toDone(applied);
     },
     /** The changes could not be prepared: try once more. */

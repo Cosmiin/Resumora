@@ -224,6 +224,7 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.light.prompt3": "Ai făcut, ai câștigat ceva sau ești mândru de ceva?",
   "enrich.light.question": "Povestește-ne despre {name}",
   "enrich.light.slot": "+ aici vor apărea un rând sau două",
+  "enrich.path.review.tidied": "Reformulat, fără fapte noi",
   "enrich.path.achievements": "Realizări-cheie",
   "enrich.path.count": "{n} din {total} alese.",
   "enrich.path.dialog": "Îmbogățește-ți CV-ul",

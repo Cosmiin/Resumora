@@ -222,6 +222,7 @@ export const basecvEn = {
   "enrich.light.prompt3": "Anything you made, won or are proud of?",
   "enrich.light.question": "Tell us about {name}",
   "enrich.light.slot": "+ a line or two will appear here",
+  "enrich.path.review.tidied": "Tidied, no new facts",
   "enrich.path.achievements": "Key achievements",
   "enrich.path.count": "{n} of {total} chosen.",
   "enrich.path.dialog": "Enrich your CV",
