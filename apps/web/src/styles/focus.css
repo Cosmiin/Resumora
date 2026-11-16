@@ -6,7 +6,7 @@
 
 .focus-mode {
   --fw: 1100px;
-  position: fixed; inset: 0; z-index: 1000; overflow-y: auto; min-height: 0;
+  position: fixed; inset: 0; z-index: 1000; overflow-y: auto; overscroll-behavior: contain; min-height: 0;
   padding: 0 max(var(--gutter), env(safe-area-inset-right, 0px)) var(--space-10) max(var(--gutter), env(safe-area-inset-left, 0px));
   background: var(--color-desk); color: var(--color-ink);
   font: var(--weight-regular) var(--text-base) / var(--leading-base) var(--font-body);
@@ -290,6 +290,18 @@
   .fm-strength { font-size: 2.6rem; }
   .fm-moment-num { font-size: 4rem; }
   .improve-btn { inset-inline-end: -4px; inset-block-start: -26px; width: 26px; height: 26px; }
+}
+
+/* Narrow screens: the step's buttons stay at the foot of the screen, on the desk, while its content scrolls under them. */
+@media (max-width: 900px) {
+  .focus-mode .fm-foot {
+    /* The screen's own bottom padding counts as part of the sticking area: step over it to reach the edge. */
+    position: sticky; bottom: calc(-1 * var(--space-10)); z-index: 1; gap: var(--space-2) var(--space-3); max-width: none;
+    margin-inline: calc(-1 * var(--gutter)); padding: var(--space-3) var(--gutter) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    background: var(--color-desk); box-shadow: 0 -1px 0 color-mix(in srgb, var(--color-ink) 12%, transparent);
+  }
+  /* In the tailoring room the page itself scrolls, and it has no padding of its own under the step. */
+  .tailor-room .focus-mode .fm-foot { bottom: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

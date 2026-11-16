@@ -15,6 +15,7 @@ import { DescriptionStep } from "./DescriptionStep.tsx";
 import type { FocusTarget } from "./focus-context.ts";
 import { ProposalStep } from "./ProposalStep.tsx";
 import { QuestionStep } from "./QuestionStep.tsx";
+import { BOX_OR_BUTTON_FIRST, focusStep } from "./focus-step.ts";
 import { issueTip } from "./tips.ts";
 import { useFocusSession, type FocusStep } from "./useFocusSession.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
@@ -119,8 +120,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
     const frame = requestAnimationFrame(() => {
       const pane = right.current;
       if (!pane || pane.contains(document.activeElement)) return;
-      const el = pane.querySelector<HTMLElement>("textarea:not(:disabled), .fm-btn:not(:disabled)") ?? pane.querySelector<HTMLElement>("#fm-step-title");
-      el?.focus();
+      focusStep(pane, BOX_OR_BUTTON_FIRST);
     });
     return () => cancelAnimationFrame(frame);
   }, [stepKey, step.kind]);
@@ -375,7 +375,7 @@ export function LightStop({ section, itemId, cv, dispatch, waitForSave, onClose,
     const frame = requestAnimationFrame(() => {
       const pane = right.current;
       if (!pane || pane.contains(document.activeElement)) return;
-      (pane.querySelector<HTMLElement>("textarea:not(:disabled), .fm-btn:not(:disabled)") ?? pane.querySelector<HTMLElement>("#fm-step-title"))?.focus();
+      focusStep(pane, BOX_OR_BUTTON_FIRST);
     });
     return () => cancelAnimationFrame(frame);
   }, [step.kind]);

@@ -46,7 +46,7 @@
 .import-page { margin-top: var(--space-4); }
 
 /* No CV yet: the upload */
-.cv-start-page { min-height: calc(100vh - 90px); }
+.cv-start-page { min-height: calc(100vh - 90px); min-height: calc(100svh - 90px); }
 .cv-start { max-width: 720px; padding-block: var(--space-7) var(--space-10); display: grid; gap: var(--space-4); justify-items: start; }
 .cv-start > .ui-stepper { margin-bottom: var(--space-3); }
 .cv-drop { width: 100%; box-sizing: border-box; margin-top: var(--space-3); padding: 48px var(--space-7); display: grid; gap: 14px; justify-items: center; text-align: center; border: var(--border-control) dashed var(--color-ink); border-radius: var(--radius-block); background: var(--color-paper-veil); transition: background-color var(--dur-fast); }

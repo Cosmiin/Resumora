@@ -95,4 +95,66 @@ describe("bottom sheet on phones", () => {
     await user.click(await screen.findByRole("textbox", { name: "Summary" }));
     expect(grip).toHaveAttribute("aria-expanded", "false");
   });
+
+  it("the sheet follows the pointer during a drag and lets go on release", async () => {
+    renderPage();
+    const grip = await screen.findByRole("button", { name: "Panel size" });
+    const sheet = grip.closest(".sheet") as HTMLElement;
+    // jsdom lays nothing out: give the sheet a height, so there is room to travel.
+    Object.defineProperty(sheet, "offsetHeight", { configurable: true, value: 600 });
+    fireEvent.pointerDown(grip, { clientY: 500, pointerId: 1 });
+    fireEvent.pointerMove(grip, { clientY: 400, pointerId: 1 });
+    expect(sheet.style.transform).toBe("translateY(324px)");
+    expect(sheet.style.transition).toBe("none");
+    fireEvent.pointerUp(grip, { clientY: 400, pointerId: 1 });
+    expect(sheet.style.transform).toBe("");
+    expect(sheet.style.transition).toBe("");
+    expect(grip).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("a short sheet opens from a drag on its content; a full one does not close from there", async () => {
+    renderPage();
+    const grip = await screen.findByRole("button", { name: "Panel size" });
+    const body = grip.closest(".sheet")!.querySelector(".sheet-body")!;
+    fireEvent.pointerDown(body, { clientY: 500, pointerId: 1 });
+    fireEvent.pointerMove(body, { clientY: 440, pointerId: 1 });
+    fireEvent.pointerUp(body, { clientY: 440, pointerId: 1 });
+    expect(grip).toHaveAttribute("aria-expanded", "true");
+    fireEvent.pointerDown(body, { clientY: 300, pointerId: 1 });
+    fireEvent.pointerMove(body, { clientY: 400, pointerId: 1 });
+    fireEvent.pointerUp(body, { clientY: 400, pointerId: 1 });
+    expect(grip).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("a drag that ends on a control does not click it", async () => {
+    renderPage();
+    const grip = await screen.findByRole("button", { name: "Panel size" });
+    const inside = grip.closest(".sheet")!.querySelector<HTMLElement>(".sheet-body button")!;
+    const clicked = vi.fn();
+    inside.addEventListener("click", clicked);
+    fireEvent.pointerDown(inside, { clientY: 500, pointerId: 1 });
+    fireEvent.pointerMove(inside, { clientY: 440, pointerId: 1 });
+    fireEvent.pointerUp(inside, { clientY: 440, pointerId: 1 });
+    fireEvent.click(inside);
+    expect(clicked).not.toHaveBeenCalled();
+    expect(grip).toHaveAttribute("aria-expanded", "true");
+    // The next plain tap is a click again.
+    fireEvent.click(inside);
+    expect(clicked).toHaveBeenCalledTimes(1);
+  });
+
+  it("a small slow drag on the grip leaves the state as it was", async () => {
+    renderPage();
+    const grip = await screen.findByRole("button", { name: "Panel size" });
+    const now = vi.spyOn(performance, "now");
+    now.mockReturnValue(0);
+    fireEvent.pointerDown(grip, { clientY: 300, pointerId: 1 });
+    now.mockReturnValue(400);
+    fireEvent.pointerMove(grip, { clientY: 280, pointerId: 1 });
+    now.mockReturnValue(800);
+    fireEvent.pointerUp(grip, { clientY: 280, pointerId: 1 });
+    fireEvent.click(grip);
+    expect(grip).toHaveAttribute("aria-expanded", "false");
+    now.mockRestore();
+  });
 });

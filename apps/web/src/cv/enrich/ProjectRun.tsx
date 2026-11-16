@@ -8,6 +8,7 @@ import { formatRange } from "../page/blocks.ts";
 import { AnswerBox, type Via } from "./AnswerBox.tsx";
 import { FocusBar } from "./FocusBar.tsx";
 import type { FocusTarget } from "./focus-context.ts";
+import { TITLE_FIRST, focusStep } from "./focus-step.ts";
 import { useFocusFrame } from "./FocusMode.tsx";
 import { BackButton } from "./QuestionStep.tsx";
 import { useProjectRun, type ProjectDecision } from "./useProjectRun.ts";
@@ -45,7 +46,7 @@ export function ProjectRun({ target, cv, dispatch, waitForSave, onClose, context
     const frame = requestAnimationFrame(() => {
       const el = pane.current;
       if (!el || el.contains(document.activeElement)) return;
-      (el.querySelector<HTMLElement>("#fm-step-title") ?? el.querySelector<HTMLElement>(".fm-btn:not(:disabled)"))?.focus();
+      focusStep(el, TITLE_FIRST);
     });
     return () => cancelAnimationFrame(frame);
   }, [stepKey]);
