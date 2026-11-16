@@ -94,6 +94,20 @@ describe("the start of a role", () => {
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
+  it("names the company next to the role in the top bar while it asks", async () => {
+    const { container } = render(<Harness context="Role 1 of 2" />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByRole("heading", { name: "What does Nordlane Logistics do?" })).toBeInTheDocument();
+    expect(container.ownerDocument.querySelector(".fm-bar .fm-ctx")?.textContent).toBe("Role 1 of 2: Operations Analyst · Nordlane Logistics");
+  });
+
+  it("shows the role alone in the top bar when it has no company", async () => {
+    const noCompany = { ...role, company: "  " };
+    render(<Harness initialRole={noCompany} roleResult={{ ...result, fingerprint: fingerprint(noCompany, "en") }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(document.querySelector(".fm-bar .fm-ctx")?.textContent).toBe("Operations Analyst");
+  });
+
   it("asks for the questions when the stored score is not for this text, and waits for them", async () => {
     let give!: (r: RoleResult) => void;
     api.scoreRole.mockReturnValue(new Promise<RoleResult>((done) => { give = done; }));

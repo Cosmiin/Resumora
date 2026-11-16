@@ -75,7 +75,7 @@ export function RoleRun({ target, cv, dispatch, scores, waitForSave, onClose, co
 
   return createPortal(
     <div ref={root} className="ui-page focus-mode role-run" role="dialog" aria-modal="true" aria-label={t("enrich.focus.dialog", { role: name })}>
-      <FocusBar context={framed ? context : undefined} name={framed ? name : undefined} onClose={() => run.close()} />
+      <FocusBar context={framed ? context : undefined} name={framed ? name : undefined} company={role.company} onClose={() => run.close()} />
       <div className="rr-col" ref={pane} aria-busy={busy}>
         {step.kind === "start" && (
           <div className="rr-card">
