@@ -285,6 +285,24 @@ export function findScored(cv: Pick<CvContent, "experience" | "projects" | "volu
   return scoredItems(cv).find(({ item }) => item.id === id);
 }
 
+/** The items that get a 0–100 score and count in the CV strength: roles, then volunteering. Projects have their own flow. */
+export function gradedItems(cv: Pick<CvContent, "experience" | "volunteering">): { item: Experience; kind: "role" | "volunteering" }[] {
+  return [
+    ...cv.experience.map((item) => ({ item, kind: "role" as const })),
+    ...cv.volunteering.map((item) => ({ item, kind: "volunteering" as const })),
+  ];
+}
+
+export function findGraded(cv: Pick<CvContent, "experience" | "volunteering">, id: string): { item: Experience; kind: "role" | "volunteering" } | undefined {
+  return gradedItems(cv).find(({ item }) => item.id === id);
+}
+
+/** A project is done when it has a description and one or two bullets with text. Derived, never stored. */
+export function projectDone(p: Pick<Project, "description" | "bullets">): boolean {
+  const lines = p.bullets.filter((b) => b.text.trim() !== "").length;
+  return p.description.trim() !== "" && lines >= 1 && lines <= 2;
+}
+
 /** The CV as shown on the page and in the exports: hidden courses, awards, publications and interests left out. */
 export function withoutHidden(cv: CvContent): CvContent {
   const shown = <T extends { hidden?: boolean }>(items: T[]) => (items.some((item) => item.hidden) ? items.filter((item) => !item.hidden) : items);

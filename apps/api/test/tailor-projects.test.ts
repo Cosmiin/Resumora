@@ -173,40 +173,28 @@ describe("Projects & volunteering step", () => {
     expect((await getRun(run.id)).currentRoleId).toBe(project.id);
   });
 
-  it("asks a project's questions about that project, at most 5", async () => {
+  it("asks nothing about a project: no questions and no model call", async () => {
     const run = await start();
     await runItem(run.id, "experience", role.id);
     await acceptItem(run.id, "experience", role.id);
-    replies.push({ questions: Array.from({ length: 7 }, (_, i) => ({
-      roleId: project.id, bulletId: project.bullets[0]!.id, skill: null, text: `Which checks did it run ${i}?`, kind: "options", options: [], reason: "Gap", gap: "r0",
-    })) });
+    const calls = model.requests.length;
     const res = await post(`/v1/tailor-runs/${run.id}/sections/projects/questions`, { roleId: project.id });
     expect(res.status).toBe(200);
-    const { questions } = await res.json() as { questions: { roleId: string; bulletId?: string; section: string }[] };
-    expect(questions).toHaveLength(5);
-    expect(questions[0]).toMatchObject({ roleId: project.id, bulletId: project.bullets[0]!.id, section: "projects" });
-    const sent = lastUser("role") as { role: { id: string } };
-    expect(sent.role.id).toBe(project.id);
+    expect((await res.json() as { questions: unknown[] }).questions).toEqual([]);
+    expect(model.requests).toHaveLength(calls);
   });
 
-  it("redoes a finished project with new answers", async () => {
+  it("redoes a finished project (it has no questions, so no answers)", async () => {
     const run = await start();
     await runItem(run.id, "experience", role.id);
     await acceptItem(run.id, "experience", role.id);
-    replies.push({ questions: [{ roleId: project.id, bulletId: null, skill: null, text: "What did it check?", kind: "options", options: [], reason: "Gap", gap: "r0" }] });
-    const asked = await (await post(`/v1/tailor-runs/${run.id}/sections/projects/questions`, { roleId: project.id })).json() as { questions: { id: string }[] };
-    const saved = await post(`/v1/tailor-runs/${run.id}/answers`, { answers: [{ questionId: asked.questions[0]!.id, value: "Tax codes", via: "typed" }] });
-    expect(saved.status).toBe(200);
-    // The answer is saved as a job note on the project itself.
-    expect((await cv.get()).content.projects[0]!.notes.map((note) => note.answer)).toEqual(["Tax codes"]);
     await runItem(run.id, "projects", project.id);
     await acceptItem(run.id, "projects", project.id);
 
     const bullet = project.bullets[0]!.id;
     replies.push({ proposals: [{ ...reword(bullet, "Built an Excel checker for payroll tax codes"), reason: null, guesses: null }] }, { results: [] });
-    const redo = await post(`/v1/tailor-runs/${run.id}/roles/${project.id}/redo`, { answers: [{ questionId: asked.questions[0]!.id, value: "Payroll tax codes", via: "typed" }] });
+    const redo = await post(`/v1/tailor-runs/${run.id}/roles/${project.id}/redo`, { answers: [] });
     expect(redo.status).toBe(200);
-    expect((await cv.get()).content.projects[0]!.notes.map((note) => note.answer)).toEqual(["Payroll tax codes"]);
     replies.push(scoreReply);
     const accepted = await post(`/v1/tailor-runs/${run.id}/roles/${project.id}/accept`, { decisions: [{ itemId: bullet, keep: true }] });
     expect(accepted.status).toBe(200);

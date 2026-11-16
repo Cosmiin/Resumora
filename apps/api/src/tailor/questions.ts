@@ -74,6 +74,8 @@ export async function askQuestions(
   const role = roleId ? stepItems(cv, input.section).find((r) => r.id === roleId) : undefined;
   // A CV without roles has nothing to ask in Experience.
   if (isRoleSection(input.section) && !role) return [];
+  // A project is reworded only from what it already holds: tailoring asks nothing about it (no per-keyword fishing).
+  if (role && findScored(cv, role.id)?.kind === "project") return [];
   const stored = input.run.tailoredCvId ? await deps.tailor.getSteering(input.run.tailoredCvId) : null;
   const roleIds = new Set(scoredItems(input.cv).map(({ item }) => item.id));
   const focusRoleIds = (stored?.steering.focusRoleIds ?? []).filter((id) => roleIds.has(id));

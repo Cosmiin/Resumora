@@ -20,6 +20,16 @@ vi.mock("./RoleRun.tsx", () => ({
     </div>
   ),
 }));
+vi.mock("./ProjectRun.tsx", () => ({
+  ProjectRun: ({ target, next, onClose, context }: { target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; context?: string }) => (
+    <div data-testid="focus">
+      <p>{context}</p>
+      <p>Project session for {target.roleId}</p>
+      <button type="button" onClick={() => next?.onNext()}>{next?.label}</button>
+      <button type="button" onClick={onClose}>✕ Close</button>
+    </div>
+  ),
+}));
 const api = vi.hoisted(() => ({ suggestAchievements: vi.fn(), getSkillSuggestions: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 import { EnrichPath } from "./EnrichPath.tsx";
@@ -366,5 +376,81 @@ describe("the focus step", () => {
       "0Clerk, Clerk Co is unchanged; you chose not to focus on it.at 70",
       "0Driver, Driver Co already reads clearly, so it had no questions.at 80",
     ]);
+  });
+});
+
+describe("projects in the guided path (no score: To do / Done)", () => {
+  const line = (id: string, text: string) => ({ id, text });
+  const todo = { ...role("p1", "Forecast app"), description: "", bullets: [line("p1-b", "Did things.")], url: "" };
+  const done = { ...role("p2", "Chess bot"), description: "A chess bot in Python.", bullets: [line("p2-b", "Built it.")], url: "" };
+  const twoProjects: CvContent = { ...emptyCv(), experience: [role("a", "Analyst"), role("b", "Buyer")], projects: [todo, done] };
+  const scores = new Map<string, RoleScoreState>([["a", ready(90)], ["b", ready(61)], ["p1", ready(10)]]);
+  const show = (content: CvContent, s = scores) =>
+    render(<MemoryRouter><EnrichPath cv={content} dispatch={() => {}} scores={s} waitForSave={() => Promise.resolve()} onClose={() => {}} /></MemoryRouter>);
+
+  it("lists the projects in their own group: the to-do one ticked, the done one not, neither with a score", () => {
+    show(twoProjects);
+    expect(screen.getByText("Projects")).toBeInTheDocument();
+    const forecast = screen.getByRole("checkbox", { name: /Forecast app/ });
+    const chess = screen.getByRole("checkbox", { name: /Chess bot/ });
+    expect(forecast).toBeChecked();
+    expect(forecast).toHaveAccessibleName(/To do/);
+    expect(forecast).not.toHaveAccessibleName(/Score/);
+    expect(chess).not.toBeChecked();
+    expect(chess).toHaveAccessibleName(/Done/);
+    expect(chess).not.toHaveAccessibleName(/Score/);
+    expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
+  });
+
+  it("while the roles are still being scored, a ticked project alone can't start the path", () => {
+    const loading = new Map<string, RoleScoreState>([["a", { state: "scoring" }], ["b", { state: "scoring" }]]);
+    const view = show(twoProjects, loading);
+    expect(screen.getByRole("checkbox", { name: /Forecast app/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Start with Forecast app" })).toBeDisabled();
+    view.rerender(<MemoryRouter><EnrichPath cv={twoProjects} dispatch={() => {}} scores={scores} waitForSave={() => Promise.resolve()} onClose={() => {}} /></MemoryRouter>);
+    expect(screen.getByRole("button", { name: "Start with Buyer" })).toBeEnabled();
+  });
+
+  it("a role ticked automatically can start the path while a role below it is still being scored (as before)", () => {
+    const a = { ...role("a", "Analyst") };
+    const b = { ...role("b", "Buyer") };
+    show({ ...twoProjects, experience: [a, b] }, new Map<string, RoleScoreState>([["a", ready(55)], ["b", { state: "scoring" }]]));
+    expect(screen.getByRole("button", { name: "Start with Analyst" })).toBeEnabled();
+  });
+
+  it("a ticked project gets its own run after the roles, with Project 1 of 1 in the bar", async () => {
+    show(twoProjects);
+    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
+    expect(screen.getByText("Session for b")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByText("Project session for p1")).toBeInTheDocument();
+    expect(screen.getByText("Project 1 of 1")).toBeInTheDocument();
+  });
+
+  it("the end screen's strength is the same with and without the project stop, and counts the described project", async () => {
+    api.suggestAchievements.mockResolvedValue({ suggestions: [] });
+    api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
+    const strength = async (content: CvContent, tickProject: boolean) => {
+      const view = show(content);
+      const box = screen.queryByRole("checkbox", { name: /Forecast app/ }) as HTMLInputElement | null;
+      if (box && box.checked !== tickProject) await userEvent.click(box);
+      await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+      if (tickProject) await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+      await screen.findAllByText(/out of 100/);
+      const text = document.querySelector(".fm-strength")?.textContent;
+      const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent ?? "");
+      view.unmount();
+      return { text, rows };
+    };
+    // The visited project is done by the end (its run wrote a description and a bullet).
+    const after: CvContent = { ...twoProjects, projects: [{ ...todo, description: "A forecast app in Excel." }, done] };
+    const without = await strength({ ...twoProjects, projects: [] }, false);
+    const withStop = await strength(twoProjects, true);
+    expect(withStop.text).toBe(without.text);
+    expect(withStop.rows.some((r) => r.includes("Forecast app"))).toBe(false);
+    const described = await strength(after, true);
+    expect(described.text).toBe(without.text);
+    expect(described.rows).toContain("+Projects: 1 described");
   });
 });

@@ -76,6 +76,27 @@ describe("the facts beside the base CV", () => {
   });
 });
 
+describe("projects leave the CV strength", () => {
+  const project = (id: string) => ({ ...role(id), url: "" });
+  const showCv = (content: CvContent, scores: Map<string, RoleScoreState>) => render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <CvFacts cv={content} scores={scores} template="modern" onTemplate={() => {}} templateFailed={false} />
+    </QueryClientProvider>,
+  );
+
+  it("counts only the role: a project with an old stored score changes neither the strength nor the waiting count", () => {
+    showCv({ ...emptyCv(), experience: [role("a")], projects: [project("p")] }, new Map([["a", ready(70)], ["p", ready(20)]]));
+    expect(screen.getByText("70")).toBeInTheDocument();
+    expect(screen.getByText("1 role still has questions waiting.")).toBeInTheDocument();
+  });
+
+  it("shows no strength for a CV with only projects", () => {
+    showCv({ ...emptyCv(), projects: [project("p")] }, new Map([["p", ready(60)]]));
+    expect(screen.getByText("–")).toBeInTheDocument();
+    expect(screen.getByText("The score appears once your roles are saved.")).toBeInTheDocument();
+  });
+});
+
 describe("isBlankCv", () => {
   it("is true only for a CV with no name, summary or entries", () => {
     expect(isBlankCv(emptyCv())).toBe(true);

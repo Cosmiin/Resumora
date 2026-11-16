@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { scoredItems, type CvContent } from "@resumora/shared";
+import { gradedItems, type CvContent } from "@resumora/shared";
 import { getPreferences, preferencesKey, savePreferences } from "../account/account-api.ts";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { t } from "../i18n/t.ts";
@@ -46,7 +46,7 @@ type Props = {
 /** Beside the base CV: its strength, the template its copies start with, and its language. */
 export function CvFacts({ cv, scores, template, onTemplate, templateFailed, onAnswer }: Props) {
   const id = useId();
-  const items = scoredItems(cv);
+  const items = gradedItems(cv);
   const strength = averageScore(new Map(items.map(({ item }) => {
     const s = scores.get(item.id);
     return [item.id, s?.state === "ready" ? (s.result?.score ?? null) : null];

@@ -417,3 +417,22 @@ describe("markEnriched", () => {
     expect(edited.enrichedAt).toBe("2026-11-09T12:00:00.000Z");
   });
 });
+
+describe("setProjectLines", () => {
+  const project = { ...role("p1", ["One", "Two", "Three", "Four", "Five"]), url: "" };
+  const cv: CvContent = { ...emptyCv(), experience: [role("e1", ["Ran payroll"])], projects: [project] };
+
+  it("replaces every bullet of a project with the kept ones, new ids, at most two", () => {
+    const next = cvReducer(cv, { type: "setProjectLines", itemId: "p1", texts: ["Built the flow in Make.", "Connected Airtable.", "Third."] });
+    const bullets = next.projects[0]!.bullets;
+    expect(bullets.map((b) => b.text)).toEqual(["Built the flow in Make.", "Connected Airtable."]);
+    expect(bullets.some((b) => project.bullets.some((old) => old.id === b.id))).toBe(false);
+    expect(next.experience).toBe(cv.experience);
+  });
+
+  it("does nothing for a role, an unknown id or no texts", () => {
+    expect(cvReducer(cv, { type: "setProjectLines", itemId: "e1", texts: ["A."] })).toBe(cv);
+    expect(cvReducer(cv, { type: "setProjectLines", itemId: "nope", texts: ["A."] })).toBe(cv);
+    expect(cvReducer(cv, { type: "setProjectLines", itemId: "p1", texts: ["  "] })).toBe(cv);
+  });
+});

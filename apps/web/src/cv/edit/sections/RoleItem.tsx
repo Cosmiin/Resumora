@@ -16,6 +16,7 @@ import { ScorePill } from "../../enrich/ScorePill.tsx";
 import type { RoleScoreState } from "../../enrich/useRoleScores.ts";
 import { focusField } from "../focus.ts";
 import { issueTip } from "../../enrich/tips.ts";
+import { useOpenFocus } from "../../enrich/focus-context.ts";
 
 type Props = {
   /** A project also has a link. */
@@ -106,6 +107,7 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, s
       <div className="cv-item-head">
         {field("title", "edit.role.title", "edit.role.titlePlaceholder", "cv-item-title")}
         {score && <ScorePill roleId={itemId} state={score} onOpen={openRole} />}
+        {list === "projects" && <DescribeProject projectId={itemId} />}
         <span className="cv-item-dates cv-role-dates">
           <ItemDate
             list={list}
@@ -158,3 +160,15 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, s
     </div>
   );
 });
+
+/** ✨ beside a project's name: opens the project's own short flow. Editor only (renders nothing elsewhere). */
+function DescribeProject({ projectId }: { projectId: string }) {
+  const open = useOpenFocus();
+  if (!open) return null;
+  return (
+    <button type="button" className="project-describe no-print" aria-label={t("enrich.project.open")} title={t("enrich.project.open")}
+      onClick={() => open({ roleId: projectId, mode: "improve" })}>
+      <span aria-hidden="true">✨</span>
+    </button>
+  );
+}

@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
-import { ItemLinesBodySchema, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
+import { ItemLinesBodySchema, ProjectQuestionsBodySchema, ProjectWriteBodySchema, RewriteEventSchemas, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
 import { z } from "zod";
 import type { AppEnv } from "../app.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -16,6 +16,8 @@ import { brainDump } from "./brain-dump.ts";
 import { roleFacts } from "./role-facts.ts";
 import { roleDescription } from "./role-description.ts";
 import { itemLines } from "./item-lines.ts";
+import { projectQuestions } from "./project-questions.ts";
+import { projectWrite } from "./project-write.ts";
 import { suggestAchievements } from "./achievements.ts";
 import { suggestSkills } from "./skills.ts";
 import { streamModel } from "../ai/stream-model.ts";
@@ -143,6 +145,40 @@ export function enrichRoutes(deps: {
     } catch (err) {
       if (err instanceof ApiError && err.status >= 500) {
         console.error(JSON.stringify({ msg: "item lines failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/project-questions", async (c) => {
+    const body = ProjectQuestionsBodySchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a projectId.");
+    const user = c.get("user");
+    try {
+      return c.json(await projectQuestions(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "project questions failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  app.post("/project-write", async (c) => {
+    const body = ProjectWriteBodySchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a projectId.");
+    const user = c.get("user");
+    try {
+      return c.json(await projectWrite(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "project write failed", code: err.code, requestId: c.get("requestId") }));
       }
       throw err;
     }

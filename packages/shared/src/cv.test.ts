@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CvContentSchema, findScored, scoredItems, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, notePeriod, type CvContent } from "./index.ts";
+import { CvContentSchema, findGraded, findScored, gradedItems, projectDone, scoredItems, ExperienceSchema, MAX_JOB_NOTES, MAX_NOTES, NoteSchema, StoredCvSchema, emptyCv, newId, notePeriod, type CvContent } from "./index.ts";
 
 function experience(overrides: Partial<CvContent["experience"][number]> = {}) {
   return {
@@ -319,5 +319,32 @@ describe("scoredItems", () => {
     expect(scoredItems(cv).map(({ item, kind }) => [item.id, kind])).toEqual([["r1", "role"], ["p1", "project"], ["v1", "volunteering"]]);
     expect(findScored(cv, "p1")?.kind).toBe("project");
     expect(findScored(cv, "nope")).toBeUndefined();
+  });
+});
+
+describe("gradedItems (projects leave the score)", () => {
+  const cv = {
+    ...emptyCv(),
+    experience: [experience({ id: "r1" })],
+    projects: [{ ...experience({ id: "p1" }), url: "" }],
+    volunteering: [experience({ id: "v1" })],
+  };
+
+  it("lists the role and the volunteering item, in that order, without the project", () => {
+    expect(gradedItems(cv).map(({ item, kind }) => [item.id, kind])).toEqual([["r1", "role"], ["v1", "volunteering"]]);
+    expect(findGraded(cv, "v1")?.kind).toBe("volunteering");
+    expect(findGraded(cv, "p1")).toBeUndefined();
+    expect(findScored(cv, "p1")?.kind).toBe("project");
+  });
+
+  it("a project is done with a description and one or two bullets", () => {
+    const line = (text: string) => ({ id: newId(), text });
+    const project = (description: string, bullets: string[]) => ({ ...experience({ description, bullets: bullets.map(line) }), url: "" });
+    expect(projectDone(project("A budget app.", ["Built it.", "Shipped it."]))).toBe(true);
+    expect(projectDone(project("A budget app.", ["Built it."]))).toBe(true);
+    expect(projectDone(project("A budget app.", ["One.", "Two.", "Three."]))).toBe(false);
+    expect(projectDone(project("  ", ["Built it."]))).toBe(false);
+    expect(projectDone(project("A budget app.", []))).toBe(false);
+    expect(projectDone(project("A budget app.", ["  "]))).toBe(false);
   });
 });

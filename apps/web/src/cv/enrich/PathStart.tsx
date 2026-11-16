@@ -17,10 +17,12 @@ export type PathItem = {
   waiting?: boolean;
   /** True once the score is at the target: listed, but not ticked unless the person ticks it. */
   strong?: boolean;
+  /** A project (no score): true once it has a description and one or two bullets. Shown as "Done", else "To do". */
+  done?: boolean;
 };
 
 type Props = {
-  /** The scored items the path can visit, in path order: roles first, then projects and volunteering. */
+  /** The items the path can visit, in path order: roles first, then projects (no score) and volunteering. */
   items: readonly PathItem[];
   /** The lighter sections with items to visit, and how many (items with no lines yet). */
   quick: readonly { section: LineList; count: number }[];
@@ -52,11 +54,12 @@ export function PathStart({ items, quick, locale, onStart, onNotNow }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onNotNow]);
   const roles = items.filter((p) => p.kind === "role");
-  const others = items.filter((p) => p.kind !== "role");
+  const projects = items.filter((p) => p.kind === "project");
+  const others = items.filter((p) => p.kind === "volunteering");
   // Every role stays listed. The most recent ones that still need work are ticked; with no role to tick, the
-  // first projects or volunteering roles instead. A tick is placed only once the score of that role and of
-  // every one above it is known, so a tick never moves while scores arrive. What the person ticks or unticks
-  // themselves is kept on top of that.
+  // first volunteering roles instead. A tick is placed only once the score of that role and of every one above
+  // it is known, so a tick never moves while scores arrive. Every project still "to do" is ticked (projects have
+  // no score). What the person ticks or unticks themselves is kept on top of that.
   const [byHand, setByHand] = useState<ReadonlyMap<string, boolean>>(new Map());
   const settle = (list: readonly PathItem[]) => {
     const ids: string[] = [];
@@ -69,22 +72,25 @@ export function PathStart({ items, quick, locale, onStart, onNotNow }: Props) {
   };
   let auto = settle(roles);
   if (auto.done && auto.ids.length === 0) auto = settle(others);
-  const chosen = new Set(auto.ids);
+  const chosen = new Set([...auto.ids, ...projects.filter((p) => !p.done).map((p) => p.item.id)]);
   for (const [id, on] of byHand) {
     if (on) chosen.add(id);
     else chosen.delete(id);
   }
-  const needWork = items.some((p) => !p.strong);
+  const needWork = items.some((p) => (p.kind === "project" ? !p.done : !p.strong));
   const toggle = (id: string) => setByHand(new Map(byHand).set(id, !chosen.has(id)));
   const picks = items.filter((p) => chosen.has(p.item.id));
   const first = picks[0];
+  // While the roles' scores load, the projects' automatic ticks alone can't start the path (the roles that will be
+  // ticked aren't known yet); a ticked role or anything ticked by hand can, as before.
 
   const row = (p: PathItem) => (
     <Checkbox key={p.item.id} checked={chosen.has(p.item.id)} onChange={() => toggle(p.item.id)}
       label={<>
         <span><b>{p.item.title.trim() || nameOf(p)}</b>{p.item.company.trim() ? `, ${p.item.company.trim()}` : ""}</span>
         <small>{formatRange(p.item.startDate, p.item.endDate, p.item.current, locale)}</small>
-        {p.score != null ? <small className="fm-rolescore">{t("enrich.path.score", { n: p.score })}</small>
+        {p.kind === "project" ? <small className="fm-rolescore">{t(p.done ? "enrich.path.projectDone" : "enrich.path.projectTodo")}</small>
+          : p.score != null ? <small className="fm-rolescore">{t("enrich.path.score", { n: p.score })}</small>
           : p.scoring ? <small className="fm-rolescore">{t("enrich.path.scoring")}</small> : null}
       </>} />
   );
@@ -102,7 +108,9 @@ export function PathStart({ items, quick, locale, onStart, onNotNow }: Props) {
               <legend>{t("enrich.path.which")}</legend>
               <div className="fm-rolepick">
                 {roles.map(row)}
-                {others.length > 0 && <p className="fm-group-label">{t("enrich.path.group.other")}</p>}
+                {projects.length > 0 && <p className="fm-group-label">{t("enrich.path.group.projects")}</p>}
+                {projects.map(row)}
+                {others.length > 0 && <p className="fm-group-label">{t("enrich.path.group.volunteering")}</p>}
                 {others.map(row)}
               </div>
             </fieldset>
@@ -118,7 +126,7 @@ export function PathStart({ items, quick, locale, onStart, onNotNow }: Props) {
         )}
         <div className="fm-foot">
           <button type="button" className="fm-ghost" onClick={onNotNow}>{t("enrich.path.notNow")}</button>
-          <button type="button" className="fm-btn" disabled={!auto.done && picks.length === 0} onClick={() => onStart(picks.map((p) => p.item.id))}>
+          <button type="button" className="fm-btn" disabled={!auto.done && !picks.some((p) => p.kind !== "project" || byHand.get(p.item.id))} onClick={() => onStart(picks.map((p) => p.item.id))}>
             {first ? t("enrich.path.start", { title: nameOf(first) }) : t("enrich.focus.continue")}
           </button>
         </div>

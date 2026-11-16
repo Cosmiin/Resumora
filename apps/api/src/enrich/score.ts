@@ -5,7 +5,7 @@ import {
   buildRoleResult,
   findScored,
   fingerprint,
-  scoredItems,
+  gradedItems,
   type Experience,
   type Locale,
   type ModelBullet,
@@ -65,12 +65,13 @@ export async function scoreRole(
 ): Promise<RoleResult> {
   const fresh = input.fresh || input.more;
   const { content } = await deps.cv.get();
-  // Roles, projects and volunteering are all scored; a cached row for anything else is stale.
-  const present = new Set(scoredItems(content).map(({ item }) => item.id));
+  // Roles and volunteering are scored; a cached row for anything else (a project, a deleted item) is stale.
+  const present = new Set(gradedItems(content).map(({ item }) => item.id));
   const stale = (await deps.insights.list()).filter((r) => !present.has(r.roleId)).map((r) => r.roleId);
   await deps.insights.remove(stale);
 
   const found = findScored(content, input.roleId);
+  if (found?.kind === "project") throw new ApiError(400, "not_scored", "Projects aren't scored.");
   const role = found?.item;
   if (!role || fingerprint(role, content.locale) !== input.fingerprint) throw notSaved();
 

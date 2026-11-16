@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  isLightTailorSection, isRoleSection, placeGuesses, scoredItems, stepItems, type CvContent, type LightTailorSection, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
+  MAX_PROJECT_BULLETS, isLightTailorSection, isRoleSection, placeGuesses, scoredItems, stepItems, type CvContent, type LightTailorSection, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError, type LogFn } from "../errors.ts";
@@ -244,5 +244,11 @@ export async function passProposals(
   const kept = proposals.filter((p) => p.flags.length === 0);
   // Proposals on flagged items that didn't come back clean from the retry, including ones the retry left out.
   const removed = Math.max(0, firstFlagged - kept.filter((p) => flagged.has(p.itemId)).length);
+  // A project keeps at most two bullets: rewordings beyond the first two bullet texts are dropped (those bullets keep
+  // their wording). Not counted in `removed`, which is only for proposals that failed the checks.
+  if (section === "projects" && roleId && cv.projects.some((p) => p.id === roleId)) {
+    let bullets = 0;
+    return { proposals: kept.filter((p) => p.itemId === roleId || p.field !== "text" || ++bullets <= MAX_PROJECT_BULLETS), items, removed };
+  }
   return { proposals: kept, items, removed };
 }

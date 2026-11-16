@@ -354,3 +354,15 @@ Built by the forked session while the main session was on templates and export. 
   - The AI is told to mark only the 2 to 5 words that carry the guess, and to give the why in one sentence of at most 20 words shaped like 'Your line says "…", so I inferred this.'; the general reason is at most 12 words.
   - Unchanged rule: an ordinary suggestion is used unless "Keep my line"; a guess left unanswered stays off the CV.
   - Not seen in the browser, and the new instructions to the AI not tried with a real call.
+
+## 2026-11-16: Projects get their own short flow
+
+- Owner's reasons: a project on a CV is not a second job. It is a short place that proves skills, above all a skill the person's jobs don't show (the owner's example: their first agentic development project, built from zero to finished). Treated like a job, it got role questions, a 0–100 score and many bullets, and read like an experience entry that takes too much space. Its value peaks at tailoring, where it can fill a gap the jobs leave.
+- What changed:
+  - Projects no longer get a score. The CV strength, the score list and the path's "below 80" count only roles and volunteering.
+  - A project has its own run, opened from the ✨ beside its name or from the path: up to 6 short questions (what, tools, connections, the person's part, method, outcome), each with options to tick, then one sentence and at most two bullets to approve. Each piece can be kept or edited right there; the new bullets replace the old ones; confirmed tools that didn't fit go to Skills.
+  - The writer uses only what the project and the person's answers say (never the rest of the CV, never an invented tool or number) and puts first what the jobs don't already show. An ended project is written in the past ("Am construit…" in Romanian).
+  - The guided path lists projects in their own group with "To do" or "Done" (done = a description and one or two bullets) instead of a score. Projects still to do start ticked. The result screen counts described projects ("Projects: 2 described"), not in the strength.
+  - Tailoring asks nothing about projects and rewords them only from what they hold.
+- Unchanged: volunteering, the CV upload (still copies projects word for word) and the database.
+- Not seen in the browser.

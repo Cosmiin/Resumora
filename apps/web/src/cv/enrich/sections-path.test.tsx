@@ -18,6 +18,16 @@ vi.mock("./RoleRun.tsx", () => ({
     </div>
   ),
 }));
+vi.mock("./ProjectRun.tsx", () => ({
+  ProjectRun: ({ target, next, onClose, context }: { target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; context?: string }) => (
+    <div data-testid="focus">
+      <p>{context}</p>
+      <p>Session for {target.roleId}</p>
+      <button type="button" onClick={() => next?.onNext()}>{next?.label}</button>
+      <button type="button" onClick={onClose}>✕ Close</button>
+    </div>
+  ),
+}));
 vi.mock("./FocusMode.tsx", async (orig) => {
   const real = await orig<typeof import("./FocusMode.tsx")>();
   return {
@@ -86,21 +96,22 @@ function Path({ cv = full, s = scores, onClose = () => {} }: { cv?: CvContent; s
 }
 
 describe("path start (1A)", () => {
-  it("groups roles, then projects and volunteering, listing every item, and a quick-pass row", () => {
+  it("groups roles, then projects (To do / Done), then volunteering, listing every item, and a quick-pass row", () => {
     render(<Path />);
     expect(screen.getByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
     const boxes = screen.getAllByRole("checkbox");
     expect(boxes).toHaveLength(5);
-    // The role below 80 starts ticked; the strong one, the projects and volunteering are listed unticked.
+    // The role below 80 starts ticked; the strong one is not. Projects still to do start ticked; volunteering not.
     expect(boxes[0]).not.toBeChecked();
     expect(boxes[1]).toHaveAccessibleName(/Buyer/);
     expect(boxes[1]).toBeChecked();
-    expect(screen.getByText("Projects and volunteering")).toBeInTheDocument();
-    expect(boxes[3]).toHaveAccessibleName(/Chess bot/);
-    expect(boxes[3]).not.toBeChecked();
+    expect(screen.getByText("Projects")).toBeInTheDocument();
+    expect(boxes[3]).toHaveAccessibleName(/Chess bot.*To do/);
+    expect(boxes[3]).toBeChecked();
+    expect(screen.getByText("Volunteering")).toBeInTheDocument();
     expect(boxes[4]).toHaveAccessibleName(/Food bank helper/);
     expect(boxes[4]).not.toBeChecked();
-    expect(screen.getByText("1 of 5 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
+    expect(screen.getByText("3 of 5 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
     // Only lighter items with no lines yet are counted (Q3): the Git course has lines.
     expect(screen.getByText("After that, a quick pass with no questions: Courses & training (2), Awards and honors (1), Interests (3).")).toBeInTheDocument();
   });
@@ -110,9 +121,9 @@ describe("path start (1A)", () => {
     expect(screen.queryByText("Projects and volunteering")).toBeNull();
   });
 
-  it("finishing the last role opens the first project, then volunteering, with their own top bar", async () => {
+  it("finishing the last role opens the ticked project, then volunteering, with their own top bar", async () => {
     render(<Path />);
-    await userEvent.click(screen.getByRole("checkbox", { name: /Chess bot/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Route planner/ }));
     await userEvent.click(screen.getByRole("checkbox", { name: /Food bank helper/ }));
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
     expect(screen.getByText("Session for b")).toBeInTheDocument();
@@ -138,8 +149,9 @@ describe("path start (1A)", () => {
     unmount();
     render(<Path s={new Map(scores).set("b", ready(84))} />);
     expect(screen.getByRole("checkbox", { name: /Buyer/ })).not.toBeChecked();
-    await userEvent.click(screen.getByRole("button", { name: "Start with Chess bot" }));
-    expect(screen.getByText("Session for p2")).toBeInTheDocument();
+    // No role below 80 now: the projects still to do lead.
+    await userEvent.click(screen.getByRole("button", { name: "Start with Route planner" }));
+    expect(screen.getByText("Session for p1")).toBeInTheDocument();
   });
 });
 
@@ -156,22 +168,21 @@ describe("focus mode on a project", () => {
   });
 });
 
-describe("scores and the panel cover projects and volunteering", () => {
+describe("scores and the panel cover volunteering, not projects", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("useRoleScores gives an entry for every scored item", async () => {
+  it("useRoleScores gives an entry for every graded item, none for a project", async () => {
     const view = renderHook(() => useRoleScores({ cv: full, status: "saved" }));
     await act(async () => {});
-    expect([...view.result.current.scores.keys()]).toEqual(["a", "b", "p1", "p2", "v1"]);
+    expect([...view.result.current.scores.keys()]).toEqual(["a", "b", "v1"]);
   });
 
-  it("the overview lists roles, then projects and volunteering, under their own headings", async () => {
+  it("the overview lists roles, then volunteering, and no project", async () => {
     const onFocusField = vi.fn();
     render(<Overview cv={full} dispatch={() => {}} onFocusField={onFocusField} opened={new Set()} onOpen={() => {}} scores={scores} />);
     expect(screen.getByText("Your roles")).toBeInTheDocument();
     expect(screen.getByText("Projects and volunteering")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Chess bot/ }));
-    expect(onFocusField).toHaveBeenCalledWith("projects-p2-title");
+    expect(screen.queryByRole("button", { name: /^Chess bot/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /^Food bank helper/ }));
     expect(onFocusField).toHaveBeenCalledWith("volunteering-v1-title");
   });
