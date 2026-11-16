@@ -432,4 +432,9 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.project.failed": "Nu am putut scrie proiectul. Încearcă din nou peste puțin timp.",
   "enrich.project.loadFailed": "Nu am putut încărca întrebările. Încearcă din nou peste puțin timp.",
   "enrich.project.done": "Proiectul tău e actualizat.",
+  "enrich.path.group.projects": "Proiecte",
+  "enrich.path.group.volunteering": "Voluntariat",
+  "enrich.path.projectTodo": "De făcut",
+  "enrich.path.projectDone": "Gata",
+  "enrich.end.projects": "Proiecte: {n} descrise",
 };

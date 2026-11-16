@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { LIGHT_SECTIONS, findScored, gradedItems, newId, type CvContent, type LightSection, type RoleResult, type ScoredKind, type SkillGroup } from "@resumora/shared";
+import { LIGHT_SECTIONS, findScored, gradedItems, newId, projectDone, scoredItems, type CvContent, type LightSection, type RoleResult, type ScoredKind, type SkillGroup } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { AchievementsPick } from "./AchievementsPick.tsx";
@@ -12,6 +12,7 @@ import { useNavigate } from "react-router";
 import { FocusBar } from "./FocusBar.tsx";
 import { LightStop } from "./FocusMode.tsx";
 import { RoleRun } from "./RoleRun.tsx";
+import { ProjectRun } from "./ProjectRun.tsx";
 import { issueTip } from "./tips.ts";
 import { PathStart } from "./PathStart.tsx";
 import { SCORED_LIST, type LineList } from "../edit/lists.ts";
@@ -62,8 +63,10 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   const lights = fixed?.lights ?? light;
   const before = fixed?.before ?? new Map<string, number | null>();
   const [stage, setStage] = useState<Stage>({ kind: "start" });
-  // The focus step lists every role, strong or not, so the list never shrinks while scores arrive.
-  const items = gradedItems(cv).map((p) => {
+  // The focus step lists every role, strong or not, so the list never shrinks while scores arrive. Projects have
+  // no score: each is "to do" or "done" (a description and one or two bullets).
+  const items = scoredItems(cv).map((p) => {
+    if (p.kind === "project") return { ...p, done: projectDone(p.item) };
     const s = scores.get(p.item.id);
     return { ...p, score: scoreOf(s), scoring: s?.state === "scoring", waiting: s?.state === "scoring" || s?.state === "previous", strong: !belowTarget(s) };
   });
@@ -88,6 +91,14 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     const kind = findScored(cv, roleId)?.kind ?? "role";
     const ofKind = stops.filter((id) => findScored(cv, id)?.kind === kind);
     const nextKind = last ? null : findScored(cv, stops[stage.index + 1]!)?.kind;
+    const context = t(OF_KEY[kind], { n: ofKind.indexOf(roleId) + 1, total: ofKind.length });
+    const nextStop = {
+      label: t(!last && nextKind === "role" ? "enrich.run.done.nextRole" : "enrich.focus.continue"),
+      onNext: () => (last ? afterRoles() : setStage({ kind: "role", index: stage.index + 1 })),
+    };
+    if (kind === "project") {
+      return <ProjectRun key={roleId} target={{ roleId, mode: "improve" }} cv={cv} dispatch={dispatch} waitForSave={waitForSave} onClose={onClose} context={context} next={nextStop} />;
+    }
     return (
       <RoleRun
         key={roleId}
@@ -98,11 +109,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         waitForSave={waitForSave}
         onClose={onClose}
         onScore={onScore}
-        context={t(OF_KEY[kind], { n: ofKind.indexOf(roleId) + 1, total: ofKind.length })}
-        next={{
-          label: t(!last && nextKind === "role" ? "enrich.run.done.nextRole" : "enrich.focus.continue"),
-          onNext: () => (last ? afterRoles() : setStage({ kind: "role", index: stage.index + 1 })),
-        }}
+        context={context}
+        next={nextStop}
       />
     );
   }
@@ -213,6 +221,8 @@ function EndStop({ cv, scores, waitForSave, before, stops, lights, achievementsA
     before: before.get(r.id) ?? null, after: now.get(r.id) ?? null, visited: stops.includes(r.id),
     offered: (before.get(r.id) ?? null) === null || before.get(r.id)! < ENRICHED_AT,
   }));
+  // Projects have no score: the path's visited projects that now have a description and one or two bullets.
+  const projectsDescribed = cv.projects.filter((p) => stops.includes(p.id) && projectDone(p)).length;
   const lowest = rows.filter((r) => r.after !== null).sort((a, b) => a.after! - b.after!)[0] ?? null;
   // What would help it most: the next step its score names, with the line it is about.
   const lowestItem = lowest ? findScored(cv, lowest.roleId)?.item : undefined;
@@ -229,6 +239,7 @@ function EndStop({ cv, scores, waitForSave, before, stops, lights, achievementsA
   })).filter((a) => a.n > 0);
   return (
     <EnrichedScreen start={averageScore(before, weights)} average={average} rows={rows} also={also} achievementsAdded={achievementsAdded} skillsAdded={skillsAdded}
+      projectsDescribed={projectsDescribed}
       notice={notice} lowest={lowest ? { ...lowest, label: roleName(findScored(cv, lowest.roleId)!.item, SCORED_LIST[lowest.kind]), tip } : null}
       onFinish={onClose} onImprove={onImprove}
       onFindJob={() => void (async () => {

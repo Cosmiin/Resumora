@@ -19,3 +19,8 @@ open: Ruling: the tense check (retry, then drop) looks at the bullets only. The 
 session: Build projects flow (Tasks 1–4) · builder: claude
 commit: 916e70d (base b584283) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
 open: Ruling: after Task 1 no project had a button to open a run any more (it used to be the score pill), so a ✨ "Describe this project" button sits beside each project's name (`RoleItem.tsx`, outside the scope list). Fix round (reviewer, low): the questions are asked only after the CV is saved, so a project added a moment ago is found. Not checked in the running app (no secrets in the worktree); covered by tests only.
+
+## Task 5: Projects in the guided path — done
+session: Build projects flow (Tasks 1–4, continued here for 5–6) · builder: claude
+commit: SHA5 (base cc4e2c5) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
+open: Ruling: `sections-path.test.tsx` (outside the scope list) was brought back to projects in the path, as To do / Done. The path's volunteering group now has its own label ("Volunteering"). The old "Projects and volunteering" label is unused in the path but still shows in the panel's score list (`enrich.roles.other`), which now lists only volunteering. Fix round (reviewer, low): while the roles' scores load, the to-do project ticks alone can't start the path. A jobs-page test timed out once under full-suite load and passes alone (file not touched by this branch).

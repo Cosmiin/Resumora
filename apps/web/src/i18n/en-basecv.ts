@@ -430,4 +430,9 @@ export const basecvEn = {
   "enrich.project.failed": "Couldn't write this project. Try again in a moment.",
   "enrich.project.loadFailed": "Couldn't load the questions. Try again in a moment.",
   "enrich.project.done": "Your project is updated.",
+  "enrich.path.group.projects": "Projects",
+  "enrich.path.group.volunteering": "Volunteering",
+  "enrich.path.projectTodo": "To do",
+  "enrich.path.projectDone": "Done",
+  "enrich.end.projects": "Projects: {n} described",
 } as const;

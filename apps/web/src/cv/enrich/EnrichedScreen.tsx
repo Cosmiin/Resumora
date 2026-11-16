@@ -7,13 +7,15 @@ import { PathSteps } from "./PathStart.tsx";
 export type RoleRow = { roleId: string; kind: ScoredKind; label: string; before: number | null; after: number | null; visited: boolean; offered: boolean };
 
 type Props = {
-  /** CV strength: the average score of every scored item (roles, projects, volunteering) when the path started, and now. */
+  /** CV strength: the average score of every graded item (roles and volunteering; projects have none) when the path started, and now. */
   start: number | null;
   average: number;
   rows: RoleRow[];
   /** Lines the path added under each lighter section (sections with none are left out). */
   also: { section: LightSection; n: number }[];
   achievementsAdded: number;
+  /** Projects the path visited that now have a description and one or two bullets (no score, so not in the strength). */
+  projectsDescribed?: number;
   skillsAdded: number;
   /** The skills bar (with Undo), on top of the screen. */
   notice: ReactNode;
@@ -27,11 +29,12 @@ type Props = {
 export const ENRICHED_AVERAGE = 80;
 
 /** The result of the path: CV strength before and after, what moved it, and what would help most next. */
-export function EnrichedScreen({ start, average, rows, also, achievementsAdded, skillsAdded, notice, lowest, onImprove, onFinish, onFindJob }: Props) {
+export function EnrichedScreen({ start, average, rows, also, achievementsAdded, skillsAdded, projectsDescribed = 0, notice, lowest, onImprove, onFinish, onFindJob }: Props) {
   const moved = start !== null && start !== average;
   const more = lowest && lowest.after !== null && lowest.after < 100 ? lowest : null;
   const extras = [
     ...also.map((a) => t(a.n === 1 ? "enrich.end.lineAdded" : "enrich.end.linesAdded", { section: t(`enrich.path.section.${a.section}`), n: a.n })),
+    ...(projectsDescribed > 0 ? [t("enrich.end.projects", { n: projectsDescribed })] : []),
     ...(achievementsAdded > 0 ? [t("enrich.end.achievements", { n: achievementsAdded })] : []),
     ...(skillsAdded > 0 ? [t("enrich.end.skills", { n: skillsAdded })] : []),
   ];
