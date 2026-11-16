@@ -411,6 +411,13 @@ describe("projects in the guided path (no score: To do / Done)", () => {
     expect(screen.getByRole("button", { name: "Start with Buyer" })).toBeEnabled();
   });
 
+  it("a role ticked automatically can start the path while a role below it is still being scored (as before)", () => {
+    const a = { ...role("a", "Analyst") };
+    const b = { ...role("b", "Buyer") };
+    show({ ...twoProjects, experience: [a, b] }, new Map<string, RoleScoreState>([["a", ready(55)], ["b", { state: "scoring" }]]));
+    expect(screen.getByRole("button", { name: "Start with Analyst" })).toBeEnabled();
+  });
+
   it("a ticked project gets its own run after the roles, with Project 1 of 1 in the bar", async () => {
     show(twoProjects);
     await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));

@@ -140,6 +140,16 @@ describe("projectWrite tense (review focus 1)", () => {
     expect(JSON.stringify(model.requests[1])).toContain("past participle");
   });
 
+  it("a Romanian description in the present is retried too, and emptied if it stays present", async () => {
+    const p = ro({});
+    await save(p, {}, "ro");
+    answers.push({ ...past, description: "Construiesc un flux în Make." }, { ...past, description: "Construiesc un flux în Make." });
+    const out = await write(p);
+    expect(model.requests).toHaveLength(2);
+    expect(out.description).toBe("");
+    expect(out.bullets).toEqual(["Am construit fluxul în Make."]);
+  });
+
   it("a line still in the present after the retry is dropped", async () => {
     const p = ro({});
     await save(p, {}, "ro");

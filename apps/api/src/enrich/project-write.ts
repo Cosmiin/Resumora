@@ -50,8 +50,13 @@ function confirmedOnly(answer: ModelAnswer, sources: string[]): { description: s
   return { description: description && ok(description) ? description : "", bullets: bullets.filter(ok) };
 }
 
-/** Only bullets are checked: the description names the project ("A Make flow…"), which the English check would read as present. */
-const inPresent = (bullets: string[], locale: Locale) => bullets.some((b) => startsInPresentTense(b, locale));
+/**
+ * The bullets are always checked. The description only in Romanian: it names the project ("A Make flow…"), which the
+ * English check (any opening word that isn't a past verb) would read as present; the Romanian check looks at verb endings.
+ */
+const checksDescription = (locale: Locale) => locale === "ro";
+const inPresent = (lines: { description: string; bullets: string[] }, locale: Locale) =>
+  [...(checksDescription(locale) ? [lines.description] : []), ...lines.bullets].some((l) => l !== "" && startsInPresentTense(l, locale));
 
 /**
  * One description sentence, at most two bullets and the tools that didn't fit, for one saved project, from its
@@ -86,11 +91,11 @@ export async function projectWrite(deps: ScoreDeps, input: ProjectWriteBody): Pr
   let answer = await ask("");
   let lines = confirmedOnly(answer, sources);
   // Check 2: an ended project's line in the present gets one retry, then is dropped.
-  if (ended && inPresent(lines.bullets, locale)) {
+  if (ended && inPresent(lines, locale)) {
     answer = await ask(`\n${pastTenseNote(locale)}`);
     lines = confirmedOnly(answer, sources);
     lines = {
-      description: lines.description,
+      description: checksDescription(locale) && lines.description && startsInPresentTense(lines.description, locale) ? "" : lines.description,
       bullets: lines.bullets.filter((b) => !startsInPresentTense(b, locale)),
     };
   }

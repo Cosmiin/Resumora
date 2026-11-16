@@ -81,8 +81,8 @@ export function PathStart({ items, quick, locale, onStart, onNotNow }: Props) {
   const toggle = (id: string) => setByHand(new Map(byHand).set(id, !chosen.has(id)));
   const picks = items.filter((p) => chosen.has(p.item.id));
   const first = picks[0];
-  // While the roles' scores load, only what the person ticked by hand can start the path: the automatic ticks
-  // (roles below 80, projects still to do) are not final yet.
+  // While the roles' scores load, the projects' automatic ticks alone can't start the path (the roles that will be
+  // ticked aren't known yet); a ticked role or anything ticked by hand can, as before.
 
   const row = (p: PathItem) => (
     <Checkbox key={p.item.id} checked={chosen.has(p.item.id)} onChange={() => toggle(p.item.id)}
@@ -126,7 +126,7 @@ export function PathStart({ items, quick, locale, onStart, onNotNow }: Props) {
         )}
         <div className="fm-foot">
           <button type="button" className="fm-ghost" onClick={onNotNow}>{t("enrich.path.notNow")}</button>
-          <button type="button" className="fm-btn" disabled={!auto.done && !picks.some((p) => byHand.get(p.item.id))} onClick={() => onStart(picks.map((p) => p.item.id))}>
+          <button type="button" className="fm-btn" disabled={!auto.done && !picks.some((p) => p.kind !== "project" || byHand.get(p.item.id))} onClick={() => onStart(picks.map((p) => p.item.id))}>
             {first ? t("enrich.path.start", { title: nameOf(first) }) : t("enrich.focus.continue")}
           </button>
         </div>
