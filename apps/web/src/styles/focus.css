@@ -240,6 +240,9 @@
 .rr-prog .fm-eyebrow { color: var(--color-ink); font-size: var(--text-base); }
 .role-run .fm-q { max-width: none; overflow-wrap: anywhere; }
 .focus-mode.role-run .answer-box, .role-run .fm-dump .answer-box, .role-run .fm-dump .fm-foot { max-width: none; }
+.rr-guess { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-left: 3px solid var(--color-highlight); background: var(--color-paper-veil); }
+.rr-guess-label { margin: 0 0 var(--space-1); font-size: var(--text-small); color: var(--color-muted); }
+.rr-guess-text { margin: 0 0 var(--space-3); overflow-wrap: anywhere; }
 .rr-aboutline { margin: 0 0 var(--space-4); padding: var(--space-2) var(--space-4); border-left: 3px solid var(--color-highlight); background: var(--color-paper-veil); font-size: var(--text-small); overflow-wrap: anywhere; }
 .rr-num { margin: 0; font: var(--weight-display) 3rem / 1 var(--font-display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .rr-card .rr-line { margin-top: 0; }

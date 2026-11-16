@@ -169,6 +169,8 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.focus.failed.saving": "Îți salvăm modificările… încearcă din nou într-o clipă.",
   "enrich.focus.failed.unavailable": "Nu am putut îmbunătăți acest punct acum. Răspunsul tău e salvat.",
   "enrich.focus.freeTalk": "Întrebările nu sunt destul de precise? Descrie cu vorbele tale ce făceai acolo.",
+  "enrich.run.guess.label": "După numele firmei, cred că:",
+  "enrich.run.guess.yes": "Da, corect",
   "enrich.focus.improve": "Mai departe",
   "enrich.focus.improveBullet": "Îmbunătățește acest punct",
   "enrich.focus.loading": "Îți încărcăm întrebările…",
