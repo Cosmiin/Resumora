@@ -182,7 +182,7 @@ export function FocusMode({ target, cv, dispatch, scores, waitForSave, onClose, 
       aria-modal="true"
       aria-label={t("enrich.focus.dialog", { role: name })}
     >
-      <FocusBar context={context} name={name} onClose={() => session.close()}
+      <FocusBar context={context} name={name} company={role.company} onClose={() => session.close()}
         skip={next && !done ? { label: t(kind === "role" ? "enrich.focus.skipRole" : "enrich.focus.skipItem"), onSkip: leaveRole } : undefined} />
       {(progress || askingStep || inQueue) && (
         <div className="fm-prog">
