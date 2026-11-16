@@ -12,6 +12,10 @@ One commit for the three tasks: Tasks 2 and 3 were built while Task 1's fix was 
 Whole-branch review (Opus): pass, one low finding (a fast drag that stops before the finger lifts counted as a flick). Fixed with a test in the next commit; not re-reviewed (three lines, low).
 Cost line: review agents 4 (3 Sonnet, 1 Opus) · guard denials 0 · no Codex.
 
+## Published on 2026-11-17 (owner asked)
+- Website only, to the Pages project `resumora` (https://resumora.pages.dev): a build of `feat/go-live` with this branch merged in (local merge `0321353`, on no branch, not pushed). The Worker and the database were not touched.
+- Until both pull requests are merged, the live website matches neither branch alone.
+
 ## Rulings
 - Task 1: the short sheet's travel also subtracts the phone's bottom inset (read from the sheet's own bottom padding), so the drag starts where the sheet rests. Review finding, fixed.
 - Task 1: the "this click belongs to the drag" flag clears itself after 350 ms, because a finger's drag sends no click. Review finding, fixed.
