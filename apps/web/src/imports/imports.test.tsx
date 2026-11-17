@@ -92,10 +92,10 @@ describe("CV import", () => {
   });
 
   it("shows the server's reason when the upload is refused", async () => {
-    importsApi.startImport.mockRejectedValue(new ApiClientError(429, "import_limit", "You can import up to 10 CVs per day."));
+    importsApi.startImport.mockRejectedValue(new ApiClientError(429, "import_limit", "You can import up to 1000 CVs per day."));
     renderPage();
     await chooseFile(pdf());
-    expect(await screen.findByText("You can import up to 10 CVs per day.")).toBeInTheDocument();
+    expect(await screen.findByText("You can import up to 1000 CVs per day.")).toBeInTheDocument();
   });
 
   it("shows progress then the review", async () => {

@@ -121,12 +121,12 @@ select is(
 set local request.jwt.claims to '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
 select lives_ok(
   $$ insert into public.cv_imports (file_name, storage_path)
-     select 'f.pdf', '22222222-2222-2222-2222-222222222222/' || g || '.pdf' from generate_series(1, 10) g $$,
-  'ten imports within 24 hours are allowed');
+     select 'f.pdf', '22222222-2222-2222-2222-222222222222/' || g || '.pdf' from generate_series(1, 1000) g $$,
+  'a thousand imports within 24 hours are allowed');
 select throws_ok(
   $$ insert into public.cv_imports (file_name, storage_path) values ('f.pdf', '22222222-2222-2222-2222-222222222222/x.pdf') $$,
   'P0001', 'import_limit',
-  'an 11th import within 24 hours is refused');
+  'the 1001st import within 24 hours is refused');
 
 select * from finish();
 rollback;

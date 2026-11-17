@@ -6,7 +6,7 @@ import type { CvRepo } from "../src/cv/repo.ts";
 import type { ModelDeps } from "../src/ai/call-model.ts";
 import { memoryImports, type MemoryImports } from "../src/imports/memory-repo.ts";
 import { handleImportMessage, sweepStaleImports, type QueueMessage } from "../src/imports/consumer.ts";
-import type { ImportMessage } from "../src/imports/repo.ts";
+import { IMPORTS_PER_DAY, type ImportMessage } from "../src/imports/repo.ts";
 import { CV_LINES, makeDocx, makePdf } from "./fixtures.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,11 +106,17 @@ describe("import endpoints", () => {
     expect(store.files.size).toBe(0);
   });
 
+  it("allows more than 10 imports per day while testing", async () => {
+    for (let i = 0; i < 11; i++) expect((await upload(makePdf(CV_LINES))).status).toBe(202);
+  });
+
   it("limits imports per day", async () => {
-    for (let i = 0; i < 10; i++) expect((await upload(makePdf(CV_LINES))).status).toBe(202);
+    expect(IMPORTS_PER_DAY).toBe(1000);
+    const repo = store.repoFor("user-a");
+    for (let i = 0; i < IMPORTS_PER_DAY; i++) await repo.create({ id: crypto.randomUUID(), fileName: "cv.pdf", format: "pdf", bytes: new Uint8Array() });
     const res = await upload(makePdf(CV_LINES));
     expect(res.status).toBe(429);
-    expect((await json(res)).error).toMatchObject({ code: "import_limit", message: "You can import up to 10 CVs per day." });
+    expect((await json(res)).error).toMatchObject({ code: "import_limit", message: "You can import up to 1000 CVs per day." });
 
     clock = new Date(clock.getTime() + 24 * 60 * 60_000 + 1000);
     expect((await upload(makePdf(CV_LINES))).status).toBe(202);
