@@ -5,7 +5,8 @@ import type { FileFormat, ImportFailureCode } from "./extract-text.ts";
 
 /** Upload limit, also enforced by the Storage bucket. */
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
-export const IMPORTS_PER_DAY = 10;
+/** Raised from 10 for the owner's testing; the database trigger (check_import_limit) uses the same number. */
+export const IMPORTS_PER_DAY = 1000;
 
 /** The queue message for one import. */
 export type ImportMessage = { importId: string; userId: string };
