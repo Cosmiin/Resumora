@@ -94,15 +94,10 @@ describe("section tools", () => {
     expect(document.activeElement).toBe(screen.getByTestId("page"));
   });
 
-  it("AI buttons are visible, marked Coming next and do nothing", async () => {
+  it("Key achievements has a working Suggest button instead of a Coming next placeholder", async () => {
     render(<Harness initial={{ ...filled(), achievements: [{ id: "a1", text: "Won an award" }] }} />);
     await userEvent.click(screen.getByDisplayValue("Won an award"));
-    const btn = screen.getByRole("button", { name: /Pull achievements from my roles/ });
-    expect(btn).toHaveAttribute("aria-disabled", "true");
-    expect(btn).toHaveAttribute("title", "Arrives in the next project");
-    expect(btn).toHaveTextContent("Coming next");
-    const before = document.body.innerHTML;
-    await userEvent.click(btn);
-    expect(document.body.innerHTML).toBe(before);
+    expect(screen.getByRole("button", { name: "Suggest" })).not.toHaveAttribute("aria-disabled");
+    expect(screen.queryByText("Coming next")).toBeNull();
   });
 });

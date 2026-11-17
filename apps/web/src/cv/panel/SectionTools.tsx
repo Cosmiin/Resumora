@@ -1,15 +1,19 @@
-import { CATEGORY, normalizeLayout, type CvContent } from "@resumora/shared";
+import { CATEGORY, LIGHT_SECTIONS, normalizeLayout, type CvContent } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction, ListKey } from "../edit/cvReducer.ts";
-import { getItems, type RoleList } from "../edit/lists.ts";
+import { getItems, type LineList, type RoleList } from "../edit/lists.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { aiButtonsFor, tipsFor } from "./sectionTips.ts";
 import { useOpenFocus } from "../enrich/focus-context.ts";
 import { ScoreCard } from "../enrich/ScoreCard.tsx";
 import { SkillsTools } from "../enrich/SkillsTools.tsx";
+import { AchievementsSuggest, LightSuggest } from "../enrich/SectionSuggest.tsx";
 import { SummaryTools } from "../enrich/SummaryTools.tsx";
 import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 import type { PanelFocus } from "./HelperPanel.tsx";
+
+/** Courses, awards, publications and interests: each item can get suggested lines. */
+const isLightSection = (key: string): key is LineList => (LIGHT_SECTIONS as readonly string[]).includes(key);
 
 type Props = {
   cv: CvContent;
@@ -204,6 +208,10 @@ export function SectionTools({ cv, dispatch, focus, onBack, onFocusPage, scores,
       )}
       {!tailored && key === "summary" && <SummaryTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
       {!tailored && key === "skills" && <SkillsTools cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
+      {!tailored && key === "achievements" && <AchievementsSuggest cv={cv} dispatch={dispatch} waitForSave={waitForSave} />}
+      {!tailored && isLightSection(key) && itemId && (
+        <LightSuggest key={itemId} cv={cv} dispatch={dispatch} waitForSave={waitForSave} section={key} itemId={itemId} />
+      )}
       {key === "skills" && <ToSortBox cv={cv} dispatch={dispatch} />}
       <div>
         <p className="p-sub">{t("panel.tools.tips")}</p>

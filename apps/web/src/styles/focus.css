@@ -163,25 +163,8 @@
 .voice-time { font-size: var(--text-small); font-variant-numeric: tabular-nums; }
 .voice-bar .answer-countdown { color: var(--color-highlight); font-size: var(--text-small); }
 
-/* ── "Improve this bullet" on the CV page, and the score card hint ─────── */
-.improve-btn {
-  position: absolute; inset-inline-end: -40px; inset-block-start: 0; width: 30px; height: 30px; padding: 0;
-  display: grid; place-items: center; border: 1px solid var(--color-line); border-radius: 50%;
-  background: var(--color-paper); box-shadow: var(--shadow-sheet); font-size: 13px; cursor: pointer;
-  opacity: 0; transition: opacity var(--dur-fast), transform var(--dur-fast);
-}
-.cv-bullets li > .improve-btn { margin-top: 0; }
-.cv-bullets li:hover > .improve-btn, .cv-bullets li:focus-within > .improve-btn { opacity: 1; }
-.improve-btn:hover { transform: scale(1.08); }
-.improve-btn:focus-visible { outline: var(--focus-width) solid var(--color-coach); outline-offset: 2px; }
-@media (hover: none) { .improve-btn { opacity: 0.75; } }
-/* ✨ beside a project's name: always shown (a project has no score pill to open its flow). */
-.project-describe {
-  flex: none; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border: 1px solid var(--color-line);
-  border-radius: 50%; background: var(--color-paper); font-size: 13px; cursor: pointer;
-}
-.project-describe:hover { transform: scale(1.08); }
-.project-describe:focus-visible { outline: var(--focus-width) solid var(--color-coach); outline-offset: 2px; }
+/* ── "Improve" beside a project's name (a project has no score pill to open its flow), and the score card hint ── */
+.project-describe { flex: none; }
 .rr-tools { display: grid; gap: var(--space-2); }
 .stand-out-hint { margin: 0; font-size: var(--text-small); font-weight: var(--weight-bold); color: #14553a; }
 
@@ -311,11 +294,10 @@
   .fm-result { padding: 26px 22px; }
   .fm-strength { font-size: 2.6rem; }
   .fm-moment-num { font-size: 4rem; }
-  .improve-btn { inset-inline-end: -4px; inset-block-start: -26px; width: 26px; height: 26px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .focus-mode, .focus-mode *, .improve-btn { animation: none !important; transition: none !important; }
+  .focus-mode, .focus-mode * { animation: none !important; transition: none !important; }
 }
 
 @keyframes fm-in { from { opacity: 0; } to { opacity: 1; } }
