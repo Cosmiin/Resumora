@@ -43,7 +43,7 @@ function fakeFetch(...responses: Array<Response | (() => Promise<Response>)>) {
 
 function deps(f: typeof fetch, extra: Partial<ModelDeps> = {}) {
   const logs: AiCallLog[] = [];
-  const d: ModelDeps = { providers, fetch: f, logCall: async (e) => void logs.push(e), ...extra };
+  const d: ModelDeps = { providers, fetch: f, logCall: async (e) => void logs.push(e), sleep: async () => undefined, ...extra };
   return { d, logs };
 }
 
@@ -321,5 +321,33 @@ describe("callModel: schemas OpenAI's strict mode accepts", () => {
       expect(node.required, path).toEqual(Object.keys(node.properties as object));
       expect(node.additionalProperties, path).toBe(false);
     }
+  });
+});
+
+// OpenRouter's 429 means Google's shared capacity is full for a moment: wait before trying it again.
+describe("callModel: pause after OpenRouter says too many", () => {
+  it("waits 2 seconds before retrying OpenRouter after a 429", async () => {
+    const order: string[] = [];
+    const { fetch, calls } = fakeFetch(status(429), ok({ answer: "yes" }));
+    const sleep = vi.fn(async (ms: number) => void order.push(`sleep ${ms}`));
+    const wrapped = (async (...args: Parameters<typeof fetch>) => { order.push("fetch"); return fetch(...args); }) as typeof fetch;
+    await expect(callModel(deps(wrapped, { sleep }).d, request)).resolves.toEqual({ answer: "yes" });
+    expect(order).toEqual(["fetch", "sleep 2000", "fetch"]);
+    expect(calls.map((c) => c.url)).toEqual(["https://openrouter.test/v1/chat/completions", "https://openrouter.test/v1/chat/completions"]);
+  });
+
+  it("goes on to OpenAI without waiting after OpenRouter's last attempt", async () => {
+    const { fetch, calls } = fakeFetch(status(429), status(429), ok({ answer: "yes" }));
+    const sleep = vi.fn(async () => undefined);
+    await expect(callModel(deps(fetch, { sleep }).d, request)).resolves.toEqual({ answer: "yes" });
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(calls[2]!.url).toBe("https://openai.test/v1/chat/completions");
+  });
+
+  it("does not wait on other errors, or on a 429 from OpenAI", async () => {
+    const { fetch } = fakeFetch(status(500), status(400), status(429), ok({ answer: "yes" }));
+    const sleep = vi.fn(async () => undefined);
+    await expect(callModel(deps(fetch, { sleep }).d, request)).resolves.toEqual({ answer: "yes" });
+    expect(sleep).not.toHaveBeenCalled();
   });
 });
