@@ -243,7 +243,7 @@ function Working({ text }: { text: string }) {
 }
 
 /** One question of the run: the line it is about (when it is about one), the likely answers, your own words, the reason. */
-function RunQuestion({ item, line, why, initial, locale, busy, onSubmit, onSkip, onBack }: {
+export function RunQuestion({ item, line, why, initial, locale, busy, onSubmit, onSkip, onBack }: {
   item: Exclude<RunItem, { kind: "box" }>; line?: string; why: string | null; initial: string; locale: Locale; busy: boolean;
   onSubmit(text: string, via: Via[]): void; onSkip(): void; onBack?(): void;
 }) {
