@@ -28,6 +28,12 @@ vi.mock("./BudgetStep.tsx", () => ({
       <p>Budget: {items.map((i) => i.question.text).join(" | ")}</p>
       <button type="button" onClick={() => { for (const i of items) onAnswer(i, `Answer to ${i.question.text}`, ["type"]); onDone(); }}>Answer all</button>
       <button type="button" onClick={() => { onAnswer(items[0]!, "First answer", ["type"]); onAnswer(items[0]!, "Corrected answer", ["type"]); }}>Answer twice</button>
+      <button type="button" onClick={() => {
+        const line = items.find((i) => i.kind === "line")!;
+        const twin = { ...line, question: { ...line.question, bulletId: `${line.roleId}b2` } } as BudgetItem;
+        onAnswer(line, "About line one", ["type"]);
+        onAnswer(twin, "About line two", ["type"]);
+      }}>Same wording, two lines</button>
     </div>
   ),
 }));
@@ -164,6 +170,18 @@ describe("the short path", () => {
     const notes = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.endsWith("answer") ? [a.note] : []));
     expect(notes.map((n) => n.answer)).toEqual(["First answer", "Corrected answer"]);
     expect(notes[1]!.id).toBe(notes[0]!.id);
+  });
+
+  it("two lines asked the same words keep two notes", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Same wording, two lines" }));
+    const notes = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.startsWith("About line") ? [a.note] : []));
+    expect(notes).toHaveLength(2);
+    expect(notes[1]!.id).not.toBe(notes[0]!.id);
   });
 
   it("Skip for now closes it", async () => {

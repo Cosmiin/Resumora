@@ -27,7 +27,41 @@ session: Company question · builder: claude
 commit: 72db7de + fix b326f52 (base 9426337) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
 open: none
 
-## Tasks 5–7: handed to a fresh session (claude-build: after 4 tasks)
+## Task 5: Budget questions and the review sheet — done
+session: Company question · builder: claude
+commit: 9edad61 (base 4730b35) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: none
+
+## Task 7: Sparkles removed; project Improve; Suggest on five sections — done
+session: Company question · builder: claude
+commit: c40d2a2 (base 9edad61) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: none
+
+## Task 6: The short enrichment path — done
+session: Company question · builder: claude
+commit: 3ba2d28 (base c40d2a2) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: none
+
+Tasks 5–7 were built in this same session: a fresh session could not be started while the owner was connected over
+Remote Control. Task 7 was built before Task 6 (it does not depend on it).
+
+## Whole-branch review (Opus, base 6a60ecb)
+Three medium and two low findings, all fixed in bd04d5c: a corrected answer (after Back) replaces its note; company
+and tools answers no longer count as an answer about the whole role (they no longer widen rewrites to lines up to
+100), and a role that got any note this round is never labelled "tidied"; Continue on the companies and tools screens
+works once; budget answers are capped at the note limit; a long company name no longer hides every proposal.
+Also 4d7b204: the four step names on the upload screen follow the short path.
+
+## Checked in a browser (local stack, Chrome, a local test account) on 2026-11-17
+A test CV with HR Manager · Carbon Global, Talent Acquisition Lead · Carbon Global SRL and Staffing Manager · Robert Half.
+- Start: "Your CV: 36", Start enabled once the three roles were scored.
+- Companies: one row for both Carbon Global roles (empty field), Robert Half with the AI's sentence and Edit.
+- Tools: one grid, 8 tool columns, the add box reachable by scrolling the grid sideways.
+- Questions: "Step 3 of 4 · Question 1 of 8", the role card (HR Manager · Carbon Global · Mar 2022 – Present) on top.
+- Review: three roles collapsed with their counts; descriptions used the company answers; tools named in the lines.
+- Apply all, then "Your CV: 36 → 58" and "8 more questions".
+- No ✨ on the page, no console errors.
+Not checked in the browser: a second round, "Rather just talk?", Suggest on Key achievements and courses, phones.
 
 ## Rulings
 - Task 1: `toolShown(role, "BI")` is true when a line says "Power BI": the tool's own words appear as whole words.
@@ -45,4 +79,21 @@ open: none
   person adds keeps its box on that row when unticked.
 - Task 4: all ticks removed from a role saves "None of these"; when the tools call fails, the grid is empty and
   Continue saves nothing.
+- Task 5: `RunQuestion` is exported from RoleRun.tsx and reused for each budget question; the review sheet never shows
+  the "was" strikethrough; Back in the budget skips roles answered with "Rather just talk?".
+- Task 6: the old result screen (EnrichedScreen, SkillsNotice, enriched-rows.test.tsx) is deleted (unused);
+  ENRICHED_AVERAGE moved into EnrichPath.tsx; PathStart.tsx stays for PathSteps (upload screen).
+- Task 6: a role with score state "none" (no lines) does not block Start; the end waits at most 20 s for new scores.
+- Task 7: AchievementsStop and PathScreen live in SectionSuggest.tsx; the "Coming next" placeholder on Key achievements
+  is gone (its mechanism, aiButtonsFor, has no entries left).
 - Task 4: strings under `enrich.path.*` (step, companies.*, tools.*, review.tidied) in en and ro.
+
+## Open (owner)
+- Deploy needs the migration `20261117000000_enrich_path_ai_tasks.sql` on the hosted database
+  (`npx supabase db push --remote`), then the Worker and the website. Not done (owner's call).
+- This branch is based on `feat/company-guess` (PR #66): merge that first.
+- Seen in the browser: the AI's rewrites sometimes pad a line ("using industry-standard recruitment tools"). That is
+  the existing rewrite prompt, not this change.
+- "Rather just talk?" sits under the question's buttons; on a short screen it is below the fold.
+
+Cost line: review agents 14 (11 Sonnet, 3 Opus) · guard denials 0 · no Codex.

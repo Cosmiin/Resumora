@@ -101,12 +101,12 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
     got.current.set(roleId, entry);
     return entry;
   };
-  // Answering a question again (after Back) replaces its note, as in a role's own run.
+  // Answering the same screen again (after Back) replaces its note, as in a role's own run. One slot per screen of
+  // this round: two lines with the same wording keep two notes, and a new round starts with new notes.
   const noteIds = useRef(new Map<string, string>());
-  const save = (roleId: string, question: string, answer: string, via: Via[]) => {
-    const key = `${roleId}|${questionKey(question)}`;
-    const id = noteIds.current.get(key) ?? newId();
-    noteIds.current.set(key, id);
+  const save = (slot: string, roleId: string, question: string, answer: string, via: Via[]) => {
+    const id = noteIds.current.get(slot) ?? newId();
+    noteIds.current.set(slot, id);
     const note: Note = { id, question, answer: answer.trim().slice(0, MAX_LONG_TEXT), via: via.length ? via : ["type"], askedAt: new Date().toISOString() };
     dispatch({ type: "setNote", roleId, note });
   };
@@ -118,6 +118,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
     });
   };
   const toBudget = () => {
+    noteIds.current = new Map();
     const items = budget();
     for (const item of items) asked.current.add(questionKey(item.question.text));
     if (items.length) setStage({ kind: "budget", items });
@@ -211,14 +212,14 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
     return screen(
       <BudgetStep cv={cv} items={stage.items}
         onAnswer={(item, text, via) => {
-          save(item.roleId, item.question.text, text, via);
+          save(`${item.roleId}|${item.kind === "line" ? `line:${item.question.bulletId}` : `role:${item.question.id}`}|${questionKey(item.question.text)}`, item.roleId, item.question.text, text, via);
           const g = gotFor(item.roleId);
           if (item.kind === "line") g.lines.add(item.question.bulletId);
           else if (item.question.topic === "purpose") g.context = true;
           else g.role = true;
         }}
         onTalk={(roleId, text, via) => {
-          save(roleId, BRAIN_DUMP_QUESTION, text, via);
+          save(`${roleId}|talk`, roleId, BRAIN_DUMP_QUESTION, text, via);
           gotFor(roleId).role = true;
         }}
         onDone={() => void prepare()} />,
