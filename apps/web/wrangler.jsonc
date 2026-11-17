@@ -1,0 +1,9 @@
+{
+  // The live website on Cloudflare Pages. Publish: `npm run build -w apps/web`, then
+  // `npx wrangler pages deploy` from this folder (see "Going live" in the root README).
+  "name": "resumora",
+  "pages_build_output_dir": "dist",
+  "compatibility_date": "2026-11-01",
+  // functions/v1 forwards API requests to the Worker published from apps/api.
+  "services": [{ "binding": "API", "service": "resumora-api" }]
+}
