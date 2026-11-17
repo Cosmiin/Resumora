@@ -33,13 +33,15 @@ describe("CompaniesStep", () => {
     ] });
   });
 
-  it("shows one row per company and saves the answer on every role there", async () => {
+  const next = () => screen.getByRole("button", { name: "Continue" });
+
+  it("asks only about the companies the AI does not know, and saves the answer on every role there", async () => {
     const onDone = vi.fn();
     render(<CompaniesStep cv={cv} onDone={onDone} />);
     const rows = await screen.findAllByRole("group");
-    expect(rows.map((r) => within(r).getByRole("heading").textContent)).toEqual(["Carbon Global · Remote", "Robert Half · Toronto", "Elias Metal"]);
+    expect(rows.map((r) => within(r).getByRole("heading").textContent)).toEqual(["Carbon Global · Remote", "Elias Metal"]);
     await userEvent.type(within(rows[0]!).getByRole("textbox"), "Carbon accounting software");
-    await userEvent.click(screen.getByRole("button", { name: "Confirm all and continue" }));
+    await userEvent.click(next());
     const saved: Saved = onDone.mock.calls[0]![0];
     const carbon = saved.filter((s) => s.note.answer === "Carbon accounting software");
     expect(carbon.map((s) => s.roleId)).toEqual(["a", "b"]);
@@ -48,63 +50,84 @@ describe("CompaniesStep", () => {
     expect(saved.some((s) => s.roleId === "d")).toBe(false);
   });
 
-  it("saves an accepted proposal as picked, and an edited one as typed", async () => {
-    const onDone = vi.fn();
-    render(<CompaniesStep cv={cv} onDone={onDone} />);
-    const robert = (await screen.findAllByRole("group"))[1]!;
-    expect(within(robert).getByText("Staffing and recruitment firm.")).toBeInTheDocument();
-    await userEvent.click(within(robert).getByRole("button", { name: "Edit" }));
-    const box = within(robert).getByRole("textbox");
-    expect(box).toHaveValue("Staffing and recruitment firm.");
-    await userEvent.type(box, " In Canada.");
-    await userEvent.click(screen.getByRole("button", { name: "Confirm all and continue" }));
-    expect((onDone.mock.calls[0]![0] as Saved).find((s) => s.roleId === "c")!.note).toMatchObject({ answer: "Staffing and recruitment firm. In Canada.", via: ["type"] });
-  });
-
-  it("Confirm saves once, even when clicked twice", async () => {
+  it("fills in a company the AI knows without asking, says so, and saves it as picked", async () => {
     const onDone = vi.fn();
     render(<CompaniesStep cv={cv} onDone={onDone} />);
     await screen.findAllByRole("group");
-    const button = screen.getByRole("button", { name: "Confirm all and continue" });
+    expect(screen.queryByText(/Robert Half/)).toBeNull();
+    expect(screen.queryByText("Staffing and recruitment firm.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(screen.getByText("We recognised 1 company and filled in what it does. You will see it in the review at the end.")).toBeInTheDocument();
+    await userEvent.click(next());
+    expect((onDone.mock.calls[0]![0] as Saved).find((s) => s.roleId === "c")!.note).toMatchObject({ question: "What does Robert Half do?", answer: "Staffing and recruitment firm.", via: ["pick"] });
+  });
+
+  it("moves on by itself when the AI knows every company", async () => {
+    api.suggestCompanies.mockResolvedValue({ companies: [
+      { key: "carbon global", proposal: "Carbon accounting software." },
+      { key: "robert half", proposal: "Staffing and recruitment firm." },
+      { key: "elias metal", proposal: "Custom metal parts." },
+    ] });
+    const onDone = vi.fn();
+    render(<CompaniesStep cv={cv} onDone={onDone} />);
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    const saved: Saved = onDone.mock.calls[0]![0];
+    expect(saved.map((s) => [s.roleId, s.note.answer, s.note.via[0]])).toEqual([
+      ["a", "Carbon accounting software.", "pick"], ["b", "Carbon accounting software.", "pick"],
+      ["c", "Staffing and recruitment firm.", "pick"], ["d", "Custom metal parts.", "pick"],
+    ]);
+    expect(screen.queryByRole("group")).toBeNull();
+  });
+
+  it("Continue saves once, even when clicked twice", async () => {
+    const onDone = vi.fn();
+    render(<CompaniesStep cv={cv} onDone={onDone} />);
+    await screen.findAllByRole("group");
+    const button = next();
     await userEvent.click(button);
     await userEvent.click(button);
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("an untouched proposal counts as confirmed", async () => {
-    const onDone = vi.fn();
-    render(<CompaniesStep cv={cv} onDone={onDone} />);
-    await screen.findAllByRole("group");
-    await userEvent.click(screen.getByRole("button", { name: "Confirm all and continue" }));
-    expect((onDone.mock.calls[0]![0] as Saved).find((s) => s.roleId === "c")!.note).toMatchObject({ answer: "Staffing and recruitment firm.", via: ["pick"] });
-  });
-
-  it("a company already answered shows its answer and asks nothing", async () => {
+  it("a company already answered is not asked again: with nothing else to ask, the step moves on and saves nothing", async () => {
     const answered = { ...cv, experience: [role("a", { company: "Robert Half", notes: [
       { id: "n1", question: "What does Robert Half do?", answer: "Recruitment", via: ["type"], askedAt: "2026-11-17T00:00:00Z" },
     ] })] };
     const onDone = vi.fn();
     render(<CompaniesStep cv={answered} onDone={onDone} />);
-    const row = (await screen.findAllByRole("group"))[0]!;
-    expect(within(row).getByText("Recruitment")).toBeInTheDocument();
-    expect(within(row).queryByRole("textbox")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Confirm all and continue" }));
-    expect(onDone).toHaveBeenCalledWith([]);
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith([]));
+    expect(api.suggestCompanies).not.toHaveBeenCalled();
   });
 
-  it("shows … on each company while the AI looks, and no Continue yet", async () => {
+  it("shows that it is looking while the AI looks: no company, and no Continue yet", async () => {
     api.suggestCompanies.mockReturnValue(new Promise(() => {}));
     render(<CompaniesStep cv={cv} onDone={vi.fn()} />);
-    expect(screen.getAllByText("…")).toHaveLength(3);
-    expect(screen.getByRole("button", { name: "Confirm all and continue" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Looking up your companies…");
+    expect(screen.queryByRole("group")).toBeNull();
+    expect(next()).toBeDisabled();
   });
 
   it("still works when the AI is unavailable: every company gets an empty field", async () => {
     api.suggestCompanies.mockRejectedValue(new Error("down"));
     render(<CompaniesStep cv={cv} onDone={vi.fn()} />);
     const rows = await screen.findAllByRole("group");
-    expect(await within(rows[1]!).findByRole("textbox")).toHaveValue("");
-    expect(screen.getByRole("button", { name: "Confirm all and continue" })).toBeEnabled();
+    expect(rows).toHaveLength(3);
+    expect(within(rows[1]!).getByRole("textbox")).toHaveValue("");
+    expect(next()).toBeEnabled();
+  });
+
+  it("uses the answer prepared while the import was on screen, and asks again only if that failed", async () => {
+    const prepared = Promise.resolve({ companies: [{ key: "carbon global", proposal: "Carbon accounting software." }, { key: "robert half", proposal: null }, { key: "elias metal", proposal: null }] });
+    const { unmount } = render(<CompaniesStep cv={cv} prepared={prepared} onDone={vi.fn()} />);
+    const rows = await screen.findAllByRole("group");
+    expect(rows.map((r) => within(r).getByRole("heading").textContent)).toEqual(["Robert Half · Toronto", "Elias Metal"]);
+    expect(api.suggestCompanies).not.toHaveBeenCalled();
+    unmount();
+    const failed = Promise.reject(new Error("used in the meantime"));
+    failed.catch(() => undefined);
+    render(<CompaniesStep cv={cv} prepared={failed} onDone={vi.fn()} />);
+    expect((await screen.findAllByRole("group")).map((r) => within(r).getByRole("heading").textContent)).toEqual(["Carbon Global · Remote", "Elias Metal"]);
+    expect(api.suggestCompanies).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -279,6 +302,19 @@ describe("ToolsStep", () => {
     render(<ToolsStep cv={cv} onDone={vi.fn()} />);
     expect(screen.getByText("Finding the usual tools for your roles…")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Next role" })).toBeDisabled();
+  });
+
+  it("uses the tools prepared while the import was on screen, and asks again only if that failed", async () => {
+    const prepared = Promise.resolve({ roles: [{ roleId: "a", tools: ["Tableau"] }, { roleId: "b", tools: [] }, { roleId: "c", tools: [] }] });
+    const { unmount } = render(<ToolsStep cv={cv} prepared={prepared} onDone={vi.fn()} />);
+    await screen.findByRole("button", { name: "Tableau" });
+    expect(api.suggestTools).not.toHaveBeenCalled();
+    unmount();
+    const failed = Promise.reject(new Error("used in the meantime"));
+    failed.catch(() => undefined);
+    render(<ToolsStep cv={cv} prepared={failed} onDone={vi.fn()} />);
+    await screen.findByRole("button", { name: "Excel" });
+    expect(api.suggestTools).toHaveBeenCalledTimes(1);
   });
 
   it("still works when the AI is unavailable", async () => {

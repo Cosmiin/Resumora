@@ -9,6 +9,8 @@ import type { CvRepo } from "../cv/repo.ts";
 import type { AuthUser } from "../env.ts";
 import { ApiError } from "../errors.ts";
 import { createVoiceSession, VoiceUnavailableError, type VoiceDeps } from "../ai/voice-session.ts";
+import type { ImportRepo } from "../imports/repo.ts";
+import { importAsCv } from "./import-source.ts";
 import type { InsightsRepo } from "./repo.ts";
 import { scoreRole } from "./score.ts";
 import { improveBullet } from "./improve.ts";
@@ -33,9 +35,12 @@ const ImproveBody = ScoreBody.extend({ bulletId: z.string().min(1).max(64) });
 /**
  * fresh: ask the model again with the notes in view, instead of returning the stored result.
  * more: every earlier question is answered; the model is asked for more, each with options to pick.
+ * importId: score a role of an import that is ready but not used yet, so its score is there when the import is used.
  * Any other field (such as an older client's `focus`) is dropped by the schema and has no effect.
  */
-const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), more: z.boolean().optional() });
+const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), more: z.boolean().optional(), importId: z.uuid().optional() });
+/** importId: read an import that is ready but not used yet instead of the saved CV, to prepare the path ahead. */
+const AheadBody = z.object({ importId: z.uuid().optional() });
 const BrainDumpBody = ScoreBody.extend({ source: z.enum(["ramble", "answers"]).default("ramble") });
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */
@@ -44,6 +49,7 @@ const MAX_BODY_BYTES = 16 * 1024;
 export function enrichRoutes(deps: {
   cvRepo(user: AuthUser): CvRepo;
   insightsRepo(user: AuthUser): InsightsRepo;
+  importRepo(user: AuthUser): ImportRepo;
   model(user: AuthUser): ModelDeps;
   /** Not set in tests that never use voice. */
   voice?(user: AuthUser): VoiceDeps;
@@ -64,9 +70,11 @@ export function enrichRoutes(deps: {
     const body = ScoreRequestBody.safeParse(await c.req.json().catch(() => null));
     if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId and a fingerprint.");
     const user = c.get("user");
+    const { importId, ...input } = body.data;
+    const cv = importId ? importAsCv(deps.cvRepo(user), deps.importRepo(user), importId) : deps.cvRepo(user);
     const result = await scoreRole(
-      { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
-      body.data,
+      { cv, insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
+      { ...input, ahead: importId !== undefined },
     );
     return c.json(result);
   });
@@ -109,9 +117,13 @@ export function enrichRoutes(deps: {
   // The short path's companies and tools screens: one call each for the whole CV.
   for (const [path, run, name] of [["/companies", suggestCompanies, "companies"], ["/tools", suggestTools, "tools"]] as const) {
     app.post(path, async (c) => {
+      const body = AheadBody.safeParse(await c.req.json().catch(() => ({})));
+      if (!body.success) throw new ApiError(400, "invalid_request", "Send nothing, or an importId.");
       const user = c.get("user");
+      const { importId } = body.data;
+      const cv = importId ? importAsCv(deps.cvRepo(user), deps.importRepo(user), importId) : deps.cvRepo(user);
       try {
-        return c.json(await run({ cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") }));
+        return c.json(await run({ cv, insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") }));
       } catch (err) {
         if (err instanceof ApiError && err.status >= 500) {
           console.error(JSON.stringify({ msg: `${name} failed`, code: err.code, requestId: c.get("requestId") }));

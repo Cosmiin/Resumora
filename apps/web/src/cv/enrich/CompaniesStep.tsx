@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
-import { MAX_LONG_TEXT, companyKey, gradedItems, newId, questionKey, type CvContent, type Experience, type Note } from "@resumora/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MAX_LONG_TEXT, companyKey, gradedItems, newId, questionKey, type CompaniesAnswer, type CvContent, type Experience, type Note } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { suggestCompanies } from "./enrich-api.ts";
 
 type Saved = { roleId: string; note: Note }[];
 type Row = { key: string; name: string; location: string; roles: Experience[]; done: string | null };
-type Draft = { text: string; edited: boolean };
 
 const companyQuestion = (name: string) => t("enrich.path.companies.note", { company: name });
 
@@ -31,28 +30,29 @@ export function companyRows(cv: CvContent): Row[] {
 }
 
 /**
- * The short path's first screen: what each company does. The AI's sentence when it knows the company for sure
- * (confirmed by continuing, or edited), an empty field otherwise. Continuing saves one note per role.
+ * The short path's first screen: what each company does. A company the AI knows for sure is filled in without
+ * asking (owner, 17 Nov 2026); the screen asks only about the rest, and moves on by itself when there is none.
+ * Continuing saves one note per role. prepared: the AI's answer asked for while the import was still on screen.
  */
-export function CompaniesStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved): void }) {
+export function CompaniesStep({ cv, prepared, onDone }: { cv: CvContent; prepared?: Promise<CompaniesAnswer>; onDone(notes: Saved): void }) {
   const rows = useMemo(() => companyRows(cv), [cv]);
   const [loading, setLoading] = useState(true);
   const [proposals, setProposals] = useState<Record<string, string>>({});
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
-  const [editing, setEditing] = useState<Record<string, boolean>>({});
-  // Continue works once: a second click must not save the notes again.
+  const [typed, setTyped] = useState<Record<string, string>>({});
+  // Continue works once: a second click (or a second run of the effect below) must not save the notes again.
   const [sent, setSent] = useState(false);
+  const sentRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
     if (rows.every((r) => r.done !== null)) { setLoading(false); return; }
-    suggestCompanies()
+    // The prepared answer may have failed (the import was used before it was asked for): then ask now.
+    (prepared ? prepared.catch(() => suggestCompanies()) : suggestCompanies())
       .then(({ companies }) => {
         if (!alive) return;
         const found: Record<string, string> = {};
         for (const c of companies) if (c.proposal) found[c.key] = c.proposal;
         setProposals(found);
-        setDrafts(Object.fromEntries(Object.entries(found).map(([k, text]) => [k, { text, edited: false }])));
       })
       .catch(() => undefined)
       .finally(() => { if (alive) setLoading(false); });
@@ -61,23 +61,33 @@ export function CompaniesStep({ cv, onDone }: { cv: CvContent; onDone(notes: Sav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const open = rows.filter((r) => r.done === null);
+  const known = open.filter((r) => proposals[r.key]);
+  const ask = open.filter((r) => !proposals[r.key]);
+
   const confirm = () => {
-    if (sent) return;
+    if (sentRef.current) return;
+    sentRef.current = true;
     setSent(true);
     const saved: Saved = [];
     const askedAt = new Date().toISOString();
-    for (const row of rows) {
-      if (row.done !== null) continue;
-      const draft = drafts[row.key];
-      const text = draft?.text.trim().slice(0, MAX_LONG_TEXT) ?? "";
+    for (const row of open) {
+      const proposal = proposals[row.key];
+      const text = (proposal ?? typed[row.key] ?? "").trim().slice(0, MAX_LONG_TEXT);
       if (!text) continue;
-      const picked = !draft!.edited && text === proposals[row.key];
       for (const role of row.roles) {
-        saved.push({ roleId: role.id, note: { id: newId(), question: companyQuestion(row.name), answer: text, via: [picked ? "pick" : "type"], askedAt } });
+        saved.push({ roleId: role.id, note: { id: newId(), question: companyQuestion(row.name), answer: text, via: [proposal ? "pick" : "type"], askedAt } });
       }
     }
     onDone(saved);
   };
+
+  // Nothing to ask: every company is known or already answered.
+  const nothingToAsk = !loading && ask.length === 0;
+  useEffect(() => {
+    if (nothingToAsk) confirm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nothingToAsk]);
 
   return (
     <>
@@ -85,35 +95,25 @@ export function CompaniesStep({ cv, onDone }: { cv: CvContent; onDone(notes: Sav
       <h2 className="rr-big" id="fm-step-title" tabIndex={-1}>{t("enrich.path.companies.title")}</h2>
       <p className="rr-lead">{t("enrich.path.companies.lead")}</p>
       {loading && <p className="fm-note" role="status">{t("enrich.path.companies.loading")}</p>}
-      <div className="ep-rows">
-        {rows.map((row) => {
-          const proposal = proposals[row.key];
-          const draft = drafts[row.key] ?? { text: "", edited: false };
-          const open = row.done === null && !loading && (!proposal || editing[row.key]);
-          const titleId = `ep-co-${row.key.replace(/[^a-z0-9]+/g, "-")}`;
-          return (
-            <section key={row.key} className="ep-row" role="group" aria-labelledby={titleId}>
-              <h3 className="ep-row-title" id={titleId}>{[row.name, row.location].filter(Boolean).join(" · ")}</h3>
-              {row.roles.length > 1 && <p className="ep-row-meta">{row.roles.map((r) => r.title).filter(Boolean).join(", ")}</p>}
-              {row.done === null && loading ? (
-                <p className="ep-row-meta" aria-hidden="true">…</p>
-              ) : row.done !== null ? (
-                <p className="ep-done">{row.done}</p>
-              ) : open ? (
-                <textarea className="ep-input" rows={2} maxLength={MAX_LONG_TEXT} value={draft.text} aria-label={companyQuestion(row.name)}
+      {!loading && known.length > 0 && ask.length > 0 && (
+        <p className="fm-note">{known.length === 1 ? t("enrich.path.companies.filledOne") : t("enrich.path.companies.filled", { n: known.length })}</p>
+      )}
+      {!loading && (
+        <div className="ep-rows">
+          {ask.map((row) => {
+            const titleId = `ep-co-${row.key.replace(/[^a-z0-9]+/g, "-")}`;
+            return (
+              <section key={row.key} className="ep-row" role="group" aria-labelledby={titleId}>
+                <h3 className="ep-row-title" id={titleId}>{[row.name, row.location].filter(Boolean).join(" · ")}</h3>
+                {row.roles.length > 1 && <p className="ep-row-meta">{row.roles.map((r) => r.title).filter(Boolean).join(", ")}</p>}
+                <textarea className="ep-input" rows={2} maxLength={MAX_LONG_TEXT} value={typed[row.key] ?? ""} aria-label={companyQuestion(row.name)}
                   placeholder={t("enrich.path.companies.placeholder")}
-                  onChange={(e) => setDrafts((d) => ({ ...d, [row.key]: { text: e.target.value, edited: true } }))} />
-              ) : proposal ? (
-                <div className="rr-guess">
-                  <p className="rr-guess-label">{t("enrich.run.guess.label")}</p>
-                  <p className="rr-guess-text" lang={cv.locale}>{draft.text}</p>
-                  <button type="button" className="ui-btn ui-btn--sm" onClick={() => setEditing((e) => ({ ...e, [row.key]: true }))}>{t("enrich.focus.describe.edit")}</button>
-                </div>
-              ) : null}
-            </section>
-          );
-        })}
-      </div>
+                  onChange={(e) => setTyped((d) => ({ ...d, [row.key]: e.target.value }))} />
+              </section>
+            );
+          })}
+        </div>
+      )}
       <div className="fm-foot">
         <button type="button" className="fm-btn" disabled={loading || sent} onClick={confirm}>{t("enrich.path.companies.confirm")}</button>
       </div>

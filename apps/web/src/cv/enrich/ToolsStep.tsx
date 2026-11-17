@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { gradedItems, newId, toolShown, type CvContent, type Note } from "@resumora/shared";
+import { gradedItems, newId, toolShown, type CvContent, type Note, type ToolsAnswer } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { formatRange } from "../page/blocks.ts";
 import { suggestTools } from "./enrich-api.ts";
@@ -20,8 +20,9 @@ type Group = (typeof GROUPS)[number];
  * The short path's second step: one role per screen, its tools as toggle buttons. A tool the role's text already names
  * starts ticked. A tool ticked on one role is offered on the roles just before and after it. Skip leaves the role as its
  * text has it. The last screen saves a note on each role whose ticks changed.
+ * prepared: the AI's answer asked for while the import was still on screen.
  */
-export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved): void }) {
+export function ToolsStep({ cv, prepared, onDone }: { cv: CvContent; prepared?: Promise<ToolsAnswer>; onDone(notes: Saved): void }) {
   const roles = useMemo(() => gradedItems(cv).map(({ item }) => item), [cv]);
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -37,7 +38,8 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
 
   useEffect(() => {
     let alive = true;
-    suggestTools()
+    // The prepared answer may have failed (the import was used before it was asked for): then ask now.
+    (prepared ? prepared.catch(() => suggestTools()) : suggestTools())
       .then(({ roles: answer }) => {
         if (!alive) return;
         const byRole: Record<string, string[]> = {};

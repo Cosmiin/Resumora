@@ -45,6 +45,14 @@ export function scoreRole(roleId: string, fingerprint: string, fresh?: boolean, 
   return apiFetch("/v1/enrich/score", { method: "POST", json, schema: RoleResultSchema });
 }
 
+/**
+ * Scores one role of an import that is read but not used yet, so its score and questions are there when it is used.
+ * 409 `not_saved`: the import can't be read (not ready, or used in the meantime).
+ */
+export function scoreAhead(importId: string, roleId: string, fingerprint: string): Promise<RoleResult> {
+  return apiFetch("/v1/enrich/score", { method: "POST", json: { roleId, fingerprint, importId }, schema: RoleResultSchema });
+}
+
 export function improveBullet(input: { roleId: string; bulletId: string; fingerprint: string }): Promise<ImproveAnswer> {
   return apiFetch("/v1/enrich/improve-bullet", { method: "POST", json: input, schema: ImproveAnswerSchema });
 }
@@ -164,17 +172,20 @@ export function getSkillSuggestions(): Promise<SkillsAnswer> {
   return apiFetch("/v1/enrich/skills", { method: "POST", json: {}, schema: SkillsAnswerSchema });
 }
 
+/**
+ * The short path's companies screen: what each company does, when the AI knows it for sure.
+ * importId: for an import that is read but not used yet, instead of the saved CV.
+ */
+export function suggestCompanies(importId?: string): Promise<CompaniesAnswer> {
+  return apiFetch("/v1/enrich/companies", { method: "POST", json: importId ? { importId } : {}, schema: CompaniesAnswerSchema });
+}
+
+/** The short path's tools screen: the tools each role likely used. importId: as for the companies. */
+export function suggestTools(importId?: string): Promise<ToolsAnswer> {
+  return apiFetch("/v1/enrich/tools", { method: "POST", json: importId ? { importId } : {}, schema: ToolsAnswerSchema });
+}
+
 /** Key achievements suggestions (4A) from the saved CV's roles: up to 5, each naming its role. */
-/** The short path's companies screen: what each company does, when the AI knows it for sure. */
-export function suggestCompanies(): Promise<CompaniesAnswer> {
-  return apiFetch("/v1/enrich/companies", { method: "POST", json: {}, schema: CompaniesAnswerSchema });
-}
-
-/** The short path's tools screen: the tools each role likely used. */
-export function suggestTools(): Promise<ToolsAnswer> {
-  return apiFetch("/v1/enrich/tools", { method: "POST", json: {}, schema: ToolsAnswerSchema });
-}
-
 export function suggestAchievements(): Promise<AchievementsAnswer> {
   return apiFetch("/v1/enrich/achievements", { method: "POST", json: {}, schema: AchievementsAnswerSchema });
 }

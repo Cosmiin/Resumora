@@ -61,14 +61,17 @@ export async function scoreRole(
   deps: ScoreDeps,
   /** fresh: skip the stored result and ask the model again, with the notes in view (after "Tell us about…"). */
   input: { roleId: string; fingerprint: string; fresh?: boolean;
-    /** Everything asked so far is answered: asks again, for a question with options for all that is still short of 100. */ more?: boolean },
+    /** Everything asked so far is answered: asks again, for a question with options for all that is still short of 100. */ more?: boolean;
+    /** The role is read from an import not used yet (`deps.cv` is that import): the saved CV's stored scores are left alone. */ ahead?: boolean },
 ): Promise<RoleResult> {
   const fresh = input.fresh || input.more;
   const { content } = await deps.cv.get();
   // Roles and volunteering are scored; a cached row for anything else (a project, a deleted item) is stale.
   const present = new Set(gradedItems(content).map(({ item }) => item.id));
-  const stale = (await deps.insights.list()).filter((r) => !present.has(r.roleId)).map((r) => r.roleId);
-  await deps.insights.remove(stale);
+  if (!input.ahead) {
+    const stale = (await deps.insights.list()).filter((r) => !present.has(r.roleId)).map((r) => r.roleId);
+    await deps.insights.remove(stale);
+  }
 
   const found = findScored(content, input.roleId);
   if (found?.kind === "project") throw new ApiError(400, "not_scored", "Projects aren't scored.");

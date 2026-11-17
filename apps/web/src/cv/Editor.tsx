@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { emptyCv, type CvContent, type CvResponse, type SaveResponse, type SectionKey } from "@resumora/shared";
+import { emptyCv, gradedItems, type CvContent, type CvResponse, type SaveResponse, type SectionKey } from "@resumora/shared";
 import type { TemplateId } from "./page/templates.ts";
 import { t } from "../i18n/t.ts";
 import type { MessageKey } from "../i18n/en.ts";
@@ -22,7 +22,8 @@ import { HelperPanel } from "./panel/HelperPanel.tsx";
 import { BottomSheet, type SheetState } from "./panel/BottomSheet.tsx";
 import { useMediaQuery } from "../hooks/useMediaQuery.ts";
 import { Overview } from "./panel/Overview.tsx";
-import { useRoleScores } from "./enrich/useRoleScores.ts";
+import { useRoleScores, type Ahead } from "./enrich/useRoleScores.ts";
+import { prepareSteps, type Prepared } from "./enrich/prepared.ts";
 import { FocusOpenProvider, type FocusTarget } from "./enrich/focus-context.ts";
 import { FocusMode } from "./enrich/FocusMode.tsx";
 import { RoleRun } from "./enrich/RoleRun.tsx";
@@ -99,7 +100,11 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
     [setContent, markEdited],
   );
   const focusPage = useCallback(() => pageRef.current?.focus(), []);
-  const roleScores = useRoleScores({ cv: isTailored ? NO_ROLES : content, status });
+  // An import that is read but not used yet: its scores, companies and tools are asked for while it is looked at,
+  // so the questions are ready when "Start with the questions" is pressed.
+  const [ahead, setAhead] = useState<Ahead | null>(null);
+  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  const roleScores = useRoleScores({ cv: isTailored ? NO_ROLES : content, status, ahead });
   const scores = isTailored ? undefined : roleScores.scores;
   const retry = roleScores.retry;
   // A tailored CV opens editable by clicking, like the base CV; "Show changes" is the option.
@@ -117,6 +122,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   }, [params, setParams]);
   const closePath = useCallback(() => {
     setPathOpen(false);
+    setPrepared(null);
     requestAnimationFrame(() => {
       if (document.activeElement === document.body) focusPage();
     });
@@ -277,17 +283,33 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
       canApply={status === "saved"}
       replaces={!isBlankCv(content)}
       currentVersion={autosave.currentVersion}
-      onClose={() => setImportId(null)}
+      onClose={() => {
+        setImportId(null);
+        setAhead(null);
+        setPrepared(null);
+      }}
+      onFound={(cv) => {
+        if (gradedItems(cv).length === 0) return;
+        setAhead({ importId, cv });
+        setPrepared(prepareSteps(importId));
+      }}
       onApplied={(cv, next) => {
         autosave.reset(cv);
         clearOpened();
         setImportId(null);
+        setAhead(null);
         if (next === "questions") setPathOpen(true);
-        else setQuestionsWaiting(cv.content.experience.length > 0);
+        else {
+          // The CV may be edited before the questions are started: the steps then ask for themselves.
+          setPrepared(null);
+          setQuestionsWaiting(cv.content.experience.length > 0);
+        }
       }}
       onConflict={(c) => {
         autosave.reportConflict(c);
         setImportId(null);
+        setAhead(null);
+        setPrepared(null);
       }}
     />
   );
@@ -394,7 +416,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
         </Dialog>
       )}
       {pathOpen && !focusTarget && !historyOpen && !isTailored && (
-        <EnrichPath cv={content} dispatch={dispatch} scores={roleScores.scores} waitForSave={waitForSave} onClose={closePath} onScore={roleScores.put} />
+        <EnrichPath cv={content} dispatch={dispatch} scores={roleScores.scores} waitForSave={waitForSave} onClose={closePath} onScore={roleScores.put} prepared={prepared} />
       )}
       {/* A whole role to improve gets the run of questions; one bullet (✨) and "Make it stand out" keep the short flow. */}
       {/* A project gets its own short flow instead of the role run. */}
