@@ -22,9 +22,12 @@ session: Company question · builder: claude
 commit: 8ae755a (base 32281c4) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: none
 
-## Task 4: Companies and tools screens — in review
+## Task 4: Companies and tools screens — done
 session: Company question · builder: claude
-commit: 72db7de (base 9426337)
+commit: 72db7de + fix b326f52 (base 9426337) · reviews: 2 (agents) · fix rounds: 1 · guard denials: 0
+open: none
+
+## Tasks 5–7: handed to a fresh session (claude-build: after 4 tasks)
 
 ## Rulings
 - Task 1: `toolShown(role, "BI")` is true when a line says "Power BI": the tool's own words appear as whole words.
@@ -38,6 +41,8 @@ commit: 72db7de (base 9426337)
   are shared. Its signature is `changeActions(cv, roleId, list, changes, decisions) → { actions, applied, changedBullets }`.
 - Task 3: `Approve`, `Piece` (and `Pick`) moved to `ReviewPieces.tsx`; `Piece` takes `tidied`.
 - Task 4: a company proposal shows with Edit only; continuing without editing confirms it (via ["pick"]).
+- Task 4: every tool a role's own text names starts ticked and always has a column (even past 8); a tool the
+  person adds keeps its box on that row when unticked.
 - Task 4: all ticks removed from a role saves "None of these"; when the tools call fails, the grid is empty and
   Continue saves nothing.
 - Task 4: strings under `enrich.path.*` (step, companies.*, tools.*, review.tidied) in en and ro.
