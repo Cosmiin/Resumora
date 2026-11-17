@@ -53,7 +53,8 @@ export async function suggestCompanies(deps: ScoreDeps): Promise<CompaniesAnswer
       schema: ModelSchema,
       system: companiesSystemPrompt(content.locale, deps.questionLanguage),
       user: ["<companies>", JSON.stringify(entries), "</companies>"].join("\n") + questionLanguageReminder(content.locale, deps.questionLanguage),
-      maxOutputTokens: Math.min(4000, 200 + 120 * entries.length),
+      // About 80 tokens per company with a sentence: enough for the 80 companies a CV can hold.
+      maxOutputTokens: Math.min(8000, 300 + 90 * entries.length),
     });
   } catch (err) {
     aiError(err);

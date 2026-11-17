@@ -40,7 +40,8 @@ export async function suggestTools(deps: ScoreDeps): Promise<ToolsAnswer> {
         id: r.id, title: r.title, company: r.company, period: [r.startDate, r.current ? "present" : r.endDate].filter(Boolean).join(" – "),
         description: r.description, bullets: r.bullets.map((b) => b.text), notes: r.notes.map((n) => n.answer),
       }))), "</roles>"].join("\n"),
-      maxOutputTokens: Math.min(4000, 200 + 90 * items.length),
+      // About 80 tokens per role (an id and up to 8 names): enough for the 80 items a CV can hold.
+      maxOutputTokens: Math.min(8000, 300 + 90 * items.length),
     });
   } catch (err) {
     aiError(err);
