@@ -94,10 +94,17 @@ describe("the short path", () => {
   // r2 has nothing left to ask: only its weak line is worked on.
   const scores = () => new Map<string, RoleScoreState>([["r1", ready(r1, 60)], ["r2", ready(r2, 70, { questions: [], roleQuestions: [] })]]);
 
-  it("waits for every role's score before it can start", async () => {
+  it("shows that it is reading the CV, and no score, until every role is checked", async () => {
     render(<Harness initial={new Map([["r1", ready(r1, 60)], ["r2", { state: "scoring" }]])} />);
-    expect(screen.getByText("Checking your roles…")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reading your CV…" })).toBeInTheDocument();
+    // r1 already has its score: a number now would move when r2's arrives.
+    expect(screen.queryByText(/Your CV:/)).toBeNull();
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
+    // (88*3 + 80*2) / 5 = 84.8
+    expect(screen.getByRole("heading", { name: "Your CV: 85" })).toBeInTheDocument();
+    expect(screen.queryByText("Reading your CV…")).toBeNull();
+    expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
   it("shows the CV's score at the start, then companies, tools, the questions, the review and the end, in that order", async () => {

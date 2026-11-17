@@ -4,6 +4,7 @@ import {
   type BudgetItem, type CvContent, type Note, type RoleResult,
 } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
+import { Skeleton } from "../../ui/Page.tsx";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { roleListOf } from "../edit/lists.ts";
 import type { Via } from "./AnswerBox.tsx";
@@ -170,11 +171,21 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   const screen = (children: ReactNode) => <PathScreen context={t("enrich.path.dialog")} onClose={onClose}>{children}</PathScreen>;
 
   if (stage.kind === "start") {
+    // No number until every role is checked: one made from the first few scores would move as the rest arrive.
     return screen(
-      <div className="rr-card">
+      <div className="rr-card" aria-busy={!settled}>
         <p className="rr-where">{t("enrich.path.dialog")}</p>
-        <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>{average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}</h2>
-        <p className="rr-lead" role="status">{settled ? t("enrich.path.v2.lead", { k: PATH_BUDGET }) : t("enrich.path.v2.checking")}</p>
+        {settled ? (
+          <>
+            <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>{average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}</h2>
+            <p className="rr-lead" role="status">{t("enrich.path.v2.lead", { k: PATH_BUDGET })}</p>
+          </>
+        ) : (
+          <>
+            <div role="status"><h2 className="rr-big" id="fm-step-title" tabIndex={-1}>{t("enrich.path.v2.checking")}</h2></div>
+            <div className="ep-reading"><Skeleton width="45%" height="30px" /><Skeleton width="70%" /><Skeleton /><Skeleton width="85%" /></div>
+          </>
+        )}
         <div className="rr-actions">
           <button type="button" className="fm-btn" disabled={!settled} onClick={() => {
             setBefore(average);
