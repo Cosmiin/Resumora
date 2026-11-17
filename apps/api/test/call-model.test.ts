@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { AiInputRejectedError, AiOutputTooLongError, AiUnavailableError, callModel, providersFromEnv, type AiCallLog, type ModelDeps } from "../src/ai/call-model.ts";
+import { ModelScoreSchema } from "@resumora/shared";
 
 const Answer = z.object({ answer: z.string() }).strict();
 
@@ -265,5 +266,60 @@ describe("providersFromEnv", () => {
   it("skips a provider whose key is empty", () => {
     const list = providersFromEnv({ OPENROUTER_API_KEY: "", OPENROUTER_MODEL: "m1", OPENAI_API_KEY: "k", OPENAI_MODEL: "m2" });
     expect(list).toEqual([{ name: "openai", url: "https://api.openai.com/v1", apiKey: "k", model: "m2" }]);
+  });
+});
+
+/** Every object in a JSON schema, with the path to it. */
+function objectsIn(node: unknown, path = "$"): { path: string; node: Record<string, unknown> }[] {
+  if (!node || typeof node !== "object") return [];
+  const n = node as Record<string, unknown>;
+  const here = n.properties ? [{ path, node: n }] : [];
+  const props = Object.entries((n.properties ?? {}) as Record<string, unknown>).flatMap(([k, v]) => objectsIn(v, `${path}.${k}`));
+  const items = n.items ? objectsIn(n.items, `${path}[]`) : [];
+  const branches = ((n.anyOf ?? []) as unknown[]).flatMap((b) => objectsIn(b, path));
+  return [...here, ...props, ...items, ...branches];
+}
+const acceptsNull = (node: Record<string, unknown>) => (Array.isArray(node.type) && node.type.includes("null")) ||
+  node.type === "null" || ((node.anyOf ?? []) as Record<string, unknown>[]).some((b) => b.type === "null");
+const sentSchema = (body: Record<string, unknown>) =>
+  (body.response_format as { json_schema: { schema: unknown } }).json_schema.schema;
+
+// OpenAI's strict structured output refuses (HTTP 400) a schema where an object leaves a property out of `required`.
+describe("callModel: schemas OpenAI's strict mode accepts", () => {
+  const WithOptional = z.object({
+    answer: z.string(),
+    note: z.string().optional(),
+    maybe: z.string().nullable().optional(),
+    kept: z.string().nullable(),
+    items: z.array(z.object({ id: z.string(), extra: z.number().optional() }).strict()),
+  }).strict();
+
+  it("sends every property as required, and optional ones as nullable", async () => {
+    const { fetch, calls } = fakeFetch(ok({ answer: "a", note: null, maybe: null, kept: null, items: [] }));
+    await callModel(deps(fetch).d, { ...request, schema: WithOptional });
+    const objects = objectsIn(sentSchema(calls[0]!.body));
+    expect(objects.length).toBeGreaterThan(1);
+    for (const { path, node } of objects) {
+      expect(node.required, path).toEqual(Object.keys(node.properties as object));
+    }
+    const top = objects[0]!.node.properties as Record<string, Record<string, unknown>>;
+    expect(acceptsNull(top.note!)).toBe(true);
+    expect(acceptsNull(top.answer!)).toBe(false);
+  });
+
+  it("reads null for an optional property as absent, and keeps null where the schema allows it", async () => {
+    const { fetch } = fakeFetch(ok({ answer: "a", note: null, maybe: null, kept: null, items: [{ id: "x", extra: null }, { id: "y", extra: 2 }] }));
+    const out = await callModel(deps(fetch).d, { ...request, schema: WithOptional });
+    expect(out).toEqual({ answer: "a", maybe: null, kept: null, items: [{ id: "x" }, { id: "y", extra: 2 }] });
+    expect("note" in out).toBe(false);
+  });
+
+  it("sends the role score schema with every property required", async () => {
+    const { fetch, calls } = fakeFetch(ok({ answer: "unused" }), status(400), status(400));
+    await callModel(deps(fetch).d, { ...request, schema: ModelScoreSchema }).catch(() => undefined);
+    for (const { path, node } of objectsIn(sentSchema(calls[0]!.body))) {
+      expect(node.required, path).toEqual(Object.keys(node.properties as object));
+      expect(node.additionalProperties, path).toBe(false);
+    }
   });
 });

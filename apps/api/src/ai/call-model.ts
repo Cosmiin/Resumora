@@ -119,11 +119,66 @@ function userContent(user: string | UserPart[]): string | unknown[] {
 const REJECTED_STATUSES = new Set([400, 415, 422]);
 const REJECTED_WORDS = /file|pdf|content type|unsupported/i;
 
+type JsonNode = Record<string, unknown>;
+
 /** JSON schema for structured output. Providers reject the `$schema` key. */
-function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
-  const json = { ...(z.toJSONSchema(schema) as Record<string, unknown>) };
+function jsonSchemaFor(schema: z.ZodType): JsonNode {
+  const json = { ...(z.toJSONSchema(schema) as JsonNode) };
   delete json.$schema;
   return json;
+}
+
+/** Zod writes a nullable field as `type: [..., "null"]` or as an anyOf with a null branch. */
+const acceptsNull = (node: JsonNode): boolean =>
+  node.type === "null" || (Array.isArray(node.type) && node.type.includes("null")) ||
+  (Array.isArray(node.anyOf) && (node.anyOf as JsonNode[]).some(acceptsNull));
+
+/** The JSON schema sent as structured output (see strictSchema). */
+export const structuredOutputSchema = (schema: z.ZodType): JsonNode => strictSchema(jsonSchemaFor(schema));
+
+/**
+ * The schema as OpenAI's strict structured output accepts it: every object lists all its properties in `required`
+ * (OpenAI answers HTTP 400 otherwise, so the fallback never worked for such a schema). A property the zod schema
+ * leaves optional is sent as nullable instead; `dropAbsentNulls` turns the model's null for it back into no key.
+ */
+function strictSchema(node: JsonNode): JsonNode {
+  const out: JsonNode = { ...node };
+  if (node.properties) {
+    const required = new Set((node.required ?? []) as string[]);
+    const properties: Record<string, JsonNode> = {};
+    for (const [key, value] of Object.entries(node.properties as Record<string, JsonNode>)) {
+      const strict = strictSchema(value);
+      properties[key] = required.has(key) || acceptsNull(strict) ? strict : { anyOf: [strict, { type: "null" }] };
+    }
+    out.properties = properties;
+    out.required = Object.keys(properties);
+  }
+  if (node.items) out.items = strictSchema(node.items as JsonNode);
+  if (Array.isArray(node.anyOf)) out.anyOf = (node.anyOf as JsonNode[]).map(strictSchema);
+  return out;
+}
+
+/** The branch of `node` (itself or one of its anyOf) that describes `value`'s shape. */
+function branchFor(node: JsonNode, value: object): JsonNode | undefined {
+  const fits = (n: JsonNode) => (Array.isArray(value) ? !!n.items : !!n.properties);
+  return fits(node) ? node : (node.anyOf as JsonNode[] | undefined)?.find(fits);
+}
+
+/** Removes the nulls the model sent for properties that the original (non-strict) schema leaves optional. */
+function dropAbsentNulls(value: unknown, node: JsonNode): unknown {
+  if (!value || typeof value !== "object") return value;
+  const branch = branchFor(node, value);
+  if (!branch) return value;
+  if (Array.isArray(value)) return value.map((item) => dropAbsentNulls(item, branch.items as JsonNode));
+  const required = new Set((branch.required ?? []) as string[]);
+  const properties = branch.properties as Record<string, JsonNode>;
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    const property = properties[key];
+    if (item === null && property && !required.has(key) && !acceptsNull(property)) continue;
+    out[key] = property ? dropAbsentNulls(item, property) : item;
+  }
+  return out;
 }
 
 /**
@@ -132,6 +187,7 @@ function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
  * move straight to the next provider. Every attempt is logged.
  */
 export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: ModelRequest<S>): Promise<z.infer<S>> {
+  const json = jsonSchemaFor(req.schema);
   const body = (provider: Provider) =>
     JSON.stringify({
       model: provider.model,
@@ -143,7 +199,7 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
       ],
       response_format: {
         type: "json_schema",
-        json_schema: { name: req.task, strict: true, schema: jsonSchemaFor(req.schema) },
+        json_schema: { name: req.task, strict: true, schema: strictSchema(json) },
       },
     });
 
@@ -158,7 +214,7 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
           .logCall({ userId: req.userId, task: req.task, provider: provider.name, model: provider.model, durationMs: Date.now() - started, ...entry })
           .catch((err: unknown) => console.error(JSON.stringify({ msg: "ai_calls log failed", error: String(err) })));
       try {
-        const { output, usage } = await attemptOnce(deps, provider, body(provider), req.schema, req.timeoutMs, hasFile);
+        const { output, usage } = await attemptOnce(deps, provider, body(provider), req.schema, json, req.timeoutMs, hasFile);
         await log({ status: "ok", inputTokens: usage?.prompt_tokens, outputTokens: usage?.completion_tokens });
         return output;
       } catch (err) {
@@ -187,6 +243,7 @@ async function attemptOnce<S extends z.ZodType>(
   provider: Provider,
   body: string,
   schema: S,
+  json: JsonNode,
   requestTimeoutMs?: number,
   hasFile = false,
 ): Promise<{ output: z.infer<S>; usage?: Usage }> {
@@ -219,13 +276,13 @@ async function attemptOnce<S extends z.ZodType>(
     if (choice.finish_reason === "length") throw new AttemptError("output cut off at the length limit", false, true);
     const content = choice.message.content ?? "";
 
-    let json: unknown;
+    let answer: unknown;
     try {
-      json = JSON.parse(content);
+      answer = JSON.parse(content);
     } catch {
       throw new AttemptError("output is not valid JSON", true);
     }
-    const parsed = schema.safeParse(json);
+    const parsed = schema.safeParse(dropAbsentNulls(answer, json));
     if (!parsed.success) {
       const path = parsed.error.issues[0]?.path.join(".") || "(root)";
       throw new AttemptError(`output does not match the schema at ${path}`, true);
