@@ -33,10 +33,12 @@ export function ImportScreen(props: {
   replaces: boolean;
   currentVersion(): number;
   onClose(): void;
+  /** The CV is read (as found, before any correction made here): what comes next can be prepared while it is looked at. */
+  onFound?(cv: CvContent): void;
   onApplied(cv: CvResponse, next: AfterImport): void;
   onConflict(conflict: Conflict): void;
 }) {
-  const { importId, canApply, replaces, currentVersion, onClose, onApplied, onConflict } = props;
+  const { importId, canApply, replaces, currentVersion, onClose, onFound, onApplied, onConflict } = props;
   const [slow, setSlow] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applyFailed, setApplyFailed] = useState(false);
@@ -69,6 +71,14 @@ export function ImportScreen(props: {
   const done = imp && (imp.status === "ready" || imp.status === "failed" || imp.status === "applied");
 
   const result = edited ?? (imp?.status === "ready" ? imp.result : null);
+
+  const found = imp?.status === "ready" ? imp.result?.content : undefined;
+  const told = useRef(false);
+  useEffect(() => {
+    if (!found || told.current) return;
+    told.current = true;
+    onFound?.(found);
+  }, [found, onFound]);
 
   function move(customId: string, target: MoveTarget, headingIndex: number) {
     const base = edited ?? imp?.result;

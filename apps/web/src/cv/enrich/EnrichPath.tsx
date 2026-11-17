@@ -11,6 +11,7 @@ import type { Via } from "./AnswerBox.tsx";
 import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
 import { changeActions, prepareRoleChanges } from "./prepare.ts";
+import type { Prepared } from "./prepared.ts";
 import { ReviewSheet, type ReviewGroup } from "./ReviewSheet.tsx";
 import { PathScreen } from "./SectionSuggest.tsx";
 import { ToolsStep } from "./ToolsStep.tsx";
@@ -24,6 +25,8 @@ type Props = {
   onClose(): void;
   /** Kept for the editor's call; the short path asks for no score itself. */
   onScore?(result: RoleResult): void;
+  /** The companies and tools answers asked for while the import was on screen, when the path opens from one. */
+  prepared?: Prepared | null;
 };
 
 /** A CV whose weighted average reaches this is saved as enriched. */
@@ -80,7 +83,7 @@ const END_WAIT_MS = 20000;
  * the score again. Answers are saved as role notes as they are given; nothing else on the CV changes before
  * "Apply all". The score is shown only at the start and the end.
  */
-export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props) {
+export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, prepared }: Props) {
   const [stage, setStage] = useState<Stage>({ kind: "start" });
   const [before, setBefore] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -199,7 +202,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   }
   if (stage.kind === "companies") {
     return screen(
-      <CompaniesStep cv={cv} onDone={(notes) => {
+      <CompaniesStep cv={cv} prepared={prepared?.companies} onDone={(notes) => {
         for (const { roleId, note } of notes) {
           dispatch({ type: "setNote", roleId, note });
           gotFor(roleId).context = true;
@@ -210,7 +213,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   }
   if (stage.kind === "tools") {
     return screen(
-      <ToolsStep cv={cv} onDone={(notes) => {
+      <ToolsStep cv={cv} prepared={prepared?.tools} onDone={(notes) => {
         for (const { roleId, note } of notes) {
           dispatch({ type: "setNote", roleId, note });
           gotFor(roleId);

@@ -3,7 +3,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
-import { emptyCv, type CvContent, type ImportResponse } from "@resumora/shared";
+import { emptyCv, fingerprint, type CvContent, type ImportResponse } from "@resumora/shared";
 import { ApiClientError } from "../lib/api-error.ts";
 
 const cvApi = vi.hoisted(() => ({ getCv: vi.fn(), saveCv: vi.fn(), listHistory: vi.fn(), getHistoryItem: vi.fn(), restoreHistory: vi.fn() }));
@@ -15,6 +15,9 @@ vi.mock("./imports-api.ts", () => importsApi);
 const enrichApi = vi.hoisted(() => ({
   getScores: vi.fn(async () => []),
   scoreRole: vi.fn(() => new Promise(() => {})),
+  scoreAhead: vi.fn(() => new Promise(() => {})),
+  suggestCompanies: vi.fn(() => new Promise(() => {})),
+  suggestTools: vi.fn(() => new Promise(() => {})),
   createVoiceSession: vi.fn(),
   streamRewrite: vi.fn(),
   getSkillSuggestions: vi.fn(),
@@ -440,6 +443,51 @@ describe("the start of the base CV flow", () => {
     expect(await screen.findByRole("dialog", { name: "Enrich your CV" })).toBeInTheDocument();
     // The short path waits for the role's score before it can start (no score arrives in this test).
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+  });
+
+  it("prepares the questions while the found CV is on screen: the score, the companies and the tools are asked for once", async () => {
+    const role = imported.experience[0]!;
+    const print = fingerprint(role, imported.locale);
+    cvApi.getCv.mockResolvedValue(blank);
+    importsApi.getImport.mockResolvedValue(ready);
+    importsApi.applyImport.mockResolvedValue({ version: 2, updatedAt: "2026-11-04T10:05:00Z" });
+    enrichApi.scoreAhead.mockResolvedValue({ roleId: "e1", policy: "score/8", fingerprint: print, score: 80, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } as never);
+    enrichApi.suggestCompanies.mockResolvedValue({ companies: [{ key: "acme", proposal: "Makes anvils." }] } as never);
+    enrichApi.suggestTools.mockResolvedValue({ roles: [{ roleId: "e1", tools: ["Jira"] }] } as never);
+    renderPage();
+    await chooseFile(pdf());
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
+    await within(dialog).findByRole("heading", { name: "We found 1 role" });
+    await waitFor(() => expect(enrichApi.suggestTools).toHaveBeenCalledWith("imp-1"));
+    expect(enrichApi.scoreAhead).toHaveBeenCalledWith("imp-1", "e1", print);
+    expect(enrichApi.suggestCompanies).toHaveBeenCalledWith("imp-1");
+    await user.click(within(dialog).getByRole("button", { name: "Start with the questions" }));
+    const path = await screen.findByRole("dialog", { name: "Enrich your CV" });
+    // The score is there already: no "Reading your CV…" again.
+    expect(await within(path).findByRole("heading", { name: "Your CV: 80" })).toBeInTheDocument();
+    await user.click(within(path).getByRole("button", { name: "Start" }));
+    // The one company is known, so the companies step saves it and moves on to the tools, which are there too.
+    expect(await within(path).findByRole("button", { name: "Jira" })).toBeInTheDocument();
+    expect(enrichApi.scoreRole).not.toHaveBeenCalled();
+    expect(enrichApi.scoreAhead).toHaveBeenCalledTimes(1);
+    expect(enrichApi.suggestCompanies).toHaveBeenCalledTimes(1);
+    expect(enrichApi.suggestTools).toHaveBeenCalledTimes(1);
+  });
+
+  it("closing the import without using it asks for nothing more", async () => {
+    importsApi.getImport.mockResolvedValue(ready);
+    let finish!: (r: unknown) => void;
+    enrichApi.scoreAhead.mockImplementation(() => new Promise((res) => (finish = res)) as never);
+    renderPage();
+    await chooseFile(pdf());
+    const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
+    await within(dialog).findByRole("heading", { name: "We found 1 role" });
+    await waitFor(() => expect(enrichApi.scoreAhead).toHaveBeenCalledTimes(1));
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await act(async () => finish({ roleId: "e1", policy: "score/8", fingerprint: "x", score: 80, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false }));
+    await advance(5000);
+    expect(enrichApi.scoreAhead).toHaveBeenCalledTimes(1);
+    expect(enrichApi.scoreRole).not.toHaveBeenCalled();
   });
 
   it("a file that is not a CV is refused on the upload screen", async () => {

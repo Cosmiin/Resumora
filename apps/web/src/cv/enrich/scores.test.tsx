@@ -6,7 +6,7 @@ import { emptyCv, fingerprint, type CvContent, type Experience, type RoleResult 
 import { ApiClientError } from "../../lib/api-error.ts";
 import type { SaveStatus } from "../useAutosave.ts";
 
-const api = vi.hoisted(() => ({ getScores: vi.fn(), scoreRole: vi.fn() }));
+const api = vi.hoisted(() => ({ getScores: vi.fn(), scoreRole: vi.fn(), scoreAhead: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 import { useRoleScores } from "./useRoleScores.ts";
@@ -36,7 +36,7 @@ function result(r: Experience, score: number | null = 80, fp = print(r)): RoleRe
 }
 const conflict = () => new ApiClientError(409, "not_saved", "not saved");
 
-type HookProps = { cv: CvContent; status: SaveStatus };
+type HookProps = { cv: CvContent; status: SaveStatus; ahead?: { importId: string; cv: CvContent } | null };
 async function mount(cv: CvContent, status: SaveStatus = "saved") {
   const view = renderHook((p: HookProps) => useRoleScores(p), { initialProps: { cv, status } });
   await act(async () => {}); // let GET /scores settle
@@ -49,6 +49,7 @@ describe("useRoleScores", () => {
     vi.useFakeTimers();
     api.getScores.mockResolvedValue([]);
     api.scoreRole.mockReset();
+    api.scoreAhead.mockReset();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -199,6 +200,80 @@ describe("useRoleScores", () => {
     const again = { ...edited, bullets: [{ id: "r2-b0", text: "Changed again" }, r2.bullets[1]!] };
     rerender({ cv: cvOf(r1, again, r3), status: "dirty" });
     expect(hook.current.scores).toBe(after); // still "previous": nothing visible changed
+  });
+
+  describe("an import that is read but not used yet", () => {
+    const [r1, r2] = [role(1), role(2)] as [Experience, Experience];
+    const found = { importId: "imp-1", cv: cvOf(r1, r2) };
+    const aheadMount = async () => {
+      const view = renderHook((p: HookProps) => useRoleScores(p), { initialProps: { cv: cvOf(), status: "saved", ahead: found } as HookProps });
+      await act(async () => {});
+      return view;
+    };
+
+    it("scores its roles one at a time, at once, without the wait after a save", async () => {
+      const gates: Array<(r: RoleResult) => void> = [];
+      api.scoreAhead.mockImplementation(() => new Promise<RoleResult>((res) => gates.push(res)));
+      await aheadMount();
+      expect(api.scoreAhead).toHaveBeenCalledTimes(1);
+      expect(api.scoreAhead).toHaveBeenLastCalledWith("imp-1", "r1", print(r1));
+      await wait(5000);
+      expect(api.scoreAhead).toHaveBeenCalledTimes(1); // r1 still in flight: never two at once
+      await act(async () => gates[0]!(result(r1, 70)));
+      expect(api.scoreAhead).toHaveBeenCalledTimes(2);
+      expect(api.scoreAhead).toHaveBeenLastCalledWith("imp-1", "r2", print(r2));
+      expect(api.scoreRole).not.toHaveBeenCalled();
+    });
+
+    it("once the import is used, its roles are ready and nothing is asked again", async () => {
+      api.scoreAhead.mockImplementation((_id: string, roleId: string) => Promise.resolve(result(roleId === "r1" ? r1 : r2, roleId === "r1" ? 70 : 55)));
+      const { result: hook, rerender } = await aheadMount();
+      await act(async () => {});
+      expect(api.scoreAhead).toHaveBeenCalledTimes(2);
+      rerender({ cv: cvOf(r1, r2), status: "saved", ahead: null });
+      expect(hook.current.scores.get("r1")).toMatchObject({ state: "ready", result: { score: 70 } });
+      expect(hook.current.scores.get("r2")).toMatchObject({ state: "ready", result: { score: 55 } });
+      await wait(5000);
+      expect(api.scoreRole).not.toHaveBeenCalled();
+      expect(api.scoreAhead).toHaveBeenCalledTimes(2);
+    });
+
+    it("used half way: the request in flight is kept and the rest are scored from the saved CV, with no wait", async () => {
+      let finish!: (r: RoleResult) => void;
+      api.scoreAhead.mockImplementationOnce(() => new Promise<RoleResult>((res) => (finish = res)));
+      api.scoreRole.mockResolvedValue(result(r2, 55));
+      const { result: hook, rerender } = await aheadMount();
+      rerender({ cv: cvOf(r1, r2), status: "saved", ahead: null });
+      expect(hook.current.scores.get("r1")!.state).toBe("scoring");
+      await wait(5000);
+      expect(api.scoreRole).not.toHaveBeenCalled(); // r1 is still on its way: nothing is asked twice
+      await act(async () => finish(result(r1, 70)));
+      expect(hook.current.scores.get("r1")).toMatchObject({ state: "ready", result: { score: 70 } });
+      expect(api.scoreRole).toHaveBeenCalledTimes(1);
+      expect(api.scoreRole).toHaveBeenLastCalledWith("r2", print(r2));
+      expect(api.scoreAhead).toHaveBeenCalledTimes(1);
+    });
+
+    it("a role that fails is asked once before the import is used, and again from the saved CV after", async () => {
+      api.scoreAhead.mockImplementation((_id: string, roleId: string) => (roleId === "r1" ? Promise.reject(conflict()) : Promise.resolve(result(r2, 55))));
+      api.scoreRole.mockResolvedValue(result(r1, 70));
+      const { result: hook, rerender } = await aheadMount();
+      await act(async () => {});
+      await wait(5000);
+      expect(api.scoreAhead.mock.calls.map((c) => c[1])).toEqual(["r1", "r2"]);
+      rerender({ cv: cvOf(r1, r2), status: "saved", ahead: null });
+      await act(async () => {});
+      expect(api.scoreRole).toHaveBeenCalledTimes(1);
+      expect(api.scoreRole).toHaveBeenLastCalledWith("r1", print(r1));
+      expect(hook.current.scores.get("r1")).toMatchObject({ state: "ready", result: { score: 70 } });
+    });
+
+    it("asks nothing for an import when there is none, and nothing while the saved scores load", async () => {
+      api.getScores.mockReturnValue(new Promise(() => {}));
+      renderHook((p: HookProps) => useRoleScores(p), { initialProps: { cv: cvOf(), status: "saved", ahead: found } as HookProps });
+      await wait(5000);
+      expect(api.scoreAhead).not.toHaveBeenCalled();
+    });
   });
 });
 

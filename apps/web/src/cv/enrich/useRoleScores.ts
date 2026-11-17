@@ -3,7 +3,7 @@ import { fingerprint, gradedItems, type CvContent, type Experience, type Locale,
 import { ApiClientError } from "../../lib/api-error.ts";
 import type { SaveStatus } from "../useAutosave.ts";
 import { getLanguage } from "../../i18n/language.ts";
-import { getScores, scoreRole } from "./enrich-api.ts";
+import { getScores, scoreAhead, scoreRole } from "./enrich-api.ts";
 
 /** A stored score is current when it is for this text and its questions are in the language the person uses now. */
 function isCurrent(result: RoleResult | undefined, print: string): result is RoleResult {
@@ -23,7 +23,10 @@ export type RoleScoreState = {
   result?: RoleResult;
 };
 
-type Props = { cv: CvContent; status: SaveStatus };
+/** An import that is read but not used yet: its roles are scored ahead, so the scores are there when it is used. */
+export type Ahead = { importId: string; cv: CvContent };
+
+type Props = { cv: CvContent; status: SaveStatus; ahead?: Ahead | null };
 
 const prints = new WeakMap<Experience, { locale: Locale; value: string }>();
 /** Roles are replaced, never changed in place, so a role's fingerprint is worked out once. */
@@ -41,7 +44,7 @@ function sameEntry(a: RoleScoreState | undefined, b: RoleScoreState): boolean {
   return !!a && a.state === b.state && a.result === b.result;
 }
 
-export function useRoleScores({ cv, status }: Props): {
+export function useRoleScores({ cv, status, ahead = null }: Props): {
   scores: Map<string, RoleScoreState>;
   retry(roleId: string): void;
   /** Takes a score asked for elsewhere (a role's run), so every place shows the same number. */
@@ -50,6 +53,9 @@ export function useRoleScores({ cv, status }: Props): {
   const { locale } = cv;
   // Roles and volunteering are scored, in that order (one list, kept stable between renders). Projects are not.
   const experience = useMemo(() => gradedItems(cv).map((s) => s.item), [cv.experience, cv.volunteering]); // eslint-disable-line react-hooks/exhaustive-deps
+  const aheadItems = useMemo(() => (ahead ? gradedItems(ahead.cv).map((s) => s.item) : []), [ahead]);
+  /** Import roles already asked for (`importId/roleId`): each is asked once; after a failure the saved CV's turn comes. */
+  const asked = useRef(new Set<string>());
   const [loaded, setLoaded] = useState(false);
   const [results, setResults] = useState<ReadonlyMap<string, RoleResult>>(new Map());
   const [inFlight, setInFlight] = useState<{ roleId: string; fingerprint: string } | null>(null);
@@ -63,9 +69,9 @@ export function useRoleScores({ cv, status }: Props): {
   const loadStarted = useRef(false);
   const busy = useRef(false);
   /** The roles as they are now, for answers that come back after the text moved on. */
-  const current = useRef({ experience, locale });
+  const current = useRef({ experience, locale, aheadItems });
   useEffect(() => {
-    current.current = { experience, locale };
+    current.current = { experience, locale, aheadItems };
   });
 
   useEffect(() => {
@@ -94,16 +100,20 @@ export function useRoleScores({ cv, status }: Props): {
     } else quiet.current = false;
   }, [status]);
 
-  const request = useCallback(async (roleId: string, print: string) => {
+  const request = useCallback(async (roleId: string, print: string, importId?: string) => {
     busy.current = true;
     setInFlight({ roleId, fingerprint: print });
     try {
-      const result = await scoreRole(roleId, print);
+      const result = await (importId ? scoreAhead(importId, roleId, print) : scoreRole(roleId, print));
       if (!alive.current) return;
-      if (current.current.experience.some((r) => r.id === roleId)) setResults((m) => new Map(m).set(roleId, result));
+      // The import may have become the CV while this was on its way: the role is then one of the CV's.
+      const { experience: now, aheadItems: coming } = current.current;
+      if (now.some((r) => r.id === roleId) || coming.some((r) => r.id === roleId)) setResults((m) => new Map(m).set(roleId, result));
       setFailed((m) => (m.has(roleId) ? new Map([...m].filter(([k]) => k !== roleId)) : m));
     } catch (err) {
       if (!alive.current) return;
+      // Scoring ahead is a head start only: a failure shows nowhere, and the role is asked again once it is saved.
+      if (importId) return;
       if (err instanceof ApiClientError && err.status === 409) {
         // Park the role until the next save only if its text is still what was sent. If it moved on,
         // that newer text may already be saved, and no other save would come to wake it up.
@@ -120,14 +130,25 @@ export function useRoleScores({ cv, status }: Props): {
   }, []);
 
   // One request at a time: the first role whose score is missing or out of date.
+  // The saved CV's roles come first; then the roles of an import not used yet, with no wait (nobody is typing in it).
   useEffect(() => {
-    if (!loaded || status !== "saved" || busy.current) return;
-    const next = experience.find((r) => {
+    if (!loaded || busy.current) return;
+    const next = status !== "saved" ? undefined : experience.find((r) => {
       if (!hasBullets(r) || waiting.current.has(r.id)) return false;
       const print = printOf(r, locale);
       return !isCurrent(results.get(r.id), print) && failed.get(r.id) !== print;
     });
-    if (!next) return;
+    if (!next) {
+      if (!ahead) return;
+      const key = (r: Experience) => `${ahead.importId}/${r.id}`;
+      const coming = aheadItems.find((r) => hasBullets(r) && !asked.current.has(key(r)) && !isCurrent(results.get(r.id), printOf(r, ahead.cv.locale)));
+      if (!coming) return;
+      asked.current.add(key(coming));
+      // The rest carry on without the 2 s wait once the import is used.
+      quiet.current = true;
+      void request(coming.id, printOf(coming, ahead.cv.locale), ahead.importId);
+      return;
+    }
     const go = () => {
       quiet.current = true;
       void request(next.id, printOf(next, locale));
@@ -138,7 +159,7 @@ export function useRoleScores({ cv, status }: Props): {
     }
     const timer = setTimeout(go, RESCORE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [loaded, status, experience, locale, results, failed, round, request]);
+  }, [loaded, status, experience, locale, results, failed, round, request, ahead, aheadItems]);
 
   const retry = useCallback((roleId: string) => {
     waiting.current.delete(roleId);
