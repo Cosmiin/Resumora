@@ -111,6 +111,8 @@ describe("schemas", () => {
   it("caps a company proposal and the tools per role", () => {
     expect(CompaniesAnswerSchema.safeParse({ companies: [{ key: "acme", proposal: "x".repeat(201) }] }).success).toBe(false);
     expect(CompaniesAnswerSchema.safeParse({ companies: [{ key: "acme", proposal: null }] }).success).toBe(true);
+    // A company field can hold up to 2000 characters, and its key comes back as it is.
+    expect(CompaniesAnswerSchema.safeParse({ companies: [{ key: "a".repeat(1500), proposal: null }] }).success).toBe(true);
     expect(ToolsAnswerSchema.safeParse({ roles: [{ roleId: "r1", tools: Array.from({ length: 9 }, (_, i) => `T${i}`) }] }).success).toBe(false);
   });
 });

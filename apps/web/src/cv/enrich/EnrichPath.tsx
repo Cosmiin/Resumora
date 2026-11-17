@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  BRAIN_DUMP_QUESTION, CLEAR_AT, PATH_BUDGET, gradedItems, newId, pickBudget, questionKey,
+  BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, PATH_BUDGET, gradedItems, newId, pickBudget, questionKey,
   type BudgetItem, type CvContent, type Note, type RoleResult,
 } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
@@ -62,8 +62,13 @@ type Stage =
   | { kind: "start" } | { kind: "companies" } | { kind: "tools" } | { kind: "budget"; items: BudgetItem[] }
   | { kind: "preparing" } | { kind: "review"; groups: ReviewGroup[]; failed: boolean } | { kind: "end" };
 
-/** What a role got in this round of the path. */
-type Got = { lines: Set<string>; role: boolean; context: boolean };
+/**
+ * What a role got in this round of the path. lines: line questions answered; role: a budget question about the whole
+ * role or "Rather just talk?" (its lines up to 100 may be rewritten); context: what the company does or the role was for
+ * (a new description); facts: any note at all from this round (company, tools, answers): a line rewritten for such a
+ * role may carry those facts, so it is not "tidied, no new facts".
+ */
+type Got = { lines: Set<string>; role: boolean; context: boolean; facts: boolean };
 
 /** The end waits this long for the new scores, then shows what it has. */
 const END_WAIT_MS = 20000;
@@ -91,12 +96,18 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
   const average = averageScore(new Map(graded.map(({ item }) => [item.id, scoreOf(scores.get(item.id))])), weights);
 
   const gotFor = (roleId: string) => {
-    const entry = got.current.get(roleId) ?? { lines: new Set<string>(), role: false, context: false };
+    const entry = got.current.get(roleId) ?? { lines: new Set<string>(), role: false, context: false, facts: false };
+    entry.facts = true;
     got.current.set(roleId, entry);
     return entry;
   };
+  // Answering a question again (after Back) replaces its note, as in a role's own run.
+  const noteIds = useRef(new Map<string, string>());
   const save = (roleId: string, question: string, answer: string, via: Via[]) => {
-    const note: Note = { id: newId(), question, answer, via: via.length ? via : ["type"], askedAt: new Date().toISOString() };
+    const key = `${roleId}|${questionKey(question)}`;
+    const id = noteIds.current.get(key) ?? newId();
+    noteIds.current.set(key, id);
+    const note: Note = { id, question, answer: answer.trim().slice(0, MAX_LONG_TEXT), via: via.length ? via : ["type"], askedAt: new Date().toISOString() };
     dispatch({ type: "setNote", roleId, note });
   };
   const budget = (): BudgetItem[] => {
@@ -124,11 +135,11 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
       const entry = scores.get(item.id);
       const result = entry?.state === "ready" ? entry.result : undefined;
       const g = got.current.get(item.id);
-      const any = !!g && (g.role || g.context || g.lines.size > 0);
+      const any = !!g && g.facts;
       const weak = (result?.bullets ?? []).some((b) => b.score < CLEAR_AT);
       if (!any && !weak) continue;
       const describe = any && (g!.context || item.description.trim() !== "");
-      const answeredRole = !!g && (g.role || g.context);
+      const answeredRole = !!g && g.role;
       const out = await prepareRoleChanges({
         cv: now, roleId: item.id, result, answeredLines: g?.lines ?? new Set(), answeredRole,
         thinWithAnswers: !!result?.thin && answeredRole, describe,
@@ -136,7 +147,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
       failed ||= out.failed;
       if (!out.changes.length) continue;
       // A line rewritten with nothing new about it or its role: worded better, no new facts.
-      const tidied = new Set(out.changes.filter((c) => c.kind === "bullet" && !answeredRole && !g?.lines.has(c.bulletId)).map((c) => c.id));
+      const tidied = new Set(any ? [] : out.changes.filter((c) => c.kind === "bullet").map((c) => c.id));
       groups.push({ roleId: item.id, changes: out.changes, tidied });
     }
     setStage({ kind: "review", groups, failed });
@@ -190,7 +201,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props
       <ToolsStep cv={cv} onDone={(notes) => {
         for (const { roleId, note } of notes) {
           dispatch({ type: "setNote", roleId, note });
-          gotFor(roleId).role = true;
+          gotFor(roleId);
         }
         void waitForSave().catch(() => undefined).then(toBudget);
       }} />,

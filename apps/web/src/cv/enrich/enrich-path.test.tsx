@@ -27,6 +27,7 @@ vi.mock("./BudgetStep.tsx", () => ({
     <div>
       <p>Budget: {items.map((i) => i.question.text).join(" | ")}</p>
       <button type="button" onClick={() => { for (const i of items) onAnswer(i, `Answer to ${i.question.text}`, ["type"]); onDone(); }}>Answer all</button>
+      <button type="button" onClick={() => { onAnswer(items[0]!, "First answer", ["type"]); onAnswer(items[0]!, "Corrected answer", ["type"]); }}>Answer twice</button>
     </div>
   ),
 }));
@@ -143,8 +144,26 @@ describe("the short path", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start" }));
     await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
     await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
-    expect(await screen.findByText(/^Review:/)).toBeInTheDocument();
+    const review = await screen.findByText(/^Review:/);
     expect(screen.queryByText(/^Budget:/)).toBeNull();
+    // A company answer brings a description, but rewrites only the weak line (60), not the one at 90, and that line
+    // may carry the company's facts, so it is not marked tidied.
+    expect(review.textContent).toContain("r1:description,bullet:r1b1 ");
+    expect(review.textContent).not.toContain("r1b2");
+    expect(review.textContent).toContain("r2:bullet:r2b1(tidied)");
+    expect(api.improveBullet.mock.calls.map(([b]) => b.bulletId)).toEqual(["r1b1", "r2b1"]);
+  });
+
+  it("answering a question again (after Back) replaces its note", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Answer twice" }));
+    const notes = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.endsWith("answer") ? [a.note] : []));
+    expect(notes.map((n) => n.answer)).toEqual(["First answer", "Corrected answer"]);
+    expect(notes[1]!.id).toBe(notes[0]!.id);
   });
 
   it("Skip for now closes it", async () => {

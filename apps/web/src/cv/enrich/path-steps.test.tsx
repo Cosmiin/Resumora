@@ -61,6 +61,16 @@ describe("CompaniesStep", () => {
     expect((onDone.mock.calls[0]![0] as Saved).find((s) => s.roleId === "c")!.note).toMatchObject({ answer: "Staffing and recruitment firm. In Canada.", via: ["type"] });
   });
 
+  it("Confirm saves once, even when clicked twice", async () => {
+    const onDone = vi.fn();
+    render(<CompaniesStep cv={cv} onDone={onDone} />);
+    await screen.findAllByRole("group");
+    const button = screen.getByRole("button", { name: "Confirm all and continue" });
+    await userEvent.click(button);
+    await userEvent.click(button);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
   it("an untouched proposal counts as confirmed", async () => {
     const onDone = vi.fn();
     render(<CompaniesStep cv={cv} onDone={onDone} />);
@@ -169,6 +179,16 @@ describe("ToolsStep", () => {
     await userEvent.type(screen.getByRole("textbox", { name: "Add a tool for Clerk" }), "Jira{Enter}");
     await userEvent.click(cell("Clerk", "Jira")!);
     expect(cell("Clerk", "Jira")).not.toBeChecked();
+  });
+
+  it("Continue saves once, even when clicked twice", async () => {
+    const onDone = vi.fn();
+    render(<ToolsStep cv={cv} onDone={onDone} />);
+    const button = await screen.findByRole("button", { name: "Continue" });
+    await userEvent.click(button);
+    await userEvent.click(button);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
   });
 
   it("still works when the AI is unavailable: the tools the CV names are shown", async () => {

@@ -23,6 +23,8 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
   const [ticks, setTicks] = useState<Record<string, Set<string>>>({});
   const [initial, setInitial] = useState<Record<string, Set<string>>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Continue works once: a second click must not save the notes again.
+  const [sent, setSent] = useState(false);
   /** Tools the person added, by the role they were added on: their cell stays even when unticked. */
   const [own, setOwn] = useState<Record<string, Set<string>>>({});
 
@@ -88,6 +90,8 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
   };
 
   const finish = () => {
+    if (sent) return;
+    setSent(true);
     const askedAt = new Date().toISOString();
     const saved: Saved = [];
     for (const role of roles) {
@@ -147,7 +151,7 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
         </div>
       )}
       <div className="fm-foot">
-        <button type="button" className="fm-btn" disabled={loading} onClick={finish}>{t("enrich.focus.continue")}</button>
+        <button type="button" className="fm-btn" disabled={loading || sent} onClick={finish}>{t("enrich.focus.continue")}</button>
       </div>
     </>
   );

@@ -40,6 +40,8 @@ export function CompaniesStep({ cv, onDone }: { cv: CvContent; onDone(notes: Sav
   const [proposals, setProposals] = useState<Record<string, string>>({});
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [editing, setEditing] = useState<Record<string, boolean>>({});
+  // Continue works once: a second click must not save the notes again.
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -60,6 +62,8 @@ export function CompaniesStep({ cv, onDone }: { cv: CvContent; onDone(notes: Sav
   }, []);
 
   const confirm = () => {
+    if (sent) return;
+    setSent(true);
     const saved: Saved = [];
     const askedAt = new Date().toISOString();
     for (const row of rows) {
@@ -111,7 +115,7 @@ export function CompaniesStep({ cv, onDone }: { cv: CvContent; onDone(notes: Sav
         })}
       </div>
       <div className="fm-foot">
-        <button type="button" className="fm-btn" disabled={loading} onClick={confirm}>{t("enrich.path.companies.confirm")}</button>
+        <button type="button" className="fm-btn" disabled={loading || sent} onClick={confirm}>{t("enrich.path.companies.confirm")}</button>
       </div>
     </>
   );

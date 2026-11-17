@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Experience } from "./cv.ts";
+import { MAX_TEXT, type Experience } from "./cv.ts";
 import { MAX_PROPOSAL, type Question, type RoleQuestion, type RoleResult } from "./enrich.ts";
 
 /** The short enrichment path asks at most this many questions per round, across the whole CV. */
@@ -39,7 +39,7 @@ export function toolShown(role: Pick<Experience, "title" | "description" | "bull
 
 /** POST /v1/enrich/companies: what each company does, when the AI knows it for sure. Keys are `companyKey`s. */
 export const CompaniesAnswerSchema = z.object({
-  companies: z.array(z.object({ key: z.string().max(200), proposal: z.string().max(MAX_PROPOSAL).nullable() }).strict()).max(80),
+  companies: z.array(z.object({ key: z.string().max(MAX_TEXT), proposal: z.string().max(MAX_PROPOSAL).nullable() }).strict()).max(80),
 }).strict();
 export type CompaniesAnswer = z.infer<typeof CompaniesAnswerSchema>;
 
