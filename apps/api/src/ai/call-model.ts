@@ -24,6 +24,8 @@ export type ModelDeps = {
   logCall(entry: AiCallLog): Promise<void>;
   /** Per attempt. Default 45 s. */
   timeoutMs?: number;
+  /** Waits before a retry (see RATE_LIMIT_PAUSE_MS). Tests pass a fake. */
+  sleep?(ms: number): Promise<void>;
 };
 
 /** One piece of the user message. A PDF is sent to the model as a file, not as extracted text. */
@@ -58,6 +60,12 @@ export class AiInputRejectedError extends Error {
 
 const DEFAULT_TIMEOUT_MS = 45_000;
 const ATTEMPTS_PER_PROVIDER = 2;
+/**
+ * OpenRouter's 429 means the model's capacity, shared with OpenRouter's other customers, is full for a moment
+ * ("temporarily rate-limited upstream"): an immediate retry usually meets the same wall, so wait first.
+ */
+const RATE_LIMIT_PAUSE_MS = 2000;
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** The answer hit the output limit. Retrying (or another provider) would be cut off the same way. */
 export class AiOutputTooLongError extends Error {
@@ -70,6 +78,9 @@ export class AiOutputTooLongError extends Error {
 class AttemptError extends Error {
   constructor(message: string, readonly retry: boolean, readonly tooLong = false, readonly inputRejected = false) {
     super(message);
+  }
+  get rateLimited(): boolean {
+    return this.message === "HTTP 429";
   }
 }
 
@@ -223,6 +234,9 @@ export async function callModel<S extends z.ZodType>(deps: ModelDeps, req: Model
         if (failure.tooLong) throw new AiOutputTooLongError();
         if (failure.inputRejected) rejectedBy++;
         if (!failure.retry) break;
+        if (failure.rateLimited && provider.name === "openrouter" && attempt < ATTEMPTS_PER_PROVIDER) {
+          await (deps.sleep ?? defaultSleep)(RATE_LIMIT_PAUSE_MS);
+        }
       }
     }
   }
