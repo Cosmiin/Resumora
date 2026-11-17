@@ -13,9 +13,7 @@ const TIPS: Partial<Record<CategoryKey, MessageKey[]>> = {
 const LIST_TIPS: MessageKey[] = ["panel.tip.list.1"];
 
 /** Names of the "Improve with AI" buttons that are visible but switched off for now. */
-const AI_BUTTONS: Partial<Record<CategoryKey, MessageKey[]>> = {
-  achievements: ["panel.ai.achievements.pull"],
-};
+const AI_BUTTONS: Partial<Record<CategoryKey, MessageKey[]>> = {};
 
 export const tipsFor = (key: CategoryKey): MessageKey[] => TIPS[key] ?? LIST_TIPS;
 export const aiButtonsFor = (key: CategoryKey): MessageKey[] => AI_BUTTONS[key] ?? [];

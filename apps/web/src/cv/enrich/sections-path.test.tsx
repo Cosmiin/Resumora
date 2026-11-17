@@ -95,63 +95,12 @@ function Path({ cv = full, s = scores, onClose = () => {} }: { cv?: CvContent; s
   return <MemoryRouter><EnrichPath cv={cv} dispatch={() => {}} scores={s} waitForSave={() => Promise.resolve()} onClose={onClose} /></MemoryRouter>;
 }
 
-describe("path start (1A)", () => {
-  it("groups roles, then projects (To do / Done), then volunteering, listing every item, and a quick-pass row", () => {
+describe("the short path (17 Nov 2026)", () => {
+  it("opens on the CV's score with no list of roles, projects or volunteering to tick", () => {
     render(<Path />);
-    expect(screen.getByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes).toHaveLength(5);
-    // The role below 80 starts ticked; the strong one is not. Projects still to do start ticked; volunteering not.
-    expect(boxes[0]).not.toBeChecked();
-    expect(boxes[1]).toHaveAccessibleName(/Buyer/);
-    expect(boxes[1]).toBeChecked();
-    expect(screen.getByText("Projects")).toBeInTheDocument();
-    expect(boxes[3]).toHaveAccessibleName(/Chess bot.*To do/);
-    expect(boxes[3]).toBeChecked();
-    expect(screen.getByText("Volunteering")).toBeInTheDocument();
-    expect(boxes[4]).toHaveAccessibleName(/Food bank helper/);
-    expect(boxes[4]).not.toBeChecked();
-    expect(screen.getByText("3 of 5 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
-    // Only lighter items with no lines yet are counted (Q3): the Git course has lines.
-    expect(screen.getByText("After that, a quick pass with no questions: Courses & training (2), Awards and honors (1), Interests (3).")).toBeInTheDocument();
-  });
-
-  it("shows no projects group when the CV has no projects or volunteering", () => {
-    render(<Path cv={{ ...full, projects: [], volunteering: [] }} />);
-    expect(screen.queryByText("Projects and volunteering")).toBeNull();
-  });
-
-  it("finishing the last role opens the ticked project, then volunteering, with their own top bar", async () => {
-    render(<Path />);
-    await userEvent.click(screen.getByRole("checkbox", { name: /Route planner/ }));
-    await userEvent.click(screen.getByRole("checkbox", { name: /Food bank helper/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    expect(screen.getByText("Session for b")).toBeInTheDocument();
-    expect(screen.getByText("Role 1 of 1")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText("Session for p2")).toBeInTheDocument();
-    expect(screen.getByText("Project 1 of 1")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText("Session for v1")).toBeInTheDocument();
-    expect(screen.getByText("Volunteering 1 of 1")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.queryByTestId("focus")).toBeNull();
-    // Then the lighter items with no lines yet (Task 7).
-    expect(screen.getByText("Courses & training, 1 of 2")).toBeInTheDocument();
-  });
-
-  it("✕ and reopen start at the first item still below 80, roles or not", async () => {
-    const onClose = vi.fn();
-    const { unmount } = render(<Path onClose={onClose} />);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    await userEvent.click(screen.getByRole("button", { name: "✕ Close" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-    unmount();
-    render(<Path s={new Map(scores).set("b", ready(84))} />);
-    expect(screen.getByRole("checkbox", { name: /Buyer/ })).not.toBeChecked();
-    // No role below 80 now: the projects still to do lead.
-    await userEvent.click(screen.getByRole("button", { name: "Start with Route planner" }));
-    expect(screen.getByText("Session for p1")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Enrich your CV" })).toBeInTheDocument();
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(screen.queryByText(/Start with/)).toBeNull();
   });
 });
 

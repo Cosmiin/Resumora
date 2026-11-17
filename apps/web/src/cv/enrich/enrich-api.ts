@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  CompaniesAnswerSchema,
+  ToolsAnswerSchema,
+  type CompaniesAnswer,
+  type ToolsAnswer,
   BrainDumpAnswerSchema,
   ItemLinesAnswerSchema,
   ProjectQuestionsAnswerSchema,
@@ -161,6 +165,16 @@ export function getSkillSuggestions(): Promise<SkillsAnswer> {
 }
 
 /** Key achievements suggestions (4A) from the saved CV's roles: up to 5, each naming its role. */
+/** The short path's companies screen: what each company does, when the AI knows it for sure. */
+export function suggestCompanies(): Promise<CompaniesAnswer> {
+  return apiFetch("/v1/enrich/companies", { method: "POST", json: {}, schema: CompaniesAnswerSchema });
+}
+
+/** The short path's tools screen: the tools each role likely used. */
+export function suggestTools(): Promise<ToolsAnswer> {
+  return apiFetch("/v1/enrich/tools", { method: "POST", json: {}, schema: ToolsAnswerSchema });
+}
+
 export function suggestAchievements(): Promise<AchievementsAnswer> {
   return apiFetch("/v1/enrich/achievements", { method: "POST", json: {}, schema: AchievementsAnswerSchema });
 }

@@ -161,14 +161,14 @@ export const RoleItem = memo(function RoleItem({ role, list, locale, dispatch, s
   );
 });
 
-/** ✨ beside a project's name: opens the project's own short flow. Editor only (renders nothing elsewhere). */
+/** "Improve" beside a project's name: opens the project's own short flow. Editor only (renders nothing elsewhere). */
 function DescribeProject({ projectId }: { projectId: string }) {
   const open = useOpenFocus();
   if (!open) return null;
   return (
-    <button type="button" className="project-describe no-print" aria-label={t("enrich.project.open")} title={t("enrich.project.open")}
+    <button type="button" className="project-describe ui-btn ui-btn--sm no-print" title={t("enrich.project.open")}
       onClick={() => open({ roleId: projectId, mode: "improve" })}>
-      <span aria-hidden="true">✨</span>
+      {t("enrich.project.improve")}
     </button>
   );
 }

@@ -382,20 +382,16 @@ describe("free talk", () => {
   });
 });
 
-describe("the ✨ improve button", () => {
+describe("no ✨ improve button on lines (the short path replaced it)", () => {
   const bullets = role.bullets;
 
-  it("in the editor, opens focus mode on that bullet", async () => {
-    const open = vi.fn();
+  it("is not on a line in the editor", () => {
     render(
-      <FocusOpenProvider value={open}>
+      <FocusOpenProvider value={vi.fn()}>
         <BulletList owner={{ list: "experience", itemId: "r1" }} bullets={bullets} dispatch={() => {}} ownerName="Dispatcher" />
       </FocusOpenProvider>,
     );
-    const buttons = screen.getAllByRole("button", { name: "Improve this bullet" });
-    expect(buttons).toHaveLength(3);
-    await userEvent.click(buttons[1]!);
-    expect(open).toHaveBeenCalledWith({ roleId: "r1", bulletId: "b2", mode: "improve" });
+    expect(screen.queryByRole("button", { name: "Improve this bullet" })).toBeNull();
   });
 
   it("is never in CvDocument, nor on bullets outside the editor", () => {

@@ -1,21 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { LIGHT_SECTIONS, findScored, gradedItems, newId, projectDone, scoredItems, type CvContent, type LightSection, type RoleResult, type ScoredKind, type SkillGroup } from "@resumora/shared";
+import {
+  BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, PATH_BUDGET, gradedItems, newId, pickBudget, questionKey,
+  type BudgetItem, type CvContent, type Note, type RoleResult,
+} from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
-import { AchievementsPick } from "./AchievementsPick.tsx";
-import { getSkillSuggestions, suggestAchievements } from "./enrich-api.ts";
-import { SkillsNotice } from "./SkillsNotice.tsx";
-import { ENRICHED_AVERAGE, EnrichedScreen, type RoleRow } from "./EnrichedScreen.tsx";
-import { roleName } from "../edit/sections/RoleItem.tsx";
-import { useNavigate } from "react-router";
-import { FocusBar } from "./FocusBar.tsx";
-import { LightStop } from "./FocusMode.tsx";
-import { RoleRun } from "./RoleRun.tsx";
-import { ProjectRun } from "./ProjectRun.tsx";
-import { issueTip } from "./tips.ts";
-import { PathStart } from "./PathStart.tsx";
-import { SCORED_LIST, type LineList } from "../edit/lists.ts";
+import { roleListOf } from "../edit/lists.ts";
+import type { Via } from "./AnswerBox.tsx";
+import { BudgetStep } from "./BudgetStep.tsx";
+import { CompaniesStep } from "./CompaniesStep.tsx";
+import { changeActions, prepareRoleChanges } from "./prepare.ts";
+import { ReviewSheet, type ReviewGroup } from "./ReviewSheet.tsx";
+import { PathScreen } from "./SectionSuggest.tsx";
+import { ToolsStep } from "./ToolsStep.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 type Props = {
@@ -24,149 +21,17 @@ type Props = {
   scores: Map<string, RoleScoreState>;
   waitForSave(): Promise<void>;
   onClose(): void;
-  /** A score a role's run asked for itself, so the editor shows the same number. */
+  /** Kept for the editor's call; the short path asks for no score itself. */
   onScore?(result: RoleResult): void;
 };
 
-/** The path's score line: a role counts as done at 80. One still being scored (or with no score) is below. */
+/** A CV whose weighted average reaches this is saved as enriched. */
+export const ENRICHED_AVERAGE = 80;
+
+/** A role counts as strong at 80. One still being scored (or with no score) is below. */
 export const ENRICHED_AT = 80;
 export function belowTarget(s: RoleScoreState | undefined): boolean {
   return !(s?.state === "ready" && s.result?.score != null && s.result.score >= ENRICHED_AT);
-}
-
-
-/** Q3: the lighter items the path visits are the ones with no lines yet, section by section. */
-export function lightStops(cv: CvContent): { section: LineList; itemId: string }[] {
-  return LIGHT_SECTIONS.flatMap((section) => (cv[section] as { id: string; bullets?: { text: string }[] }[])
-    .filter((item) => !(item.bullets ?? []).some((b) => b.text.trim() !== ""))
-    .map((item) => ({ section, itemId: item.id })));
-}
-
-const OF_KEY = { role: "enrich.path.roleOf", project: "enrich.path.projectOf", volunteering: "enrich.path.volunteeringOf" } as const satisfies Record<ScoredKind, string>;
-
-type Stage = { kind: "start" } | { kind: "role"; index: number } | { kind: "light"; index: number } | { kind: "achievements" } | { kind: "skills" } | { kind: "end" } | { kind: "improve"; roleId: string };
-
-/**
- * One guided path through the CV. It opens on the focus step: the roles, projects and volunteering below 80 are
- * offered and the person ticks the ones to work on. Each ticked one gets its
- * own run of questions (in CV order), then one stop per lighter item with no lines yet, then Key achievements,
- * Skills and the result. "Save and exit" closes it; opening it again offers the roles still below 80.
- */
-export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore }: Props) {
-  // The roles below 80 and each role's score are read live on the start screen (stored scores may still be
-  // loading, e.g. from "/cv?enrich=1") and fixed when the path starts.
-  // Roles, then volunteering (CV order within each), each below 80. Projects have no score.
-  const below = gradedItems(cv).filter(({ item }) => belowTarget(scores.get(item.id))).map(({ item }) => item.id);
-  const light = lightStops(cv);
-  const [fixed, setFixed] = useState<{ stops: string[]; lights: typeof light; before: Map<string, number | null> } | null>(null);
-  const stops = fixed?.stops ?? below;
-  const lights = fixed?.lights ?? light;
-  const before = fixed?.before ?? new Map<string, number | null>();
-  const [stage, setStage] = useState<Stage>({ kind: "start" });
-  // The focus step lists every role, strong or not, so the list never shrinks while scores arrive. Projects have
-  // no score: each is "to do" or "done" (a description and one or two bullets).
-  const items = scoredItems(cv).map((p) => {
-    if (p.kind === "project") return { ...p, done: projectDone(p.item) };
-    const s = scores.get(p.item.id);
-    return { ...p, score: scoreOf(s), scoring: s?.state === "scoring", waiting: s?.state === "scoring" || s?.state === "previous", strong: !belowTarget(s) };
-  });
-  const quick = LIGHT_SECTIONS.map((section) => ({ section, count: light.filter((l) => l.section === section).length })).filter((q) => q.count > 0);
-  const afterRoles = () => setStage(lights.length ? { kind: "light", index: 0 } : { kind: "achievements" });
-  // 5A: the skills the path added, so Undo removes exactly those.
-  const [skills, setSkills] = useState<{ ids: string[]; names: string[]; undone: boolean }>({ ids: [], names: [], undone: false });
-  // 6B: how many Key achievements the path added.
-  const [achievementsAdded, setAchievementsAdded] = useState(0);
-
-  if (stage.kind === "start") {
-    return <PathStart items={items} quick={quick} locale={cv.locale} onNotNow={onClose}
-      onStart={(chosen) => {
-        setFixed({ stops: chosen, lights: light, before: new Map(gradedItems(cv).map(({ item }) => [item.id, scoreOf(scores.get(item.id))])) });
-        if (chosen.length) setStage({ kind: "role", index: 0 });
-        else setStage(light.length ? { kind: "light", index: 0 } : { kind: "achievements" });
-      }} />;
-  }
-  if (stage.kind === "role") {
-    const roleId = stops[stage.index]!;
-    const last = stage.index === stops.length - 1;
-    const kind = findScored(cv, roleId)?.kind ?? "role";
-    const ofKind = stops.filter((id) => findScored(cv, id)?.kind === kind);
-    const nextKind = last ? null : findScored(cv, stops[stage.index + 1]!)?.kind;
-    const context = t(OF_KEY[kind], { n: ofKind.indexOf(roleId) + 1, total: ofKind.length });
-    const nextStop = {
-      label: t(!last && nextKind === "role" ? "enrich.run.done.nextRole" : "enrich.focus.continue"),
-      onNext: () => (last ? afterRoles() : setStage({ kind: "role", index: stage.index + 1 })),
-    };
-    if (kind === "project") {
-      return <ProjectRun key={roleId} target={{ roleId, mode: "improve" }} cv={cv} dispatch={dispatch} waitForSave={waitForSave} onClose={onClose} context={context} next={nextStop} />;
-    }
-    return (
-      <RoleRun
-        key={roleId}
-        target={{ roleId, mode: "improve" }}
-        cv={cv}
-        dispatch={dispatch}
-        scores={scores}
-        waitForSave={waitForSave}
-        onClose={onClose}
-        onScore={onScore}
-        context={context}
-        next={nextStop}
-      />
-    );
-  }
-  if (stage.kind === "light") {
-    const stop = lights[stage.index]!;
-    const ofSection = lights.filter((l) => l.section === stop.section);
-    const onNext = () => setStage(stage.index + 1 < lights.length ? { kind: "light", index: stage.index + 1 } : { kind: "achievements" });
-    return (
-      <LightStop key={`${stop.section}:${stop.itemId}`} section={stop.section} itemId={stop.itemId} cv={cv} dispatch={dispatch} waitForSave={waitForSave}
-        onClose={onClose} onNext={onNext}
-        context={t("enrich.path.lightOf", { section: t(`enrich.path.section.${stop.section}`), n: ofSection.indexOf(stop) + 1, total: ofSection.length })} />
-    );
-  }
-  if (stage.kind === "achievements") {
-    return (
-      <PathScreen context={t("enrich.path.achievements")} onClose={onClose}>
-        <AchievementsStop cv={cv} waitForSave={waitForSave} onDone={(texts) => {
-          if (texts.length) dispatch({ type: "addAchievements", texts });
-          setAchievementsAdded(texts.length);
-          setStage({ kind: "skills" });
-        }} />
-      </PathScreen>
-    );
-  }
-  if (stage.kind === "skills") {
-    return (
-      <PathScreen context={t("enrich.path.skills")} onClose={onClose}>
-        <SkillsStop waitForSave={waitForSave} onDone={(added) => {
-          if (added.length) dispatch({ type: "addSkills", skills: added });
-          setSkills({ ids: added.map((s) => s.id), names: added.map((s) => s.name), undone: false });
-          setStage({ kind: "end" });
-        }} />
-      </PathScreen>
-    );
-  }
-  if (stage.kind === "improve") {
-    return (
-      <RoleRun key={`improve:${stage.roleId}`} target={{ roleId: stage.roleId, mode: "improve" }} cv={cv} dispatch={dispatch} scores={scores}
-        waitForSave={waitForSave} onClose={onClose} onScore={onScore} next={{ label: t("enrich.focus.continue"), onNext: () => setStage({ kind: "end" }) }} />
-    );
-  }
-  const notice = <SkillsNotice names={skills.names} undone={skills.undone} onUndo={() => {
-    dispatch({ type: "removeSkills", ids: skills.ids });
-    setSkills((s) => ({ ...s, undone: true }));
-  }} />;
-  return (
-    <PathScreen context={t("enrich.path.result")} onClose={onClose}>
-      <EndStop cv={cv} scores={scores} waitForSave={waitForSave} before={before} stops={stops} lights={lights} achievementsAdded={achievementsAdded}
-        skillsAdded={skills.undone ? 0 : skills.names.length} notice={notice} dispatch={dispatch} onClose={onClose}
-        onImprove={(roleId) => {
-          // The role now counts as worked on, so the result shows how far it moved.
-          setFixed((f) => (f && !f.stops.includes(roleId) ? { ...f, stops: [...f.stops, roleId] } : f));
-          setStage({ kind: "improve", roleId });
-        }} />
-    </PathScreen>
-  );
 }
 
 /**
@@ -190,141 +55,231 @@ export function strengthWeights(cv: Pick<CvContent, "experience">): ReadonlyMap<
   return new Map(cv.experience.map((role, i) => [role.id, i === 0 ? 3 : i === 1 ? 2 : 1]));
 }
 const scoreOf = (s: RoleScoreState | undefined) => (s && s.state !== "none" ? (s.result?.score ?? null) : null);
+/** A score is still on its way (or not loaded yet): the start and the end wait for it. */
+const pending = (s: RoleScoreState | undefined) => !s || s.state === "scoring" || s.state === "previous";
 
-/** Waits for the last scores, then shows the result. An average of 80 or more marks the CV as enriched (saved once). */
-function EndStop({ cv, scores, waitForSave, before, stops, lights, achievementsAdded, skillsAdded, notice, dispatch, onClose, onImprove }: {
-  cv: CvContent; scores: ReadonlyMap<string, RoleScoreState>; waitForSave(): Promise<void>; before: ReadonlyMap<string, number | null>; stops: string[];
-  lights: { section: LightSection; itemId: string }[]; achievementsAdded: number; skillsAdded: number; notice: ReactNode; dispatch(a: CvAction): void; onClose(): void; onImprove(roleId: string): void;
-}) {
-  const navigate = useNavigate();
-  // Q1: every graded item counts (volunteering only when the CV has it; projects never). One still being scored
-  // (or waiting for it) would give a wrong average: wait for it.
-  const scored = gradedItems(cv);
-  const settled = scored.every(({ item }) => !["scoring", "previous"].includes(scores.get(item.id)?.state ?? ""));
-  const now = new Map(scored.map(({ item }) => [item.id, scoreOf(scores.get(item.id))]));
+type Stage =
+  | { kind: "start" } | { kind: "companies" } | { kind: "tools" } | { kind: "budget"; items: BudgetItem[] }
+  | { kind: "preparing" } | { kind: "review"; groups: ReviewGroup[]; failed: boolean } | { kind: "end" };
+
+/**
+ * What a role got in this round of the path. lines: line questions answered; role: a budget question about the whole
+ * role or "Rather just talk?" (its lines up to 100 may be rewritten); context: what the company does or the role was for
+ * (a new description); facts: any note at all from this round (company, tools, answers): a line rewritten for such a
+ * role may carry those facts, so it is not "tidied, no new facts".
+ */
+type Got = { lines: Set<string>; role: boolean; context: boolean; facts: boolean };
+
+/** The end waits this long for the new scores, then shows what it has. */
+const END_WAIT_MS = 20000;
+
+/**
+ * The short enrichment path (owner, 17 Nov 2026): the CV's score, then four steps whatever the number of roles —
+ * what each company does, the tools per role, the questions worth the most across the CV, one review sheet — then
+ * the score again. Answers are saved as role notes as they are given; nothing else on the CV changes before
+ * "Apply all". The score is shown only at the start and the end.
+ */
+export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose }: Props) {
+  const [stage, setStage] = useState<Stage>({ kind: "start" });
+  const [before, setBefore] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+  // Questions already asked in this path (earlier rounds), and what each role got in the current round.
+  const asked = useRef(new Set<string>());
+  const got = useRef(new Map<string, Got>());
+  const latest = useRef(cv);
+  useEffect(() => { latest.current = cv; });
+
+  const graded = gradedItems(cv);
   const weights = strengthWeights(cv);
-  const average = averageScore(now, weights) ?? 0;
-  const enriched = settled && average >= ENRICHED_AVERAGE;
+  const settled = graded.every(({ item }) => !pending(scores.get(item.id)));
+  const average = averageScore(new Map(graded.map(({ item }) => [item.id, scoreOf(scores.get(item.id))])), weights);
+
+  const gotFor = (roleId: string) => {
+    const entry = got.current.get(roleId) ?? { lines: new Set<string>(), role: false, context: false, facts: false };
+    entry.facts = true;
+    got.current.set(roleId, entry);
+    return entry;
+  };
+  // Answering the same screen again (after Back) replaces its note, as in a role's own run. One slot per screen of
+  // this round: two lines with the same wording keep two notes, and a new round starts with new notes.
+  const noteIds = useRef(new Map<string, string>());
+  const save = (slot: string, roleId: string, question: string, answer: string, via: Via[]) => {
+    const id = noteIds.current.get(slot) ?? newId();
+    noteIds.current.set(slot, id);
+    const note: Note = { id, question, answer: answer.trim().slice(0, MAX_LONG_TEXT), via: via.length ? via : ["type"], askedAt: new Date().toISOString() };
+    dispatch({ type: "setNote", roleId, note });
+  };
+  const budget = (): BudgetItem[] => {
+    const known = new Set([...asked.current, ...latest.current.experience.concat(latest.current.volunteering).flatMap((r) => r.notes.map((n) => questionKey(n.question)))]);
+    return pickBudget({
+      items: gradedItems(latest.current).map(({ item }) => ({ id: item.id, result: scores.get(item.id)?.state === "ready" ? scores.get(item.id)?.result : undefined })),
+      weights: strengthWeights(latest.current), asked: known, size: PATH_BUDGET,
+    });
+  };
+  const toBudget = () => {
+    noteIds.current = new Map();
+    const items = budget();
+    for (const item of items) asked.current.add(questionKey(item.question.text));
+    if (items.length) setStage({ kind: "budget", items });
+    else void prepare();
+  };
+
+  /** Every role's changes, from what it got in this round and its weak lines. */
+  const prepare = async () => {
+    setStage({ kind: "preparing" });
+    await waitForSave().catch(() => undefined);
+    const now = latest.current;
+    const groups: ReviewGroup[] = [];
+    let failed = false;
+    for (const { item } of gradedItems(now)) {
+      const entry = scores.get(item.id);
+      const result = entry?.state === "ready" ? entry.result : undefined;
+      const g = got.current.get(item.id);
+      const any = !!g && g.facts;
+      const weak = (result?.bullets ?? []).some((b) => b.score < CLEAR_AT);
+      if (!any && !weak) continue;
+      const describe = any && (g!.context || item.description.trim() !== "");
+      const answeredRole = !!g && g.role;
+      const out = await prepareRoleChanges({
+        cv: now, roleId: item.id, result, answeredLines: g?.lines ?? new Set(), answeredRole,
+        thinWithAnswers: !!result?.thin && answeredRole, describe,
+      });
+      failed ||= out.failed;
+      if (!out.changes.length) continue;
+      // A line rewritten with nothing new about it or its role: worded better, no new facts.
+      const tidied = new Set(any ? [] : out.changes.filter((c) => c.kind === "bullet").map((c) => c.id));
+      groups.push({ roleId: item.id, changes: out.changes, tidied });
+    }
+    setStage({ kind: "review", groups, failed });
+  };
+
+  // The end: wait for the new scores, at most END_WAIT_MS.
+  const ending = stage.kind === "end";
+  useEffect(() => {
+    if (!ending) return;
+    setTimedOut(false);
+    const timer = setTimeout(() => setTimedOut(true), END_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [ending]);
+  const enriched = ending && settled && (average ?? 0) >= ENRICHED_AVERAGE;
   useEffect(() => {
     if (enriched) dispatch({ type: "markEnriched", at: new Date().toISOString() });
   }, [enriched, dispatch]);
-  if (!settled) {
-    return (
-      <div className="fm-working" role="status">
-        <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
-        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.end.checking")}</h2>
-      </div>
+
+  const screen = (children: ReactNode) => <PathScreen context={t("enrich.path.dialog")} onClose={onClose}>{children}</PathScreen>;
+
+  if (stage.kind === "start") {
+    return screen(
+      <div className="rr-card">
+        <p className="rr-where">{t("enrich.path.dialog")}</p>
+        <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>{average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}</h2>
+        <p className="rr-lead" role="status">{settled ? t("enrich.path.v2.lead", { k: PATH_BUDGET }) : t("enrich.path.v2.checking")}</p>
+        <div className="rr-actions">
+          <button type="button" className="fm-btn" disabled={!settled} onClick={() => {
+            setBefore(average);
+            got.current = new Map();
+            setStage({ kind: "companies" });
+          }}>{t("enrich.run.start")}</button>
+          <button type="button" className="ui-btn" onClick={onClose}>{t("enrich.path.notNow")}</button>
+        </div>
+      </div>,
     );
   }
-  const rows: RoleRow[] = scored.map(({ item: r, kind }) => ({
-    roleId: r.id, kind, label: [r.title.trim(), r.company.trim()].filter(Boolean).join(", ") || roleName(r, SCORED_LIST[kind]),
-    before: before.get(r.id) ?? null, after: now.get(r.id) ?? null, visited: stops.includes(r.id),
-    offered: (before.get(r.id) ?? null) === null || before.get(r.id)! < ENRICHED_AT,
-  }));
-  // Projects have no score: the path's visited projects that now have a description and one or two bullets.
-  const projectsDescribed = cv.projects.filter((p) => stops.includes(p.id) && projectDone(p)).length;
-  const lowest = rows.filter((r) => r.after !== null).sort((a, b) => a.after! - b.after!)[0] ?? null;
-  // What would help it most: the next step its score names, with the line it is about.
-  const lowestItem = lowest ? findScored(cv, lowest.roleId)?.item : undefined;
-  const step = lowest ? scores.get(lowest.roleId)?.result?.nextStep : undefined;
-  const line = step ? lowestItem?.bullets.find((b) => b.id === step.bulletId)?.text.trim() : undefined;
-  const tip = step && line ? { line, text: issueTip(step.issue, step.tip) } : undefined;
-  // The lighter items the path visited had no lines, so their lines now are the ones it added.
-  const also = LIGHT_SECTIONS.map((section) => ({
-    section,
-    n: lights.filter((l) => l.section === section).reduce((sum, l) => {
-      const found = (cv[section] as { id: string; bullets?: { text: string }[] }[]).find((i) => i.id === l.itemId);
-      return sum + (found?.bullets ?? []).filter((b) => b.text.trim() !== "").length;
-    }, 0),
-  })).filter((a) => a.n > 0);
-  return (
-    <EnrichedScreen start={averageScore(before, weights)} average={average} rows={rows} also={also} achievementsAdded={achievementsAdded} skillsAdded={skillsAdded}
-      projectsDescribed={projectsDescribed}
-      notice={notice} lowest={lowest ? { ...lowest, label: roleName(findScored(cv, lowest.roleId)!.item, SCORED_LIST[lowest.kind]), tip } : null}
-      onFinish={onClose} onImprove={onImprove}
-      onFindJob={() => void (async () => {
-        // Leaving /cv drops a save still waiting: "enriched" and the added skills must be saved first.
-        await waitForSave().catch(() => undefined);
-        onClose();
-        void navigate("/jobs");
-      })()} />
-  );
-}
+  if (stage.kind === "companies") {
+    return screen(
+      <CompaniesStep cv={cv} onDone={(notes) => {
+        for (const { roleId, note } of notes) {
+          dispatch({ type: "setNote", roleId, note });
+          gotFor(roleId).context = true;
+        }
+        setStage({ kind: "tools" });
+      }} />,
+    );
+  }
+  if (stage.kind === "tools") {
+    return screen(
+      <ToolsStep cv={cv} onDone={(notes) => {
+        for (const { roleId, note } of notes) {
+          dispatch({ type: "setNote", roleId, note });
+          gotFor(roleId);
+        }
+        void waitForSave().catch(() => undefined).then(toBudget);
+      }} />,
+    );
+  }
+  if (stage.kind === "budget") {
+    return screen(
+      <BudgetStep cv={cv} items={stage.items}
+        onAnswer={(item, text, via) => {
+          save(`${item.roleId}|${item.kind === "line" ? `line:${item.question.bulletId}` : `role:${item.question.id}`}|${questionKey(item.question.text)}`, item.roleId, item.question.text, text, via);
+          const g = gotFor(item.roleId);
+          if (item.kind === "line") g.lines.add(item.question.bulletId);
+          else if (item.question.topic === "purpose") g.context = true;
+          else g.role = true;
+        }}
+        onTalk={(roleId, text, via) => {
+          save(`${roleId}|talk`, roleId, BRAIN_DUMP_QUESTION, text, via);
+          gotFor(roleId).role = true;
+        }}
+        onDone={() => void prepare()} />,
+    );
+  }
+  if (stage.kind === "preparing") {
+    return screen(
+      <div className="fm-working" role="status">
+        <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
+        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.path.v2.preparing")}</h2>
+      </div>,
+    );
+  }
+  if (stage.kind === "review") {
+    return screen(
+      <>
+        {stage.failed && <p className="ui-notice ui-notice--bad" role="alert">{t("enrich.path.v2.someFailed")}</p>}
+        <ReviewSheet cv={cv} groups={stage.groups} busy={busy} onApply={(decisions) => {
+          setBusy(true);
+          const now = latest.current;
+          for (const group of stage.groups) {
+            const list = roleListOf(now, group.roleId);
+            if (!list) continue;
+            const mine = decisions.filter((d) => d.roleId === group.roleId);
+            for (const action of changeActions(now, group.roleId, list, group.changes, mine).actions) dispatch(action);
+          }
+          setBusy(false);
+          setStage({ kind: "end" });
+        }} />
+      </>,
+    );
+  }
 
-/** A full-screen step of the path that isn't a role: the top bar, then one thing in the middle. Esc closes too. */
-function PathScreen({ context, onClose, children }: { context: string; onClose(): void; children: ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  return createPortal(
-    <div className="ui-page focus-mode fm-path" role="dialog" aria-modal="true" aria-label={t("enrich.path.dialog")}>
-      <FocusBar context={context} onClose={onClose} />
-      <section className="fm-path-start">
-        {children}
-      </section>
+  // The end: the score before and after, then Done or another round.
+  const waiting = !settled && !timedOut;
+  const more = waiting ? [] : budget();
+  return screen(
+    <div className="rr-card">
+      <p className="rr-where">{t("enrich.path.dialog")}</p>
+      {waiting ? (
+        <div className="fm-working" role="status">
+          <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
+          <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.end.checking")}</h2>
+        </div>
+      ) : (
+        <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>
+          {before !== null && average !== null && before !== average ? t("enrich.path.v2.moved", { from: before, to: average })
+            : average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}
+        </h2>
+      )}
+      <div className="rr-actions">
+        <button type="button" className="fm-btn" onClick={onClose}>{t("enrich.path.v2.done")}</button>
+        {more.length > 0 && (
+          <button type="button" className="ui-btn" onClick={() => {
+            got.current = new Map();
+            setBefore(average);
+            toBudget();
+          }}>{more.length === 1 ? t("enrich.path.moreOne") : t("enrich.path.more", { n: more.length })}</button>
+        )}
+      </div>
     </div>,
-    document.body,
-  );
-}
-
-/** 4A: asks for suggestions from the saved CV; none (or a failure) moves straight on. */
-function AchievementsStop({ cv, waitForSave, onDone }: { cv: CvContent; waitForSave(): Promise<void>; onDone(texts: string[]): void }) {
-  const [suggestions, setSuggestions] = useState<{ id: string; text: string; roleId: string }[] | null>(null);
-  const done = useRef(onDone);
-  useEffect(() => {
-    done.current = onDone;
-  });
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      let found: { text: string; roleId: string }[] = [];
-      try {
-        await waitForSave();
-        found = (await suggestAchievements()).suggestions;
-      } catch { /* No suggestions this time: the step is skipped. */ }
-      if (!alive) return;
-      if (!found.length) done.current([]);
-      else setSuggestions(found.map((s, i) => ({ ...s, id: String(i) })));
-    })();
-    return () => { alive = false; };
-  }, [waitForSave]);
-  if (!suggestions) {
-    return (
-      <div className="fm-working" role="status">
-        <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
-        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.achievements.loading")}</h2>
-      </div>
-    );
-  }
-  return <AchievementsPick suggestions={suggestions} roles={cv.experience} onDone={(texts) => done.current(texts)} />;
-}
-
-/** 5A: adds every skill the roles show (no screen of its own); none, or a failure, adds nothing. */
-function SkillsStop({ waitForSave, onDone }: { waitForSave(): Promise<void>; onDone(added: { id: string; name: string; group: SkillGroup }[]): void }) {
-  const done = useRef(onDone);
-  useEffect(() => {
-    done.current = onDone;
-  });
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      let found: { id: string; name: string; group: SkillGroup }[] = [];
-      try {
-        await waitForSave();
-        found = (await getSkillSuggestions()).suggestions.map((s) => ({ id: newId(), name: s.name, group: s.group }));
-      } catch { /* Nothing added this time. */ }
-      if (alive) done.current(found);
-    })();
-    return () => { alive = false; };
-  }, [waitForSave]);
-  return (
-    <div className="fm-working" role="status">
-      <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
-      <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.skills.noticeWorking")}</h2>
-    </div>
   );
 }

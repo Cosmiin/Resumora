@@ -326,8 +326,9 @@ describe("Coming next", () => {
     expect(screen.queryByText("Coming next")).toBeNull();
   });
 
-  it("stays on Key achievements", () => {
+  it("is gone from Key achievements too: Suggest replaces it", () => {
     render(<Harness focus="achievements" />);
-    expect(screen.getByRole("button", { name: /Pull achievements from my roles/ })).toHaveTextContent("Coming next");
+    expect(screen.queryByText("Coming next")).toBeNull();
+    expect(screen.getByRole("button", { name: "Suggest" })).toBeInTheDocument();
   });
 });

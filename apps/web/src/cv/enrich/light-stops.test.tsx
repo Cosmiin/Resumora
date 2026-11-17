@@ -3,10 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
-import type { RoleScoreState } from "./useRoleScores.ts";
+import { emptyCv, type CvContent, type Experience } from "@resumora/shared";
 
-// Task 7 (E6, 3B): one stop per lighter item with no lines yet: "Tell us about ‹item›", then the picks.
+// "Tell us about ‹item›", then the picks, for one course (opened from "Suggest lines" in its section).
 
 const api = vi.hoisted(() => ({
   suggestAchievements: vi.fn(), getSkillSuggestions: vi.fn(), itemLines: vi.fn(),
@@ -14,11 +13,12 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock("./enrich-api.ts", () => api);
 
-import { EnrichPath } from "./EnrichPath.tsx";
+import { LightStop } from "./FocusMode.tsx";
 import { cvReducer } from "../edit/cvReducer.ts";
 
 beforeEach(() => {
   vi.resetAllMocks();
+  next.mockReset();
   api.suggestAchievements.mockReturnValue(new Promise(() => {}));
   api.getSkillSuggestions.mockReturnValue(new Promise(() => {}));
 });
@@ -27,10 +27,6 @@ const role: Experience = {
   id: "r", company: "Acme", title: "Analyst", location: "", startDate: "2020-01", endDate: "", current: true,
   description: "", bullets: [{ id: "r-b", text: "Did things." }], notes: [],
 };
-const ready = (score: number): RoleScoreState => ({
-  state: "ready",
-  result: { roleId: "r", policy: "score/4", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } satisfies RoleResult,
-});
 const start: CvContent = {
   ...emptyCv(),
   experience: [role],
@@ -42,26 +38,25 @@ const start: CvContent = {
 };
 
 let latest: CvContent;
+const next = vi.fn();
 function Host({ cv = start }: { cv?: CvContent }) {
   const [state, dispatch] = useReducer(cvReducer, cv);
   latest = state;
   return (
     <MemoryRouter>
-      <EnrichPath cv={state} dispatch={dispatch} scores={new Map([["r", ready(90)]])} waitForSave={() => Promise.resolve()} onClose={() => {}} />
+      <LightStop section="courses" itemId="c1" cv={state} dispatch={dispatch} waitForSave={() => Promise.resolve()} onClose={() => {}} onNext={next} />
     </MemoryRouter>
   );
 }
 
 async function openFirst() {
   render(<Host />);
-  await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 }
 
-describe("lighter stops in the path (3B)", () => {
-  it("visits each course with no lines: the box, then the picks; Add 2 adds exactly 2 lines under that course", async () => {
+describe("Tell us about a course", () => {
+  it("the box, then the picks; Add 2 adds exactly 2 lines under that course", async () => {
     api.itemLines.mockResolvedValue({ lines: ["Built pivot tables for sales.", "Made a monthly dashboard.", "Cleaned raw exports."] });
     await openFirst();
-    expect(screen.getByText("Courses & training, 1 of 2")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Tell us about Excel for analysts" })).toBeInTheDocument();
     expect(screen.getByText("Tell us more. There are no wrong answers.")).toBeInTheDocument();
     expect(screen.getAllByText("Excel for analysts").length).toBeGreaterThan(0);
@@ -78,17 +73,14 @@ describe("lighter stops in the path (3B)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add 2 lines" }));
     expect(latest.courses[0]!.bullets?.map((b) => b.text)).toEqual(["Built pivot tables for sales.", "Cleaned raw exports."]);
     expect(latest.courses[1]!.bullets).toBeUndefined();
-    expect(screen.getByText("Courses & training, 2 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Tell us about SQL basics" })).toBeInTheDocument();
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
-  it("Skip moves on without a call, and the last stop goes on to Key achievements", async () => {
+  it("Skip moves on without a call", async () => {
     await openFirst();
     await userEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByRole("heading", { name: "Tell us about SQL basics" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(api.itemLines).not.toHaveBeenCalled();
-    expect(screen.getAllByText("Key achievements").length).toBeGreaterThan(0);
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it("an empty answer from the API skips the picks", async () => {
@@ -96,7 +88,7 @@ describe("lighter stops in the path (3B)", () => {
     await openFirst();
     await userEvent.type(screen.getByRole("textbox"), "Not much to say");
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(await screen.findByRole("heading", { name: "Tell us about SQL basics" })).toBeInTheDocument();
+    await vi.waitFor(() => expect(next).toHaveBeenCalledTimes(1));
     expect(latest.courses[0]!.bullets).toBeUndefined();
   });
 
@@ -111,7 +103,7 @@ describe("lighter stops in the path (3B)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
     await userEvent.click(await screen.findByRole("button", { name: "None of these" }));
     expect(latest.courses[0]!.bullets).toBeUndefined();
-    expect(screen.getByRole("heading", { name: "Tell us about SQL basics" })).toBeInTheDocument();
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it("a failed call offers Try again and Skip", async () => {

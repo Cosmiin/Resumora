@@ -178,13 +178,15 @@ describe("opening a project", () => {
     expect(isProjectTarget(base, { roleId: "p1", bulletId: "pb0", mode: "improve" })).toBe(false);
   });
 
-  it("the project's ✨ button on the CV page opens it; a role has none", async () => {
+  it("the project's Improve button on the CV page opens it; a role has none", async () => {
     const open = vi.fn();
     const view = render(<FocusOpenProvider value={open}><RoleItem role={project} list="projects" locale="en" dispatch={() => {}} /></FocusOpenProvider>);
-    await userEvent.click(screen.getByRole("button", { name: "Describe this project" }));
+    const button = screen.getByRole("button", { name: "Improve" });
+    expect(button).not.toHaveTextContent("✨");
+    await userEvent.click(button);
     expect(open).toHaveBeenCalledWith({ roleId: "p1", mode: "improve" });
     view.unmount();
     render(<FocusOpenProvider value={open}><RoleItem role={role} list="experience" locale="en" dispatch={() => {}} /></FocusOpenProvider>);
-    expect(screen.queryByRole("button", { name: "Describe this project" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Improve" })).toBeNull();
   });
 });

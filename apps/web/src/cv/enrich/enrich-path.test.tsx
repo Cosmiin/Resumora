@@ -1,456 +1,219 @@
-import { useState } from "react";
+import { useReducer, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
-import { emptyCv, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
+import { emptyCv, fingerprint, type BudgetItem, type CvContent, type Experience, type Note, type RoleResult } from "@resumora/shared";
+import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
+import type { ReviewGroup } from "./ReviewSheet.tsx";
 
-// Each role's run of questions is replaced by a stub: these tests are about the path around it.
-vi.mock("./RoleRun.tsx", () => ({
-  RoleRun: ({ target, next, onClose, context, ...rest }: {
-    target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; context?: string;
-  }) => (
-    <div data-testid="focus">
-      <p>{context}</p>
-      {"focus" in rest && <p>Has a focus prop</p>}
-      <p>Session for {target.roleId}</p>
-      <button type="button" onClick={() => next?.onNext()}>{next?.label}</button>
-      <button type="button" onClick={onClose}>✕ Close</button>
-    </div>
-  ),
-}));
-vi.mock("./ProjectRun.tsx", () => ({
-  ProjectRun: ({ target, next, onClose, context }: { target: { roleId: string }; next?: { label: string; onNext(): void }; onClose(): void; context?: string }) => (
-    <div data-testid="focus">
-      <p>{context}</p>
-      <p>Project session for {target.roleId}</p>
-      <button type="button" onClick={() => next?.onNext()}>{next?.label}</button>
-      <button type="button" onClick={onClose}>✕ Close</button>
-    </div>
-  ),
-}));
-const api = vi.hoisted(() => ({ suggestAchievements: vi.fn(), getSkillSuggestions: vi.fn() }));
+const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
-import { EnrichPath } from "./EnrichPath.tsx";
+
+const note = (question: string, answer: string): Note => ({ id: `n-${question}`, question, answer, via: ["type"], askedAt: "2026-11-17T00:00:00Z" });
+// Each step is a stub: these tests are about the path around them.
+vi.mock("./CompaniesStep.tsx", () => ({
+  CompaniesStep: ({ onDone }: { onDone(n: { roleId: string; note: Note }[]): void }) => (
+    <div><p>Companies step</p><button type="button" onClick={() => onDone([{ roleId: "r1", note: note("What does Acme do?", "Makes anvils") }])}>Companies done</button></div>
+  ),
+}));
+vi.mock("./ToolsStep.tsx", () => ({
+  ToolsStep: ({ onDone }: { onDone(n: { roleId: string; note: Note }[]): void }) => (
+    <div><p>Tools step</p><button type="button" onClick={() => onDone([])}>Tools done</button></div>
+  ),
+}));
+vi.mock("./BudgetStep.tsx", () => ({
+  BudgetStep: ({ items, onAnswer, onTalk, onDone }: { items: BudgetItem[]; onAnswer(i: BudgetItem, t: string, v: string[]): void; onTalk(r: string, t: string, v: string[]): void; onDone(): void }) => (
+    <div>
+      <p>Budget: {items.map((i) => i.question.text).join(" | ")}</p>
+      <button type="button" onClick={() => { for (const i of items) onAnswer(i, `Answer to ${i.question.text}`, ["type"]); onDone(); }}>Answer all</button>
+      <button type="button" onClick={() => { onAnswer(items[0]!, "First answer", ["type"]); onAnswer(items[0]!, "Corrected answer", ["type"]); }}>Answer twice</button>
+      <button type="button" onClick={() => { onTalk("r1", `Talked before ${items[0]!.question.text}`, ["type"]); onDone(); }}>Talk and finish</button>
+      <button type="button" onClick={() => {
+        const line = items.find((i) => i.kind === "line")!;
+        const twin = { ...line, question: { ...line.question, bulletId: `${line.roleId}b2` } } as BudgetItem;
+        onAnswer(line, "About line one", ["type"]);
+        onAnswer(twin, "About line two", ["type"]);
+      }}>Same wording, two lines</button>
+    </div>
+  ),
+}));
+vi.mock("./ReviewSheet.tsx", () => ({
+  ReviewSheet: ({ groups, onApply }: { groups: ReviewGroup[]; onApply(d: { roleId: string; id: string; text: string }[]): void }) => (
+    <div>
+      <p>Review: {groups.map((g) => `${g.roleId}:${g.changes.map((c) => `${c.id}${g.tidied.has(c.id) ? "(tidied)" : ""}`).join(",")}`).join(" ")}</p>
+      <button type="button" onClick={() => onApply(groups.flatMap((g) => g.changes.map((c) => ({ roleId: g.roleId, id: c.id, text: c.after }))))}>Apply all</button>
+    </div>
+  ),
+}));
+
+import { EnrichPath, averageScore, strengthWeights } from "./EnrichPath.tsx";
+
+const role = (id: string, over: Partial<Experience> = {}): Experience => ({
+  id, company: "Acme", title: `Role ${id}`, location: "", startDate: "2020-01", endDate: "", current: false, description: "",
+  bullets: [{ id: `${id}b1`, text: "Did reports." }, { id: `${id}b2`, text: "Cut costs by 10% in a year." }], notes: [], ...over,
+});
+const grade = (id: string, score: number) => ({
+  id, score, contribution: "specific" as const, clarity: "specific" as const, specificity: "specific" as const,
+  impact: "missing" as const, issue: "impact" as const, tip: null, question: null,
+});
+function result(r: Experience, score: number, over: Partial<RoleResult> = {}): RoleResult {
+  return { roleId: r.id, policy: "score/8", fingerprint: fingerprint(r, "en"), score, nextStep: null, thin: false,
+    bullets: [grade(`${r.id}b1`, 60), grade(`${r.id}b2`, 90)],
+    questions: [{ bulletId: `${r.id}b1`, text: `What changed in ${r.id}?`, options: [], kind: "result" }],
+    roleQuestions: [{ id: "rq1", text: "What does Acme do?", options: [], kind: "role", topic: "company" }, { id: "rq2", text: `Did anyone report to you in ${r.id}?`, options: [], kind: "role", topic: "leadership" }],
+    ...over };
+}
+const r1 = role("r1");
+const r2 = role("r2", { company: "Beta" });
+const cv: CvContent = { ...emptyCv("en"), experience: [r1, r2] };
+const ready = (r: Experience, score: number, over: Partial<RoleResult> = {}): RoleScoreState => ({ state: "ready", result: result(r, score, over) });
+
+function Harness({ initial, onAction, onClose = () => {}, extra }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string }) {
+  const [state, apply] = useReducer(cvReducer, cv);
+  const [scores, setScores] = useState(initial);
+  return (
+    <>
+      <button type="button" onClick={() => setScores(new Map([
+        ["r1", ready(state.experience[0]!, 88, extra ? { roleQuestions: [{ id: "rq9", text: extra, options: [], kind: "role", topic: "other" }] } : {})],
+        ["r2", ready(state.experience[1]!, 80, { questions: [], roleQuestions: [] })]]))}>Rescore</button>
+      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose}
+        dispatch={(a) => { onAction?.(a); apply(a); }} />
+    </>
+  );
+}
 
 beforeEach(() => {
   vi.resetAllMocks();
-  api.suggestAchievements.mockReturnValue(new Promise(() => {}));
-  api.getSkillSuggestions.mockReturnValue(new Promise(() => {}));
+  api.improveBullet.mockImplementation(({ bulletId }: { bulletId: string }) => Promise.resolve({ proposal: { bulletId, text: `Better ${bulletId}.` }, bulletBefore: 60, bulletAfter: 90, roleBefore: 60, roleAfter: 70, cached: false }));
+  api.roleDescription.mockResolvedValue({ text: "Acme makes anvils. Ran reports.", keywords: [] });
+  api.brainDump.mockResolvedValue({ proposals: [], roleBefore: null, roleAfterAll: null });
 });
 
-const role = (id: string, title: string): Experience => ({
-  id, company: `${title} Co`, title, location: "", startDate: "2020-01", endDate: "", current: true,
-  description: "", bullets: [{ id: `${id}-b`, text: "Did things." }], notes: [],
-});
-const ready = (score: number): RoleScoreState => ({
-  state: "ready",
-  result: { roleId: "x", policy: "score/4", fingerprint: "x", score, bullets: [], nextStep: null, questions: [], roleQuestions: [], thin: false } satisfies RoleResult,
-});
-const cv: CvContent = { ...emptyCv(), experience: [role("a", "Analyst"), role("b", "Buyer"), role("c", "Clerk"), role("d", "Driver")] };
+describe("the short path", () => {
+  // r2 has nothing left to ask: only its weak line is worked on.
+  const scores = () => new Map<string, RoleScoreState>([["r1", ready(r1, 60)], ["r2", ready(r2, 70, { questions: [], roleQuestions: [] })]]);
 
-function Host({ scores, onClose = () => {}, dispatch = () => {} }: { scores: Map<string, RoleScoreState>; onClose?(): void; dispatch?(a: unknown): void }) {
-  return <MemoryRouter><EnrichPath cv={cv} dispatch={dispatch} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} /></MemoryRouter>;
-}
-
-describe("the guided path (1A)", () => {
-  const scores = new Map<string, RoleScoreState>([["a", ready(90)], ["b", ready(61)], ["c", ready(55)], ["d", ready(80)]]);
-
-  it("lists every role in CV order with its score, ticks the recent ones below 80, and starts with the first ticked", () => {
-    render(<Host scores={scores} />);
-    expect(screen.getByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
-    const rows = screen.getAllByRole("checkbox");
-    expect(rows).toHaveLength(4);
-    expect(rows[0]).toHaveAccessibleName(/Analyst, Analyst Co.*Score: 90 of 100/);
-    expect(rows[1]).toHaveAccessibleName(/Buyer, Buyer Co.*Score: 61 of 100/);
-    expect(rows[2]).toHaveAccessibleName(/Clerk, Clerk Co.*Score: 55 of 100/);
-    expect(rows[3]).toHaveAccessibleName(/Driver, Driver Co.*Score: 80 of 100/);
-    expect(rows.map((r) => (r as HTMLInputElement).checked)).toEqual([false, true, true, false]);
-    expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start with Buyer" })).toBeInTheDocument();
+  it("waits for every role's score before it can start", async () => {
+    render(<Harness initial={new Map([["r1", ready(r1, 60)], ["r2", { state: "scoring" }]])} />);
+    expect(screen.getByText("Checking your roles…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
-  it("a tick never moves while scores arrive: each is placed once the roles above it have a score", () => {
-    const checked = () => screen.getAllByRole("checkbox").map((r) => (r as HTMLInputElement).checked);
-    const wait: RoleScoreState = { state: "scoring" };
-    const view = render(<Host scores={new Map([["a", wait], ["b", wait], ["c", wait], ["d", wait]])} />);
-    expect(screen.getAllByRole("checkbox")[2]).toHaveAccessibleName(/Clerk, Clerk Co.*Checking this role…/);
-    expect(checked()).toEqual([false, false, false, false]);
-    // Nothing to start with yet: the button waits rather than skipping every role.
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
-    // A later role scored first is not ticked ahead of the ones above it.
-    view.rerender(<Host scores={new Map([["a", wait], ["b", wait], ["c", ready(55)], ["d", wait]])} />);
-    expect(checked()).toEqual([false, false, false, false]);
-    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", wait], ["c", ready(55)], ["d", wait]])} />);
-    expect(checked()).toEqual([false, false, false, false]);
-    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(55)], ["d", wait]])} />);
-    expect(checked()).toEqual([false, true, true, false]);
-    expect(screen.getByRole("button", { name: "Start with Buyer" })).toBeEnabled();
-    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(55)], ["d", ready(40)]])} />);
-    expect(checked()).toEqual([false, true, true, false]);
+  it("shows the CV's score at the start, then companies, tools, the questions, the review and the end, in that order", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} />);
+    // Weighted: r1 counts 3, r2 counts 2 → (60*3 + 70*2) / 5 = 64.
+    expect(screen.getByRole("heading", { name: "Your CV: 64" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByText("Companies step")).toBeInTheDocument();
+    expect(screen.queryByText(/Your CV:/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    expect(actions[0]).toMatchObject({ type: "setNote", roleId: "r1", note: { question: "What does Acme do?" } });
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    // The company question is never in the budget; the role's own question and the line question are.
+    const budget = await screen.findByText(/^Budget:/);
+    expect(budget.textContent).not.toContain("What does Acme do?");
+    expect(budget.textContent).toContain("Did anyone report to you in r1?");
+    expect(budget.textContent).toContain("What changed in r1?");
+    expect(screen.queryByText(/Your CV:/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
+    expect(actions.some((a) => a.type === "setNote" && a.note.question === "What changed in r1?")).toBe(true);
+    const review = await screen.findByText(/^Review:/);
+    expect(review.textContent).toContain("r1:description,bullet:r1b1");
+    // r2 got no answers: its weak line is tidied, with no new facts.
+    expect(review.textContent).toContain("r2:bullet:r2b1(tidied)");
+    await userEvent.click(screen.getByRole("button", { name: "Apply all" }));
+    expect(actions).toContainEqual({ type: "replaceBullet", roleId: "r1", bulletId: "r1b1", text: "Better r1b1." });
+    expect(actions).toContainEqual({ type: "setItemField", list: "experience", itemId: "r1", field: "description", value: "Acme makes anvils. Ran reports." });
+    await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
+    expect(await screen.findByRole("heading", { name: "Your CV: 64 → 85" })).toBeInTheDocument();
   });
 
-  it("goes role by role, then on to Key achievements", async () => {
-    render(<Host scores={scores} />);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    expect(screen.getByText("Session for b")).toBeInTheDocument();
-    expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Next role" }));
-    expect(screen.getByText("Session for c")).toBeInTheDocument();
-    expect(screen.getByText("Role 2 of 2")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.queryByTestId("focus")).toBeNull();
-    expect(screen.getAllByText("Key achievements").length).toBeGreaterThan(0);
+  it("8 more questions starts another round without asking a question twice", async () => {
+    render(<Harness initial={scores()} extra="Which teams did you work with in r1?" />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    const first = (await screen.findByText(/^Budget:/)).textContent ?? "";
+    await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Apply all" }));
+    await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
+    await userEvent.click(await screen.findByRole("button", { name: "1 more question" }));
+    const second = (await screen.findByText(/^Budget:/)).textContent ?? "";
+    expect(second).toBe("Budget: Which teams did you work with in r1?");
+    expect(first).toContain("What changed in r1?");
   });
 
-  it("✕ closes the path; opening it again starts at the first role still below 80", async () => {
+  it("goes straight from tools to the review when there is nothing to ask", async () => {
+    const quiet = new Map<string, RoleScoreState>([["r1", ready(r1, 60, { questions: [], roleQuestions: [] })], ["r2", ready(r2, 70, { questions: [], roleQuestions: [] })]]);
+    render(<Harness initial={quiet} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    const review = await screen.findByText(/^Review:/);
+    expect(screen.queryByText(/^Budget:/)).toBeNull();
+    // A company answer brings a description, but rewrites only the weak line (60), not the one at 90, and that line
+    // may carry the company's facts, so it is not marked tidied.
+    expect(review.textContent).toContain("r1:description,bullet:r1b1 ");
+    expect(review.textContent).not.toContain("r1b2");
+    expect(review.textContent).toContain("r2:bullet:r2b1(tidied)");
+    expect(api.improveBullet.mock.calls.map(([b]) => b.bulletId)).toEqual(["r1b1", "r2b1"]);
+  });
+
+  it("answering a question again (after Back) replaces its note", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Answer twice" }));
+    const notes = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.endsWith("answer") ? [a.note] : []));
+    expect(notes.map((n) => n.answer)).toEqual(["First answer", "Corrected answer"]);
+    expect(notes[1]!.id).toBe(notes[0]!.id);
+  });
+
+  it("a free answer in a second round is kept next to the first one", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} extra="Which teams did you work with in r1?" />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Talk and finish" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Apply all" }));
+    await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
+    await userEvent.click(await screen.findByRole("button", { name: "1 more question" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Talk and finish" }));
+    const talks = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.startsWith("Talked before") ? [a.note] : []));
+    expect(talks).toHaveLength(2);
+    expect(talks[1]!.id).not.toBe(talks[0]!.id);
+  });
+
+  it("two lines asked the same words keep two notes", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Same wording, two lines" }));
+    const notes = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.startsWith("About line") ? [a.note] : []));
+    expect(notes).toHaveLength(2);
+    expect(notes[1]!.id).not.toBe(notes[0]!.id);
+  });
+
+  it("Skip for now closes it", async () => {
     const onClose = vi.fn();
-    const { unmount } = render(<Host scores={scores} onClose={onClose} />);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    await userEvent.click(screen.getByRole("button", { name: "✕ Close" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-    unmount();
-    render(<Host scores={new Map(scores).set("b", ready(84))} />);
-    expect(screen.getByRole("button", { name: "Start with Clerk" })).toBeInTheDocument();
-  });
-
-  it("with no role below 80, Continue goes to Key achievements", async () => {
-    render(<Host scores={new Map([["a", ready(90)], ["b", ready(85)], ["c", ready(80)], ["d", ready(99)]])} />);
-    // Strong roles stay listed, unticked; the person may still tick one.
-    const rows = screen.getAllByRole("checkbox");
-    expect(rows).toHaveLength(4);
-    expect(rows.some((r) => (r as HTMLInputElement).checked)).toBe(false);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getAllByText("Key achievements").length).toBeGreaterThan(0);
-  });
-
-  it("Not now closes the start screen", async () => {
-    const onClose = vi.fn();
-    render(<Host scores={scores} onClose={onClose} />);
+    render(<Harness initial={scores()} onClose={onClose} />);
     await userEvent.click(screen.getByRole("button", { name: "Skip for now" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps its stops when a visited role's score changes mid-path", async () => {
-    function Live() {
-      const [live, setLive] = useState(scores);
-      return (
-        <>
-          <button type="button" onClick={() => setLive(new Map(live).set("b", ready(88)))}>rescore</button>
-          <EnrichPath cv={cv} dispatch={() => {}} scores={live} waitForSave={() => Promise.resolve()} onClose={() => {}} />
-        </>
-      );
-    }
-    render(<MemoryRouter><Live /></MemoryRouter>);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    await userEvent.click(screen.getByRole("button", { name: "rescore" }));
-    expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
+    expect(onClose).toHaveBeenCalled();
   });
 });
 
-describe("Key achievements (4A)", () => {
-  const allDone = new Map([["a", ready(90)], ["b", ready(85)], ["c", ready(80)], ["d", ready(99)]]);
-  const suggestions = [
-    { text: "Cut supplier costs by 10%", roleId: "b" },
-    { text: "Cleared a 3-month backlog", roleId: "c" },
-    { text: "Planned routes for 20 drivers", roleId: "d" },
-  ];
-  async function open(dispatch = vi.fn()) {
-    render(<Host scores={allDone} dispatch={dispatch} />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await screen.findByRole("heading", { name: "Which of these are true and you're proud of?" });
-    return dispatch;
-  }
-
-  it("shows the suggestions as cards, none ticked, each naming its role", async () => {
-    api.suggestAchievements.mockResolvedValue({ suggestions });
-    await open();
-    expect(screen.getByText("Almost done")).toBeInTheDocument();
-    expect(screen.getByText("They open your CV, right under the summary.")).toBeInTheDocument();
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes).toHaveLength(3);
-    for (const box of boxes) expect(box).not.toBeChecked();
-    expect(screen.getByText("From Buyer · Buyer Co")).toBeInTheDocument();
-    expect(screen.getByText("From Driver · Driver Co")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add 0 achievements" })).toBeDisabled();
-  });
-
-  it("Add 2 achievements adds exactly those two in one action", async () => {
-    api.suggestAchievements.mockResolvedValue({ suggestions });
-    const dispatch = await open();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Cut supplier costs/ }));
-    await userEvent.click(screen.getByRole("checkbox", { name: /Planned routes/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Add 2 achievements" }));
-    expect(dispatch).toHaveBeenCalledExactlyOnceWith({ type: "addAchievements", texts: ["Cut supplier costs by 10%", "Planned routes for 20 drivers"] });
-    expect(screen.queryByRole("heading", { name: "Which of these are true and you're proud of?" })).toBeNull();
-  });
-
-  it("None of these adds nothing and moves on", async () => {
-    api.suggestAchievements.mockResolvedValue({ suggestions });
-    const dispatch = await open();
-    await userEvent.click(screen.getByRole("button", { name: "None of these" }));
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(screen.queryByRole("heading", { name: "Which of these are true and you're proud of?" })).toBeNull();
-  });
-
-  it.each(["empty", "failed"])("an %s answer skips the step", async (how) => {
-    if (how === "empty") api.suggestAchievements.mockResolvedValue({ suggestions: [] });
-    else api.suggestAchievements.mockRejectedValue(new Error("down"));
-    render(<Host scores={allDone} />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(await screen.findByText("Skills")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Which of these are true and you're proud of?" })).toBeNull();
-  });
-});
-
-describe("skills added automatically (5A)", () => {
-  const allDone = new Map([["a", ready(90)], ["b", ready(85)], ["c", ready(80)], ["d", ready(99)]]);
-  async function toTheEnd(dispatch = vi.fn()) {
-    api.suggestAchievements.mockResolvedValue({ suggestions: [] });
-    render(<Host scores={allDone} dispatch={dispatch} />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    return dispatch;
-  }
-  it("adds every suggestion in one action when the end is reached, lists them, and Undo removes exactly those", async () => {
-    api.getSkillSuggestions.mockResolvedValue({ suggestions: [
-      { name: "SAP", group: "technicalSkills", evidence: "SAP" }, { name: "Negotiation", group: "professionalSkills", evidence: "negotiated" },
-    ], sort: [] });
-    const dispatch = await toTheEnd();
-    expect(await screen.findByText("Added 2 skills from your roles: SAP, Negotiation")).toBeInTheDocument();
-    const adds = dispatch.mock.calls.filter(([a]) => a.type === "addSkills");
-    expect(adds).toHaveLength(1);
-    const added = adds[0]![0].skills as { id: string; name: string; group: string }[];
-    expect(added.map((s) => [s.name, s.group])).toEqual([["SAP", "technicalSkills"], ["Negotiation", "professionalSkills"]]);
-    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
-    expect(dispatch).toHaveBeenLastCalledWith({ type: "removeSkills", ids: added.map((s) => s.id) });
-    expect(screen.getByText("Skills removed")).toBeInTheDocument();
-  });
-  it.each(["empty", "failed"])("an %s answer adds nothing and shows no bar", async (how) => {
-    if (how === "empty") api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
-    else api.getSkillSuggestions.mockRejectedValue(new Error("down"));
-    const dispatch = await toTheEnd();
-    expect(await screen.findByRole("button", { name: "See my CV" })).toBeInTheDocument();
-    expect(dispatch.mock.calls.filter(([a]) => a.type === "addSkills" || a.type === "removeSkills")).toEqual([]);
-    expect(screen.queryByText(/from your roles/)).toBeNull();
-  });
-});
-
-describe("the end of the path (6B)", () => {
-  const start = new Map<string, RoleScoreState>([["a", ready(90)], ["b", ready(61)], ["c", ready(70)], ["d", ready(80)]]);
-  async function finish(after: Map<string, RoleScoreState>, dispatch = vi.fn()) {
-    api.suggestAchievements.mockResolvedValue({ suggestions: [{ text: "Cut supplier costs by 10%", roleId: "b" }] });
-    api.getSkillSuggestions.mockResolvedValue({ suggestions: [{ name: "SAP", group: "technicalSkills", evidence: "SAP" }], sort: [] });
-    const view = render(<Host scores={start} dispatch={dispatch} />);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    await userEvent.click(screen.getByRole("button", { name: "Next role" }));
-    view.rerender(<Host scores={new Map([...after].map(([k, v]) => [k, k === "c" ? { state: "scoring" as const, result: v.result } : v]))} dispatch={dispatch} />);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await userEvent.click(await screen.findByRole("checkbox"));
-    await userEvent.click(screen.getByRole("button", { name: "Add 1 achievement" }));
-    expect(await screen.findByText("Checking your scores…")).toBeInTheDocument();
-    expect(dispatch.mock.calls.some(([a]) => a.type === "markEnriched")).toBe(false);
-    view.rerender(<Host scores={after} dispatch={dispatch} />);
-    return dispatch;
-  }
-
-  it("average 85: saves the CV as enriched and shows the report card", async () => {
-    const dispatch = await finish(new Map([["a", ready(90)], ["b", ready(82)], ["c", ready(84)], ["d", ready(80)]]));
-    expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
-    expect(dispatch).toHaveBeenCalledWith({ type: "markEnriched", at: expect.any(String) });
-    expect(screen.getByText("From 77 to 85 out of 100.")).toBeInTheDocument();
-    const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent);
-    expect(rows).toEqual([
-      "0Analyst, Analyst Co already reads clearly, so it had no questions.at 90",
-      "+21Buyer, Buyer Cofrom 61 to 82",
-      "+14Clerk, Clerk Cofrom 70 to 84",
-      "0Driver, Driver Co already reads clearly, so it had no questions.at 80",
-      "+Key achievements: 1 added", "+Skills: 1 added"]);
-    expect(screen.getByText("Your CV is ready to be tailored to a job.")).toBeInTheDocument();
-    expect(screen.getByText("Added 1 skill from your roles: SAP")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Find a job" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "See my CV" })).toBeInTheDocument();
-  });
-
-  it("average 79: not saved as enriched, names the lowest role; Answer more questions opens it and comes back", async () => {
-    const dispatch = await finish(new Map([["a", ready(90)], ["b", ready(66)], ["c", ready(68)], ["d", ready(80)]]));
-    expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
-    expect(dispatch.mock.calls.some(([a]) => a.type === "markEnriched")).toBe(false);
-    expect(screen.getByText("From 77 to 79 out of 100.")).toBeInTheDocument();
-    expect(screen.getByText("Buyer is at 66. One more pass would lift it.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Find a job" })).toBeNull();
-    expect(screen.getByText("Added 1 skill from your roles: SAP")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Answer more questions" }));
-    expect(screen.getByText("Session for b")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(await screen.findByRole("heading", { name: "Your CV got stronger" })).toBeInTheDocument();
-  });
-});
-
-describe("whole-branch review fixes", () => {
-  it("keeps every role listed while scores arrive, and a role the person ticked stays ticked", async () => {
-    const loading = new Map<string, RoleScoreState>([["a", { state: "scoring" }], ["b", { state: "scoring" }], ["c", { state: "scoring" }], ["d", { state: "scoring" }]]);
-    const view = render(<Host scores={loading} />);
-    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
-    await userEvent.click(screen.getByRole("checkbox", { name: /Driver/ }));
-    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(85)], ["d", ready(80)]])} />);
-    expect(screen.getAllByRole("checkbox")).toHaveLength(4);
-    expect(screen.getByRole("checkbox", { name: /Driver/ })).toBeChecked();
-    // Buyer (61) is ticked for them; Driver is their own tick.
-    expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
-  });
-
-  it("opened before the stored scores arrive (from /cv?enrich=1), it still leaves roles at 80 or more unticked", async () => {
-    const loading = new Map<string, RoleScoreState>([["a", { state: "scoring" }], ["b", { state: "scoring" }], ["c", { state: "scoring" }], ["d", { state: "scoring" }]]);
-    const view = render(<Host scores={loading} />);
-    view.rerender(<Host scores={new Map([["a", ready(90)], ["b", ready(61)], ["c", ready(85)], ["d", ready(80)]])} />);
-    expect(screen.getAllByRole("checkbox").map((b) => (b as HTMLInputElement).checked)).toEqual([false, true, false, false]);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    expect(screen.getByText("Role 1 of 1")).toBeInTheDocument();
-  });
-
-  it("Find a job waits for the save before leaving the CV", async () => {
-    api.suggestAchievements.mockResolvedValue({ suggestions: [] });
-    api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
-    let saved!: () => void;
-    const waitForSave = vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
-      .mockReturnValueOnce(new Promise<void>((done) => { saved = done; }));
-    const onClose = vi.fn();
-    const allDone = new Map([["a", ready(90)], ["b", ready(85)], ["c", ready(80)], ["d", ready(99)]]);
-    render(<MemoryRouter><EnrichPath cv={cv} dispatch={() => {}} scores={allDone} waitForSave={waitForSave} onClose={onClose} /></MemoryRouter>);
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Find a job" }));
-    expect(onClose).not.toHaveBeenCalled();
-    saved();
-    await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-  });
-});
-
-describe("the focus step", () => {
-  const scores = new Map<string, RoleScoreState>([["a", ready(40)], ["b", ready(61)], ["c", ready(70)], ["d", ready(80)]]);
-
-  it("ticks the two most recent roles; the path visits only the ticked ones", async () => {
-    render(<Host scores={scores} />);
-    const boxes = screen.getAllByRole("checkbox");
-    expect(boxes.map((b) => (b as HTMLInputElement).checked)).toEqual([true, true, false, false]);
-    expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Analyst/ }));
-    await userEvent.click(screen.getByRole("checkbox", { name: /Clerk/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    expect(screen.getByText("Session for b")).toBeInTheDocument();
-    expect(screen.getByText("Role 1 of 2")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Next role" }));
-    expect(screen.getByText("Session for c")).toBeInTheDocument();
-  });
-
-  it("with nothing ticked, Continue goes past the roles", async () => {
-    render(<Host scores={scores} />);
-    await userEvent.click(screen.getByRole("checkbox", { name: /Analyst/ }));
-    await userEvent.click(screen.getByRole("checkbox", { name: /Buyer/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.queryByTestId("focus")).toBeNull();
-    expect(screen.getAllByText("Key achievements").length).toBeGreaterThan(0);
-  });
-
-  it("the focus step asks nothing beyond the roles: no text box, and no goal text reaches a role's questions", async () => {
-    render(<Host scores={scores} />);
-    expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.queryByText(/bring out/i)).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Start with Analyst" }));
-    expect(screen.getByText("Session for a")).toBeInTheDocument();
-    expect(screen.queryByText("Has a focus prop")).toBeNull();
-  });
-
-  it("the result says which roles were offered and not chosen", async () => {
-    api.suggestAchievements.mockResolvedValue({ suggestions: [] });
-    api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
-    render(<Host scores={scores} />);
-    await userEvent.click(screen.getByRole("checkbox", { name: /Buyer/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Start with Analyst" }));
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    await screen.findByRole("heading", { name: "Here is where your CV stands" });
-    const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent);
-    expect(rows).toEqual([
-      "0Analyst, Analyst Co: no change this time.at 40",
-      "0Buyer, Buyer Co is unchanged; you chose not to focus on it.at 61",
-      "0Clerk, Clerk Co is unchanged; you chose not to focus on it.at 70",
-      "0Driver, Driver Co already reads clearly, so it had no questions.at 80",
-    ]);
-  });
-});
-
-describe("projects in the guided path (no score: To do / Done)", () => {
-  const line = (id: string, text: string) => ({ id, text });
-  const todo = { ...role("p1", "Forecast app"), description: "", bullets: [line("p1-b", "Did things.")], url: "" };
-  const done = { ...role("p2", "Chess bot"), description: "A chess bot in Python.", bullets: [line("p2-b", "Built it.")], url: "" };
-  const twoProjects: CvContent = { ...emptyCv(), experience: [role("a", "Analyst"), role("b", "Buyer")], projects: [todo, done] };
-  const scores = new Map<string, RoleScoreState>([["a", ready(90)], ["b", ready(61)], ["p1", ready(10)]]);
-  const show = (content: CvContent, s = scores) =>
-    render(<MemoryRouter><EnrichPath cv={content} dispatch={() => {}} scores={s} waitForSave={() => Promise.resolve()} onClose={() => {}} /></MemoryRouter>);
-
-  it("lists the projects in their own group: the to-do one ticked, the done one not, neither with a score", () => {
-    show(twoProjects);
-    expect(screen.getByText("Projects")).toBeInTheDocument();
-    const forecast = screen.getByRole("checkbox", { name: /Forecast app/ });
-    const chess = screen.getByRole("checkbox", { name: /Chess bot/ });
-    expect(forecast).toBeChecked();
-    expect(forecast).toHaveAccessibleName(/To do/);
-    expect(forecast).not.toHaveAccessibleName(/Score/);
-    expect(chess).not.toBeChecked();
-    expect(chess).toHaveAccessibleName(/Done/);
-    expect(chess).not.toHaveAccessibleName(/Score/);
-    expect(screen.getByText("2 of 4 chosen. The others stay on your CV as they are.")).toBeInTheDocument();
-  });
-
-  it("while the roles are still being scored, a ticked project alone can't start the path", () => {
-    const loading = new Map<string, RoleScoreState>([["a", { state: "scoring" }], ["b", { state: "scoring" }]]);
-    const view = show(twoProjects, loading);
-    expect(screen.getByRole("checkbox", { name: /Forecast app/ })).toBeChecked();
-    expect(screen.getByRole("button", { name: "Start with Forecast app" })).toBeDisabled();
-    view.rerender(<MemoryRouter><EnrichPath cv={twoProjects} dispatch={() => {}} scores={scores} waitForSave={() => Promise.resolve()} onClose={() => {}} /></MemoryRouter>);
-    expect(screen.getByRole("button", { name: "Start with Buyer" })).toBeEnabled();
-  });
-
-  it("a role ticked automatically can start the path while a role below it is still being scored (as before)", () => {
-    const a = { ...role("a", "Analyst") };
-    const b = { ...role("b", "Buyer") };
-    show({ ...twoProjects, experience: [a, b] }, new Map<string, RoleScoreState>([["a", ready(55)], ["b", { state: "scoring" }]]));
-    expect(screen.getByRole("button", { name: "Start with Analyst" })).toBeEnabled();
-  });
-
-  it("a ticked project gets its own run after the roles, with Project 1 of 1 in the bar", async () => {
-    show(twoProjects);
-    await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-    expect(screen.getByText("Session for b")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText("Project session for p1")).toBeInTheDocument();
-    expect(screen.getByText("Project 1 of 1")).toBeInTheDocument();
-  });
-
-  it("the end screen's strength is the same with and without the project stop, and counts the described project", async () => {
-    api.suggestAchievements.mockResolvedValue({ suggestions: [] });
-    api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
-    const strength = async (content: CvContent, tickProject: boolean) => {
-      const view = show(content);
-      const box = screen.queryByRole("checkbox", { name: /Forecast app/ }) as HTMLInputElement | null;
-      if (box && box.checked !== tickProject) await userEvent.click(box);
-      await userEvent.click(screen.getByRole("button", { name: "Start with Buyer" }));
-      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-      if (tickProject) await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-      await screen.findAllByText(/out of 100/);
-      const text = document.querySelector(".fm-strength")?.textContent;
-      const rows = [...document.querySelectorAll(".fm-reasons li")].map((li) => li.textContent ?? "");
-      view.unmount();
-      return { text, rows };
-    };
-    // The visited project is done by the end (its run wrote a description and a bullet).
-    const after: CvContent = { ...twoProjects, projects: [{ ...todo, description: "A forecast app in Excel." }, done] };
-    const without = await strength({ ...twoProjects, projects: [] }, false);
-    const withStop = await strength(twoProjects, true);
-    expect(withStop.text).toBe(without.text);
-    expect(withStop.rows.some((r) => r.includes("Forecast app"))).toBe(false);
-    const described = await strength(after, true);
-    expect(described.text).toBe(without.text);
-    expect(described.rows).toContain("+Projects: 1 described");
+describe("the CV's strength", () => {
+  it("weights the latest role 3, the one before 2, the rest 1", () => {
+    const weights = strengthWeights({ experience: [role("a"), role("b"), role("c")] });
+    expect([...weights.values()]).toEqual([3, 2, 1]);
+    expect(averageScore(new Map([["a", 90], ["b", 60], ["c", null]]), weights)).toBe(78);
+    expect(averageScore(new Map([["a", null]]))).toBeNull();
   });
 });
