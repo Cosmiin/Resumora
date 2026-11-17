@@ -28,7 +28,22 @@ open: none
 - Tailoring: language and keyword steps, first role question generated.
 - Not tested: sign-up of a new account, password-reset email, export, photo upload, voice, the extension, large CV files.
 
+## Published from main on 2026-11-17 (owner asked)
+- Pull requests 64 (go-live) and 65 (phones) merged; main at `6905c78`. `npm run typecheck`, `npm run lint` and
+  `npm test` pass on that commit.
+- Hosted database: `20261117000000_enrich_path_ai_tasks.sql` applied; `supabase db push --remote --dry-run` reports
+  up to date (25 in all).
+- Worker `resumora-api` and the Pages project `resumora` published from `6905c78`. The live site now equals main.
+  This replaces the two publishes of the night before, which were local merges on no branch (`0321353`, `f09b746`;
+  see the mobile-fluid and company-guess progress files).
+- Tested on the live site (owner's account, Chrome): import of `cv-weak-en.pdf`, the enrichment start screen, the
+  companies step, the tools step and question 1 of 8. `ai_calls` has rows for `enrich_companies` and `enrich_tools`.
+- Seen in `ai_calls` during that test: the first `enrich_tools` call (OpenRouter, google/gemini-3.1-flash-lite)
+  failed with HTTP 400 and the OpenAI fallback answered; one `enrich_score` call got HTTP 429 and the others passed.
+- Not tested: questions 2 to 8 and the review step on the live site, the phone changes on a real phone.
+
 ## Open (owner)
+- The first `enrich_tools` call is rejected by OpenRouter (HTTP 400) and only works through the fallback. Seen once.
 - The extension starts on the Local environment; live users have to switch to Hosted.
 - Supabase's built-in email sender only sends a few emails per hour.
 - Larger CV files may still exceed the Workers Free CPU limit (10 ms per request); only a 63 KB PDF was tried.
