@@ -437,9 +437,9 @@ describe("the start of the base CV flow", () => {
     expect(within(dialog).queryByText("Your current CV is kept in History, so you can go back.")).toBeNull();
     await user.click(within(dialog).getByRole("button", { name: "Start with the questions" }));
     expect(importsApi.applyImport).toHaveBeenCalledWith("imp-1", 1);
-    expect(await screen.findByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
-    // The role is offered; its tick settles once its score arrives (not in this test).
-    expect(screen.getByRole("checkbox", { name: /Product Manager, Acme SRL/ })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Enrich your CV" })).toBeInTheDocument();
+    // The short path waits for the role's score before it can start (no score arrives in this test).
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
   it("a file that is not a CV is refused on the upload screen", async () => {
@@ -467,7 +467,7 @@ describe("the start of the base CV flow", () => {
     await user.click(await useThisCv(await screen.findByRole("dialog", { name: "Import your CV" })));
     const notice = await screen.findByText("Your CV is imported as it was. The questions are waiting whenever you have 10 minutes.");
     await user.click(within(notice.parentElement!).getByRole("button", { name: "Start with the questions" }));
-    expect(await screen.findByRole("heading", { name: "What should we focus on?" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Enrich your CV" })).toBeInTheDocument();
     expect(screen.queryByText("Your CV is imported as it was. The questions are waiting whenever you have 10 minutes.")).toBeNull();
   });
 
@@ -505,7 +505,7 @@ describe("review fixes for the start of the flow", () => {
     renderPage();
     await chooseFile(pdf());
     await user.click(await screen.findByRole("button", { name: "Enrich my CV" }));
-    await screen.findByRole("heading", { name: "What should we focus on?" });
+    await screen.findByRole("dialog", { name: "Enrich your CV" });
     await act(async () => finishUpload(imp("queued")));
     const dialog = await screen.findByRole("dialog", { name: "Import your CV" });
     expect(document.body.style.overflow).toBe("hidden");
