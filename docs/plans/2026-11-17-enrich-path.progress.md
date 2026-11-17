@@ -96,4 +96,6 @@ Not checked in the browser: a second round, "Rather just talk?", Suggest on Key 
   the existing rewrite prompt, not this change.
 - "Rather just talk?" sits under the question's buttons; on a short screen it is below the fold.
 
-Cost line: review agents 14 (11 Sonnet, 3 Opus) · guard denials 0 · no Codex.
+Fix-only reviews (Opus): two rounds on the review fixes; the last asked for a test of a second-round "Rather just talk?", added and checked by removing the fix (the test then fails).
+
+Cost line: review agents 16 (11 Sonnet, 5 Opus) · guard denials 0 · no Codex.

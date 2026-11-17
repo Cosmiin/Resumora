@@ -23,11 +23,12 @@ vi.mock("./ToolsStep.tsx", () => ({
   ),
 }));
 vi.mock("./BudgetStep.tsx", () => ({
-  BudgetStep: ({ items, onAnswer, onDone }: { items: BudgetItem[]; onAnswer(i: BudgetItem, t: string, v: string[]): void; onDone(): void }) => (
+  BudgetStep: ({ items, onAnswer, onTalk, onDone }: { items: BudgetItem[]; onAnswer(i: BudgetItem, t: string, v: string[]): void; onTalk(r: string, t: string, v: string[]): void; onDone(): void }) => (
     <div>
       <p>Budget: {items.map((i) => i.question.text).join(" | ")}</p>
       <button type="button" onClick={() => { for (const i of items) onAnswer(i, `Answer to ${i.question.text}`, ["type"]); onDone(); }}>Answer all</button>
       <button type="button" onClick={() => { onAnswer(items[0]!, "First answer", ["type"]); onAnswer(items[0]!, "Corrected answer", ["type"]); }}>Answer twice</button>
+      <button type="button" onClick={() => { onTalk("r1", `Talked before ${items[0]!.question.text}`, ["type"]); onDone(); }}>Talk and finish</button>
       <button type="button" onClick={() => {
         const line = items.find((i) => i.kind === "line")!;
         const twin = { ...line, question: { ...line.question, bulletId: `${line.roleId}b2` } } as BudgetItem;
@@ -170,6 +171,22 @@ describe("the short path", () => {
     const notes = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.endsWith("answer") ? [a.note] : []));
     expect(notes.map((n) => n.answer)).toEqual(["First answer", "Corrected answer"]);
     expect(notes[1]!.id).toBe(notes[0]!.id);
+  });
+
+  it("a free answer in a second round is kept next to the first one", async () => {
+    const actions: CvAction[] = [];
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} extra="Which teams did you work with in r1?" />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Talk and finish" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Apply all" }));
+    await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
+    await userEvent.click(await screen.findByRole("button", { name: "1 more question" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Talk and finish" }));
+    const talks = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.startsWith("Talked before") ? [a.note] : []));
+    expect(talks).toHaveLength(2);
+    expect(talks[1]!.id).not.toBe(talks[0]!.id);
   });
 
   it("two lines asked the same words keep two notes", async () => {
