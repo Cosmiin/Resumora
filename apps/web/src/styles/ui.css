@@ -301,6 +301,7 @@ select.ui-input {
 .ui-dialog {
   width: min(520px, calc(100vw - 2 * var(--gutter)));
   max-height: calc(100vh - 2 * var(--gutter));
+  max-height: calc(100dvh - 2 * var(--gutter));
   padding: var(--space-7);
   border: 0;
   border-radius: var(--radius-block);
@@ -703,6 +704,7 @@ select.ui-input {
 /* ---------- Page frame and text styles for rebuilt screens ---------- */
 .ui-page {
   min-height: 100vh;
+  min-height: 100svh;
   background: var(--color-desk);
   color: var(--color-ink);
   font: var(--weight-regular) var(--text-base) / var(--leading-base) var(--font-body);

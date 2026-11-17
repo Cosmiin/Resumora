@@ -236,7 +236,7 @@
 .tailor-sec-lit { margin: 0 -14px; padding: 12px 14px; border-radius: 10px; background: color-mix(in srgb, var(--color-highlight) 50%, transparent); box-shadow: inset 4px 0 var(--color-coach); }
 
 /* The room: one bar, the map of every stop on the left, the stop's own screen in the middle. */
-.tailor-room { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; background: var(--color-desk); color: var(--color-ink); }
+.tailor-room { min-height: 100vh; min-height: 100svh; display: grid; grid-template-rows: auto 1fr; background: var(--color-desk); color: var(--color-ink); }
 .tailor-room-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); padding: 14px max(var(--space-6), env(safe-area-inset-right, 0px)) 14px max(var(--space-6), env(safe-area-inset-left, 0px)); border-bottom: 2px solid color-mix(in srgb, var(--color-ink) 12%, transparent); }
 .tailor-room-bar p { margin: 0; }
 .tailor-room-score { display: inline-flex; align-items: baseline; gap: var(--space-2); padding: 4px 16px; border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }

@@ -14,6 +14,7 @@ import { useFocusFrame } from "./FocusMode.tsx";
 import { BackButton } from "./QuestionStep.tsx";
 import { ScoreExplain, canExplain } from "./ScoreExplain.tsx";
 import { issueTip } from "./tips.ts";
+import { focusStep } from "./focus-step.ts";
 import type { RunItem } from "./run.ts";
 import { useRoleRun } from "./useRoleRun.ts";
 import { Approve } from "./ReviewPieces.tsx";
@@ -56,7 +57,7 @@ export function RoleRun({ target, cv, dispatch, scores, waitForSave, onClose, co
     const frame = requestAnimationFrame(() => {
       const el = pane.current;
       if (!el || el.contains(document.activeElement)) return;
-      (el.querySelector<HTMLElement>("textarea:not(:disabled)") ?? el.querySelector<HTMLElement>("#fm-step-title") ?? el.querySelector<HTMLElement>(".fm-btn:not(:disabled)"))?.focus();
+      focusStep(el);
     });
     return () => cancelAnimationFrame(frame);
   }, [stepKey]);

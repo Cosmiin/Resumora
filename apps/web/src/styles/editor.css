@@ -123,20 +123,26 @@
   .stage { padding: 16px 10px; }
 }
 
-/* Phone sheet: a short peek, or up to 80% of the screen when full. */
+/* Phone sheet: a short peek, or up to 80% of the screen when full. It is always laid out at its full
+   size and pushed down while short, so it can slide between the two and follow a finger (BottomSheet.tsx). */
 .sheet {
+  --sheet-peek: calc(176px + env(safe-area-inset-bottom, 0px)); /* 176: PEEK_HEIGHT in BottomSheet.tsx */
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
   display: grid; grid-template-rows: auto minmax(0, 1fr);
+  max-height: 80vh; max-height: 80dvh;
   background: var(--white); border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgb(15 40 38 / 16%);
   padding: 0 0 env(safe-area-inset-bottom);
+  transition: transform var(--dur-base) var(--ease-out);
 }
-.sheet.peek { max-height: calc(176px + env(safe-area-inset-bottom)); }
-.sheet.full { max-height: 80vh; }
-.sheet-grip { display: block; width: 100%; min-height: 28px; padding: 12px 0 8px; border: 0; border-radius: 18px 18px 0 0; background: none; cursor: grab; touch-action: none; }
+.sheet.peek { transform: translateY(max(0px, calc(100% - var(--sheet-peek)))); }
+.sheet-grip { display: block; width: 100%; min-height: var(--control-h-sm); padding: 12px 0 8px; border: 0; border-radius: 18px 18px 0 0; background: none; cursor: grab; touch-action: none; }
 .sheet-grip::before { content: ""; display: block; width: 36px; height: 4px; margin: 0 auto; border-radius: 4px; background: var(--sage-300); }
 .sheet-grip:focus-visible { outline: 2px solid var(--pine-600); outline-offset: -2px; }
-.sheet-body { min-height: 0; overflow: hidden; }
+.sheet-body { min-height: 0; overflow: hidden; overscroll-behavior: contain; }
+/* A short sheet opens from a drag anywhere on it; a full one scrolls its own content. */
+.sheet.peek .sheet-body { touch-action: none; }
 .sheet.full .sheet-body { overflow-y: auto; }
+@media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
 .sheet .panel { border-top: 0; padding: 4px 16px 16px; }
 /* Room to scroll the end of the page above the sheet. */
 .editor-workspace:has(.sheet) .stage { padding-bottom: calc(190px + env(safe-area-inset-bottom)); }
@@ -201,7 +207,7 @@
 @media (max-width: 900px) {
   .side-panel.history-panel {
     inset: auto 0 0 0;
-    max-height: 55vh;
+    max-height: 55vh; max-height: 55dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -210,9 +216,9 @@
     box-shadow: var(--shadow-page);
   }
   .history-panel > * { flex-shrink: 0; }
-  .history-panel > .side-panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .history-panel > .side-panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   /* Room to scroll the end of the page above the sheet. */
-  .editor-workspace:has(.history-panel) .stage { padding-bottom: 55vh; }
+  .editor-workspace:has(.history-panel) .stage { padding-bottom: 55vh; padding-bottom: 55dvh; }
 }
 
 .history-intro, .history-hint { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
