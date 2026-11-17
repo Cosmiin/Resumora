@@ -100,6 +100,25 @@ describe("scoreRole", () => {
     expect(result.thin).toBe(true);
   });
 
+  it("tells the model the company and location, and asks for a proposal only when it is sure", async () => {
+    const role = roleWith(["Prepared payroll files."], { company: "Philip Morris International", location: "Bucharest, Romania" });
+    await save(role);
+    const model = fakeModel(() => ({ ...allSpecific(role),
+      roleQuestions: [{ text: "What does the company do?", options: [], topic: "company", proposal: "Makes tobacco and smoke-free products." }] }));
+    const result = await run(model, role);
+    const sent = JSON.stringify(model.requests[0]?.messages);
+    expect(sent).toContain('Company (context only, not graded): \\"Philip Morris International\\"');
+    expect(sent).toContain('Location (context only, not graded): \\"Bucharest, Romania\\"');
+    expect(sent).toContain("proposal");
+    expect(result.roleQuestions[0]?.proposal).toBe("Makes tobacco and smoke-free products.");
+  });
+
+  it("leaves the company and location lines out when they are empty", () => {
+    const user = scoreUserMessage(roleWith(["Prepared payroll files."], { company: "", location: "" }));
+    expect(user).not.toContain("Company (context only");
+    expect(user).not.toContain("Location (context only");
+  });
+
   it("asks the model once for a missing row and stores the result", async () => {
     const role = roleWith(["Prepared employment contracts for temporary workers."]);
     await save(role);
@@ -359,14 +378,14 @@ describe("score prompt", () => {
     expect(scoreUserMessage(role)).toContain(JSON.stringify({ question: "Which tools did you use?", answer: "SAP" }));
   });
 
-  it("sends title and description as context and every bullet as { id, text }, its period, and no company", () => {
-    const role = roleWith(["First", "Second"], { company: "Secret Corp", startDate: "2019-03" });
+  it("sends title, company and description as context and every bullet as { id, text }, and its period", () => {
+    const role = roleWith(["First", "Second"], { company: "Nordlane Logistics", startDate: "2019-03" });
     const message = scoreUserMessage(role);
     expect(message).toContain("context only");
     expect(message).toContain("Payroll Specialist");
     expect(message).toContain("Payroll for 40 staff.");
     for (const b of role.bullets) expect(message).toContain(JSON.stringify({ id: b.id, text: b.text }));
-    expect(message).not.toContain("Secret Corp");
+    expect(message).toContain('Company (context only, not graded): "Nordlane Logistics"');
     expect(message).toContain("Role period (context only, not graded): 2019-03 – ");
   });
 

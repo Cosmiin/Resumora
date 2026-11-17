@@ -64,8 +64,8 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/7", () => {
-    expect(SCORE_POLICY).toBe("score/7");
+  it("uses policy score/8", () => {
+    expect(SCORE_POLICY).toBe("score/8");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -143,6 +143,23 @@ describe("buildRoleResult", () => {
     const nine = [...roleQuestions, { text: "Question 9?", options: [], topic: "other" }];
     expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions: nine }).success).toBe(false);
     expect(RoleResultSchema.safeParse({ ...result, roleQuestions: [...result.roleQuestions, { ...result.roleQuestions[0]!, id: "rq9" }] }).success).toBe(false);
+  });
+
+  it("keeps a proposal only on the company question, trimmed and non-empty, and the company question still has no options", () => {
+    const roleQuestions = [
+      { text: "What does the company do?", options: ["Tobacco"], topic: "company" as const, proposal: "  Makes tobacco and smoke-free products.  " },
+      { text: "What was the role for?", options: ["Ops", "Sales"], topic: "purpose" as const, proposal: "Should be dropped." },
+      { text: "Which tools?", options: ["Excel", "SAP"], topic: "tools" as const, proposal: null },
+    ];
+    const result = buildRoleResult(role([]), { ...model([]), roleQuestions }, "fp");
+    expect(result.roleQuestions[0]).toEqual({ id: "rq1", text: "What does the company do?", options: [], kind: "role", topic: "company", proposal: "Makes tobacco and smoke-free products." });
+    expect(result.roleQuestions[1]).not.toHaveProperty("proposal");
+    expect(result.roleQuestions[2]).not.toHaveProperty("proposal");
+    expect(RoleResultSchema.parse(result)).toEqual(result);
+    expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions }).success).toBe(true);
+    const blank = buildRoleResult(role([]), { ...model([]), roleQuestions: [{ ...roleQuestions[0]!, proposal: "   " }] }, "fp");
+    expect(blank.roleQuestions[0]).not.toHaveProperty("proposal");
+    expect(ModelScoreSchema.safeParse({ ...model([]), roleQuestions: [{ ...roleQuestions[0]!, proposal: "x".repeat(201) }] }).success).toBe(false);
   });
 
   it("reads a stored role question without a topic as other", () => {
@@ -351,14 +368,14 @@ describe("fingerprint", () => {
     expect(fingerprint(role(["one", "twO"]), "en")).not.toBe(fp);
     expect(fingerprint(role(["one", "two"], { description: "x" }), "en")).not.toBe(fp);
     expect(fingerprint(role(["one", "two"], { title: "Other" }), "en")).not.toBe(fp);
+    // The company proposal is written from the company and its location.
+    expect(fingerprint(role(["one", "two"], { company: "Nordlane Logistics" }), "en")).not.toBe(fp);
+    expect(fingerprint(role(["one", "two"], { location: "Cluj" }), "en")).not.toBe(fp);
     expect(fingerprint(base, "ro")).not.toBe(fp);
   });
   it("changes when a bullet keeps its text but gets a new id", () => {
     const retyped = { ...base, bullets: [base.bullets[0]!, { id: "b9", text: "two" }] };
     expect(fingerprint(retyped, "en")).not.toBe(fp);
-  });
-  it("ignores the company", () => {
-    expect(fingerprint(role(["one", "two"], { company: "Z" }), "en")).toBe(fp);
   });
   it("changes with the role's period, because questions are written for the time the work happened", () => {
     expect(fingerprint(role(["one", "two"], { startDate: "2000", endDate: "", current: true }), "en")).not.toBe(fp);

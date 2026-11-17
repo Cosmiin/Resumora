@@ -167,6 +167,8 @@ export const basecvEn = {
   "enrich.focus.failed.saving": "Saving your changes… try again in a moment.",
   "enrich.focus.failed.unavailable": "Couldn't improve this one right now. Your answer is saved.",
   "enrich.focus.freeTalk": "Questions not specific enough? Describe what you did there in your own words.",
+  "enrich.run.guess.label": "From the company name, I think:",
+  "enrich.run.guess.yes": "Yes, that's right",
   "enrich.focus.improve": "Next",
   "enrich.focus.improveBullet": "Improve this bullet",
   "enrich.focus.loading": "Loading your questions…",

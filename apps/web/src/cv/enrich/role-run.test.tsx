@@ -207,6 +207,43 @@ describe("the run of questions", () => {
     expect(page()).toBe(before);
   });
 
+  describe("a company question with the AI's proposal", () => {
+    const SENTENCE = "Nordlane Logistics delivers parcels for online shops in Romania.";
+    const withProposal: RoleResult = { ...result, roleQuestions: [{ ...result.roleQuestions[0]!, proposal: SENTENCE }, result.roleQuestions[1]!] };
+
+    it("shows the sentence with Yes and Edit; Yes saves it as the answer", async () => {
+      const actions: CvAction[] = [];
+      render(<Harness roleResult={withProposal} onAction={(a) => actions.push(a)} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      expect(screen.getByText("From the company name, I think:")).toBeInTheDocument();
+      expect(screen.getByText(SENTENCE)).toBeInTheDocument();
+      expect(screen.queryByLabelText("Your answer")).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Yes, that's right" }));
+      expect(actions[0]).toMatchObject({ type: "setNote", note: { question: "What does Nordlane Logistics do?", answer: SENTENCE, via: ["pick"] } });
+      expect(screen.getByText("Question 2 of 3 · about the role")).toBeInTheDocument();
+    });
+
+    it("Edit puts the sentence in the answer box, and the edited text is saved", async () => {
+      const actions: CvAction[] = [];
+      render(<Harness roleResult={withProposal} onAction={(a) => actions.push(a)} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+      const box = screen.getByLabelText("Your answer");
+      expect(box).toHaveValue(SENTENCE);
+      await userEvent.clear(box);
+      await userEvent.type(box, "Parcel lockers for online shops");
+      await userEvent.click(screen.getByRole("button", { name: "Next" }));
+      expect(actions[0]).toMatchObject({ type: "setNote", note: { answer: "Parcel lockers for online shops" } });
+    });
+
+    it("a question without a proposal shows no such block", async () => {
+      render(<Harness />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      expect(screen.queryByText("From the company name, I think:")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Yes, that's right" })).toBeNull();
+    });
+  });
+
   it("Back shows the earlier answer; sending it again updates the same note", async () => {
     const actions: CvAction[] = [];
     render(<Harness onAction={(a) => actions.push(a)} />);

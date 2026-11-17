@@ -249,6 +249,10 @@ function RunQuestion({ item, line, why, initial, locale, busy, onSubmit, onSkip,
   const [value, setValue] = useState(initial);
   const [via, setVia] = useState<Via[]>([]);
   const [voiceBusy, setVoiceBusy] = useState(false);
+  // The AI's sentence on what the company does: confirmed in one tap, or edited in the answer box.
+  // Back to an answered question shows the answer itself.
+  const proposal = item.kind === "role" ? item.question.proposal?.trim() : undefined;
+  const [editing, setEditing] = useState(!proposal || initial.trim() !== "");
   const options = item.question.options.filter((o) => o.length <= 60 && isAllowedOption(o)).slice(0, 4);
   const asked: Question = {
     bulletId: item.kind === "line" ? item.question.bulletId : item.question.id, text: item.question.text,
@@ -259,16 +263,31 @@ function RunQuestion({ item, line, why, initial, locale, busy, onSubmit, onSkip,
       {line && <p className="rr-aboutline"><span className="visually-hidden">{t("enrich.run.lineLabel")} </span>“{line}”</p>}
       {item.kind === "line" && item.followUp && <p className="fm-note">{t("enrich.focus.needsDetail")}</p>}
       <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{asked.text}</h2>
-      <AnswerBox question={asked} value={value} via={via} locale={locale} onBusyChange={setVoiceBusy}
-        onChange={(v, how) => {
-          setValue(v);
-          setVia(how);
-        }} />
+      {editing ? (
+        <AnswerBox question={asked} value={value} via={via} locale={locale} onBusyChange={setVoiceBusy}
+          onChange={(v, how) => {
+            setValue(v);
+            setVia(how);
+          }} />
+      ) : (
+        <div className="rr-guess">
+          <p className="rr-guess-label">{t("enrich.run.guess.label")}</p>
+          <p className="rr-guess-text" lang={locale}>{proposal}</p>
+          <span className="rr-chips">
+            <button type="button" className="ui-btn ui-btn--primary ui-btn--sm" disabled={busy} onClick={() => onSubmit(proposal!, ["pick"])}>{t("enrich.run.guess.yes")}</button>
+            <button type="button" className="ui-btn ui-btn--sm" disabled={busy} onClick={() => {
+              setValue(proposal!);
+              setVia(["type"]);
+              setEditing(true);
+            }}>{t("enrich.focus.describe.edit")}</button>
+          </span>
+        </div>
+      )}
       {why && <p className="fm-why">{t("enrich.focus.why", { reason: why })}</p>}
       <div className="fm-foot">
         <BackButton onBack={onBack} busy={busy} />
         <button type="button" className="fm-ghost" onClick={onSkip} disabled={busy}>{t("enrich.focus.skip")}</button>
-        <button type="button" className="fm-btn" disabled={busy || voiceBusy || value.trim() === ""} onClick={() => onSubmit(value, via)}>{t("enrich.focus.improve")}</button>
+        {editing && <button type="button" className="fm-btn" disabled={busy || voiceBusy || value.trim() === ""} onClick={() => onSubmit(value, via)}>{t("enrich.focus.improve")}</button>}
       </div>
     </>
   );

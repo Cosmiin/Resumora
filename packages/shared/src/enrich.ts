@@ -2,7 +2,7 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/7";
+export const SCORE_POLICY = "score/8";
 
 /** A bullet's five checks. A clear, short bullet with no result scores 80. */
 export const WEIGHTS = { contribution: 30, clarity: 20, specificity: 20, impact: 20, concise: 10 } as const;
@@ -98,6 +98,9 @@ export const ModelBulletSchema = z
   .strict();
 export type ModelBullet = z.infer<typeof ModelBulletSchema>;
 
+/** The longest company proposal, in characters. */
+export const MAX_PROPOSAL = 200;
+
 export const ModelScoreSchema = z
   .object({
     bullets: z.array(ModelBulletSchema),
@@ -106,6 +109,8 @@ export const ModelScoreSchema = z
       text: z.string().max(240),
       options: z.array(z.string().max(60)).max(4),
       topic: RoleTopicSchema.default("other"),
+      /** Topic company only: what the company does, when the model recognises it from its name and location. */
+      proposal: z.string().max(MAX_PROPOSAL).nullable().optional(),
     }).strict()).max(MAX_ROLE_QUESTIONS).default([]),
     /** Too little information to infer plausible skills or achievements. */
     thin: z.boolean().default(false),
@@ -129,7 +134,9 @@ export const QuestionSchema = z
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const RoleQuestionSchema = z
-  .object({ id, text: z.string(), options: z.array(z.string().max(60)).max(4), kind: z.literal("role"), topic: RoleTopicSchema.default("other") })
+  .object({ id, text: z.string(), options: z.array(z.string().max(60)).max(4), kind: z.literal("role"), topic: RoleTopicSchema.default("other"),
+    /** Topic company only: the AI's sentence on what the company does, for the person to confirm or edit. */
+    proposal: z.string().max(MAX_PROPOSAL).optional() })
   .strict();
 export type RoleQuestion = z.infer<typeof RoleQuestionSchema>;
 
@@ -369,6 +376,7 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
 
   const roleQuestions: RoleQuestion[] = (model.roleQuestions ?? []).slice(0, MAX_ROLE_QUESTIONS).map((q, i) => ({
     id: `rq${i + 1}`, text: q.text, options: q.topic === "company" ? [] : q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
+    ...(q.topic === "company" && q.proposal?.trim() ? { proposal: q.proposal.trim() } : {}),
   }));
   const thin = role.bullets.length <= 1 || model.thin === true;
   return { roleId: role.id, policy: SCORE_POLICY, fingerprint: fingerprintValue, score, bullets, nextStep, questions, roleQuestions, thin, lines, coverage };
@@ -393,12 +401,13 @@ export function hashText(text: string): string {
 }
 
 /**
- * Changes when anything the score depends on changes: bullet ids and texts, title, description, the role's period,
- * locale or policy. The period counts because questions are written for the time the work happened.
+ * Changes when anything the score depends on changes: bullet ids and texts, title, company, location, description,
+ * the role's period, locale or policy. The period counts because questions are written for the time the work happened;
+ * the company and location because the company proposal is written from them.
  * Ids count because the result points at bullets by id: a bullet deleted and retyped gets a new id.
  */
 export function fingerprint(role: Experience, locale: Locale): string {
-  const parts = [SCORE_POLICY, locale, role.title, role.description, role.startDate, role.endDate, String(role.current), ...role.bullets.flatMap((b) => [b.id, b.text])];
+  const parts = [SCORE_POLICY, locale, role.title, role.company, role.location, role.description, role.startDate, role.endDate, String(role.current), ...role.bullets.flatMap((b) => [b.id, b.text])];
   return cyrb53(parts.join("\u0000")).toString(16);
 }
 
