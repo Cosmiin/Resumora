@@ -23,6 +23,8 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
   const [ticks, setTicks] = useState<Record<string, Set<string>>>({});
   const [initial, setInitial] = useState<Record<string, Set<string>>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  /** Tools the person added, by the role they were added on: their cell stays even when unticked. */
+  const [own, setOwn] = useState<Record<string, Set<string>>>({});
 
   useEffect(() => {
     let alive = true;
@@ -31,8 +33,10 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
         if (!alive) return;
         const byRole: Record<string, string[]> = {};
         for (const r of answer) byRole[r.roleId] = r.tools;
+        // Every tool on the grid starts ticked on each role whose own text names it.
+        const all = answer.flatMap((r) => r.tools);
         const start: Record<string, Set<string>> = {};
-        for (const role of roles) start[role.id] = new Set((byRole[role.id] ?? []).filter((tool) => toolShown(role, tool)).map(norm));
+        for (const role of roles) start[role.id] = new Set(all.filter((tool) => toolShown(role, tool)).map(norm));
         setSuggested(byRole);
         setTicks(Object.fromEntries(Object.entries(start).map(([k, v]) => [k, new Set(v)])));
         setInitial(start);
@@ -54,15 +58,19 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
       c.n++;
       count.set(key, c);
     }
-    const top = [...count.values()].sort((a, b) => b.n - a.n || a.first - b.first).slice(0, MAX_COLUMNS).map((c) => c.name);
-    const keys = new Set(top.map(norm));
-    return [...top, ...added.filter((name) => !keys.has(norm(name)))];
-  }, [roles, suggested, added]);
+    const ranked = [...count.values()].sort((a, b) => b.n - a.n || a.first - b.first);
+    // A tool a role already names always has a column, even past the first eight.
+    const named = new Set(Object.values(initial).flatMap((set) => [...set]));
+    const shown = ranked.filter((c, i) => i < MAX_COLUMNS || named.has(norm(c.name))).map((c) => c.name);
+    const keys = new Set(shown.map(norm));
+    return [...shown, ...added.filter((name) => !keys.has(norm(name)))];
+  }, [roles, suggested, added, initial]);
 
   const ticked = (roleId: string, tool: string) => ticks[roleId]?.has(norm(tool)) ?? false;
   const offered = (index: number, tool: string) => {
     const role = roles[index]!;
-    if (ticked(role.id, tool) || (suggested[role.id] ?? []).some((s) => norm(s) === norm(tool))) return true;
+    if (ticked(role.id, tool) || own[role.id]?.has(norm(tool)) || initial[role.id]?.has(norm(tool))) return true;
+    if ((suggested[role.id] ?? []).some((s) => norm(s) === norm(tool))) return true;
     return [roles[index - 1], roles[index + 1]].some((r) => r && ticked(r.id, tool));
   };
   const toggle = (roleId: string, tool: string, on: boolean) => setTicks((all) => {
@@ -74,6 +82,7 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
     const name = (drafts[roleId] ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
     if (!name) return;
     if (!columns.some((c) => norm(c) === norm(name))) setAdded((a) => [...a, name]);
+    setOwn((o) => ({ ...o, [roleId]: new Set([...(o[roleId] ?? []), norm(name)]) }));
     toggle(roleId, name, true);
     setDrafts((d) => ({ ...d, [roleId]: "" }));
   };
@@ -86,6 +95,7 @@ export function ToolsStep({ cv, onDone }: { cv: CvContent; onDone(notes: Saved):
       const was = initial[role.id] ?? new Set<string>();
       if (now.size === was.size && [...now].every((k) => was.has(k))) continue;
       const names = columns.filter((c) => now.has(norm(c)));
+      // Every column exists for a ticked tool (see columns), so names holds every tick.
       saved.push({ roleId: role.id, note: {
         id: newId(), question: t("enrich.path.tools.note"), answer: names.length ? names.join(", ") : t("enrich.path.tools.none"), via: ["pick"], askedAt,
       } });

@@ -82,6 +82,13 @@ describe("CompaniesStep", () => {
     expect(onDone).toHaveBeenCalledWith([]);
   });
 
+  it("shows … on each company while the AI looks, and no Continue yet", async () => {
+    api.suggestCompanies.mockReturnValue(new Promise(() => {}));
+    render(<CompaniesStep cv={cv} onDone={vi.fn()} />);
+    expect(screen.getAllByText("…")).toHaveLength(3);
+    expect(screen.getByRole("button", { name: "Confirm all and continue" })).toBeDisabled();
+  });
+
   it("still works when the AI is unavailable: every company gets an empty field", async () => {
     api.suggestCompanies.mockRejectedValue(new Error("down"));
     render(<CompaniesStep cv={cv} onDone={vi.fn()} />);
@@ -137,6 +144,30 @@ describe("ToolsStep", () => {
     await userEvent.type(screen.getByRole("textbox", { name: "Add a tool for Planner" }), "Jira{Enter}");
     expect(cell("Planner", "Jira")).toBeChecked();
     expect(cell("Analyst", "Jira")).not.toBeChecked();
+    expect(cell("Clerk", "Jira")).not.toBeChecked();
+  });
+
+  it("a tool the role names gets a column past the first eight, and stays in the saved answer", async () => {
+    const many = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"];
+    api.suggestTools.mockResolvedValue({ roles: [
+      { roleId: "a", tools: many }, { roleId: "b", tools: many }, { roleId: "c", tools: ["Excel"] },
+    ] });
+    const named: CvContent = { ...cv, experience: [cv.experience[0]!, cv.experience[1]!, role("c", { title: "Clerk", bullets: [{ id: "x", text: "Kept stock in Excel." }] })] };
+    const onDone = vi.fn();
+    render(<ToolsStep cv={named} onDone={onDone} />);
+    expect(await screen.findByRole("checkbox", { name: "Excel in Clerk" })).toBeChecked();
+    // Analyst's own line names Excel too, though no suggestion for it does.
+    expect(cell("Analyst", "Excel")).toBeChecked();
+    await userEvent.type(screen.getByRole("textbox", { name: "Add a tool for Clerk" }), "SAP{Enter}");
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect((onDone.mock.calls[0]![0] as Saved).find((s) => s.roleId === "c")!.note.answer).toBe("Excel, SAP");
+  });
+
+  it("a tool added on a row keeps its box there when unticked", async () => {
+    render(<ToolsStep cv={cv} onDone={vi.fn()} />);
+    await screen.findByRole("checkbox", { name: "Excel in Analyst" });
+    await userEvent.type(screen.getByRole("textbox", { name: "Add a tool for Clerk" }), "Jira{Enter}");
+    await userEvent.click(cell("Clerk", "Jira")!);
     expect(cell("Clerk", "Jira")).not.toBeChecked();
   });
 

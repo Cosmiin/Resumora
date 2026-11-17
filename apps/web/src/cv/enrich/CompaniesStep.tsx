@@ -91,7 +91,9 @@ export function CompaniesStep({ cv, onDone }: { cv: CvContent; onDone(notes: Sav
             <section key={row.key} className="ep-row" role="group" aria-labelledby={titleId}>
               <h3 className="ep-row-title" id={titleId}>{[row.name, row.location].filter(Boolean).join(" · ")}</h3>
               {row.roles.length > 1 && <p className="ep-row-meta">{row.roles.map((r) => r.title).filter(Boolean).join(", ")}</p>}
-              {row.done !== null ? (
+              {row.done === null && loading ? (
+                <p className="ep-row-meta" aria-hidden="true">…</p>
+              ) : row.done !== null ? (
                 <p className="ep-done">{row.done}</p>
               ) : open ? (
                 <textarea className="ep-input" rows={2} maxLength={MAX_LONG_TEXT} value={draft.text} aria-label={companyQuestion(row.name)}
