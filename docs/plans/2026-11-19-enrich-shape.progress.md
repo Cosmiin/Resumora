@@ -19,3 +19,8 @@ open: MIGRATION for the owner — `supabase/migrations/20261119000000_enrich_sha
 session: Enrichment redesign (owner session, 19 Nov) · builder: claude
 commit: (this commit) (base 1d15744) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: notes — `gradeWithCoverage` returns coverage possibly undefined (stored marks kept then); the second call after a hold grades no lines (marks only), kept lines keep their first-call grades. Web `editor.test.tsx` and `jobs-page.test.tsx` time out in the full run and pass alone (known flaky).
+
+## Task 5: Use every answer — done
+session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
+commit: 694062d (base b43aca0) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: notes — the stored grades passed to the writer are the saved role's (a line rewritten by the prepared changes shows its old grade with its new text); new lines respect MAX_BULLETS (the CV's own limit).

@@ -134,7 +134,7 @@ export function ToolsStep({ cv, prepared, onDone }: { cv: CvContent; prepared?: 
   if (!role) {
     return (
       <>
-        <p className="fm-eyebrow">{t("enrich.path.step", { n: 2, total: 4 })}</p>
+        <p className="fm-eyebrow">{t("enrich.path.step", { n: 3, total: 4 })}</p>
         <h2 className="rr-big" id="fm-step-title" tabIndex={-1}>{t("enrich.path.tools.title")}</h2>
         <div className="fm-foot">
           <button type="button" className="fm-btn" disabled={loading || sent} onClick={() => leave(false)}>{t("enrich.focus.continue")}</button>
@@ -148,7 +148,7 @@ export function ToolsStep({ cv, prepared, onDone }: { cv: CvContent; prepared?: 
   return (
     <>
       <div className="rr-prog">
-        <p className="fm-eyebrow">{t("enrich.path.step", { n: 2, total: 4 })} · {t("enrich.path.tools.roleOf", { n: index + 1, total: roles.length })}</p>
+        <p className="fm-eyebrow">{t("enrich.path.step", { n: 3, total: 4 })} · {t("enrich.path.tools.roleOf", { n: index + 1, total: roles.length })}</p>
         <div className="fm-steps" aria-hidden="true">
           {roles.map((r, i) => <i key={r.id} className={i < index ? "is-done" : i === index ? "is-on" : undefined} />)}
         </div>

@@ -7,7 +7,7 @@ import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 import type { ReviewGroup } from "./ReviewSheet.tsx";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn() }));
+const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn(), proposeShape: vi.fn(), checkChanges: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 const note = (question: string, answer: string): Note => ({ id: `n-${question}`, question, answer, via: ["type"], askedAt: "2026-11-17T00:00:00Z" });
@@ -69,15 +69,15 @@ const r2 = role("r2", { company: "Beta" });
 const cv: CvContent = { ...emptyCv("en"), experience: [r1, r2] };
 const ready = (r: Experience, score: number, over: Partial<RoleResult> = {}): RoleScoreState => ({ state: "ready", result: result(r, score, over) });
 
-function Harness({ initial, onAction, onClose = () => {}, extra }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string }) {
-  const [state, apply] = useReducer(cvReducer, cv);
+function Harness({ initial, onAction, onClose = () => {}, extra, start = cv, onScore }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string; start?: CvContent; onScore?(r: RoleResult): void }) {
+  const [state, apply] = useReducer(cvReducer, start);
   const [scores, setScores] = useState(initial);
   return (
     <>
       <button type="button" onClick={() => setScores(new Map([
         ["r1", ready(state.experience[0]!, 88, extra ? { roleQuestions: [{ id: "rq9", text: extra, options: [], kind: "role", topic: "other" }] } : {})],
         ["r2", ready(state.experience[1]!, 80, { questions: [], roleQuestions: [] })]]))}>Rescore</button>
-      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose}
+      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} onScore={onScore}
         dispatch={(a) => { onAction?.(a); apply(a); }} />
     </>
   );
@@ -206,6 +206,59 @@ describe("the short path", () => {
     const notes = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.startsWith("About line") ? [a.note] : []));
     expect(notes).toHaveLength(2);
     expect(notes[1]!.id).not.toBe(notes[0]!.id);
+  });
+
+  it("with no role needing Shape, Start goes straight to companies", async () => {
+    render(<Harness initial={scores()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByText("Companies step")).toBeInTheDocument();
+    expect(api.proposeShape).not.toHaveBeenCalled();
+  });
+
+  describe("Shape", () => {
+    const long = role("r1", { bullets: Array.from({ length: 8 }, (_, i) => ({ id: `r1b${i + 1}`, text: `Did task ${i + 1} for 5 clients.` })) });
+    const start: CvContent = { ...emptyCv("en"), experience: [long, r2] };
+    const shapeScores = () => new Map<string, RoleScoreState>([["r1", ready(long, 60)], ["r2", ready(r2, 70, { questions: [], roleQuestions: [] })]]);
+    const mergedText = "Did tasks 2 and 3 for 5 clients.";
+    const predicted = (): RoleResult => ({ ...result(long, 75), fingerprint: "after" });
+
+    beforeEach(() => {
+      api.proposeShape.mockResolvedValue({ merges: [{ ids: ["r1b2", "r1b3"], text: mergedText }] });
+      api.checkChanges.mockResolvedValue({ result: predicted(), kept: [], held: [] });
+    });
+
+    it("after Merge all the CV has the merged line in place of the first, the other removed, and the predicted score is put", async () => {
+      const actions: CvAction[] = [];
+      const onScore = vi.fn();
+      render(<Harness initial={shapeScores()} start={start} onAction={(a) => actions.push(a)} onScore={onScore} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
+      expect(await screen.findByText("Companies step")).toBeInTheDocument();
+      const changes = [
+        { id: "merge:r1b2", kind: "bullet", bulletId: "r1b2", text: mergedText },
+        { id: "remove:r1b3", kind: "remove", bulletId: "r1b3" },
+      ];
+      expect(api.checkChanges).toHaveBeenCalledWith({ roleId: "r1", fingerprint: fingerprint(long, "en"), changes, hold: false });
+      const applied = actions.find((a) => a.type === "applyRoleChanges");
+      expect(applied).toEqual({ type: "applyRoleChanges", roleId: "r1", changes });
+      const after = cvReducer(start, applied!);
+      expect(after.experience[0]!.bullets.map((b) => b.text)).toEqual([
+        "Did task 1 for 5 clients.", mergedText, ...[4, 5, 6, 7, 8].map((n) => `Did task ${n} for 5 clients.`),
+      ]);
+      expect(onScore).toHaveBeenCalledWith(predicted());
+    });
+
+    it("when the check fails (or the CV moved on), the merges are applied anyway and no score is put", async () => {
+      api.checkChanges.mockRejectedValue(Object.assign(new Error("not saved"), { status: 409 }));
+      const actions: CvAction[] = [];
+      const onScore = vi.fn();
+      render(<Harness initial={shapeScores()} start={start} onAction={(a) => actions.push(a)} onScore={onScore} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
+      expect(await screen.findByText("Companies step")).toBeInTheDocument();
+      expect(actions.some((a) => a.type === "applyRoleChanges" && a.roleId === "r1")).toBe(true);
+      expect(onScore).not.toHaveBeenCalled();
+    });
   });
 
   it("Skip for now closes it", async () => {

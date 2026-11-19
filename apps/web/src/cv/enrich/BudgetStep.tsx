@@ -50,7 +50,7 @@ export function BudgetStep({ cv, items, onAnswer, onTalk, onDone }: Props) {
   return (
     <>
       <div className="rr-prog">
-        <p className="fm-eyebrow">{t("enrich.path.step", { n: 3, total: 4 })} · {t("enrich.focus.questionOf", { n: index + 1, total: items.length })}</p>
+        <p className="fm-eyebrow">{t("enrich.path.step", { n: 4, total: 4 })} · {t("enrich.focus.questionOf", { n: index + 1, total: items.length })}</p>
         <div className="fm-steps" aria-hidden="true">
           {items.map((it, i) => <i key={i} className={i < index ? "is-done" : i === index ? "is-on" : undefined} />)}
         </div>

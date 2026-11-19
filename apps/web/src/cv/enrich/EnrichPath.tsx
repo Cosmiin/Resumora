@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, PATH_BUDGET, gradedItems, newId, pickBudget, questionKey,
+  BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, PATH_BUDGET, findGraded, fingerprint, gradedItems, newId, pickBudget, questionKey,
   type BudgetItem, type CvContent, type Note, type RoleResult,
 } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
@@ -10,10 +10,12 @@ import { roleListOf } from "../edit/lists.ts";
 import type { Via } from "./AnswerBox.tsx";
 import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
+import { checkChanges } from "./enrich-api.ts";
 import { changeActions, prepareRoleChanges } from "./prepare.ts";
 import type { Prepared } from "./prepared.ts";
 import { ReviewSheet, type ReviewGroup } from "./ReviewSheet.tsx";
 import { PathScreen } from "./SectionSuggest.tsx";
+import { ShapeStep, hasShapeWork, type ShapeDone } from "./ShapeStep.tsx";
 import { ToolsStep } from "./ToolsStep.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
@@ -23,7 +25,7 @@ type Props = {
   scores: Map<string, RoleScoreState>;
   waitForSave(): Promise<void>;
   onClose(): void;
-  /** Kept for the editor's call; the short path asks for no score itself. */
+  /** Puts a predicted score (after Shape) in place at once, so no score call is needed after saving. */
   onScore?(result: RoleResult): void;
   /** The companies and tools answers asked for while the import was on screen, when the path opens from one. */
   prepared?: Prepared | null;
@@ -63,7 +65,7 @@ const scoreOf = (s: RoleScoreState | undefined) => (s && s.state !== "none" ? (s
 const pending = (s: RoleScoreState | undefined) => !s || s.state === "scoring" || s.state === "previous";
 
 type Stage =
-  | { kind: "start" } | { kind: "companies" } | { kind: "tools" } | { kind: "budget"; items: BudgetItem[] }
+  | { kind: "start" } | { kind: "shape" } | { kind: "shaping" } | { kind: "companies" } | { kind: "tools" } | { kind: "budget"; items: BudgetItem[] }
   | { kind: "preparing" } | { kind: "review"; groups: ReviewGroup[]; failed: boolean } | { kind: "end" };
 
 /**
@@ -83,7 +85,7 @@ const END_WAIT_MS = 20000;
  * the score again. Answers are saved as role notes as they are given; nothing else on the CV changes before
  * "Apply all". The score is shown only at the start and the end.
  */
-export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, prepared }: Props) {
+export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore, prepared }: Props) {
   const [stage, setStage] = useState<Stage>({ kind: "start" });
   const [before, setBefore] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -158,6 +160,27 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, prepare
     setStage({ kind: "review", groups, failed });
   };
 
+  /**
+   * Shape's merges and reorders, per role: checked first (only the merged lines graded, nothing held), then put on the
+   * CV, then the predicted score shown at once. A failed or outdated check still puts them on the CV; the normal score runs.
+   */
+  const shaped = async (list: ShapeDone) => {
+    if (list.length) {
+      setStage({ kind: "shaping" });
+      await waitForSave().catch(() => undefined);
+      const now = latest.current;
+      await Promise.all(list.map(async ({ roleId, changes }) => {
+        const item = findGraded(now, roleId)?.item;
+        if (!item) return;
+        const result = await checkChanges({ roleId, fingerprint: fingerprint(item, now.locale), changes, hold: false })
+          .then((a) => a.result).catch(() => undefined);
+        dispatch({ type: "applyRoleChanges", roleId, changes });
+        if (result) onScore?.(result);
+      }));
+    }
+    setStage({ kind: "companies" });
+  };
+
   // The end: wait for the new scores, at most END_WAIT_MS.
   const ending = stage.kind === "end";
   useEffect(() => {
@@ -193,10 +216,21 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, prepare
           <button type="button" className="fm-btn" disabled={!settled} onClick={() => {
             setBefore(average);
             got.current = new Map();
-            setStage({ kind: "companies" });
+            setStage({ kind: hasShapeWork(cv, scores) ? "shape" : "companies" });
           }}>{t("enrich.run.start")}</button>
           <button type="button" className="ui-btn" onClick={onClose}>{t("enrich.path.notNow")}</button>
         </div>
+      </div>,
+    );
+  }
+  if (stage.kind === "shape") {
+    return screen(<ShapeStep cv={cv} scores={scores} onDone={(list) => void shaped(list)} />);
+  }
+  if (stage.kind === "shaping") {
+    return screen(
+      <div className="fm-working" role="status">
+        <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
+        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.path.shape.saving")}</h2>
       </div>,
     );
   }
