@@ -2,14 +2,17 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/11";
+export const SCORE_POLICY = "score/12";
 
 /** A bullet's five checks. A clear, short bullet with no result scores 80. */
 export const WEIGHTS = { contribution: 30, clarity: 20, specificity: 20, impact: 20, concise: 10 } as const;
 /** A role's score: this share from its bullets (Lines), the rest from the four core items shown on the page (Coverage). */
 export const LINES_SHARE = 0.6;
-/** A bullet longer than the first is at most "partial" on concise; longer than the second is "missing". */
-export const CONCISE_CHARS = { partial: 220, missing: 300 } as const;
+/**
+ * A bullet longer than the first is at most "partial" on concise; longer than the second is "missing". Both are 440
+ * (score/12, the owner's limit): up to 440 characters a line can be concise, over it it is not.
+ */
+export const CONCISE_CHARS = { partial: 440, missing: 440 } as const;
 /** From this score a bullet or a role reads clearly and has nothing waiting. */
 export const CLEAR_AT = 80;
 
@@ -94,7 +97,7 @@ export const ModelBulletSchema = z
     clarity: GradeSchema,
     specificity: GradeSchema,
     impact: GradeSchema,
-    /** Every phrase carries a fact, in two lines at most. Absent (older answers, test doubles) reads as specific. */
+    /** Every phrase carries a fact, within 440 characters. Absent (older answers, test doubles) reads as specific. */
     concise: GradeSchema.optional(),
     issue: IssueSchema,
     duplicateOf: id.nullable(),

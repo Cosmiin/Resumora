@@ -13,14 +13,14 @@ describe("rewrite rules", () => {
     expect(system).toContain("name it inside the bullet, where it was used");
     expect(system).toContain("Never append a list of tools.");
     expect(system).toContain("Leave out a fact that belongs to another bullet or to the role as a whole");
-    expect(system).toContain("Keep the bullet to one sentence, at most 2 lines and 220 characters.");
+    expect(system).toContain("Keep the bullet to one sentence, at most 440 characters.");
   });
 
   it("new bullets from answers never repeat a fact that only adds to an existing bullet", () => {
     const system = brainDumpSystemPrompt("en");
     expect(system).toContain("A fact that only adds to an existing bullet (its tool, its team size, its scale) is not a new bullet: leave it out.");
     expect(system).toContain("Name a tool inside the bullet where it was used, never as a list of tools on its own.");
-    expect(system).toContain("Keep each bullet to one sentence, at most 2 lines and 220 characters.");
+    expect(system).toContain("Keep each bullet to one sentence, at most 440 characters.");
   });
 
   it("every prompt that writes a role's lines gives the same Romanian tense rule, and allows \"Am …\"", () => {

@@ -334,7 +334,7 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.tips.ats.missingDates": "Adaugă datele de început și de sfârșit ale rolului, ca filtrele să-l poată plasa.",
   "enrich.tips.ats.missingTitle": "Dă-i acestui rol un titlu de post.",
   "enrich.tips.ats.oddCharacters": "Scoate simbolurile, emoji-urile și taburile din puncte. Unele filtre nu le pot citi.",
-  "enrich.tips.ats.tooLong": "Scurtează cel mai lung punct la cel mult două rânduri.",
+  "enrich.tips.ats.tooLong": "Scurtează cel mai lung punct la cel mult 440 de caractere.",
   "enrich.tips.issue.clarity": "Spune-o mai simplu: începe cu un verb și numește sarcina.",
   "enrich.tips.issue.contribution": "Spune ce ai făcut tu personal, nu doar ce acoperea echipa sau rolul.",
   "enrich.tips.issue.duplicate": "Spune același lucru ca alt punct. Unește-le sau taie unul.",

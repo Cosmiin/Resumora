@@ -18,7 +18,7 @@ describe("gradeContext", () => {
     const [b1, b2] = result.bullets;
     expect(text).toContain(`${b1!.id} (grade ${b1!.score}): contribution: partial, clarity: specific, specificity: missing, impact: missing, concise: specific`);
     expect(text).toContain(`impact: missing`);
-    expect(text).toContain(`${long.length} of 220 characters`);
+    expect(text).toContain(`${long.length} of 440 characters`);
     expect(text).toContain(b2!.id);
   });
 
@@ -26,7 +26,7 @@ describe("gradeContext", () => {
     const text = gradeContext(role, result);
     expect(text).toContain(`Role score: ${result.score}. Line average: ${result.lines}.`);
     expect(text).toContain(GRADING_RULES);
-    expect(text).toContain("Use the answers. Keep every part at least as good as now. Improve the parts marked partial or missing. Stay within 220 characters.");
+    expect(text).toContain("Use the answers. Keep every part at least as good as now. Improve the parts marked partial or missing. Stay within 440 characters.");
   });
 
   it("lists only the lines asked for", () => {

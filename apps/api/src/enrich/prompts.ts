@@ -105,7 +105,7 @@ Concise:
 - partial: The point is there but padded with filler, repetition or
   stacked buzzwords, such as "responsible for", "in order to", "various",
   "successfully".
-- specific: Every phrase carries a fact, in two lines at most.
+- specific: Every phrase carries a fact, within 440 characters.
 
 Grade concise on the words that are there. A bullet is not concise merely
 because it is short, and brevity never raises the other grades. A bullet

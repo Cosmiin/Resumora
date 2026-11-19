@@ -68,7 +68,7 @@ function idMaker(taken: Iterable<string>) {
  * POST /v1/enrich/use-answers (score/9): after the rewrites, the facts from this round's answers still missing from the
  * page, placed in the description or in the line they belong to (a new line when none fits). Works on the role with
  * the prepared changes applied; a returned `bullet` change holds that line's whole new text. No model call when no note
- * answers this round's questions. A line over 220 characters, with a number neither the role nor its notes give, for a
+ * answers this round's questions. A line over 440 characters, with a number neither the role nor its notes give, for a
  * line that isn't there, or that changes nothing is dropped; so is a description over the field's limit.
  */
 export async function placeAnswers(deps: ScoreDeps, body: UseAnswersBody): Promise<UseAnswersAnswer> {

@@ -36,9 +36,9 @@ describe("atsChecks", () => {
     expect(atsChecks(role(twoBullets))).toEqual([]);
   });
   it("flags a bullet over the limit", () => {
-    expect(PROPOSAL_MAX).toBe(220);
-    expect(atsChecks(role(["a".repeat(221), "ok"]))).toEqual(["tooLong"]);
-    expect(atsChecks(role(["a".repeat(220), "ok"]))).toEqual([]);
+    expect(PROPOSAL_MAX).toBe(440);
+    expect(atsChecks(role(["a".repeat(441), "ok"]))).toEqual(["tooLong"]);
+    expect(atsChecks(role(["a".repeat(440), "ok"]))).toEqual([]);
   });
   it("flags first person in English and Romanian, at word boundaries", () => {
     expect(atsChecks(role(["I managed payroll", "ok"]))).toEqual(["firstPerson"]);
@@ -74,7 +74,7 @@ describe("atsChecks", () => {
     expect(atsChecks(role(["Led team 🚀", "ok"]))).toEqual(["oddCharacters"]);
   });
   it("lists tips in a fixed order", () => {
-    const tips = atsChecks(role(["I " + "a".repeat(230) + "★"], { title: "", startDate: "" }));
+    const tips = atsChecks(role(["I " + "a".repeat(450) + "★"], { title: "", startDate: "" }));
     expect(tips).toEqual(["tooLong", "firstPerson", "missingDates", "missingTitle", "fewBullets", "oddCharacters"]);
   });
 });

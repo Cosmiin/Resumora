@@ -65,8 +65,8 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/11", () => {
-    expect(SCORE_POLICY).toBe("score/11");
+  it("uses policy score/12", () => {
+    expect(SCORE_POLICY).toBe("score/12");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -507,12 +507,11 @@ describe("coverage and the role score", () => {
   });
 
   it("caps concise by length, whatever the model says", () => {
-    expect(conciseGrade("x".repeat(220), "specific")).toBe("specific");
-    expect(conciseGrade("x".repeat(221), "specific")).toBe("partial");
-    expect(conciseGrade("x".repeat(301), "specific")).toBe("missing");
+    expect(conciseGrade("x".repeat(440), "specific")).toBe("specific");
+    expect(conciseGrade("x".repeat(441), "specific")).toBe("missing");
     expect(conciseGrade("short", "partial")).toBe("partial");
-    const r = buildRoleResult(role(["y".repeat(250)]), model([mb("b1")]), "fp");
-    expect(r.bullets[0]).toMatchObject({ concise: "partial", score: 95 });
+    const r = buildRoleResult(role(["y".repeat(441)]), model([mb("b1")]), "fp");
+    expect(r.bullets[0]).toMatchObject({ concise: "missing", score: 90 });
   });
 
   it("keeps the role-wide marks when one bullet is graded again", () => {

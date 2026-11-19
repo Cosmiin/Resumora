@@ -332,7 +332,7 @@ export const basecvEn = {
   "enrich.tips.ats.missingDates": "Add start and end dates to this role so filters can place it.",
   "enrich.tips.ats.missingTitle": "Give this role a job title.",
   "enrich.tips.ats.oddCharacters": "Remove symbols, emoji and tabs from your bullets. Some filters cannot read them.",
-  "enrich.tips.ats.tooLong": "Shorten your longest bullet to two lines or fewer.",
+  "enrich.tips.ats.tooLong": "Shorten your longest bullet to 440 characters or fewer.",
   "enrich.tips.issue.clarity": "Say it more plainly: start with a verb and name the task.",
   "enrich.tips.issue.contribution": "Say what you personally did, not only what the team or the role covered.",
   "enrich.tips.issue.duplicate": "This says the same as another bullet. Merge them or cut one.",

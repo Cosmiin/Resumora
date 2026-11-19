@@ -47,7 +47,7 @@ function shapeUserMessage(role: Experience): string {
 /**
  * POST /v1/enrich/shape: merges of lines that describe the same work (score/9). No model call for a role of 6 lines or
  * fewer with no repeated line. A merge is dropped when it names an unknown or already used line, has fewer than two
- * or more than six lines, loses a number, runs over 220 characters, or only repeats one of its lines; with 6 lines or fewer, only a
+ * or more than six lines, loses a number, runs over 440 characters, or only repeats one of its lines; with 6 lines or fewer, only a
  * merge of a repeated line is kept.
  */
 export async function proposeShape(deps: ScoreDeps, input: ShapeBody): Promise<ShapeAnswer> {

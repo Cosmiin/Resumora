@@ -77,9 +77,9 @@ describe("proposeShape", () => {
     expect(await run()).toEqual({ merges: [] });
   });
 
-  it("drops a merged line over 220 characters, and one that is just an original line", async () => {
+  it("drops a merged line over 440 characters, and one that is just an original line", async () => {
     model = fakeModel(() => ({ merges: [
-      { ids: ids(1, 2), text: `${merged} ${"x".repeat(221 - merged.length - 1)}` },
+      { ids: ids(1, 2), text: `${merged} ${"x".repeat(441 - merged.length - 1)}` },
       { ids: ids(4, 5), text: vevol[4]! },
     ] }));
     expect(await run()).toEqual({ merges: [] });

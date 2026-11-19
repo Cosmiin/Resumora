@@ -110,8 +110,8 @@ describe("needsShape", () => {
 });
 
 describe("ShapeAnswerSchema", () => {
-  it("caps a merged line at 220 characters and needs at least two lines per merge", () => {
-    expect(ShapeAnswerSchema.safeParse({ merges: [{ ids: ["b1", "b2"], text: "x".repeat(221) }] }).success).toBe(false);
+  it("caps a merged line at 440 characters and needs at least two lines per merge", () => {
+    expect(ShapeAnswerSchema.safeParse({ merges: [{ ids: ["b1", "b2"], text: "x".repeat(441) }] }).success).toBe(false);
     expect(ShapeAnswerSchema.safeParse({ merges: [{ ids: ["b1"], text: "ok" }] }).success).toBe(false);
     expect(ShapeAnswerSchema.safeParse({ merges: [{ ids: ["b1", "b2"], text: "ok" }] }).success).toBe(true);
   });

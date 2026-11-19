@@ -1,7 +1,7 @@
 import type { CvContent, Experience } from "./cv.ts";
 
-/** Longest bullet or proposal we accept (two lines). */
-export const PROPOSAL_MAX = 220;
+/** Longest bullet or proposal we accept (the same limit as the grader's concise check). */
+export const PROPOSAL_MAX = 440;
 
 export type AtsTip =
   | "tooLong"
