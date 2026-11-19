@@ -24,3 +24,8 @@ open: notes — `gradeWithCoverage` returns coverage possibly undefined (stored 
 session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
 commit: 694062d (base b43aca0) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: notes — the stored grades passed to the writer are the saved role's (a line rewritten by the prepared changes shows its old grade with its new text); new lines respect MAX_BULLETS (the CV's own limit).
+
+## Task 6: The Shape screen — done
+session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
+commit: aa5726d (base 694062d) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: ruling — step eyebrows renumbered in CompaniesStep/ToolsStep/BudgetStep (+ path-steps and budget-review tests), outside the file list. Start skips Shape synchronously when no role needs a merge or a move; Shape's check calls run all at once (no limit named). Web `editor.test.tsx` and `jobs-page.test.tsx` timed out in the full run and pass alone (known flaky).

@@ -6,8 +6,6 @@ import { emptyCv, type BudgetItem, type CvContent, type Experience } from "@resu
 vi.mock("./enrich-api.ts", () => ({ createVoiceSession: vi.fn() }));
 
 import { BudgetStep } from "./BudgetStep.tsx";
-import { ReviewSheet } from "./ReviewSheet.tsx";
-import type { Change } from "./prepare.ts";
 
 const role = (id: string, over: Partial<Experience> = {}): Experience => ({
   id, company: "Acme", title: `Role ${id}`, location: "", startDate: "2019-03", endDate: "2021-06", current: false,
@@ -57,50 +55,5 @@ describe("BudgetStep", () => {
     await userEvent.click(screen.getByRole("button", { name: /Continue|Next|Send/ }));
     expect(onTalk).toHaveBeenCalledWith("a", "I ran the Toronto desk with two recruiters.", ["type"]);
     expect(screen.getByTestId("ep-rolecard")).toHaveTextContent("Clerk");
-  });
-});
-
-describe("ReviewSheet", () => {
-  const changes: Change[] = [
-    { id: "description", kind: "description", before: "", after: "Robert Half is a staffing firm. Ran the Toronto desk." },
-    { id: "bullet:b1", kind: "bullet", bulletId: "b1", before: "Built a candidate pipeline.", after: "Built a pipeline of 40 candidates a week." },
-  ];
-  const groups = [
-    { roleId: "a", changes, tidied: new Set<string>() },
-    { roleId: "b", changes: [{ id: "bullet:x", kind: "bullet" as const, bulletId: "x", before: "Helped.", after: "Helped the stock team." }], tidied: new Set(["bullet:x"]) },
-  ];
-
-  it("starts with every role collapsed and says how many changes each has", () => {
-    render(<ReviewSheet cv={cv} groups={groups} busy={false} onApply={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Staffing Manager · Robert Half: 2 changes" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("button", { name: "Clerk · Elias Metal: 1 change" })).toBeInTheDocument();
-    expect(screen.queryByText("Built a pipeline of 40 candidates a week.")).toBeNull();
-  });
-
-  it("Keep mine leaves that change out of Apply all", async () => {
-    const onApply = vi.fn();
-    render(<ReviewSheet cv={cv} groups={groups} busy={false} onApply={onApply} />);
-    await userEvent.click(screen.getByRole("button", { name: "Staffing Manager · Robert Half: 2 changes" }));
-    expect(screen.getByText("Built a pipeline of 40 candidates a week.")).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole("button", { name: "Keep mine" })[1]!);
-    await userEvent.click(screen.getByRole("button", { name: "Apply all" }));
-    expect(onApply).toHaveBeenCalledWith([
-      { roleId: "a", id: "description", text: "Robert Half is a staffing firm. Ran the Toronto desk." },
-      { roleId: "b", id: "bullet:x", text: "Helped the stock team." },
-    ]);
-  });
-
-  it("marks a line rewritten with no new facts", async () => {
-    render(<ReviewSheet cv={cv} groups={groups} busy={false} onApply={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: "Clerk · Elias Metal: 1 change" }));
-    expect(screen.getByText("Tidied, no new facts")).toBeInTheDocument();
-  });
-
-  it("with nothing to change says so and lets the person go on", async () => {
-    const onApply = vi.fn();
-    render(<ReviewSheet cv={cv} groups={[]} busy={false} onApply={onApply} />);
-    expect(screen.getByText("Nothing to change.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(onApply).toHaveBeenCalledWith([]);
   });
 });

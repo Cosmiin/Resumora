@@ -241,6 +241,21 @@
 .sh-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-line); }
 .sh-top p { margin: 0; flex: 1 1 16rem; overflow-wrap: anywhere; }
 .sh-top [aria-pressed="true"] { background: var(--color-ink); color: var(--color-on-ink); }
+/* The path's preparing rows and end screen (score/9). */
+.es-prep { display: grid; gap: var(--space-1); margin: var(--space-3) 0 0; padding: 0; list-style: none; width: 100%; max-width: 28rem; }
+.es-prep li { display: flex; justify-content: space-between; gap: var(--space-3); color: var(--color-muted); overflow-wrap: anywhere; }
+.es-prep li.is-done { color: var(--color-ink); }
+.es-score { margin: 0 0 var(--space-2); font-weight: var(--weight-bold); }
+.es-helds { display: grid; gap: var(--space-3); margin: var(--space-4) 0; padding: 0; list-style: none; }
+.es-held { padding: var(--space-4); background: var(--color-warn-soft); border-radius: var(--radius-field); }
+.es-held-why { margin: 0 0 var(--space-1); font-size: var(--text-small); font-weight: var(--weight-bold); }
+.es-held-line { margin: 0; overflow-wrap: anywhere; }
+.rc { display: grid; gap: var(--space-2); }
+.rc-title { margin: 0; font-size: var(--text-small); font-weight: var(--weight-bold); }
+.rc-list { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; padding: 0; list-style: none; font-size: var(--text-small); }
+.rc-item { display: inline-flex; gap: var(--space-1); }
+.rc-item.is-no { color: var(--color-muted); }
+.rc-item.is-yes .rc-mark { color: var(--color-good); }
 /* Tools step: one role per screen, its tools as toggle buttons. Dark = ticked; dashed = offered by a neighbouring role. */
 .ep-tools-lead { margin: calc(-1 * var(--space-3)) 0 var(--space-5); color: var(--color-muted); }
 .ep-toolgroup { margin: 0 0 var(--space-5); }

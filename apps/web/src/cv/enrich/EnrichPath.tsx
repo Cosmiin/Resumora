@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, PATH_BUDGET, findGraded, fingerprint, gradedItems, newId, pickBudget, questionKey,
-  type BudgetItem, type CvContent, type Note, type RoleResult,
+  type BudgetItem, type Change, type CvContent, type Note, type RoleResult,
 } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
+import { ApiClientError } from "../../lib/api-error.ts";
 import { Skeleton } from "../../ui/Page.tsx";
 import type { CvAction } from "../edit/cvReducer.ts";
-import { roleListOf } from "../edit/lists.ts";
 import type { Via } from "./AnswerBox.tsx";
 import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
-import { checkChanges } from "./enrich-api.ts";
-import { changeActions, prepareRoleChanges } from "./prepare.ts";
+import { EndStep, type HeldChange } from "./EndStep.tsx";
+import { checkChanges, useAnswersOnCv } from "./enrich-api.ts";
+import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
 import type { Prepared } from "./prepared.ts";
-import { ReviewSheet, type ReviewGroup } from "./ReviewSheet.tsx";
 import { PathScreen } from "./SectionSuggest.tsx";
 import { ShapeStep, hasShapeWork, type ShapeDone } from "./ShapeStep.tsx";
 import { ToolsStep } from "./ToolsStep.tsx";
@@ -25,7 +25,7 @@ type Props = {
   scores: Map<string, RoleScoreState>;
   waitForSave(): Promise<void>;
   onClose(): void;
-  /** Puts a predicted score (after Shape) in place at once, so no score call is needed after saving. */
+  /** Puts a predicted score (after Shape, after preparing) in place at once, so no score call is needed after saving. */
   onScore?(result: RoleResult): void;
   /** The companies and tools answers asked for while the import was on screen, when the path opens from one. */
   prepared?: Prepared | null;
@@ -66,34 +66,53 @@ const pending = (s: RoleScoreState | undefined) => !s || s.state === "scoring" |
 
 type Stage =
   | { kind: "start" } | { kind: "shape" } | { kind: "shaping" } | { kind: "companies" } | { kind: "tools" } | { kind: "budget"; items: BudgetItem[] }
-  | { kind: "preparing" } | { kind: "review"; groups: ReviewGroup[]; failed: boolean } | { kind: "end" };
+  | { kind: "preparing" } | { kind: "end"; held: HeldChange[]; failed: boolean };
 
 /**
  * What a role got in this round of the path. lines: line questions answered; role: a budget question about the whole
  * role or "Rather just talk?" (its lines up to 100 may be rewritten); context: what the company does or the role was for
- * (a new description); facts: any note at all from this round (company, tools, answers): a line rewritten for such a
- * role may carry those facts, so it is not "tidied, no new facts".
+ * (a new description); facts: any note at all from this round (company, tools, answers); questions: the questions of
+ * this round's notes, whose facts must end up on the page.
  */
-type Got = { lines: Set<string>; role: boolean; context: boolean; facts: boolean };
+type Got = { lines: Set<string>; role: boolean; context: boolean; facts: boolean; questions: Set<string> };
+
+/**
+ * A role's changes with the facts placed from its answers: a line change replaces the role's own change for that line
+ * (or the text of a line it adds), a description replaces its description; the rest is added.
+ */
+function withPlaced(changes: readonly Change[], placed: readonly Change[]): Change[] {
+  const out = [...changes];
+  for (const c of placed) {
+    const i = c.kind === "bullet" ? out.findIndex((x) => (x.kind === "bullet" && x.bulletId === c.bulletId) || (x.kind === "new" && x.id === c.bulletId))
+      : c.kind === "description" ? out.findIndex((x) => x.kind === "description") : -1;
+    const own = out[i];
+    if (!own || (c.kind !== "bullet" && c.kind !== "description")) out.push(c);
+    else if (own.kind === "new") out[i] = { ...own, text: c.text };
+    else out[i] = { ...c, id: own.id };
+  }
+  return out;
+}
 
 /** The end waits this long for the new scores, then shows what it has. */
 const END_WAIT_MS = 20000;
 
 /**
- * The short enrichment path (owner, 17 Nov 2026): the CV's score, then four steps whatever the number of roles —
- * what each company does, the tools per role, the questions worth the most across the CV, one review sheet — then
- * the score again. Answers are saved as role notes as they are given; nothing else on the CV changes before
- * "Apply all". The score is shown only at the start and the end.
+ * The short enrichment path (owner, 17 Nov 2026; score/9 on 19 Nov): the CV's score, then Shape (merges the person
+ * confirms), what each company does, the tools per role, the questions worth the most across the CV, then every role
+ * prepared at once and put straight on the CV, and the end with the score again. A change that would lower a role's
+ * score is held and shown at the end with Add anyway. Answers are saved as role notes as they are given.
  */
 export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore, prepared }: Props) {
   const [stage, setStage] = useState<Stage>({ kind: "start" });
   const [before, setBefore] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [rolesBefore, setRolesBefore] = useState<ReadonlyMap<string, number | null>>(new Map());
+  const [rows, setRows] = useState<{ id: string; name: string; done: boolean }[]>([]);
   const [timedOut, setTimedOut] = useState(false);
   // Questions already asked in this path (earlier rounds), and what each role got in the current round.
   const asked = useRef(new Set<string>());
   const got = useRef(new Map<string, Got>());
   const latest = useRef(cv);
+  const endShown = useRef(false);
   useEffect(() => { latest.current = cv; });
 
   const graded = gradedItems(cv);
@@ -101,9 +120,10 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   const settled = graded.every(({ item }) => !pending(scores.get(item.id)));
   const average = averageScore(new Map(graded.map(({ item }) => [item.id, scoreOf(scores.get(item.id))])), weights);
 
-  const gotFor = (roleId: string) => {
-    const entry = got.current.get(roleId) ?? { lines: new Set<string>(), role: false, context: false, facts: false };
+  const gotFor = (roleId: string, question: string) => {
+    const entry = got.current.get(roleId) ?? { lines: new Set<string>(), role: false, context: false, facts: false, questions: new Set<string>() };
     entry.facts = true;
+    entry.questions.add(question);
     got.current.set(roleId, entry);
     return entry;
   };
@@ -131,33 +151,65 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     else void prepare();
   };
 
-  /** Every role's changes, from what it got in this round and its weak lines. */
+  /** The scores before a round, for the end screen. */
+  const markBefore = () => {
+    setBefore(average);
+    setRolesBefore(new Map(graded.map(({ item }) => [item.id, scoreOf(scores.get(item.id))])));
+  };
+
+  /**
+   * Every role at once, through one limit for the whole CV: its changes from what it got in this round and its weak
+   * lines, then the facts its answers still lack placed on the page, then the check (what would lower the score held,
+   * the new score predicted), then straight onto the CV. A failed check leaves that role as it is; an outdated one (409)
+   * puts its changes on the CV without a prediction, and the normal score runs.
+   */
   const prepare = async () => {
+    endShown.current = false;
     setStage({ kind: "preparing" });
     await waitForSave().catch(() => undefined);
     const now = latest.current;
-    const groups: ReviewGroup[] = [];
-    let failed = false;
-    for (const { item } of gradedItems(now)) {
+    const limit = createLimiter(PATH_PARALLEL);
+    const work = gradedItems(now).flatMap(({ item }) => {
       const entry = scores.get(item.id);
       const result = entry?.state === "ready" ? entry.result : undefined;
       const g = got.current.get(item.id);
-      const any = !!g && g.facts;
       const weak = (result?.bullets ?? []).some((b) => b.score < CLEAR_AT);
-      if (!any && !weak) continue;
-      const describe = any && (g!.context || item.description.trim() !== "");
+      return (g?.facts ?? false) || weak ? [{ item, result, g }] : [];
+    });
+    setRows(work.map(({ item }) => ({ id: item.id, name: [item.title, item.company].filter(Boolean).join(" · "), done: false })));
+    const held: HeldChange[] = [];
+    let failed = false;
+    await Promise.all(work.map(async ({ item, result, g }) => {
+      const describe = !!g && g.facts && (g.context || item.description.trim() !== "");
       const answeredRole = !!g && g.role;
       const out = await prepareRoleChanges({
         cv: now, roleId: item.id, result, answeredLines: g?.lines ?? new Set(), answeredRole,
-        thinWithAnswers: !!result?.thin && answeredRole, describe,
+        thinWithAnswers: !!result?.thin && answeredRole, describe, limit,
       });
       failed ||= out.failed;
-      if (!out.changes.length) continue;
-      // A line rewritten with nothing new about it or its role: worded better, no new facts.
-      const tidied = new Set(any ? [] : out.changes.filter((c) => c.kind === "bullet").map((c) => c.id));
-      groups.push({ roleId: item.id, changes: out.changes, tidied });
-    }
-    setStage({ kind: "review", groups, failed });
+      const print = fingerprint(item, now.locale);
+      let changes = toChanges(out.changes);
+      const questions = [...(g?.questions ?? [])].slice(0, 20);
+      if (questions.length) {
+        const placed = await limit(() => useAnswersOnCv({ roleId: item.id, fingerprint: print, changes, questions }))
+          .then((a) => a.changes).catch(() => { failed = true; return []; });
+        changes = withPlaced(changes, placed);
+      }
+      if (changes.length) {
+        try {
+          const answer = await limit(() => checkChanges({ roleId: item.id, fingerprint: print, changes, hold: true }));
+          const kept = changes.filter((c) => answer.kept.includes(c.id));
+          if (kept.length) dispatch({ type: "applyRoleChanges", roleId: item.id, changes: kept });
+          onScore?.(answer.result);
+          held.push(...answer.held.map((change) => ({ roleId: item.id, change })));
+        } catch (err) {
+          if (err instanceof ApiClientError && err.status === 409) dispatch({ type: "applyRoleChanges", roleId: item.id, changes });
+          else failed = true;
+        }
+      }
+      setRows((all) => all.map((r) => (r.id === item.id ? { ...r, done: true } : r)));
+    }));
+    setStage({ kind: "end", held, failed });
   };
 
   /**
@@ -214,7 +266,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         )}
         <div className="rr-actions">
           <button type="button" className="fm-btn" disabled={!settled} onClick={() => {
-            setBefore(average);
+            markBefore();
             got.current = new Map();
             setStage({ kind: hasShapeWork(cv, scores) ? "shape" : "companies" });
           }}>{t("enrich.run.start")}</button>
@@ -239,7 +291,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       <CompaniesStep cv={cv} prepared={prepared?.companies} onDone={(notes) => {
         for (const { roleId, note } of notes) {
           dispatch({ type: "setNote", roleId, note });
-          gotFor(roleId).context = true;
+          gotFor(roleId, note.question).context = true;
         }
         setStage({ kind: "tools" });
       }} />,
@@ -250,7 +302,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       <ToolsStep cv={cv} prepared={prepared?.tools} onDone={(notes) => {
         for (const { roleId, note } of notes) {
           dispatch({ type: "setNote", roleId, note });
-          gotFor(roleId);
+          gotFor(roleId, note.question);
         }
         void waitForSave().catch(() => undefined).then(toBudget);
       }} />,
@@ -261,14 +313,14 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       <BudgetStep cv={cv} items={stage.items}
         onAnswer={(item, text, via) => {
           save(`${item.roleId}|${item.kind === "line" ? `line:${item.question.bulletId}` : `role:${item.question.id}`}|${questionKey(item.question.text)}`, item.roleId, item.question.text, text, via);
-          const g = gotFor(item.roleId);
+          const g = gotFor(item.roleId, item.question.text);
           if (item.kind === "line") g.lines.add(item.question.bulletId);
           else if (item.question.topic === "purpose") g.context = true;
           else g.role = true;
         }}
         onTalk={(roleId, text, via) => {
           save(`${roleId}|talk`, roleId, BRAIN_DUMP_QUESTION, text, via);
-          gotFor(roleId).role = true;
+          gotFor(roleId, BRAIN_DUMP_QUESTION).role = true;
         }}
         onDone={() => void prepare()} />,
     );
@@ -277,57 +329,51 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     return screen(
       <div className="fm-working" role="status">
         <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
-        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.path.v2.preparing")}</h2>
+        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.path.prep.title")}</h2>
+        {rows.length > 1 && (
+          <>
+            <p className="rr-lead">{t("enrich.path.prep.lead")}</p>
+            <ul className="es-prep">
+              {rows.map((r) => (
+                <li key={r.id} className={r.done ? "is-done" : undefined}>
+                  <span>{r.name}</span> <span>{r.done ? t("enrich.path.prep.done") : t("enrich.path.prep.working")}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>,
     );
   }
-  if (stage.kind === "review") {
-    return screen(
-      <>
-        {stage.failed && <p className="ui-notice ui-notice--bad" role="alert">{t("enrich.path.v2.someFailed")}</p>}
-        <ReviewSheet cv={cv} groups={stage.groups} busy={busy} onApply={(decisions) => {
-          setBusy(true);
-          const now = latest.current;
-          for (const group of stage.groups) {
-            const list = roleListOf(now, group.roleId);
-            if (!list) continue;
-            const mine = decisions.filter((d) => d.roleId === group.roleId);
-            for (const action of changeActions(now, group.roleId, list, group.changes, mine).actions) dispatch(action);
-          }
-          setBusy(false);
-          setStage({ kind: "end" });
-        }} />
-      </>,
-    );
-  }
 
-  // The end: the score before and after, then Done or another round.
-  const waiting = !settled && !timedOut;
-  const more = waiting ? [] : budget();
-  return screen(
-    <div className="rr-card">
-      <p className="rr-where">{t("enrich.path.dialog")}</p>
-      {waiting ? (
+  // The end: the score before and after, held changes, then Done or another round.
+  // Once shown, the end stays up: a line added anyway is scored again without hiding the rest.
+  const waiting = !settled && !timedOut && !endShown.current;
+  if (!waiting) endShown.current = true;
+  if (waiting) {
+    return screen(
+      <div className="rr-card">
+        <p className="rr-where">{t("enrich.path.dialog")}</p>
         <div className="fm-working" role="status">
           <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
           <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.end.checking")}</h2>
         </div>
-      ) : (
-        <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>
-          {before !== null && average !== null && before !== average ? t("enrich.path.v2.moved", { from: before, to: average })
-            : average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}
-        </h2>
-      )}
-      <div className="rr-actions">
-        <button type="button" className="fm-btn" onClick={onClose}>{t("enrich.path.v2.done")}</button>
-        {more.length > 0 && (
-          <button type="button" className="ui-btn" onClick={() => {
-            got.current = new Map();
-            setBefore(average);
-            toBudget();
-          }}>{more.length === 1 ? t("enrich.path.moreOne") : t("enrich.path.more", { n: more.length })}</button>
-        )}
-      </div>
-    </div>,
+      </div>,
+    );
+  }
+  const more = budget();
+  return screen(
+    <EndStep cv={cv} scores={scores} before={before} rolesBefore={rolesBefore} held={stage.held} failed={stage.failed}
+      onAdd={(roleId, change) => {
+        // Added anyway: on the CV, and the normal score runs after saving.
+        dispatch({ type: "applyRoleChanges", roleId, changes: [change] });
+        setStage({ ...stage, held: stage.held.filter((h) => !(h.roleId === roleId && h.change.id === change.id)) });
+      }}
+      onDone={onClose} more={more.length}
+      onMore={() => {
+        got.current = new Map();
+        markBefore();
+        toBudget();
+      }} />,
   );
 }

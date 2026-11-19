@@ -1,42 +1,62 @@
-import { CLEAR_AT, MAX_LONG_TEXT, MAX_TEXT, findScored, fingerprint, type CvContent, type RoleResult } from "@resumora/shared";
+import {
+  CLEAR_AT, MAX_LONG_TEXT, MAX_TEXT, findScored, fingerprint, newId, type Change as PathChange, type CvContent, type RoleResult,
+} from "@resumora/shared";
 import type { CvAction } from "../edit/cvReducer.ts";
 import type { RoleList } from "../edit/lists.ts";
 import { brainDump, improveBullet, roleDescription } from "./enrich-api.ts";
 
 /** One piece of the role that the answers changed: its description, one of its bullets, or a new bullet. */
-export type Change =
+export type PrepChange =
   | { id: string; kind: "description"; before: string; after: string }
   | { id: string; kind: "bullet"; bulletId: string; before: string; after: string }
   | { id: string; kind: "new"; before: ""; after: string };
+/** The old name, kept for the role run and its review pieces. */
+export type Change = PrepChange;
 
 const squash = (text: string) => text.trim().replace(/\s+/g, " ");
 
-/** At most this many requests at once while a CV's changes are prepared. */
+/** At most this many line rewrites at once in a role's own run. */
 const PARALLEL = 3;
+/** Requests at once for the whole CV while the path prepares every role (Claude's call; tune after the real run). */
+export const PATH_PARALLEL = 6;
 
-async function limited<T>(tasks: (() => Promise<T>)[]): Promise<T[]> {
-  const out: T[] = new Array(tasks.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < tasks.length) {
-      const i = next++;
-      out[i] = await tasks[i]!();
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(PARALLEL, tasks.length) }, worker));
-  return out;
+export type Limiter = <T>(task: () => Promise<T>) => Promise<T>;
+
+/** Runs tasks with at most `max` of them under way at once, in the order they were given. */
+export function createLimiter(max: number): Limiter {
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  return <T>(task: () => Promise<T>) => new Promise<T>((resolve, reject) => {
+    const run = () => {
+      active++;
+      Promise.resolve().then(task).then(resolve, reject).finally(() => {
+        active--;
+        waiting.shift()?.();
+      });
+    };
+    if (active < max) run();
+    else waiting.push(run);
+  });
+}
+
+/** The shared change list for prepared changes (score/9). A new line gets a fresh id, never one a line may already have. */
+export function toChanges(changes: readonly PrepChange[]): PathChange[] {
+  return changes.map((c): PathChange => (c.kind === "description" ? { id: c.id, kind: "description", text: c.after.slice(0, MAX_LONG_TEXT) }
+    : c.kind === "bullet" ? { id: c.id, kind: "bullet", bulletId: c.bulletId, text: c.after.slice(0, MAX_TEXT) }
+      : { id: newId(), kind: "new", text: c.after.slice(0, MAX_TEXT) }));
 }
 
 /**
- * The changes for one role of the saved CV (the short path's review sheet): a rewrite for every line answered about
+ * The changes for one role of the saved CV (the short path's preparing step): a rewrite for every line answered about
  * and every other line below CLEAR_AT (or every line below 100 when the role got an answer about the whole role, as in
  * a role's own run), new lines from the answers of a thin role, and a description when asked. The CV must be saved
- * before this is called. `failed` is true when any call failed; the changes that did come are kept.
+ * before this is called. `failed` is true when any call failed; the changes that did come are kept. `limit` is shared
+ * by every role when the whole CV is prepared at once; without it a role's line rewrites run 3 at a time, as before.
  */
 export async function prepareRoleChanges(input: {
   cv: CvContent; roleId: string; result: RoleResult | undefined;
-  answeredLines: ReadonlySet<string>; answeredRole: boolean; thinWithAnswers: boolean; describe: boolean;
-}): Promise<{ changes: Change[]; failed: boolean }> {
+  answeredLines: ReadonlySet<string>; answeredRole: boolean; thinWithAnswers: boolean; describe: boolean; limit?: Limiter;
+}): Promise<{ changes: PrepChange[]; failed: boolean }> {
   const role = findScored(input.cv, input.roleId)?.item;
   if (!role) return { changes: [], failed: false };
   const print = fingerprint(role, input.cv.locale);
@@ -46,17 +66,20 @@ export async function prepareRoleChanges(input: {
   let failed = false;
   const fail = () => { failed = true; return undefined; };
 
-  const rewrites = limited(lines.map((b) => () => improveBullet({ roleId: role.id, bulletId: b.id, fingerprint: print })
+  // A shared limit holds every request; a role's own run limits only its line rewrites, as before.
+  const limitLines = input.limit ?? createLimiter(PARALLEL);
+  const limitOther: Limiter = input.limit ?? ((task) => task());
+  const rewrites = Promise.all(lines.map((b) => limitLines(() => improveBullet({ roleId: role.id, bulletId: b.id, fingerprint: print }))
     .then((a) => ("proposal" in a ? a.proposal.text : undefined)).catch(fail)));
   const added = input.thinWithAnswers
-    ? brainDump({ roleId: role.id, fingerprint: print, source: "answers" }).then((a) => a.proposals).catch(() => fail() ?? [])
+    ? limitOther(() => brainDump({ roleId: role.id, fingerprint: print, source: "answers" })).then((a) => a.proposals).catch(() => fail() ?? [])
     : Promise.resolve([]);
   const description = input.describe
-    ? roleDescription({ roleId: role.id, fingerprint: print }).then((a) => a.text).catch(() => fail() ?? "")
+    ? limitOther(() => roleDescription({ roleId: role.id, fingerprint: print })).then((a) => a.text).catch(() => fail() ?? "")
     : Promise.resolve("");
   const [texts, fresh, written] = await Promise.all([rewrites, added, description]);
 
-  const changes: Change[] = [];
+  const changes: PrepChange[] = [];
   if (written && squash(written) !== squash(role.description)) changes.push({ id: "description", kind: "description", before: role.description, after: written });
   lines.forEach((b, i) => {
     const text = texts[i];
