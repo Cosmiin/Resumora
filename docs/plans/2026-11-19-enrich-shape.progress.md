@@ -50,3 +50,9 @@ results:
 open (owner decides):
 1. The core-item marks are re-read on every AI call and flip on the same text: on "Shopify agency." the company and purpose items went shown → applies between calls. One flip moves a role about 7 points (1 of 6 × 40%). In one run the only kept change raised a line 70 → 100, yet the prediction fell 93 → 88 because company flipped. So a change from the answers can still show as a lower score, the outcome the redesign is meant to prevent. Options: (a) during the path, a core item stored as shown stays shown unless its text was removed; (b) for Shape, keep the stored marks, as the design says ("the core-item marks stay"; Task 4 re-reads them on every check); (c) leave as is and accept the noise. Not built: no rule the owner didn't ask for.
 2. `checkChanges` with `hold: true` holds a merge's `bullet` change but keeps its `remove` changes, so the merged-away lines would vanish. The path never does this today (Shape checks with `hold: false`; preparing makes no removals); the eval's first run hit it by mixing them. Fix would be to hold a merge's removals with its line.
+
+## Whole-branch review (base 15ed0f7) — passed
+session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
+reviews: 1 whole-branch (Opus high) + 1 fix-only (Opus high) · fix: d95a9bd (a second round's end screen could skip waiting for its scores; low)
+open: the two Task 9 points above (core-mark noise; hold with a merge's removals), and PATH_PARALLEL = 6 untested against OpenRouter.
+cost: no Codex; review agents this part (Tasks 5–9): 4 per-task Sonnet + 2 Opus; guard denials: 0; real-AI eval: 6 runs, ~300k tokens on gemini-3.1-flash-lite. Weekly usage not read in this session.
