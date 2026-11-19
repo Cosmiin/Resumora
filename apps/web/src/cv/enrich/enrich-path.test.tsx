@@ -243,6 +243,32 @@ describe("the short path", () => {
       expect(onScore).toHaveBeenCalledWith(expect.objectContaining({ roleId: "r2", fingerprint: "after-r2" }));
     });
 
+    it("a held line's retry after a failure replaces its note instead of adding a second one (score/12)", async () => {
+      const held = { id: "answer1", kind: "new", text: "Helped the team." };
+      const ask = { changeId: "answer1", text: "What did you do for the team?", options: ["Ran the weekly rota", "Trained new clerks"] };
+      api.placeAnswersOnCv.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string }[] }) => Promise.resolve(
+        roleId !== "r1" || changes.some((c) => c.id === "answer1") ? { changes: [] } : { changes: [held] }));
+      let failOnce = true;
+      api.checkChanges.mockImplementation(({ roleId, changes, hold }: { roleId: string; changes: { id: string; kind: string }[]; hold: boolean }) => {
+        if (!hold && failOnce) { failOnce = false; return Promise.reject(new Error("down")); }
+        return Promise.resolve({
+          result: { ...result(roleId === "r1" ? r1 : r2, 85), fingerprint: `after-${roleId}` },
+          kept: changes.filter((c) => !hold || c.kind !== "new").map((c) => c.id), held: hold ? changes.filter((c) => c.kind === "new") : [],
+          asks: hold && roleId === "r1" ? [ask] : [],
+        });
+      });
+      const actions: CvAction[] = [];
+      await toEnd((a) => actions.push(a));
+      await userEvent.click(screen.getByRole("button", { name: "Ran the weekly rota" }));
+      await userEvent.click(screen.getByRole("button", { name: "Add with this fact" }));
+      expect(await screen.findByText("Couldn't add it. Try again.")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Add with this fact" }));
+      await waitFor(() => expect(screen.queryByText("Helped the team.")).toBeNull());
+      const notes = actions.filter((a): a is Extract<CvAction, { type: "setNote" }> => a.type === "setNote" && a.note.question === ask.text);
+      expect(notes).toHaveLength(2);
+      expect(notes[1]!.note.id).toBe(notes[0]!.note.id);
+    });
+
     it("a held line with a question: Add with this fact saves the note, places it, checks without holding, and applies (score/12)", async () => {
       const held = { id: "answer1", kind: "new", text: "Helped the team." };
       const ask = { changeId: "answer1", text: "What did you do for the team?", options: ["Ran the weekly rota", "Trained new clerks"] };

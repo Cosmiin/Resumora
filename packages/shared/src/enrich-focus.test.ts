@@ -46,6 +46,16 @@ describe("mergeGrades", () => {
     expect(fresh.score).toBeGreaterThan(stored.score!);
   });
 
+  it("keeps a blank option's amounts on the lines it does not grade again (score/12)", () => {
+    const r = role();
+    const stored = buildRoleResult(r, { bullets: [
+      grade("b1", { options: ["Increased sales by …%", "Orders shipped same day"], amounts: ["Under 10", "10–25"] }), grade("b2"),
+    ], nextStepId: null }, "old");
+    expect(stored.questions.find((q) => q.bulletId === "b1")?.amounts).toEqual(["Under 10", "10–25"]);
+    const merged = mergeGrades(r, stored, [grade("b2", { impact: "specific", issue: "none", question: null, tip: null })], "new");
+    expect(merged.questions.find((q) => q.bulletId === "b1")).toMatchObject({ options: ["Increased sales by …%", "Orders shipped same day"], amounts: ["Under 10", "10–25"] });
+  });
+
   it("replaces one bullet's grades and recomputes the rounded role mean", () => {
     const r = role();
     const stored = buildRoleResult(r, {

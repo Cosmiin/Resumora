@@ -35,3 +35,9 @@ Same eval on main (d6d29b8) and on the branch, 5 runs each, payroll role with th
 - Line rewrites (improve-bullet): before 5 of 6 at 100 (avg 96.7); after 5 of 6 (avg 99.2). Both sides answered "needs more detail" for 9 of 15 requests even with the answers in the notes — unchanged by this work, worth a look on its own.
 - Line length: every written line 75–116 characters; nothing used the new room up to 440.
 - Options: vague result options ("Faster", "Lower cost" …) 0 on both sides. Blank options: before 0, after 7, on 2 questions, both with amounts; 0 blank questions without amounts. Purpose options: before bare nouns ("Client account management", "Project coordination"); after concrete aims ("To manage Shopify store operations for clients", "Managing end-to-end payroll for small business clients").
+
+## End of part
+Whole-branch review (Opus high): 1 medium, 1 low, both fixed — `mergeGrades` dropped `amounts` on lines it did not grade again (stored results after check-changes / improve-bullet lost the amount chips); "Add with this fact" added a second note on a retry (now one note per card via the round's `save` slot). Fix-only review (Opus high): pass. No second whole-branch review needed: the fix touched one shared function's output field and one web handler.
+Cost: review agents 12 (9 Sonnet, 3 Opus for the Task 4 escalation and the branch); guard denials 0; no Codex. Real-AI eval: 120 AI calls across both sides.
+Tests: shared 518, api 936 (+4 skipped), extension 229, web 1213 — all pass; lint and typecheck clean.
+Not done: hosted database needs nothing (no migration). Not checked in a browser.

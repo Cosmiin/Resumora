@@ -388,8 +388,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
    * Throws when any step fails, so the card stays with its error.
    */
   const addWithFact = async (roleId: string, change: Change, ask: HeldAsk, answer: string, via: Via[]) => {
-    const note: Note = { id: newId(), question: ask.text, answer: answer.trim().slice(0, MAX_LONG_TEXT), via: via.length ? via : ["type"], askedAt: new Date().toISOString() };
-    dispatch({ type: "setNote", roleId, note });
+    // One note per card: trying again after a failure replaces the answer instead of adding a second one.
+    save(`held|${roleId}|${change.id}`, roleId, ask.text, answer, via);
     await waitForSave();
     const now = latest.current;
     const item = findGraded(now, roleId)?.item;

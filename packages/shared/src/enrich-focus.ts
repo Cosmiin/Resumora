@@ -35,6 +35,8 @@ export function mergeGrades(
       tip: old.tip,
       question: old.question,
       options: stored?.questions.find((q) => q.bulletId === id)?.options ?? [],
+      // A blank option's amounts stay with it (score/12).
+      amounts: stored?.questions.find((q) => q.bulletId === id)?.amounts,
     };
   });
   return {
