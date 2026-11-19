@@ -1,6 +1,6 @@
 import { useReducer, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, fingerprint, type BudgetItem, type CvContent, type Experience, type Note, type RoleResult } from "@resumora/shared";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
@@ -282,6 +282,15 @@ describe("the short path", () => {
       expect(onScore.mock.calls.map(([r]) => r.roleId)).toEqual(["r2"]);
       expect(screen.queryByRole("alert")).toBeNull();
     });
+  });
+
+  it("the start lists each role with its score and checklist, and says the checklist doesn't change the score", () => {
+    render(<Harness initial={scores()} />);
+    expect(screen.getByText("About 5 minutes: tidy your lines, then your companies, your tools, and the 8 questions that will help most.")).toBeInTheDocument();
+    const first = screen.getByRole("group", { name: /^Role r1 · Acme · / });
+    expect(within(first).getByText("60")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: /^Role r2 · Beta · / })).getByText("70")).toBeInTheDocument();
+    expect(screen.getByText("Shape and Worth adding don't change your score. They show what a recruiter notices.")).toBeInTheDocument();
   });
 
   it("with no role needing Shape, Start goes straight to companies", async () => {

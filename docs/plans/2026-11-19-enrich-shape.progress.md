@@ -29,3 +29,8 @@ open: notes — the stored grades passed to the writer are the saved role's (a l
 session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
 commit: aa5726d (base 694062d) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: ruling — step eyebrows renumbered in CompaniesStep/ToolsStep/BudgetStep (+ path-steps and budget-review tests), outside the file list. Start skips Shape synchronously when no role needs a merge or a move; Shape's check calls run all at once (no limit named). Web `editor.test.tsx` and `jobs-page.test.tsx` timed out in the full run and pass alone (known flaky).
+
+## Task 7: Prepare all roles at once, apply directly, the new end screen — done
+session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
+commit: 1edc737 (base aa5726d) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: rulings — ReviewSheet.tsx deleted with its tests in budget-review.test.tsx and its unused strings; `PrepChange` keeps `Change` as an alias; EndStep takes extra optional props `rolesBefore` and `more`; `RoleChecklist` written here (pulled forward from Task 8); new lines get fresh ids. The reviewer's one low finding (end screen flipped back to the spinner after Add anyway, losing a half-edited held line) was fixed before the commit: once shown, the end stays up (no test, covered by the branch review). A non-409 failed check leaves that role unchanged (its changes are not applied unchecked). `PATH_PARALLEL = 6` is untested against OpenRouter until a real run.

@@ -6,10 +6,12 @@ import {
 import { t } from "../../i18n/t.ts";
 import { ApiClientError } from "../../lib/api-error.ts";
 import { Skeleton } from "../../ui/Page.tsx";
+import { formatRange } from "../page/blocks.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import type { Via } from "./AnswerBox.tsx";
 import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
+import { RoleChecklist } from "./Checklist.tsx";
 import { EndStep, type HeldChange } from "./EndStep.tsx";
 import { checkChanges, useAnswersOnCv } from "./enrich-api.ts";
 import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
@@ -257,6 +259,23 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           <>
             <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>{average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}</h2>
             <p className="rr-lead" role="status">{t("enrich.path.v2.lead", { k: PATH_BUDGET })}</p>
+            <div className="ep-rows">
+              {graded.map(({ item }) => {
+                const s = scores.get(item.id);
+                const n = scoreOf(s);
+                const titleId = `ep-start-${item.id}`;
+                return (
+                  <section key={item.id} className="ep-row" role="group" aria-labelledby={titleId}>
+                    <h3 className="ep-row-title" id={titleId}>
+                      {[item.title, item.company, formatRange(item.startDate, item.endDate, item.current, cv.locale)].filter(Boolean).join(" · ")}
+                    </h3>
+                    {n !== null && <p className="es-score">{n}</p>}
+                    {s?.state === "ready" && s.result && <RoleChecklist result={s.result} />}
+                  </section>
+                );
+              })}
+            </div>
+            <p className="fm-note">{t("enrich.path.start.checklist")}</p>
           </>
         ) : (
           <>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CONDITIONAL_PARAMETERS, CORE_PARAMETERS, band, type Experience, type RoleResult, type ScoredKind } from "@resumora/shared";
+import { CORE_PARAMETERS, band, type Experience, type RoleResult, type ScoredKind } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { SCORED_LIST, type RoleList } from "../edit/lists.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
@@ -35,12 +35,12 @@ function nameOf(name: string, s: RoleScoreState): string {
 }
 
 /**
- * The one next step of a role: the first thing a recruiter looks for that the page does not show, then one that may
- * apply, then the score's own tip. Null when there is nothing to add.
+ * The one next step of a role: the first item every role needs that the page does not show, then the score's own tip.
+ * Never a "worth adding" item: those don't change the score (score/9). Null when there is nothing to add.
  */
 export function nextStepOf(result: RoleResult): string | null {
   const marks = result.coverage?.marks;
-  const missing = marks && (CORE_PARAMETERS.find((p) => marks[p] !== "shown") ?? CONDITIONAL_PARAMETERS.find((p) => marks[p] === "applies" || marks[p] === "unknown"));
+  const missing = marks && CORE_PARAMETERS.find((p) => marks[p] !== "shown");
   if (missing) return t(`enrich.next.${missing}`);
   return result.nextStep ? issueTip(result.nextStep.issue, result.nextStep.tip) : null;
 }

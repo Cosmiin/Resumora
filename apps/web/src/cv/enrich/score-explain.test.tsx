@@ -29,17 +29,17 @@ const result: RoleResult = {
 const texts = (list: HTMLElement) => within(list).getAllByRole("listitem").map((li) => li.textContent);
 
 describe("Understand the score", () => {
-  it("shows the number, the two parts as bars, a tick per parameter and the three shape checks", () => {
+  it("shows the number, its two parts as bars, a tick per item every role needs, then the checklist that doesn't count", () => {
     render(<ScoreExplain open onClose={() => {}} name="Operations Analyst" role={role} result={result} />);
     expect(screen.getByRole("heading", { name: "Operations Analyst: the score" })).toBeInTheDocument();
     expect(screen.getByText("88")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "Lines: how well each bullet is written" })).toHaveAttribute("aria-valuenow", "86");
-    expect(screen.getByRole("progressbar", { name: "Coverage: what a recruiter looks for" })).toHaveAttribute("aria-valuenow", "92");
-    expect(texts(screen.getByRole("list", { name: "What a recruiter looks for" }))).toEqual([
+    expect(screen.getByRole("progressbar", { name: "Your lines · 60%" })).toHaveAttribute("aria-valuenow", "86");
+    expect(screen.getByRole("progressbar", { name: "What every role needs · 40%" })).toHaveAttribute("aria-valuetext", "6 of 6");
+    expect(texts(screen.getByRole("list", { name: "What every role needs" }))).toEqual([
       "Shown: What the company does", "Shown: What the role was for", "Shown: What you did", "Shown: Tools", "Shown: Results", "Shown: Scale",
-      "Not counted: Leadership: doesn't apply", "Not counted: Seniority and reporting line: doesn't apply", "Missing: People you worked with", "Not counted: Domain knowledge: doesn't apply",
-      "Missing: Three to six bullets", "Shown: No bullet repeats another", "Shown: A bullet with a result comes first",
     ]);
+    expect(texts(screen.getByRole("list", { name: "Shape" }))).toEqual(["○Missing: 3 to 6 lines", "✓Shown: No repeated lines", "✓Shown: Strongest line first"]);
+    expect(texts(screen.getByRole("list", { name: "Worth adding" }))).toEqual(["○Missing: People you worked with"]);
   });
 
   it("takes the role's strongest bullet apart into its five checks", () => {
@@ -73,7 +73,8 @@ describe("a role's score, clicked in the Contents column", () => {
   it("shows the number, one next step with its button, and the link to the explanation", async () => {
     const openFocus = list();
     await userEvent.click(screen.getByRole("button", { name: "Operations Analyst, score 88 of 100, Clear" }));
-    expect(screen.getByText("Next: say who you worked with, in a few words.")).toBeInTheDocument();
+    // Every core item is shown, and people is only worth adding: the next step is the score's own tip.
+    expect(screen.getByText("Next: Say who used the report.")).toBeInTheDocument();
     // The full score card is gone from here: no ring text, no tips list.
     expect(screen.queryByText("How clearly this role tells a recruiter what you did.")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Answer 1 question" }));
@@ -82,10 +83,9 @@ describe("a role's score, clicked in the Contents column", () => {
     expect(screen.getByRole("heading", { name: "Operations Analyst: the score" })).toBeInTheDocument();
   });
 
-  it("the next step is the first of: a core parameter not shown, a conditional one, the score's tip, nothing", () => {
+  it("the next step is the first of: a core parameter not shown, the score's tip, nothing", () => {
     expect(nextStepOf({ ...result, coverage: { ...result.coverage!, marks: { ...marks, tools: "applies" } } })).toBe("name the tools you used, where you used them.");
-    expect(nextStepOf(result)).toBe("say who you worked with, in a few words.");
-    expect(nextStepOf({ ...result, coverage: { ...result.coverage!, marks: { ...marks, people: "shown" } } })).toBe("Say who used the report.");
+    expect(nextStepOf(result)).toBe("Say who used the report.");
     expect(nextStepOf({ ...result, coverage: { ...result.coverage!, marks: { ...marks, people: "na" } }, nextStep: null })).toBeNull();
   });
 

@@ -40,7 +40,7 @@ export function RoleChecklist({ result }: { result: RoleResult }) {
       {groups.map((g) => (
         <div key={g.key} className="rc-group">
           <p className="rc-title">{g.title}</p>
-          <ul className="rc-list">
+          <ul className="rc-list" aria-label={g.title}>
             {g.items.map((it) => (
               <li key={it.key} className={`rc-item ${it.ok ? "is-yes" : "is-no"}`}>
                 <span className="rc-mark" aria-hidden="true">{it.ok ? "✓" : "○"}</span>
