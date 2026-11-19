@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MAX_LONG_TEXT, MAX_TEXT, type Experience } from "./cv.ts";
-import { CONCISE_CHARS, type RoleResult } from "./enrich.ts";
+import { CONCISE_CHARS, RoleResultSchema, type RoleResult } from "./enrich.ts";
 import { numbersIn } from "./enrich-checks.ts";
 
 const id = z.string().min(1).max(64);
@@ -74,3 +74,16 @@ export const ShapeAnswerSchema = z.object({
   merges: z.array(z.object({ ids: z.array(id).min(2).max(6), text: z.string().min(1).max(CONCISE_CHARS.partial) }).strict()).max(4),
 }).strict();
 export type ShapeAnswer = z.infer<typeof ShapeAnswerSchema>;
+
+/**
+ * POST /v1/enrich/check-changes: grade only the lines a change touches, hold a change that would lower the score
+ * (with `hold`), and store the predicted result under the new fingerprint.
+ */
+export const CheckChangesBodySchema = z.object({
+  roleId: id, fingerprint: z.string().min(1).max(64), changes: z.array(ChangeSchema).max(30), hold: z.boolean(),
+}).strict();
+export type CheckChangesBody = z.infer<typeof CheckChangesBodySchema>;
+export const CheckChangesAnswerSchema = z.object({
+  result: RoleResultSchema, kept: z.array(id), held: z.array(ChangeSchema),
+}).strict();
+export type CheckChangesAnswer = z.infer<typeof CheckChangesAnswerSchema>;

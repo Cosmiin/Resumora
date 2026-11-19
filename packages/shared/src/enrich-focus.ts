@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Experience, Note } from "./cv.ts";
-import { buildRoleResult, EnrichParseError, hashText, modelMarks, type ModelBullet, type RoleResult } from "./enrich.ts";
+import { buildRoleResult, EnrichParseError, hashText, modelMarks, type ModelBullet, type ModelCoverage, type RoleResult } from "./enrich.ts";
 
 export const BRAIN_DUMP_QUESTION = "What did a normal week here look like?";
 export const MAX_PENDING = 5;
@@ -14,6 +14,8 @@ export function mergeGrades(
   stored: RoleResult | null,
   graded: ModelBullet[],
   fingerprintValue: string,
+  /** Fresh role-wide marks (a grading call that re-read the role). Absent: the stored marks are kept. */
+  coverage?: ModelCoverage,
 ): RoleResult {
   const bullets = role.bullets.map(({ id }): ModelBullet => {
     const fresh = graded.find((b) => b.id === id);
@@ -36,8 +38,8 @@ export function mergeGrades(
     };
   });
   return {
-    // The role-wide marks are kept from the stored result: grading one bullet again does not re-read the role.
-    ...buildRoleResult(role, { bullets, nextStepId: stored?.nextStep?.bulletId ?? null, coverage: stored?.coverage ? modelMarks(stored.coverage) : undefined }, fingerprintValue),
+    // The role-wide marks are kept from the stored result unless fresh ones are given: grading one bullet again does not re-read the role.
+    ...buildRoleResult(role, { bullets, nextStepId: stored?.nextStep?.bulletId ?? null, coverage: coverage ?? (stored?.coverage ? modelMarks(stored.coverage) : undefined) }, fingerprintValue),
     roleQuestions: stored?.roleQuestions ?? [],
     thin: role.bullets.length <= 1 || (stored?.thin ?? false),
   };

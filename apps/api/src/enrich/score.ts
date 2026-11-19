@@ -9,6 +9,7 @@ import {
   type Experience,
   type Locale,
   type ModelBullet,
+  type ModelCoverage,
   type RoleResult,
 } from "@resumora/shared";
 import { AiInputRejectedError, AiOutputTooLongError, AiUnavailableError, callModel, type ModelDeps } from "../ai/call-model.ts";
@@ -44,6 +45,36 @@ export async function gradeBullets(deps: ScoreDeps, role: Experience, locale: Lo
       throw new EnrichParseError("Model answer must contain exactly the requested bullet ids");
     }
     return answer.bullets;
+  } catch (err) {
+    aiError(err);
+  }
+}
+
+/**
+ * Grades only `ids` (none is fine) and re-reads the whole role for its marks (score/9): used when a change set is
+ * checked, so unchanged lines keep their grades but what the page shows is read again. Marks absent from the answer
+ * come back undefined, and the caller keeps the stored ones.
+ */
+export async function gradeWithCoverage(
+  deps: ScoreDeps, role: Experience, locale: Locale, ids: readonly string[],
+): Promise<{ bullets: ModelBullet[]; coverage: ModelCoverage | undefined }> {
+  try {
+    const answer = await callModel(deps.model, {
+      userId: deps.userId,
+      task: "enrich_score",
+      schema: ModelScoreSchema,
+      system: scoreSystemPrompt(locale, deps.questionLanguage),
+      user: scoreUserMessage(role, ids)
+        + (ids.length ? "" : "\nGrade no bullets: return an empty bullets list.")
+        + "\nAlso return coverage for the whole role, as the page reads now."
+        + questionLanguageReminder(locale, deps.questionLanguage),
+      maxOutputTokens: 800 + 180 * ids.length,
+    });
+    const actual = new Set(answer.bullets.map((b) => b.id));
+    if (answer.bullets.length !== ids.length || actual.size !== ids.length || !ids.every((id) => actual.has(id))) {
+      throw new EnrichParseError("Model answer must contain exactly the requested bullet ids");
+    }
+    return { bullets: answer.bullets, coverage: answer.coverage };
   } catch (err) {
     aiError(err);
   }

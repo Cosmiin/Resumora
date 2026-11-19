@@ -172,6 +172,16 @@ describe("POST /v1/enrich/shape", () => {
   });
 });
 
+describe("POST /v1/enrich/check-changes", () => {
+  const post = (body: unknown) => app.request("/v1/enrich/check-changes", { method: "POST", headers: auth, body: JSON.stringify(body) });
+
+  it("400 for a malformed body, 409 for a stale fingerprint", async () => {
+    expect((await post({ roleId: role.id, fingerprint: fp, changes: [] })).status).toBe(400);
+    expect((await post({ roleId: role.id, fingerprint: fp, changes: [{ id: "x", kind: "rename" }], hold: true })).status).toBe(400);
+    expect((await post({ roleId: role.id, fingerprint: "old", changes: [], hold: true })).status).toBe(409);
+  });
+});
+
 describe("POST /v1/enrich/project-questions", () => {
   const post = (body: unknown) => app.request("/v1/enrich/project-questions", { method: "POST", headers: auth, body: JSON.stringify(body) });
   const project = { ...roleWith(["Built a planner."], { title: "Route planner", company: "Personal project" }), url: "" };

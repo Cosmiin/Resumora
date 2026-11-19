@@ -36,6 +36,16 @@ describe("notesHash", () => {
 });
 
 describe("mergeGrades", () => {
+  it("uses fresh role-wide marks when they are given, and the stored ones otherwise", () => {
+    const r = role();
+    const marks = { company: "applies", purpose: "applies", tools: "applies", scale: "applies", leadership: "na", seniority: "na", people: "na", domain: "na" } as const;
+    const stored = buildRoleResult(r, { bullets: [grade("b1"), grade("b2")], nextStepId: null, coverage: marks }, "old");
+    expect(mergeGrades(r, stored, [], "new").coverage?.marks.tools).toBe("applies");
+    const fresh = mergeGrades(r, stored, [], "new", { ...marks, tools: "shown" });
+    expect(fresh.coverage?.marks.tools).toBe("shown");
+    expect(fresh.score).toBeGreaterThan(stored.score!);
+  });
+
   it("replaces one bullet's grades and recomputes the rounded role mean", () => {
     const r = role();
     const stored = buildRoleResult(r, {

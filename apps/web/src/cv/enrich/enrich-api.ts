@@ -1,5 +1,8 @@
 import { z } from "zod";
 import {
+  CheckChangesAnswerSchema,
+  type CheckChangesAnswer,
+  type CheckChangesBody,
   ShapeAnswerSchema,
   type ShapeAnswer,
   type ShapeBody,
@@ -211,4 +214,9 @@ export function projectWrite(projectId: string): Promise<ProjectWriteAnswer> {
 /** The path's Shape step: merges of lines that describe the same work in one saved role (score/9). */
 export function proposeShape(input: ShapeBody): Promise<ShapeAnswer> {
   return apiFetch("/v1/enrich/shape", { method: "POST", json: input, schema: ShapeAnswerSchema });
+}
+
+/** Checks a role's change set before it is applied: what would lower the score is held, the new score predicted (score/9). */
+export function checkChanges(body: CheckChangesBody): Promise<CheckChangesAnswer> {
+  return apiFetch("/v1/enrich/check-changes", { method: "POST", json: body, schema: CheckChangesAnswerSchema });
 }
