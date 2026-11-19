@@ -22,3 +22,16 @@ session: enrich-shape handoff · builder: claude
 commit: 9ffc063 (base 44c0eef) · reviews: 4 (agents: 3 Sonnet, 1 Opus) · fix rounds: 2 + 1 after escalation · guard denials: 0
 rulings: an unfilled blank is dropped by `withoutOpenBlanks` in each submitting screen (QuestionStep, RoleRun, ProjectRun), not in the reducer, so a "…" typed by a phone's autocorrect survives; focus.css in scope for the focus-mode amount row. Escalation: character-by-character matching kept missing edge cases (endless loop for "…% faster", trailing space or ", " hiding an open blank), so the blank logic was rewritten on trimmed comma pieces; a fill counts only as a short amount with a digit. Amounts without a digit are dropped in shared `pickOptions` to match.
 open (low, from the Opus review): a short typed text that starts like a trailing-blank option and has a digit ("Led a team of 5" vs "Led …") reads as filled; a blank option can match an already picked plain option with a range ("10–50 clients" vs "… clients"); words spoken right after a filled blank join with a space, so the chip reads unpicked; text typed after a blank without a comma ("…% in Q3") keeps the "…". Blank options containing a comma are unsupported.
+
+## Task 5: A held line asks for its missing fact — done
+session: enrich-shape handoff · builder: claude
+commit: 584e168 (base 9ffc063) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+ruling: ro-basecv.ts in scope; `asks[].amounts` optional like every other amounts field.
+open: none
+
+## Task 6: Real-AI check — done (not committed; eval deleted)
+Same eval on main (d6d29b8) and on the branch, 5 runs each, payroll role with three answers, plus 5 scores each of the Vevol and payroll roles. 60 AI calls per side, 0 failed.
+- Facts placed from answers (use-answers, then graded): before 11 of 15 lines at 100 (average 94.7); after 15 of 15 at 100 (average 100). The before misses were the month-end line at 80.
+- Line rewrites (improve-bullet): before 5 of 6 at 100 (avg 96.7); after 5 of 6 (avg 99.2). Both sides answered "needs more detail" for 9 of 15 requests even with the answers in the notes — unchanged by this work, worth a look on its own.
+- Line length: every written line 75–116 characters; nothing used the new room up to 440.
+- Options: vague result options ("Faster", "Lower cost" …) 0 on both sides. Blank options: before 0, after 7, on 2 questions, both with amounts; 0 blank questions without amounts. Purpose options: before bare nouns ("Client account management", "Project coordination"); after concrete aims ("To manage Shopify store operations for clients", "Managing end-to-end payroll for small business clients").
