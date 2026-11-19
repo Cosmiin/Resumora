@@ -87,3 +87,18 @@ export const CheckChangesAnswerSchema = z.object({
   result: RoleResultSchema, kept: z.array(id), held: z.array(ChangeSchema),
 }).strict();
 export type CheckChangesAnswer = z.infer<typeof CheckChangesAnswerSchema>;
+
+/**
+ * POST /v1/enrich/use-answers: after the rewrites, place each fact from this round's answers that is still missing from
+ * the page. `changes` are the role's prepared changes; `questions` are this round's note questions.
+ */
+export const UseAnswersBodySchema = z.object({
+  roleId: id, fingerprint: z.string().min(1).max(64), changes: z.array(ChangeSchema).max(30),
+  questions: z.array(z.string().min(1).max(MAX_TEXT)).max(20),
+}).strict();
+export type UseAnswersBody = z.infer<typeof UseAnswersBodySchema>;
+/** Only line rewrites, new lines and the description; a `bullet` change holds the line's whole new text. */
+export const UseAnswersAnswerSchema = z.object({
+  changes: z.array(ChangeSchema.refine((c) => c.kind === "bullet" || c.kind === "new" || c.kind === "description")),
+}).strict();
+export type UseAnswersAnswer = z.infer<typeof UseAnswersAnswerSchema>;

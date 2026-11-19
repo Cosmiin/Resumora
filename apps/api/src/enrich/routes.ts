@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
-import { ItemLinesBodySchema, ProjectQuestionsBodySchema, ProjectWriteBodySchema, RewriteEventSchemas, ShapeBodySchema, CheckChangesBodySchema, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
+import { ItemLinesBodySchema, ProjectQuestionsBodySchema, ProjectWriteBodySchema, RewriteEventSchemas, ShapeBodySchema, CheckChangesBodySchema, UseAnswersBodySchema, VOICE, type Locale, type RewriteEvent } from "@resumora/shared";
 import { z } from "zod";
 import type { AppEnv } from "../app.ts";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -26,6 +26,7 @@ import { suggestTools } from "./tools.ts";
 import { suggestSkills } from "./skills.ts";
 import { proposeShape } from "./shape.ts";
 import { checkChanges } from "./check-changes.ts";
+import { useAnswers } from "./use-answers.ts";
 import { streamModel } from "../ai/stream-model.ts";
 import { checkSummary, rewriteEvents } from "./rewrite.ts";
 import { rewriteSummarySystemPrompt, rewriteSummaryUserMessage } from "./rewrite-prompts.ts";
@@ -148,6 +149,24 @@ export function enrichRoutes(deps: {
     } catch (err) {
       if (err instanceof ApiError && err.status >= 500) {
         console.error(JSON.stringify({ msg: "check changes failed", code: err.code, requestId: c.get("requestId") }));
+      }
+      throw err;
+    }
+  });
+
+  // After the rewrites: the facts from this round's answers still missing from the page, placed on it (score/9).
+  app.post("/use-answers", async (c) => {
+    const body = UseAnswersBodySchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId, a fingerprint, the changes and the questions.");
+    const user = c.get("user");
+    try {
+      return c.json(await useAnswers(
+        { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
+        body.data,
+      ));
+    } catch (err) {
+      if (err instanceof ApiError && err.status >= 500) {
+        console.error(JSON.stringify({ msg: "use answers failed", code: err.code, requestId: c.get("requestId") }));
       }
       throw err;
     }
