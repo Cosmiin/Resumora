@@ -1,13 +1,13 @@
 import { useReducer, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { emptyCv, fingerprint, type BudgetItem, type CvContent, type Experience, type Note, type RoleResult } from "@resumora/shared";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
-import type { ReviewGroup } from "./ReviewSheet.tsx";
+import { ApiClientError } from "../../lib/api-error.ts";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn() }));
+const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn(), proposeShape: vi.fn(), checkChanges: vi.fn(), placeAnswersOnCv: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 const note = (question: string, answer: string): Note => ({ id: `n-${question}`, question, answer, via: ["type"], askedAt: "2026-11-17T00:00:00Z" });
@@ -38,14 +38,6 @@ vi.mock("./BudgetStep.tsx", () => ({
     </div>
   ),
 }));
-vi.mock("./ReviewSheet.tsx", () => ({
-  ReviewSheet: ({ groups, onApply }: { groups: ReviewGroup[]; onApply(d: { roleId: string; id: string; text: string }[]): void }) => (
-    <div>
-      <p>Review: {groups.map((g) => `${g.roleId}:${g.changes.map((c) => `${c.id}${g.tidied.has(c.id) ? "(tidied)" : ""}`).join(",")}`).join(" ")}</p>
-      <button type="button" onClick={() => onApply(groups.flatMap((g) => g.changes.map((c) => ({ roleId: g.roleId, id: c.id, text: c.after }))))}>Apply all</button>
-    </div>
-  ),
-}));
 
 import { EnrichPath, averageScore, strengthWeights } from "./EnrichPath.tsx";
 
@@ -69,15 +61,15 @@ const r2 = role("r2", { company: "Beta" });
 const cv: CvContent = { ...emptyCv("en"), experience: [r1, r2] };
 const ready = (r: Experience, score: number, over: Partial<RoleResult> = {}): RoleScoreState => ({ state: "ready", result: result(r, score, over) });
 
-function Harness({ initial, onAction, onClose = () => {}, extra }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string }) {
-  const [state, apply] = useReducer(cvReducer, cv);
+function Harness({ initial, onAction, onClose = () => {}, extra, start = cv, onScore }: { initial: Map<string, RoleScoreState>; onAction?(a: CvAction): void; onClose?(): void; extra?: string; start?: CvContent; onScore?(r: RoleResult): void }) {
+  const [state, apply] = useReducer(cvReducer, start);
   const [scores, setScores] = useState(initial);
   return (
     <>
       <button type="button" onClick={() => setScores(new Map([
         ["r1", ready(state.experience[0]!, 88, extra ? { roleQuestions: [{ id: "rq9", text: extra, options: [], kind: "role", topic: "other" }] } : {})],
         ["r2", ready(state.experience[1]!, 80, { questions: [], roleQuestions: [] })]]))}>Rescore</button>
-      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose}
+      <EnrichPath cv={state} scores={scores} waitForSave={() => Promise.resolve()} onClose={onClose} onScore={onScore}
         dispatch={(a) => { onAction?.(a); apply(a); }} />
     </>
   );
@@ -88,7 +80,15 @@ beforeEach(() => {
   api.improveBullet.mockImplementation(({ bulletId }: { bulletId: string }) => Promise.resolve({ proposal: { bulletId, text: `Better ${bulletId}.` }, bulletBefore: 60, bulletAfter: 90, roleBefore: 60, roleAfter: 70, cached: false }));
   api.roleDescription.mockResolvedValue({ text: "Acme makes anvils. Ran reports.", keywords: [] });
   api.brainDump.mockResolvedValue({ proposals: [], roleBefore: null, roleAfterAll: null });
+  api.placeAnswersOnCv.mockResolvedValue({ changes: [] });
+  // Keeps every change, and predicts the role at 85.
+  api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string }[] }) =>
+    Promise.resolve({ result: { ...result(roleId === "r1" ? r1 : r2, 85), fingerprint: `after-${roleId}` }, kept: changes.map((c) => c.id), held: [] }));
 });
+
+/** The change list put on the CV for a role. */
+const appliedTo = (actions: CvAction[], roleId: string) =>
+  actions.flatMap((a) => (a.type === "applyRoleChanges" && a.roleId === roleId ? a.changes : []));
 
 describe("the short path", () => {
   // r2 has nothing left to ask: only its weak line is worked on.
@@ -107,7 +107,7 @@ describe("the short path", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
-  it("shows the CV's score at the start, then companies, tools, the questions, the review and the end, in that order", async () => {
+  it("shows the CV's score at the start, then companies, tools, the questions and the end, with no review sheet", async () => {
     const actions: CvAction[] = [];
     render(<Harness initial={scores()} onAction={(a) => actions.push(a)} />);
     // Weighted: r1 counts 3, r2 counts 2 → (60*3 + 70*2) / 5 = 64.
@@ -126,13 +126,22 @@ describe("the short path", () => {
     expect(screen.queryByText(/Your CV:/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
     expect(actions.some((a) => a.type === "setNote" && a.note.question === "What changed in r1?")).toBe(true);
-    const review = await screen.findByText(/^Review:/);
-    expect(review.textContent).toContain("r1:description,bullet:r1b1");
-    // r2 got no answers: its weak line is tidied, with no new facts.
-    expect(review.textContent).toContain("r2:bullet:r2b1(tidied)");
-    await userEvent.click(screen.getByRole("button", { name: "Apply all" }));
-    expect(actions).toContainEqual({ type: "replaceBullet", roleId: "r1", bulletId: "r1b1", text: "Better r1b1." });
-    expect(actions).toContainEqual({ type: "setItemField", list: "experience", itemId: "r1", field: "description", value: "Acme makes anvils. Ran reports." });
+    expect(await screen.findByRole("button", { name: "Done" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply all" })).toBeNull();
+    expect(appliedTo(actions, "r1")).toEqual([
+      { id: "description", kind: "description", text: "Acme makes anvils. Ran reports." },
+      { id: "bullet:r1b1", kind: "bullet", bulletId: "r1b1", text: "Better r1b1." },
+      // A question about the whole role was answered: lines below 100 are worked on too.
+      { id: "bullet:r1b2", kind: "bullet", bulletId: "r1b2", text: "Better r1b2." },
+    ]);
+    // r2 got no answers: only its weak line is tidied.
+    expect(appliedTo(actions, "r2")).toEqual([{ id: "bullet:r2b1", kind: "bullet", bulletId: "r2b1", text: "Better r2b1." }]);
+    // Every answer of this round is offered to be placed, on the role with its prepared changes.
+    expect(api.placeAnswersOnCv).toHaveBeenCalledWith(expect.objectContaining({
+      roleId: "r1", fingerprint: fingerprint(r1, "en"),
+      questions: expect.arrayContaining(["What does Acme do?", "What changed in r1?", "Did anyone report to you in r1?"]),
+    }));
+    expect(api.checkChanges).toHaveBeenCalledWith(expect.objectContaining({ roleId: "r1", hold: true }));
     await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
     expect(await screen.findByRole("heading", { name: "Your CV: 64 → 85" })).toBeInTheDocument();
   });
@@ -144,7 +153,7 @@ describe("the short path", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
     const first = (await screen.findByText(/^Budget:/)).textContent ?? "";
     await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Apply all" }));
+    await screen.findByRole("button", { name: "Done" });
     await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
     await userEvent.click(await screen.findByRole("button", { name: "1 more question" }));
     const second = (await screen.findByText(/^Budget:/)).textContent ?? "";
@@ -152,19 +161,18 @@ describe("the short path", () => {
     expect(first).toContain("What changed in r1?");
   });
 
-  it("goes straight from tools to the review when there is nothing to ask", async () => {
+  it("goes straight from tools to the end when there is nothing to ask", async () => {
+    const actions: CvAction[] = [];
     const quiet = new Map<string, RoleScoreState>([["r1", ready(r1, 60, { questions: [], roleQuestions: [] })], ["r2", ready(r2, 70, { questions: [], roleQuestions: [] })]]);
-    render(<Harness initial={quiet} />);
+    render(<Harness initial={quiet} onAction={(a) => actions.push(a)} />);
     await userEvent.click(screen.getByRole("button", { name: "Start" }));
     await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
     await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
-    const review = await screen.findByText(/^Review:/);
+    await screen.findByRole("button", { name: "Done" });
     expect(screen.queryByText(/^Budget:/)).toBeNull();
-    // A company answer brings a description, but rewrites only the weak line (60), not the one at 90, and that line
-    // may carry the company's facts, so it is not marked tidied.
-    expect(review.textContent).toContain("r1:description,bullet:r1b1 ");
-    expect(review.textContent).not.toContain("r1b2");
-    expect(review.textContent).toContain("r2:bullet:r2b1(tidied)");
+    // A company answer brings a description, but rewrites only the weak line (60), not the one at 90.
+    expect(appliedTo(actions, "r1").map((c) => c.id)).toEqual(["description", "bullet:r1b1"]);
+    expect(appliedTo(actions, "r2").map((c) => c.id)).toEqual(["bullet:r2b1"]);
     expect(api.improveBullet.mock.calls.map(([b]) => b.bulletId)).toEqual(["r1b1", "r2b1"]);
   });
 
@@ -187,7 +195,7 @@ describe("the short path", () => {
     await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
     await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
     await userEvent.click(await screen.findByRole("button", { name: "Talk and finish" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Apply all" }));
+    await screen.findByRole("button", { name: "Done" });
     await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
     await userEvent.click(await screen.findByRole("button", { name: "1 more question" }));
     await userEvent.click(await screen.findByRole("button", { name: "Talk and finish" }));
@@ -206,6 +214,136 @@ describe("the short path", () => {
     const notes = actions.flatMap((a) => (a.type === "setNote" && a.note.answer.startsWith("About line") ? [a.note] : []));
     expect(notes).toHaveLength(2);
     expect(notes[1]!.id).not.toBe(notes[0]!.id);
+  });
+
+  describe("preparing", () => {
+    const toEnd = async (onAction?: (a: CvAction) => void, onScore?: (r: RoleResult) => void) => {
+      render(<Harness initial={scores()} onAction={onAction} onScore={onScore} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Answer all" }));
+      await screen.findByRole("button", { name: "Done" });
+    };
+
+    it("places what the answers still lack, replacing the role's own change for the same line, and puts the prediction", async () => {
+      api.placeAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
+        ? { changes: [{ id: "answer1", kind: "bullet", bulletId: "r1b1", text: "Better r1b1, for 3 teams." }, { id: "answer2", kind: "new", text: "Reported to the CFO." }] }
+        : { changes: [] }));
+      const actions: CvAction[] = [];
+      const onScore = vi.fn();
+      await toEnd((a) => actions.push(a), onScore);
+      expect(appliedTo(actions, "r1")).toEqual([
+        { id: "description", kind: "description", text: "Acme makes anvils. Ran reports." },
+        { id: "bullet:r1b1", kind: "bullet", bulletId: "r1b1", text: "Better r1b1, for 3 teams." },
+        { id: "bullet:r1b2", kind: "bullet", bulletId: "r1b2", text: "Better r1b2." },
+        { id: "answer2", kind: "new", text: "Reported to the CFO." },
+      ]);
+      expect(onScore).toHaveBeenCalledWith(expect.objectContaining({ roleId: "r1", fingerprint: "after-r1" }));
+      expect(onScore).toHaveBeenCalledWith(expect.objectContaining({ roleId: "r2", fingerprint: "after-r2" }));
+    });
+
+    it("a held new line stays off the CV and is shown at the end; Add anyway puts it on", async () => {
+      api.placeAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
+        ? { changes: [{ id: "answer1", kind: "new", text: "Helped the team." }] } : { changes: [] }));
+      api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string; kind: string }[] }) => Promise.resolve({
+        result: { ...result(roleId === "r1" ? r1 : r2, 85), fingerprint: `after-${roleId}` },
+        kept: changes.filter((c) => c.kind !== "new").map((c) => c.id), held: changes.filter((c) => c.kind === "new"),
+      }));
+      const actions: CvAction[] = [];
+      await toEnd((a) => actions.push(a));
+      expect(appliedTo(actions, "r1").map((c) => c.id)).toEqual(["description", "bullet:r1b1", "bullet:r1b2"]);
+      expect(screen.getByText("Not added: it would lower Role r1's score a little")).toBeInTheDocument();
+      expect(screen.getByText("Helped the team.")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Add anyway" }));
+      expect(actions.at(-1)).toEqual({ type: "applyRoleChanges", roleId: "r1", changes: [{ id: "answer1", kind: "new", text: "Helped the team." }] });
+      expect(screen.queryByText("Helped the team.")).toBeNull();
+    });
+
+    it("when one role's check fails, the other role's changes are on the CV and the notice shows", async () => {
+      api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string }[] }) => (roleId === "r1"
+        ? Promise.reject(new ApiClientError(503, "ai_unavailable", "down"))
+        : Promise.resolve({ result: { ...result(r2, 85), fingerprint: "after-r2" }, kept: changes.map((c) => c.id), held: [] })));
+      const actions: CvAction[] = [];
+      await toEnd((a) => actions.push(a));
+      expect(appliedTo(actions, "r2").map((c) => c.id)).toEqual(["bullet:r2b1"]);
+      expect(appliedTo(actions, "r1")).toEqual([]);
+      expect(screen.getByRole("alert")).toHaveTextContent("Some changes could not be prepared.");
+    });
+
+    it("when the CV moved on (409), that role's changes go on the CV anyway, with no prediction", async () => {
+      api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string }[] }) => (roleId === "r1"
+        ? Promise.reject(new ApiClientError(409, "not_saved", "not saved"))
+        : Promise.resolve({ result: { ...result(r2, 85), fingerprint: "after-r2" }, kept: changes.map((c) => c.id), held: [] })));
+      const actions: CvAction[] = [];
+      const onScore = vi.fn();
+      await toEnd((a) => actions.push(a), onScore);
+      expect(appliedTo(actions, "r1").map((c) => c.id)).toEqual(["description", "bullet:r1b1", "bullet:r1b2"]);
+      expect(onScore.mock.calls.map(([r]) => r.roleId)).toEqual(["r2"]);
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+  });
+
+  it("the start lists each role with its score and checklist, and says the checklist doesn't change the score", () => {
+    render(<Harness initial={scores()} />);
+    expect(screen.getByText("About 5 minutes: tidy your lines, then your companies, your tools, and the 8 questions that will help most.")).toBeInTheDocument();
+    const first = screen.getByRole("group", { name: /^Role r1 · Acme · / });
+    expect(within(first).getByText("60")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: /^Role r2 · Beta · / })).getByText("70")).toBeInTheDocument();
+    expect(screen.getByText("Shape and Worth adding don't change your score. They show what a recruiter notices.")).toBeInTheDocument();
+  });
+
+  it("with no role needing Shape, Start goes straight to companies", async () => {
+    render(<Harness initial={scores()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    expect(screen.getByText("Companies step")).toBeInTheDocument();
+    expect(api.proposeShape).not.toHaveBeenCalled();
+  });
+
+  describe("Shape", () => {
+    const long = role("r1", { bullets: Array.from({ length: 8 }, (_, i) => ({ id: `r1b${i + 1}`, text: `Did task ${i + 1} for 5 clients.` })) });
+    const start: CvContent = { ...emptyCv("en"), experience: [long, r2] };
+    const shapeScores = () => new Map<string, RoleScoreState>([["r1", ready(long, 60)], ["r2", ready(r2, 70, { questions: [], roleQuestions: [] })]]);
+    const mergedText = "Did tasks 2 and 3 for 5 clients.";
+    const predicted = (): RoleResult => ({ ...result(long, 75), fingerprint: "after" });
+
+    beforeEach(() => {
+      api.proposeShape.mockResolvedValue({ merges: [{ ids: ["r1b2", "r1b3"], text: mergedText }] });
+      api.checkChanges.mockResolvedValue({ result: predicted(), kept: [], held: [] });
+    });
+
+    it("after Merge all the CV has the merged line in place of the first, the other removed, and the predicted score is put", async () => {
+      const actions: CvAction[] = [];
+      const onScore = vi.fn();
+      render(<Harness initial={shapeScores()} start={start} onAction={(a) => actions.push(a)} onScore={onScore} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
+      expect(await screen.findByText("Companies step")).toBeInTheDocument();
+      const changes = [
+        { id: "merge:r1b2", kind: "bullet", bulletId: "r1b2", text: mergedText },
+        { id: "remove:r1b3", kind: "remove", bulletId: "r1b3" },
+      ];
+      expect(api.checkChanges).toHaveBeenCalledWith({ roleId: "r1", fingerprint: fingerprint(long, "en"), changes, hold: false });
+      const applied = actions.find((a) => a.type === "applyRoleChanges");
+      expect(applied).toEqual({ type: "applyRoleChanges", roleId: "r1", changes });
+      const after = cvReducer(start, applied!);
+      expect(after.experience[0]!.bullets.map((b) => b.text)).toEqual([
+        "Did task 1 for 5 clients.", mergedText, ...[4, 5, 6, 7, 8].map((n) => `Did task ${n} for 5 clients.`),
+      ]);
+      expect(onScore).toHaveBeenCalledWith(predicted());
+    });
+
+    it("when the check fails (or the CV moved on), the merges are applied anyway and no score is put", async () => {
+      api.checkChanges.mockRejectedValue(Object.assign(new Error("not saved"), { status: 409 }));
+      const actions: CvAction[] = [];
+      const onScore = vi.fn();
+      render(<Harness initial={shapeScores()} start={start} onAction={(a) => actions.push(a)} onScore={onScore} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Merge all and continue" }));
+      expect(await screen.findByText("Companies step")).toBeInTheDocument();
+      expect(actions.some((a) => a.type === "applyRoleChanges" && a.roleId === "r1")).toBe(true);
+      expect(onScore).not.toHaveBeenCalled();
+    });
   });
 
   it("Skip for now closes it", async () => {

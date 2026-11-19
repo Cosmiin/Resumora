@@ -4,7 +4,7 @@ import { emptyCv, fingerprint, type CvContent, type Experience, type RoleResult 
 const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
-import { changeActions, prepareRoleChanges, type Change } from "./prepare.ts";
+import { changeActions, createLimiter, prepareRoleChanges, toChanges, type Change } from "./prepare.ts";
 
 const role: Experience = {
   id: "r1", company: "Acme", title: "Analyst", location: "", startDate: "2020-01", endDate: "", current: true, description: "Old.",
@@ -101,5 +101,79 @@ describe("changeActions", () => {
 
   it("does nothing without decisions", () => {
     expect(changeActions(cv, "r1", "experience", changes, [])).toEqual({ actions: [], applied: 0, changedBullets: [] });
+  });
+});
+
+describe("createLimiter", () => {
+  const deferred = () => {
+    let resolve!: () => void;
+    const promise = new Promise<void>((r) => { resolve = r; });
+    return { promise, resolve };
+  };
+
+  it("never runs more than its limit at once, and runs every task", async () => {
+    const limit = createLimiter(2);
+    let running = 0;
+    let most = 0;
+    const gates = Array.from({ length: 5 }, deferred);
+    const all = Promise.all(gates.map((g, i) => limit(async () => {
+      running++;
+      most = Math.max(most, running);
+      await g.promise;
+      running--;
+      return i;
+    })));
+    for (const g of gates) { await Promise.resolve(); g.resolve(); await new Promise((r) => setTimeout(r, 0)); }
+    expect(await all).toEqual([0, 1, 2, 3, 4]);
+    expect(most).toBe(2);
+  });
+
+  it("passes a failure on and keeps going", async () => {
+    const limit = createLimiter(1);
+    await expect(limit(() => Promise.reject(new Error("down")))).rejects.toThrow("down");
+    expect(await limit(() => Promise.resolve("next"))).toBe("next");
+  });
+
+  it("shared by two roles, their requests interleave within one limit", async () => {
+    const order: string[] = [];
+    let running = 0;
+    let most = 0;
+    api.improveBullet.mockImplementation(async ({ roleId, bulletId }: { roleId: string; bulletId: string }) => {
+      running++;
+      most = Math.max(most, running);
+      order.push(`${roleId}:${bulletId}`);
+      await new Promise((r) => setTimeout(r, 5));
+      order.push(`end ${roleId}:${bulletId}`);
+      running--;
+      return rewrite(bulletId, `New ${bulletId}.`);
+    });
+    const r2: Experience = { ...role, id: "r2", bullets: role.bullets.map((b) => ({ ...b, id: `2${b.id}` })) };
+    const two: CvContent = { ...cv, experience: [role, r2] };
+    const result2: RoleResult = { ...result, roleId: "r2", fingerprint: fingerprint(r2, "en"), bullets: result.bullets.map((b) => ({ ...b, id: `2${b.id}` })) };
+    const limit = createLimiter(3);
+    await Promise.all([
+      prepareRoleChanges({ ...base, cv: two, answeredRole: true, limit }),
+      prepareRoleChanges({ ...base, cv: two, roleId: "r2", result: result2, answeredRole: true, limit }),
+    ]);
+    expect(most).toBe(3);
+    // r2 starts while r1 is still under way: one queue for both.
+    expect(order.indexOf("r2:2b1")).toBeLessThan(order.indexOf("end r1:b3"));
+  });
+});
+
+describe("toChanges", () => {
+  it("turns prepared changes into the shared change list; a new line gets a fresh id", () => {
+    const out = toChanges([
+      { id: "description", kind: "description", before: "Old.", after: "New description." },
+      { id: "bullet:b1", kind: "bullet", bulletId: "b1", before: "Did reports.", after: "Built weekly reports." },
+      { id: "new:new1", kind: "new", before: "", after: "Built a dashboard." },
+    ]);
+    expect(out.slice(0, 2)).toEqual([
+      { id: "description", kind: "description", text: "New description." },
+      { id: "bullet:b1", kind: "bullet", bulletId: "b1", text: "Built weekly reports." },
+    ]);
+    expect(out[2]).toMatchObject({ kind: "new", text: "Built a dashboard." });
+    expect(out[2]!.id).not.toBe("new:new1");
+    expect(toChanges([{ id: "new:new1", kind: "new", before: "", after: "X." }])[0]!.id).not.toBe(out[2]!.id);
   });
 });

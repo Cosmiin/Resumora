@@ -163,13 +163,13 @@ describe("ToolsStep", () => {
   it("shows one role at a time, ticks a tool the role already names, and saves only the roles that changed", async () => {
     const onDone = await open();
     onRole("Analyst");
-    expect(screen.getByText("Step 2 of 4 · Role 1 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Step 3 of 4 · Role 1 of 3")).toBeInTheDocument();
     ticked("Excel");
     unticked("SAP");
     expect(tool("Back")).toBeNull();
     await press("Next role");
     onRole("Planner");
-    expect(screen.getByText("Step 2 of 4 · Role 2 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Step 3 of 4 · Role 2 of 3")).toBeInTheDocument();
     await press("SAP");
     await press("Next role");
     onRole("Clerk");

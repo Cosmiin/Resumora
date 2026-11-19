@@ -91,7 +91,7 @@ export function CompaniesStep({ cv, prepared, onDone }: { cv: CvContent; prepare
 
   return (
     <>
-      <p className="fm-eyebrow">{t("enrich.path.step", { n: 1, total: 4 })}</p>
+      <p className="fm-eyebrow">{t("enrich.path.step", { n: 2, total: 4 })}</p>
       <h2 className="rr-big" id="fm-step-title" tabIndex={-1}>{t("enrich.path.companies.title")}</h2>
       <p className="rr-lead">{t("enrich.path.companies.lead")}</p>
       {loading && <p className="fm-note" role="status">{t("enrich.path.companies.loading")}</p>}

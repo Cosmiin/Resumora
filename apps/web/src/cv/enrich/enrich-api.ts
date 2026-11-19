@@ -1,5 +1,14 @@
 import { z } from "zod";
 import {
+  CheckChangesAnswerSchema,
+  UseAnswersAnswerSchema,
+  type UseAnswersAnswer,
+  type UseAnswersBody,
+  type CheckChangesAnswer,
+  type CheckChangesBody,
+  ShapeAnswerSchema,
+  type ShapeAnswer,
+  type ShapeBody,
   CompaniesAnswerSchema,
   ToolsAnswerSchema,
   type CompaniesAnswer,
@@ -203,4 +212,19 @@ export function projectQuestions(projectId: string): Promise<ProjectQuestionsAns
 /** One description sentence, at most two bullets and the extra tools for one saved project, from its own text and answers. */
 export function projectWrite(projectId: string): Promise<ProjectWriteAnswer> {
   return apiFetch("/v1/enrich/project-write", { method: "POST", json: { projectId }, schema: ProjectWriteAnswerSchema });
+}
+
+/** The path's Shape step: merges of lines that describe the same work in one saved role (score/9). */
+export function proposeShape(input: ShapeBody): Promise<ShapeAnswer> {
+  return apiFetch("/v1/enrich/shape", { method: "POST", json: input, schema: ShapeAnswerSchema });
+}
+
+/** Checks a role's change set before it is applied: what would lower the score is held, the new score predicted (score/9). */
+export function checkChanges(body: CheckChangesBody): Promise<CheckChangesAnswer> {
+  return apiFetch("/v1/enrich/check-changes", { method: "POST", json: body, schema: CheckChangesAnswerSchema });
+}
+
+/** Places the facts from this round's answers still missing from a role's page (score/9). Not `use…`: React would read it as a hook. */
+export function placeAnswersOnCv(body: UseAnswersBody): Promise<UseAnswersAnswer> {
+  return apiFetch("/v1/enrich/use-answers", { method: "POST", json: body, schema: UseAnswersAnswerSchema });
 }

@@ -7,12 +7,14 @@ import {
   MAX_NOTES,
   MAX_TITLES,
   SKILL_GROUPS,
+  applyChanges,
   emptyCv,
   isCopiedDescription,
   isSectionEmpty,
   newId,
   normalizeLayout,
   notesHash,
+  type Change,
   type CvContent,
   type Note,
   type RoleFacts,
@@ -76,6 +78,8 @@ export type CvAction =
   | { type: "setItemHidden"; list: LineList; itemId: string; hidden: boolean }
   | { type: "setFacts"; roleId: string; facts: RoleFacts | null }
   | { type: "setNote"; roleId: string; note: Note }
+  /** A role's (or volunteering item's) change list from the guided path, applied as the server applies it (score/9). */
+  | { type: "applyRoleChanges"; roleId: string; changes: Change[] }
   | { type: "setCurrent"; list: RoleList; itemId: string; current: boolean }
   /** Empties role descriptions that only repeat the company and/or location (old imports). */
   | { type: "clearCopiedDescriptions" }
@@ -348,6 +352,11 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
       if (before === facts || (before && facts && before.fromNotes === facts.fromNotes && before.updatedAt === facts.updatedAt
         && before.items.length === facts.items.length && before.items.every((item, i) => item === facts.items[i]))) return cv;
       return { ...cv, [list]: cv[list].map((r) => (r === role ? { ...r, facts } : r)) };
+    }
+    case "applyRoleChanges": {
+      const list = roleListOf(cv, action.roleId);
+      if (list !== "experience" && list !== "volunteering") return cv;
+      return { ...cv, [list]: cv[list].map((r) => (r.id === action.roleId ? applyChanges(r, action.changes) : r)) };
     }
     case "setNote": {
       const list = roleListOf(cv, action.roleId);

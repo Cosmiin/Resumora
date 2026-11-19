@@ -43,6 +43,74 @@ export function questionLanguageReminder(locale: Locale, questionLanguage: Local
   return `\nThe CV is in ${LANGUAGE_NAME[locale]}, but the person reads ${LANGUAGE_NAME[questionLanguage]}: write every tip, question and answer option in ${LANGUAGE_NAME[questionLanguage]}. Quote CV text as it is.`;
 }
 
+/** How each part of a line is graded. Shared by the score prompt and every writer (score/9), so they use one rubric. */
+export const GRADING_RULES = `GRADING
+
+Grade contribution, clarity, specificity, impact and concise independently
+using missing, partial, or specific.
+
+Contribution:
+- missing: No actual task, responsibility, or intervention is identified.
+  An unexplained result claim counts as missing contribution.
+- partial: A recognizable area of work is named, but the person's
+  involvement remains vague, such as "supported" or "helped with".
+- specific: The person's action or responsibility is clear, including
+  what they worked on, produced, handled, or coordinated.
+
+A clear responsibility is sufficient. Leadership, ownership of an
+entire project, and achievements are not required. Partial is only for
+vague verbs with nothing concrete after them, such as "supported",
+"helped with", "assisted", "was involved in" or "participated in".
+A broad verb followed by the concrete action, such as "ran campaigns by
+setting up discount codes", is specific.
+
+Clarity:
+- missing: The statement's intended meaning cannot be understood.
+- partial: Ambiguous wording, unclear references, or unexplained terms
+  require the reader to guess its meaning.
+- specific: The statement communicates its meaning directly.
+
+Generic wording is not automatically confusing. Do not penalize
+contribution and clarity for the same reason without distinguishing
+the two problems. Ordinary professional terminology is acceptable.
+Broad wording is a specificity problem: it never lowers clarity or concise.
+
+Specificity:
+- missing: The statement gives only a generic responsibility or
+  unexplained value claim.
+- partial: Only a broad area of work is named, such as "month-end tasks",
+  "daily operations" or "general office work", with nothing that tells this
+  work apart from the same job elsewhere.
+- specific: The bullet names what was worked on (a document, system, product,
+  process or topic) and at least one more detail: who it was for, when or how
+  often, with which tool or method, or why. For example "Reviewed supplier
+  invoices before payment" or "Explained leave rules to new staff".
+
+Impact:
+- missing: No result, scale, frequency or reason is stated.
+- partial: A result is stated vaguely, such as "improved efficiency".
+- specific: A concrete result, scale, frequency or reason is stated,
+  such as "for 1.2M customers", "weekly", or "so payroll closed on time".
+
+A number of people, clients, accounts, sites or items the work covered
+is scale, so impact is specific, such as "for 12 stores" or "across 3-4 regional teams".
+A range counts as a number.
+
+Many good bullets have no result. Grade impact honestly, but never let
+a missing result lower the other grades.
+
+Concise:
+- missing: Rambling. Several ideas run together, or most of the words
+  carry no fact.
+- partial: The point is there but padded with filler, repetition or
+  stacked buzzwords, such as "responsible for", "in order to", "various",
+  "successfully".
+- specific: Every phrase carries a fact, in two lines at most.
+
+Grade concise on the words that are there. A bullet is not concise merely
+because it is short, and brevity never raises the other grades. A bullet
+that needs one more fact should gain a few words, not a second sentence.`;
+
 const SCORE_BODY = `You are a CV experience reviewer and writing coach for Resumora.
 
 You are reviewing one employment experience entry from a person's CV.
@@ -81,60 +149,7 @@ For each bullet, consider:
 Use these questions to assign grades and select feedback. Do not return
 a separate explanation of your assessment process.
 
-GRADING
-
-Grade contribution, clarity, specificity, impact and concise independently
-using missing, partial, or specific.
-
-Contribution:
-- missing: No actual task, responsibility, or intervention is identified.
-  An unexplained result claim counts as missing contribution.
-- partial: A recognizable area of work is named, but the person's
-  involvement remains vague, such as "supported" or "helped with".
-- specific: The person's action or responsibility is clear, including
-  what they worked on, produced, handled, or coordinated.
-
-A clear responsibility is sufficient. Leadership, ownership of an
-entire project, and achievements are not required.
-
-Clarity:
-- missing: The statement's intended meaning cannot be understood.
-- partial: Ambiguous wording, unclear references, or unexplained terms
-  require the reader to guess its meaning.
-- specific: The statement communicates its meaning directly.
-
-Generic wording is not automatically confusing. Do not penalize
-contribution and clarity for the same reason without distinguishing
-the two problems. Ordinary professional terminology is acceptable.
-
-Specificity:
-- missing: The statement gives only a generic responsibility or
-  unexplained value claim.
-- partial: Some useful context exists, but the activity remains broad.
-- specific: The bullet contains enough relevant context to distinguish
-  the work, such as the document, task, audience, workflow, deliverable,
-  problem, or purpose involved.
-
-Impact:
-- missing: No result, scale, frequency or reason is stated.
-- partial: A result is stated vaguely, such as "improved efficiency".
-- specific: A concrete result, scale, frequency or reason is stated,
-  such as "for 1.2M customers", "weekly", or "so payroll closed on time".
-
-Many good bullets have no result. Grade impact honestly, but never let
-a missing result lower the other grades.
-
-Concise:
-- missing: Rambling. Several ideas run together, or most of the words
-  carry no fact.
-- partial: The point is there but padded with filler, repetition or
-  stacked buzzwords, such as "responsible for", "in order to", "various",
-  "successfully".
-- specific: Every phrase carries a fact, in two lines at most.
-
-Grade concise on the words that are there. A bullet is not concise merely
-because it is short, and brevity never raises the other grades. A bullet
-that needs one more fact should gain a few words, not a second sentence.
+${GRADING_RULES}
 
 SUFFICIENCY TEST
 

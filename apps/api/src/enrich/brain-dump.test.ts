@@ -80,7 +80,7 @@ describe("POST /v1/enrich/brain-dump", () => {
     const saved = await cv.get();
     expect(await result()).toEqual({
       proposals: texts.slice(1).map((text, i) => ({ id: `new${i + 2}`, text, score: i === 0 ? 40 : 100 })),
-      roleBefore: 73, roleAfterAll: 67,
+      roleBefore: 80, roleAfterAll: 71,
     });
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_brain_dump", "enrich_score"]);
     expect(model.logged.every((entry) => entry.userId === "user-a")).toBe(true);
@@ -139,7 +139,7 @@ describe("POST /v1/enrich/brain-dump", () => {
 
     const got = await result();
     expect(got.proposals).toEqual(proposed.map((b) => ({ ...b, score: 100 })));
-    expect(got.roleAfterAll).toBe(76);
+    expect(got.roleAfterAll).toBe(80);
     expect(new Set(got.proposals.map((b) => b.id)).size).toBe(4);
     expect(got.proposals.every((b) => role.bullets.every((saved) => saved.id !== b.id))).toBe(true);
   });
@@ -162,7 +162,7 @@ describe("POST /v1/enrich/brain-dump", () => {
 
   it("skips grading when no proposals pass", async () => {
     answer(["Prepared payroll for 999 staff."]);
-    expect(await result()).toEqual({ proposals: [], roleBefore: 73, roleAfterAll: 73 });
+    expect(await result()).toEqual({ proposals: [], roleBefore: 80, roleAfterAll: 80 });
     expect(model.requests).toHaveLength(1);
   });
 
@@ -174,7 +174,7 @@ describe("POST /v1/enrich/brain-dump", () => {
     await insights.put(role.id, buildRoleResult(role, initial, fingerprint(role, "en")));
     gradeChange = (b) => { b.meaningful = false; };
 
-    expect(await result()).toEqual({ proposals: [], roleBefore: 40, roleAfterAll: 40 });
+    expect(await result()).toEqual({ proposals: [], roleBefore: 50, roleAfterAll: 50 });
     expect(model.requests).toHaveLength(2);
   });
   it("builds first bullets from role answers without a ramble", async () => {
@@ -191,6 +191,24 @@ describe("POST /v1/enrich/brain-dump", () => {
     expect(messages[1]!.content).toContain("Q: Which tools did you use? A: Excel and SAP");
     expect(messages[1]!.content).toContain("Q: Who did you work with? A: The finance team");
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_brain_dump", "enrich_score"]);
+  });
+
+  it("gives the writer the role's grades and the line average when building from answers", async () => {
+    role.notes = [{ ...note("Excel and SAP"), question: "Which tools did you use?" }];
+    await save();
+    const res = await post({ ...input(), source: "answers" });
+    expect(res.status).toBe(200);
+    const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
+    expect(user).toContain(`${role.bullets[0]!.id} (grade 100): contribution: specific`);
+    expect(user).toContain("Line average: 100.");
+    expect(user).toContain("Each new line must reach at least the role's line average.");
+  });
+
+  it("gives no grades to a ramble", async () => {
+    const res = await post();
+    expect(res.status).toBe(200);
+    const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
+    expect(user).not.toContain("Line average:");
   });
 
   it("requires role answers for source answers", async () => {
@@ -262,7 +280,7 @@ describe("POST /v1/enrich/brain-dump", () => {
   it("returns the saved score for a full role without any model calls", async () => {
     role.bullets = roleWith(Array.from({ length: 20 }, (_, i) => `Handled office task ${i}.`)).bullets;
     await save();
-    expect(await result()).toEqual({ proposals: [], roleBefore: 73, roleAfterAll: 73 });
+    expect(await result()).toEqual({ proposals: [], roleBefore: 80, roleAfterAll: 80 });
     await insights.remove([role.id]);
     expect(await result()).toEqual({ proposals: [], roleBefore: null, roleAfterAll: null });
     expect(model.requests).toHaveLength(0);
@@ -274,7 +292,7 @@ describe("POST /v1/enrich/brain-dump", () => {
     if (!survive) gradeChange = (b) => { b.meaningful = false; };
     const got = await result();
     expect(got.roleBefore).toBeNull();
-    expect(got.roleAfterAll).toBe(survive ? 76 : null);
+    expect(got.roleAfterAll).toBe(survive ? 80 : null);
     expect(got.proposals).toHaveLength(survive ? 4 : 0);
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_brain_dump", "enrich_score"]);
   });

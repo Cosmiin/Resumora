@@ -105,6 +105,32 @@ describe("pickBudget", () => {
     ];
     expect(pickBudget({ items, weights: new Map(), asked: new Set() })).toHaveLength(2);
   });
+
+  it("asks worth-adding questions only when no other question is left", () => {
+    const lead = (n: number) => roleQ(`Did anyone report to you ${n}?`, "leadership");
+    const tier1 = Array.from({ length: 10 }, (_, i) => ({ id: `r${i}`, result: result(`r${i}`, { bullets: [grade(`b${i}`, 70)], questions: [lineQ(`b${i}`, `Line ${i}?`)] }) }));
+    const tier2 = Array.from({ length: 3 }, (_, i) => ({ id: `w${i}`, result: result(`w${i}`, { roleQuestions: [lead(i)] }) }));
+    // By value the worth-adding questions win (40 × 3 = 120 against 30), but they still come last.
+    const weights = new Map(tier2.map((t) => [t.id, 3] as [string, number]));
+    const out = pickBudget({ items: [...tier2, ...tier1], weights, asked: new Set() });
+    expect(out).toHaveLength(8);
+    expect(out.every((b) => b.kind === "line")).toBe(true);
+  });
+
+  it("fills the rest with worth-adding questions, still in CV order; purpose is one of them (score/10)", () => {
+    const items = [
+      { id: "a", result: result("a", { roleQuestions: [roleQ("Did anyone report to you?", "leadership")] }) },
+      { id: "b", result: result("b", { bullets: [grade("b1", 50)], questions: [lineQ("b1", "What changed?")] }) },
+      { id: "c", result: result("c", { roleQuestions: [roleQ("What was the role for?", "purpose")] }) },
+    ];
+    // By value purpose wins (40 × 3 = 120 against 50), but it no longer counts toward the score: the line comes first.
+    const one = pickBudget({ items, weights: new Map([["c", 3]]), asked: new Set(), size: 1 });
+    expect(one.map((b) => b.question.text)).toEqual(["What changed?"]);
+    const two = pickBudget({ items, weights: new Map([["c", 3]]), asked: new Set(), size: 2 });
+    expect(two.map((b) => b.question.text)).toEqual(["What changed?", "What was the role for?"]);
+    const all = pickBudget({ items, weights: new Map(), asked: new Set() });
+    expect(all.map((b) => b.question.text)).toEqual(["Did anyone report to you?", "What changed?", "What was the role for?"]);
+  });
 });
 
 describe("schemas", () => {

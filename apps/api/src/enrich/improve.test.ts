@@ -115,6 +115,14 @@ describe("POST /v1/enrich/improve-bullet", () => {
     },
   );
 
+  it("gives the writer the target line's grades, not the other lines'", async () => {
+    await post();
+    const user = (model.requests[0]!.messages as { role: string; content: string }[])[1]!.content;
+    expect(user).toContain(`${role.bullets[0]!.id} (grade 45): contribution: partial, clarity: specific, specificity: missing, impact: missing`);
+    expect(user).not.toContain(`${role.bullets[1]!.id} (grade`);
+    expect(user).toContain("Keep every part at least as good as now.");
+  });
+
   it("offers a better bullet and promotes its prediction after saving without another model call", async () => {
     answer(proposal, nextQuestion);
     const saved = await cv.get();
@@ -123,7 +131,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     const result = ImproveAnswerSchema.parse(await res.json());
     expect(result).toEqual({
       proposal: { bulletId: input().bulletId, text: proposal },
-      bulletBefore: 45, bulletAfter: 80, roleBefore: 54, roleAfter: 64, cached: true,
+      bulletBefore: 45, bulletAfter: 80, roleBefore: 64, roleAfter: 74, cached: true,
     });
     const swapped = { ...role, bullets: role.bullets.map((b, i) => i === 0 ? { ...b, text: proposal } : b) };
     const predicted = buildRoleResult(swapped, { ...initial, bullets: [grade.bullets[0]!, initial.bullets[1]!] }, fingerprint(swapped, "en"));
@@ -283,7 +291,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     initial.bullets[1]!.duplicateOf = role.bullets[0]!.id;
     await save();
     expect(await (await post()).json()).toMatchObject({
-      proposal: { text: proposal }, bulletAfter: 80, roleBefore: 14, roleAfter: 28, cached: false,
+      proposal: { text: proposal }, bulletAfter: 80, roleBefore: 14, roleAfter: 34, cached: false,
     });
     expect(await insights.pending(role.id)).toEqual([]);
   });

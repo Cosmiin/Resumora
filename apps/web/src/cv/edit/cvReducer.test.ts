@@ -436,3 +436,23 @@ describe("setProjectLines", () => {
     expect(cvReducer(cv, { type: "setProjectLines", itemId: "p1", texts: ["  "] })).toBe(cv);
   });
 });
+
+describe("applyRoleChanges", () => {
+  it("applies a change list to a volunteering item, and leaves the other roles alone", () => {
+    const vol = role("v1", ["Ran the stall.", "Counted the cash.", "Packed up."]);
+    const cv: CvContent = { ...withRole(["Wrote code."]), volunteering: [vol] };
+    const next = cvReducer(cv, { type: "applyRoleChanges", roleId: "v1", changes: [
+      { id: "m", kind: "bullet", bulletId: "v1-b1", text: "Ran the stall and counted the cash." },
+      { id: "r", kind: "remove", bulletId: "v1-b2" },
+      { id: "o", kind: "order", ids: ["v1-b3"] },
+    ] });
+    expect(next.volunteering[0]!.bullets).toEqual([{ id: "v1-b3", text: "Packed up." }, { id: "v1-b1", text: "Ran the stall and counted the cash." }]);
+    expect(next.experience).toBe(cv.experience);
+  });
+
+  it("does nothing for an unknown id or a project", () => {
+    const cv: CvContent = { ...withRole(["Wrote code."]), projects: [{ ...role("p1", ["Built it."]), url: "" }] };
+    expect(cvReducer(cv, { type: "applyRoleChanges", roleId: "nope", changes: [{ id: "n", kind: "new", text: "Hi." }] })).toBe(cv);
+    expect(cvReducer(cv, { type: "applyRoleChanges", roleId: "p1", changes: [{ id: "n", kind: "new", text: "Hi." }] })).toBe(cv);
+  });
+});
