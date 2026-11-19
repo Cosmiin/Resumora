@@ -193,6 +193,24 @@ describe("POST /v1/enrich/brain-dump", () => {
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_brain_dump", "enrich_score"]);
   });
 
+  it("gives the writer the role's grades and the line average when building from answers", async () => {
+    role.notes = [{ ...note("Excel and SAP"), question: "Which tools did you use?" }];
+    await save();
+    const res = await post({ ...input(), source: "answers" });
+    expect(res.status).toBe(200);
+    const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
+    expect(user).toContain(`${role.bullets[0]!.id} (grade 100): contribution: specific`);
+    expect(user).toContain("Line average: 100.");
+    expect(user).toContain("Each new line must reach at least the role's line average.");
+  });
+
+  it("gives no grades to a ramble", async () => {
+    const res = await post();
+    expect(res.status).toBe(200);
+    const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
+    expect(user).not.toContain("Line average:");
+  });
+
   it("requires role answers for source answers", async () => {
     role.notes = [];
     await save();

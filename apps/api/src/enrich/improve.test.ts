@@ -115,6 +115,14 @@ describe("POST /v1/enrich/improve-bullet", () => {
     },
   );
 
+  it("gives the writer the target line's grades, not the other lines'", async () => {
+    await post();
+    const user = (model.requests[0]!.messages as { role: string; content: string }[])[1]!.content;
+    expect(user).toContain(`${role.bullets[0]!.id} (grade 45): contribution: partial, clarity: specific, specificity: missing, impact: missing`);
+    expect(user).not.toContain(`${role.bullets[1]!.id} (grade`);
+    expect(user).toContain("Keep every part at least as good as now.");
+  });
+
   it("offers a better bullet and promotes its prediction after saving without another model call", async () => {
     answer(proposal, nextQuestion);
     const saved = await cv.get();

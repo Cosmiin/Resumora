@@ -4,6 +4,7 @@ import { callModel } from "../ai/call-model.ts";
 import { ApiError } from "../errors.ts";
 import { brainDumpSystemPrompt, brainDumpUserMessage } from "./focus-prompts.ts";
 import { checkProposal, squash } from "./rewrite.ts";
+import { gradeContext } from "./grade-context.ts";
 import { aiError, gradeBullets, scoreRole, type ScoreDeps } from "./score.ts";
 
 const BrainDumpSchema = z.object({ bullets: z.array(z.string()).max(4) });
@@ -46,7 +47,9 @@ export async function brainDump(
       task: "enrich_brain_dump",
       schema: BrainDumpSchema,
       system: brainDumpSystemPrompt(content.locale),
-      user: brainDumpUserMessage(role, details, source, found!.kind),
+      // From answers, the writer sees the grades so its new lines reach the role's line average (score/9).
+      user: brainDumpUserMessage(role, details, source, found!.kind)
+        + (source === "answers" && before ? `\n\n${gradeContext(role, before)}\nEach new line must reach at least the role's line average.` : ""),
       maxOutputTokens: 1200,
     });
     const seen = new Set(role.bullets.map((b) => repeatKey(b.text)));
