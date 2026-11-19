@@ -26,7 +26,9 @@ describe("gradeContext", () => {
     const text = gradeContext(role, result);
     expect(text).toContain(`Role score: ${result.score}. Line average: ${result.lines}.`);
     expect(text).toContain(GRADING_RULES);
-    expect(text).toContain("Use the answers. Keep every part at least as good as now. Improve the parts marked partial or missing. Stay within 440 characters.");
+    expect(text).toContain("Use the answers and the page. Keep every part at least as good as now, and write every line to reach specific on all five parts (contribution, clarity, specificity, impact, concise).");
+    expect(text).toContain("A part may stay below specific only when the fact it needs is in neither the page nor the answers: never invent one. Stay within 440 characters.");
+    expect(text).not.toContain("must reach at least");
   });
 
   it("lists only the lines asked for", () => {

@@ -47,9 +47,9 @@ export async function brainDump(
       task: "enrich_brain_dump",
       schema: BrainDumpSchema,
       system: brainDumpSystemPrompt(content.locale),
-      // From answers, the writer sees the grades so its new lines reach the role's line average (score/9).
+      // From answers, the writer sees the grades and aims every new line at the top grade (score/12).
       user: brainDumpUserMessage(role, details, source, found!.kind)
-        + (source === "answers" && before ? `\n\n${gradeContext(role, before)}\nEach new line must reach at least the role's line average.` : ""),
+        + (source === "answers" && before ? `\n\n${gradeContext(role, before)}` : ""),
       maxOutputTokens: 1200,
     });
     const seen = new Set(role.bullets.map((b) => repeatKey(b.text)));

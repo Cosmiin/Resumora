@@ -201,7 +201,8 @@ describe("POST /v1/enrich/brain-dump", () => {
     const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
     expect(user).toContain(`${role.bullets[0]!.id} (grade 100): contribution: specific`);
     expect(user).toContain("Line average: 100.");
-    expect(user).toContain("Each new line must reach at least the role's line average.");
+    expect(user).toContain("write every line to reach specific on all five parts");
+    expect(user).not.toContain("must reach at least the role's line average");
   });
 
   it("gives no grades to a ramble", async () => {

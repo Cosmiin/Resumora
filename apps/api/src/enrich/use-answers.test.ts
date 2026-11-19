@@ -47,6 +47,8 @@ describe("placeAnswers", () => {
     expect(model.logged.map((l) => l.task)).toEqual(["enrich_use_answers"]);
     expect(userMessage()).toContain("About 12 stores");
     expect(userMessage()).not.toContain("Head of Ecommerce");
+    expect(userMessage()).toContain("write every line to reach specific on all five parts");
+    expect(userMessage()).not.toContain("must reach at least the role's line average");
   });
 
   it("returns a fact placed in the description as a description change", async () => {

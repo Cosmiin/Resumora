@@ -93,7 +93,7 @@ export async function placeAnswers(deps: ScoreDeps, body: UseAnswersBody): Promi
       task: "enrich_use_answers",
       schema: ModelSchema,
       system: placeAnswersSystemPrompt(content.locale),
-      user: `${placeAnswersUserMessage(proposed, notes)}\n\n${gradeContext(proposed, stored)}\nEach new line must reach at least the role's line average.`,
+      user: `${placeAnswersUserMessage(proposed, notes)}\n\n${gradeContext(proposed, stored)}`,
       maxOutputTokens: 1500,
     });
   } catch (err) {

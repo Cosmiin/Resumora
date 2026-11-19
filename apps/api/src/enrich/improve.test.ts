@@ -120,7 +120,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     const user = (model.requests[0]!.messages as { role: string; content: string }[])[1]!.content;
     expect(user).toContain(`${role.bullets[0]!.id} (grade 45): contribution: partial, clarity: specific, specificity: missing, impact: missing`);
     expect(user).not.toContain(`${role.bullets[1]!.id} (grade`);
-    expect(user).toContain("Keep every part at least as good as now.");
+    expect(user).toContain("Keep every part at least as good as now, and write every line to reach specific on all five parts");
   });
 
   it("offers a better bullet and promotes its prediction after saving without another model call", async () => {
