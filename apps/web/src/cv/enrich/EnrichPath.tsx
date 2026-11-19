@@ -166,7 +166,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
    * puts its changes on the CV without a prediction, and the normal score runs.
    */
   const prepare = async () => {
+    // A new round: its end waits for its own scores.
     endShown.current = false;
+    setTimedOut(false);
     setStage({ kind: "preparing" });
     await waitForSave().catch(() => undefined);
     const now = latest.current;
