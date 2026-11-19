@@ -83,8 +83,13 @@ export const CheckChangesBodySchema = z.object({
   roleId: id, fingerprint: z.string().min(1).max(64), changes: z.array(ChangeSchema).max(30), hold: z.boolean(),
 }).strict();
 export type CheckChangesBody = z.infer<typeof CheckChangesBodySchema>;
+/** For a held change: the question that would bring its line to the top grade, from the same grading (score/12). */
+export const HeldAskSchema = z.object({
+  changeId: id, text: z.string(), options: z.array(z.string()), amounts: z.array(z.string()).optional(),
+}).strict();
+export type HeldAsk = z.infer<typeof HeldAskSchema>;
 export const CheckChangesAnswerSchema = z.object({
-  result: RoleResultSchema, kept: z.array(id), held: z.array(ChangeSchema),
+  result: RoleResultSchema, kept: z.array(id), held: z.array(ChangeSchema), asks: z.array(HeldAskSchema).default([]),
 }).strict();
 export type CheckChangesAnswer = z.infer<typeof CheckChangesAnswerSchema>;
 

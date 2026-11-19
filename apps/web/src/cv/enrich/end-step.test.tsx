@@ -24,6 +24,7 @@ const r2 = role("r2", "Clerk");
 const cv: CvContent = { ...emptyCv("en"), experience: [r1, r2] };
 const scores = new Map<string, RoleScoreState>([["r1", { state: "ready", result: result(r1, 85) }], ["r2", { state: "ready", result: result(r2, 70) }]]);
 const weak: Change = { id: "c9", kind: "new", text: "Helped the team." };
+const ask = { changeId: "c9", text: "What did you do for the team?", options: ["Trained … new clerks", "Ran the weekly rota"], amounts: ["1–3", "4–10"] };
 
 function renderEnd(over: Partial<Parameters<typeof EndStep>[0]> = {}) {
   const props = {
@@ -78,5 +79,32 @@ describe("EndStep", () => {
     expect(onMore).toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(props.onDone).toHaveBeenCalled();
+  });
+
+  describe("a held line with a question (score/12)", () => {
+    it("shows the question and its options; Add with this fact sends the answer", async () => {
+      const onAddWithFact = vi.fn().mockResolvedValue(undefined);
+      renderEnd({ held: [{ roleId: "r1", change: weak, ask }], onAddWithFact });
+      expect(screen.getByText("Analyst: one fact away")).toBeInTheDocument();
+      expect(screen.getByText("Helped the team.")).toBeInTheDocument();
+      expect(screen.getByText("What did you do for the team?")).toBeInTheDocument();
+      const add = screen.getByRole("button", { name: "Add with this fact" });
+      expect(add).toBeDisabled();
+      await userEvent.click(screen.getByRole("button", { name: "Trained … new clerks" }));
+      expect(add).toBeDisabled();
+      await userEvent.click(screen.getByRole("button", { name: "Ran the weekly rota" }));
+      await userEvent.click(add);
+      expect(onAddWithFact).toHaveBeenCalledWith("r1", weak, ask, "Ran the weekly rota", ["pick"]);
+    });
+
+    it("keeps the card with an error when adding fails, and Add as it is still works", async () => {
+      const onAddWithFact = vi.fn().mockRejectedValue(new Error("boom"));
+      const props = renderEnd({ held: [{ roleId: "r1", change: weak, ask }], onAddWithFact });
+      await userEvent.click(screen.getByRole("button", { name: "Ran the weekly rota" }));
+      await userEvent.click(screen.getByRole("button", { name: "Add with this fact" }));
+      expect(await screen.findByText("Couldn't add it. Try again.")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Add as it is" }));
+      expect(props.onAdd).toHaveBeenCalledWith("r1", weak);
+    });
   });
 });

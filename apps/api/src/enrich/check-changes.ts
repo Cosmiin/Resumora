@@ -44,6 +44,7 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
   let result: RoleResult;
   let kept: Change[] = [...body.changes];
   const held: Change[] = [];
+  const asks: CheckChangesAnswer["asks"] = [];
   if (toGrade.length === 0 && proposed.description === role.description) {
     result = predict(proposed, locale, stored, [], undefined);
   } else {
@@ -64,6 +65,12 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
         }
       }
       kept = body.changes.filter((c) => !held.includes(c));
+      // Each held line's own question from this grading: the fact that would bring it to the top grade (score/12).
+      for (const change of held) {
+        const lineId = change.kind === "bullet" ? change.bulletId : change.id;
+        const q = firstResult.questions.find((x) => x.bulletId === lineId);
+        if (q) asks.push({ changeId: change.id, text: q.text, options: q.options, ...(q.amounts ? { amounts: q.amounts } : {}) });
+      }
     }
     if (held.length === 0) {
       result = firstResult;
@@ -77,5 +84,5 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
     }
   }
   await deps.insights.putPending(role.id, result);
-  return { result, kept: kept.map((c) => c.id), held };
+  return { result, kept: kept.map((c) => c.id), held, asks };
 }
