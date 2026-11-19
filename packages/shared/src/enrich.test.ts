@@ -20,6 +20,7 @@ import {
   type Grade,
   type ModelBullet,
   type ModelScore,
+  worthAdding,
 } from "./enrich.ts";
 import type { Experience } from "./cv.ts";
 import { mergeGrades } from "./enrich-focus.ts";
@@ -64,8 +65,8 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/8", () => {
-    expect(SCORE_POLICY).toBe("score/8");
+  it("uses policy score/9", () => {
+    expect(SCORE_POLICY).toBe("score/9");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -426,7 +427,8 @@ describe("blank tip and question", () => {
   });
 });
 
-// score/6: a role's score is 60% its bullets (Lines) and 40% what the role shows a recruiter (Coverage).
+// score/9: a role's score is 60% its bullets (Lines) and 40% the six core items shown on the page (Coverage).
+// The four conditional items and the shape are a checklist only: they never move the number.
 describe("coverage and the role score", () => {
   const texts = ["Planned routes for 14 depots in Excel", "Built the weekly delivery report", "Trained colleagues"];
   const bullets = [
@@ -435,28 +437,62 @@ describe("coverage and the role score", () => {
     mb("b3", g("specific", "specific", "missing", "missing")),
   ];
   const marks = { company: "applies", purpose: "applies", tools: "shown", scale: "shown", leadership: "shown", seniority: "na", people: "na", domain: "na" } as const;
+  const allCore = { company: "shown", purpose: "shown", tools: "shown", scale: "shown", leadership: "na", seniority: "na", people: "na", domain: "na" } as const;
+  const withResult = [mb("b1"), bullets[1]!, bullets[2]!];
 
-  it("adds up the example from the owner's score page: lines 73, coverage 64, score 69", () => {
+  it("adds up lines 73 and coverage 50 (3 of 6 core items shown) to 64", () => {
     const r = buildRoleResult(role(texts), { ...model(bullets), coverage: marks }, "fp");
     expect(r.bullets.map((b) => b.score)).toEqual([80, 80, 60]);
     expect(r.lines).toBe(73);
-    // Core shown: actions (from the grades), tools, scale = 30. Leadership applies and is shown = 20. Shape: 3 bullets, no repeats = 14.
-    expect(r.coverage).toMatchObject({ score: 64, marks: { actions: "shown", results: "applies" }, shape: { amount: true, repeats: true, order: false } });
-    expect(r.score).toBe(69);
+    // Core shown: actions (from the grades), tools, scale. Results, company and purpose are not.
+    expect(r.coverage).toMatchObject({ score: 50, marks: { actions: "shown", results: "applies" }, shape: { amount: true, repeats: true, order: false } });
+    expect(r.score).toBe(64);
   });
 
-  it("gives the conditional points when nothing conditional applies, and none while one is still unknown", () => {
-    const none = { ...marks, leadership: "na" } as const;
-    expect(buildRoleResult(role(texts), { ...model(bullets), coverage: none }, "fp").coverage?.score).toBe(64);
-    const unknown = { ...marks, leadership: "unknown" } as const;
-    expect(buildRoleResult(role(texts), { ...model(bullets), coverage: unknown }, "fp").coverage?.score).toBe(44);
+  it("gives full coverage when all six core items are shown", () => {
+    const r = buildRoleResult(role(texts), { ...model(withResult), coverage: allCore }, "fp");
+    expect(r.coverage?.score).toBe(100);
+    expect(r.score).toBe(Math.round(0.6 * r.lines! + 40));
+  });
+
+  it("never moves the number for the four conditional items", () => {
+    const base = buildRoleResult(role(texts), { ...model(withResult), coverage: allCore }, "fp").score;
+    for (const mark of ["shown", "applies", "unknown", "na"] as const) {
+      const r = buildRoleResult(role(texts), { ...model(withResult), coverage: { ...allCore, leadership: mark, seniority: mark, people: mark, domain: mark } }, "fp");
+      expect(r.score).toBe(base);
+    }
+  });
+
+  it("never moves the number for the shape", () => {
+    // Eight lines, one repeated, no result first: every shape check fails, the score is the same formula.
+    const many = Array.from({ length: 8 }, (_, i) => `Did task ${i}`);
+    const graded = many.map((_, i) => mb(`b${i + 1}`, g("specific", "specific", "specific", "missing")));
+    const r = buildRoleResult(role(many), { ...model(graded), coverage: allCore }, "fp");
+    expect(r.coverage?.shape).toMatchObject({ amount: false, order: false });
+    // results not shown (no specific impact): 5 of 6 core items.
+    expect(r.coverage?.score).toBe(83);
+    expect(r.score).toBe(Math.round(0.6 * r.lines! + 0.4 * 83));
+  });
+
+  it("drops a core item that is not shown: 5 of 6 is 83", () => {
+    const r = buildRoleResult(role(texts), { ...model(withResult), coverage: { ...allCore, tools: "applies" } }, "fp");
+    expect(r.coverage?.score).toBe(83);
   });
 
   it("counts a result first, and a core parameter the model calls not applicable as not shown", () => {
-    const first = [mb("b1"), bullets[1]!, bullets[2]!];
-    const r = buildRoleResult(role(texts), { ...model(first), coverage: { ...marks, company: "na" } }, "fp");
+    const r = buildRoleResult(role(texts), { ...model(withResult), coverage: { ...marks, company: "na" } }, "fp");
     expect(r.coverage).toMatchObject({ marks: { company: "applies", results: "shown" }, shape: { order: true } });
-    expect(r.coverage?.score).toBe(80);
+    // actions, tools, scale, results: 4 of 6.
+    expect(r.coverage?.score).toBe(67);
+  });
+
+  it("lists the conditional items worth adding, leaving out those that don't apply", () => {
+    const r = buildRoleResult(role(texts), { ...model(bullets), coverage: { ...marks, leadership: "na", seniority: "applies", people: "shown", domain: "unknown" } }, "fp");
+    expect(worthAdding(r.coverage!)).toEqual([
+      { param: "seniority", shown: false },
+      { param: "people", shown: true },
+      { param: "domain", shown: false },
+    ]);
   });
 
   it("caps concise by length, whatever the model says", () => {

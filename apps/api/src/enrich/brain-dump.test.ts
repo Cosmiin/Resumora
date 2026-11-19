@@ -80,7 +80,7 @@ describe("POST /v1/enrich/brain-dump", () => {
     const saved = await cv.get();
     expect(await result()).toEqual({
       proposals: texts.slice(1).map((text, i) => ({ id: `new${i + 2}`, text, score: i === 0 ? 40 : 100 })),
-      roleBefore: 73, roleAfterAll: 67,
+      roleBefore: 73, roleAfterAll: 64,
     });
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_brain_dump", "enrich_score"]);
     expect(model.logged.every((entry) => entry.userId === "user-a")).toBe(true);
@@ -139,7 +139,7 @@ describe("POST /v1/enrich/brain-dump", () => {
 
     const got = await result();
     expect(got.proposals).toEqual(proposed.map((b) => ({ ...b, score: 100 })));
-    expect(got.roleAfterAll).toBe(76);
+    expect(got.roleAfterAll).toBe(73);
     expect(new Set(got.proposals.map((b) => b.id)).size).toBe(4);
     expect(got.proposals.every((b) => role.bullets.every((saved) => saved.id !== b.id))).toBe(true);
   });
@@ -174,7 +174,7 @@ describe("POST /v1/enrich/brain-dump", () => {
     await insights.put(role.id, buildRoleResult(role, initial, fingerprint(role, "en")));
     gradeChange = (b) => { b.meaningful = false; };
 
-    expect(await result()).toEqual({ proposals: [], roleBefore: 40, roleAfterAll: 40 });
+    expect(await result()).toEqual({ proposals: [], roleBefore: 43, roleAfterAll: 43 });
     expect(model.requests).toHaveLength(2);
   });
   it("builds first bullets from role answers without a ramble", async () => {
@@ -274,7 +274,7 @@ describe("POST /v1/enrich/brain-dump", () => {
     if (!survive) gradeChange = (b) => { b.meaningful = false; };
     const got = await result();
     expect(got.roleBefore).toBeNull();
-    expect(got.roleAfterAll).toBe(survive ? 76 : null);
+    expect(got.roleAfterAll).toBe(survive ? 73 : null);
     expect(got.proposals).toHaveLength(survive ? 4 : 0);
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_brain_dump", "enrich_score"]);
   });

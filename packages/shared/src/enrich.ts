@@ -2,11 +2,11 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/8";
+export const SCORE_POLICY = "score/9";
 
 /** A bullet's five checks. A clear, short bullet with no result scores 80. */
 export const WEIGHTS = { contribution: 30, clarity: 20, specificity: 20, impact: 20, concise: 10 } as const;
-/** A role's score: this share from its bullets (Lines), the rest from what the role shows a recruiter (Coverage). */
+/** A role's score: this share from its bullets (Lines), the rest from the six core items shown on the page (Coverage). */
 export const LINES_SHARE = 0.6;
 /** A bullet longer than the first is at most "partial" on concise; longer than the second is "missing". */
 export const CONCISE_CHARS = { partial: 220, missing: 300 } as const;
@@ -36,7 +36,8 @@ export type Issue = z.infer<typeof IssueSchema>;
 /** What a recruiter looks for in a role. Core ones count for every role; conditional ones only when they apply. */
 export const CORE_PARAMETERS = ["company", "purpose", "actions", "tools", "results", "scale"] as const;
 export const CONDITIONAL_PARAMETERS = ["leadership", "seniority", "people", "domain"] as const;
-export type CoverageParameter = (typeof CORE_PARAMETERS)[number] | (typeof CONDITIONAL_PARAMETERS)[number];
+export type ConditionalParameter = (typeof CONDITIONAL_PARAMETERS)[number];
+export type CoverageParameter = (typeof CORE_PARAMETERS)[number] | ConditionalParameter;
 /** shown: on the page. applies: the role involves it but the page does not say it. unknown: no clue either way. na: does not apply. */
 export const MarkSchema = z.enum(["shown", "applies", "unknown", "na"]);
 export type Mark = z.infer<typeof MarkSchema>;
@@ -53,8 +54,6 @@ export const ModelCoverageSchema = z.object({
 }).strict();
 export type ModelCoverage = z.infer<typeof ModelCoverageSchema>;
 const NO_COVERAGE: ModelCoverage = { company: "unknown", purpose: "unknown", tools: "unknown", scale: "unknown", leadership: "unknown", seniority: "unknown", people: "unknown", domain: "unknown" };
-/** Coverage is 100 points: each core parameter shown, the conditional ones that apply (shared), and the role's shape. */
-export const COVERAGE_POINTS = { core: 10, conditional: 20, amount: 8, repeats: 6, order: 6 } as const;
 export const CoverageSchema = z.object({
   score: z.number().int().min(0).max(100),
   marks: z.object({
@@ -281,7 +280,11 @@ function normalizedIssue(m: ModelBullet, unusable: boolean, duplicate: boolean):
 
 type ResultBullet = RoleResult["bullets"][number];
 
-/** What the role shows a recruiter, as points. Actions and results come from the bullet grades; the rest from the model's marks. */
+/**
+ * What the role shows a recruiter. Actions and results come from the bullet grades; the rest from the model's marks.
+ * `score` (0–100) counts only the six core items shown on the page (score/9): the four conditional items and the shape
+ * are kept for the checklist, never for the number, so an answer can't lower it.
+ */
 export function buildCoverage(bullets: readonly ResultBullet[], model: ModelCoverage): Coverage {
   const real = bullets.filter((b) => b.issue !== "example" && b.issue !== "duplicate");
   // The four that always apply are either on the page or not.
@@ -300,12 +303,15 @@ export function buildCoverage(bullets: readonly ResultBullet[], model: ModelCove
     repeats: !bullets.some((b) => b.issue === "duplicate"),
     order: real[0]?.impact === "specific",
   };
-  const applies = CONDITIONAL_PARAMETERS.filter((p) => marks[p] !== "na");
-  const conditional = applies.length === 0 ? COVERAGE_POINTS.conditional
-    : Math.round((COVERAGE_POINTS.conditional * applies.filter((p) => marks[p] === "shown").length) / applies.length);
-  const score = CORE_PARAMETERS.filter((p) => marks[p] === "shown").length * COVERAGE_POINTS.core + conditional
-    + (shape.amount ? COVERAGE_POINTS.amount : 0) + (shape.repeats ? COVERAGE_POINTS.repeats : 0) + (shape.order ? COVERAGE_POINTS.order : 0);
+  const score = Math.round((100 * CORE_PARAMETERS.filter((p) => marks[p] === "shown").length) / CORE_PARAMETERS.length);
   return { score, marks, shape };
+}
+
+/** The "worth adding" checklist: the conditional items that apply to the role (not `na`), ticked when shown. No points. */
+export function worthAdding(coverage: Pick<Coverage, "marks">): { param: ConditionalParameter; shown: boolean }[] {
+  return CONDITIONAL_PARAMETERS
+    .filter((p) => coverage.marks[p] !== "na")
+    .map((p) => ({ param: p, shown: coverage.marks[p] === "shown" }));
 }
 
 export function buildRoleResult(role: Experience, model: z.input<typeof ModelScoreSchema>, fingerprintValue: string): RoleResult {

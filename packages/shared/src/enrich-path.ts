@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MAX_TEXT, type Experience } from "./cv.ts";
-import { MAX_PROPOSAL, type Question, type RoleQuestion, type RoleResult } from "./enrich.ts";
+import { CONDITIONAL_TOPICS, MAX_PROPOSAL, type Question, type RoleQuestion, type RoleResult } from "./enrich.ts";
 
 /** The short enrichment path asks at most this many questions per round, across the whole CV. */
 export const PATH_BUDGET = 8;
@@ -63,6 +63,8 @@ const ROLE_QUESTION_VALUE = 40;
  * come here; a question whose key is in `asked` is left out. A line question is worth its gap to 100, a question about
  * the whole role a fixed 40, both times the role's weight. The top `size` are returned in CV order, a role's questions
  * about the whole role before its line questions, so the person moves from role to role as rarely as possible.
+ * Questions about the four "worth adding" items (leadership, seniority, people, domain) don't move the score, so they
+ * are picked only when no other question is left (score/9).
  */
 export function pickBudget(input: {
   items: readonly { id: string; result: RoleResult | undefined }[];
@@ -71,7 +73,7 @@ export function pickBudget(input: {
   size?: number;
 }): BudgetItem[] {
   const size = input.size ?? PATH_BUDGET;
-  const candidates: { item: BudgetItem; value: number; order: number }[] = [];
+  const candidates: { item: BudgetItem; value: number; order: number; tier: number }[] = [];
   input.items.forEach(({ id, result }, roleIndex) => {
     if (!result) return;
     const weight = input.weights.get(id) ?? 1;
@@ -86,16 +88,17 @@ export function pickBudget(input: {
     let within = 0;
     for (const question of result.roleQuestions) {
       if (question.topic === "company" || question.topic === "tools" || !fresh(question.text)) continue;
-      candidates.push({ item: { roleId: id, kind: "role", question }, value: ROLE_QUESTION_VALUE * weight, order: roleIndex * 1000 + within++ });
+      const tier = CONDITIONAL_TOPICS.includes(question.topic) ? 2 : 1;
+      candidates.push({ item: { roleId: id, kind: "role", question }, value: ROLE_QUESTION_VALUE * weight, order: roleIndex * 1000 + within++, tier });
     }
     for (const question of result.questions) {
       if (!fresh(question.text, question.bulletId)) continue;
       const score = result.bullets.find((b) => b.id === question.bulletId)?.score ?? 0;
-      candidates.push({ item: { roleId: id, kind: "line", question }, value: (100 - score) * weight, order: roleIndex * 1000 + 500 + within++ });
+      candidates.push({ item: { roleId: id, kind: "line", question }, value: (100 - score) * weight, order: roleIndex * 1000 + 500 + within++, tier: 1 });
     }
   });
   return candidates
-    .sort((a, b) => b.value - a.value || a.order - b.order)
+    .sort((a, b) => a.tier - b.tier || b.value - a.value || a.order - b.order)
     .slice(0, size)
     .sort((a, b) => a.order - b.order)
     .map((c) => c.item);
