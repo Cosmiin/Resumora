@@ -3,7 +3,7 @@ import { buildRoleResult, emptyCv, fingerprint, type Change, type Experience, ty
 import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { allSpecific, fakeModel, roleWith } from "./fake-model.ts";
 import { memoryInsightsRepo } from "./memory-repo.ts";
-import { useAnswers } from "./use-answers.ts";
+import { placeAnswers } from "./use-answers.ts";
 
 const note = (question: string, answer: string): Note =>
   ({ id: `n-${question.length}`, question, answer, via: ["type"], askedAt: "2026-11-19T10:00:00.000Z" });
@@ -24,7 +24,7 @@ async function save(r: Experience) {
 }
 
 const run = (changes: Change[] = [], questions = [stores.question, boss.question], fp = fingerprint(role, "en")) =>
-  useAnswers({ cv, insights, model: model.deps, userId: "user-a" }, { roleId: role.id, fingerprint: fp, changes, questions });
+  placeAnswers({ cv, insights, model: model.deps, userId: "user-a" }, { roleId: role.id, fingerprint: fp, changes, questions });
 const userMessage = () => (model.requests[0]!.messages as { content: string }[])[1]!.content;
 
 beforeEach(async () => {
@@ -35,7 +35,7 @@ beforeEach(async () => {
   await save(roleWith(["Managed online stores.", "Ran discount campaigns."], { notes: [stores, boss], description: "Ecommerce agency." }));
 });
 
-describe("useAnswers", () => {
+describe("placeAnswers", () => {
   it("makes no model call when no note answers this round's questions", async () => {
     expect(await run([], ["What did you build?"])).toEqual({ changes: [] });
     expect(model.requests).toHaveLength(0);

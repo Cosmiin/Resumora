@@ -225,6 +225,6 @@ export function checkChanges(body: CheckChangesBody): Promise<CheckChangesAnswer
 }
 
 /** Places the facts from this round's answers still missing from a role's page (score/9). Not `use…`: React would read it as a hook. */
-export function useAnswersOnCv(body: UseAnswersBody): Promise<UseAnswersAnswer> {
+export function placeAnswersOnCv(body: UseAnswersBody): Promise<UseAnswersAnswer> {
   return apiFetch("/v1/enrich/use-answers", { method: "POST", json: body, schema: UseAnswersAnswerSchema });
 }

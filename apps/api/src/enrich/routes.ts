@@ -26,7 +26,7 @@ import { suggestTools } from "./tools.ts";
 import { suggestSkills } from "./skills.ts";
 import { proposeShape } from "./shape.ts";
 import { checkChanges } from "./check-changes.ts";
-import { useAnswers } from "./use-answers.ts";
+import { placeAnswers } from "./use-answers.ts";
 import { streamModel } from "../ai/stream-model.ts";
 import { checkSummary, rewriteEvents } from "./rewrite.ts";
 import { rewriteSummarySystemPrompt, rewriteSummaryUserMessage } from "./rewrite-prompts.ts";
@@ -160,7 +160,7 @@ export function enrichRoutes(deps: {
     if (!body.success) throw new ApiError(400, "invalid_request", "Send a roleId, a fingerprint, the changes and the questions.");
     const user = c.get("user");
     try {
-      return c.json(await useAnswers(
+      return c.json(await placeAnswers(
         { cv: deps.cvRepo(user), insights: deps.insightsRepo(user), model: deps.model(user), userId: user.id, questionLanguage: c.get("interfaceLanguage") },
         body.data,
       ));

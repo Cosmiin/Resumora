@@ -16,7 +16,7 @@ const ModelSchema = z.object({
   lines: z.array(z.object({ id: z.string().nullable(), text: z.string() })).max(12),
 });
 
-export function useAnswersSystemPrompt(locale: Locale): string {
+export function placeAnswersSystemPrompt(locale: Locale): string {
   return `${languageInstruction(locale)}
 
 You make sure every fact the person gave in their answers ends up on their CV, for one role.
@@ -38,7 +38,7 @@ Return only JSON: { "description": the whole new description or null, "lines": [
 whole line } ] }.`;
 }
 
-function useAnswersUserMessage(role: Experience, notes: readonly Note[]): string {
+function placeAnswersUserMessage(role: Experience, notes: readonly Note[]): string {
   return [
     "<experience>",
     `Role title: ${JSON.stringify(role.title)}`,
@@ -71,7 +71,7 @@ function idMaker(taken: Iterable<string>) {
  * answers this round's questions. A line over 220 characters, with a number neither the role nor its notes give, for a
  * line that isn't there, or that changes nothing is dropped; so is a description over the field's limit.
  */
-export async function useAnswers(deps: ScoreDeps, body: UseAnswersBody): Promise<UseAnswersAnswer> {
+export async function placeAnswers(deps: ScoreDeps, body: UseAnswersBody): Promise<UseAnswersAnswer> {
   const { content } = await deps.cv.get();
   const found = findScored(content, body.roleId);
   if (!found || found.kind === "project" || fingerprint(found.item, content.locale) !== body.fingerprint) {
@@ -92,8 +92,8 @@ export async function useAnswers(deps: ScoreDeps, body: UseAnswersBody): Promise
       userId: deps.userId,
       task: "enrich_use_answers",
       schema: ModelSchema,
-      system: useAnswersSystemPrompt(content.locale),
-      user: `${useAnswersUserMessage(proposed, notes)}\n\n${gradeContext(proposed, stored)}\nEach new line must reach at least the role's line average.`,
+      system: placeAnswersSystemPrompt(content.locale),
+      user: `${placeAnswersUserMessage(proposed, notes)}\n\n${gradeContext(proposed, stored)}\nEach new line must reach at least the role's line average.`,
       maxOutputTokens: 1500,
     });
   } catch (err) {

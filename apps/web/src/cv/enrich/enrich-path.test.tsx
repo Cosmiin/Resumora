@@ -7,7 +7,7 @@ import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 import { ApiClientError } from "../../lib/api-error.ts";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn(), proposeShape: vi.fn(), checkChanges: vi.fn(), useAnswersOnCv: vi.fn() }));
+const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn(), proposeShape: vi.fn(), checkChanges: vi.fn(), placeAnswersOnCv: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 const note = (question: string, answer: string): Note => ({ id: `n-${question}`, question, answer, via: ["type"], askedAt: "2026-11-17T00:00:00Z" });
@@ -80,7 +80,7 @@ beforeEach(() => {
   api.improveBullet.mockImplementation(({ bulletId }: { bulletId: string }) => Promise.resolve({ proposal: { bulletId, text: `Better ${bulletId}.` }, bulletBefore: 60, bulletAfter: 90, roleBefore: 60, roleAfter: 70, cached: false }));
   api.roleDescription.mockResolvedValue({ text: "Acme makes anvils. Ran reports.", keywords: [] });
   api.brainDump.mockResolvedValue({ proposals: [], roleBefore: null, roleAfterAll: null });
-  api.useAnswersOnCv.mockResolvedValue({ changes: [] });
+  api.placeAnswersOnCv.mockResolvedValue({ changes: [] });
   // Keeps every change, and predicts the role at 85.
   api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string }[] }) =>
     Promise.resolve({ result: { ...result(roleId === "r1" ? r1 : r2, 85), fingerprint: `after-${roleId}` }, kept: changes.map((c) => c.id), held: [] }));
@@ -137,7 +137,7 @@ describe("the short path", () => {
     // r2 got no answers: only its weak line is tidied.
     expect(appliedTo(actions, "r2")).toEqual([{ id: "bullet:r2b1", kind: "bullet", bulletId: "r2b1", text: "Better r2b1." }]);
     // Every answer of this round is offered to be placed, on the role with its prepared changes.
-    expect(api.useAnswersOnCv).toHaveBeenCalledWith(expect.objectContaining({
+    expect(api.placeAnswersOnCv).toHaveBeenCalledWith(expect.objectContaining({
       roleId: "r1", fingerprint: fingerprint(r1, "en"),
       questions: expect.arrayContaining(["What does Acme do?", "What changed in r1?", "Did anyone report to you in r1?"]),
     }));
@@ -227,7 +227,7 @@ describe("the short path", () => {
     };
 
     it("places what the answers still lack, replacing the role's own change for the same line, and puts the prediction", async () => {
-      api.useAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
+      api.placeAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
         ? { changes: [{ id: "answer1", kind: "bullet", bulletId: "r1b1", text: "Better r1b1, for 3 teams." }, { id: "answer2", kind: "new", text: "Reported to the CFO." }] }
         : { changes: [] }));
       const actions: CvAction[] = [];
@@ -244,7 +244,7 @@ describe("the short path", () => {
     });
 
     it("a held new line stays off the CV and is shown at the end; Add anyway puts it on", async () => {
-      api.useAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
+      api.placeAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
         ? { changes: [{ id: "answer1", kind: "new", text: "Helped the team." }] } : { changes: [] }));
       api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string; kind: string }[] }) => Promise.resolve({
         result: { ...result(roleId === "r1" ? r1 : r2, 85), fingerprint: `after-${roleId}` },

@@ -13,7 +13,7 @@ import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
 import { RoleChecklist } from "./Checklist.tsx";
 import { EndStep, type HeldChange } from "./EndStep.tsx";
-import { checkChanges, useAnswersOnCv } from "./enrich-api.ts";
+import { checkChanges, placeAnswersOnCv } from "./enrich-api.ts";
 import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
 import type { Prepared } from "./prepared.ts";
 import { PathScreen } from "./SectionSuggest.tsx";
@@ -195,7 +195,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       let changes = toChanges(out.changes);
       const questions = [...(g?.questions ?? [])].slice(0, 20);
       if (questions.length) {
-        const placed = await limit(() => useAnswersOnCv({ roleId: item.id, fingerprint: print, changes, questions }))
+        const placed = await limit(() => placeAnswersOnCv({ roleId: item.id, fingerprint: print, changes, questions }))
           .then((a) => a.changes).catch(() => { failed = true; return []; });
         changes = withPlaced(changes, placed);
       }
