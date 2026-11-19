@@ -34,3 +34,19 @@ open: ruling — step eyebrows renumbered in CompaniesStep/ToolsStep/BudgetStep 
 session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
 commit: 1edc737 (base aa5726d) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: rulings — ReviewSheet.tsx deleted with its tests in budget-review.test.tsx and its unused strings; `PrepChange` keeps `Change` as an alias; EndStep takes extra optional props `rolesBefore` and `more`; `RoleChecklist` written here (pulled forward from Task 8); new lines get fresh ids. The reviewer's one low finding (end screen flipped back to the spinner after Add anyway, losing a half-edited held line) was fixed before the commit: once shown, the end stays up (no test, covered by the branch review). A non-409 failed check leaves that role unchanged (its changes are not applied unchecked). `PATH_PARALLEL = 6` is untested against OpenRouter until a real run.
+
+## Task 8: Start screen and score explanation show the checklist — done
+session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
+commit: 7a7c6a0 (base 1edc737) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: rulings — RoleChecklist came from Task 7; score-explain.test.tsx expectations updated to the new layout; the old explanation strings (lines, coverage, coverageList, shape.*, na) removed as unused. Start dates use the CV's own date format (`formatRange`), e.g. "Jan 2020 – Present", not years only. Web `editor.test.tsx` and `jobs-page.test.tsx` timed out in the full run and pass alone (known flaky).
+
+## Task 9: Real AI check on the Vevol role (not committed) — done, two findings for the owner
+session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
+commit: none (eval deleted after the run) · model: openrouter google/gemini-3.1-flash-lite · 6 runs, 8–9 calls and ~45–52k tokens each
+results:
+- Step 1 (Shape merges lines 2, 3, 5): 4 of 6 runs merged at least two of them (twice 1+2+3+5, once 1+3+5, plus one run whose details were not captured); 2 runs merged only 1+5. Every merge kept "5-10", Asana and Shopify Plus, at 125–164 characters (limit 220). Merged role vs original (full rescores): 87→91, 84→87, 84→90, 93→97, 87→81.
+- Step 2 (an answer "I reported to the Head of Ecommerce"): 6 of 6 runs put it in the description ("Shopify agency. Reported to the Head of Ecommerce."), never in a line.
+- Step 3 (a weak rewrite of the revenue line, plus one better line): the weak rewrite was held in 6 of 6 runs. Predicted vs full rescore of the kept role: 91 vs 87 (first run, different setup), 84 vs 91, 80 vs 91, ≤3 (one run), 88 vs 91, 83 vs 85: within ±3 in 3 of 6.
+open (owner decides):
+1. The core-item marks are re-read on every AI call and flip on the same text: on "Shopify agency." the company and purpose items went shown → applies between calls. One flip moves a role about 7 points (1 of 6 × 40%). In one run the only kept change raised a line 70 → 100, yet the prediction fell 93 → 88 because company flipped. So a change from the answers can still show as a lower score, the outcome the redesign is meant to prevent. Options: (a) during the path, a core item stored as shown stays shown unless its text was removed; (b) for Shape, keep the stored marks, as the design says ("the core-item marks stay"; Task 4 re-reads them on every check); (c) leave as is and accept the noise. Not built: no rule the owner didn't ask for.
+2. `checkChanges` with `hold: true` holds a merge's `bullet` change but keeps its `remove` changes, so the merged-away lines would vanish. The path never does this today (Shape checks with `hold: false`; preparing makes no removals); the eval's first run hit it by mixing them. Fix would be to hold a merge's removals with its line.
