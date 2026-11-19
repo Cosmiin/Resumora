@@ -125,8 +125,8 @@ describe("scoreRole", () => {
     const model = fakeModel(() => allSpecific(role));
     const result = await run(model, role);
     expect(result.lines).toBe(100);
-    // One perfect bullet with nothing known about the role: Lines 100, Coverage 32 (actions, results, no repeats, a result first).
-    expect(result.score).toBe(73);
+    // One perfect bullet with nothing known about the role: Lines 100, Coverage 50 (actions and results of the four).
+    expect(result.score).toBe(80);
     expect(model.requests).toHaveLength(1);
     expect(model.requests[0]).toMatchObject({ temperature: 0, max_completion_tokens: 1200 });
     expect(model.logged.map((l) => l.task)).toEqual(["enrich_score"]);

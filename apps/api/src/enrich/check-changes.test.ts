@@ -125,6 +125,18 @@ describe("checkChanges", () => {
     expect(out.result.bullets[0]!.id).toBe(role.bullets[2]!.id);
   });
 
+  it("never lowers a mark stored as shown; a better mark is taken", async () => {
+    // Stored: tools shown, scale applies. The grader now says tools applies and scale shown.
+    model = fakeModel(() => {
+      const user = (model.requests.at(-1)!.messages as { content: string }[])[1]!.content;
+      const ids = (/Grade only these bullets: (.*?)\. Return/.exec(user)?.[1] ?? "").split(", ").filter(Boolean);
+      const bullets = allSpecific({ ...role, bullets: ids.map((id) => ({ id, text: "x" })) }).bullets;
+      return { bullets, nextStepId: null, roleQuestions: [], thin: false, coverage: { ...marks, company: "applies", tools: "applies", scale: "shown" } };
+    });
+    const out = await run([{ id: "c1", kind: "bullet", bulletId: role.bullets[1]!.id, text: "Checked 30 contracts a week." }]);
+    expect(out.result.coverage?.marks).toMatchObject({ company: "shown", tools: "shown", scale: "shown" });
+  });
+
   it("409 when the role changed since the fingerprint", async () => {
     await expect(run([], true, "old")).rejects.toMatchObject({ status: 409, code: "not_saved" });
   });

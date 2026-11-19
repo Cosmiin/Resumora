@@ -34,12 +34,14 @@ describe("Understand the score", () => {
     expect(screen.getByRole("heading", { name: "Operations Analyst: the score" })).toBeInTheDocument();
     expect(screen.getByText("88")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Your lines · 60%" })).toHaveAttribute("aria-valuenow", "86");
-    expect(screen.getByRole("progressbar", { name: "What every role needs · 40%" })).toHaveAttribute("aria-valuetext", "6 of 6");
+    expect(screen.getByRole("progressbar", { name: "What every role needs · 40%" })).toHaveAttribute("aria-valuetext", "4 of 4");
     expect(texts(screen.getByRole("list", { name: "What every role needs" }))).toEqual([
-      "Shown: What the company does", "Shown: What the role was for", "Shown: What you did", "Shown: Tools", "Shown: Results", "Shown: Scale",
+      "Shown: What you did", "Shown: Tools", "Shown: Results", "Shown: Scale",
     ]);
     expect(texts(screen.getByRole("list", { name: "Shape" }))).toEqual(["○Missing: 3 to 6 lines", "✓Shown: No repeated lines", "✓Shown: Strongest line first"]);
-    expect(texts(screen.getByRole("list", { name: "Worth adding" }))).toEqual(["○Missing: People you worked with"]);
+    expect(texts(screen.getByRole("list", { name: "Worth adding" }))).toEqual([
+      "✓Shown: What the company does", "✓Shown: What the role was for", "○Missing: People you worked with",
+    ]);
   });
 
   it("takes the role's strongest bullet apart into its five checks", () => {

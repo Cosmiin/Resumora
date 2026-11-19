@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MAX_TEXT, type Experience } from "./cv.ts";
-import { CONDITIONAL_TOPICS, MAX_PROPOSAL, type Question, type RoleQuestion, type RoleResult } from "./enrich.ts";
+import { MAX_PROPOSAL, UNSCORED_TOPICS, type Question, type RoleQuestion, type RoleResult } from "./enrich.ts";
 
 /** The short enrichment path asks at most this many questions per round, across the whole CV. */
 export const PATH_BUDGET = 8;
@@ -88,7 +88,7 @@ export function pickBudget(input: {
     let within = 0;
     for (const question of result.roleQuestions) {
       if (question.topic === "company" || question.topic === "tools" || !fresh(question.text)) continue;
-      const tier = CONDITIONAL_TOPICS.includes(question.topic) ? 2 : 1;
+      const tier = UNSCORED_TOPICS.includes(question.topic) ? 2 : 1;
       candidates.push({ item: { roleId: id, kind: "role", question }, value: ROLE_QUESTION_VALUE * weight, order: roleIndex * 1000 + within++, tier });
     }
     for (const question of result.questions) {

@@ -24,7 +24,7 @@ function Tick({ state, children }: { state: TickState; children: string }) {
 }
 
 /**
- * "Understand the score": the role's number; what makes it (the lines, 60%, and the six items every role needs, 40%);
+ * "Understand the score": the role's number; what makes it (the lines, 60%, and the four items every role needs, 40%);
  * what doesn't change it (the shape and worth-adding checklist); and the role's strongest bullet with its five checks.
  * Opens only when asked.
  */

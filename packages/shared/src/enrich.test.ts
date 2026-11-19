@@ -65,8 +65,8 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/9", () => {
-    expect(SCORE_POLICY).toBe("score/9");
+  it("uses policy score/10", () => {
+    expect(SCORE_POLICY).toBe("score/10");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -427,8 +427,8 @@ describe("blank tip and question", () => {
   });
 });
 
-// score/9: a role's score is 60% its bullets (Lines) and 40% the six core items shown on the page (Coverage).
-// The four conditional items and the shape are a checklist only: they never move the number.
+// score/10: a role's score is 60% its bullets (Lines) and 40% the four core items shown on the page (Coverage).
+// Company, purpose, the four conditional items and the shape are a checklist only: they never move the number.
 describe("coverage and the role score", () => {
   const texts = ["Planned routes for 14 depots in Excel", "Built the weekly delivery report", "Trained colleagues"];
   const bullets = [
@@ -440,19 +440,27 @@ describe("coverage and the role score", () => {
   const allCore = { company: "shown", purpose: "shown", tools: "shown", scale: "shown", leadership: "na", seniority: "na", people: "na", domain: "na" } as const;
   const withResult = [mb("b1"), bullets[1]!, bullets[2]!];
 
-  it("adds up lines 73 and coverage 50 (3 of 6 core items shown) to 64", () => {
+  it("adds up lines 73 and coverage 75 (3 of 4 core items shown) to 74", () => {
     const r = buildRoleResult(role(texts), { ...model(bullets), coverage: marks }, "fp");
     expect(r.bullets.map((b) => b.score)).toEqual([80, 80, 60]);
     expect(r.lines).toBe(73);
-    // Core shown: actions (from the grades), tools, scale. Results, company and purpose are not.
-    expect(r.coverage).toMatchObject({ score: 50, marks: { actions: "shown", results: "applies" }, shape: { amount: true, repeats: true, order: false } });
-    expect(r.score).toBe(64);
+    // Core shown: actions (from the grades), tools, scale. Results is not; company and purpose don't count.
+    expect(r.coverage).toMatchObject({ score: 75, marks: { actions: "shown", results: "applies" }, shape: { amount: true, repeats: true, order: false } });
+    expect(r.score).toBe(74);
   });
 
-  it("gives full coverage when all six core items are shown", () => {
-    const r = buildRoleResult(role(texts), { ...model(withResult), coverage: allCore }, "fp");
+  it("gives full coverage when all four core items are shown, whatever company and purpose say", () => {
+    const r = buildRoleResult(role(texts), { ...model(withResult), coverage: { ...allCore, company: "applies", purpose: "applies" } }, "fp");
     expect(r.coverage?.score).toBe(100);
     expect(r.score).toBe(Math.round(0.6 * r.lines! + 40));
+  });
+
+  it("never moves the number for company and purpose", () => {
+    const base = buildRoleResult(role(texts), { ...model(withResult), coverage: allCore }, "fp").score;
+    for (const mark of ["shown", "applies", "unknown", "na"] as const) {
+      const r = buildRoleResult(role(texts), { ...model(withResult), coverage: { ...allCore, company: mark, purpose: mark } }, "fp");
+      expect(r.score).toBe(base);
+    }
   });
 
   it("never moves the number for the four conditional items", () => {
@@ -469,26 +477,29 @@ describe("coverage and the role score", () => {
     const graded = many.map((_, i) => mb(`b${i + 1}`, g("specific", "specific", "specific", "missing")));
     const r = buildRoleResult(role(many), { ...model(graded), coverage: allCore }, "fp");
     expect(r.coverage?.shape).toMatchObject({ amount: false, order: false });
-    // results not shown (no specific impact): 5 of 6 core items.
-    expect(r.coverage?.score).toBe(83);
-    expect(r.score).toBe(Math.round(0.6 * r.lines! + 0.4 * 83));
+    // results not shown (no specific impact): 3 of 4 core items.
+    expect(r.coverage?.score).toBe(75);
+    expect(r.score).toBe(Math.round(0.6 * r.lines! + 0.4 * 75));
   });
 
-  it("drops a core item that is not shown: 5 of 6 is 83", () => {
+  it("drops a core item that is not shown: 3 of 4 is 75", () => {
     const r = buildRoleResult(role(texts), { ...model(withResult), coverage: { ...allCore, tools: "applies" } }, "fp");
-    expect(r.coverage?.score).toBe(83);
+    expect(r.coverage?.score).toBe(75);
   });
 
   it("counts a result first, and a core parameter the model calls not applicable as not shown", () => {
     const r = buildRoleResult(role(texts), { ...model(withResult), coverage: { ...marks, company: "na" } }, "fp");
     expect(r.coverage).toMatchObject({ marks: { company: "applies", results: "shown" }, shape: { order: true } });
-    // actions, tools, scale, results: 4 of 6.
-    expect(r.coverage?.score).toBe(67);
+    // actions, tools, scale, results: 4 of 4 (company no longer counts).
+    expect(r.coverage?.score).toBe(100);
   });
 
-  it("lists the conditional items worth adding, leaving out those that don't apply", () => {
-    const r = buildRoleResult(role(texts), { ...model(bullets), coverage: { ...marks, leadership: "na", seniority: "applies", people: "shown", domain: "unknown" } }, "fp");
+  it("lists company and purpose first, then the conditional items worth adding, leaving out those that don't apply", () => {
+    const r = buildRoleResult(role(texts), { ...model(bullets), coverage: { ...marks, company: "shown", purpose: "na", leadership: "na", seniority: "applies", people: "shown", domain: "unknown" } }, "fp");
     expect(worthAdding(r.coverage!)).toEqual([
+      { param: "company", shown: true },
+      // Always listed: "na" reads as not on the page.
+      { param: "purpose", shown: false },
       { param: "seniority", shown: false },
       { param: "people", shown: true },
       { param: "domain", shown: false },

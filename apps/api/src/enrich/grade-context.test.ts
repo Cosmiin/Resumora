@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRoleResult, fingerprint, hashText } from "@resumora/shared";
+import { SCORE_POLICY, buildRoleResult, fingerprint, hashText } from "@resumora/shared";
 import { allSpecific, roleWith } from "./fake-model.ts";
 import { gradeContext } from "./grade-context.ts";
 import { GRADING_RULES, scoreSystemPrompt } from "./prompts.ts";
@@ -48,8 +48,10 @@ describe("GRADING_RULES", () => {
   });
 
   it("leaves the score prompt word for word as before the move", () => {
-    // Hashes of scoreSystemPrompt("en") and scoreSystemPrompt("ro", "en") taken before GRADING_RULES was moved out.
-    expect([hashText(scoreSystemPrompt("en")), hashText(scoreSystemPrompt("ro", "en"))]).toEqual(BEFORE);
+    // Hashes of scoreSystemPrompt("en") and scoreSystemPrompt("ro", "en") taken before GRADING_RULES was moved out
+    // (policy score/9). Only the policy line has changed since.
+    const asBefore = (prompt: string) => hashText(prompt.replace(`(policy ${SCORE_POLICY})`, "(policy score/9)"));
+    expect([asBefore(scoreSystemPrompt("en")), asBefore(scoreSystemPrompt("ro", "en"))]).toEqual(BEFORE);
   });
 });
 

@@ -117,13 +117,16 @@ describe("pickBudget", () => {
     expect(out.every((b) => b.kind === "line")).toBe(true);
   });
 
-  it("fills the rest with worth-adding questions, still in CV order", () => {
+  it("fills the rest with worth-adding questions, still in CV order; purpose is one of them (score/10)", () => {
     const items = [
       { id: "a", result: result("a", { roleQuestions: [roleQ("Did anyone report to you?", "leadership")] }) },
       { id: "b", result: result("b", { bullets: [grade("b1", 50)], questions: [lineQ("b1", "What changed?")] }) },
       { id: "c", result: result("c", { roleQuestions: [roleQ("What was the role for?", "purpose")] }) },
     ];
-    const two = pickBudget({ items, weights: new Map(), asked: new Set(), size: 2 });
+    // By value purpose wins (40 × 3 = 120 against 50), but it no longer counts toward the score: the line comes first.
+    const one = pickBudget({ items, weights: new Map([["c", 3]]), asked: new Set(), size: 1 });
+    expect(one.map((b) => b.question.text)).toEqual(["What changed?"]);
+    const two = pickBudget({ items, weights: new Map([["c", 3]]), asked: new Set(), size: 2 });
     expect(two.map((b) => b.question.text)).toEqual(["What changed?", "What was the role for?"]);
     const all = pickBudget({ items, weights: new Map(), asked: new Set() });
     expect(all.map((b) => b.question.text)).toEqual(["Did anyone report to you?", "What changed?", "What was the role for?"]);

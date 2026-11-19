@@ -27,6 +27,7 @@ describe("RoleChecklist", () => {
       "○Missing: 3 to 6 lines", "✓Shown: No repeated lines", "✓Shown: Strongest line first",
     ]);
     expect(items(screen.getByRole("list", { name: "Worth adding" }))).toEqual([
+      "✓Shown: What the company does", "✓Shown: What the role was for",
       "○Missing: Seniority and reporting line", "✓Shown: People you worked with", "○Missing: Domain knowledge",
     ]);
     expect(screen.queryByText("Leadership")).toBeNull();
@@ -45,21 +46,24 @@ describe("ScoreExplain", () => {
     expect(screen.getByText("Your lines · 60%")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Your lines · 60%" })).toHaveAttribute("aria-valuenow", "80");
     expect(screen.getByText("What every role needs · 40%")).toBeInTheDocument();
-    expect(screen.getByText("6 of 6")).toBeInTheDocument();
-    expect(items(screen.getByRole("list", { name: "What every role needs" }))).toHaveLength(6);
+    expect(screen.getByText("4 of 4")).toBeInTheDocument();
+    expect(items(screen.getByRole("list", { name: "What every role needs" }))).toEqual([
+      "Shown: What you did", "Shown: Tools", "Shown: Results", "Shown: Scale",
+    ]);
     expect(screen.getByRole("heading", { name: "Doesn't change the number" })).toBeInTheDocument();
     expect(screen.getByText(/They can't lower your score, so answering a question about them is never wasted\./)).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Worth adding" })).toBeInTheDocument();
   });
 
   it("counts the core items shown", () => {
-    render(<ScoreExplain open onClose={() => {}} name="Operations Analyst" role={role} result={result(coverage({ tools: "applies", scale: "unknown" }))} />);
-    expect(screen.getByText("4 of 6")).toBeInTheDocument();
+    render(<ScoreExplain open onClose={() => {}} name="Operations Analyst" role={role} result={result(coverage({ tools: "applies", scale: "unknown", company: "applies" }))} />);
+    expect(screen.getByText("2 of 4")).toBeInTheDocument();
   });
 });
 
 describe("a role's next step", () => {
   it("names only a core item, never one that is worth adding", () => {
+    expect(nextStepOf(result(coverage({ company: "applies", purpose: "applies" })))).toBe("Say what changed.");
     expect(nextStepOf(result(coverage({ leadership: "applies", seniority: "unknown", people: "applies", domain: "applies" })))).toBe("Say what changed.");
     expect(nextStepOf(result(coverage({ tools: "applies", leadership: "applies" })))).toBe("name the tools you used, where you used them.");
   });

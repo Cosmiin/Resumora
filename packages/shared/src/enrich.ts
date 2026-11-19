@@ -2,11 +2,11 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/9";
+export const SCORE_POLICY = "score/10";
 
 /** A bullet's five checks. A clear, short bullet with no result scores 80. */
 export const WEIGHTS = { contribution: 30, clarity: 20, specificity: 20, impact: 20, concise: 10 } as const;
-/** A role's score: this share from its bullets (Lines), the rest from the six core items shown on the page (Coverage). */
+/** A role's score: this share from its bullets (Lines), the rest from the four core items shown on the page (Coverage). */
 export const LINES_SHARE = 0.6;
 /** A bullet longer than the first is at most "partial" on concise; longer than the second is "missing". */
 export const CONCISE_CHARS = { partial: 220, missing: 300 } as const;
@@ -24,6 +24,8 @@ export const MAX_ROLE_QUESTIONS = 8;
 export const ROLE_TOPICS = ["company", "purpose", "tools", "leadership", "seniority", "people", "domain", "other"] as const;
 /** The role topics that are conditional coverage parameters. */
 export const CONDITIONAL_TOPICS: readonly RoleTopic[] = ["leadership", "seniority", "people", "domain"];
+/** Role topics whose answers never move the score (score/10): the path asks them only when nothing else is left. */
+export const UNSCORED_TOPICS: readonly RoleTopic[] = ["purpose", ...CONDITIONAL_TOPICS];
 export const RoleTopicSchema = z.enum(ROLE_TOPICS);
 export type RoleTopic = z.infer<typeof RoleTopicSchema>;
 
@@ -33,11 +35,17 @@ export type Grade = z.infer<typeof GradeSchema>;
 export const IssueSchema = z.enum(["example", "duplicate", "contribution", "clarity", "specificity", "impact", "none"]);
 export type Issue = z.infer<typeof IssueSchema>;
 
-/** What a recruiter looks for in a role. Core ones count for every role; conditional ones only when they apply. */
-export const CORE_PARAMETERS = ["company", "purpose", "actions", "tools", "results", "scale"] as const;
+/**
+ * What a recruiter looks for in a role. The core ones make the score (score/10). Company and purpose apply to every role
+ * but are read from the description, which the AI judged differently from call to call: they are on the checklist only,
+ * like the conditional ones, which apply to some roles.
+ */
+export const CORE_PARAMETERS = ["actions", "tools", "results", "scale"] as const;
+export const CONTEXT_PARAMETERS = ["company", "purpose"] as const;
 export const CONDITIONAL_PARAMETERS = ["leadership", "seniority", "people", "domain"] as const;
 export type ConditionalParameter = (typeof CONDITIONAL_PARAMETERS)[number];
-export type CoverageParameter = (typeof CORE_PARAMETERS)[number] | ConditionalParameter;
+export type ChecklistParameter = (typeof CONTEXT_PARAMETERS)[number] | ConditionalParameter;
+export type CoverageParameter = (typeof CORE_PARAMETERS)[number] | ChecklistParameter;
 /** shown: on the page. applies: the role involves it but the page does not say it. unknown: no clue either way. na: does not apply. */
 export const MarkSchema = z.enum(["shown", "applies", "unknown", "na"]);
 export type Mark = z.infer<typeof MarkSchema>;
@@ -282,8 +290,8 @@ type ResultBullet = RoleResult["bullets"][number];
 
 /**
  * What the role shows a recruiter. Actions and results come from the bullet grades; the rest from the model's marks.
- * `score` (0–100) counts only the six core items shown on the page (score/9): the four conditional items and the shape
- * are kept for the checklist, never for the number, so an answer can't lower it.
+ * `score` (0–100) counts only the four core items shown on the page (score/10): company, purpose, the four conditional
+ * items and the shape are kept for the checklist, never for the number.
  */
 export function buildCoverage(bullets: readonly ResultBullet[], model: ModelCoverage): Coverage {
   const real = bullets.filter((b) => b.issue !== "example" && b.issue !== "duplicate");
@@ -307,10 +315,12 @@ export function buildCoverage(bullets: readonly ResultBullet[], model: ModelCove
   return { score, marks, shape };
 }
 
-/** The "worth adding" checklist: the conditional items that apply to the role (not `na`), ticked when shown. No points. */
-export function worthAdding(coverage: Pick<Coverage, "marks">): { param: ConditionalParameter; shown: boolean }[] {
-  return CONDITIONAL_PARAMETERS
-    .filter((p) => coverage.marks[p] !== "na")
+/**
+ * The "worth adding" checklist (no points): company and purpose, always, then the conditional items that apply to the
+ * role (not `na`); each ticked when shown.
+ */
+export function worthAdding(coverage: Pick<Coverage, "marks">): { param: ChecklistParameter; shown: boolean }[] {
+  return [...CONTEXT_PARAMETERS, ...CONDITIONAL_PARAMETERS.filter((p) => coverage.marks[p] !== "na")]
     .map((p) => ({ param: p, shown: coverage.marks[p] === "shown" }));
 }
 
