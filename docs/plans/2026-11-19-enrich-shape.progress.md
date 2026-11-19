@@ -56,3 +56,10 @@ session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: cla
 reviews: 1 whole-branch (Opus high) + 1 fix-only (Opus high) · fix: d95a9bd (a second round's end screen could skip waiting for its scores; low)
 open: the two Task 9 points above (core-mark noise; hold with a merge's removals), and PATH_PARALLEL = 6 untested against OpenRouter.
 cost: no Codex; review agents this part (Tasks 5–9): 4 per-task Sonnet + 2 Opus; guard denials: 0; real-AI eval: 6 runs, ~300k tokens on gemini-3.1-flash-lite. Weekly usage not read in this session.
+
+## Task 10: Company and purpose leave the score; the path's check keeps shown marks (owner, 19 Nov) — done
+session: Enrichment redesign: Tasks 5–9 (side session, 19 Nov) · builder: claude
+commit: 9995103 (base fd53dd1) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+what: core = actions, tools, results, scale (round(100 × shown / 4)); company and purpose on the checklist (first under Worth adding, always listed); purpose questions in the budget's second tier; `/check-changes` never lowers a mark stored as shown; SCORE_POLICY = score/10. Score expectations in api tests moved +7 (the fake roles never showed company or purpose); the prompt snapshot test now ignores the policy line.
+stability (real AI, Vevol role, gemini-3.1-flash-lite, 2 runs in separate processes, 44 calls, ~300k tokens): the same role scored 10 times per run gave 95 ×10 in the first run and 93 ×10 in the second (spread 0 within a run, 2 across runs; identical requests at the same moment likely got the same cached answer, so within-run repeats aren't independent). Core part 100 in all 20 scores (before: 84–93 across runs, mostly company/purpose flips). The 2 points across runs come from one line graded 100 vs 80. Prediction vs full rescore after a kept rewrite: 96 vs 98 (×3) and 95 vs 98 (×3), within ±3; the weak rewrite was held 6 of 6.
+open: line grades still differ between runs on borderline lines (one line 80 ↔ 100 = 2 role points). Tightening the line-grading wording is the next lever if the owner wants a spread of 0.
