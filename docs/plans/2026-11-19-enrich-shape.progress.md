@@ -73,3 +73,8 @@ measured (real AI, gemini-3.1-flash-lite, 10 independent scores per batch, fresh
 - after (5 batches of the kept wording or near variants): Vevol 96×8 93 97 | 96×4 98×4 93 95 | 96×5 98×4 97 (final); payroll 87×9 89 | 87×8 86 88 | 89×5 87×3 88×2 (final). Lines that still change: 1 of 8 (Vevol, "Managed technical store operations…"), 2–3 of 5 (payroll, "Checked employment contracts before signing", "Answered staff questions about payslips").
 - One variant (also telling the model broad wording never lowers contribution) was tried and dropped: no gain.
 open: rewording has reached its limit on this model: about ±1–2 points remain on genuinely borderline lines. Further options (owner's call, not built): a stronger grading model, or grading each role twice and keeping the higher/agreed grade (2× the cost).
+
+## Task 12: CI lint fix (react-hooks rule on use-prefixed functions) — done
+session: enrich-shape handoff · builder: claude
+commit: 7b73c0a (base 05bccc0) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: none. `useAnswers*` renamed to `placeAnswers*`; route `/v1/enrich/use-answers` and `UseAnswers*` types unchanged. Lint, typecheck and tests pass (editor/pdf timeouts under full load passed alone).
