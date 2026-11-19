@@ -65,8 +65,8 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/10", () => {
-    expect(SCORE_POLICY).toBe("score/10");
+  it("uses policy score/11", () => {
+    expect(SCORE_POLICY).toBe("score/11");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {

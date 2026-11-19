@@ -47,12 +47,28 @@ describe("GRADING_RULES", () => {
     expect(scoreSystemPrompt("en")).toContain(`\n\n${GRADING_RULES}\n\nSUFFICIENCY TEST`);
   });
 
-  it("leaves the score prompt word for word as before the move", () => {
-    // Hashes of scoreSystemPrompt("en") and scoreSystemPrompt("ro", "en") taken before GRADING_RULES was moved out
-    // (policy score/9). Only the policy line has changed since.
-    const asBefore = (prompt: string) => hashText(prompt.replace(`(policy ${SCORE_POLICY})`, "(policy score/9)"));
-    expect([asBefore(scoreSystemPrompt("en")), asBefore(scoreSystemPrompt("ro", "en"))]).toEqual(BEFORE);
+  it("keeps the rest of the score prompt word for word (only the grading rules and the policy line change)", () => {
+    // Hashes of scoreSystemPrompt("en") and scoreSystemPrompt("ro", "en") with those two parts blanked, taken at score/10.
+    const rest = (prompt: string) => hashText(prompt.replace(GRADING_RULES, "GRADING").replace(`(policy ${SCORE_POLICY})`, "(policy)"));
+    expect([rest(scoreSystemPrompt("en")), rest(scoreSystemPrompt("ro", "en"))]).toEqual(REST);
   });
 });
 
-const BEFORE = ["as0zweqyog", "1192kplo30s"];
+const REST = ["1puc1mislmw", "1h4jgyy8rw9"];
+
+// score/11: the grading rules settle the cases the model read both ways between independent scores.
+describe("GRADING_RULES, sharpened", () => {
+  const rules = GRADING_RULES.replace(/\s+/g, " ");
+  it("counts a number of people, clients or items the work served as scale, so impact is specific", () => {
+    expect(rules).toContain("A number of people, clients, accounts, sites or items the work covered is scale");
+  });
+  it("keeps contribution specific when a concrete action follows a broad verb", () => {
+    expect(rules).toContain("A broad verb followed by the concrete action, such as \"ran campaigns by setting up discount codes\", is specific");
+  });
+  it("leaves broad wording to specificity, not clarity or concise", () => {
+    expect(rules).toContain("Broad wording is a specificity problem: it never lowers clarity or concise");
+  });
+  it("defines specific specificity as an object plus one more detail", () => {
+    expect(rules).toContain("specific: The bullet names what was worked on (a document, system, product, process or topic) and at least one more detail");
+  });
+});

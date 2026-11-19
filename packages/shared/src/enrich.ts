@@ -2,7 +2,7 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/10";
+export const SCORE_POLICY = "score/11";
 
 /** A bullet's five checks. A clear, short bullet with no result scores 80. */
 export const WEIGHTS = { contribution: 30, clarity: 20, specificity: 20, impact: 20, concise: 10 } as const;

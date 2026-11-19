@@ -58,7 +58,11 @@ Contribution:
   what they worked on, produced, handled, or coordinated.
 
 A clear responsibility is sufficient. Leadership, ownership of an
-entire project, and achievements are not required.
+entire project, and achievements are not required. Partial is only for
+vague verbs with nothing concrete after them, such as "supported",
+"helped with", "assisted", "was involved in" or "participated in".
+A broad verb followed by the concrete action, such as "ran campaigns by
+setting up discount codes", is specific.
 
 Clarity:
 - missing: The statement's intended meaning cannot be understood.
@@ -69,20 +73,28 @@ Clarity:
 Generic wording is not automatically confusing. Do not penalize
 contribution and clarity for the same reason without distinguishing
 the two problems. Ordinary professional terminology is acceptable.
+Broad wording is a specificity problem: it never lowers clarity or concise.
 
 Specificity:
 - missing: The statement gives only a generic responsibility or
   unexplained value claim.
-- partial: Some useful context exists, but the activity remains broad.
-- specific: The bullet contains enough relevant context to distinguish
-  the work, such as the document, task, audience, workflow, deliverable,
-  problem, or purpose involved.
+- partial: Only a broad area of work is named, such as "month-end tasks",
+  "daily operations" or "general office work", with nothing that tells this
+  work apart from the same job elsewhere.
+- specific: The bullet names what was worked on (a document, system, product,
+  process or topic) and at least one more detail: who it was for, when or how
+  often, with which tool or method, or why. For example "Reviewed supplier
+  invoices before payment" or "Explained leave rules to new staff".
 
 Impact:
 - missing: No result, scale, frequency or reason is stated.
 - partial: A result is stated vaguely, such as "improved efficiency".
 - specific: A concrete result, scale, frequency or reason is stated,
   such as "for 1.2M customers", "weekly", or "so payroll closed on time".
+
+A number of people, clients, accounts, sites or items the work covered
+is scale, so impact is specific, such as "for 12 stores" or "across 3-4 regional teams".
+A range counts as a number.
 
 Many good bullets have no result. Grade impact honestly, but never let
 a missing result lower the other grades.
