@@ -1,5 +1,8 @@
 import { z } from "zod";
 import {
+  ShapeAnswerSchema,
+  type ShapeAnswer,
+  type ShapeBody,
   CompaniesAnswerSchema,
   ToolsAnswerSchema,
   type CompaniesAnswer,
@@ -203,4 +206,9 @@ export function projectQuestions(projectId: string): Promise<ProjectQuestionsAns
 /** One description sentence, at most two bullets and the extra tools for one saved project, from its own text and answers. */
 export function projectWrite(projectId: string): Promise<ProjectWriteAnswer> {
   return apiFetch("/v1/enrich/project-write", { method: "POST", json: { projectId }, schema: ProjectWriteAnswerSchema });
+}
+
+/** The path's Shape step: merges of lines that describe the same work in one saved role (score/9). */
+export function proposeShape(input: ShapeBody): Promise<ShapeAnswer> {
+  return apiFetch("/v1/enrich/shape", { method: "POST", json: input, schema: ShapeAnswerSchema });
 }

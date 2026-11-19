@@ -159,6 +159,19 @@ describe("/v1/enrich", () => {
   });
 });
 
+describe("POST /v1/enrich/shape", () => {
+  const post = (body: unknown) => app.request("/v1/enrich/shape", { method: "POST", headers: auth, body: JSON.stringify(body) });
+
+  it("400 for a malformed body, 409 for a stale fingerprint, no merges for a clean saved role", async () => {
+    expect((await post({})).status).toBe(400);
+    expect((await post({ roleId: role.id, fingerprint: fp, extra: true })).status).toBe(400);
+    expect((await post({ roleId: role.id, fingerprint: "old" })).status).toBe(409);
+    const res = await post({ roleId: role.id, fingerprint: fp });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ merges: [] });
+  });
+});
+
 describe("POST /v1/enrich/project-questions", () => {
   const post = (body: unknown) => app.request("/v1/enrich/project-questions", { method: "POST", headers: auth, body: JSON.stringify(body) });
   const project = { ...roleWith(["Built a planner."], { title: "Route planner", company: "Personal project" }), url: "" };
