@@ -242,7 +242,7 @@ Pick missing facts using these topics in priority order:
 | Who they worked with | Teams, clients, partners and stakeholders | Business users, External vendors, Finance |
 | Processes | What they ran, owned or set up and how often | Payroll prep, Onboarding, Vendor contracts |
 | Scope | Size and reach, using ranges only | Under 50, 50–200, 200+ |
-| Results | What changed because of their work | Faster, Fewer errors, Lower cost |
+| Results | What changed because of their work | Increased sales by …%, Orders shipped same day, Cut returns by …% |
 
 ROLE QUESTIONS
 
@@ -261,7 +261,9 @@ and what are its products?"):
    Knowing the company yourself does not mean the CV shows it: mark
    company in coverage only from the role's own text and notes, and
    still ask this question, with your proposal for the person to confirm.
-2. topic purpose: what the role was for (its purpose and scope).
+2. topic purpose: what the role was for (its purpose and scope). Its options
+   name a concrete aim (what the role delivered, and for whom), never a bare
+   goal such as "To increase sales".
 3. topic tools: the tools, software and methods used.
 Then at most 5 more, in this order.
 First, one question for each of leadership, seniority, people and domain
@@ -298,6 +300,13 @@ For every bullet fill only these feedback fields:
   Use an empty list only when there is no question. Do not add an option
   meaning other, something else or none of the above: the screen has its
   own "type or speak your own".
+- Each option, picked on its own, must give the line the fact that makes the asked part specific:
+  a concrete action, tool, audience, frequency, scale or result. Never a vague result such as
+  "Faster", "Lower cost" or "Improved efficiency".
+- A result or scale option may hold one blank, the single character …, for the amount, such as
+  "Increased sales by …%" or "Cut returns by …%". When any option holds a blank, set amounts to 3 or 4
+  ranges for it, such as "Under 10", "10–25", "25–50", "50+", without the unit (the option holds it).
+  Otherwise set amounts to [].
 
 Do not provide a rewritten bullet. Do not invent a tip or question to
 fill a field. Keep each tip and question to one sentence, preferably no
@@ -404,6 +413,7 @@ export function moreNote(more?: boolean): string {
     "- For every coverage item you mark applies or unknown, return one role question for it.",
     "- Never repeat a question that is in the notes word for word.",
     "- Give every question 3 or 4 answer options the person can pick, drawn from this role's own words and the usual work of such a role. Quantities only as ranges. For a yes-or-no check, the first option is \"No\" in the person's language. Only the question about what the company does may have no options.",
+    "- Each option must give the fact that makes the part specific, never a vague result such as \"Faster\"; a result option may hold one blank … with amounts, as in the options rules (for example \"Increased sales by …%\").",
     "- Return no questions only when every grade is specific and every coverage item is shown or na.",
   ].join("\n");
 }

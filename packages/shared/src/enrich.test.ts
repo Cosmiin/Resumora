@@ -4,6 +4,7 @@ import {
   MAX_QUESTIONS,
   MAX_ROLE_QUESTIONS,
   ModelScoreSchema,
+  hasBlank,
   RoleResultSchema,
   SCORE_POLICY,
   band,
@@ -518,5 +519,50 @@ describe("coverage and the role score", () => {
     const stored = buildRoleResult(role(texts), { ...model(bullets), coverage: marks }, "old");
     const again = mergeGrades(role(texts), stored, [mb("b3")], "new");
     expect(again.coverage?.marks).toMatchObject({ tools: "shown", company: "applies", leadership: "shown", results: "shown" });
+  });
+});
+
+describe("options with a blank and its amounts (score/12)", () => {
+  const ask = (options: string[], amounts?: string[]) =>
+    mb("b1", { ...g("specific", "specific", "specific", "partial"), issue: "impact", question: "What changed?", options, ...(amounts ? { amounts } : {}) });
+
+  it("finds a blank", () => {
+    expect(hasBlank("Increased sales by …%")).toBe(true);
+    expect(hasBlank("Orders shipped same day")).toBe(false);
+  });
+
+  it("accepts amounts on the model's answer and keeps it optional", () => {
+    expect(ModelScoreSchema.safeParse(model([ask(["Increased sales by …%"], ["Under 10", "10–25"])])).success).toBe(true);
+    expect(ModelScoreSchema.safeParse(model([ask(["Increased sales by …%"])])).success).toBe(true);
+    expect(ModelScoreSchema.safeParse(model([ask(["x"], ["a", "b", "c", "d", "e"])])).success).toBe(false);
+  });
+
+  it("passes amounts through to the bullet question when an option has a blank", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Increased sales by …%", "Orders shipped same day"], ["Under 10", "10–25", "25–50", "50+"])]), "fp");
+    expect(r.questions[0]).toMatchObject({ options: ["Increased sales by …%", "Orders shipped same day"], amounts: ["Under 10", "10–25", "25–50", "50+"] });
+  });
+
+  it("drops amounts when no option has a blank, and an option with two blanks", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Orders shipped same day", "Cut … by …%"], ["Under 10"])]), "fp");
+    expect(r.questions[0]!.options).toEqual(["Orders shipped same day"]);
+    expect(r.questions[0]!.amounts).toBeUndefined();
+  });
+
+  it("drops an amount that is an exact number", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Increased sales by …%"], ["15", "10–25", "50+"])]), "fp");
+    expect(r.questions[0]!.amounts).toEqual(["10–25", "50+"]);
+  });
+
+  it("passes amounts through on role questions", () => {
+    const r = buildRoleResult(role(["Ran the store."]), { ...model([mb("b1")]), roleQuestions: [
+      { text: "How big was the work?", options: ["About … stores"], topic: "other", proposal: null, amounts: ["Under 10", "10–50", "50+"] },
+    ] }, "fp");
+    expect(r.roleQuestions[0]).toMatchObject({ options: ["About … stores"], amounts: ["Under 10", "10–50", "50+"] });
+  });
+
+  it("reads a stored result from before score/12 without amounts", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Orders shipped same day"])]), "fp");
+    const old = JSON.parse(JSON.stringify(r));
+    expect(RoleResultSchema.safeParse(old).success).toBe(true);
   });
 });

@@ -18,7 +18,7 @@ import { ApiError } from "../errors.ts";
 import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { memoryInsightsRepo } from "./memory-repo.ts";
 import { gradeBullets, scoreRole } from "./score.ts";
-import { scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
+import { moreNote, scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
 import { allSpecific, fakeModel, roleWith } from "./fake-model.ts";
 
 let cv: ReturnType<typeof memoryCvRepo>;
@@ -369,6 +369,18 @@ describe("score prompt", () => {
     expect(prompt).toContain("Do not add an option\n  meaning other, something else or none of the above");
     expect(prompt).toContain("Never ask about something the CV or the notes already answer.");
     expect(prompt).not.toContain("Use an empty list when the question is open");
+  });
+
+  it("asks for options that give a gradeable fact, with a blank and its amounts for a result (score/12)", () => {
+    for (const prompt of [scoreSystemPrompt("en"), scoreSystemPrompt("en") + moreNote(true)]) {
+      expect(prompt).not.toContain("Faster, Fewer errors, Lower cost");
+      expect(prompt).toContain("Increased sales by …%");
+    }
+    const prompt = scoreSystemPrompt("en");
+    expect(prompt).toContain("Each option, picked on its own, must give the line the fact that makes the asked part specific");
+    expect(prompt).toContain("When any option holds a blank, set amounts to 3 or 4\n  ranges for it");
+    expect(prompt).toContain('never a bare\n   goal such as "To increase sales"');
+    expect(moreNote(true)).toContain("a result option may hold one blank … with amounts");
   });
 
   it("includes the role's notes so known facts are not asked again", () => {
