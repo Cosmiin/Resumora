@@ -88,6 +88,8 @@ export const basecvEn = {
   "enrich.answer.options": "Likely answers",
   "enrich.answer.optionsHint": "Options are only suggestions. Pick what is true, then add detail in your own words.",
   "enrich.answer.other": "Something else",
+  "enrich.answer.amount": "How much?",
+  "enrich.answer.typeIt": "or type it",
   "enrich.answer.placeholder": "Pick, type or speak…",
   "enrich.end.achievements": "Key achievements: {n} added",
   "enrich.end.at": "at {n}",

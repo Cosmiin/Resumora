@@ -10,3 +10,9 @@ open: none
 session: enrich-shape handoff · builder: claude
 commit: 846438c (base fe6a830) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: none. Shape keeps its floor ("not weaker than the lines it replaces") next to the top-grade bar.
+
+## Task 3: Gradeable options with a blank and its amounts — done
+session: enrich-shape handoff · builder: claude
+commit: 44c0eef (base 846438c) · reviews: 1 (agents) · fix rounds: 0 (one low finding fixed: a dead regex removed) · guard denials: 0
+ruling: `amounts` is optional everywhere (not default []), so older results and test doubles need no change. REST hash updated on purpose: the option rules and the Results row are new prompt text.
+open: none

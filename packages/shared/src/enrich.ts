@@ -270,7 +270,7 @@ export const hasBlank = (option: string): boolean => option.includes(BLANK);
  */
 function pickOptions(options: readonly string[], amounts: readonly string[] | undefined): { options: string[]; amounts?: string[] } {
   const kept = options.filter((o) => isAllowedOption(o) && o.split(BLANK).length <= 2);
-  const fills = kept.some(hasBlank) ? (amounts ?? []).filter((a) => a.trim() !== "" && isAllowedOption(a)) : [];
+  const fills = kept.some(hasBlank) ? (amounts ?? []).filter((a) => /\d/.test(a) && a.length <= 20 && isAllowedOption(a)) : [];
   return fills.length ? { options: kept, amounts: fills } : { options: kept };
 }
 

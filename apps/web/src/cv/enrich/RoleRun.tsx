@@ -6,7 +6,7 @@ import type { CvAction } from "../edit/cvReducer.ts";
 import { SCORED_LIST } from "../edit/lists.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { formatRange } from "../page/blocks.ts";
-import { AnswerBox, type Via } from "./AnswerBox.tsx";
+import { AnswerBox, withoutOpenBlanks, type Via } from "./AnswerBox.tsx";
 import { BrainDumpStep } from "./BrainDumpStep.tsx";
 import { FocusBar } from "./FocusBar.tsx";
 import type { FocusTarget } from "./focus-context.ts";
@@ -259,7 +259,10 @@ export function RunQuestion({ item, line, why, initial, locale, busy, onSubmit, 
   const asked: Question = {
     bulletId: item.kind === "line" ? item.question.bulletId : item.question.id, text: item.question.text,
     kind: item.kind === "line" ? item.question.kind : "detail", options: options.length >= 2 ? options : [],
+    ...(options.length >= 2 && item.question.amounts?.length ? { amounts: item.question.amounts } : {}),
   };
+  // An option whose blank is still "…" is not part of the answer.
+  const answer = withoutOpenBlanks(value, asked.options);
   return (
     <>
       {line && <p className="rr-aboutline"><span className="visually-hidden">{t("enrich.run.lineLabel")} </span>“{line}”</p>}
@@ -289,7 +292,7 @@ export function RunQuestion({ item, line, why, initial, locale, busy, onSubmit, 
       <div className="fm-foot">
         <BackButton onBack={onBack} busy={busy} />
         <button type="button" className="fm-ghost" onClick={onSkip} disabled={busy}>{t("enrich.focus.skip")}</button>
-        {editing && <button type="button" className="fm-btn" disabled={busy || voiceBusy || value.trim() === ""} onClick={() => onSubmit(value, via)}>{t("enrich.focus.improve")}</button>}
+        {editing && <button type="button" className="fm-btn" disabled={busy || voiceBusy || answer === ""} onClick={() => onSubmit(answer, via)}>{t("enrich.focus.improve")}</button>}
       </div>
     </>
   );

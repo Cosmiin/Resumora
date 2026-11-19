@@ -12,7 +12,8 @@ vi.mock("./mic.ts", () => mic);
 const rt = vi.hoisted(() => ({ openTranscription: vi.fn() }));
 vi.mock("./realtime.ts", () => rt);
 
-import { AnswerBox, type Via } from "./AnswerBox.tsx";
+import { AnswerBox, withoutOpenBlanks, type Via } from "./AnswerBox.tsx";
+import { QuestionStep } from "./QuestionStep.tsx";
 import { latinOnly, useVoice } from "./useVoice.ts";
 
 const question: Question = {
@@ -495,5 +496,144 @@ describe("AnswerBox: voice countdown", () => {
     fireEvent.click(screen.getByRole("button", { name: "Answer by speaking" }));
     await act(() => vi.advanceTimersByTimeAsync(3_000));
     expect(screen.getByText(/Listening… 0:00 of 1:00/)).toBeInTheDocument();
+  });
+});
+
+describe("an option with a blank and its amounts (score/12)", () => {
+  const blankQ: Question = {
+    bulletId: "b1", kind: "result", text: "What changed because of this work?",
+    options: ["Increased sales by …%", "Orders shipped same day"], amounts: ["Under 10", "10–25", "25–50", "50+"],
+  };
+  const box = () => screen.getByRole("textbox", { name: "Your answer" }) as HTMLTextAreaElement;
+
+  it("shows the amount chips only while a picked blank is unfilled, and a chip fills it", () => {
+    render(<Harness q={blankQ} />);
+    expect(screen.queryByText("How much?")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Increased sales by …%" }));
+    expect(box().value).toBe("Increased sales by …%");
+    expect(screen.getByText("How much?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "10–25" }));
+    expect(box().value).toBe("Increased sales by 10–25%");
+    expect(screen.queryByText("How much?")).toBeNull();
+    expect(screen.getByRole("button", { name: "Increased sales by …%" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps a number typed over the blank", () => {
+    render(<Harness q={blankQ} />);
+    fireEvent.click(screen.getByRole("button", { name: "Increased sales by …%" }));
+    fireEvent.change(box(), { target: { value: "Increased sales by 18%" } });
+    expect(box().value).toBe("Increased sales by 18%");
+    expect(screen.queryByText("How much?")).toBeNull();
+  });
+
+  it("unpicking removes the piece, filled or not, and leaves the others", () => {
+    render(<Harness q={blankQ} />);
+    fireEvent.click(screen.getByRole("button", { name: "Orders shipped same day" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increased sales by …%" }));
+    fireEvent.click(screen.getByRole("button", { name: "50+" }));
+    expect(box().value).toBe("Orders shipped same day, Increased sales by 50+%");
+    fireEvent.click(screen.getByRole("button", { name: "Increased sales by …%" }));
+    expect(box().value).toBe("Orders shipped same day");
+  });
+
+  it("shows no amount row for a question without amounts", () => {
+    render(<Harness q={{ ...blankQ, amounts: undefined }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Increased sales by …%" }));
+    expect(screen.queryByText("How much?")).toBeNull();
+  });
+});
+
+describe("withoutOpenBlanks", () => {
+  const options = ["Increased sales by …%", "Orders shipped same day"];
+  it("drops a piece that is still an unfilled blank option, keeps the rest", () => {
+    expect(withoutOpenBlanks("Orders shipped same day, Increased sales by …%", options)).toBe("Orders shipped same day");
+    expect(withoutOpenBlanks("Increased sales by …%, Orders shipped same day", options)).toBe("Orders shipped same day");
+    expect(withoutOpenBlanks("Increased sales by …%", options)).toBe("");
+    expect(withoutOpenBlanks("Increased sales by 10–25%", options)).toBe("Increased sales by 10–25%");
+    expect(withoutOpenBlanks("Sales grew… a lot", options)).toBe("Sales grew… a lot");
+  });
+});
+
+describe("QuestionStep with a blank option", () => {
+  it("sends the answer without an unfilled blank, and can't send it alone", () => {
+    const onSubmit = vi.fn();
+    render(<QuestionStep question={{ bulletId: "b1", kind: "result", text: "What changed?", options: ["Increased sales by …%", "Orders shipped same day"], amounts: ["Under 10", "10–25"] }}
+      needsDetail={false} locale="en" busy={false} onSubmit={onSubmit} onSkip={() => {}} onFreeTalk={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Increased sales by …%" }));
+    expect(screen.getByText("How much?")).toBeInTheDocument();
+    const send = screen.getByRole("button", { name: "Next" });
+    expect(send).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Orders shipped same day" }));
+    fireEvent.click(send);
+    expect(onSubmit).toHaveBeenCalledWith("Orders shipped same day", ["pick"]);
+  });
+});
+
+describe("blank options at the edges (score/12)", () => {
+  const leading: Question = { bulletId: "b1", kind: "result", text: "How much faster?", options: ["…% faster pages", "Fewer errors on checkout"], amounts: ["Under 10", "10–25"] };
+  const box = () => screen.getByRole("textbox", { name: "Your answer" }) as HTMLTextAreaElement;
+
+  it("handles an option that starts with the blank", () => {
+    render(<Harness q={leading} />);
+    expect(screen.getByRole("button", { name: "…% faster pages" })).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByRole("button", { name: "…% faster pages" }));
+    fireEvent.click(screen.getByRole("button", { name: "10–25" }));
+    expect(box().value).toBe("10–25% faster pages");
+    expect(screen.getByRole("button", { name: "…% faster pages" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "…% faster pages" }));
+    expect(box().value).toBe("");
+  });
+
+  it("keeps offering amounts after a trailing space, and drops the open blank when saving", () => {
+    render(<Harness q={leading} />);
+    fireEvent.click(screen.getByRole("button", { name: "…% faster pages" }));
+    fireEvent.change(box(), { target: { value: "…% faster pages " } });
+    expect(screen.getByText("How much?")).toBeInTheDocument();
+    expect(withoutOpenBlanks("Fewer errors on checkout, …% faster pages \n", leading.options)).toBe("Fewer errors on checkout");
+  });
+
+  it("keeps offering amounts after a typed \", \", and drops the open blank when saving", () => {
+    render(<Harness q={leading} />);
+    fireEvent.click(screen.getByRole("button", { name: "…% faster pages" }));
+    fireEvent.change(box(), { target: { value: "…% faster pages, " } });
+    expect(screen.getByText("How much?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Under 10" }));
+    expect(box().value).toBe("Under 10% faster pages, ");
+    expect(withoutOpenBlanks("…% faster pages, ", leading.options)).toBe("");
+    expect(withoutOpenBlanks("Fewer errors on checkout, …% faster pages, ", leading.options)).toBe("Fewer errors on checkout");
+  });
+});
+
+describe("blank options with stray spaces and typed text (score/12)", () => {
+  const q: Question = { bulletId: "b1", kind: "result", text: "What changed?", options: ["Increased sales by …%", "Led …"], amounts: ["Under 10", "10–25"] };
+  const box = () => screen.getByRole("textbox", { name: "Your answer" }) as HTMLTextAreaElement;
+  const chip = (name: string) => screen.getByRole("button", { name });
+
+  it("unpicks a blank option, filled or not, even with a space or new line after it", () => {
+    render(<Harness q={q} />);
+    fireEvent.change(box(), { target: { value: "Increased sales by …% " } });
+    expect(chip("Increased sales by …%")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(chip("Increased sales by …%"));
+    expect(box().value).toBe("");
+    fireEvent.change(box(), { target: { value: "Increased sales by 10%\n" } });
+    fireEvent.click(chip("Increased sales by …%"));
+    expect(box().value.trim()).toBe("");
+  });
+
+  it("never treats a sentence the person typed as a filled blank", () => {
+    render(<Harness q={q} />);
+    fireEvent.change(box(), { target: { value: "Led a team of five" } });
+    expect(chip("Led …")).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(chip("Led …"));
+    expect(box().value).toBe("Led a team of five, Led …");
+  });
+
+  it("finds an open blank after a leading space or extra spaces after the comma", () => {
+    for (const value of [" Increased sales by …%", "A,  Increased sales by …%", "A,\nIncreased sales by …%"])
+      expect(withoutOpenBlanks(value, q.options)).toBe(value.startsWith(" ") ? "" : "A");
+    render(<Harness q={q} />);
+    fireEvent.change(box(), { target: { value: "A,  Increased sales by …%" } });
+    fireEvent.click(chip("10–25"));
+    expect(box().value).toBe("A,  Increased sales by 10–25%");
   });
 });

@@ -548,6 +548,11 @@ describe("options with a blank and its amounts (score/12)", () => {
     expect(r.questions[0]!.amounts).toBeUndefined();
   });
 
+  it("drops an amount without a number, since the answer box only knows a filled blank by its digits", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Increased sales by …%"], ["Dozens", "10–25"])]), "fp");
+    expect(r.questions[0]!.amounts).toEqual(["10–25"]);
+  });
+
   it("drops an amount that is an exact number", () => {
     const r = buildRoleResult(role(["Ran the store."]), model([ask(["Increased sales by …%"], ["15", "10–25", "50+"])]), "fp");
     expect(r.questions[0]!.amounts).toEqual(["10–25", "50+"]);

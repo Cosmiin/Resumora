@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { isAllowedOption, type Locale, type Question, type RoleQuestion } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
-import { AnswerBox, type Via } from "./AnswerBox.tsx";
+import { AnswerBox, withoutOpenBlanks, type Via } from "./AnswerBox.tsx";
 
 type Props = {
   question: Question | RoleQuestion;
@@ -26,7 +26,10 @@ export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, on
   const [voiceBusy, setVoiceBusy] = useState(false);
   const options = question.options.filter((o) => o.length <= 60 && isAllowedOption(o)).slice(0, 4);
   const asked: Question = { ...question, bulletId: "bulletId" in question ? question.bulletId : question.id,
-    kind: question.kind === "role" ? "detail" : question.kind, options: options.length >= 2 ? options : [] };
+    kind: question.kind === "role" ? "detail" : question.kind, options: options.length >= 2 ? options : [],
+    ...(options.length >= 2 && question.amounts?.length ? { amounts: question.amounts } : {}) };
+  // An option whose blank is still "…" is not part of the answer.
+  const answer = withoutOpenBlanks(value, asked.options);
 
   return (
     <>
@@ -55,8 +58,8 @@ export function QuestionStep({ question, needsDetail, locale, busy, onSubmit, on
         <button
           type="button"
           className="fm-btn"
-          disabled={busy || voiceBusy || value.trim() === ""}
-          onClick={() => onSubmit(value, via)}
+          disabled={busy || voiceBusy || answer === ""}
+          onClick={() => onSubmit(answer, via)}
         >
           {t(question.kind === "role" ? "enrich.focus.continue" : "enrich.focus.improve")}
         </button>

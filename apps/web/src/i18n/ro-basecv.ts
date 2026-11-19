@@ -90,6 +90,8 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.answer.options": "Răspunsuri probabile",
   "enrich.answer.optionsHint": "Variantele sunt doar sugestii. Alege ce e adevărat, apoi adaugă detalii cu vorbele tale.",
   "enrich.answer.other": "Altceva",
+  "enrich.answer.amount": "Cât?",
+  "enrich.answer.typeIt": "sau scrie-l",
   "enrich.answer.placeholder": "Alege, scrie sau vorbește…",
   "enrich.end.achievements": "Realizări-cheie: {n} adăugate",
   "enrich.end.at": "la {n}",
