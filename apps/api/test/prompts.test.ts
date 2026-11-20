@@ -1,7 +1,7 @@
 import { CATEGORIES } from "@resumora/shared";
 import { describe, expect, it } from "vitest";
 import { improveBulletSystemPrompt } from "../src/enrich/focus-prompts.ts";
-import { buildExtractPrompt, extractPrompt } from "../src/imports/prompts.ts";
+import { buildExtractPrompt, extractPrompt, PROMPT_VERSION } from "../src/imports/prompts.ts";
 
 describe("buildExtractPrompt", () => {
   it("the prompt names every category and every synonym", () => {
@@ -37,6 +37,22 @@ describe("buildExtractPrompt category rules", () => {
     expect(prompt).not.toContain("(also: )");
     expect(prompt).toContain("(driving licence, references, availability…)");
     expect(prompt).not.toContain("(volunteering, awards, publications");
+  });
+});
+
+describe("buildExtractPrompt skills", () => {
+  it("takes skills only from where the CV lists them, never from role lines (import.v3.4)", () => {
+    const prompt = buildExtractPrompt();
+    expect(prompt).toContain(
+      "Take skills only from where the CV lists them as skills: a skills or competencies section, or a labelled list such as \"Skills: …\" or \"Tools: …\", also when that list sits under a role. Each item of such a list is a skill.",
+    );
+    expect(prompt).toContain(
+      `Never take a skill from a sentence: a role's bullets, description or title, the summary or any other prose, even when the sentence names a clear skill or tool ("Managed Shopify stores", "Built reports in Excel"). That tool stays in its sentence.`,
+    );
+    expect(prompt).toContain("If the CV lists no skills, leave technicalSkills, professionalSkills and unclearSkills empty.");
+    expect(prompt).not.toContain("demonstrated work capabilities");
+    expect(prompt).toContain("Copy the item exactly as written, with nothing added to its name, and explain the ambiguity only in a warning;");
+    expect(PROMPT_VERSION).toBe("import.v3.4");
   });
 });
 
