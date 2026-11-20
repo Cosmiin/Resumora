@@ -11,12 +11,12 @@ import type { CvAction } from "../edit/cvReducer.ts";
 import type { Via } from "./AnswerBox.tsx";
 import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
-import { RoleChecklist } from "./Checklist.tsx";
 import { EndStep, type HeldChange } from "./EndStep.tsx";
 import { PrepRing, type PrepRow } from "./PrepRing.tsx";
 import { checkChanges, placeAnswersOnCv } from "./enrich-api.ts";
 import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
 import type { Prepared } from "./prepared.ts";
+import { ScoreRows } from "./ScoreRows.tsx";
 import { PathScreen } from "./SectionSuggest.tsx";
 import { ShapeStep, hasShapeWork, type ShapeDone } from "./ShapeStep.tsx";
 import { ToolsStep } from "./ToolsStep.tsx";
@@ -64,6 +64,10 @@ export function strengthWeights(cv: Pick<CvContent, "experience">): ReadonlyMap<
   return new Map(cv.experience.map((role, i) => [role.id, i === 0 ? 3 : i === 1 ? 2 : 1]));
 }
 const scoreOf = (s: RoleScoreState | undefined) => (s && s.state !== "none" ? (s.result?.score ?? null) : null);
+/** A role's company and period, the line under its title on the start and end screens. */
+export function roleMeta(item: { company: string; startDate: string; endDate: string; current: boolean }, locale: CvContent["locale"]): string {
+  return [item.company, formatRange(item.startDate, item.endDate, item.current, locale)].filter(Boolean).join(" · ");
+}
 /** A score is still on its way (or not loaded yet): the start and the end wait for it. */
 const pending = (s: RoleScoreState | undefined) => !s || s.state === "scoring" || s.state === "previous";
 
@@ -264,23 +268,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           <>
             <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>{average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}</h2>
             <p className="rr-lead" role="status">{t("enrich.path.v2.lead", { k: PATH_BUDGET })}</p>
-            <div className="ep-rows">
-              {graded.map(({ item }) => {
-                const s = scores.get(item.id);
-                const n = scoreOf(s);
-                const titleId = `ep-start-${item.id}`;
-                return (
-                  <section key={item.id} className="ep-row" role="group" aria-labelledby={titleId}>
-                    <h3 className="ep-row-title" id={titleId}>
-                      {[item.title, item.company, formatRange(item.startDate, item.endDate, item.current, cv.locale)].filter(Boolean).join(" · ")}
-                    </h3>
-                    {n !== null && <p className="es-score">{n}</p>}
-                    {s?.state === "ready" && s.result && <RoleChecklist result={s.result} />}
-                  </section>
-                );
-              })}
-            </div>
-            <p className="fm-note">{t("enrich.path.start.checklist")}</p>
+            <ScoreRows idPrefix="ep-start" rows={graded.map(({ item }) => ({
+              id: item.id, title: item.title, meta: roleMeta(item, cv.locale), now: scoreOf(scores.get(item.id)),
+            }))} />
           </>
         ) : (
           <>

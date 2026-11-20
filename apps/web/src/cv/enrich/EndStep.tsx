@@ -2,8 +2,8 @@ import { useState } from "react";
 import { MAX_TEXT, gradedItems, type Change, type CvContent, type HeldAsk } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { AnswerBox, withoutOpenBlanks, type Via } from "./AnswerBox.tsx";
-import { RoleChecklist } from "./Checklist.tsx";
-import { averageScore, strengthWeights } from "./EnrichPath.tsx";
+import { averageScore, roleMeta, strengthWeights } from "./EnrichPath.tsx";
+import { ScoreRows, scoreChange } from "./ScoreRows.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 /** A held change and, when the grading had one, the question that would bring its line to the top grade (score/12). */
@@ -96,36 +96,29 @@ function HeldRow({ name, change, ask, onAdd, onAddWithFact }: {
 }
 
 /**
- * The end of the path (score/9): the CV's score before and after, each role's with its checklist ticks, the changes held
+ * The end of the path (score/9): the CV's score before and after with its gain, each role as a score row with its
+ * change and a before/after bar (owner's pick B, 20 Nov 2026), the changes held
  * back because they would lower a role's score (Add anyway / Edit it first), and Done or another round of questions.
  */
 export function EndStep({ cv, scores, before, rolesBefore, held, failed, onAdd, onAddWithFact, onDone, onMore, more }: Props) {
   const graded = gradedItems(cv);
   const average = averageScore(new Map(graded.map(({ item }) => [item.id, scoreOf(scores.get(item.id))])), strengthWeights(cv));
+  const moved = before !== null && average !== null && before !== average ? { from: before, to: average } : null;
   const nameOf = (roleId: string) => graded.find(({ item }) => item.id === roleId)?.item.title || t("enrich.path.end.thisRole");
   return (
     <div className="rr-card">
       <p className="rr-where">{t("enrich.path.dialog")}</p>
-      <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>
-        {before !== null && average !== null && before !== average ? t("enrich.path.v2.moved", { from: before, to: average })
-          : average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}
-      </h2>
-      {failed && <p className="ui-notice ui-notice--bad" role="alert">{t("enrich.path.v2.someFailed")}</p>}
-      <div className="ep-rows">
-        {graded.map(({ item }) => {
-          const s = scores.get(item.id);
-          const now = scoreOf(s);
-          const was = rolesBefore?.get(item.id) ?? null;
-          const titleId = `es-role-${item.id}`;
-          return (
-            <section key={item.id} className="ep-row" role="group" aria-labelledby={titleId}>
-              <h3 className="ep-row-title" id={titleId}>{[item.title, item.company].filter(Boolean).join(" · ")}</h3>
-              {now !== null && <p className="es-score">{was !== null && was !== now ? `${was} → ${now}` : String(now)}</p>}
-              {s?.state === "ready" && s.result && <RoleChecklist result={s.result} />}
-            </section>
-          );
-        })}
+      <div className="rr-scoreline">
+        <h2 className="rr-num" id="fm-step-title" tabIndex={-1}>
+          {moved ? t("enrich.path.v2.moved", moved)
+            : average === null ? t("enrich.path.v2.noScore") : t("enrich.path.v2.score", { n: average })}
+        </h2>
+        {moved && <span className={`rr-gain ${moved.to > moved.from ? "is-up" : "is-down"}`}>{scoreChange(moved.from, moved.to)}</span>}
       </div>
+      {failed && <p className="ui-notice ui-notice--bad" role="alert">{t("enrich.path.v2.someFailed")}</p>}
+      <ScoreRows idPrefix="es-role" rows={graded.map(({ item }) => ({
+        id: item.id, title: item.title, meta: roleMeta(item, cv.locale), now: scoreOf(scores.get(item.id)), was: rolesBefore?.get(item.id) ?? null,
+      }))} />
       {held.length > 0 && (
         <ul className="es-helds">
           {held.map((h) => <HeldRow key={`${h.roleId}|${h.change.id}`} name={nameOf(h.roleId)} change={h.change} ask={h.ask} onAdd={(c) => onAdd(h.roleId, c)}

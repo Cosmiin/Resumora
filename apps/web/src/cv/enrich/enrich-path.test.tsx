@@ -356,13 +356,16 @@ describe("the short path", () => {
     });
   });
 
-  it("the start lists each role with its score and checklist, and says the checklist doesn't change the score", () => {
+  it("the start lists each role as one row: title, company and period, and its score, with no checklist", () => {
     render(<Harness initial={scores()} />);
     expect(screen.getByText("About 5 minutes: tidy your lines, then your companies, your tools, and the 8 questions that will help most.")).toBeInTheDocument();
-    const first = screen.getByRole("group", { name: /^Role r1 · Acme · / });
+    const first = screen.getByRole("group", { name: /^Role r1/ });
+    expect(within(first).getByText(/^Acme · /)).toBeInTheDocument();
     expect(within(first).getByText("60")).toBeInTheDocument();
-    expect(within(screen.getByRole("group", { name: /^Role r2 · Beta · / })).getByText("70")).toBeInTheDocument();
-    expect(screen.getByText("Shape and Worth adding don't change your score. They show what a recruiter notices.")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: /^Role r2/ })).getByText("70")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Shape" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "Worth adding" })).toBeNull();
+    expect(screen.queryByText("Shape and Worth adding don't change your score. They show what a recruiter notices.")).toBeNull();
   });
 
   it("with no role needing Shape, Start goes straight to companies", async () => {
