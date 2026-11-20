@@ -2,6 +2,7 @@ import { CATEGORIES } from "@resumora/shared";
 import { describe, expect, it } from "vitest";
 import { improveBulletSystemPrompt } from "../src/enrich/focus-prompts.ts";
 import { buildExtractPrompt, extractPrompt, PROMPT_VERSION } from "../src/imports/prompts.ts";
+import { toolsSystemPrompt } from "../src/enrich/tools.ts";
 
 describe("buildExtractPrompt", () => {
   it("the prompt names every category and every synonym", () => {
@@ -52,7 +53,7 @@ describe("buildExtractPrompt skills", () => {
     expect(prompt).toContain("If the CV lists no skills, leave technicalSkills, professionalSkills and unclearSkills empty.");
     expect(prompt).not.toContain("demonstrated work capabilities");
     expect(prompt).toContain("Copy the item exactly as written, with nothing added to its name, and explain the ambiguity only in a warning;");
-    expect(PROMPT_VERSION).toBe("import.v3.4");
+    expect(PROMPT_VERSION).toBe("import.v3.5");
   });
 });
 
@@ -61,5 +62,28 @@ describe("improveBulletSystemPrompt", () => {
     expect(improveBulletSystemPrompt("en")).toContain(
       `Do not add a purpose, reason or result ("to ...", "so that ...", "resulting in ...") unless the original bullet or the role's notes state it.`,
     );
+  });
+});
+
+describe("import descriptions (import.v3.5)", () => {
+  it("keeps a role without an introduction line without a description and without a warning", () => {
+    const prompt = buildExtractPrompt();
+    expect(prompt).toContain("- A role, project or other entry without a description is normal: leave its description empty and add no warning about it.");
+    expect(prompt).toContain(
+      "When a role's lines carry no list markers (text from a Word file), the line right after the role's dates is experience.description only when it introduces the role or the company (its scope or context), not when it states a task or a result; otherwise every line is a bullet and the description stays empty.",
+    );
+    expect(prompt).not.toContain("the line right after the role's dates that states its scope or responsibility is experience.description");
+    expect(PROMPT_VERSION).toBe("import.v3.5");
+  });
+});
+
+describe("toolsSystemPrompt", () => {
+  it("asks for named tools only, never activities, methods, metrics or departments", () => {
+    const prompt = toolsSystemPrompt("en");
+    expect(prompt).toContain("software, apps, platforms, systems, programming languages or equipment");
+    expect(prompt).toContain(
+      `Never list an activity, duty, method, process, framework, metric, skill, team or department, even when the CV names it: "recruitment", "onboarding", "client follow-up", "KPI reviews", "KPI framework", "People Operations" and "compensation benchmarking" are not tools.`,
+    );
+    expect(prompt).not.toContain("platforms or\nmethods");
   });
 });
