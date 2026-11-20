@@ -17,7 +17,7 @@ import { RoleResultSchema, SCORE_POLICY, buildRoleResult, emptyCv, fingerprint, 
 import { ApiError } from "../errors.ts";
 import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { memoryInsightsRepo } from "./memory-repo.ts";
-import { gradeBullets, scoreRole } from "./score.ts";
+import { GRADE_TOKENS, gradeBullets, gradeWithCoverage, scoreRole } from "./score.ts";
 import { moreNote, scoreSystemPrompt, scoreUserMessage } from "./prompts.ts";
 import { allSpecific, fakeModel, roleWith } from "./fake-model.ts";
 
@@ -128,7 +128,7 @@ describe("scoreRole", () => {
     // One perfect bullet with nothing known about the role: Lines 100, Coverage 50 (actions and results of the four).
     expect(result.score).toBe(80);
     expect(model.requests).toHaveLength(1);
-    expect(model.requests[0]).toMatchObject({ temperature: 0, max_completion_tokens: 1200 });
+    expect(model.requests[0]).toMatchObject({ temperature: 0, max_completion_tokens: 1700 });
     expect(model.logged.map((l) => l.task)).toEqual(["enrich_score"]);
     expect(await insights.get(role.id)).toEqual(result);
   });
@@ -231,7 +231,7 @@ describe("scoreRole", () => {
       ],
     });
     expect(model.requests).toHaveLength(1);
-    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 1000 });
+    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 1400 });
     expect(JSON.stringify(model.requests[0]?.messages)).toContain("[]");
     expect(await insights.get(role.id)).toEqual(result);
     expect(await run(model, role)).toEqual(result);
@@ -292,7 +292,7 @@ describe("gradeBullets", () => {
     expect(await grade(model)).toEqual(answer.bullets);
     expect(model.requests).toHaveLength(1);
     expect(model.requests[0]).toMatchObject({
-      max_completion_tokens: 780,
+      max_completion_tokens: 1700,
       messages: [
         { role: "system", content: scoreSystemPrompt("ro") },
         { role: "user", content: expect.stringContaining("Grade only these bullets: b2. Return entries for those ids only; the other bullets are context.") },
@@ -327,12 +327,24 @@ describe("gradeBullets", () => {
     const answer = allSpecific(role);
     const model = fakeModel(() => answer);
     expect(await grade(model, ["b2", "b1"])).toEqual(answer.bullets);
-    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 960 });
+    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 2000 });
     expect(JSON.stringify(model.requests[0]?.messages)).toContain("Grade only these bullets: b2, b1.");
   });
 
   it("keeps provider failures as 503 ai_unavailable", async () => {
     await expect(grade(fakeModel(() => ({}), 500))).rejects.toMatchObject({ status: 503, code: "ai_unavailable" });
+  });
+});
+
+describe("grading output limits", () => {
+  it("leave room for the role questions and about 300 tokens a line (a live answer was cut off at 800 + 180 a line)", async () => {
+    expect(GRADE_TOKENS(0)).toBe(1400);
+    expect(GRADE_TOKENS(3)).toBe(2300);
+    expect(GRADE_TOKENS(40)).toBe(8000);
+    const role = roleWith([], { bullets: [{ id: "b1", text: "Prepared payroll files." }] });
+    const model = fakeModel(() => ({ ...allSpecific(role), bullets: [] }));
+    await gradeWithCoverage({ cv, insights, model: model.deps, userId: "user-1" }, role, "en", []);
+    expect(model.requests[0]).toMatchObject({ max_completion_tokens: 1400 });
   });
 });
 
