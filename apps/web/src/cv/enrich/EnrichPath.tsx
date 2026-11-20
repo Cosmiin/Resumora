@@ -13,6 +13,7 @@ import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
 import { RoleChecklist } from "./Checklist.tsx";
 import { EndStep, type HeldChange } from "./EndStep.tsx";
+import { PrepRing, type PrepRow } from "./PrepRing.tsx";
 import { checkChanges, placeAnswersOnCv } from "./enrich-api.ts";
 import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
 import type { Prepared } from "./prepared.ts";
@@ -108,7 +109,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   const [stage, setStage] = useState<Stage>({ kind: "start" });
   const [before, setBefore] = useState<number | null>(null);
   const [rolesBefore, setRolesBefore] = useState<ReadonlyMap<string, number | null>>(new Map());
-  const [rows, setRows] = useState<{ id: string; name: string; done: boolean }[]>([]);
+  const [rows, setRows] = useState<PrepRow[]>([]);
   const [timedOut, setTimedOut] = useState(false);
   // Questions already asked in this path (earlier rounds), and what each role got in the current round.
   const asked = useRef(new Set<string>());
@@ -180,7 +181,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       const weak = (result?.bullets ?? []).some((b) => b.score < CLEAR_AT);
       return (g?.facts ?? false) || weak ? [{ item, result, g }] : [];
     });
-    setRows(work.map(({ item }) => ({ id: item.id, name: [item.title, item.company].filter(Boolean).join(" · "), done: false })));
+    setRows(work.map(({ item, g }) => ({ id: item.id, name: [item.title, item.company].filter(Boolean).join(" · "), answers: g?.questions.size ?? 0, state: "working" })));
     const held: HeldChange[] = [];
     let failed = false;
     await Promise.all(work.map(async ({ item, result, g }) => {
@@ -190,13 +191,14 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         cv: now, roleId: item.id, result, answeredLines: g?.lines ?? new Set(), answeredRole,
         thinWithAnswers: !!result?.thin && answeredRole, describe, limit,
       });
-      failed ||= out.failed;
+      // This role failed somewhere: its piece of the ring turns red. The end screen still says some changes failed.
+      let roleFailed = out.failed;
       const print = fingerprint(item, now.locale);
       let changes = toChanges(out.changes);
       const questions = [...(g?.questions ?? [])].slice(0, 20);
       if (questions.length) {
         const placed = await limit(() => placeAnswersOnCv({ roleId: item.id, fingerprint: print, changes, questions }))
-          .then((a) => a.changes).catch(() => { failed = true; return []; });
+          .then((a) => a.changes).catch(() => { roleFailed = true; return []; });
         changes = withPlaced(changes, placed);
       }
       if (changes.length) {
@@ -208,10 +210,11 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           held.push(...answer.held.map((change) => ({ roleId: item.id, change, ask: answer.asks.find((a) => a.changeId === change.id) })));
         } catch (err) {
           if (err instanceof ApiClientError && err.status === 409) dispatch({ type: "applyRoleChanges", roleId: item.id, changes });
-          else failed = true;
+          else roleFailed = true;
         }
       }
-      setRows((all) => all.map((r) => (r.id === item.id ? { ...r, done: true } : r)));
+      failed ||= roleFailed;
+      setRows((all) => all.map((r) => (r.id === item.id ? { ...r, state: roleFailed ? "failed" : "done" } : r)));
     }));
     setStage({ kind: "end", held, failed });
   };
@@ -348,21 +351,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   }
   if (stage.kind === "preparing") {
     return screen(
-      <div className="fm-working" role="status">
-        <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
+      <div className="fm-working is-ring" role="status">
         <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.path.prep.title")}</h2>
-        {rows.length > 1 && (
-          <>
-            <p className="rr-lead">{t("enrich.path.prep.lead")}</p>
-            <ul className="es-prep">
-              {rows.map((r) => (
-                <li key={r.id} className={r.done ? "is-done" : undefined}>
-                  <span>{r.name}</span> <span>{r.done ? t("enrich.path.prep.done") : t("enrich.path.prep.working")}</span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+        {rows.length > 0 && <PrepRing rows={rows} />}
       </div>,
     );
   }
