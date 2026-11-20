@@ -30,6 +30,13 @@ export function aiError(err: unknown): never {
   throw err;
 }
 
+/**
+ * The most a grading answer may be: the role-wide part (marks and up to 8 role questions with options and amounts)
+ * plus about 300 tokens a graded line. Measured on 20 Nov 2026: about 200 a line and 400–700 for the rest; a live
+ * check was cut off at the old 800 + 180 a line.
+ */
+export const GRADE_TOKENS = (lines: number): number => Math.min(8000, 1400 + 300 * lines);
+
 export async function gradeBullets(deps: ScoreDeps, role: Experience, locale: Locale, ids: readonly string[]): Promise<ModelBullet[]> {
   try {
     const answer = await callModel(deps.model, {
@@ -38,7 +45,7 @@ export async function gradeBullets(deps: ScoreDeps, role: Experience, locale: Lo
       schema: ModelScoreSchema,
       system: scoreSystemPrompt(locale, deps.questionLanguage),
       user: scoreUserMessage(role, ids) + questionLanguageReminder(locale, deps.questionLanguage),
-      maxOutputTokens: 600 + 180 * ids.length,
+      maxOutputTokens: GRADE_TOKENS(ids.length),
     });
     const actual = new Set(answer.bullets.map((b) => b.id));
     if (answer.bullets.length !== ids.length || actual.size !== ids.length || !ids.every((id) => actual.has(id))) {
@@ -68,7 +75,7 @@ export async function gradeWithCoverage(
         + (ids.length ? "" : "\nGrade no bullets: return an empty bullets list.")
         + "\nAlso return coverage for the whole role, as the page reads now."
         + questionLanguageReminder(locale, deps.questionLanguage),
-      maxOutputTokens: 800 + 180 * ids.length,
+      maxOutputTokens: GRADE_TOKENS(ids.length),
     });
     const actual = new Set(answer.bullets.map((b) => b.id));
     if (answer.bullets.length !== ids.length || actual.size !== ids.length || !ids.every((id) => actual.has(id))) {
@@ -129,7 +136,7 @@ export async function scoreRole(
           system: scoreSystemPrompt(content.locale, wanted),
           user: scoreUserMessage(role, undefined, found!.kind) + moreNote(input.more) + questionLanguageReminder(content.locale, wanted),
           // score/6 and score/7 made the answer longer: a concise grade per bullet, the coverage marks and up to four more role questions.
-          maxOutputTokens: Math.min(5000, 1000 + 200 * role.bullets.length),
+          maxOutputTokens: GRADE_TOKENS(role.bullets.length),
         });
         result = { ...buildRoleResult(role, answer, input.fingerprint), questionLanguage: wanted };
         // Asking for more questions must not move the score: the stored grades stay, only the questions are new.
