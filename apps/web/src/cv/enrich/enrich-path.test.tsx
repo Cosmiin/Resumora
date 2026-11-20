@@ -226,6 +226,26 @@ describe("the short path", () => {
       await screen.findByRole("button", { name: "Done" });
     };
 
+    it("shows one ring: finished roles counted and a failed one not placed, while another still works", async () => {
+      let release = () => {};
+      api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string }[] }) => roleId === "r2"
+        ? Promise.reject(new Error("down"))
+        : new Promise((resolve) => {
+          release = () => resolve({ result: { ...result(r1, 85), fingerprint: "after-r1" }, kept: changes.map((c) => c.id), held: [], asks: [] });
+        }));
+      render(<Harness initial={scores()} />);
+      await userEvent.click(screen.getByRole("button", { name: "Start" }));
+      await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Answer all" }));
+      expect(await screen.findByRole("img", { name: "1 of 2 roles ready" })).toBeInTheDocument();
+      expect(screen.getByText("Role r2 · Beta: not placed")).toBeInTheDocument();
+      expect(screen.getByText(/^Placing \d+ answers? in Role r1 · Acme$/)).toBeInTheDocument();
+      expect(screen.queryByText("All roles at once.")).toBeNull();
+      release();
+      await screen.findByRole("button", { name: "Done" });
+    });
+
     it("places what the answers still lack, replacing the role's own change for the same line, and puts the prediction", async () => {
       api.placeAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
         ? { changes: [{ id: "answer1", kind: "bullet", bulletId: "r1b1", text: "Better r1b1, for 3 teams." }, { id: "answer2", kind: "new", text: "Reported to the CFO." }] }

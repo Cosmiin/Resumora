@@ -245,9 +245,22 @@
 .sh-top p { margin: 0; flex: 1 1 16rem; overflow-wrap: anywhere; }
 .sh-top [aria-pressed="true"] { background: var(--color-ink); color: var(--color-on-ink); }
 /* The path's preparing rows and end screen (score/9). */
-.es-prep { display: grid; gap: var(--space-1); margin: var(--space-3) 0 0; padding: 0; list-style: none; width: 100%; max-width: 28rem; }
-.es-prep li { display: flex; justify-content: space-between; gap: var(--space-3); color: var(--color-muted); overflow-wrap: anywhere; }
-.es-prep li.is-done { color: var(--color-ink); }
+/* The prepare screen: one ring, one piece per role (owner, 20 Nov 2026). */
+.fm-working.is-ring { justify-items: center; text-align: center; }
+.prep-ring { display: grid; justify-items: center; gap: var(--space-3); width: 100%; max-width: 28rem; }
+.prep-ring-svg { width: 190px; height: 190px; max-width: 100%; }
+.prep-ring-seg { fill: none; stroke-width: 14; stroke-linecap: round; transition: stroke 0.4s; }
+/* Working pieces: the coach blue, faint, pulsing between 0.2 and 0.45 (fm-pulse) so they read on the yellow desk. */
+.prep-ring-seg[data-state="working"] { stroke: var(--color-coach); opacity: 0.2; animation: fm-pulse 1.6s ease-in-out infinite; }
+.prep-ring-seg[data-state="done"] { stroke: var(--color-coach); }
+.prep-ring-seg[data-state="failed"] { stroke: var(--color-bad); }
+.prep-ring-count { font-family: var(--font-display); font-weight: var(--weight-display); font-size: 40px; fill: var(--color-ink); }
+.prep-ring-sub { font-family: var(--font-body); font-size: 13px; fill: var(--color-muted); }
+.prep-ring-now { margin: 0; min-height: 2.7em; max-width: 34ch; font-family: var(--font-coach); font-size: var(--text-coach-sm); line-height: var(--leading-coach); color: var(--color-coach); overflow-wrap: anywhere; }
+.prep-ring-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.prep-ring-chip { padding: 4px 10px; border: 1px solid var(--color-line); border-radius: 999px; background: var(--color-paper); font-size: var(--text-label); overflow-wrap: anywhere; animation: fm-pop 0.35s ease-out; }
+.prep-ring-chip[data-state="done"] { border-color: var(--color-good); color: var(--color-good); }
+.prep-ring-chip[data-state="failed"] { border-color: var(--color-bad); color: var(--color-bad); }
 .es-score { margin: 0 0 var(--space-2); font-weight: var(--weight-bold); }
 .es-helds { display: grid; gap: var(--space-3); margin: var(--space-4) 0; padding: 0; list-style: none; }
 .es-held { padding: var(--space-4); background: var(--color-warn-soft); border-radius: var(--radius-field); }
