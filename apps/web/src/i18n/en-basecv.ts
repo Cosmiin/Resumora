@@ -456,7 +456,7 @@ export const basecvEn = {
   "enrich.explain.coreList": "What every role needs",
   "enrich.explain.notCounted": "Doesn't change the number",
   "enrich.explain.notCountedLead": "These help a recruiter read the role. They can't lower your score, so answering a question about them is never wasted.",
-  "enrich.path.start.checklist": "Shape and Worth adding don't change your score. They show what a recruiter notices.",
+  "enrich.path.rows.was": "was {n}",
   "enrich.explain.param.company": "What the company does",
   "enrich.explain.param.purpose": "What the role was for",
   "enrich.explain.param.actions": "What you did",

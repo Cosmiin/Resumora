@@ -458,7 +458,7 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.explain.coreList": "Ce are nevoie orice rol",
   "enrich.explain.notCounted": "Nu schimbă numărul",
   "enrich.explain.notCountedLead": "Acestea ajută un recrutor să citească rolul. Nu îți pot scădea scorul, așa că un răspuns despre ele nu e niciodată în zadar.",
-  "enrich.path.start.checklist": "Forma și „Merită adăugat” nu îți schimbă scorul. Arată ce observă un recrutor.",
+  "enrich.path.rows.was": "înainte: {n}",
   "enrich.explain.param.company": "Ce face compania",
   "enrich.explain.param.purpose": "La ce a servit rolul",
   "enrich.explain.param.actions": "Ce ai făcut tu",

@@ -36,15 +36,25 @@ function renderEnd(over: Partial<Parameters<typeof EndStep>[0]> = {}) {
 }
 
 describe("EndStep", () => {
-  it("shows the CV's score before and after, each role's, and its checklist ticks", () => {
+  it("shows the CV's score before and after with its gain, and each role's new score with its change, no checklist", () => {
     renderEnd();
     // (85*3 + 70*2) / 5 = 79
     expect(screen.getByRole("heading", { name: "Your CV: 64 → 79" })).toBeInTheDocument();
+    expect(screen.getByText("+15", { selector: ".rr-gain" })).toBeInTheDocument();
     const analyst = screen.getByRole("group", { name: /Analyst/ });
-    expect(within(analyst).getByText("70 → 85")).toBeInTheDocument();
-    expect(within(analyst).getByText("Seniority and reporting line")).toBeInTheDocument();
-    expect(within(analyst).queryByText("Leadership")).toBeNull();
-    expect(within(screen.getByRole("group", { name: /Clerk/ })).getByText("70")).toBeInTheDocument();
+    expect(within(analyst).getByText("85")).toBeInTheDocument();
+    expect(within(analyst).getByText("+15")).toBeInTheDocument();
+    expect(within(analyst).getByText(/^Acme · /)).toBeInTheDocument();
+    expect(within(analyst).queryByText("Seniority and reporting line")).toBeNull();
+    const clerk = screen.getByRole("group", { name: /Clerk/ });
+    expect(within(clerk).getByText("70")).toBeInTheDocument();
+    expect(clerk.querySelector(".sr-change")).toBeNull();
+  });
+
+  it("shows no gain next to the CV's score when it did not move", () => {
+    renderEnd({ before: 79 });
+    expect(screen.getByRole("heading", { name: "Your CV: 79" })).toBeInTheDocument();
+    expect(document.querySelector(".rr-gain")).toBeNull();
   });
 
   it("shows a held change with its line, and Add anyway adds it", async () => {
