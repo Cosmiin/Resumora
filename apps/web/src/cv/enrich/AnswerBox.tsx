@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { VOICE, type Locale, type Note, type Question } from "@resumora/shared";
+import { BLANK, VOICE, hasBlank, type Locale, type Note, type Question } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { useVoice } from "./useVoice.ts";
 import { MicButton, micAvailable, VoiceStatus } from "./VoiceControls.tsx";
@@ -53,6 +53,79 @@ function togglePick(value: string, option: string): string {
   return base ? base + SEP + option : option;
 }
 
+/*
+ * Blank options (score/12), worked on whole pieces: the answer is split at commas and each piece is compared with its
+ * spaces trimmed, so stray spaces, new lines or a trailing ", " never hide a picked option. A blank option holding a
+ * comma itself is not supported (the prompt's examples have none).
+ */
+type Piece = { text: string; start: number; end: number; rawStart: number; rawEnd: number };
+
+/** The answer's comma-separated pieces: trimmed text, its place, and the place of the raw piece around it. */
+function pieces(value: string): Piece[] {
+  const out: Piece[] = [];
+  let rawStart = 0;
+  for (let k = 0; k <= value.length; k++) {
+    if (k < value.length && value[k] !== ",") continue;
+    const raw = value.slice(rawStart, k);
+    const text = raw.trim();
+    const lead = raw.length - raw.trimStart().length;
+    if (text) out.push({ text, start: rawStart + lead, end: rawStart + lead + text.length, rawStart, rawEnd: k });
+    rawStart = k + 1;
+  }
+  return out;
+}
+
+/** A filled blank: a short amount with a digit in it ("10–25", "18", "Under 10"), never a sentence someone typed. */
+const isAmount = (fill: string) => fill.trim() !== "" && fill.length <= 20 && /\d/.test(fill) && !fill.includes(BLANK);
+
+/** The piece holding a blank option: unfilled (the option itself) or filled with an amount. */
+function blankPiece(value: string, option: string): { piece: Piece; filled: boolean } | null {
+  const all = pieces(value);
+  const open = all.find((p) => p.text === option);
+  if (open) return { piece: open, filled: false };
+  const [pre = "", post = ""] = option.split(BLANK);
+  const filled = all.find((p) => p.text.length > pre.length + post.length && p.text.startsWith(pre) && p.text.endsWith(post)
+    && isAmount(p.text.slice(pre.length, p.text.length - post.length)));
+  return filled ? { piece: filled, filled: true } : null;
+}
+
+/** The answer without that piece and one comma next to it. */
+function removePiece(value: string, p: Piece): string {
+  const out = value[p.rawEnd] === ","
+    ? value.slice(0, p.rawStart) + value.slice(p.rawEnd + 1)
+    : value.slice(0, Math.max(0, p.rawStart - 1)) + value.slice(p.rawEnd);
+  return out.replace(/^[\s,]+/, "");
+}
+
+/** The piece that is a picked blank option still waiting for its amount, if any. */
+function openBlank(value: string, options: readonly string[]): { option: string; piece: Piece } | null {
+  for (const p of pieces(value)) {
+    const option = options.find((o) => hasBlank(o) && o === p.text);
+    if (option) return { option, piece: p };
+  }
+  return null;
+}
+
+/** Picks or unpicks an option; a blank option is unpicked whether its blank is filled or not. */
+function toggleOption(value: string, option: string): string {
+  if (!hasBlank(option)) return togglePick(value, option);
+  const found = blankPiece(value, option);
+  return found ? removePiece(value, found.piece) : togglePick(value, option);
+}
+
+/** Whether the option's chip shows as picked. */
+const optionPicked = (value: string, option: string) => (hasBlank(option) ? blankPiece(value, option) !== null : isPicked(value, option));
+
+/**
+ * The answer as it should be saved: every piece that is still a blank option with its blank unfilled is left out
+ * (score/12). A "…" the person typed themselves stays.
+ */
+export function withoutOpenBlanks(value: string, options: readonly string[]): string {
+  let out = value;
+  for (let open = openBlank(out, options); open; open = openBlank(out, options)) out = removePiece(out, open.piece);
+  return out.replace(/^[\s,]+|[\s,]+$/g, "");
+}
+
 /** Spoken words go after a picked option as a new ", " piece, otherwise after a space. */
 function appendSpoken(value: string, text: string, options: string[]): string {
   const base = value.replace(/\s+$/, "");
@@ -98,6 +171,22 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
         : state === "idle" && voice.interrupted
           ? t("enrich.voice.interrupted")
           : null;
+  // A picked option whose blank is still "…": its amounts are offered until it is filled (score/12).
+  // Filling replaces only that piece's text, so whatever was typed around it stays.
+  const amounts = question.amounts ?? [];
+  const open = amounts.length > 0 ? openBlank(value, question.options) : null;
+  const fill = (amount: string) => {
+    if (!open) return;
+    const { option, piece } = open;
+    onChange(value.slice(0, piece.start) + option.replace(BLANK, amount) + value.slice(piece.end), addVia(via, "pick"));
+  };
+  const typeIt = () => {
+    const box = field.current;
+    if (!box || !open) return;
+    const at = open.piece.start + open.option.indexOf(BLANK);
+    box.focus();
+    box.setSelectionRange(at, at + BLANK.length);
+  };
 
   return (
     <div className={plain ? "answer-box is-plain" : "answer-box"}>
@@ -107,8 +196,8 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
             key={`${i}:${o}`}
             type="button"
             className="answer-opt"
-            aria-pressed={isPicked(value, o)}
-            onClick={() => onChange(togglePick(value, o), addVia(via, "pick"))}
+            aria-pressed={optionPicked(value, o)}
+            onClick={() => onChange(toggleOption(value, o), addVia(via, "pick"))}
           >
             {o}
           </button>
@@ -117,6 +206,15 @@ export function AnswerBox({ question, value, via, onChange, locale = "en", maxSe
           {t("enrich.answer.other")}
         </button>
       </div>}
+      {!plain && open && (
+        <div className="answer-amounts" role="group" aria-label={t("enrich.answer.amount")}>
+          <span className="answer-amounts-label">{t("enrich.answer.amount")}</span>
+          {amounts.map((a, i) => (
+            <button key={`${i}:${a}`} type="button" className="answer-opt" onClick={() => fill(a)}>{a}</button>
+          ))}
+          <button type="button" className="answer-opt is-other" onClick={typeIt}>{t("enrich.answer.typeIt")}</button>
+        </div>
+      )}
       <div className={micShown ? "answer-field has-mic" : "answer-field"}>
         <textarea
           ref={field}

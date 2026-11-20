@@ -2,7 +2,7 @@ import { CONCISE_CHARS, type Experience, type RoleResult } from "@resumora/share
 import { GRADING_RULES } from "./prompts.ts";
 
 /**
- * What a writer needs to improve lines without lowering the score (score/9): each line's grade and its parts, its
+ * What a writer needs to write every line at the top grade (score/12): each line's grade and its parts, its
  * length, the role's score and line average, the rubric the grader uses, and the task. Empty without a stored result.
  */
 export function gradeContext(role: Experience, result: RoleResult | undefined, ids?: readonly string[]): string {
@@ -23,6 +23,7 @@ export function gradeContext(role: Experience, result: RoleResult | undefined, i
     "",
     GRADING_RULES,
     "",
-    `Use the answers. Keep every part at least as good as now. Improve the parts marked partial or missing. Stay within ${CONCISE_CHARS.partial} characters.`,
+    "Use the answers and the page. Keep every part at least as good as now, and write every line to reach specific on all five parts (contribution, clarity, specificity, impact, concise).",
+    `A part may stay below specific only when the fact it needs is in neither the page nor the answers: never invent one. Stay within ${CONCISE_CHARS.partial} characters.`,
   ].join("\n");
 }

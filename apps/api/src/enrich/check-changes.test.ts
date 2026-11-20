@@ -98,6 +98,26 @@ describe("checkChanges", () => {
     expect(asked).toEqual([["new-1", "new-2"], []]);
   });
 
+  it("asks, for a held new line, the grader's question with its options and amounts (score/12)", async () => {
+    gradeFor = (text) => (text === "Helped the team." ? {
+      contribution: "partial", impact: "missing", issue: "contribution", question: "What did you do for the team?",
+      options: ["Trained … new clerks", "Ran the weekly rota"], amounts: ["1–3", "4–10"],
+    } : {});
+    const weak: Change = { id: "new-1", kind: "new", text: "Helped the team." };
+    const out = await run([weak]);
+    expect(out.held).toEqual([weak]);
+    expect(out.asks).toEqual([{ changeId: "new-1", text: "What did you do for the team?", options: ["Trained … new clerks", "Ran the weekly rota"], amounts: ["1–3", "4–10"] }]);
+  });
+
+  it("asks, for a held rewrite, its line's question; a held change with no question gets none", async () => {
+    const b2 = role.bullets[1]!.id;
+    gradeFor = (text) => (text === "Checked." ? { contribution: "missing", specificity: "missing", impact: "missing", issue: "contribution", question: "Which contracts?", options: ["Employment contracts", "Supplier contracts"] }
+      : text === "Helped." ? { contribution: "missing", issue: "contribution" } : {});
+    const out = await run([{ id: "c1", kind: "bullet", bulletId: b2, text: "Checked." }, { id: "new-1", kind: "new", text: "Helped." }]);
+    expect(out.held.map((c) => c.id)).toEqual(["c1", "new-1"]);
+    expect(out.asks).toEqual([{ changeId: "c1", text: "Which contracts?", options: ["Employment contracts", "Supplier contracts"] }]);
+  });
+
   it("holds nothing when asked not to", async () => {
     gradeFor = () => ({ contribution: "missing", issue: "contribution" });
     const out = await run([{ id: "new-1", kind: "new", text: "Helped." }], false);

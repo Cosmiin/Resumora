@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BRAIN_DUMP_QUESTION, CLEAR_AT, MAX_LONG_TEXT, PATH_BUDGET, findGraded, fingerprint, gradedItems, newId, pickBudget, questionKey,
-  type BudgetItem, type Change, type CvContent, type Note, type RoleResult,
+  type BudgetItem, type Change, type CvContent, type HeldAsk, type Note, type RoleResult,
 } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { ApiClientError } from "../../lib/api-error.ts";
@@ -205,7 +205,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           const kept = changes.filter((c) => answer.kept.includes(c.id));
           if (kept.length) dispatch({ type: "applyRoleChanges", roleId: item.id, changes: kept });
           onScore?.(answer.result);
-          held.push(...answer.held.map((change) => ({ roleId: item.id, change })));
+          held.push(...answer.held.map((change) => ({ roleId: item.id, change, ask: answer.asks.find((a) => a.changeId === change.id) })));
         } catch (err) {
           if (err instanceof ApiClientError && err.status === 409) dispatch({ type: "applyRoleChanges", roleId: item.id, changes });
           else failed = true;
@@ -382,6 +382,28 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       </div>,
     );
   }
+  /**
+   * A held line one fact away (score/12): the answer is saved as a role note like any other, then placed on that line
+   * (use-answers), checked without holding (the person chose to add it) and put on the CV with its predicted score.
+   * Throws when any step fails, so the card stays with its error.
+   */
+  const addWithFact = async (roleId: string, change: Change, ask: HeldAsk, answer: string, via: Via[]) => {
+    // One note per card: trying again after a failure replaces the answer instead of adding a second one.
+    save(`held|${roleId}|${change.id}`, roleId, ask.text, answer, via);
+    await waitForSave();
+    const now = latest.current;
+    const item = findGraded(now, roleId)?.item;
+    if (!item) throw new Error("role not found");
+    const print = fingerprint(item, now.locale);
+    const placed = await placeAnswersOnCv({ roleId, fingerprint: print, changes: [change], questions: [ask.text] });
+    const changes = withPlaced([change], placed.changes);
+    const answerOf = await checkChanges({ roleId, fingerprint: print, changes, hold: false });
+    const kept = changes.filter((c) => answerOf.kept.includes(c.id));
+    if (kept.length) dispatch({ type: "applyRoleChanges", roleId, changes: kept });
+    onScore?.(answerOf.result);
+    setStage((s) => (s.kind === "end" ? { ...s, held: s.held.filter((h) => !(h.roleId === roleId && h.change.id === change.id)) } : s));
+  };
+
   const more = budget();
   return screen(
     <EndStep cv={cv} scores={scores} before={before} rolesBefore={rolesBefore} held={stage.held} failed={stage.failed}
@@ -390,6 +412,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         dispatch({ type: "applyRoleChanges", roleId, changes: [change] });
         setStage({ ...stage, held: stage.held.filter((h) => !(h.roleId === roleId && h.change.id === change.id)) });
       }}
+      onAddWithFact={addWithFact}
       onDone={onClose} more={more.length}
       onMore={() => {
         got.current = new Map();

@@ -2,14 +2,17 @@ import { z } from "zod";
 import { MAX_LONG_TEXT, type Experience, type Locale } from "./cv.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
-export const SCORE_POLICY = "score/11";
+export const SCORE_POLICY = "score/12";
 
 /** A bullet's five checks. A clear, short bullet with no result scores 80. */
 export const WEIGHTS = { contribution: 30, clarity: 20, specificity: 20, impact: 20, concise: 10 } as const;
 /** A role's score: this share from its bullets (Lines), the rest from the four core items shown on the page (Coverage). */
 export const LINES_SHARE = 0.6;
-/** A bullet longer than the first is at most "partial" on concise; longer than the second is "missing". */
-export const CONCISE_CHARS = { partial: 220, missing: 300 } as const;
+/**
+ * A bullet longer than the first is at most "partial" on concise; longer than the second is "missing". Both are 440
+ * (score/12, the owner's limit): up to 440 characters a line can be concise, over it it is not.
+ */
+export const CONCISE_CHARS = { partial: 440, missing: 440 } as const;
 /** From this score a bullet or a role reads clearly and has nothing waiting. */
 export const CLEAR_AT = 80;
 
@@ -86,6 +89,11 @@ const ISSUE_ORDER: readonly Issue[] = ["example", "duplicate", "contribution", "
 
 const id = z.string().min(1).max(64);
 
+/** The blank in an answer option ("Increased sales by …%") that an amount fills (score/12). */
+export const BLANK = "…";
+/** Amount choices for an option's blank: ranges or bounds, no unit (the option holds it). */
+const AmountsSchema = z.array(z.string().max(20)).max(4);
+
 export const ModelBulletSchema = z
   .object({
     id,
@@ -94,13 +102,15 @@ export const ModelBulletSchema = z
     clarity: GradeSchema,
     specificity: GradeSchema,
     impact: GradeSchema,
-    /** Every phrase carries a fact, in two lines at most. Absent (older answers, test doubles) reads as specific. */
+    /** Every phrase carries a fact, within 440 characters. Absent (older answers, test doubles) reads as specific. */
     concise: GradeSchema.optional(),
     issue: IssueSchema,
     duplicateOf: id.nullable(),
     tip: z.string().max(240).nullable(),
     question: z.string().max(240).nullable(),
     options: z.array(z.string().max(60)).max(4),
+    /** Ranges for the blank of an option that has one (score/12). */
+    amounts: AmountsSchema.optional(),
   })
   .strict();
 export type ModelBullet = z.infer<typeof ModelBulletSchema>;
@@ -118,6 +128,8 @@ export const ModelScoreSchema = z
       topic: RoleTopicSchema.default("other"),
       /** Topic company only: what the company does, when the model recognises it from its name and location. */
       proposal: z.string().max(MAX_PROPOSAL).nullable().optional(),
+      /** Ranges for the blank of an option that has one (score/12). */
+      amounts: AmountsSchema.optional(),
     }).strict()).max(MAX_ROLE_QUESTIONS).default([]),
     /** Too little information to infer plausible skills or achievements. */
     thin: z.boolean().default(false),
@@ -136,14 +148,16 @@ export function questionKind(b: { contribution: Grade; clarity: Grade; specifici
 }
 
 export const QuestionSchema = z
-  .object({ bulletId: id, text: z.string(), options: z.array(z.string()), kind: QuestionKindSchema })
+  .object({ bulletId: id, text: z.string(), options: z.array(z.string()), kind: QuestionKindSchema, amounts: z.array(z.string()).optional() })
   .strict();
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const RoleQuestionSchema = z
   .object({ id, text: z.string(), options: z.array(z.string().max(60)).max(4), kind: z.literal("role"), topic: RoleTopicSchema.default("other"),
     /** Topic company only: the AI's sentence on what the company does, for the person to confirm or edit. */
-    proposal: z.string().max(MAX_PROPOSAL).optional() })
+    proposal: z.string().max(MAX_PROPOSAL).optional(),
+    /** Ranges for the blank of an option that has one (score/12). Absent on older results. */
+    amounts: z.array(z.string()).optional() })
   .strict();
 export type RoleQuestion = z.infer<typeof RoleQuestionSchema>;
 
@@ -247,6 +261,19 @@ export function isAllowedOption(option: string): boolean {
   return !/\d/.test(rest);
 }
 
+/** Whether an option holds the blank an amount fills. */
+export const hasBlank = (option: string): boolean => option.includes(BLANK);
+
+/**
+ * A question's options and amounts as shown: allowed options with at most one blank, and the amounts (allowed ranges)
+ * only when a kept option has a blank.
+ */
+function pickOptions(options: readonly string[], amounts: readonly string[] | undefined): { options: string[]; amounts?: string[] } {
+  const kept = options.filter((o) => isAllowedOption(o) && o.split(BLANK).length <= 2);
+  const fills = kept.some(hasBlank) ? (amounts ?? []).filter((a) => /\d/.test(a) && a.length <= 20 && isAllowedOption(a)) : [];
+  return fills.length ? { options: kept, amounts: fills } : { options: kept };
+}
+
 /** Whole-text matches only: these words start real bullets too ("Testing API endpoints"). */
 const PLACEHOLDER_WORDS = ["placeholder", "test", "testing", "todo", "tbd", "asdf", "exemplu", "nimic"];
 const PLACEHOLDER_PHRASES = ["lorem ipsum", "nothing special", "de completat"];
@@ -339,7 +366,7 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
   }
 
   const seen = new Set<string>();
-  const options = new Map<string, string[]>();
+  const options = new Map<string, { options: string[]; amounts?: string[] }>();
   const bullets: ResultBullet[] = role.bullets.map((b, index) => {
     const m = byId.get(b.id) as ModelBullet;
     const unusable = !m.meaningful || isPlaceholder(b.text);
@@ -352,7 +379,7 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
     const concise = conciseGrade(b.text, m.concise ?? "specific");
     const keep = issue === m.issue;
     const question = keep && issue !== "duplicate" ? blankToNull(m.question) : null;
-    if (question !== null) options.set(b.id, m.options.filter(isAllowedOption));
+    if (question !== null) options.set(b.id, pickOptions(m.options, m.amounts));
     return {
       id: b.id,
       score: unusable || duplicate ? 0 : bulletScore({ ...m, concise }),
@@ -374,7 +401,7 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
     .filter((b) => b.question !== null)
     .sort(byUrgency)
     .slice(0, MAX_QUESTIONS)
-    .map((b) => ({ bulletId: b.id, text: b.question as string, options: options.get(b.id) ?? [], kind: questionKind(b) }));
+    .map((b) => ({ bulletId: b.id, text: b.question as string, ...(options.get(b.id) ?? { options: [] }), kind: questionKind(b) }));
 
   const open = bullets.filter((b) => b.issue !== "none");
   let nextStep: RoleResult["nextStep"] = null;
@@ -391,7 +418,7 @@ export function buildRoleResult(role: Experience, model: z.input<typeof ModelSco
   const score = lines === null ? null : Math.round(LINES_SHARE * lines + (1 - LINES_SHARE) * coverage.score);
 
   const roleQuestions: RoleQuestion[] = (model.roleQuestions ?? []).slice(0, MAX_ROLE_QUESTIONS).map((q, i) => ({
-    id: `rq${i + 1}`, text: q.text, options: q.topic === "company" ? [] : q.options.filter(isAllowedOption), kind: "role", topic: q.topic ?? "other",
+    id: `rq${i + 1}`, text: q.text, ...(q.topic === "company" ? { options: [] } : pickOptions(q.options, q.amounts ?? undefined)), kind: "role", topic: q.topic ?? "other",
     ...(q.topic === "company" && q.proposal?.trim() ? { proposal: q.proposal.trim() } : {}),
   }));
   const thin = role.bullets.length <= 1 || model.thin === true;

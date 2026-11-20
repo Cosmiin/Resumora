@@ -10,7 +10,7 @@ const RULES = `REWRITE RULES
 - Use only facts from the original text and the notes.
 - Write in the CV's own language.
 - Start with a verb, using past tense for past roles and present tense for the current role.
-- Keep each bullet to 2 lines or less (≤ 220 characters).
+- Keep each bullet to at most 440 characters.
 - A known fact adds a few words to the bullet it belongs to, never a new line. Name a tool inside the bullet where it was used.
 - ${NO_FIRST_PERSON}
 - ${ROMANIAN_TENSE}

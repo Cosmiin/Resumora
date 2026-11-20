@@ -18,7 +18,7 @@ describe("gradeContext", () => {
     const [b1, b2] = result.bullets;
     expect(text).toContain(`${b1!.id} (grade ${b1!.score}): contribution: partial, clarity: specific, specificity: missing, impact: missing, concise: specific`);
     expect(text).toContain(`impact: missing`);
-    expect(text).toContain(`${long.length} of 220 characters`);
+    expect(text).toContain(`${long.length} of 440 characters`);
     expect(text).toContain(b2!.id);
   });
 
@@ -26,7 +26,9 @@ describe("gradeContext", () => {
     const text = gradeContext(role, result);
     expect(text).toContain(`Role score: ${result.score}. Line average: ${result.lines}.`);
     expect(text).toContain(GRADING_RULES);
-    expect(text).toContain("Use the answers. Keep every part at least as good as now. Improve the parts marked partial or missing. Stay within 220 characters.");
+    expect(text).toContain("Use the answers and the page. Keep every part at least as good as now, and write every line to reach specific on all five parts (contribution, clarity, specificity, impact, concise).");
+    expect(text).toContain("A part may stay below specific only when the fact it needs is in neither the page nor the answers: never invent one. Stay within 440 characters.");
+    expect(text).not.toContain("must reach at least");
   });
 
   it("lists only the lines asked for", () => {
@@ -48,13 +50,13 @@ describe("GRADING_RULES", () => {
   });
 
   it("keeps the rest of the score prompt word for word (only the grading rules and the policy line change)", () => {
-    // Hashes of scoreSystemPrompt("en") and scoreSystemPrompt("ro", "en") with those two parts blanked, taken at score/10.
+    // Hashes of scoreSystemPrompt("en") and scoreSystemPrompt("ro", "en") with those two parts blanked, taken at score/12 (score/12 changed the option rules on purpose).
     const rest = (prompt: string) => hashText(prompt.replace(GRADING_RULES, "GRADING").replace(`(policy ${SCORE_POLICY})`, "(policy)"));
     expect([rest(scoreSystemPrompt("en")), rest(scoreSystemPrompt("ro", "en"))]).toEqual(REST);
   });
 });
 
-const REST = ["1puc1mislmw", "1h4jgyy8rw9"];
+const REST = ["zmg6fcxte2", "cnlcbz1v53"];
 
 // score/11: the grading rules settle the cases the model read both ways between independent scores.
 describe("GRADING_RULES, sharpened", () => {

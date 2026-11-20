@@ -34,9 +34,9 @@ describe("checkProposal", () => {
     expect(checkProposal(role, b2!.id, "Answered 10–50 calls a week.")).toBe("ok");
     expect(checkProposal(role, b2!.id, "Answered 30 calls a week.")).toBe("number");
   });
-  it("drops 221 characters or more", () => {
-    expect(checkProposal(role, b2!.id, "x".repeat(220))).toBe("ok");
-    expect(checkProposal(role, b2!.id, "x".repeat(221))).toBe("length");
+  it("drops 441 characters or more", () => {
+    expect(checkProposal(role, b2!.id, "x".repeat(440))).toBe("ok");
+    expect(checkProposal(role, b2!.id, "x".repeat(441))).toBe("length");
   });
   it("drops unknown ids, new without notes, and unchanged text", () => {
     expect(checkProposal(role, "nope", "Something new here.")).toBe("unknownBullet");

@@ -4,6 +4,7 @@ import {
   MAX_QUESTIONS,
   MAX_ROLE_QUESTIONS,
   ModelScoreSchema,
+  hasBlank,
   RoleResultSchema,
   SCORE_POLICY,
   band,
@@ -65,8 +66,8 @@ function mb(id: string, over: Partial<ModelBullet> = {}): ModelBullet {
 const model = (bullets: ModelBullet[], nextStepId: string | null = null): ModelScore => ({ bullets, nextStepId, roleQuestions: [], thin: false });
 
 describe("bulletScore", () => {
-  it("uses policy score/11", () => {
-    expect(SCORE_POLICY).toBe("score/11");
+  it("uses policy score/12", () => {
+    expect(SCORE_POLICY).toBe("score/12");
   });
 
   it("asks for a result only when impact is the remaining gap", () => {
@@ -507,17 +508,66 @@ describe("coverage and the role score", () => {
   });
 
   it("caps concise by length, whatever the model says", () => {
-    expect(conciseGrade("x".repeat(220), "specific")).toBe("specific");
-    expect(conciseGrade("x".repeat(221), "specific")).toBe("partial");
-    expect(conciseGrade("x".repeat(301), "specific")).toBe("missing");
+    expect(conciseGrade("x".repeat(440), "specific")).toBe("specific");
+    expect(conciseGrade("x".repeat(441), "specific")).toBe("missing");
     expect(conciseGrade("short", "partial")).toBe("partial");
-    const r = buildRoleResult(role(["y".repeat(250)]), model([mb("b1")]), "fp");
-    expect(r.bullets[0]).toMatchObject({ concise: "partial", score: 95 });
+    const r = buildRoleResult(role(["y".repeat(441)]), model([mb("b1")]), "fp");
+    expect(r.bullets[0]).toMatchObject({ concise: "missing", score: 90 });
   });
 
   it("keeps the role-wide marks when one bullet is graded again", () => {
     const stored = buildRoleResult(role(texts), { ...model(bullets), coverage: marks }, "old");
     const again = mergeGrades(role(texts), stored, [mb("b3")], "new");
     expect(again.coverage?.marks).toMatchObject({ tools: "shown", company: "applies", leadership: "shown", results: "shown" });
+  });
+});
+
+describe("options with a blank and its amounts (score/12)", () => {
+  const ask = (options: string[], amounts?: string[]) =>
+    mb("b1", { ...g("specific", "specific", "specific", "partial"), issue: "impact", question: "What changed?", options, ...(amounts ? { amounts } : {}) });
+
+  it("finds a blank", () => {
+    expect(hasBlank("Increased sales by …%")).toBe(true);
+    expect(hasBlank("Orders shipped same day")).toBe(false);
+  });
+
+  it("accepts amounts on the model's answer and keeps it optional", () => {
+    expect(ModelScoreSchema.safeParse(model([ask(["Increased sales by …%"], ["Under 10", "10–25"])])).success).toBe(true);
+    expect(ModelScoreSchema.safeParse(model([ask(["Increased sales by …%"])])).success).toBe(true);
+    expect(ModelScoreSchema.safeParse(model([ask(["x"], ["a", "b", "c", "d", "e"])])).success).toBe(false);
+  });
+
+  it("passes amounts through to the bullet question when an option has a blank", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Increased sales by …%", "Orders shipped same day"], ["Under 10", "10–25", "25–50", "50+"])]), "fp");
+    expect(r.questions[0]).toMatchObject({ options: ["Increased sales by …%", "Orders shipped same day"], amounts: ["Under 10", "10–25", "25–50", "50+"] });
+  });
+
+  it("drops amounts when no option has a blank, and an option with two blanks", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Orders shipped same day", "Cut … by …%"], ["Under 10"])]), "fp");
+    expect(r.questions[0]!.options).toEqual(["Orders shipped same day"]);
+    expect(r.questions[0]!.amounts).toBeUndefined();
+  });
+
+  it("drops an amount without a number, since the answer box only knows a filled blank by its digits", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Increased sales by …%"], ["Dozens", "10–25"])]), "fp");
+    expect(r.questions[0]!.amounts).toEqual(["10–25"]);
+  });
+
+  it("drops an amount that is an exact number", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Increased sales by …%"], ["15", "10–25", "50+"])]), "fp");
+    expect(r.questions[0]!.amounts).toEqual(["10–25", "50+"]);
+  });
+
+  it("passes amounts through on role questions", () => {
+    const r = buildRoleResult(role(["Ran the store."]), { ...model([mb("b1")]), roleQuestions: [
+      { text: "How big was the work?", options: ["About … stores"], topic: "other", proposal: null, amounts: ["Under 10", "10–50", "50+"] },
+    ] }, "fp");
+    expect(r.roleQuestions[0]).toMatchObject({ options: ["About … stores"], amounts: ["Under 10", "10–50", "50+"] });
+  });
+
+  it("reads a stored result from before score/12 without amounts", () => {
+    const r = buildRoleResult(role(["Ran the store."]), model([ask(["Orders shipped same day"])]), "fp");
+    const old = JSON.parse(JSON.stringify(r));
+    expect(RoleResultSchema.safeParse(old).success).toBe(true);
   });
 });

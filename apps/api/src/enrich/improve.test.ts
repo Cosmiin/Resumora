@@ -120,7 +120,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     const user = (model.requests[0]!.messages as { role: string; content: string }[])[1]!.content;
     expect(user).toContain(`${role.bullets[0]!.id} (grade 45): contribution: partial, clarity: specific, specificity: missing, impact: missing`);
     expect(user).not.toContain(`${role.bullets[1]!.id} (grade`);
-    expect(user).toContain("Keep every part at least as good as now.");
+    expect(user).toContain("Keep every part at least as good as now, and write every line to reach specific on all five parts");
   });
 
   it("offers a better bullet and promotes its prediction after saving without another model call", async () => {
@@ -245,7 +245,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(await insights.pending(role.id)).toEqual([]);
   });
 
-  it.each(["Prepared payroll for 999 staff.", "", "Helped with payroll.", "Prepared " + "payroll ".repeat(32)])(
+  it.each(["Prepared payroll for 999 staff.", "", "Helped with payroll.", "Prepared " + "payroll ".repeat(60)])(
     "rejects an unsupported number, blank, unchanged or overlong proposal: %s", async (text) => {
       answer(text);
       expect(await (await post()).json()).toEqual({ needsDetail: true, nextQuestion: null });
@@ -272,7 +272,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     const result = ImproveAnswerSchema.parse(await res.json());
     if (!("proposal" in result)) throw new Error("Expected a proposal");
     expect(result.proposal.text).not.toMatch(/ {2}/);
-    expect(result.proposal.text.length).toBeLessThanOrEqual(220);
+    expect(result.proposal.text.length).toBeLessThanOrEqual(440);
     const text = `Prepared ${"a".repeat(192)}`;
     expect(result.proposal.text).toBe(text);
     const swapped = { ...role, bullets: role.bullets.map((b, i) => i === 0 ? { ...b, text } : b) };
@@ -382,7 +382,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     const messages = model.requests[0]!.messages as { role: string; content: string }[];
     const system = messages[0]!.content;
     const user = messages[1]!.content;
-    for (const text of ["CV locale: ro", "verb", "past tense", "present tense", "220", "first person", "untrusted", "null", "range"])
+    for (const text of ["CV locale: ro", "verb", "past tense", "present tense", "440", "first person", "untrusted", "null", "range"])
       expect(system).toContain(text);
     for (const text of [role.title, role.description, ...role.bullets.map((b) => b.text), "context only", "Which tool?", "Sage", "current"])
       expect(user).toContain(text);

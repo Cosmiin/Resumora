@@ -47,6 +47,8 @@ describe("placeAnswers", () => {
     expect(model.logged.map((l) => l.task)).toEqual(["enrich_use_answers"]);
     expect(userMessage()).toContain("About 12 stores");
     expect(userMessage()).not.toContain("Head of Ecommerce");
+    expect(userMessage()).toContain("write every line to reach specific on all five parts");
+    expect(userMessage()).not.toContain("must reach at least the role's line average");
   });
 
   it("returns a fact placed in the description as a description change", async () => {
@@ -75,11 +77,18 @@ describe("placeAnswers", () => {
     expect(await run()).toEqual({ changes: [] });
   });
 
-  it("drops a line over 220 characters", async () => {
-    const long = `${`Managed 12 online stores on Shopify Plus ${"and more ".repeat(30)}`.slice(0, 220)}x`;
-    expect(long.length).toBe(221);
+  it("drops a line over 440 characters", async () => {
+    const long = `${`Managed 12 online stores on Shopify Plus ${"and more ".repeat(60)}`.slice(0, 440)}x`;
+    expect(long.length).toBe(441);
     reply = { description: null, lines: [{ id: role.bullets[0]!.id, text: long }] };
     expect(await run()).toEqual({ changes: [] });
+  });
+
+  it("keeps a line of exactly 440 characters", async () => {
+    const text = `Managed 12 online stores on Shopify Plus ${"and more ".repeat(60)}`.slice(0, 439).trimEnd().padEnd(439, "x") + "y";
+    expect(text.length).toBe(440);
+    reply = { description: null, lines: [{ id: role.bullets[0]!.id, text }] };
+    expect((await run()).changes).toEqual([expect.objectContaining({ kind: "bullet", bulletId: role.bullets[0]!.id, text })]);
   });
 
   it("drops a line for an unknown id and a line that changes nothing", async () => {

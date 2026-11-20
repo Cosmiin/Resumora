@@ -5,7 +5,7 @@ import { t } from "../../i18n/t.ts";
 import type { CvAction } from "../edit/cvReducer.ts";
 import { roleName } from "../edit/sections/RoleItem.tsx";
 import { formatRange } from "../page/blocks.ts";
-import { AnswerBox, type Via } from "./AnswerBox.tsx";
+import { AnswerBox, withoutOpenBlanks, type Via } from "./AnswerBox.tsx";
 import { FocusBar } from "./FocusBar.tsx";
 import type { FocusTarget } from "./focus-context.ts";
 import { TITLE_FIRST, focusStep } from "./focus-step.ts";
@@ -161,7 +161,7 @@ function ProjectQuestionStep({ question, initial, locale, busy, onSubmit, onSkip
       <div className="fm-foot">
         <BackButton onBack={onBack} busy={busy} />
         <button type="button" className="fm-ghost" onClick={onSkip} disabled={busy}>{t("enrich.focus.skip")}</button>
-        <button type="button" className="fm-btn" disabled={busy || voiceBusy || value.trim() === ""} onClick={() => onSubmit(value, via)}>{t("enrich.project.next")}</button>
+        <button type="button" className="fm-btn" disabled={busy || voiceBusy || withoutOpenBlanks(value, question.options) === ""} onClick={() => onSubmit(withoutOpenBlanks(value, question.options), via)}>{t("enrich.project.next")}</button>
       </div>
     </>
   );

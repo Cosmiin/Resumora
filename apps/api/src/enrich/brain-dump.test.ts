@@ -156,7 +156,7 @@ describe("POST /v1/enrich/brain-dump", () => {
 
   it("squashes whitespace before checking length and returning text", async () => {
     const text = `Prepared ${"a".repeat(192)}`;
-    answer([`  Prepared${" ".repeat(32)}${"a".repeat(192)}  `, "Prepared " + "a".repeat(220), "   "]);
+    answer([`  Prepared${" ".repeat(32)}${"a".repeat(192)}  `, "Prepared " + "a".repeat(440), "   "]);
     expect((await result()).proposals).toEqual([{ id: "new1", text, score: 100 }]);
   });
 
@@ -201,7 +201,8 @@ describe("POST /v1/enrich/brain-dump", () => {
     const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
     expect(user).toContain(`${role.bullets[0]!.id} (grade 100): contribution: specific`);
     expect(user).toContain("Line average: 100.");
-    expect(user).toContain("Each new line must reach at least the role's line average.");
+    expect(user).toContain("write every line to reach specific on all five parts");
+    expect(user).not.toContain("must reach at least the role's line average");
   });
 
   it("gives no grades to a ramble", async () => {
@@ -358,7 +359,7 @@ describe("POST /v1/enrich/brain-dump", () => {
     await insights.put(role.id, buildRoleResult(role, initial, fingerprint(role, "ro")));
     expect((await post({ ...input(), fingerprint: fingerprint(role, "ro") })).status).toBe(200);
     const messages = model.requests[0]!.messages as { content: string }[];
-    for (const text of ["CV locale: ro", "verb", "past tense", "present tense", "220", "first person", "untrusted", "range", "names"])
+    for (const text of ["CV locale: ro", "verb", "past tense", "present tense", "440", "first person", "untrusted", "range", "names"])
       expect(messages[0]!.content).toContain(text);
     for (const text of ["up to 4", role.notes[0]!.answer, role.bullets[0]!.text, "current"])
       expect(messages[1]!.content).toContain(text);

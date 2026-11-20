@@ -81,14 +81,14 @@ describe("ShapeStep", () => {
     expect(onDone).toHaveBeenCalledWith([{ roleId: "r1", changes: [{ id: "order", kind: "order", ids: ["r1b5"] }] }]);
   });
 
-  it("Edit changes the merged text that is sent, and refuses more than 220 characters", async () => {
+  it("Edit changes the merged text that is sent, and refuses more than 440 characters", async () => {
     const onDone = renderStep();
     await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
     const box = screen.getByRole("textbox", { name: "Merged into one line" });
     await userEvent.clear(box);
     await userEvent.click(box);
-    await userEvent.paste("x".repeat(221));
-    expect(screen.getByText("At most 220 characters.")).toBeInTheDocument();
+    await userEvent.paste("x".repeat(441));
+    expect(screen.getByText("At most 440 characters.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Merge" })).toBeDisabled();
     await userEvent.clear(box);
     await userEvent.type(box, "Ran stores and features for 5-10 client accounts via Asana.");
