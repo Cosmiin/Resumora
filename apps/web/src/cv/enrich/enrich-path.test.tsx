@@ -201,9 +201,10 @@ describe("the short path", () => {
 
   it("an answer from an earlier round is not shown after More questions starts a new one", async () => {
     let release: (v: unknown) => void = () => {};
+    // Round 1's answer is held back; round 2's never comes, so only round 1's could fill the block.
     api.getSkillSuggestions
       .mockImplementationOnce(() => new Promise((r) => (release = r)))
-      .mockResolvedValue({ suggestions: [], sort: [] });
+      .mockImplementationOnce(() => new Promise(() => {}));
     render(<Harness initial={scores()} extra="Which teams did you work with in r1?" />);
     await userEvent.click(screen.getByRole("button", { name: "Start" }));
     await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
@@ -213,10 +214,12 @@ describe("the short path", () => {
     await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
     await userEvent.click(await screen.findByRole("button", { name: "1 more question" }));
     await screen.findByText(/^Budget:/);
-    release({ suggestions: [{ name: "Gem", group: "technicalSkills", lines: [{ roleId: "r1", text: "Gem" }], picked: true }], sort: [] });
     await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
     await screen.findByRole("button", { name: "Done" });
     await waitFor(() => expect(api.getSkillSuggestions).toHaveBeenCalledTimes(2));
+    // Round 1's answer arrives on round 2's end screen: it must not show there.
+    release({ suggestions: [{ name: "Gem", group: "technicalSkills", lines: [{ roleId: "r1", text: "Gem" }], picked: true }], sort: [] });
+    await new Promise((r) => setTimeout(r, 0));
     expect(screen.queryByText(/Your roles show/)).toBeNull();
   });
 
