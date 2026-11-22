@@ -168,13 +168,21 @@ export function streamRewrite(path: string, body: unknown, onEvent: (e: RewriteE
 
 const SkillGroupSchema = z.enum(["technicalSkills", "professionalSkills"]);
 const SkillsAnswerSchema = z.object({
-  suggestions: z.array(z.object({ name: z.string(), group: SkillGroupSchema, evidence: z.string() })),
+  suggestions: z.array(z.object({
+    name: z.string(),
+    group: SkillGroupSchema,
+    lines: z.array(z.object({ roleId: z.string(), text: z.string() })),
+    picked: z.boolean(),
+  })),
   sort: z.array(z.object({ skillId: z.string(), group: SkillGroupSchema })),
 });
 export type SkillsAnswer = z.infer<typeof SkillsAnswerSchema>;
+/** A skill the roles show: the exact lines it rests on (each with its role), and picked when the person ticked it in the Tools step. */
+export type SkillSuggestion = SkillsAnswer["suggestions"][number];
 
 /**
- * Skills the saved roles show (each with the line it came from), and a group for each skill still to sort.
+ * Skills the saved roles show (deduced ones too, each with the lines it rests on) and the tools the person confirmed,
+ * and a group for each skill still to sort.
  * 503 `ai_unavailable`: the AI is down. 502 `ai_bad_answer`: its answer couldn't be used.
  */
 export function getSkillSuggestions(): Promise<SkillsAnswer> {

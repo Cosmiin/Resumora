@@ -1,3 +1,5 @@
+import { TOOLS_NOTE } from "@resumora/shared";
+
 /** Copy for the base CV flow: import, the enrichment path (focus step, questions, result) and its voice answers. Romanian: `ro-basecv.ts`, same keys. Spread into `en`. */
 export const basecvEn = {
   "cv.start.title": "Start with the CV you have",
@@ -253,8 +255,9 @@ export const basecvEn = {
   "enrich.path.tools.ask": "Which tools did you use in this role?",
   "enrich.path.tools.lead": "Tap every tool you used here. Dark ones are ticked.",
   "enrich.path.tools.loading": "Finding the usual tools for your roles…",
-  "enrich.path.tools.note": "Which tools did you use?",
-  "enrich.path.tools.none": "None of these",
+  // The skills route reads these to find the tools a person ticked: they live in @resumora/shared.
+  "enrich.path.tools.note": TOOLS_NOTE.en.question,
+  "enrich.path.tools.none": TOOLS_NOTE.en.none,
   "enrich.path.tools.group.named": "Named in your CV",
   "enrich.path.tools.group.usual": "Often used in this kind of role",
   "enrich.path.tools.group.near": "From the role before or after",
