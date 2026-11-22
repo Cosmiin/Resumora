@@ -129,14 +129,17 @@ describe("/v1/enrich", () => {
     expect((await app.request("/v1/enrich/skills", { method: "POST" })).status).toBe(401);
     model = fakeModel(() => ({
       suggestions: [
-        { name: "payroll", group: "professionalSkills", evidence: "Payroll for 40 staff" },
-        { name: "Python", group: "technicalSkills", evidence: "Payroll for 40 staff" },
+        { name: "payroll", group: "professionalSkills", evidence: ["Payroll for 40 staff"] },
+        { name: "Python", group: "technicalSkills", evidence: ["Wrote Python scripts"] },
       ],
       sort: [],
     }));
     const res = await app.request("/v1/enrich/skills", { method: "POST", headers: auth });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ suggestions: [{ name: "payroll", group: "professionalSkills", evidence: "Payroll for 40 staff" }], sort: [] });
+    expect(await res.json()).toEqual({
+      suggestions: [{ name: "payroll", group: "professionalSkills", lines: [{ roleId: expect.any(String), text: "Payroll for 40 staff" }], picked: false }],
+      sort: [],
+    });
   });
 
   it("413 content_too_large for a 20 KB body, before any repo or model call", async () => {

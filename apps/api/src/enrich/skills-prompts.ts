@@ -1,20 +1,25 @@
 import { notePeriod, type CvContent, type Experience, type Locale } from "@resumora/shared";
 import { languageInstruction } from "./prompts.ts";
 
-// Prompts for the skills route. The group definitions are the ones in packages/shared/src/cv.ts.
+// Prompts for the skills route (the Skills panel and the end of an Enrich round). The group definitions are the ones in
+// packages/shared/src/cv.ts. Skills may be deduced from what the lines say (owner's picks, 22 Nov 2026); the code checks
+// every quote against the person's own text.
 
 const BODY = `SKILL GROUPS
 
-- technicalSkills: tools, software, programming languages, platforms, technologies.
-- professionalSkills: work capabilities, domain expertise, interpersonal and self-management skills.
+- technicalSkills: named software, apps, platforms, systems, programming languages, equipment and technologies.
+- professionalSkills: work capabilities, methods, domain expertise, interpersonal and self-management skills. An activity, method or practice is professional ("recruitment", "onboarding", "KPI reviews"), never technical.
 
 TASK
 
-1. suggestions: skills this person's own experience shows but their skills lists do not yet contain.
-   - "name" is the skill as written in the experience text, so it can be found there.
-   - "evidence" is a short exact quote (copy it character for character) from one role's title, description, bullet or note answer that shows the skill.
+1. suggestions: skills this person's roles show that their skills lists do not yet contain.
+   - Deduce a skill from what the lines say the person did, not only from words they name. A skill may rest on one line or on several lines together.
+   - Only what the person did themselves: never from a goal, a team's or the company's work, and never a level ("advanced", "expert") or a number of years.
+   - "name": the shortest, most recognisable name for the skill, the one CVs, job ads and ATS filters use, in the CV's language. Not a sentence, not the line reworded.
+   - "evidence": a list of short exact quotes (copy each character for character), one from each line the skill rests on: a role's title, description, bullet or note answer.
    - "group" is technicalSkills or professionalSkills.
-   - Do not suggest a skill that is already in any of the three lists. Suggest at most 15, the clearest first.
+   - One entry per skill. Do not suggest a skill already in any list, also under another name ("Recruiting" is "Recruitment"), or one under "Confirmed tools".
+   - Suggest at most 15, the clearest first.
 2. sort: for each item in "To sort" that clearly belongs in a group, return { skillId, group }. Leave an item out when you cannot tell.
 
 If nothing qualifies, return empty lists. Never invent a skill the text does not show.
@@ -42,13 +47,17 @@ function roleBlock(r: Experience): string {
   ].join("\n");
 }
 
-/** Every role's text, the skills already listed, and the "to sort" items with their ids. */
-export function skillsUserMessage(content: Pick<CvContent, "experience" | "technicalSkills" | "professionalSkills" | "unclearSkills">): string {
+/** Every role's text, the skills already listed, the tools the person confirmed, and the "to sort" items with their ids. */
+export function skillsUserMessage(
+  content: Pick<CvContent, "experience" | "technicalSkills" | "professionalSkills" | "unclearSkills">,
+  confirmedTools: readonly string[] = [],
+): string {
   const names = (list: { name: string }[]) => JSON.stringify(list.map((s) => s.name));
   return [
     ...content.experience.map(roleBlock),
     `Technical skills already listed: ${names(content.technicalSkills)}`,
     `Professional skills already listed: ${names(content.professionalSkills)}`,
+    `Confirmed tools (already offered to the person): ${JSON.stringify(confirmedTools)}`,
     "To sort (JSON, each { id, name }):",
     ...content.unclearSkills.map((s) => JSON.stringify({ id: s.id, name: s.name })),
   ].join("\n");
