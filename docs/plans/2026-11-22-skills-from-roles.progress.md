@@ -2,3 +2,8 @@
 session: Skills from roles build · builder: claude
 commit: 93f19204 (base 74b0ff3a) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
 open: ruling: apps/api/src/enrich/routes.test.ts updated outside the scope list (its /skills test asserted the old answer shape)
+
+## Task 2: The panel and the web client read the new answer — done
+session: Skills from roles build · builder: claude
+commit: c1ec444d (base 93f19204) · reviews: 1 (agents) · fix rounds: 0 · guard denials: 0
+open: none

@@ -13,7 +13,7 @@ import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
 import { EndStep, type HeldChange } from "./EndStep.tsx";
 import { PrepRing, type PrepRow } from "./PrepRing.tsx";
-import { checkChanges, placeAnswersOnCv } from "./enrich-api.ts";
+import { checkChanges, getSkillSuggestions, placeAnswersOnCv, type SkillSuggestion } from "./enrich-api.ts";
 import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
 import type { Prepared } from "./prepared.ts";
 import { ScoreRows } from "./ScoreRows.tsx";
@@ -115,6 +115,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
   const [rolesBefore, setRolesBefore] = useState<ReadonlyMap<string, number | null>>(new Map());
   const [rows, setRows] = useState<PrepRow[]>([]);
   const [timedOut, setTimedOut] = useState(false);
+  // The skills the roles show, asked for at the end of each round; a round number keeps an older answer off a newer end.
+  const [skills, setSkills] = useState<readonly SkillSuggestion[] | null>(null);
+  const round = useRef(0);
   // Questions already asked in this path (earlier rounds), and what each role got in the current round.
   const asked = useRef(new Set<string>());
   const got = useRef(new Map<string, Got>());
@@ -174,6 +177,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     // A new round: its end waits for its own scores.
     endShown.current = false;
     setTimedOut(false);
+    const mine = ++round.current;
+    setSkills(null);
     setStage({ kind: "preparing" });
     await waitForSave().catch(() => undefined);
     const now = latest.current;
@@ -221,6 +226,10 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       setRows((all) => all.map((r) => (r.id === item.id ? { ...r, state: roleFailed ? "failed" : "done" } : r)));
     }));
     setStage({ kind: "end", held, failed });
+    // The server reads the saved CV, so this round's lines are saved first. A failure shows no block (owner's call 5).
+    void waitForSave().catch(() => undefined).then(() => getSkillSuggestions())
+      .then((answer) => { if (round.current === mine) setSkills(answer.suggestions); })
+      .catch(() => undefined);
   };
 
   /**
@@ -394,6 +403,8 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         setStage({ ...stage, held: stage.held.filter((h) => !(h.roleId === roleId && h.change.id === change.id)) });
       }}
       onAddWithFact={addWithFact}
+      skills={skills}
+      onAddSkills={(list) => dispatch({ type: "addSkills", skills: list.map((s) => ({ id: newId(), ...s })) })}
       onDone={onClose} more={more.length}
       onMore={() => {
         got.current = new Map();
