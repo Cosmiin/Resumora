@@ -51,6 +51,21 @@ describe("EndStep", () => {
     expect(clerk.querySelector(".sr-change")).toBeNull();
   });
 
+  it("shows the skills block after the held lines when skills are given, and nothing when skills is null", async () => {
+    const onAddSkills = vi.fn();
+    const skills = [{ name: "Gem", group: "technicalSkills" as const, lines: [{ roleId: "r1", text: "Used Gem" }], picked: true }];
+    const { unmount } = render(<EndStep cv={cv} scores={scores} before={64} held={[{ roleId: "r1", change: weak }]} failed={false}
+      onAdd={vi.fn()} onDone={vi.fn()} skills={skills} onAddSkills={onAddSkills} />);
+    const block = screen.getByRole("heading", { name: "Your roles show 1 skill" });
+    const held = document.querySelector(".es-helds")!;
+    expect(held.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Add to my CV" }));
+    expect(onAddSkills).toHaveBeenCalledWith([{ name: "Gem", group: "technicalSkills" }]);
+    unmount();
+    renderEnd({ skills: null, onAddSkills });
+    expect(screen.queryByText(/Your roles show/)).toBeNull();
+  });
+
   it("shows no gain next to the CV's score when it did not move", () => {
     renderEnd({ before: 79 });
     expect(screen.getByRole("heading", { name: "Your CV: 79" })).toBeInTheDocument();

@@ -7,7 +7,7 @@ import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 import { ApiClientError } from "../../lib/api-error.ts";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn(), proposeShape: vi.fn(), checkChanges: vi.fn(), placeAnswersOnCv: vi.fn() }));
+const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn(), proposeShape: vi.fn(), checkChanges: vi.fn(), placeAnswersOnCv: vi.fn(), getSkillSuggestions: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 const note = (question: string, answer: string): Note => ({ id: `n-${question}`, question, answer, via: ["type"], askedAt: "2026-11-17T00:00:00Z" });
@@ -81,6 +81,7 @@ beforeEach(() => {
   api.roleDescription.mockResolvedValue({ text: "Acme makes anvils. Ran reports.", keywords: [] });
   api.brainDump.mockResolvedValue({ proposals: [], roleBefore: null, roleAfterAll: null });
   api.placeAnswersOnCv.mockResolvedValue({ changes: [] });
+  api.getSkillSuggestions.mockResolvedValue({ suggestions: [], sort: [] });
   // Keeps every change, and predicts the role at 85.
   api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string }[] }) =>
     Promise.resolve({ result: { ...result(roleId === "r1" ? r1 : r2, 85), fingerprint: `after-${roleId}` }, kept: changes.map((c) => c.id), held: [] }));
@@ -159,6 +160,67 @@ describe("the short path", () => {
     const second = (await screen.findByText(/^Budget:/)).textContent ?? "";
     expect(second).toBe("Budget: Which teams did you work with in r1?");
     expect(first).toContain("What changed in r1?");
+  });
+
+  it("after a round, asks for skills once the save is done and shows them on the end screen; Add all puts them in one addSkills", async () => {
+    const actions: CvAction[] = [];
+    api.getSkillSuggestions.mockResolvedValue({ suggestions: [
+      { name: "Gem", group: "technicalSkills", lines: [{ roleId: "r1", text: "Gem" }], picked: true },
+      { name: "Reporting", group: "professionalSkills", lines: [{ roleId: "r1", text: "Did reports." }], picked: false },
+    ], sort: [] });
+    render(<Harness initial={scores()} onAction={(a) => actions.push(a)} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await screen.findByText(/^Budget:/);
+    expect(api.getSkillSuggestions).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Add all 2" }));
+    expect(api.getSkillSuggestions).toHaveBeenCalledTimes(1);
+    const adds = actions.filter((a) => a.type === "addSkills");
+    expect(adds).toHaveLength(1);
+    expect(adds[0]).toMatchObject({ type: "addSkills", skills: [
+      { id: expect.any(String), name: "Gem", group: "technicalSkills" },
+      { id: expect.any(String), name: "Reporting", group: "professionalSkills" },
+    ] });
+    expect(screen.getByRole("status")).toHaveTextContent("2 skills added to your CV.");
+  });
+
+  it("a failed skills request shows the end screen without the block or an error", async () => {
+    api.getSkillSuggestions.mockRejectedValue(new Error("down"));
+    render(<Harness initial={scores()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Answer all" }));
+    await screen.findByRole("button", { name: "Done" });
+    await waitFor(() => expect(api.getSkillSuggestions).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/Your roles show/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("an answer from an earlier round is not shown after More questions starts a new one", async () => {
+    let release: (v: unknown) => void = () => {};
+    // Round 1's answer is held back; round 2's never comes, so only round 1's could fill the block.
+    api.getSkillSuggestions
+      .mockImplementationOnce(() => new Promise((r) => (release = r)))
+      .mockImplementationOnce(() => new Promise(() => {}));
+    render(<Harness initial={scores()} extra="Which teams did you work with in r1?" />);
+    await userEvent.click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Companies done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tools done" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Answer all" }));
+    await screen.findByRole("button", { name: "Done" });
+    await userEvent.click(screen.getByRole("button", { name: "Rescore" }));
+    await userEvent.click(await screen.findByRole("button", { name: "1 more question" }));
+    await screen.findByText(/^Budget:/);
+    await userEvent.click(screen.getByRole("button", { name: "Answer all" }));
+    await screen.findByRole("button", { name: "Done" });
+    await waitFor(() => expect(api.getSkillSuggestions).toHaveBeenCalledTimes(2));
+    // Round 1's answer arrives on round 2's end screen: it must not show there.
+    release({ suggestions: [{ name: "Gem", group: "technicalSkills", lines: [{ roleId: "r1", text: "Gem" }], picked: true }], sort: [] });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByText(/Your roles show/)).toBeNull();
   });
 
   it("goes straight from tools to the end when there is nothing to ask", async () => {

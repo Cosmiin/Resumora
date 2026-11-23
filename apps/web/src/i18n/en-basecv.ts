@@ -1,3 +1,5 @@
+import { TOOLS_NOTE } from "@resumora/shared";
+
 /** Copy for the base CV flow: import, the enrichment path (focus step, questions, result) and its voice answers. Romanian: `ro-basecv.ts`, same keys. Spread into `en`. */
 export const basecvEn = {
   "cv.start.title": "Start with the CV you have",
@@ -253,8 +255,23 @@ export const basecvEn = {
   "enrich.path.tools.ask": "Which tools did you use in this role?",
   "enrich.path.tools.lead": "Tap every tool you used here. Dark ones are ticked.",
   "enrich.path.tools.loading": "Finding the usual tools for your roles…",
-  "enrich.path.tools.note": "Which tools did you use?",
-  "enrich.path.tools.none": "None of these",
+  // The skills route reads these to find the tools a person ticked: they live in @resumora/shared.
+  "enrich.path.tools.note": TOOLS_NOTE.en.question,
+  "enrich.path.tools.none": TOOLS_NOTE.en.none,
+  "enrich.path.skills.title": "Your roles show {n} skills",
+  "enrich.path.skills.titleOne": "Your roles show 1 skill",
+  "enrich.path.skills.counts": "{t} technical · {p} professional",
+  "enrich.path.skills.more": "+{n} more",
+  "enrich.path.skills.addAll": "Add all {n}",
+  "enrich.path.skills.addOne": "Add to my CV",
+  "enrich.path.skills.look": "Look through",
+  "enrich.path.skills.lookNote": "Remove any you don't want. Tap one to see the line it came from.",
+  "enrich.path.skills.add": "Add {n}",
+  "enrich.path.skills.back": "Back",
+  "enrich.path.skills.added": "{n} skills added to your CV.",
+  "enrich.path.skills.addedOne": "1 skill added to your CV.",
+  "enrich.path.skills.picked": "you picked",
+  "enrich.path.skills.remove": "Remove {name}",
   "enrich.path.tools.group.named": "Named in your CV",
   "enrich.path.tools.group.usual": "Often used in this kind of role",
   "enrich.path.tools.group.near": "From the role before or after",

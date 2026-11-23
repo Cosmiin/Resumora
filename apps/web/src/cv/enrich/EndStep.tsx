@@ -3,7 +3,9 @@ import { MAX_TEXT, gradedItems, type Change, type CvContent, type HeldAsk } from
 import { t } from "../../i18n/t.ts";
 import { AnswerBox, withoutOpenBlanks, type Via } from "./AnswerBox.tsx";
 import { averageScore, roleMeta, strengthWeights } from "./EnrichPath.tsx";
+import type { SkillSuggestion } from "./enrich-api.ts";
 import { ScoreRows, scoreChange } from "./ScoreRows.tsx";
+import { SkillsFound } from "./SkillsFound.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
 /** A held change and, when the grading had one, the question that would bring its line to the top grade (score/12). */
@@ -25,6 +27,9 @@ type Props = {
   onMore?(): void;
   /** How many questions "more" would ask. */
   more?: number;
+  /** The skills the roles show, once asked for (null until then or when the request failed). */
+  skills?: readonly SkillSuggestion[] | null;
+  onAddSkills?(skills: { name: string; group: SkillSuggestion["group"] }[]): void;
 };
 
 const scoreOf = (s: RoleScoreState | undefined) => (s && s.state !== "none" ? (s.result?.score ?? null) : null);
@@ -98,9 +103,10 @@ function HeldRow({ name, change, ask, onAdd, onAddWithFact }: {
 /**
  * The end of the path (score/9): the CV's score before and after with its gain, each role as a score row with its
  * change and a before/after bar (owner's pick B, 20 Nov 2026), the changes held
- * back because they would lower a role's score (Add anyway / Edit it first), and Done or another round of questions.
+ * back because they would lower a role's score (Add anyway / Edit it first), the skills the roles show (owner's pick C,
+ * 22 Nov 2026), and Done or another round of questions.
  */
-export function EndStep({ cv, scores, before, rolesBefore, held, failed, onAdd, onAddWithFact, onDone, onMore, more }: Props) {
+export function EndStep({ cv, scores, before, rolesBefore, held, failed, onAdd, onAddWithFact, onDone, onMore, more, skills, onAddSkills }: Props) {
   const graded = gradedItems(cv);
   const average = averageScore(new Map(graded.map(({ item }) => [item.id, scoreOf(scores.get(item.id))])), strengthWeights(cv));
   const moved = before !== null && average !== null && before !== average ? { from: before, to: average } : null;
@@ -125,6 +131,7 @@ export function EndStep({ cv, scores, before, rolesBefore, held, failed, onAdd, 
             onAddWithFact={onAddWithFact && ((ask, answer, via) => onAddWithFact(h.roleId, h.change, ask, answer, via))} />)}
         </ul>
       )}
+      {skills && onAddSkills && <SkillsFound cv={cv} suggestions={skills} onAdd={onAddSkills} />}
       <div className="rr-actions">
         <button type="button" className="fm-btn" onClick={onDone}>{t("enrich.path.v2.done")}</button>
         {onMore && more !== undefined && more > 0 && (

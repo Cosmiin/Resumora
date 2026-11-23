@@ -18,7 +18,7 @@ type Shown = "suggest" | "sort";
 const groupLabel = (g: SkillGroup) => t(g === "technicalSkills" ? "enrich.skills.technical" : "enrich.skills.professional");
 const arrowLabel = (g: SkillGroup) => t(g === "technicalSkills" ? "enrich.skills.toTechnical" : "enrich.skills.toProfessional");
 
-/** Suggestions from the person's own roles: each with the line it came from and "Add". */
+/** Suggestions from the person's own roles: each with the lines it rests on and "Add". */
 function Suggestions({ cv, answer, dispatch }: { cv: CvContent; answer: SkillsAnswer; dispatch(a: CvAction): void }) {
   const listed = (name: string) =>
     [...cv.technicalSkills, ...cv.professionalSkills, ...cv.unclearSkills].some((s) => s.name.trim().toLowerCase() === name.trim().toLowerCase());
@@ -48,7 +48,7 @@ function Suggestions({ cv, answer, dispatch }: { cv: CvContent; answer: SkillsAn
             >
               {done ? t("enrich.skills.added") : t("enrich.skills.add")}
             </button>
-            <span className="ev">“{s.evidence}”</span>
+            <span className="ev">{s.lines.map((l) => `“${l.text}”`).join(" · ")}</span>
           </div>
         );
       })}

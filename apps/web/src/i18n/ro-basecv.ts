@@ -1,3 +1,4 @@
+import { TOOLS_NOTE } from "@resumora/shared";
 import type { basecvEn } from "./en-basecv.ts";
 
 /** Romanian copy for the base CV flow. The type makes a missing or extra key a compile error. */
@@ -255,8 +256,22 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.path.tools.ask": "Ce instrumente ai folosit în acest rol?",
   "enrich.path.tools.lead": "Atinge fiecare instrument folosit aici. Cele închise la culoare sunt bifate.",
   "enrich.path.tools.loading": "Caut instrumentele obișnuite pentru rolurile tale…",
-  "enrich.path.tools.note": "Ce instrumente ai folosit?",
-  "enrich.path.tools.none": "Niciunul dintre acestea",
+  "enrich.path.tools.note": TOOLS_NOTE.ro.question,
+  "enrich.path.tools.none": TOOLS_NOTE.ro.none,
+  "enrich.path.skills.title": "Rolurile tale arată {n} competențe",
+  "enrich.path.skills.titleOne": "Rolurile tale arată o competență",
+  "enrich.path.skills.counts": "{t} tehnice · {p} profesionale",
+  "enrich.path.skills.more": "încă {n}",
+  "enrich.path.skills.addAll": "Adaugă toate {n}",
+  "enrich.path.skills.addOne": "Adaugă în CV",
+  "enrich.path.skills.look": "Vezi lista",
+  "enrich.path.skills.lookNote": "Scoate ce nu vrei. Atinge una ca să vezi rândul din care vine.",
+  "enrich.path.skills.add": "Adaugă {n}",
+  "enrich.path.skills.back": "Înapoi",
+  "enrich.path.skills.added": "Am adăugat {n} competențe în CV.",
+  "enrich.path.skills.addedOne": "Am adăugat o competență în CV.",
+  "enrich.path.skills.picked": "ales de tine",
+  "enrich.path.skills.remove": "Scoate {name}",
   "enrich.path.tools.group.named": "Menționate în CV",
   "enrich.path.tools.group.usual": "Folosite des în astfel de roluri",
   "enrich.path.tools.group.near": "De la rolul dinainte sau de după",

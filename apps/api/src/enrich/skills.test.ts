@@ -10,10 +10,11 @@ vi.mock("../ai/call-model.ts", async (importOriginal) => {
     callModel: (...args: Parameters<typeof real.callModel>) => (forced.error ? Promise.reject(forced.error) : real.callModel(...args)),
   };
 });
-import { emptyCv, newId, type CvContent, type Experience } from "@resumora/shared";
+import { emptyCv, newId, TOOLS_NOTE, type CvContent, type Experience, type Note } from "@resumora/shared";
 import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { ApiError } from "../errors.ts";
 import { fakeModel, roleWith } from "./fake-model.ts";
+import { skillsSystemPrompt } from "./skills-prompts.ts";
 import { suggestSkills } from "./skills.ts";
 
 let cv: ReturnType<typeof memoryCvRepo>;
@@ -32,8 +33,11 @@ const run = async (answer: unknown) => {
   const result = await suggestSkills({ cv, model: model.deps, userId: "u" });
   return { model, result };
 };
-const sug = (name: string, evidence: string, group = "technicalSkills") => ({ name, group, evidence });
+const sug = (name: string, evidence: string | string[], group = "technicalSkills") => ({ name, group, evidence: typeof evidence === "string" ? [evidence] : evidence });
 const names = (r: { suggestions: { name: string }[] }) => r.suggestions.map((s) => s.name);
+/** A Tools step note, as the web saves it. */
+const toolsNote = (answer: string, askedAt: string, over: Partial<Note> = {}): Note =>
+  ({ id: newId(), question: TOOLS_NOTE.en.question, answer, via: ["pick"], askedAt, ...over });
 
 beforeEach(() => {
   forced.error = null;
@@ -67,58 +71,65 @@ describe("suggestSkills", () => {
     expect(model.requests).toHaveLength(0);
   });
 
-  it("drops a suggestion whose name is not in the experience text", async () => {
+  it("keeps a deduced skill whose name is not in its line, with the line and its role", async () => {
     await save();
-    const { result } = await run({ suggestions: [sug("Python", "Ran payroll in SAP"), sug("sap", "Ran payroll in SAP")], sort: [] });
-    expect(names(result)).toEqual(["sap"]);
+    const { result } = await run({ suggestions: [sug("Team leadership", "trained 3 new colleagues", "professionalSkills")], sort: [] });
+    expect(result.suggestions).toEqual([
+      { name: "Team leadership", group: "professionalSkills", lines: [{ roleId: role.id, text: "trained 3 new colleagues" }], picked: false },
+    ]);
   });
 
-  it("finds a name in the title, description, bullets and note answers", async () => {
-    await save();
-    const { result } = await run({
-      suggestions: [sug("Payroll Specialist", "Payroll Specialist", "professionalSkills"), sug("staff", "40 staff"), sug("colleagues", "3 new colleagues"), sug("excel", "excel macros")],
-      sort: [],
-    });
-    expect(names(result)).toEqual(["Payroll Specialist", "staff", "colleagues", "excel"]);
-  });
-
-  it("drops a suggestion already listed in any of the three groups", async () => {
-    await save({ technicalSkills: [skill("SAP")], professionalSkills: [skill("payroll")], unclearSkills: [skill("EXCEL")] });
-    const { result } = await run({
-      suggestions: [sug("sap", "Ran payroll in SAP"), sug("Payroll", "Monthly payroll", "professionalSkills"), sug("Excel", "Excel macros"), sug("colleagues", "new colleagues")],
-      sort: [],
-    });
-    expect(names(result)).toEqual(["colleagues"]);
-  });
-
-  it("matches evidence ignoring case and extra spaces, and drops evidence that is not in the text", async () => {
+  it("finds quotes in the title, description, bullets and note answers", async () => {
     await save();
     const { result } = await run({
-      suggestions: [sug("SAP", "RAN PAYROLL  IN sap"), sug("Excel", "used excel macros"), sug("staff", "Ran payroll in SAP and Excel")],
+      suggestions: [sug("Payroll", "Payroll Specialist", "professionalSkills"), sug("HR", "40 staff"), sug("SAP", "Ran payroll in SAP"), sug("Excel", "excel macros")],
       sort: [],
     });
-    expect(names(result)).toEqual(["SAP", "Excel"]);
+    expect(names(result)).toEqual(["Payroll", "HR", "SAP", "Excel"]);
   });
 
-  it("drops evidence that spans two separate texts", async () => {
+  it("drops a skill when any of its quotes is not in the text, or it has none", async () => {
+    await save();
+    const { result } = await run({ suggestions: [sug("Leadership", ["Ran payroll in SAP", "led a team of 9"]), sug("SAP", [])], sort: [] });
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it("a skill may rest on lines of two roles", async () => {
+    const other = roleWith(["Wrote the leave policy"], { title: "HR Officer", description: "" });
+    await save({}, [role, other]);
+    const { result } = await run({ suggestions: [sug("HR policy", ["Monthly payroll for 40 staff", "Wrote the leave policy"], "professionalSkills")], sort: [] });
+    expect(result.suggestions[0]!.lines).toEqual([
+      { roleId: role.id, text: "Monthly payroll for 40 staff" },
+      { roleId: other.id, text: "Wrote the leave policy" },
+    ]);
+  });
+
+  it("matches quotes ignoring case and spacing, and takes the first role that contains it", async () => {
+    const twin = { ...role, id: newId() };
+    await save({}, [role, twin]);
+    const { result } = await run({ suggestions: [sug("Excel", "excel MACROS daily")], sort: [] });
+    expect(result.suggestions[0]!.lines).toEqual([{ roleId: role.id, text: "excel MACROS daily" }]);
+  });
+
+  it("drops a quote that spans two separate texts", async () => {
     await save();
     const { result } = await run({ suggestions: [sug("staff", "Payroll Specialist Monthly payroll for 40 staff.")], sort: [] });
     expect(result.suggestions).toEqual([]);
   });
 
-  it("matches the name only as a whole word", async () => {
-    await save({}, [roleWith(["Ran payroll", "wrote C and Go", "Built tools in C++", "Used tool10 daily"])]);
-    const { result } = await run({
-      suggestions: [sug("C", "Ran payroll"), sug("C", "wrote C and Go"), sug("C++", "Built tools in C++"), sug("tool1", "Used tool10 daily")],
-      sort: [],
-    });
-    expect(result.suggestions.map((s) => [s.name, s.evidence])).toEqual([["C", "wrote C and Go"], ["C++", "Built tools in C++"]]);
+  it("keeps one line when the same quote is given twice", async () => {
+    await save();
+    const { result } = await run({ suggestions: [sug("SAP", ["Ran payroll in SAP", "ran payroll  in sap"])], sort: [] });
+    expect(result.suggestions[0]!.lines).toEqual([{ roleId: role.id, text: "Ran payroll in SAP" }]);
   });
 
-  it("drops a name that appears only in a different field from its evidence", async () => {
-    await save({}, [roleWith(["Ran payroll monthly", "Led the Kanban board"])]);
-    const { result } = await run({ suggestions: [sug("Kanban", "Ran payroll monthly")], sort: [] });
-    expect(result.suggestions).toEqual([]);
+  it("drops a suggestion already listed in any of the three groups", async () => {
+    await save({ technicalSkills: [skill("SAP")], professionalSkills: [skill("payroll")], unclearSkills: [skill("EXCEL")] });
+    const { result } = await run({
+      suggestions: [sug("sap", "Ran payroll in SAP"), sug("Payroll", "Monthly payroll", "professionalSkills"), sug("Excel", "Excel macros"), sug("Training", "new colleagues")],
+      sort: [],
+    });
+    expect(names(result)).toEqual(["Training"]);
   });
 
   it("keeps the first of duplicate suggestion names", async () => {
@@ -133,6 +144,93 @@ describe("suggestSkills", () => {
     await save({}, [roleWith([words.join(" ")])]);
     const { result } = await run({ suggestions: words.map((w) => sug(w, w)), sort: [] });
     expect(result.suggestions).toHaveLength(15);
+  });
+
+  it("adds confirmed tools from the latest Tools note first, marked picked", async () => {
+    const tools = roleWith(["Ran payroll in SAP"], { notes: [toolsNote("Gem, Pin", "2026-11-01T10:00:00.000Z")] });
+    await save({}, [tools]);
+    const { result } = await run({ suggestions: [sug("SAP", "Ran payroll in SAP")], sort: [] });
+    expect(result.suggestions).toEqual([
+      { name: "Gem", group: "technicalSkills", lines: [{ roleId: tools.id, text: "Gem, Pin" }], picked: true },
+      { name: "Pin", group: "technicalSkills", lines: [{ roleId: tools.id, text: "Gem, Pin" }], picked: true },
+      { name: "SAP", group: "technicalSkills", lines: [{ roleId: tools.id, text: "Ran payroll in SAP" }], picked: false },
+    ]);
+  });
+
+  it("the same confirmed tool on two roles is one entry with two lines", async () => {
+    const a = roleWith(["x"], { notes: [toolsNote("Gem", "2026-11-01T10:00:00.000Z")] });
+    const b = roleWith(["y"], { notes: [toolsNote("Gem, Pin", "2026-11-01T10:00:00.000Z")] });
+    await save({}, [a, b]);
+    const { result } = await run({ suggestions: [], sort: [] });
+    expect(result.suggestions.map((s) => [s.name, s.lines.map((l) => l.roleId)])).toEqual([["Gem", [a.id, b.id]], ["Pin", [b.id]]]);
+  });
+
+  it("only the latest Tools note of a role counts", async () => {
+    const tools = roleWith(["x"], { notes: [toolsNote("Gem", "2026-11-02T10:00:00.000Z"), toolsNote("Gem, Pin", "2026-11-01T10:00:00.000Z")] });
+    await save({}, [tools]);
+    const { result } = await run({ suggestions: [], sort: [] });
+    expect(names(result)).toEqual(["Gem"]);
+  });
+
+  it("a None of these answer gives no tools, in English and Romanian", async () => {
+    const en = roleWith(["x"], { notes: [toolsNote(TOOLS_NOTE.en.none, "2026-11-01T10:00:00.000Z")] });
+    const ro = roleWith(["y"], { notes: [toolsNote(TOOLS_NOTE.ro.none, "2026-11-01T10:00:00.000Z", { question: TOOLS_NOTE.ro.question })] });
+    await save({}, [en, ro]);
+    const { result } = await run({ suggestions: [], sort: [] });
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it("a Romanian Tools note counts too", async () => {
+    const ro = roleWith(["y"], { notes: [toolsNote("Gem", "2026-11-01T10:00:00.000Z", { question: TOOLS_NOTE.ro.question })] });
+    await save({}, [ro]);
+    const { result } = await run({ suggestions: [], sort: [] });
+    expect(names(result)).toEqual(["Gem"]);
+  });
+
+  it("a Tools note typed rather than picked, or another question, is not a confirmed tool", async () => {
+    const typed = roleWith(["x"], { notes: [toolsNote("Gem", "2026-11-01T10:00:00.000Z", { via: ["type"] }), toolsNote("Pin", "2026-11-01T10:00:00.000Z", { question: "Who did you work with?" })] });
+    await save({}, [typed]);
+    const { result } = await run({ suggestions: [], sort: [] });
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it("confirmed tools don't count toward the 15, and drop the AI's duplicates", async () => {
+    const words = Array.from({ length: 16 }, (_, i) => `tool${i}`);
+    const tools = roleWith([words.join(" ") + " gem"], { notes: [toolsNote("Gem, Pin", "2026-11-01T10:00:00.000Z")] });
+    await save({}, [tools]);
+    const { result } = await run({ suggestions: [sug("gem", "gem"), ...words.map((w) => sug(w, w))], sort: [] });
+    expect(result.suggestions).toHaveLength(17);
+    expect(result.suggestions.filter((s) => s.name.toLowerCase() === "gem")).toHaveLength(1);
+    expect(result.suggestions.filter((s) => s.picked)).toHaveLength(2);
+  });
+
+  it("a confirmed tool already in a list is left out", async () => {
+    const tools = roleWith(["x"], { notes: [toolsNote("Gem, Pin", "2026-11-01T10:00:00.000Z")] });
+    await save({ technicalSkills: [skill("gem")] }, [tools]);
+    const { result } = await run({ suggestions: [], sort: [] });
+    expect(names(result)).toEqual(["Pin"]);
+  });
+
+  it("the user message lists the confirmed tools", async () => {
+    const tools = roleWith(["x"], { notes: [toolsNote("Gem, Pin", "2026-11-01T10:00:00.000Z")] });
+    await save({}, [tools]);
+    const { model } = await run({ suggestions: [], sort: [] });
+    const user = (model.requests[0]!.messages as { content: string }[])[1]!.content;
+    expect(user).toContain('Confirmed tools (already offered to the person): ["Gem","Pin"]');
+  });
+
+  it("the prompt deduces, names the short ATS way and never adds a level", () => {
+    const prompt = skillsSystemPrompt("en");
+    for (const rule of [
+      "Deduce a skill from what the lines say the person did, not only from words they name. A skill may rest on one line or on several lines together.",
+      `Only what the person did themselves: never from a goal, a team's or the company's work, and never a level ("advanced", "expert") or a number of years.`,
+      `"name": the shortest, most recognisable name for the skill, the one CVs, job ads and ATS filters use, in the CV's language. Not a sentence, not the line reworded.`,
+      `"evidence": a list of short exact quotes (copy each character for character), one from each line the skill rests on: a role's title, description, bullet or note answer.`,
+      `An activity, method or practice is professional ("recruitment", "onboarding", "KPI reviews"), never technical.`,
+      `One entry per skill. Do not suggest a skill already in any list, also under another name ("Recruiting" is "Recruitment"), or one under "Confirmed tools".`,
+      "Suggest at most 15, the clearest first.",
+    ]) expect(prompt).toContain(rule);
+    expect(prompt).not.toContain(`"name" is the skill as written in the experience text`);
   });
 
   it("drops sort entries for ids not in unclearSkills and keeps the first per id", async () => {

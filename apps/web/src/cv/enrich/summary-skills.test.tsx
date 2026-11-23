@@ -2,7 +2,9 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { emptyCv, type CategoryKey, type CvContent, type RewriteEvent } from "@resumora/shared";
+import { emptyCv, TOOLS_NOTE, type CategoryKey, type CvContent, type RewriteEvent } from "@resumora/shared";
+import { basecvEn } from "../../i18n/en-basecv.ts";
+import { basecvRo } from "../../i18n/ro-basecv.ts";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 
 const api = vi.hoisted(() => ({ streamRewrite: vi.fn(), getSkillSuggestions: vi.fn() }));
@@ -203,8 +205,8 @@ describe("summary tools", () => {
 describe("skills tools", () => {
   const answer = {
     suggestions: [
-      { name: "SQL", group: "technicalSkills", evidence: "Built churn reports in SQL" },
-      { name: "Delivery schedules", group: "professionalSkills", evidence: "Prepared weekly delivery schedules" },
+      { name: "SQL", group: "technicalSkills", lines: [{ roleId: "r1", text: "Built churn reports in SQL" }, { roleId: "r1", text: "Kept the SQL views tidy" }], picked: false },
+      { name: "Delivery schedules", group: "professionalSkills", lines: [{ roleId: "r1", text: "Prepared weekly delivery schedules" }], picked: false },
     ],
     sort: [
       { skillId: "u1", group: "professionalSkills" },
@@ -223,7 +225,7 @@ describe("skills tools", () => {
     const onAction = vi.fn<(a: CvAction) => void>();
     render(<Harness focus="skills" onAction={onAction} />);
     await userEvent.click(screen.getByRole("button", { name: "Suggest skills from my experience" }));
-    expect(await screen.findByText(/Built churn reports in SQL/, { selector: ".ev" })).toBeInTheDocument();
+    expect(await screen.findByText("“Built churn reports in SQL” · “Kept the SQL views tidy”", { selector: ".ev" })).toBeInTheDocument();
     expect(screen.getByText("Prepared weekly delivery schedules", { exact: false, selector: ".ev" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Add SQL" }));
     expect(onAction).toHaveBeenCalledWith({ type: "addSkill", group: "technicalSkills", name: "SQL" });
@@ -305,8 +307,8 @@ describe("skills tools", () => {
   it("a name returned twice is shown once", async () => {
     api.getSkillSuggestions.mockResolvedValue({
       suggestions: [
-        { name: "SQL", group: "technicalSkills", evidence: "a" },
-        { name: "sql", group: "technicalSkills", evidence: "b" },
+        { name: "SQL", group: "technicalSkills", lines: [{ roleId: "r1", text: "a" }], picked: false },
+        { name: "sql", group: "technicalSkills", lines: [{ roleId: "r1", text: "b" }], picked: false },
       ],
       sort: [],
     });
@@ -314,6 +316,15 @@ describe("skills tools", () => {
     await userEvent.click(screen.getByRole("button", { name: "Suggest skills from my experience" }));
     await screen.findByRole("button", { name: "Add SQL" });
     expect(screen.getAllByRole("button", { name: /^Add sql$/i })).toHaveLength(1);
+  });
+});
+
+describe("Tools step note", () => {
+  it("uses the shared strings the skills route reads", () => {
+    expect(basecvEn["enrich.path.tools.note"]).toBe(TOOLS_NOTE.en.question);
+    expect(basecvEn["enrich.path.tools.none"]).toBe(TOOLS_NOTE.en.none);
+    expect(basecvRo["enrich.path.tools.note"]).toBe(TOOLS_NOTE.ro.question);
+    expect(basecvRo["enrich.path.tools.none"]).toBe(TOOLS_NOTE.ro.none);
   });
 });
 
