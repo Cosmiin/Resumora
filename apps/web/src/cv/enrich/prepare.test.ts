@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyCv, fingerprint, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn() }));
+const api = vi.hoisted(() => ({ reportFailure: vi.fn(), improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 import { changeActions, createLimiter, prepareRoleChanges, toChanges, type Change } from "./prepare.ts";
@@ -61,6 +61,7 @@ describe("prepareRoleChanges", () => {
     const { changes, failed } = await prepareRoleChanges(base);
     expect(changes.map((c) => c.id)).toEqual(["bullet:b3"]);
     expect(failed).toBe(true);
+    expect(api.reportFailure).toHaveBeenCalledWith("improve-bullet", "r1", expect.any(Error));
   });
 
   it("leaves out a rewrite that says nothing better and one equal to the page", async () => {

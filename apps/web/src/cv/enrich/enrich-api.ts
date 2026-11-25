@@ -236,3 +236,19 @@ export function checkChanges(body: CheckChangesBody): Promise<CheckChangesAnswer
 export function placeAnswersOnCv(body: UseAnswersBody): Promise<UseAnswersAnswer> {
   return apiFetch("/v1/enrich/use-answers", { method: "POST", json: body, schema: UseAnswersAnswerSchema });
 }
+
+/**
+ * Records a failed step of preparing changes (which step, which role, why), so the cause can be found later. Never
+ * throws: a failed record changes nothing for the person. No status means the request never came back.
+ */
+export function reportFailure(step: string, roleId: string, err: unknown): void {
+  const api = err instanceof ApiClientError ? err : undefined;
+  const requestId = (api?.body as { error?: { requestId?: unknown } } | null)?.error?.requestId;
+  const json = {
+    step, roleId,
+    ...(api ? { status: api.status, code: api.code.slice(0, 100) } : {}),
+    message: (err instanceof Error ? `${err.name}: ${err.message}` : String(err)).slice(0, 500),
+    ...(typeof requestId === "string" ? { requestId: requestId.slice(0, 100) } : {}),
+  };
+  void apiFetch("/v1/enrich/failures", { method: "POST", json, schema: z.unknown() }).catch(() => undefined);
+}

@@ -13,7 +13,7 @@ import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
 import { EndStep, type HeldChange } from "./EndStep.tsx";
 import { PrepRing, type PrepRow } from "./PrepRing.tsx";
-import { checkChanges, getSkillSuggestions, placeAnswersOnCv, type SkillSuggestion } from "./enrich-api.ts";
+import { checkChanges, getSkillSuggestions, placeAnswersOnCv, reportFailure, type SkillSuggestion } from "./enrich-api.ts";
 import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
 import type { Prepared } from "./prepared.ts";
 import { ScoreRows } from "./ScoreRows.tsx";
@@ -207,7 +207,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       const questions = [...(g?.questions ?? [])].slice(0, 20);
       if (questions.length) {
         const placed = await limit(() => placeAnswersOnCv({ roleId: item.id, fingerprint: print, changes, questions }))
-          .then((a) => a.changes).catch(() => { roleFailed = true; return []; });
+          .then((a) => a.changes).catch((err: unknown) => { roleFailed = true; reportFailure("use-answers", item.id, err); return []; });
         changes = withPlaced(changes, placed);
       }
       if (changes.length) {
@@ -219,7 +219,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           held.push(...answer.held.map((change) => ({ roleId: item.id, change, ask: answer.asks.find((a) => a.changeId === change.id) })));
         } catch (err) {
           if (err instanceof ApiClientError && err.status === 409) dispatch({ type: "applyRoleChanges", roleId: item.id, changes });
-          else roleFailed = true;
+          else { roleFailed = true; reportFailure("check-changes", item.id, err); }
         }
       }
       failed ||= roleFailed;

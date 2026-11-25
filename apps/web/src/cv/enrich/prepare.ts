@@ -3,7 +3,7 @@ import {
 } from "@resumora/shared";
 import type { CvAction } from "../edit/cvReducer.ts";
 import type { RoleList } from "../edit/lists.ts";
-import { brainDump, improveBullet, roleDescription } from "./enrich-api.ts";
+import { brainDump, improveBullet, reportFailure, roleDescription } from "./enrich-api.ts";
 
 /** One piece of the role that the answers changed: its description, one of its bullets, or a new bullet. */
 export type PrepChange =
@@ -64,18 +64,18 @@ export async function prepareRoleChanges(input: {
   const upTo = input.answeredRole ? 100 : CLEAR_AT;
   const lines = role.bullets.filter((b) => b.text.trim() !== "" && (input.answeredLines.has(b.id) || (grades.get(b.id) ?? 0) < upTo));
   let failed = false;
-  const fail = () => { failed = true; return undefined; };
+  const fail = (step: string) => (err: unknown) => { failed = true; reportFailure(step, role.id, err); return undefined; };
 
   // A shared limit holds every request; a role's own run limits only its line rewrites, as before.
   const limitLines = input.limit ?? createLimiter(PARALLEL);
   const limitOther: Limiter = input.limit ?? ((task) => task());
   const rewrites = Promise.all(lines.map((b) => limitLines(() => improveBullet({ roleId: role.id, bulletId: b.id, fingerprint: print }))
-    .then((a) => ("proposal" in a ? a.proposal.text : undefined)).catch(fail)));
+    .then((a) => ("proposal" in a ? a.proposal.text : undefined)).catch(fail("improve-bullet"))));
   const added = input.thinWithAnswers
-    ? limitOther(() => brainDump({ roleId: role.id, fingerprint: print, source: "answers" })).then((a) => a.proposals).catch(() => fail() ?? [])
+    ? limitOther(() => brainDump({ roleId: role.id, fingerprint: print, source: "answers" })).then((a) => a.proposals).catch((err) => fail("brain-dump")(err) ?? [])
     : Promise.resolve([]);
   const description = input.describe
-    ? limitOther(() => roleDescription({ roleId: role.id, fingerprint: print })).then((a) => a.text).catch(() => fail() ?? "")
+    ? limitOther(() => roleDescription({ roleId: role.id, fingerprint: print })).then((a) => a.text).catch((err) => fail("role-description")(err) ?? "")
     : Promise.resolve("");
   const [texts, fresh, written] = await Promise.all([rewrites, added, description]);
 

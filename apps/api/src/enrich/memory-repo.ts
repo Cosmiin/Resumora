@@ -1,6 +1,6 @@
 import { MAX_PENDING, RoleResultSchema, type RoleResult } from "@resumora/shared";
 import { VOICE_TASK } from "../ai/voice-session.ts";
-import type { InsightsRepo, PendingEntry } from "./repo.ts";
+import type { EnrichFailure, InsightsRepo, PendingEntry } from "./repo.ts";
 
 /** Rows of all users, keyed by `userId/roleId`. Shared between repos in a test to show users stay apart. */
 export type MemoryInsightsStore = Map<string, { userId: string; result: RoleResult; pending: PendingEntry[] }>;
@@ -9,7 +9,9 @@ export type MemoryInsightsStore = Map<string, { userId: string; result: RoleResu
 export type MemoryAiCalls = { userId: string; task: string; status: "ok" | "error"; createdAt: string }[];
 
 /** In-memory InsightsRepo for tests, scoped to one user. */
-export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = new Map(), aiCalls: MemoryAiCalls = []): InsightsRepo {
+export function memoryInsightsRepo(
+  userId: string, store: MemoryInsightsStore = new Map(), aiCalls: MemoryAiCalls = [], failures: EnrichFailure[] = [],
+): InsightsRepo {
   const key = (roleId: string) => `${userId}/${roleId}`;
   return {
     async list() {
@@ -49,6 +51,9 @@ export function memoryInsightsRepo(userId: string, store: MemoryInsightsStore = 
       if (used >= limit) return false;
       aiCalls.push({ userId, task: VOICE_TASK, status: "ok", createdAt: new Date().toISOString() });
       return true;
+    },
+    async recordFailure(failure) {
+      failures.push(structuredClone(failure));
     },
   };
 }

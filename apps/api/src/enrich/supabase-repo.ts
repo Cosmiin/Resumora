@@ -89,6 +89,14 @@ export function supabaseInsightsRepo(env: SupabaseEnv, user: AuthUser): Insights
       if (error) throw new Error(`reserve_voice_session failed: ${error.message}`);
       return data === true;
     },
+
+    async recordFailure(f) {
+      const { error } = await db.from("enrich_failures").insert({
+        step: f.step, role_id: f.roleId ?? null, status: f.status ?? null, code: f.code ?? null,
+        message: f.message ?? null, request_id: f.requestId ?? null,
+      });
+      if (error) throw new Error(`enrich_failures insert failed: ${error.message}`);
+    },
   };
 }
 

@@ -2,6 +2,9 @@ import type { RoleResult } from "@resumora/shared";
 
 export type PendingEntry = { fingerprint: string; result: RoleResult; at: string };
 
+/** One failed step of preparing changes, as the browser saw it (`enrich_failures`). */
+export type EnrichFailure = { step: string; roleId?: string; status?: number; code?: string; message?: string; requestId?: string };
+
 /** Access to the signed-in user's cached role results (`cv_insights`). A cache: losing it costs only tokens. */
 export interface InsightsRepo {
   list(): Promise<RoleResult[]>;
@@ -16,4 +19,6 @@ export interface InsightsRepo {
    * Returns false when the limit is reached.
    */
   reserveVoiceSession(model: string, limit: number): Promise<boolean>;
+  /** Records a failed step of preparing changes, for diagnosis only. */
+  recordFailure(failure: EnrichFailure): Promise<void>;
 }
