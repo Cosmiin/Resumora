@@ -54,6 +54,7 @@ export type CvAction =
   | { type: "addBullet"; owner: BulletOwner; newId: string }
   | { type: "addSkill"; group: SkillGroup; name: string }
   | { type: "removeSkill"; group: SkillGroup; skillId: string }
+  | { type: "renameSkill"; group: SkillGroup; skillId: string; name: string }
   | { type: "moveSkill"; skillId: string; to: SkillGroup }
   | { type: "moveSkills"; moves: { skillId: string; group: SkillGroup }[] }
   | { type: "addInterest"; name: string }
@@ -182,6 +183,16 @@ function addSkill(cv: CvContent, group: SkillGroup, raw: string, id = newId()): 
   return { ...cv, [group]: [...cv[group], { id, name }] };
 }
 
+/** A new name for one skill; empty, or the name of another skill already on the CV, leaves it as it was. */
+function renameSkill(cv: CvContent, group: SkillGroup, skillId: string, raw: string): CvContent {
+  const name = raw.trim();
+  const skill = cv[group].find((s) => s.id === skillId);
+  if (!skill || name === "" || skill.name === name) return cv;
+  const lower = name.toLowerCase();
+  if (SKILL_GROUPS.some((g) => cv[g].some((s) => s.id !== skillId && s.name.trim().toLowerCase() === lower))) return cv;
+  return { ...cv, [group]: cv[group].map((s) => (s.id === skillId ? { ...s, name } : s)) };
+}
+
 function moveSkill(cv: CvContent, skillId: string, to: SkillGroup): CvContent {
   const from = SKILL_GROUPS.find((g) => cv[g].some((s) => s.id === skillId));
   if (!from || from === to || cv[to].length >= MAX_ITEMS) return cv;
@@ -267,6 +278,8 @@ export function cvReducer(cv: CvContent, action: CvAction): CvContent {
     case "removeSkill":
       if (!cv[action.group].some((s) => s.id === action.skillId)) return cv;
       return { ...cv, [action.group]: cv[action.group].filter((s) => s.id !== action.skillId) };
+    case "renameSkill":
+      return renameSkill(cv, action.group, action.skillId, action.name);
     case "moveSkill":
       return moveSkill(cv, action.skillId, action.to);
     case "moveSkills":

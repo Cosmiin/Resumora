@@ -73,8 +73,12 @@
 .cv-bullets li { padding-inline-start: 2px; }
 .cv-chips { align-items: center; min-width: 0; }
 .cv-chip { display: inline-flex; align-items: center; gap: 2px; padding-inline-end: 4px; }
-.cv-chip button { font: inherit; border: 0; background: none; color: var(--sage-500); cursor: pointer; padding: 0 3px; line-height: 1; visibility: hidden; }
-.cv-section:focus-within .cv-chip button, .cv-chip:hover button { visibility: visible; }
+.cv-chip button { font: inherit; border: 0; background: none; cursor: pointer; line-height: 1; }
+.cv-chip .cv-chip-remove { color: var(--sage-500); padding: 0 3px; visibility: hidden; }
+.cv-section:focus-within .cv-chip-remove, .cv-chip:hover .cv-chip-remove { visibility: visible; }
+.cv-chip .cv-chip-name { color: inherit; padding: 0; cursor: text; }
+.cv-chip.is-editing { padding-inline-end: 9px; outline: 1px solid var(--pine-800); }
+.cv-chips .cv-chip-edit { font-size: 12px; color: inherit; background: none; min-width: 3ch; }
 .cv-chips .cv-chip-input { font-size: 12px; min-width: 9ch; }
 .cv-date-field { position: relative; }
 .date-hint {

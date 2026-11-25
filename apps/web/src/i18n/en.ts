@@ -145,6 +145,7 @@ export const en = {
   "edit.dateHint": "Not saved yet. Try \"Mar 2021\", \"03/2021\" or \"2021\".",
   "edit.removeChip": "Remove {name}",
   "edit.addChip": "Add…",
+  "edit.editChip": "Edit {name}",
   "edit.namePlaceholder": "Your name",
   "edit.title1": "Job title",
   "edit.title2": "Second title (optional)",
