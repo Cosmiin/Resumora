@@ -22,15 +22,20 @@ afterEach(() => {
 const sent = () => fetchMock.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string) as { kind: string; message: string });
 
 describe("watchRedMessages", () => {
-  it("records each red message as it appears, but not a field's own check or a plain notice", async () => {
+  it("records each red message as it appears (alerts and error toasts), but not a field's own check or a plain notice", async () => {
     document.body.innerHTML = `<div><p role="alert" class="ui-notice ui-notice--bad">Some changes could not be prepared.</p></div>`;
     const more = document.createElement("div");
     more.innerHTML = `<span role="alert" class="ui-field-error">Too long</span><p role="alert" class="ui-notice">Still working…</p><p role="alert">Couldn't load your CV.</p>`;
     document.body.append(more);
-    await vi.waitFor(() => expect(sent()).toHaveLength(2));
+    const toast = document.createElement("div");
+    toast.className = "ui-toast ui-toast--error";
+    toast.innerHTML = "<span>Couldn't tailor this section.</span>";
+    document.body.append(toast);
+    await vi.waitFor(() => expect(sent()).toHaveLength(3));
     expect(sent().map((b) => [b.kind, b.message])).toEqual([
       ["message", "Some changes could not be prepared."],
       ["message", "Couldn't load your CV."],
+      ["message", "Couldn't tailor this section."],
     ]);
   });
 

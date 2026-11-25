@@ -8,7 +8,7 @@ concepts: [logging]
 ---
 ## What we decided
 The browser records what goes wrong in a new table, `app_errors`, through `POST /v1/errors`, as the signed-in user:
-- **message**: every red message (`role="alert"`) the moment it appears, with its text and the page. A field's own check while typing and plain (not red) notices are left out.
+- **message**: every red message (`role="alert"`, error toasts, red form messages) the moment it appears, in every part of the app (CV, Enrich, Jobs, Tailoring, import, export), with its text and the page. A field's own check while typing and plain (not red) notices are left out.
 - **request**: every request to our API that fails, with the path, HTTP status, error code and request id. A request that never came back has no status.
 - **step**: a failed step of preparing Enrich changes, with the step name and the role.
 Each user can write and read only their own rows. Nothing in the app reads them back; they are for tracing a red message to its cause. Signed out, nothing is sent. Recording adds no retries and changes nothing the person sees; a lost record is ignored.

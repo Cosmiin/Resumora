@@ -30,13 +30,16 @@ export async function reportError(record: ErrorRecord): Promise<void> {
 /** A field's own check while typing (too long, required) is not an error of the app; neither is a plain notice. */
 const NOT_AN_ERROR = ".ui-field-error, .sh-error, .ui-notice:not(.ui-notice--bad)";
 
-/** Records every red message (`role="alert"`) as it appears anywhere on the page. Returns the stop function. */
+/** A red message: an alert, an error toast (e.g. in Tailoring), or a red form message shown as a status. */
+const RED = '[role="alert"], .ui-toast--error, .form-error';
+
+/** Records every red message as it appears anywhere on the page, in every part of the app. Returns the stop function. */
 export function watchRedMessages(root: Node = document.body): () => void {
   const observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       for (const node of m.addedNodes) {
         if (!(node instanceof Element)) continue;
-        const alerts = [...(node.matches('[role="alert"]') ? [node] : []), ...node.querySelectorAll('[role="alert"]')];
+        const alerts = [...(node.matches(RED) ? [node] : []), ...node.querySelectorAll(RED)];
         for (const el of alerts) {
           const text = el.textContent?.trim() ?? "";
           if (text && !el.matches(NOT_AN_ERROR)) void reportError({ kind: "message", message: text });
