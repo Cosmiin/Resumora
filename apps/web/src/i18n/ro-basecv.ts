@@ -304,6 +304,7 @@ export const basecvRo: Record<keyof typeof basecvEn, string> = {
   "enrich.path.facts.now": "Acum pe CV",
   "enrich.path.facts.proposal": "Varianta propusă",
   "enrich.path.facts.use": "Folosește varianta",
+  "enrich.path.facts.noBetter": "N-am găsit încă o variantă care să urce scorul. Adaug-o oricum, editeaz-o sau sari peste",
   "enrich.path.end.held": "Nu am adăugat: ar scădea puțin scorul pentru {role}",
   "enrich.path.end.thisRole": "acest rol",
   "enrich.path.end.addAnyway": "Adaugă oricum",

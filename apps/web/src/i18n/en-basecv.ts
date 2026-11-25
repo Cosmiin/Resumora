@@ -304,6 +304,7 @@ export const basecvEn = {
   "enrich.path.facts.now": "On your CV now",
   "enrich.path.facts.proposal": "Proposed version",
   "enrich.path.facts.use": "Use this version",
+  "enrich.path.facts.noBetter": "No version we found raises the score yet. Add it anyway, edit it, or skip it",
   "enrich.path.end.held": "Not added: it would lower {role}'s score a little",
   "enrich.path.end.thisRole": "this role",
   "enrich.path.end.addAnyway": "Add anyway",

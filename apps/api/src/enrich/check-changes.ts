@@ -82,8 +82,8 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
         const q = firstResult.questions.find((x) => x.bulletId === lineId);
         if (q) asks.push({ changeId: change.id, text: q.text, options: q.options, ...(q.amounts ? { amounts: q.amounts } : {}) });
       }
-      // The rest: a better version of the line, offered before the scores (owner, 25 Nov 2026).
-      better = await betterLines(deps, proposed, locale, stored, firstResult, held.filter((c) => !ungraded(c) && !asks.some((a) => a.changeId === c.id)));
+      // The rest, including lines the grader left out: a better version, offered before the scores (owner, 25 Nov 2026).
+      better = await betterLines(deps, proposed, locale, stored, firstResult, held.filter((c) => !asks.some((a) => a.changeId === c.id)));
     }
     ungradedKept = kept.some(ungraded);
     if (held.length === 0) {
