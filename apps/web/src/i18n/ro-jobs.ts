@@ -19,6 +19,8 @@ export const jobsRo: Record<keyof typeof jobsEn, string> = {
   "jobs.col.cv": "CV",
   "jobs.col.application": "Aplicare",
   "jobs.open": "Deschide",
+  "jobs.remove": "Șterge",
+  "jobs.removeLabel": "Șterge {title}",
   "jobs.continue": "Continuă",
   "jobs.scoreNote": "Scor: din CV-ul adaptat, când jobul are unul; altfel din CV-ul tău de bază.",
   "jobs.badge.failed": "Necitit",

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { useInfiniteQuery, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueries, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import type { JobListItem, JobListPage } from "@resumora/shared";
 import { useAuth } from "../auth/AuthProvider.tsx";
@@ -7,9 +7,10 @@ import { AppShell } from "../layout/AppShell.tsx";
 import { useT } from "../i18n/t.ts";
 import { getLanguage } from "../i18n/language.ts";
 import { Skeleton } from "../ui/Page.tsx";
+import { Dialog } from "../ui/Dialog.tsx";
 import { remembered } from "../tailor/flow-phase.ts";
 import { fetchOpenRun } from "../tailor/open-run.ts";
-import { listJobs } from "./jobs-api.ts";
+import { deleteJob, listJobs } from "./jobs-api.ts";
 import { AddJobDialog } from "./AddJobDialog.tsx";
 
 const isReading = (job: JobListItem) => job.status === "queued" || job.status === "processing";
@@ -46,6 +47,10 @@ function JobsList({ userId }: { userId: string }) {
   const addButton = useRef<HTMLButtonElement>(null);
   const [pollStartedAt, setPollStartedAt] = useState<number | null>(null);
   const [pollStopped, setPollStopped] = useState(false);
+  // The job whose Remove button was pressed, waiting for the person to confirm.
+  const [removing, setRemoving] = useState<JobListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const query = useInfiniteQuery({
     queryKey: ["jobs", userId], gcTime: 0,
     initialPageParam: undefined as string | undefined,
@@ -110,6 +115,28 @@ function JobsList({ userId }: { userId: string }) {
     await queryClient.cancelQueries({ queryKey: ["jobs", userId] });
     await query.refetch();
   }
+  function closeRemove() {
+    if (deleting) return;
+    setRemoving(null);
+    setDeleteError(null);
+  }
+  async function remove(id: string) {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteJob(id);
+      await queryClient.cancelQueries({ queryKey: ["jobs", userId], exact: true });
+      queryClient.setQueryData<InfiniteData<JobListPage>>(["jobs", userId], (data) => data && ({
+        ...data, pages: data.pages.map((page) => ({ ...page, items: page.items.filter((row) => row.id !== id) })),
+      }));
+      setRemoving(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : t("jobs.error.generic"));
+    } finally {
+      setDeleting(false);
+    }
+  }
+  const titleOf = (job: JobListItem) => job.title || hostOf(job);
   const saved = (job: JobListItem) => {
     const days = savedDays(job.createdAt);
     if (days <= 0) return t("jobs.saved.today");
@@ -208,6 +235,8 @@ function JobsList({ userId }: { userId: string }) {
                               {run ? <Link className="ui-btn ui-btn--primary ui-btn--sm" to={`${to}/tailor`}>{t("jobs.continue")}</Link>
                                 : ready ? <Link className="ui-btn ui-btn--sm" to={to}>{t("jobs.open")}</Link>
                                 : !reading ? <Link className="ui-btn ui-btn--sm" to={to}>{t("jobs.view")}</Link> : null}
+                              {!reading && <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm jobs-remove"
+                                aria-label={t("jobs.removeLabel", { title: titleOf(job) })} onClick={() => setRemoving(job)}>{t("jobs.remove")}</button>}
                             </div>
                           </li>
                         );
@@ -230,6 +259,15 @@ function JobsList({ userId }: { userId: string }) {
           )}
         </div>
       </main>
+      <Dialog open={removing !== null} onClose={closeRemove} title={t("job.deleteConfirm")}
+        actions={<>
+          <button type="button" className="ui-btn ui-btn--quiet" disabled={deleting} onClick={closeRemove}>{t("job.deleteCancel")}</button>
+          <button type="button" className="ui-btn ui-btn--danger" disabled={deleting} onClick={() => removing && void remove(removing.id)}>{t("job.delete")}</button>
+        </>}>
+        {removing && <p><strong>{titleOf(removing)}</strong>{removing.company ? `, ${removing.company}` : ""}</p>}
+        {(removing?.tailoredLanguages?.length ?? 0) > 0 && <p>{t("job.deleteTailored")}</p>}
+        {deleteError && <p role="alert" className="ui-notice ui-notice--bad">{deleteError}</p>}
+      </Dialog>
       {dialogOpen && <AddJobDialog key={initialUrl} initialUrl={initialUrl} onClose={() => setDialogOpen(false)} onAdded={added} />}
     </AppShell>
   );
