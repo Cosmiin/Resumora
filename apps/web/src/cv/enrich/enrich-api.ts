@@ -36,6 +36,7 @@ import {
   type RoleResult,
 } from "@resumora/shared";
 import { ApiClientError, apiFetch, authedFetch, errorOf } from "../../lib/api.ts";
+import { reportError } from "../../lib/report-error.ts";
 
 const ScoresSchema = z.object({ items: z.array(RoleResultSchema) });
 
@@ -235,4 +236,20 @@ export function checkChanges(body: CheckChangesBody): Promise<CheckChangesAnswer
 /** Places the facts from this round's answers still missing from a role's page (score/9). Not `use…`: React would read it as a hook. */
 export function placeAnswersOnCv(body: UseAnswersBody): Promise<UseAnswersAnswer> {
   return apiFetch("/v1/enrich/use-answers", { method: "POST", json: body, schema: UseAnswersAnswerSchema });
+}
+
+/**
+ * Records a failed step of preparing changes (which step, which role, why), so the cause can be found later. Never
+ * throws: a failed record changes nothing for the person. No status means the request never came back.
+ */
+export function reportFailure(step: string, roleId: string, err: unknown): void {
+  const api = err instanceof ApiClientError ? err : undefined;
+  const requestId = (api?.body as { error?: { requestId?: unknown } } | null)?.error?.requestId;
+  void reportError({
+    kind: "step", step, roleId,
+    ...(api && api.status > 0 ? { status: api.status } : {}),
+    ...(api ? { code: api.code } : {}),
+    message: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    ...(typeof requestId === "string" ? { requestId } : {}),
+  });
 }

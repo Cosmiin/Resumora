@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { emptyCv, fingerprint, type CvContent, type Experience, type RoleResult } from "@resumora/shared";
 import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn(), roleDescription: vi.fn(), createVoiceSession: vi.fn() }));
+const api = vi.hoisted(() => ({ reportFailure: vi.fn(), improveBullet: vi.fn(), brainDump: vi.fn(), roleFacts: vi.fn(), scoreRole: vi.fn(), roleDescription: vi.fn(), createVoiceSession: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 import { RoleRun } from "./RoleRun.tsx";

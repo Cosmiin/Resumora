@@ -33,6 +33,30 @@ async function send(path: string, init: Omit<ApiInit, "schema">, token: string |
  * itself can't reach Supabase, the user stays signed in and gets a network error.
  */
 export async function authedFetch(path: string, init: Omit<ApiInit, "schema">): Promise<Response> {
+  try {
+    const res = await authedFetchOnce(path, init);
+    if (!res.ok && onFailedRequest) {
+      const body: unknown = await res.clone().json().catch(() => null);
+      const requestId = (body as { error?: { requestId?: unknown } } | null)?.error?.requestId;
+      onFailedRequest({ path, status: res.status, ...errorOf(res.status, body), ...(typeof requestId === "string" ? { requestId } : {}) });
+    }
+    return res;
+  } catch (err) {
+    if (err instanceof ApiClientError) onFailedRequest?.({ path, code: err.code, message: err.message });
+    throw err;
+  }
+}
+
+/** A failed request to our API: no status when it never came back. */
+export type FailedRequest = { path: string; status?: number; code: string; message: string; requestId?: string };
+let onFailedRequest: ((failed: FailedRequest) => void) | undefined;
+
+/** Sets who hears about every failed request (the error log, set up once when the app starts). */
+export function onRequestFailed(listener: (failed: FailedRequest) => void): void {
+  onFailedRequest = listener;
+}
+
+async function authedFetchOnce(path: string, init: Omit<ApiInit, "schema">): Promise<Response> {
   const { data } = await supabase.auth.getSession();
   let res = await send(path, init, data.session?.access_token);
 

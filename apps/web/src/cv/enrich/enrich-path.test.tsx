@@ -7,7 +7,7 @@ import { cvReducer, type CvAction } from "../edit/cvReducer.ts";
 import type { RoleScoreState } from "./useRoleScores.ts";
 import { ApiClientError } from "../../lib/api-error.ts";
 
-const api = vi.hoisted(() => ({ improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn(), proposeShape: vi.fn(), checkChanges: vi.fn(), placeAnswersOnCv: vi.fn(), getSkillSuggestions: vi.fn() }));
+const api = vi.hoisted(() => ({ reportFailure: vi.fn(), improveBullet: vi.fn(), brainDump: vi.fn(), roleDescription: vi.fn(), proposeShape: vi.fn(), checkChanges: vi.fn(), placeAnswersOnCv: vi.fn(), getSkillSuggestions: vi.fn() }));
 vi.mock("./enrich-api.ts", () => api);
 
 const note = (question: string, answer: string): Note => ({ id: `n-${question}`, question, answer, via: ["type"], askedAt: "2026-11-17T00:00:00Z" });
@@ -403,6 +403,7 @@ describe("the short path", () => {
       expect(appliedTo(actions, "r2").map((c) => c.id)).toEqual(["bullet:r2b1"]);
       expect(appliedTo(actions, "r1")).toEqual([]);
       expect(screen.getByRole("alert")).toHaveTextContent("Some changes could not be prepared.");
+      expect(api.reportFailure).toHaveBeenCalledWith("check-changes", "r1", expect.anything());
     });
 
     it("when the CV moved on (409), that role's changes go on the CV anyway, with no prediction", async () => {

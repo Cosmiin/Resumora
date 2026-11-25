@@ -11,6 +11,7 @@ import type { JobMessage } from "./jobs/repo.ts";
 import { supabaseJobAdmin, supabaseJobRepo } from "./jobs/supabase-repo.ts";
 import { supabaseTailorAdmin, supabaseTailorRepo } from "./tailor/supabase-repo.ts";
 import { supabaseAccountAdmin, supabaseAccountRepo } from "./account/supabase-repo.ts";
+import { supabaseAppErrorLog } from "./app-errors.ts";
 import type { Env } from "./env.ts";
 import type { LogFn } from "./errors.ts";
 
@@ -43,6 +44,7 @@ function realDeps(env: Env): AppDeps {
     jobRepo: (user) => supabaseJobRepo(env, user),
     tailorRepo: (user) => supabaseTailorRepo(env, user),
     insightsRepo: (user) => supabaseInsightsRepo(env, user),
+    appErrors: (user) => supabaseAppErrorLog(env, user),
     account: { repo: (user) => supabaseAccountRepo(env, user), admin: () => supabaseAccountAdmin(env) },
     model: (user) => ({
       providers: providersFromEnv(env),
