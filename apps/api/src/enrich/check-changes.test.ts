@@ -17,6 +17,8 @@ let model: ReturnType<typeof fakeModel>;
 let gradeFor: (text: string) => Partial<ModelBullet>;
 /** The ids each grading call asked for. */
 let asked: string[][];
+/** Which lines the fake grader actually grades, from the ids it was asked for (a real one sometimes adds or leaves out lines). */
+let answerIds: (ids: string[]) => string[];
 
 async function save(r: Experience, change?: (b: ModelScore["bullets"][number], i: number) => void) {
   role = r;
@@ -32,6 +34,7 @@ beforeEach(async () => {
   insights = memoryInsightsRepo("user-a");
   gradeFor = () => ({});
   asked = [];
+  answerIds = (ids) => ids;
   await save(roleWith(["Ran payroll for 40 staff.", "Checked contracts.", "Filed reports."]), (b, i) => {
     if (i === 1) Object.assign(b, { contribution: "partial", specificity: "missing", impact: "missing", issue: "contribution" });
   });
@@ -41,13 +44,42 @@ beforeEach(async () => {
     const ids = list ? list.split(", ") : [];
     asked.push(ids);
     const texts = new Map(JSON.parse(/Bullets to grade \(JSON, each \{ id, text \}\):\n(.*)\n/.exec(user)![1]!).map((b: { id: string; text: string }) => [b.id, b.text]));
-    const bullets = allSpecific({ ...role, bullets: ids.map((id) => ({ id, text: String(texts.get(id)) })) }).bullets
-      .map((b) => ({ ...b, ...gradeFor(String(texts.get(b.id))) }));
+    const textOf = (id: string) => String(texts.get(id) ?? role.bullets.find((b) => b.id === id)?.text);
+    const bullets = allSpecific({ ...role, bullets: answerIds(ids).map((id) => ({ id, text: textOf(id) })) }).bullets
+      .map((b) => ({ ...b, ...gradeFor(textOf(b.id)) }));
     return { bullets, nextStepId: null, roleQuestions: [], thin: false, coverage: { ...marks, scale: "shown" } };
   });
 });
 
 describe("checkChanges", () => {
+  it("uses what is usable when the grader grades lines it wasn't asked for", async () => {
+    answerIds = () => role.bullets.map((b) => b.id);
+    const out = await run([{ id: "c1", kind: "bullet", bulletId: role.bullets[1]!.id, text: "Checked 30 contracts a week." }]);
+    expect(out.kept).toEqual(["c1"]);
+    expect(out.held).toEqual([]);
+    expect(await insights.pending(role.id)).toHaveLength(1);
+  });
+
+  it("holds only the change whose line the grader left out; the others are kept", async () => {
+    const left = role.bullets[2]!.id;
+    const stored = (await insights.get(role.id))!;
+    answerIds = (ids) => ids.filter((id) => id !== left);
+    const out = await run([
+      { id: "c1", kind: "bullet", bulletId: role.bullets[1]!.id, text: "Checked 30 contracts a week." },
+      { id: "c2", kind: "bullet", bulletId: left, text: "Filed 12 monthly reports." },
+    ]);
+    expect(out.kept).toEqual(["c1"]);
+    expect(out.held.map((c) => c.id)).toEqual(["c2"]);
+    expect(out.result.bullets.find((b) => b.id === left)).toEqual(stored.bullets.find((b) => b.id === left));
+  });
+
+  it("without hold, keeps a change the grader left out but stores no prediction for it", async () => {
+    answerIds = () => [];
+    const out = await run([{ id: "c1", kind: "bullet", bulletId: role.bullets[1]!.id, text: "Checked 30 contracts a week." }], false);
+    expect(out.kept).toEqual(["c1"]);
+    expect(await insights.pending(role.id)).toEqual([]);
+  });
+
   it("grades only the changed line; the others keep their stored grades", async () => {
     const stored = (await insights.get(role.id))!;
     const out = await run([{ id: "c1", kind: "bullet", bulletId: role.bullets[1]!.id, text: "Checked 30 contracts a week." }]);

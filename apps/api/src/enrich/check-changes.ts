@@ -45,14 +45,23 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
   let kept: Change[] = [...body.changes];
   const held: Change[] = [];
   const asks: CheckChangesAnswer["asks"] = [];
+  let ungradedKept = false;
   if (toGrade.length === 0 && proposed.description === role.description) {
     result = predict(proposed, locale, stored, [], undefined);
   } else {
     const first = await gradeWithCoverage(deps, proposed, locale, toGrade);
+    // A changed line the grader left out: its change is held (the line stays as it was), so no guess reaches the CV.
+    const graded = new Set(first.bullets.map((b) => b.id));
+    const missing = new Set(toGrade.filter((id) => !graded.has(id)));
+    const ungraded = (change: Change) => missing.has(change.kind === "bullet" ? change.bulletId : change.id);
     const firstResult = predict(proposed, locale, stored, first.bullets, keepShown(stored, first.coverage));
     if (body.hold) {
       const scoreOf = (r: RoleResult, id: string) => r.bullets.find((b) => b.id === id)?.score;
       for (const change of body.changes) {
+        if (ungraded(change)) {
+          held.push(change);
+          continue;
+        }
         const after = change.kind === "bullet" ? scoreOf(firstResult, change.bulletId) : change.kind === "new" ? scoreOf(firstResult, change.id) : undefined;
         if (after === undefined) continue;
         if (change.kind === "bullet") {
@@ -72,6 +81,7 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
         if (q) asks.push({ changeId: change.id, text: q.text, options: q.options, ...(q.amounts ? { amounts: q.amounts } : {}) });
       }
     }
+    ungradedKept = kept.some(ungraded);
     if (held.length === 0) {
       result = firstResult;
     } else {
@@ -83,6 +93,8 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
       result = predict(final, locale, stored, keptGraded, marks);
     }
   }
-  await deps.insights.putPending(role.id, result);
+  // Without hold, a change to a line the grader left out still goes on the CV: no prediction is stored for it, so the
+  // normal score runs after saving instead of trusting the old line's grade.
+  if (!ungradedKept) await deps.insights.putPending(role.id, result);
   return { result, kept: kept.map((c) => c.id), held, asks };
 }

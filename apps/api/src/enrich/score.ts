@@ -60,7 +60,9 @@ export async function gradeBullets(deps: ScoreDeps, role: Experience, locale: Lo
 /**
  * Grades only `ids` (none is fine) and re-reads the whole role for its marks (score/9): used when a change set is
  * checked, so unchanged lines keep their grades but what the page shows is read again. Marks absent from the answer
- * come back undefined, and the caller keeps the stored ones.
+ * come back undefined, and the caller keeps the stored ones. What is usable is kept (25 Nov): grades for lines not
+ * asked for, or a line graded twice, are dropped, and a line asked for but not graded is simply missing from `bullets`
+ * (the caller decides what to do with it). Before, any mismatch threw away the whole answer.
  */
 export async function gradeWithCoverage(
   deps: ScoreDeps, role: Experience, locale: Locale, ids: readonly string[],
@@ -77,11 +79,9 @@ export async function gradeWithCoverage(
         + questionLanguageReminder(locale, deps.questionLanguage),
       maxOutputTokens: GRADE_TOKENS(ids.length),
     });
-    const actual = new Set(answer.bullets.map((b) => b.id));
-    if (answer.bullets.length !== ids.length || actual.size !== ids.length || !ids.every((id) => actual.has(id))) {
-      throw new EnrichParseError("Model answer must contain exactly the requested bullet ids");
-    }
-    return { bullets: answer.bullets, coverage: answer.coverage };
+    const asked = new Set(ids);
+    const bullets = answer.bullets.filter((b) => asked.delete(b.id));
+    return { bullets, coverage: answer.coverage };
   } catch (err) {
     aiError(err);
   }
