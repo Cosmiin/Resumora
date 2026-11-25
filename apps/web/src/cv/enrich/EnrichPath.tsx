@@ -12,6 +12,7 @@ import type { Via } from "./AnswerBox.tsx";
 import { BudgetStep } from "./BudgetStep.tsx";
 import { CompaniesStep } from "./CompaniesStep.tsx";
 import { EndStep, type HeldChange } from "./EndStep.tsx";
+import { FactsStep } from "./FactsStep.tsx";
 import { PrepRing, type PrepRow } from "./PrepRing.tsx";
 import { checkChanges, getSkillSuggestions, placeAnswersOnCv, reportFailure, type SkillSuggestion } from "./enrich-api.ts";
 import { PATH_PARALLEL, createLimiter, prepareRoleChanges, toChanges } from "./prepare.ts";
@@ -73,7 +74,8 @@ const pending = (s: RoleScoreState | undefined) => !s || s.state === "scoring" |
 
 type Stage =
   | { kind: "start" } | { kind: "shape" } | { kind: "shaping" } | { kind: "companies" } | { kind: "tools" } | { kind: "budget"; items: BudgetItem[] }
-  | { kind: "preparing" } | { kind: "end"; held: HeldChange[]; failed: boolean };
+  | { kind: "preparing" } | { kind: "facts"; items: HeldChange[]; held: HeldChange[]; failed: boolean } | { kind: "placing" }
+  | { kind: "end"; held: HeldChange[]; failed: boolean };
 
 /**
  * What a role got in this round of the path. lines: line questions answered; role: a budget question about the whole
@@ -216,7 +218,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
           const kept = changes.filter((c) => answer.kept.includes(c.id));
           if (kept.length) dispatch({ type: "applyRoleChanges", roleId: item.id, changes: kept });
           onScore?.(answer.result);
-          held.push(...answer.held.map((change) => ({ roleId: item.id, change, ask: answer.asks.find((a) => a.changeId === change.id) })));
+          held.push(...answer.held.map((change) => ({
+            roleId: item.id, change, ask: answer.asks.find((a) => a.changeId === change.id), better: answer.better.find((b) => b.changeId === change.id)?.text,
+          })));
         } catch (err) {
           if (err instanceof ApiClientError && err.status === 409) dispatch({ type: "applyRoleChanges", roleId: item.id, changes });
           else { roleFailed = true; reportFailure("check-changes", item.id, err); }
@@ -225,7 +229,11 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       failed ||= roleFailed;
       setRows((all) => all.map((r) => (r.id === item.id ? { ...r, state: roleFailed ? "failed" : "done" } : r)));
     }));
-    setStage({ kind: "end", held, failed });
+    // Lines one fact away, and better versions of held lines, come before the scores (owner, 25 Nov 2026); the rest go to the end.
+    const asking = held.filter((h) => h.ask || h.better);
+    const rest = held.filter((h) => !h.ask && !h.better);
+    facts.current = { chain: Promise.resolve(), failed: [] };
+    setStage(asking.length ? { kind: "facts", items: asking, held: rest, failed } : { kind: "end", held, failed });
     // The server reads the saved CV, so this round's lines are saved first. A failure shows no block (owner's call 5).
     void waitForSave().catch(() => undefined).then(() => getSkillSuggestions())
       .then((answer) => { if (round.current === mine) setSkills(answer.suggestions); })
@@ -252,6 +260,29 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     }
     setStage({ kind: "companies" });
   };
+
+  /**
+   * A held line one fact away (score/12): the answer is saved as a role note like any other, then placed on that line
+   * (use-answers), checked without holding (the person chose to add it) and put on the CV with its predicted score.
+   * Throws when any step fails.
+   */
+  const placeFact = async (roleId: string, change: Change, ask: HeldAsk, answer: string, via: Via[]) => {
+    // One note per line: trying again after a failure replaces the answer instead of adding a second one.
+    save(`held|${roleId}|${change.id}`, roleId, ask.text, answer, via);
+    await waitForSave();
+    const now = latest.current;
+    const item = findGraded(now, roleId)?.item;
+    if (!item) throw new Error("role not found");
+    const print = fingerprint(item, now.locale);
+    const placed = await placeAnswersOnCv({ roleId, fingerprint: print, changes: [change], questions: [ask.text] });
+    const changes = withPlaced([change], placed.changes);
+    const answerOf = await checkChanges({ roleId, fingerprint: print, changes, hold: false });
+    const kept = changes.filter((c) => answerOf.kept.includes(c.id));
+    if (kept.length) dispatch({ type: "applyRoleChanges", roleId, changes: kept });
+    onScore?.(answerOf.result);
+  };
+  // The answers given before the scores, placed one after another (each reads the CV the one before saved).
+  const facts = useRef<{ chain: Promise<void>; failed: HeldChange[] }>({ chain: Promise.resolve(), failed: [] });
 
   // The end: wait for the new scores, at most END_WAIT_MS.
   const ending = stage.kind === "end";
@@ -348,6 +379,34 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         onDone={() => void prepare()} />,
     );
   }
+  if (stage.kind === "facts") {
+    const { held, failed } = stage;
+    return screen(
+      <FactsStep cv={cv} items={stage.items}
+        onUse={(h, text) => {
+          // A better version (or the person's edit of it): on the CV, and the normal score runs after saving.
+          facts.current.chain = facts.current.chain.then(() => dispatch({ type: "applyRoleChanges", roleId: h.roleId, changes: [{ ...h.change, text } as Change] }));
+        }}
+        onAnswer={(h, text, via) => {
+          facts.current.chain = facts.current.chain.then(() => placeFact(h.roleId, h.change, h.ask!, text, via)).catch((err: unknown) => {
+            reportFailure("held-fact", h.roleId, err);
+            facts.current.failed.push(h);
+          });
+        }}
+        onDone={(skipped) => {
+          setStage({ kind: "placing" });
+          void facts.current.chain.then(() => setStage({ kind: "end", held: [...facts.current.failed, ...skipped, ...held], failed }));
+        }} />,
+    );
+  }
+  if (stage.kind === "placing") {
+    return screen(
+      <div className="fm-working" role="status">
+        <span className="fm-dots" aria-hidden="true"><i /><i /><i /></span>
+        <h2 className="fm-q" id="fm-step-title" tabIndex={-1}>{t("enrich.path.prep.title")}</h2>
+      </div>,
+    );
+  }
   if (stage.kind === "preparing") {
     return screen(
       <div className="fm-working is-ring" role="status">
@@ -372,28 +431,6 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       </div>,
     );
   }
-  /**
-   * A held line one fact away (score/12): the answer is saved as a role note like any other, then placed on that line
-   * (use-answers), checked without holding (the person chose to add it) and put on the CV with its predicted score.
-   * Throws when any step fails, so the card stays with its error.
-   */
-  const addWithFact = async (roleId: string, change: Change, ask: HeldAsk, answer: string, via: Via[]) => {
-    // One note per card: trying again after a failure replaces the answer instead of adding a second one.
-    save(`held|${roleId}|${change.id}`, roleId, ask.text, answer, via);
-    await waitForSave();
-    const now = latest.current;
-    const item = findGraded(now, roleId)?.item;
-    if (!item) throw new Error("role not found");
-    const print = fingerprint(item, now.locale);
-    const placed = await placeAnswersOnCv({ roleId, fingerprint: print, changes: [change], questions: [ask.text] });
-    const changes = withPlaced([change], placed.changes);
-    const answerOf = await checkChanges({ roleId, fingerprint: print, changes, hold: false });
-    const kept = changes.filter((c) => answerOf.kept.includes(c.id));
-    if (kept.length) dispatch({ type: "applyRoleChanges", roleId, changes: kept });
-    onScore?.(answerOf.result);
-    setStage((s) => (s.kind === "end" ? { ...s, held: s.held.filter((h) => !(h.roleId === roleId && h.change.id === change.id)) } : s));
-  };
-
   const more = budget();
   return screen(
     <EndStep cv={cv} scores={scores} before={before} rolesBefore={rolesBefore} held={stage.held} failed={stage.failed}
@@ -402,7 +439,10 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
         dispatch({ type: "applyRoleChanges", roleId, changes: [change] });
         setStage({ ...stage, held: stage.held.filter((h) => !(h.roleId === roleId && h.change.id === change.id)) });
       }}
-      onAddWithFact={addWithFact}
+      onAddWithFact={async (roleId, change, ask, answer, via) => {
+        await placeFact(roleId, change, ask, answer, via);
+        setStage((s) => (s.kind === "end" ? { ...s, held: s.held.filter((h) => !(h.roleId === roleId && h.change.id === change.id)) } : s));
+      }}
       skills={skills}
       onAddSkills={(list) => dispatch({ type: "addSkills", skills: list.map((s) => ({ id: newId(), ...s })) })}
       onDone={onClose} more={more.length}

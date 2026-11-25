@@ -8,7 +8,7 @@ import { gradeContext } from "./grade-context.ts";
 import { checkProposal, squash } from "./rewrite.ts";
 import { aiError, gradeBullets, scoreRole, type ScoreDeps } from "./score.ts";
 
-const ImproveSchema = z.object({
+export const ImproveSchema = z.object({
   text: z.string().nullable(),
   nextQuestion: z.object({ text: z.string(), options: z.array(z.string().max(60)).max(4) }).nullable(),
 });
