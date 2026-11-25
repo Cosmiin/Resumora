@@ -224,6 +224,8 @@ describe("EditablePage", () => {
     await userEvent.clear(second);
     await userEvent.type(second, "{Backspace}");
     expect(state().courses[0]!.bullets!.map((b) => b.text)).toEqual(["Dashboards!"]);
+    // Joining moves the caret on the next frame; wait for it, or it can land after the next click and take the typing.
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Bullet 1 of Power BI" })).toHaveFocus());
     await userEvent.type(screen.getByRole("textbox", { name: "Bullet 1 of Running" }), "!");
     expect(state().interests[0]!.bullets![0]!.text).toBe("Half marathons!");
   });
