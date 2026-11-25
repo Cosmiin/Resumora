@@ -36,6 +36,7 @@ import {
   type RoleResult,
 } from "@resumora/shared";
 import { ApiClientError, apiFetch, authedFetch, errorOf } from "../../lib/api.ts";
+import { reportError } from "../../lib/report-error.ts";
 
 const ScoresSchema = z.object({ items: z.array(RoleResultSchema) });
 
@@ -244,11 +245,11 @@ export function placeAnswersOnCv(body: UseAnswersBody): Promise<UseAnswersAnswer
 export function reportFailure(step: string, roleId: string, err: unknown): void {
   const api = err instanceof ApiClientError ? err : undefined;
   const requestId = (api?.body as { error?: { requestId?: unknown } } | null)?.error?.requestId;
-  const json = {
-    step, roleId,
-    ...(api ? { status: api.status, code: api.code.slice(0, 100) } : {}),
-    message: (err instanceof Error ? `${err.name}: ${err.message}` : String(err)).slice(0, 500),
-    ...(typeof requestId === "string" ? { requestId: requestId.slice(0, 100) } : {}),
-  };
-  void apiFetch("/v1/enrich/failures", { method: "POST", json, schema: z.unknown() }).catch(() => undefined);
+  void reportError({
+    kind: "step", step, roleId,
+    ...(api && api.status > 0 ? { status: api.status } : {}),
+    ...(api ? { code: api.code } : {}),
+    message: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    ...(typeof requestId === "string" ? { requestId } : {}),
+  });
 }

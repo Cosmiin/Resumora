@@ -18,6 +18,7 @@ import type { InsightsRepo } from "./enrich/repo.ts";
 import { enrichRoutes } from "./enrich/routes.ts";
 import type { AccountAdmin, AccountRepo } from "./account/repo.ts";
 import { accountRoutes } from "./account/routes.ts";
+import { appErrorRoutes, type AppErrorLog } from "./app-errors.ts";
 
 export type AppDeps = {
   /** The only browser origin allowed to call the API cross-origin. */
@@ -33,6 +34,8 @@ export type AppDeps = {
   account?: { repo(user: AuthUser): AccountRepo; admin(): AccountAdmin };
   /** Model access for request handlers, logging each call as this user. */
   model(user: AuthUser): ModelDeps;
+  /** Where the browser's error records go (`app_errors`). Not set in tests that never record one. */
+  appErrors?(user: AuthUser): AppErrorLog;
   /** Live voice sessions (OpenAI key and logging). */
   voice?(user: AuthUser): VoiceDeps;
   /** Where new imports are sent for processing. */
@@ -145,6 +148,11 @@ export function createApp(deps: AppDeps) {
       now: deps.now ?? (() => new Date()),
     }),
   );
+
+  app.route("/v1/errors", appErrorRoutes((user) => {
+    if (!deps.appErrors) throw new Error("Error log is not configured");
+    return deps.appErrors(user);
+  }));
 
   app.notFound((c) => c.json(errorBody("not_found", "Not found.", c.get("requestId")), 404));
 

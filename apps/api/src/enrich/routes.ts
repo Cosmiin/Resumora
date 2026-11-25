@@ -45,11 +45,6 @@ const ScoreRequestBody = ScoreBody.extend({ fresh: z.boolean().optional(), more:
 /** importId: read an import that is ready but not used yet instead of the saved CV, to prepare the path ahead. */
 const AheadBody = z.object({ importId: z.uuid().optional() });
 const BrainDumpBody = ScoreBody.extend({ source: z.enum(["ramble", "answers"]).default("ramble") });
-/** A failed step of preparing changes: status is missing when the request never came back. */
-const FailureBody = z.object({
-  step: z.string().min(1).max(40), roleId: z.string().max(100).optional(), status: z.number().int().optional(),
-  code: z.string().max(100).optional(), message: z.string().max(500).optional(), requestId: z.string().max(100).optional(),
-});
 
 /** Enrich bodies are tiny ({ roleId, fingerprint } or nothing), so anything bigger is refused before it is read. */
 const MAX_BODY_BYTES = 16 * 1024;
@@ -316,14 +311,6 @@ export function enrichRoutes(deps: {
       signal: c.req.raw.signal,
     });
     return sendEvents(c, rewriteEvents(chunks, (key, text) => checkSummary(content, key, text)));
-  });
-
-  // A failed step of preparing changes, recorded by the browser so the cause can be found later (diagnosis only).
-  app.post("/failures", async (c) => {
-    const body = FailureBody.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) throw new ApiError(400, "invalid_request", "Send a step.");
-    await deps.insightsRepo(c.get("user")).recordFailure(body.data);
-    return c.body(null, 204);
   });
 
   app.post("/skills", async (c) => {

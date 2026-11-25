@@ -9,7 +9,7 @@ const auth = vi.hoisted(() => ({
 }));
 vi.mock("./supabase.ts", () => ({ supabase: { auth } }));
 
-import { ApiClientError, apiFetch } from "./api.ts";
+import { ApiClientError, apiFetch, onRequestFailed } from "./api.ts";
 
 const Ok = z.object({ ok: z.boolean() });
 const session = (token: string) => ({ data: { session: { access_token: token } }, error: null });
@@ -31,6 +31,22 @@ const authHeader = (call: number) =>
   new Headers((fetchMock.mock.calls[call]?.[1] as RequestInit).headers).get("authorization");
 
 describe("apiFetch", () => {
+  it("tells the error log about a failed request, with its code and request id, and about one that never came back", async () => {
+    const failed: unknown[] = [];
+    onRequestFailed((f) => failed.push(f));
+    fetchMock.mockResolvedValueOnce(json(409, { error: { code: "not_saved", message: "Not saved", requestId: "r-7" } }));
+    await expect(apiFetch("/v1/enrich/check-changes", { schema: Ok })).rejects.toBeInstanceOf(ApiClientError);
+    fetchMock.mockRejectedValueOnce(new TypeError("offline"));
+    await expect(apiFetch("/v1/cv", { schema: Ok })).rejects.toBeInstanceOf(ApiClientError);
+    fetchMock.mockResolvedValueOnce(json(200, { ok: true }));
+    await apiFetch("/v1/cv", { schema: Ok });
+    expect(failed).toEqual([
+      { path: "/v1/enrich/check-changes", status: 409, code: "not_saved", message: "Not saved", requestId: "r-7" },
+      { path: "/v1/cv", code: "network", message: "Can't reach Resumora." },
+    ]);
+    onRequestFailed(() => undefined);
+  });
+
   it("adds bearer token", async () => {
     fetchMock.mockResolvedValue(json(200, { ok: true }));
     await expect(apiFetch("/v1/cv", { schema: Ok })).resolves.toEqual({ ok: true });

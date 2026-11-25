@@ -23,8 +23,14 @@ import "./styles/shell.css";
 import "./styles/public.css";
 import "./styles/account.css";
 import { getLanguage } from "./i18n/language.ts";
+import { onRequestFailed } from "./lib/api.ts";
+import { reportError, watchRedMessages } from "./lib/report-error.ts";
 
 document.documentElement.lang = getLanguage();
+
+// Every red message and every failed request is recorded (app_errors), so a message can be traced to its cause.
+onRequestFailed((failed) => void reportError({ kind: "request", ...failed }));
+watchRedMessages();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },

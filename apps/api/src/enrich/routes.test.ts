@@ -3,7 +3,6 @@ import { RoleResultSchema, emptyCv, fingerprint } from "@resumora/shared";
 import { createApp } from "../app.ts";
 import { memoryCvRepo } from "../cv/memory-repo.ts";
 import { memoryInsightsRepo, type MemoryInsightsStore } from "./memory-repo.ts";
-import type { EnrichFailure } from "./repo.ts";
 import { allSpecific, fakeModel, roleWith } from "./fake-model.ts";
 
 const auth = { authorization: "Bearer good", "content-type": "application/json" };
@@ -14,11 +13,9 @@ let store: MemoryInsightsStore;
 let model: ReturnType<typeof fakeModel>;
 let app: ReturnType<typeof createApp>;
 let savedCv: ReturnType<typeof memoryCvRepo>;
-let failures: EnrichFailure[];
 
 beforeEach(async () => {
   store = new Map();
-  failures = [];
   model = fakeModel(() => allSpecific(role));
   const cv = (savedCv = memoryCvRepo());
   await cv.save({ ...emptyCv("en"), experience: [role] }, 0);
@@ -32,7 +29,7 @@ beforeEach(async () => {
     jobRepo: () => {
       throw new Error("job repo not used in these tests");
     },
-    insightsRepo: (user) => memoryInsightsRepo(user.id, store, [], failures),
+    insightsRepo: (user) => memoryInsightsRepo(user.id, store),
     model: () => model.deps,
     queue: { send: async () => {} },
     jobQueue: { send: async () => {} },
@@ -46,15 +43,6 @@ const code = async (res: Response) => ((await res.json()) as { error: { code: st
 describe("/v1/enrich", () => {
   it("needs sign-in", async () => {
     expect((await app.request("/v1/enrich/scores")).status).toBe(401);
-  });
-
-  it("POST /failures records a failed step, and refuses one without a step", async () => {
-    const failure = { step: "check-changes", roleId: role.id, status: 409, code: "not_saved", requestId: "r-1" };
-    const res = await app.request("/v1/enrich/failures", { method: "POST", headers: auth, body: JSON.stringify(failure) });
-    expect(res.status).toBe(204);
-    expect(failures).toEqual([failure]);
-    const bad = await app.request("/v1/enrich/failures", { method: "POST", headers: auth, body: JSON.stringify({ roleId: role.id }) });
-    expect(bad.status).toBe(400);
   });
 
   it("POST /rewrite-role returns 404", async () => {

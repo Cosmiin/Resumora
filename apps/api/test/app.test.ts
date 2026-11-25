@@ -29,6 +29,16 @@ function deps(overrides: Partial<AppDeps> = {}): AppDeps {
 }
 
 describe("app", () => {
+  it("POST /v1/errors records what the browser saw, as the signed-in user, and refuses a record without a kind", async () => {
+    const recorded: unknown[] = [];
+    const app = createApp(deps({ appErrors: (user) => async (e) => void recorded.push({ user: user.id, ...e }) }));
+    const headers = { authorization: "Bearer good", "content-type": "application/json" };
+    const record = { kind: "message", page: "/cv/enrich", message: "Some changes could not be prepared." };
+    expect((await app.request("/v1/errors", { method: "POST", headers, body: JSON.stringify(record) })).status).toBe(204);
+    expect(recorded).toEqual([{ user: "user-1", ...record }]);
+    expect((await app.request("/v1/errors", { method: "POST", headers, body: JSON.stringify({ page: "/cv" }) })).status).toBe(400);
+  });
+
   it("health is public", async () => {
     const res = await createApp(deps()).request("/health");
     expect(res.status).toBe(200);
