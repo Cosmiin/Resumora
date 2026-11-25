@@ -74,7 +74,7 @@ const pending = (s: RoleScoreState | undefined) => !s || s.state === "scoring" |
 
 type Stage =
   | { kind: "start" } | { kind: "shape" } | { kind: "shaping" } | { kind: "companies" } | { kind: "tools" } | { kind: "budget"; items: BudgetItem[] }
-  | { kind: "preparing" } | { kind: "facts"; items: HeldChange[]; held: HeldChange[]; failed: boolean } | { kind: "placing" }
+  | { kind: "preparing" } | { kind: "facts"; items: HeldChange[]; failed: boolean } | { kind: "placing" }
   | { kind: "end"; held: HeldChange[]; failed: boolean };
 
 /**
@@ -229,11 +229,9 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
       failed ||= roleFailed;
       setRows((all) => all.map((r) => (r.id === item.id ? { ...r, state: roleFailed ? "failed" : "done" } : r)));
     }));
-    // Lines one fact away, and better versions of held lines, come before the scores (owner, 25 Nov 2026); the rest go to the end.
-    const asking = held.filter((h) => h.ask || h.better);
-    const rest = held.filter((h) => !h.ask && !h.better);
+    // Every held line comes before the scores (owner, 25 Nov 2026): its question, its better version, or the line itself.
     facts.current = { chain: Promise.resolve(), failed: [] };
-    setStage(asking.length ? { kind: "facts", items: asking, held: rest, failed } : { kind: "end", held, failed });
+    setStage(held.length ? { kind: "facts", items: held, failed } : { kind: "end", held: [], failed });
     // The server reads the saved CV, so this round's lines are saved first. A failure shows no block (owner's call 5).
     void waitForSave().catch(() => undefined).then(() => getSkillSuggestions())
       .then((answer) => { if (round.current === mine) setSkills(answer.suggestions); })
@@ -380,7 +378,7 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
     );
   }
   if (stage.kind === "facts") {
-    const { held, failed } = stage;
+    const { failed } = stage;
     return screen(
       <FactsStep cv={cv} items={stage.items}
         onUse={(h, text) => {
@@ -393,9 +391,10 @@ export function EnrichPath({ cv, dispatch, scores, waitForSave, onClose, onScore
             facts.current.failed.push(h);
           });
         }}
-        onDone={(skipped) => {
+        onDone={() => {
+          // Skipped lines stay off the CV; only an answer that failed to place waits at the end, to try again.
           setStage({ kind: "placing" });
-          void facts.current.chain.then(() => setStage({ kind: "end", held: [...facts.current.failed, ...skipped, ...held], failed }));
+          void facts.current.chain.then(() => setStage({ kind: "end", held: facts.current.failed, failed }));
         }} />,
     );
   }

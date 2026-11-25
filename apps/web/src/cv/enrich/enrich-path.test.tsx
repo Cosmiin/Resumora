@@ -385,7 +385,7 @@ describe("the short path", () => {
       expect(onScore).toHaveBeenLastCalledWith(expect.objectContaining({ roleId: "r1", fingerprint: "after-r1" }));
     });
 
-    it("a held new line stays off the CV and is shown at the end; Add anyway puts it on", async () => {
+    it("a held line with no better version is shown before the scores, never after; Add anyway puts it on", async () => {
       api.placeAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
         ? { changes: [{ id: "answer1", kind: "new", text: "Helped the team." }] } : { changes: [] }));
       api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string; kind: string }[] }) => Promise.resolve({
@@ -393,12 +393,28 @@ describe("the short path", () => {
         kept: changes.filter((c) => c.kind !== "new").map((c) => c.id), held: changes.filter((c) => c.kind === "new"), asks: [], better: [],
       }));
       const actions: CvAction[] = [];
-      await toEnd((a) => actions.push(a));
+      await toPrepared((a) => actions.push(a));
+      expect(await screen.findByText("Helped the team.")).toBeInTheDocument();
       expect(appliedTo(actions, "r1").map((c) => c.id)).toEqual(["description", "bullet:r1b1", "bullet:r1b2"]);
-      expect(screen.getByText("Not added: it would lower Role r1's score a little")).toBeInTheDocument();
-      expect(screen.getByText("Helped the team.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
       await userEvent.click(screen.getByRole("button", { name: "Add anyway" }));
+      await screen.findByRole("button", { name: "Done" });
       expect(actions.at(-1)).toEqual({ type: "applyRoleChanges", roleId: "r1", changes: [{ id: "answer1", kind: "new", text: "Helped the team." }] });
+      expect(screen.queryByText(/Not added/)).toBeNull();
+    });
+
+    it("a skipped held line stays off the CV and doesn't come back after the scores", async () => {
+      api.placeAnswersOnCv.mockImplementation(({ roleId }: { roleId: string }) => Promise.resolve(roleId === "r1"
+        ? { changes: [{ id: "answer1", kind: "new", text: "Helped the team." }] } : { changes: [] }));
+      api.checkChanges.mockImplementation(({ roleId, changes }: { roleId: string; changes: { id: string; kind: string }[] }) => Promise.resolve({
+        result: { ...result(roleId === "r1" ? r1 : r2, 85), fingerprint: `after-${roleId}` },
+        kept: changes.filter((c) => c.kind !== "new").map((c) => c.id), held: changes.filter((c) => c.kind === "new"), asks: [], better: [],
+      }));
+      const actions: CvAction[] = [];
+      await toPrepared((a) => actions.push(a));
+      await userEvent.click(await screen.findByRole("button", { name: "Skip" }));
+      await screen.findByRole("button", { name: "Done" });
+      expect(appliedTo(actions, "r1").map((c) => c.id)).toEqual(["description", "bullet:r1b1", "bullet:r1b2"]);
       expect(screen.queryByText("Helped the team.")).toBeNull();
     });
 

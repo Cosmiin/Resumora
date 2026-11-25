@@ -169,6 +169,20 @@ describe("checkChanges", () => {
     expect(none.better).toEqual([]);
   });
 
+  it("offers a better version for a held line the grader left out, too", async () => {
+    const b2 = role.bullets[1]!.id;
+    let first = true;
+    answerIds = (ids) => {
+      const out = first ? ids.filter((id) => id !== b2) : ids;
+      first = false;
+      return out;
+    };
+    betterText = "Checked employment contracts for every new hire.";
+    const out = await run([{ id: "c1", kind: "bullet", bulletId: b2, text: "Checked contracts carefully." }]);
+    expect(out.held.map((c) => c.id)).toEqual(["c1"]);
+    expect(out.better).toEqual([{ changeId: "c1", text: "Checked employment contracts for every new hire." }]);
+  });
+
   it("holds nothing when asked not to", async () => {
     gradeFor = () => ({ contribution: "missing", issue: "contribution" });
     const out = await run([{ id: "new-1", kind: "new", text: "Helped." }], false);
