@@ -28,6 +28,10 @@ const SkillRow = memo(function SkillRow({
     (skillId: string) => dispatch({ type: "removeSkill", group, skillId }),
     [dispatch, group],
   );
+  const onRename = useCallback(
+    (skillId: string, name: string) => dispatch({ type: "renameSkill", group, skillId, name }),
+    [dispatch, group],
+  );
   return (
     <div className="cv-skill-row">
       <span className="cv-skill-label">{t(label)}</span>
@@ -35,6 +39,7 @@ const SkillRow = memo(function SkillRow({
         items={items}
         onAdd={onAdd}
         onRemove={onRemove}
+        onRename={onRename}
         label={t(addLabel)}
         tone={sort ? "sort" : undefined}
         fieldKey={`skills-${group}`}

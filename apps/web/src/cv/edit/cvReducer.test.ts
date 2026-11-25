@@ -147,6 +147,15 @@ describe("sections", () => {
 });
 
 describe("skills", () => {
+  it("renameSkill changes one name and refuses a name already on the CV", () => {
+    let cv = cvReducer(emptyCv(), { type: "addSkill", group: "technicalSkills", name: "SQL" });
+    cv = cvReducer(cv, { type: "addSkill", group: "professionalSkills", name: "Teamwork" });
+    const id = cv.technicalSkills[0]!.id;
+    const renamed = cvReducer(cv, { type: "renameSkill", group: "technicalSkills", skillId: id, name: " PostgreSQL " });
+    expect(renamed.technicalSkills).toEqual([{ id, name: "PostgreSQL" }]);
+    expect(cvReducer(cv, { type: "renameSkill", group: "technicalSkills", skillId: id, name: "teamwork" })).toBe(cv);
+  });
+
   it("addSkill ignores duplicates across groups", () => {
     let cv = cvReducer(emptyCv(), { type: "addSkill", group: "technicalSkills", name: "  React " });
     expect(cv.technicalSkills.map((s) => s.name)).toEqual(["React"]);

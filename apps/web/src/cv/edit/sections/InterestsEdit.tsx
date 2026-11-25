@@ -7,10 +7,14 @@ import type { SectionProps } from "./types.ts";
 export function InterestsEdit({ cv, dispatch }: SectionProps) {
   const onAdd = useCallback((name: string) => dispatch({ type: "addInterest", name }), [dispatch]);
   const onRemove = useCallback((itemId: string) => dispatch({ type: "removeInterest", itemId }), [dispatch]);
+  const onRename = useCallback(
+    (itemId: string, name: string) => dispatch({ type: "setItemField", list: "interests", itemId, field: "name", value: name }),
+    [dispatch],
+  );
   const hidden = cv.interests.filter((i) => i.hidden);
   return (
     <>
-      <ChipInput fieldKey="interests" label={t("edit.interests")} items={cv.interests} onAdd={onAdd} onRemove={onRemove} />
+      <ChipInput fieldKey="interests" label={t("edit.interests")} items={cv.interests} onAdd={onAdd} onRemove={onRemove} onRename={onRename} />
       {/* Interests hidden on this CV (tailoring's "Hide for this job?"): kept, and one click shows them again. */}
       {hidden.length > 0 && (
         <p className="cv-hidden-list">
