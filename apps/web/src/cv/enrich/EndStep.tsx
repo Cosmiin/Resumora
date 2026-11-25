@@ -8,8 +8,11 @@ import { ScoreRows, scoreChange } from "./ScoreRows.tsx";
 import { SkillsFound } from "./SkillsFound.tsx";
 import type { RoleScoreState } from "./useRoleScores.ts";
 
-/** A held change and, when the grading had one, the question that would bring its line to the top grade (score/12). */
-export type HeldChange = { roleId: string; change: Change; ask?: HeldAsk };
+/**
+ * A held change and, when the grading had one, the question that would bring its line to the top grade (score/12), or
+ * else a better version of its line that raises the score (owner, 25 Nov 2026).
+ */
+export type HeldChange = { roleId: string; change: Change; ask?: HeldAsk; better?: string };
 
 type Props = {
   cv: CvContent;

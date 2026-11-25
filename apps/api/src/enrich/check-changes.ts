@@ -3,6 +3,7 @@ import {
   type Change, type CheckChangesAnswer, type CheckChangesBody, type Experience, type ModelCoverage, type RoleResult,
 } from "@resumora/shared";
 import { ApiError } from "../errors.ts";
+import { betterLines } from "./better-lines.ts";
 import { gradeWithCoverage, scoreRole, type ScoreDeps } from "./score.ts";
 
 /**
@@ -45,6 +46,7 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
   let kept: Change[] = [...body.changes];
   const held: Change[] = [];
   const asks: CheckChangesAnswer["asks"] = [];
+  let better: CheckChangesAnswer["better"] = [];
   let ungradedKept = false;
   if (toGrade.length === 0 && proposed.description === role.description) {
     result = predict(proposed, locale, stored, [], undefined);
@@ -80,6 +82,8 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
         const q = firstResult.questions.find((x) => x.bulletId === lineId);
         if (q) asks.push({ changeId: change.id, text: q.text, options: q.options, ...(q.amounts ? { amounts: q.amounts } : {}) });
       }
+      // The rest: a better version of the line, offered before the scores (owner, 25 Nov 2026).
+      better = await betterLines(deps, proposed, locale, stored, firstResult, held.filter((c) => !ungraded(c) && !asks.some((a) => a.changeId === c.id)));
     }
     ungradedKept = kept.some(ungraded);
     if (held.length === 0) {
@@ -96,5 +100,5 @@ export async function checkChanges(deps: ScoreDeps, body: CheckChangesBody): Pro
   // Without hold, a change to a line the grader left out still goes on the CV: no prediction is stored for it, so the
   // normal score runs after saving instead of trusting the old line's grade.
   if (!ungradedKept) await deps.insights.putPending(role.id, result);
-  return { result, kept: kept.map((c) => c.id), held, asks };
+  return { result, kept: kept.map((c) => c.id), held, asks, better };
 }

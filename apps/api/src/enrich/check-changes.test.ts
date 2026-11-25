@@ -19,6 +19,8 @@ let gradeFor: (text: string) => Partial<ModelBullet>;
 let asked: string[][];
 /** Which lines the fake grader actually grades, from the ids it was asked for (a real one sometimes adds or leaves out lines). */
 let answerIds: (ids: string[]) => string[];
+/** What the fake writer answers when asked for a better version of a held line (null: no better version). */
+let betterText: string | null;
 
 async function save(r: Experience, change?: (b: ModelScore["bullets"][number], i: number) => void) {
   role = r;
@@ -35,10 +37,13 @@ beforeEach(async () => {
   gradeFor = () => ({});
   asked = [];
   answerIds = (ids) => ids;
+  betterText = null;
   await save(roleWith(["Ran payroll for 40 staff.", "Checked contracts.", "Filed reports."]), (b, i) => {
     if (i === 1) Object.assign(b, { contribution: "partial", specificity: "missing", impact: "missing", issue: "contribution" });
   });
   model = fakeModel(() => {
+    const request = model.requests.at(-1) as { response_format?: { json_schema?: { name?: string } } };
+    if (request.response_format?.json_schema?.name === "enrich_better_line") return { text: betterText, nextQuestion: null };
     const user = (model.requests.at(-1)!.messages as { content: string }[])[1]!.content;
     const list = /Grade only these bullets: (.*?)\. Return/.exec(user)?.[1]?.trim() ?? "";
     const ids = list ? list.split(", ") : [];
@@ -148,6 +153,20 @@ describe("checkChanges", () => {
     const out = await run([{ id: "c1", kind: "bullet", bulletId: b2, text: "Checked." }, { id: "new-1", kind: "new", text: "Helped." }]);
     expect(out.held.map((c) => c.id)).toEqual(["c1", "new-1"]);
     expect(out.asks).toEqual([{ changeId: "c1", text: "Which contracts?", options: ["Employment contracts", "Supplier contracts"] }]);
+  });
+
+  it("offers, for a held line with no question, a better version only when it grades higher (owner, 25 Nov 2026)", async () => {
+    const b2 = role.bullets[1]!.id;
+    gradeFor = (text) => (text === "Helped." || text === "Checked." ? { contribution: "missing", specificity: "missing", impact: "missing", issue: "contribution" } : {});
+    betterText = "Checked employment contracts for every new hire.";
+    const better = await run([{ id: "c1", kind: "bullet", bulletId: b2, text: "Checked." }]);
+    expect(better.held.map((c) => c.id)).toEqual(["c1"]);
+    expect(better.better).toEqual([{ changeId: "c1", text: "Checked employment contracts for every new hire." }]);
+
+    betterText = "Helped.";
+    const none = await run([{ id: "new-1", kind: "new", text: "Helped." }]);
+    expect(none.held.map((c) => c.id)).toEqual(["new-1"]);
+    expect(none.better).toEqual([]);
   });
 
   it("holds nothing when asked not to", async () => {

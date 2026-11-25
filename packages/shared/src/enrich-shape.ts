@@ -88,8 +88,11 @@ export const HeldAskSchema = z.object({
   changeId: id, text: z.string(), options: z.array(z.string()), amounts: z.array(z.string()).optional(),
 }).strict();
 export type HeldAsk = z.infer<typeof HeldAskSchema>;
+/** For a held change with no question: a new version of its line, graded, that reaches what the line had to reach. */
+export const BetterLineSchema = z.object({ changeId: id, text: z.string().min(1).max(MAX_TEXT) }).strict();
 export const CheckChangesAnswerSchema = z.object({
   result: RoleResultSchema, kept: z.array(id), held: z.array(ChangeSchema), asks: z.array(HeldAskSchema).default([]),
+  better: z.array(BetterLineSchema).default([]),
 }).strict();
 export type CheckChangesAnswer = z.infer<typeof CheckChangesAnswerSchema>;
 
