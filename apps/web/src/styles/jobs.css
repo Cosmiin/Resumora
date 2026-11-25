@@ -7,7 +7,7 @@
 .jobs-rule { width: 100%; margin: var(--space-2) 0; border: 0; border-top: 1px solid var(--color-line); }
 .jobs-search { display: grid; gap: var(--space-2); max-width: 420px; margin-bottom: var(--space-5); }
 /* The list: one row per job with the columns Job, Score, CV, Application and the row's action. On a phone each row is a card (see the end of the next block). */
-.jobs-row { display: grid; grid-template-columns: minmax(0, 2.3fr) 72px minmax(0, 1.3fr) minmax(0, 1.1fr) 112px; gap: var(--space-2) var(--space-5); align-items: center; }
+.jobs-row { display: grid; grid-template-columns: minmax(0, 2.3fr) 72px minmax(0, 1.3fr) minmax(0, 1.1fr) 176px; gap: var(--space-2) var(--space-5); align-items: center; }
 .jobs-head-row { padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-line); font: var(--weight-bold) var(--text-label) / 1.4 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-muted); }
 .jobs-list > li { padding: 18px 0; border-bottom: 1px solid var(--color-line); }
 .jobs-list > li:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -18,7 +18,7 @@
 /* CV and Application are two columns here and one wrapping line in the phone card. */
 .jobs-cell-meta { display: contents; }
 .jobs-cell-cv, .jobs-cell-app { min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); align-items: center; }
-.jobs-cell-act { justify-self: end; }
+.jobs-cell-act { justify-self: end; display: flex; gap: var(--space-1); align-items: center; }
 .jobs-page .job-title { font: var(--weight-display) 1.25rem / 1.2 var(--font-display); letter-spacing: -0.01em; color: var(--color-ink); text-decoration: none; overflow-wrap: anywhere; }
 .jobs-page a.job-title:hover, .jobs-list > li:hover a.job-title { text-decoration: underline; text-underline-offset: 4px; }
 /* The whole row opens the job: the title's link is stretched over it, and the row's button stays on top. */
@@ -151,7 +151,8 @@
   .jobs-cell-meta { grid-area: meta; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; }
   .jobs-cell-cv:empty, .jobs-cell-app:empty, .jobs-cell-act:empty { display: none; }
   .jobs-cell-act { grid-area: act; justify-self: stretch; }
-  .jobs-cell-act .ui-btn { width: 100%; min-height: 44px; }
+  .jobs-cell-act .ui-btn { flex: 1 1 auto; min-height: 44px; }
+  .jobs-cell-act .jobs-remove { flex: none; }
 }
 
 /* ---- Edit form (old look, still to be rebuilt) ---- */

@@ -16,6 +16,8 @@ export const jobsEn = {
   "jobs.col.cv": "CV",
   "jobs.col.application": "Application",
   "jobs.open": "Open",
+  "jobs.remove": "Remove",
+  "jobs.removeLabel": "Remove {title}",
   "jobs.continue": "Continue",
   "jobs.scoreNote": "Score: from the tailored CV when the job has one, otherwise from your base CV.",
   "jobs.badge.failed": "Couldn't read",
