@@ -8,7 +8,7 @@ import type { JobListItem } from "@resumora/shared";
 const auth = vi.hoisted(() => ({ getSession: vi.fn(), onAuthStateChange: vi.fn(), signOut: vi.fn() }));
 vi.mock("../lib/supabase.ts", () => ({ supabase: { auth } }));
 vi.mock("../cv/cv-api.ts", () => ({ getCv: () => new Promise(() => {}) }));
-vi.mock("./jobs-api.ts", () => ({ listJobs: vi.fn(), createJob: vi.fn() }));
+vi.mock("./jobs-api.ts", () => ({ listJobs: vi.fn(), createJob: vi.fn(), deleteJob: vi.fn() }));
 vi.mock("../tailor/tailor-api.ts", async (original) => ({ ...(await original<object>()), getRun: vi.fn() }));
 import { getRun } from "../tailor/tailor-api.ts";
 import { readFileSync } from "node:fs";
@@ -19,7 +19,7 @@ import { AuthProvider } from "../auth/AuthProvider.tsx";
 import { routes } from "../router.tsx";
 import { setUnsavedChanges } from "../cv/unsaved.ts";
 import { ApiClientError } from "../lib/api.ts";
-import { createJob, listJobs } from "./jobs-api.ts";
+import { createJob, deleteJob, listJobs } from "./jobs-api.ts";
 
 const job: JobListItem = {
   id: "one", title: "Engineer", company: "Acme", location: "London", status: "ready",
@@ -248,6 +248,29 @@ describe("jobs list", () => {
       expect(tracks).toHaveLength(2);
       for (const track of tracks) expect(track.replaceAll(/minmax\(0, [^)]+\)|\d+px/g, "").trim()).toBe("");
     });
+  });
+
+  it("removes a job from the list after the person confirms, warning about its tailored CVs", async () => {
+    vi.mocked(listJobs).mockResolvedValue(page([{ ...job, tailoredLanguages: ["en"] }, { ...job, id: "two", title: "Designer" }]));
+    vi.mocked(deleteJob).mockResolvedValue(undefined);
+    renderJobs();
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Engineer" }));
+    const dialog = within(screen.getByRole("dialog", { name: "Remove this job?" }));
+    expect(dialog.getByText("This also deletes its tailored CVs, translations and cover letters.")).toBeInTheDocument();
+    expect(deleteJob).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove this job" }));
+    expect(deleteJob).toHaveBeenCalledWith("one");
+    await waitFor(() => expect(screen.queryByRole("link", { name: /Engineer/ })).toBeNull());
+    expect(screen.getByRole("link", { name: /Designer/ })).toBeInTheDocument();
+  });
+
+  it("keeps the job and reports a failed delete from the list", async () => {
+    vi.mocked(deleteJob).mockRejectedValue(new Error("Can't delete this job."));
+    renderJobs();
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Engineer" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove this job" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Can't delete this job.");
+    expect(screen.getByRole("link", { name: /Engineer/ })).toBeInTheDocument();
   });
 
   it("appends more jobs, deduplicates against refreshed first-page rows and ends pagination", async () => {
