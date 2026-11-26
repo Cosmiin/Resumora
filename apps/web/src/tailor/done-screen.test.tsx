@@ -28,7 +28,7 @@ function renderDone(over: { final?: MatchScore; base?: MatchScore; job?: JobExtr
     { path: "/jobs/:id/tailor", element: <DoneScreen jobId="one" docId="cv1" base={over.base ?? base} final={over.final ?? final}
       job={over.job === undefined ? job : over.job} onAnswers={over.onAnswers} /> },
     { path: "/jobs/:id/cv", element: <p>CV page</p> },
-    { path: "/jobs/:id/cv/template", element: <p>Template page</p> },
+    { path: "/jobs/:id/cv/export", element: <p>Download page</p> },
   ], { initialEntries: ["/jobs/one/tailor"] });
   render(<RouterProvider router={router} />);
   return router;
@@ -47,7 +47,7 @@ describe("the finish screen", () => {
     expect(big.querySelector("b")).toHaveTextContent("81");
     expect(screen.getByText("19 points better than your base CV.")).toBeInTheDocument();
     expect(screen.getByText("Must-haves shown: 1 of 2 → 2 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Choose a template" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download your CV" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Mark as ready" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Change my answer" })).toBeNull();
   });
@@ -112,7 +112,7 @@ describe("the finish screen", () => {
   });
 
   it.each([
-    ["Choose a template", "/jobs/one/cv/template?cv=cv1"],
+    ["Download your CV", "/jobs/one/cv/export?cv=cv1"],
     ["Open the CV", "/jobs/one/cv?cv=cv1"],
     ["Write a cover letter", "/jobs/one/cv?cv=cv1&tab=letter"],
   ])("%s goes to %s", async (name, to) => {

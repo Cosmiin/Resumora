@@ -234,6 +234,7 @@ export function TailorFlow() {
   /** Changing the steering redoes every step with the stored answers, in a new run. */
   async function restart(steering: Steering, confirm: Extract<Phase, { kind: "confirm" }>) {
     setPhase({ ...confirm, busy: true });
+    setMoved(null);
     try {
       const { run: created } = await api.changeSteering(runRef.current!.id, steering);
       setSteering(steering);

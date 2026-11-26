@@ -28,6 +28,7 @@
 /* Download: two formats side by side. */
 .cvs-divider { width: 100%; margin: 0; border: 0; border-top: 1px solid var(--color-line); }
 .cvs-formats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.cvs-formats--stack { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 .cvs-format { display: grid; gap: 10px; align-content: start; justify-items: start; }
 .cvs-letter { align-items: center; }
 .cvs-spinner { display: inline-block; box-sizing: border-box; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: cvs-spin 1s linear infinite; }

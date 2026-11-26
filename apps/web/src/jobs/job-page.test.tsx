@@ -287,7 +287,7 @@ describe("job page", () => {
       expect(strip.queryByRole("link", { name: "Export" })).toBeNull();
       expect(strip.getByRole("link", { name: "Tailor again" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv1&retailor=1");
       expect(await screen.findByText(/Template: Modern/)).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/template?cv=cv1");
+      expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/export?cv=cv1");
       // The old main action of a tailored job is gone with the old layout.
       expect(screen.queryByRole("link", { name: "Open tailored CV" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Tailor my CV" })).toBeNull();
@@ -383,7 +383,7 @@ describe("job page", () => {
         expect(strip.getByRole("link", { name: "Edit CV" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv2");
         expect(strip.getByRole("button", { name: "Export" })).toBeEnabled();
         expect(strip.getByRole("link", { name: "Tailor again" })).toHaveAttribute("href", "/jobs/one/cv?cv=cv2&retailor=1");
-        expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/template?cv=cv2");
+        expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/one/cv/export?cv=cv2");
       });
 
       it("never shows one copy's Re-check answer under the other copy's address", async () => {

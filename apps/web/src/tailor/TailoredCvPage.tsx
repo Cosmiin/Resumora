@@ -117,11 +117,11 @@ export function TailoredCvPage() {
   const template = getTemplate(cv.template).id;
   const page = `/jobs/${encodeURIComponent(jobId)}/cv`;
   const query = `?cv=${encodeURIComponent(cv.id)}`;
-  const links = { template: `${page}/template${query}`, export: `${page}/export${query}` };
+  const links = { export: `${page}/export${query}` };
   const openDialog = () => { setRetailoring({ busy: false, error: false }); setDialog(true); };
   const toolbar = (
     <>
-      <TailorToolbar tab={tab} onTab={setTab} template={template} links={links}>
+      <TailorToolbar tab={tab} onTab={setTab} links={links}>
         <LanguageMenu key={cv.id} jobId={jobId} current={{ id: cv.id, language: cv.language }} />
         <button type="button" className="ui-btn ui-btn--sm" onClick={openDialog}>{t("tailored.retailor")}</button>
       </TailorToolbar>
