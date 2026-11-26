@@ -103,7 +103,7 @@ export function lightList(cv: CvContent, section: "achievements" | LightTailorSe
 export const notText = (p: Pick<Proposal, "field">) => p.field === "hidden" || p.field === "order";
 
 /** An answer that says no ("No", "Nu", "Never") confirms nothing. */
-const NEGATIVE = /^\s*(no|nu|not|never|niciodat|n-am)\b/i;
+const NEGATIVE = /^\s*(no|nu|not|never|none|nope|niciodat|n-am)\b/i;
 const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 /** Singular and plural count as one word: "systems" is "system". */
 const stem = (word: string) => word.replace(/(ies|es|s)$/, "");
