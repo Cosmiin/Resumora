@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   applyGuesses, CvContentSchema, findScored, isLightTailorSection, isRoleSection, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId, scoredItems, stepOrder, withoutHidden,
-  type CvContent, type Job, type JobExtraction, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
+  type CvContent, type Job, type JobExtraction, type MatchLabel, type MatchScore, type Note, type Proposal, type SectionKey, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
@@ -9,7 +9,7 @@ import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import { newestRole } from "./questions.ts";
 import type { Review, TailorRepo } from "./repo.ts";
-import { scoreMatch } from "./score.ts";
+import { scoreMatch, scoredTexts } from "./score.ts";
 import { currentRole, lightList, sectionItems } from "./section-pass.ts";
 import { jobNotFound } from "./start.ts";
 
@@ -81,6 +81,18 @@ function apply(cv: CvContent, p: Proposal, section: TailorSection): void {
   }
 }
 
+/** The labels of the CV's latest score that still apply to the job: requirement labels only while its requirements are unchanged. */
+async function previousLabels(
+  deps: { tailor: TailorRepo }, cv: { id: string; jobId: string; score: MatchScore | null }, job: JobExtraction,
+): Promise<MatchLabel[] | undefined> {
+  const previous = cv.score ?? await deps.tailor.getScore(cv.jobId, "tailored", cv.id)
+    ?? await deps.tailor.getScore(cv.jobId, "base");
+  const sameRequirements = previous?.requirementTexts !== undefined
+    && previous.requirementTexts.length === job.requirements.length
+    && previous.requirementTexts.every((text, index) => text === job.requirements[index]!.text);
+  return previous?.labels.filter((label) => label.kind === "keyword" || sameRequirements);
+}
+
 /** Score 2 for a tailored CV as it stands: its kept guesses count as such, and its previous labels keep the result steady. */
 export async function scoreTailored(
   deps: { model: ModelDeps; tailor: TailorRepo },
@@ -89,16 +101,32 @@ export async function scoreTailored(
   const { cv, job } = input;
   const keptInferredTexts = Object.values(cv.review ?? {}).flatMap((items) => Object.values(items as Record<string, ItemReview>))
     .filter((item) => item.inferred && item.kept).map((item) => item.text);
-  const previous = cv.score ?? await deps.tailor.getScore(cv.jobId, "tailored", cv.id)
-    ?? await deps.tailor.getScore(cv.jobId, "base");
-  const sameRequirements = previous?.requirementTexts !== undefined
-    && previous.requirementTexts.length === job.requirements.length
-    && previous.requirementTexts.every((text, index) => text === job.requirements[index]!.text);
   return scoreMatch({ model: deps.model }, {
     // Items hidden for this job are not on the CV the recruiter sees, so they do not count.
     userId: input.userId, cv: withoutHidden(cv.content), job, keptInferred: new Set(), keptInferredTexts,
-    previous: previous?.labels.filter((label) => label.kind === "keyword" || sameRequirements),
+    previous: await previousLabels(deps, cv, job),
   });
+}
+
+/**
+ * The kept changes that take away words a requirement or keyword was met with before this step (26 Nov: a reworded
+ * line lost "shared change documentation", the only evidence for "knowledge management", and the score fell 82 → 80).
+ * Each change is tried alone on the step's starting CV: one that leaves fewer lines quoting an evidence part is dropped.
+ */
+function evidenceDropped(labels: MatchLabel[] | undefined, start: CvContent, kept: { key: string; applied: Proposal }[], section: TailorSection): Set<string> {
+  const parts = [...new Set((labels ?? []).filter((label) => label.status !== "missing" && !label.inferred && label.evidence)
+    .flatMap((label) => label.evidence!.split(" | ").map((part) => part.trim())).filter(Boolean))];
+  if (parts.length === 0) return new Set();
+  const count = (cv: CvContent) => {
+    const texts = scoredTexts(withoutHidden(cv));
+    return parts.map((part) => texts.filter((text) => text.includes(part)).length);
+  };
+  const before = count(start);
+  return new Set(kept.filter(({ applied }) => {
+    const alone = structuredClone(start);
+    apply(alone, applied, section);
+    return count(alone).some((n, i) => n < before[i]!);
+  }).map(({ key }) => key));
 }
 
 /**
@@ -144,6 +172,7 @@ export async function acceptSection(
   const flags = new Map(body.flags.map((f) => [f.questionId, f.confirmed]));
   const state: Record<string, ItemReview> = {};
   const notes: { roleId: string | null; note: Note }[] = [];
+  const kept: { key: string; applied: Proposal }[] = [];
   for (const p of (run.proposals ?? []).filter((proposal) => ids.has(proposal.itemId))) {
     const key = reviewKey(p);
     let keep: boolean | undefined;
@@ -177,7 +206,18 @@ export async function acceptSection(
     // A guess keeps its reason, which the guided review shows.
     state[key] = { kept: keep ?? !p.flags.length, inferred: p.inferred, reviewed: keep !== undefined, text: applied.text,
       ...(p.inferred && p.reason ? { reason: p.reason } : {}) };
-    if (keep ?? !p.flags.length) apply(content, applied, section);
+    if (keep ?? !p.flags.length) kept.push({ key, applied });
+  }
+  // A step must not end below where it started: a change that drops met evidence is left out, and its line keeps the
+  // wording it had (shown as not kept).
+  const dropped = evidenceDropped(await previousLabels(deps, { id: doc.id, jobId: run.jobId, score: doc.score }, input.job.extracted),
+    structuredClone(content), kept, section);
+  for (const { key, applied } of kept) {
+    if (dropped.has(key)) {
+      // The line's summary guesses went with it.
+      for (const at of Object.keys(state)) if (at === key || at.startsWith(`${key}#`)) state[at] = { ...state[at]!, kept: false };
+    }
+    else apply(content, applied, section);
   }
   const parsed = CvContentSchema.safeParse(content);
   if (!parsed.success) throw new ApiError(502, "ai_failed", `Couldn't tailor ${section}. Try again.`);

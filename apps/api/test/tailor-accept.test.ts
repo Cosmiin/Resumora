@@ -149,6 +149,28 @@ describe("accept section", () => {
     expect(score.labels.find((label) => label.ref === "r0")?.status).toBe("missing");
   });
 
+  it("keeps a line's earlier wording when a kept rewording drops the words that met a keyword, so the step can't lower the score", async () => {
+    const runId = await start();
+    const previous: MatchScore = {
+      policy: "match/1", total: 100, band: "excellent", capped: false,
+      parts: { requirements: null, keywords: null, seniority: null, langEdu: null }, requirementTexts: [job.requirements[0]!.text],
+      labels: [
+        { ref: "r0", kind: "requirement", status: "met", evidence: "Payroll person.", inferred: false },
+        { ref: "k:Payroll", kind: "keyword", status: "met", evidence: first.text, inferred: false },
+      ],
+    };
+    await repo().saveScore(jobId, "tailored", tailored().id, previous);
+    await run(runId, "experience", reword(first.id, "Managed payroll records"), reword(second.id, "Filed payroll taxes"));
+    const missing = { ...scoreReply(), labels: scoreReply().labels.map((label) => ({ ...label, status: "missing", evidence: null })) };
+    const res = await accept(runId, "experience", { decisions: [{ itemId: first.id, keep: true }, { itemId: second.id, keep: true }] }, missing);
+    expect(res.status).toBe(200);
+    const { score } = await res.json() as { score: MatchScore };
+    const doc = tailored();
+    expect(doc.content.experience[0]!.bullets.map((b) => b.text)).toEqual([first.text, "Filed payroll taxes"]);
+    expect(doc.review).toMatchObject({ experience: { [first.id]: { kept: false }, [second.id]: { kept: true } } });
+    expect(score.labels.find((label) => label.ref === "k:Payroll")).toMatchObject({ status: "met", evidence: first.text });
+  });
+
   it("writes only the kept Experience proposals, saves Score 2 and moves to Skills", async () => {
     const runId = await start();
     await run(runId, "experience", reword(first.id, "Ran accurate payroll for 40 staff"), reword(second.id, "Filed payroll taxes"));
