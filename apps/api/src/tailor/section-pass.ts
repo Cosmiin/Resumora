@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  MAX_PROJECT_BULLETS, isLightTailorSection, isRoleSection, placeGuesses, scoredItems, startsInPastTense, stepItems, type CvContent, type LightTailorSection, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
+  MAX_PROJECT_BULLETS, isLightTailorSection, isRoleSection, placeGuesses, scoredItems, startsInPastTense, stepItems, type Answer, type CvContent, type LightTailorSection, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError, type LogFn } from "../errors.ts";
@@ -22,6 +22,16 @@ const ModelProposalsSchema = z.object({
   })),
 });
 const VerifySchema = z.object({ results: z.array(z.object({ itemId: z.string(), claims: z.array(z.string()) })) });
+
+/**
+ * What an all-roles answer says, as a note: "Used KissFlow", or for something similar the person's own tool without
+ * the asked one's name, so no check reads it as a source for that tool. Null when neither was used.
+ */
+export function acrossNote(question: TailorQuestion, answer: Answer): string | null {
+  if (answer.via === "skip" || answer.use === "none" || !answer.value?.trim()) return null;
+  if (answer.use === "similar") return `Used ${answer.value.trim()} for the kind of work a tool the job names does (not that tool itself)`;
+  return `Used ${question.skill ?? question.text}`;
+}
 
 /**
  * Experience and Projects & volunteering go item by item: each step names the run's current item,
@@ -144,9 +154,15 @@ export async function passProposals(
   const items = sectionItems(cv, section, roleId);
   // Flag questions quote the flagged proposal, so their answers are never a source.
   const asked = new Map((run.questions ?? []).filter((question) => question.kind !== "flag"
-    && (!isRoleSection(section) || question.roleId === roleId)).map((question) => [question.id, question.text]));
-  const answers = (run.answers ?? []).flatMap((answer) => answer.value && asked.has(answer.questionId)
-    ? [{ question: asked.get(answer.questionId)!, answer: answer.value }] : []);
+    && (!isRoleSection(section) || question.roleId === roleId)).map((question) => [question.id, question]));
+  // An all-roles answer goes in as its note: a similar tool never brings the asked tool's name along as a source.
+  const answers = (run.answers ?? []).flatMap((answer) => {
+    const question = asked.get(answer.questionId);
+    if (!answer.value || !question) return [];
+    if (question.scope !== "all") return [{ question: question.text, answer: answer.value }];
+    const note = acrossNote(question, answer);
+    return note ? [{ question: "Used in the roles ticked", answer: note }] : [];
+  });
   const ownItems = stepItems(cv, section).filter((item) => item.id === roleId)
     .map((item) => ({ ...item, notes: item.notes.filter((note) => !note.jobId || note.jobId === run.jobId) }));
   const sources = [...texts(isRoleSection(section) ? ownItems : cv),
@@ -157,7 +173,8 @@ export async function passProposals(
     const question = (run.questions ?? []).find((q) => q.id === answer.questionId);
     const roles = (answer.roleIds ?? []).flatMap((id) => cv.experience.filter((role) => role.id === id))
       .map((role) => [role.title, role.company].filter((part) => part.trim()).join(" · "));
-    if (question?.kind === "skill" && question.skill && answer.via !== "skip" && roles.length > 0) {
+    const used = question?.scope !== "all" || answer.use === "used";
+    if (question?.kind === "skill" && question.skill && used && answer.via !== "skip" && roles.length > 0) {
       usedIn.set(question.skill.trim().toLowerCase(), `Used in: ${roles.join(", ")}`);
     }
   }

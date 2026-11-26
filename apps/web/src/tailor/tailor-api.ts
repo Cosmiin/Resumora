@@ -47,6 +47,12 @@ export async function askQuestions(id: string, section: TailorSection, roleId?: 
   return body.questions;
 }
 
+/** The questions answered once for every role (a tool or practice the CV misses), before the first role's own. */
+export async function askAcross(id: string): Promise<TailorQuestion[]> {
+  const body = await apiFetch(`${run(id)}/across-questions`, { method: "POST", json: {}, schema: z.object({ questions: z.array(TailorQuestionSchema) }) });
+  return body.questions;
+}
+
 export async function sendAnswers(id: string, answers: Answer[]): Promise<void> {
   await apiFetch(`${run(id)}/answers`, { method: "POST", json: { answers }, schema: z.object({ ok: z.literal(true) }) });
 }

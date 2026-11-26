@@ -524,3 +524,64 @@ describe("skills questions", () => {
     expect(await jobNotes()).toEqual([expect.objectContaining({ roleId: older.id, answer: "Used SQL (A little)" })]);
   });
 });
+
+describe("questions for every role at once", () => {
+  const tool = (skill: string, over: Partial<ModelQuestion> = {}) =>
+    ask(`Did you use ${skill}?`, { roleId: null, skill, options: [], ...over });
+  const across = async (runId: string) => {
+    const res = await call(`/v1/tailor-runs/${runId}/across-questions`);
+    expect(res.status).toBe(200);
+    return (await res.json() as { questions: Question[] }).questions;
+  };
+  const answer = (runId: string, body: unknown) => call(`/v1/tailor-runs/${runId}/answers`, { answers: [body] });
+
+  it("asks a missing tool once for all roles, then never again", async () => {
+    const runId = await startRun();
+    replies = [[tool("Kubernetes"), tool("Docker", { gap: "nope" })]];
+    const got = await across(runId);
+    expect(got.map((q) => [q.text, q.kind, q.scope, q.roleId, q.section, q.skill, q.gap])).toEqual([
+      ["Did you use Kubernetes?", "skill", "all", null, "experience", "Kubernetes", "r0"],
+    ]);
+    const sent = JSON.parse((model.requests[0]!.messages as { content: string }[])[1]!.content) as { roles: { id: string }[] };
+    expect(sent.roles.map((r) => r.id)).toEqual([newest.id, older.id]);
+    expect(await across(runId)).toEqual([]);
+    expect(model.requests).toHaveLength(1);
+  });
+
+  it("asks nothing across a CV with one role, without calling the model", async () => {
+    await cv.save({ ...base, experience: [newest] }, 1);
+    const runId = await startRun();
+    expect(await across(runId)).toEqual([]);
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it("puts a used tool on each role ticked, and a similar one as itself, never as the tool asked about", async () => {
+    const runId = await startRun();
+    replies = [[tool("Kubernetes"), tool("Team lead", { gap: "r1" })]];
+    const [k8s, lead] = await across(runId);
+    await call(`/v1/tailor-runs/${runId}/answers`, { answers: [
+      { questionId: k8s!.id, value: "Nomad", via: "typed", use: "similar", roleIds: [older.id] },
+      { questionId: lead!.id, value: "Yes", via: "option", use: "used", roleIds: [newest.id, older.id] },
+    ] });
+    const notes = await jobNotes();
+    expect(notes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ roleId: older.id, answer: "Used Nomad for the kind of work a tool the job names does (not that tool itself)" }),
+      expect.objectContaining({ roleId: newest.id, answer: "Used Team lead" }),
+      expect.objectContaining({ roleId: older.id, answer: "Used Team lead" }),
+    ]));
+    expect(notes).toHaveLength(3);
+  });
+
+  it("a tool never used closes its gap in every role; a tool used keeps it open only in the roles ticked", async () => {
+    const runId = await startRun();
+    replies = [[tool("Kubernetes"), tool("Team lead", { gap: "r1" })]];
+    const [k8s, lead] = await across(runId);
+    await answer(runId, { questionId: k8s!.id, value: "No", via: "option", use: "none" });
+    await answer(runId, { questionId: lead!.id, value: "Yes", via: "option", use: "used", roleIds: [newest.id] });
+    replies = [[ask("Did you lead the team on releases?", { gap: "r1" }), ask("Kubernetes here?", { gap: "r0" })]];
+    const first = await questions(runId, "experience", newest.id);
+    expect(first.map((q) => q.gap)).toEqual(["r1"]);
+    const gapsSent = JSON.parse((model.requests.at(-1)!.messages as { content: string }[])[1]!.content).gaps.map((g: { ref: string }) => g.ref);
+    expect(gapsSent).toEqual(["r1"]);
+  });
+});

@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { JobExtraction, MatchLabel, MatchScore, TailorQuestion } from "@resumora/shared";
 
-vi.mock("./tailor-api.ts", () => ({ getLanguages: vi.fn() }));
+vi.mock("./tailor-api.ts", () => ({ askAcross: vi.fn(async () => []), getLanguages: vi.fn() }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
 import { useVoice } from "../cv/enrich/useVoice.ts";
 import { KeywordsStep, keywordsOf } from "./KeywordsStep.tsx";

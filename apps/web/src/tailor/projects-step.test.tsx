@@ -6,7 +6,7 @@ import { emptyCv, TAILOR_SECTIONS, type MatchScore, type TailorQuestion, type Ta
 
 // E6 Task 9: the "Projects & volunteering" step reuses the Experience loop, item by item, with the kind's labels.
 vi.mock("./tailor-api.ts", () => ({
-  startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(), runSection: vi.fn(), acceptSection: vi.fn(),
+  askAcross: vi.fn(async () => []), startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(), runSection: vi.fn(), acceptSection: vi.fn(),
   getScores: vi.fn(), getToneExamples: vi.fn(), redoRole: vi.fn(), acceptRole: vi.fn(), getSteering: vi.fn(), changeSteering: vi.fn(),
 }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));

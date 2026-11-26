@@ -59,6 +59,8 @@ export function TailorFlow() {
   const baseRef = useRef<MatchScore | null>(null);
   const [job, setJob] = useState<JobExtraction | null>(null);
   const started = useRef(false);
+  // The all-roles questions are asked once per visit (a run that already holds some never asks again).
+  const acrossAsked = useRef(false);
   // FinalA: final touches with nothing to change, accepted on their own; the next screen shows a tick for each.
   const [ticks, setTicks] = useState<TailorSection[]>([]);
   // A change inside these screens never needs the newest score on screen, only on the next one.
@@ -105,17 +107,24 @@ export function TailorFlow() {
   async function ask(at: TailorSection) {
     setPhase({ kind: "asking" });
     try {
+      // Before the first role: the tools and practices the CV misses, asked once for every role.
+      if (at === "experience" && !acrossAsked.current && !(runRef.current!.questions ?? []).some((q) => q.scope === "all")) {
+        const across = await api.askAcross(runRef.current!.id);
+        acrossAsked.current = true;
+        if (across.length > 0) return setPhase({ kind: "questions", questions: across, index: 0, answers: across.map(() => undefined) });
+      }
       const questions = await api.askQuestions(runRef.current!.id, at, roleArg(at));
       if (questions.length === 0) return void work(at);
       setPhase({ kind: "questions", questions, index: 0, answers: questions.map(() => undefined) });
     } catch (cause) { fail(cause, at, () => void ask(at)); }
   }
-  async function submit(at: TailorSection, answers: Answer[]) {
+  /** `across`: the answers to the all-roles questions; the current role's own questions come next. */
+  async function submit(at: TailorSection, answers: Answer[], across = false) {
     setPhase({ kind: "working" });
     try {
       await api.sendAnswers(runRef.current!.id, answers);
-      await work(at);
-    } catch (cause) { fail(cause, at, () => void submit(at, answers)); }
+      await (across ? ask(at) : work(at));
+    } catch (cause) { fail(cause, at, () => void submit(at, answers, across)); }
   }
   async function work(at: TailorSection) {
     setPhase({ kind: "working" });
@@ -375,17 +384,19 @@ export function TailorFlow() {
       : <Working text={t("tailor.working", { section: t(`tailor.section.${section}`) })} role={waiting?.item} kind={waiting?.kind} locale={locale} />;
   } else if (phase.kind === "questions") {
     const question = phase.questions[phase.index]!;
+    const across = phase.questions.some((q) => q.scope === "all");
     // Next or Skip stores the answer; after the last question the step's answers go together.
     const answerWith = (answer: Draft) => {
       const answers = phase.answers.map((given, i) => (i === phase.index ? answer : given));
       if (phase.index + 1 < phase.questions.length) return setPhase({ ...phase, index: phase.index + 1, answers });
-      void submit(section, phase.questions.map((q, i): Answer => ({ ...(answers[i] ?? { value: null, via: "skip" }), questionId: q.id })));
+      void submit(section, phase.questions.map((q, i): Answer => ({ ...(answers[i] ?? { value: null, via: "skip" }), questionId: q.id })), across);
     };
     // "Project 1 of 2 · Question 1 of 3": the current item among the step's items of its kind (roles: every role).
     const current = scoredOf(run?.currentRoleId);
     const kindOrder = !run || !isRoleSection(section) ? [] : cv && current
       ? stepOrder(run, cv, section).filter((id) => scoredOf(id)?.kind === current.kind) : section === "experience" ? run.roleOrder ?? [] : [];
-    const progress = run?.currentRoleId && kindOrder.includes(run.currentRoleId)
+    const progress = across ? t("tailor.question.acrossProgress", { n: phase.index + 1, total: phase.questions.length })
+      : run?.currentRoleId && kindOrder.includes(run.currentRoleId)
       ? t(`tailor.question.roleProgress${kindKey(current?.kind)}`, { role: kindOrder.indexOf(run.currentRoleId) + 1, roles: kindOrder.length,
         n: phase.index + 1, total: phase.questions.length })
       : t("tailor.question.progress", { n: phase.index + 1, total: phase.questions.length });
@@ -420,7 +431,7 @@ export function TailorFlow() {
     const moment = !staged ? undefined : asking ? 0 : phase.kind === "working" ? 1 : phase.kind === "review" ? 2 : undefined;
     return <Room jobName={jobName || undefined} onExit={() => void navigate(toJob)} base={baseScore?.total ?? null} now={scoreRef.current?.total ?? null}
       stops={stops} moment={moment}
-      skip={section && phase.kind === "questions" && isRoleSection(section)
+      skip={section && phase.kind === "questions" && isRoleSection(section) && !phase.questions.some((q) => q.scope === "all")
         ? { label: t(`tailor.roleReview.skip${kindKey(scoredOf(run.currentRoleId)?.kind)}`), onSkip: () => void skipRole(section) } : undefined}>
       {settled && <p className="tailor-links">
         <span className="ui-muted">{t("tailor.lookBack")}</span>

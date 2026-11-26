@@ -6,8 +6,8 @@ import {
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
-import { questionSystemPrompt, questionUserMessage } from "./question-prompts.ts";
-import { currentRole } from "./section-pass.ts";
+import { acrossSystemPrompt, acrossUserMessage, questionSystemPrompt, questionUserMessage } from "./question-prompts.ts";
+import { acrossNote, currentRole } from "./section-pass.ts";
 import type { TailorRepo } from "./repo.ts";
 import { steeringText } from "./steering.ts";
 import { stripHeader } from "./strip-header.ts";
@@ -17,6 +17,8 @@ export const MAX_RUN_QUESTIONS = 8;
 export const MAX_ROLE_QUESTIONS = 5;
 export const NON_FOCUS_ROLE_QUESTIONS = 2;
 export const MAX_SKILL_QUESTIONS = 5;
+/** Questions asked once for every role, before the first role. */
+export const MAX_ACROSS_QUESTIONS = 5;
 
 const ModelQuestionsSchema = z.object({
   questions: z.array(z.object({
@@ -113,8 +115,14 @@ export async function askQuestions(
     if (answer && answer.via !== "skip" && answer.value?.trim()) entry.answered = true;
     byGap.set(question.gap, entry);
   }
+  // A gap answered for every role at once stays open only in the roles ticked (for a detail); in the others it is done.
+  const closedAcross = (ref: string) => asked.some((question) => {
+    if (question.scope !== "all" || question.gap !== ref) return false;
+    const answer = answers.get(question.id);
+    return !!answer && answer.via !== "skip" && !(answer.roleIds ?? []).includes(roleId ?? "");
+  });
   // In Experience a gap may be asked once in each role; elsewhere the run-wide rule above applies.
-  const open = role ? (ref: string) => !asked.some((question) => inRole(question) && question.gap === ref)
+  const open = role ? (ref: string) => !closedAcross(ref) && !asked.some((question) => inRole(question) && question.gap === ref)
     : (ref: string) => { const entry = byGap.get(ref); return !entry || (!entry.answered && entry.asks.size < 2); };
   const gaps = (score?.labels ?? []).filter((label) => (label.status !== "met" || label.inferred) && !met.has(label.ref.startsWith("k:") ? label.ref.toLowerCase() : label.ref) && open(label.ref));
   if (score && gaps.length === 0) return [];
@@ -157,6 +165,57 @@ export async function askQuestions(
   return fresh;
 }
 
+/** Requirements a person may have met in several roles; education, languages and certificates are asked elsewhere. */
+const ACROSS_CATEGORIES = new Set(["skill", "experience", "other"]);
+
+/**
+ * The questions answered once for all roles (a tool or practice the CV misses), asked before the first role's own
+ * questions: the person ticks the roles, names something similar, or says neither. Asked once per run, and only
+ * when the CV has two roles or more.
+ */
+export async function askAcross(
+  deps: { model: ModelDeps; tailor: TailorRepo },
+  input: { userId: string; run: TailorRun; job: JobExtraction; cv: CvContent; questionLanguage?: Locale },
+): Promise<Question[]> {
+  const asked = input.run.questions ?? [];
+  if (asked.some((question) => question.scope === "all")) return [];
+  const cv = stripHeader(input.cv).cv;
+  if (cv.experience.length < 2) return [];
+  const score = await deps.tailor.getScore(input.run.jobId, "base");
+  if (!score) return [];
+  const answered = new Set(asked.filter((question) => question.gap && (input.run.answers ?? [])
+    .some((answer) => answer.questionId === question.id && answer.via !== "skip" && answer.value?.trim())).map((question) => question.gap));
+  const gaps = score.labels.filter((label) => (label.status !== "met" || label.inferred) && !answered.has(label.ref)
+    && (label.kind === "keyword" || ACROSS_CATEGORIES.has(input.job.requirements[Number(label.ref.slice(1))]?.category ?? "")));
+  if (gaps.length === 0) return [];
+  const gapRefs = new Set(gaps.map((label) => label.ref));
+  let reply: z.infer<typeof ModelQuestionsSchema>;
+  try {
+    reply = await callModel(deps.model, {
+      userId: input.userId, task: "tailor_questions", tier: "cheap", schema: ModelQuestionsSchema,
+      system: acrossSystemPrompt,
+      user: acrossUserMessage({ cv, job: input.job, gaps, answered: answeredForJob(input.cv, input.run, null), max: MAX_ACROSS_QUESTIONS,
+        questionLanguage: input.questionLanguage }),
+      maxOutputTokens: 2000,
+    });
+  } catch {
+    throw new ApiError(502, "ai_failed", "Couldn't tailor experience. Try again.");
+  }
+  const fresh: Question[] = [];
+  const seen = new Set<string>();
+  for (const question of reply.questions) {
+    const text = question.text.trim().slice(0, MAX_TEXT);
+    // The answer becomes "Used <skill>" on the roles ticked: a question without its short name is dropped.
+    if (!text || !question.skill?.trim() || !gapRefs.has(question.gap) || seen.has(question.gap) || fresh.length >= MAX_ACROSS_QUESTIONS) continue;
+    seen.add(question.gap);
+    const skill = question.skill?.trim().slice(0, MAX_TEXT);
+    fresh.push({ id: newId(), section: "experience", roleId: null, text, kind: "skill", options: [], reason: question.reason, gap: question.gap,
+      scope: "all", ...(skill ? { skill } : {}) });
+  }
+  if (fresh.length > 0) await deps.tailor.updateRun(input.run.id, { questions: [...asked, ...fresh] });
+  return fresh;
+}
+
 /** Stores answers on the run and saves each new non-skip answer as a job note on its role (or the newest role). */
 export async function saveAnswers(
   deps: { cv: CvRepo; tailor: TailorRepo; now(): Date },
@@ -181,8 +240,13 @@ export async function saveAnswers(
     // A confirmed skill goes on every role it was used in ("Used SQL (Yes)"); other answers on their question's role.
     const usedIn = question.kind === "skill" ? (answer.roleIds ?? []).filter((id) => roleIds.has(id)) : [];
     const own = question.roleId && roleIds.has(question.roleId) ? question.roleId : fallback;
+    // An all-roles question notes only the roles ticked: the tool itself, or the similar one named as itself, never as the tool asked.
+    const across = question.scope === "all";
+    if (across && (answer.use === "none" || usedIn.length === 0)) continue;
     const targets = usedIn.length > 0 ? [...new Set(usedIn)] : own ? [own] : [];
-    const text = usedIn.length > 0 && question.skill ? `Used ${question.skill} (${answer.value.trim()})` : answer.value.trim();
+    const text = across
+      ? acrossNote(question, answer) ?? ""
+      : usedIn.length > 0 && question.skill ? `Used ${question.skill} (${answer.value.trim()})` : answer.value.trim();
     for (const roleId of targets) {
       const note = NoteSchema.parse({ id: newId(), question: question.text, answer: text, via: [NOTE_VIA[answer.via]],
         askedAt: deps.now().toISOString(), jobId: run.jobId });

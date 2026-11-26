@@ -9,7 +9,7 @@ import { ApiError, type LogFn } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import { AcceptBodySchema, acceptSection } from "./accept.ts";
 import { runLayoutPass } from "./layout-pass.ts";
-import { askQuestions, MAX_RUN_QUESTIONS, saveAnswers } from "./questions.ts";
+import { askAcross, askQuestions, MAX_RUN_QUESTIONS, saveAnswers } from "./questions.ts";
 import { finishedRole, RedoBodySchema, redoRole } from "./redo.ts";
 import type { TailorRepo } from "./repo.ts";
 import { restartWithSteering } from "./retailor.ts";
@@ -109,6 +109,16 @@ export function tailorRoutes(deps: {
     const questions = await askQuestions({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
       userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section, roleId,
       questionLanguage: c.get("interfaceLanguage"),
+    });
+    return c.json({ questions });
+  });
+
+  // Asked once for every role, before the first role's own questions.
+  app.post("/tailor-runs/:id/across-questions", async (c) => {
+    const { run, job } = await stepRun(c);
+    if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
+    const questions = await askAcross({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
+      userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, questionLanguage: c.get("interfaceLanguage"),
     });
     return c.json({ questions });
   });
