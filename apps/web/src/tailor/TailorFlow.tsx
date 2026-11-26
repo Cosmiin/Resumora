@@ -78,6 +78,8 @@ export function TailorFlow() {
   const roleArg = (at: TailorSection) => (isRoleSection(at) ? runRef.current?.currentRoleId ?? undefined : undefined);
   function fail(cause: unknown, at: TailorSection | null, retry: () => void) {
     if (cause instanceof ApiClientError && cause.code === "job_not_found") { remember(jobId, null); setPhase({ kind: "deleted" }); return; }
+    // The run was made from a CV that was replaced since: start again (the start rebuilds it from the current CV).
+    if (cause instanceof ApiClientError && cause.code === "base_cv_changed") { remember(jobId, null); setRun(null); runRef.current = null; setPhase({ kind: "lang" }); return; }
     const ai = cause instanceof ApiClientError && cause.code === "ai_failed" && at;
     setPhase({ kind: "error", retry, message: ai ? t("tailor.error.ai", { section: t(`tailor.section.${at}`) }) : t("tailor.error.generic") });
   }
@@ -203,8 +205,15 @@ export function TailorFlow() {
   async function start() {
     setPhase({ kind: "keywords", busy: true });
     try {
-      const { run: created } = await api.startTailoring(jobId, steering ?? {}, language);
+      const { run: created, restarted } = await api.startTailoring(jobId, steering ?? {}, language);
       remember(jobId, created.id);
+      // A start over a replaced CV worked out the job's match again and begins from its wording: score from there.
+      if (restarted) {
+        try {
+          const { base } = await api.getScores(jobId);
+          if (base) { baseRef.current = base; scoreRef.current = base; setBaseScore(base); }
+        } catch { /* the run doesn't need it */ }
+      }
       enter(created);
     } catch (cause) { fail(cause, null, () => setPhase({ kind: "keywords", busy: false })); }
   }

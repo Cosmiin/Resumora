@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { AnswerSchema, stepOf, SteeringSchema, TailorLanguageSchema, TailorSectionSchema } from "@resumora/shared";
-import type { Preferences } from "@resumora/shared";
+import type { CvContent, Preferences } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
 import type { AppEnv } from "../app.ts";
 import type { CvRepo } from "../cv/repo.ts";
@@ -14,6 +14,8 @@ import { finishedRole, RedoBodySchema, redoRole } from "./redo.ts";
 import type { TailorRepo } from "./repo.ts";
 import { restartWithSteering } from "./retailor.ts";
 import { runSectionPass } from "./section-pass.ts";
+import { ensureSameBaseCv } from "./base-changed.ts";
+import { scoreMatch } from "./score.ts";
 import { jobNotFound, startTailoring, tailorLanguages } from "./start.ts";
 import { toneExamples } from "./tone-examples.ts";
 
@@ -43,8 +45,22 @@ export function tailorRoutes(deps: {
     const { instruction, language, ...steering } = SteeringSchema.extend({ language: TailorLanguageSchema.optional() })
       .parse(await c.req.json().catch(() => ({})));
     if (!isUuid(id)) throw jobNotFound();
+    const tailor = deps.tailorFor(c);
+    /** Score 1 again, for a job tailored from a Base CV that was replaced since; tailoring goes on without it. */
+    const rescoreBase = async (base: CvContent) => {
+      try {
+        const extracted = (await deps.jobsFor(c).get(id))?.extracted;
+        if (!extracted) return null;
+        const score = await scoreMatch({ model: deps.modelFor(c) }, { userId: c.get("user").id, cv: base, job: extracted, keptInferred: new Set() });
+        await tailor.saveScore(id, "base", null, score);
+        return score;
+      } catch (cause) {
+        deps.log?.({ msg: "base rescore failed", jobId: id, error: cause instanceof Error ? cause.message : String(cause) });
+        return null;
+      }
+    };
     const result = await startTailoring(
-      { jobs: deps.jobsFor(c), cv: deps.cvFor(c), tailor: deps.tailorFor(c), now: deps.now, preferences: deps.preferencesFor && (() => deps.preferencesFor!(c)) },
+      { jobs: deps.jobsFor(c), cv: deps.cvFor(c), tailor, now: deps.now, preferences: deps.preferencesFor && (() => deps.preferencesFor!(c)), rescoreBase },
       id, { ...steering, ...(instruction?.trim() ? { instruction: instruction.trim() } : {}) }, language,
     );
     return c.json(result);
@@ -76,13 +92,19 @@ export function tailorRoutes(deps: {
     if (!run || !job) throw jobNotFound();
     return { run, job };
   }
+  /** A run's step: also 409 base_cv_changed when its tailored CV came from a Base CV that was replaced since. */
+  async function stepRun(c: Context<AppEnv>) {
+    const found = await runWithJob(c);
+    await ensureSameBaseCv({ tailor: deps.tailorFor(c) }, found.run, (await deps.cvFor(c).get()).content);
+    return found;
+  }
 
   app.get("/tailor-runs/:id", async (c) => c.json((await runWithJob(c)).run));
 
   app.post("/tailor-runs/:id/sections/:section/questions", async (c) => {
     const section = TailorSectionSchema.parse(c.req.param("section"));
     const roleId = await roleBody(c);
-    const { run, job } = await runWithJob(c);
+    const { run, job } = await stepRun(c);
     if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
     const questions = await askQuestions({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, {
       userId: c.get("user").id, run, job: job.extracted, cv: (await deps.cvFor(c).get()).content, section, roleId,
@@ -94,7 +116,7 @@ export function tailorRoutes(deps: {
   app.post("/tailor-runs/:id/sections/:section/run", async (c) => {
     const section = TailorSectionSchema.parse(c.req.param("section"));
     const roleId = await roleBody(c);
-    const { run, job } = await runWithJob(c);
+    const { run, job } = await stepRun(c);
     if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
     if (section === "layout") {
       return c.json(await runLayoutPass({ model: deps.modelFor(c), tailor: deps.tailorFor(c) }, { userId: c.get("user").id, run, job: job.extracted }));
@@ -107,7 +129,7 @@ export function tailorRoutes(deps: {
   app.post("/tailor-runs/:id/sections/:section/accept", async (c) => {
     const section = TailorSectionSchema.parse(c.req.param("section"));
     const body = AcceptBodySchema.parse(await c.req.json().catch(() => ({})));
-    const { run, job } = await runWithJob(c);
+    const { run, job } = await stepRun(c);
     return c.json(await acceptSection(
       { model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), jobs: deps.jobsFor(c), now: deps.now },
       { userId: c.get("user").id, run, job, section, body },
@@ -117,7 +139,7 @@ export function tailorRoutes(deps: {
   /** Going back (BackA): new answers for a finished role, and its proposals made again for review. */
   app.post("/tailor-runs/:id/roles/:roleId/redo", async (c) => {
     const { answers } = RedoBodySchema.parse(await c.req.json().catch(() => ({})));
-    const { run, job } = await runWithJob(c);
+    const { run, job } = await stepRun(c);
     if (!job.extracted) throw new ApiError(409, "job_not_ready", "This job isn't ready yet.");
     return c.json(await redoRole({ model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), now: deps.now, log: deps.log }, {
       userId: c.get("user").id, run, job: job.extracted, roleId: c.req.param("roleId"), answers,
@@ -127,7 +149,7 @@ export function tailorRoutes(deps: {
   /** Accepts a redone role; the run stays on its current step. */
   app.post("/tailor-runs/:id/roles/:roleId/accept", async (c) => {
     const body = AcceptBodySchema.parse(await c.req.json().catch(() => ({})));
-    const { run, job } = await runWithJob(c);
+    const { run, job } = await stepRun(c);
     const roleId = finishedRole(run, c.req.param("roleId"));
     return c.json(await acceptSection(
       { model: deps.modelFor(c), tailor: deps.tailorFor(c), cv: deps.cvFor(c), jobs: deps.jobsFor(c), now: deps.now },
@@ -153,7 +175,7 @@ export function tailorRoutes(deps: {
 
   app.post("/tailor-runs/:id/answers", async (c) => {
     const { answers } = AnswersBodySchema.parse(await c.req.json().catch(() => ({})));
-    const { run } = await runWithJob(c);
+    const { run } = await stepRun(c);
     await saveAnswers({ cv: deps.cvFor(c), tailor: deps.tailorFor(c), now: deps.now }, run, answers);
     return c.json({ ok: true });
   });
