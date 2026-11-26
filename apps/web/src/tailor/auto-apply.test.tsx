@@ -75,19 +75,15 @@ describe("tailoring applies plain rewordings by itself", () => {
     expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [], inferred: [], flags: [], roleId: "r1" });
   });
 
-  it("a role with a guess shows only the guess; after Save the next role comes straight up", async () => {
-    const user = userEvent.setup();
+  it("a role with a guess is saved too, with no screen: the guess stays marked on the CV for its review", async () => {
     vi.mocked(askQuestions).mockImplementation(async (_id, _section, roleId) => roleId === "r2"
       ? [{ id: "q2", section: "experience", roleId: "r2", text: "Which tools did you use?", kind: "options", options: ["SQL"], reason: "Gap" }] : []);
     vi.mocked(runSection).mockResolvedValue({ proposals: [reword, guess], questions: [], removed: 0 });
     vi.mocked(acceptSection).mockResolvedValue({ run: run({ currentRoleId: "r2", status: "running" }), score: score(70) });
     open();
-    expect(await screen.findByText("Suggestion 1 of 1")).toBeInTheDocument();
-    expect(screen.getByRole("article")).toHaveTextContent("Checked data quality with sales leads");
-    await user.click(screen.getByRole("button", { name: "Yes, it's true. Use it" }));
-    await user.click(screen.getByRole("button", { name: "Save and continue" }));
-    expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "r1-b2", keep: true }], inferred: [], flags: [], roleId: "r1" });
     expect(await screen.findByText("Which tools did you use?")).toBeInTheDocument();
+    expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [], inferred: [], flags: [], roleId: "r1" });
+    expect(screen.queryByText("Checked data quality with sales leads")).toBeNull();
     expect(screen.queryByText("Business Analyst is done")).toBeNull();
   });
 });

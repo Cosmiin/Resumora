@@ -102,6 +102,18 @@ export function lightList(cv: CvContent, section: "achievements" | LightTailorSe
 /** A hide or an order is not CV text: nothing in it is a claim, so the truth checks skip it. */
 export const notText = (p: Pick<Proposal, "field">) => p.field === "hidden" || p.field === "order";
 
+/** An answer that says no ("No", "Nu", "Never") confirms nothing. */
+const NEGATIVE = /^\s*(no|nu|not|never|niciodat|n-am)\b/i;
+const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+/** Singular and plural count as one word: "systems" is "system". */
+const stem = (word: string) => word.replace(/(ies|es|s)$/, "");
+/** True when every word of 3 letters or more in `phrase` stands in one of the texts. */
+export function confirmedIn(phrase: string, texts: string[]): boolean {
+  const needed = words(phrase).filter((w) => w.length >= 3).map(stem);
+  if (needed.length === 0) return false;
+  return texts.some((text) => { const have = new Set(words(text).map(stem)); return needed.every((w) => have.has(w)); });
+}
+
 /** Written CV text only: ids, layout and metadata would add digits that look like known numbers. */
 export function texts(value: unknown): string[] {
   if (typeof value === "string") return [value];
@@ -167,6 +179,14 @@ export async function passProposals(
     .map((item) => ({ ...item, notes: item.notes.filter((note) => !note.jobId || note.jobId === run.jobId) }));
   const sources = [...texts(isRoleSection(section) ? ownItems : cv),
     ...answers.flatMap((answer) => [answer.question, answer.answer])];
+  // What the person has said yes to (this step's answers, the item's notes) and what the item already says: a guessed
+  // phrase all of whose words stand in one of these is no guess.
+  const affirmed = (answer: string) => !NEGATIVE.test(answer);
+  const confirmed = [
+    ...answers.filter((a) => affirmed(a.answer)).map((a) => `${a.question} ${a.answer}`),
+    ...ownItems.flatMap((item) => [item.description, ...item.bullets.map((b) => b.text),
+      ...item.notes.filter((n) => affirmed(n.answer)).map((n) => `${n.question} ${n.answer}`)]),
+  ];
   // A confirmed skill names the roles it was used in: "Used in: Title · Company, Title · Company".
   const usedIn = new Map<string, string>();
   for (const answer of run.answers ?? []) {
@@ -204,13 +224,16 @@ export async function passProposals(
       const parts = p.itemId !== "summary" && p.inferred
         ? placeGuesses(p.text.trim(), (guesses ?? []).map((g) => ({ text: g.text, reason: g.reason.trim() }))).filter((g) => g.reason)
           .map((g) => ({ text: g.text, reason: g.reason })) : [];
-      const partly = parts.length > 0 ? { inferredParts: parts } : {};
+      // A phrase the person already confirmed is no guess; a line left with none is a plain rewording, used without asking.
+      const open = parts.filter((g) => !confirmedIn(g.text, confirmed));
+      const settled = parts.length > 0 && open.length === 0;
+      const partly = open.length > 0 ? { inferredParts: open } : settled ? { inferred: false } : {};
       // An order that changes nothing is no change, so a section with nothing else passes with a tick.
       const same = (a: string) => a.split(",").map((id) => id.trim()).join(",");
       if (p.itemId === "order" && field && same(p.text) === same(items.get("order")!.fields.order ?? "")) continue;
       // A hide or an order is never a guess: it names no fact, and the person decides it on the screen.
       if (field && p.text.trim() && notText({ field })) kept.push({ ...p, field, text: p.text.trim(), inferred: false, flags: [] });
-      else if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...why, ...guessed, ...partly });
+      else if (field && p.text.trim()) kept.push({ ...p, field, text: p.text.trim(), flags: [], ...(settled && !used ? {} : why), ...guessed, ...partly });
       else if (!field) dropped.push({ itemId: p.itemId, field: p.field });
     }
     if (dropped.length) deps.log?.({ msg: "tailor proposals dropped", section, count: dropped.length, dropped });

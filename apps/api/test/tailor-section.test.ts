@@ -299,6 +299,30 @@ describe("section pass", () => {
     expect(body.proposals[0]!.guesses).toBeUndefined();
   });
 
+  it("a phrase the person already confirmed is no guess; a line left with only such phrases is a plain rewording", async () => {
+    const note = (answer: string) => ({ id: "n1", question: "Did you use knowledge management systems?", answer, via: ["pick" as const], askedAt: "2026-11-10T10:00:00Z" });
+    const line = "Ran payroll for 40 staff and kept knowledge management systems up to date for lifecycle events";
+    const kms = { text: "knowledge management systems", reason: "You confirmed experience with knowledge management systems." };
+    const events = { text: "lifecycle events", reason: "The job asks for it." };
+    await cv.save({ ...base, experience: [{ ...role, notes: [note("Yes, in Confluence")] }] }, 1);
+
+    replies = [proposals(reword(line, { inferred: true, reason: "From your answer", guesses: [kms, events] })), { results: [] }];
+    let body = await (await runSection()).res.json() as { proposals: Proposal[] };
+    expect(body.proposals[0]).toMatchObject({ inferred: true, inferredParts: [events] });
+
+    replies = [proposals(reword(line.replace(" for lifecycle events", ""), { inferred: true, reason: "From your answer", guesses: [kms] })), { results: [] }];
+    body = await (await runSection()).res.json() as { proposals: Proposal[] };
+    expect(body.proposals[0]).toMatchObject({ inferred: false });
+    expect(body.proposals[0]!.inferredParts).toBeUndefined();
+    expect(body.proposals[0]!.reason).toBeUndefined();
+
+    // A "No" confirms nothing.
+    await cv.save({ ...base, experience: [{ ...role, notes: [note("No")] }] }, 2);
+    replies = [proposals(reword(line.replace(" for lifecycle events", ""), { inferred: true, reason: "From your answer", guesses: [kms] })), { results: [] }];
+    body = await (await runSection()).res.json() as { proposals: Proposal[] };
+    expect(body.proposals[0]).toMatchObject({ inferred: true, inferredParts: [kms] });
+  });
+
   it("states the truth rule in the section prompt", async () => {
     replies = [proposals()];
     await runSection();
