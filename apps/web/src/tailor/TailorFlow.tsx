@@ -3,15 +3,13 @@ import { Link, useNavigate, useParams } from "react-router";
 import { findScored, isRoleSection, stepItems, stepOf, stepOrder, type Answer, type CvContent, type JobExtraction, type MatchScore, type Proposal, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { AppShell } from "../layout/AppShell.tsx";
-import { Stepper } from "../ui/index.ts";
 import { Room, StopDone, type Stop } from "./Room.tsx";
 import { getJob, scoreJob } from "../jobs/jobs-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { QuestionCard, type Draft } from "./QuestionCard.tsx";
 import { kindKey, nameOf } from "./role-done.ts";
-import { KeywordsStep, keywordsOf } from "./KeywordsStep.tsx";
-import { LanguageStep } from "./LanguageStep.tsx";
+import { keywordsOf } from "./KeywordsStep.tsx";
 import { Working } from "./Working.tsx";
 import { RoleReview } from "./RoleReview.tsx";
 import { SectionReview } from "./SectionReview.tsx";
@@ -32,7 +30,7 @@ const plain = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
 const sameWords = (a: string, b: string) => plain(a) === plain(b);
 
 /**
- * `/jobs/:id/tailor`: the language check and the keywords, then the room: one stop after another (each role, the
+ * `/jobs/:id/tailor`: starts at once (in the language the person's preferences pick), in the room: one stop after another (each role, the
  * skills, the summary, the last touches), each with its questions, its wait and its review, then the result.
  */
 export function TailorFlow() {
@@ -40,9 +38,9 @@ export function TailorFlow() {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [run, setRun] = useState<TailorRun | null>(null);
-  // The language picked on the language step; a run continued later no longer knows it.
+  // The language the run's CV is written in, from the start; a run continued later no longer knows it.
   const [language, setLanguage] = useState<TailorLanguage | undefined>(undefined);
-  // The base CV's match with the job, for the keywords before tailoring starts.
+  // The base CV's match with the job, for the bar's match.
   const [baseScore, setBaseScore] = useState<MatchScore | null>(null);
   // The Base CV the questions and proposals are made from: shows each role and the wording a change replaces.
   const [cv, setCv] = useState<CvContent | null>(null);
@@ -89,7 +87,7 @@ export function TailorFlow() {
   function fail(cause: unknown, at: TailorSection | null, retry: () => void) {
     if (cause instanceof ApiClientError && cause.code === "job_not_found") { remember(jobId, null); setPhase({ kind: "deleted" }); return; }
     // The run was made from a CV that was replaced since: start again (the start rebuilds it from the current CV).
-    if (cause instanceof ApiClientError && cause.code === "base_cv_changed") { remember(jobId, null); setRun(null); runRef.current = null; setPhase({ kind: "lang" }); return; }
+    if (cause instanceof ApiClientError && cause.code === "base_cv_changed") { remember(jobId, null); setRun(null); runRef.current = null; void start(); return; }
     const ai = cause instanceof ApiClientError && cause.code === "ai_failed" && at;
     setPhase({ kind: "error", retry, message: ai ? t("tailor.error.ai", { section: t(`tailor.section.${at}`) }) : t("tailor.error.generic") });
   }
@@ -241,10 +239,12 @@ export function TailorFlow() {
       enter(created);
     } catch (cause) { fail(cause, null, () => setPhase({ ...confirm, busy: false })); }
   }
-  async function start() {
-    setPhase({ kind: "keywords", busy: true });
+  /** `picked`: another language from the bar's menu; without it the person's default decides. */
+  async function start(picked?: TailorLanguage) {
+    setPhase({ kind: "loading" });
     try {
-      const { run: created, restarted } = await api.startTailoring(jobId, steering ?? {}, language);
+      const { run: created, restarted, language: written } = await api.startTailoring(jobId, steering ?? {}, picked);
+      setLanguage(written);
       remember(jobId, created.id);
       // A start over a replaced CV worked out the job's match again and begins from its wording: score from there.
       if (restarted) {
@@ -254,11 +254,11 @@ export function TailorFlow() {
         } catch { /* the run doesn't need it */ }
       }
       enter(created);
-    } catch (cause) { fail(cause, null, () => setPhase({ kind: "keywords", busy: false })); }
+    } catch (cause) { fail(cause, null, () => void start(picked)); }
   }
   async function load() {
     const stored = remembered(jobId);
-    if (!stored) return setPhase({ kind: "lang" });
+    if (!stored) return void start();
     setPhase({ kind: "loading" });
     try { enter(await api.getRun(stored)); } catch (cause) { fail(cause, null, () => void load()); }
   }
@@ -325,18 +325,12 @@ export function TailorFlow() {
 
   let body: React.ReactNode;
   if (phase.kind === "loading") body = <p role="status">{t("tailor.loading")}</p>;
-  else if (phase.kind === "lang") {
-    body = <LanguageStep jobId={jobId} picked={language} onContinue={(picked) => { setLanguage(picked); setPhase({ kind: "keywords", busy: false }); }} />;
-  } else if (phase.kind === "keywords") {
-    body = <KeywordsStep score={baseScore} roles={cv?.experience ?? []} locale={locale} busy={phase.busy}
-      onBack={() => setPhase({ kind: "lang" })} onStart={() => void start()} onSteer={() => setPhase({ kind: "steer", busy: false })} />;
-  } else if (phase.kind === "steer") {
+  else if (phase.kind === "steer") {
     const { resume } = phase;
-    // Before the start the choices are only kept; on a started run they redo every step, so that asks first.
-    const keywords = (): void => setPhase({ kind: "keywords", busy: false });
+    // New choices redo every step, so that asks first.
     body = <SteeringStep jobId={jobId} roles={cv?.experience ?? []} busy={phase.busy} initial={steering}
-      startLabel={t(resume ? "tailor.steer.save" : "tailor.steer.keep")} onCancel={resume ? () => setPhase(resume) : keywords}
-      onStart={(s) => { if (resume) return setPhase({ kind: "confirm", steering: s, busy: false, resume }); setSteering(s); keywords(); }} />;
+      startLabel={t("tailor.steer.save")} onCancel={() => setPhase(resume)}
+      onStart={(s) => setPhase({ kind: "confirm", steering: s, busy: false, resume })} />;
   } else if (phase.kind === "confirm") {
     body = <SteerConfirm busy={phase.busy} onCancel={() => setPhase(phase.resume)} onRedo={() => void restart(phase.steering, phase)} />;
   } else if (phase.kind === "back") {
@@ -429,8 +423,12 @@ export function TailorFlow() {
     const asking = !!section && (phase.kind === "questions" || phase.kind === "asking");
     const staged = !!section && !FINAL_SECTIONS.includes(section);
     const moment = !staged ? undefined : asking ? 0 : phase.kind === "working" ? 1 : phase.kind === "review" ? 2 : undefined;
+    const words = keywordsOf(scoreRef.current);
+    // Another language starts again, so it is offered only until the first step is saved.
+    const fresh = !stops.some((stop) => stop.state === "ok" && stop.id !== "setup") && (phase.kind === "questions" || phase.kind === "review");
     return <Room jobName={jobName || undefined} onExit={() => void navigate(toJob)} base={baseScore?.total ?? null} now={scoreRef.current?.total ?? null}
-      stops={stops} moment={moment}
+      stops={stops} moment={moment} keywords={words.has.length + words.missing.length > 0 ? { has: words.has.length, total: words.has.length + words.missing.length } : undefined}
+      language={language && { value: language, onPick: fresh ? (picked) => void start(picked) : undefined }}
       skip={section && phase.kind === "questions" && isRoleSection(section) && !phase.questions.some((q) => q.scope === "all")
         ? { label: t(`tailor.roleReview.skip${kindKey(scoredOf(run.currentRoleId)?.kind)}`), onSkip: () => void skipRole(section) } : undefined}>
       {settled && <p className="tailor-links">
@@ -443,12 +441,9 @@ export function TailorFlow() {
     </Room>;
   }
 
-  const step = phase.kind === "lang" ? 0 : 1;
   return <AppShell>
     <main className="ui-page tailor-page">
       <div className="ui-wrap ui-main">
-        <Stepper label={t("tailor.steps")} current={step}
-          steps={[t("tailor.step.language"), t("tailor.step.keywords"), t("tailor.step.roles"), t("tailor.step.summary"), t("tailor.step.finish")]} />
         {jobName && <p className="ui-small ui-muted tailor-for">{t("tailor.for")}: <Link to={toJob}>{jobName}</Link></p>}
         {body}
       </div>

@@ -4,11 +4,8 @@ import type { Draft } from "./QuestionCard.tsx";
 /** Where the tailoring flow stands; each kind is one screen. */
 export type Phase =
   | { kind: "loading" }
-  /** Before tailoring starts: the language check, then the keywords. */
-  | { kind: "lang" }
-  | { kind: "keywords"; busy: boolean }
-  /** The optional tone and extra questions. `resume`: changing them on a started run; going back returns there. */
-  | { kind: "steer"; busy: boolean; resume?: Phase }
+  /** The optional tone and extra questions of a started run. `resume`: where going back returns. */
+  | { kind: "steer"; busy: boolean; resume: Phase }
   | { kind: "confirm"; steering: Steering; busy: boolean; resume: Phase }
   /** Going back (BackA): a finished step, a finished role's answers, a redone role's review. */
   | { kind: "back"; section: TailorSection; resume: Phase }

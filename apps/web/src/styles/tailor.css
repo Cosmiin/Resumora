@@ -242,6 +242,8 @@
 .tailor-room-score { display: inline-flex; align-items: baseline; gap: var(--space-2); padding: 4px 16px; border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
 .tailor-room-score b { font: var(--weight-display) 1.25rem / 1 var(--font-display); }
 .tailor-room-score b.is-up, .tailor-bigscore b.is-up { color: var(--color-good); }
+.tailor-room-lang { margin: 0; color: var(--color-muted); }
+.tailor-room-lang select { font: inherit; padding: 4px 8px; border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper); }
 .tailor-room-body { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 0; }
 .tailor-map { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-5) var(--space-3) var(--space-6) var(--space-5); border-inline-end: 2px solid color-mix(in srgb, var(--color-ink) 12%, transparent); font-size: var(--text-small); }
 .tailor-map ol { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }

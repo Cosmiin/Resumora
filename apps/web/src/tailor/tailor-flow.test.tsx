@@ -77,51 +77,39 @@ describe("tailoring flow", () => {
     expect(screen.getByRole("heading", { name: "Question q1?" })).toBeInTheDocument();
   });
 
-  it("checks the language, shows the keywords, then starts tailoring in the picked language", async () => {
+  it("starts straight away in the person's language, with the keywords and the language in the bar", async () => {
     const user = userEvent.setup();
-    vi.mocked(getLanguages).mockResolvedValue({ cv: "en", ad: "ro", chosen: "en" });
     const label = (ref: string, status: "met" | "missing") => ({ ref, kind: "keyword" as const, status, evidence: null, inferred: false });
     vi.mocked(getScores).mockResolvedValue({ base: { ...score(62), labels: [label("k:SQL", "met"), label("k:dbt", "missing")] }, tailored: null });
+    vi.mocked(askQuestions).mockResolvedValue([question("q1", { roleId: "r1" })]);
+    vi.mocked(startTailoring).mockResolvedValueOnce({ run: makeRun(), language: "en" }).mockResolvedValueOnce({ run: makeRun({ id: "run2" }), language: "ro" });
     renderFlow();
-    expect(await screen.findByRole("heading", { name: "Your CV is in English, this job ad is in Romanian" })).toBeInTheDocument();
-    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Language");
-    expect(screen.getByRole("radio", { name: "English" })).toBeChecked();
-    await user.click(screen.getByRole("radio", { name: "Romanian" }));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("heading", { name: "Question q1?" })).toBeInTheDocument();
+    expect(startTailoring).toHaveBeenCalledWith("one", {}, undefined);
+    expect(getLanguages).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "What this ad looks for" })).toBeNull();
+    expect(await screen.findByLabelText("Keywords from the ad on your CV")).toHaveTextContent("1/2");
+    // Until the first step is saved, another language starts again in that language.
+    const menu = screen.getByRole("combobox", { name: "CV language" });
+    expect(menu).toHaveValue("en");
+    await user.selectOptions(menu, "ro");
+    expect(startTailoring).toHaveBeenLastCalledWith("one", {}, "ro");
+    await waitFor(() => expect(askQuestions).toHaveBeenLastCalledWith("run2", "experience", "r1"));
+    expect(localStorage.getItem("resumora.tailorRun.one")).toBe("run2");
+  });
 
-    expect(screen.getByRole("heading", { name: "What this ad looks for" })).toBeInTheDocument();
-    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Keywords");
-    expect(await screen.findByRole("progressbar", { name: "Keywords from the ad on your CV" })).toHaveAttribute("aria-valuetext", "1 of 2");
-    expect(screen.getByRole("list", { name: "Already on your CV" })).toHaveTextContent("SQL");
-    expect(screen.getByRole("list", { name: "Not on your CV yet" })).toHaveTextContent("dbt");
-    expect(startTailoring).not.toHaveBeenCalled();
-    // Back keeps the language that was picked.
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(await screen.findByRole("radio", { name: "Romanian" })).toBeChecked();
-    await user.click(screen.getByRole("button", { name: "Continue" }));
-    await user.click(screen.getByRole("button", { name: "Start with the first role" }));
-    expect(startTailoring).toHaveBeenCalledWith("one", {}, "ro");
-    await waitFor(() => expect(askQuestions).toHaveBeenCalledWith("run1", "experience", "r1"));
+  it("shows the language as a plain label once a step is saved", async () => {
+    vi.mocked(startTailoring).mockResolvedValue({ run: makeRun({ roleOrder: ["r1", "r2"], currentRoleId: "r2" }), language: "ro" });
+    vi.mocked(askQuestions).mockResolvedValue([question("q1", { roleId: "r2" })]);
+    renderFlow();
+    expect(await screen.findByText("CV in Romanian")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "CV language" })).toBeNull();
   });
 
   it("asks for the match with the base CV when the job has none yet", async () => {
     vi.mocked(getScores).mockResolvedValue({ base: null, tailored: null });
     renderFlow();
     await waitFor(() => expect(scoreJob).toHaveBeenCalledWith("one"));
-  });
-
-  it("keeps the optional tone and extra answers for the start", async () => {
-    const user = userEvent.setup();
-    renderFlow();
-    await user.click(await screen.findByRole("button", { name: "Continue" }));
-    await user.click(screen.getByRole("button", { name: "Tone and extra questions (optional)" }));
-    await user.click(await screen.findByRole("button", { name: /^Confident/ }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.type(screen.getByRole("textbox"), "Lead with payroll");
-    await user.click(screen.getByRole("button", { name: "Keep these choices" }));
-    expect(startTailoring).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Start with the first role" }));
-    expect(startTailoring).toHaveBeenCalledWith("one", { tone: "confident", draws: [], fit: null, focusRoleIds: [], instruction: "Lead with payroll" }, "en");
   });
 
   it("Skip this role leaves the role as it is and moves on; Back to the job leaves the flow", async () => {
@@ -244,12 +232,13 @@ describe("tailoring flow", () => {
     expect(await screen.findByText("This job was deleted")).toBeTruthy();
   });
 
-  it("goes back to the start when the run was made from a CV that was replaced since", async () => {
-    localStorage.setItem("resumora.tailorRun.one", "run1");
-    vi.mocked(getRun).mockResolvedValue(makeRun());
-    vi.mocked(askQuestions).mockRejectedValue(new ApiClientError(409, "base_cv_changed", "replaced"));
+  it("starts again on its own when the run was made from a CV that was replaced since", async () => {
+    localStorage.setItem("resumora.tailorRun.one", "old");
+    vi.mocked(getRun).mockResolvedValue(makeRun({ id: "old" }));
+    vi.mocked(askQuestions).mockRejectedValueOnce(new ApiClientError(409, "base_cv_changed", "replaced")).mockResolvedValue([question("q1", { roleId: "r1" })]);
     renderFlow();
-    expect(await screen.findByRole("heading", { name: "Your CV and this job ad are both in English" })).toBeInTheDocument();
-    expect(localStorage.getItem("resumora.tailorRun.one")).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Question q1?" })).toBeInTheDocument();
+    expect(startTailoring).toHaveBeenCalledWith("one", {}, undefined);
+    expect(localStorage.getItem("resumora.tailorRun.one")).toBe("run1");
   });
 });
