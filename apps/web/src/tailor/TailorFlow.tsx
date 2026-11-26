@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { findScored, isRoleSection, stepItems, stepOf, stepOrder, type Answer, type CvContent, type JobExtraction, type MatchScore, type Proposal, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
+import { getTailored } from "./tailored-api.ts";
 import { AppShell } from "../layout/AppShell.tsx";
 import { Room, type Stop } from "./Room.tsx";
 import { getJob, scoreJob } from "../jobs/jobs-api.ts";
@@ -38,7 +39,7 @@ export function TailorFlow() {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [run, setRun] = useState<TailorRun | null>(null);
-  // The language the run's CV is written in, from the start; a run continued later no longer knows it.
+  // The language the run's CV is written in: from the start, or read from the tailored CV of a run continued later.
   const [language, setLanguage] = useState<TailorLanguage | undefined>(undefined);
   // The base CV's match with the job, for the bar's match.
   const [baseScore, setBaseScore] = useState<MatchScore | null>(null);
@@ -265,7 +266,12 @@ export function TailorFlow() {
     const stored = remembered(jobId);
     if (!stored) return void start();
     setPhase({ kind: "loading" });
-    try { enter(await api.getRun(stored)); } catch (cause) { fail(cause, null, () => void load()); }
+    try {
+      const found = await api.getRun(stored);
+      // The bar's language; without it the bar just leaves the language out.
+      if (found.tailoredCvId) getTailored(found.tailoredCvId).then((doc) => setLanguage((known) => known ?? doc.language), () => {});
+      enter(found);
+    } catch (cause) { fail(cause, null, () => void load()); }
   }
 
   useEffect(() => {

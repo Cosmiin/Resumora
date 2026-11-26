@@ -101,6 +101,18 @@ describe("tailoring flow", () => {
     expect(askAcross).toHaveBeenLastCalledWith("run2");
   });
 
+  it("shows the language of a continued run, still as a menu before its first step is saved", async () => {
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun());
+    vi.mocked(getTailored).mockResolvedValue({ language: "de" } as Awaited<ReturnType<typeof getTailored>>);
+    vi.mocked(askQuestions).mockResolvedValue([question("q1", { roleId: "r1" })]);
+    renderFlow();
+    await screen.findByRole("heading", { name: "Question q1?" });
+    expect(await screen.findByRole("combobox", { name: "CV language" })).toHaveValue("de");
+    expect(getTailored).toHaveBeenCalledWith("cv1");
+    expect(startTailoring).not.toHaveBeenCalled();
+  });
+
   it("shows the language as a plain label once a step is saved", async () => {
     vi.mocked(startTailoring).mockResolvedValue({ run: makeRun({ roleOrder: ["r1", "r2"], currentRoleId: "r2" }), language: "ro" });
     vi.mocked(askQuestions).mockResolvedValue([question("q1", { roleId: "r2" })]);
