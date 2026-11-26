@@ -85,6 +85,9 @@ const questions = async (runId: string, section: string, roleId?: string) => {
   expect(res.status).toBe(200);
   return (await res.json() as { questions: Question[] }).questions;
 };
+/** One more gap in the base score, for a step after a gap was already asked (a gap is asked once per run). */
+const addKeywordGap = (word: string) => memoryTailorRepo("user-a", scores).saveScore(jobId, "base", null,
+  { ...score, labels: [...score.labels, { ref: `k:${word}`, kind: "keyword", status: "missing", evidence: null, inferred: false }] });
 const jobNotes = async () => (await cv.get()).content.experience.flatMap((role) =>
   role.notes.filter((note) => note.jobId === jobId).map((note) => ({ roleId: role.id, ...note })));
 
@@ -111,9 +114,10 @@ describe("job questions", () => {
   });
 
   it("asks from the section's gaps with the cheap tier: 5 per role, 5 in Skills, 8 across the other sections", async () => {
+    await addKeywordGap("docker");
     const runId = await startRun();
-    replies = [Array.from({ length: 6 }, (_, i) => ask(`Experience ${i}?`)), Array.from({ length: 6 }, (_, i) => ask(`Skill ${i}?`, { roleId: null })),
-      Array.from({ length: 6 }, (_, i) => ask(`Summary ${i}?`, { roleId: null, gap: "r1" }))];
+    replies = [Array.from({ length: 6 }, (_, i) => ask(`Experience ${i}?`)), Array.from({ length: 6 }, (_, i) => ask(`Skill ${i}?`, { roleId: null, gap: "r1" })),
+      Array.from({ length: 6 }, (_, i) => ask(`Summary ${i}?`, { roleId: null, gap: "k:docker" }))];
     const first = await questions(runId, "experience");
     expect(first).toHaveLength(5);
     expect(first[0]).toMatchObject({ section: "experience", roleId: newest.id, text: "Experience 0?", id: expect.any(String) });
@@ -245,7 +249,7 @@ describe("job questions", () => {
     await repo.setSteering(run.tailoredCvId!, { focusRoleIds });
     for (const role of [newest, older]) {
       await repo.updateRun(runId, { currentRoleId: role.id });
-      replies = [Array.from({ length: 6 }, (_, i) => ask(`Question ${i} for ${role.id}?`))];
+      replies = [Array.from({ length: 6 }, (_, i) => ask(`Question ${i} for ${role.id}?`, { gap: role === newest ? "r0" : "r1" }))];
       const got = await questions(runId, "experience");
       const nonFocus = !!focusRoleIds?.length && !focusRoleIds.includes(role.id);
       const max = nonFocus ? 2 : 5;
@@ -269,7 +273,7 @@ describe("job questions", () => {
     await repo.setSteering(run.tailoredCvId!, { focusRoleIds: ["deleted-role"] });
     for (const role of [newest, older]) {
       await repo.updateRun(runId, { currentRoleId: role.id });
-      replies = [Array.from({ length: 6 }, (_, i) => ask(`Question ${i} for ${role.id}?`))];
+      replies = [Array.from({ length: 6 }, (_, i) => ask(`Question ${i} for ${role.id}?`, { gap: role === newest ? "r0" : "r1" }))];
       const got = await questions(runId, "experience");
       expect(got).toHaveLength(5);
       const sent = JSON.parse((model.requests.at(-1)!.messages as { content: string }[])[1]!.content);
@@ -365,7 +369,7 @@ describe("job questions", () => {
     expect((await memoryTailorRepo("user-a", scores, docs).getRun(runId))!.questions).toEqual(got);
   });
 
-  it("asks a gap open in 2 roles once in each role, but not twice in one role", async () => {
+  it("asks a gap in one role only: the next role does not ask it again", async () => {
     const runId = await startRun();
     replies = [[ask("Have you used Kubernetes?")]];
     const [inFirst] = await questions(runId, "experience");
@@ -374,9 +378,9 @@ describe("job questions", () => {
     expect(await questions(runId, "experience")).toEqual([]);
     // Accept moves the run to the next role (set directly here: the accept flow has its own tests).
     await memoryTailorRepo("user-a", scores, docs).updateRun(runId, { currentRoleId: older.id });
-    replies = [[ask("Have you used Kubernetes?")]];
+    replies = [[ask("Kubernetes in this role?"), ask("Did you lead the team?", { gap: "r1" })]];
     const inSecond = await questions(runId, "experience");
-    expect(inSecond).toEqual([expect.objectContaining({ text: "Have you used Kubernetes?", gap: "r0", roleId: older.id })]);
+    expect(inSecond.map((q) => q.gap)).toEqual(["r1"]);
   });
 
   it("refuses an Experience question for a role that isn't current with 409", async () => {
@@ -405,18 +409,17 @@ describe("job questions", () => {
     expect(model.requests).toHaveLength(2);
   });
 
-  it("lets a skipped gap come back once, not repeatedly", async () => {
+  it("never asks a skipped gap again, in any section", async () => {
     const runId = await startRun();
     const skip = async (question: Question) =>
       call(`/v1/tailor-runs/${runId}/answers`, { answers: [{ questionId: question.id, value: null, via: "skip" }] });
     replies = [[ask("Kubernetes?")]];
     await skip((await questions(runId, "experience"))[0]!);
-    replies = [[ask("Kubernetes, any at all?", { roleId: null })]];
+    replies = [[ask("Kubernetes, any at all?", { roleId: null }), ask("Lead?", { gap: "r1", roleId: null })]];
     const again = await questions(runId, "skills");
-    expect(again.map((q) => q.text)).toEqual(["Kubernetes, any at all?"]);
+    expect(again.map((q) => q.text)).toEqual(["Lead?"]);
     await skip(again[0]!);
-    replies = [[ask("Kubernetes, really none?"), ask("Lead?", { gap: "r1" })]];
-    expect((await questions(runId, "summary")).map((q) => q.text)).toEqual(["Lead?"]);
+    expect(await questions(runId, "summary")).toEqual([]);
   });
 
   it("does not ask again what was already answered for this job in an earlier run", async () => {
@@ -444,14 +447,15 @@ describe("job questions", () => {
 
 describe("answers", () => {
   it("stores answers in the run and saves job notes: skip none, voice and option mapped, each on its question's role", async () => {
+    await addKeywordGap("terraform");
     const runId = await startRun();
     await memoryTailorRepo("user-a", scores, docs).updateRun(runId, { currentRoleId: older.id });
     replies = [[ask("Kubernetes?"), ask("Docker?")]];
     const [k] = await questions(runId, "experience");
     await memoryTailorRepo("user-a", scores, docs).updateRun(runId, { currentRoleId: newest.id });
-    replies = [[ask("Lead?")]];
+    replies = [[ask("Lead?", { gap: "r1" })]];
     const [lead] = await questions(runId, "experience");
-    replies = [[ask("Terraform?", { roleId: null })]];
+    replies = [[ask("Terraform?", { roleId: null, gap: "k:terraform" })]];
     const [terraform] = await questions(runId, "skills");
     const answers = [
       { questionId: k!.id, value: "Yes", via: "option" },
@@ -572,16 +576,19 @@ describe("questions for every role at once", () => {
     expect(notes).toHaveLength(3);
   });
 
-  it("a tool never used closes its gap in every role; a tool used keeps it open only in the roles ticked", async () => {
+  it("an all-roles question closes its gap in every role and in Skills, whatever the answer", async () => {
     const runId = await startRun();
     replies = [[tool("Kubernetes"), tool("Team lead", { gap: "r1" })]];
     const [k8s, lead] = await across(runId);
     await answer(runId, { questionId: k8s!.id, value: "No", via: "option", use: "none" });
     await answer(runId, { questionId: lead!.id, value: "Yes", via: "option", use: "used", roleIds: [newest.id] });
+    const calls = model.requests.length;
     replies = [[ask("Did you lead the team on releases?", { gap: "r1" }), ask("Kubernetes here?", { gap: "r0" })]];
-    const first = await questions(runId, "experience", newest.id);
-    expect(first.map((q) => q.gap)).toEqual(["r1"]);
-    const gapsSent = JSON.parse((model.requests.at(-1)!.messages as { content: string }[])[1]!.content).gaps.map((g: { ref: string }) => g.ref);
-    expect(gapsSent).toEqual(["r1"]);
+    expect(await questions(runId, "experience", newest.id)).toEqual([]);
+    replies = [[ask("Do you know Kubernetes?", { roleId: null, gap: "r0" })]];
+    expect(await questions(runId, "skills")).toEqual([]);
+    // Nothing left to ask: no model call.
+    expect(model.requests).toHaveLength(calls);
   });
+
 });
