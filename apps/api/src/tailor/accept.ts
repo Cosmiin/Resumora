@@ -213,7 +213,10 @@ export async function acceptSection(
   const dropped = evidenceDropped(await previousLabels(deps, { id: doc.id, jobId: run.jobId, score: doc.score }, input.job.extracted),
     structuredClone(content), kept, section);
   for (const { key, applied } of kept) {
-    if (dropped.has(key)) state[key] = { ...state[key]!, kept: false };
+    if (dropped.has(key)) {
+      // The line's summary guesses went with it.
+      for (const at of Object.keys(state)) if (at === key || at.startsWith(`${key}#`)) state[at] = { ...state[at]!, kept: false };
+    }
     else apply(content, applied, section);
   }
   const parsed = CvContentSchema.safeParse(content);
