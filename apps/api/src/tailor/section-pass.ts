@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  MAX_PROJECT_BULLETS, isLightTailorSection, isRoleSection, placeGuesses, scoredItems, stepItems, type CvContent, type LightTailorSection, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
+  MAX_PROJECT_BULLETS, isLightTailorSection, isRoleSection, placeGuesses, scoredItems, startsInPastTense, stepItems, type CvContent, type LightTailorSection, type JobExtraction, type Proposal, type TailorQuestion, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError, type LogFn } from "../errors.ts";
@@ -211,9 +211,12 @@ export async function passProposals(
       const fields = item.fields;
       const role = isRoleSection(section) ? stepItems(cv, section).find((role) => role.id === item.roleId) : undefined;
       const pastRole = !!role && !role.current && role.endDate !== "";
+      // A current role keeps the tense the person wrote the line in: a line in the past stays in the past.
+      const before = fields[p.field];
+      const pastLine = !!role && !pastRole && before !== undefined && startsInPastTense(before, cv.locale);
       const original = "company" in fields ? fields : undefined;
       const claims = verified.results.filter((result) => result.itemId === p.itemId).flatMap((result) => result.claims);
-      return { ...p, flags: [...checkProposal(p, { sources, original, pastRole, locale: steering!.language }), ...claims.map((detail) => ({ rule: "achievement" as const, detail }))] };
+      return { ...p, flags: [...checkProposal(p, { sources, original, pastRole, pastLine, locale: steering!.language }), ...claims.map((detail) => ({ rule: "achievement" as const, detail }))] };
     });
   }
 

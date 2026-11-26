@@ -1,5 +1,4 @@
 import type { JobExtraction, Proposal, TailorLanguage, TailorSection } from "@resumora/shared";
-import { ROMANIAN_TENSE } from "../enrich/prompts.ts";
 
 /** Final touches for awards, courses, publications and interests: lines reworded, most relevant first, unrelated ones hidden. */
 const LIGHT_RULES = `Each line under an item is its own item: itemId = the line's id, field "text". Reword lines with the job's keywords inside natural sentences.
@@ -7,17 +6,20 @@ Never change an item's name, provider, issuer, publisher, link or date, and neve
 Order: when the order should change, return one proposal with itemId "order", field "order", text = every item id of the section once, comma-separated, most relevant to the job first.
 Hide: for an item with no link to the job, return itemId "hide:" followed by the item's id, field "hidden", text = one short line saying why it isn't relevant to this job. Never hide an item that relates to the job.`;
 
+/** Romanian lines in the past start with "Am" and the past participle, and every verb after it stays a participle. */
+const TAILOR_ROMANIAN_TENSE = "In Romanian, a line in the past starts with \"Am\" and the past participle, and every verb joined to it is a participle too (\"Am coordonat și verificat…\"), never the present (\"Coordonez…\", \"Am coordonat și verific…\").";
+
 const SECTION_RULES: Record<Exclude<TailorSection, "layout">, string> = {
   experience: `Reorder each role's bullets so the most relevant come first (return proposals in that order).
 Use only this item's own bullets, notes, facts and answers.
-A role that has ended keeps past tense; only a current role uses present tense.
+Keep each line in the past tense when the role has ended or the line is already in the past; every verb in the line uses that tense.
 Reword bullets with the job's exact keywords inside natural sentences. Condense old or less relevant roles to 1-2 short bullets' worth of wording.
 Never remove a role, a bullet's facts, or change company, title or dates.
 Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; a role's own wording is itemId = the role's id, field "description". Never return a role's bullets as one field.`,
   projects: `The item under "edit" is a project or a volunteering role (its "kind" says which).
 A volunteering role: tailor it like a role.
 - Use only this item's own bullets, notes, facts and answers.
-- A role that has ended keeps past tense; only a current role uses present tense.
+- Keep each line in the past tense when the role has ended or the line is already in the past; every verb in the line uses that tense.
 - Reorder its bullets so the most relevant come first (return proposals in that order).
 - Reword bullets with the job's exact keywords inside natural sentences.
 - Never remove the item or a bullet's facts, and never change its name (title), organisation (company), dates or link.
@@ -26,7 +28,7 @@ A project: a short place on the CV that proves skills, not a job.
 - Use only the project's own lines, notes and answers.
 - A job keyword may be used only when it is the same thing in other words or a direct part of what the person said ("built agents with the Claude API" supports "LLM integration" and "agentic development"); never a different tool (TypeScript never becomes Java).
 - A job keyword the project doesn't support is left out.
-- An ended project keeps past tense; only an ongoing one uses present tense.
+- An ended project's lines, and any line already in the past, stay in the past tense; every verb in the line uses that tense.
 - Never change its name (title), organisation (company), dates or link.
 Editable fields: each bullet is its own item, itemId = the bullet's id, field "text"; the item's own wording is itemId = its id, field "description". Never return its bullets as one field.`,
   skills: `Reword skill names toward the job's exact keywords, most relevant first (return proposals in that order).
@@ -51,7 +53,7 @@ Principles, most important first:
 2. Each item on its own. When items has "edit" and "context", change only the items under "edit"; "context" is read-only evidence. A note or answer is true for its role's period, not for today.
 3. Respect the item's time and kind of work. Use the job's words only where they describe what the person did there. Do not force a job keyword onto an item it doesn't fit.
 4. A change must be a real improvement: clearer, more specific, or closer to the job with the facts given. If you would only swap words, leave the item out.
-5. A role that has ended stays in the past tense. Only a current role uses the present tense. ${ROMANIAN_TENSE}
+5. Tense. A role that has ended stays in the past tense. A current role keeps the tense each of its lines already has: a line written in the past stays in the past, and never moves to the present. Every verb in a line uses the same tense: "Designed and updated process maps", never "Design and update…" or "Designed and update…". ${TAILOR_ROMANIAN_TENSE}
 6. Mark what you inferred. Set inferred to true for any wording or skill that is a reasonable inference rather than stated, and set reason to one short line (at most 12 words) naming what it rests on (the bullet, note or answer). Set reason to null when inferred is false. When inferred is true outside the summary, also fill guesses with one entry per thing you inferred: text is only the few words that carry the guess (2 to 5 words, never the whole line or clause), copied exactly from your new wording, and reason is one short sentence to the person, at most 20 words, in this shape: 'Your line says "<their own words>", so I inferred this.' Quote the note, the answer or the job requirement instead when that is what you rest on. Otherwise set guesses to null, except in the summary.
 7. Write in the requested language and in the tone given under "steering". Follow the rest of the steering when it doesn't break these principles.
 

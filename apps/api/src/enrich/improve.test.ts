@@ -74,7 +74,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(model.logged.map((entry) => entry.task)).toEqual(["enrich_improve_bullet", "enrich_improve_bullet", "enrich_score"]);
     const first = model.requests[0]!.messages as { role: string; content: string }[];
     const retry = model.requests[1]!.messages as { role: string; content: string }[];
-    expect(retry).toEqual([first[0], { ...first[1], content: first[1]!.content + "\nThe role has ended: start with a past-tense verb." }]);
+    expect(retry).toEqual([first[0], { ...first[1], content: first[1]!.content + "\nThe role has ended: use the past tense for every verb (\"Designed and updated…\")." }]);
   });
 
   it("retries a Romanian present-tense bullet for a past role, asking for the \"Am …\" form", async () => {
@@ -87,7 +87,7 @@ describe("POST /v1/enrich/improve-bullet", () => {
     expect(res.status).toBe(200);
     expect(ImproveAnswerSchema.parse(await res.json())).toMatchObject({ proposal: { text } });
     const retry = model.requests[1]!.messages as { role: string; content: string }[];
-    expect(retry[1]!.content).toContain("The role has ended: start with \"Am\" and the past participle (\"Am coordonat…\").");
+    expect(retry[1]!.content).toContain("The role has ended: start with \"Am\" and the past participle, and keep every verb in the past (\"Am coordonat și verificat…\").");
   });
 
   it("needs detail without a proposal when both answers for a past role use present tense", async () => {
