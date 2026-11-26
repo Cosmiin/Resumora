@@ -24,6 +24,8 @@ type Props = {
   position?: string;
   /** The ad's keywords the CV shows so far (no longer shown here: the match is in the room's bar). */
   keywords?: { has: number; total: number };
+  /** Plain rewordings are used without asking: only the guesses (a fact the person must confirm) are walked. */
+  guessesOnly?: boolean;
 };
 
 /**
@@ -31,7 +33,7 @@ type Props = {
  * my line, or edit it), then the next. A suggestion is used unless the person keeps their line; a guess is used
  * only when the person says it is true. Lines with no suggestion are only counted.
  */
-export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers, removed = 0, kind, position }: Props) {
+export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers, removed = 0, kind, position, guessesOnly = false }: Props) {
   const [decided, setDecided] = useState<Record<string, DiffDecision>>({});
   const [index, setIndex] = useState(0);
   const changes = proposals.filter((p) => p.flags.length === 0);
@@ -42,7 +44,7 @@ export function RoleReview({ role, proposals, locale, busy, onAccept, onAnswers,
     ...(description ? [{ id: role.id, old: role.description, proposal: description as Proposal | undefined }] : []),
     ...role.bullets.map((bullet) => ({ id: bullet.id, old: bullet.text, proposal: find(bullet.id, "text") })),
   ];
-  const open = lines.filter((line) => line.proposal);
+  const open = lines.filter((line) => line.proposal && (!guessesOnly || line.proposal.inferred));
   // What each line stands at: the person's own decision, else the suggestion, except a guess, which waits for a yes.
   const standing = (line: (typeof open)[number]): DiffDecision | null =>
     decided[line.id] ?? (line.proposal!.inferred ? null : { choice: "new", text: line.proposal!.text });

@@ -1,9 +1,10 @@
-import { memo, useCallback, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { memo, useCallback, useContext, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { newId, type Bullet } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import type { BulletOwner, CvAction } from "./cvReducer.ts";
 import { focusField } from "./focus.ts";
 import { PageField } from "./PageField.tsx";
+import { WasContext } from "./was.ts";
 
 /** A weak bullet's tip; `mid` means a score of 40 or more (a softer colour). */
 export type WeakMark = { tip: string; mid: boolean };
@@ -29,6 +30,8 @@ type ItemProps = {
   readText(id: string): number;
   /** Why this bullet is weak; shown as a faint marker. */
   mark?: WeakMark;
+  /** Tailored CV: the Base wording this line replaced; shown behind a dot, with a way back. */
+  was?: string;
 };
 
 const BulletItem = memo(function BulletItem({
@@ -42,6 +45,7 @@ const BulletItem = memo(function BulletItem({
   focusLater,
   readText,
   mark,
+  was,
 }: ItemProps) {
   const owner = useMemo(
     () => (ownerList === "achievements" ? { list: ownerList } : { list: ownerList, itemId: ownerItemId ?? "" }) as BulletOwner,
@@ -49,6 +53,7 @@ const BulletItem = memo(function BulletItem({
   );
   const id = bullet.id;
   const [tipOpen, setTipOpen] = useState(false);
+  const [wasOpen, setWasOpen] = useState(false);
 
   const onChange = useCallback(
     (text: string) => dispatch({ type: "setBullet", owner, bulletId: id, text }),
@@ -97,6 +102,20 @@ const BulletItem = memo(function BulletItem({
           </span>
         </>
       )}
+      {was !== undefined && !mark && (
+        <>
+          <button type="button" className="was-dot" aria-expanded={wasOpen} aria-controls={`was-${id}`}
+            aria-label={t("tailored.changedDot")} title={t("tailored.changedDot")} onClick={() => setWasOpen((o) => !o)} />
+          {wasOpen && (
+            <span className="was-tip" id={`was-${id}`}>
+              <span className="was-tip-label">{t("tailored.was")}</span> <span>{was}</span>
+              <button type="button" className="link" onClick={() => { setWasOpen(false); dispatch({ type: "setBullet", owner, bulletId: id, text: was }); }}>
+                {t("tailored.useOriginal")}
+              </button>
+            </span>
+          )}
+        </>
+      )}
       <PageField
         multiline
         fieldKey={`bullet-${id}`}
@@ -114,6 +133,7 @@ const BulletItem = memo(function BulletItem({
 export function BulletList({ owner, bullets, dispatch, ownerName, marks }: Props) {
   const root = useRef<HTMLUListElement>(null);
   const ownerItemId = owner.list === "achievements" ? undefined : owner.itemId;
+  const was = useContext(WasContext);
 
   const focusLater = useCallback((id: string, caret: number) => {
     requestAnimationFrame(() => {
@@ -142,6 +162,7 @@ export function BulletList({ owner, bullets, dispatch, ownerName, marks }: Props
           focusLater={focusLater}
           readText={readText}
           mark={marks?.get(bullet.id)}
+          was={was?.get(bullet.id)}
         />
       ))}
     </ul>

@@ -128,3 +128,13 @@
 /* score/12: the amounts for a picked option's blank ("Increased sales by …%"). */
 .answer-amounts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .answer-amounts-label { font-size: 12.5px; color: var(--sage-600); }
+
+/* Tailored CV: a quiet dot beside each line tailoring changed; it opens the old wording and a way back */
+.was-dot { position: absolute; inset-inline-start: -22px; inset-block-start: 8px; width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%; background: var(--pine-400); opacity: 0.45; cursor: pointer; }
+.was-dot::after { content: ""; position: absolute; inset: -8px; }
+.was-dot:hover, .was-dot:focus-visible, .was-dot[aria-expanded="true"] { opacity: 1; }
+.was-dot:focus-visible { outline: 2px solid var(--pine-600); outline-offset: 2px; }
+.was-tip { position: absolute; inset-inline-start: -6px; inset-block-start: calc(100% + 2px); z-index: 4; width: 280px; display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 7px; background: var(--pine-50); color: var(--pine-800); border: 1px solid var(--pine-200); }
+.was-tip-label { font-weight: 600; }
+@media (max-width: 720px) { .was-dot { inset-inline-start: -14px; } }
+@media print { .was-dot, .was-tip { display: none; } }

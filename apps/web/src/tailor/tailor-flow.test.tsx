@@ -162,13 +162,9 @@ describe("tailoring flow", () => {
     await user.click(screen.getByRole("button", { name: "Finish the questions" }));
     expect(sendAnswers).toHaveBeenCalledWith("run1", [{ questionId: "q1", value: "Yes, daily", via: "option" }]);
     expect(runSection).toHaveBeenCalledWith("run1", "experience", "r1");
-    expect(await screen.findByText("Ran payroll accurately")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Accept section" }));
-    expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [], roleId: "r1" });
-
-    // The stop ends on its score, and waits for Next.
-    expect(await screen.findByRole("status")).toHaveTextContent("Your match went from 62 to 71.");
-    await user.click(screen.getByRole("button", { name: "Next: Skills" }));
+    // A plain rewording is used without a review, and Skills come straight up.
+    await waitFor(() => expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [], inferred: [], flags: [], roleId: "r1" }));
+    expect(screen.queryByText("Ran payroll accurately")).toBeNull();
     expect(await screen.findByText("Gusto")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Remove Gusto" }));
     await user.click(screen.getByRole("button", { name: "Save skills" }));
@@ -207,19 +203,15 @@ describe("tailoring flow", () => {
   });
 
   it("goes through Experience role by role, then on to Skills", async () => {
-    const user = userEvent.setup();
     localStorage.setItem("resumora.tailorRun.one", "run1");
     vi.mocked(getRun).mockResolvedValue(makeRun({ roleOrder: ["r1", "r2"], currentRoleId: "r1" }));
     vi.mocked(acceptSection)
       .mockResolvedValueOnce({ run: makeRun({ roleOrder: ["r1", "r2"], currentRoleId: "r2", status: "running" }), score: score(66) })
       .mockResolvedValueOnce({ run: makeRun({ roleOrder: ["r1", "r2"], currentRoleId: null, currentSection: "skills" }), score: score(70) });
     renderFlow();
-    await user.click(await screen.findByRole("button", { name: "Accept section" }));
-    await user.click(await screen.findByRole("button", { name: /^Next: / }));
+    // Nothing to confirm in either role: each is saved and the next comes straight up.
     await waitFor(() => expect(askQuestions).toHaveBeenCalledWith("run1", "experience", "r2"));
-    await user.click(await screen.findByRole("button", { name: "Accept section" }));
-    expect(acceptSection).toHaveBeenLastCalledWith("run1", "experience", { decisions: [], inferred: [], flags: [], roleId: "r2" });
-    await user.click(await screen.findByRole("button", { name: "Next: Skills" }));
+    await waitFor(() => expect(acceptSection).toHaveBeenLastCalledWith("run1", "experience", { decisions: [], inferred: [], flags: [], roleId: "r2" }));
     await waitFor(() => expect(askQuestions).toHaveBeenLastCalledWith("run1", "skills", undefined));
   });
 
