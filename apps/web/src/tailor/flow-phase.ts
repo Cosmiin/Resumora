@@ -1,4 +1,4 @@
-import type { Proposal, Steering, TailorQuestion, TailorRun, TailorSection } from "@resumora/shared";
+import type { Proposal, Steering, TailorQuestion, TailorSection } from "@resumora/shared";
 import type { Draft } from "./QuestionCard.tsx";
 
 /** Where the tailoring flow stands; each kind is one screen. */

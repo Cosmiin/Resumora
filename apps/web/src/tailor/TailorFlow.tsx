@@ -223,7 +223,7 @@ export function TailorFlow() {
       setPhase({ kind: "role", roleId: runRef.current!.currentRoleId!, busy: false, resume: review });
     } catch (cause) { fail(cause, "experience", () => setPhase(review)); }
   }
-  /** The Tone and questions screens of a started run, from its stored steering (never from defaults). */
+  /** The Adjust screen of a started run, from its stored steering (never from defaults). */
   async function openSteer(resume: Phase) {
     setPhase({ kind: "loading" });
     try {
@@ -332,7 +332,7 @@ export function TailorFlow() {
   else if (phase.kind === "steer") {
     const { resume } = phase;
     // New choices redo every step, so that asks first.
-    body = <SteeringStep jobId={jobId} roles={cv?.experience ?? []} busy={phase.busy} initial={steering}
+    body = <SteeringStep jobId={jobId} busy={phase.busy} initial={steering}
       startLabel={t("tailor.steer.save")} onCancel={() => setPhase(resume)}
       onStart={(s) => setPhase({ kind: "confirm", steering: s, busy: false, resume })} />;
   } else if (phase.kind === "confirm") {
