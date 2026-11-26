@@ -16,6 +16,8 @@ function cvText(value: unknown): string[] {
   }
   return [];
 }
+/** The CV's text values as the score reads them: evidence must be quoted from one of these. */
+export const scoredTexts = (cv: CvContent): string[] => cvText(stripHeader(cv).cv);
 
 const FLUENT_NEED = /\b(fluent|advanced)\b/i;
 const FLUENT_LEVEL = /\b(c1|c2|native|fluent|advanced)\b/i;
@@ -97,7 +99,9 @@ export async function scoreMatch(
       const previous = input.previous?.find((old) => old.kind === label.kind && (label.kind === "keyword"
         ? old.ref.slice(2).trim().toLowerCase() === label.ref.slice(2).trim().toLowerCase()
         : old.ref === label.ref));
-      return previous?.status === "met" && !previous.inferred && previous.evidence && quoted(previous.evidence)
+      // A previous partial match also stands against a new "missing": re-scoring the same words must not lower it.
+      const better = previous?.status === "met" || (previous?.status === "partial" && label.status === "missing");
+      return better && previous && !previous.inferred && previous.evidence && quoted(previous.evidence)
         ? { ...previous, ref: label.ref } : label;
     });
     const kept = new Set(input.keptInferred);

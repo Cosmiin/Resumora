@@ -43,6 +43,17 @@ describe("scoreMatch", () => {
       ? work.previous[0] : label("r4", { status: "missing", evidence: null }));
   });
 
+  it.each([["missing", "partial"], ["partial", "partial"], ["met", "met"]] as const)(
+    "keeps a previous partial match while its evidence remains, when the new label is %s", async (status, expected) => {
+      const work = input();
+      work.cv.basics.summary = "Designed onboarding workflows";
+      const previous = label("k:sql", { status: "partial", evidence: "Designed onboarding workflows" });
+      const model = fakeModel(() => ({ ...answer(), labels: [label(), label("k:SQL", status === "missing"
+        ? { status, evidence: null } : { status, evidence: "Designed onboarding workflows" })] }));
+      const result = await scoreMatch({ model: model.deps }, { ...work, previous: [previous] });
+      expect(result.labels.find((item) => item.ref === "k:SQL")?.status).toBe(expected);
+    });
+
   it.each([true, false])("keeps previous keyword matches only while every evidence part remains (all present=%s)", async (present) => {
     const work = input();
     work.cv.basics.summary = present ? "Designed onboarding workflows using SQL" : "Designed onboarding workflows";
