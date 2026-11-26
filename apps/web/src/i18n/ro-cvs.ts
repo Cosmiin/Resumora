@@ -77,6 +77,7 @@ export const cvsRo: Record<keyof typeof cvsEn | TailoredPageKey, string> = {
   "tailored.showChanges": "Arată schimbările",
   "tailored.was": "Era:",
   "tailored.useOriginal": "Folosește formularea originală",
+  "tailored.changedDot": "Schimbat pentru acest job: vezi formularea veche",
   "tailored.loadError": "N-am putut încărca CV-ul adaptat.",
   "tailored.none": "Acest job nu are încă un CV adaptat.",
   "tailored.toJob": "Înapoi la job",

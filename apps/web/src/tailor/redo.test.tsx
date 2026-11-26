@@ -80,10 +80,9 @@ describe("going back (BackA)", () => {
     await user.click(screen.getByRole("button", { name: "Update this role" }));
     expect(redoRole).toHaveBeenCalledWith("run1", "r2", [{ questionId: "q2", value: "12 a day", via: "typed" }]);
 
-    await user.click(await screen.findByRole("button", { name: "Use this" }));
-    expect(document.querySelector(".ui-diff-new")).toHaveTextContent("Checked 12 sheets a day");
-    await user.click(screen.getByRole("button", { name: "Save and continue" }));
-    expect(acceptRole).toHaveBeenCalledWith("run1", "r2", { decisions: [{ itemId: "r2-b", keep: true }], inferred: [], flags: [] });
+    // A plain rewording is used without a review.
+    await waitFor(() => expect(acceptRole).toHaveBeenCalledWith("run1", "r2", { decisions: [], inferred: [], flags: [] }));
+    expect(screen.queryByRole("button", { name: "Save and continue" })).toBeNull();
     // Back where the person was: the Skills review, not redone.
     expect(await screen.findByText("Advanced Excel")).toBeTruthy();
     expect(runSection).toHaveBeenCalledTimes(1);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { findScored, isRoleSection, stepItems, stepOf, stepOrder, type Answer, type CvContent, type JobExtraction, type MatchScore, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
+import { findScored, isRoleSection, stepItems, stepOf, stepOrder, type Answer, type CvContent, type JobExtraction, type MatchScore, type Proposal, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { AppShell } from "../layout/AppShell.tsx";
 import { Stepper } from "../ui/index.ts";
@@ -25,6 +25,12 @@ import "../styles/tailor.css";
 
 export { remember, remembered } from "./flow-phase.ts";
 
+/** A guess: an inferred line the person must confirm (flagged lines never reach a review). */
+const isGuess = (p: Proposal) => p.inferred && p.flags.length === 0;
+const plain = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
+/** The same words, whatever the case or spacing. */
+const sameWords = (a: string, b: string) => plain(a) === plain(b);
+
 /**
  * `/jobs/:id/tailor`: the language check and the keywords, then the room: one stop after another (each role, the
  * skills, the summary, the last touches), each with its questions, its wait and its review, then the result.
@@ -40,6 +46,8 @@ export function TailorFlow() {
   const [baseScore, setBaseScore] = useState<MatchScore | null>(null);
   // The Base CV the questions and proposals are made from: shows each role and the wording a change replaces.
   const [cv, setCv] = useState<CvContent | null>(null);
+  // The same CV for the steps that run on from an earlier screen (their closures keep the first render's state).
+  const cvRef = useRef<CvContent | null>(null);
   // Questions may be about a role, a project or a volunteering role (same shape as a job).
   const scoredOf = (id: string | null | undefined) => (cv && id ? findScored(cv, id) : undefined);
   const roleFor = (question: TailorQuestion) => scoredOf(question.roleId)?.item;
@@ -114,7 +122,13 @@ export function TailorFlow() {
     try {
       const { proposals, removed } = await api.runSection(runRef.current!.id, at, roleArg(at));
       if (proposals.length === 0 && FINAL_SECTIONS.includes(at)) return void pass(at);
-      setPhase({ kind: "review", proposals, busy: false, removed });
+      // A role's plain rewordings are used without asking; only a guess (a fact to confirm) opens its review.
+      const none = { decisions: [], inferred: [], flags: [] };
+      if (isRoleSection(at) && !proposals.some(isGuess)) return void accept(at, none, () => void work(at));
+      // Changes that only alter case or spacing (webhooks → Webhooks) are used without a screen; with nothing else, no screen at all.
+      const shown = proposals.filter((p) => !cosmetic(p));
+      if (proposals.length > 0 && shown.length === 0) return void accept(at, none, () => void work(at), true);
+      setPhase({ kind: "review", proposals: shown, busy: false, removed });
     } catch (cause) { fail(cause, at, () => void work(at)); }
   }
   /** FinalA: a final touch with nothing to change is accepted on its own; once saved, the next screen shows its tick. */
@@ -127,15 +141,24 @@ export function TailorFlow() {
       enter(result.run);
     } catch (cause) { fail(cause, at, () => void pass(at)); }
   }
-  async function accept(at: TailorSection, body: api.AcceptBody) {
+  /** A plain change of case or spacing to a skill's name: nothing worth a look. */
+  function cosmetic(p: Proposal) {
+    if (p.inferred || p.flags.length > 0) return false;
+    const base = cvRef.current;
+    const skill = base && [...base.technicalSkills, ...base.professionalSkills].find((s) => s.id === p.itemId);
+    return !!skill && sameWords(skill.name, p.text);
+  }
+  /** `retry`: what a failure offers again (an accept made without a review re-runs its step). */
+  async function accept(at: TailorSection, body: api.AcceptBody, retry?: () => void, quiet = false) {
     setPhase((current) => current.kind === "review" ? { ...current, busy: true } : current);
     try {
       const roleId = roleArg(at);
       const result = await api.acceptSection(runRef.current!.id, at, roleId ? { ...body, roleId } : body);
       const name = roleId ? scoredOf(roleId)?.item.title.trim() || t("tailor.role.untitled") : t(`tailor.section.${at}`);
       const moved = gained(at, roleId, result.score);
-      // A role, the skills or the summary ends on its score; the short last touches go straight on.
-      if (FINAL_SECTIONS.includes(at)) return enter(result.run);
+      // The skills and the summary end on their score once reviewed; a role, the short last touches and a step saved
+      // without a screen go straight on.
+      if (quiet || isRoleSection(at) || FINAL_SECTIONS.includes(at)) return enter(result.run);
       track(result.run);
       setPhase({ kind: "stop", name, ...moved, next: result.run });
     } catch (cause) {
@@ -143,7 +166,7 @@ export function TailorFlow() {
       if (cause instanceof ApiClientError && cause.code === "job_not_found") fail(cause, at, () => {});
       else {
         const review = phase;
-        fail(cause, at, () => setPhase(review.kind === "review" ? { ...review, busy: false } : review));
+        fail(cause, at, retry ?? (() => setPhase(review.kind === "review" ? { ...review, busy: false } : review)));
       }
     }
   }
@@ -163,8 +186,15 @@ export function TailorFlow() {
     try {
       const { proposals, removed } = await api.redoRole(runRef.current!.id, roleId, answers);
       // The role under review goes back to its own review, whose accept moves the run on.
-      const current = isRoleSection(runRef.current?.currentSection) && runRef.current?.currentRoleId === roleId;
-      setPhase(current ? { kind: "review", proposals, removed, busy: false } : { kind: "redo", roleId, proposals, removed, busy: false, resume });
+      const at = runRef.current?.currentSection;
+      const current = isRoleSection(at) && runRef.current?.currentRoleId === roleId;
+      const review: Extract<Phase, { kind: "redo" }> = { kind: "redo", roleId, proposals, removed, busy: false, resume };
+      // Plain rewordings are used without asking, as on the first pass.
+      if (!proposals.some(isGuess)) {
+        const none = { decisions: [], inferred: [], flags: [] };
+        return void (current && at ? accept(at, none, () => setPhase(resume)) : acceptRedo(roleId, none, review));
+      }
+      setPhase(current ? { kind: "review", proposals, removed, busy: false } : review);
     } catch (cause) { fail(cause, "experience", () => setPhase({ kind: "role", roleId, busy: false, resume })); }
   }
   async function acceptRedo(roleId: string, body: api.AcceptBody, review: Extract<Phase, { kind: "redo" }>) {
@@ -234,7 +264,7 @@ export function TailorFlow() {
       setBaseScore(scores.base);
     }, () => {});
     // Without it the screens fall back to the plain list; the run itself doesn't need it.
-    getCv().then((response) => setCv(response.content), () => {});
+    getCv().then((response) => { cvRef.current = response.content; setCv(response.content); }, () => {});
     getJob(jobId).then((found) => setJob(found.extracted ?? null), () => {});
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -319,7 +349,7 @@ export function TailorFlow() {
     const review = phase;
     const role = scoredOf(review.roleId)?.item;
     const onAccept = (accepted: api.AcceptBody) => void acceptRedo(review.roleId, accepted, review);
-    body = role ? <RoleReview key={`redo-${role.id}`} role={role} kind={scoredOf(review.roleId)?.kind} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} />
+    body = role ? <RoleReview key={`redo-${role.id}`} role={role} kind={scoredOf(review.roleId)?.kind} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} guessesOnly />
       : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
         busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
   }
@@ -372,7 +402,7 @@ export function TailorFlow() {
     const position = kindOrder.includes(current.item.id)
       ? t(`tailor.roleReview.position${kindKey(current.kind)}`, { n: kindOrder.indexOf(current.item.id) + 1, total: kindOrder.length }) : undefined;
     const words = keywordsOf(scoreRef.current);
-    body = <RoleReview key={run!.currentRoleId!} role={current.item} kind={current.kind} proposals={review.proposals} locale={locale}
+    body = <RoleReview guessesOnly key={run!.currentRoleId!} role={current.item} kind={current.kind} proposals={review.proposals} locale={locale}
       position={position} keywords={{ has: words.has.length, total: words.has.length + words.missing.length }}
       busy={review.busy} onAccept={(accepted) => void accept(section, accepted)} onAnswers={() => void openAnswers(review)} removed={review.removed} />;
   } else {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   CATEGORY,
   isSectionEmpty,
@@ -21,6 +21,7 @@ import { useFocusAfterRender } from "./useFocusAfterRender.ts";
 import { HeaderEdit } from "./sections/HeaderEdit.tsx";
 import type { RoleScoreState } from "../enrich/useRoleScores.ts";
 import { firstFieldKey, sectionRenderers } from "./sections/renderers.tsx";
+import { changedBullets, WasContext } from "./was.ts";
 
 type Props = {
   cv: CvContent;
@@ -35,12 +36,15 @@ type Props = {
   sectionAction?(key: SectionKey): ReactNode;
   /** Tailored CV: a "···" menu on each heading, empty sections hidden automatically, and the hidden line under the page. */
   tailored?: boolean;
+  /** Tailored CV: the Base wording; each line tailoring changed gets a dot that shows it and brings it back. */
+  original?: CvContent;
 };
 
 type Deleted = { key: SectionKey; name: string; from: CvContent };
 
 /** The CV page where every piece of text is typed in place. */
-export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId, template, sectionAction, tailored = false }: Props) {
+export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId, template, sectionAction, tailored = false, original }: Props) {
+  const was = useMemo(() => (tailored && original ? changedBullets(cv, original) : null), [tailored, original, cv]);
   const root = useRef<HTMLDivElement>(null);
   const focusLater = useFocusAfterRender(root);
   const [deleted, setDeleted] = useState<Deleted | null>(null);
@@ -89,6 +93,7 @@ export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId
   );
 
   const page = (
+    <WasContext.Provider value={was}>
     <div className={template ? `cv-page cv-page-edit ${getTemplate(template).className}` : "cv-page cv-page-edit"} ref={root} tabIndex={-1}>
       <HeaderEdit basics={cv.basics} dispatch={dispatch} tailored={tailored} template={template} />
       {layout.order.map((key) => {
@@ -112,6 +117,7 @@ export function EditablePage({ cv, dispatch, opened, onOpen, scores, toolsRoleId
         ) : null;
       })}
     </div>
+    </WasContext.Provider>
   );
   if (!tailored) return page;
   return (

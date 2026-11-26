@@ -319,6 +319,7 @@ export const tailorEn = {
   "tailored.showChanges": "Show changes",
   "tailored.was": "Was:",
   "tailored.useOriginal": "Use original wording",
+  "tailored.changedDot": "Changed for this job: see the old wording",
   "tailored.loadError": "Couldn't load your tailored CV.",
   "tailored.none": "This job has no tailored CV yet.",
   "tailored.toJob": "Back to the job",

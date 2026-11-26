@@ -149,12 +149,12 @@ describe("the Experience review in the flow", () => {
     vi.mocked(getRun).mockResolvedValue(run());
     vi.mocked(askQuestions).mockResolvedValue([]);
     vi.mocked(sendAnswers).mockResolvedValue(undefined);
-    vi.mocked(runSection).mockResolvedValue({ proposals: [proposals[1]!], questions: [] });
+    vi.mocked(runSection).mockResolvedValue({ proposals: [proposals[2]!], questions: [] });
   });
 
   it("shows the current role's review; Change my answers updates this role and the accept still moves the run on", async () => {
     const user = userEvent.setup();
-    vi.mocked(redoRole).mockResolvedValue({ proposals: [{ ...proposals[1]!, text: "Made daily KPI reports" }], removed: 0 });
+    vi.mocked(redoRole).mockResolvedValue({ proposals: [{ ...proposals[2]!, text: "Checked data daily with sales leads" }], removed: 0 });
     vi.mocked(acceptSection).mockResolvedValue({ run: run({ status: "done", currentSection: null }), score: score(70) });
     const router = createMemoryRouter([{ path: "/jobs/:id/tailor", element: <TailorFlow /> }, { path: "/jobs/:id/cv", element: <p>CV page</p> }],
       { initialEntries: ["/jobs/one/tailor"] });
@@ -169,11 +169,11 @@ describe("the Experience review in the flow", () => {
     expect(redoRole).toHaveBeenCalledWith("run1", "r1", [{ questionId: "q1", value: "Daily", via: "typed" }]);
 
     const card = await screen.findByRole("region", { name: "Business Analyst, Emedi" });
-    expect(card.querySelector(".ui-diff-new")).toHaveTextContent("Made daily KPI reports");
+    expect(card.querySelector(".ui-diff-new")).toHaveTextContent("Checked data daily with sales leads");
     expect(within(card).getByText("Role 1 of 1 · Mar 2021 – Present")).toBeInTheDocument();
-    await user.click(within(card).getByRole("button", { name: "Use this" }));
+    await user.click(within(card).getByRole("button", { name: "Yes, it's true. Use it" }));
     await user.click(screen.getByRole("button", { name: "Save and continue" }));
-    expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b1", keep: true }], inferred: [], flags: [], roleId: "r1" });
+    expect(acceptSection).toHaveBeenCalledWith("run1", "experience", { decisions: [{ itemId: "b2", keep: true }], inferred: [], flags: [], roleId: "r1" });
     expect(acceptRole).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { emptyCv, TAILOR_SECTIONS, type MatchScore, type TailorQuestion, type TailorRun } from "@resumora/shared";
@@ -55,7 +55,7 @@ describe("Projects & volunteering step", () => {
   it("asks about the project beside it, reviews it as on the CV, then goes on to the volunteering role", async () => {
     const user = userEvent.setup();
     vi.mocked(askQuestions).mockImplementation(async (_id, _section, roleId) => [question(roleId!)]);
-    vi.mocked(runSection).mockResolvedValue({ proposals: [{ itemId: "p1-b", field: "text", text: "Built an Excel payroll checker", inferred: false, flags: [] }], questions: [] });
+    vi.mocked(runSection).mockResolvedValue({ proposals: [{ itemId: "p1-b", field: "text", text: "Built an Excel payroll checker", inferred: true, flags: [], reason: "From your answer" }], questions: [] });
     vi.mocked(acceptSection).mockResolvedValue({ run: run({ currentRoleId: "v1" }), score: score(84) });
     open();
 
@@ -70,11 +70,11 @@ describe("Projects & volunteering step", () => {
     expect(screen.getByText(/^Project 1 of 1/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Skip this project" })).toBeInTheDocument();
     expect(runSection).toHaveBeenLastCalledWith("run1", "projects", "p1");
+    await user.click(screen.getByRole("button", { name: "Yes, it's true. Use it" }));
     await user.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "projects", expect.objectContaining({ roleId: "p1" }));
 
-    // The project ends on its score; Next goes on to the next item.
-    await user.click(await screen.findByRole("button", { name: /^Next: / }));
+    // Saved, the next item comes straight up.
     expect(await screen.findByText("Volunteering 1 of 1 · Question 1 of 1")).toBeInTheDocument();
     expect(askQuestions).toHaveBeenLastCalledWith("run1", "projects", "v1");
     expect(screen.getByText("The volunteering role, as it is on your CV now")).toBeInTheDocument();
@@ -113,8 +113,10 @@ describe("a project with nothing to change (browser check)", () => {
     vi.mocked(runSection).mockResolvedValue({ proposals: [], questions: [] });
   });
 
-  it("says so in project words", async () => {
+  it("is saved as it is, with no screen of its own", async () => {
+    vi.mocked(acceptSection).mockResolvedValue({ run: run({ status: "done", currentSection: null }), score: score(82) });
     open();
-    expect(await screen.findByText("Nothing to change in this project ✓")).toBeInTheDocument();
+    await waitFor(() => expect(acceptSection).toHaveBeenCalledWith("run1", "projects", { decisions: [], inferred: [], flags: [], roleId: "p1" }));
+    expect(screen.queryByText("Nothing to change in this project ✓")).toBeNull();
   });
 });

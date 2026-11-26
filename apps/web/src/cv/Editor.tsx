@@ -274,7 +274,7 @@ export function Editor({ initial, source = baseSource, mode = "base", tailored }
   ) : tailored && showChanges ? (
     <CvDocument content={content} template={tailored.template} highlights={tailored.highlights} inferred={tailored.inferred} sectionAction={tailored.sectionAction} />
   ) : (
-    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} template={tailored ? tailored.template : startTemplate.template} sectionAction={tailored?.sectionAction} tailored={isTailored} />
+    <EditablePage cv={content} dispatch={dispatch} opened={opened} onOpen={onOpen} scores={scores} toolsRoleId={sectionFocus?.key === "experience" ? sectionFocus.itemId : undefined} template={tailored ? tailored.template : startTemplate.template} sectionAction={tailored?.sectionAction} tailored={isTailored} original={tailored?.original} />
   );
 
   const importScreen = importId && (
