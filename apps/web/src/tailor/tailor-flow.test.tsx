@@ -251,4 +251,13 @@ describe("tailoring flow", () => {
     renderFlow();
     expect(await screen.findByText("This job was deleted")).toBeTruthy();
   });
+
+  it("goes back to the start when the run was made from a CV that was replaced since", async () => {
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun());
+    vi.mocked(askQuestions).mockRejectedValue(new ApiClientError(409, "base_cv_changed", "replaced"));
+    renderFlow();
+    expect(await screen.findByRole("heading", { name: "Your CV and this job ad are both in English" })).toBeInTheDocument();
+    expect(localStorage.getItem("resumora.tailorRun.one")).toBeNull();
+  });
 });

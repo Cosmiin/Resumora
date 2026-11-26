@@ -28,10 +28,11 @@ export function getLanguages(jobId: string): Promise<Languages> {
 }
 
 /** `language`: the one picked on the language step; without it the person's default decides. */
-export function startTailoring(jobId: string, steering: Steering, language?: TailorLanguage): Promise<{ run: TailorRun; language: TailorLanguage }> {
+export function startTailoring(jobId: string, steering: Steering, language?: TailorLanguage): Promise<{ run: TailorRun; language: TailorLanguage; restarted?: true }> {
   return apiFetch(`/v1/jobs/${encodeURIComponent(jobId)}/tailor`, {
     method: "POST", json: language ? { ...steering, language } : steering,
-    schema: z.object({ run: TailorRunSchema, tailoredCvId: z.string(), language: TailorLanguageSchema }),
+    // `restarted`: the job was tailored from a CV that has since been replaced, so it starts again from the current one.
+    schema: z.object({ run: TailorRunSchema, tailoredCvId: z.string(), language: TailorLanguageSchema, restarted: z.literal(true).optional() }),
   });
 }
 

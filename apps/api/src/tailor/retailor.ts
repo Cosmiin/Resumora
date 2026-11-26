@@ -4,6 +4,7 @@ import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
 import type { TailorRepo } from "./repo.ts";
+import { fromOtherBaseCv, restartFromBase } from "./base-changed.ts";
 import { jobNotFound } from "./start.ts";
 
 export const RetailorBodySchema = z.object({ sections: z.array(TailorSectionSchema).min(1).max(TAILOR_SECTIONS.length * 2) });
@@ -26,6 +27,8 @@ export async function startRetailor(
   // The lighter sections are reworded from the Base CV and rebuilt from it on accept, so items added to the Base CV
   // since the first tailoring count (a course added later still gets its step).
   const base = (await deps.cv.get()).content;
+  // Made from a Base CV that has since been replaced: every step starts again from the current one.
+  if (fromOtherBaseCv(doc.content, base)) return { run: await restartFromBase(deps, { jobId: doc.jobId, tailoredCvId, base }) };
   const sections = runSections({ ...doc.content, courses: base.courses, publications: base.publications, interests: base.interests }, picked);
   if (sections.length === 0) throw new ApiError(400, "invalid_content", "This CV has nothing to tailor in those steps.");
   const run = await deps.tailor.createRun({

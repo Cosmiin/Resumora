@@ -1,13 +1,15 @@
-import { DEFAULT_PREFERENCES, runItems, runSections, type Preferences, type Steering, type TailorLanguage, type TailorRun } from "@resumora/shared";
+import { DEFAULT_PREFERENCES, runItems, runSections, type CvContent, type MatchScore, type Preferences, type Steering, type TailorLanguage, type TailorRun } from "@resumora/shared";
 import type { CvRepo } from "../cv/repo.ts";
 import { ApiError } from "../errors.ts";
 import type { JobRepo } from "../jobs/repo.ts";
+import { fromOtherBaseCv, restartFromBase } from "./base-changed.ts";
 import { detectAdLanguage } from "./language.ts";
 import type { TailorRepo } from "./repo.ts";
 
 export const jobNotFound = () => new ApiError(404, "job_not_found", "This job was deleted.");
 
-export type StartResult = { run: TailorRun; tailoredCvId: string; language: TailorLanguage };
+/** `restarted`: the job's copy was made from a replaced Base CV and started again from the current one. */
+export type StartResult = { run: TailorRun; tailoredCvId: string; language: TailorLanguage; restarted?: true };
 /** The language check before tailoring: the CV's language, the ad's (null when unclear), and the one a start would use. */
 export type TailorLanguages = { cv: TailorLanguage; ad: TailorLanguage | null; chosen: TailorLanguage };
 
@@ -37,7 +39,11 @@ export async function tailorLanguages(deps: LanguageDeps, jobId: string): Promis
  * The unique (job_id, language) row makes a second start at the same moment reuse the first document.
  */
 export async function startTailoring(
-  deps: { jobs: JobRepo; cv: CvRepo; tailor: TailorRepo; now(): Date; preferences?(): Promise<Preferences> },
+  deps: {
+    jobs: JobRepo; cv: CvRepo; tailor: TailorRepo; now(): Date; preferences?(): Promise<Preferences>;
+    /** Works out and saves the job's Score 1 again for a new Base CV; null when it couldn't. */
+    rescoreBase?(base: CvContent): Promise<MatchScore | null>;
+  },
   jobId: string,
   steering: Steering,
   /** The language picked on the language step; absent = the person's default. */
@@ -63,6 +69,13 @@ export async function startTailoring(
     }
     tailoredCvId = await deps.tailor.findTailoredCvId(jobId, language);
     if (!tailoredCvId) throw new Error("tailored CV vanished after a duplicate insert");
+  }
+  // The job was tailored from a Base CV that has since been replaced: its copy and runs point at items that are
+  // gone, so it starts again from the current Base CV instead of going on with the old run.
+  const existing = await deps.tailor.getTailoredCv(tailoredCvId);
+  if (existing && fromOtherBaseCv(existing.content, base)) {
+    const run = await restartFromBase(deps, { jobId, tailoredCvId, base });
+    return { run, tailoredCvId, language, restarted: true };
   }
   const run = await deps.tailor.latestRun(tailoredCvId)
     ?? await deps.tailor.createRun({ jobId, tailoredCvId, kind: "tailor", sections, currentSection: sections[0]!, ...items });
