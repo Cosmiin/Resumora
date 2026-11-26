@@ -78,10 +78,10 @@ describe("TailoredCvPage", () => {
     expect(await screen.findByRole("tab", { name: "Cover letter" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("links to this CV's template page and download page, naming the template it has", async () => {
+  it("links to this CV's download page, where the template is chosen too", async () => {
     renderPage();
     const bar = await screen.findByRole("group", { name: "This tailored CV" });
-    expect(within(bar).getByRole("link", { name: "Template: Classic" })).toHaveAttribute("href", "/jobs/job-1/cv/template?cv=tc-1");
+    expect(within(bar).queryByRole("link", { name: /^Template/ })).toBeNull();
     expect(within(bar).getByRole("link", { name: "Export" })).toHaveAttribute("href", "/jobs/job-1/cv/export?cv=tc-1");
     expect(screen.queryByText(/Score/)).toBeNull();
   });
@@ -183,7 +183,7 @@ describe("TailoredCvPage", () => {
   it("shows the CV in the template it was saved with", async () => {
     tailoredApi.getTailored.mockResolvedValue({ ...tailored, template: "compact" });
     renderPage();
-    await screen.findByRole("link", { name: "Template: Compact" });
+    await screen.findByRole("link", { name: "Export" });
     expect(cvPage()).toHaveClass("cv-template-compact");
     expect(tailoredApi.setTemplate).not.toHaveBeenCalled();
   });

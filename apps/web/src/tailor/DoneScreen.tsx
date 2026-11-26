@@ -101,7 +101,7 @@ export function DoneScreen({ jobId, docId, base, final, job, onAnswers, gains = 
       <Link to={to("review=1")}>{t("tailor.done.review")}</Link>
     </p>}
     <nav aria-label={t("tailor.done.next")} className="ui-row tailor-gap">
-      <Link className="ui-btn ui-btn--primary" to={`/jobs/${encodeURIComponent(jobId)}/cv/template${query}`}>{t("cvs.template.title")}</Link>
+      <Link className="ui-btn ui-btn--primary" to={`/jobs/${encodeURIComponent(jobId)}/cv/export${query}`}>{t("cvs.export.title")}</Link>
       <Link className="ui-btn" to={page}>{t("tailor.finish.open")}</Link>
       <Link className="ui-btn ui-btn--quiet" to={to("tab=letter")}>{t("tailor.done.letter")}</Link>
     </nav>

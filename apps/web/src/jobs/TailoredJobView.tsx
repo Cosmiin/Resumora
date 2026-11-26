@@ -54,7 +54,7 @@ export function TailoredJobView({ jobPath, requirements, score, onScore, runStep
   // The loaded CV's own links; the same addresses before it has loaded, so the buttons always work.
   const page = `${jobPath}/cv`;
   const query = cvId ? `?cv=${encodeURIComponent(cvId)}` : "";
-  const links = doc.data?.links ?? { open: page + query, template: `${page}/template${query}`, export: `${page}/export${query}` };
+  const links = doc.data?.links ?? { open: page + query, export: `${page}/export${query}` };
   const checking = check && check.cv === cvId ? check.state : "idle";
 
   /** Makes the file in the browser from the copy on screen, as the export page does. */
@@ -154,7 +154,7 @@ export function TailoredJobView({ jobPath, requirements, score, onScore, runStep
       )}
       <p className="ui-small">
         {doc.data && <>{t("job.tailored.template", { name: t(getTemplate(doc.data.template).label) })} · </>}
-        <Link to={links.template}>{t("job.tailored.changeTemplate")}</Link>
+        <Link to={links.export}>{t("job.tailored.changeTemplate")}</Link>
       </p>
     </div>
     {doc.isPending ? (

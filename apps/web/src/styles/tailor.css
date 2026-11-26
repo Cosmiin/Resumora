@@ -242,6 +242,8 @@
 .tailor-room-score { display: inline-flex; align-items: baseline; gap: var(--space-2); padding: 4px 16px; border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
 .tailor-room-score b { font: var(--weight-display) 1.25rem / 1 var(--font-display); }
 .tailor-room-score b.is-up, .tailor-bigscore b.is-up { color: var(--color-good); }
+.tailor-room-lang { margin: 0; color: var(--color-muted); }
+.tailor-room-lang select { font: inherit; padding: 4px 8px; border: var(--border-control) solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper); }
 .tailor-room-body { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 0; }
 .tailor-map { display: grid; gap: var(--space-4); align-content: start; padding: var(--space-5) var(--space-3) var(--space-6) var(--space-5); border-inline-end: 2px solid color-mix(in srgb, var(--color-ink) 12%, transparent); font-size: var(--text-small); }
 .tailor-map ol { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
@@ -266,14 +268,9 @@
 .tailor-room .fm-prog { margin-top: 0; }
 .tailor-room .tailor-focus:not(.is-done) .fm-grid.has-sheet { grid-template-columns: minmax(0, 470px) minmax(0, 1fr); gap: var(--space-6) 40px; }
 
-/* Between two stops, and on the result: the match before and after. */
-.tailor-stopdone { display: grid; gap: var(--space-3); max-width: 720px; margin: var(--space-7) auto 0; padding: var(--space-7); animation: tailor-rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.tailor-stopdone p { margin: 0; }
+/* On the result: the match before and after. */
 .tailor-bigscore { display: flex; align-items: baseline; gap: var(--space-3); margin: 0; font: var(--weight-display) 3.25rem / 1 var(--font-display); font-variant-numeric: tabular-nums; }
 .tailor-bigscore s { color: var(--color-muted); font-size: 1.875rem; text-decoration-thickness: 3px; }
-.tailor-wins { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
-.tailor-wins li { position: relative; padding-inline-start: 24px; }
-.tailor-wins li::before { content: "✓"; position: absolute; inset-inline-start: 2px; color: var(--color-good); font-weight: var(--weight-bold); }
 .tailor-result { display: grid; gap: var(--space-4); max-width: 1000px; }
 .tailor-result > * { margin: 0; }
 .tailor-result-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }

@@ -121,6 +121,8 @@ export const QuestionSchema = z.object({
   bulletId: z.string().optional(),
   /** A Skills question's one skill ("SQL"): its answer becomes "Used SQL" on the roles picked. */
   skill: z.string().optional(),
+  /** "all": asked once for every role (a tool or practice the CV misses), before the first role's own questions. */
+  scope: z.literal("all").optional(),
 });
 export type Question = z.infer<typeof QuestionSchema>;
 
@@ -130,6 +132,8 @@ export const AnswerSchema = z.object({
   via: z.enum(["option", "typed", "voice", "skip"]),
   /** The roles a confirmed skill was used in. */
   roleIds: z.array(z.string()).optional(),
+  /** An all-roles question's answer: used it (in roleIds), used something similar (named in value, in roleIds), or neither. */
+  use: z.enum(["used", "similar", "none"]).optional(),
 });
 export type Answer = z.infer<typeof AnswerSchema>;
 

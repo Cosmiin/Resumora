@@ -20,7 +20,6 @@ vi.mock("../export/export-files.ts", async (original) => ({ ...(await original<t
 
 import { routes } from "../router.tsx";
 import { ExportPage } from "./ExportPage.tsx";
-import { TemplatePage } from "./TemplatePage.tsx";
 
 const content = { ...emptyCv("en"), basics: { ...emptyCv("en").basics, fullName: "Ana Pop", summary: "Payroll lead." } };
 const guess = { kept: true, inferred: true, reviewed: false, text: "works abroad" };
@@ -33,16 +32,13 @@ const tailored = (over: Partial<TailoredCv> = {}): TailoredCv => ({
 function open(entry: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter([
-    { path: "/cv/template", element: <TemplatePage /> },
     { path: "/cv/export", element: <ExportPage /> },
-    { path: "/jobs/:id/cv/template", element: <TemplatePage /> },
     { path: "/jobs/:id/cv/export", element: <ExportPage /> },
     { path: "*", element: <p>Elsewhere</p> },
   ], { initialEntries: [entry] });
   render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
   return router;
 }
-const at = (router: ReturnType<typeof open>) => router.state.location.pathname + router.state.location.search;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -55,10 +51,10 @@ beforeEach(() => {
   files.exportFile.mockResolvedValue({ name: "Ana_Pop_Beta_Payroll_Lead.pdf", pages: 1, fits: true, tightened: false });
 });
 
-describe("the template page", () => {
-  it("shows the person's own CV in the picked template; Use this template saves it on the tailored CV and goes to the download", async () => {
+describe("the template choice on the download page", () => {
+  it("shows the person's own CV in the picked template; picking another saves it on the tailored CV and the download uses it", async () => {
     const user = userEvent.setup();
-    const router = open("/jobs/job-1/cv/template?cv=tc-1");
+    open("/jobs/job-1/cv/export?cv=tc-1");
     expect(await screen.findByRole("radio", { name: /Modern/ })).toBeChecked();
     expect(screen.getByRole("link", { name: "Payroll Lead, Beta" })).toHaveAttribute("href", "/jobs/job-1/cv?cv=tc-1");
     expect(within(screen.getByRole("radio", { name: /Classic/ }).closest("label")!).getByText("Your default")).toBeInTheDocument();
@@ -67,52 +63,59 @@ describe("the template page", () => {
     expect(page()).toHaveTextContent("Ana Pop");
     await user.click(screen.getByRole("radio", { name: /Compact/ }));
     expect(page()).toHaveClass("cv-template-compact");
-    // Nothing is saved until the template is used.
-    expect(tailoredApi.setTemplate).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Use this template" }));
     expect(tailoredApi.setTemplate).toHaveBeenCalledWith("tc-1", "compact");
     expect(account.savePreferences).not.toHaveBeenCalled();
-    await waitFor(() => expect(at(router)).toBe("/jobs/job-1/cv/export?cv=tc-1"));
+    await user.click(await screen.findByRole("button", { name: "Download PDF" }));
+    expect(files.exportFile).toHaveBeenCalledWith("cv", "pdf", expect.objectContaining({ template: "compact" }));
   });
 
   it("also makes it the default when asked", async () => {
     const user = userEvent.setup();
-    open("/jobs/job-1/cv/template?cv=tc-1");
+    open("/jobs/job-1/cv/export?cv=tc-1");
     await user.click(await screen.findByRole("checkbox", { name: "Also make this my default template" }));
-    await user.click(screen.getByRole("button", { name: "Use this template" }));
     await waitFor(() => expect(account.savePreferences).toHaveBeenCalledWith({ defaultTemplate: "modern" }));
   });
 
-  it("for the base CV, using a template makes it the default", async () => {
+  it("for the base CV, picking a template makes it the default", async () => {
     const user = userEvent.setup();
-    const router = open("/cv/template");
+    open("/cv/export");
     expect(await screen.findByRole("radio", { name: /Classic/ })).toBeChecked();
     expect(screen.queryByRole("checkbox")).toBeNull();
     await user.click(screen.getByRole("radio", { name: /Modern/ }));
-    await user.click(screen.getByRole("button", { name: "Use this template" }));
     expect(account.savePreferences).toHaveBeenCalledWith({ defaultTemplate: "modern" });
     expect(tailoredApi.setTemplate).not.toHaveBeenCalled();
-    await waitFor(() => expect(at(router)).toBe("/cv/export"));
   });
 
-  it("stays on the page and says so when the template cannot be saved", async () => {
+  it("says so and goes back to the saved template when the template cannot be saved", async () => {
     tailoredApi.setTemplate.mockRejectedValue(new Error("offline"));
-    const router = open("/jobs/job-1/cv/template?cv=tc-1");
-    await userEvent.click(await screen.findByRole("button", { name: "Use this template" }));
+    open("/jobs/job-1/cv/export?cv=tc-1");
+    await userEvent.click(await screen.findByRole("radio", { name: /Compact/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't change the template");
-    expect(at(router)).toBe("/jobs/job-1/cv/template?cv=tc-1");
+    expect(screen.getByRole("radio", { name: /Modern/ })).toBeChecked();
+  });
+
+  it("sends the old template pages to the download page", async () => {
+    const all = (list: RouteObject[]): RouteObject[] => list.flatMap((route) => [route, ...all(route.children ?? [])]);
+    for (const [from, to] of [["/jobs/job-1/cv/template?cv=tc-1", "/jobs/job-1/cv/export?cv=tc-1"], ["/cv/template", "/cv/export"]] as const) {
+      const old = all(routes).find((route) => route.path === (from.startsWith("/cv") ? "/cv/template" : "/jobs/:id/cv/template"))!;
+      const router = createMemoryRouter([old, { path: "*", element: <p>Download page</p> }], { initialEntries: [from] });
+      const view = render(<RouterProvider router={router} />);
+      expect(await screen.findByText("Download page")).toBeInTheDocument();
+      expect(router.state.location.pathname + router.state.location.search).toBe(to);
+      view.unmount();
+    }
   });
 
   it("says when the job has no tailored CV", async () => {
     tailoredApi.listTailored.mockResolvedValue([]);
-    open("/jobs/job-1/cv/template");
+    open("/jobs/job-1/cv/export");
     expect(await screen.findByRole("alert")).toHaveTextContent("This job has no tailored CV yet.");
     expect(screen.getByRole("link", { name: "Back to the job" })).toHaveAttribute("href", "/jobs/job-1");
   });
 
   it("leads back to My CV when the base CV cannot be loaded", async () => {
     cvApi.getCv.mockRejectedValue(new Error("offline"));
-    open("/cv/template");
+    open("/cv/export");
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to my CV" })).toHaveAttribute("href", "/cv");
     expect(screen.queryByRole("link", { name: "Back to the job" })).toBeNull();
@@ -130,7 +133,7 @@ describe("My CVs is gone", () => {
   });
 
   it("has no My CVs entry in the menu", async () => {
-    open("/cv/template");
+    open("/cv/export");
     const menu = within(await screen.findByRole("navigation", { name: "Main" }));
     expect(menu.getAllByRole("link").map((link) => link.textContent)).toEqual(["My CV", "Jobs", "Account"]);
   });
@@ -154,7 +157,6 @@ describe("the download page", () => {
     expect(screen.getByText("Good luck with this one.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to the job" })).toHaveAttribute("href", "/jobs/job-1");
     expect(screen.queryByText(/My CVs/)).toBeNull();
-    expect(screen.getByRole("link", { name: "Change template" })).toHaveAttribute("href", "/jobs/job-1/cv/template?cv=tc-1");
     // No cover letter yet: no cover letter files.
     expect(screen.queryByText("Cover letter")).toBeNull();
   });

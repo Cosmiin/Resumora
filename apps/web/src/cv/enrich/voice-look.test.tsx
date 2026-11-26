@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { useVoice, type VoiceState } from "./useVoice.ts";
 import { SteeringStep } from "../../tailor/SteeringStep.tsx";
 
@@ -13,12 +13,8 @@ function voiceIn(state: VoiceState, extra: Partial<ReturnType<typeof useVoice>> 
 
 // T2: every mic uses the enrichment recording look (the AnswerBox mic, 3-2-1, "Start talking" and the recording bar).
 const mics = {
-  // The steering mic is on its second screen ("Anything else we should know?").
-  "tailoring steering": () => {
-    const view = render(<SteeringStep jobId="j1" roles={[]} busy={false} onStart={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    return view;
-  },
+  // The steering mic is on the Adjust screen ("Anything else we should know?").
+  "tailoring steering": () => render(<SteeringStep jobId="j1" busy={false} onStart={vi.fn()} />),
 };
 
 describe.each(Object.entries(mics))("the %s mic", (_name, renderMic) => {

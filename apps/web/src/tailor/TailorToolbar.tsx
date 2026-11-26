@@ -5,17 +5,15 @@ import { useQuery } from "@tanstack/react-query";
 import { TailorLanguageSchema, type TailorLanguage } from "@resumora/shared";
 import { listTailored, translate } from "./tailored-api.ts";
 import { t } from "../i18n/t.ts";
-import { getTemplate, type TemplateId } from "../cv/page/templates.ts";
 
 export type TailoredTab = "cv" | "letter";
 
 type Props = {
   tab: TailoredTab;
   onTab(tab: TailoredTab): void;
-  template: TemplateId;
-  /** This CV's template page and download page. */
-  links: { template: string; export: string };
-  /** Actions between Template and Export (Language, Re-tailor). */
+  /** This CV's download page (the template is chosen there too). */
+  links: { export: string };
+  /** Actions before Export (Language, Re-tailor). */
   children?: ReactNode;
 };
 
@@ -84,8 +82,8 @@ export function LanguageMenu({ jobId, current }: { jobId: string; current: { id:
   );
 }
 
-/** Above a tailored CV: CV | Cover letter, then its template, its other languages, tailoring again, and Export. */
-export function TailorToolbar({ tab, onTab, template, links, children }: Props) {
+/** Above a tailored CV: CV | Cover letter, then its other languages, tailoring again, and Export. */
+export function TailorToolbar({ tab, onTab, links, children }: Props) {
   return (
     <div className="tailored-bar" role="group" aria-label={t("tailored.toolbar")}>
       <div className="tailored-tabs" role="tablist" aria-label={t("tailored.tabs")}>
@@ -95,7 +93,6 @@ export function TailorToolbar({ tab, onTab, template, links, children }: Props) 
           </button>
         ))}
       </div>
-      <LeaveLink className="ui-btn ui-btn--sm" to={links.template}>{t("tailored.templateLink", { name: t(getTemplate(template).label) })}</LeaveLink>
       {children}
       <LeaveLink className="ui-btn ui-btn--primary ui-btn--sm" to={links.export}>{t("tailored.exportLink")}</LeaveLink>
     </div>

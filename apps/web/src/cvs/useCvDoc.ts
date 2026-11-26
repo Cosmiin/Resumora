@@ -22,8 +22,8 @@ export type CvDoc = {
   template: TemplateId;
   /** The person's default template. */
   defaultTemplate: TemplateId;
-  /** This CV's page, its template page and its export page. */
-  links: { open: string; template: string; export: string };
+  /** This CV's page and its download page (where the template is chosen too). */
+  links: { open: string; export: string };
 };
 
 /**
@@ -48,7 +48,7 @@ export function useCvDoc(cvId?: string) {
       if (!jobId) {
         const base = await getCv();
         return { kind: "base", cv: { content: base.content, language: base.content.locale, coverLetter: null }, job: null,
-          template: defaultTemplate, defaultTemplate, links: { open: "/cv", template: "/cv/template", export: "/cv/export" } };
+          template: defaultTemplate, defaultTemplate, links: { open: "/cv", export: "/cv/export" } };
       }
       const items = await listTailored(jobId);
       const pick = items.find((item) => item.id === wanted) ?? items.find((item) => item.translatedFrom === null) ?? items[0];
@@ -57,7 +57,7 @@ export function useCvDoc(cvId?: string) {
       const page = `/jobs/${encodeURIComponent(jobId)}/cv`;
       const query = `?cv=${encodeURIComponent(tailored.id)}`;
       return { kind: "tailored", cv: tailored, tailored, job: job?.extracted ?? null, template: getTemplate(tailored.template).id, defaultTemplate,
-        links: { open: page + query, template: `${page}/template${query}`, export: `${page}/export${query}` } };
+        links: { open: page + query, export: `${page}/export${query}` } };
     },
   });
 

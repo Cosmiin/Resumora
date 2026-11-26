@@ -5,7 +5,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { emptyCv, TAILOR_SECTIONS, type MatchScore, type TailorRun } from "@resumora/shared";
 
 vi.mock("./tailor-api.ts", () => ({
-  startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(), runSection: vi.fn(), acceptSection: vi.fn(),
+  askAcross: vi.fn(async () => []), startTailoring: vi.fn(), getRun: vi.fn(), askQuestions: vi.fn(), sendAnswers: vi.fn(), runSection: vi.fn(), acceptSection: vi.fn(),
   getScores: vi.fn(), getToneExamples: vi.fn(), redoRole: vi.fn(), acceptRole: vi.fn(), changeSteering: vi.fn(), getSteering: vi.fn(),
 }));
 vi.mock("../cv/enrich/useVoice.ts", () => ({ useVoice: vi.fn() }));
@@ -95,9 +95,8 @@ describe("going back (BackA)", () => {
     renderFlow();
     expect(await screen.findByText("Advanced Excel")).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Tone and questions" }));
+    await user.click(screen.getByRole("button", { name: "Adjust" }));
     await user.click(await screen.findByRole("button", { name: /^Confident/ }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     const confirm = screen.getByRole("alertdialog", { name: "Redo every step?" });
@@ -113,9 +112,8 @@ describe("going back (BackA)", () => {
     const user = userEvent.setup();
     renderFlow();
     expect(await screen.findByText("Advanced Excel")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Tone and questions" }));
-    await user.click(await screen.findByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(screen.getByRole("button", { name: "Adjust" }));
+    await user.click(await screen.findByRole("button", { name: "Save changes" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(await screen.findByText("Advanced Excel")).toBeTruthy();
     expect(changeSteering).not.toHaveBeenCalled();

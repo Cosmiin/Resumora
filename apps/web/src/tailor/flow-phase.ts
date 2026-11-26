@@ -1,14 +1,11 @@
-import type { Proposal, Steering, TailorQuestion, TailorRun, TailorSection } from "@resumora/shared";
+import type { Proposal, Steering, TailorQuestion, TailorSection } from "@resumora/shared";
 import type { Draft } from "./QuestionCard.tsx";
 
 /** Where the tailoring flow stands; each kind is one screen. */
 export type Phase =
   | { kind: "loading" }
-  /** Before tailoring starts: the language check, then the keywords. */
-  | { kind: "lang" }
-  | { kind: "keywords"; busy: boolean }
-  /** The optional tone and extra questions. `resume`: changing them on a started run; going back returns there. */
-  | { kind: "steer"; busy: boolean; resume?: Phase }
+  /** The optional tone and extra questions of a started run. `resume`: where going back returns. */
+  | { kind: "steer"; busy: boolean; resume: Phase }
   | { kind: "confirm"; steering: Steering; busy: boolean; resume: Phase }
   /** Going back (BackA): a finished step, a finished role's answers, a redone role's review. */
   | { kind: "back"; section: TailorSection; resume: Phase }
@@ -19,8 +16,6 @@ export type Phase =
   | { kind: "questions"; questions: TailorQuestion[]; index: number; answers: (Draft | undefined)[] }
   | { kind: "working" }
   | { kind: "review"; proposals: Proposal[]; busy: boolean; removed?: number }
-  /** Between two stops: the match before and after the stop just accepted; `next` is the run to go on with. */
-  | { kind: "stop"; name: string; from: number; to: number; won: string[]; next: TailorRun }
   /** After the last step: the finish screen. */
   | { kind: "done" }
   | { kind: "error"; message: string; retry(): void }
