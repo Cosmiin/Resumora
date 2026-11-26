@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { findScored, isRoleSection, stepItems, stepOf, stepOrder, type Answer, type CvContent, type JobExtraction, type MatchScore, type Proposal, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
 import { AppShell } from "../layout/AppShell.tsx";
-import { Room, StopDone, type Stop } from "./Room.tsx";
+import { Room, type Stop } from "./Room.tsx";
 import { getJob, scoreJob } from "../jobs/jobs-api.ts";
 import { t } from "../i18n/t.ts";
 import { ApiClientError } from "../lib/api.ts";
@@ -61,6 +61,8 @@ export function TailorFlow() {
   const acrossAsked = useRef(false);
   // FinalA: final touches with nothing to change, accepted on their own; the next screen shows a tick for each.
   const [ticks, setTicks] = useState<TailorSection[]>([]);
+  // The step just saved and the match it moved, as one line on the next step's screen (no screen of its own).
+  const [moved, setMoved] = useState<{ name: string; from: number; to: number } | null>(null);
   // A change inside these screens never needs the newest score on screen, only on the next one.
   const noteScore = (score: MatchScore) => { scoreRef.current = score; };
   // The points each stop added, by stop (a role's id, a section, "last" for the last touches): this visit only.
@@ -141,6 +143,7 @@ export function TailorFlow() {
   /** FinalA: a final touch with nothing to change is accepted on its own; once saved, the next screen shows its tick. */
   async function pass(at: TailorSection) {
     setPhase({ kind: "working" });
+    setMoved(null);
     try {
       const result = await api.acceptSection(runRef.current!.id, at, { decisions: [], inferred: [], flags: [] });
       gained(at, undefined, result.score);
@@ -158,16 +161,15 @@ export function TailorFlow() {
   /** `retry`: what a failure offers again (an accept made without a review re-runs its step). */
   async function accept(at: TailorSection, body: api.AcceptBody, retry?: () => void, quiet = false) {
     setPhase((current) => current.kind === "review" ? { ...current, busy: true } : current);
+    setMoved(null);
     try {
       const roleId = roleArg(at);
       const result = await api.acceptSection(runRef.current!.id, at, roleId ? { ...body, roleId } : body);
       const name = roleId ? scoredOf(roleId)?.item.title.trim() || t("tailor.role.untitled") : t(`tailor.section.${at}`);
-      const moved = gained(at, roleId, result.score);
-      // The skills and the summary end on their score once reviewed; a role, the short last touches and a step saved
-      // without a screen go straight on.
-      if (quiet || isRoleSection(at) || FINAL_SECTIONS.includes(at)) return enter(result.run);
-      track(result.run);
-      setPhase({ kind: "stop", name, ...moved, next: result.run });
+      const { from, to } = gained(at, roleId, result.score);
+      // Every step goes straight on; a reviewed Skills or Summary leaves a line on what it moved.
+      if (!quiet && !isRoleSection(at) && !FINAL_SECTIONS.includes(at)) setMoved({ name, from, to });
+      enter(result.run);
     } catch (cause) {
       setPhase((current) => current.kind === "review" ? { ...current, busy: false } : current);
       if (cause instanceof ApiClientError && cause.code === "job_not_found") fail(cause, at, () => {});
@@ -246,6 +248,8 @@ export function TailorFlow() {
       const { run: created, restarted, language: written } = await api.startTailoring(jobId, steering ?? {}, picked);
       setLanguage(written);
       remember(jobId, created.id);
+      // A new run (another language, a replaced CV) asks the all-roles questions again.
+      acrossAsked.current = false;
       // A start over a replaced CV worked out the job's match again and begins from its wording: score from there.
       if (restarted) {
         try {
@@ -356,11 +360,6 @@ export function TailorFlow() {
       : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
         busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
   }
-  else if (phase.kind === "stop") {
-    const upcoming = phase.next.status === "done" || !phase.next.currentSection ? undefined : stops.find((stop) => stop.state === "now")?.name;
-    body = <StopDone name={phase.name} from={phase.from} to={phase.to} won={phase.won} nextName={upcoming}
-      left={stops.filter((stop) => stop.state !== "ok" && stop.id !== "result").length} onNext={() => enter(phase.next)} />;
-  }
   else if (phase.kind === "done") {
     body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job}
       gains={stops.flatMap((stop) => (stop.gain && stop.gain > 0 ? [{ name: stop.name, points: stop.gain }] : []))}
@@ -436,6 +435,7 @@ export function TailorFlow() {
         {open.map((s) => <button key={s} type="button" onClick={() => setPhase({ kind: "back", section: s, resume: phase })}>{t(`tailor.section.${s}`)}</button>)}
         <button type="button" onClick={() => void openSteer(phase)}>{t("tailor.steps.steering")}</button>
       </p>}
+      {moved && <p className="ui-small ui-muted tailor-tick" role="status">{t(moved.to === moved.from ? "tailor.stop.same" : "tailor.stop.moved", moved)}</p>}
       {ticks.map((s) => <p key={s} className="ui-small ui-muted tailor-tick">{t("tailor.final.nothing", { section: t(`tailor.section.${s}`) })}</p>)}
       {asking ? <div className="focus-mode tailor-focus">{phase.kind === "asking" ? <div className="fm-grid">{body}</div> : body}</div> : body}
     </Room>;

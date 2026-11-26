@@ -80,22 +80,3 @@ export function Room({ jobName, onExit, skip, base, now, stops, keywords, langua
   </div>;
 }
 
-/** Between two stops: the match before and after the stop just finished, what earned the points, and the way on. */
-export function StopDone({ name, from, to, won, left, nextName, onNext }: {
-  name: string; from: number; to: number; won: string[]; left: number; nextName?: string; onNext(): void;
-}) {
-  return <section className="ui-sheet tailor-stopdone" aria-labelledby="tailor-stopdone-title">
-    <p className="ui-label" id="tailor-stopdone-title">{t("tailor.stop.done", { name })}</p>
-    <p className="tailor-bigscore" role="status">
-      {to !== from ? <><s>{from}</s> <span aria-hidden="true">→</span> <b className={to > from ? "is-up" : undefined}>{to}</b></> : <b>{to}</b>}
-      <span className="ui-sr">{t(to === from ? "tailor.stop.same" : "tailor.stop.moved", { from, to })}</span>
-    </p>
-    {to === from && <p className="ui-muted">{t("tailor.stop.same", { from, to })}</p>}
-    {won.length > 0 && <ul className="tailor-wins">{won.map((item) => <li key={item}>{t("tailor.stop.won", { name: item })}</li>)}</ul>}
-    <p className="ui-coach ui-coach--sm">{t(left === 0 ? "tailor.stop.leftNone" : left === 1 ? "tailor.stop.leftOne" : "tailor.stop.left", { n: left })}</p>
-    <div className="tailor-foot">
-      <span />
-      <button type="button" className="ui-btn ui-btn--primary" onClick={onNext}>{nextName ? t("tailor.stop.next", { name: nextName }) : t("tailor.stop.nextResult")}</button>
-    </div>
-  </section>;
-}

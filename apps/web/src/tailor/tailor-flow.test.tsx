@@ -18,7 +18,7 @@ import { getCv } from "../cv/cv-api.ts";
 import { useVoice } from "../cv/enrich/useVoice.ts";
 import { ApiClientError } from "../lib/api.ts";
 import { getJob, scoreJob } from "../jobs/jobs-api.ts";
-import { acceptSection, askQuestions, getLanguages, getRun, getScores, getToneExamples, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
+import { acceptSection, askAcross, askQuestions, getLanguages, getRun, getScores, getToneExamples, runSection, sendAnswers, startTailoring } from "./tailor-api.ts";
 import { TailorFlow } from "./TailorFlow.tsx";
 
 const at = "2026-11-08T10:00:00Z";
@@ -96,6 +96,9 @@ describe("tailoring flow", () => {
     expect(startTailoring).toHaveBeenLastCalledWith("one", {}, "ro");
     await waitFor(() => expect(askQuestions).toHaveBeenLastCalledWith("run2", "experience", "r1"));
     expect(localStorage.getItem("resumora.tailorRun.one")).toBe("run2");
+    // The new run asks the all-roles questions again.
+    expect(askAcross).toHaveBeenCalledWith("run1");
+    expect(askAcross).toHaveBeenLastCalledWith("run2");
   });
 
   it("shows the language as a plain label once a step is saved", async () => {
@@ -159,13 +162,26 @@ describe("tailoring flow", () => {
     expect(acceptSection).toHaveBeenLastCalledWith("run1", "skills", {
       decisions: [], inferred: [{ itemId: "new-skill:Gusto", keep: false }], flags: [],
     });
-    await user.click(await screen.findByRole("button", { name: "See my result" }));
     expect(await screen.findByRole("heading", { name: "Tailoring is done" })).toBeInTheDocument();
     expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Result");
     expect(screen.getByText("16 points better than your base CV.")).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "Open the CV" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/one/cv"));
     expect(router.state.location.search).toBe("?cv=cv1");
+  });
+
+  it("goes straight on after Skills, with a line on what they moved", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("resumora.tailorRun.one", "run1");
+    vi.mocked(getRun).mockResolvedValue(makeRun({ currentSection: "skills" }));
+    vi.mocked(runSection).mockResolvedValueOnce({ proposals: [{ itemId: "new-skill", field: "name", text: "Gusto", inferred: true, flags: [], reason: "Shown in: Payroll" }], questions: [] });
+    vi.mocked(acceptSection).mockResolvedValueOnce({ run: makeRun({ currentSection: "summary" }), score: score(70) });
+    vi.mocked(askQuestions).mockResolvedValueOnce([]).mockResolvedValueOnce([question("s1", { section: "summary" })]);
+    renderFlow();
+    await user.click(await screen.findByRole("button", { name: "Save skills" }));
+    expect(await screen.findByRole("heading", { name: "Question s1?" })).toBeInTheDocument();
+    expect(screen.getByText("Skills done · match 62 → 70")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Next:/ })).toBeNull();
   });
 
   it("Back shows the earlier answer selected; the role's answers are sent together after its last question", async () => {
