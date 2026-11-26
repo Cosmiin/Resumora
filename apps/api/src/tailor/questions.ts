@@ -104,26 +104,10 @@ export async function askQuestions(
   const met = new Set((tailoredScore?.labels ?? [])
     .filter((label) => (label.kind === "keyword" || sameRequirements) && label.status === "met" && !label.inferred)
     .map((label) => label.ref.startsWith("k:") ? label.ref.toLowerCase() : label.ref));
-  // A gap answered in this run is done; one asked but skipped (or left) may come back once, not again.
-  const answers = new Map((input.run.answers ?? []).map((answer) => [answer.questionId, answer]));
-  const byGap = new Map<string, { asks: Set<string>; answered: boolean }>();
-  for (const question of asked) {
-    if (!question.gap) continue;
-    const entry = byGap.get(question.gap) ?? { asks: new Set<string>(), answered: false };
-    entry.asks.add(question.section);
-    const answer = answers.get(question.id);
-    if (answer && answer.via !== "skip" && answer.value?.trim()) entry.answered = true;
-    byGap.set(question.gap, entry);
-  }
-  // A gap answered for every role at once stays open only in the roles ticked (for a detail); in the others it is done.
-  const closedAcross = (ref: string) => asked.some((question) => {
-    if (question.scope !== "all" || question.gap !== ref) return false;
-    const answer = answers.get(question.id);
-    return !!answer && answer.via !== "skip" && !(answer.roleIds ?? []).includes(roleId ?? "");
-  });
-  // In Experience a gap may be asked once in each role; elsewhere the run-wide rule above applies.
-  const open = role ? (ref: string) => !closedAcross(ref) && !asked.some((question) => inRole(question) && question.gap === ref)
-    : (ref: string) => { const entry = byGap.get(ref); return !entry || (!entry.answered && entry.asks.size < 2); };
+  // A gap is asked once per run: once asked (in a role, in another section, or for every role at once), answered or
+  // skipped, it is never asked again. The answer to an all-roles question is reused in every role.
+  const askedGaps = new Set(jobQuestions.flatMap((question) => (question.gap ? [question.gap] : [])));
+  const open = (ref: string) => !askedGaps.has(ref);
   const gaps = (score?.labels ?? []).filter((label) => (label.status !== "met" || label.inferred) && !met.has(label.ref.startsWith("k:") ? label.ref.toLowerCase() : label.ref) && open(label.ref));
   if (score && gaps.length === 0) return [];
   const gapRefs = new Set(gaps.map((label) => label.ref));
@@ -144,9 +128,7 @@ export async function askQuestions(
     throw new ApiError(502, "ai_failed", `Couldn't tailor ${input.section}. Try again.`);
   }
 
-  // A question that fits two roles is asked once in each, so only this role's questions count as asked.
-  const seen = new Set([...answered.map((item) => same(item.question)),
-    ...asked.filter((question) => !role || inRole(question)).map((question) => same(question.text))]);
+  const seen = new Set([...answered.map((item) => same(item.question)), ...asked.map((question) => same(question.text))]);
   const fresh: Question[] = [];
   const skills = input.section === "skills";
   for (const { roleId: named, bulletId, skill, ...question } of reply.questions) {
@@ -169,8 +151,8 @@ export async function askQuestions(
 const ACROSS_CATEGORIES = new Set(["skill", "experience", "other"]);
 
 /**
- * The questions answered once for all roles (a tool or practice the CV misses), asked before the first role's own
- * questions: the person ticks the roles, names something similar, or says neither. Asked once per run, and only
+ * The questions answered once for all roles (a tool, skill or practice the CV misses), asked before the first role's own
+ * questions, so no role asks them again: the person ticks the roles, names something similar, or says neither. Asked once per run, and only
  * when the CV has two roles or more.
  */
 export async function askAcross(
@@ -183,8 +165,7 @@ export async function askAcross(
   if (cv.experience.length < 2) return [];
   const score = await deps.tailor.getScore(input.run.jobId, "base");
   if (!score) return [];
-  const answered = new Set(asked.filter((question) => question.gap && (input.run.answers ?? [])
-    .some((answer) => answer.questionId === question.id && answer.via !== "skip" && answer.value?.trim())).map((question) => question.gap));
+  const answered = new Set(asked.filter((question) => question.kind !== "flag" && question.gap).map((question) => question.gap));
   const gaps = score.labels.filter((label) => (label.status !== "met" || label.inferred) && !answered.has(label.ref)
     && (label.kind === "keyword" || ACROSS_CATEGORIES.has(input.job.requirements[Number(label.ref.slice(1))]?.category ?? "")));
   if (gaps.length === 0) return [];
@@ -206,11 +187,11 @@ export async function askAcross(
   for (const question of reply.questions) {
     const text = question.text.trim().slice(0, MAX_TEXT);
     // The answer becomes "Used <skill>" on the roles ticked: a question without its short name is dropped.
-    if (!text || !question.skill?.trim() || !gapRefs.has(question.gap) || seen.has(question.gap) || fresh.length >= MAX_ACROSS_QUESTIONS) continue;
-    seen.add(question.gap);
     const skill = question.skill?.trim().slice(0, MAX_TEXT);
+    if (!text || !skill || !gapRefs.has(question.gap) || seen.has(question.gap) || fresh.length >= MAX_ACROSS_QUESTIONS) continue;
+    seen.add(question.gap);
     fresh.push({ id: newId(), section: "experience", roleId: null, text, kind: "skill", options: [], reason: question.reason, gap: question.gap,
-      scope: "all", ...(skill ? { skill } : {}) });
+      scope: "all", skill });
   }
   if (fresh.length > 0) await deps.tailor.updateRun(input.run.id, { questions: [...asked, ...fresh] });
   return fresh;
