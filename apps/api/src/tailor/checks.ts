@@ -8,6 +8,8 @@ export type CheckContext = {
   /** CV text, notes, facts and answers the proposal may draw on. */
   sources: string[];
   pastRole?: boolean;
+  /** A current role's line that the person wrote in the past tense: the rewrite keeps the past too. */
+  pastLine?: boolean;
   locale?: Locale;
   /** The item's current entity fields, for experience roles. */
   original?: Partial<Record<EntityField, string>>;
@@ -54,9 +56,9 @@ export function checkProposal(proposal: Proposal, ctx: CheckContext): Flag[] {
   const unknown = unknownTools(proposal.text, ctx.sources, proposal.field === "name");
   if (unknown.length > 0) flags.push({ rule: "tool", detail: unknown.join(", ") });
   if (proposal.inferred && !proposal.reason?.trim()) flags.push({ rule: "guess", detail: "A guess without a reason" });
-  if (ctx.pastRole && ctx.locale && (proposal.field === "text" || proposal.field === "description") &&
+  if ((ctx.pastRole || ctx.pastLine) && ctx.locale && (proposal.field === "text" || proposal.field === "description") &&
     startsInPresentTense(proposal.text, ctx.locale)) {
-    flags.push({ rule: "tense", detail: pastTenseNote(ctx.locale) });
+    flags.push({ rule: "tense", detail: pastTenseNote(ctx.locale, !!ctx.pastRole) });
   }
   return flags;
 }

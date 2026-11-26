@@ -23,11 +23,17 @@ describe("rewrite rules", () => {
     expect(system).toContain("Keep each bullet to one sentence, at most 440 characters.");
   });
 
-  it("every prompt that writes a role's lines gives the same Romanian tense rule, and allows \"Am …\"", () => {
-    const prompts = [
-      improveBulletSystemPrompt("ro"), brainDumpSystemPrompt("ro"), rewriteSummarySystemPrompt("ro"),
-      sectionSystemPrompt("experience"), sectionSystemPrompt("projects"),
-    ];
+  it("tailoring keeps a line's past tense, for every verb, even on a current role", () => {
+    for (const system of [sectionSystemPrompt("experience"), sectionSystemPrompt("projects")]) {
+      expect(system).toContain("a line written in the past stays in the past, and never moves to the present");
+      expect(system).toContain("Every verb in a line uses the same tense");
+      expect(system).toContain("\"Am coordonat și verificat…\"");
+      expect(system).not.toContain("Only a current role uses the present tense");
+    }
+  });
+
+  it("every enrichment prompt that writes a role's lines gives the same Romanian tense rule, and allows \"Am …\"", () => {
+    const prompts = [improveBulletSystemPrompt("ro"), brainDumpSystemPrompt("ro"), rewriteSummarySystemPrompt("ro")];
     for (const system of prompts) {
       expect(system).toContain(ROMANIAN_TENSE);
       expect(system).not.toContain("never with \"Am …\"");

@@ -34,20 +34,66 @@ function romanianPresent(word: string): boolean {
   return RO_PRESENT_ENDINGS.test(first) || RO_PRESENT_VERBS.has(first);
 }
 
-/** Bullet openings in the present tense: English (no recognised past-tense verb) and Romanian. Other languages are not checked. */
+/**
+ * The verbs a line opens with: the first word and every verb joined to it by "and", "or", a comma ("Designed,
+ * built and shipped…") or, in Romanian, "și"/"sau" ("Am coordonat și verificat…"). A Romanian "Am" is skipped.
+ * The chain stops at the first word that isn't joined this way, so "Designed maps and dashboards" gives one verb.
+ */
+function openingVerbs(text: string, locale: "en" | "ro"): string[] {
+  const words = [...text.matchAll(/[\p{L}-]+|,/gu)].map((m) => m[0].toLowerCase());
+  const joins = locale === "ro" ? new Set(["și", "şi", "sau", ","]) : new Set(["and", "or", ","]);
+  let i = locale === "ro" && words[0] === "am" ? 1 : 0;
+  const verbs: string[] = [];
+  if (!words[i] || words[i] === ",") return verbs;
+  verbs.push(words[i]!);
+  while (joins.has(words[i + 1] ?? "")) {
+    let j = i + 1;
+    while (joins.has(words[j] ?? "")) j++;
+    const next = words[j];
+    if (!next || (locale === "ro" && next === "am")) break;
+    verbs.push(next);
+    i = j;
+  }
+  return verbs;
+}
+
+const englishPresent = (word: string) => !word.endsWith("ed") && !PAST_VERBS.has(word);
+
+/**
+ * Bullet openings in the present tense: English (no recognised past-tense verb) and Romanian. Every verb the line
+ * opens with counts, so "Designed and update…" and "Am coordonat și verific…" are present too. Other languages
+ * are not checked.
+ */
 export function startsInPresentTense(text: string, locale: Locale): boolean {
   if (locale === "ro") {
     const first = text.match(/[\p{L}-]+/u)?.[0].toLowerCase();
-    return !!first && romanianPresent(first);
+    if (!first) return false;
+    if (first !== "am") return romanianPresent(first);
+    return openingVerbs(text, "ro").slice(1).some(romanianPresent);
   }
   if (locale !== "en") return false;
-  const first = text.match(/[a-z][a-z-]*/i)?.[0].toLowerCase();
-  return !!first && !first.endsWith("ed") && !PAST_VERBS.has(first);
+  if (!/^[^a-z]*[a-z]/i.test(text)) return false;
+  return openingVerbs(text, "en").some(englishPresent);
 }
 
-/** The note sent with a retry, and shown as a tailoring flag, when a line of an ended role opens in the present. */
-export function pastTenseNote(locale: Locale): string {
+/**
+ * A line that opens in the past tense: English with a recognised past-tense verb, Romanian with "Am". Other
+ * languages, and lines that open with no clear verb ("Responsible for…"), are not.
+ */
+export function startsInPastTense(text: string, locale: Locale): boolean {
+  const first = text.match(/[\p{L}-]+/u)?.[0].toLowerCase();
+  if (!first) return false;
+  if (locale === "ro") return first === "am";
+  return locale === "en" && !englishPresent(first);
+}
+
+/**
+ * The note sent with a retry, and shown as a tailoring flag, when a line that must stay in the past opens in the
+ * present: a line of an ended role, or (`ended` false) a current role's line that the person wrote in the past.
+ */
+export function pastTenseNote(locale: Locale, ended = true): string {
+  const why = ended ? "The role has ended" : "Your line is in the past tense";
   return locale === "ro"
-    ? "The role has ended: start with \"Am\" and the past participle (\"Am coordonat…\")."
-    : "The role has ended: start with a past-tense verb.";
+    ? `${why}: start with "Am" and the past participle, and keep every verb in the past ("Am coordonat și verificat…").`
+    : `${why}: use the past tense for every verb ("Designed and updated…").`;
 }

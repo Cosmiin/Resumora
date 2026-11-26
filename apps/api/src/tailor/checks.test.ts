@@ -17,17 +17,30 @@ describe("checkProposal", () => {
   it.each(["text", "description"])("flags present tense in a past role's %s for English and Romanian", (field) => {
     const p = proposal("Coordinate partner onboarding", { field });
     expect(checkProposal(p, { sources: [], pastRole: true, locale: "en" })).toEqual([
-      { rule: "tense", detail: "The role has ended: start with a past-tense verb." },
+      { rule: "tense", detail: "The role has ended: use the past tense for every verb (\"Designed and updated…\")." },
     ]);
     expect(checkProposal(p, { sources: [], pastRole: false, locale: "en" })).toEqual([]);
     expect(checkProposal(p, { sources: [], pastRole: true, locale: "fr" })).toEqual([]);
     const ro = proposal("Coordonez integrarea partenerilor", { field });
     expect(checkProposal(ro, { sources: [], pastRole: true, locale: "ro" })).toEqual([
-      { rule: "tense", detail: "The role has ended: start with \"Am\" and the past participle (\"Am coordonat…\")." },
+      { rule: "tense", detail: "The role has ended: start with \"Am\" and the past participle, and keep every verb in the past (\"Am coordonat și verificat…\")." },
     ]);
     expect(checkProposal(ro, { sources: [], pastRole: false, locale: "ro" })).toEqual([]);
     expect(checkProposal(proposal("Am coordonat integrarea partenerilor", { field }), { sources: [], pastRole: true, locale: "ro" })).toEqual([]);
     expect(checkProposal(proposal("Coordinated partner onboarding", { field }), { sources: [], pastRole: true, locale: "en" })).toEqual([]);
+  });
+
+  it("flags a present verb anywhere in the opening, and a current role's line written in the past", () => {
+    const past: CheckContext = { sources: [], pastRole: true, locale: "en" };
+    expect(checkProposal(proposal("Designed and update process maps"), past).map((f) => f.rule)).toEqual(["tense"]);
+    expect(checkProposal(proposal("Designed, built and ship dashboards"), past).map((f) => f.rule)).toEqual(["tense"]);
+    expect(checkProposal(proposal("Designed and updated process maps and dashboards"), past)).toEqual([]);
+    const line = proposal("Design and update process maps");
+    expect(checkProposal(line, { sources: [], pastLine: true, locale: "en" })).toEqual([
+      { rule: "tense", detail: "Your line is in the past tense: use the past tense for every verb (\"Designed and updated…\")." },
+    ]);
+    expect(checkProposal(proposal("Am coordonat și verific facturile"), { sources: [], pastRole: true, locale: "ro" }).map((f) => f.rule)).toEqual(["tense"]);
+    expect(checkProposal(proposal("Am coordonat și verificat facturile"), { sources: [], pastRole: true, locale: "ro" })).toEqual([]);
   });
 
   it("keeps sources-only checks unchanged when locale and role context are absent", () => {
@@ -99,10 +112,11 @@ describe.each([
   it.each([
     { locale: "ro", language: "en", current: false, endDate: "2022-01", tense: true },
     { locale: "en", language: "ro", current: false, endDate: "2022-01", tense: false },
-    { locale: "en", language: "en", current: true, endDate: "2022-01", tense: false },
-    { locale: "en", language: "en", current: false, endDate: "", tense: false },
-  ] as const)("uses output language and role dates: %j", async ({ locale, language, current, endDate, tense }) => {
-    const role = roleWith(["Coordinated partner onboarding"], { current, endDate });
+    { locale: "en", language: "en", current: true, endDate: "2022-01", tense: false, before: "Coordinate partner onboarding" },
+    { locale: "en", language: "en", current: true, endDate: "", tense: true, before: "Coordinated partner onboarding", detail: "Your line is in the past tense" },
+    { locale: "en", language: "en", current: false, endDate: "", tense: false, before: "Coordinate partner onboarding" },
+  ] as const)("uses output language and role dates: %j", async ({ locale, language, current, endDate, tense, before = "Coordinated partner onboarding", detail = "The role has ended" }) => {
+    const role = roleWith([before], { current, endDate, description: before });
     const cv = { ...emptyCv(locale), [list]: [role] };
     const tailor = memoryTailorRepo("user-a");
     const tailoredCvId = await tailor.createTailoredCv({
@@ -126,7 +140,7 @@ describe.each([
       const retry = JSON.parse(messages[1]!.content);
       expect(retry.fix.proposals).toHaveLength(2);
       for (const p of retry.fix.proposals) expect(p.flags).toEqual([
-        { rule: "tense", detail: "The role has ended: start with a past-tense verb." },
+        { rule: "tense", detail: `${detail}: use the past tense for every verb ("Designed and updated…").` },
       ]);
     }
   });

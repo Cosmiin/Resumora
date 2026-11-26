@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { startsInPresentTense } from "./tense.ts";
+import { startsInPastTense, startsInPresentTense } from "./tense.ts";
 
 describe("startsInPresentTense", () => {
   it.each(["Validate compliance with legal teams", "Coordinate partner onboarding", "  VALIDATE compliance", "Co-ordinate onboarding"])(
@@ -34,6 +34,35 @@ describe("startsInPresentTense", () => {
   ])("accepts a Romanian opening that is not in the present: %s", (text) => {
     expect(startsInPresentTense(text, "ro")).toBe(false);
   });
+
+  it.each([
+    "Designed and update process maps", "Designed, built and ship dashboards", "Led or run the weekly review",
+  ])("recognises a present verb joined to a past one in English: %s", (text) => {
+    expect(startsInPresentTense(text, "en")).toBe(true);
+  });
+
+  it.each(["Designed and updated process maps and dashboards", "Designed, built and shipped dashboards", "Designed maps and update logs"])(
+    "accepts an English opening whose joined verbs are all past: %s", (text) => {
+      expect(startsInPresentTense(text, "en")).toBe(false);
+    },
+  );
+
+  it.each(["Am coordonat și verific facturile", "Am coordonat, verificat și pregătesc rapoartele"])(
+    "recognises a present verb joined to \"Am\" + participle in Romanian: %s", (text) => {
+      expect(startsInPresentTense(text, "ro")).toBe(true);
+    },
+  );
+
+  it("accepts Romanian participles joined after \"Am\"", () => {
+    expect(startsInPresentTense("Am coordonat și verificat facturile", "ro")).toBe(false);
+    expect(startsInPresentTense("Am coordonat echipa și am pregătit rapoartele", "ro")).toBe(false);
+  });
+
+  it.each([["Designed process maps", true], ["Design process maps", false], ["Am coordonat echipa", true], ["Responsible for payroll", false]] as const)(
+    "startsInPastTense(%s) is %s", (text, past) => {
+      expect(startsInPastTense(text, /^(Am|Coord)/.test(text) ? "ro" : "en")).toBe(past);
+    },
+  );
 
   it.each(["fr", "de", "es", "it"] as const)("skips tense checks for %s", (locale) => {
     expect(startsInPresentTense("Validate compliance with legal teams", locale)).toBe(false);
