@@ -3,7 +3,7 @@ import { applyGuesses, CvContentSchema, isLightTailorSection, MAX_TEXT, scoredIt
 import { ApiError } from "../errors.ts";
 import { withHeadline, type ItemReview } from "./accept.ts";
 import { sameCv, type TailorRepo } from "./repo.ts";
-import { lightList } from "./section-pass.ts";
+import { lightList, NEW_BULLET } from "./section-pass.ts";
 
 export const ReviewItemBodySchema = z.object({
   section: z.string().min(1).max(40),
@@ -92,6 +92,14 @@ export async function reviewItem(tailor: TailorRepo, id: string, body: ReviewIte
     const inBase = [...doc.baseSnapshot.technicalSkills, ...doc.baseSnapshot.professionalSkills].some((s) => s.name.trim().toLowerCase() === name);
     if (body.action === "remove" && !inBase) for (const list of lists) list.splice(0, list.length, ...list.filter((s) => s !== skill));
     if (body.action === "edit") skill!.name = text;
+  } else if (body.key.startsWith(`${NEW_BULLET}:`)) {
+    // A line the tailoring added to a role: Remove takes it out, Edit rewords it.
+    if (body.action !== "keep") {
+      const role = content.experience.find((entry) => entry.bullets.some((bullet) => bullet.id === body.key));
+      if (!role) throw changed();
+      if (keep) role.bullets.find((bullet) => bullet.id === body.key)!.text = text;
+      else role.bullets = role.bullets.filter((bullet) => bullet.id !== body.key);
+    }
   } else if (body.key === "summary") {
     if (body.action !== "keep") content.basics.summary = keep ? text : doc.baseSnapshot.basics.summary;
   } else if (body.action !== "keep") {

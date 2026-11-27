@@ -420,7 +420,9 @@ describe("section pass", () => {
   });
 
   describe("the skills step never gives two skills the same name", () => {
-    const skills = [{ id: "s1", name: "Make.com" }, { id: "s2", name: "Zapier" }, { id: "s3", name: "Make / Integromat" }, { id: "s4", name: "Power-BI" }];
+    // Each rename below keeps a word of the skill's name: a rename to an unrelated name is another rule (further down).
+    const skills = [{ id: "s1", name: "Automation" }, { id: "s2", name: "Workflow automation" }, { id: "s3", name: "Automation tools" }, { id: "s4", name: "Power-BI" },
+      { id: "s5", name: "Anthropic Claude" }];
     const rename = (itemId: string, text: string): ModelProposal => ({ itemId, field: "name", text, inferred: false });
     const added = (text: string) => ({ itemId: "new-skill", field: "name", text, inferred: true, reason: "Shown in: Payroll Specialist · Acme Payroll" } as ModelProposal);
     const names = async () => ((await (await runSection("skills")).res.json()) as { proposals: Proposal[]; removed: number });
@@ -442,17 +444,26 @@ describe("section pass", () => {
     });
 
     it("drops a new skill the CV already has, and the second of two new skills with one name", async () => {
-      replies = [proposals(added("zapier"), added("Payroll"), added("Pay-roll"))];
+      replies = [proposals(added("automation"), added("Payroll"), added("Pay-roll"))];
       const body = await names();
       expect(body.proposals.map((p) => [p.itemId, p.text])).toEqual([["new-skill", "Payroll"]]);
       expect(body.removed).toBe(0);
     });
 
     it("a retried rename can't take the name a first-reply rename already has", async () => {
-      // "Kubernetes" is a tool no source has, so the first rename of Zapier is flagged and asked again.
-      replies = [proposals(rename("s1", "Workflow Automation Tools"), rename("s2", "Kubernetes")), { results: [] },
+      // "5000" is a number no source has, so the first rename of the second skill is flagged and asked again.
+      replies = [proposals(rename("s1", "Workflow Automation Tools"), rename("s2", "Automation 5000")), { results: [] },
         proposals(rename("s2", "workflow automation tools")), { results: [] }];
       expect((await names()).proposals.map((p) => [p.itemId, p.text])).toEqual([["s1", "Workflow Automation Tools"]]);
+    });
+
+    it("never replaces a skill with another one: a rename keeps a word of the skill's own name", async () => {
+      // 27 Nov, local runs: "Anthropic Claude" came back as "Prompt Engineering", "Business Intelligence" as "Decision Support".
+      replies = [proposals(rename("s5", "Workflow Automation"), rename("s4", "Power BI Reports"), rename("s3", "Workflow Automation Tools"))];
+      const body = await names();
+      expect(body.proposals.map((p) => [p.itemId, p.text])).toEqual([["s4", "Power BI Reports"], ["s3", "Workflow Automation Tools"]]);
+      expect(body.removed).toBe(0);
+      expect(log).toHaveBeenCalledWith({ msg: "tailor skill replacements dropped", section: "skills", count: 1, items: ["s5"] });
     });
 
     it("says so in the skills prompt", async () => {

@@ -143,6 +143,36 @@ describe("the list of changes on the final page", () => {
     expect(screen.getByRole("group", { name: "Skills" })).toBeInTheDocument();
   });
 
+  it("shows a line added to a role from the person's answer, and takes it out again", async () => {
+    const user = userEvent.setup();
+    const key = "new-bullet:r2:0";
+    const added = { experience: { [key]: kept("Used KissFlow for invoices") } };
+    const withLine = tailored({ content: { experience: [own.experience[0]!, { ...own.experience[1]!, bullets: [...own.experience[1]!.bullets, { id: key, text: "Used KissFlow for invoices" }] }] }, review: added });
+    const without = tailored({ version: 4, content: { experience: own.experience },
+      review: { experience: { [key]: { kept: false, inferred: false, reviewed: true, text: "Used KissFlow for invoices" } } } });
+    vi.mocked(reviewItem).mockResolvedValue(without);
+    const { group } = show(withLine);
+    const row = group("Intern · Acme");
+    expect(row.getByText("New line, from your answer")).toBeInTheDocument();
+    expect(row.getByText("Used KissFlow for invoices")).toBeInTheDocument();
+    // The role has a change on it, so it is not among the parts left as written.
+    expect(screen.getByText("Left as you wrote them: Business Analyst · Emedi, Summary.")).toBeInTheDocument();
+
+    await user.click(row.getByRole("button", { name: "Remove" }));
+    expect(reviewItem).toHaveBeenCalledWith("cv1", { section: "experience", key, action: "remove", version: 3 });
+    expect(group("Intern · Acme").getByText("Removed: Used KissFlow for invoices")).toBeInTheDocument();
+    expect(group("Intern · Acme").queryByRole("button")).toBeNull();
+  });
+
+  it("leaves out an added line the person has reworded on the CV since", () => {
+    const key = "new-bullet:r2:0";
+    const edited = tailored({ content: { experience: [own.experience[0]!, { ...own.experience[1]!, bullets: [...own.experience[1]!.bullets, { id: key, text: "Ran invoice approvals in KissFlow" }] }] },
+      review: { experience: { [key]: kept("Used KissFlow for invoices") } } });
+    show(edited);
+    expect(screen.queryByRole("group", { name: "Intern · Acme" })).toBeNull();
+    expect(screen.queryByText("Used KissFlow for invoices")).toBeNull();
+  });
+
   it("says so when the job needed no change", () => {
     show({ ...tailored(), content: own, review: {} } as unknown as TailoredCv);
     expect(screen.getByText("Nothing needed changing for this job.")).toBeInTheDocument();

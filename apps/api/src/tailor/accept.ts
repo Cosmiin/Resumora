@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-  applyGuesses, CvContentSchema, findScored, isLightTailorSection, isRoleSection, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId, scoredItems, stepOrder, withoutHidden,
+  applyGuesses, CvContentSchema, findScored, isLightTailorSection, isRoleSection, MAX_BULLETS, MAX_ITEMS, MAX_LONG_TEXT, MAX_TEXT, NoteSchema, newId, scoredItems, stepOrder, withoutHidden,
   type CvContent, type Job, type JobExtraction, type MatchLabel, type MatchScore, type Note, type Proposal, type SectionKey, type TailoredCv, type TailorRun, type TailorSection,
 } from "@resumora/shared";
 import type { ModelDeps } from "../ai/call-model.ts";
@@ -10,7 +10,7 @@ import type { JobRepo } from "../jobs/repo.ts";
 import { newestRole } from "./questions.ts";
 import type { Review, TailorRepo } from "./repo.ts";
 import { scoreMatch, scoredTexts } from "./score.ts";
-import { currentRole, lightList, sectionItems } from "./section-pass.ts";
+import { currentRole, lightList, NEW_BULLET, sectionItems } from "./section-pass.ts";
 import { jobNotFound } from "./start.ts";
 
 /** `text`: a summary guess's edited wording (its item id is "summary#<n>"), or a kept line the person reworded. */
@@ -81,6 +81,14 @@ function apply(cv: CvContent, p: Proposal, section: TailorSection): void {
     if (!known && cv.technicalSkills.length < MAX_ITEMS) cv.technicalSkills.push({ id: newId(), name: p.text });
   }
   else {
+    if (p.itemId.startsWith(`${NEW_BULLET}:`)) {
+      // A line the tailoring adds: after the role's own lines, once (written again, it takes the new wording).
+      const role = cv.experience.find((entry) => p.itemId.startsWith(`${NEW_BULLET}:${entry.id}:`));
+      const line = role?.bullets.find((bullet) => bullet.id === p.itemId);
+      if (line) line.text = p.text;
+      else if (role && role.bullets.length < MAX_BULLETS) role.bullets.push({ id: p.itemId, text: p.text });
+      return;
+    }
     for (const { item: role } of scoredItems(cv)) {
       if (role.id === p.itemId) return void ((role as Record<string, unknown>)[p.field] = p.text);
       const bullet = role.bullets.find((b) => b.id === p.itemId);
@@ -223,7 +231,15 @@ export async function mergeStep(
     const list = lightList(content, section);
     list.splice(0, list.length, ...structuredClone(lightList((await deps.cv.get()).content, section)));
   }
-  const ids = new Set(section === "layout" ? LAYOUT_ITEMS : sectionItems(content, section, roleId).keys());
+  // Each line the writer adds to the role gets an id of its own, in the order the lines came.
+  let lines = 0;
+  const added = `${NEW_BULLET}:${roleId}:`;
+  // A role that is full takes none: a line that can't be written is not recorded as a change either.
+  const own = content.experience.find((entry) => entry.id === roleId)?.bullets.filter((bullet) => !bullet.id.startsWith(added)).length ?? MAX_BULLETS;
+  const proposals = input.proposals.flatMap((p) => (p.itemId !== NEW_BULLET ? [p]
+    : section === "experience" && roleId && own + lines < MAX_BULLETS ? [{ ...p, itemId: `${added}${lines++}` }] : []));
+  const ids = new Set(section === "layout" ? LAYOUT_ITEMS
+    : [...sectionItems(content, section, roleId).keys(), ...proposals.map((p) => p.itemId).filter((id) => id.startsWith(added))]);
   const decisions = new Map(body.decisions.map((d) => [d.itemId, d.keep]));
   const inferred = new Map(body.inferred.map((d) => [d.itemId, d.keep]));
   // A kept line the person reworded on the review (a bullet, a description, the summary). Never a flagged one:
@@ -234,7 +250,7 @@ export async function mergeStep(
   const state: Record<string, ItemReview> = {};
   const notes: { roleId: string | null; note: Note }[] = [];
   const kept: { key: string; applied: Proposal }[] = [];
-  for (const p of input.proposals.filter((proposal) => ids.has(proposal.itemId))) {
+  for (const p of proposals.filter((proposal) => ids.has(proposal.itemId))) {
     const key = reviewKey(p);
     let keep: boolean | undefined;
     if (p.flags.length > 0) {
@@ -285,7 +301,8 @@ export async function mergeStep(
 
   // A role's accept replaces only that role's items; the other roles keep their review.
   const others = roleId ? Object.fromEntries(Object.entries((doc.review?.[section] ?? {}) as Record<string, ItemReview>)
-    .filter(([key]) => !ids.has(key))) : {};
+    // The lines added to this role before go with its earlier wording.
+    .filter(([key]) => !ids.has(key) && !key.startsWith(added))) : {};
   const review: Review = { ...(doc.review ?? {}), [section]: { ...others, ...state } };
   return { content: parsed.data, review, notes, changed: kept.length - dropped.size };
 }
