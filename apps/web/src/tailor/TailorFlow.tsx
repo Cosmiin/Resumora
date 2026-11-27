@@ -1,224 +1,140 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { findScored, isRoleSection, stepItems, stepOf, stepOrder, type Answer, type CvContent, type JobExtraction, type MatchScore, type Proposal, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun, type TailorSection } from "@resumora/shared";
+import { findScored, isRoleSection, type Answer, type CvContent, type JobExtraction, type MatchScore, type Steering, type TailorLanguage, type TailorQuestion, type TailorRun } from "@resumora/shared";
 import { getCv } from "../cv/cv-api.ts";
-import { getTailored } from "./tailored-api.ts";
-import { AppShell } from "../layout/AppShell.tsx";
-import { Room, type Stop } from "./Room.tsx";
-import { getJob, scoreJob } from "../jobs/jobs-api.ts";
 import { t } from "../i18n/t.ts";
+import { getJob, scoreJob } from "../jobs/jobs-api.ts";
+import { AppShell } from "../layout/AppShell.tsx";
 import { ApiClientError } from "../lib/api.ts";
-import { QuestionCard, type Draft } from "./QuestionCard.tsx";
-import { kindKey, nameOf } from "./role-done.ts";
-import { keywordsOf } from "./KeywordsStep.tsx";
-import { Working } from "./Working.tsx";
-import { RoleReview } from "./RoleReview.tsx";
-import { SectionReview } from "./SectionReview.tsx";
-import { SteerConfirm, SteeringStep } from "./SteeringStep.tsx";
+import { roleName } from "./ChangesList.tsx";
 import { DoneScreen } from "./DoneScreen.tsx";
-import { FINAL_SECTIONS } from "./LayoutReview.tsx";
 import { remember, remembered, type Phase } from "./flow-phase.ts";
+import { GapQuestions } from "./GapQuestions.tsx";
+import { keywordsOf } from "./KeywordsStep.tsx";
+import { Room } from "./Room.tsx";
+import { runAll, stepsOf, type Step } from "./run-all.ts";
+import { SteerConfirm, SteeringStep } from "./SteeringStep.tsx";
 import * as api from "./tailor-api.ts";
-import { FinishedRoles, roleName, YourAnswers } from "./YourAnswers.tsx";
+import { getTailored } from "./tailored-api.ts";
+import { Working } from "./Working.tsx";
 import "../styles/tailor.css";
 
 export { remember, remembered } from "./flow-phase.ts";
 
-const plain = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
-/** The same words, whatever the case or spacing. */
-const sameWords = (a: string, b: string) => plain(a) === plain(b);
+/** The answers a run holds, with the ones just sent in place of the earlier ones to the same questions. */
+function withAnswers(run: TailorRun, answers: Answer[]): TailorRun {
+  const sent = new Set(answers.map((answer) => answer.questionId));
+  return { ...run, answers: [...(run.answers ?? []).filter((answer) => !sent.has(answer.questionId)), ...answers] };
+}
 
 /**
- * `/jobs/:id/tailor`: starts at once (in the language the person's preferences pick), in the room: one stop after another (each role, the
- * skills, the summary, the last touches), each with its questions, its wait and its review, then the result.
+ * `/jobs/:id/tailor` in three screens: every question the job raises on one screen, one wait while every part of the
+ * CV is written at the same time, and the final page with the match, what changed and the downloads. It starts at
+ * once, in the language the person's preferences pick.
  */
 export function TailorFlow() {
   const jobId = useParams().id ?? "";
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [run, setRun] = useState<TailorRun | null>(null);
+  const runRef = useRef<TailorRun | null>(null);
   // The language the run's CV is written in: from the start, or read from the tailored CV of a run continued later.
   const [language, setLanguage] = useState<TailorLanguage | undefined>(undefined);
-  // The base CV's match with the job, for the bar's match.
+  // The match with the base CV, and with the tailored CV once it has one.
   const [baseScore, setBaseScore] = useState<MatchScore | null>(null);
-  // The Base CV the questions and proposals are made from: shows each role and the wording a change replaces.
+  const [score, setScore] = useState<MatchScore | null>(null);
+  // The Base CV: the roles the questions are ticked for, and the parts the wait writes.
   const [cv, setCv] = useState<CvContent | null>(null);
-  // The same CV for the steps that run on from an earlier screen (their closures keep the first render's state).
-  const cvRef = useRef<CvContent | null>(null);
-  // Questions may be about a role, a project or a volunteering role (same shape as a job).
-  const scoredOf = (id: string | null | undefined) => (cv && id ? findScored(cv, id) : undefined);
-  const roleFor = (question: TailorQuestion) => scoredOf(question.roleId)?.item;
-  // The tone and extra questions: chosen before the start (optional), or read from a started run.
-  const [steering, setSteering] = useState<Steering | undefined>(undefined);
-  const runRef = useRef<TailorRun | null>(null);
-  // The newest score with its labels (base, then each accept's), and the job: for the role done line.
-  const scoreRef = useRef<MatchScore | null>(null);
-  const baseRef = useRef<MatchScore | null>(null);
+  const cvLoad = useRef<Promise<CvContent> | null>(null);
   const [job, setJob] = useState<JobExtraction | null>(null);
+  // The tone and extra questions of a started run, read when Adjust opens.
+  const [steering, setSteering] = useState<Steering | undefined>(undefined);
   const started = useRef(false);
-  // The all-roles questions are asked once per visit (a run that already holds some never asks again).
-  const acrossAsked = useRef(false);
-  // FinalA: final touches with nothing to change, accepted on their own; the next screen shows a tick for each.
-  const [ticks, setTicks] = useState<TailorSection[]>([]);
-  // The step just saved and the match it moved, as one line on the next step's screen (no screen of its own).
-  const [moved, setMoved] = useState<{ name: string; from: number; to: number } | null>(null);
-  // A change inside these screens never needs the newest score on screen, only on the next one.
-  const noteScore = (score: MatchScore) => { scoreRef.current = score; };
-  // The points each stop added, by stop (a role's id, a section, "last" for the last touches): this visit only.
-  const [gains, setGains] = useState<Record<string, number>>({});
-  const stopKey = (at: TailorSection, roleId?: string) => roleId ?? (FINAL_SECTIONS.includes(at) ? "last" : at);
-  /** Takes the new score in and says what it moved: the points, and what the CV shows now that it did not before. */
-  function gained(at: TailorSection, roleId: string | undefined, score: MatchScore) {
-    const before = scoreRef.current;
-    noteScore(score);
-    const to = score.total ?? 0;
-    const from = before?.total ?? to;
-    const key = stopKey(at, roleId);
-    if (to !== from) setGains((all) => ({ ...all, [key]: (all[key] ?? 0) + to - from }));
-    const had = new Set((before?.labels ?? []).filter((label) => label.status === "met").map((label) => label.ref));
-    const won = score.labels.filter((label) => label.status === "met" && !had.has(label.ref))
-      .flatMap((label) => nameOf(label.ref, job) ?? []).slice(0, 3);
-    return { from, to, won: before ? won : [] };
-  }
-  const section = run?.currentSection ?? null;
 
   function track(next: TailorRun) { runRef.current = next; setRun(next); }
-  /** Experience and Projects & volunteering steps name the run's current item. */
-  const roleArg = (at: TailorSection) => (isRoleSection(at) ? runRef.current?.currentRoleId ?? undefined : undefined);
-  function fail(cause: unknown, at: TailorSection | null, retry: () => void) {
+  /** The Base CV, loaded once (again after it was replaced). */
+  function baseCv(): Promise<CvContent> {
+    cvLoad.current ??= getCv().then((response) => { setCv(response.content); return response.content; },
+      (cause: unknown) => { cvLoad.current = null; throw cause; });
+    return cvLoad.current;
+  }
+  function fail(cause: unknown, retry: () => void) {
     if (cause instanceof ApiClientError && cause.code === "job_not_found") { remember(jobId, null); setPhase({ kind: "deleted" }); return; }
     // The run was made from a CV that was replaced since: start again (the start rebuilds it from the current CV).
-    if (cause instanceof ApiClientError && cause.code === "base_cv_changed") { remember(jobId, null); setRun(null); runRef.current = null; void start(); return; }
-    const ai = cause instanceof ApiClientError && cause.code === "ai_failed" && at;
-    setPhase({ kind: "error", retry, message: ai ? t("tailor.error.ai", { section: t(`tailor.section.${at}`) }) : t("tailor.error.generic") });
+    if (cause instanceof ApiClientError && cause.code === "base_cv_changed") { remember(jobId, null); cvLoad.current = null; void start(); return; }
+    setPhase({ kind: "error", retry, message: t("tailor.error.generic") });
   }
-  /** After the last step: the done screen, for the document this run tailored (a translated copy too). */
-  function finish() { remember(jobId, null); setPhase({ kind: "done" }); }
 
-  /** Continues the run where it stands: a section with a finished pass goes back to its run, otherwise to its questions. */
+  /** Continues a run where it stands: a finished one on the final page, any other at its questions. */
   function enter(next: TailorRun) {
     track(next);
-    const current = next.currentSection;
-    if (next.status === "done" || !current) return finish();
-    if (next.status === "waiting_user" || current === "layout") return void work(current);
-    void ask(current);
+    if (next.status === "done") return setPhase({ kind: "done", failed: [] });
+    void ask(next);
   }
-  async function ask(at: TailorSection) {
+  /** Every question at once. None to ask, or all of them answered before: straight to the wait. */
+  async function ask(current: TailorRun) {
     setPhase({ kind: "asking" });
     try {
-      // Before the first role: the tools and practices the CV misses, asked once for every role.
-      if (at === "experience" && !acrossAsked.current && !(runRef.current!.questions ?? []).some((q) => q.scope === "all")) {
-        const across = await api.askAcross(runRef.current!.id);
-        acrossAsked.current = true;
-        if (across.length > 0) return setPhase({ kind: "questions", questions: across, index: 0, answers: across.map(() => undefined) });
+      // The questions are about the roles, so a run that redoes only other sections asks none.
+      const questions = current.sections.some(isRoleSection) ? await api.askGaps(current.id) : [];
+      const known = new Set(questions.map((question) => question.id));
+      const asked = { ...current, questions: [...(current.questions ?? []).filter((question) => !known.has(question.id)), ...questions] };
+      track(asked);
+      const answered = new Set((current.answers ?? []).map((answer) => answer.questionId));
+      if (questions.every((question) => answered.has(question.id))) return void wait(asked);
+      // The questions are answered by ticking roles, so they wait for the CV that holds them.
+      await baseCv();
+      setPhase({ kind: "questions", questions, busy: false });
+    } catch (cause) { fail(cause, () => void ask(current)); }
+  }
+  /**
+   * Sends the answers and tailors. From the final page (`resume`) the run is finished, so every part is first put
+   * back to the person's own wording, in a new run that carries the questions and the tone over.
+   */
+  async function submit(questions: TailorQuestion[], answers: Answer[], resume?: Phase) {
+    setPhase({ kind: "questions", questions, busy: true, resume });
+    try {
+      let current = runRef.current!;
+      if (current.status === "done") {
+        const stored = await api.getSteering(current.id);
+        current = (await api.changeSteering(current.id, stored)).run;
+        remember(jobId, current.id);
+        setScore(null);
+        track(current);
       }
-      const questions = await api.askQuestions(runRef.current!.id, at, roleArg(at));
-      if (questions.length === 0) return void work(at);
-      setPhase({ kind: "questions", questions, index: 0, answers: questions.map(() => undefined) });
-    } catch (cause) { fail(cause, at, () => void ask(at)); }
+      await api.sendAnswers(current.id, answers);
+      const next = withAnswers(current, answers);
+      track(next);
+      await wait(next);
+    } catch (cause) { fail(cause, () => void submit(questions, answers, resume)); }
   }
-  /** `across`: the answers to the all-roles questions; the current role's own questions come next. */
-  async function submit(at: TailorSection, answers: Answer[], across = false) {
-    setPhase({ kind: "working" });
+  /** The one wait: every part written at the same time, then one score, then the final page. */
+  async function wait(current: TailorRun) {
+    setPhase({ kind: "working", done: 0, total: 0 });
     try {
-      await api.sendAnswers(runRef.current!.id, answers);
-      await (across ? ask(at) : work(at));
-    } catch (cause) { fail(cause, at, () => void submit(at, answers, across)); }
+      const base = await baseCv();
+      const total = stepsOf(current, base).length + (current.sections.includes("layout") ? 1 : 0);
+      setPhase({ kind: "working", done: 0, total });
+      const result = await runAll(api, current, base, (progress) => setPhase({ kind: "working", ...progress }));
+      // The questions and answers stay at hand for "Change my answers".
+      track({ ...result.run, questions: result.run.questions ?? current.questions, answers: result.run.answers ?? current.answers });
+      setScore(result.score);
+      remember(jobId, null);
+      const name = (step: Step) => {
+        const role = step.roleId ? findScored(base, step.roleId)?.item : undefined;
+        return role ? roleName(role) || t("tailor.role.untitled") : t(`tailor.section.${step.section}`);
+      };
+      setPhase({ kind: "done", failed: result.failed.map(name) });
+    } catch (cause) { fail(cause, () => void wait(current)); }
   }
-  async function work(at: TailorSection) {
-    setPhase({ kind: "working" });
-    try {
-      const { proposals, removed } = await api.runSection(runRef.current!.id, at, roleArg(at));
-      if (proposals.length === 0 && FINAL_SECTIONS.includes(at)) return void pass(at);
-      // A role is saved without a screen: missing facts are asked by the questions, never by showing the line. A guess
-      // nobody confirmed stays marked on the tailored CV, for its guided review.
-      const none = { decisions: [], inferred: [], flags: [] };
-      if (isRoleSection(at)) return void accept(at, none, () => void work(at));
-      // Changes that only alter case or spacing (webhooks → Webhooks) are used without a screen; with nothing else, no screen at all.
-      const shown = proposals.filter((p) => !cosmetic(p));
-      if (proposals.length > 0 && shown.length === 0) return void accept(at, none, () => void work(at), true);
-      setPhase({ kind: "review", proposals: shown, busy: false, removed });
-    } catch (cause) { fail(cause, at, () => void work(at)); }
-  }
-  /** FinalA: a final touch with nothing to change is accepted on its own; once saved, the next screen shows its tick. */
-  async function pass(at: TailorSection) {
-    setPhase({ kind: "working" });
-    setMoved(null);
-    try {
-      const result = await api.acceptSection(runRef.current!.id, at, { decisions: [], inferred: [], flags: [] });
-      gained(at, undefined, result.score);
-      setTicks((list) => (list.includes(at) ? list : [...list, at]));
-      enter(result.run);
-    } catch (cause) { fail(cause, at, () => void pass(at)); }
-  }
-  /** A plain change of case or spacing to a skill's name: nothing worth a look. */
-  function cosmetic(p: Proposal) {
-    if (p.inferred || p.flags.length > 0) return false;
-    const base = cvRef.current;
-    const skill = base && [...base.technicalSkills, ...base.professionalSkills].find((s) => s.id === p.itemId);
-    return !!skill && sameWords(skill.name, p.text);
-  }
-  /** `retry`: what a failure offers again (an accept made without a review re-runs its step). */
-  async function accept(at: TailorSection, body: api.AcceptBody, retry?: () => void, quiet = false) {
-    setPhase((current) => current.kind === "review" ? { ...current, busy: true } : current);
-    setMoved(null);
-    try {
-      const roleId = roleArg(at);
-      const result = await api.acceptSection(runRef.current!.id, at, roleId ? { ...body, roleId } : body);
-      const name = roleId ? scoredOf(roleId)?.item.title.trim() || t("tailor.role.untitled") : t(`tailor.section.${at}`);
-      const { from, to } = gained(at, roleId, result.score);
-      // Every step goes straight on; a reviewed Skills or Summary leaves a line on what it moved.
-      if (!quiet && !isRoleSection(at) && !FINAL_SECTIONS.includes(at)) setMoved({ name, from, to });
-      enter(result.run);
-    } catch (cause) {
-      setPhase((current) => current.kind === "review" ? { ...current, busy: false } : current);
-      if (cause instanceof ApiClientError && cause.code === "job_not_found") fail(cause, at, () => {});
-      else {
-        const review = phase;
-        fail(cause, at, retry ?? (() => setPhase(review.kind === "review" ? { ...review, busy: false } : review)));
-      }
-    }
-  }
-  /** "Skip this role" while its questions are open: the role stays as it is on the CV and the run moves on. */
-  async function skipRole(at: TailorSection) {
-    setPhase({ kind: "working" });
-    try {
-      const roleId = roleArg(at);
-      const result = await api.acceptSection(runRef.current!.id, at, { decisions: [], inferred: [], flags: [], ...(roleId ? { roleId } : {}) });
-      gained(at, roleId, result.score);
-      enter(result.run);
-    } catch (cause) { fail(cause, at, () => void ask(at)); }
-  }
-  /** A finished role's new answers: its proposals come back for review; the run stays where it was. */
-  async function redo(roleId: string, answers: Answer[], resume: Phase) {
-    setPhase({ kind: "role", roleId, busy: true, resume });
-    try {
-      const { proposals, removed } = await api.redoRole(runRef.current!.id, roleId, answers);
-      // The role under review goes back to its own review, whose accept moves the run on.
-      const at = runRef.current?.currentSection;
-      const current = isRoleSection(at) && runRef.current?.currentRoleId === roleId;
-      const review: Extract<Phase, { kind: "redo" }> = { kind: "redo", roleId, proposals, removed, busy: false, resume };
-      // Saved without a screen, as on the first pass.
-      const none = { decisions: [], inferred: [], flags: [] };
-      return void (current && at ? accept(at, none, () => setPhase(resume)) : acceptRedo(roleId, none, review));
-    } catch (cause) { fail(cause, "experience", () => setPhase({ kind: "role", roleId, busy: false, resume })); }
-  }
-  async function acceptRedo(roleId: string, body: api.AcceptBody, review: Extract<Phase, { kind: "redo" }>) {
-    setPhase({ ...review, busy: true });
-    try {
-      const result = await api.acceptRole(runRef.current!.id, roleId, body);
-      noteScore(result.score);
-      track(result.run);
-      setPhase(review.resume);
-    } catch (cause) { fail(cause, "experience", () => setPhase({ ...review, busy: false })); }
-  }
-  /** "← My answers" on the role under review: its answers, read fresh from the run. */
-  async function openAnswers(review: Phase) {
+
+  /** "Change my answers" on the final page: the questions with the answers given, once the roles to tick are there. */
+  async function reopen(questions: TailorQuestion[], resume: Phase) {
     setPhase({ kind: "loading" });
     try {
-      track(await api.getRun(runRef.current!.id));
-      setPhase({ kind: "role", roleId: runRef.current!.currentRoleId!, busy: false, resume: review });
-    } catch (cause) { fail(cause, "experience", () => setPhase(review)); }
+      await baseCv();
+      setPhase({ kind: "questions", questions, busy: false, resume });
+    } catch (cause) { fail(cause, () => void reopen(questions, resume)); }
   }
   /** The Adjust screen of a started run, from its stored steering (never from defaults). */
   async function openSteer(resume: Phase) {
@@ -226,18 +142,18 @@ export function TailorFlow() {
     try {
       setSteering(await api.getSteering(runRef.current!.id));
       setPhase({ kind: "steer", busy: false, resume });
-    } catch (cause) { fail(cause, null, () => setPhase(resume)); }
+    } catch (cause) { fail(cause, () => setPhase(resume)); }
   }
-  /** Changing the steering redoes every step with the stored answers, in a new run. */
-  async function restart(steering: Steering, confirm: Extract<Phase, { kind: "confirm" }>) {
+  /** Changing the steering tailors every part again with the stored answers, in a new run. */
+  async function restart(next: Steering, confirm: Extract<Phase, { kind: "confirm" }>) {
     setPhase({ ...confirm, busy: true });
-    setMoved(null);
     try {
-      const { run: created } = await api.changeSteering(runRef.current!.id, steering);
-      setSteering(steering);
+      const { run: created } = await api.changeSteering(runRef.current!.id, next);
+      setSteering(next);
+      setScore(null);
       remember(jobId, created.id);
       enter(created);
-    } catch (cause) { fail(cause, null, () => setPhase({ ...confirm, busy: false })); }
+    } catch (cause) { fail(cause, () => setPhase({ ...confirm, busy: false })); }
   }
   /** `picked`: another language from the bar's menu; without it the person's default decides. */
   async function start(picked?: TailorLanguage) {
@@ -246,17 +162,15 @@ export function TailorFlow() {
       const { run: created, restarted, language: written } = await api.startTailoring(jobId, steering ?? {}, picked);
       setLanguage(written);
       remember(jobId, created.id);
-      // A new run (another language, a replaced CV) asks the all-roles questions again.
-      acrossAsked.current = false;
-      // A start over a replaced CV worked out the job's match again and begins from its wording: score from there.
+      // A start over a replaced CV worked out the job's match again: show that one.
       if (restarted) {
         try {
           const { base } = await api.getScores(jobId);
-          if (base) { baseRef.current = base; scoreRef.current = base; setBaseScore(base); }
+          if (base) setBaseScore(base);
         } catch { /* the run doesn't need it */ }
       }
       enter(created);
-    } catch (cause) { fail(cause, null, () => void start(picked)); }
+    } catch (cause) { fail(cause, () => void start(picked)); }
   }
   async function load() {
     const stored = remembered(jobId);
@@ -267,7 +181,7 @@ export function TailorFlow() {
       // The bar's language; without it the bar just leaves the language out.
       if (found.tailoredCvId) getTailored(found.tailoredCvId).then((doc) => setLanguage((known) => known ?? doc.language), () => {});
       enter(found);
-    } catch (cause) { fail(cause, null, () => void load()); }
+    } catch (cause) { fail(cause, () => void load()); }
   }
 
   useEffect(() => {
@@ -275,172 +189,64 @@ export function TailorFlow() {
     started.current = true;
     // The match with the base CV is worked out on the job page; someone who lands here first gets it now.
     api.getScores(jobId).then((scores) => (scores.base ? scores : scoreJob(jobId))).then((scores) => {
-      scoreRef.current ??= scores.tailored ?? scores.base;
-      baseRef.current = scores.base;
-      setBaseScore(scores.base);
+      setBaseScore((known) => known ?? scores.base);
+      setScore((known) => known ?? scores.tailored);
     }, () => {});
-    // Without it the screens fall back to the plain list; the run itself doesn't need it.
-    getCv().then((response) => { cvRef.current = response.content; setCv(response.content); }, () => {});
+    // The roles on the questions screen; the wait loads it again itself when this fails.
+    baseCv().catch(() => {});
     getJob(jobId).then((found) => setJob(found.extracted ?? null), () => {});
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Items already accepted (roles, then projects and volunteering, in one order): all of them once the role steps are
-  // behind the run, else the ones before the current item.
-  const order = run?.roleOrder ?? [];
-  const lastRoleStep = run ? Math.max(...run.sections.map((s, i) => (isRoleSection(s) ? i : -1))) : -1;
-  const pastRoleSteps = !!run && (run.status === "done" || !section || run.sections.indexOf(section) > lastRoleStep);
-  const doneRoles = pastRoleSteps ? order
-    : isRoleSection(section) && run?.currentRoleId && order.includes(run.currentRoleId) ? order.slice(0, order.indexOf(run.currentRoleId)) : [];
-  const doneIn = (s: TailorSection) => (cv ? stepItems(cv, s).filter((item) => doneRoles.includes(item.id)) : []);
-  // Going back opens only from a question or a review, so nothing in flight comes back over it.
-  const settled = phase.kind === "questions" || phase.kind === "review";
-  const reached = run && section ? run.sections.indexOf(section) : run?.sections.length ?? 0;
-  // Without the CV loaded, finished roles still open Experience (as before projects were tailored).
-  const anyDone = (s: TailorSection) => (cv ? doneIn(s).length > 0 : s === "experience" && doneRoles.length > 0);
-  const open = settled && run ? run.sections.filter((s, i) => (isRoleSection(s) ? anyDone(s) : i < reached)) : [];
-  const stepQuestions = (s: TailorSection, roleId?: string) => (run?.questions ?? [])
-    .filter((q) => q.section === s && q.kind !== "flag" && (!roleId || q.roleId === roleId));
-  const locale = cv?.locale ?? "en";
+  // Each screen starts at its top (the questions are long, and the result opens where they were left).
+  useEffect(() => { document.querySelector(".tailor-room-bar")?.scrollIntoView?.({ block: "start" }); }, [phase.kind]);
 
-  // The map: every stop of the run, in order, with where it stands and the points it added.
-  const stops: Stop[] = [];
-  if (run) {
-    const over = run.status === "done" || !section || phase.kind === "done";
-    stops.push({ id: "setup", name: t("tailor.room.setup"), state: "ok", group: "" });
-    for (const s of run.sections.filter(isRoleSection)) {
-      const ids = cv ? stepOrder(run, cv, s) : s === "experience" ? run.roleOrder ?? [] : [];
-      for (const id of ids) {
-        const item = scoredOf(id)?.item;
-        const state = over || doneRoles.includes(id) ? "ok" : run.currentRoleId === id && isRoleSection(section) ? "now" : "todo";
-        stops.push({ id: `item:${id}`, name: item?.title.trim() || t("tailor.role.untitled"), state, gain: gains[id],
-          sub: state === "now" && item ? item.company.trim() || undefined : undefined, group: t(`tailor.section.${s}`) });
-      }
-    }
-    const rest = t("tailor.room.rest");
-    const at = (s: TailorSection) => run.sections.indexOf(s);
-    for (const s of run.sections.filter((key) => !isRoleSection(key) && !FINAL_SECTIONS.includes(key))) {
-      stops.push({ id: s, name: t(`tailor.section.${s}`), state: over || at(s) < reached ? "ok" : s === section ? "now" : "todo", gain: gains[s], group: rest });
-    }
-    const last = run.sections.filter((key) => FINAL_SECTIONS.includes(key));
-    if (last.length > 0) {
-      stops.push({ id: "last", name: t("tailor.room.last"), gain: gains.last, group: rest,
-        state: over || last.every((s) => at(s) < reached) ? "ok" : section && last.includes(section) ? "now" : "todo" });
-    }
-    stops.push({ id: "result", name: t("tailor.room.result"), state: phase.kind === "done" ? "now" : "todo", group: rest });
-  }
+  // The questions a finished run can be asked again: the ones about every role.
+  const gaps = (run?.questions ?? []).filter((question) => question.scope === "all");
+  const locale = cv?.locale ?? "en";
 
   let body: React.ReactNode;
   if (phase.kind === "loading") body = <p role="status">{t("tailor.loading")}</p>;
+  else if (phase.kind === "asking") body = <p role="status" className="ui-coach tailor-working">{t("tailor.gaps.asking")}</p>;
   else if (phase.kind === "steer") {
     const { resume } = phase;
-    // New choices redo every step, so that asks first.
+    // New choices tailor every part again, so that asks first.
     body = <SteeringStep jobId={jobId} busy={phase.busy} initial={steering}
       startLabel={t("tailor.steer.save")} onCancel={() => setPhase(resume)}
-      onStart={(s) => setPhase({ kind: "confirm", steering: s, busy: false, resume })} />;
+      onStart={(next) => setPhase({ kind: "confirm", steering: next, busy: false, resume })} />;
   } else if (phase.kind === "confirm") {
     body = <SteerConfirm busy={phase.busy} onCancel={() => setPhase(phase.resume)} onRedo={() => void restart(phase.steering, phase)} />;
-  } else if (phase.kind === "back") {
-    const { resume } = phase;
-    body = isRoleSection(phase.section)
-      // From the finish every finished item is offered (roles, then projects and volunteering); from a step, that step's.
-      ? <FinishedRoles roles={resume.kind === "done" ? [...doneIn("experience"), ...doneIn("projects")] : doneIn(phase.section)} locale={locale}
-        onPick={(roleId) => setPhase({ kind: "role", roleId, busy: false, resume })} onClose={() => setPhase(resume)} />
-      : <YourAnswers key={phase.section} title={t(`tailor.section.${phase.section}`)} questions={stepQuestions(phase.section)}
-        answers={run?.answers ?? []} busy={false} locale={locale} onClose={() => setPhase(resume)} />;
-  } else if (phase.kind === "role") {
-    const { roleId, resume } = phase;
-    const role = scoredOf(roleId)?.item;
-    body = <YourAnswers key={roleId} title={role ? roleName(role, locale) : t("tailor.role.untitled")}
-      questions={stepQuestions((cv && stepOf(cv, roleId)) || "experience", roleId)}
-      answers={run?.answers ?? []} busy={phase.busy} locale={locale}
-      onUpdate={(answers) => void redo(roleId, answers, resume)} onClose={() => setPhase(resume)} />;
-  } else if (phase.kind === "redo") {
-    const review = phase;
-    const role = scoredOf(review.roleId)?.item;
-    const onAccept = (accepted: api.AcceptBody) => void acceptRedo(review.roleId, accepted, review);
-    body = role ? <RoleReview key={`redo-${role.id}`} role={role} kind={scoredOf(review.roleId)?.kind} proposals={review.proposals} locale={locale} busy={review.busy} onAccept={onAccept} removed={review.removed} guessesOnly />
-      : <SectionReview key={`redo-${review.roleId}`} section="experience" proposals={review.proposals} flags={[]} confirmed={[]}
-        busy={review.busy} onAccept={onAccept} cv={cv} removed={review.removed} />;
-  }
+  } else if (phase.kind === "questions") {
+    const { questions, resume } = phase;
+    body = <GapQuestions questions={questions} roles={cv?.experience ?? []} locale={locale} answers={run?.answers ?? []} busy={phase.busy}
+      onSubmit={(answers) => void submit(questions, answers, resume)} onCancel={resume ? () => setPhase(resume) : undefined} />;
+  } else if (phase.kind === "working") body = <Working done={phase.done} total={phase.total} />;
   else if (phase.kind === "done") {
-    body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseRef.current} final={scoreRef.current} job={job}
-      gains={stops.flatMap((stop) => (stop.gain && stop.gain > 0 ? [{ name: stop.name, points: stop.gain }] : []))}
-      onAnswers={anyDone("experience") || anyDone("projects") ? () => setPhase({ kind: "back", section: "experience", resume: phase }) : undefined} />;
+    body = <DoneScreen jobId={jobId} docId={run?.tailoredCvId ?? null} base={baseScore} final={score ?? baseScore} job={job} failed={phase.failed}
+      onAnswers={gaps.length > 0 ? () => void reopen(gaps, phase) : undefined} />;
   } else if (phase.kind === "deleted") {
     body = <section className="ui-stack tailor-narrow" role="alert"><h1 className="ui-title">{t("tailor.error.deleted")}</h1>
       <p><Link className="ui-btn" to="/jobs">{t("tailor.error.toJobs")}</Link></p></section>;
-  } else if (phase.kind === "error") {
+  } else {
     body = <section className="ui-stack tailor-narrow"><p role="alert" className="ui-notice ui-notice--bad">{phase.message}</p>
       <p><button type="button" className="ui-btn" onClick={phase.retry}>{t("tailor.retry")}</button></p></section>;
-  } else if (!section) body = null;
-  else if (phase.kind === "asking" || phase.kind === "working") {
-    const waiting = phase.kind === "working" && isRoleSection(section) ? scoredOf(run?.currentRoleId) : undefined;
-    body = phase.kind === "asking" ? <p role="status" className="ui-coach tailor-working">{t("tailor.asking", { section: t(`tailor.section.${section}`) })}</p>
-      : <Working text={t("tailor.working", { section: t(`tailor.section.${section}`) })} role={waiting?.item} kind={waiting?.kind} locale={locale} />;
-  } else if (phase.kind === "questions") {
-    const question = phase.questions[phase.index]!;
-    const across = phase.questions.some((q) => q.scope === "all");
-    // Next or Skip stores the answer; after the last question the step's answers go together.
-    const answerWith = (answer: Draft) => {
-      const answers = phase.answers.map((given, i) => (i === phase.index ? answer : given));
-      if (phase.index + 1 < phase.questions.length) return setPhase({ ...phase, index: phase.index + 1, answers });
-      void submit(section, phase.questions.map((q, i): Answer => ({ ...(answers[i] ?? { value: null, via: "skip" }), questionId: q.id })), across);
-    };
-    // "Project 1 of 2 · Question 1 of 3": the current item among the step's items of its kind (roles: every role).
-    const current = scoredOf(run?.currentRoleId);
-    const kindOrder = !run || !isRoleSection(section) ? [] : cv && current
-      ? stepOrder(run, cv, section).filter((id) => scoredOf(id)?.kind === current.kind) : section === "experience" ? run.roleOrder ?? [] : [];
-    const progress = across ? t("tailor.question.acrossProgress", { n: phase.index + 1, total: phase.questions.length })
-      : run?.currentRoleId && kindOrder.includes(run.currentRoleId)
-      ? t(`tailor.question.roleProgress${kindKey(current?.kind)}`, { role: kindOrder.indexOf(run.currentRoleId) + 1, roles: kindOrder.length,
-        n: phase.index + 1, total: phase.questions.length })
-      : t("tailor.question.progress", { n: phase.index + 1, total: phase.questions.length });
-    body = <QuestionCard key={question.id} question={question} progress={progress} index={phase.index} total={phase.questions.length}
-      job={job} score={baseRef.current} initial={phase.answers[phase.index]}
-      onNext={answerWith} onSkip={() => answerWith({ value: null, via: "skip" })}
-      onBack={phase.index > 0 ? () => setPhase({ ...phase, index: phase.index - 1 }) : undefined}
-      role={roleFor(question)} kind={scoredOf(question.roleId)?.kind} roles={cv?.experience ?? []} locale={cv?.locale} cv={cv} />;
-  } else if (isRoleSection(section) && scoredOf(run?.currentRoleId)) {
-    const review = phase;
-    const current = scoredOf(run!.currentRoleId)!;
-    // "Role 1 of 2": the item among the step's items of its kind.
-    const kindOrder = cv ? stepOrder(run!, cv, section).filter((id) => scoredOf(id)?.kind === current.kind) : [];
-    const position = kindOrder.includes(current.item.id)
-      ? t(`tailor.roleReview.position${kindKey(current.kind)}`, { n: kindOrder.indexOf(current.item.id) + 1, total: kindOrder.length }) : undefined;
-    const words = keywordsOf(scoreRef.current);
-    body = <RoleReview guessesOnly key={run!.currentRoleId!} role={current.item} kind={current.kind} proposals={review.proposals} locale={locale}
-      position={position} keywords={{ has: words.has.length, total: words.has.length + words.missing.length }}
-      busy={review.busy} onAccept={(accepted) => void accept(section, accepted)} onAnswers={() => void openAnswers(review)} removed={review.removed} />;
-  } else {
-    body = <SectionReview key={section} section={section} proposals={phase.proposals} flags={[]}
-      confirmed={[]} busy={phase.busy} onAccept={(accepted) => { setTicks([]); void accept(section, accepted); }} cv={cv} removed={phase.removed} />;
   }
   const jobName = [job?.title.trim(), job?.company?.trim()].filter(Boolean).join(", ");
   const toJob = `/jobs/${encodeURIComponent(jobId)}`;
 
-  // A started run happens in the room: one bar, the map of every stop, and the stop's own screen, from the first
-  // question to the result.
+  // A started run happens in the room: one bar over the screen of the moment, from the questions to the result.
   if (run && phase.kind !== "deleted") {
-    const asking = !!section && (phase.kind === "questions" || phase.kind === "asking");
-    const staged = !!section && !FINAL_SECTIONS.includes(section);
-    const moment = !staged ? undefined : asking ? 0 : phase.kind === "working" ? 1 : phase.kind === "review" ? 2 : undefined;
-    const words = keywordsOf(scoreRef.current);
-    // Another language starts again, so it is offered only until the first step is saved.
-    const fresh = !stops.some((stop) => stop.state === "ok" && stop.id !== "setup") && (phase.kind === "questions" || phase.kind === "review");
-    return <Room jobName={jobName || undefined} onExit={() => void navigate(toJob)} base={baseScore?.total ?? null} now={scoreRef.current?.total ?? null}
-      stops={stops} moment={moment} keywords={words.has.length + words.missing.length > 0 ? { has: words.has.length, total: words.has.length + words.missing.length } : undefined}
-      language={language && { value: language, onPick: fresh ? (picked) => void start(picked) : undefined }}
-      skip={section && phase.kind === "questions" && isRoleSection(section) && !phase.questions.some((q) => q.scope === "all")
-        ? { label: t(`tailor.roleReview.skip${kindKey(scoredOf(run.currentRoleId)?.kind)}`), onSkip: () => void skipRole(section) } : undefined}>
-      {settled && <p className="tailor-links">
-        <span className="ui-muted">{t("tailor.lookBack")}</span>
-        {open.map((s) => <button key={s} type="button" onClick={() => setPhase({ kind: "back", section: s, resume: phase })}>{t(`tailor.section.${s}`)}</button>)}
-        <button type="button" onClick={() => void openSteer(phase)}>{t("tailor.steps.steering")}</button>
-      </p>}
-      {moved && <p className="ui-small ui-muted tailor-tick" role="status">{t(moved.to === moved.from ? "tailor.stop.same" : "tailor.stop.moved", moved)}</p>}
-      {ticks.map((s) => <p key={s} className="ui-small ui-muted tailor-tick">{t("tailor.final.nothing", { section: t(`tailor.section.${s}`) })}</p>)}
-      {asking ? <div className="focus-mode tailor-focus">{phase.kind === "asking" ? <div className="fm-grid">{body}</div> : body}</div> : body}
+    const shown = score ?? baseScore;
+    const words = keywordsOf(shown);
+    // Another language starts again, so it is offered only until the answers are sent. Adjust tailors again too, so it
+    // is offered where nothing is in flight: on the questions and on the final page.
+    const asking = phase.kind === "questions" && !phase.busy && !phase.resume;
+    const settled = (phase.kind === "questions" && !phase.busy) || phase.kind === "done";
+    return <Room jobName={jobName || undefined} onExit={() => void navigate(toJob)} base={baseScore?.total ?? null} now={score?.total ?? null}
+      keywords={words.has.length + words.missing.length > 0 ? { has: words.has.length, total: words.has.length + words.missing.length } : undefined}
+      language={language && { value: language, onPick: asking ? (picked) => void start(picked) : undefined }}
+      onAdjust={settled ? () => void openSteer(phase) : undefined}>
+      {body}
     </Room>;
   }
 

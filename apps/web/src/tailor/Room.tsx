@@ -2,37 +2,28 @@ import type { ReactNode } from "react";
 import { TailorLanguageSchema, type TailorLanguage } from "@resumora/shared";
 import { t } from "../i18n/t.ts";
 
-/** One stop on the map: a role, a project, Skills, Summary, the last touches, the result. */
-export type Stop = { id: string; name: string; sub?: string; state: "ok" | "now" | "todo"; group: string; gain?: number };
-
 type Props = {
   /** The job being tailored for, and the way out. */
   jobName?: string;
   onExit(): void;
-  skip?: { label: string; onSkip(): void };
   /** The match with the base CV, and with the tailored CV as it stands. */
   base: number | null;
   now: number | null;
-  stops: Stop[];
   /** The ad's keywords the CV shows, out of all of them; absent when there is nothing to compare. */
   keywords?: { has: number; total: number };
   /** The language the CV is written in; `onPick` (a menu) only while another language can still start again. */
   language?: { value: TailorLanguage; onPick?(language: TailorLanguage): void };
-  /** Which of a stop's three moments is on screen (questions, writing, review); absent between stops. */
-  moment?: 0 | 1 | 2;
+  /** Opens the tone and the extra questions; absent while a screen that can't be left is up. */
+  onAdjust?(): void;
   children: ReactNode;
 };
 
-const MOMENTS = ["questions", "writing", "review"] as const;
-
 /**
- * The room tailoring happens in, from the first question to the result: one bar (the job, the match, the way
- * out), the map of every stop on the left, and the stop's own screen in the middle.
+ * The room tailoring happens in, from the questions to the result: one bar (the job, the match, the CV's language,
+ * Adjust and the way out) over the screen of the moment.
  */
-export function Room({ jobName, onExit, skip, base, now, stops, keywords, language, moment, children }: Props) {
+export function Room({ jobName, onExit, base, now, keywords, language, onAdjust, children }: Props) {
   const name = (code: TailorLanguage) => t(`tailored.lang.${code}`);
-  const groups = [...new Set(stops.map((stop) => stop.group))];
-  let n = 0;
   return <div className="ui-page tailor-room">
     <header className="tailor-room-bar">
       <span className="fm-brand">{t("app.name")}</span>
@@ -51,32 +42,10 @@ export function Room({ jobName, onExit, skip, base, now, stops, keywords, langua
           </select></label>
         : <p className="tailor-room-lang ui-small">{t("tailor.room.languageIs", { language: name(language.value) })}</p>)}
       <div className="fm-bar-actions">
-        {skip && <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm" onClick={skip.onSkip}>{skip.label}</button>}
+        {onAdjust && <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm" onClick={onAdjust}>{t("tailor.steps.steering")}</button>}
         <button type="button" className="ui-btn ui-btn--quiet ui-btn--sm" onClick={onExit}>{t("tailor.back")}</button>
       </div>
     </header>
-    <div className="tailor-room-body">
-      <nav className="tailor-map" aria-label={t("tailor.steps")}>
-        {groups.map((group) => <div key={group} className="tailor-map-group">
-          {group && <p className="ui-label">{group}</p>}
-          <ol>{stops.filter((stop) => stop.group === group).map((stop) => {
-            const numbered = stop.id.startsWith("item:");
-            if (numbered) n++;
-            return <li key={stop.id} className={`tailor-stop is-${stop.state}`} aria-current={stop.state === "now" ? "step" : undefined}>
-              <span className="tailor-stop-dot" aria-hidden="true">{stop.state === "ok" ? "✓" : numbered ? n : ""}</span>
-              <span className="tailor-stop-name">{stop.name}{stop.sub && <small>{stop.sub}</small>}</span>
-              {stop.state === "ok" && !!stop.gain && stop.gain > 0 && <span className="tailor-stop-gain">+{stop.gain}</span>}
-            </li>;
-          })}</ol>
-        </div>)}
-      </nav>
-      <main className="tailor-room-main">
-        {moment !== undefined && <ol className="tailor-moments" aria-hidden="true">
-          {MOMENTS.map((key, i) => <li key={key} className={i === moment ? "is-on" : i < moment ? "is-done" : undefined}>{i < moment ? "✓ " : ""}{t(`tailor.room.moment.${key}`)}</li>)}
-        </ol>}
-        {children}
-      </main>
-    </div>
+    <main className="tailor-room-main">{children}</main>
   </div>;
 }
-

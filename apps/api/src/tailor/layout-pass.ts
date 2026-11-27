@@ -55,15 +55,23 @@ export async function runLayoutPass(
   return { proposals, questions: [] };
 }
 
-/** The layout step's proposals from the tailored CV as it stands, without touching the run. */
+/**
+ * The layout step's proposals from the tailored CV as it stands, without touching the run.
+ * `fromBase`: the order and headline to improve on are the person's own (the Base CV's), not the ones an earlier
+ * layout step left on the tailored CV; for a step that is written starting from the Base order and titles.
+ */
 export async function layoutProposals(
   deps: { model: ModelDeps; tailor: TailorRepo },
-  input: { userId: string; run: TailorRun; job: JobExtraction },
+  input: { userId: string; run: TailorRun; job: JobExtraction; fromBase?: boolean },
 ): Promise<Proposal[]> {
   const { run } = input;
-  const doc = run.tailoredCvId ? await deps.tailor.getTailoredCv(run.tailoredCvId) : null;
+  const doc = run.tailoredCvId ? await deps.tailor.readTailoredCv(run.tailoredCvId) : null;
   if (!doc) throw jobNotFound();
   const cv = stripHeader(doc.content).cv;
+  if (input.fromBase) {
+    cv.layout.order = [...doc.baseSnapshot.layout.order];
+    cv.basics.titles = [...doc.baseSnapshot.basics.titles];
+  }
   const order = cv.layout.order;
   const headline = cv.basics.titles[0] ?? "";
   const stored = await deps.tailor.getSteering(doc.id);

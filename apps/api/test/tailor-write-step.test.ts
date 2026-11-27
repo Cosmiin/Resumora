@@ -100,6 +100,28 @@ describe("writing a step straight into the tailored CV", () => {
     expect(await repo().getRun(runId)).toMatchObject({ status: "running", currentSection: "experience", currentRoleId: newer.id });
   });
 
+  it("a role no longer ticked for a gap doesn't hand the writer the note its earlier yes left", async () => {
+    const { runId } = await start();
+    const question = { id: "g1", section: "experience" as const, roleId: null, text: "Did you use KissFlow?", kind: "skill" as const, options: [],
+      reason: "The ad asks for KissFlow.", gap: "k:KissFlow", skill: "KissFlow", scope: "all" as const };
+    // The first answer ticked both roles, so both carry its note; the answer was then changed to the older role only.
+    const note = { id: "n1", question: question.text, answer: "Used KissFlow (Yes)", via: ["pick" as const], askedAt: "2026-11-27T10:00:00.000Z", jobId };
+    await cv.addJobNotes(newer.id, [note]);
+    await cv.addJobNotes(older.id, [{ ...note, id: "n2" }]);
+    await repo().updateRun(runId, { questions: [question], answers: [{ questionId: "g1", value: "Yes", via: "option", use: "used", roleIds: [older.id] }] });
+
+    replies = [proposals(reword(newer.bullets[0]!.id, "Ran accurate payroll for 40 staff")), { results: [] }];
+    expect((await write(runId, "experience", newer.id)).status).toBe(200);
+    expect(JSON.stringify(model.requests)).not.toContain("Used KissFlow");
+
+    const before = model.requests.length;
+    replies = [proposals(reword(older.bullets[0]!.id, "Checked payroll timesheets every week")), { results: [] }];
+    expect((await write(runId, "experience", older.id)).status).toBe(200);
+    expect(JSON.stringify(model.requests.slice(before))).toContain("Used KissFlow");
+    // The note itself stays on the Base CV: only this run's writer doesn't see it.
+    expect((await cv.get()).content.experience[0]!.notes).toHaveLength(1);
+  });
+
   it("two steps written at the same time both end up in the tailored CV", async () => {
     const { runId, docId } = await start();
     // Each reply is picked by what the request holds, since the two steps' model calls interleave.
@@ -154,17 +176,22 @@ describe("writing a step straight into the tailored CV", () => {
     expect(doc.content.basics.summary).toBe("Payroll specialist who ran payroll for 40 staff.");
   });
 
-  it("the layout step reads the tailored CV and writes the headline and the section order", async () => {
+  it("the layout step reads the tailored CV, writes the section order and leaves the headline for the person to choose", async () => {
     const { runId, docId } = await start();
     replies = [proposals({ ...reword("summary", "Payroll lead for 40 staff.", "summary"), guesses: [] }), { results: [] }];
     await write(runId, "summary");
     const order = [...base.layout.order].reverse();
     // "Lead" stands only in the tailored summary: the headline may use it because this step reads the tailored CV.
     replies = [{ order, headline: "Payroll Lead" }];
-    expect(await (await write(runId, "layout")).json()).toEqual({ changed: 2, removed: 0 });
+    expect(await (await write(runId, "layout")).json()).toEqual({ changed: 1, removed: 0 });
     const doc = await tailored(docId);
-    expect(doc.content.basics.titles[0]).toBe("Payroll Lead");
     expect(doc.content.layout.order).toEqual(order);
+    // The headline is proposed, not applied: the titles stay, and the proposal waits in the review state.
+    expect(doc.content.basics.titles).toEqual(["Payroll Specialist"]);
+    expect((doc.review as Record<string, Record<string, unknown>>).layout).toMatchObject({
+      layout: { kept: true, text: order.join(",") },
+      headline: { kept: false, reviewed: false, text: "Payroll Lead" },
+    });
     expect(await repo().getRun(runId)).toMatchObject({ currentSection: "experience" });
   });
 
@@ -242,5 +269,113 @@ describe("finishing a run written step by step", () => {
     expect((await finish(runId)).status).toBe(502);
     expect(await repo().getRun(runId)).toMatchObject({ status: "running", currentSection: "experience" });
     expect((await finish(runId, "token-b")).status).toBe(404);
+  });
+});
+
+describe("the headline and the section order on the final page", () => {
+  const review = async (docId: string, key: string, action: "keep" | "remove") => {
+    const doc = await tailored(docId);
+    return app.request(`/v1/tailored/${docId}/review`, { method: "PATCH", headers: { authorization: "Bearer token-a", "content-type": "application/json" },
+      body: JSON.stringify({ section: "layout", key, action, version: doc.version }) });
+  };
+  const order = [...base.layout.order].reverse();
+  /** A run whose layout step proposed a headline and a new order. */
+  async function written(headline: string, titles = ["Payroll Specialist"]) {
+    // "and" stands in the summary, so a headline may use it.
+    await cv.save({ ...base, basics: { ...base.basics, titles, summary: "Payroll and teams." } }, 1);
+    const { runId, docId } = await start();
+    replies = [{ order, headline }];
+    expect((await write(runId, "layout")).status).toBe(200);
+    return docId;
+  }
+  const state = async (docId: string) => ((await tailored(docId)).review as Record<string, Record<string, { kept: boolean; reviewed: boolean }>>).layout!;
+
+  it("uses the proposed headline when the person picks it, and puts their own titles back when they change their mind", async () => {
+    const docId = await written("Payroll Specialist for Staff");
+    expect((await review(docId, "headline", "keep")).status).toBe(200);
+    expect((await tailored(docId)).content.basics.titles).toEqual(["Payroll Specialist for Staff"]);
+    expect((await state(docId)).headline).toMatchObject({ kept: true, reviewed: true });
+
+    expect((await review(docId, "headline", "remove")).status).toBe(200);
+    expect((await tailored(docId)).content.basics.titles).toEqual(["Payroll Specialist"]);
+    expect((await state(docId)).headline).toMatchObject({ kept: false, reviewed: true });
+  });
+
+  it("a headline that holds the other title drops that title", async () => {
+    const docId = await written("Payroll Specialist and Team Lead", ["Payroll Specialist", "Team Lead"]);
+    expect((await review(docId, "headline", "keep")).status).toBe(200);
+    expect((await tailored(docId)).content.basics.titles).toEqual(["Payroll Specialist and Team Lead"]);
+    // Their own titles come back whole.
+    await review(docId, "headline", "remove");
+    expect((await tailored(docId)).content.basics.titles).toEqual(["Payroll Specialist", "Team Lead"]);
+  });
+
+  it("a headline keeps the other title when it doesn't hold it", async () => {
+    const docId = await written("Payroll Specialist for Staff", ["Payroll Specialist", "Team Lead"]);
+    await review(docId, "headline", "keep");
+    expect((await tailored(docId)).content.basics.titles).toEqual(["Payroll Specialist for Staff", "Team Lead"]);
+  });
+
+  it("writing the layout step again starts from the person's own titles and order, with the headline undecided", async () => {
+    const docId = await written("Payroll Specialist and Team Lead", ["Payroll Specialist", "Team Lead"]);
+    await review(docId, "headline", "keep");
+    const run = (await repo().readTailoredCv(docId))!;
+    const runId = [...docs.runs.values()].find((r) => r.tailoredCvId === run.id)!.id;
+    // This time nothing new is proposed: the same order as the person's, and the headline they already have.
+    replies = [{ order: base.layout.order, headline: "Payroll Specialist" }];
+    expect(await (await write(runId, "layout")).json()).toEqual({ changed: 0, removed: 0 });
+    const doc = await tailored(docId);
+    expect(doc.content.basics.titles).toEqual(["Payroll Specialist", "Team Lead"]);
+    expect(doc.content.layout.order).toEqual(base.layout.order);
+    expect((doc.review as Record<string, unknown>).layout).toEqual({});
+  });
+
+  it("puts the person's own section order back, and the proposed one again", async () => {
+    const docId = await written("Payroll Specialist for Staff");
+    expect((await tailored(docId)).content.layout.order).toEqual(order);
+    expect((await review(docId, "layout", "remove")).status).toBe(200);
+    expect((await tailored(docId)).content.layout.order).toEqual(base.layout.order);
+    expect((await state(docId)).layout).toMatchObject({ kept: false, reviewed: true });
+    expect((await review(docId, "layout", "keep")).status).toBe(200);
+    expect((await tailored(docId)).content.layout.order).toEqual(order);
+  });
+
+  it("shows an item hidden for this job again, and puts a section's items back in the person's order", async () => {
+    const interests = [{ id: "i1", name: "Knitting" }, { id: "i2", name: "Spreadsheets" }];
+    await cv.save({ ...base, interests }, 1);
+    const { runId, docId } = await start();
+    replies = [proposals({ ...reword("order", "i2,i1", "order") }, { ...reword("hide:i1", "Not about payroll", "hidden") }), { results: [] }];
+    expect(await (await write(runId, "interests")).json()).toEqual({ changed: 2, removed: 0 });
+    expect((await tailored(docId)).content.interests).toEqual([{ id: "i2", name: "Spreadsheets" }, { id: "i1", name: "Knitting", hidden: true }]);
+    const undo = async (key: string) => app.request(`/v1/tailored/${docId}/review`, { method: "PATCH", headers: { authorization: "Bearer token-a", "content-type": "application/json" },
+      body: JSON.stringify({ section: "interests", key, action: "remove", version: (await tailored(docId)).version }) });
+
+    expect((await undo("hide:i1")).status).toBe(200);
+    expect((await tailored(docId)).content.interests).toEqual([{ id: "i2", name: "Spreadsheets" }, { id: "i1", name: "Knitting" }]);
+    expect((await undo("order")).status).toBe(200);
+    const doc = await tailored(docId);
+    expect(doc.content.interests).toEqual(interests);
+    expect(doc.review).toMatchObject({ interests: { order: { kept: false, reviewed: true }, "hide:i1": { kept: false, reviewed: true } } });
+  });
+
+  it("takes the person's own wording for the headline, and refuses to edit an order", async () => {
+    const docId = await written("Payroll Specialist for Staff", ["Payroll Specialist", "Team Lead"]);
+    const edit = async (key: string, text: string) => app.request(`/v1/tailored/${docId}/review`, { method: "PATCH", headers: { authorization: "Bearer token-a", "content-type": "application/json" },
+      body: JSON.stringify({ section: "layout", key, action: "edit", text, version: (await tailored(docId)).version }) });
+    expect((await edit("headline", "Payroll and Team Lead")).status).toBe(200);
+    expect((await tailored(docId)).content.basics.titles).toEqual(["Payroll and Team Lead"]);
+    expect((await edit("layout", "summary")).status).toBe(400);
+    expect((await tailored(docId)).content.layout.order).toEqual(order);
+  });
+
+  it("the step-by-step accept drops a doubled title too", async () => {
+    await cv.save({ ...base, basics: { ...base.basics, titles: ["Payroll Specialist", "Team Lead"], summary: "Payroll and teams." } }, 1);
+    const { runId, docId } = await start();
+    await repo().updateRun(runId, { currentSection: "layout" });
+    replies = [{ order: base.layout.order, headline: "Payroll Specialist and Team Lead" }];
+    await post(`/v1/tailor-runs/${runId}/sections/layout/run`);
+    replies = [scoreReply()];
+    expect((await post(`/v1/tailor-runs/${runId}/sections/layout/accept`)).status).toBe(200);
+    expect((await tailored(docId)).content.basics.titles).toEqual(["Payroll Specialist and Team Lead"]);
   });
 });

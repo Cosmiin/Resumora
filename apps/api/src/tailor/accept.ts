@@ -35,6 +35,16 @@ const flagQuestionFor = (run: TailorRun, section: TailorSection, p: Proposal) =>
     && (q.itemId ? q.itemId === `${reviewKey(p)}|${p.field}` : q.text.startsWith(`Please check: "${p.text}"`)));
 export const LAYOUT_ITEMS = ["layout", "headline"];
 
+const titleWords = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+/**
+ * The CV's titles with a headline in first place. A headline that holds another of the titles ("Business Analyst and
+ * Solution Architect" beside "Solution Architect") would print that title twice, so the title it holds is dropped.
+ */
+export function withHeadline(titles: string[], headline: string): string[] {
+  const held = ` ${titleWords(headline)} `;
+  return [headline, ...titles.slice(1).filter((title) => !held.includes(` ${titleWords(title)} `))];
+}
+
 function apply(cv: CvContent, p: Proposal, section: TailorSection): void {
   if (section === "achievements" || isLightTailorSection(section)) {
     const list = lightList(cv, section);
@@ -62,7 +72,7 @@ function apply(cv: CvContent, p: Proposal, section: TailorSection): void {
     if (order.length === current.size && order.every((key) => current.has(key))) cv.layout.order = order;
     return;
   }
-  if (p.itemId === "headline") cv.basics.titles = [p.text, ...cv.basics.titles.slice(1)];
+  if (p.itemId === "headline") cv.basics.titles = withHeadline(cv.basics.titles, p.text);
   else if (p.itemId === "summary") cv.basics.summary = p.text;
   else if (p.itemId === "new-skill") {
     // Section passes read the Base CV, so a re-tailor (or a retry) can propose a skill an earlier accept already added.
@@ -201,6 +211,11 @@ export async function mergeStep(
       const at = list.findIndex((role) => role.id === roleId);
       if (baseRole && at >= 0) list[at] = structuredClone(baseRole);
     }
+  }
+  if (input.fromBase && section === "layout") {
+    // Written again, the layout step starts from the person's own titles and section order.
+    content.basics.titles = [...doc.baseSnapshot.basics.titles];
+    content.layout.order = [...doc.baseSnapshot.layout.order];
   }
   if (section === "achievements" || isLightTailorSection(section)) {
     // The pass proposed changes on the Base items, so each accept of a lighter section starts again from them: items

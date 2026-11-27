@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { applyGuesses, CvContentSchema, MAX_TEXT, scoredItems, type CvContent, type TailoredCv } from "@resumora/shared";
+import { applyGuesses, CvContentSchema, isLightTailorSection, MAX_TEXT, scoredItems, type CvContent, type LightTailorSection, type SectionKey, type TailoredCv, type TailorSection } from "@resumora/shared";
 import { ApiError } from "../errors.ts";
-import type { ItemReview } from "./accept.ts";
+import { withHeadline, type ItemReview } from "./accept.ts";
 import { sameCv, type TailorRepo } from "./repo.ts";
+import { lightList } from "./section-pass.ts";
 
 export const ReviewItemBodySchema = z.object({
   section: z.string().min(1).max(40),
@@ -13,6 +14,7 @@ export const ReviewItemBodySchema = z.object({
 }).refine((body) => body.action !== "edit" || body.text !== undefined, { message: "Edit needs the new text." });
 export type ReviewItemBody = z.infer<typeof ReviewItemBodySchema>;
 
+const isLight = (section: string): section is "achievements" | LightTailorSection => section === "achievements" || isLightTailorSection(section as TailorSection);
 const changed = () => new ApiError(409, "item_changed", "This item changed since it was tailored. Reload and try again.");
 
 /** Items with a stable id and their text fields: roles, projects and volunteering with their bullets, skills, awards, languages. */
@@ -47,7 +49,35 @@ export async function reviewItem(tailor: TailorRepo, id: string, body: ReviewIte
   const keep = body.action !== "remove";
   const text = body.action === "edit" ? body.text! : item.text;
 
-  if (body.key.startsWith("summary#")) {
+  // An order or a hidden item is a choice between two states: there is no wording to edit.
+  const choice = (body.section === "layout" && body.key === "layout") || (isLight(body.section) && (body.key === "order" || body.key.startsWith("hide:")));
+  if (choice && body.action === "edit") throw new ApiError(400, "invalid_request", "This choice can't be edited.");
+  if (body.section === "layout" && body.key === "headline") {
+    // The proposed headline is the person's choice: used (theirs, when they typed one), or their own titles as they were.
+    content.basics.titles = keep ? withHeadline(doc.baseSnapshot.basics.titles, text) : [...doc.baseSnapshot.basics.titles];
+  } else if (body.section === "layout" && body.key === "layout") {
+    // The proposed section order, or the person's own. An order that no longer names every section is left alone.
+    const order = keep ? item.text.split(",") as SectionKey[] : doc.baseSnapshot.layout.order;
+    const current = new Set<string>(content.layout.order);
+    if (order.length !== current.size || !order.every((key) => current.has(key))) throw changed();
+    content.layout.order = [...order];
+  } else if (isLight(body.section) && (body.key === "order" || body.key.startsWith("hide:"))) {
+    // A lighter section's order, or an item hidden for this job: the tailoring's choice, or the person's own again.
+    const list = lightList(content, body.section);
+    const own = lightList(doc.baseSnapshot, body.section);
+    if (body.key === "order") {
+      const ids = keep ? item.text.split(",").map((part) => part.trim()) : own.map((entry) => entry.id);
+      const byId = new Map(list.map((entry) => [entry.id, entry]));
+      if (ids.length !== list.length || new Set(ids).size !== ids.length || !ids.every((part) => byId.has(part))) throw changed();
+      list.splice(0, list.length, ...ids.map((part) => byId.get(part)!));
+    } else {
+      const id = body.key.slice("hide:".length);
+      const target = list.find((entry) => entry.id === id);
+      if (!target) throw changed();
+      if (keep || own.find((entry) => entry.id === id)?.hidden) target.hidden = true;
+      else delete target.hidden;
+    }
+  } else if (body.key.startsWith("summary#")) {
     // A guessed phrase of the summary: cut it out, or put the typed text in its place.
     if (body.action !== "keep") {
       if (!content.basics.summary.includes(item.text)) throw changed();
