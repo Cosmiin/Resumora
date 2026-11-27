@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyCv, type CvContent, type JobExtraction, type Proposal, type TailorQuestion, type TailorSection } from "@resumora/shared";
+import { emptyCv, type CvContent, type JobExtraction, type MatchLabel, type MatchScore, type Proposal, type TailorQuestion, type TailorSection } from "@resumora/shared";
 import { createApp, type AppDeps } from "../src/app.ts";
 import { memoryCvRepo } from "../src/cv/memory-repo.ts";
 import type { CvRepo } from "../src/cv/repo.ts";
 import { memoryJobs } from "../src/jobs/memory-repo.ts";
 import { roleWith } from "../src/enrich/fake-model.ts";
 import { fakeModel } from "../src/tailor/fake-model.ts";
-import { memoryTailorDocs, memoryTailorRepo, type MemoryTailorDocs } from "../src/tailor/memory-repo.ts";
+import { memoryTailorDocs, memoryTailorRepo, type MemoryTailorDocs, type MemoryTailorStore } from "../src/tailor/memory-repo.ts";
 
 const job: JobExtraction = {
   title: "Payroll Lead", company: "Beta", location: null, workMode: "remote", employmentType: "full_time",
@@ -24,6 +24,7 @@ let replies: unknown[];
 let model: ReturnType<typeof fakeModel>;
 let jobs: ReturnType<typeof memoryJobs>;
 let docs: MemoryTailorDocs;
+let scores: MemoryTailorStore;
 let cv: CvRepo;
 let app: ReturnType<typeof createApp>;
 let jobId: string;
@@ -34,6 +35,7 @@ beforeEach(async () => {
   model = fakeModel(() => replies.shift() ?? { results: [] });
   jobs = memoryJobs({ now: () => new Date("2026-11-08T10:00:00Z") });
   docs = memoryTailorDocs();
+  scores = new Map();
   cv = memoryCvRepo();
   await cv.save(base, 0);
   log = vi.fn<(entry: Record<string, unknown>) => void>();
@@ -43,7 +45,7 @@ beforeEach(async () => {
     cvRepo: () => cv,
     importRepo: () => { throw new Error("not used"); },
     jobRepo: (user) => jobs.repoFor(user.id),
-    tailorRepo: (user) => memoryTailorRepo(user.id, new Map(), docs),
+    tailorRepo: (user) => memoryTailorRepo(user.id, scores, docs),
     insightsRepo: () => { throw new Error("not used"); },
     model: () => model.deps,
     queue: { send: async () => {} },
@@ -72,6 +74,14 @@ const roleOf = async (runId: string) => ({ roleId: (await memoryTailorRepo("user
 const proposals = (...items: ModelProposal[]) => ({ proposals: items.map((item) => ({ reason: null, guesses: null, ...item })) });
 const reword = (text: string, over: Partial<ModelProposal> = {}): ModelProposal =>
   ({ itemId: bullet.id, field: "text", text, inferred: false, ...over });
+/** The first model request's user message, as the section step sent it. */
+const sentMessage = () => JSON.parse(String((model.requests[0]!.messages as { content: string }[])[1]!.content));
+const label = (ref: string, status: MatchLabel["status"] = "missing", inferred = false): MatchLabel =>
+  ({ ref, kind: ref.startsWith("k:") ? "keyword" : "requirement", status, evidence: null, inferred });
+/** Stores the job's Base score, as the job page does before tailoring starts. */
+const baseScore = (labels: MatchLabel[]) => memoryTailorRepo("user-a", scores).saveScore(jobId, "base", null,
+  { policy: "match/1", total: 70, band: "strong", parts: { requirements: null, keywords: null, seniority: null, langEdu: null }, capped: false,
+    requirementTexts: job.requirements.map((r) => r.text), labels } satisfies MatchScore);
 
 describe("section pass", () => {
   it.each(["experience", "summary"] as const)("scopes %s evidence and answers to the permitted roles", async (section) => {
@@ -346,5 +356,44 @@ describe("section pass", () => {
     const body = await (await runSection("skills")).res.json() as { proposals: { text: string }[]; removed: number };
     expect(body.proposals.map((p) => p.text)).toEqual(["Payroll"]);
     expect(body.removed).toBe(1);
+  });
+
+  it("sends a role step only the job's open gaps, not every requirement", async () => {
+    await baseScore([label("r0", "met"), label("k:Kissflow"), label("k:Excel", "met"), label("k:Payroll runs", "partial")]);
+    replies = [proposals()];
+    await runSection();
+    expect(sentMessage().job).toEqual({ title: job.title, summary: job.summary, gaps: [
+      { ref: "k:Kissflow", kind: "keyword", text: "Kissflow", status: "missing" },
+      { ref: "k:Payroll runs", kind: "keyword", text: "Payroll runs", status: "partial" },
+    ] });
+  });
+
+  it("leaves a role as it is, without calling the model, when the job has no open gap", async () => {
+    await baseScore([label("r0", "met"), label("k:Excel", "met")]);
+    const { res } = await runSection();
+    expect(await res.json()).toMatchObject({ proposals: [], removed: 0 });
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it("still sends every requirement to the summary, and to a role of a job that has no Base score", async () => {
+    replies = [proposals()];
+    await runSection();
+    expect(sentMessage().job).toEqual({ title: job.title, summary: job.summary, requirements: job.requirements, responsibilities: job.responsibilities });
+    model.requests.length = 0;
+    await baseScore([label("r0", "met")]);
+    replies = [proposals()];
+    await runSection("summary");
+    expect(sentMessage().job.requirements).toEqual(job.requirements);
+    expect(sentMessage().job.gaps).toBeUndefined();
+  });
+
+  it("tells a role step to change a line only for a gap the item itself states", async () => {
+    replies = [proposals()];
+    await runSection();
+    const system = JSON.stringify(model.requests[0]);
+    expect(system).toContain("Change a bullet only so that it shows one of the gaps under job.gaps");
+    expect(system).toContain("With no gap this item can show, return no proposals.");
+    expect(system).not.toContain("exact keywords inside natural sentences");
+    expect(system).not.toContain("Condense old");
   });
 });

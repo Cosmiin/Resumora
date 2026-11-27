@@ -5,6 +5,7 @@ import {
 import { callModel, type ModelDeps } from "../ai/call-model.ts";
 import { ApiError, type LogFn } from "../errors.ts";
 import { checkProposal } from "./checks.ts";
+import { openGaps } from "./gaps.ts";
 import type { TailorRepo } from "./repo.ts";
 import { sectionSystemPrompt, sectionUserMessage, verifySystemPrompt } from "./section-prompts.ts";
 import { steeringText } from "./steering.ts";
@@ -198,6 +199,12 @@ export async function passProposals(
       usedIn.set(question.skill.trim().toLowerCase(), `Used in: ${roles.join(", ")}`);
     }
   }
+  // A role step writes only for what the job still misses; with nothing open the role keeps its Base wording, unasked.
+  // A job never scored against the Base CV (older jobs) has no gap list: its role steps get every requirement, as before.
+  const base = isRoleSection(section) ? await deps.tailor.getScore(run.jobId, "base") : null;
+  const copy = base && run.tailoredCvId ? await deps.tailor.readTailoredCv(run.tailoredCvId) : null;
+  const gaps = base ? openGaps(base, copy?.score ?? null, input.job) : undefined;
+  if (gaps?.length === 0) return { proposals: [], items, removed: 0 };
   const call = <S extends z.ZodType>(task: "tailor_section" | "tailor_verify", tier: "strong" | "cheap", schema: S, system: string, user: string) =>
     callModel(deps.model, { userId: input.userId, task, tier, schema, system, user, maxOutputTokens: 12000 });
 
@@ -205,6 +212,7 @@ export async function passProposals(
     const reply = await call("tailor_section", "strong", ModelProposalsSchema, sectionSystemPrompt(contentSection), sectionUserMessage({
       section, items: sectionData(cv, section, run.jobId, roleId), job: input.job, language: steering!.language,
       steering: steeringText(steering!.steering, cv, isRoleSection(section) ? roleId ?? undefined : undefined), answers, retry,
+      ...(gaps ? { gaps } : {}),
     }));
     // An item with one editable field (a bullet's text, the summary) takes any field name; other unknown item ids
     // or fields are dropped and logged (ids and fields only); items without a proposal keep the Base CV wording.
