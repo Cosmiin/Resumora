@@ -379,3 +379,155 @@ describe("the headline and the section order on the final page", () => {
     expect((await tailored(docId)).content.basics.titles).toEqual(["Payroll Specialist and Team Lead"]);
   });
 });
+
+describe("a new line for a gap the person ticked, when no line of the role can carry it", () => {
+  const question = { id: "g1", section: "experience" as const, roleId: null, text: "Did you use KissFlow for approvals?", kind: "skill" as const, options: [],
+    reason: "The ad asks for KissFlow.", gap: "k:KissFlow", skill: "KissFlow", scope: "all" as const };
+  const line = (text: string) => ({ itemId: "new-bullet", field: "text", text, inferred: false, reason: null, guesses: null });
+  const added = (roleId: string, n = 0) => `new-bullet:${roleId}:${n}`;
+  /** A run in which the person ticked the newer role for KissFlow, sent as the site sends it. */
+  async function ticked() {
+    const started = await start();
+    await repo().updateRun(started.runId, { questions: [question] });
+    expect((await post(`/v1/tailor-runs/${started.runId}/answers`, { answers: [{ questionId: "g1", value: "Yes", via: "option", use: "used", roleIds: [newer.id] }] })).status).toBe(200);
+    return started;
+  }
+  const bullets = async (docId: string, at = 0) => (await tailored(docId)).content.experience[at]!.bullets;
+
+  it("adds the line the writer makes from the answer, after the role's own lines", async () => {
+    const { runId, docId } = await ticked();
+    replies = [proposals(line("Used KissFlow for payroll approvals for 40 staff")), { results: [] }];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 1, removed: 0 });
+    expect(await bullets(docId)).toEqual([newer.bullets[0], { id: added(newer.id), text: "Used KissFlow for payroll approvals for 40 staff" }]);
+    expect((await tailored(docId)).review).toMatchObject({ experience: { [added(newer.id)]: { kept: true, inferred: false, reviewed: false, text: "Used KissFlow for payroll approvals for 40 staff" } } });
+    // The writer is told which gaps the person confirmed for this role, and when it may add a line.
+    const sent = JSON.stringify(model.requests[0]);
+    expect(sent).toContain("new-bullet");
+    expect(JSON.parse((model.requests[0] as { messages: { content: string }[] }).messages[1]!.content)).toMatchObject({ confirmed: [{ gap: "KissFlow", question: question.text }] });
+  });
+
+  it("asks once more, for the ticked gap alone, when the first answer passes it over", async () => {
+    const { runId, docId } = await ticked();
+    replies = [proposals(), proposals(line("Used KissFlow for payroll approvals")), { results: [] }];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 1, removed: 0 });
+    expect((await bullets(docId)).at(-1)).toEqual({ id: added(newer.id), text: "Used KissFlow for payroll approvals" });
+    const second = JSON.parse((model.requests[1] as { messages: { content: string }[] }).messages[1]!.content) as { stillMissing?: { gaps: unknown } };
+    expect(second.stillMissing?.gaps).toEqual([{ gap: "KissFlow", question: question.text }]);
+    // A role nobody ticked is asked once, as before.
+    const before = model.requests.length;
+    replies = [proposals()];
+    await write(runId, "experience", older.id);
+    expect(model.requests.length - before).toBe(1);
+  });
+
+  it("the second ask can't replace a change the first one made, and a failure of it changes nothing", async () => {
+    const { runId, docId } = await ticked();
+    // The first answer rewords a line without naming the gap; the second tries to reword the same line and adds one.
+    replies = [proposals(reword(newer.bullets[0]!.id, "Ran accurate payroll for 40 staff")), { results: [] },
+      proposals(reword(newer.bullets[0]!.id, "Ran payroll for 40 staff in KissFlow"), line("Used KissFlow for payroll approvals")), { results: [] }];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 2, removed: 0 });
+    expect((await bullets(docId)).map((bullet) => bullet.text)).toEqual(["Ran accurate payroll for 40 staff", "Used KissFlow for payroll approvals"]);
+
+    // The second ask fails (the model answers with something else): the first answer's change stands.
+    replies = [proposals(reword(newer.bullets[0]!.id, "Ran accurate payroll for 40 staff")), { results: [] }, { nonsense: true }];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 1, removed: 0 });
+    expect((await bullets(docId)).map((bullet) => bullet.text)).toEqual(["Ran accurate payroll for 40 staff"]);
+  });
+
+  it("the second ask adds a line only for the gap still missing, never a second one for a gap the first answer covered", async () => {
+    const started = await start();
+    const sap = { ...question, id: "g2", text: "Did you use SAP for payroll?", gap: "k:SAP", skill: "SAP" };
+    await repo().updateRun(started.runId, { questions: [question, sap] });
+    await post(`/v1/tailor-runs/${started.runId}/answers`, { answers: [
+      { questionId: "g1", value: "Yes", via: "option", use: "used", roleIds: [newer.id] }, { questionId: "g2", value: "Yes", via: "option", use: "used", roleIds: [newer.id] }] });
+    replies = [proposals(line("Used KissFlow for payroll approvals")), { results: [] },
+      proposals(line("Used KissFlow for staff approvals"), line("Used SAP for payroll")), { results: [] }];
+    expect(await (await write(started.runId, "experience", newer.id)).json()).toEqual({ changed: 2, removed: 0 });
+    expect((await bullets(started.docId)).map((bullet) => bullet.text)).toEqual(["Ran payroll for 40 staff", "Used KissFlow for payroll approvals", "Used SAP for payroll"]);
+    // Only the missing gap is asked for again.
+    const second = JSON.parse((model.requests[2] as { messages: { content: string }[] }).messages[1]!.content) as { stillMissing: { gaps: { gap: string }[] } };
+    expect(second.stillMissing.gaps.map((entry) => entry.gap)).toEqual(["SAP"]);
+  });
+
+  it("a gap named in two letters gets its line too, and is not asked for again once it is there", async () => {
+    const started = await start();
+    await repo().updateRun(started.runId, { questions: [{ ...question, text: "Did you use AI for payroll?", gap: "k:AI", skill: "AI" }] });
+    await post(`/v1/tailor-runs/${started.runId}/answers`, { answers: [{ questionId: "g1", value: "Yes", via: "option", use: "used", roleIds: [newer.id] }] });
+    replies = [proposals(line("Used AI for payroll")), { results: [] }];
+    expect(await (await write(started.runId, "experience", newer.id)).json()).toEqual({ changed: 1, removed: 0 });
+    expect((await bullets(started.docId)).at(-1)?.text).toBe("Used AI for payroll");
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it("a role that is full takes no new line, and says nothing changed", async () => {
+    const full = { ...newer, bullets: Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, text: `Ran payroll for staff group ${i + 1}` })) };
+    await cv.save({ ...base, experience: [full, older] }, 1);
+    const { runId, docId } = await ticked();
+    replies = [proposals(line("Used KissFlow for payroll approvals")), { results: [] }];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 0, removed: 0 });
+    expect(await bullets(docId)).toHaveLength(20);
+    expect(JSON.stringify((await tailored(docId)).review)).not.toContain("new-bullet");
+  });
+
+  it("sends a line back once when it has words neither the role nor the question has, naming them", async () => {
+    const { runId, docId } = await ticked();
+    replies = [proposals(line("Used KissFlow to automate invoice approvals across finance")), { results: [] },
+      proposals(line("Used KissFlow for payroll approvals")), { results: [] }];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 1, removed: 0 });
+    expect((await bullets(docId)).at(-1)).toEqual({ id: added(newer.id), text: "Used KissFlow for payroll approvals" });
+    const retry = JSON.stringify(model.requests[2]);
+    expect(retry).toContain("automate");
+    expect(retry).toContain("invoice");
+    expect(retry).toContain("finance");
+  });
+
+  it("leaves the role as written when the line still has such words after the retry", async () => {
+    const { runId, docId } = await ticked();
+    replies = [proposals(line("Used KissFlow to automate invoice approvals")), { results: [] }, proposals(line("Automated invoice approvals in KissFlow")), { results: [] },
+      // Asked once more for the gap nothing names yet, the writer has nothing it may say.
+      proposals()];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 0, removed: 1 });
+    expect(await bullets(docId)).toEqual(newer.bullets);
+  });
+
+  it("adds no line that does not name the gap, and none for a role the gap was not ticked for", async () => {
+    const { runId, docId } = await ticked();
+    // A line made only of the role's own words, with no gap in it, is not what a tick allows.
+    replies = [proposals(line("Ran payroll for staff")), { results: [] }, proposals()];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 0, removed: 0 });
+    replies = [proposals(line("Used KissFlow for timesheets")), { results: [] }];
+    expect(await (await write(runId, "experience", older.id)).json()).toEqual({ changed: 0, removed: 0 });
+    expect(await bullets(docId)).toEqual(newer.bullets);
+    expect(await bullets(docId, 1)).toEqual(older.bullets);
+  });
+
+  it("rewording comes first: a line that already names the gap leaves no room for a new one", async () => {
+    const { runId, docId } = await ticked();
+    replies = [proposals(reword(newer.bullets[0]!.id, "Ran payroll for 40 staff, with approvals in KissFlow"), line("Used KissFlow for payroll approvals")), { results: [] }];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 1, removed: 0 });
+    expect(await bullets(docId)).toEqual([{ id: newer.bullets[0]!.id, text: "Ran payroll for 40 staff, with approvals in KissFlow" }]);
+  });
+
+  it("one line per gap, however many the writer sends", async () => {
+    const { runId, docId } = await ticked();
+    replies = [proposals(line("Used KissFlow for payroll approvals"), line("Used KissFlow for staff approvals")), { results: [] }];
+    expect(await (await write(runId, "experience", newer.id)).json()).toEqual({ changed: 1, removed: 0 });
+    expect(await bullets(docId)).toHaveLength(2);
+  });
+
+  it("writing the role again adds the line once, and Remove takes it out", async () => {
+    const { runId, docId } = await ticked();
+    const reply = () => [proposals(line("Used KissFlow for payroll approvals")), { results: [] }];
+    replies = reply();
+    await write(runId, "experience", newer.id);
+    replies = reply();
+    await write(runId, "experience", newer.id);
+    expect(await bullets(docId)).toHaveLength(2);
+
+    const res = await app.request(`/v1/tailored/${docId}/review`, { method: "PATCH", headers: { authorization: "Bearer token-a", "content-type": "application/json" },
+      body: JSON.stringify({ section: "experience", key: added(newer.id), action: "remove", version: (await tailored(docId)).version }) });
+    expect(res.status).toBe(200);
+    expect(await bullets(docId)).toEqual(newer.bullets);
+    expect((await tailored(docId)).review).toMatchObject({ experience: { [added(newer.id)]: { kept: false, reviewed: true } } });
+  });
+});

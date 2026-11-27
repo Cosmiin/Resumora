@@ -65,6 +65,8 @@ export const tailorRo: Record<FlowKey, string> = {
   "tailor.changes.none": "Nu a fost nevoie de nicio schimbare pentru acest job.",
   "tailor.changes.undo": "Anulează",
   "tailor.changes.undone": "A rămas formularea ta",
+  "tailor.changes.lineAdded": "Rând nou, din răspunsul tău",
+  "tailor.changes.lineRemoved": "Eliminat: {text}",
   "tailor.changes.skillAdded": "Abilitate adăugată: {name}",
   "tailor.changes.skillRemoved": "Eliminată: {name}",
   "tailor.changes.remove": "Elimină",

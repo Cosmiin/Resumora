@@ -58,6 +58,8 @@ export const tailorEn = {
   "tailor.changes.none": "Nothing needed changing for this job.",
   "tailor.changes.undo": "Undo",
   "tailor.changes.undone": "Kept your wording",
+  "tailor.changes.lineAdded": "New line, from your answer",
+  "tailor.changes.lineRemoved": "Removed: {text}",
   "tailor.changes.skillAdded": "Added skill: {name}",
   "tailor.changes.skillRemoved": "Removed: {name}",
   "tailor.changes.remove": "Remove",

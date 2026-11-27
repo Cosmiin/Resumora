@@ -10,10 +10,11 @@ export type Change = {
   section: string;
   key: string;
   /**
-   * text: a reworded line, name or summary. skill: a skill the tailoring added. hide: an item hidden for this job.
+   * text: a reworded line, name or summary. line: a line added to a role from the person's answer. skill: a skill the
+   * tailoring added. hide: an item hidden for this job.
    * order: a section's items in a new order. sections: the CV's sections in a new order. headline: the proposed headline.
    */
-  kind: "text" | "skill" | "hide" | "order" | "sections" | "headline";
+  kind: "text" | "line" | "skill" | "hide" | "order" | "sections" | "headline";
   /** The person's own wording, and the tailored one. */
   before: string;
   after: string;
@@ -74,9 +75,15 @@ export function changesOf(cv: TailoredCv, labels: Labels): { groups: ChangeGroup
       // A guessed phrase of the summary has its own review (the notice under the list).
       if (key.includes("#")) continue;
       const text = item.text ?? "";
-      const role = roleOf.get(key);
+      // A line the tailoring added carries its role in its id (`new-bullet:<roleId>:<n>`), so it is found once removed too.
+      const addedTo = key.startsWith("new-bullet:") ? roles.find((entry) => key.startsWith(`new-bullet:${entry.id}:`)) : undefined;
+      const role = addedTo ?? roleOf.get(key);
       const group: [string, string] = role ? [role.id, roleName(role)] : [section, labels.section(section)];
-      if (key === "summary") {
+      if (addedTo) {
+        // Like any change: once the CV no longer has the line as it was added (reworded or deleted there), it is left out.
+        if (item.kept && str(now.get(key)?.text) !== text) continue;
+        add(...group, { section, key, kind: "line", before: "", after: text, state: state(item) });
+      } else if (key === "summary") {
         const before = cv.baseSnapshot.basics.summary;
         if (item.kept && cv.content.basics.summary === before) continue;
         add(...group, { section, key, kind: "text", before, after: item.kept ? cv.content.basics.summary : text, state: state(item) });
@@ -169,6 +176,12 @@ export function ChangesList({ cv, onChange }: { cv: TailoredCv; onChange(cv: Tai
         <p>{change.after}</p>
         <p className="ui-small ui-muted">{t("tailor.changes.yours", { text: change.before })}</p>
       </div><div className="tailor-change-acts">{pick(change, t("tailor.changes.useOrder"))}</div></>;
+      case "line": return off
+        ? <div className="tailor-change-text"><p>{t("tailor.changes.lineRemoved", { text: change.after })}</p></div>
+        : <><div className="tailor-change-text">
+          <p className="ui-small ui-muted">{t("tailor.changes.lineAdded")}</p>
+          <p>{change.after}</p>
+        </div><div className="tailor-change-acts">{undo(change, t("tailor.changes.remove"))}</div></>;
       case "skill": return <><div className="tailor-change-text"><p>{t(off ? "tailor.changes.skillRemoved" : "tailor.changes.skillAdded", { name: change.after })}</p></div>
         <div className="tailor-change-acts">{undo(change, t("tailor.changes.remove"))}</div></>;
       case "hide": return <><div className="tailor-change-text"><p>{t(off ? "tailor.changes.shownAgain" : "tailor.changes.hidden", { name: change.after })}</p></div>
