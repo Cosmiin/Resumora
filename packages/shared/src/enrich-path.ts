@@ -37,9 +37,15 @@ export function toolShown(role: Pick<Experience, "title" | "description" | "bull
   return texts.some((text) => pattern.test(text));
 }
 
-/** POST /v1/enrich/companies: what each company does, when the AI knows it for sure. Keys are `companyKey`s. */
+/**
+ * POST /v1/enrich/companies: what each company does, when the AI knows it for sure. Keys are `companyKey`s.
+ * selfEmployed: the name is the person working for themselves (self-employed, freelancing), so there is no company to
+ * describe and nothing to ask.
+ */
 export const CompaniesAnswerSchema = z.object({
-  companies: z.array(z.object({ key: z.string().max(MAX_TEXT), proposal: z.string().max(MAX_PROPOSAL).nullable() }).strict()).max(80),
+  companies: z.array(z.object({
+    key: z.string().max(MAX_TEXT), proposal: z.string().max(MAX_PROPOSAL).nullable(), selfEmployed: z.boolean().optional(),
+  }).strict()).max(80),
 }).strict();
 export type CompaniesAnswer = z.infer<typeof CompaniesAnswerSchema>;
 

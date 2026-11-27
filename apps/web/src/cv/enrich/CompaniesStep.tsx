@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MAX_LONG_TEXT, companyKey, gradedItems, newId, questionKey, type CompaniesAnswer, type CvContent, type Experience, type Note } from "@resumora/shared";
+import { MAX_LONG_TEXT, companyKey, gradedItems, isSelfEmployed, newId, questionKey, type CompaniesAnswer, type CvContent, type Experience, type Note } from "@resumora/shared";
 import { t } from "../../i18n/t.ts";
 import { suggestCompanies } from "./enrich-api.ts";
 
@@ -8,12 +8,15 @@ type Row = { key: string; name: string; location: string; roles: Experience[]; d
 
 const companyQuestion = (name: string) => t("enrich.path.companies.note", { company: name });
 
-/** One row per company on the CV (roles and volunteering), in CV order; roles at the same company share it. */
+/**
+ * One row per company on the CV (roles and volunteering), in CV order; roles at the same company share it. A role the
+ * person did for themselves ("Self-Employed", "Freelance") has no company to describe: it gets no row.
+ */
 export function companyRows(cv: CvContent): Row[] {
   const rows = new Map<string, Row>();
   for (const { item } of gradedItems(cv)) {
     const key = companyKey(item.company);
-    if (key === "") continue;
+    if (key === "" || isSelfEmployed(item.company)) continue;
     const row = rows.get(key) ?? { key, name: item.company.trim(), location: "", roles: [], done: null };
     if (!row.location) row.location = item.location.trim();
     row.roles.push(item);
@@ -32,12 +35,15 @@ export function companyRows(cv: CvContent): Row[] {
 /**
  * The short path's first screen: what each company does. A company the AI knows for sure is filled in without
  * asking (owner, 17 Nov 2026); the screen asks only about the rest, and moves on by itself when there is none.
+ * A self-employed or freelance role is asked nothing (owner, 27 Nov 2026).
  * Continuing saves one note per role. prepared: the AI's answer asked for while the import was still on screen.
  */
 export function CompaniesStep({ cv, prepared, onDone }: { cv: CvContent; prepared?: Promise<CompaniesAnswer>; onDone(notes: Saved): void }) {
   const rows = useMemo(() => companyRows(cv), [cv]);
   const [loading, setLoading] = useState(true);
   const [proposals, setProposals] = useState<Record<string, string>>({});
+  // Names the AI says are the person working for themselves, not a company: nothing is asked or saved for them.
+  const [own, setOwn] = useState<ReadonlySet<string>>(new Set());
   const [typed, setTyped] = useState<Record<string, string>>({});
   // Continue works once: a second click (or a second run of the effect below) must not save the notes again.
   const [sent, setSent] = useState(false);
@@ -53,6 +59,7 @@ export function CompaniesStep({ cv, prepared, onDone }: { cv: CvContent; prepare
         const found: Record<string, string> = {};
         for (const c of companies) if (c.proposal) found[c.key] = c.proposal;
         setProposals(found);
+        setOwn(new Set(companies.filter((c) => c.selfEmployed).map((c) => c.key)));
       })
       .catch(() => undefined)
       .finally(() => { if (alive) setLoading(false); });
@@ -61,7 +68,7 @@ export function CompaniesStep({ cv, prepared, onDone }: { cv: CvContent; prepare
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const open = rows.filter((r) => r.done === null);
+  const open = rows.filter((r) => r.done === null && !own.has(r.key));
   const known = open.filter((r) => proposals[r.key]);
   const ask = open.filter((r) => !proposals[r.key]);
 

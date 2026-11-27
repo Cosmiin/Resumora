@@ -94,3 +94,18 @@ Trial with the real AI (`eval/enrich/shape.eval.ts`, two fictional roles of eigh
 all different work the live code proposed 4 merges (one joined "wrote handover guides" with "negotiated software
 contracts"); the new code proposed none, in 2 of 2 runs. On the role with two real overlaps both versions proposed
 the two merges, each about as long as its longest line (177 + 122 characters became 190 to 199; 218 + 152 became 255).
+
+## After the owner's first run: a self-employed or freelance role is asked nothing about its company — done
+The owner's run showed "Self-Employed · Remote" on "Your companies" with an empty box asking what it does; he added
+"freelancing also".
+- `packages/shared/src/self-employed.ts`, `isSelfEmployed`: names that plainly say the person worked for themselves
+  (Self-Employed, Freelance, Freelancer, Freelancing, Independent contractor, PFA, Pe cont propriu…). A company with such
+  a word in its name is still a company (Freelancer.com, Independent Media Group).
+- The companies request does not send such a name to the AI and answers it with `selfEmployed: true`; for the names
+  that only sound like it ("Independent Shopify Projects", "Own practice") the AI sets the flag.
+- The companies step gives such a role no row and saves nothing for it; when nothing else is left to ask it moves on.
+- `answeredTopics` counts the company as covered for a plainly self-employed role, so a role's own run does not ask
+  "What does Freelancing do?" either.
+Ruling: a name only the AI flags is skipped on the companies step, but nothing is stored about it, so a role's own run
+may still ask what it does (the score's question). Storing the flag would need a new field on the role.
+Trial with the real AI (`eval/enrich/companies.eval.ts`, ten names, five of each kind): 10 of 10 right in 2 runs.

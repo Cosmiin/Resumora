@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MAX_LONG_TEXT, RoleTopicSchema, type Experience, type Locale, type RoleTopic } from "./cv.ts";
+import { isSelfEmployed } from "./self-employed.ts";
 import { TOOLS_NOTE } from "./tools-note.ts";
 
 /** Names the weights and prompt behind a score. Bump it when either changes. */
@@ -30,10 +31,12 @@ const TOOLS_QUESTIONS: ReadonlySet<string> = new Set(Object.values(TOOLS_NOTE).m
 /**
  * The topics a role's enrichment answers already cover: a question about one of them is not asked again, whatever its
  * wording (owner, 27 Nov 2026). "other" never counts: it is not one topic. A tools note saved before notes carried a
- * topic is known by its question.
+ * topic is known by its question. A self-employed or freelance role has no company to ask about: its company counts as
+ * covered.
  */
-export function answeredTopics(role: Pick<Experience, "notes">): Set<RoleTopic> {
+export function answeredTopics(role: Pick<Experience, "notes"> & { company?: string }): Set<RoleTopic> {
   const topics = new Set<RoleTopic>();
+  if (role.company !== undefined && isSelfEmployed(role.company)) topics.add("company");
   for (const note of role.notes) {
     if (note.jobId !== undefined) continue;
     if (note.topic && note.topic !== "other") topics.add(note.topic);

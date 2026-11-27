@@ -370,6 +370,13 @@ describe("answeredTopics", () => {
     expect(answeredTopics({ notes: [note({ question: "Which tools did you use?" })] }).has("tools")).toBe(true);
     expect(answeredTopics({ notes: [note({ question: "Ce instrumente ai folosit?" })] }).has("tools")).toBe(true);
   });
+  it("counts the company as covered for a self-employed or freelance role: there is none to ask about", () => {
+    expect(answeredTopics({ notes: [], company: "Self-Employed" }).has("company")).toBe(true);
+    expect(answeredTopics({ notes: [], company: "Freelancing" }).has("company")).toBe(true);
+    expect(answeredTopics({ notes: [], company: "Carbon Global" }).has("company")).toBe(false);
+    expect(answeredTopics({ notes: [] }).has("company")).toBe(false);
+  });
+
   it("leaves out \"other\" and the notes given for a job", () => {
     const topics = answeredTopics({ notes: [note({ topic: "other" }), note({ topic: "tools", jobId: "7d9f3c1e-1b1a-4c58-9f0e-0d2c7c1a2b3c" })] });
     expect(topics.size).toBe(0);
